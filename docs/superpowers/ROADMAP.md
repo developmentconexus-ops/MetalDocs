@@ -55,6 +55,9 @@ Ordering rationale (locked): G1–G3 land INSIDE the nested kernel BEFORE extrac
 | 4.1 | **M3 journey closure** | Deep links (cockpit↔detail, notifications, fanout CTA); delete dead FE affordances (findings 9–12, 20). Spec: `2026-07-06-lifecycle-ux-coherence-design.md`. | 1.1 (M2 HS-1). Independent otherwise — may interleave after §2 screens to avoid same-surface collisions. |
 | 4.2 | **M4 template inbox** | Template reviews in single approver worklist, contract-first (finding 15). | **3.1** — templates rewire onto extracted kernel first; building this before M3 = guaranteed rework. |
 
+| 4.3 | **E-PROD zero-baseline + testdb-clone isolation** (operator-approved 2026-07-13) | Kill the 9-accepted-RED baseline. Sequenced: (1) migrate the 4 non-isolated packages (`tests/integration/iam`-style shared-DB suites: `controlleddocuments/application`, `jobs/approval_sla_surfacer`, `tests/integration/scenarios`, `tests/integration/tenantdata`) to per-test testdb-clone (ADR 0034 framework, already canonical elsewhere); (2) re-run on clean DB — surviving RED = genuine product defect; (3) fix those at root (incl. registering `approval_delegations` + `approval_review_verdicts` TenantDataPorts). Exit: baseline = 0, gate = binary suite-green. Also kills `OCC_Race_N50` flake. Named trigger for wider sweep: any OTHER package showing pollution-flake migrates immediately. | after 4.1/4.2 (same-surface avoidance) |
+| 4.4 | **Schema/symbol hygiene** (operator-approved 2026-07-13) | Mechanical sweep: DROP dead `templates_template_version.pending_reviewer_role`/`pending_approver_role` (write-never/read-never since 3.1a, migration + pre-drop assert); M3 idempotency-key drift (`submit_service.go:81` raw-header passthrough — restore derivation or ratify); testdb per-pid template-DB leak (if 4.3 didn't absorb); stale "14 modules" count strings → 15. Cheap, haiku/sonnet workers. | after 4.3 |
+
 Deferred register (findings 18/19/21/22/23): `docs/superpowers/milestones/lifecycle-ux-coherence/README.md`.
 
 ## 5. Operator decision queue (no agent work)
@@ -65,7 +68,7 @@ Deferred register (findings 18/19/21/22/23): `docs/superpowers/milestones/lifecy
 4. ~~Push consolidation~~ **DONE 2026-07-13**: 621 commits pushed, origin/main == main @ 91195a76. Standing rule unchanged: every future push needs explicit operator permission.
 5. F-18 fresh-repo re-baseline at v1 (memory `f18-history-fresh-repo-at-release`) — unchanged by the push; history purge happens at re-baseline.
 6. Consolidated L3 browser QA session (operator): F2d.8 walkthrough + route builder v2 + rebuilt template approval flow — :80 stack rebuilt 2026-07-13, images current.
-7. Debt units pending operator scope-OK: (i) E-PROD 9-RED + testdb-clone isolation; (ii) schema/symbol hygiene (dead pending_*_role columns, idempotency-key drift, module-count strings).
+7. ~~Debt units scope-OK~~ **APPROVED 2026-07-13** → rows 4.3 (E-PROD zero-baseline + testdb-clone) and 4.4 (schema/symbol hygiene).
 
 ## 6. Token discipline (how to work each unit)
 
