@@ -120,7 +120,6 @@ var capabilityDescriptions = map[Capability]string{
 	CapTemplateCreate:              "Criar templates",
 	CapTemplateEdit:                "Editar templates",
 	CapTemplateSubmit:              "Submeter template para revisão",
-	CapTemplateReview:              "Revisar template",
 	CapTemplateApprove:             "Aprovar template",
 	CapTemplatePublish:             "Publicar template",
 	CapTemplateArchive:             "Arquivar template",

@@ -16,8 +16,6 @@ const draftVersion = {
   metadata_schema: null,
   placeholder_schema: null,
   author_id: 'user-1',
-  pending_reviewer_role: 'quality',
-  pending_approver_role: 'quality',
   reviewer_id: null,
   approver_id: null,
   submitted_at: null,
@@ -63,7 +61,11 @@ async function mockBaseAPIs(page: Page, versionOverride: Record<string, unknown>
         user_id: 'user-1',
         email: 'test@example.com',
         roles: ['admin', 'quality'],
-        capabilities: ['template.submit', 'template.review', 'template.approve'],
+        // template.review named a capability from the retired role-branched
+        // review/approve split; the approval-kernel gates are template.submit
+        // (draft submit), template.approve (under_review signoff),
+        // template.publish (approved publish). See canActOnVersion.ts.
+        capabilities: ['template.submit', 'template.approve', 'template.publish'],
         tenant_id: 'tenant-1',
       }),
     }),
@@ -135,8 +137,18 @@ test('golden path: create → author → submit → approve review → publish',
     }
   });
 
+  // NOTE (unit 3.1a S3 sweep): route paths below were renamed to match the
+  // approval-kernel endpoints (submit-for-approval / signoff / publish); the
+  // response envelope shapes were left as the pre-existing {data:{version}}
+  // fixtures. This test was already broken before the kernel rebuild — it
+  // asserts English button text ("submit for review", "approve review",
+  // "publish") and a bespoke "reviewer actions"/"approver actions" panel that
+  // don't exist in the current pt-BR ArtifactApprovalScreen-based UI, and its
+  // create call targets a nonexistent /api/v2/templates. Full repair is out of
+  // scope for this FE-only slice; left broken pending a dedicated e2e pass.
+
   // Submit → under_review
-  await page.route(`**/api/v1/templates/${TPL_ID}/versions/1/submit`, (r) =>
+  await page.route(`**/api/v1/templates/${TPL_ID}/versions/1/submit-for-approval`, (r) =>
     r.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -144,8 +156,8 @@ test('golden path: create → author → submit → approve review → publish',
     }),
   );
 
-  // Reviewer approves → approved
-  await page.route(`**/api/v1/templates/${TPL_ID}/versions/1/review`, (r) =>
+  // Reviewer signs off → approved
+  await page.route(`**/api/v1/templates/${TPL_ID}/versions/1/signoff`, (r) =>
     r.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -153,8 +165,8 @@ test('golden path: create → author → submit → approve review → publish',
     }),
   );
 
-  // Approver publishes → published
-  await page.route(`**/api/v1/templates/${TPL_ID}/versions/1/approve`, (r) =>
+  // Publish → published
+  await page.route(`**/api/v1/templates/${TPL_ID}/versions/1/publish`, (r) =>
     r.fulfill({
       status: 200,
       contentType: 'application/json',

@@ -4,7 +4,7 @@
 >
 > **Naming note:** module dir is `internal/modules/templates/` and routes still mount under `/api/v1/templates`. Plan 2 (commits ae1229e8..c84215f7) flipped *some* modules to `/api/v1/`; templates is **not yet flipped**. This doc reflects on-disk state. Rename to `templates.md` (and `internal/modules/templates/`, `/api/v1/templates`) lands in a single follow-up commit (see `backlog/templates-refactor.md#R-101`).
 
-**Last verified:** 2026-07-12 (M3 approval-kernel-extraction wiki-sync: two new additive kernel routes `POST .../submit-for-approval` + `POST .../signoff` documented in §5.3 route table + new §5.4a "transitional coexistence" section — the kernel is backend truth for template approval but the 4 legacy role-based routes (`submit`/`review`/`approve`/`approval-config`) are untouched and still the only path the frontend calls; retirement deferred to ROADMAP unit 3.1a per [ADR 0082](../decisions/0082-approval-kernel-extraction.md) "Transitional coexistence"; `CreateTemplate`/`PublishTemplateVersion` confirmed still role-based (`create.go:83`, `lifecycle.go:421-427`) — not touched by M3) | prior: 2026-07-06 (F9.4 doc-truth pass: F9.5 `repository/`→`infrastructure/` rename — `infrastructure/postgres.go` (Repository/New/GetTemplate unchanged line numbers, re-verified), `infrastructure/mappers.go:18` (`scanTemplateRead`); C4 container + §4 Solution Strategy prose relabeled; `routes_mapping.go:122/:147` re-verified unchanged) | prior: 2026-07-03 (ADR 0065 cutover — `TemplateDTO` version pointers are now nested value objects: compact `latest_version`/`published_version` are `TemplateVersionRef {id, number, revision_number, status}`; the four coupled flat scalars `latest_revision_number`/`published_version_id`/`published_version_number`/`current_revision_number` are removed from `TemplateDTO`. `getTemplate`'s detail envelope is unchanged — `GetTemplateResponse.data.latest_version` still carries the full `VersionDTO`. Read/write split: repository now returns `domain.TemplateRead` (`Template` + `Latest domain.VersionRef` + `Published *domain.VersionRef`, new file `domain/read_model.go`); `domain.Template` dropped its projection scalars and is the write aggregate only. `repository/postgres.go` GetTemplate/GetTemplateByKey/ListTemplates now double-join `templates_template_version` (aliases `lv`/`pv`) and scan into the read model via `scanTemplateRead` (`repository/mappers.go:18`). Mapper gained `toAPIVersionRef` (`routes_mapping.go:122`) and `toAPITemplateDTO(*domain.TemplateRead, …)` (`routes_mapping.go:147`). See `wiki/decisions/0065-version-references-are-nested-value-objects.md`.) | **Prior:** 2026-07-01 (DOC-01 drift fix: corrected stale "auto-spawned vN+1 draft after publish" line in §Version chip source-of-truth to reflect ADR 0052 manual versioning) | **Prior:** 2026-06-30 (ADR 0052 + ADR 0053 — manual versioning only: `Approve`/`PublishTemplateVersion` transition status only; `CreateNextVersion` is the sole revision path; `next_draft*` dropped from contract; status `in_review` renamed to `under_review`; templates render through shared controlled-artifact view layer with `TemplateDetailRoute` + `TemplateApprovalRoute`; inline `VersionActionPanel` removed from approval surface; prior: ADR 0050 — `/placeholder-catalog` and `ValidatePlaceholders` both derived from `render/domain.ComputedCatalog()` single source; hand-maintained 7-key slices deleted; `approval_date` now author-visible; templates→render/domain legal edge; prior: 2026-06-28 SP-1 cross-link to tokens module added) | **Prior:** 2026-06-15 (M4/F4.2 — port ADR 0030 cross-link: `TemplateVersionPort` extended with `GetTemplateVersionState`; raw state now exposed to controlled-documents without cross-module SQL) | **Prior:** 2026-06-12 (Wave 2.12: `db==nil` dual-mode branches removed from autosave/create/lifecycle/schema/approval_config application services — single-mode only; `CreateTemplateTx` no longer writes `areas`/`visibility`/`specific_areas` (dropped by migration 0236); nodualmode CI guard. Prior Wave 2: AppendAuditTx before commit; typed CapTemplate* consts; upsertApprovalConfig tier-1 fixed template.admin→CapTemplateEdit; publish route tier-1 aligned to CapTemplatePublish; post-publication role gate fixed phantom admin→system_admin/qms_admin; CompositionConfig deleted; legacy areas/visibility columns removed from CreateTemplate INSERT. Prior: Wave 1: F-07-sub-split — ListAudit reads metaldocs.audit_events; version_id now carried in audit payload) | prior: 2026-06-10 (P2 consolidation: �3/�5 C4 fragments tagged as module-scoped with pointer to canonical diagrams; added Failure modes section) | prior: 2026-05-31 (fix/templates-schema-occ-lock: PUT /schema lock-version CAS � `expected_lock_version` required on the contract, `UpdateVersionSchemaCAS`/`Tx` enforce CAS, 412 `stale_lock_version` on miss; FE useTemplateSchemas holds lockVersion, surfaces staleConflict + refetch � multi-tab last-write-wins closed) | prior: 2026-05-29 (feat/templates-rev-labels: ADR 0013 � first-class `revision_number` column on `templates_template_version` + `current_revision_number` on TemplateDTO; FE renders REV{nn} via shared `formatRevisionCode`; bug/templates-version-chip: honest chip via `published_version_number`; qa/templates-list: empty-state i18n fix + dead `updated_at` cast removal in `TemplatesListPage.tsx`) | **Owner:** unassigned | **Status:** active (production module; generated OpenAPI surface for 22 template routes; Plan 3 tenant-context sweep applied; Plan 5 wired authz.Require + tripwire on lifecycle/create paths; 2026-05-17 wired the autosave/import commit paths to the same tripwire contract and removed creator-scoped template-use visibility from runtime/API selection behavior; 2026-05-26 added optimistic concurrency on lifecycle version updates and aligned local lifecycle capability checks with the route permission table; 2026-05-29 added `published_version_number` to TemplateDTO so the list-page version chip reflects the *published* version, not the auto-spawned draft `latest_version`; 2026-05-29 promoted `revision_number` to a persisted column per ADR 0013 so REV chip labels are backend-canonical and never computed in the FE) | **Maturity:** L3
+**Last verified:** 2026-07-13 (ROADMAP unit 3.1a, slices S1–S5 — [ADR 0082](../decisions/0082-approval-kernel-extraction.md) "Transitional coexistence" retirement executed: `CreateTemplate` no longer seeds approval roles (S1); `PublishTemplateVersion` is kernel-driven — role-binding gate deleted, capability (`template.publish`) + identity SoD (`CheckSegregation`) only, accepts `draft`/`approved` sources, kernel-stamped `ApprovedAt` preserved (S2); publish is bodyless — `schema_key` server-derived (S2b); FE rebuilt kernel-only (`submitTemplateVersionForApproval`/`signoffTemplateVersion` wrappers), chain display degraded to 3 kernel-truth steps with honest-null actors (S3); legacy path DELETED — 4 routes/ops (`submitTemplateVersion`, `reviewTemplateVersion`, `approveTemplateVersion`, `upsertTemplateApprovalConfig` + its GET), orphan schemas, `VersionDTO.pending_reviewer_role`/`pending_approver_role`, `Service.SubmitForReview`/`Review`/`Approve`, the `ApprovalConfig` domain type, and 3 repo methods all gone (S4); `CapTemplateReview` retired — capability registry 40→39 — and `templates_approval_config` DROPPED behind a pre-drop emptiness assert (migration 0302); 3 seed grant rows removed (S5). The kernel (`submit-for-approval` → `signoff` approve/reject → `publish`) is now the **only** approval path — §5.3/§5.4/§6.3/§8.1 below rewritten accordingly; §5.4a deleted. `pending_reviewer_role`/`pending_approver_role` columns still exist on `templates_template_version` (write-never/read-never, named debt, ratified out of the migration-0302 drop list — see §11 T-004). Evidence: `docs/superpowers/reports/2026-07-13-unit-3.1a-evidence.md`.) | prior: 2026-07-12 (M3 approval-kernel-extraction wiki-sync: two new additive kernel routes `POST .../submit-for-approval` + `POST .../signoff` documented in §5.3 route table + new §5.4a "transitional coexistence" section — the kernel is backend truth for template approval but the 4 legacy role-based routes (`submit`/`review`/`approve`/`approval-config`) are untouched and still the only path the frontend calls; retirement deferred to ROADMAP unit 3.1a per [ADR 0082](../decisions/0082-approval-kernel-extraction.md) "Transitional coexistence"; `CreateTemplate`/`PublishTemplateVersion` confirmed still role-based (`create.go:83`, `lifecycle.go:421-427`) — not touched by M3) | prior: 2026-07-06 (F9.4 doc-truth pass: F9.5 `repository/`→`infrastructure/` rename — `infrastructure/postgres.go` (Repository/New/GetTemplate unchanged line numbers, re-verified), `infrastructure/mappers.go:18` (`scanTemplateRead`); C4 container + §4 Solution Strategy prose relabeled; `routes_mapping.go:122/:147` re-verified unchanged) | prior: 2026-07-03 (ADR 0065 cutover — `TemplateDTO` version pointers are now nested value objects: compact `latest_version`/`published_version` are `TemplateVersionRef {id, number, revision_number, status}`; the four coupled flat scalars `latest_revision_number`/`published_version_id`/`published_version_number`/`current_revision_number` are removed from `TemplateDTO`. `getTemplate`'s detail envelope is unchanged — `GetTemplateResponse.data.latest_version` still carries the full `VersionDTO`. Read/write split: repository now returns `domain.TemplateRead` (`Template` + `Latest domain.VersionRef` + `Published *domain.VersionRef`, new file `domain/read_model.go`); `domain.Template` dropped its projection scalars and is the write aggregate only. `repository/postgres.go` GetTemplate/GetTemplateByKey/ListTemplates now double-join `templates_template_version` (aliases `lv`/`pv`) and scan into the read model via `scanTemplateRead` (`repository/mappers.go:18`). Mapper gained `toAPIVersionRef` (`routes_mapping.go:122`) and `toAPITemplateDTO(*domain.TemplateRead, …)` (`routes_mapping.go:147`). See `wiki/decisions/0065-version-references-are-nested-value-objects.md`.) | **Prior:** 2026-07-01 (DOC-01 drift fix: corrected stale "auto-spawned vN+1 draft after publish" line in §Version chip source-of-truth to reflect ADR 0052 manual versioning) | **Prior:** 2026-06-30 (ADR 0052 + ADR 0053 — manual versioning only: `Approve`/`PublishTemplateVersion` transition status only; `CreateNextVersion` is the sole revision path; `next_draft*` dropped from contract; status `in_review` renamed to `under_review`; templates render through shared controlled-artifact view layer with `TemplateDetailRoute` + `TemplateApprovalRoute`; inline `VersionActionPanel` removed from approval surface; prior: ADR 0050 — `/placeholder-catalog` and `ValidatePlaceholders` both derived from `render/domain.ComputedCatalog()` single source; hand-maintained 7-key slices deleted; `approval_date` now author-visible; templates→render/domain legal edge; prior: 2026-06-28 SP-1 cross-link to tokens module added) | **Prior:** 2026-06-15 (M4/F4.2 — port ADR 0030 cross-link: `TemplateVersionPort` extended with `GetTemplateVersionState`; raw state now exposed to controlled-documents without cross-module SQL) | **Prior:** 2026-06-12 (Wave 2.12: `db==nil` dual-mode branches removed from autosave/create/lifecycle/schema/approval_config application services — single-mode only; `CreateTemplateTx` no longer writes `areas`/`visibility`/`specific_areas` (dropped by migration 0236); nodualmode CI guard. Prior Wave 2: AppendAuditTx before commit; typed CapTemplate* consts; upsertApprovalConfig tier-1 fixed template.admin→CapTemplateEdit; publish route tier-1 aligned to CapTemplatePublish; post-publication role gate fixed phantom admin→system_admin/qms_admin; CompositionConfig deleted; legacy areas/visibility columns removed from CreateTemplate INSERT. Prior: Wave 1: F-07-sub-split — ListAudit reads metaldocs.audit_events; version_id now carried in audit payload) | prior: 2026-06-10 (P2 consolidation: �3/�5 C4 fragments tagged as module-scoped with pointer to canonical diagrams; added Failure modes section) | prior: 2026-05-31 (fix/templates-schema-occ-lock: PUT /schema lock-version CAS � `expected_lock_version` required on the contract, `UpdateVersionSchemaCAS`/`Tx` enforce CAS, 412 `stale_lock_version` on miss; FE useTemplateSchemas holds lockVersion, surfaces staleConflict + refetch � multi-tab last-write-wins closed) | prior: 2026-05-29 (feat/templates-rev-labels: ADR 0013 � first-class `revision_number` column on `templates_template_version` + `current_revision_number` on TemplateDTO; FE renders REV{nn} via shared `formatRevisionCode`; bug/templates-version-chip: honest chip via `published_version_number`; qa/templates-list: empty-state i18n fix + dead `updated_at` cast removal in `TemplatesListPage.tsx`) | **Owner:** unassigned | **Status:** active (production module; generated OpenAPI surface for 22 template routes; Plan 3 tenant-context sweep applied; Plan 5 wired authz.Require + tripwire on lifecycle/create paths; 2026-05-17 wired the autosave/import commit paths to the same tripwire contract and removed creator-scoped template-use visibility from runtime/API selection behavior; 2026-05-26 added optimistic concurrency on lifecycle version updates and aligned local lifecycle capability checks with the route permission table; 2026-05-29 added `published_version_number` to TemplateDTO so the list-page version chip reflects the *published* version, not the auto-spawned draft `latest_version`; 2026-05-29 promoted `revision_number` to a persisted column per ADR 0013 so REV chip labels are backend-canonical and never computed in the FE) | **Maturity:** L3
 
 ### Version chip source-of-truth (2026-05-29)
 
@@ -40,12 +40,12 @@ Frontend wiring (all under `frontend/apps/web/src/features/templates/`):
 
 ## 1. Introduction & Goals
 
-`templates` owns the lifecycle of DOCX-based document templates: authoring (DOCX upload + placeholder schema), versioning, two-stage approval (review Ã¢â€ â€™ approve), publishing, and obsoletion of the previous published version. Every document instance in MetalDocs is instantiated from a *published* template version Ã¢â‚¬â€ `documents` is the downstream consumer that snapshots `placeholder_schema` at finalize.
+`templates` owns the lifecycle of DOCX-based document templates: authoring (DOCX upload + placeholder schema), versioning, kernel-driven approval (submit → signoff → publish; ADR 0082), publishing, and obsoletion of the previous published version. Every document instance in MetalDocs is instantiated from a *published* template version — `documents` is the downstream consumer that snapshots `placeholder_schema` at finalize.
 
 ### 1.1 Requirements overview
 
 - **Authoring of regulated DOCX templates** with eigenpal-native `{name}` placeholders restricted to the fixed 8-token computed catalog (per `wiki/concepts/placeholders.md`, ADR 0008 amended by ADR 0050; catalog derived from `render/domain.ComputedCatalog()`).
-- **Two-stage approval lifecycle** (`draft → under_review → approved → published`, with `obsolete` for superseded versions) enforcing ISO segregation of duties (per `wiki/concepts/iso-segregation.md`).
+- **Kernel-driven approval lifecycle** (`draft → under_review → approved → published`, with `obsolete` for superseded versions) enforcing ISO segregation of duties (per `wiki/concepts/iso-segregation.md`); the `under_review`-stage decision belongs to the approval kernel module (`internal/modules/approval`), not to `templates` itself — see §5.4.
 - **Snapshot contract for downstream consumers** Ã¢â‚¬â€ published `template_version.placeholder_schema` is read by `documents` at instantiation (`wiki/modules/documents.md Ã‚Â§8.7`).
 - **Authoring identity carried on every version** Ã¢â‚¬â€ `author_id`, `reviewer_id`, `approver_id` columns are the SoD probe surface consumed by `approval` (per `wiki/modules/approval.md` SoD T-003).
 - **Per-tenant isolation** Ã¢â‚¬â€ every template scoped by `tenant_id` (origin: `wiki/architecture/data-model.md`).
@@ -55,17 +55,16 @@ Frontend wiring (all under `frontend/apps/web/src/features/templates/`):
 | Rank | Goal | How verified |
 |---|---|---|
 | 1 | Tenant isolation of templates and versions | tripwire on every `templates_*` mutation; query-side tenant guard on `GetVersion*` (currently NOT met Ã¢â‚¬â€ see T-002) |
-| 2 | Approval contract correctness (no self-approve, no self-publish) | `domain.CheckSegregation` invoked on every state transition (currently NOT met for `PublishTemplateVersion` Ã¢â‚¬â€ see T-004) |
+| 2 | Approval contract correctness (no self-approve, no self-publish) | `domain.CheckSegregation` invoked on every state transition — now met for `PublishTemplateVersion` too; T-004 resolved by retirement, ROADMAP unit 3.1a S2 (see §11) |
 | 3 | Placeholder catalog enforcement (no template-injection) | `application.ValidatePlaceholders` rejects non-catalog `PHType` at schema save; resolver registry check on `PHComputed` (resolver registry currently NOT wired Ã¢â‚¬â€ see T-008) |
 
 ### 1.3 Stakeholders
 
 | Role | Expectation |
 |---|---|
-| Author (role: `author`) | Create draft, upload DOCX, define `placeholder_schema`, submit for review |
-| Reviewer (role: `editor`/`approver`) | Accept or reject submitted draft; cannot review own authorship |
-| Approver (role: `approver`/`system_admin`) | Sign off; cannot approve own authorship or own review |
-| Publisher (role: `system_admin`) | Publish approved version; obsoletes prior published |
+| Author (capability: `template.submit`) | Create draft, upload DOCX, define `placeholder_schema`, submit for approval |
+| Approver (capability: `template.approve`) | Kernel signoff decision (approve/reject) on the `under_review` stage — password e-signature; cannot approve own authorship (identity SoD, `CheckSegregation`) |
+| Publisher (capability: `template.publish`) | Publish a `draft` (direct) or `approved` (post-signoff) version; obsoletes prior published; cannot publish own authorship (identity SoD) |
 | Downstream consumer (`documents`, `approval`, `search`, `controlled_documents` controlled-documents module) | Snapshot `placeholder_schema`, read author identity, FK to `template_version_id` |
 
 ---
@@ -90,7 +89,7 @@ Frontend wiring (all under `frontend/apps/web/src/features/templates/`):
 C4Context
     title System Context � templates (module-scoped)
     Person(author, "Author", "QMS author / template editor")
-    Person(reviewer, "Reviewer/Approver", "Role-gated workflow actor")
+    Person(reviewer, "Approver", "Capability-gated workflow actor (template.submit / template.approve / template.publish)")
     System_Boundary(b1, "MetalDocs") {
         System(tpl, "templates", "Template authoring + lifecycle")
         System(docs, "documents", "Instantiates from published templates")
@@ -104,7 +103,7 @@ C4Context
     System_Ext(minio, "MinIO", "DOCX object storage (presigned upload/download)")
 
     Rel(author, tpl, "HTTP /api/v1/templates")
-    Rel(reviewer, tpl, "HTTP /api/v1/templates/{id}/versions/{n}/{review,approve}")
+    Rel(reviewer, tpl, "HTTP /api/v1/templates/{id}/versions/{n}/{submit-for-approval,signoff}")
     Rel(tpl, pg, "SQL")
     Rel(tpl, minio, "Presigned PUT/GET via objectstore Presigner")
     Rel(docs, tpl, "Go: template domain types (Placeholder, TemplateVersion)")
@@ -120,13 +119,13 @@ Quality teams author DOCX templates that downstream document instances inherit (
 ### 3.2 Technical Context
 
 Inbound interfaces:
-- 22 HTTP routes: 20 under `/api/v1/templates/*`, plus `GET /api/v1/signed` and `GET /api/v1/templates/system/blank` (`handler.go:42-65`); Plan 12.4 routes them through generated oapi-codegen wrapper methods, with some generated methods delegating to existing internal handler bodies (see §5.3).
+- 20 HTTP routes: 18 under `/api/v1/templates/*`, plus `GET /api/v1/signed` and `GET /api/v1/templates/system/blank` (`handler.go:42-65`); Plan 12.4 routes them through generated oapi-codegen wrapper methods, with some generated methods delegating to existing internal handler bodies (see §5.3).
 - Go domain types consumed by `documents` (`Placeholder`, `TemplateVersion`, `TemplateSnapshot`, `PHType` constants).
 
 Outbound interfaces:
-- Postgres: 4 owned tables (`templates_template`, `templates_template_version`, `templates_approval_config`, `templates_audit_log`).
+- Postgres: 3 owned tables (`templates_template`, `templates_template_version`, `templates_audit_log`); `templates_approval_config` DROPPED (migration 0302, ROADMAP unit 3.1a S5, [ADR 0082](../decisions/0082-approval-kernel-extraction.md)).
 - MinIO: presigned PUT for DOCX/schema upload; presigned GET for DOCX retrieval (TTL 10 minutes, max object size 25 MiB hard-coded at `apps/api/cmd/metaldocs-api/main.go:327`).
-- iam: capability namespace `template.*` (declared by seed) enforced at HTTP edge and/or service mutation layer for write paths; residual gaps are tracked in T-004/T-009.
+- iam: capability namespace `template.*` (declared by seed) enforced at HTTP edge and/or service mutation layer for write paths; residual gaps are tracked in T-009 (T-004 resolved by retirement — see §11).
 - Canonical `audit` module: `ListAudit` now reads `metaldocs.audit_events` (resource_type='template'), fixing the read-path split (Wave 1, F-07-sub-split). Write path still uses the `templates_audit_log` parallel sink for domain event writes (see T-013 for full consolidation plan). Historical `templates_audit_log` rows are an accepted seam.
 
 ---
@@ -136,11 +135,11 @@ Outbound interfaces:
 - **Hexagonal layout** Ã¢â‚¬â€ `domain/` (entities + invariants), `application/` (use-cases + ports), `delivery/http/` (handlers + routing), `infrastructure/` (Postgres I/O; renamed from `repository/`, F9.5). No ADR; same shape as `documents` and `auth` (missing-ADR Ã¢â‚¬â€ see T-014).
 - **Approval as state machine on `template_version.status`** Ã¢â‚¬â€ driver: ISO 9001 Ã‚Â§7.5 traceability requirement. Transitions enforced by `domain.TemplateVersion.CanTransition` (`internal/modules/templates/domain/version.go`).
 - **DOCX bytes via presigned MinIO PUT/GET** Ã¢â‚¬â€ driver: avoid round-tripping multi-MB DOCX through the API. Authored at `application/autosave.go`; `/templates/new` now uses create -> autosave presign -> object-store PUT -> autosave commit before opening Eigenpal for imported `.docx`.
-- **Template governance stays role/capability-based** Ã¢â‚¬â€ `template.*` IAM capabilities govern create/edit/review/approve/publish/archive. Runtime/API selection no longer treats template creator-scoped `visibility`, `areas`, or `specific_areas` as who-can-use-this-template permission gates; document type/profile and lifecycle state drive valid template choices.
+- **Template governance stays role/capability-based** Ã¢â‚¬â€ `template.*` IAM capabilities govern create/edit/approve/publish/archive (`template.review` retired, ROADMAP unit 3.1a S5). Runtime/API selection no longer treats template creator-scoped `visibility`, `areas`, or `specific_areas` as who-can-use-this-template permission gates; document type/profile and lifecycle state drive valid template choices.
 - **Placeholder validation as a security boundary** — `application/schema.go ValidatePlaceholders` enforces the fixed 8-token computed catalog (PHType enum) at schema-save. The computed set is derived from `render/domain.ComputedCatalog()` via a `sync.Once` accessor (`computedCatalogSet()`) — a hand-maintained 7-key set was deleted (ADR 0050). Resolver-key validation for `PHComputed` requires `ResolverRegistryReader`, currently nil at wiring (T-008).
 
   > **Computed catalog single source (ADR 0050):** both `/placeholder-catalog` and `ValidatePlaceholders` now derive their computed set from `render/domain.ComputedCatalog()`. Adding a new computed token to that function automatically updates the palette, the validator, and the parity guard without any change to this module. The computed catalog has a dictionary neighbour: see [tokens module](tokens.md) for SP-1 tenant-defined `name → value` entries (ADR 0049). Both kinds are now architecturally symmetric: each publishes a catalog from its owning module’s domain layer, composed at the editor palette. The `templates → render/domain` import edge is legal per the module boundary law (`scripts/check-module-boundaries.ps1:52`); `templates → render/resolvers` is not permitted.
-- **Two parallel publish paths** Ã¢â‚¬â€ `Service.Approve` (lifecycle.go:209, the canonical author-review-approve chain) and `Service.PublishTemplateVersion` (lifecycle.go:373, a direct draft Ã¢â€ â€™ published path used by `POST /publish`). Different invariants Ã¢â‚¬â€ Approve enforces SoD, Publish does not. See T-004.
+- **Kernel-driven approval, single publish path (ADR 0082, ROADMAP unit 3.1a)** — `Service.Approve` (the old author-review-approve chain) is deleted; `Service.PublishTemplateVersion` (`lifecycle.go:51`) is the sole publish path, accepting a `draft` (direct-publish) or `approved` (post-kernel-signoff) source. Identity-based SoD (`CheckSegregation`) is enforced on every publish regardless of source status. See T-004 (resolved by retirement).
 - **Version pointers are nested value objects, never parallel scalars (ADR 0065)** — the repository read path returns `domain.TemplateRead` (embeds the write-side `domain.Template` + `Latest`/`Published domain.VersionRef`, `domain/read_model.go`), keeping join-projection fields off the write aggregate. The HTTP mapper (`delivery/http/routes_mapping.go`) converts that read model into `TemplateDTO.latest_version`/`published_version`, both `TemplateVersionRef {id, number, revision_number, status}`; `published_version` is required-and-nullable so consumers gate on one object instead of three independently drift-able scalars. See `wiki/decisions/0065-version-references-are-nested-value-objects.md`.
 
 ---
@@ -154,11 +153,11 @@ Outbound interfaces:
 ```mermaid
 C4Container
     title Container View - templates (module-internal packages)
-    Container(http, "HTTP Handlers", "Go (net/http + oapi-codegen)", "22 routes: 20 under /api/v1/templates + GET /api/v1/signed + GET /api/v1/templates/system/blank")
-    Container(svc, "Service Layer", "Go", "CreateTemplate Ã‚Â· CreateNextVersion Ã‚Â· UpdateSchemas Ã‚Â· SaveTemplateDraft Ã‚Â· PresignTemplateUpload Ã‚Â· CommitAutosave Ã‚Â· SubmitForReview Ã‚Â· Review Ã‚Â· Approve Ã‚Â· PublishTemplateVersion Ã‚Â· ArchiveTemplate Ã‚Â· UpsertApprovalConfig Ã‚Â· queries")
-    Container(domain, "Domain", "Go", "Template Ã‚Â· TemplateVersion Ã‚Â· ApprovalConfig Ã‚Â· MetadataSchema Ã‚Â· Placeholder Ã‚Â· VisibilityCondition Ã‚Â· CheckSegregation")
+    Container(http, "HTTP Handlers", "Go (net/http + oapi-codegen)", "20 routes: 18 under /api/v1/templates + GET /api/v1/signed + GET /api/v1/templates/system/blank")
+    Container(svc, "Service Layer", "Go", "CreateTemplate · CreateNextVersion · UpdateSchemas · SaveTemplateDraft · PresignTemplateUpload · CommitAutosave · PublishTemplateVersion · ArchiveTemplate · queries; kernel submit/signoff delegate to approval module")
+    Container(domain, "Domain", "Go", "Template · TemplateVersion · MetadataSchema · Placeholder · VisibilityCondition · CheckSegregation")
     Container(repo, "infrastructure/", "Go + database/sql + pgx pgconn", "Postgres I/O (dir renamed from repository/, F9.5)")
-    ContainerDb(db, "Postgres", "Postgres", "templates_template Ã‚Â· templates_template_version Ã‚Â· templates_approval_config Ã‚Â· templates_audit_log")
+    ContainerDb(db, "Postgres", "Postgres", "templates_template · templates_template_version · templates_audit_log")
     Container_Ext(presigner, "Presigner", "Go (objectstore adapter)", "PresignPUT / PresignGET / HeadContentHash / Delete (MinIO)")
     Rel(http, svc, "calls")
     Rel(svc, domain, "uses entities + invariants")
@@ -183,9 +182,8 @@ Grouped by file. Source of truth: `_artifacts/01-surface.md` Ã‚Â§3.
 | `internal/modules/templates/domain/schemas.go:55` | `VisibilityCondition` | struct | Conditional placeholder visibility primitive |
 | `internal/modules/templates/domain/schemas.go:61` | `Placeholder` | struct | Placeholder entity (id, type, name, options, etc.) |
 | `internal/modules/templates/domain/schemas.go:81` | `CompositionConfig` | struct | **DELETED Wave 2** (was deprecated per ADR `wiki/decisions/0008-placeholder-fixed-catalog.md` Ã¢â‚¬â€ composition removed 2026-04-27; struct retained for backward compat) |
-| `internal/modules/templates/domain/approval.go:3` | `ApprovalConfig` | struct | Reviewer/approver role binding per template |
-| `internal/modules/templates/domain/approval.go:37` | `CheckSegregation` | func | SoD enforcement (author Ã¢â€°Â  reviewer Ã¢â€°Â  approver) |
-| `internal/modules/templates/domain/audit.go:10` | `AuditCreated`, `AuditSaved`, `AuditSubmitted`, `AuditReviewed`, `AuditApproved`, `AuditRejected`, `AuditPublished`, `AuditObsoleted`, `AuditArchived`, `AuditRestored`, `AuditApprovalConfigUpdated` | const | Audit action enum |
+| `internal/modules/templates/domain/approval.go:19` | `CheckSegregation` | func | SoD enforcement — actor != author AND actor != reviewer (role="approver"; `SegregationRoleApprover` is the only defined role) |
+| `internal/modules/templates/domain/audit.go:10` | `AuditCreated`, `AuditSaved`, `AuditSubmitted`, `AuditReviewed`, `AuditApproved`, `AuditRejected`, `AuditPublished`, `AuditObsoleted`, `AuditArchived`, `AuditRestored` | const | Audit action enum (`AuditReviewed` retained for reading historical rows; nothing writes it post-retirement) |
 | `internal/modules/templates/domain/audit.go:25` | `AuditEvent` | struct | Audit row written to `templates_audit_log` |
 | `internal/modules/templates/application/ports.go:19` | `Repository` | iface | Persistence port (used by service); `GetTemplate`/`GetTemplateByKey`/`ListTemplates` return `*domain.TemplateRead`/`[]*domain.TemplateRead` (ADR 0065) |
 | `internal/modules/templates/application/ports.go:42` | `Presigner` | iface | Object-store port (PresignPUT/GET, HeadContentHash, Delete) |
@@ -194,21 +192,20 @@ Grouped by file. Source of truth: `_artifacts/01-surface.md` Ã‚Â§3.
 | `internal/modules/templates/application/service.go:5` | `Service` | struct | Use-case orchestrator |
 | `internal/modules/templates/application/service.go:14` | `New` | func | Service constructor |
 | `internal/modules/templates/application/create.go:11` | `CreateTemplateCmd`, `CreateTemplateResult` | struct | Create-template command + result |
-| `internal/modules/templates/application/create.go:30` | `Service.CreateTemplate` | method | Create template + version 1 + approval config + audit |
+| `internal/modules/templates/application/create.go:30` | `Service.CreateTemplate` | method | Create template + version 1 + audit (no longer seeds approval config/role bindings — ADR 0082 S1) |
 | `internal/modules/templates/application/create.go:109` | `CreateVersionCmd` + `Service.CreateNextVersion` | struct + method | Spawn next version (clones source schemas) |
 | `internal/modules/templates/application/schema.go:12` | `UpdateSchemasCmd` | struct | Schema update command |
 | `internal/modules/templates/application/schema.go:84` | `ValidatePlaceholders` | func | Placeholder catalog enforcement (PHType + resolver_key when registry wired) |
-| `internal/modules/templates/application/lifecycle.go:13..368` | `SubmitForReviewCmd`, `ReviewCmd`, `ApproveCmd`, `ArchiveCmd`, `PublishTemplateVersionCmd`, `PublishTemplateVersionResult` | struct | Lifecycle commands |
-| `internal/modules/templates/application/lifecycle.go:18..497` | `Service.SubmitForReview`, `Service.Review`, `Service.Approve`, `Service.PublishTemplateVersion`, `Service.ArchiveTemplate` | method | Lifecycle ops; `Approve` (lifecycle.go:209) and `PublishTemplateVersion` (lifecycle.go:373) are two parallel publish paths (see Ã‚Â§4) |
+| `internal/modules/templates/application/lifecycle.go:14..26` | `ArchiveCmd`, `PublishTemplateVersionCmd`, `PublishTemplateVersionResult` | struct | Lifecycle commands (`SubmitForReviewCmd`/`ReviewCmd`/`ApproveCmd` deleted — ADR 0082 S4) |
+| `internal/modules/templates/application/lifecycle.go:51..231` | `Service.PublishTemplateVersion`, `Service.ArchiveTemplate` | method | Lifecycle ops; `PublishTemplateVersion` (lifecycle.go:51) accepts `draft` (direct) or `approved` (post-kernel-signoff) source — the sole publish path since `Service.SubmitForReview`/`Review`/`Approve` were deleted (ADR 0082 S4); see §4 |
 | `internal/modules/templates/application/autosave.go:13..171` | `PresignAutosaveCmd/Result`, `PresignTemplateUploadCmd`, `CommitAutosaveCmd`, `SaveTemplateDraftCmd` + their `Service` methods | struct + method | DOCX upload + autosave path |
-| `internal/modules/templates/application/approval_config.go:9` | `UpsertApprovalConfigCmd` | struct | Approval-config command |
 | `internal/modules/templates/application/queries.go:41` | `GetDocxURLCmd` | struct | Presigned GET for stored DOCX |
 | `internal/modules/templates/application/visibility_graph.go:16` | `DetectVisibilityCycle` | func | Cycle check across `VisibilityCondition` graph |
 | `internal/modules/templates/delivery/http/handler.go:17` | `AuthzFunc` | type | Authz callback; now wired to real `capabilityService` (T-001 closed Plan 5) |
 | `internal/modules/templates/delivery/http/handler.go:19` | `Handler` | struct | HTTP handler |
 | `internal/modules/templates/delivery/http/handler.go:24` | `New` | func | Handler constructor |
 | `internal/modules/templates/application/service.go:22` | `WithDB` | method | Builder that injects `*sql.DB` enabling tx-backed `authz.Require` calls (added Plan 5) |
-| `internal/modules/templates/delivery/http/handler.go:34` | `Handler.Register` | method | Mounts 22 routes on `*http.ServeMux` (`handler.go:34-65`) |
+| `internal/modules/templates/delivery/http/handler.go:34` | `Handler.Register` | method | Mounts 20 routes on `*http.ServeMux` (`handler.go:34-65`) |
 | `internal/modules/templates/delivery/http/errors.go:10` | `MapErr` | func | Domain error Ã¢â€ â€™ HTTP status + code mapping |
 | `internal/modules/templates/infrastructure/postgres.go:42` | `Repository` | struct | Postgres adapter implementing `application.Repository` |
 | `internal/modules/templates/infrastructure/postgres.go:48` | `New` | func | Repository constructor |
@@ -224,6 +221,8 @@ Grouped by file. Source of truth: `_artifacts/01-surface.md` Ã‚Â§3.
 
 Source: `internal/modules/templates/delivery/http/handler.go` and Plan 12.4 generated contract refresh. All routes mount under `/api/v1/templates` unless noted. Generated wrapper methods are the route entrypoint; several wrapper methods intentionally delegate to pre-existing internal handler bodies.
 
+**Retirement executed (ROADMAP unit 3.1a, 2026-07-13):** the legacy role-based approval path (`submit`/`review`/`approve`/`approval-config`, previously documented here as a "transitional coexistence" alongside the kernel routes) is deleted outright. The kernel path below (`submit-for-approval` -> `signoff`) is the only approval path. See the [ADR 0082](../decisions/0082-approval-kernel-extraction.md) execution note and `docs/superpowers/reports/2026-07-13-unit-3.1a-evidence.md`.
+
 | Method | Path | OperationID | Generated method | Runtime body | Authz / idempotency notes |
 |---|---|---|---|---|---|
 | GET | `/api/v1/signed` | `redirectSignedUrl` | `RedirectSignedUrl` | generated helper | signed redirect helper |
@@ -238,14 +237,11 @@ Source: `internal/modules/templates/delivery/http/handler.go` and Plan 12.4 gene
 | POST | `/api/v1/templates/{id}/versions/{n}/schema-upload-url` | `presignTemplateSchemaUploadUrl` | `PresignTemplateSchemaUploadUrl` | generated presign body | HTTP `template.edit` |
 | POST | `/api/v1/templates/{id}/versions/{n}/autosave/presign` | `presignTemplateAutosave` | `PresignTemplateAutosave` | delegates to `h.presignAutosave` | HTTP `template.edit` |
 | POST | `/api/v1/templates/{id}/versions/{n}/autosave/commit` | `commitTemplateAutosave` | `CommitTemplateAutosave` | delegates to `h.commitAutosave` | HTTP `template.edit` |
-| POST | `/api/v1/templates/{id}/versions/{n}/submit` | `submitTemplateVersion` | `SubmitTemplateVersion` | delegates to `h.submitForReview` | `h.idempotent`; HTTP `template.edit`; service `CapTemplateSubmit` |
-| POST | `/api/v1/templates/{id}/versions/{n}/review` | `reviewTemplateVersion` | `ReviewTemplateVersion` | delegates to `h.review` | `h.idempotent`; HTTP `template.review`; service edit cap on version update |
-| POST | `/api/v1/templates/{id}/versions/{n}/approve` | `approveTemplateVersion` | `ApproveTemplateVersion` | delegates to `h.approve` | `h.idempotent`; HTTP `template.approve`; service `CapTemplateApprove` |
-| POST | `/api/v1/templates/{id}/versions/{n}/publish` | `publishTemplateVersion` | `PublishTemplateVersion` | generated publish body | `h.idempotent`; HTTP `CapTemplatePublish` (Wave 2: tier-1 aligned to `CapTemplatePublish`; was `template.approve` — see T-004 closed); service `CapTemplatePublish` (Tier 2) |
+| POST | `/api/v1/templates/{id}/versions/{n}/publish` | `publishTemplateVersion` | `PublishTemplateVersion` | bodyless (S2b — `schema_key` server-derived, never client input) | `h.idempotent`; HTTP `CapTemplatePublish`; service `CapTemplatePublish` (Tier 2) + identity SoD (`CheckSegregation`) — role-binding gate deleted (T-004 resolved by retirement, ADR 0082 S2); accepts `draft`\|`approved` source |
 | POST | `/api/v1/templates/{id}/archive` | `archiveTemplate` | `ArchiveTemplate` | delegates to `h.archiveTemplate` | HTTP `template.archive`; service edit cap |
-| PUT | `/api/v1/templates/{id}/approval-config` | `upsertTemplateApprovalConfig` | `UpsertTemplateApprovalConfig` | delegates to `h.upsertApprovalConfig` | HTTP `CapTemplateEdit` (Wave 2: fixed from phantom `template.admin` — route was permanently locked; now functional) — **legacy, retirement deferred to ROADMAP 3.1a, see §4a below** |
-| POST | `/api/v1/templates/{id}/versions/{n}/submit-for-approval` | `submitTemplateVersionForApproval` | `SubmitTemplateVersionForApproval` (`routes_approval_kernel.go:35`) | delegates to `approvalapp.TemplateSubmitService.SubmitTemplateVersionForReview` | tier-1 `CapTemplateSubmit`; **kernel route (M3, additive), not the legacy submit above** — see §5.4a |
-| POST | `/api/v1/templates/{id}/versions/{n}/signoff` | `signoffTemplateVersion` | `SignoffTemplateVersion` (`routes_approval_kernel.go:89`) | delegates to `approvalapp.DecisionService.RecordSignoff` | tier-1 `CapTemplateApprove`; **kernel route (M3, additive)** — no `content_hash` in the request (template versions never freeze; content identity is read server-side) — see §5.4a |
+
+| POST | `/api/v1/templates/{id}/versions/{n}/submit-for-approval` | `submitTemplateVersionForApproval` | `SubmitTemplateVersionForApproval` (`routes_approval_kernel.go:33`) | delegates to `approvalapp.TemplateSubmitService.SubmitTemplateVersionForReview` | tier-1 `CapTemplateSubmit`; the sole submit route since legacy `submit` was deleted (ADR 0082 S4) |
+| POST | `/api/v1/templates/{id}/versions/{n}/signoff` | `signoffTemplateVersion` | `SignoffTemplateVersion` (`routes_approval_kernel.go:87`) | delegates to `approvalapp.DecisionService.RecordSignoff` | tier-1 `CapTemplateApprove`; the sole approval-decision route since legacy `review`/`approve` were deleted (ADR 0082 S4) — no `content_hash` in the request (template versions never freeze; content identity read server-side) |
 | GET | `/api/v1/templates/{id}/versions/{n}/docx-url` | `getTemplateDocxUrl` | `GetTemplateDocxUrl` | delegates to `h.getDocxURL` | HTTP `template.view` |
 | GET | `/api/v1/templates/{id}/audit` | `listTemplateAudit` | `ListTemplateAudit` | delegates to `h.listAudit` | HTTP `template.view` |
 | GET | `/api/v1/templates/placeholder-catalog` | `listTemplatePlaceholderCatalog` | `ListTemplatePlaceholderCatalog` | delegates to `h.listPlaceholderCatalog` | public catalog response typed as `PlaceholderCatalogResponse` |
@@ -253,44 +249,6 @@ Source: `internal/modules/templates/delivery/http/handler.go` and Plan 12.4 gene
 
 Module contract status: Plan 12.4 route/spec/generated coverage refreshed. Remaining debt is behavioral hardening, replay auditing, and stricter response schemas on routes whose wrappers still delegate to legacy bodies.
 Owner: leandro
-
----
-
-### 5.4a Kernel approval routes + legacy role-based path — transitional coexistence (M3, [ADR 0082](../decisions/0082-approval-kernel-extraction.md))
-
-Approval-remediation M3 (2026-07-12) added two **additive, contract-first** routes that put template-version
-approval under the same subject-generic approval kernel used by documents (`internal/modules/approval`,
-`(subject_kind="template", subject_key=template_id)`): `POST /templates/{id}/versions/{n}/submit-for-approval`
-and `POST /templates/{id}/versions/{n}/signoff`, both thin adapters in
-`internal/modules/templates/delivery/http/routes_approval_kernel.go` that resolve `(id, n)` to the kernel's
-identifiers and delegate to `approvalapp.TemplateSubmitService`/`DecisionService` — no template-owned SQL or
-state-machine logic. `submit-for-approval` locks the version `draft → under_review`; `signoff` completion
-flips it `under_review → approved` (quorum met) or back to `draft` (rejected), mirroring the document flow.
-
-**This is NOT a replacement of the legacy role-based path.** The 4 legacy routes — `submit`, `review`,
-`approve` (§5.3 above), and `PUT .../approval-config` — remain live, unmodified, and are the ONLY path the
-frontend calls today (`TemplateApprovalRoute.tsx` has zero kernel-route consumer). Both paths write to the
-same `template_version.status` column, so at any point in time exactly one governs a given version's
-transitions in practice, but the code for both exists simultaneously in the tree.
-
-**Why the legacy path is not deleted in M3 (ADR 0082 "Transitional coexistence"):** the role-based model
-(`templates_approval_config` table, `domain.ApprovalConfig`, `CheckSegregation`, `RoleBindingFor`,
-`PendingReviewerRole`/`PendingApproverRole`) is also load-bearing for two paths that are **not** part of the
-4 legacy approval routes: `Service.CreateTemplate` seeds the reviewer/approver role and writes the config
-table at creation time (`application/create.go:83`), and `Service.PublishTemplateVersion` performs
-role-based SoD + role-binding tier-2 on its own direct-publish path (`application/lifecycle.go:421-427`).
-Deleting the legacy routes without also migrating create+publish off the role model would strand those two
-paths; deleting `templates_approval_config` outright would break them at runtime. Retirement is therefore
-sequenced as its own milestone.
-
-**Retirement plan (operator-ratified Option A, deferred to ROADMAP unit 3.1a):** (a) migrate `CreateTemplate`
-(stop seeding roles) and `PublishTemplateVersion` (kernel-driven completion, drop role-SoD) off the role
-model; (b) rebuild `TemplateApprovalRoute.tsx` onto the kernel routes; (c) delete the legacy path (4 routes +
-handlers + `Service.SubmitForReview/Review/Approve/UpsertApprovalConfig` + `domain/approval.go` +
-`GetApprovalConfig`/non-Tx `UpsertApprovalConfig` repo methods + legacy tests + FE consumers) and drop
-`templates_approval_config` behind a pre-drop emptiness assert. Until 3.1a lands, treat any change to the
-legacy approval surface (§5.3 `submit`/`review`/`approve`/`approval-config` rows, `domain/approval.go`,
-`application/lifecycle.go` SoD block) as touching **live, in-use** code — not dead code awaiting deletion.
 
 ---
 
@@ -370,17 +328,15 @@ Source: `_artifacts/02-flow-publish.md` + `application/lifecycle.go`.
 
 State transitions on `templates_template_version.status`:
 
-| From | To | Trigger | Authz cap (intended / actual) | SoD check |
+| From | To | Trigger | Authz cap | SoD check |
 |---|---|---|---|---|
-| draft | under_review | `POST .../submit` | `template.submit` / **bypassed (T-001)** | Ã¢â‚¬â€ (no actor restriction at submit) |
-| under_review | approved | `POST .../review` (Accept) | `template.approve` / bypassed | `CheckSegregation("reviewer", actor, author, nil)` Ã¢Å“â€œ |
-| under_review | draft | `POST .../review` (Reject) | `template.approve` / bypassed | Ã¢â‚¬â€ |
-| approved | published | `POST .../approve` (Accept, hasReviewer) | `template.approve` / bypassed | `CheckSegregation("approver", actor, author, reviewer)` Ã¢Å“â€œ |
-| under_review | published | `POST .../approve` (Accept, no reviewer) | `template.approve` / bypassed | `CheckSegregation("approver", actor, author, nil)` Ã¢Å“â€œ |
-| draft | published | `POST .../publish` (`PublishTemplateVersion`) | `template.publish` (Tier 1) + `pending_approver_role` binding (Tier 2, since 2026-05-31) | CheckSegregation(approver, actor, author, reviewer) + role-binding (T-004 CLOSED) |
-| approved | draft | `POST .../approve` (Reject) | `template.approve` / bypassed | Ã¢â‚¬â€ |
-| published | obsolete | side-effect of `Approve(Accept)` or `PublishTemplateVersion` (`ObsoletePreviousPublished`) | implicit | Ã¢â‚¬â€ |
-| any | (template.archived_at NOT NULL) | `POST .../archive` | `template.edit` / bypassed | Ã¢â‚¬â€ |
+| draft | under_review | `POST .../submit-for-approval` (kernel) | `template.submit` | -- (no actor restriction at submit) |
+| under_review | approved | `POST .../signoff` (approve) | `template.approve` | identity SoD `CheckSegregation(approver, actor, author)` -- actor != author |
+| under_review | draft | `POST .../signoff` (reject) | `template.approve` | -- |
+| draft | published | `POST .../publish` (`PublishTemplateVersion`, direct source) | `template.publish` (Tier 1 + Tier 2) | identity SoD `CheckSegregation` -- no role-binding (removed 3.1a S2) |
+| approved | published | `POST .../publish` (`PublishTemplateVersion`, post-signoff source) | `template.publish` (Tier 1 + Tier 2) | identity SoD `CheckSegregation` |
+| published | obsolete | side-effect of `PublishTemplateVersion` (`ObsoletePreviousPublished`) | implicit | -- |
+| any | (template.archived_at NOT NULL) | `POST .../archive` | `template.edit`/`template.archive` | -- |
 
 Publish sequence (`Service.PublishTemplateVersion`, `lifecycle.go:373`):
 
@@ -397,7 +353,7 @@ sequenceDiagram
     S->>R: GetTemplate(tenant, id)
     S->>R: GetVersion(id, n) Ã¢â‚¬â€ no tenant arg
     Note over S: if status != draft Ã¢â€ â€™ 409
-    Note over S: CheckSegregation(approver) + content_hash gate + RoleBindingFor(Published) + authz.Require(template.publish) � all enforced (T-004 CLOSED 2026-05-31)
+    Note over S: CheckSegregation(approver) + content_hash gate + authz.Require(template.publish) -- identity SoD only, no role-binding (removed 3.1a S2)
     S->>R: ObsoletePreviousPublished(template_id, new_version_id)
     R->>DB: UPDATE templates_template_version SET status='obsolete' WHERE ...
     Note over S,DB: NOT in same tx (T-007) Ã¢â‚¬â€ race window for concurrent publish
@@ -412,7 +368,7 @@ sequenceDiagram
     H-->>C: 200
 ```
 
-`Service.Approve` (Accept branch, `lifecycle.go:198`) transitions to `published`, updates head pointers, appends the audit event, and returns `ApproveResult{Version}` only. No next draft is spawned — use `POST /api/v1/templates/{id}/versions` (`CreateNextVersion`) to start a new revision deliberately (ADR 0052).
+`Service.PublishTemplateVersion` (`lifecycle.go:51`) is now the sole path to `published` — from either a `draft` (direct-publish) or `approved` (post-kernel-signoff) source status. It updates head pointers, appends the audit event, and returns `PublishTemplateVersionResult{PublishedVersion}` only. No next draft is auto-spawned — use `POST /api/v1/templates/{id}/versions` (`CreateNextVersion`) to start a new revision deliberately (ADR 0052).
 
 Failure modes:
 
@@ -438,18 +394,18 @@ Failure modes:
 ### 8.1 Authentication & Authorization
 
 - Tier 1 (HTTP edge): `CapabilityService` now wired Ã¢â‚¬â€ `AuthzFunc` receives real `capabilityService` check (T-001 closed Plan 5).
-- Tier 2 (in-tx): `internal/modules/iam/authz.Require` called in `CreateTemplate`, template lifecycle mutations, `SaveTemplateDraft`, and `CommitAutosave` when `s.db != nil` (injected via `WithDB`). The 2026-05-17 repair added transaction-local tenant/actor GUC setup and `template.edit` assertion around DOCX import/autosave commits so the tripwire accepts `templates_template_version` updates. As of 2026-05-26, local lifecycle mutations are aligned with the route permission table: submit uses `template.submit`, review uses `template.review`, approve uses `template.approve`, publish uses `template.publish`, and archive uses `template.archive`.
+- Tier 2 (in-tx): `internal/modules/iam/authz.Require` called in `CreateTemplate`, template lifecycle mutations, `SaveTemplateDraft`, and `CommitAutosave` when `s.db != nil` (injected via `WithDB`). The 2026-05-17 repair added transaction-local tenant/actor GUC setup and `template.edit` assertion around DOCX import/autosave commits so the tripwire accepts `templates_template_version` updates. As of 2026-05-26, local lifecycle mutations are aligned with the route permission table: submit uses `template.submit`, approve uses `template.approve` (kernel signoff), publish uses `template.publish`, and archive uses `template.archive` (`template.review` retired, ROADMAP unit 3.1a S5).
 - Postgres tripwire: `db/migrations/0231_db_hardening_tripwire_and_dead_schema.sql:88-93` attaches `trg_require_cap_asserted` to `public.templates_template` and `public.templates_template_version`.
 - Capabilities in seed (`migrations/0165_role_capabilities_reseed.sql`): `template.view/create/edit/submit/approve/publish` mapped to `viewer/editor/author/approver/system_admin` Ã¢â‚¬â€ currently advisory only. See T-001.
 
-- **Frontend defense-in-depth gate (2026-05-31, updated ADR 0053)**: `frontend/apps/web/src/features/templates/lib/canActOnVersion.ts` exposes `canSubmit/canReview/canApprove/canPublish` returning `{ allowed, reason }`. `TemplateEditorPage` (Submeter) and `TemplateApprovalRoute` (Approve/Reject/Publish — replaces the removed inline `VersionActionPanel`) consume the gate via `disabled + title` so users see why a button is unavailable (status / capability / role-binding mismatch). Backend remains the sole enforcer (`wiki/concepts/authz-tiers.md`); the FE hint is fed by `CurrentUser.capabilities` (added to `/api/v1/auth/me` + `/login`) — `iamapp.CapabilityService.CapsByUserID` resolves the union of direct + group role capabilities, with `system_admin` short-circuiting to `iamdomain.AllCapabilities()`.
+- **Frontend defense-in-depth gate (2026-05-31, updated ADR 0053)**: `frontend/apps/web/src/features/templates/lib/canActOnVersion.ts` exposes `canSubmit/canApprove/canPublish` returning `{ allowed, reason }`. `TemplateEditorPage` (Submeter) and `TemplateApprovalRoute` (Approve/Reject/Publish — replaces the removed inline `VersionActionPanel`) consume the gate via `disabled + title` so users see why a button is unavailable (status / capability / role-binding mismatch). Backend remains the sole enforcer (`wiki/concepts/authz-tiers.md`); the FE hint is fed by `CurrentUser.capabilities` (added to `/api/v1/auth/me` + `/login`) — `iamapp.CapabilityService.CapsByUserID` resolves the union of direct + group role capabilities, with `system_admin` short-circuiting to `iamdomain.AllCapabilities()`.
 ### 8.2 Error envelope
 
 - All non-2xx responses: legacy `{"error":{"code","message"}}` via `httpresponse.WriteJSON` (`delivery/http/handler.go:95-102`). RFC 9457 Problem+JSON not adopted. See T-005.
 
 ### 8.3 Idempotency
 
-- Generated mutation wrappers include idempotency wiring on the active create path; Plan 12.4 verified `POST /api/v1/templates` with `Idempotency-Key` returning HTTP 201. Same-key replay behavior across create/publish/submit/review/approve still needs a focused audit. See T-009.
+- Generated mutation wrappers include idempotency wiring on the active create path; Plan 12.4 verified `POST /api/v1/templates` with `Idempotency-Key` returning HTTP 201. Same-key replay behavior across create/publish/submit-for-approval/signoff still needs a focused audit. See T-009.
 
 ### 8.4 Pagination
 
@@ -463,7 +419,7 @@ Failure modes:
 ### 8.6 Concurrency / Transactions
 
 - Repository methods take `context.Context` and call `*sql.DB.ExecContext` directly Ã¢â‚¬â€ **no `pgx.Tx` parameter, no transactional wrapping at the service layer**.
-- Multi-step operations (publish, approve, create) emit 3Ã¢â‚¬â€œ5 statements as independent `ExecContext` calls. Partial-failure leaves inconsistent state and missing audit rows. See T-007.
+- Multi-step operations (publish, create) emit 3Ã¢â‚¬â€œ5 statements as independent `ExecContext` calls. Partial-failure leaves inconsistent state and missing audit rows. See T-007.
 - Draft save optimistic locking is enforced for `SaveTemplateDraft` through `UpdateVersionDraftCAS`; as of 2026-05-26 the shared `UpdateVersion` / `UpdateVersionTx` path also enforces `lock_version` compare-and-swap for lifecycle state changes so stale version transitions fail with `ErrStaleLockVersion` instead of silently clobbering newer state. As of 2026-05-31 (fix/templates-schema-occ-lock), `PUT /api/v1/templates/{id}/versions/{n}/schema` is also lock-version gated: the contract now requires `expected_lock_version`, the service calls `UpdateVersionSchemaCAS` / `UpdateVersionSchemaCASTx`, and CAS misses return HTTP 412 RFC 9457 `code: "stale_lock_version"`. Two concurrent editors can no longer silently last-write-wins each other; the FE surfaces the stale conflict and lets the user refetch. The legacy `/autosave/commit` route remains content-hash gated and does not carry a lock version. See T-010.
 
 ### 8.7 Tenant scoping
@@ -505,10 +461,10 @@ The inline `VersionActionPanel` component (previously embedded in `TemplateEdito
 | `{name}` single-brace token syntax | `wiki/decisions/0003-token-syntax-migration.md` |
 | Computed-token catalog single source of truth | `wiki/decisions/0008-placeholder-fixed-catalog.md` (amended by ADR 0050); `wiki/decisions/0050-computed-token-catalog-single-source.md` |
 | `templates → render/domain` cross-module edge (legal) | ADR 0050 — `templates` imports `render/domain` only; boundary law enforced by `scripts/check-module-boundaries.ps1:52` |
-| Two-tier authz | `wiki/decisions/0007-two-tier-authz.md` Ã¢â‚¬â€ applied Plan 5 (T-001 closed); `PublishTemplateVersion` role-binding check added 2026-05-31 (T-004 CLOSED) |
+| Two-tier authz | `wiki/decisions/0007-two-tier-authz.md` -- applied Plan 5 (T-001 closed); `PublishTemplateVersion` role-binding gate added 2026-05-31, then REMOVED 2026-07-13 by ROADMAP unit 3.1a S2 (identity SoD via `CheckSegregation` retained) |
 | Contract-first via oapi-codegen | `wiki/decisions/0012-contract-first-api.md` (PARTIAL Ã¢â‚¬â€ T-006) |
 | Hexagonal layer split (`domain/application/delivery/repository`) | tech-debt: missing-ADR (T-014) |
-| Two parallel publish paths (`Approve` vs `PublishTemplateVersion`) | tech-debt: covered by ADR 0007 (two-tier authz); T-004 CLOSED 2026-05-31 |
+| Single kernel-driven publish path (`Service.PublishTemplateVersion`, no parallel `Approve` chain) | ADR 0082 / ROADMAP unit 3.1a — T-004 resolved by retirement (legacy `Service.Approve` chain deleted, S4) |
 | Module-local audit **write** sink (`templates_audit_log`); `ListAudit` reads `metaldocs.audit_events` (Wave 1 half-fix) | tech-debt: T-013 (full write-path migration pending) |
 | `TemplateVersionPort` extended with `GetTemplateVersionState` — templates owns the raw state read; controlled-documents `PostgresTemplateVersionChecker` deleted + `status := "published"` hardcode removed (M4/F4.2) | [`wiki/decisions/0030-template-version-state-port.md`](../decisions/0030-template-version-state-port.md) |
 | Manual template versioning — `Approve`/`PublishTemplateVersion` transition status only; `CreateNextVersion` is the sole revision path; `next_draft*` dropped from contract; `in_review` → `under_review` | [`wiki/decisions/0052-template-manual-versioning.md`](../decisions/0052-template-manual-versioning.md) |
@@ -522,7 +478,7 @@ The inline `VersionActionPanel` component (previously embedded in `TemplateEdito
 |---|---|---|
 | Tenant isolation | Authn'd user from tenant A calls `GET /api/v1/templates/{id-from-tenant-B}/versions/1` with a known version_id | 404 not found (currently: 200 with the row Ã¢â‚¬â€ T-002) |
 | Authz enforcement | Authn'd user without `template.publish` calls `POST /publish` | 403 with Problem `metaldocs.authz.forbidden` (currently: 200 Ã¢â‚¬â€ T-001) |
-| Approval SoD | Author calls `POST /publish` on own draft | 403 with `{"code":"sod_violation"}` (T-004 CLOSED 2026-05-31; combined with role-binding gate) |
+| Approval SoD | Author calls `POST /publish` on own draft | 403 with `{"code":"sod_violation"}` (T-004 resolved by retirement, ROADMAP unit 3.1a — identity SoD `CheckSegregation` only, no role-binding) |
 | Placeholder injection | Template author saves schema with `{type:"computed", resolver_key:"; DROP TABLE Ã¢â‚¬Â¦"}` | 422 invalid resolver_key (currently: 204 saved Ã¢â‚¬â€ T-008) |
 | Idempotency | Client retries a generated POST route with same `Idempotency-Key` | second response equals first; one audit row/state transition (create path header covered; replay audit still open - T-009) |
 
@@ -540,7 +496,7 @@ Top 3 (by severity, then blast-radius):
 
 1. **T-001 closed Plan 5, autosave extension 2026-05-17** � `authz.Require` wired through `WithDB`; DOCX import/autosave commit now asserts `template.edit` before updating `templates_template_version`; tripwire on both templates tables (migration 0231).
 2. **Tenant sourced from `tenant.FromContext`** (`handler.go:83`) Ã¢â‚¬â€ Plan 3 closed the header-trust gap (T-003 resolved).
-3. **`PublishTemplateVersion` partially hardened Plan 5** (`lifecycle.go:320-347`) Ã¢â‚¬â€ `content_hash` gate + SoD check + `authz.Require(CapTemplatePublish)` added. Residual closed 2026-05-31 � `pending_approver_role` binding now enforced via `version.RoleBindingFor(VersionStatusPublished)` (T-004 CLOSED). Ã¢â‚¬â€ see tech-debt Ã‚Â§T-004
+3. **`PublishTemplateVersion` hardened, then simplified to kernel-only** (`lifecycle.go:51`) -- `content_hash` gate + identity SoD (`CheckSegregation`) + `authz.Require(CapTemplatePublish)`. The `pending_approver_role` role-binding gate added 2026-05-31 was REMOVED 2026-07-13 (ROADMAP unit 3.1a S2, T-004 resolved by retirement) — see tech-debt §T-004
 
 ---
 
@@ -551,8 +507,6 @@ Top 3 (by severity, then blast-radius):
 | Template | A reusable DOCX skeleton bound to a `doc_type_code` and `tenant_id`. Aggregate root; PK on `templates_template`. Runtime/API use selection is profile/document-type driven, not creator-scoped visibility driven. |
 | Template Version | A specific revision of a template (`version_number` per template). Carries the DOCX storage key, content hash, metadata + placeholder schemas, and lifecycle status. |
 | Placeholder | A `{name}` token in the DOCX whose `PHType` is one of the fixed 8-type placeholder catalog. Substituted at document finalize. |
-| Approval Config | Per-template binding of `reviewer_role` (optional) and `approver_role` (required). Drives `pending_*_role` on each new version. |
-| ApprovalConfig.HasReviewer | Boolean derived from `reviewer_role != nil`. Determines whether `Approve` requires `status == approved` (with reviewer) or `status == under_review` (without). |
 | Audit log (templates) | Module-local sink at `templates_audit_log`. Parallel to canonical `metaldocs.audit_events`. |
 | Obsolete | Status assigned to the previous published version when a new version is published. |
 
@@ -565,13 +519,13 @@ Top 3 (by severity, then blast-radius):
 | Postgres unavailable | 500 on all template mutating routes; lifecycle / autosave / publish reject | API logs; `/healthz` | Restore Postgres; autosave-uploaded DOCX in MinIO remains until commit |
 | MinIO presigned-PUT fails mid-import | Wizard / autosave commit not invoked; template version stays at prior content_hash | Frontend surfaces fetch error; `apps/api/cmd/metaldocs-api/main.go:327` controls 25 MiB cap | User retries; if persistent, MinIO healthcheck + CORS on dev (per 2026-05-17 hardening) |
 | Stale `lock_version` on PUT schema / lifecycle UPDATE | 412 `stale_lock_version`; client must refetch | OCC CAS in shared `UpdateVersion`/`UpdateVersionTx` (Wave 5, 2026-05-26) | Frontend `useTemplateSchemas` exposes `staleConflict`; user retries with fresh lock |
-| SoD violation on Approve | 409 `template.sod_violation`; cannot approve own work | `domain/approval.go:37 CheckSegregation` enforces author ? reviewer ? approver | Operator routes to different actor |
-| Publish path bypasses SoD (`Service.PublishTemplateVersion`) | Direct publish allowed without reviewer/approver chain | T-004 � known divergence between `Service.Approve` and `Service.PublishTemplateVersion` | Restrict `template.publish` capability; T-004 tracks unification |
-| Missing `template.publish` / `template.approve` capability | 403 `authz.forbidden` from tier-2 (PR #37 added `pending_approver_role` Tier-2 binding) | Backend authz check | Operator escalates; never bypass tier-1 |
+| SoD violation on signoff (kernel) | 409 equivalent from approval kernel; cannot approve own authorship | `domain/approval.go CheckSegregation` enforces actor != author | Operator routes to different actor |
+| Publish enforces identity SoD (no bypass) | `Service.PublishTemplateVersion` rejects self-publish regardless of source status (`draft` or `approved`) | `CheckSegregation` on every publish (T-004 resolved by retirement, ROADMAP unit 3.1a) | N/A — enforced, not a failure mode; kept for historical trace |
+| Missing `template.publish` / `template.approve` capability | 403 `authz.forbidden` from tier-2 | Backend authz check | Operator escalates; never bypass tier-1 |
 | Placeholder validation rejects unknown PHType | 422 `template.invalid_placeholder` | `application/schema.go:84 ValidatePlaceholders` enforces fixed 8-type placeholder catalog | Author fixes schema; refer to `wiki/concepts/placeholders.md` |
 | `PHComputed` resolver_key unknown (registry wired) | 422 `template.unknown_resolver` | `ResolverRegistryReader` lookup fails | Operator registers the resolver; T-008 � currently nil registry at wiring |
 | Tripwire abort on template_version write | 500 (mapped to RFC 9457); INSERT rejected because `metaldocs.asserted_caps` missing | Postgres `RAISE` from template tripwire | Code path bypassed `authz.Require(CapTemplateEdit/...)`; 2026-05-17 CommitAutosave/SaveTemplateDraft hardening wraps writes in `template.edit` tx |
-| Idempotency replay on submit/review/approve/publish | 200 with prior body; lifecycle state unchanged | PR #36 stabilized idempotency key handling | Expected; safe network retry |
+| Idempotency replay on submit-for-approval/signoff/publish | 200 with prior body; lifecycle state unchanged | PR #36 stabilized idempotency key handling | Expected; safe network retry |
 | Templates audit split (`ListAudit` fixed Wave 1; write path still `templates_audit_log`) | `ListAudit` reads `metaldocs.audit_events`; domain-event writes still append to `templates_audit_log` | T-013 � known gap | Migrate to canonical sink; current sink remains append-only |
 | Obsolete-on-publish race (two near-simultaneous publishes) | Both could attempt to obsolete the same prior published version | `UpdateVersionTx` OCC compares lock_version; loser retries | Loser refetches and rebuilds publish |
 
@@ -590,6 +544,7 @@ Top 3 (by severity, then blast-radius):
 
 ## Changelog
 
+- 2026-07-13 - ROADMAP unit 3.1a (ADR 0082 retirement executed): legacy 4-route role-based approval path deleted (`submit`/`review`/`approve`/`approval-config` handlers, `Service.SubmitForReview`/`Review`/`Approve`/`UpsertApprovalConfig`, `domain.ApprovalConfig`, `VersionDTO.pending_reviewer_role`/`pending_approver_role` wire fields, `ErrForbiddenRole`/`ErrInvalidApprovalConfig`, 3 repo methods); `CreateTemplate` no longer seeds approval roles (S1); `PublishTemplateVersion` is kernel-driven — role-binding gate deleted, capability + identity SoD (`CheckSegregation`) only, accepts `draft`/`approved` sources (S2); publish is bodyless, `schema_key` server-derived (S2b); frontend rebuilt onto kernel routes (`submitTemplateVersionForApproval`/`signoffTemplateVersion`, S3); `CapTemplateReview` retired (capability registry 40→39) and `templates_approval_config` dropped via migration 0302 behind a pre-drop emptiness assert (S5). `pending_reviewer_role`/`pending_approver_role` DB columns retained as named debt (write-never/read-never, ratified out of the 0302 drop list). §5.4a ("transitional coexistence") removed — kernel is now the sole approval path. See [ADR 0082](../decisions/0082-approval-kernel-extraction.md) execution note and `docs/superpowers/reports/2026-07-13-unit-3.1a-evidence.md`.
 - 2026-07-12 - M3 (approval-remediation, [ADR 0082](../decisions/0082-approval-kernel-extraction.md)): two additive kernel routes wired (`POST /templates/{id}/versions/{n}/submit-for-approval`, `POST /templates/{id}/versions/{n}/signoff`, `internal/modules/templates/delivery/http/routes_approval_kernel.go`), thin adapters delegating to the newly-promoted top-level `approval` module's subject-generic `TemplateSubmitService`/`DecisionService`. The 4 legacy role-based routes and `templates_approval_config` are untouched — new §5.4a documents the transitional coexistence and the ROADMAP 3.1a retirement plan.
 - 2026-06-30 - ADR 0052 + ADR 0053: manual versioning (no auto-next-draft on approve/publish); `CreateNextVersion` is the sole revision path; `next_draft*` dropped from OpenAPI contract (regen, no drift); status renamed `in_review` to `under_review` (DB migration + contract + FE literals in `canActOnVersion.ts`); `Approve` returns `ApproveResult{Version}` only; `PublishTemplateVersion` returns `PublishTemplateVersionResult{PublishedVersion}` only. Templates now render through the shared controlled-artifact view layer: `TemplateDetailRoute` + `TemplateApprovalRoute` route wrappers; per-kind adapters `useTemplateArtifact` + `useTemplateApprovalArtifact`; inline `VersionActionPanel` removed.
 - 2026-06-29 - ADR 0050: computed-token catalog single source of truth. Hand-maintained 7-key `placeholderCatalog` slice (routes_catalog.go) and `placeholderCatalogSet` (schema.go) both deleted; both consumers now derive from `render/domain.ComputedCatalog()`. `approval_date` is now author-visible (was absent from both copies). Bidirectional parity guard added in render module (`catalog_parity_test.go`). `templates → render/domain` legal edge per `check-module-boundaries.ps1`.

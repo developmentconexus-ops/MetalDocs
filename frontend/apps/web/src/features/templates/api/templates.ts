@@ -18,18 +18,21 @@ export type VersionRef = components['schemas']['TemplateVersionRef'];
 // envelope-vs-flat shape can never drift from api/openapi. Verified 1:1
 // against the Go handlers (internal/modules/templates/delivery/http/*.go):
 // getTemplate -> {data:{template,latest_version}}; getDocxURL -> {data:{url}};
-// submit/review -> TemplateVersionEnvelope {data:{version}}; approve ->
-// ApproveTemplateVersionResponse {data:{version}}; updateTemplateSchema ->
-// {data:{version}}.
+// updateTemplateSchema -> {data:{version}}.
 type GetTemplateResponse = operations['getTemplate']['responses'][200]['content']['application/json'];
 type GetTemplateDocxUrlResponse =
   operations['getTemplateDocxUrl']['responses'][200]['content']['application/json'];
-type TemplateVersionEnvelope =
-  operations['submitTemplateVersion']['responses'][200]['content']['application/json'];
-type ApproveTemplateVersionResponse =
-  operations['approveTemplateVersion']['responses'][200]['content']['application/json'];
 type UpdateTemplateSchemaResponse =
   operations['updateTemplateSchema']['responses'][200]['content']['application/json'];
+// Approval-kernel flow (submit-for-approval -> signoff -> publish). Submit
+// keeps the {data:{...}} envelope; signoff and publish are flat (ADR 0035).
+type SubmitForApprovalResponse =
+  operations['submitTemplateVersionForApproval']['responses'][200]['content']['application/json'];
+type SignoffVersionRequest = components['schemas']['SignoffTemplateVersionRequest'];
+type SignoffVersionResponse =
+  operations['signoffTemplateVersion']['responses'][200]['content']['application/json'];
+type PublishVersionResponse =
+  operations['publishTemplateVersion']['responses'][200]['content']['application/json'];
 
 export type TemplateDTO = components['schemas']['TemplateDTO'];
 export type VersionDTO = components['schemas']['VersionDTO'];
@@ -159,48 +162,49 @@ export async function getDocxURL(templateId: string, versionNum: number): Promis
   return body.data.url;
 }
 
-export async function submitForReview(
+// Kernel approval flow: draft --submitVersionForApproval--> under_review
+// --signoffVersion--> approved (or back to draft on reject) --publishVersion--> published.
+
+export async function submitVersionForApproval(
   templateId: string,
   versionNum: number,
   idempotencyKey: string,
-): Promise<VersionDTO> {
-  const data = await apiFetch<TemplateVersionEnvelope>(
-    `/api/v1/templates/${templateId}/versions/${versionNum}/submit`,
+): Promise<SubmitForApprovalResponse['data']> {
+  const body = await apiFetch<SubmitForApprovalResponse>(
+    `/api/v1/templates/${templateId}/versions/${versionNum}/submit-for-approval`,
     { method: 'POST', idempotencyKey },
   );
-  return data.data.version as VersionDTO;
+  return body.data;
 }
 
-export async function reviewVersion(
+export async function signoffVersion(
   templateId: string,
   versionNum: number,
-  accept: boolean,
+  cmd: { decision: 'approve' | 'reject'; reason?: string; password: string },
   idempotencyKey: string,
-  reason?: string,
-): Promise<VersionDTO> {
-  const data = await apiFetch<TemplateVersionEnvelope>(
-    `/api/v1/templates/${templateId}/versions/${versionNum}/review`,
-    { method: 'POST', idempotencyKey, body: JSON.stringify({ accept, reason: reason || '' }) },
+): Promise<SignoffVersionResponse> {
+  const payload: SignoffVersionRequest = {
+    decision: cmd.decision,
+    ...(cmd.reason ? { reason: cmd.reason } : {}),
+    password: cmd.password,
+  };
+  return apiFetch<SignoffVersionResponse>(
+    `/api/v1/templates/${templateId}/versions/${versionNum}/signoff`,
+    { method: 'POST', idempotencyKey, body: JSON.stringify(payload) },
   );
-  return data.data.version as VersionDTO;
 }
 
-export async function approveVersion(
+// No body (S2b) — the kernel publish endpoint takes the version's already-approved
+// state as sole input; sending one would just be dead payload.
+export async function publishVersion(
   templateId: string,
   versionNum: number,
-  accept: boolean,
   idempotencyKey: string,
-  reason?: string,
-): Promise<VersionDTO> {
-  const data = await apiFetch<ApproveTemplateVersionResponse>(
-    `/api/v1/templates/${templateId}/versions/${versionNum}/approve`,
-    {
-      method: 'POST',
-      idempotencyKey,
-      body: JSON.stringify({ accept, reason: reason || '' }),
-    },
+): Promise<PublishVersionResponse> {
+  return apiFetch<PublishVersionResponse>(
+    `/api/v1/templates/${templateId}/versions/${versionNum}/publish`,
+    { method: 'POST', idempotencyKey },
   );
-  return data.data.version as VersionDTO;
 }
 
 // Wire-format types (backend snake_case)

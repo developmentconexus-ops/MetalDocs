@@ -55,13 +55,6 @@ func toAPIVersionDTO(v *domain.TemplateVersion) (templatesapi.VersionDTO, error)
 		CreatedAt:         v.CreatedAt.UTC(),
 	}
 
-	if v.PendingReviewerRole != nil {
-		dto.PendingReviewerRole = v.PendingReviewerRole
-	}
-	if v.PendingApproverRole != "" {
-		s := v.PendingApproverRole
-		dto.PendingApproverRole = &s
-	}
 	dto.ReviewerId = v.ReviewerID
 	dto.ApproverId = v.ApproverID
 	dto.SubmittedAt = utcPtr(v.SubmittedAt)

@@ -82,10 +82,8 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "templates schema upload url", method: http.MethodPost, path: "/api/v1/templates/t1/versions/1/schema-upload-url", wantCap: iamdomain.CapTemplateEdit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "templates autosave presign", method: http.MethodPost, path: "/api/v1/templates/t1/versions/1/autosave/presign", wantCap: iamdomain.CapTemplateEdit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "templates autosave commit", method: http.MethodPost, path: "/api/v1/templates/t1/versions/1/autosave/commit", wantCap: iamdomain.CapTemplateEdit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "templates submit", method: http.MethodPost, path: "/api/v1/templates/t1/versions/1/submit", wantCap: iamdomain.CapTemplateSubmit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "templates review", method: http.MethodPost, path: "/api/v1/templates/t1/versions/1/review", wantCap: iamdomain.CapTemplateReview, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "templates approve", method: http.MethodPost, path: "/api/v1/templates/t1/versions/1/approve", wantCap: iamdomain.CapTemplateApprove, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "templates approval config", method: http.MethodPut, path: "/api/v1/templates/t1/approval-config", wantCap: iamdomain.CapTemplateEdit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "templates submit-for-approval", method: http.MethodPost, path: "/api/v1/templates/t1/versions/1/submit-for-approval", wantCap: iamdomain.CapTemplateSubmit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "templates signoff", method: http.MethodPost, path: "/api/v1/templates/t1/versions/1/signoff", wantCap: iamdomain.CapTemplateApprove, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "templates archive", method: http.MethodPost, path: "/api/v1/templates/t1/archive", wantCap: iamdomain.CapTemplateArchive, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 
 		// --- Permission-guarded: IAM users (F-001 split: GET=view, writes=manage) ---
@@ -298,10 +296,8 @@ func TestRouteCoverage(t *testing.T) {
 		{"templates", http.MethodPost, "/api/v1/templates/t1/versions/1/docx-upload-url"},
 		{"templates", http.MethodPost, "/api/v1/templates/t1/versions/1/schema-upload-url"},
 		{"templates", http.MethodPost, "/api/v1/templates/t1/versions/1/autosave/presign"},
-		{"templates", http.MethodPost, "/api/v1/templates/t1/versions/1/submit"},
-		{"templates", http.MethodPost, "/api/v1/templates/t1/versions/1/review"},
-		{"templates", http.MethodPost, "/api/v1/templates/t1/versions/1/approve"},
-		{"templates", http.MethodPut, "/api/v1/templates/t1/approval-config"},
+		{"templates", http.MethodPost, "/api/v1/templates/t1/versions/1/submit-for-approval"},
+		{"templates", http.MethodPost, "/api/v1/templates/t1/versions/1/signoff"},
 		{"templates", http.MethodPost, "/api/v1/templates/t1/archive"},
 		{"templates", http.MethodGet, "/api/v1/signed"},
 

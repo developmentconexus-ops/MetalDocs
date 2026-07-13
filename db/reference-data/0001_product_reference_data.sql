@@ -83,7 +83,6 @@ INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES (
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('approver', 'document.submit', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('approver', 'document.view', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('approver', 'template.approve', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('approver', 'template.review', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('approver', 'template.view', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('area_admin', 'document.create', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('area_admin', 'document.edit', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
@@ -119,7 +118,6 @@ INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES (
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'taxonomy.manage', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'template.approve', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'template.publish', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'template.review', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'template.view', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('signer', 'document.signoff', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('signer', 'document.view', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
@@ -139,7 +137,6 @@ INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES (
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('system_admin', 'template.create', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('system_admin', 'template.edit', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('system_admin', 'template.publish', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('system_admin', 'template.review', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('system_admin', 'template.submit', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('system_admin', 'template.view', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('system_admin', 'user.manage', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;

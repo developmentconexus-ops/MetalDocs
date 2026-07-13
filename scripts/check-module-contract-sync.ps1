@@ -21,14 +21,17 @@ function New-ModuleConfig {
                 RuntimePatterns = @('templatesapi.HandlerWithOptions', '/api/v1/templates')
                 OpenApiFile = 'api/openapi/v1/openapi.yaml'
                 # AD-1: spec path keys are relative (servers.url already carries /api/v1).
-                OpenApiPatterns = @('/templates:', '/templates/{id}/versions/{n}/submit:', '/templates/placeholder-catalog:')
+                # ADR 0082 slice S4: legacy submit/review/approve triad retired in favor of
+                # the approval-kernel routes (submit-for-approval / signoff); presence
+                # patterns below track the kernel-era route/symbol names.
+                OpenApiPatterns = @('/templates:', '/templates/{id}/versions/{n}/submit-for-approval:', '/templates/placeholder-catalog:')
                 BackendFile = 'internal/modules/templates/api/api.gen.go'
-                BackendPatterns = @('ListTemplates', 'CreateTemplate', 'GetTemplate', 'SubmitTemplateVersion')
+                BackendPatterns = @('ListTemplates', 'CreateTemplate', 'GetTemplate', 'SubmitTemplateVersionForApproval')
                 FrontendTypesFile = 'frontend/apps/web/src/lib/api-types/index.d.ts'
                 # Generated index.d.ts keys are also relative (same AD-1 migration).
-                FrontendTypesPatterns = @('"/templates":', '"/templates/{id}/versions/{n}/submit":', '"/templates/placeholder-catalog":')
+                FrontendTypesPatterns = @('"/templates":', '"/templates/{id}/versions/{n}/submit-for-approval":', '"/templates/placeholder-catalog":')
                 FrontendWrapperFile = 'frontend/apps/web/src/features/templates/api/templates.ts'
-                FrontendWrapperPatterns = @('/api/v1/templates', 'submitForReview', 'approveVersion', 'putTemplateSchemas')
+                FrontendWrapperPatterns = @('/api/v1/templates', 'submitVersionForApproval', 'signoffVersion', 'putTemplateSchemas')
                 RouteFamilies = @('/api/v1/templates')
                 WikiFile = 'wiki/modules/templates.md'
                 UsesGeneratedBoundary = $true

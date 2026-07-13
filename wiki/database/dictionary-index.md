@@ -68,7 +68,7 @@
 | `template_audit_log` | `public` | templates | `wiki/database/tables/template_audit_log.md` |
 | `template_versions` | `public` | templates | `wiki/database/tables/template_versions.md` (RETIRED 2026-07-03, migration 0268 — canonical successor is `templates_template_version`) |
 | `templates` | `public` | templates | `wiki/database/tables/templates.md` (RETIRED 2026-07-03, migration 0268 — canonical successor is `templates_template`) |
-| `templates_approval_config` | `public` | templates | `wiki/database/tables/templates_approval_config.md` |
+| `templates_approval_config` | `public` | templates | `wiki/database/tables/templates_approval_config.md` (DROPPED 2026-07-13, migration 0302 — ROADMAP unit 3.1a, ADR 0082) |
 | `templates_audit_log` | `public` | templates | `wiki/database/tables/templates_audit_log.md` (RETIRED 2026-07-02, migration 0262 — audit sink is `metaldocs.audit_events`) |
 | `templates_template` | `public` | templates | `wiki/database/tables/templates_template.md` |
 | `templates_template_version` | `public` | templates | `wiki/database/tables/templates_template_version.md` |

@@ -1,348 +1,13 @@
 package http_test
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
-	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/templates/domain"
 )
-
-func strPtr(v string) *string { return &v }
-
-func withActorRoles(req *http.Request, roles string) {
-	parts := strings.Split(roles, ",")
-	ctxRoles := make([]iamdomain.Role, 0, len(parts))
-	for _, role := range parts {
-		role = strings.TrimSpace(role)
-		if role == "" {
-			continue
-		}
-		ctxRoles = append(ctxRoles, iamdomain.Role(role))
-	}
-	*req = *req.WithContext(iamdomain.WithAuthContext(req.Context(), iamdomain.UserIDFromContext(req.Context()), ctxRoles))
-}
-
-func TestSubmitForReview_Happy(t *testing.T) {
-	repo := newFakeRepo()
-	reviewerRole := "reviewer"
-	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
-	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
-		ID:            "22222222-2222-4222-8222-222222222222",
-		TemplateID:    "11111111-1111-1111-1111-111111111111",
-		VersionNumber: 1,
-		Status:        domain.VersionStatusDraft,
-		ContentHash:   "deadbeef",
-		AuthorID:      "author-1",
-	}
-	repo.approvalConfigs["11111111-1111-1111-1111-111111111111"] = &domain.ApprovalConfig{
-		TemplateID:   "11111111-1111-1111-1111-111111111111",
-		ReviewerRole: &reviewerRole,
-		ApproverRole: "approver",
-	}
-	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/submit", nil)
-	withHeaders(req)
-	rr := httptest.NewRecorder()
-
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
-	}
-
-	var out struct {
-		Data struct {
-			Version struct {
-				Status string `json:"status"`
-			} `json:"version"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
-		t.Fatalf("decode body: %v", err)
-	}
-	if out.Data.Version.Status != string(domain.VersionStatusUnderReview) {
-		t.Fatalf("expected status=under_review, got %q", out.Data.Version.Status)
-	}
-}
-
-func TestSubmitForReview_UsesTemplateSubmitCapability(t *testing.T) {
-	repo := newFakeRepo()
-	reviewerRole := "reviewer"
-	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
-	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
-		ID:            "22222222-2222-4222-8222-222222222222",
-		TemplateID:    "11111111-1111-1111-1111-111111111111",
-		VersionNumber: 1,
-		Status:        domain.VersionStatusDraft,
-		ContentHash:   "deadbeef",
-		AuthorID:      "author-1",
-	}
-	repo.approvalConfigs["11111111-1111-1111-1111-111111111111"] = &domain.ApprovalConfig{
-		TemplateID:   "11111111-1111-1111-1111-111111111111",
-		ReviewerRole: &reviewerRole,
-		ApproverRole: "approver",
-	}
-
-	var gotAction string
-	mux := newMux(t, func(_ *http.Request, _, _, action string) error {
-		gotAction = action
-		return nil
-	}, repo)
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/submit", nil)
-	withHeaders(req)
-	rr := httptest.NewRecorder()
-
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
-	}
-	if gotAction != "template.submit" {
-		t.Fatalf("authz action = %q, want template.submit", gotAction)
-	}
-}
-
-func TestSubmitForReview_NonDraft(t *testing.T) {
-	repo := newFakeRepo()
-	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
-	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
-		ID:            "22222222-2222-4222-8222-222222222222",
-		TemplateID:    "11111111-1111-1111-1111-111111111111",
-		VersionNumber: 1,
-		Status:        domain.VersionStatusUnderReview,
-	}
-	repo.approvalConfigs["11111111-1111-1111-1111-111111111111"] = &domain.ApprovalConfig{TemplateID: "11111111-1111-1111-1111-111111111111", ApproverRole: "approver"}
-	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/submit", nil)
-	withHeaders(req)
-	rr := httptest.NewRecorder()
-
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusConflict {
-		t.Fatalf("expected 409, got %d body=%s", rr.Code, rr.Body.String())
-	}
-
-	var out struct {
-		Code string `json:"code"`
-	}
-	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
-		t.Fatalf("decode body: %v", err)
-	}
-	if out.Code != "STATE_TRANSITION_INVALID" {
-		t.Fatalf("expected error.code=STATE_TRANSITION_INVALID, got %q", out.Code)
-	}
-}
-
-func TestSubmitForReview_NoUpload(t *testing.T) {
-	repo := newFakeRepo()
-	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
-	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
-		ID:            "22222222-2222-4222-8222-222222222222",
-		TemplateID:    "11111111-1111-1111-1111-111111111111",
-		VersionNumber: 1,
-		Status:        domain.VersionStatusDraft,
-		ContentHash:   "", // no autosave committed
-	}
-	repo.approvalConfigs["11111111-1111-1111-1111-111111111111"] = &domain.ApprovalConfig{TemplateID: "11111111-1111-1111-1111-111111111111", ApproverRole: "approver"}
-	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/submit", nil)
-	withHeaders(req)
-	rr := httptest.NewRecorder()
-
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusConflict {
-		t.Fatalf("expected 409, got %d body=%s", rr.Code, rr.Body.String())
-	}
-
-	var out struct {
-		Code string `json:"code"`
-	}
-	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
-		t.Fatalf("decode body: %v", err)
-	}
-	if out.Code != "UPLOAD_MISSING" {
-		t.Fatalf("expected error.code=UPLOAD_MISSING, got %q", out.Code)
-	}
-}
-
-func TestSubmitForReview_SystemOwnedTemplateImmutable(t *testing.T) {
-	repo := newFakeRepo()
-	templateID := "00000000-0000-0000-0000-000000000101"
-	repo.templates[templateID] = &domain.Template{
-		ID:          templateID,
-		TenantID:    "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-		SystemOwned: true,
-	}
-	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
-		ID:            "22222222-2222-4222-8222-222222222222",
-		TemplateID:    templateID,
-		VersionNumber: 1,
-		Status:        domain.VersionStatusDraft,
-		ContentHash:   "deadbeef",
-	}
-	repo.approvalConfigs[templateID] = &domain.ApprovalConfig{TemplateID: templateID, ApproverRole: "approver"}
-	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates/"+templateID+"/versions/1/submit", nil)
-	withHeaders(req)
-	rr := httptest.NewRecorder()
-
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusConflict {
-		t.Fatalf("expected 409, got %d body=%s", rr.Code, rr.Body.String())
-	}
-
-	var out struct {
-		Code string `json:"code"`
-	}
-	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
-		t.Fatalf("decode body: %v", err)
-	}
-	if out.Code != "SYSTEM_TEMPLATE_IMMUTABLE" {
-		t.Fatalf("expected error.code=SYSTEM_TEMPLATE_IMMUTABLE, got %q", out.Code)
-	}
-}
-
-func TestReview_Accept_Happy(t *testing.T) {
-	repo := newFakeRepo()
-	reviewerRole := "reviewer"
-	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
-	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
-		ID:                  "22222222-2222-4222-8222-222222222222",
-		TemplateID:          "11111111-1111-1111-1111-111111111111",
-		VersionNumber:       1,
-		Status:              domain.VersionStatusUnderReview,
-		AuthorID:            "author-1",
-		PendingReviewerRole: &reviewerRole,
-	}
-	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
-
-	raw, _ := json.Marshal(map[string]any{"accept": true})
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/review", bytes.NewReader(raw))
-	withHeaders(req)
-	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "reviewer-1", []iamdomain.Role{}))
-	withActorRoles(req, "reviewer")
-	rr := httptest.NewRecorder()
-
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
-	}
-
-	var out struct {
-		Data struct {
-			Version struct {
-				Status string `json:"status"`
-			} `json:"version"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
-		t.Fatalf("decode body: %v", err)
-	}
-	if out.Data.Version.Status != string(domain.VersionStatusApproved) {
-		t.Fatalf("expected status=approved, got %q", out.Data.Version.Status)
-	}
-}
-
-func TestApprove_Accept_Happy(t *testing.T) {
-	repo := newFakeRepo()
-	reviewerRole := "reviewer"
-	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
-	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
-		ID:                  "22222222-2222-4222-8222-222222222222",
-		TemplateID:          "11111111-1111-1111-1111-111111111111",
-		VersionNumber:       1,
-		Status:              domain.VersionStatusApproved,
-		ContentHash:         "deadbeef", // F-T2: publish path now gates on a committed docx
-		AuthorID:            "author-1",
-		PendingReviewerRole: &reviewerRole,
-		PendingApproverRole: "approver",
-		ReviewerID:          strPtr("reviewer-1"),
-	}
-	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
-
-	raw, _ := json.Marshal(map[string]any{"accept": true})
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/approve", bytes.NewReader(raw))
-	withHeaders(req)
-	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "approver-1", []iamdomain.Role{}))
-	withActorRoles(req, "approver")
-	rr := httptest.NewRecorder()
-
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
-	}
-
-	var out struct {
-		Data struct {
-			Version struct {
-				Status        string `json:"status"`
-				VersionNumber int    `json:"version_number"`
-			} `json:"version"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
-		t.Fatalf("decode body: %v", err)
-	}
-	if out.Data.Version.Status != string(domain.VersionStatusPublished) {
-		t.Fatalf("expected status=published, got %q", out.Data.Version.Status)
-	}
-	// M1·T2: the approve-publish response no longer carries a next_draft field;
-	// the strict-decode typed-response tests (routes_typed_response_f53/f61) are
-	// the wire-shape guard. This test asserts the published status only.
-}
-
-func TestApprove_Reject_ReturnsDraftVersionOnly(t *testing.T) {
-	repo := newFakeRepo()
-	reviewerRole := "reviewer"
-	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
-	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
-		ID:                  "22222222-2222-4222-8222-222222222222",
-		TemplateID:          "11111111-1111-1111-1111-111111111111",
-		VersionNumber:       1,
-		Status:              domain.VersionStatusApproved,
-		ContentHash:         "deadbeef", // F-T2: publish path now gates on a committed docx
-		AuthorID:            "author-1",
-		PendingReviewerRole: &reviewerRole,
-		PendingApproverRole: "approver",
-		ReviewerID:          strPtr("reviewer-1"),
-	}
-	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
-
-	raw, _ := json.Marshal(map[string]any{"accept": false, "reason": "needs work"})
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/approve", bytes.NewReader(raw))
-	withHeaders(req)
-	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "approver-1", []iamdomain.Role{}))
-	withActorRoles(req, "approver")
-	rr := httptest.NewRecorder()
-
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
-	}
-
-	var out struct {
-		Data struct {
-			Version struct {
-				Status string `json:"status"`
-			} `json:"version"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
-		t.Fatalf("decode body: %v", err)
-	}
-	if out.Data.Version.Status != string(domain.VersionStatusDraft) {
-		t.Fatalf("expected status=draft on reject, got %q", out.Data.Version.Status)
-	}
-	// M1·T2: next_draft field removed; reject path returns only version.
-}
 
 func TestArchiveTemplate_Happy(t *testing.T) {
 	repo := newFakeRepo()
@@ -399,33 +64,36 @@ func TestArchiveTemplate_SystemOwnedTemplateImmutable(t *testing.T) {
 	}
 }
 
-// TestPublishTemplateVersion_ForbiddenRoleRFC9457 verifies that POST /publish
-// rejects an actor who holds the template.publish capability but lacks the
-// version's PendingApproverRole binding, returning RFC 9457 problem+json with
-// `code: "FORBIDDEN_CAPABILITY"` and HTTP 403. Closes residual T-004 contract gap.
-func TestPublishTemplateVersion_ForbiddenRoleRFC9457(t *testing.T) {
+// TestPublishTemplateVersion_SelfPublishForbiddenRFC9457 verifies that POST
+// /publish rejects an actor attempting to publish a version they authored,
+// returning RFC 9457 problem+json with `code: "ISO_SEGREGATION_VIOLATION"`
+// and HTTP 403. This is the surviving identity-based SoD gate (CheckSegregation).
+//
+// Formerly TestPublishTemplateVersion_ForbiddenRoleRFC9457, which asserted the
+// role-binding tier-2 gate (RoleBindingFor(Published) + containsRole). ADR
+// 0082 unit 3.1a slice S2 deletes that gate — a capability holder with no
+// matching role now publishes successfully (see
+// TestPublishTemplateVersion_NoRoles_CapabilityAlone in lifecycle_test.go for
+// the application-layer equivalent). No other HTTP-level test in this module
+// asserted the identity-SoD 403 shape, so this test is rewritten rather than
+// deleted to close that coverage gap.
+func TestPublishTemplateVersion_SelfPublishForbiddenRFC9457(t *testing.T) {
 	repo := newFakeRepo()
 	templateID := "11111111-1111-1111-1111-111111111111"
 	repo.templates[templateID] = &domain.Template{ID: templateID, TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", LatestVersion: 1}
 	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
-		ID:                  "22222222-2222-4222-8222-222222222222",
-		TemplateID:          templateID,
-		VersionNumber:       1,
-		Status:              domain.VersionStatusDraft,
-		DocxStorageKey:      "templates/" + templateID + "/versions/1.docx",
-		ContentHash:         "hash_ok",
-		AuthorID:            "author-1",
-		PendingApproverRole: "approver",
+		ID:             "22222222-2222-4222-8222-222222222222",
+		TemplateID:     templateID,
+		VersionNumber:  1,
+		Status:         domain.VersionStatusDraft,
+		DocxStorageKey: "templates/" + templateID + "/versions/1.docx",
+		ContentHash:    "hash_ok",
+		AuthorID:       "user-a", // matches withHeaders' actor id below -> self-publish
 	}
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 
-	body, _ := json.Marshal(map[string]any{
-		"schema_key": "templates/" + templateID + "/versions/1.schema.json",
-	})
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates/"+templateID+"/versions/1/publish", bytes.NewReader(body))
-	withHeaders(req)
-	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "publisher-1", []iamdomain.Role{}))
-	withActorRoles(req, "editor") // capability holder, NOT the required approver role
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates/"+templateID+"/versions/1/publish", nil)
+	withHeaders(req) // sets actor "user-a" -- the version's own AuthorID
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
@@ -439,49 +107,15 @@ func TestPublishTemplateVersion_ForbiddenRoleRFC9457(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Code != "FORBIDDEN_CAPABILITY" {
-		t.Fatalf("expected error.code=FORBIDDEN_CAPABILITY, got %q (body=%s)", out.Code, rr.Body.String())
+	if out.Code != "ISO_SEGREGATION_VIOLATION" {
+		t.Fatalf("expected error.code=ISO_SEGREGATION_VIOLATION, got %q (body=%s)", out.Code, rr.Body.String())
 	}
 
 	stored := repo.versions["22222222-2222-4222-8222-222222222222"]
 	if stored.Status != domain.VersionStatusDraft {
 		t.Fatalf("expected version status unchanged (draft), got %q", stored.Status)
 	}
-	if len(repo.audit) != 1 || repo.audit[0].Action != domain.AuditPublishForbiddenRole {
-		t.Fatalf("expected one publish_forbidden_role audit event, got %+v", repo.audit)
-	}
-}
-
-func TestUpsertApprovalConfig_Happy(t *testing.T) {
-	repo := newFakeRepo()
-	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", CreatedBy: "user-a"}
-	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
-
-	raw, _ := json.Marshal(map[string]any{
-		"reviewer_role": "reviewer",
-		"approver_role": "approver",
-	})
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/templates/11111111-1111-1111-1111-111111111111/approval-config", bytes.NewReader(raw))
-	withHeaders(req)
-	withActorRoles(req, "editor")
-	rr := httptest.NewRecorder()
-
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
-	}
-
-	var out struct {
-		Data struct {
-			ApprovalConfig struct {
-				ApproverRole string `json:"approver_role"`
-			} `json:"approval_config"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
-		t.Fatalf("decode body: %v", err)
-	}
-	if out.Data.ApprovalConfig.ApproverRole != "approver" {
-		t.Fatalf("expected data.approval_config.approver_role=approver, got %q", out.Data.ApprovalConfig.ApproverRole)
+	if len(repo.audit) != 0 {
+		t.Fatalf("expected no audit events on a segregation-blocked publish, got %+v", repo.audit)
 	}
 }

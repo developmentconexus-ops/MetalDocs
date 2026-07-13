@@ -5,14 +5,15 @@ import (
 	"strings"
 )
 
-// RenderMigration renders the full 0300 forward-only migration SQL,
-// regenerated from the prior tripwire migration (0299) with every CASE branch
-// preserved byte-for-byte EXCEPT approval_signoffs/INSERT, which becomes a
-// parent-lookup nested CASE (ADR 0083 follow-on, M3 P3.S2b-3b-iii-a):
-// approval_signoffs has no direct subject_kind column, so its subject is
-// resolved via the parent approval_instances row (NEW.approval_instance_id) —
-// parent subject_kind 'document' requires exactly document.signoff, parent
-// subject_kind 'template' requires exactly template.approve, never unioned.
+// RenderMigration renders the full 0301 forward-only migration SQL,
+// regenerated from the prior tripwire migration (0300) with every CASE branch
+// preserved byte-for-byte EXCEPT templates_template_version, whose
+// v_required_caps literal drops 'template.review' (ADR 0082 phase c, unit
+// 3.1a S5): the legacy reviewer stage (Service.Review) — the only writer that
+// asserted the cap on that table (added by 0269) — was deleted with the
+// legacy template-approval path, and CapTemplateReview is retired from the
+// IAM capability registry in the same change-set (compile-enforced: the arm
+// references the Go const, which no longer exists).
 // Branch order follows M2 validation-contract.md §1.2 as extended by M6 §3
 // (documents/UPDATE gains document.review), M7 §5 (tenants/INSERT arm), M7 §5
 // (tenant_lifecycle_jobs/INSERT arm), ADR 0083 (approval_instances/INSERT
@@ -104,6 +105,9 @@ func RenderMigration() string {
 		"    WHEN TG_TABLE_NAME = 'templates_template_version' THEN\n" +
 		"      -- 0269: 'template.review' added — the reviewer stage (Service.Review)\n" +
 		"      -- writes this table under CapTemplateReview; see file header.\n" +
+		"      -- 0301 (ADR 0082 phase c, unit 3.1a S5): 'template.review' removed —\n" +
+		"      -- the legacy reviewer stage was deleted and the capability retired;\n" +
+		"      -- see file header.\n" +
 		"      v_required_caps := " + renderArray(findArm("templates_template_version", OpAny)) + ";\n" +
 		"      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);\n" +
 		"    -- ── New branches (SEC-05 / T-004 residual) ──────────────────────────────\n" +
@@ -242,54 +246,48 @@ func RenderMigration() string {
 		"-- ── schema_migrations ledger ─────────────────────────────────────────────────────────────\n" +
 		"\n" +
 		"INSERT INTO public.schema_migrations (version, description)\n" +
-		"VALUES ('0300', '" + ledgerDescription + "')\n" +
+		"VALUES ('0301', '" + ledgerDescription + "')\n" +
 		"ON CONFLICT (version) DO NOTHING;\n" +
 		"\n" +
 		"COMMIT;\n"
 }
 
-// migrationHeader is the file-header comment block for 0300, in
-// 0269/0270/0271/0275/0277/0283/0299 house style: goal/incident framing, root
-// cause, writer inventory, fix statement.
-const migrationHeader = `-- 0300_tripwire_signoff_parent_discriminator.sql
--- M3 P3.S2b-3b-iii-a (approval-remediation, kernel extraction, ADR 0083
--- follow-on -- extends ADR 0083, which itself extends ADR 0082):
--- approval_signoffs is INSERTed by both document and template signoff flows,
--- but has NO subject_kind column of its own (unlike approval_instances) --
--- its subject lives on the parent approval_instances row via
--- NEW.approval_instance_id. The capability tripwire
--- enforce_capability_asserted() hardcoded approval_signoffs INSERT ->
--- ARRAY['document.signoff'] (its Go source of truth, TripwireArms arm #2, had
--- no discriminator at all). A template signoff therefore fail-closed P0001
--- for every actor, and the "obvious" fix -- widening the arm to
--- ARRAY['document.signoff', 'template.approve'] -- would be a SECURITY
--- REGRESSION, exactly as ADR 0083 rejected for approval_instances: a
--- principal holding only template.approve would authorize a document
--- signoff (and vice versa), cross-contaminating the two subjects'
--- capability requirements on the shared table.
+// migrationHeader is the file-header comment block for 0301, in
+// 0269/0270/0271/0275/0277/0283/0299/0300 house style: goal/incident framing,
+// root cause, writer inventory, fix statement.
+const migrationHeader = `-- 0301_tripwire_template_review_retired.sql
+-- Unit 3.1a S5 (ADR 0082 phase c -- legacy template-approval retirement):
+-- the legacy role-based template-approval path is deleted. S4 removed the 4
+-- legacy routes and Service.Review -- the ONLY writer that asserted
+-- 'template.review' while writing templates_template_version (the reason
+-- 0269 added the cap to this arm) -- and this change-set (S5) retires the
+-- 'template.review' capability from the IAM registry
+-- (internal/modules/iam/domain/model.go), its catalog/scope entries, and the
+-- role_capabilities reference seeds. The templates_template_version tripwire
+-- arm is regenerated without it: keeping an unregistered capability string in
+-- an arm is harmless at runtime (match-one semantics, no principal can hold
+-- it) but the arm's Go source of truth references the CapTemplateReview
+-- const, which no longer exists -- the removal is compile-enforced at the
+-- generator, and the rendered SQL must follow.
 --
 -- Fix, at the generator (internal/platform/tripwire/arms.go + render.go),
--- regenerated here: TripwireArms arm #2 splits into two
--- parent-lookup-discriminated entries (WhenParentTable "approval_instances",
--- WhenParentKeyCol "approval_instance_id", WhenParentDiscrimCol
--- "subject_kind", WhenValue "document" / "template"); RenderMigration emits,
--- inside the approval_signoffs/INSERT branch, a SELECT of the parent row's
--- subject_kind followed by a nested CASE on the looked-up value, assigning
--- v_required_caps := ARRAY['document.signoff'] or ARRAY['template.approve']
--- per parent subject (never unioned), with a fail-closed ELSE (RAISE P0001)
--- for any other/absent parent subject_kind.
+-- regenerated here: TripwireArms arm #14 (templates_template_version, ANY op)
+-- drops 'template.review', leaving ARRAY['template.create', 'template.edit',
+-- 'template.submit', 'template.approve', 'template.publish']. Reverses 0269
+-- for the deleted reviewer stage; the surviving create/autosave/submit and
+-- kernel-driven approve/publish writers are unaffected (their caps stay).
 --
 -- No other arm/cap change of any kind -- every other CASE branch and its
--- v_required_caps literal are reproduced byte-for-byte from 0299. This
+-- v_required_caps literal are reproduced byte-for-byte from 0300. This
 -- migration is machine-generated from internal/platform/tripwire
 -- (TripwireArms + RenderMigration) per the M2 regeneration protocol
 -- (milestone-2-authz-enforcement-generation/validation-contract.md §1.2/§1.4)
--- as amended by ADR 0083 and its follow-on. Supersedes 0299 as the latest
+-- as amended by ADR 0083 and its follow-on. Supersedes 0300 as the latest
 -- definition of public.enforce_capability_asserted().
 
 `
 
-const ledgerDescription = "M3 P3.S2b-3b-iii-a (ADR 0083 follow-on): approval_signoffs/INSERT arm split into two parent-lookup-discriminated entries (parent approval_instances.subject_kind=document -> document.signoff; subject_kind=template -> template.approve, never unioned) via a SELECT of the parent approval_instances row subject_kind + a nested CASE with a fail-closed ELSE. No other arm/cap change; every other branch byte-for-byte from 0299; machine-generated from internal/platform/tripwire."
+const ledgerDescription = "Unit 3.1a S5 (ADR 0082 phase c): template.review removed from the templates_template_version tripwire arm -- the legacy reviewer stage (Service.Review, deleted in S4) was its only asserting writer and the capability itself is retired from the IAM registry in this change-set; reverses 0269 for the deleted stage. No other arm/cap change; every other branch byte-for-byte from 0300; machine-generated from internal/platform/tripwire."
 
 // findArm returns the single, undiscriminated Arm for (table, op), panicking
 // if absent or if the pair is discriminated (multiple entries share the

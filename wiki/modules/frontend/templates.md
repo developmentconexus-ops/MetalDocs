@@ -14,7 +14,7 @@ Lets template authors create, edit, submit for review, and approve template vers
 - [`frontend/apps/web/src/features/templates/pages/TemplatesListRoutePage.tsx:4`](../../../frontend/apps/web/src/features/templates/pages/TemplatesListRoutePage.tsx) → [`TemplatesListPage.tsx`](../../../frontend/apps/web/src/features/templates/TemplatesListPage.tsx).
 - [`frontend/apps/web/src/features/templates/pages/TemplateWizardPage.tsx:44`](../../../frontend/apps/web/src/features/templates/pages/TemplateWizardPage.tsx) — create-new wizard (shared `WizardShell`).
 - [`frontend/apps/web/src/features/templates/pages/TemplateEditorRoutePage.tsx`](../../../frontend/apps/web/src/features/templates/pages/TemplateEditorRoutePage.tsx) → [`TemplateEditorPage.tsx:53`](../../../frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx).
-- [`frontend/apps/web/src/features/templates/api/templates.ts`](../../../frontend/apps/web/src/features/templates/api/templates.ts) — full template surface (`createTemplate`:118, `listTemplates`:144, `getTemplate`:176, `getVersion`:182, `presignAutosave`:188, `commitAutosave`:201, `importTemplateDocx`:220, `saveDraft`:255, `publishVersion`:269, `submitForReview`:299, `reviewVersion`:307, `approveVersion`:336, `getTemplateSchemas`:414, `StaleLockVersionError`:406).
+- [`frontend/apps/web/src/features/templates/api/templates.ts`](../../../frontend/apps/web/src/features/templates/api/templates.ts) — full template surface (`createTemplate`:46, `listTemplates`:71, `getTemplate`:97, `getVersion`:103, `createNextVersion`:109, `presignAutosave`:113, `commitAutosave`:123, `importTemplateDocx`:139, `getDocxURL`:158, `submitVersionForApproval`:168, `signoffVersion`:180, `publishVersion`:199, `putTemplateSchemas`:292, `StaleLockVersionError`:251). **Kernel-only since ROADMAP unit 3.1a S3 (2026-07-13)** — the legacy `submitForReview`/`reviewVersion`/`approveVersion` wrappers documented here previously (2026-07-01 snapshot) are deleted; `submitVersionForApproval`/`signoffVersion` call the approval-kernel routes.
 - [`frontend/apps/web/src/features/templates/queries/useTemplatesQuery.ts:5`](../../../frontend/apps/web/src/features/templates/queries/useTemplatesQuery.ts)
 - [`frontend/apps/web/src/features/templates/AvailableTokensPanel.tsx`](../../../frontend/apps/web/src/features/templates/AvailableTokensPanel.tsx) (SP-0; replaced the deleted `TemplateOutlinePanel.tsx` + `PlaceholderCatalogPanel.tsx` — outline is now the eigenpal native `showOutlineButton`), [`VersionActionPanel.tsx`](../../../frontend/apps/web/src/features/templates/VersionActionPanel.tsx).
 
@@ -34,7 +34,7 @@ Lets template authors create, edit, submit for review, and approve template vers
 | `QK.templates.blank()` | `lib/queryKeys.ts:56` | `useBlankTemplateQuery` (documents wizard) |
 | `QK.templates.byProfile(code)` | `lib/queryKeys.ts:57` | `useTemplatesByProfileQuery` |
 
-**Invalidation:** publish / approve / submit-for-review mutations must invalidate `QK.templates.list()` and `QK.templates.byProfile(profileCode)`. Approve/publish transition status only and do not spawn a next version (ADR 0052); the editor stays on the current version. Starting a new revision is an explicit user action — "Criar nova versão" calls `createTemplateVersion` (`POST /api/v1/templates/{id}/versions`, `CreateNextVersion`), which the frontend then navigates to.
+**Invalidation:** publish / signoff / submit-for-approval mutations must invalidate `QK.templates.list()` and `QK.templates.byProfile(profileCode)`. Approve/publish transition status only and do not spawn a next version (ADR 0052); the editor stays on the current version. Starting a new revision is an explicit user action — "Criar nova versão" calls `createTemplateVersion` (`POST /api/v1/templates/{id}/versions`, `CreateNextVersion`), which the frontend then navigates to.
 
 ## 5. API endpoints consumed
 
@@ -48,11 +48,10 @@ Backend routes under `/api/v1/templates` and `/api/v1/templates/{id}/versions`. 
 | `getVersion` | `GET /api/v1/templates/{id}/versions/{n}` |
 | `presignAutosave` + `commitAutosave` | autosave direct-to-MinIO |
 | `importTemplateDocx`, `presignDocxUpload`, `presignSchemaUpload` | initial docx ingestion |
-| `saveDraft` | `PUT /api/v1/templates/{id}/versions/{n}` |
-| `submitForReview` | `POST .../submit` |
-| `reviewVersion` | `POST .../review` |
-| `approveVersion` | `POST .../approve` — transitions status only (no `next_draft`, ADR 0052) |
-| `publishVersion` | `POST .../publish` — transitions status only (no `next_draft`, ADR 0052) |
+| `putTemplateSchemas` | `PUT /api/v1/templates/{id}/versions/{n}/schema` |
+| `submitVersionForApproval` | `POST .../submit-for-approval` (approval kernel, ROADMAP unit 3.1a S3) |
+| `signoffVersion` | `POST .../signoff` (approve/reject decision, approval kernel, ROADMAP unit 3.1a S3) |
+| `publishVersion` | `POST .../publish` — transitions status only (no `next_draft`, ADR 0052); bodyless since 3.1a S2b |
 | `createTemplateVersion` | `POST /api/v1/templates/{id}/versions` — `CreateNextVersion`, the sole path to start a new revision (explicit "Criar nova versão" action) |
 | `getDocxURL` | resolves storage URL |
 | `getTemplateSchemas` | placeholder catalog |
@@ -66,7 +65,7 @@ Backend routes under `/api/v1/templates` and `/api/v1/templates/{id}/versions`. 
 ## 7. Invariants
 
 - Server state via TanStack Query keyed by `QK.templates.*`.
-- Optimistic concurrency on version edits — `StaleLockVersionError` (`templates.ts:406`) surfaces 409 inline; no silent overwrite.
+- Optimistic concurrency on version edits — `StaleLockVersionError` (`templates.ts:251`) surfaces 409 inline; no silent overwrite.
 - Approve gates on `template.approve` capability (backend). FE button visibility derives from server state, never role string.
 - Autosave uses presigned-PUT to MinIO before `commitAutosave`.
 - Editor wizard chrome is the shared `WizardShell` — do not fork.
@@ -82,11 +81,11 @@ Backend routes under `/api/v1/templates` and `/api/v1/templates/{id}/versions`. 
 
 | Failure | Symptom | Detection | Response |
 |---|---|---|---|
-| Schema PUT 412 `stale_lock_version` (multi-tab edit) | Editor surfaces conflict inline; schema not saved | `templates.ts:406` throws `StaleLockVersionError`; `useTemplateSchemas` surfaces `staleConflict` flag | User refetches via the prompted action; resolves divergence then retries |
-| 403 on `publishVersion` / `approveVersion` (missing `template.publish` / `template.approve`) | Action button hidden; if reached, backend returns 403 with role-binding code | FE button visibility derives from server `canPublish` / `canApprove` (per backend Tier-2 binding) | Operator escalation; never bypass FE gate |
+| Schema PUT 412 `stale_lock_version` (multi-tab edit) | Editor surfaces conflict inline; schema not saved | `templates.ts:251` throws `StaleLockVersionError`; `useTemplateSchemas` surfaces `staleConflict` flag | User refetches via the prompted action; resolves divergence then retries |
+| 403 on `publishVersion` / `signoffVersion` (missing `template.publish` / `template.approve`) | Action button hidden; if reached, backend returns 403 | FE button visibility derives from server `canPublish` / `canApprove` gate (identity SoD, no role-binding since 3.1a S2) | Operator escalation; never bypass FE gate |
 | MinIO presigned-PUT fails during template autosave | Editor autosave indicator turns red; `commitAutosave` not invoked | `presignAutosave` returns OK but PUT to MinIO rejects | User retries; MinIO healthcheck / CORS audit |
 | `importTemplateDocx` 4xx (invalid docx) | Wizard surfaces friendly error from `resolveErrorMessage` | `ApiError.code` from backend templates module | User fixes source docx; PR #36 wired friendly errors here |
-| Idempotency replay on submit/review/approve | 200 with prior body; lifecycle state unchanged | Backend `Idempotency-Key` replay | Expected on network retry; no double-transition |
+| Idempotency replay on submit-for-approval/signoff/publish | 200 with prior body; lifecycle state unchanged | Backend `Idempotency-Key` replay | Expected on network retry; no double-transition |
 | `createTemplateVersion` fails after approve/publish | User cannot start a new revision; stuck on published version | `CreateNextVersion` 4xx/5xx from `POST /api/v1/templates/{id}/versions` | User retries "Criar nova versão"; this is the only revision path per ADR 0052 |
 
 ## 10. Cross-links

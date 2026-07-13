@@ -9,19 +9,11 @@ var ErrISOSegregationViolation = errors.New("templates: iso_segregation_violatio
 // ErrForbidden is returned when the actor lacks permission for the operation.
 var ErrForbidden = errors.New("templates: forbidden")
 
-// ErrForbiddenRole is returned when the actor does not hold the role bound to
-// the requested lifecycle transition (or an unknown segregation role is given).
-var ErrForbiddenRole = errors.New("templates: forbidden_role")
-
 // ErrUploadMissing is returned when a required DOCX upload is absent.
 var ErrUploadMissing = errors.New("templates: upload_missing")
 
 // ErrUploadTooLarge is returned when an uploaded DOCX exceeds the size limit.
 var ErrUploadTooLarge = errors.New("templates: upload_too_large")
-
-// ErrInvalidApprovalConfig is returned when an approval config is missing its
-// template ID or approver role.
-var ErrInvalidApprovalConfig = errors.New("templates: invalid_approval_config")
 
 // ErrPlaceholderIDEmpty is returned when a placeholder has an empty ID.
 var ErrPlaceholderIDEmpty = errors.New("placeholder id empty")

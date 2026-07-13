@@ -99,20 +99,18 @@ func newPermissiveMockDB(t *testing.T) *sql.DB {
 }
 
 type fakeRepo struct {
-	templates       map[string]*domain.Template
-	versions        map[string]*domain.TemplateVersion
-	audit           []*domain.AuditEvent
-	approvalConfigs map[string]*domain.ApprovalConfig
-	lockVersions    map[string]int
+	templates    map[string]*domain.Template
+	versions     map[string]*domain.TemplateVersion
+	audit        []*domain.AuditEvent
+	lockVersions map[string]int
 }
 
 func newFakeRepo() *fakeRepo {
 	return &fakeRepo{
-		templates:       map[string]*domain.Template{},
-		versions:        map[string]*domain.TemplateVersion{},
-		audit:           []*domain.AuditEvent{},
-		approvalConfigs: map[string]*domain.ApprovalConfig{},
-		lockVersions:    map[string]int{},
+		templates:    map[string]*domain.Template{},
+		versions:     map[string]*domain.TemplateVersion{},
+		audit:        []*domain.AuditEvent{},
+		lockVersions: map[string]int{},
 	}
 }
 
@@ -306,27 +304,6 @@ func (r *fakeRepo) ObsoletePreviousPublished(_ context.Context, _ string, templa
 
 func (r *fakeRepo) ObsoletePreviousPublishedTx(_ context.Context, _ db.Tx, tenantID, templateID, keepVersionID string) error {
 	return r.ObsoletePreviousPublished(context.Background(), tenantID, templateID, keepVersionID)
-}
-
-func (r *fakeRepo) GetApprovalConfig(_ context.Context, tenantID, templateID string) (*domain.ApprovalConfig, error) {
-	t, ok := r.templates[templateID]
-	if !ok || t.TenantID != tenantID {
-		return nil, domain.ErrNotFound
-	}
-	cfg, ok := r.approvalConfigs[templateID]
-	if !ok {
-		return nil, domain.ErrNotFound
-	}
-	return cfg, nil
-}
-
-func (r *fakeRepo) UpsertApprovalConfig(_ context.Context, c *domain.ApprovalConfig) error {
-	r.approvalConfigs[c.TemplateID] = c
-	return nil
-}
-
-func (r *fakeRepo) UpsertApprovalConfigTx(_ context.Context, _ db.Tx, c *domain.ApprovalConfig) error {
-	return r.UpsertApprovalConfig(context.Background(), c)
 }
 
 func (r *fakeRepo) AppendAudit(_ context.Context, e *domain.AuditEvent) error {
@@ -557,81 +534,6 @@ func TestCreateTemplate_KeyConflict(t *testing.T) {
 		t.Fatalf("expected error.code=ALREADY_EXISTS, got %q", out.Code)
 	}
 }
-
-// TestCreateTemplate_ApproverReviewerRoleBinding is the glue test for the F-T4
-// approver_role/reviewer_role wiring in CreateTemplate (routes_generated.go:50-71):
-//   - omitted  → approver_role defaults to "approver", reviewer_role stays nil
-//   - blank    → same defaults (whitespace trimmed to empty is treated as absent)
-//   - provided → both pass through verbatim (trimmed) to the created version's
-//     PendingApproverRole/PendingReviewerRole binding.
-func TestCreateTemplate_ApproverReviewerRoleBinding(t *testing.T) {
-	reviewer := "reviewer"
-	blank := "   "
-	custom := "  qms_lead  "
-	customReviewer := "  area_reviewer  "
-
-	tests := []struct {
-		name             string
-		approverRole     *string
-		reviewerRole     *string
-		wantApproverRole string
-		wantReviewerRole *string // nil → expect no reviewer bound
-	}{
-		{name: "omitted defaults", wantApproverRole: "approver", wantReviewerRole: nil},
-		{name: "blank defaults", approverRole: &blank, reviewerRole: &blank, wantApproverRole: "approver", wantReviewerRole: nil},
-		{name: "provided passthrough trimmed", approverRole: &custom, reviewerRole: &customReviewer, wantApproverRole: "qms_lead", wantReviewerRole: ptr("area_reviewer")},
-		{name: "approver only", approverRole: &reviewer, wantApproverRole: "reviewer", wantReviewerRole: nil},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			repo := newFakeRepo()
-			mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
-
-			body := map[string]any{
-				"key":         "contract-default",
-				"name":        "Contract Template",
-				"description": "Default contract",
-			}
-			if tt.approverRole != nil {
-				body["approver_role"] = *tt.approverRole
-			}
-			if tt.reviewerRole != nil {
-				body["reviewer_role"] = *tt.reviewerRole
-			}
-			raw, _ := json.Marshal(body)
-
-			req := httptest.NewRequest(http.MethodPost, "/api/v1/templates", bytes.NewReader(raw))
-			withHeaders(req)
-			rr := httptest.NewRecorder()
-			mux.ServeHTTP(rr, req)
-			if rr.Code != http.StatusCreated {
-				t.Fatalf("expected 201, got %d body=%s", rr.Code, rr.Body.String())
-			}
-
-			if len(repo.versions) != 1 {
-				t.Fatalf("expected exactly one created version, got %d", len(repo.versions))
-			}
-			var v *domain.TemplateVersion
-			for _, ver := range repo.versions {
-				v = ver
-			}
-			if v.PendingApproverRole != tt.wantApproverRole {
-				t.Errorf("PendingApproverRole=%q, want %q", v.PendingApproverRole, tt.wantApproverRole)
-			}
-			switch {
-			case tt.wantReviewerRole == nil && v.PendingReviewerRole != nil:
-				t.Errorf("PendingReviewerRole=%q, want nil", *v.PendingReviewerRole)
-			case tt.wantReviewerRole != nil && v.PendingReviewerRole == nil:
-				t.Errorf("PendingReviewerRole=nil, want %q", *tt.wantReviewerRole)
-			case tt.wantReviewerRole != nil && *v.PendingReviewerRole != *tt.wantReviewerRole:
-				t.Errorf("PendingReviewerRole=%q, want %q", *v.PendingReviewerRole, *tt.wantReviewerRole)
-			}
-		})
-	}
-}
-
-func ptr(s string) *string { return &s }
 
 func TestCreateNextVersion_SystemOwnedTemplateImmutable(t *testing.T) {
 	repo := newFakeRepo()

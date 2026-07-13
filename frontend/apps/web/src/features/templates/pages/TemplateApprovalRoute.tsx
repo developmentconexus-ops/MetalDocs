@@ -7,12 +7,7 @@ import {
   type TemplateApprovalHandlers,
 } from "../adapters/useTemplateApprovalArtifact";
 import { useTemplateDetailQuery } from "../queries/useTemplateDetailQuery";
-import {
-  reviewVersion,
-  approveVersion,
-  type VersionDTO,
-  type VersionStatus,
-} from "../api/templates";
+import { publishVersion, signoffVersion, type VersionStatus } from "../api/templates";
 import { TemplateReviewCanvas } from "../components/TemplateReviewCanvas";
 import { TemplateApprovalExtras } from "../components/TemplateApprovalExtras";
 import { QK } from "../../../lib/queryKeys";
@@ -21,15 +16,19 @@ import type { ArtifactViewModel } from "../../shared/controlled-artifact/types";
 import styles from "./TemplateApprovalRoute.module.css";
 
 /**
- * Template-specific route wrapper for the shared ArtifactApprovalScreen. Composes
- * the shared DecisionModel for the review/approve states (accept/reject radio + an
- * inline motivo, no password/legal — templates carry no legal e-signature).
- * Draft submission lives solely in the template editor (R1) — this cockpit yields
- * no actions for draft versions. Reads the working version_number from the detail query.
+ * Template-specific route wrapper for the shared ArtifactApprovalScreen.
  *
- * The main slot renders the template content read-only (TemplateReviewCanvas). When
- * a decision is offered the DecisionPanel owns accept/reject + the motivo; otherwise
- * the sidebar extras surface status + the fire-and-forget result message.
+ * Kernel model: the DecisionPanel owns the under_review signoff (accept/reject
+ * + motivo + senha, POST .../signoff). Publish (approved -> published) has no
+ * signature ceremony and runs through the plain `actions[]` band instead
+ * (Publicar, POST .../publish). Draft submission lives solely in the template
+ * editor (R1) — this cockpit yields no actions for draft versions. Reads the
+ * working version_number from the detail query.
+ *
+ * The main slot renders the template content read-only (TemplateReviewCanvas).
+ * When a decision is offered the DecisionPanel owns accept/reject + the motivo
+ * + senha; otherwise the sidebar extras surface status + the fire-and-forget
+ * result message.
  */
 export function TemplateApprovalRoute() {
   const { templateId = "" } = useParams<{ templateId: string }>();
@@ -42,9 +41,9 @@ export function TemplateApprovalRoute() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 
-  // Fire-and-forget runner for the plain fallback actions (review/approve) — surfaces
+  // Fire-and-forget runner for the plain fallback actions (publish) — surfaces
   // its outcome as a sidebar message.
-  const runAction = async (fn: () => Promise<VersionDTO>, successText: string) => {
+  const runAction = async (fn: () => Promise<unknown>, successText: string) => {
     if (busy) return;
     setBusy(true);
     setMessage(null);
@@ -60,9 +59,12 @@ export function TemplateApprovalRoute() {
     }
   };
 
-  // Awaitable runner for the DecisionPanel: the panel owns the in-flight/error UI,
-  // so this re-throws a resolved message string for the panel's error banner.
-  const runDecision = async (fn: () => Promise<VersionDTO>) => {
+  // Awaitable runner for the DecisionPanel: the panel owns the in-flight/error UI
+  // and re-throws a resolved message string for its error banner. The decision
+  // always disappears after a signoff either way (status leaves under_review on
+  // both approve and reject), so this also sets the sidebar message the fallback
+  // extras then surfaces once the panel unmounts.
+  const runDecision = async (fn: () => Promise<unknown>, successText: string) => {
     try {
       await fn();
     } catch (err) {
@@ -70,41 +72,33 @@ export function TemplateApprovalRoute() {
     }
     await queryClient.invalidateQueries({ queryKey: QK.templates.detail(templateId) });
     void queryClient.invalidateQueries({ queryKey: QK.templates.list() });
+    setMessage({ kind: "success", text: successText });
   };
 
   const handlers: TemplateApprovalHandlers = {
-    runReview: (accept) => {
+    // Unreachable in practice: whenever canSignoff allows this pair, the adapter
+    // offers `model.decision` instead and zeroes `actions[]` (see
+    // useTemplateApprovalArtifact). This only exists so the disabled fallback
+    // button (gate denied, no decision offered either) has somewhere to point.
+    runSignoff: (_accept) => {},
+    runPublish: () => {
       if (versionNum == null) return;
-      void runAction(
-        () => reviewVersion(templateId, versionNum, accept, crypto.randomUUID()),
-        accept ? "Revisão aprovada." : "Revisão rejeitada — volta para rascunho.",
-      );
-    },
-    runApprove: (accept) => {
-      if (versionNum == null) return;
-      void runAction(
-        () => approveVersion(templateId, versionNum, accept, crypto.randomUUID()),
-        accept ? "Publicado." : "Rejeitado — volta para rascunho.",
-      );
+      void runAction(() => publishVersion(templateId, versionNum, crypto.randomUUID()), "Publicado.");
     },
   };
 
-  // A decision is offered only when the actor can actually act on a review/approve
-  // state — the adapter's `buildTemplateApprovalDecision` reuses the gate it already
-  // computed (accept.available) rather than re-deriving capability logic here. This
-  // route only supplies the raw submit call — it knows `versionNum` + which of
-  // reviewVersion/approveVersion applies (FE-02: single decision-model construction
-  // path, owned by the adapter/lib, not duplicated in the route).
-  const underReview = status === "under_review";
-  const hasReviewer = detailQuery.data?.latest_version.pending_reviewer_role != null;
-  const isReview = underReview && hasReviewer;
-
-  const decisionSubmit = async (accept: boolean, reason: string) => {
+  const decisionSubmit = async (accept: boolean, reason: string, password: string) => {
     if (versionNum == null) return;
-    const call = isReview
-      ? () => reviewVersion(templateId, versionNum, accept, crypto.randomUUID(), reason)
-      : () => approveVersion(templateId, versionNum, accept, crypto.randomUUID(), reason);
-    await runDecision(call);
+    await runDecision(
+      () =>
+        signoffVersion(
+          templateId,
+          versionNum,
+          { decision: accept ? "approve" : "reject", reason: reason || undefined, password },
+          crypto.randomUUID(),
+        ),
+      accept ? "Assinatura registrada." : "Rejeitado — volta para rascunho.",
+    );
   };
 
   const { model, isLoading, isError } = useTemplateApprovalArtifact(templateId, handlers, decisionSubmit);
@@ -118,9 +112,9 @@ export function TemplateApprovalRoute() {
 
   const decision = model.decision;
 
-  // When a decision is offered the panel owns accept/reject, so strip those from the
-  // plain actions band. Otherwise disable the fallback buttons while busy.
-  const actions = decision != null ? [] : busy ? model.actions.map((a) => ({ ...a, available: false })) : model.actions;
+  // The adapter already emits actions=[] whenever a decision is offered (single
+  // owner of that invariant); here we only disable the plain actions while busy.
+  const actions = busy ? model.actions.map((a) => ({ ...a, available: false })) : model.actions;
   const screenModel: ArtifactViewModel = { ...model, actions, decision };
 
   return (

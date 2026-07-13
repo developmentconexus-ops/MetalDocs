@@ -1,21 +1,30 @@
 // Template approval-chain builder.
 //
-// Templates are NOT signoff-less. A template `VersionDTO` carries the same
-// submit → review → approve actors + timestamps that a document stores in its
-// `ApprovalInstance.stages[]`, only inline on the version row. This module maps
-// those inline fields to the SAME kind-agnostic `ApprovalChainItem[]` the shared
-// flow-viz renders for documents — so the approval cockpit timeline looks
-// identical for both kinds, with zero fabricated names or timestamps.
+// Kernel-truth rebuild (ADR 0082 / unit 3.1a S3): the chain is always exactly
+// three steps mirroring the kernel's own lifecycle, Submissão → Aprovação →
+// Publicação (draft->under_review, under_review->approved, approved->published),
+// driven solely by `VersionDTO.status` + its `submitted_at`/`approved_at`/
+// `published_at` timestamps. Maps to the SAME kind-agnostic `ApprovalChainItem[]`
+// the shared flow-viz renders for documents, so the cockpit timeline looks
+// identical for both kinds.
 //
-// Actor display echoes the raw actor id (parity with the document mapper, whose
-// `actorDisplay` also echoes `actor_user_id` pending an IAM name-lookup); pending
-// stages surface the real `pending_*_role` instead. No React import — pure data.
+// Actor identity: `author_id` is a live kernel-truth column (echoed raw, parity
+// with the document mapper's `actorDisplay`, pending an IAM name-lookup) so the
+// Submissão step shows it. `reviewer_id`/`approver_id`, by contrast, are NEVER
+// written by the kernel completion path — `ApprovalCompletionWriter.
+// MarkTemplateVersionApproved` (internal/modules/templates/infrastructure/
+// approval_completion_writer.go) sets only `status`+`approved_at`, and publish
+// only backfills `approved_at`/`published_at`. Displaying `reviewer_id`/
+// `approver_id` for the Aprovação/Publicação steps would surface a dead legacy
+// column, not the real signer (that identity lives in the approval-kernel's own
+// module, not on the template version row) — so those steps honest-omit the
+// actor (null) rather than fabricate one. No React import — pure data.
 
 import type { ApprovalChainItem, ApprovalFlowState } from '../../shared/controlled-artifact/types';
 import type { VersionDTO } from '../api/templates';
 
 // Lifecycle position of each template status. Drives the fallback flow-state for
-// a stage that has no timestamp yet (e.g. the current under_review stage).
+// the stage that has no timestamp yet (the current pending-decision step).
 const STATUS_ORDER: Record<string, number> = {
   draft: 0,
   under_review: 1,
@@ -35,21 +44,22 @@ function flowState(done: boolean, isCurrent: boolean): ApprovalFlowState {
 }
 
 /**
- * Map a template `VersionDTO` to the shared submit → review → approve chain.
- * Always three steps, so the timeline is stable across the whole lifecycle.
+ * Map a template `VersionDTO` to the shared Submissão → Aprovação → Publicação
+ * chain. Always three steps, so the timeline is stable across the whole
+ * lifecycle.
  */
 export function buildTemplateApprovalChain(version: VersionDTO): ApprovalChainItem[] {
   const order = STATUS_ORDER[version.status] ?? 0;
 
   const submitted = version.submitted_at != null;
-  const reviewDone = version.reviewed_at != null || order >= 2;
-  const approveDone = version.approved_at != null || order >= 3;
+  const approveDone = version.approved_at != null || order >= 2;
+  const publishDone = version.published_at != null || order >= 3;
 
   const submit: ApprovalChainItem = {
     stageIndex: 0,
-    label: 'Autoria',
+    label: 'Submissão',
     status: submitted ? 'sent' : 'active',
-    roleLabel: 'Autoria',
+    roleLabel: 'Submissão',
     // Submit is a hand-off, not a signoff: 'sent' once submitted, otherwise the
     // current step while still in draft.
     flowState: submitted ? 'sent' : order === 0 ? 'current' : 'pending',
@@ -59,29 +69,32 @@ export function buildTemplateApprovalChain(version: VersionDTO): ApprovalChainIt
     signedAt: version.submitted_at ?? null,
   };
 
-  const review: ApprovalChainItem = {
-    stageIndex: 1,
-    label: 'Revisão técnica',
-    status: reviewDone ? 'approved' : order === 1 ? 'active' : 'pending',
-    roleLabel: 'Revisão técnica',
-    flowState: flowState(reviewDone, order === 1),
-    actorUserId: version.reviewer_id ?? null,
-    actorDisplay: version.reviewer_id ?? version.pending_reviewer_role ?? null,
-    decision: reviewDone ? 'approved' : null,
-    signedAt: version.reviewed_at ?? null,
-  };
-
   const approve: ApprovalChainItem = {
-    stageIndex: 2,
+    stageIndex: 1,
     label: 'Aprovação',
-    status: approveDone ? 'approved' : order === 2 ? 'active' : 'pending',
+    status: approveDone ? 'approved' : order === 1 ? 'active' : 'waiting',
     roleLabel: 'Aprovação',
-    flowState: flowState(approveDone, order === 2),
-    actorUserId: version.approver_id ?? null,
-    actorDisplay: version.approver_id ?? version.pending_approver_role ?? null,
+    flowState: flowState(approveDone, order === 1),
+    // Honest-omit: the kernel completion writer never populates reviewer_id/
+    // approver_id (see module header) — no real signer identity to show here.
+    actorUserId: null,
+    actorDisplay: null,
     decision: approveDone ? 'approved' : null,
     signedAt: version.approved_at ?? null,
   };
 
-  return [submit, review, approve];
+  const publish: ApprovalChainItem = {
+    stageIndex: 2,
+    label: 'Publicação',
+    status: publishDone ? 'approved' : order === 2 ? 'active' : 'waiting',
+    roleLabel: 'Publicação',
+    flowState: flowState(publishDone, order === 2),
+    // VersionDTO carries no publisher-id field — honest-omit, same as above.
+    actorUserId: null,
+    actorDisplay: null,
+    decision: publishDone ? 'published' : null,
+    signedAt: version.published_at ?? null,
+  };
+
+  return [submit, approve, publish];
 }

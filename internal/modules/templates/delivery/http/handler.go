@@ -169,9 +169,6 @@ func (h *Handler) resolveCreatedByDisplayNames(ctx context.Context, tenantID str
 var idempotentRoutes = map[string]bool{
 	"POST /api/v1/templates":                                       true,
 	"POST /api/v1/templates/{id}/versions/{n}/publish":             true,
-	"POST /api/v1/templates/{id}/versions/{n}/submit":              true,
-	"POST /api/v1/templates/{id}/versions/{n}/review":              true,
-	"POST /api/v1/templates/{id}/versions/{n}/approve":             true,
 	"POST /api/v1/templates/{id}/versions/{n}/submit-for-approval": true,
 	"POST /api/v1/templates/{id}/versions/{n}/signoff":             true,
 }

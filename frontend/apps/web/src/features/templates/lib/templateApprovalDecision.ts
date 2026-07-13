@@ -1,65 +1,65 @@
 // Template approval decision-model builder.
 //
-// Single construction path for the template `ArtifactDecisionModel` (FE-02) — was
-// previously built inline in `TemplateApprovalRoute`. Templates carry no legal
-// e-signature (no password/legal fields, unlike the document sign-off model built
-// in `DocumentWorkspacePage`), so this mirrors that adapter's shape minus
-// those two fields.
+// Single construction path for the template `ArtifactDecisionModel` (FE-02).
+// Kernel model: the decision exists ONLY for the under_review → signoff step
+// (POST .../signoff, backend cap template.approve). Publish (approved →
+// published) has no signature ceremony — it is a plain `actions[]` entry
+// (see templateApprovalActions.ts), not a decision. Signoff is password-gated
+// like the document sign-off (`documentSignoffDecision.ts`), so this now
+// mirrors that idiom's password + signer fields; unlike documents there is no
+// `legal` MP 2.200-2/2001 checkbox — not requested, no backend field.
 
 import type { ArtifactDecisionModel } from '../../shared/controlled-artifact/types';
-import type { VersionDTO, VersionStatus } from '../api/templates';
+import type { VersionStatus } from '../api/templates';
 
-/** Awaitable decision submit — the route supplies the actual API call + invalidation. */
-export type TemplateApprovalDecisionSubmit = (accept: boolean, reason: string) => Promise<void>;
+export interface TemplateApprovalSigner {
+  displayName: string;
+  email: string | null;
+  username: string;
+}
+
+/** Awaitable decision submit — the route supplies the actual signoff call + invalidation. */
+export type TemplateApprovalDecisionSubmit = (
+  accept: boolean,
+  reason: string,
+  password: string,
+) => Promise<void>;
 
 export interface BuildTemplateApprovalDecisionArgs {
   status: VersionStatus | null;
-  version: VersionDTO | null;
-  /** Whether the actor can act on this version's accept action (reuses the gate the
-   *  adapter already computed via `buildTemplateApprovalActions`, rather than
-   *  re-deriving capability logic). */
-  acceptAvailable: boolean;
+  /** Gate computed by the adapter via `canSignoff` — status + template.approve capability. */
+  signoffAvailable: boolean;
+  signer: TemplateApprovalSigner | null;
   submit: TemplateApprovalDecisionSubmit;
 }
 
 /**
- * Builds the decision model offered on the template approval cockpit for the
- * review (under_review + pending reviewer) and publish (approved, or under_review
- * with no reviewer) states. Returns undefined when no decision applies — the
- * cockpit then falls back to the plain `actions[]` band.
+ * Builds the decision model offered on the template approval cockpit while the
+ * version is under_review and the actor may sign off. Returns undefined
+ * otherwise — the cockpit then falls back to the plain `actions[]` band
+ * (draft: no actions; approved: Publicar).
  */
 export function buildTemplateApprovalDecision({
   status,
-  version,
-  acceptAvailable,
+  signoffAvailable,
+  signer,
   submit,
 }: BuildTemplateApprovalDecisionArgs): ArtifactDecisionModel | undefined {
-  const underReview = status === 'under_review';
-  const hasReviewer = version?.pending_reviewer_role != null;
-  const isReview = underReview && hasReviewer;
-  const offerDecision = (underReview || status === 'approved') && acceptAvailable;
-
-  if (!offerDecision) {
+  if (status !== 'under_review' || !signoffAvailable) {
     return undefined;
   }
-
-  const acceptLabel = isReview ? 'Aprovar revisão' : 'Publicar';
 
   return {
     kicker: 'Decisão requerida',
     heading: 'Registrar decisão',
-    description: isReview
-      ? 'Revise o conteúdo do modelo e registre sua decisão de revisão.'
-      : 'Confirme para publicar esta versão do modelo.',
+    description: 'Revise o conteúdo do modelo e confirme sua senha para registrar a decisão.',
     options: [
       {
         key: 'accept',
-        label: acceptLabel,
-        description: isReview
-          ? 'Aprova a revisão técnica e avança o fluxo.'
-          : 'Publica esta versão do modelo.',
+        label: 'Assinar aprovação',
+        description: 'Aprova a versão e avança para publicação.',
         tone: 'approve',
-        submitLabel: acceptLabel,
+        submitLabel: 'Assinar aprovação',
         requiresReason: false,
       },
       {
@@ -73,11 +73,17 @@ export function buildTemplateApprovalDecision({
     ],
     reasonLabel: 'Motivo',
     reasonPlaceholder: 'Comentário registrado na trilha do modelo…',
-    password: null,
+    password: { label: 'Senha' },
     legal: null,
-    signer: null,
-    submit: async ({ optionKey, reason }) => {
-      await submit(optionKey === 'accept', reason);
+    signer: signer
+      ? {
+          name: signer.displayName,
+          detail: signer.email ?? signer.username,
+          note: 'Assinatura digital gerada no ato da confirmação.',
+        }
+      : null,
+    submit: async ({ optionKey, reason, password }) => {
+      await submit(optionKey === 'accept', reason, password);
     },
   };
 }

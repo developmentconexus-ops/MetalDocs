@@ -22,8 +22,9 @@ func (h *Handler) ListTemplates(w http.ResponseWriter, r *http.Request, params t
 }
 
 // CreateTemplate handles POST /templates: authorizes CapTemplateCreate,
-// validates the required key/name fields, applies the approver/reviewer
-// role defaults, and creates a new template with its initial draft version.
+// validates the required key/name fields, and creates a new template with
+// its initial draft version. ADR 0082 phase (a) part 1: this no longer
+// accepts or seeds approver/reviewer role bindings.
 func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request, _ templatesapi.CreateTemplateParams) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
@@ -54,28 +55,13 @@ func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request, _ templ
 	if req.DocTypeCode != nil {
 		docTypeCode = strings.TrimSpace(*req.DocTypeCode)
 	}
-	// approver_role is now caller-configurable (F-T4); default to "approver"
-	// server-side when omitted or blank so the creation contract is self-contained
-	// without changing the historical default binding.
-	approverRole := "approver"
-	if req.ApproverRole != nil && strings.TrimSpace(*req.ApproverRole) != "" {
-		approverRole = strings.TrimSpace(*req.ApproverRole)
-	}
-	var reviewerRole *string
-	if req.ReviewerRole != nil {
-		if trimmed := strings.TrimSpace(*req.ReviewerRole); trimmed != "" {
-			reviewerRole = &trimmed
-		}
-	}
 	res, err := h.svc.CreateTemplate(r.Context(), application.CreateTemplateCmd{
-		TenantID:     tenantID,
-		ActorUserID:  actorID,
-		Key:          strings.TrimSpace(req.Key),
-		Name:         strings.TrimSpace(req.Name),
-		Description:  description,
-		DocTypeCode:  docTypeCode,
-		ApproverRole: approverRole,
-		ReviewerRole: reviewerRole,
+		TenantID:    tenantID,
+		ActorUserID: actorID,
+		Key:         strings.TrimSpace(req.Key),
+		Name:        strings.TrimSpace(req.Name),
+		Description: description,
+		DocTypeCode: docTypeCode,
 	})
 	if err != nil {
 		writeMappedErr(w, err)
@@ -205,9 +191,9 @@ func (h *Handler) presignTemplateUpload(w http.ResponseWriter, r *http.Request, 
 }
 
 // PublishTemplateVersion handles POST /templates/{id}/versions/{n}/publish:
-// authorizes CapTemplatePublish, requires a non-blank schema_key in the
-// request body, and publishes the given approved version via the
-// application service, returning the published version's id.
+// authorizes CapTemplatePublish and publishes the given approved version via
+// the application service (bodyless — the schema object key is derived
+// server-side), returning the published version's id.
 func (h *Handler) PublishTemplateVersion(w http.ResponseWriter, r *http.Request, id string, n int, _ templatesapi.PublishTemplateVersionParams) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
@@ -220,24 +206,11 @@ func (h *Handler) PublishTemplateVersion(w http.ResponseWriter, r *http.Request,
 		return
 	}
 
-	var req templatesapi.PublishTemplateVersionJSONRequestBody
-	if err := readStrictJSON(r, &req); err != nil {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, err.Error())
-		return
-	}
-	schemaKey := strings.TrimSpace(req.SchemaKey)
-	if schemaKey == "" {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, "field schema_key is required")
-		return
-	}
-
 	res, err := h.svc.PublishTemplateVersion(r.Context(), application.PublishTemplateVersionCmd{
 		TenantID:      tenantID,
 		ActorUserID:   actorID,
-		ActorRoles:    actorRolesFromReq(r),
 		TemplateID:    id,
 		VersionNumber: n,
-		SchemaKey:     schemaKey,
 	})
 	if err != nil {
 		writeMappedErr(w, err)
@@ -278,35 +251,10 @@ func (h *Handler) CommitTemplateAutosave(w http.ResponseWriter, r *http.Request,
 	h.commitAutosave(w, r)
 }
 
-// SubmitTemplateVersion handles POST /templates/{id}/versions/{n}/submit,
-// delegating to the underlying submit-for-review use case (h.submitForReview).
-func (h *Handler) SubmitTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, _ templatesapi.SubmitTemplateVersionParams) {
-	h.submitForReview(w, r)
-}
-
-// ReviewTemplateVersion handles POST /templates/{id}/versions/{n}/review,
-// delegating to the underlying review use case (h.review).
-func (h *Handler) ReviewTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, _ templatesapi.ReviewTemplateVersionParams) {
-	h.review(w, r)
-}
-
-// ApproveTemplateVersion handles POST /templates/{id}/versions/{n}/approve,
-// delegating to the underlying approve use case (h.approve).
-func (h *Handler) ApproveTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, _ templatesapi.ApproveTemplateVersionParams) {
-	h.approve(w, r)
-}
-
 // ArchiveTemplate handles the archive-template route, delegating to the
 // underlying archive-template use case (h.archiveTemplate).
 func (h *Handler) ArchiveTemplate(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	h.archiveTemplate(w, r)
-}
-
-// UpsertTemplateApprovalConfig handles the approval-config upsert route,
-// delegating to the underlying upsert-approval-config use case
-// (h.upsertApprovalConfig).
-func (h *Handler) UpsertTemplateApprovalConfig(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	h.upsertApprovalConfig(w, r)
 }
 
 // GetTemplate handles GET /templates/{id}, delegating to the underlying

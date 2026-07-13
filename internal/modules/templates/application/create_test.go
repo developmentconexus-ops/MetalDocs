@@ -19,14 +19,12 @@ func TestCreateTemplate_Happy(t *testing.T) {
 	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
 
 	cmd := application.CreateTemplateCmd{
-		TenantID:     "tenant-a",
-		ActorUserID:  "user-a",
-		DocTypeCode:  "CONTRACT",
-		Key:          "contract-default",
-		Name:         "Contract Template",
-		Description:  "Default contract",
-		ApproverRole: "approver",
-		ReviewerRole: strPtr("reviewer"),
+		TenantID:    "tenant-a",
+		ActorUserID: "user-a",
+		DocTypeCode: "CONTRACT",
+		Key:         "contract-default",
+		Name:        "Contract Template",
+		Description: "Default contract",
 	}
 
 	got, err := svc.CreateTemplate(context.Background(), cmd)
@@ -64,19 +62,6 @@ func TestCreateTemplate_Happy(t *testing.T) {
 	if audit.VersionID == nil || *audit.VersionID != got.Version.ID {
 		t.Fatalf("expected audit version id %q, got %v", got.Version.ID, audit.VersionID)
 	}
-	cfg, ok := repo.approvalConfigs[got.Template.ID]
-	if !ok {
-		t.Fatalf("expected approval config for template %q", got.Template.ID)
-	}
-	if cfg.TemplateID != got.Template.ID {
-		t.Fatalf("expected config template id %q, got %q", got.Template.ID, cfg.TemplateID)
-	}
-	if cfg.ApproverRole != cmd.ApproverRole {
-		t.Fatalf("expected approver role %q, got %q", cmd.ApproverRole, cfg.ApproverRole)
-	}
-	if cfg.ReviewerRole == nil || *cfg.ReviewerRole != *cmd.ReviewerRole {
-		t.Fatalf("expected reviewer role %q, got %v", *cmd.ReviewerRole, cfg.ReviewerRole)
-	}
 }
 
 func TestCreateTemplate_KeyConflict(t *testing.T) {
@@ -89,12 +74,11 @@ func TestCreateTemplate_KeyConflict(t *testing.T) {
 	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
 
 	_, err := svc.CreateTemplate(context.Background(), application.CreateTemplateCmd{
-		TenantID:     "tenant-a",
-		ActorUserID:  "user-a",
-		DocTypeCode:  "CONTRACT",
-		Key:          "contract-default",
-		Name:         "Contract Template",
-		ApproverRole: "approver",
+		TenantID:    "tenant-a",
+		ActorUserID: "user-a",
+		DocTypeCode: "CONTRACT",
+		Key:         "contract-default",
+		Name:        "Contract Template",
 	})
 	if !errors.Is(err, domain.ErrKeyConflict) {
 		t.Fatalf("expected ErrKeyConflict, got %v", err)
@@ -107,12 +91,11 @@ func TestCreateTemplate_KeyLookupInfraError(t *testing.T) {
 	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
 
 	_, err := svc.CreateTemplate(context.Background(), application.CreateTemplateCmd{
-		TenantID:     "tenant-a",
-		ActorUserID:  "user-a",
-		DocTypeCode:  "CONTRACT",
-		Key:          "contract-default",
-		Name:         "Contract Template",
-		ApproverRole: "approver",
+		TenantID:    "tenant-a",
+		ActorUserID: "user-a",
+		DocTypeCode: "CONTRACT",
+		Key:         "contract-default",
+		Name:        "Contract Template",
 	})
 	if err == nil || errors.Is(err, domain.ErrKeyConflict) {
 		t.Fatalf("expected infra error passthrough, got %v", err)
@@ -134,12 +117,11 @@ func TestCreateTemplate_WithDBSetsAuthzContext(t *testing.T) {
 	mock.ExpectCommit()
 
 	_, err = svc.CreateTemplate(authzCtx("11111111-1111-1111-1111-111111111111", "user-a"), application.CreateTemplateCmd{
-		TenantID:     "11111111-1111-1111-1111-111111111111",
-		ActorUserID:  "user-a",
-		DocTypeCode:  "CONTRACT",
-		Key:          "contract-default",
-		Name:         "Contract Template",
-		ApproverRole: "approver",
+		TenantID:    "11111111-1111-1111-1111-111111111111",
+		ActorUserID: "user-a",
+		DocTypeCode: "CONTRACT",
+		Key:         "contract-default",
+		Name:        "Contract Template",
 	})
 	if err != nil {
 		t.Fatalf("CreateTemplate returned error: %v", err)
