@@ -21,11 +21,9 @@ const (
 	codeTplUploadMissing          = problem.CodeUploadMissing
 	codeTplUploadTooLarge         = problem.CodeRequestBodyTooLarge
 	codeTplISOSegregation         = problem.CodeISOSegregationViolation
-	codeTplForbiddenRole          = problem.CodeForbiddenCapability
 	codeTplForbidden              = problem.CodeAuthForbidden
 	codeTplSystemImmutable        = problem.CodeSystemTemplateImmutable
 	codeTplArchived               = problem.CodeStateTransitionInvalid
-	codeTplInvalidApprovalConfig  = problem.CodeValidationError
 	codeTplPlaceholderNameInvalid = problem.CodeValidationError
 	codeTplDuplicatePlaceholder   = problem.CodeAlreadyExists
 	codeTplInternalError          = problem.CodeInternalError
@@ -74,16 +72,12 @@ func MapErr(err error) (httpStatus int, code problem.Code) {
 		return http.StatusForbidden, codeTplISOSegregation
 	case errors.As(err, new(iamauthz.ErrCapDenied)):
 		return http.StatusForbidden, problem.CodeForbiddenCapability
-	case errors.Is(err, domain.ErrForbiddenRole):
-		return http.StatusForbidden, codeTplForbiddenRole
 	case errors.Is(err, domain.ErrForbidden):
 		return http.StatusForbidden, codeTplForbidden
 	case errors.Is(err, domain.ErrSystemTemplateImmutable):
 		return http.StatusConflict, codeTplSystemImmutable
 	case errors.Is(err, domain.ErrArchived):
 		return http.StatusConflict, codeTplArchived
-	case errors.Is(err, domain.ErrInvalidApprovalConfig):
-		return http.StatusBadRequest, codeTplInvalidApprovalConfig
 	case errors.Is(err, domain.ErrPlaceholderNameInvalid):
 		return http.StatusUnprocessableEntity, codeTplPlaceholderNameInvalid
 	case errors.Is(err, domain.ErrPlaceholderReservedName):

@@ -16,8 +16,6 @@ const draftVersion = {
   metadata_schema: null,
   placeholder_schema: null,
   author_id: 'user-1',
-  pending_reviewer_role: 'quality',
-  pending_approver_role: 'quality',
   reviewer_id: null,
   approver_id: null,
   submitted_at: null,

@@ -68,8 +68,6 @@ function makeVersion(overrides: Record<string, unknown> = {}) {
     metadata_schema: null,
     placeholder_schema: null,
     author_id: 'actor-1',
-    pending_reviewer_role: null,
-    pending_approver_role: null,
     reviewer_id: null,
     approver_id: null,
     submitted_at: null,

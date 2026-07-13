@@ -11,11 +11,10 @@ import (
 
 // Repository defines the persistence port required by the application
 // layer: CRUD and CAS-guarded updates for templates and template versions,
-// approval configuration, and audit trail access. Implementations must
-// provide both a plain and a Tx-suffixed variant of each mutating method so
-// callers can compose multi-step writes inside a single caller-owned
-// transaction (via db.Tx) when a use case requires atomicity across several
-// repository calls.
+// and audit trail access. Implementations must provide both a plain and a
+// Tx-suffixed variant of each mutating method so callers can compose
+// multi-step writes inside a single caller-owned transaction (via db.Tx)
+// when a use case requires atomicity across several repository calls.
 type Repository interface {
 	CreateTemplate(ctx context.Context, t *domain.Template) error
 	CreateTemplateTx(ctx context.Context, tx db.Tx, t *domain.Template) error
@@ -35,10 +34,6 @@ type Repository interface {
 	UpdateVersionSchemaCASTx(ctx context.Context, tx db.Tx, tenantID string, v *domain.TemplateVersion, expectedLockVersion int) error
 	ObsoletePreviousPublished(ctx context.Context, tenantID, templateID, keepVersionID string) error
 	ObsoletePreviousPublishedTx(ctx context.Context, tx db.Tx, tenantID, templateID, keepVersionID string) error
-
-	GetApprovalConfig(ctx context.Context, tenantID, templateID string) (*domain.ApprovalConfig, error)
-	UpsertApprovalConfig(ctx context.Context, c *domain.ApprovalConfig) error
-	UpsertApprovalConfigTx(ctx context.Context, tx db.Tx, c *domain.ApprovalConfig) error
 
 	AppendAudit(ctx context.Context, e *domain.AuditEvent) error
 	AppendAuditTx(ctx context.Context, tx db.Tx, e *domain.AuditEvent) error

@@ -16,8 +16,6 @@ import (
 // caller-addressed (template_id, version_n) pair to the approval kernel's
 // subject-generic identifiers and delegate the actual state transition to
 // approval/application's published TemplateSubmitService / DecisionService.
-// STRICTLY ADDITIVE — the legacy submit/review/approve/upsertApprovalConfig
-// triad in routes_lifecycle.go is untouched and out of scope here.
 
 // nilApprovalKernel reports whether the approval-kernel wiring
 // (WithApprovalKernel) has not been configured on this Handler. The two

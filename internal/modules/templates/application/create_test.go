@@ -62,18 +62,6 @@ func TestCreateTemplate_Happy(t *testing.T) {
 	if audit.VersionID == nil || *audit.VersionID != got.Version.ID {
 		t.Fatalf("expected audit version id %q, got %v", got.Version.ID, audit.VersionID)
 	}
-	// ADR 0082 phase (a) part 1: CreateTemplate no longer seeds role bindings
-	// or writes approval config. Capability-based authz (CapTemplateCreate)
-	// already gates this call; role-based approval seeding is retired.
-	if _, ok := repo.approvalConfigs[got.Template.ID]; ok {
-		t.Fatalf("expected no approval config written for template %q", got.Template.ID)
-	}
-	if got.Version.PendingApproverRole != "" {
-		t.Fatalf("expected PendingApproverRole empty, got %q", got.Version.PendingApproverRole)
-	}
-	if got.Version.PendingReviewerRole != nil {
-		t.Fatalf("expected PendingReviewerRole nil, got %q", *got.Version.PendingReviewerRole)
-	}
 }
 
 func TestCreateTemplate_KeyConflict(t *testing.T) {

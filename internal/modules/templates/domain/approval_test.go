@@ -19,19 +19,6 @@ func TestCheckSegregation(t *testing.T) {
 		wantErr    error
 	}{
 		{
-			name:     "reviewer OK - distinct from author",
-			role:     domain.SegregationRoleReviewer,
-			actorID:  "reviewer-1",
-			authorID: "author-1",
-		},
-		{
-			name:     "reviewer FAIL - same as author",
-			role:     domain.SegregationRoleReviewer,
-			actorID:  "author-1",
-			authorID: "author-1",
-			wantErr:  domain.ErrISOSegregationViolation,
-		},
-		{
 			name:       "approver OK - distinct from both",
 			role:       domain.SegregationRoleApprover,
 			actorID:    "approver-1",
@@ -61,11 +48,11 @@ func TestCheckSegregation(t *testing.T) {
 			authorID: "author-1",
 		},
 		{
-			name:     "unknown role returns ErrForbiddenRole",
+			name:     "unknown role returns ErrForbidden",
 			role:     domain.SegregationRole("admin"),
 			actorID:  "actor-1",
 			authorID: "author-1",
-			wantErr:  domain.ErrForbiddenRole,
+			wantErr:  domain.ErrForbidden,
 		},
 	}
 

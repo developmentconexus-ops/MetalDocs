@@ -100,13 +100,6 @@ func (e VersionDTOStatus) Valid() bool {
 	}
 }
 
-// ApproveTemplateVersionResponse defines model for ApproveTemplateVersionResponse.
-type ApproveTemplateVersionResponse struct {
-	Data struct {
-		Version VersionDTO `json:"version"`
-	} `json:"data"`
-}
-
 // ArchiveTemplateResponse defines model for ArchiveTemplateResponse.
 type ArchiveTemplateResponse struct {
 	Data struct {
@@ -220,13 +213,6 @@ type SystemBlankTemplateResponse struct {
 	TemplateVersionId openapi_types.UUID `json:"template_version_id"`
 }
 
-// TemplateApprovalConfig defines model for TemplateApprovalConfig.
-type TemplateApprovalConfig struct {
-	ApproverRole string             `json:"approver_role"`
-	ReviewerRole *string            `json:"reviewer_role"`
-	TemplateId   openapi_types.UUID `json:"template_id"`
-}
-
 // TemplateApprovalSubmitResponse defines model for TemplateApprovalSubmitResponse.
 type TemplateApprovalSubmitResponse struct {
 	Data struct {
@@ -283,14 +269,6 @@ type TemplatePresignAutosaveResponse struct {
 	UploadUrl string `json:"upload_url"`
 }
 
-// TemplateVersionEnvelope Shared 200 response envelope for template version mutations that return the
-// post-transition version DTO. Used by submit/review.
-type TemplateVersionEnvelope struct {
-	Data struct {
-		Version VersionDTO `json:"version"`
-	} `json:"data"`
-}
-
 // TemplateVersionRef Compact reference to a template version: internal version counter, regulated revision number (REV{nn}, ADR 0013), and lifecycle status. ADR 0065 — version pointers are nested value objects, never parallel scalars.
 type TemplateVersionRef struct {
 	Id             openapi_types.UUID       `json:"id"`
@@ -301,13 +279,6 @@ type TemplateVersionRef struct {
 
 // TemplateVersionRefStatus defines model for TemplateVersionRef.Status.
 type TemplateVersionRefStatus string
-
-// UpsertTemplateApprovalConfigResponse defines model for UpsertTemplateApprovalConfigResponse.
-type UpsertTemplateApprovalConfigResponse struct {
-	Data struct {
-		ApprovalConfig TemplateApprovalConfig `json:"approval_config"`
-	} `json:"data"`
-}
 
 // VersionDTO defines model for VersionDTO.
 type VersionDTO struct {
@@ -320,11 +291,9 @@ type VersionDTO struct {
 	Id             openapi_types.UUID `json:"id"`
 
 	// LockVersion Optimistic-concurrency token. Increments on every successful write to the version row. Clients must echo the last-seen value back via `expected_lock_version` on PUT .../schema. A mismatch yields HTTP 412 with code `stale_lock_version`.
-	LockVersion         *int32                  `json:"lock_version,omitempty"`
-	MetadataSchema      *map[string]interface{} `json:"metadata_schema"`
-	ObsoletedAt         *time.Time              `json:"obsoleted_at"`
-	PendingApproverRole *string                 `json:"pending_approver_role"`
-	PendingReviewerRole *string                 `json:"pending_reviewer_role"`
+	LockVersion    *int32                  `json:"lock_version,omitempty"`
+	MetadataSchema *map[string]interface{} `json:"metadata_schema"`
+	ObsoletedAt    *time.Time              `json:"obsoleted_at"`
 
 	// PlaceholderSchema Ordered placeholder list. Matches `domain.TemplateVersion.PlaceholderSchema` ([]Placeholder). Backend always emits as array; ADR 0035 declared shape corrected from `object` 2026-06-15 (F1.2).
 	PlaceholderSchema *[]map[string]interface{} `json:"placeholder_schema"`
@@ -400,11 +369,6 @@ type CreateTemplateParams struct {
 	IdempotencyKey openapi_types.UUID `json:"Idempotency-Key"`
 }
 
-// ApproveTemplateVersionParams defines parameters for ApproveTemplateVersion.
-type ApproveTemplateVersionParams struct {
-	IdempotencyKey openapi_types.UUID `json:"Idempotency-Key"`
-}
-
 // CommitTemplateAutosaveJSONBody defines parameters for CommitTemplateAutosave.
 type CommitTemplateAutosaveJSONBody struct {
 	// ExpectedContentHash Content hash captured at presign time. The server confirms the uploaded object's SHA256 matches this value (optimistic concurrency); a mismatch returns 409.
@@ -413,11 +377,6 @@ type CommitTemplateAutosaveJSONBody struct {
 
 // PublishTemplateVersionParams defines parameters for PublishTemplateVersion.
 type PublishTemplateVersionParams struct {
-	IdempotencyKey openapi_types.UUID `json:"Idempotency-Key"`
-}
-
-// ReviewTemplateVersionParams defines parameters for ReviewTemplateVersion.
-type ReviewTemplateVersionParams struct {
 	IdempotencyKey openapi_types.UUID `json:"Idempotency-Key"`
 }
 
@@ -432,11 +391,6 @@ type UpdateTemplateSchemaJSONBody struct {
 // SignoffTemplateVersionParams defines parameters for SignoffTemplateVersion.
 type SignoffTemplateVersionParams struct {
 	IdempotencyKey string `json:"Idempotency-Key"`
-}
-
-// SubmitTemplateVersionParams defines parameters for SubmitTemplateVersion.
-type SubmitTemplateVersionParams struct {
-	IdempotencyKey openapi_types.UUID `json:"Idempotency-Key"`
 }
 
 // SubmitTemplateVersionForApprovalParams defines parameters for SubmitTemplateVersionForApproval.
@@ -473,9 +427,6 @@ type ServerInterface interface {
 	// Get template
 	// (GET /templates/{id})
 	GetTemplate(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
-	// Upsert template approval config
-	// (PUT /templates/{id}/approval-config)
-	UpsertTemplateApprovalConfig(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// Archive template
 	// (POST /templates/{id}/archive)
 	ArchiveTemplate(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
@@ -488,9 +439,6 @@ type ServerInterface interface {
 	// Get template version metadata (docx)
 	// (GET /templates/{id}/versions/{n})
 	GetTemplateVersion(w http.ResponseWriter, r *http.Request, id string, n int)
-	// Approve template version
-	// (POST /templates/{id}/versions/{n}/approve)
-	ApproveTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params ApproveTemplateVersionParams)
 	// Commit template autosave
 	// (POST /templates/{id}/versions/{n}/autosave/commit)
 	CommitTemplateAutosave(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int)
@@ -506,9 +454,6 @@ type ServerInterface interface {
 	// Publish draft (validates template tokens)
 	// (POST /templates/{id}/versions/{n}/publish)
 	PublishTemplateVersion(w http.ResponseWriter, r *http.Request, id string, n int, params PublishTemplateVersionParams)
-	// Review template version
-	// (POST /templates/{id}/versions/{n}/review)
-	ReviewTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params ReviewTemplateVersionParams)
 	// Update template schema
 	// (PUT /templates/{id}/versions/{n}/schema)
 	UpdateTemplateSchema(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int)
@@ -518,9 +463,6 @@ type ServerInterface interface {
 	// Record a template version approval sign-off
 	// (POST /templates/{id}/versions/{n}/signoff)
 	SignoffTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params SignoffTemplateVersionParams)
-	// Submit template version
-	// (POST /templates/{id}/versions/{n}/submit)
-	SubmitTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params SubmitTemplateVersionParams)
 	// Submit template version to the approval kernel
 	// (POST /templates/{id}/versions/{n}/submit-for-approval)
 	SubmitTemplateVersionForApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params SubmitTemplateVersionForApprovalParams)
@@ -736,38 +678,6 @@ func (siw *ServerInterfaceWrapper) GetTemplate(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
-// UpsertTemplateApprovalConfig operation middleware
-func (siw *ServerInterfaceWrapper) UpsertTemplateApprovalConfig(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpsertTemplateApprovalConfig(w, r, id)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
 // ArchiveTemplate operation middleware
 func (siw *ServerInterfaceWrapper) ArchiveTemplate(w http.ResponseWriter, r *http.Request) {
 
@@ -896,75 +806,6 @@ func (siw *ServerInterfaceWrapper) GetTemplateVersion(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetTemplateVersion(w, r, id, n)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// ApproveTemplateVersion operation middleware
-func (siw *ServerInterfaceWrapper) ApproveTemplateVersion(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "n" -------------
-	var n int
-
-	err = runtime.BindStyledParameterWithOptions("simple", "n", r.PathValue("n"), &n, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "n", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params ApproveTemplateVersionParams
-
-	headers := r.Header
-
-	// ------------- Required header parameter "Idempotency-Key" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
-		var IdempotencyKey openapi_types.UUID
-		n := len(valueList)
-		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
-			return
-		}
-
-		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: "uuid"})
-		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
-			return
-		}
-
-		params.IdempotencyKey = IdempotencyKey
-
-	} else {
-		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ApproveTemplateVersion(w, r, id, n, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1207,75 +1048,6 @@ func (siw *ServerInterfaceWrapper) PublishTemplateVersion(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
-// ReviewTemplateVersion operation middleware
-func (siw *ServerInterfaceWrapper) ReviewTemplateVersion(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "n" -------------
-	var n int
-
-	err = runtime.BindStyledParameterWithOptions("simple", "n", r.PathValue("n"), &n, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "n", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params ReviewTemplateVersionParams
-
-	headers := r.Header
-
-	// ------------- Required header parameter "Idempotency-Key" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
-		var IdempotencyKey openapi_types.UUID
-		n := len(valueList)
-		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
-			return
-		}
-
-		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: "uuid"})
-		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
-			return
-		}
-
-		params.IdempotencyKey = IdempotencyKey
-
-	} else {
-		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ReviewTemplateVersion(w, r, id, n, params)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
 // UpdateTemplateSchema operation middleware
 func (siw *ServerInterfaceWrapper) UpdateTemplateSchema(w http.ResponseWriter, r *http.Request) {
 
@@ -1418,75 +1190,6 @@ func (siw *ServerInterfaceWrapper) SignoffTemplateVersion(w http.ResponseWriter,
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SignoffTemplateVersion(w, r, id, n, params)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// SubmitTemplateVersion operation middleware
-func (siw *ServerInterfaceWrapper) SubmitTemplateVersion(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "n" -------------
-	var n int
-
-	err = runtime.BindStyledParameterWithOptions("simple", "n", r.PathValue("n"), &n, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "n", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params SubmitTemplateVersionParams
-
-	headers := r.Header
-
-	// ------------- Required header parameter "Idempotency-Key" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
-		var IdempotencyKey openapi_types.UUID
-		n := len(valueList)
-		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
-			return
-		}
-
-		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: "uuid"})
-		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
-			return
-		}
-
-		params.IdempotencyKey = IdempotencyKey
-
-	} else {
-		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.SubmitTemplateVersion(w, r, id, n, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1690,22 +1393,18 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/templates/placeholder-catalog", wrapper.ListTemplatePlaceholderCatalog)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/templates/system/blank", wrapper.GetSystemBlankTemplate)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/templates/{id}", wrapper.GetTemplate)
-	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/templates/{id}/approval-config", wrapper.UpsertTemplateApprovalConfig)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/archive", wrapper.ArchiveTemplate)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/templates/{id}/audit", wrapper.ListTemplateAudit)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions", wrapper.CreateTemplateVersion)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/templates/{id}/versions/{n}", wrapper.GetTemplateVersion)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions/{n}/approve", wrapper.ApproveTemplateVersion)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions/{n}/autosave/commit", wrapper.CommitTemplateAutosave)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions/{n}/autosave/presign", wrapper.PresignTemplateAutosave)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions/{n}/docx-upload-url", wrapper.PresignTemplateDocxUploadUrl)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/templates/{id}/versions/{n}/docx-url", wrapper.GetTemplateDocxUrl)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions/{n}/publish", wrapper.PublishTemplateVersion)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions/{n}/review", wrapper.ReviewTemplateVersion)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/templates/{id}/versions/{n}/schema", wrapper.UpdateTemplateSchema)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions/{n}/schema-upload-url", wrapper.PresignTemplateSchemaUploadUrl)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions/{n}/signoff", wrapper.SignoffTemplateVersion)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions/{n}/submit", wrapper.SubmitTemplateVersion)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions/{n}/submit-for-approval", wrapper.SubmitTemplateVersionForApproval)
 
 	return m
@@ -2140,124 +1839,6 @@ func (response GetTemplate500ApplicationProblemPlusJSONResponse) VisitGetTemplat
 	return err
 }
 
-type UpsertTemplateApprovalConfigRequestObject struct {
-	Id openapi_types.UUID `json:"id"`
-}
-
-type UpsertTemplateApprovalConfigResponseObject interface {
-	VisitUpsertTemplateApprovalConfigResponse(w http.ResponseWriter) error
-}
-
-type UpsertTemplateApprovalConfig200JSONResponse UpsertTemplateApprovalConfigResponse
-
-func (response UpsertTemplateApprovalConfig200JSONResponse) VisitUpsertTemplateApprovalConfigResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type UpsertTemplateApprovalConfig400ApplicationProblemPlusJSONResponse struct {
-	BadRequestApplicationProblemPlusJSONResponse
-}
-
-func (response UpsertTemplateApprovalConfig400ApplicationProblemPlusJSONResponse) VisitUpsertTemplateApprovalConfigResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(400)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type UpsertTemplateApprovalConfig401ApplicationProblemPlusJSONResponse struct {
-	UnauthorizedApplicationProblemPlusJSONResponse
-}
-
-func (response UpsertTemplateApprovalConfig401ApplicationProblemPlusJSONResponse) VisitUpsertTemplateApprovalConfigResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type UpsertTemplateApprovalConfig403ApplicationProblemPlusJSONResponse struct {
-	ForbiddenApplicationProblemPlusJSONResponse
-}
-
-func (response UpsertTemplateApprovalConfig403ApplicationProblemPlusJSONResponse) VisitUpsertTemplateApprovalConfigResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(403)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type UpsertTemplateApprovalConfig404ApplicationProblemPlusJSONResponse struct {
-	NotFoundApplicationProblemPlusJSONResponse
-}
-
-func (response UpsertTemplateApprovalConfig404ApplicationProblemPlusJSONResponse) VisitUpsertTemplateApprovalConfigResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(404)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type UpsertTemplateApprovalConfig409ApplicationProblemPlusJSONResponse struct {
-	ConflictApplicationProblemPlusJSONResponse
-}
-
-func (response UpsertTemplateApprovalConfig409ApplicationProblemPlusJSONResponse) VisitUpsertTemplateApprovalConfigResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(409)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type UpsertTemplateApprovalConfig500ApplicationProblemPlusJSONResponse struct {
-	InternalServerErrorApplicationProblemPlusJSONResponse
-}
-
-func (response UpsertTemplateApprovalConfig500ApplicationProblemPlusJSONResponse) VisitUpsertTemplateApprovalConfigResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(500)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
 type ArchiveTemplateRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
@@ -2656,126 +2237,6 @@ type GetTemplateVersion500ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response GetTemplateVersion500ApplicationProblemPlusJSONResponse) VisitGetTemplateVersionResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(500)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ApproveTemplateVersionRequestObject struct {
-	Id     openapi_types.UUID `json:"id"`
-	N      int                `json:"n"`
-	Params ApproveTemplateVersionParams
-}
-
-type ApproveTemplateVersionResponseObject interface {
-	VisitApproveTemplateVersionResponse(w http.ResponseWriter) error
-}
-
-type ApproveTemplateVersion200JSONResponse ApproveTemplateVersionResponse
-
-func (response ApproveTemplateVersion200JSONResponse) VisitApproveTemplateVersionResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ApproveTemplateVersion400ApplicationProblemPlusJSONResponse struct {
-	BadRequestApplicationProblemPlusJSONResponse
-}
-
-func (response ApproveTemplateVersion400ApplicationProblemPlusJSONResponse) VisitApproveTemplateVersionResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(400)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ApproveTemplateVersion401ApplicationProblemPlusJSONResponse struct {
-	UnauthorizedApplicationProblemPlusJSONResponse
-}
-
-func (response ApproveTemplateVersion401ApplicationProblemPlusJSONResponse) VisitApproveTemplateVersionResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ApproveTemplateVersion403ApplicationProblemPlusJSONResponse struct {
-	ForbiddenApplicationProblemPlusJSONResponse
-}
-
-func (response ApproveTemplateVersion403ApplicationProblemPlusJSONResponse) VisitApproveTemplateVersionResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(403)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ApproveTemplateVersion404ApplicationProblemPlusJSONResponse struct {
-	NotFoundApplicationProblemPlusJSONResponse
-}
-
-func (response ApproveTemplateVersion404ApplicationProblemPlusJSONResponse) VisitApproveTemplateVersionResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(404)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ApproveTemplateVersion409ApplicationProblemPlusJSONResponse struct {
-	ConflictApplicationProblemPlusJSONResponse
-}
-
-func (response ApproveTemplateVersion409ApplicationProblemPlusJSONResponse) VisitApproveTemplateVersionResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(409)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ApproveTemplateVersion500ApplicationProblemPlusJSONResponse struct {
-	InternalServerErrorApplicationProblemPlusJSONResponse
-}
-
-func (response ApproveTemplateVersion500ApplicationProblemPlusJSONResponse) VisitApproveTemplateVersionResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -3325,126 +2786,6 @@ func (response PublishTemplateVersion500ApplicationProblemPlusJSONResponse) Visi
 	return err
 }
 
-type ReviewTemplateVersionRequestObject struct {
-	Id     openapi_types.UUID `json:"id"`
-	N      int                `json:"n"`
-	Params ReviewTemplateVersionParams
-}
-
-type ReviewTemplateVersionResponseObject interface {
-	VisitReviewTemplateVersionResponse(w http.ResponseWriter) error
-}
-
-type ReviewTemplateVersion200JSONResponse TemplateVersionEnvelope
-
-func (response ReviewTemplateVersion200JSONResponse) VisitReviewTemplateVersionResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ReviewTemplateVersion400ApplicationProblemPlusJSONResponse struct {
-	BadRequestApplicationProblemPlusJSONResponse
-}
-
-func (response ReviewTemplateVersion400ApplicationProblemPlusJSONResponse) VisitReviewTemplateVersionResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(400)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ReviewTemplateVersion401ApplicationProblemPlusJSONResponse struct {
-	UnauthorizedApplicationProblemPlusJSONResponse
-}
-
-func (response ReviewTemplateVersion401ApplicationProblemPlusJSONResponse) VisitReviewTemplateVersionResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ReviewTemplateVersion403ApplicationProblemPlusJSONResponse struct {
-	ForbiddenApplicationProblemPlusJSONResponse
-}
-
-func (response ReviewTemplateVersion403ApplicationProblemPlusJSONResponse) VisitReviewTemplateVersionResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(403)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ReviewTemplateVersion404ApplicationProblemPlusJSONResponse struct {
-	NotFoundApplicationProblemPlusJSONResponse
-}
-
-func (response ReviewTemplateVersion404ApplicationProblemPlusJSONResponse) VisitReviewTemplateVersionResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(404)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ReviewTemplateVersion409ApplicationProblemPlusJSONResponse struct {
-	ConflictApplicationProblemPlusJSONResponse
-}
-
-func (response ReviewTemplateVersion409ApplicationProblemPlusJSONResponse) VisitReviewTemplateVersionResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(409)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ReviewTemplateVersion500ApplicationProblemPlusJSONResponse struct {
-	InternalServerErrorApplicationProblemPlusJSONResponse
-}
-
-func (response ReviewTemplateVersion500ApplicationProblemPlusJSONResponse) VisitReviewTemplateVersionResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(500)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
 type UpdateTemplateSchemaRequestObject struct {
 	Id   openapi_types.UUID `json:"id"`
 	N    int                `json:"n"`
@@ -3828,126 +3169,6 @@ func (response SignoffTemplateVersion500ApplicationProblemPlusJSONResponse) Visi
 	return err
 }
 
-type SubmitTemplateVersionRequestObject struct {
-	Id     openapi_types.UUID `json:"id"`
-	N      int                `json:"n"`
-	Params SubmitTemplateVersionParams
-}
-
-type SubmitTemplateVersionResponseObject interface {
-	VisitSubmitTemplateVersionResponse(w http.ResponseWriter) error
-}
-
-type SubmitTemplateVersion200JSONResponse TemplateVersionEnvelope
-
-func (response SubmitTemplateVersion200JSONResponse) VisitSubmitTemplateVersionResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type SubmitTemplateVersion400ApplicationProblemPlusJSONResponse struct {
-	BadRequestApplicationProblemPlusJSONResponse
-}
-
-func (response SubmitTemplateVersion400ApplicationProblemPlusJSONResponse) VisitSubmitTemplateVersionResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(400)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type SubmitTemplateVersion401ApplicationProblemPlusJSONResponse struct {
-	UnauthorizedApplicationProblemPlusJSONResponse
-}
-
-func (response SubmitTemplateVersion401ApplicationProblemPlusJSONResponse) VisitSubmitTemplateVersionResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type SubmitTemplateVersion403ApplicationProblemPlusJSONResponse struct {
-	ForbiddenApplicationProblemPlusJSONResponse
-}
-
-func (response SubmitTemplateVersion403ApplicationProblemPlusJSONResponse) VisitSubmitTemplateVersionResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(403)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type SubmitTemplateVersion404ApplicationProblemPlusJSONResponse struct {
-	NotFoundApplicationProblemPlusJSONResponse
-}
-
-func (response SubmitTemplateVersion404ApplicationProblemPlusJSONResponse) VisitSubmitTemplateVersionResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(404)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type SubmitTemplateVersion409ApplicationProblemPlusJSONResponse struct {
-	ConflictApplicationProblemPlusJSONResponse
-}
-
-func (response SubmitTemplateVersion409ApplicationProblemPlusJSONResponse) VisitSubmitTemplateVersionResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(409)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type SubmitTemplateVersion500ApplicationProblemPlusJSONResponse struct {
-	InternalServerErrorApplicationProblemPlusJSONResponse
-}
-
-func (response SubmitTemplateVersion500ApplicationProblemPlusJSONResponse) VisitSubmitTemplateVersionResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(500)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
 type SubmitTemplateVersionForApprovalRequestObject struct {
 	Id     openapi_types.UUID `json:"id"`
 	N      int                `json:"n"`
@@ -4085,9 +3306,6 @@ type StrictServerInterface interface {
 	// Get template
 	// (GET /templates/{id})
 	GetTemplate(ctx context.Context, request GetTemplateRequestObject) (GetTemplateResponseObject, error)
-	// Upsert template approval config
-	// (PUT /templates/{id}/approval-config)
-	UpsertTemplateApprovalConfig(ctx context.Context, request UpsertTemplateApprovalConfigRequestObject) (UpsertTemplateApprovalConfigResponseObject, error)
 	// Archive template
 	// (POST /templates/{id}/archive)
 	ArchiveTemplate(ctx context.Context, request ArchiveTemplateRequestObject) (ArchiveTemplateResponseObject, error)
@@ -4100,9 +3318,6 @@ type StrictServerInterface interface {
 	// Get template version metadata (docx)
 	// (GET /templates/{id}/versions/{n})
 	GetTemplateVersion(ctx context.Context, request GetTemplateVersionRequestObject) (GetTemplateVersionResponseObject, error)
-	// Approve template version
-	// (POST /templates/{id}/versions/{n}/approve)
-	ApproveTemplateVersion(ctx context.Context, request ApproveTemplateVersionRequestObject) (ApproveTemplateVersionResponseObject, error)
 	// Commit template autosave
 	// (POST /templates/{id}/versions/{n}/autosave/commit)
 	CommitTemplateAutosave(ctx context.Context, request CommitTemplateAutosaveRequestObject) (CommitTemplateAutosaveResponseObject, error)
@@ -4118,9 +3333,6 @@ type StrictServerInterface interface {
 	// Publish draft (validates template tokens)
 	// (POST /templates/{id}/versions/{n}/publish)
 	PublishTemplateVersion(ctx context.Context, request PublishTemplateVersionRequestObject) (PublishTemplateVersionResponseObject, error)
-	// Review template version
-	// (POST /templates/{id}/versions/{n}/review)
-	ReviewTemplateVersion(ctx context.Context, request ReviewTemplateVersionRequestObject) (ReviewTemplateVersionResponseObject, error)
 	// Update template schema
 	// (PUT /templates/{id}/versions/{n}/schema)
 	UpdateTemplateSchema(ctx context.Context, request UpdateTemplateSchemaRequestObject) (UpdateTemplateSchemaResponseObject, error)
@@ -4130,9 +3342,6 @@ type StrictServerInterface interface {
 	// Record a template version approval sign-off
 	// (POST /templates/{id}/versions/{n}/signoff)
 	SignoffTemplateVersion(ctx context.Context, request SignoffTemplateVersionRequestObject) (SignoffTemplateVersionResponseObject, error)
-	// Submit template version
-	// (POST /templates/{id}/versions/{n}/submit)
-	SubmitTemplateVersion(ctx context.Context, request SubmitTemplateVersionRequestObject) (SubmitTemplateVersionResponseObject, error)
 	// Submit template version to the approval kernel
 	// (POST /templates/{id}/versions/{n}/submit-for-approval)
 	SubmitTemplateVersionForApproval(ctx context.Context, request SubmitTemplateVersionForApprovalRequestObject) (SubmitTemplateVersionForApprovalResponseObject, error)
@@ -4300,32 +3509,6 @@ func (sh *strictHandler) GetTemplate(w http.ResponseWriter, r *http.Request, id 
 	}
 }
 
-// UpsertTemplateApprovalConfig operation middleware
-func (sh *strictHandler) UpsertTemplateApprovalConfig(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request UpsertTemplateApprovalConfigRequestObject
-
-	request.Id = id
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.UpsertTemplateApprovalConfig(ctx, request.(UpsertTemplateApprovalConfigRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "UpsertTemplateApprovalConfig")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(UpsertTemplateApprovalConfigResponseObject); ok {
-		if err := validResponse.VisitUpsertTemplateApprovalConfigResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
 // ArchiveTemplate operation middleware
 func (sh *strictHandler) ArchiveTemplate(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	var request ArchiveTemplateRequestObject
@@ -4424,34 +3607,6 @@ func (sh *strictHandler) GetTemplateVersion(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetTemplateVersionResponseObject); ok {
 		if err := validResponse.VisitGetTemplateVersionResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// ApproveTemplateVersion operation middleware
-func (sh *strictHandler) ApproveTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params ApproveTemplateVersionParams) {
-	var request ApproveTemplateVersionRequestObject
-
-	request.Id = id
-	request.N = n
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ApproveTemplateVersion(ctx, request.(ApproveTemplateVersionRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ApproveTemplateVersion")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ApproveTemplateVersionResponseObject); ok {
-		if err := validResponse.VisitApproveTemplateVersionResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -4602,34 +3757,6 @@ func (sh *strictHandler) PublishTemplateVersion(w http.ResponseWriter, r *http.R
 	}
 }
 
-// ReviewTemplateVersion operation middleware
-func (sh *strictHandler) ReviewTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params ReviewTemplateVersionParams) {
-	var request ReviewTemplateVersionRequestObject
-
-	request.Id = id
-	request.N = n
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ReviewTemplateVersion(ctx, request.(ReviewTemplateVersionRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ReviewTemplateVersion")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ReviewTemplateVersionResponseObject); ok {
-		if err := validResponse.VisitReviewTemplateVersionResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
 // UpdateTemplateSchema operation middleware
 func (sh *strictHandler) UpdateTemplateSchema(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
 	var request UpdateTemplateSchemaRequestObject
@@ -4726,34 +3853,6 @@ func (sh *strictHandler) SignoffTemplateVersion(w http.ResponseWriter, r *http.R
 	}
 }
 
-// SubmitTemplateVersion operation middleware
-func (sh *strictHandler) SubmitTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params SubmitTemplateVersionParams) {
-	var request SubmitTemplateVersionRequestObject
-
-	request.Id = id
-	request.N = n
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.SubmitTemplateVersion(ctx, request.(SubmitTemplateVersionRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "SubmitTemplateVersion")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(SubmitTemplateVersionResponseObject); ok {
-		if err := validResponse.VisitSubmitTemplateVersionResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
 // SubmitTemplateVersionForApproval operation middleware
 func (sh *strictHandler) SubmitTemplateVersionForApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params SubmitTemplateVersionForApprovalParams) {
 	var request SubmitTemplateVersionForApprovalRequestObject
@@ -4787,109 +3886,104 @@ func (sh *strictHandler) SubmitTemplateVersionForApproval(w http.ResponseWriter,
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"mBsJ6Jcgun53/X8BAAD//w==",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

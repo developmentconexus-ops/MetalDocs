@@ -215,9 +215,6 @@ func TestGeneratedTemplatesRoutes_IdempotencyKeyRequired(t *testing.T) {
 	}{
 		{name: "create", method: http.MethodPost, path: "/api/v1/templates", body: `{"key":"k1","name":"n1"}`},
 		{name: "publish", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/publish"},
-		{name: "submit", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/submit", body: `{}`},
-		{name: "review", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/review", body: `{"accept":true}`},
-		{name: "approve", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/approve", body: `{"accept":true}`},
 	}
 
 	for _, tt := range tests {
@@ -302,9 +299,6 @@ func TestGeneratedTemplatesRoutes_IdempotencyStoreEngaged(t *testing.T) {
 	}{
 		{name: "create", path: "/api/v1/templates", routeTemplate: "POST /api/v1/templates"},
 		{name: "publish", path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/publish", routeTemplate: "POST /api/v1/templates/{id}/versions/{n}/publish"},
-		{name: "submit", path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/submit", routeTemplate: "POST /api/v1/templates/{id}/versions/{n}/submit"},
-		{name: "review", path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/review", routeTemplate: "POST /api/v1/templates/{id}/versions/{n}/review"},
-		{name: "approve", path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/approve", routeTemplate: "POST /api/v1/templates/{id}/versions/{n}/approve"},
 	}
 	for _, tt := range idempotentPaths {
 		t.Run(tt.name, func(t *testing.T) {

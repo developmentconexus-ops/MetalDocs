@@ -853,57 +853,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/templates/{id}/versions/{n}/submit": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Submit template version */
-        post: operations["submitTemplateVersion"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/templates/{id}/versions/{n}/review": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Review template version */
-        post: operations["reviewTemplateVersion"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/templates/{id}/versions/{n}/approve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Approve template version */
-        post: operations["approveTemplateVersion"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/templates/{id}/versions/{n}/submit-for-approval": {
         parameters: {
             query?: never;
@@ -955,23 +904,6 @@ export interface paths {
         put?: never;
         /** Archive template */
         post: operations["archiveTemplate"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/templates/{id}/approval-config": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Upsert template approval config */
-        put: operations["upsertTemplateApprovalConfig"];
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3186,8 +3118,6 @@ export interface components {
                 [key: string]: unknown;
             }[] | null;
             author_id: string;
-            pending_reviewer_role: string | null;
-            pending_approver_role: string | null;
             reviewer_id: string | null;
             approver_id: string | null;
             /** Format: date-time */
@@ -3225,34 +3155,9 @@ export interface components {
                 version: components["schemas"]["VersionDTO"];
             };
         };
-        ApproveTemplateVersionResponse: {
-            data: {
-                version: components["schemas"]["VersionDTO"];
-            };
-        };
-        /**
-         * @description Shared 200 response envelope for template version mutations that return the
-         *     post-transition version DTO. Used by submit/review.
-         */
-        TemplateVersionEnvelope: {
-            data: {
-                version: components["schemas"]["VersionDTO"];
-            };
-        };
         ArchiveTemplateResponse: {
             data: {
                 template: components["schemas"]["TemplateDTO"];
-            };
-        };
-        TemplateApprovalConfig: {
-            /** Format: uuid */
-            template_id: string;
-            reviewer_role: string | null;
-            approver_role: string;
-        };
-        UpsertTemplateApprovalConfigResponse: {
-            data: {
-                approval_config: components["schemas"]["TemplateApprovalConfig"];
             };
         };
         GetTemplateResponse: {
@@ -5478,99 +5383,6 @@ export interface operations {
             500: components["responses"]["InternalServerError"];
         };
     };
-    submitTemplateVersion: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": string;
-            };
-            path: {
-                id: string;
-                n: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description ok */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TemplateVersionEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            500: components["responses"]["InternalServerError"];
-        };
-    };
-    reviewTemplateVersion: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": string;
-            };
-            path: {
-                id: string;
-                n: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description ok */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TemplateVersionEnvelope"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            500: components["responses"]["InternalServerError"];
-        };
-    };
-    approveTemplateVersion: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": string;
-            };
-            path: {
-                id: string;
-                n: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description ok */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApproveTemplateVersionResponse"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            500: components["responses"]["InternalServerError"];
-        };
-    };
     submitTemplateVersionForApproval: {
         parameters: {
             query?: never;
@@ -5655,34 +5467,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ArchiveTemplateResponse"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            500: components["responses"]["InternalServerError"];
-        };
-    };
-    upsertTemplateApprovalConfig: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description ok */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UpsertTemplateApprovalConfigResponse"];
                 };
             };
             400: components["responses"]["BadRequest"];

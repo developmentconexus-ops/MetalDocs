@@ -29,31 +29,29 @@ const (
 
 // TemplateVersion is one immutable-content revision of a Template moving
 // through the review/approval lifecycle. It carries the DOCX storage key and
-// content hash, the metadata and placeholder schemas, the role bindings and
-// actor IDs collected at each transition, and an optimistic-lock version.
+// content hash, the metadata and placeholder schemas, the actor IDs collected
+// at each transition, and an optimistic-lock version.
 type TemplateVersion struct {
-	ID                  string
-	TenantID            string
-	TemplateID          string
-	VersionNumber       int
-	RevisionNumber      int
-	Status              VersionStatus
-	DocxStorageKey      string
-	ContentHash         string
-	MetadataSchema      MetadataSchema
-	PlaceholderSchema   []Placeholder
-	AuthorID            string
-	PendingReviewerRole *string
-	PendingApproverRole string
-	ReviewerID          *string
-	ApproverID          *string
-	SubmittedAt         *time.Time
-	ReviewedAt          *time.Time
-	ApprovedAt          *time.Time
-	PublishedAt         *time.Time
-	ObsoletedAt         *time.Time
-	LockVersion         int
-	CreatedAt           time.Time
+	ID                string
+	TenantID          string
+	TemplateID        string
+	VersionNumber     int
+	RevisionNumber    int
+	Status            VersionStatus
+	DocxStorageKey    string
+	ContentHash       string
+	MetadataSchema    MetadataSchema
+	PlaceholderSchema []Placeholder
+	AuthorID          string
+	ReviewerID        *string
+	ApproverID        *string
+	SubmittedAt       *time.Time
+	ReviewedAt        *time.Time
+	ApprovedAt        *time.Time
+	PublishedAt       *time.Time
+	ObsoletedAt       *time.Time
+	LockVersion       int
+	CreatedAt         time.Time
 }
 
 // NewTemplateVersionDraft constructs a new version in draft status with an
@@ -72,27 +70,6 @@ func NewTemplateVersionDraft(id, tenantID, templateID, authorID, docxStorageKey 
 		AuthorID:          authorID,
 		CreatedAt:         createdAt,
 	}
-}
-
-// RoleBindingFor returns the role name required to perform the given lifecycle
-// transition on this version, or "" when no binding is configured (in which
-// case the capability tier remains the sole gate).
-//
-// Callers must treat the empty-string result as "permit if capability passes".
-// In production this branch is only reachable on a version that has never gone
-// through SubmitForReview (which always populates PendingApproverRole from the
-// template's ApprovalConfig). Callers that need a stricter "binding required"
-// posture should assert the field is non-empty separately.
-func (v *TemplateVersion) RoleBindingFor(transition VersionStatus) string {
-	switch transition {
-	case VersionStatusUnderReview, VersionStatusApproved:
-		if v.PendingReviewerRole != nil {
-			return *v.PendingReviewerRole
-		}
-	case VersionStatusPublished:
-		return v.PendingApproverRole
-	}
-	return ""
 }
 
 // CanTransition reports whether moving from the version's current status to

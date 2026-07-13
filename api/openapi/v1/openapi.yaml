@@ -1563,99 +1563,6 @@ paths:
           $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/InternalServerError'
-  /templates/{id}/versions/{n}/submit:
-    post:
-      summary: Submit template version
-      tags: [templates]
-      operationId: submitTemplateVersion
-      parameters:
-        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
-        - name: Idempotency-Key
-          in: header
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '200':
-          description: ok
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TemplateVersionEnvelope'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-  /templates/{id}/versions/{n}/review:
-    post:
-      summary: Review template version
-      tags: [templates]
-      operationId: reviewTemplateVersion
-      parameters:
-        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
-        - name: Idempotency-Key
-          in: header
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '200':
-          description: ok
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TemplateVersionEnvelope'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-  /templates/{id}/versions/{n}/approve:
-    post:
-      summary: Approve template version
-      tags: [templates]
-      operationId: approveTemplateVersion
-      parameters:
-        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
-        - name: Idempotency-Key
-          in: header
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '200':
-          description: ok
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApproveTemplateVersionResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
   /templates/{id}/versions/{n}/submit-for-approval:
     post:
       summary: Submit template version to the approval kernel
@@ -1751,32 +1658,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ArchiveTemplateResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-  /templates/{id}/approval-config:
-    put:
-      summary: Upsert template approval config
-      tags: [templates]
-      operationId: upsertTemplateApprovalConfig
-      parameters:
-        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-      responses:
-        '200':
-          description: ok
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UpsertTemplateApprovalConfigResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -6305,7 +6186,7 @@ components:
       type: object
       required: [id, template_id, version_number, status, author_id, created_at,
                  docx_storage_key, content_hash, metadata_schema, placeholder_schema,
-                 pending_reviewer_role, pending_approver_role, reviewer_id, approver_id,
+                 reviewer_id, approver_id,
                  submitted_at, reviewed_at, approved_at, published_at, obsoleted_at]
       properties:
         id: { type: string, format: uuid }
@@ -6331,8 +6212,6 @@ components:
             ([]Placeholder). Backend always emits as array; ADR 0035 declared shape
             corrected from `object` 2026-06-15 (F1.2).
         author_id: { type: string }
-        pending_reviewer_role: { type: string, nullable: true }
-        pending_approver_role: { type: string, nullable: true }
         reviewer_id: { type: string, nullable: true }
         approver_id: { type: string, nullable: true }
         submitted_at: { type: string, format: date-time, nullable: true }
@@ -6370,29 +6249,6 @@ components:
               $ref: '#/components/schemas/TemplateDTO'
             version:
               $ref: '#/components/schemas/VersionDTO'
-    ApproveTemplateVersionResponse:
-      type: object
-      required: [data]
-      properties:
-        data:
-          type: object
-          required: [version]
-          properties:
-            version:
-              $ref: '#/components/schemas/VersionDTO'
-    TemplateVersionEnvelope:
-      description: |
-        Shared 200 response envelope for template version mutations that return the
-        post-transition version DTO. Used by submit/review.
-      type: object
-      required: [data]
-      properties:
-        data:
-          type: object
-          required: [version]
-          properties:
-            version:
-              $ref: '#/components/schemas/VersionDTO'
     ArchiveTemplateResponse:
       type: object
       required: [data]
@@ -6403,23 +6259,6 @@ components:
           properties:
             template:
               $ref: '#/components/schemas/TemplateDTO'
-    TemplateApprovalConfig:
-      type: object
-      required: [template_id, approver_role, reviewer_role]
-      properties:
-        template_id: { type: string, format: uuid }
-        reviewer_role: { type: string, nullable: true }
-        approver_role: { type: string }
-    UpsertTemplateApprovalConfigResponse:
-      type: object
-      required: [data]
-      properties:
-        data:
-          type: object
-          required: [approval_config]
-          properties:
-            approval_config:
-              $ref: '#/components/schemas/TemplateApprovalConfig'
     GetTemplateResponse:
       type: object
       required: [data]

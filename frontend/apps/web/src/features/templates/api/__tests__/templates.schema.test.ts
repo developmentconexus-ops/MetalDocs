@@ -28,8 +28,10 @@ describe('templates.putTemplateSchemas', () => {
   });
 
   // FE-15: verified against internal/modules/templates/delivery/http/routes_schema.go
-  // updateSchemas, which writes TemplateVersionEnvelope { data: { version } } —
-  // matches operations['updateTemplateSchema'] exactly.
+  // updateSchemas, which writes the inline { data: { version } } envelope declared
+  // by operations['updateTemplateSchema'] (the shared TemplateVersionEnvelope
+  // component this used to $ref was retired with the submit/review routes it was
+  // written for — ADR 0082 slice S4 — the shape itself is unchanged).
   it('returns the bumped lock_version on a correctly enveloped 200', async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockResolvedValueOnce(

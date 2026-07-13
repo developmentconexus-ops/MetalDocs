@@ -31,8 +31,6 @@ func isDomainErr(err error) bool {
 		errors.Is(err, domain.ErrUploadMissing),
 		errors.Is(err, domain.ErrISOSegregationViolation),
 		errors.Is(err, domain.ErrForbidden),
-		errors.Is(err, domain.ErrForbiddenRole),
-		errors.Is(err, domain.ErrInvalidApprovalConfig),
 		errors.Is(err, domain.ErrPlaceholderIDEmpty),
 		errors.Is(err, domain.ErrDuplicatePlaceholderID),
 		errors.Is(err, domain.ErrPlaceholderNameInvalid),

@@ -63,31 +63,27 @@ func scanTemplateRead(row rowScanner) (*domain.TemplateRead, error) {
 
 func scanTemplateVersion(row rowScanner) (*domain.TemplateVersion, error) {
 	var (
-		v                   domain.TemplateVersion
-		status              string
-		metadataJSON        []byte
-		placeholderJSON     []byte
-		pendingReviewerRole sql.NullString
-		reviewerID          sql.NullString
-		approverID          sql.NullString
-		submittedAt         sql.NullTime
-		reviewedAt          sql.NullTime
-		approvedAt          sql.NullTime
-		publishedAt         sql.NullTime
-		obsoletedAt         sql.NullTime
+		v               domain.TemplateVersion
+		status          string
+		metadataJSON    []byte
+		placeholderJSON []byte
+		reviewerID      sql.NullString
+		approverID      sql.NullString
+		submittedAt     sql.NullTime
+		reviewedAt      sql.NullTime
+		approvedAt      sql.NullTime
+		publishedAt     sql.NullTime
+		obsoletedAt     sql.NullTime
 	)
 	if err := row.Scan(
 		&v.ID, &v.TemplateID, &v.VersionNumber, &v.RevisionNumber, &status, &v.DocxStorageKey, &v.ContentHash,
 		&metadataJSON, &placeholderJSON, &v.AuthorID,
-		&pendingReviewerRole, &v.PendingApproverRole, &reviewerID, &approverID,
+		&reviewerID, &approverID,
 		&submittedAt, &reviewedAt, &approvedAt, &publishedAt, &obsoletedAt, &v.LockVersion, &v.CreatedAt,
 	); err != nil {
 		return nil, err
 	}
 	v.Status = domain.VersionStatus(status)
-	if pendingReviewerRole.Valid {
-		v.PendingReviewerRole = &pendingReviewerRole.String
-	}
 	if reviewerID.Valid {
 		v.ReviewerID = &reviewerID.String
 	}

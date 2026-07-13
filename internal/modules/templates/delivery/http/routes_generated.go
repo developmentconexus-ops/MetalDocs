@@ -251,35 +251,10 @@ func (h *Handler) CommitTemplateAutosave(w http.ResponseWriter, r *http.Request,
 	h.commitAutosave(w, r)
 }
 
-// SubmitTemplateVersion handles POST /templates/{id}/versions/{n}/submit,
-// delegating to the underlying submit-for-review use case (h.submitForReview).
-func (h *Handler) SubmitTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, _ templatesapi.SubmitTemplateVersionParams) {
-	h.submitForReview(w, r)
-}
-
-// ReviewTemplateVersion handles POST /templates/{id}/versions/{n}/review,
-// delegating to the underlying review use case (h.review).
-func (h *Handler) ReviewTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, _ templatesapi.ReviewTemplateVersionParams) {
-	h.review(w, r)
-}
-
-// ApproveTemplateVersion handles POST /templates/{id}/versions/{n}/approve,
-// delegating to the underlying approve use case (h.approve).
-func (h *Handler) ApproveTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, _ templatesapi.ApproveTemplateVersionParams) {
-	h.approve(w, r)
-}
-
 // ArchiveTemplate handles the archive-template route, delegating to the
 // underlying archive-template use case (h.archiveTemplate).
 func (h *Handler) ArchiveTemplate(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	h.archiveTemplate(w, r)
-}
-
-// UpsertTemplateApprovalConfig handles the approval-config upsert route,
-// delegating to the underlying upsert-approval-config use case
-// (h.upsertApprovalConfig).
-func (h *Handler) UpsertTemplateApprovalConfig(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	h.upsertApprovalConfig(w, r)
 }
 
 // GetTemplate handles GET /templates/{id}, delegating to the underlying

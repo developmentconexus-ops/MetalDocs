@@ -274,23 +274,23 @@ func (r *Repository) CreateVersion(ctx context.Context, v *domain.TemplateVersio
 INSERT INTO templates_template_version (
 	id, tenant_id, template_id, version_number, revision_number, status, docx_storage_key, content_hash,
 	metadata_schema, placeholder_schema, author_id,
-	pending_reviewer_role, pending_approver_role, reviewer_id, approver_id,
+	reviewer_id, approver_id,
 	submitted_at, reviewed_at, approved_at, published_at, obsoleted_at, lock_version, created_at
 ) VALUES (
-	$1, $21::uuid, $2, $3,
+	$1, $19::uuid, $2, $3,
 	COALESCE((SELECT MAX(rn.revision_number) + 1
 	            FROM templates_template_version rn
 	           WHERE rn.template_id = $2), 0),
 	$4, $5, $6,
 	$7, $8, $9,
-	$10, $11, $12, $13,
-	$14, $15, $16, $17, $18, $19, $20
+	$10, $11,
+	$12, $13, $14, $15, $16, $17, $18
 )
 RETURNING revision_number`
 	row := r.db.QueryRowContext(ctx, q,
 		v.ID, v.TemplateID, v.VersionNumber, string(v.Status), v.DocxStorageKey, v.ContentHash,
 		metadataJSON, placeholderJSON, v.AuthorID,
-		v.PendingReviewerRole, v.PendingApproverRole, v.ReviewerID, v.ApproverID,
+		v.ReviewerID, v.ApproverID,
 		v.SubmittedAt, v.ReviewedAt, v.ApprovedAt, v.PublishedAt, v.ObsoletedAt, v.LockVersion, v.CreatedAt,
 		v.TenantID,
 	)
@@ -312,23 +312,23 @@ func (r *Repository) CreateVersionTx(ctx context.Context, tx db.Tx, v *domain.Te
 INSERT INTO templates_template_version (
 	id, tenant_id, template_id, version_number, revision_number, status, docx_storage_key, content_hash,
 	metadata_schema, placeholder_schema, author_id,
-	pending_reviewer_role, pending_approver_role, reviewer_id, approver_id,
+	reviewer_id, approver_id,
 	submitted_at, reviewed_at, approved_at, published_at, obsoleted_at, lock_version, created_at
 ) VALUES (
-	$1, $21::uuid, $2, $3,
+	$1, $19::uuid, $2, $3,
 	COALESCE((SELECT MAX(rn.revision_number) + 1
 	            FROM templates_template_version rn
 	           WHERE rn.template_id = $2), 0),
 	$4, $5, $6,
 	$7, $8, $9,
-	$10, $11, $12, $13,
-	$14, $15, $16, $17, $18, $19, $20
+	$10, $11,
+	$12, $13, $14, $15, $16, $17, $18
 )
 RETURNING revision_number`
 	row := tx.QueryRowContext(ctx, q,
 		v.ID, v.TemplateID, v.VersionNumber, string(v.Status), v.DocxStorageKey, v.ContentHash,
 		metadataJSON, placeholderJSON, v.AuthorID,
-		v.PendingReviewerRole, v.PendingApproverRole, v.ReviewerID, v.ApproverID,
+		v.ReviewerID, v.ApproverID,
 		v.SubmittedAt, v.ReviewedAt, v.ApprovedAt, v.PublishedAt, v.ObsoletedAt, v.LockVersion, v.CreatedAt,
 		v.TenantID,
 	)
@@ -346,7 +346,7 @@ func (r *Repository) GetVersion(ctx context.Context, tenantID, templateID string
 SELECT
 	v.id::text, v.template_id::text, v.version_number, v.revision_number, v.status, v.docx_storage_key, v.content_hash,
 	v.metadata_schema, v.placeholder_schema, v.author_id,
-	v.pending_reviewer_role, v.pending_approver_role, v.reviewer_id, v.approver_id,
+	v.reviewer_id, v.approver_id,
 	v.submitted_at, v.reviewed_at, v.approved_at, v.published_at, v.obsoleted_at, v.lock_version, v.created_at
 FROM templates_template_version v
 JOIN templates_template t ON t.id = v.template_id
@@ -370,7 +370,7 @@ func (r *Repository) GetVersionByID(ctx context.Context, tenantID, id string) (*
 SELECT
 	v.id::text, v.template_id::text, v.version_number, v.revision_number, v.status, v.docx_storage_key, v.content_hash,
 	v.metadata_schema, v.placeholder_schema, v.author_id,
-	v.pending_reviewer_role, v.pending_approver_role, v.reviewer_id, v.approver_id,
+	v.reviewer_id, v.approver_id,
 	v.submitted_at, v.reviewed_at, v.approved_at, v.published_at, v.obsoleted_at, v.lock_version, v.created_at
 FROM templates_template_version v
 JOIN templates_template t ON t.id = v.template_id
@@ -441,27 +441,25 @@ SET
 	content_hash = $4,
 	metadata_schema = $5,
 	placeholder_schema = $6,
-	pending_reviewer_role = $7,
-	pending_approver_role = $8,
-	reviewer_id = $9,
-	approver_id = $10,
-	submitted_at = $11,
-	reviewed_at = $12,
-	approved_at = $13,
-	published_at = $14,
-	obsoleted_at = $15,
+	reviewer_id = $7,
+	approver_id = $8,
+	submitted_at = $9,
+	reviewed_at = $10,
+	approved_at = $11,
+	published_at = $12,
+	obsoleted_at = $13,
 	lock_version = lock_version + 1
 WHERE id = $1
   AND EXISTS (
     SELECT 1 FROM templates_template t
     WHERE t.id = templates_template_version.template_id
-      AND t.tenant_id = $17::uuid
+      AND t.tenant_id = $15::uuid
   )
-  AND lock_version = $16`
+  AND lock_version = $14`
 	res, err := db.ExecContext(ctx, q,
 		v.ID, string(v.Status), v.DocxStorageKey, v.ContentHash,
 		metadataJSON, placeholderJSON,
-		v.PendingReviewerRole, v.PendingApproverRole, v.ReviewerID, v.ApproverID,
+		v.ReviewerID, v.ApproverID,
 		v.SubmittedAt, v.ReviewedAt, v.ApprovedAt, v.PublishedAt, v.ObsoletedAt, v.LockVersion, tenantID,
 	)
 	if err != nil {
@@ -656,73 +654,6 @@ WHERE v.template_id = $1
 	}
 	if _, err := rowsAffected(res); err != nil {
 		return fmt.Errorf("templates repository obsolete previous published tx: %w", err)
-	}
-	return nil
-}
-
-// GetApprovalConfig loads the reviewer/approver role configuration for a
-// template, scoped to the tenant via a subquery on templates_template. It
-// returns domain.ErrNotFound when no config row exists or templateID is not
-// a valid UUID.
-func (r *Repository) GetApprovalConfig(ctx context.Context, tenantID, templateID string) (*domain.ApprovalConfig, error) {
-	const q = `
-SELECT template_id::text, reviewer_role, approver_role
-FROM templates_approval_config
-WHERE template_id = $1
-  AND template_id IN (SELECT id FROM templates_template WHERE tenant_id = $2::uuid)`
-	var (
-		cfg      domain.ApprovalConfig
-		reviewer sql.NullString
-	)
-	err := r.db.QueryRowContext(ctx, q, templateID, tenantID).Scan(&cfg.TemplateID, &reviewer, &cfg.ApproverRole)
-	if errors.Is(err, sql.ErrNoRows) || isInvalidUUID(err) {
-		return nil, domain.ErrNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	if reviewer.Valid {
-		cfg.ReviewerRole = &reviewer.String
-	}
-	return &cfg, nil
-}
-
-// UpsertApprovalConfig inserts or updates a template's reviewer/approver
-// role configuration, executing directly against the repository's database
-// handle (ON CONFLICT (template_id) DO UPDATE).
-func (r *Repository) UpsertApprovalConfig(ctx context.Context, c *domain.ApprovalConfig) error {
-	const q = `
-INSERT INTO templates_approval_config (template_id, reviewer_role, approver_role)
-VALUES ($1, $2, $3)
-ON CONFLICT (template_id) DO UPDATE
-SET reviewer_role = EXCLUDED.reviewer_role,
-    approver_role = EXCLUDED.approver_role`
-	res, err := r.db.ExecContext(ctx, q, c.TemplateID, c.ReviewerRole, c.ApproverRole)
-	if err != nil {
-		return fmt.Errorf("templates repository upsert approval config: %w", err)
-	}
-	if _, err := rowsAffected(res); err != nil {
-		return fmt.Errorf("templates repository upsert approval config: %w", err)
-	}
-	return nil
-}
-
-// UpsertApprovalConfigTx inserts or updates a template's reviewer/approver
-// role configuration using the caller-supplied transaction (ON CONFLICT
-// (template_id) DO UPDATE).
-func (r *Repository) UpsertApprovalConfigTx(ctx context.Context, tx db.Tx, c *domain.ApprovalConfig) error {
-	const q = `
-INSERT INTO templates_approval_config (template_id, reviewer_role, approver_role)
-VALUES ($1, $2, $3)
-ON CONFLICT (template_id) DO UPDATE
-SET reviewer_role = EXCLUDED.reviewer_role,
-    approver_role = EXCLUDED.approver_role`
-	res, err := tx.ExecContext(ctx, q, c.TemplateID, c.ReviewerRole, c.ApproverRole)
-	if err != nil {
-		return fmt.Errorf("templates repository upsert approval config tx: %w", err)
-	}
-	if _, err := rowsAffected(res); err != nil {
-		return fmt.Errorf("templates repository upsert approval config tx: %w", err)
 	}
 	return nil
 }

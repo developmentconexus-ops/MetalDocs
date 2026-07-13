@@ -168,14 +168,12 @@ func TestLifecycle_NoAutoNextDraft(t *testing.T) {
 	})
 
 	// ── Step 3: direct publish ────────────────────────────────────────────
-	// ADR 0082 phase (a) part 1: CreateTemplate no longer seeds an approval
-	// config, so the legacy submit → review → approve flow cannot run against
-	// a fresh template (SubmitForReview reads the retired config). The KEPT
-	// path to published is PublishTemplateVersion on the draft: committed
-	// content hash (T-004), publisher ≠ author (SoD via CheckSegregation),
-	// and capability template.publish. The never-submitted version carries no
-	// pending role binding (RoleBindingFor returns ""), so the capability
-	// tier is the sole gate — no ActorRoles are passed.
+	// ADR 0082 unit 3.1a: the legacy submit/review/approve triad (and the
+	// approval-config it depended on) is retired (slice S4); the KEPT path to
+	// published is PublishTemplateVersion on the draft: committed content hash
+	// (T-004), publisher ≠ author (SoD via CheckSegregation), and capability
+	// template.publish. Capability is the sole gate — no ActorRoles are
+	// passed, and no role-binding concept exists on the version at all.
 	publishRes, err := svc.PublishTemplateVersion(approverCtx, application.PublishTemplateVersionCmd{
 		TenantID:      tenant.ID,
 		ActorUserID:   approver,

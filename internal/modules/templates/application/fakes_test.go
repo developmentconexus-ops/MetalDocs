@@ -56,11 +56,10 @@ func newPermissiveMockDB(t *testing.T) *sql.DB {
 }
 
 type fakeRepo struct {
-	templates       map[string]*domain.Template
-	versions        map[string]*domain.TemplateVersion
-	audit           []*domain.AuditEvent
-	approvalConfigs map[string]*domain.ApprovalConfig
-	receivedFilter  application.ListFilter
+	templates      map[string]*domain.Template
+	versions       map[string]*domain.TemplateVersion
+	audit          []*domain.AuditEvent
+	receivedFilter application.ListFilter
 
 	ignoreTenantOnGetTemplate bool
 	lockVersions              map[string]int
@@ -73,11 +72,10 @@ type fakeRepo struct {
 
 func newFakeRepo() *fakeRepo {
 	return &fakeRepo{
-		templates:       map[string]*domain.Template{},
-		versions:        map[string]*domain.TemplateVersion{},
-		audit:           []*domain.AuditEvent{},
-		approvalConfigs: map[string]*domain.ApprovalConfig{},
-		lockVersions:    map[string]int{},
+		templates:    map[string]*domain.Template{},
+		versions:     map[string]*domain.TemplateVersion{},
+		audit:        []*domain.AuditEvent{},
+		lockVersions: map[string]int{},
 	}
 }
 
@@ -261,27 +259,6 @@ func (r *fakeRepo) ObsoletePreviousPublished(_ context.Context, _ /*tenantID*/ s
 
 func (r *fakeRepo) ObsoletePreviousPublishedTx(_ context.Context, _ db.Tx, tenantID, templateID, keepVersionID string) error {
 	return r.ObsoletePreviousPublished(context.Background(), tenantID, templateID, keepVersionID)
-}
-
-func (r *fakeRepo) GetApprovalConfig(_ context.Context, tenantID, templateID string) (*domain.ApprovalConfig, error) {
-	t, ok := r.templates[templateID]
-	if !ok || t.TenantID != tenantID {
-		return nil, domain.ErrNotFound
-	}
-	c, ok := r.approvalConfigs[templateID]
-	if !ok {
-		return nil, domain.ErrNotFound
-	}
-	return c, nil
-}
-
-func (r *fakeRepo) UpsertApprovalConfig(_ context.Context, c *domain.ApprovalConfig) error {
-	r.approvalConfigs[c.TemplateID] = c
-	return nil
-}
-
-func (r *fakeRepo) UpsertApprovalConfigTx(_ context.Context, _ db.Tx, c *domain.ApprovalConfig) error {
-	return r.UpsertApprovalConfig(context.Background(), c)
 }
 
 func (r *fakeRepo) AppendAudit(_ context.Context, e *domain.AuditEvent) error {

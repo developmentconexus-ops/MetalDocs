@@ -9,5 +9,5 @@ import (
 )
 
 func TestScaffoldCompiles(t *testing.T) {
-	_ = domain.ApprovalConfig{}
+	_ = domain.Template{}
 }

@@ -30,11 +30,6 @@ const (
 	AuditArchived AuditAction = "archived"
 	// AuditRestored marks that an archived template was restored.
 	AuditRestored AuditAction = "restored"
-	// AuditApprovalConfigUpdated marks that a template's ApprovalConfig was updated.
-	AuditApprovalConfigUpdated AuditAction = "approval_config_updated"
-	// AuditPublishForbiddenRole marks that a publish attempt was denied because
-	// the actor did not hold the role bound to the transition.
-	AuditPublishForbiddenRole AuditAction = "publish_forbidden_role"
 )
 
 // AuditEvent records a single lifecycle action taken against a template or
