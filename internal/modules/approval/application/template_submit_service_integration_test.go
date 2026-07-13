@@ -54,6 +54,53 @@ func (fakeTemplateVersionReader) LoadTemplateVersionStatus(ctx context.Context, 
 	return status.String, true, nil
 }
 
+func (fakeTemplateVersionReader) LoadTemplateVersionContentHash(ctx context.Context, tx db.Tx, tenantID, templateVersionID string) (string, bool, error) {
+	var hash sql.NullString
+	err := tx.QueryRowContext(ctx, `
+		SELECT content_hash FROM templates_template_version
+		 WHERE id = $1 AND tenant_id = $2`,
+		templateVersionID, tenantID,
+	).Scan(&hash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	if !hash.Valid || hash.String == "" {
+		return "", false, nil
+	}
+	return hash.String, true, nil
+}
+
+// fakeTemplateVersionSubmitWriter is a test-local double for the approval-owned
+// TemplateVersionSubmitWriter port (M3 P3.S2b-3b-iii-b submit-lock). Like the
+// reader fake it duplicates (rather than imports) the production
+// templates/infrastructure adapter's UPDATE — this test package must never
+// import templates infrastructure. Mirrors ApprovalCompletionWriter's
+// draft -> under_review CAS.
+type fakeTemplateVersionSubmitWriter struct{}
+
+func (fakeTemplateVersionSubmitWriter) MarkTemplateVersionUnderReview(ctx context.Context, tx db.Tx, tenantID, templateVersionID string) error {
+	res, err := tx.ExecContext(ctx, `
+		UPDATE templates_template_version
+		   SET status = 'under_review', submitted_at = now(), lock_version = lock_version + 1
+		 WHERE id = $1 AND tenant_id = $2 AND status = 'draft'`,
+		templateVersionID, tenantID,
+	)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return errors.New("fake submit-lock: version not draft")
+	}
+	return nil
+}
+
 // seedTemplateVersion inserts a templates_template + templates_template_version
 // pair, mirroring testdb.InsertDraftDocument's canonical-family fixture but
 // parameterized on status (draft vs published) since that unexported helper
@@ -95,7 +142,7 @@ func seedTemplateVersion(t *testing.T, dbc *sql.DB, tenantID, actorID, status st
 		`INSERT INTO public.templates_template_version
 		   (id, tenant_id, template_id, version_number, status, docx_storage_key, content_hash,
 		    metadata_schema, placeholder_schema, author_id)
-		 VALUES (gen_random_uuid(), $1::uuid, $2::uuid, 1, $3, $4, $5, '{}'::jsonb, '{"placeholders":[]}'::jsonb, $6::text)
+		 VALUES (gen_random_uuid(), $1::uuid, $2::uuid, 1, $3, $4, $5, '{}'::jsonb, '[]'::jsonb, $6::text)
 		 RETURNING id::text`,
 		tenantID, templateID, status, docxKey, contentHash, actorID,
 	).Scan(&versionID); err != nil {
@@ -254,6 +301,7 @@ func TestSubmitTemplateVersionForReview_Success_RealDB(t *testing.T) {
 
 	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
 	svc := NewTemplateSubmitService(repo, NewSQLEmitter(), RealClock{}, fakeTemplateVersionReader{})
+	svc.versionWriter = fakeTemplateVersionSubmitWriter{}
 	runner := db.NewTxRunner(dbc)
 
 	res, err := svc.SubmitTemplateVersionForReview(newTemplateSubmitCtx(tnt.ID, actor.ID), runner, TemplateSubmitRequest{
@@ -318,6 +366,20 @@ func TestSubmitTemplateVersionForReview_Success_RealDB(t *testing.T) {
 	if eventType != "approval_submitted" || resourceType != "template" || resourceID != versionID {
 		t.Fatalf("event = (%q,%q,%q), want (approval_submitted,template,%q)", eventType, resourceType, resourceID, versionID)
 	}
+
+	// Submit-lock (M3 P3.S2b-3b-iii-b): the version's own status column must
+	// now be under_review, so the templates module's draft-gated edit/upload
+	// endpoints reject further author edits for the duration of the approval.
+	var versionStatus string
+	if err := dbc.QueryRowContext(ctx,
+		`SELECT status FROM templates_template_version WHERE id = $1::uuid AND tenant_id = $2::uuid`,
+		versionID, tnt.ID,
+	).Scan(&versionStatus); err != nil {
+		t.Fatalf("query version status: %v", err)
+	}
+	if versionStatus != "under_review" {
+		t.Fatalf("version status = %q, want under_review (submit-lock)", versionStatus)
+	}
 }
 
 // TestSubmitTemplateVersionForReview_NonDraft_Rejected_RealDB proves the
@@ -333,6 +395,7 @@ func TestSubmitTemplateVersionForReview_NonDraft_Rejected_RealDB(t *testing.T) {
 
 	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
 	svc := NewTemplateSubmitService(repo, NewSQLEmitter(), RealClock{}, fakeTemplateVersionReader{})
+	svc.versionWriter = fakeTemplateVersionSubmitWriter{}
 	runner := db.NewTxRunner(dbc)
 
 	_, err := svc.SubmitTemplateVersionForReview(newTemplateSubmitCtx(tnt.ID, actor.ID), runner, TemplateSubmitRequest{

@@ -32,6 +32,32 @@ type TemplateVersionReader interface {
 	// cross-tenant id) — the same not-found shape LoadControlledDocumentID
 	// uses elsewhere in this package.
 	LoadTemplateVersionStatus(ctx context.Context, tx db.Tx, tenantID, templateVersionID string) (status string, ok bool, err error)
+
+	// LoadTemplateVersionContentHash returns
+	// templates_template_version.content_hash for templateVersionID, scoped
+	// to tenantID, read inside the caller's transaction (M3
+	// P3.S2b-3b-iii-b). DecisionService reads through this in place of the
+	// document-only freeze pin (LoadFrozenContentHash): a template version's
+	// content is locked (no author edits) once it is under_review, so its
+	// stored content_hash is the same immutable content identity a frozen
+	// pin captures for a document — not a fallback, the authoritative value.
+	// ok is false when no row matches (absent id, cross-tenant id, or an
+	// empty/never-set hash).
+	LoadTemplateVersionContentHash(ctx context.Context, tx db.Tx, tenantID, templateVersionID string) (contentHash string, ok bool, err error)
+}
+
+// TemplateVersionSubmitWriter is the approval-owned port through which the
+// kernel submit path locks a template version's own status column
+// (draft -> under_review) in the submit tx (M3 P3.S2b-3b-iii-b, hub Option
+// (a)). Mirrors the TemplateCompletionWriter / PinInvoker seam: approval
+// never UPDATEs templates_template_version directly — this narrow interface
+// is the ONLY write surface, satisfied by templates/infrastructure's
+// ApprovalCompletionWriter and wired at the composition root. The write runs
+// INSIDE the submit tx so the version-status lock is atomic with the
+// approval-instance creation (a version can never be kernel-submitted yet
+// still author-editable).
+type TemplateVersionSubmitWriter interface {
+	MarkTemplateVersionUnderReview(ctx context.Context, tx db.Tx, tenantID, templateVersionID string) error
 }
 
 // ErrTemplateVersionNotFound is returned when the submitted template version
@@ -56,6 +82,10 @@ type TemplateSubmitService struct {
 	emitter       EventEmitter
 	clock         Clock
 	versionReader TemplateVersionReader
+	// versionWriter locks the version's own status column draft->under_review
+	// in the submit tx (M3 P3.S2b-3b-iii-b, hub Option (a)). nil fails closed
+	// (an explicit error) rather than leaving the concurrent-edit hole open.
+	versionWriter TemplateVersionSubmitWriter
 	// routeResolver reaches LoadActiveRouteIDBySubject, declared on
 	// SubmitDefaultsResolver (not the broader ApprovalRepository interface —
 	// same ISP split SubmitService.resolver uses). Populated via type
@@ -130,6 +160,22 @@ func (s *TemplateSubmitService) SubmitTemplateVersionForReview(ctx context.Conte
 		}
 		if status != "draft" {
 			return ErrTemplateVersionNotDraft
+		}
+
+		// Submit-lock (M3 P3.S2b-3b-iii-b, hub Option (a)): flip the version's
+		// own status column draft -> under_review inside this same tx,
+		// atomically with the approval-instance creation below. This closes
+		// the concurrent-edit hole — the templates module's edit/upload gates
+		// permit writes only while status='draft', so a kernel-submitted
+		// version becomes immutable to the author for the approval's duration.
+		// Fail-closed on a nil writer or a 0-row CAS (draft precondition
+		// lost). template.submit is already asserted above in this tx, so the
+		// tripwire GUC authorizes the UPDATE without a second assertion.
+		if s.versionWriter == nil {
+			return fmt.Errorf("template submit: version submit-writer not configured")
+		}
+		if err := s.versionWriter.MarkTemplateVersionUnderReview(ctx, tx, req.TenantID, req.TemplateVersionID); err != nil {
+			return fmt.Errorf("template submit: lock version under_review: %w", err)
 		}
 
 		// Resolve the active route by the template's own id (the governance

@@ -643,6 +643,10 @@ func main() {
 	// the templates-side adapter. approval never imports templates
 	// infrastructure beyond this narrow interface satisfaction.
 	approvalServices = approvalServices.WithTemplateVersionReader(templatesinfra.NewApprovalVersionReader())
+	// M3 P3.S2b-3b-iii-b: wire the approval-owned TemplateCompletionWriter
+	// port to the templates-side adapter — the ONLY seam a terminal
+	// template-subject signoff decision crosses into templates_template_version.
+	approvalServices = approvalServices.WithTemplateCompletionWriter(templatesinfra.NewApprovalCompletionWriter())
 	jobsCfg, err := config.LoadJobsConfig()
 	if err != nil {
 		slog.Error("invalid jobs config", "err", err)

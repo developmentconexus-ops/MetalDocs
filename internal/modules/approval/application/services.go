@@ -160,7 +160,39 @@ func (s *Services) WithTemplateVersionReader(reader TemplateVersionReader) *Serv
 		return s
 	}
 	if s.TemplateSubmit != nil {
-		s.TemplateSubmit = NewTemplateSubmitService(s.TemplateSubmit.repo, s.TemplateSubmit.emitter, s.TemplateSubmit.clock, reader)
+		// Set the field in place (rather than reconstructing) so a previously
+		// wired versionWriter is preserved regardless of call order.
+		s.TemplateSubmit.versionReader = reader
+	}
+	// M3 P3.S2b-3b-iii-b: DecisionService reuses the same port to read a
+	// template version's content_hash in place of the document-only freeze
+	// pin during signoff.
+	if s.Decision != nil {
+		s.Decision = s.Decision.WithTemplateVersionReader(reader)
+	}
+	return s
+}
+
+// WithTemplateCompletionWriter wires the M3 P3.S2b-3b-iii-b completion port
+// into Decision. Call after NewServices. A nil writer leaves a
+// template-subject terminal decision fail-closed (an explicit error) rather
+// than silently skipping the templates_template_version transition.
+func (s *Services) WithTemplateCompletionWriter(writer TemplateCompletionWriter) *Services {
+	if s == nil {
+		return s
+	}
+	if s.Decision != nil {
+		s.Decision = s.Decision.WithTemplateCompletionWriter(writer)
+	}
+	// The same templates-infra adapter (ApprovalCompletionWriter) also
+	// satisfies the submit-lock port (M3 P3.S2b-3b-iii-b, hub Option (a)):
+	// one concrete adapter owns the full template-version lifecycle under
+	// kernel governance (under_review at submit, approved/draft at
+	// completion). Wire the submit-lock leg when the writer implements it.
+	if s.TemplateSubmit != nil {
+		if sw, ok := writer.(TemplateVersionSubmitWriter); ok {
+			s.TemplateSubmit.versionWriter = sw
+		}
 	}
 	return s
 }

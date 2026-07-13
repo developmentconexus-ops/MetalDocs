@@ -52,3 +52,30 @@ func (r *ApprovalVersionReader) LoadTemplateVersionStatus(ctx context.Context, t
 	}
 	return status.String, true, nil
 }
+
+// LoadTemplateVersionContentHash returns templates_template_version.content_hash
+// for templateVersionID, scoped to tenantID, read inside tx (M3
+// P3.S2b-3b-iii-b). Used by approval's DecisionService in place of the
+// document-only freeze pin when the signoff's parent instance is
+// subject_kind='template'. ok is false when no row matches, or the row has
+// no content_hash yet (empty string — never populated).
+func (r *ApprovalVersionReader) LoadTemplateVersionContentHash(ctx context.Context, tx db.Tx, tenantID, templateVersionID string) (string, bool, error) {
+	var hash sql.NullString
+	err := tx.QueryRowContext(ctx, `
+		SELECT content_hash
+		  FROM templates_template_version
+		 WHERE id = $1
+		   AND tenant_id = $2`,
+		templateVersionID, tenantID,
+	).Scan(&hash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	if !hash.Valid || hash.String == "" {
+		return "", false, nil
+	}
+	return hash.String, true, nil
+}

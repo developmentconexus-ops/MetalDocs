@@ -47,6 +47,24 @@ type PinInvoker interface {
 	Pin(ctx context.Context, tx db.Tx, tenantID, revisionID string, approver docapp.ApproverContext) error
 }
 
+// TemplateCompletionWriter is the approval-owned completion port for a
+// template-subject instance reaching a terminal outcome (M3
+// P3.S2b-3b-iii-b). Mirrors the PinInvoker / TemplateVersionReader
+// injection pattern: approval never imports templates infrastructure or
+// writes templates_template_version directly — this is the ONLY seam a
+// terminal approve/reject decision crosses the module boundary through. The
+// production adapter lives in templates/infrastructure
+// (ApprovalCompletionWriter) and runs its UPDATE on the CALLER's
+// transaction (tx) so the version transition commits atomically with the
+// signoff write. Fail-closed: a template instance reaching a terminal
+// outcome with this port unset is a wiring error surfaced as an explicit
+// error, never a silent skip of the version transition (mirrors the
+// pinInvoker == nil guard on the document path).
+type TemplateCompletionWriter interface {
+	MarkTemplateVersionApproved(ctx context.Context, tx db.Tx, tenantID, templateVersionID string) error
+	MarkTemplateVersionRejected(ctx context.Context, tx db.Tx, tenantID, templateVersionID string) error
+}
+
 // pdfDispatchEnqueuer is the minimal published interface for the staging
 // pdf dispatch Enqueuer (render/fanout/dispatchjobs), owned here (the
 // consumer) and satisfied by *dispatchjobs.Enqueuer. It inserts the paired
@@ -67,6 +85,16 @@ type DecisionService struct {
 	sigRegistry       *signature.Registry
 	cdRead            controlleddocumentsdomain.CDFieldReader
 	lifecycleEnqueuer docsdomain.LifecycleEventEnqueuer
+	// templateCompletion is the M3 P3.S2b-3b-iii-b completion port: on a
+	// terminal decision for a subject_kind='template' instance, drives the
+	// templates_template_version status transition in place of the
+	// document-only `UPDATE documents` path. nil in tests that never
+	// exercise a template-subject instance.
+	templateCompletion TemplateCompletionWriter
+	// templateVersionReader is the same approval-owned port
+	// TemplateSubmitService uses (#24), reused here to read a template
+	// version's real content_hash in place of the document-only freeze pin.
+	templateVersionReader TemplateVersionReader
 }
 
 // NewDecisionService builds the approve/reject decision service. The async-freeze
@@ -118,6 +146,25 @@ func (s *DecisionService) WithSignatureRegistry(registry *signature.Registry) *D
 // lifecycle events after a decision completes a stage or instance transition.
 func (s *DecisionService) WithLifecycleEnqueuer(e docsdomain.LifecycleEventEnqueuer) *DecisionService {
 	s.lifecycleEnqueuer = e
+	return s
+}
+
+// WithTemplateCompletionWriter wires the M3 P3.S2b-3b-iii-b completion port
+// used to transition templates_template_version on a terminal
+// template-subject decision. Call after NewServices/NewDecisionService. A
+// nil writer fails closed (an explicit error from recordSignoffInTx) rather
+// than silently skipping the version transition.
+func (s *DecisionService) WithTemplateCompletionWriter(writer TemplateCompletionWriter) *DecisionService {
+	s.templateCompletion = writer
+	return s
+}
+
+// WithTemplateVersionReader wires the approval-owned TemplateVersionReader
+// port (shared with TemplateSubmitService, #24) so a template-subject
+// signoff can read the version's real content_hash in place of the
+// document-only freeze pin (M3 P3.S2b-3b-iii-b).
+func (s *DecisionService) WithTemplateVersionReader(reader TemplateVersionReader) *DecisionService {
+	s.templateVersionReader = reader
 	return s
 }
 
@@ -268,7 +315,18 @@ func (s *DecisionService) recordSignoffInTx(ctx context.Context, tx *sql.Tx, req
 	if err != nil {
 		return SignoffResult{}, nil, fmt.Errorf("recordSignoff: load document area: %w", err)
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentSignoff), areaCode); err != nil {
+	// Subject-conditional assertion (M3 P3.S2b-3b-iii-b, ADR 0083): the
+	// approval_signoffs tripwire (migration 0300) discriminates by the
+	// parent instance's subject_kind — a template-subject signoff requires
+	// template.approve, a document-subject signoff requires document.signoff.
+	// resolveSubjectAreaCode already returns "tenant" (area-blind) for a
+	// template subject (subject_area.go), which is api-lint clean for
+	// CapTemplateApprove (ScopeTenant).
+	signoffCap := string(iamdomain.CapDocumentSignoff)
+	if instance.Subject.Kind == domain.SubjectKindTemplate {
+		signoffCap = string(iamdomain.CapTemplateApprove)
+	}
+	if err := authz.Require(ctx, tx, signoffCap, areaCode); err != nil {
 		return SignoffResult{}, nil, err
 	}
 
@@ -282,30 +340,53 @@ func (s *DecisionService) recordSignoffInTx(ctx context.Context, tx *sql.Tx, req
 		return SignoffResult{}, nil, err
 	}
 
-	// Content pin: client echoes back the content hash from the active-document
-	// endpoint to confirm the instance content has not drifted since they loaded it.
-	// No-fallback (F6, spec §11): the ONLY authoritative source is the instance's
-	// frozen_content_hash, pinned once at the freeze boundary (F5). By the time an
-	// approval-kind stage is active and signoff is possible, the instance must
-	// already be frozen — a NULL pin here is an impossible state, not a legitimate
-	// "not yet computed" case, so it fails closed via ErrNoActiveContentHash rather
-	// than falling back to any document-table or revision-history hash.
-	contentHash, err := s.repo.LoadFrozenContentHash(ctx, tx, req.TenantID, instance.ID)
-	if err != nil {
-		if errors.Is(err, infrastructure.ErrNoActiveContentHash) {
+	// Content pin (DOCUMENT-ONLY, M3 P3.S2b-3b-iii-b): a template never
+	// freezes (#24's template submit deliberately omits freeze), so a
+	// template-subject instance has no frozen_content_hash to pin against and
+	// no client-echo to verify. Its content_hash is instead read straight off
+	// templates_template_version.content_hash through the approval-owned
+	// TemplateVersionReader port (#24) — the version's real content identity,
+	// locked from author edits once under_review — never a direct table read.
+	var contentHash string
+	if instance.Subject.Kind == domain.SubjectKindTemplate {
+		if s.templateVersionReader == nil {
+			return SignoffResult{}, nil, fmt.Errorf("recordSignoff: template version reader not configured")
+		}
+		hash, ok, hashErr := s.templateVersionReader.LoadTemplateVersionContentHash(ctx, tx, req.TenantID, instance.Subject.Key)
+		if hashErr != nil {
+			return SignoffResult{}, nil, fmt.Errorf("recordSignoff: load template version content hash: %w", hashErr)
+		}
+		if !ok {
 			return SignoffResult{}, nil, ErrContentHashMismatch
 		}
-		return SignoffResult{}, nil, fmt.Errorf("recordSignoff: load frozen content hash: %w", err)
-	}
-	// Content pin is mandatory: an unauthenticated or programmatic caller must not
-	// be able to skip the check by omitting `_content_hash`. The HTTP boundary
-	// already enforces a 64-hex hash, so this is a defense-in-depth guard.
-	clientHash, ok := clientContentHash(req.ContentFormData)
-	if !ok {
-		return SignoffResult{}, nil, ErrContentHashMismatch
-	}
-	if clientHash != contentHash {
-		return SignoffResult{}, nil, ErrContentHashMismatch
+		contentHash = hash
+	} else {
+		// client echoes back the content hash from the active-document
+		// endpoint to confirm the instance content has not drifted since they loaded it.
+		// No-fallback (F6, spec §11): the ONLY authoritative source is the instance's
+		// frozen_content_hash, pinned once at the freeze boundary (F5). By the time an
+		// approval-kind stage is active and signoff is possible, the instance must
+		// already be frozen — a NULL pin here is an impossible state, not a legitimate
+		// "not yet computed" case, so it fails closed via ErrNoActiveContentHash rather
+		// than falling back to any document-table or revision-history hash.
+		var hashErr error
+		contentHash, hashErr = s.repo.LoadFrozenContentHash(ctx, tx, req.TenantID, instance.ID)
+		if hashErr != nil {
+			if errors.Is(hashErr, infrastructure.ErrNoActiveContentHash) {
+				return SignoffResult{}, nil, ErrContentHashMismatch
+			}
+			return SignoffResult{}, nil, fmt.Errorf("recordSignoff: load frozen content hash: %w", hashErr)
+		}
+		// Content pin is mandatory: an unauthenticated or programmatic caller must not
+		// be able to skip the check by omitting `_content_hash`. The HTTP boundary
+		// already enforces a 64-hex hash, so this is a defense-in-depth guard.
+		clientHash, ok := clientContentHash(req.ContentFormData)
+		if !ok {
+			return SignoffResult{}, nil, ErrContentHashMismatch
+		}
+		if clientHash != contentHash {
+			return SignoffResult{}, nil, ErrContentHashMismatch
+		}
 	}
 
 	// Step 5: identify active stage.
@@ -459,47 +540,61 @@ func (s *DecisionService) recordSignoffInTx(ctx context.Context, tx *sql.Tx, req
 				domain.InstanceApproved, domain.InstanceInProgress, &now); err != nil {
 				return SignoffResult{}, nil, fmt.Errorf("recordSignoff: complete instance: %w", err)
 			}
-			if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
-				return SignoffResult{}, nil, err
+			if instance.Subject.Kind == domain.SubjectKindTemplate {
+				// M3 P3.S2b-3b-iii-b: no document-table transition, no
+				// async-freeze Pin (templates never freeze) — the completion
+				// port drives templates_template_version under_review ->
+				// approved atomically in this same tx.
+				if s.templateCompletion == nil {
+					return SignoffResult{}, nil, fmt.Errorf("recordSignoff: template completion writer not configured")
+				}
+				if err := s.templateCompletion.MarkTemplateVersionApproved(ctx, tx, req.TenantID, instance.Subject.Key); err != nil {
+					return SignoffResult{}, nil, fmt.Errorf("recordSignoff: mark template version approved: %w", err)
+				}
+				result.InstanceApproved = true
+			} else {
+				if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
+					return SignoffResult{}, nil, err
+				}
+				if s.pinInvoker == nil {
+					return SignoffResult{}, nil, fmt.Errorf("recordSignoff: pinInvoker not configured")
+				}
+				if err := s.pinInvoker.Pin(ctx, tx, req.TenantID, instance.DocumentID, docapp.ApproverContext{
+					UserID:       req.ActorUserID,
+					Capabilities: req.Capabilities,
+				}); err != nil {
+					return SignoffResult{}, nil, fmt.Errorf("recordSignoff: pin: %w", err)
+				}
+				// Transition document under_review → approved. Friendly first-line
+				// legality check (M4/F4.1) mirrors the DB trigger; the OCC WHERE
+				// below remains the atomic CAS + optimistic-lock enforcement.
+				if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusUnderReview, docsdomain.DocStatusApproved); err != nil {
+					return SignoffResult{}, nil, err
+				}
+				res, err := tx.ExecContext(ctx, `
+					UPDATE documents
+					   SET status           = 'approved',
+					       revision_version = revision_version + 1
+					 WHERE id        = $1
+					   AND tenant_id = $2
+					   AND status    = 'under_review'`,
+					instance.DocumentID, req.TenantID,
+				)
+				if err != nil {
+					return SignoffResult{}, nil, fmt.Errorf("recordSignoff: approve document: %w", err)
+				}
+				rows, err := res.RowsAffected()
+				if err != nil {
+					return SignoffResult{}, nil, fmt.Errorf("recordSignoff: approve document rows affected: %w", err)
+				}
+				if rows == 0 {
+					return SignoffResult{}, nil, infrastructure.ErrStaleRevision
+				}
+				result.InstanceApproved = true
+				shouldDispatchPDF = true
+				pdfTenantID = req.TenantID
+				pdfRevisionID = instance.DocumentID
 			}
-			if s.pinInvoker == nil {
-				return SignoffResult{}, nil, fmt.Errorf("recordSignoff: pinInvoker not configured")
-			}
-			if err := s.pinInvoker.Pin(ctx, tx, req.TenantID, instance.DocumentID, docapp.ApproverContext{
-				UserID:       req.ActorUserID,
-				Capabilities: req.Capabilities,
-			}); err != nil {
-				return SignoffResult{}, nil, fmt.Errorf("recordSignoff: pin: %w", err)
-			}
-			// Transition document under_review → approved. Friendly first-line
-			// legality check (M4/F4.1) mirrors the DB trigger; the OCC WHERE
-			// below remains the atomic CAS + optimistic-lock enforcement.
-			if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusUnderReview, docsdomain.DocStatusApproved); err != nil {
-				return SignoffResult{}, nil, err
-			}
-			res, err := tx.ExecContext(ctx, `
-				UPDATE documents
-				   SET status           = 'approved',
-				       revision_version = revision_version + 1
-				 WHERE id        = $1
-				   AND tenant_id = $2
-				   AND status    = 'under_review'`,
-				instance.DocumentID, req.TenantID,
-			)
-			if err != nil {
-				return SignoffResult{}, nil, fmt.Errorf("recordSignoff: approve document: %w", err)
-			}
-			rows, err := res.RowsAffected()
-			if err != nil {
-				return SignoffResult{}, nil, fmt.Errorf("recordSignoff: approve document rows affected: %w", err)
-			}
-			if rows == 0 {
-				return SignoffResult{}, nil, infrastructure.ErrStaleRevision
-			}
-			result.InstanceApproved = true
-			shouldDispatchPDF = true
-			pdfTenantID = req.TenantID
-			pdfRevisionID = instance.DocumentID
 		} else {
 			// Activate the next stage that AdvanceStage marked active.
 			nextStage := instance.Active()
@@ -521,43 +616,56 @@ func (s *DecisionService) recordSignoffInTx(ctx context.Context, tx *sql.Tx, req
 		}
 		result.InstanceRejected = true
 
-		// SET LOCAL cancel GUC authorises under_review -> draft transition in trigger.
-		if _, err := tx.ExecContext(ctx,
-			`SELECT set_config('metaldocs.cancel_in_progress', $1, true)`,
-			instance.ID,
-		); err != nil {
-			return SignoffResult{}, nil, fmt.Errorf("recordSignoff: set cancel GUC: %w", err)
-		}
-		if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
-			return SignoffResult{}, nil, err
-		}
+		if instance.Subject.Kind == domain.SubjectKindTemplate {
+			// M3 P3.S2b-3b-iii-b: no cancel GUC, no CapDocumentEdit assert (both
+			// authorize the documents-table trigger arc only) — the completion
+			// port drives templates_template_version under_review -> draft
+			// atomically in this same tx.
+			if s.templateCompletion == nil {
+				return SignoffResult{}, nil, fmt.Errorf("recordSignoff: template completion writer not configured")
+			}
+			if err := s.templateCompletion.MarkTemplateVersionRejected(ctx, tx, req.TenantID, instance.Subject.Key); err != nil {
+				return SignoffResult{}, nil, fmt.Errorf("recordSignoff: mark template version rejected: %w", err)
+			}
+		} else {
+			// SET LOCAL cancel GUC authorises under_review -> draft transition in trigger.
+			if _, err := tx.ExecContext(ctx,
+				`SELECT set_config('metaldocs.cancel_in_progress', $1, true)`,
+				instance.ID,
+			); err != nil {
+				return SignoffResult{}, nil, fmt.Errorf("recordSignoff: set cancel GUC: %w", err)
+			}
+			if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
+				return SignoffResult{}, nil, err
+			}
 
-		// Transition document under_review -> draft so the author can edit and
-		// resubmit. Friendly first-line legality check (M4/F4.1) mirrors the DB
-		// trigger; the OCC WHERE below remains the atomic CAS + optimistic-lock
-		// enforcement (the DB trigger additionally gates this specific arc on the
-		// metaldocs.cancel_in_progress GUC set above).
-		if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusUnderReview, docsdomain.DocStatusDraft); err != nil {
-			return SignoffResult{}, nil, err
-		}
-		res, err := tx.ExecContext(ctx, `
+			// Transition document under_review -> draft so the author can edit and
+			// resubmit. Friendly first-line legality check (M4/F4.1) mirrors the DB
+			// trigger; the OCC WHERE below remains the atomic CAS + optimistic-lock
+			// enforcement (the DB trigger additionally gates this specific arc on the
+			// metaldocs.cancel_in_progress GUC set above).
+			if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusUnderReview, docsdomain.DocStatusDraft); err != nil {
+				return SignoffResult{}, nil, err
+			}
+			res, err := tx.ExecContext(ctx, `
         UPDATE documents
            SET status           = 'draft',
                revision_version = revision_version + 1
          WHERE id        = $1
            AND tenant_id = $2
            AND status    = 'under_review'`,
-			instance.DocumentID, req.TenantID,
-		)
-		if err != nil {
-			return SignoffResult{}, nil, fmt.Errorf("recordSignoff: reject document: %w", err)
-		}
-		rows, err := res.RowsAffected()
-		if err != nil {
-			return SignoffResult{}, nil, fmt.Errorf("recordSignoff: reject document rows affected: %w", err)
-		}
-		if rows == 0 {
-			return SignoffResult{}, nil, infrastructure.ErrStaleRevision
+				instance.DocumentID, req.TenantID,
+			)
+			if err != nil {
+				return SignoffResult{}, nil, fmt.Errorf("recordSignoff: reject document: %w", err)
+			}
+			rows, err := res.RowsAffected()
+			if err != nil {
+				return SignoffResult{}, nil, fmt.Errorf("recordSignoff: reject document rows affected: %w", err)
+			}
+			if rows == 0 {
+				return SignoffResult{}, nil, infrastructure.ErrStaleRevision
+			}
 		}
 
 	default:
@@ -589,8 +697,11 @@ func (s *DecisionService) recordSignoffInTx(ctx context.Context, tx *sql.Tx, req
 		return SignoffResult{}, nil, fmt.Errorf("recordSignoff: emit event: %w", err)
 	}
 
-	// Additive in-tx domain-event enqueue (ADR-0044; F3.3). Author events — terminal transitions only.
-	if s.lifecycleEnqueuer != nil {
+	// Additive in-tx domain-event enqueue (ADR-0044; F3.3). Author events — terminal
+	// transitions only. DOCUMENT-ONLY (M3 P3.S2b-3b-iii-b): the event types below
+	// are documents-domain events; a template-subject instance has no document to
+	// notify about, so this block is skipped entirely for it.
+	if s.lifecycleEnqueuer != nil && instance.Subject.Kind != domain.SubjectKindTemplate {
 		var lifecycleEventType string
 		if result.InstanceApproved {
 			lifecycleEventType = docsdomain.EventTypeDocumentApproved
