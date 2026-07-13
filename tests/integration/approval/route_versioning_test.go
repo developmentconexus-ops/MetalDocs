@@ -207,9 +207,9 @@ func seedRouteStage(t *testing.T, database *sql.DB, routeID, name string) {
 	t.Helper()
 	if _, err := database.ExecContext(context.Background(), `
 		INSERT INTO public.approval_route_stages
-		  (route_id, stage_order, name, required_role, required_capability,
-		   area_code, quorum, on_eligibility_drift)
-		VALUES ($1::uuid, 1, $2, 'author', 'document.review', 'area-1',
+		  (route_id, stage_order, name, required_capability,
+		   quorum, on_eligibility_drift)
+		VALUES ($1::uuid, 1, $2, 'document.review',
 		        'any_1_of', 'reduce_quorum')`,
 		routeID, name,
 	); err != nil {

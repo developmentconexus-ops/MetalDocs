@@ -791,7 +791,7 @@ func (r *postgresApprovalRepository) LoadActorDisplayName(ctx context.Context, t
 
 const listRoutesQuery = `
 		SELECT r.id, r.name, r.tenant_id::text, r.profile_code, r.subject_kind, r.subject_key, r.active, r.version, r.created_at, r.created_at AS updated_at,
-		       s.id, s.stage_order, s.name, s.required_role, s.required_capability, s.area_code, s.quorum, s.quorum_m, s.on_eligibility_drift,
+		       s.id, s.stage_order, s.name, s.required_capability, s.quorum, s.quorum_m, s.on_eligibility_drift,
 		       s.stage_kind, s.due_in_days,
 		       (SELECT COUNT(*) FROM approval_routes WHERE tenant_id = $1::uuid) AS total_count
 		  FROM approval_routes r
@@ -813,8 +813,8 @@ func scanRouteListRows(rows *sql.Rows) ([]Route, error) {
 			createdAt, updatedAt                           time.Time
 			stage                                          RouteStage
 			stageID                                        string
-			stageName, stageRole, stageCapability          sql.NullString
-			stageArea, stageQuorum, stageDrift             sql.NullString
+			stageName, stageCapability                     sql.NullString
+			stageQuorum, stageDrift                        sql.NullString
 			stageQuorumM                                   sql.NullInt64
 			stageKind                                      sql.NullString
 			stageDueInDays                                 sql.NullInt64
@@ -822,7 +822,7 @@ func scanRouteListRows(rows *sql.Rows) ([]Route, error) {
 		)
 		if err := rows.Scan(
 			&routeID, &routeName, &routeTenantID, &profileCode, &subjectKind, &subjectKey, &active, &version, &createdAt, &updatedAt,
-			&stageID, &stage.Order, &stageName, &stageRole, &stageCapability, &stageArea, &stageQuorum, &stageQuorumM, &stageDrift,
+			&stageID, &stage.Order, &stageName, &stageCapability, &stageQuorum, &stageQuorumM, &stageDrift,
 			&stageKind, &stageDueInDays,
 			&totalCount,
 		); err != nil {
@@ -853,14 +853,8 @@ func scanRouteListRows(rows *sql.Rows) ([]Route, error) {
 		if stageName.Valid {
 			stage.Name = stageName.String
 		}
-		if stageRole.Valid {
-			stage.RequiredRole = stageRole.String
-		}
 		if stageCapability.Valid {
 			stage.RequiredCapability = stageCapability.String
-		}
-		if stageArea.Valid {
-			stage.AreaCode = stageArea.String
 		}
 		if stageQuorum.Valid {
 			stage.Quorum = stageQuorum.String
@@ -2107,8 +2101,8 @@ func (r *postgresApprovalRepository) LoadRoute(ctx context.Context, tx db.Tx, te
 	route.Subject = domain.Subject{Kind: domain.SubjectKind(subjectKind), Key: subjectKey}
 
 	rows, err := tx.QueryContext(ctx, `
-		SELECT ars.id, ars.stage_order, ars.name, ars.required_role, ars.required_capability,
-		       ars.area_code, ars.quorum, ars.quorum_m, ars.on_eligibility_drift,
+		SELECT ars.id, ars.stage_order, ars.name, ars.required_capability,
+		       ars.quorum, ars.quorum_m, ars.on_eligibility_drift,
 		       ars.stage_kind, ars.due_in_days
 		  FROM approval_route_stages ars
 		  JOIN approval_routes ar
@@ -2131,8 +2125,8 @@ func (r *postgresApprovalRepository) LoadRoute(ctx context.Context, tx db.Tx, te
 		var dueInDays sql.NullInt32
 		var kindStr string
 		if err := rows.Scan(
-			&stageID, &stage.Order, &stage.Name, &stage.RequiredRole, &stage.RequiredCapability,
-			&stage.AreaCode, &stage.Quorum, &quorumM, &stage.OnEligibilityDrift,
+			&stageID, &stage.Order, &stage.Name, &stage.RequiredCapability,
+			&stage.Quorum, &quorumM, &stage.OnEligibilityDrift,
 			&kindStr, &dueInDays,
 		); err != nil {
 			return domain.Route{}, err

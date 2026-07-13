@@ -255,7 +255,7 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 				status = domain.StageActive
 				openedAt = &now
 			}
-			eligibleIDs, err := s.repo.ResolveEligibleActorsForSelectors(ctx, tx, req.TenantID, stage.EffectiveSelectors(), areaCode)
+			eligibleIDs, err := s.repo.ResolveEligibleActorsForSelectors(ctx, tx, req.TenantID, stage.Selectors, areaCode)
 			if err != nil {
 				return fmt.Errorf("submit: resolve eligible actors for stage %d: %w", stage.Order, err)
 			}
@@ -273,14 +273,15 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 				// instance. Shared sentinel with decision_service.go's quorum-eval gap.
 				return domain.ErrEmptyEligiblePool
 			}
+			flatRole, flatArea := domain.FlatRoleArea(stage.Selectors)
 			stageInstances[i] = domain.StageInstance{
 				ID:                         uuid.New().String(),
 				ApprovalInstanceID:         instanceID,
 				StageOrder:                 stage.Order,
 				NameSnapshot:               stage.Name,
-				RequiredRoleSnapshot:       stage.RequiredRole,
+				RequiredRoleSnapshot:       flatRole,
 				RequiredCapabilitySnapshot: stage.RequiredCapability,
-				AreaCodeSnapshot:           stage.AreaCode,
+				AreaCodeSnapshot:           flatArea,
 				QuorumSnapshot:             stage.Quorum,
 				QuorumMSnapshot:            stage.QuorumM,
 				OnEligibilityDriftSnapshot: stage.OnEligibilityDrift,
@@ -296,7 +297,7 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 				// (F2 route-version pinning: in-flight instances stay pinned
 				// to the version they started on).
 				DueInDaysSnapshot: stage.DueInDays,
-				SelectorsSnapshot: materializeSelectorsSnapshot(stage.EffectiveSelectors(), chosenIDs),
+				SelectorsSnapshot: materializeSelectorsSnapshot(stage.Selectors, chosenIDs),
 			}
 		}
 
@@ -541,14 +542,14 @@ func nullableString(s string) any {
 // ---------------------------------------------------------------------------
 
 // stagesWithSubmitChoice returns, for every stage in stages that carries a
-// submit_choice selector (via EffectiveSelectors), a map of stage.Order to
-// that selector. A stage with more than one submit_choice selector is not a
-// contract this feature supports; the first one found wins (route
-// construction is not expected to produce that shape).
+// submit_choice selector, a map of stage.Order to that selector. A stage with
+// more than one submit_choice selector is not a contract this feature
+// supports; the first one found wins (route construction is not expected to
+// produce that shape).
 func stagesWithSubmitChoice(stages []domain.Stage) map[int]domain.ActorSelector {
 	out := make(map[int]domain.ActorSelector)
 	for _, stage := range stages {
-		for _, sel := range stage.EffectiveSelectors() {
+		for _, sel := range stage.Selectors {
 			if sel.Kind == domain.SelectorSubmitChoice {
 				out[stage.Order] = sel
 				break

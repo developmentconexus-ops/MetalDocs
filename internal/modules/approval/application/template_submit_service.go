@@ -243,7 +243,8 @@ func (s *TemplateSubmitService) SubmitTemplateVersionForReview(ctx context.Conte
 				status = domain.StageActive
 				openedAt = &now
 			}
-			eligibleIDs, err := s.repo.ResolveEligibleActorsForSelectors(ctx, tx, req.TenantID, stage.EffectiveSelectors(), stage.AreaCode)
+			flatRole, flatArea := domain.FlatRoleArea(stage.Selectors)
+			eligibleIDs, err := s.repo.ResolveEligibleActorsForSelectors(ctx, tx, req.TenantID, stage.Selectors, flatArea)
 			if err != nil {
 				return fmt.Errorf("template submit: resolve eligible actors for stage %d: %w", stage.Order, err)
 			}
@@ -263,9 +264,9 @@ func (s *TemplateSubmitService) SubmitTemplateVersionForReview(ctx context.Conte
 				ApprovalInstanceID:         instanceID,
 				StageOrder:                 stage.Order,
 				NameSnapshot:               stage.Name,
-				RequiredRoleSnapshot:       stage.RequiredRole,
+				RequiredRoleSnapshot:       flatRole,
 				RequiredCapabilitySnapshot: stage.RequiredCapability,
-				AreaCodeSnapshot:           stage.AreaCode,
+				AreaCodeSnapshot:           flatArea,
 				QuorumSnapshot:             stage.Quorum,
 				QuorumMSnapshot:            stage.QuorumM,
 				OnEligibilityDriftSnapshot: stage.OnEligibilityDrift,
@@ -274,7 +275,7 @@ func (s *TemplateSubmitService) SubmitTemplateVersionForReview(ctx context.Conte
 				Status:                     status,
 				OpenedAt:                   openedAt,
 				DueInDaysSnapshot:          stage.DueInDays,
-				SelectorsSnapshot:          materializeSelectorsSnapshot(stage.EffectiveSelectors(), chosenIDs),
+				SelectorsSnapshot:          materializeSelectorsSnapshot(stage.Selectors, chosenIDs),
 			}
 		}
 

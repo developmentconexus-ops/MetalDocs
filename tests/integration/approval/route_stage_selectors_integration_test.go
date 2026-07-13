@@ -3,22 +3,19 @@
 
 // Package approval_test — unit 3.2 slice 2 (M4 ActorSelector, B2 DB expand)
 // real-Postgres coverage for public.approval_route_stage_selectors
-// (migration 0303) and the Go read/write paths that keep it in sync with
-// approval_route_stages during the flat-column/selector coexistence window
-// (docs/superpowers/specs/2026-07-13-unit-3.2-actor-selector-design.md §3).
+// (migration 0303) and the Go read/write paths that keep it in sync.
+// Selectors is the sole source of truth for a stage's actor pool post-slice-6b
+// (migration 0305 dropped approval_route_stages.required_role/area_code); the
+// flat<->selector synthesis now lives at the HTTP boundary
+// (route_admin_handler.go), not in domain.Stage or RouteAdminService.
 //
-//  1. Round-trip: RouteAdminService.Create persists a legacy stage
-//     (RequiredRole/AreaCode only, no explicit Selectors) — insertRouteStages
-//     writes the stage's EffectiveSelectors() (a synthesized role_in_fixed_area
-//     selector) via insertRouteStageSelectors, and
-//     postgresApprovalRepository.LoadRoute reads it back into
-//     domain.Stage.Selectors. Proves write+read of selector rows through the
-//     real Go paths, not just the migration's own backfill.
+//  1. Round-trip: RouteAdminService.Create persists a stage with an explicit
+//     role_in_fixed_area selector — insertRouteStages writes it via
+//     insertRouteStageSelectors, and postgresApprovalRepository.LoadRoute reads
+//     it back into domain.Stage.Selectors. Proves write+read of selector rows
+//     through the real Go paths.
 //  2. CHECK rejection: a raw malformed insert per selector kind is rejected by
 //     approval_route_stage_selectors_fields_consistent.
-//  3. Backfill coverage: every approval_route_stages row (seeded before this
-//     slice's Go writer existed, via the raw-SQL idiom other tests already
-//     use) has >=1 selector row after the 0303 migration's backfill.
 package approval_test
 
 import (
@@ -62,11 +59,12 @@ func TestRouteStageSelectors_RoundTrip_RealDB(t *testing.T) {
 		{
 			Order:              1,
 			Name:               "quality",
-			RequiredRole:       "qa_reviewer",
 			RequiredCapability: "document.signoff",
-			AreaCode:           "area-1",
 			Quorum:             domain.QuorumAny1Of,
 			OnEligibilityDrift: domain.DriftReduceQuorum,
+			Selectors: []domain.ActorSelector{
+				{Kind: domain.SelectorRoleInFixedArea, Role: "qa_reviewer", AreaCode: "area-1"},
+			},
 		},
 	}
 
@@ -161,89 +159,21 @@ func TestRouteStageSelectors_CheckRejection_RealDB(t *testing.T) {
 	}
 }
 
-// TestRouteStageSelectors_BackfillCoverage_RealDB proves migration 0303's
-// backfill statement: a bare approval_route_stages row (the pre-slice-2 shape,
-// no Go selector writer involved) gains exactly one role_in_fixed_area selector
-// carrying its required_role/area_code and the owning route's tenant_id, and
-// the WHERE NOT EXISTS guard makes a re-run a no-op (idempotent).
-//
-// testdb clones an already-migrated template with zero tenant rows, so the
-// one-time backfill in 0303 has nothing to act on at clone time — a row seeded
-// now postdates it. This test therefore executes the migration's exact backfill
-// INSERT against the seeded row, which is what validates the SQL that WILL run
-// against real pre-existing rows on a production deploy.
-func TestRouteStageSelectors_BackfillCoverage_RealDB(t *testing.T) {
-	database, _ := testdb.Open(t)
-	ctx := context.Background()
-
-	route := testdb.NewApprovalRoute(t, database)
-	stageID := seedBareRouteStage(t, database, route.ID)
-
-	// The verbatim backfill statement from db/migrations/0303 (kept in sync).
-	const backfill = `
-		INSERT INTO public.approval_route_stage_selectors
-			(tenant_id, route_stage_id, selector_order, kind, role, area_code)
-		SELECT r.tenant_id, s.id, 1, 'role_in_fixed_area', s.required_role, s.area_code
-		  FROM public.approval_route_stages s
-		  JOIN public.approval_routes r ON r.id = s.route_id
-		 WHERE s.id = $1::uuid
-		   AND NOT EXISTS (
-			SELECT 1 FROM public.approval_route_stage_selectors x
-			 WHERE x.route_stage_id = s.id
-		)`
-
-	if _, err := database.ExecContext(ctx, backfill, stageID); err != nil {
-		t.Fatalf("backfill insert: %v", err)
-	}
-
-	assertBackfilledSelector := func() {
-		t.Helper()
-		var count int
-		if err := database.QueryRowContext(ctx,
-			`SELECT count(*) FROM public.approval_route_stage_selectors WHERE route_stage_id = $1::uuid`,
-			stageID,
-		).Scan(&count); err != nil {
-			t.Fatalf("count selectors: %v", err)
-		}
-		if count != 1 {
-			t.Fatalf("selector count for stage %s = %d, want exactly 1", stageID, count)
-		}
-		var kind, role, areaCode string
-		if err := database.QueryRowContext(ctx,
-			`SELECT kind, role, area_code FROM public.approval_route_stage_selectors WHERE route_stage_id = $1::uuid AND selector_order = 1`,
-			stageID,
-		).Scan(&kind, &role, &areaCode); err != nil {
-			t.Fatalf("read backfilled selector: %v", err)
-		}
-		if kind != "role_in_fixed_area" || role != "author" || areaCode != "area-1" {
-			t.Fatalf("backfilled selector = {kind:%s role:%s area:%s}, want {role_in_fixed_area author area-1}", kind, role, areaCode)
-		}
-	}
-
-	assertBackfilledSelector()
-
-	// Idempotency: re-running the backfill (the WHERE NOT EXISTS guard) is a
-	// no-op — still exactly one selector, unchanged.
-	if _, err := database.ExecContext(ctx, backfill, stageID); err != nil {
-		t.Fatalf("backfill re-run: %v", err)
-	}
-	assertBackfilledSelector()
-}
-
 // seedBareRouteStage inserts a public.approval_route_stages row directly
 // (mirrors route_versioning_test.go's seedRouteStage — no tripwire on this
-// table), simulating a stage written before this slice's Go selector writer
-// existed. The 0303 migration's backfill (already applied to the testdb
-// template) is what gives this row its selector row, not any code this slice
-// adds — that is exactly the backfill-coverage property under test.
+// table), giving TestRouteStageSelectors_CheckRejection_RealDB a bare stage id
+// to hang malformed selector rows off of. It does not itself seed a selector
+// row — this slice's synthesis (flat -> role_in_fixed_area) lives at the HTTP
+// boundary, not in a DB backfill, since migration 0305 dropped the flat
+// required_role/area_code columns this used to read from.
 func seedBareRouteStage(t *testing.T, database *sql.DB, routeID string) string {
 	t.Helper()
 	var stageID string
 	if err := database.QueryRowContext(context.Background(), `
 		INSERT INTO public.approval_route_stages
-		  (route_id, stage_order, name, required_role, required_capability,
-		   area_code, quorum, on_eligibility_drift)
-		VALUES ($1::uuid, 1, 'Stage 1', 'author', 'document.review', 'area-1',
+		  (route_id, stage_order, name, required_capability,
+		   quorum, on_eligibility_drift)
+		VALUES ($1::uuid, 1, 'Stage 1', 'document.review',
 		        'any_1_of', 'reduce_quorum')
 		RETURNING id`,
 		routeID,

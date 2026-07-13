@@ -56,13 +56,27 @@ import (
 func seedSubmitRouteWithStage(t *testing.T, dbc *sql.DB, tenantID, profileCode string) string {
 	t.Helper()
 	route := testdb.NewApprovalRoute(t, dbc, testdb.WithTenant(tenantID), testdb.WithProfile(profileCode))
-	if _, err := dbc.ExecContext(context.Background(),
+	var stageID string
+	if err := dbc.QueryRowContext(context.Background(),
 		`INSERT INTO public.approval_route_stages
-		   (route_id, stage_order, name, required_role, required_capability, area_code, quorum, on_eligibility_drift)
-		 VALUES ($1::uuid, 1, 'Stage 1', 'approver', 'document.signoff', 'area-001', 'any_1_of', 'keep_snapshot')`,
+		   (route_id, stage_order, name, required_capability, quorum, on_eligibility_drift)
+		 VALUES ($1::uuid, 1, 'Stage 1', 'document.signoff', 'any_1_of', 'keep_snapshot')
+		 RETURNING id`,
 		route.ID,
-	); err != nil {
+	).Scan(&stageID); err != nil {
 		t.Fatalf("seed approval_route_stages: %v", err)
+	}
+	// Selectors is the sole source of truth for a stage's actor pool
+	// (unit 3.2 slice 6b); seed the equivalent role_in_fixed_area selector row
+	// so ResolveEligibleActorsForSelectors resolves the same eligible pool the
+	// old flat required_role/area_code columns used to drive.
+	if _, err := dbc.ExecContext(context.Background(),
+		`INSERT INTO public.approval_route_stage_selectors
+		   (tenant_id, route_stage_id, selector_order, kind, role, area_code)
+		 VALUES ($1::uuid, $2::uuid, 1, 'role_in_fixed_area', 'approver', 'area-001')`,
+		tenantID, stageID,
+	); err != nil {
+		t.Fatalf("seed approval_route_stage_selectors: %v", err)
 	}
 
 	approver := testdb.NewUser(t, dbc, testdb.WithTenant(tenantID), testdb.WithDisplayName("Stage Approver"))

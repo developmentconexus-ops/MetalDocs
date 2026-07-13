@@ -224,12 +224,18 @@ func mapListRoute(route infrastructure.Route) contracts.ListRouteItem {
 
 	stages := make([]contracts.ListStageItem, 0, len(route.Stages))
 	for _, stage := range route.Stages {
+		// required_role/area_code are compat wire fields (M4 ActorSelector,
+		// unit 3.2 slice 6b): Selectors is the sole source of truth, so the
+		// flat pair is derived back via FlatRoleArea for a single
+		// role_in_fixed_area stage; multi/other-kind stages emit "" (FE reads
+		// Selectors directly post-slice-7/8).
+		r, a := domain.FlatRoleArea(stage.Selectors)
 		stages = append(stages, contracts.ListStageItem{
 			Order:              stage.Order,
 			Name:               stage.Name,
-			RequiredRole:       stage.RequiredRole,
+			RequiredRole:       r,
 			RequiredCapability: stage.RequiredCapability,
-			AreaCode:           stage.AreaCode,
+			AreaCode:           a,
 			Quorum:             contracts.QuorumKind(stage.Quorum),
 			QuorumM:            stage.QuorumM,
 			DriftPolicy:        contracts.DriftPolicyKind(stage.DriftPolicy),
@@ -261,12 +267,27 @@ func mapStageRequests(stages []contracts.StageRequest) []domain.Stage {
 		// so no silent default is needed (and a defaulted code may not even be
 		// a registered capability).
 		cap := strings.TrimSpace(s.RequiredCapability)
+		// Selectors is the sole source of truth for domain.Stage post-slice-6b
+		// (required_role/area_code dropped from the route-stage DB layer and
+		// the domain.Stage struct). The wire still carries the flat compat
+		// fields (FE sends them until slices 7/8 migrate it), so this is the
+		// sole surviving flat->selector synthesis site — the old domain
+		// EffectiveSelectors bridge, relocated to the HTTP boundary: if the
+		// wire supplied explicit selectors they win, else synthesize the
+		// single role_in_fixed_area selector the 0303 backfill would have
+		// produced. Net: stage.Selectors is always non-empty after mapping.
+		selectors := mapSelectorsFromWire(s.Selectors)
+		if len(selectors) == 0 {
+			selectors = []domain.ActorSelector{{
+				Kind:     domain.SelectorRoleInFixedArea,
+				Role:     strings.ToLower(strings.TrimSpace(s.RequiredRole)),
+				AreaCode: strings.ToLower(strings.TrimSpace(s.AreaCode)),
+			}}
+		}
 		out = append(out, domain.Stage{
 			Order:              s.Order,
 			Name:               s.Name,
-			RequiredRole:       strings.ToLower(strings.TrimSpace(s.RequiredRole)),
 			RequiredCapability: cap,
-			AreaCode:           strings.ToLower(strings.TrimSpace(s.AreaCode)),
 			Quorum:             domain.QuorumPolicy(s.Quorum),
 			QuorumM:            s.QuorumM,
 			OnEligibilityDrift: domain.DriftPolicy(s.DriftPolicy),
@@ -275,15 +296,15 @@ func mapStageRequests(stages []contracts.StageRequest) []domain.Stage {
 			// migration 0286 DEFAULT 'approval'); a supplied review makes a
 			// review-kind stage. Validated as review|approval|"" in contracts.
 			Kind:      domain.StageKind(s.StageKind),
-			Selectors: mapSelectorsFromWire(s.Selectors),
+			Selectors: selectors,
 		})
 	}
 	return out
 }
 
 // mapSelectorsFromWire maps wire ActorSelectors to domain ActorSelectors
-// (M4, unit 3.2, slice 4). Role and AreaCode are normalized the same way
-// Stage.RequiredRole/AreaCode are above (lowercase + trim); UserID is
+// (M4, unit 3.2, slice 4). Role and AreaCode are normalized the same way the
+// synthesized flat->selector fallback is above (lowercase + trim); UserID is
 // trimmed only — user ids are not role/area codes and are not lowercased
 // elsewhere in this module.
 func mapSelectorsFromWire(selectors []contracts.ActorSelector) []domain.ActorSelector {

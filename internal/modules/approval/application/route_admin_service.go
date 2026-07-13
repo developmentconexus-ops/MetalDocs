@@ -18,6 +18,7 @@ import (
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/lib/pq"
 )
 
 // routeProfileFKConstraint is the FK on approval_routes (tenant_id, profile_code)
@@ -804,25 +805,25 @@ func lockRouteForUpdate(ctx context.Context, tx *sql.Tx, tenantID, routeID strin
 	return state, nil
 }
 
-// insertRouteStages persists the flat approval_route_stages rows, then
+// insertRouteStages persists the approval_route_stages rows, then
 // insertRouteStageSelectors persists the ActorSelector rows that govern each
-// stage's eligible-actor pool (unit 3.2 M4, B2 DB expand). Every stage's
-// EffectiveSelectors() is written — for a legacy stage carrying only
-// RequiredRole/AreaCode this synthesizes the single role_in_fixed_area
-// selector the 0303 backfill would have produced, keeping newly-written
-// routes consistent with backfilled ones during the coexistence window.
+// stage's eligible-actor pool (unit 3.2 M4, B2 DB expand / 6b contract step).
+// Every stage's Selectors is written — Selectors is the sole source of truth
+// post-slice-6b; the flat RequiredRole/AreaCode → selector synthesis happens
+// at the HTTP boundary (route_admin_handler.go) before a Stage ever reaches
+// this service, so Selectors is always non-empty here.
 func insertRouteStages(ctx context.Context, tx *sql.Tx, tenantID, routeID string, stages []domain.Stage) error {
 	if len(stages) == 0 {
 		return nil
 	}
-	const colsPerRow = 11
+	const colsPerRow = 9
 	placeholders := make([]string, 0, len(stages))
 	args := make([]any, 0, len(stages)*colsPerRow)
 	for i, st := range stages {
 		base := i*colsPerRow + 1
 		placeholders = append(placeholders, fmt.Sprintf(
-			"($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)",
-			base, base+1, base+2, base+3, base+4, base+5, base+6, base+7, base+8, base+9, base+10,
+			"($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)",
+			base, base+1, base+2, base+3, base+4, base+5, base+6, base+7, base+8,
 		))
 		// stage_kind is NOT NULL DEFAULT 'approval'; an empty domain zero-value
 		// must not clobber the DB default with an empty string (F1 migration 0286).
@@ -834,9 +835,7 @@ func insertRouteStages(ctx context.Context, tx *sql.Tx, tenantID, routeID string
 			routeID,
 			st.Order,
 			st.Name,
-			st.RequiredRole,
 			st.RequiredCapability,
-			st.AreaCode,
 			st.Quorum,
 			st.QuorumM,
 			st.OnEligibilityDrift,
@@ -846,7 +845,7 @@ func insertRouteStages(ctx context.Context, tx *sql.Tx, tenantID, routeID string
 	}
 	query := `
 		INSERT INTO approval_route_stages
-			(route_id, stage_order, name, required_role, required_capability, area_code, quorum, quorum_m, on_eligibility_drift, stage_kind, due_in_days)
+			(route_id, stage_order, name, required_capability, quorum, quorum_m, on_eligibility_drift, stage_kind, due_in_days)
 		VALUES ` + strings.Join(placeholders, ",")
 	if _, err := tx.ExecContext(ctx, query, args...); err != nil {
 		return fmt.Errorf("route_admin: insert stages: %w", infrastructure.MapPgError(err, infrastructure.MapHints{}))
@@ -859,11 +858,11 @@ func insertRouteStages(ctx context.Context, tx *sql.Tx, tenantID, routeID string
 }
 
 // insertRouteStageSelectors writes the approval_route_stage_selectors rows
-// for every stage's EffectiveSelectors(). It correlates each selector row to
-// its parent approval_route_stages row entirely in SQL — a single INSERT
-// ... SELECT ... JOIN keyed on (route_id, stage_order) — rather than a
-// round-trip to fetch the just-inserted stage ids, since the batched stage
-// INSERT above has no RETURNING clause.
+// for every stage's Selectors. It correlates each selector row to its parent
+// approval_route_stages row entirely in SQL — a single INSERT ... SELECT ...
+// JOIN keyed on (route_id, stage_order) — rather than a round-trip to fetch
+// the just-inserted stage ids, since the batched stage INSERT above has no
+// RETURNING clause.
 func insertRouteStageSelectors(ctx context.Context, tx *sql.Tx, tenantID, routeID string, stages []domain.Stage) error {
 	type selectorRow struct {
 		stageOrder int
@@ -876,7 +875,7 @@ func insertRouteStageSelectors(ctx context.Context, tx *sql.Tx, tenantID, routeI
 
 	var rows []selectorRow
 	for _, st := range stages {
-		for i, sel := range st.EffectiveSelectors() {
+		for i, sel := range st.Selectors {
 			rows = append(rows, selectorRow{
 				stageOrder: st.Order,
 				order:      i + 1,
@@ -924,7 +923,7 @@ func insertRouteStageSelectors(ctx context.Context, tx *sql.Tx, tenantID, routeI
 
 func loadRouteStagesTx(ctx context.Context, tx *sql.Tx, routeID string) ([]domain.Stage, error) {
 	rows, err := tx.QueryContext(ctx, `
-		SELECT stage_order, name, required_role, required_capability, area_code, quorum, quorum_m, on_eligibility_drift, stage_kind, due_in_days
+		SELECT id, stage_order, name, required_capability, quorum, quorum_m, on_eligibility_drift, stage_kind, due_in_days
 		  FROM approval_route_stages
 		 WHERE route_id = $1
 		 ORDER BY stage_order ASC`,
@@ -936,14 +935,16 @@ func loadRouteStagesTx(ctx context.Context, tx *sql.Tx, routeID string) ([]domai
 	defer rows.Close()
 
 	var out []domain.Stage
+	var stageIDs []string
 	for rows.Next() {
 		var (
 			st        domain.Stage
+			stageID   string
 			quorumM   sql.NullInt64
 			kindStr   string
 			dueInDays sql.NullInt64
 		)
-		if err := rows.Scan(&st.Order, &st.Name, &st.RequiredRole, &st.RequiredCapability, &st.AreaCode, &st.Quorum, &quorumM, &st.OnEligibilityDrift, &kindStr, &dueInDays); err != nil {
+		if err := rows.Scan(&stageID, &st.Order, &st.Name, &st.RequiredCapability, &st.Quorum, &quorumM, &st.OnEligibilityDrift, &kindStr, &dueInDays); err != nil {
 			return nil, fmt.Errorf("route_admin: scan stage: %w", err)
 		}
 		if quorumM.Valid {
@@ -956,10 +957,56 @@ func loadRouteStagesTx(ctx context.Context, tx *sql.Tx, routeID string) ([]domai
 			st.DueInDays = &d
 		}
 		out = append(out, st)
+		stageIDs = append(stageIDs, stageID)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("route_admin: iterate stages: %w", err)
 	}
+
+	// Selectors is the sole source of truth (slice 6b); load them here too so
+	// stagesEqual's DeepEqual comparison against in.Stages (whose Selectors is
+	// always populated by the HTTP boundary synthesis) is meaningful rather
+	// than spuriously "changed" on every update.
+	if len(stageIDs) > 0 {
+		selRows, err := tx.QueryContext(ctx, `
+			SELECT route_stage_id, kind, user_id, role, area_code
+			  FROM approval_route_stage_selectors
+			 WHERE route_stage_id = ANY($1)
+			 ORDER BY route_stage_id, selector_order ASC`,
+			pq.Array(stageIDs),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("route_admin: load stage selectors: %w", infrastructure.MapPgError(err, infrastructure.MapHints{}))
+		}
+		defer selRows.Close()
+
+		selectorsByStageID := make(map[string][]domain.ActorSelector, len(stageIDs))
+		for selRows.Next() {
+			var stageID, kind string
+			var userID, role, areaCode sql.NullString
+			if err := selRows.Scan(&stageID, &kind, &userID, &role, &areaCode); err != nil {
+				return nil, fmt.Errorf("route_admin: scan stage selector: %w", err)
+			}
+			sel := domain.ActorSelector{Kind: domain.SelectorKind(kind)}
+			if userID.Valid {
+				sel.UserID = userID.String
+			}
+			if role.Valid {
+				sel.Role = role.String
+			}
+			if areaCode.Valid {
+				sel.AreaCode = areaCode.String
+			}
+			selectorsByStageID[stageID] = append(selectorsByStageID[stageID], sel)
+		}
+		if err := selRows.Err(); err != nil {
+			return nil, fmt.Errorf("route_admin: iterate stage selectors: %w", err)
+		}
+		for i, stageID := range stageIDs {
+			out[i].Selectors = selectorsByStageID[stageID]
+		}
+	}
+
 	return out, nil
 }
 

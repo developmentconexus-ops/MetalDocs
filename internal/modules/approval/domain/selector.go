@@ -54,3 +54,29 @@ func (s ActorSelector) Validate() error {
 	}
 	return ErrSelectorFieldsInvalid
 }
+
+// FlatRoleArea returns the (role, area_code) of sels' single
+// role_in_fixed_area selector, or ("", "") if sels has none or more than one
+// such selector. It is the reverse of the flat->selector synthesis performed
+// at the HTTP boundary (route_admin_handler.go), used to repopulate the
+// audit-only RequiredRoleSnapshot/AreaCodeSnapshot and the compat wire fields
+// (StageSummary.RequiredRole/AreaCode) for a single-role_in_fixed_area stage.
+// Multi-selector or other-kind stages return ("", "") — acceptable
+// transitional lossiness; FE reads Selectors directly post-slice-7/8.
+func FlatRoleArea(sels []ActorSelector) (role, area string) {
+	found := false
+	for _, sel := range sels {
+		if sel.Kind != SelectorRoleInFixedArea {
+			continue
+		}
+		if found {
+			return "", ""
+		}
+		found = true
+		role, area = sel.Role, sel.AreaCode
+	}
+	if !found {
+		return "", ""
+	}
+	return role, area
+}

@@ -62,8 +62,8 @@ func (r *fakeSubmitRepo) LoadRoute(ctx context.Context, tx db.Tx, tenantID, rout
 		return domain.Route{}, err
 	}
 	rows, err := tx.QueryContext(ctx, `
-		SELECT ars.stage_order, ars.name, ars.required_role, ars.required_capability,
-		       ars.area_code, ars.quorum, ars.quorum_m, ars.on_eligibility_drift
+		SELECT ars.stage_order, ars.name, ars.required_capability,
+		       ars.quorum, ars.quorum_m, ars.on_eligibility_drift
 		  FROM approval_route_stages ars
 		  JOIN approval_routes ar
 		    ON ar.id = ars.route_id
@@ -80,8 +80,8 @@ func (r *fakeSubmitRepo) LoadRoute(ctx context.Context, tx db.Tx, tenantID, rout
 		var stage domain.Stage
 		var quorumM sql.NullInt32
 		if err := rows.Scan(
-			&stage.Order, &stage.Name, &stage.RequiredRole, &stage.RequiredCapability,
-			&stage.AreaCode, &stage.Quorum, &quorumM, &stage.OnEligibilityDrift,
+			&stage.Order, &stage.Name, &stage.RequiredCapability,
+			&stage.Quorum, &quorumM, &stage.OnEligibilityDrift,
 		); err != nil {
 			return domain.Route{}, err
 		}
@@ -89,6 +89,12 @@ func (r *fakeSubmitRepo) LoadRoute(ctx context.Context, tx db.Tx, tenantID, rout
 			v := int(quorumM.Int32)
 			stage.QuorumM = &v
 		}
+		// Selectors is the sole source of truth post-slice-6b; this fake repo
+		// hardcodes the single role_in_fixed_area selector that used to be
+		// carried by the dropped required_role/area_code columns (matching
+		// stageRows' fixture values below) since approval_route_stage_selectors
+		// is not modeled by this in-memory driver.
+		stage.Selectors = []domain.ActorSelector{{Kind: domain.SelectorRoleInFixedArea, Role: "quality_approver", AreaCode: "QA"}}
 		route.Stages = append(route.Stages, stage)
 	}
 	if err := rows.Err(); err != nil {
@@ -143,10 +149,10 @@ func (r *fakeSubmitRepo) ResolveEligibleActors(ctx context.Context, tx db.Tx, te
 }
 
 // ResolveEligibleActorsForSelectors is called by SubmitRevisionForReview (M4,
-// unit 3.2, slice 3) via stage.EffectiveSelectors(). Existing fixtures only
-// exercise legacy stages (no explicit Selectors), which synthesize a single
-// role_in_fixed_area selector — delegate straight to ResolveEligibleActors
-// for that kind; other kinds are not exercised by these fixtures.
+// unit 3.2, slice 3) via stage.Selectors. Existing fixtures only exercise a
+// single role_in_fixed_area selector — delegate straight to
+// ResolveEligibleActors for that kind; other kinds are not exercised by these
+// fixtures.
 func (r *fakeSubmitRepo) ResolveEligibleActorsForSelectors(ctx context.Context, tx db.Tx, tenantID string, selectors []domain.ActorSelector, subjectArea string) ([]string, error) {
 	seen := make(map[string]struct{})
 	var ids []string
@@ -320,17 +326,18 @@ func (r *routeRows) Next(dest []driver.Value) error {
 }
 
 // stageRows returns one stage row representing approval_route_stages.
-// Columns: stage_order, name, required_role, required_capability,
-//
-//	area_code, quorum, quorum_m, on_eligibility_drift
+// Columns: stage_order, name, required_capability, quorum, quorum_m,
+// on_eligibility_drift. (required_role/area_code dropped from the table by
+// migration 0305, unit 3.2 slice 6b — the fake LoadRoute above hardcodes the
+// equivalent role_in_fixed_area selector instead.)
 type stageRows struct {
 	done bool
 }
 
 func (r *stageRows) Columns() []string {
 	return []string{
-		"stage_order", "name", "required_role", "required_capability",
-		"area_code", "quorum", "quorum_m", "on_eligibility_drift",
+		"stage_order", "name", "required_capability",
+		"quorum", "quorum_m", "on_eligibility_drift",
 	}
 }
 func (r *stageRows) Close() error { return nil }
@@ -341,12 +348,10 @@ func (r *stageRows) Next(dest []driver.Value) error {
 	r.done = true
 	dest[0] = int64(1)
 	dest[1] = "QA Review"
-	dest[2] = "quality_approver"
-	dest[3] = "doc.approve"
-	dest[4] = "QA"
-	dest[5] = "any_1_of"
-	dest[6] = nil // quorum_m NULL
-	dest[7] = "keep_snapshot"
+	dest[2] = "doc.approve"
+	dest[3] = "any_1_of"
+	dest[4] = nil // quorum_m NULL
+	dest[5] = "keep_snapshot"
 	return nil
 }
 

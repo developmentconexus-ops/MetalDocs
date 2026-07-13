@@ -24,10 +24,10 @@ import (
 )
 
 // TestRouteAdminSelectors_LoadRouteAndListRoutes_AgreeOnExplicitSelectors_RealDB
-// creates a route whose stage carries an EXPLICIT named_user selector (the
-// EffectiveSelectors bridge only synthesizes when Selectors is empty), then
+// creates a route whose stage carries an EXPLICIT named_user selector, then
 // asserts LoadRoute AND ListRoutes/ListRoutesTx all return that selector
-// verbatim — not the legacy role_in_fixed_area synthesis.
+// verbatim — Selectors is the sole source of truth post-slice-6b, no flat
+// RequiredRole/AreaCode synthesis happens below the HTTP boundary.
 func TestRouteAdminSelectors_LoadRouteAndListRoutes_AgreeOnExplicitSelectors_RealDB(t *testing.T) {
 	database, _ := testdb.Open(t)
 	ctx := context.Background()
@@ -48,9 +48,7 @@ func TestRouteAdminSelectors_LoadRouteAndListRoutes_AgreeOnExplicitSelectors_Rea
 		{
 			Order:              1,
 			Name:               "quality",
-			RequiredRole:       "qa_reviewer",
 			RequiredCapability: "document.signoff",
-			AreaCode:           "area-1",
 			Quorum:             domain.QuorumAny1Of,
 			OnEligibilityDrift: domain.DriftReduceQuorum,
 			Selectors:          wantSelectors,

@@ -73,15 +73,33 @@ func canonicalStages(stages []domain.Stage) string {
 		if s.QuorumM != nil {
 			quorumM = strconv.Itoa(*s.QuorumM)
 		}
-		fmt.Fprintf(&sb, "%d|%s|%s|%s|%s|%s|%s|%s\n",
+		fmt.Fprintf(&sb, "%d|%s|%s|%s|%s|%s|%s\n",
 			s.Order,
 			strings.TrimSpace(s.Name),
-			strings.TrimSpace(s.RequiredRole),
 			strings.TrimSpace(s.RequiredCapability),
-			strings.TrimSpace(s.AreaCode),
 			string(s.Quorum),
 			quorumM,
 			string(s.OnEligibilityDrift),
+			canonicalSelectors(s.Selectors),
+		)
+	}
+	return sb.String()
+}
+
+// canonicalSelectors fingerprints a stage's Selectors (M4 ActorSelector, unit
+// 3.2 slice 6b: Selectors is the sole source of truth for a stage's actor
+// pool, so it replaces the flat RequiredRole/AreaCode fields that used to
+// feed this hash). Selector order is preserved as-given — the HTTP boundary
+// synthesis (route_admin_handler.go) produces a deterministic order for any
+// given request, so this stays a stable fingerprint of client-supplied input.
+func canonicalSelectors(selectors []domain.ActorSelector) string {
+	var sb strings.Builder
+	for _, sel := range selectors {
+		fmt.Fprintf(&sb, "%s,%s,%s,%s;",
+			string(sel.Kind),
+			strings.TrimSpace(sel.UserID),
+			strings.TrimSpace(sel.Role),
+			strings.TrimSpace(sel.AreaCode),
 		)
 	}
 	return sb.String()

@@ -133,7 +133,8 @@ func TestCreateRoute_HappyPath(t *testing.T) {
 			}
 
 			stage := svc.createReq.Stages[0]
-			if stage.Order != 1 || stage.Name != "Review" || stage.RequiredRole != "approver" || stage.RequiredCapability != "document.signoff" || stage.AreaCode != "ops" {
+			flatRole, flatArea := domain.FlatRoleArea(stage.Selectors)
+			if stage.Order != 1 || stage.Name != "Review" || flatRole != "approver" || stage.RequiredCapability != "document.signoff" || flatArea != "ops" {
 				t.Fatalf("unexpected stage mapping: %+v", stage)
 			}
 			if stage.Quorum != domain.QuorumPolicy("any_1_of") {

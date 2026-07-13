@@ -64,7 +64,7 @@ func TestRouteCarriesDocumentSubject(t *testing.T) {
 		ID: "r1", TenantID: "t1", ProfileCode: "SOP", Version: 1,
 		Subject: NewDocumentSubject("SOP"),
 		Stages: []Stage{
-			{Order: 1, Name: "QA", RequiredRole: "approver", RequiredCapability: "document.signoff", AreaCode: "qa", Quorum: QuorumAny1Of, OnEligibilityDrift: DriftReduceQuorum},
+			{Order: 1, Name: "QA", RequiredCapability: "document.signoff", Quorum: QuorumAny1Of, OnEligibilityDrift: DriftReduceQuorum, Selectors: []ActorSelector{{Kind: SelectorRoleInFixedArea, Role: "approver", AreaCode: "qa"}}},
 		},
 	}
 	if r.Subject.Kind != SubjectKindDocument {

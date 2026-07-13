@@ -55,34 +55,13 @@ func (k StageKind) Validate() error {
 type Stage struct {
 	Order              int
 	Name               string
-	RequiredRole       string
 	RequiredCapability string
-	AreaCode           string
 	Quorum             QuorumPolicy
 	QuorumM            *int
 	OnEligibilityDrift DriftPolicy
 	Kind               StageKind
 	DueInDays          *int
 	Selectors          []ActorSelector
-}
-
-// EffectiveSelectors returns the actor selectors that govern this stage during
-// the flat-column → selector coexistence window. If explicit Selectors are set
-// they win; otherwise a legacy stage's RequiredRole/AreaCode is synthesized
-// into a single role_in_fixed_area selector — the in-memory mirror of the 0303
-// backfill. A stage with neither returns nil (rejected by Route.Validate).
-//
-// TRANSITION bridge: deleted in slice 6 / migration 0304 when the flat
-// RequiredRole/RequiredCapability/AreaCode columns drop and Selectors becomes
-// the sole source of truth.
-func (s Stage) EffectiveSelectors() []ActorSelector {
-	if len(s.Selectors) >= 1 {
-		return s.Selectors
-	}
-	if s.RequiredRole != "" {
-		return []ActorSelector{{Kind: SelectorRoleInFixedArea, Role: s.RequiredRole, AreaCode: s.AreaCode}}
-	}
-	return nil
 }
 
 // Route is the per-profile approval route configuration.
@@ -153,12 +132,12 @@ func (r Route) Validate(policy taxonomydomain.RoutePolicy) error {
 		names[s.Name] = true
 
 		// Every stage must name at least one way to resolve its eligible
-		// actor pool (M4, unit 3.2), and every effective selector must be
-		// internally consistent for its kind. EffectiveSelectors bridges the
-		// coexistence window: an explicit-Selectors stage validates on those;
-		// a legacy RequiredRole/AreaCode stage validates on the synthesized
-		// role_in_fixed_area selector.
-		effective := s.EffectiveSelectors()
+		// actor pool (M4, unit 3.2), and every selector must be internally
+		// consistent for its kind. Selectors is the sole source of truth
+		// post-slice-6b; the flat RequiredRole/AreaCode → selector synthesis
+		// happens at the HTTP boundary (route_admin_handler.go) before a
+		// Stage ever reaches domain code.
+		effective := s.Selectors
 		if len(effective) == 0 {
 			return ErrStageNoSelector
 		}

@@ -184,10 +184,34 @@ func (s *routeAdminStmt) Query(args []driver.Value) (driver.Rows, error) {
 			values: []driver.Value{int64(s.conn.newVersion)},
 		}, nil
 	}
+	if strings.Contains(lower, "from approval_route_stage_selectors") {
+		stages := s.conn.stageLoadStages
+		rows := &routeAdminMultiRows{
+			cols:   []string{"route_stage_id", "kind", "user_id", "role", "area_code"},
+			values: make([][]driver.Value, 0),
+		}
+		for _, st := range stages {
+			stageID := fmt.Sprintf("stage-%d", st.Order)
+			for _, sel := range st.Selectors {
+				var userID, role, areaCode driver.Value
+				if sel.UserID != "" {
+					userID = sel.UserID
+				}
+				if sel.Role != "" {
+					role = sel.Role
+				}
+				if sel.AreaCode != "" {
+					areaCode = sel.AreaCode
+				}
+				rows.values = append(rows.values, []driver.Value{stageID, string(sel.Kind), userID, role, areaCode})
+			}
+		}
+		return rows, nil
+	}
 	if strings.Contains(lower, "from approval_route_stages") && strings.Contains(lower, "select") {
 		stages := s.conn.stageLoadStages
 		rows := &routeAdminMultiRows{
-			cols:   []string{"stage_order", "name", "required_role", "required_capability", "area_code", "quorum", "quorum_m", "on_eligibility_drift", "stage_kind", "due_in_days"},
+			cols:   []string{"id", "stage_order", "name", "required_capability", "quorum", "quorum_m", "on_eligibility_drift", "stage_kind", "due_in_days"},
 			values: make([][]driver.Value, 0, len(stages)),
 		}
 		for _, st := range stages {
@@ -207,7 +231,8 @@ func (s *routeAdminStmt) Query(args []driver.Value) (driver.Rows, error) {
 			if kind == "" {
 				kind = domain.StageKindApproval
 			}
-			rows.values = append(rows.values, []driver.Value{int64(st.Order), st.Name, st.RequiredRole, st.RequiredCapability, st.AreaCode, string(st.Quorum), qm, string(st.OnEligibilityDrift), string(kind), dueInDays})
+			stageID := fmt.Sprintf("stage-%d", st.Order)
+			rows.values = append(rows.values, []driver.Value{stageID, int64(st.Order), st.Name, st.RequiredCapability, string(st.Quorum), qm, string(st.OnEligibilityDrift), string(kind), dueInDays})
 		}
 		return rows, nil
 	}
@@ -290,20 +315,22 @@ func validRouteStages() []domain.Stage {
 		{
 			Order:              1,
 			Name:               "quality",
-			RequiredRole:       "qa_reviewer",
 			RequiredCapability: "document.signoff",
-			AreaCode:           "tenant",
 			Quorum:             domain.QuorumAny1Of,
 			OnEligibilityDrift: domain.DriftReduceQuorum,
+			Selectors: []domain.ActorSelector{
+				{Kind: domain.SelectorRoleInFixedArea, Role: "qa_reviewer", AreaCode: "tenant"},
+			},
 		},
 		{
 			Order:              2,
 			Name:               "approval",
-			RequiredRole:       "qa_manager",
 			RequiredCapability: "document.signoff",
-			AreaCode:           "tenant",
 			Quorum:             domain.QuorumAllOf,
 			OnEligibilityDrift: domain.DriftFailStage,
+			Selectors: []domain.ActorSelector{
+				{Kind: domain.SelectorRoleInFixedArea, Role: "qa_manager", AreaCode: "tenant"},
+			},
 		},
 	}
 }
@@ -1061,9 +1088,9 @@ func TestRouteAdminCreate_BatchesStageInsert(t *testing.T) {
 	}
 
 	stages := []domain.Stage{
-		{Order: 1, Name: "s1", RequiredRole: "r1", RequiredCapability: "document.signoff", AreaCode: "tenant", Quorum: domain.QuorumAny1Of, OnEligibilityDrift: domain.DriftReduceQuorum},
-		{Order: 2, Name: "s2", RequiredRole: "r2", RequiredCapability: "document.signoff", AreaCode: "tenant", Quorum: domain.QuorumAllOf, OnEligibilityDrift: domain.DriftFailStage},
-		{Order: 3, Name: "s3", RequiredRole: "r3", RequiredCapability: "document.signoff", AreaCode: "tenant", Quorum: domain.QuorumAllOf, OnEligibilityDrift: domain.DriftFailStage},
+		{Order: 1, Name: "s1", RequiredCapability: "document.signoff", Quorum: domain.QuorumAny1Of, OnEligibilityDrift: domain.DriftReduceQuorum, Selectors: []domain.ActorSelector{{Kind: domain.SelectorRoleInFixedArea, Role: "r1", AreaCode: "tenant"}}},
+		{Order: 2, Name: "s2", RequiredCapability: "document.signoff", Quorum: domain.QuorumAllOf, OnEligibilityDrift: domain.DriftFailStage, Selectors: []domain.ActorSelector{{Kind: domain.SelectorRoleInFixedArea, Role: "r2", AreaCode: "tenant"}}},
+		{Order: 3, Name: "s3", RequiredCapability: "document.signoff", Quorum: domain.QuorumAllOf, OnEligibilityDrift: domain.DriftFailStage, Selectors: []domain.ActorSelector{{Kind: domain.SelectorRoleInFixedArea, Role: "r3", AreaCode: "tenant"}}},
 	}
 	if _, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
 		TenantID:    "tenant-1",
@@ -1077,8 +1104,8 @@ func TestRouteAdminCreate_BatchesStageInsert(t *testing.T) {
 	if conn.stageInsertExecCount != 1 {
 		t.Fatalf("stage insert exec count = %d; want 1 (batched)", conn.stageInsertExecCount)
 	}
-	if conn.stageInsertArgCount != 33 {
-		t.Fatalf("stage insert arg count = %d; want 33 (3 stages * 11 cols)", conn.stageInsertArgCount)
+	if conn.stageInsertArgCount != 27 {
+		t.Fatalf("stage insert arg count = %d; want 27 (3 stages * 9 cols)", conn.stageInsertArgCount)
 	}
 }
 

@@ -73,35 +73,39 @@ func TestActorSelectorValidateFieldPermutations(t *testing.T) {
 	}
 }
 
-// TestStageEffectiveSelectors covers the transition bridge: explicit Selectors
-// win; a legacy RequiredRole/AreaCode stage synthesizes a single
-// role_in_fixed_area selector; a stage with neither returns nil.
-func TestStageEffectiveSelectors(t *testing.T) {
-	t.Run("explicit selectors win", func(t *testing.T) {
-		explicit := []ActorSelector{{Kind: SelectorNamedUser, UserID: "u1"}}
-		s := Stage{RequiredRole: "approver", AreaCode: "qa", Selectors: explicit}
-		got := s.EffectiveSelectors()
-		if len(got) != 1 || got[0] != explicit[0] {
-			t.Fatalf("EffectiveSelectors() = %+v, want %+v", got, explicit)
+// TestFlatRoleArea covers the reverse mapping used to repopulate audit
+// snapshots and compat wire fields: a single role_in_fixed_area selector
+// yields its (role, area_code); zero, multiple, or other-kind-only selectors
+// yield ("", "").
+func TestFlatRoleArea(t *testing.T) {
+	t.Run("single role_in_fixed_area", func(t *testing.T) {
+		role, area := FlatRoleArea([]ActorSelector{{Kind: SelectorRoleInFixedArea, Role: "approver", AreaCode: "qa"}})
+		if role != "approver" || area != "qa" {
+			t.Fatalf("FlatRoleArea() = (%q, %q), want (approver, qa)", role, area)
 		}
 	})
 
-	t.Run("legacy synthesizes role_in_fixed_area", func(t *testing.T) {
-		s := Stage{RequiredRole: "approver", AreaCode: "qa"}
-		got := s.EffectiveSelectors()
-		want := ActorSelector{Kind: SelectorRoleInFixedArea, Role: "approver", AreaCode: "qa"}
-		if len(got) != 1 || got[0] != want {
-			t.Fatalf("EffectiveSelectors() = %+v, want [%+v]", got, want)
-		}
-		if err := got[0].Validate(); err != nil {
-			t.Fatalf("synthesized selector invalid: %v", err)
+	t.Run("no role_in_fixed_area", func(t *testing.T) {
+		role, area := FlatRoleArea([]ActorSelector{{Kind: SelectorNamedUser, UserID: "u1"}})
+		if role != "" || area != "" {
+			t.Fatalf("FlatRoleArea() = (%q, %q), want (\"\", \"\")", role, area)
 		}
 	})
 
-	t.Run("neither returns nil", func(t *testing.T) {
-		s := Stage{Name: "A"}
-		if got := s.EffectiveSelectors(); got != nil {
-			t.Fatalf("EffectiveSelectors() = %+v, want nil", got)
+	t.Run("multiple role_in_fixed_area", func(t *testing.T) {
+		role, area := FlatRoleArea([]ActorSelector{
+			{Kind: SelectorRoleInFixedArea, Role: "approver", AreaCode: "qa"},
+			{Kind: SelectorRoleInFixedArea, Role: "director", AreaCode: "exec"},
+		})
+		if role != "" || area != "" {
+			t.Fatalf("FlatRoleArea() = (%q, %q), want (\"\", \"\")", role, area)
+		}
+	})
+
+	t.Run("empty", func(t *testing.T) {
+		role, area := FlatRoleArea(nil)
+		if role != "" || area != "" {
+			t.Fatalf("FlatRoleArea() = (%q, %q), want (\"\", \"\")", role, area)
 		}
 	})
 }
@@ -123,14 +127,17 @@ func TestRouteValidateSelectors(t *testing.T) {
 		}
 	})
 
-	t.Run("legacy bridge passes", func(t *testing.T) {
+	t.Run("selector-populated stage passes", func(t *testing.T) {
 		r := Route{
 			Stages: []Stage{
-				{Order: 1, Name: "A", RequiredRole: "approver", AreaCode: "qa", Quorum: QuorumAny1Of, OnEligibilityDrift: DriftReduceQuorum},
+				{
+					Order: 1, Name: "A", Quorum: QuorumAny1Of, OnEligibilityDrift: DriftReduceQuorum,
+					Selectors: []ActorSelector{{Kind: SelectorRoleInFixedArea, Role: "approver", AreaCode: "qa"}},
+				},
 			},
 		}
 		if err := r.Validate(""); err != nil {
-			t.Fatalf("Validate() = %v, want nil (legacy bridge)", err)
+			t.Fatalf("Validate() = %v, want nil", err)
 		}
 	})
 
