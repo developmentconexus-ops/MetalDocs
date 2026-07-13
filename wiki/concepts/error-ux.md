@@ -2,7 +2,7 @@
 
 > **Migration note (DONE).** The legacy `ApiErrorEnvelope` shape (`{ error: { code, message } }`) has been **fully retired** by api-contract-hardening Phase D (AD-2, 2026-06-07): RFC 9457 `application/problem+json` is the only error shape across the whole API, including `GET /api/v1/audit/events` (already on `problem.New`/`writeProblem`). The shared parser is the canonical contract; see [`architecture/api-design-system.md`](../architecture/api-design-system.md). Any "legacy envelope" wording below is historical.
 
-> **Last verified:** 2026-06-07 (Phase D: legacy `ApiErrorEnvelope` retired API-wide; audit confirmed Problem-based. Prior: 2026-05-28 qa/fe-401-interceptor)
+> **Last verified:** 2026-07-12 (M3 approval-kernel-extraction path fix: `signoff.not_eligible` anchor `documents/approval/http/errors.go:48-50` → `approval/http/errors.go:162`) | Prior: 2026-06-07 (Phase D: legacy `ApiErrorEnvelope` retired API-wide; audit confirmed Problem-based. Prior: 2026-05-28 qa/fe-401-interceptor)
 > **Branch:** `phase-e-error-ux` (merged into main)
 > **Bugs fixed:** E2, E3, E4; T-014 (401 session-expiry vs domain-401 conflation)
 
@@ -73,7 +73,7 @@ Key codes:
 - `sod.submitter_cannot_sign` — submitter ≠ approver SoD
 - `sod.cross_stage_duplicate` — same user, multiple stages
 - `approval.unresolved_comments` — final approval/release is blocked until active document comments are resolved; handled inline in `SignoffDialog`, not as a generic outage message
-- `signoff.not_eligible` — actor not in `eligible_actor_ids` snapshot frozen at submit time; HTTP 403. Mapped from `domain.ErrActorNotEligible` at `internal/modules/documents/approval/http/errors.go:48-50`. Handle analogously to SoD codes in `SignoffDialog` — inline dialog error, not a toast.
+- `signoff.not_eligible` — actor not in `eligible_actor_ids` snapshot frozen at submit time; HTTP 403. Mapped from `domain.ErrActorNotEligible` at `internal/modules/approval/http/errors.go:162` (M3 2026-07-12: path+line corrected, was `documents/approval/...errors.go:48-50`; approval promoted to top-level 15th module, [ADR 0082](../decisions/0082-approval-kernel-extraction.md)). Handle analogously to SoD codes in `SignoffDialog` — inline dialog error, not a toast.
 - `not_found.route` — no approval route configured for document profile
 - `authn.expired` — session expired
 - `authn.rate_limited` — too many attempts

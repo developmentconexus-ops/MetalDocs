@@ -41,7 +41,7 @@ const testIdempotencyKey = "11111111-1111-1111-1111-111111111111"
 
 // TestRegisterRoutes_AllRoutesRegistered pins every operation declared for the
 // taxonomy tag in api/openapi/v1/openapi.yaml to a live mux registration —
-// mirrors internal/modules/documents/approval/http/router_test.go. A spec
+// mirrors internal/modules/approval/http/router_test.go. A spec
 // route with no ServerInterface method fails to compile (routes_generated.go
 // asserts `var _ taxonomyapi.ServerInterface = (*Handler)(nil)`); this test
 // closes the remaining gap where a route compiles but is never reachable

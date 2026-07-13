@@ -46,7 +46,7 @@ var asyncHandlerRoots = []string{
 	"apps/worker",
 	"apps/jobs",
 	"internal/platform/worker",
-	"internal/modules/documents/approval/jobs",
+	"internal/modules/approval/jobs",
 	"internal/modules/notifications/infrastructure",
 	"internal/modules/render/fanout",
 }
@@ -54,12 +54,12 @@ var asyncHandlerRoots = []string{
 // asyncHandlerFiles are individual files that are async (worker/jobs)
 // handlers even though they live inside an otherwise sync-API-path package —
 // e.g. RunScheduledPublishJob is a River-job entrypoint colocated in
-// internal/modules/documents/approval/application alongside the sync
+// internal/modules/approval/application alongside the sync
 // decision/publish/submit/obsolete/supersede services (those are called from
 // the F3.1-chokepoint-covered API path, not this rule's concern; scanning
 // the whole package would false-positive on every one of their repo writes).
 var asyncHandlerFiles = map[string]struct{}{
-	"internal/modules/documents/approval/application/scheduler_service.go": {},
+	"internal/modules/approval/application/scheduler_service.go": {},
 }
 
 func isAsyncHandlerPath(relSlash string) bool {

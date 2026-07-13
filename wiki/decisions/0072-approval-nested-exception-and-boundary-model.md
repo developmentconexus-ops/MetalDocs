@@ -1,6 +1,9 @@
 # ADR 0072 — `documents/approval` nested exception + boundary-guard published-surface model
 
-> **Status:** Accepted 2026-07-06
+> **Status:** Accepted 2026-07-06 · ruling (a) SUPERSEDED 2026-07-12 by
+> [ADR 0082](0082-approval-kernel-extraction.md) — the recorded promotion trigger ("second
+> bounded-context consumer that isn't `documents`") fired (templates), so `documents/approval` was
+> promoted to the first-class `internal/modules/approval` module. Rulings (b) and (c) remain in force.
 > **Scope:** M9 F9.5 structure-hygiene — approval module-birth decision, `repository/`→`infrastructure/`
 > rename, and `scripts/check-module-boundaries.ps1` realignment to REQ-TOP-1.
 

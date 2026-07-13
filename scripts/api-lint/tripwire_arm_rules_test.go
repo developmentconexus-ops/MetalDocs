@@ -272,6 +272,86 @@ func TestTripwireArmDrift_MatchOneAmongMultipleCapsIsGreen(t *testing.T) {
 	}
 }
 
+// Subject-discriminated arm (ADR 0083): approval_instances/INSERT now has TWO
+// real arms — document->document.submit, template->template.submit. A function
+// asserting ONLY template.submit and writing approval_instances must be GREEN
+// (the static DRIFT lint unions the arm caps; the DB trigger's CASE
+// NEW.subject_kind does the precise per-row enforcement). Before the
+// unionArmCapsFor generalization this fired a false positive, because armFor
+// returned only the FIRST matching arm (document->{document.submit}).
+func TestTripwireArmDrift_TemplateSubmitOnApprovalInstancesIsGreen(t *testing.T) {
+	dir := t.TempDir()
+	subjModel := "package domain\n" +
+		"type Capability string\n" +
+		"const (\n" +
+		"\tCapDocumentSubmit Capability = \"document.submit\"\n" +
+		"\tCapTemplateSubmit Capability = \"template.submit\"\n" +
+		")\n"
+	writeFile(t, dir, filepath.Join("internal", "modules", "iam", "domain", "model.go"), subjModel)
+	writeFile(t, dir, filepath.Join("internal", "modules", "fixture", "repo.go"),
+		"package fixture\n"+
+			"import (\n\t\"context\"\n\t\"database/sql\"\n)\n"+
+			"var authz = struct{ Require func(context.Context, *sql.Tx, string, string) error }{}\n"+
+			"type iamdomainPkg struct{ CapTemplateSubmit string }\n"+
+			"var iamdomain = iamdomainPkg{CapTemplateSubmit: \"template.submit\"}\n"+
+			"func submitTemplate(ctx context.Context, tx *sql.Tx) error {\n"+
+			"\tif err := authz.Require(ctx, tx, string(iamdomain.CapTemplateSubmit), \"tenant\"); err != nil {\n"+
+			"\t\treturn err\n"+
+			"\t}\n"+
+			"\t_, err := tx.ExecContext(ctx, `INSERT INTO approval_instances (id) VALUES ($1)`, \"x\")\n"+
+			"\treturn err\n"+
+			"}\n")
+	got, err := checkTripwireArmDrift(dir, token.NewFileSet(), false)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if n := countRule(got, "TRIPWIRE-ARM-DRIFT"); n != 0 {
+		t.Fatalf("template.submit + approval_instances INSERT: want 0 violations (union arm), got %d: %+v", n, got)
+	}
+}
+
+// Fail-closed for the discriminated table: a function asserting NEITHER
+// document.submit NOR template.submit, then writing approval_instances, still
+// fires — the union of the two arms is {document.submit, template.submit}, and
+// document.view is in neither.
+func TestTripwireArmDrift_NonSubmitCapOnApprovalInstancesFires(t *testing.T) {
+	dir := t.TempDir()
+	subjModel := "package domain\n" +
+		"type Capability string\n" +
+		"const (\n" +
+		"\tCapDocumentView Capability = \"document.view\"\n" +
+		")\n"
+	writeFile(t, dir, filepath.Join("internal", "modules", "iam", "domain", "model.go"), subjModel)
+	writeFile(t, dir, filepath.Join("internal", "modules", "fixture", "repo.go"),
+		"package fixture\n"+
+			"import (\n\t\"context\"\n\t\"database/sql\"\n)\n"+
+			"var authz = struct{ Require func(context.Context, *sql.Tx, string, string) error }{}\n"+
+			"type iamdomainPkg struct{ CapDocumentView string }\n"+
+			"var iamdomain = iamdomainPkg{CapDocumentView: \"document.view\"}\n"+
+			"func writeInstance(ctx context.Context, tx *sql.Tx) error {\n"+
+			"\tif err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), \"tenant\"); err != nil {\n"+
+			"\t\treturn err\n"+
+			"\t}\n"+
+			"\t_, err := tx.ExecContext(ctx, `INSERT INTO approval_instances (id) VALUES ($1)`, \"x\")\n"+
+			"\treturn err\n"+
+			"}\n")
+	got, err := checkTripwireArmDrift(dir, token.NewFileSet(), false)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if n := countRule(got, "TRIPWIRE-ARM-DRIFT"); n != 1 {
+		t.Fatalf("document.view + approval_instances INSERT: want 1 violation, got %d: %+v", n, got)
+	}
+	if !containsMsg(got, "approval_instances") || !containsMsg(got, "writeInstance") {
+		t.Fatalf("violation should name the function and table: %+v", got)
+	}
+	// The reported arm set must be the UNION (both submit caps), proving the
+	// generalization rendered the full expected membership, not a single arm.
+	if !containsMsg(got, "document.submit") || !containsMsg(got, "template.submit") {
+		t.Fatalf("violation message should list the unioned arm caps: %+v", got)
+	}
+}
+
 // --- Detection proof: pre-0271-style arm reproduces the two real latent
 // incidents (force-release + obsolete) as RED. We do NOT mutate the real
 // arms.go here (forbidden by the task); this test constructs a temp tree that

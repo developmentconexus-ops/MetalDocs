@@ -124,7 +124,7 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "signed download", method: http.MethodGet, path: "/api/v1/signed", wantCap: iamdomain.CapTemplateView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "approval get instance", method: http.MethodGet, path: "/api/v1/approval/instances/a-1", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		// M2b F3 (P1): generic /api/v1/approval/ prefix fallback deleted; these are
-		// the real runtime routes (verified against internal/modules/documents/approval/http/router.go),
+		// the real runtime routes (verified against internal/modules/approval/http/router.go),
 		// each now explicit and matching its real tier-2 capability.
 		{name: "approval signoff", method: http.MethodPost, path: "/api/v1/approval/instances/a-1/stages/s-1/signoffs", wantCap: iamdomain.CapDocumentSignoff, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "approval cancel", method: http.MethodPost, path: "/api/v1/approval/instances/a-1/cancel", wantCap: iamdomain.CapDocumentEdit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
@@ -306,7 +306,7 @@ func TestRouteCoverage(t *testing.T) {
 		{"templates", http.MethodGet, "/api/v1/signed"},
 
 		// approvalHandler.RegisterRoutes (main.go:753) — verified against the real
-		// router at internal/modules/documents/approval/http/router.go (M2b F3): no
+		// router at internal/modules/approval/http/router.go (M2b F3): no
 		// PUT/DELETE on /instances/{id} and no /decisions path exist; the prior
 		// entries here were stale, only ever exercised via the now-deleted generic
 		// /api/v1/approval/ prefix fallback.
@@ -675,7 +675,7 @@ func TestEveryCapSeededOrDeferred(t *testing.T) {
 //   - force-release: internal/modules/documents/repository/repository.go
 //     ForceReleaseSession/ForceReleaseSessionTx call
 //     authz.Require(ctx, tx, string(iamdomain.CapMembershipManage), docArea).
-//   - approval-route management: internal/modules/documents/approval/application/
+//   - approval-route management: internal/modules/approval/application/
 //     route_admin_service.go calls
 //     authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant").
 //

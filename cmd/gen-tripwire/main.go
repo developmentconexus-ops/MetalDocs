@@ -1,7 +1,9 @@
 // Command gen-tripwire writes the machine-generated tripwire migration SQL
 // (internal/platform/tripwire.RenderMigration()) to the latest canonical
-// migration path (0283 as of M7 F7.3 Task F fix: DELETE paths RETURN OLD —
-// RETURN NEW on a BEFORE DELETE trigger silently cancelled every DELETE).
+// migration path (0300 as of M3 P3.S2b-3b-iii-a, ADR 0083 follow-on:
+// approval_signoffs arm splits into parent-lookup-discriminated
+// document/template entries — a SELECT of the parent approval_instances
+// row's subject_kind followed by a nested CASE on the looked-up value).
 //
 // Usage: go run ./cmd/gen-tripwire [output-path]
 // With no argument, writes to the canonical path relative to the repo root
@@ -16,7 +18,7 @@ import (
 	"metaldocs/internal/platform/tripwire"
 )
 
-const defaultRelPath = "db/migrations/0283_tripwire_delete_return_old.sql"
+const defaultRelPath = "db/migrations/0300_tripwire_signoff_parent_discriminator.sql"
 
 func main() {
 	out := defaultRelPath

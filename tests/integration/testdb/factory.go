@@ -15,7 +15,7 @@ import (
 
 	cddomain "metaldocs/internal/modules/controlleddocuments/domain"
 	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
-	domain "metaldocs/internal/modules/documents/approval/domain"
+	domain "metaldocs/internal/modules/approval/domain"
 )
 
 // factory.go — unified integration-test fixture builders, built ON the testdb

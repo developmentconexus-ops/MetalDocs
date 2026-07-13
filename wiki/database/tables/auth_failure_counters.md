@@ -3,7 +3,7 @@
 > **Source:** `db/migrations/0235_auth_failure_counters.sql`
 > **Schema:** `public`
 > **Owner:** approval
-> **Last verified:** 2026-06-12 (created — F-20e, REQ-REL-3, OWASP ASVS §2.2.1)
+> **Last verified:** 2026-07-12 (M3 approval-kernel-extraction path fix: Implementation/Interface anchors `documents/approval/` → `approval/`) | **Prior:** 2026-06-12 (created — F-20e, REQ-REL-3, OWASP ASVS §2.2.1)
 
 ## Purpose
 
@@ -48,8 +48,8 @@ CREATE TABLE public.auth_failure_counters (
 - **Writer:** `RecordFailure` — UPSERT with window-reset CASE expression
 - **Deleter:** `Reset` — `DELETE WHERE actor_id = $1` on successful authentication
 
-Implementation: `internal/modules/documents/approval/infrastructure/signature/postgres_auth_failure_rate_limiter.go`  
-Interface: `AuthFailureRateLimiter` in `internal/modules/documents/approval/infrastructure/signature/password_reauth.go`  
+Implementation: `internal/modules/approval/infrastructure/signature/postgres_auth_failure_rate_limiter.go` (M3 2026-07-12: path corrected, approval promoted to top-level 15th module, [ADR 0082](../../decisions/0082-approval-kernel-extraction.md); was `internal/modules/documents/approval/...`)  
+Interface: `AuthFailureRateLimiter` in `internal/modules/approval/infrastructure/signature/password_reauth.go`  
 Wiring: `apps/api/cmd/metaldocs-api/reauth.go` — Postgres impl when `db != nil`, in-memory for dev/test.
 
 ## Seed or Reference Data

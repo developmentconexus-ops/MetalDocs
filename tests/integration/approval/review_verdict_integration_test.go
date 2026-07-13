@@ -23,9 +23,9 @@ import (
 	"strings"
 	"testing"
 
-	"metaldocs/internal/modules/documents/approval/application"
-	"metaldocs/internal/modules/documents/approval/domain"
-	"metaldocs/internal/modules/documents/approval/infrastructure"
+	"metaldocs/internal/modules/approval/application"
+	"metaldocs/internal/modules/approval/domain"
+	"metaldocs/internal/modules/approval/infrastructure"
 	iampostgres "metaldocs/internal/modules/iam/infrastructure/postgres"
 	"metaldocs/internal/platform/db"
 	"metaldocs/tests/integration/testdb"

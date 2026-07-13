@@ -28,6 +28,24 @@ const (
 	SessionCookieScopes sessionCookieContextKey = "sessionCookie.Scopes"
 )
 
+// Defines values for SignoffTemplateVersionRequestDecision.
+const (
+	Approve SignoffTemplateVersionRequestDecision = "approve"
+	Reject  SignoffTemplateVersionRequestDecision = "reject"
+)
+
+// Valid indicates whether the value is a known member of the SignoffTemplateVersionRequestDecision enum.
+func (e SignoffTemplateVersionRequestDecision) Valid() bool {
+	switch e {
+	case Approve:
+		return true
+	case Reject:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for TemplateVersionRefStatus.
 const (
 	TemplateVersionRefStatusApproved    TemplateVersionRefStatus = "approved"
@@ -174,6 +192,27 @@ type Problem struct {
 	Type     *string       `json:"type,omitempty"`
 }
 
+// SignoffDocumentResponse defines model for SignoffDocumentResponse.
+type SignoffDocumentResponse struct {
+	Outcome   string `json:"outcome"`
+	SignoffId string `json:"signoff_id"`
+	WasReplay bool   `json:"was_replay"`
+}
+
+// SignoffTemplateVersionRequest defines model for SignoffTemplateVersionRequest.
+type SignoffTemplateVersionRequest struct {
+	Decision SignoffTemplateVersionRequestDecision `json:"decision"`
+
+	// Password Re-authentication password for the signature (password_reauth method).
+	Password string `json:"password"`
+
+	// Reason Required when decision is reject.
+	Reason *string `json:"reason,omitempty"`
+}
+
+// SignoffTemplateVersionRequestDecision defines model for SignoffTemplateVersionRequest.Decision.
+type SignoffTemplateVersionRequestDecision string
+
 // SystemBlankTemplateResponse defines model for SystemBlankTemplateResponse.
 type SystemBlankTemplateResponse struct {
 	Name              string             `json:"name"`
@@ -186,6 +225,16 @@ type TemplateApprovalConfig struct {
 	ApproverRole string             `json:"approver_role"`
 	ReviewerRole *string            `json:"reviewer_role"`
 	TemplateId   openapi_types.UUID `json:"template_id"`
+}
+
+// TemplateApprovalSubmitResponse defines model for TemplateApprovalSubmitResponse.
+type TemplateApprovalSubmitResponse struct {
+	Data struct {
+		InstanceId openapi_types.UUID `json:"instance_id"`
+
+		// VersionStatus The template version's status after the kernel submit-lock (always under_review on success).
+		VersionStatus string `json:"version_status"`
+	} `json:"data"`
 }
 
 // TemplateAuditEvent defines model for TemplateAuditEvent.
@@ -390,8 +439,18 @@ type UpdateTemplateSchemaJSONBody struct {
 	PlaceholderSchema   []map[string]interface{} `json:"placeholder_schema"`
 }
 
+// SignoffTemplateVersionParams defines parameters for SignoffTemplateVersion.
+type SignoffTemplateVersionParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
 // SubmitTemplateVersionParams defines parameters for SubmitTemplateVersion.
 type SubmitTemplateVersionParams struct {
+	IdempotencyKey openapi_types.UUID `json:"Idempotency-Key"`
+}
+
+// SubmitTemplateVersionForApprovalParams defines parameters for SubmitTemplateVersionForApproval.
+type SubmitTemplateVersionForApprovalParams struct {
 	IdempotencyKey openapi_types.UUID `json:"Idempotency-Key"`
 }
 
@@ -406,6 +465,9 @@ type PublishTemplateVersionJSONRequestBody PublishTemplateVersionJSONBody
 
 // UpdateTemplateSchemaJSONRequestBody defines body for UpdateTemplateSchema for application/json ContentType.
 type UpdateTemplateSchemaJSONRequestBody UpdateTemplateSchemaJSONBody
+
+// SignoffTemplateVersionJSONRequestBody defines body for SignoffTemplateVersion for application/json ContentType.
+type SignoffTemplateVersionJSONRequestBody = SignoffTemplateVersionRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -466,9 +528,15 @@ type ServerInterface interface {
 	// Presign PUT URL for draft schema.json upload
 	// (POST /templates/{id}/versions/{n}/schema-upload-url)
 	PresignTemplateSchemaUploadUrl(w http.ResponseWriter, r *http.Request, id string, n int)
+	// Record a template version approval sign-off
+	// (POST /templates/{id}/versions/{n}/signoff)
+	SignoffTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params SignoffTemplateVersionParams)
 	// Submit template version
 	// (POST /templates/{id}/versions/{n}/submit)
 	SubmitTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params SubmitTemplateVersionParams)
+	// Submit template version to the approval kernel
+	// (POST /templates/{id}/versions/{n}/submit-for-approval)
+	SubmitTemplateVersionForApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params SubmitTemplateVersionForApprovalParams)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -1303,6 +1371,75 @@ func (siw *ServerInterfaceWrapper) PresignTemplateSchemaUploadUrl(w http.Respons
 	handler.ServeHTTP(w, r)
 }
 
+// SignoffTemplateVersion operation middleware
+func (siw *ServerInterfaceWrapper) SignoffTemplateVersion(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "n" -------------
+	var n int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "n", r.PathValue("n"), &n, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "n", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SignoffTemplateVersionParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SignoffTemplateVersion(w, r, id, n, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // SubmitTemplateVersion operation middleware
 func (siw *ServerInterfaceWrapper) SubmitTemplateVersion(w http.ResponseWriter, r *http.Request) {
 
@@ -1363,6 +1500,75 @@ func (siw *ServerInterfaceWrapper) SubmitTemplateVersion(w http.ResponseWriter, 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SubmitTemplateVersion(w, r, id, n, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SubmitTemplateVersionForApproval operation middleware
+func (siw *ServerInterfaceWrapper) SubmitTemplateVersionForApproval(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "n" -------------
+	var n int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "n", r.PathValue("n"), &n, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "n", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SubmitTemplateVersionForApprovalParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey openapi_types.UUID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SubmitTemplateVersionForApproval(w, r, id, n, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1511,7 +1717,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions/{n}/review", wrapper.ReviewTemplateVersion)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/templates/{id}/versions/{n}/schema", wrapper.UpdateTemplateSchema)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions/{n}/schema-upload-url", wrapper.PresignTemplateSchemaUploadUrl)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions/{n}/signoff", wrapper.SignoffTemplateVersion)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions/{n}/submit", wrapper.SubmitTemplateVersion)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions/{n}/submit-for-approval", wrapper.SubmitTemplateVersionForApproval)
 
 	return m
 }
@@ -3513,6 +3721,127 @@ func (response PresignTemplateSchemaUploadUrl500ApplicationProblemPlusJSONRespon
 	return err
 }
 
+type SignoffTemplateVersionRequestObject struct {
+	Id     openapi_types.UUID `json:"id"`
+	N      int                `json:"n"`
+	Params SignoffTemplateVersionParams
+	Body   *SignoffTemplateVersionJSONRequestBody
+}
+
+type SignoffTemplateVersionResponseObject interface {
+	VisitSignoffTemplateVersionResponse(w http.ResponseWriter) error
+}
+
+type SignoffTemplateVersion200JSONResponse SignoffDocumentResponse
+
+func (response SignoffTemplateVersion200JSONResponse) VisitSignoffTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignoffTemplateVersion400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response SignoffTemplateVersion400ApplicationProblemPlusJSONResponse) VisitSignoffTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignoffTemplateVersion401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response SignoffTemplateVersion401ApplicationProblemPlusJSONResponse) VisitSignoffTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignoffTemplateVersion403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response SignoffTemplateVersion403ApplicationProblemPlusJSONResponse) VisitSignoffTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignoffTemplateVersion404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response SignoffTemplateVersion404ApplicationProblemPlusJSONResponse) VisitSignoffTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignoffTemplateVersion409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response SignoffTemplateVersion409ApplicationProblemPlusJSONResponse) VisitSignoffTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignoffTemplateVersion500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response SignoffTemplateVersion500ApplicationProblemPlusJSONResponse) VisitSignoffTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type SubmitTemplateVersionRequestObject struct {
 	Id     openapi_types.UUID `json:"id"`
 	N      int                `json:"n"`
@@ -3633,6 +3962,126 @@ func (response SubmitTemplateVersion500ApplicationProblemPlusJSONResponse) Visit
 	return err
 }
 
+type SubmitTemplateVersionForApprovalRequestObject struct {
+	Id     openapi_types.UUID `json:"id"`
+	N      int                `json:"n"`
+	Params SubmitTemplateVersionForApprovalParams
+}
+
+type SubmitTemplateVersionForApprovalResponseObject interface {
+	VisitSubmitTemplateVersionForApprovalResponse(w http.ResponseWriter) error
+}
+
+type SubmitTemplateVersionForApproval200JSONResponse TemplateApprovalSubmitResponse
+
+func (response SubmitTemplateVersionForApproval200JSONResponse) VisitSubmitTemplateVersionForApprovalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitTemplateVersionForApproval400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response SubmitTemplateVersionForApproval400ApplicationProblemPlusJSONResponse) VisitSubmitTemplateVersionForApprovalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitTemplateVersionForApproval401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response SubmitTemplateVersionForApproval401ApplicationProblemPlusJSONResponse) VisitSubmitTemplateVersionForApprovalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitTemplateVersionForApproval403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response SubmitTemplateVersionForApproval403ApplicationProblemPlusJSONResponse) VisitSubmitTemplateVersionForApprovalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitTemplateVersionForApproval404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response SubmitTemplateVersionForApproval404ApplicationProblemPlusJSONResponse) VisitSubmitTemplateVersionForApprovalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitTemplateVersionForApproval409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response SubmitTemplateVersionForApproval409ApplicationProblemPlusJSONResponse) VisitSubmitTemplateVersionForApprovalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitTemplateVersionForApproval500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response SubmitTemplateVersionForApproval500ApplicationProblemPlusJSONResponse) VisitSubmitTemplateVersionForApprovalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// List templates for tenant (docx)
@@ -3692,9 +4141,15 @@ type StrictServerInterface interface {
 	// Presign PUT URL for draft schema.json upload
 	// (POST /templates/{id}/versions/{n}/schema-upload-url)
 	PresignTemplateSchemaUploadUrl(ctx context.Context, request PresignTemplateSchemaUploadUrlRequestObject) (PresignTemplateSchemaUploadUrlResponseObject, error)
+	// Record a template version approval sign-off
+	// (POST /templates/{id}/versions/{n}/signoff)
+	SignoffTemplateVersion(ctx context.Context, request SignoffTemplateVersionRequestObject) (SignoffTemplateVersionResponseObject, error)
 	// Submit template version
 	// (POST /templates/{id}/versions/{n}/submit)
 	SubmitTemplateVersion(ctx context.Context, request SubmitTemplateVersionRequestObject) (SubmitTemplateVersionResponseObject, error)
+	// Submit template version to the approval kernel
+	// (POST /templates/{id}/versions/{n}/submit-for-approval)
+	SubmitTemplateVersionForApproval(ctx context.Context, request SubmitTemplateVersionForApprovalRequestObject) (SubmitTemplateVersionForApprovalResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -4257,6 +4712,41 @@ func (sh *strictHandler) PresignTemplateSchemaUploadUrl(w http.ResponseWriter, r
 	}
 }
 
+// SignoffTemplateVersion operation middleware
+func (sh *strictHandler) SignoffTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params SignoffTemplateVersionParams) {
+	var request SignoffTemplateVersionRequestObject
+
+	request.Id = id
+	request.N = n
+	request.Params = params
+
+	var body SignoffTemplateVersionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SignoffTemplateVersion(ctx, request.(SignoffTemplateVersionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SignoffTemplateVersion")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SignoffTemplateVersionResponseObject); ok {
+		if err := validResponse.VisitSignoffTemplateVersionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // SubmitTemplateVersion operation middleware
 func (sh *strictHandler) SubmitTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params SubmitTemplateVersionParams) {
 	var request SubmitTemplateVersionRequestObject
@@ -4285,105 +4775,143 @@ func (sh *strictHandler) SubmitTemplateVersion(w http.ResponseWriter, r *http.Re
 	}
 }
 
+// SubmitTemplateVersionForApproval operation middleware
+func (sh *strictHandler) SubmitTemplateVersionForApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params SubmitTemplateVersionForApprovalParams) {
+	var request SubmitTemplateVersionForApprovalRequestObject
+
+	request.Id = id
+	request.N = n
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SubmitTemplateVersionForApproval(ctx, request.(SubmitTemplateVersionForApprovalRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SubmitTemplateVersionForApproval")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SubmitTemplateVersionForApprovalResponseObject); ok {
+		if err := validResponse.VisitSubmitTemplateVersionForApprovalResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, compressed with deflate, json marshaled OpenAPI spec.
 // Stored as a slice of fixed-width chunks rather than one concatenated
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"A/otCK7fX/9/AAAA//8=",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

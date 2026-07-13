@@ -1667,6 +1667,86 @@ paths:
           $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /templates/{id}/versions/{n}/submit-for-approval:
+    post:
+      summary: Submit template version to the approval kernel
+      description: >-
+        Thin kernel entry point (M3 P3.S2b-4, R2a): resolves the template
+        version and delegates to the approval module's subject-generic
+        TemplateSubmitService, which locks the version draft -> under_review
+        and creates an approval_instances row from the template's active
+        approval route. Additive to the legacy submit route above — does not
+        replace it.
+      tags: [templates]
+      operationId: submitTemplateVersionForApproval
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateApprovalSubmitResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /templates/{id}/versions/{n}/signoff:
+    post:
+      summary: Record a template version approval sign-off
+      description: >-
+        Thin kernel entry point (M3 P3.S2b-4, R2a): resolves the template's
+        active approval instance and active stage internally, then delegates
+        to the approval module's subject-generic DecisionService.RecordSignoff.
+        Mirrors POST /documents/{id}/signoff's request shape (decision,
+        reason, password) but omits content_hash — a template version never
+        freezes, so its content identity is read server-side off
+        templates_template_version.content_hash, never echoed by the client.
+      tags: [templates]
+      operationId: signoffTemplateVersion
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignoffTemplateVersionRequest'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignoffDocumentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /templates/{id}/archive:
     post:
       summary: Archive template
@@ -6760,6 +6840,34 @@ components:
           type: boolean
         outcome:
           type: string
+    TemplateApprovalSubmitResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [instance_id, version_status]
+          properties:
+            instance_id:
+              type: string
+              format: uuid
+            version_status:
+              type: string
+              description: The template version's status after the kernel submit-lock (always under_review on success).
+    SignoffTemplateVersionRequest:
+      type: object
+      required: [decision, password]
+      properties:
+        decision:
+          type: string
+          enum: [approve, reject]
+        reason:
+          type: string
+          description: Required when decision is reject.
+        password:
+          type: string
+          minLength: 1
+          description: Re-authentication password for the signature (password_reauth method).
     SignoffApprovalStageRequest:
       type: object
       required: [decision, password_token, content_hash]
@@ -7127,6 +7235,23 @@ components:
       properties:
         profile_code: { type: string, minLength: 1, maxLength: 64, pattern: '^[a-z0-9_-]+$' }
         name: { type: string, minLength: 1, maxLength: 200 }
+        subject_kind:
+          type: string
+          enum: [document, template]
+          description: >-
+            M3 kernel extraction (ADR 0082, P2.S3). Optional; omitted defaults
+            to `document`, preserving the legacy (document, profile_code)
+            subject unchanged. A non-document kind is accepted and persisted
+            faithfully but carries no template-specific governance in this
+            slice (Phase 3).
+        subject_key:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: >-
+            M3 kernel extraction (ADR 0082, P2.S3). Optional; omitted defaults
+            to `profile_code` when `subject_kind` is `document` (or absent),
+            preserving byte-equal legacy behavior.
         stages:
           type: array
           minItems: 1
@@ -7170,6 +7295,19 @@ components:
         name: { type: string }
         tenant_id: { type: string, format: uuid }
         profile_code: { type: string }
+        subject_kind:
+          type: string
+          enum: [document, template]
+          description: >-
+            M3 kernel extraction (ADR 0082, P2.S3). What this route governs;
+            `document` for every route created via the legacy profile_code
+            path.
+        subject_key:
+          type: string
+          description: >-
+            M3 kernel extraction (ADR 0082, P2.S3). The governed entity's key
+            within subject_kind's bounded context; equals profile_code for a
+            document-subject route.
         active: { type: boolean }
         version:
           type: integer

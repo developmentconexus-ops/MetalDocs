@@ -42,8 +42,19 @@ import (
 // (tenants/INSERT arm gated on tenant.onboard + attachment, ADR 0070); M7 F7.3
 // re-rendered it to 0279 (tenant_lifecycle_jobs/INSERT arm gated on
 // tenant.export OR tenant.erase + attachment, ADR 0070), then to 0283 (DELETE
-// paths RETURN OLD — RETURN NEW on BEFORE DELETE silently cancelled DELETEs).
-const tripwireMigrationPath = "db/migrations/0283_tripwire_delete_return_old.sql"
+// paths RETURN OLD — RETURN NEW on BEFORE DELETE silently cancelled DELETEs),
+// then to 0299 (ADR 0083, M3 P3.S2b-3b-0: approval_instances/INSERT arm
+// splits into two subject-discriminated entries — document rows require
+// document.submit, template rows require template.submit, via a nested CASE
+// NEW.subject_kind, never unioned; numbered 0299 to avoid the 0284_ci_rls_role
+// prefix collision — migrate.Apply dedupes by 4-digit prefix only), then to
+// 0300 (ADR 0083 follow-on, M3 P3.S2b-3b-iii-a: approval_signoffs/INSERT arm
+// splits into two parent-lookup-discriminated entries — approval_signoffs has
+// no direct subject_kind column, so the trigger SELECTs the parent
+// approval_instances row's subject_kind and CASEs on the looked-up value;
+// document-parent rows require document.signoff, template-parent rows
+// require template.approve, never unioned).
+const tripwireMigrationPath = "db/migrations/0300_tripwire_signoff_parent_discriminator.sql"
 
 // gatedTableSet returns the set of table names present in TripwireArms — the
 // tables TRIPWIRE-ARM-DRIFT restricts its attention to (contract §1.5.b: "only
@@ -69,6 +80,39 @@ func armFor(arms []tripwire.Arm, table string, op tripwire.Op) (tripwire.Arm, bo
 		}
 	}
 	return tripwire.Arm{}, false
+}
+
+// unionArmCapsFor returns the UNION of Caps across ALL arms matching table+op,
+// and whether any arm matched. A subject-discriminated table (ADR 0083:
+// approval_instances/INSERT splits into a document arm requiring document.submit
+// and a template arm requiring template.submit) has more than one arm for the
+// same (table, op); the DB trigger picks the precise arm per-row via
+// CASE NEW.subject_kind, but this STATIC function-local lint cannot know
+// subject_kind at compile time. Unioning the arm caps for the static membership
+// check is sound: it lets a function asserting EITHER subject's cap pass, while
+// a function asserting NEITHER still fails. Runtime security is unchanged — the
+// trigger's per-subject CASE remains the exact enforcer.
+func unionArmCapsFor(arms []tripwire.Arm, table string, op tripwire.Op) ([]iamdomain.Capability, bool) {
+	var union []iamdomain.Capability
+	seen := map[iamdomain.Capability]struct{}{}
+	matched := false
+	for _, a := range arms {
+		if a.Table != table {
+			continue
+		}
+		if a.Op != tripwire.OpAny && a.Op != op {
+			continue
+		}
+		matched = true
+		for _, c := range a.Caps {
+			if _, dup := seen[c]; dup {
+				continue
+			}
+			seen[c] = struct{}{}
+			union = append(union, c)
+		}
+	}
+	return union, matched
 }
 
 // ---------------------------------------------------------------------------
@@ -293,22 +337,22 @@ func checkTripwireArmDrift(modulesRoot string, fset *token.FileSet, strict bool)
 				if _, isGated := gated[w.table]; !isGated {
 					continue
 				}
-				arm, found := armFor(tripwire.TripwireArms, w.table, w.op)
+				armCaps, found := unionArmCapsFor(tripwire.TripwireArms, w.table, w.op)
 				if !found {
 					// Gated table but no arm matches this exact op (e.g. a DELETE
 					// against a table only gated for INSERT/UPDATE by the contract's
-					// 18 entries) — not this rule's concern; the DB trigger's own
+					// entries) — not this rule's concern; the DB trigger's own
 					// CASE branches are the runtime source of truth for op coverage.
 					continue
 				}
-				if !anyCapInArm(caps, arm.Caps) {
+				if !anyCapInArm(caps, armCaps) {
 					out = append(out, Violation{
 						File: path,
 						Line: w.line,
 						Rule: "TRIPWIRE-ARM-DRIFT",
 						Message: fmt.Sprintf(
 							"function %s asserts capabilities %s and writes gated table %s (op %s), but none of the asserted caps are in TripwireArms[%s,%s]=%s; the DB tripwire will reject this write with P0001 for every actor — widen the arm in internal/platform/tripwire/arms.go or assert an arm-member capability",
-							fn.Name.Name, capListString(caps), w.table, w.op, w.table, w.op, capListString(arm.Caps),
+							fn.Name.Name, capListString(caps), w.table, w.op, w.table, w.op, capListString(armCaps),
 						),
 					})
 				}

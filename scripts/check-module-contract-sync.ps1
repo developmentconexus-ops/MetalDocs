@@ -49,13 +49,13 @@ function New-ModuleConfig {
         'approval' {
             return @{
                 ModuleName = 'approval'
-                RuntimeFile = 'internal/modules/documents/approval/http/router.go'
-                RuntimeOwnerFiles = @('internal/modules/documents/approval/http/router.go')
+                RuntimeFile = 'internal/modules/approval/http/router.go'
+                RuntimeOwnerFiles = @('internal/modules/approval/http/router.go')
                 RuntimePatterns = @('/api/v1/approval/inbox', '/api/v1/documents/{id}/signoff', '/api/v1/approval/routes', 'approvalapi.ServerInterfaceWrapper')
                 RuntimeForbiddenPatterns = @('h.SubmitHandler', 'h.SignoffHandler', 'h.PublishHandler', 'h.SchedulePublishHandler')
                 OpenApiFile = 'api/openapi/v1/openapi.yaml'
                 OpenApiPatterns = @('/api/v1/approval/inbox:', '/api/v1/documents/{id}/signoff:', '/api/v1/documents/{id}/cancel:', '/api/v1/approval/routes:')
-                BackendFile = 'internal/modules/documents/approval/api/api.gen.go'
+                BackendFile = 'internal/modules/approval/api/api.gen.go'
                 BackendPatterns = @('ListApprovalInbox', 'ListApprovalRoutes', 'CreateApprovalRoute')
                 FrontendTypesFile = 'frontend/apps/web/src/lib/api-types/index.d.ts'
                 FrontendTypesPatterns = @('"/api/v1/approval/inbox":', '"/api/v1/documents/{id}/signoff":', '"/api/v1/documents/{id}/cancel":', '"/api/v1/approval/routes":')

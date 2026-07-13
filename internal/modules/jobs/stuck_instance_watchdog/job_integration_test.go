@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"metaldocs/internal/modules/documents/approval/application"
+	"metaldocs/internal/modules/approval/application"
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/tests/integration/testdb"
 )

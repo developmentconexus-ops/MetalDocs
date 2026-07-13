@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 
+	approvalapp "metaldocs/internal/modules/approval/application"
+	approvaldomain "metaldocs/internal/modules/approval/domain"
 	iamauthz "metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/modules/templates/domain"
 	"metaldocs/internal/platform/problem"
@@ -31,6 +33,15 @@ const (
 	codeTplInvalidBody            = problem.CodeValidationError
 	codeTplInvalidLimit           = problem.CodeValidationError
 	codeTplInvalidParam           = problem.CodeValidationError
+
+	// Approval-kernel entry point codes (M3 P3.S2b-4, R2a): the thin
+	// submit-for-approval/signoff handlers delegate to
+	// approval/application's kernel services and classify the published
+	// (application-layer) error surface here — never approval/infrastructure,
+	// per the module-boundary allow-model.
+	codeTplApprovalRouteMissing = problem.CodeApprovalRouteMissing
+	codeTplApprovalConflict     = problem.CodeConflict
+	codeTplApprovalNotFound     = problem.CodeNotFound
 )
 
 // MapErr translates a domain/application error from the templates module into
@@ -81,6 +92,32 @@ func MapErr(err error) (httpStatus int, code problem.Code) {
 		return http.StatusUnprocessableEntity, codeTplPlaceholderNameInvalid
 	case errors.Is(err, domain.ErrDuplicatePlaceholderName):
 		return http.StatusUnprocessableEntity, codeTplDuplicatePlaceholder
+	case errors.Is(err, approvalapp.ErrTemplateVersionNotFound):
+		return http.StatusNotFound, codeTplApprovalNotFound
+	case errors.Is(err, approvalapp.ErrTemplateVersionNotDraft):
+		return http.StatusConflict, codeTplApprovalConflict
+	case errors.Is(err, approvalapp.ErrNoActiveApprovalRoute):
+		return http.StatusConflict, codeTplApprovalRouteMissing
+	case errors.Is(err, approvalapp.ErrDuplicateSubmission):
+		return http.StatusConflict, codeTplApprovalConflict
+	case errors.Is(err, approvalapp.ErrNoActiveInstance):
+		return http.StatusNotFound, codeTplApprovalNotFound
+	case errors.Is(err, approvalapp.ErrInstanceCompleted):
+		return http.StatusConflict, codeTplApprovalConflict
+	case errors.Is(err, approvalapp.ErrStageNotActive):
+		return http.StatusConflict, codeTplApprovalConflict
+	case errors.Is(err, approvalapp.ErrContentHashMismatch):
+		return http.StatusConflict, codeTplContentHashMismatch
+	case errors.Is(err, approvalapp.ErrIdempotencyKeyRequired):
+		return http.StatusBadRequest, problem.CodeIdempotencyKeyRequired
+	case errors.Is(err, approvaldomain.ErrEmptyEligiblePool):
+		return http.StatusUnprocessableEntity, codeTplApprovalConflict
+	case errors.Is(err, approvaldomain.ErrNoActiveStage):
+		return http.StatusConflict, codeTplApprovalConflict
+	case errors.Is(err, approvaldomain.ErrActorNotEligible):
+		return http.StatusForbidden, problem.CodeForbiddenCapability
+	case errors.Is(err, approvaldomain.ErrAuthorCannotSign):
+		return http.StatusForbidden, problem.CodeForbiddenCapability
 	default:
 		return http.StatusInternalServerError, codeTplInternalError
 	}

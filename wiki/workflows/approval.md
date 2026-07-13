@@ -1,14 +1,14 @@
 # Workflow: Approval
 
-> **Last verified:** 2026-07-01 (CON-01 grade-A simplification: `POST /documents/{id}/finalize` — still the route the editor's **Finalizar** button calls, per the Quick summary below — is now a deprecated convenience wrapper; `POST /documents/{id}/submit` is canonical (DEC-01). `If-Match` is now mandatory on finalize (OCC parity with submit). The atomic finalize+submit behavior described below is unchanged, since finalize still converges on the same `SubmitRevisionForReview` call.) | prior: 2026-06-08 (Phase F F8: finalizeDocument line anchor updated :423 → :435; CheckReplay note replaced with BeginReplay)
+> **Last verified:** 2026-07-12 (M3 approval-kernel-extraction path fix: `internal/modules/documents/approval/` → `internal/modules/approval/` — approval promoted to the top-level 15th module, [ADR 0082](../decisions/0082-approval-kernel-extraction.md); anchors re-pointed with re-verified line numbers — `resolveEligibleActors` is now the repo method `ResolveEligibleActors(ctx, tx, tenantID, areaCode, requiredRole)`, call site + interface + Postgres impl anchors below all corrected) | prior: 2026-07-01 (CON-01 grade-A simplification: `POST /documents/{id}/finalize` — still the route the editor's **Finalizar** button calls, per the Quick summary below — is now a deprecated convenience wrapper; `POST /documents/{id}/submit` is canonical (DEC-01). `If-Match` is now mandatory on finalize (OCC parity with submit). The atomic finalize+submit behavior described below is unchanged, since finalize still converges on the same `SubmitRevisionForReview` call.) | prior: 2026-06-08 (Phase F F8: finalizeDocument line anchor updated :423 → :435; CheckReplay note replaced with BeginReplay)
 > **Scope:** Submit → route assignment → signoffs → approval condition met → freeze trigger.
 > **Out of scope:** Freeze pipeline (see `workflows/freeze-and-fanout.md`), route admin (see `modules/approval.md`).
 > **Key files:**
 > - `internal/modules/documents/delivery/http/handler.go:435` — `finalizeDocument` — atomic finalize+submit handler
-> - `internal/modules/documents/approval/application/submit_service.go:140` — `resolveEligibleActors` call inside stage-instance loop
-> - `internal/modules/documents/approval/application/submit_service.go:299` — `resolveEligibleActors` implementation (queries `metaldocs.user_process_areas`)
-> - `internal/modules/documents/approval/http/doc_approval_handler.go:51` — `SignoffByDocumentHandler` with idempotency replay
-> - `internal/modules/documents/approval/infrastructure/postgres_signoff_idemp_store.go:1` — `PostgresSignoffIdempStore`
+> - `internal/modules/approval/application/submit_service.go:230` — `ResolveEligibleActors` call site inside stage-instance loop
+> - `internal/modules/approval/infrastructure/postgres_approval_repository.go:1777` — `ResolveEligibleActors` Postgres impl (queries `metaldocs.user_process_areas`, area-blind for template stages per M3)
+> - `internal/modules/approval/http/doc_approval_handler.go:87` — `SignoffByDocumentHandler` with idempotency replay
+> - `internal/modules/approval/infrastructure/idempotency/postgres_signoff_idemp_store.go:59` — `PostgresSignoffIdempStore`
 
 ## Quick summary
 
@@ -36,9 +36,9 @@ Now `finalizeDocument` at `handler.go:435`:
 
 ## eligible_actor_ids populated at submit time (fixed 2026-05-02)
 
-**File:** `internal/modules/documents/approval/application/submit_service.go:299`
+**File:** `internal/modules/approval/infrastructure/postgres_approval_repository.go:1777` (`ResolveEligibleActors`, called from `application/submit_service.go:230`)
 
-`resolveEligibleActors` now queries `metaldocs.user_process_areas` to find all users holding `required_role` in `area_code` as of `now()`. The result is stored in `approval_stage_instances.eligible_actor_ids` so the inbox filter can match the calling approver's user ID.
+`ResolveEligibleActors` now queries `metaldocs.user_process_areas` to find all users holding `required_role` in `area_code` as of `now()`. The result is stored in `approval_stage_instances.eligible_actor_ids` so the inbox filter can match the calling approver's user ID.
 
 No DB patch is needed for new submissions. Existing stage instances created before this fix still have `[]` and may need manual patching (see historic workaround below) or re-submission.
 
@@ -61,8 +61,8 @@ WHERE id = '<stage_id>';
 ## Signoff idempotency (fixed 2026-05-02)
 
 **Files:**
-- `internal/modules/documents/approval/http/doc_approval_handler.go:51` — `SignoffByDocumentHandler`
-- `internal/modules/documents/approval/infrastructure/postgres_signoff_idemp_store.go:1` — `PostgresSignoffIdempStore`
+- `internal/modules/approval/http/doc_approval_handler.go:87` — `SignoffByDocumentHandler`
+- `internal/modules/approval/infrastructure/idempotency/postgres_signoff_idemp_store.go:59` — `PostgresSignoffIdempStore`
 
 `SignoffByDocumentHandler` now requires an `Idempotency-Key` request header. Before calling the domain:
 
@@ -72,7 +72,7 @@ WHERE id = '<stage_id>';
 
 Previously a duplicate POST after instance close returned HTTP 500. Now it returns `was_replay:true`.
 
-`NewHandler` in `internal/modules/documents/approval/http/handler.go:65` accepts `signoffIdempStore` as a positional parameter. Pass `nil` to disable idempotency (not recommended outside tests).
+`NewHandler` in `internal/modules/approval/http/handler.go:135` accepts `signoffIdempStore` as a positional parameter. Pass `nil` to disable idempotency (not recommended outside tests).
 
 Migration `0160` grants `metaldocs_app` SELECT/INSERT/UPDATE on `metaldocs.idempotency_keys`. Without this migration the store returns a Postgres permission error.
 
@@ -87,7 +87,7 @@ Migration `0160` grants `metaldocs_app` SELECT/INSERT/UPDATE on `metaldocs.idemp
 - Author can immediately open the document, edit, and call finalize again → new approval round (prior signoff history preserved on the old instance).
 - Author notification mechanism TBD (email? in-app?).
 
-**File:** `internal/modules/documents/approval/application/decision_service.go:319` — `QuorumRejectedStage` branch.
+**File:** `internal/modules/approval/application/decision_service.go:608` — `QuorumRejectedStage` branch (line re-verified 2026-07-12, was `:319` pre-M3 relocate; content shifted from unrelated changes, not the relocate itself).
 
 ## Edge cases (TBD)
 

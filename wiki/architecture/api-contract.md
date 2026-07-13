@@ -111,7 +111,7 @@ The handler struct (`*Handler`) implements `ServerInterface`; the generated `Han
 
 oapi-codegen does **not** enforce:
 
-- **Unknown fields:** Use `strictjson.Decode` from `internal/platform/strictjson/strictjson.go:25` (moved from module-local `internal/modules/documents/approval/http/contracts/strictjson.go`, a platform-package extraction predating and unrelated to F9.5). It sets `decoder.DisallowUnknownFields()`. Call it instead of `json.NewDecoder(r.Body).Decode(...)` at handler boundaries.
+- **Unknown fields:** Use `strictjson.Decode` from `internal/platform/strictjson/strictjson.go:25` (moved from module-local `internal/modules/approval/http/contracts/strictjson.go` — path corrected M3 2026-07-12, approval promoted to a top-level module; a platform-package extraction predating and unrelated to F9.5). It sets `decoder.DisallowUnknownFields()`. Call it instead of `json.NewDecoder(r.Body).Decode(...)` at handler boundaries.
 - **Required fields:** oapi-codegen generates pointer fields for optional and value fields for required, but does not produce 400 responses for missing required fields at runtime. Handlers must check explicitly (e.g., `missingAtomicCreateField` at `internal/modules/controlleddocuments/delivery/http/routes.go:162`, called at `:90`; was cited `:102`, drift predates F9.5).
 
 ---
@@ -157,11 +157,11 @@ honest gate therefore measures in two parts:
 **Scope — the FULL public-route surface, not just `delivery/http/`.** The M8 re-audit (4th miss)
 proved the path-scoped grep was blind to public routes registered OUTSIDE `internal/modules/*/delivery/http/`
 — presence (`internal/modules/iam/presence/`), metrics/health (`internal/platform/observability/`), and
-the approval HTTP package (`internal/modules/documents/approval/http/`). The gate now covers every package
+the approval HTTP package (`internal/modules/approval/http/` — path corrected M3 2026-07-12, approval promoted to a top-level module). The gate now covers every package
 that registers a public route:
 
 ```bash
-ROUTE_PATHS='internal/modules/*/delivery/http/ internal/modules/documents/approval/http/ internal/modules/iam/presence/ internal/platform/observability/'
+ROUTE_PATHS='internal/modules/*/delivery/http/ internal/modules/approval/http/ internal/modules/iam/presence/ internal/platform/observability/'
 
 # Part A — necessary (the one-liner). Must be 0. Any map[string]<T>, not just any.
 grep -rEn 'write(JSON|FillInJSON)|WriteJSON' $ROUTE_PATHS --include='*.go' | grep -v _test.go | grep -E 'map\[string\]'

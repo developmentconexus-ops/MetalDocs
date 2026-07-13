@@ -16,9 +16,9 @@ import (
 	"errors"
 	"testing"
 
-	"metaldocs/internal/modules/documents/approval/application"
-	"metaldocs/internal/modules/documents/approval/domain"
-	"metaldocs/internal/modules/documents/approval/infrastructure"
+	"metaldocs/internal/modules/approval/application"
+	"metaldocs/internal/modules/approval/domain"
+	"metaldocs/internal/modules/approval/infrastructure"
 	docsapp "metaldocs/internal/modules/documents/application"
 	iampostgres "metaldocs/internal/modules/iam/infrastructure/postgres"
 	"metaldocs/internal/platform/db"
@@ -26,7 +26,7 @@ import (
 )
 
 // fakePinInvoker is a no-op application.PinInvoker, mirroring the identical
-// fake in internal/modules/documents/approval/application/decision_service_freeze_test.go.
+// fake in internal/modules/approval/application/decision_service_freeze_test.go.
 // The signoff leg's async-freeze seam (ADR 0015) requires a PinInvoker to be
 // wired before RecordSignoff's instance-approved branch runs; a no-op is
 // sufficient here since these tests assert approval's OWN frozen_content_hash

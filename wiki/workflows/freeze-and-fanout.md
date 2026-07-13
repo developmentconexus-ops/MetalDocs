@@ -1,10 +1,10 @@
 # Workflow: Freeze and Fanout
 
-> **Last verified:** 2026-07-02 (anchor refresh: PDF `StagingOutboxWorker` instance now wired at `main.go:960` via `startOutboxWorkers`, `main.go:945`) | **Prior:** 2026-07-01 (APP-01: post-commit `PDFDispatcher`/`PDFDispatchAdapter` deleted — PDF dispatch is outbox-only: `DecisionService` enqueues `pdf_dispatch_outbox` in-tx, `StagingOutboxWorker` publishes `docgen_v2_pdf`), 2026-06-08 (Phase F F8: legacyFanout param removed from NewFreezeService)
+> **Last verified:** 2026-07-12 (M3 approval-kernel-extraction path fix: `internal/modules/documents/approval/` → `internal/modules/approval/`; `decision_service.go` PDF-enqueue anchor corrected `:535`→`:731`, symbol corrected `pdfOutbox.Enqueue`→`s.pdfDispatch.EnqueuePDFTx`) | **Prior:** 2026-07-02 (anchor refresh: PDF `StagingOutboxWorker` instance now wired at `main.go:960` via `startOutboxWorkers`, `main.go:945`) | **Prior:** 2026-07-01 (APP-01: post-commit `PDFDispatcher`/`PDFDispatchAdapter` deleted — PDF dispatch is outbox-only: `DecisionService` enqueues `pdf_dispatch_outbox` in-tx, `StagingOutboxWorker` publishes `docgen_v2_pdf`), 2026-06-08 (Phase F F8: legacyFanout param removed from NewFreezeService)
 > **Scope:** The full pipeline from signoff approval → computed value resolution → DOCX substitution → frozen artifact stored in S3 → async PDF generation via outbox worker.
 > **Out of scope:** Approval routing and signoff rules (see `workflows/approval.md`), editor-side substitution deferral (see `modules/editor-ui-eigenpal.md`).
 > **Key files:**
-> - `internal/modules/documents/approval/application/decision_service.go` — triggers freeze on signoff
+> - `internal/modules/approval/application/decision_service.go` — triggers freeze on signoff (M3 2026-07-12: approval promoted to top-level 15th module, [ADR 0082](../decisions/0082-approval-kernel-extraction.md); path was `internal/modules/documents/approval/`)
 > - `internal/modules/documents/application/freeze_service.go` — FreezeService.Freeze orchestration
 > - `internal/modules/documents/application/context_builder.go` — builds resolver input context
 > - `internal/modules/render/fanout/client.go` — HTTP client calling docgen-v2
@@ -146,7 +146,7 @@ After step 17, `GET /api/v1/documents/{id}/view` returns `{"pdf_status":"ready",
 - `apps/api/cmd/metaldocs-api/main.go:960` — wires the PDF `StagingOutboxWorker` (publisher + `PDFConvertPayload` buildEvent closure)
 - `internal/modules/render/fanout/staging_outbox.go` — `StagingOutboxRepository`: in-tx `Enqueue` into `pdf_dispatch_outbox`
 - `internal/modules/render/fanout/staging_outbox_worker.go` — `StagingOutboxWorker`: polls staging outbox, publishes `docgen_v2_pdf`
-- `internal/modules/documents/approval/application/decision_service.go:535` — in-tx `pdfOutbox.Enqueue` call (APP-01: `PDFDispatchInvoker` post-commit surface deleted)
+- `internal/modules/approval/application/decision_service.go:731` — in-tx `s.pdfDispatch.EnqueuePDFTx` call (APP-01: `PDFDispatchInvoker` post-commit surface deleted; path+symbol+line corrected M3 2026-07-12, was `documents/approval/...decision_service.go:535` calling `pdfOutbox.Enqueue`)
 - `internal/platform/worker/pdf_job_runner.go` — `PDFJobRunner`: handles `docgen_v2_pdf` events end-to-end
 - `internal/platform/worker/service.go` — routes `docgen_v2_pdf` to `PDFJobRunner`
 - `internal/platform/bootstrap/worker.go` — builds `DocgenV2Client` + exposes `SQLDB` in `WorkerDependencies`

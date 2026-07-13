@@ -73,7 +73,7 @@ func (h *Handler) WithExporter(exporter AuditExporter) *Handler {
 // pattern (internal/modules/controlleddocuments/delivery/http/handler.go)
 // and the templates/approval CON-03 migrations
 // (internal/modules/templates/delivery/http/handler.go,
-// internal/modules/documents/approval/http/router.go).
+// internal/modules/approval/http/router.go).
 //
 // Audit has no per-route Idempotency-Key requirement (list is a GET, export
 // creates a job but the spec does not mark it idempotent), so no Middlewares

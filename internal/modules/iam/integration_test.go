@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"metaldocs/internal/modules/documents/approval/infrastructure"
+	"metaldocs/internal/modules/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/tenant"
 

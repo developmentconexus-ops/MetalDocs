@@ -13,21 +13,21 @@ import (
 	"syscall"
 	"time"
 
+	approvalapp "metaldocs/internal/modules/approval/application"
+	approvalhttp "metaldocs/internal/modules/approval/http"
+	approvalrepo "metaldocs/internal/modules/approval/infrastructure"
+	approvalinfra "metaldocs/internal/modules/approval/infrastructure/idempotency"
+	approvaljobs "metaldocs/internal/modules/approval/jobs"
 	auditdomain "metaldocs/internal/modules/audit/domain"
 	documents "metaldocs/internal/modules/documents"
 	docapp "metaldocs/internal/modules/documents/application"
-	approvalapp "metaldocs/internal/modules/documents/approval/application"
-	approvalhttp "metaldocs/internal/modules/documents/approval/http"
-	approvalinfra "metaldocs/internal/modules/documents/approval/infrastructure/idempotency"
-	approvaljobs "metaldocs/internal/modules/documents/approval/jobs"
-	approvalrepo "metaldocs/internal/modules/documents/approval/infrastructure"
-	"metaldocs/internal/modules/documents/jobs"
 	docrepo "metaldocs/internal/modules/documents/infrastructure"
+	"metaldocs/internal/modules/documents/jobs"
 	"metaldocs/internal/modules/jobs/maintenance"
 	templatesapp "metaldocs/internal/modules/templates/application"
 	templateshttp "metaldocs/internal/modules/templates/delivery/http"
-	templatejobs "metaldocs/internal/modules/templates/jobs"
 	templatesrepo "metaldocs/internal/modules/templates/infrastructure"
+	templatejobs "metaldocs/internal/modules/templates/jobs"
 
 	"metaldocs/apps/api/internal/wiring"
 	auditapp "metaldocs/internal/modules/audit/application"
@@ -639,6 +639,14 @@ func main() {
 	// adapter reads through the taxonomy profileRepo (own short tx, CapTaxonomyView,
 	// H-PRE-1). The DB deferrable trigger remains the authoritative last line.
 	approvalServices = approvalServices.WithProfilePolicyReader(approvalrepo.NewProfilePolicyReader(profileRepo))
+	// M3 P3.S2b-3b-ii: wire the approval-owned TemplateVersionReader port to
+	// the templates-side adapter. approval never imports templates
+	// infrastructure beyond this narrow interface satisfaction.
+	approvalServices = approvalServices.WithTemplateVersionReader(templatesinfra.NewApprovalVersionReader())
+	// M3 P3.S2b-3b-iii-b: wire the approval-owned TemplateCompletionWriter
+	// port to the templates-side adapter — the ONLY seam a terminal
+	// template-subject signoff decision crosses into templates_template_version.
+	approvalServices = approvalServices.WithTemplateCompletionWriter(templatesinfra.NewApprovalCompletionWriter())
 	jobsCfg, err := config.LoadJobsConfig()
 	if err != nil {
 		slog.Error("invalid jobs config", "err", err)
@@ -750,6 +758,11 @@ func main() {
 		deps.Cleanup()
 		os.Exit(1)
 	}
+	// M3 P3.S2b-4 (R2a): wire the approval kernel's published services into
+	// the templates HTTP handler so its two thin kernel routes
+	// (submit-for-approval, signoff) can delegate. Must happen after
+	// approvalServices.Decision is finalized above (line ~737-741).
+	templatesModule.WithApprovalKernel(approvalServices.TemplateSubmit, approvalServices.Decision, approvalServices.Read, db.NewTxRunner(deps.SQLDB))
 	templatesModule.Register(mux)
 	signoffIdempStore := approvalinfra.NewPostgresSignoffIdempStore(deps.SQLDB)
 	routeAdminIdempStore := approvalinfra.NewPostgresRouteAdminIdempStore(deps.SQLDB)
