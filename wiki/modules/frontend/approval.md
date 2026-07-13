@@ -50,7 +50,7 @@ The cockpit (`/approvals/:documentId`) unifies review, redline, and signoff in a
 
 ## 5. API endpoints consumed
 
-Backend owner: `internal/modules/documents/approval/http/router.go` (16 routes — see backend [`approval.md` §5.3](../approval.md)). Frontend wrappers in `approvalApi.ts`:
+Backend owner: `internal/modules/approval/http/router.go` (now the top-level 15th module, [ADR 0082](../../decisions/0082-approval-kernel-extraction.md) — see backend [`approval.md` §5.3](../approval.md)). Frontend wrappers in `approvalApi.ts`:
 
 | FE call | Backend route |
 |---|---|

@@ -1,13 +1,13 @@
 # Concept: Approval Routes
 
-> **Last verified:** 2026-07-06 (anchor refresh: route.go:39→41, Validate :48→50; drift.go/db baseline/ADR refs re-checked, unchanged)
+> **Last verified:** 2026-07-12 (M3 approval-kernel-extraction path fix: `internal/modules/documents/approval/` → `internal/modules/approval/` — approval promoted to the top-level 15th module, [ADR 0082](../decisions/0082-approval-kernel-extraction.md); a route's governance target generalized from document-only to subject-generic `Route.Subject{Kind, Key}` — see `wiki/modules/approval.md` §12 Glossary "Subject"; `route.go`/`drift.go` anchors re-verified with fresh line numbers)
 > **Status:** Canonical concept doc.
 > **Scope:** Plain-language explanation of approval routes, stages, quorum kinds, drift policies, and the route lifecycle. Reader audience: anyone who needs to *understand* the route catalogue without reading service code.
-> **Out of scope:** Per-instance signoff runtime (see `wiki/modules/approval.md` §6). Quorum evaluation math edge cases (see `internal/modules/documents/approval/domain/quorum.go` and `drift.go`). HTTP contract (see [`wiki/decisions/0018-approval-route-lifecycle.md`](../decisions/0018-approval-route-lifecycle.md) and OpenAPI).
+> **Out of scope:** Per-instance signoff runtime (see `wiki/modules/approval.md` §6). Quorum evaluation math edge cases (see `internal/modules/approval/domain/quorum.go` and `drift.go`). HTTP contract (see [`wiki/decisions/0018-approval-route-lifecycle.md`](../decisions/0018-approval-route-lifecycle.md) and OpenAPI).
 > **Key files:**
-> - `internal/modules/documents/approval/domain/route.go:41` — `Route` aggregate, `Stage` value object, `Validate` (:50)
-> - `internal/modules/documents/approval/domain/quorum.go` — quorum evaluation
-> - `internal/modules/documents/approval/domain/drift.go:17` — `ApplyEligibilityDrift`
+> - `internal/modules/approval/domain/route.go:69` — `Route` aggregate, `Stage` value object (`:55`), `Validate` (`:103`)
+> - `internal/modules/approval/domain/quorum.go` — quorum evaluation
+> - `internal/modules/approval/domain/drift.go:17` — `ApplyEligibilityDrift`
 > - `db/baseline/0001_current_schema.sql:1865` — `approval_routes` table
 > - [`wiki/decisions/0018-approval-route-lifecycle.md`](../decisions/0018-approval-route-lifecycle.md) — lifecycle ADR
 > - [`wiki/decisions/0007-two-tier-authz.md`](../decisions/0007-two-tier-authz.md) — authz model the required-capability pin participates in
@@ -113,7 +113,7 @@ A tenant configures a route for `profile_code = "engineering-procedure"`:
 
 - **Eligibility snapshot (J1):** routes *declare* who is eligible by role + area + cap; the snapshot at submit *materializes* the actor list. See `wiki/workflows/approval.md` §J1.
 - **SoD:** the submitter cannot sign any stage of their own submission, independent of the route's role/cap config. See [`iso-segregation.md`](iso-segregation.md).
-- **Authz tiers:** all route admin operations — including the `GET /api/v1/approval/routes` list read — require `cap:route.manage` at both tier-1 and tier-2 (`apps/api/cmd/metaldocs-api/permissions.go:228-240`, `internal/modules/documents/approval/application/route_admin_service.go`). ADR 0018 §6 originally proposed a Tier-1 read/write split introducing `route.view`; ADR 0022 Phase 11 (F4) superseded that plan and unified tier-1/tier-2 on `route.manage` instead, closing the divergence at the root. See [`authz-tiers.md`](authz-tiers.md) "Tier-1 rule authoring rules" and [`wiki/decisions/0018-approval-route-lifecycle.md`](../decisions/0018-approval-route-lifecycle.md) §6.
+- **Authz tiers:** all route admin operations — including the `GET /api/v1/approval/routes` list read — require `cap:route.manage` at both tier-1 and tier-2 (`apps/api/cmd/metaldocs-api/permissions.go:228-240`, `internal/modules/approval/application/route_admin_service.go`). ADR 0018 §6 originally proposed a Tier-1 read/write split introducing `route.view`; ADR 0022 Phase 11 (F4) superseded that plan and unified tier-1/tier-2 on `route.manage` instead, closing the divergence at the root. See [`authz-tiers.md`](authz-tiers.md) "Tier-1 rule authoring rules" and [`wiki/decisions/0018-approval-route-lifecycle.md`](../decisions/0018-approval-route-lifecycle.md) §6.
 
 ## See also
 

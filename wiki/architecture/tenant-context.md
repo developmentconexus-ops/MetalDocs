@@ -1,6 +1,6 @@
 ﻿# Architecture: Session-Bound Tenant Context
 
-> **Last verified:** 2026-07-03 (M3 tenancy chokepoint: §4 middleware block now covers the F3.1 actor-carrier
+> **Last verified:** 2026-07-12 (approval-remediation M3 path fix, §6 table: `documents/approval/http/handler.go` → `internal/modules/approval/http/handler.go`, ADR 0082 — distinct from the "GMR M3 tenancy chokepoint" milestone in the entry below) | **Prior:** 2026-07-03 (GMR M3 tenancy chokepoint: §4 middleware block now covers the F3.1 actor-carrier
 > injection; added §9 RLS backstop & GUC seeding summary; corrected the stale "RLS tracked as tech debt"
 > out-of-scope line below — row-level Postgres isolation is live, not deferred)
 > **Prior:** 2026-06-08 (Phase F: controlled-documents injectTenant anchor :50 → :49)
@@ -164,7 +164,7 @@ All of the following now call `tenant.FromContext` (or a thin wrapper over it) i
 | templates | `templates/delivery/http/handler.go:83` | `tenantIDFromReq`     `tenant.FromContext` |
 | taxonomy | `taxonomy/delivery/http/routes_profiles.go:230` | `tenantIDFromRequest`     `tenant.FromContext` |
 | documents | `documents/delivery/http/handler.go` | `tenant.FromContext` |
-| documents/approval | `documents/approval/http/handler.go` | `tenant.FromContext` |
+| approval | `internal/modules/approval/http/handler.go` | `tenant.FromContext` (M3 2026-07-12: approval promoted to top-level 15th module, [ADR 0082](../decisions/0082-approval-kernel-extraction.md); path was `documents/approval/http/handler.go`) |
 | documents | `documents/http/fillin_handler.go` | `tenant.FromContext` |
 | documents | `documents/http/placeholder_options_handler.go` | `tenant.FromContext` |
 | documents | `documents/http/reconstruct_handler.go` | `tenant.FromContext` |

@@ -41,6 +41,11 @@
 | P3.S3 config→route migration | 2026-07-12 | main (scout) | — | NO-OP: 0 configs (R4/P3.S1); `templates_approval_config(template_id PK, reviewer_role, approver_role)` has inbound FK→templates_template, ZERO outbound dependents → clean DROP folded into #11 behind pre-drop emptiness assert; no ceremonial empty migration | (evidence) | DONE (folded→#11) |
 | P3.S4 retire parallel path | 2026-07-12 | main (scout+verify) | operator decision | STOP — 2 verified blockers: (1) role model shared by CreateTemplate (create.go:83 seeds roles + writes table) + PublishTemplateVersion (lifecycle.go:421-427 role-SoD) → table not droppable; (2) FE has 0 kernel consumer → delete 404s UI. Operator ratified Option A: **DEFER retirement to sequenced M4**. No deletion in M3. Recorded in ADR 0082 §Transitional coexistence | (ADR 0082 note) | DEFERRED→M4 |
 
+### #14 pre-close testdb hygiene (2026-07-12)
+- **Rebuild template = automatic per-run:** `tests/integration/testdb/db.go` uses a per-process template `metaldocs_test_template_<pid>` rebuilt via `rebuildTemplateDatabase` on first `Open` (drop stale → CREATE → `ApplyCuratedBootstrap` = prerequisites + baseline + reference-data + **all** `db/migrations/*` incl. 0296–0300 + River schema). No persistent cross-run cache → no stale-template drift possible; every integration run re-applies M3 migrations fresh.
+- **Orphan drop:** the per-pid template DB persists after its process exits (only per-test clones self-drop in `t.Cleanup`), so templates accumulate. Found **144** orphan `metaldocs_test%` DBs in `metaldocs-postgres`; dropped all (`DROP DATABASE ... WITH (FORCE)` after backend terminate); **0 remaining**. No active run affected.
+- **Flagged (out of M3 scope):** the per-pid template is never dropped at process exit → recurring orphan accumulation (144 in ~4h dev use). Spawned as a separate hygiene task (testdb template-leak).
+
 ## Gate results (fill per slice)
 
 ### P1.S2 finding — audit edge was a FALSE POSITIVE
