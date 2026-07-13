@@ -873,6 +873,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/templates/{id}/versions/{n}/approval-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview the resolved active approval route for a template version
+         * @description Read-only, submitter-scoped preview (SLICE 8a, unit 3.2): resolves the template's active approval route (ROUTE.subject_key = template id, same governance selector submit-for-approval resolves against) before the caller actually submits, so the client can build a chosen_actors picker for any submit_choice-governed stage. route_id is null and stages is empty when no active route resolves yet.
+         */
+        get: operations["getTemplateVersionApprovalPreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/templates/{id}/versions/{n}/signoff": {
         parameters: {
             query?: never;
@@ -1669,6 +1689,26 @@ export interface paths {
          * @description Canonical draft→under_review submission endpoint (DEC-01, ADR 0073). The sole submit entrypoint: the deprecated /documents/{id}/finalize wrapper was removed. route_id and content_hash are optional — when omitted the server resolves the active route for the document's profile and the head revision's content hash inside the same transaction (closing the wrapper-era TOCTOU between prereq read and submit).
          */
         post: operations["submitDocumentForApproval"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/documents/{id}/approval-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview the resolved active approval route for a document
+         * @description Read-only, submitter-scoped preview (SLICE 8a, unit 3.2): resolves the document's active approval route the same way POST .../submit would (ADR 0073), before the caller actually submits, so the client can build a chosen_actors picker for any submit_choice-governed stage. Never mutates state and enforces no If-Match/Idempotency-Key precondition. route_id is null and stages is empty when no active route resolves yet for the document's profile — informational absence, not an error; submit-time resolution remains the sole authority.
+         */
+        get: operations["getDocumentApprovalPreview"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3724,6 +3764,24 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        ApprovalRoutePreviewStage: {
+            stage_order: number;
+            /** @description The stage's configured name. */
+            label: string;
+            /** @description M4 ActorSelector (unit 3.2). Reused verbatim from StageSummary — the same discriminated union a submit_choice picker inspects to learn a stage's role/area_code constraint before the caller supplies chosen_actors. */
+            selectors: components["schemas"]["ActorSelector"][];
+        };
+        ApprovalRoutePreview: {
+            /**
+             * Format: uuid
+             * @description The resolved active route's id, or null when no active approval route resolves for this subject yet. Informational only — submit-time resolution (ADR 0073 / ADR 0082) remains the sole authority; a null here does not guarantee submit will also fail (a route could be activated concurrently) and a non-null id does not guarantee submit will succeed (e.g. a concurrently deactivated route).
+             */
+            route_id: string | null;
+            /** @description The resolved route's configured display name; null when route_id is null. */
+            route_name: string | null;
+            /** @description Empty when route_id is null. */
+            stages: components["schemas"]["ApprovalRoutePreviewStage"][];
+        };
         CreateRouteRequest: {
             profile_code: string;
             name: string;
@@ -5435,6 +5493,33 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getTemplateVersionApprovalPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                n: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalRoutePreview"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -7224,6 +7309,32 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["UnprocessableEntity"];
             428: components["responses"]["PreconditionRequired"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getDocumentApprovalPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalRoutePreview"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalServerError"];
         };
     };

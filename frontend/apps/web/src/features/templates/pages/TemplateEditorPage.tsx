@@ -19,9 +19,16 @@ import {
   AutosaveStatus,
   type AutosaveState,
 } from '../../shared/components/editor-chrome';
-import { StatusPill, type DocumentStatus } from '../../../components/ui';
+import { Dialog, StatusPill, type DocumentStatus } from '../../../components/ui';
 import { resolveQueryError } from '../../../lib/api';
 import { formatRevisionCode } from '../../../lib/labels/revisionCode';
+import { useTemplateVersionApprovalPreviewQuery } from '../queries/useTemplateVersionApprovalPreviewQuery';
+import {
+  SubmitChoicePicker,
+  isSubmitChoiceSelectionComplete,
+  submitChoiceStagesOf,
+  type SubmitChosenActors,
+} from '../../approval/components/SubmitChoicePicker';
 import styles from './styles/TemplateEditorPage.module.css';
 
 export type TemplateEditorPageProps = {
@@ -74,6 +81,23 @@ export function TemplateEditorPage({
 
   const currentVersion = liveVersion ?? draft.version ?? null;
   const isDraft = currentVersion?.status === 'draft';
+
+  // SLICE 8b (unit 3.2) — submit-time preview mirrors the document workspace
+  // flow: resolves the template version's active approval route so a
+  // submit_choice-governed stage can be given chosen_actors BEFORE the actual
+  // POST .../submit-for-approval. Enabled only while the version is a draft
+  // (the only state submit is offered from).
+  const approvalPreviewQuery = useTemplateVersionApprovalPreviewQuery(templateId, versionNum, isDraft);
+  const submitChoiceStages = submitChoiceStagesOf(approvalPreviewQuery.data);
+  // Race guard (review MAJOR): submitChoiceStagesOf(undefined) is [] while the
+  // preview is still loading, which would let submit fire with chosen_actors
+  // omitted and hit a backend 422 for a submit_choice route. Block submit for
+  // a draft until the preview resolves. UX gating only — backend stays
+  // authoritative.
+  const previewNotReady = isDraft && !approvalPreviewQuery.isSuccess;
+  const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
+  const [chosenActors, setChosenActors] = useState<SubmitChosenActors[]>([]);
+  const [attemptedSubmitChoice, setAttemptedSubmitChoice] = useState(false);
 
   const user = useAuthStore((s) => s.user);
   const actor: ActorContext = { capabilities: user?.capabilities ?? [] };
@@ -144,7 +168,7 @@ export function TemplateEditorPage({
     return () => window.removeEventListener('scroll', guard, true);
   }, []);
 
-  async function handleSubmitForReview() {
+  async function submitForReview(chosenActorsPayload?: SubmitChosenActors[]) {
     setSubmitMsg(null);
     setSubmitting(true);
     try {
@@ -155,18 +179,47 @@ export function TemplateEditorPage({
           return;
         }
       }
-      await submitVersionForApproval(templateId, versionNum, crypto.randomUUID());
+      await submitVersionForApproval(templateId, versionNum, crypto.randomUUID(), chosenActorsPayload);
       // The kernel response carries only {instance_id, version_status} — no
       // full VersionDTO to patch locally. Refetch (same idiom handleImportFile
       // uses below) rather than fabricate the rest of the version's fields;
       // the existing draft.version effect above resyncs `liveVersion`.
       draft.refetch();
       setSubmitMsg({ kind: 'success', text: 'Enviado para aprovação.' });
+      setSubmitDialogOpen(false);
+      setChosenActors([]);
+      setAttemptedSubmitChoice(false);
     } catch (err) {
       setSubmitMsg({ kind: 'error', text: resolveQueryError(err, 'Falha ao submeter para aprovação.') });
     } finally {
       setSubmitting(false);
     }
+  }
+
+  // Entry point for the submit button: a route with no submit_choice stage
+  // submits directly (unchanged prior behavior); one with at least one such
+  // stage opens the picker dialog first.
+  function handleSubmitForReview() {
+    // Never submit while the resolved route is unknown — see previewNotReady.
+    if (previewNotReady) return;
+    if (submitChoiceStages.length === 0) {
+      void submitForReview();
+      return;
+    }
+    setChosenActors([]);
+    setAttemptedSubmitChoice(false);
+    setSubmitDialogOpen(true);
+  }
+
+  function handleConfirmSubmitForReview() {
+    if (submitting) return;
+    // Defensive: the dialog only opens once the preview resolved.
+    if (previewNotReady) return;
+    if (!isSubmitChoiceSelectionComplete(submitChoiceStages, chosenActors)) {
+      setAttemptedSubmitChoice(true);
+      return;
+    }
+    void submitForReview(chosenActors);
   }
 
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -307,11 +360,15 @@ export function TemplateEditorPage({
                     <button
                       type="button"
                       className={editorChromeStyles.primaryBtn}
-                      onClick={() => void handleSubmitForReview()}
-                      disabled={submitting || !(submitGate?.allowed ?? false)}
+                      onClick={handleSubmitForReview}
+                      disabled={submitting || previewNotReady || !(submitGate?.allowed ?? false)}
                       title={submitGate && !submitGate.allowed ? submitGate.reason : undefined}
                     >
-                      {submitting ? 'Enviando...' : 'Submeter para aprovação'}
+                      {submitting
+                        ? 'Enviando...'
+                        : previewNotReady
+                          ? 'Carregando rota de aprovação…'
+                          : 'Submeter para aprovação'}
                     </button>
                   </>
                 )}
@@ -372,6 +429,41 @@ export function TemplateEditorPage({
           loadingLabel="Carregando metadados do modelo"
         />
       </div>
+
+      <Dialog
+        open={submitDialogOpen}
+        title="Submeter para aprovação"
+        description="Esta etapa exige a escolha de aprovador(es) no envio."
+        onClose={() => setSubmitDialogOpen(false)}
+        footer={
+          <>
+            <button
+              type="button"
+              className={styles.retryBtn}
+              onClick={() => setSubmitDialogOpen(false)}
+              disabled={submitting}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className={editorChromeStyles.primaryBtn}
+              onClick={handleConfirmSubmitForReview}
+              disabled={submitting}
+            >
+              {submitting ? 'Enviando...' : 'Confirmar submissão'}
+            </button>
+          </>
+        }
+      >
+        <SubmitChoicePicker
+          stages={submitChoiceStages}
+          value={chosenActors}
+          onChange={setChosenActors}
+          showValidation={attemptedSubmitChoice}
+          disabled={submitting}
+        />
+      </Dialog>
     </div>
   );
 }
