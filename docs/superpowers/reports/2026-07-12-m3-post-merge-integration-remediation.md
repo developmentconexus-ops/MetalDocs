@@ -119,9 +119,9 @@ baseline**, no other RED. The 3 remediated packages are GREEN.
 
 | Package | Tests | Baseline ID |
 |---------|-------|-------------|
-| `internal/modules/controlleddocuments/application` | `TestGrantAreaMembershipFn`, `TestGrantAreaMembershipIdempotent`, `TestTriggerBypassBlocked` | E-PROD |
+| `internal/modules/controlleddocuments/application` | `TestTenantIsolation_SequenceCounters_CrossTenant` | E-PROD |
 | `internal/modules/jobs/approval_sla_surfacer` | `…_FullTick_IteratesAllTenants`, `…_Writer_TenantSeed_DoesNotSurfaceOtherTenant`, `…_Idempotent_SecondRunNoOp`, `…_AlertOnly_DoesNotMutateStatusOrDueAt` | E-PROD |
-| `tests/integration/scenarios` | `TestTenantIsolation_SequenceCounters_CrossTenant` | E-PROD |
+| `tests/integration/scenarios` | `TestGrantAreaMembershipFn`, `TestGrantAreaMembershipIdempotent`, `TestTriggerBypassBlocked` | E-PROD |
 | `tests/integration/tenantdata` | `TestTenantDataPortCoverage` | E-PROD |
 
 **Now GREEN (the 3 beyond-baseline packages, remediated by this branch):**
