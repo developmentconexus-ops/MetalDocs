@@ -91,6 +91,14 @@ type ApprovalRepository interface {
 	// mismatch or not found) are silently omitted.
 	LoadInstancesByIDs(ctx context.Context, tx db.Tx, tenantID string, ids []string) ([]domain.Instance, error)
 	LoadActiveInstanceByDocument(ctx context.Context, tx db.Tx, tenantID, docID string) (*domain.Instance, error)
+	// LoadActiveInstanceBySubject is LoadActiveInstanceByDocument's
+	// subject-generic sibling (M3 P3.S2b-4, R2a): finds the current active
+	// (in_progress or approved) instance for ANY subject (subject_kind,
+	// subject_key), not just a document_id join. The template kernel entry
+	// points (submit-for-approval, signoff) use this to resolve
+	// (template_id, version_n) -> the active instance without a document row
+	// to join through — a template-subject instance has NULL document_id.
+	LoadActiveInstanceBySubject(ctx context.Context, tx db.Tx, tenantID, subjectKind, subjectKey string) (*domain.Instance, error)
 	// LoadInstanceByDocumentForView is LoadActiveInstanceByDocument's view-only
 	// sibling: identical query except its status filter also includes
 	// changes_requested, so the FE author-facing GET

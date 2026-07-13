@@ -462,6 +462,78 @@ func (r *postgresApprovalRepository) LoadActiveInstanceByDocument(ctx context.Co
 	return &inst, nil
 }
 
+// LoadActiveInstanceBySubject is LoadActiveInstanceByDocument's
+// subject-generic sibling (M3 P3.S2b-4, R2a): loads the single
+// in_progress/approved instance for ANY (subject_kind, subject_key), not
+// just a document join. Uses a LEFT JOIN on documents (mirrors LoadInstance,
+// not LoadActiveInstanceByDocument's INNER JOIN) because a template-subject
+// row has NULL ai.document_id — an INNER JOIN would drop it entirely.
+// Returns ErrNoActiveInstance when none exists or tenant doesn't match.
+func (r *postgresApprovalRepository) LoadActiveInstanceBySubject(ctx context.Context, tx db.Tx, tenantID, subjectKind, subjectKey string) (*domain.Instance, error) {
+	var inst domain.Instance
+	var completedAt sql.NullTime
+	var frozenContentHash, cancelReason sql.NullString
+	var documentID sql.NullString
+	var revisionVersion sql.NullInt64
+	var gotSubjectKind, gotSubjectKey string
+
+	err := tx.QueryRowContext(ctx, `
+		SELECT ai.id, ai.tenant_id, ai.document_id, ai.route_id, ai.route_version_snapshot,
+		       d.revision_version,
+		       ai.status, ai.submitted_by, ai.submitted_at, ai.completed_at,
+		       ai.content_hash_at_submit, ai.idempotency_key,
+		       ai.frozen_content_hash, ai.cancel_reason,
+		       ai.subject_kind, ai.subject_key
+		FROM approval_instances ai
+		LEFT JOIN documents d
+		  ON d.id = ai.document_id
+		 AND d.tenant_id = ai.tenant_id
+		WHERE ai.tenant_id    = $1
+		  AND ai.subject_kind = $2
+		  AND ai.subject_key  = $3
+		  AND ai.status IN ('in_progress', 'approved')
+		ORDER BY ai.submitted_at DESC, ai.id DESC
+		LIMIT 1`,
+		tenantID, subjectKind, subjectKey,
+	).Scan(
+		&inst.ID, &inst.TenantID, &documentID, &inst.RouteID, &inst.RouteVersionSnapshot,
+		&revisionVersion,
+		&inst.Status, &inst.SubmittedBy, &inst.SubmittedAt, &completedAt,
+		&inst.ContentHashAtSubmit, &inst.IdempotencyKey,
+		&frozenContentHash, &cancelReason,
+		&gotSubjectKind, &gotSubjectKey,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNoActiveInstance
+	}
+	if err != nil {
+		return nil, MapPgError(err, MapHints{})
+	}
+	if documentID.Valid {
+		inst.DocumentID = documentID.String
+	}
+	if revisionVersion.Valid {
+		inst.RevisionVersion = int(revisionVersion.Int64)
+	}
+	if completedAt.Valid {
+		inst.CompletedAt = &completedAt.Time
+	}
+	if frozenContentHash.Valid {
+		inst.FrozenContentHash = &frozenContentHash.String
+	}
+	if cancelReason.Valid {
+		inst.CancelReason = &cancelReason.String
+	}
+	inst.Subject = domain.Subject{Kind: domain.SubjectKind(gotSubjectKind), Key: gotSubjectKey}
+
+	stages, err := r.loadStageInstances(ctx, tx, tenantID, inst.ID)
+	if err != nil {
+		return nil, err
+	}
+	inst.Stages = stages
+	return &inst, nil
+}
+
 // LoadInstanceByDocumentForView is LoadActiveInstanceByDocument's view-only
 // sibling (see the interface doc comment in approval_repository.go): identical
 // in every respect except the status filter also admits changes_requested.

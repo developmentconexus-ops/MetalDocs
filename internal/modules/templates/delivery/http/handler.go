@@ -14,14 +14,35 @@ import (
 	"log/slog"
 	"net/http"
 
+	approvalapp "metaldocs/internal/modules/approval/application"
+	approvaldomain "metaldocs/internal/modules/approval/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	templatesapi "metaldocs/internal/modules/templates/api"
 	"metaldocs/internal/modules/templates/application"
+	platformdb "metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
+
+// Narrow, testable seams onto the approval kernel's published services (M3
+// P3.S2b-4, R2a). Mirrors approval/http's own submitService/decisionService/
+// readService interfaces (internal/modules/approval/http/handler.go) — the
+// concrete *approvalapp.TemplateSubmitService / *approvalapp.DecisionService /
+// *approvalapp.ReadService types satisfy these implicitly, but tests can
+// substitute a fake without exercising the real signature-reauth/DB path.
+type approvalSubmitService interface {
+	SubmitTemplateVersionForReview(ctx context.Context, runner platformdb.TxRunner, req approvalapp.TemplateSubmitRequest) (approvalapp.TemplateSubmitResult, error)
+}
+
+type approvalDecisionService interface {
+	RecordSignoff(ctx context.Context, runner platformdb.TxRunner, req approvalapp.SignoffRequest) (approvalapp.SignoffResult, error)
+}
+
+type approvalReadService interface {
+	LoadActiveInstanceBySubjectForMutation(ctx context.Context, runner platformdb.TxRunner, tenantID, subjectKind, subjectKey string) (*approvaldomain.Instance, error)
+}
 
 // AuthzFunc is the tier-1 route→capability check for template routes.
 //
@@ -44,6 +65,16 @@ type Handler struct {
 	authz             AuthzFunc
 	db                *sql.DB
 	displayNameReader iamdomain.UserDisplayNameReader
+
+	// Approval-kernel wiring (M3 P3.S2b-4, R2a): optional — nil until
+	// WithApprovalKernel is called. The two thin kernel entry points
+	// (submit-for-approval, signoff) delegate to these published
+	// approval/application services; templates never imports
+	// approval/infrastructure or approval/delivery.
+	approvalSubmit   approvalSubmitService
+	approvalDecision approvalDecisionService
+	approvalRead     approvalReadService
+	approvalRunner   platformdb.TxRunner
 }
 
 // New constructs a Handler wired to the given application service, tier-1
@@ -65,6 +96,21 @@ func (h *Handler) WithDisplayNameReader(r iamdomain.UserDisplayNameReader) *Hand
 	if r != nil {
 		h.displayNameReader = r
 	}
+	return h
+}
+
+// WithApprovalKernel wires the approval module's published kernel services
+// (M3 P3.S2b-4, R2a) used by the thin submit-for-approval/signoff routes.
+// Optional — nil kernel fields cause those two routes to 500 rather than
+// panic (see nilApprovalKernel guard in routes_approval_kernel.go); every
+// other route is unaffected. runner is the shared db.TxRunner the kernel
+// application-layer services expect (mirrors documents' composition-root
+// wiring of the same approval services).
+func (h *Handler) WithApprovalKernel(submit approvalSubmitService, decision approvalDecisionService, read approvalReadService, runner platformdb.TxRunner) *Handler {
+	h.approvalSubmit = submit
+	h.approvalDecision = decision
+	h.approvalRead = read
+	h.approvalRunner = runner
 	return h
 }
 
@@ -121,11 +167,13 @@ func (h *Handler) resolveCreatedByDisplayNames(ctx context.Context, tenantID str
 // to compile). Mirrors the controlleddocuments pattern
 // (internal/modules/controlleddocuments/delivery/http/handler.go).
 var idempotentRoutes = map[string]bool{
-	"POST /api/v1/templates":                           true,
-	"POST /api/v1/templates/{id}/versions/{n}/publish": true,
-	"POST /api/v1/templates/{id}/versions/{n}/submit":  true,
-	"POST /api/v1/templates/{id}/versions/{n}/review":  true,
-	"POST /api/v1/templates/{id}/versions/{n}/approve": true,
+	"POST /api/v1/templates":                                       true,
+	"POST /api/v1/templates/{id}/versions/{n}/publish":             true,
+	"POST /api/v1/templates/{id}/versions/{n}/submit":              true,
+	"POST /api/v1/templates/{id}/versions/{n}/review":              true,
+	"POST /api/v1/templates/{id}/versions/{n}/approve":             true,
+	"POST /api/v1/templates/{id}/versions/{n}/submit-for-approval": true,
+	"POST /api/v1/templates/{id}/versions/{n}/signoff":             true,
 }
 
 // Register mounts the generated templates routes onto mux via

@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"time"
 
-	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/approval/domain"
 	"metaldocs/internal/modules/approval/infrastructure"
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
@@ -304,6 +304,34 @@ func (s *ReadService) LoadActiveInstanceByDocumentForMutation(ctx context.Contex
 			return infrastructure.ErrNoActiveInstance
 		}
 
+		inst = loaded
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return inst, nil
+}
+
+// LoadActiveInstanceBySubjectForMutation is
+// LoadActiveInstanceByDocumentForMutation's subject-generic sibling (M3
+// P3.S2b-4, R2a): resolves the active instance for ANY subject
+// (subject_kind, subject_key) without enforcing read-capability checks.
+// Mutation callers (e.g. the templates kernel signoff entry point) enforce
+// their own capability gates before or via the downstream decision service.
+func (s *ReadService) LoadActiveInstanceBySubjectForMutation(ctx context.Context, runner db.TxRunner, tenantID, subjectKind, subjectKey string) (*domain.Instance, error) {
+	var inst *domain.Instance
+	err := runner.Do(ctx, func(tx *sql.Tx) error {
+		loaded, err := s.repo.LoadActiveInstanceBySubject(ctx, tx, tenantID, subjectKind, subjectKey)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return infrastructure.ErrNoActiveInstance
+			}
+			return err
+		}
+		if loaded == nil {
+			return infrastructure.ErrNoActiveInstance
+		}
 		inst = loaded
 		return nil
 	})

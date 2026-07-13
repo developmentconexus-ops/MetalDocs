@@ -13,21 +13,21 @@ import (
 	"syscall"
 	"time"
 
+	approvalapp "metaldocs/internal/modules/approval/application"
+	approvalhttp "metaldocs/internal/modules/approval/http"
+	approvalrepo "metaldocs/internal/modules/approval/infrastructure"
+	approvalinfra "metaldocs/internal/modules/approval/infrastructure/idempotency"
+	approvaljobs "metaldocs/internal/modules/approval/jobs"
 	auditdomain "metaldocs/internal/modules/audit/domain"
 	documents "metaldocs/internal/modules/documents"
 	docapp "metaldocs/internal/modules/documents/application"
-	approvalapp "metaldocs/internal/modules/approval/application"
-	approvalhttp "metaldocs/internal/modules/approval/http"
-	approvalinfra "metaldocs/internal/modules/approval/infrastructure/idempotency"
-	approvaljobs "metaldocs/internal/modules/approval/jobs"
-	approvalrepo "metaldocs/internal/modules/approval/infrastructure"
-	"metaldocs/internal/modules/documents/jobs"
 	docrepo "metaldocs/internal/modules/documents/infrastructure"
+	"metaldocs/internal/modules/documents/jobs"
 	"metaldocs/internal/modules/jobs/maintenance"
 	templatesapp "metaldocs/internal/modules/templates/application"
 	templateshttp "metaldocs/internal/modules/templates/delivery/http"
-	templatejobs "metaldocs/internal/modules/templates/jobs"
 	templatesrepo "metaldocs/internal/modules/templates/infrastructure"
+	templatejobs "metaldocs/internal/modules/templates/jobs"
 
 	"metaldocs/apps/api/internal/wiring"
 	auditapp "metaldocs/internal/modules/audit/application"
@@ -758,6 +758,11 @@ func main() {
 		deps.Cleanup()
 		os.Exit(1)
 	}
+	// M3 P3.S2b-4 (R2a): wire the approval kernel's published services into
+	// the templates HTTP handler so its two thin kernel routes
+	// (submit-for-approval, signoff) can delegate. Must happen after
+	// approvalServices.Decision is finalized above (line ~737-741).
+	templatesModule.WithApprovalKernel(approvalServices.TemplateSubmit, approvalServices.Decision, approvalServices.Read, db.NewTxRunner(deps.SQLDB))
 	templatesModule.Register(mux)
 	signoffIdempStore := approvalinfra.NewPostgresSignoffIdempStore(deps.SQLDB)
 	routeAdminIdempStore := approvalinfra.NewPostgresRouteAdminIdempStore(deps.SQLDB)

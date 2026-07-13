@@ -143,6 +143,9 @@ var routeRules = []routeRule{
 	{method: http.MethodPost, pathPrefix: "/api/v1/templates", pathSuffix: "/submit", capability: iamdomain.CapTemplateSubmit, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/templates", pathSuffix: "/review", capability: iamdomain.CapTemplateReview, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/templates", pathSuffix: "/approve", capability: iamdomain.CapTemplateApprove, visibility: iamdelivery.VisibilityPermissionGuarded},
+	// M3 P3.S2b-4 (R2a): thin kernel entry points, additive to the triad above.
+	{method: http.MethodPost, pathPrefix: "/api/v1/templates", pathSuffix: "/submit-for-approval", capability: iamdomain.CapTemplateSubmit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/templates", pathSuffix: "/signoff", capability: iamdomain.CapTemplateApprove, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPut, pathPrefix: "/api/v1/templates", pathSuffix: "/approval-config", capability: iamdomain.CapTemplateEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/templates", pathSuffix: "/archive", capability: iamdomain.CapTemplateArchive, visibility: iamdelivery.VisibilityPermissionGuarded},
 
