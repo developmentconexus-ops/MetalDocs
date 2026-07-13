@@ -70,9 +70,15 @@ a decision or an operator escalation, not silence; ACCEPT-WITH-CONDITIONS / REJE
 back **to the same chip session** via `send_message` — context is intact there, so remediation is
 a message, not a new chip (a new corrective chip only on 2× reject = redesign). Reviewer
 subagents dispatched by the hub are **git read-only** (diff/show/log; never checkout/apply/stash
-— an acceptance reviewer once contaminated the main index via checkout). Known friction, accepted:
-hub→chip `send_message` prompts the operator to confirm each send; chip→hub arrives on the hub's
-next turn. That keeps the operator in the loop by design.
+— an acceptance reviewer once contaminated the main index via checkout). Comms autonomy:
+`mcp__ccd_session_mgmt__send_message` (+ `list_sessions`, `get_session`,
+`search_session_transcripts`) are allowlisted in the committed `.claude/settings.json`
+`permissions.allow`, so hub↔chip protocol messages run without per-send operator confirmation;
+chips inherit the allowlist via their worktree checkout (chips forked before that commit still
+prompt — acceptable, they drain out). If the host client hard-enforces a confirmation regardless
+of allowlist, that residual prompt is a client limitation, not doctrine — never reroute comms
+through side-channel files to dodge it. Operator oversight lives in the transcripts: every
+protocol message is visible in both sessions. Chip→hub delivery remains next-turn-processed.
 
 **Hub bootstrap:** any fresh session becomes the hub via the `harness-hub` skill
 (`.claude/skills/harness-hub/SKILL.md`) — it reconstructs hub state from repo truth (this file,
