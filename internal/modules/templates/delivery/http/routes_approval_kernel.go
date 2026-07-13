@@ -54,12 +54,35 @@ func (h *Handler) SubmitTemplateVersionForApproval(w http.ResponseWriter, r *htt
 		return
 	}
 
+	// requestBody is OPTIONAL (M4, unit 3.2, slice 5): existing callers that
+	// never submit a submit_choice-governed route send no body at all. Only
+	// decode when the client actually sent one — an empty/absent body is not
+	// an error here (a missing chosen_actors entry for a submit_choice stage
+	// is caught downstream by the application service's fail-closed check).
+	var chosenActors []approvalapp.StageChosenActors
+	if r.ContentLength != 0 {
+		var body templatesapi.TemplateSubmitForApprovalRequest
+		if err := readJSON(r, &body); err != nil {
+			writeErr(w, http.StatusBadRequest, codeTplInvalidBody, err.Error())
+			return
+		}
+		if body.ChosenActors != nil {
+			for _, c := range *body.ChosenActors {
+				chosenActors = append(chosenActors, approvalapp.StageChosenActors{
+					StageOrder: c.StageOrder,
+					UserIDs:    c.UserIds,
+				})
+			}
+		}
+	}
+
 	res, err := h.approvalSubmit.SubmitTemplateVersionForReview(r.Context(), h.approvalRunner, approvalapp.TemplateSubmitRequest{
 		TenantID:          tenantID,
 		TemplateID:        templateID,
 		TemplateVersionID: version.ID,
 		SubmittedBy:       actorID,
 		IdempotencyKey:    params.IdempotencyKey.String(),
+		ChosenActors:      chosenActors,
 	})
 	if err != nil {
 		writeMappedErr(w, err)

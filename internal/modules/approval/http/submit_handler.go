@@ -68,6 +68,14 @@ func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 		reasonCategory = *req.ReasonCategory
 	}
 
+	chosenActors := make([]application.StageChosenActors, 0, len(req.ChosenActors))
+	for _, c := range req.ChosenActors {
+		chosenActors = append(chosenActors, application.StageChosenActors{
+			StageOrder: c.StageOrder,
+			UserIDs:    c.UserIDs,
+		})
+	}
+
 	result, err := submitSvc.SubmitRevisionForReview(r.Context(), h.runner, application.SubmitRequest{
 		TenantID:        tenantID,
 		DocumentID:      documentID,
@@ -79,6 +87,7 @@ func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 		ContentFormData: map[string]any{"_content_hash": req.ContentHash},
 		RevisionVersion: expectedRevisionVersion,
 		IdempotencyKey:  idempotencyKey,
+		ChosenActors:    chosenActors,
 	})
 	if err != nil {
 		WriteError(w, err)

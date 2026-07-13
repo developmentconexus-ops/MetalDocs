@@ -36,6 +36,22 @@ type SubmitRequest struct {
 	// pointers so an absent field is distinguishable from an explicit "".
 	ReasonForChange *string `json:"reason_for_change,omitempty"`
 	ReasonCategory  *string `json:"reason_category,omitempty"`
+
+	// ChosenActors (M4, unit 3.2, slice 5) carries per-stage caller-chosen
+	// actors for stages governed by a submit_choice selector. Optional at the
+	// wire level — omitted or empty is legal for routes with no
+	// submit_choice stage; the application service fails closed
+	// (ErrSubmitChoiceRequired / ErrSubmitChoiceConstraintViolated) when a
+	// submit_choice stage is present and the entry is missing, empty, or
+	// targets the wrong stage.
+	ChosenActors []SubmitChosenActors `json:"chosen_actors,omitempty"`
+}
+
+// SubmitChosenActors is the wire shape of one chosen_actors entry: the
+// stage_order it targets plus the chosen user_ids.
+type SubmitChosenActors struct {
+	StageOrder int      `json:"stage_order"`
+	UserIDs    []string `json:"user_ids"`
 }
 
 // Validate is format-only and optionality-aware (ADR 0073): route_id and

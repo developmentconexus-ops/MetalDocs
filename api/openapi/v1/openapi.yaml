@@ -1582,6 +1582,12 @@ paths:
           in: header
           required: true
           schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateSubmitForApprovalRequest'
       responses:
         '200':
           description: ok
@@ -6628,6 +6634,30 @@ components:
           type: string
           enum: [content, corrective, regulatory, periodic_review, administrative]
           description: Optional structured category for the reason-for-change.
+        chosen_actors:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubmitChosenActors'
+          description: >-
+            Per-stage caller-chosen actors (M4, unit 3.2, slice 5). Required
+            only for stages governed by a submit_choice actor selector: a
+            matching entry with a non-empty user_ids is mandatory for such a
+            stage (422 otherwise), and every chosen user is validated
+            server-side against the selector's role x area_code constraint
+            (422 on violation). An entry naming a stage_order with no
+            submit_choice selector is also rejected (422, fail-closed).
+    SubmitChosenActors:
+      type: object
+      required: [stage_order, user_ids]
+      properties:
+        stage_order:
+          type: integer
+          minimum: 1
+        user_ids:
+          type: array
+          minItems: 1
+          items:
+            type: string
     SubmitDocumentResponse:
       type: object
       required: [instance_id, was_replay, etag]
@@ -6682,6 +6712,18 @@ components:
             version_status:
               type: string
               description: The template version's status after the kernel submit-lock (always under_review on success).
+    TemplateSubmitForApprovalRequest:
+      type: object
+      properties:
+        chosen_actors:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubmitChosenActors'
+          description: >-
+            Per-stage caller-chosen actors (M4, unit 3.2, slice 5), symmetric
+            with SubmitDocumentRequest.chosen_actors. Optional body: existing
+            callers that never submit a submit_choice-governed route may omit
+            it entirely.
     SignoffTemplateVersionRequest:
       type: object
       required: [decision, password]

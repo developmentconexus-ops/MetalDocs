@@ -1899,6 +1899,31 @@ func (r *postgresApprovalRepository) ResolveEligibleActorsForSelectors(ctx conte
 	return unionDedupSort(pools...), nil
 }
 
+// ValidateSubmitChoiceActors (M4, unit 3.2, slice 5) resolves the constraint
+// pool for a submit_choice selector (the same active role x area_code query
+// ResolveEligibleActors/the role_in_fixed_area branch uses, selector.Role x
+// selector.AreaCode) and checks every id in userIDs is a member of that pool.
+// Fail-closed: if ANY id is not a member, returns
+// domain.ErrSubmitChoiceConstraintViolated and no ids. On success returns the
+// deduped, ascending-sorted validated ids (never nil). Single-tx, non-
+// recording read (H-PRE-1): no authz.Require inside.
+func (r *postgresApprovalRepository) ValidateSubmitChoiceActors(ctx context.Context, tx db.Tx, tenantID string, selector domain.ActorSelector, userIDs []string) ([]string, error) {
+	pool, err := r.ResolveEligibleActors(ctx, tx, tenantID, selector.AreaCode, selector.Role)
+	if err != nil {
+		return nil, fmt.Errorf("validateSubmitChoiceActors: %w", err)
+	}
+	poolSet := make(map[string]struct{}, len(pool))
+	for _, id := range pool {
+		poolSet[id] = struct{}{}
+	}
+	for _, id := range userIDs {
+		if _, ok := poolSet[id]; !ok {
+			return nil, domain.ErrSubmitChoiceConstraintViolated
+		}
+	}
+	return unionDedupSort(userIDs), nil
+}
+
 // isActiveUser reports whether userID is an active member of tenantID, per
 // metaldocs.v_active_user_areas (the same published active-membership view
 // ResolveEligibleActors trusts).

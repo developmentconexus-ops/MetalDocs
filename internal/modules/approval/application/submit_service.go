@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -54,6 +55,24 @@ type SubmitRequest struct {
 	ContentFormData map[string]any // raw form data for hashing
 	RevisionVersion int            // OCC version from caller
 	IdempotencyKey  string         // client Idempotency-Key header, threaded from the handler
+	// ChosenActors carries the caller-chosen actors per stage_order, for
+	// stages governed by a submit_choice actor selector (M4, unit 3.2, slice
+	// 5; spec §5, §4). A submit_choice stage contributes no pool from the
+	// route alone — the chosen users are validated server-side against the
+	// selector's role x area_code constraint, then unioned into that stage's
+	// eligible pool. Ignored for stage_orders that carry no submit_choice
+	// selector — see resolveSubmitChoiceEligibleIDs for the fail-closed
+	// contract on mismatches.
+	ChosenActors []StageChosenActors
+}
+
+// StageChosenActors carries the caller-supplied chosen_actors for one stage
+// (M4, unit 3.2, slice 5). Shared between SubmitRequest and
+// TemplateSubmitRequest — both submit paths resolve submit_choice stages
+// identically.
+type StageChosenActors struct {
+	StageOrder int
+	UserIDs    []string
 }
 
 // SubmitResult is returned on successful submission.
@@ -217,6 +236,15 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 			return fmt.Errorf("submit: %w", err)
 		}
 
+		// Step 7b: submit_choice pre-pass (M4, unit 3.2, slice 5). Fail-closed:
+		// any ChosenActors entry naming a stage_order with no submit_choice
+		// selector is rejected before any stage instance is created — no
+		// silent accept of an out-of-scope choice (no-fallback principle).
+		submitChoiceStages := stagesWithSubmitChoice(route.Stages)
+		if err := validateChosenActorsTargets(req.ChosenActors, submitChoiceStages); err != nil {
+			return err
+		}
+
 		// Step 8: create stage instances.
 		// First stage is active; all others start pending.
 		stageInstances := make([]domain.StageInstance, len(route.Stages))
@@ -230,6 +258,13 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 			eligibleIDs, err := s.repo.ResolveEligibleActorsForSelectors(ctx, tx, req.TenantID, stage.EffectiveSelectors(), areaCode)
 			if err != nil {
 				return fmt.Errorf("submit: resolve eligible actors for stage %d: %w", stage.Order, err)
+			}
+			if sel, ok := submitChoiceStages[stage.Order]; ok {
+				chosenIDs, err := resolveSubmitChoiceEligibleIDs(ctx, tx, s.repo, req.TenantID, sel, req.ChosenActors, stage.Order)
+				if err != nil {
+					return err
+				}
+				eligibleIDs = unionUserIDs(eligibleIDs, chosenIDs)
 			}
 			if len(eligibleIDs) == 0 {
 				// W6: a stage pool that resolves to zero eligible actors can never be
@@ -494,4 +529,90 @@ func nullableString(s string) any {
 		return nil
 	}
 	return s
+}
+
+// ---------------------------------------------------------------------------
+// submit_choice resolution (M4, unit 3.2, slice 5; spec §5, §4). Shared by
+// SubmitService.SubmitRevisionForReview and
+// TemplateSubmitService.SubmitTemplateVersionForReview — both submit paths
+// resolve submit_choice stages identically.
+// ---------------------------------------------------------------------------
+
+// stagesWithSubmitChoice returns, for every stage in stages that carries a
+// submit_choice selector (via EffectiveSelectors), a map of stage.Order to
+// that selector. A stage with more than one submit_choice selector is not a
+// contract this feature supports; the first one found wins (route
+// construction is not expected to produce that shape).
+func stagesWithSubmitChoice(stages []domain.Stage) map[int]domain.ActorSelector {
+	out := make(map[int]domain.ActorSelector)
+	for _, stage := range stages {
+		for _, sel := range stage.EffectiveSelectors() {
+			if sel.Kind == domain.SelectorSubmitChoice {
+				out[stage.Order] = sel
+				break
+			}
+		}
+	}
+	return out
+}
+
+// validateChosenActorsTargets fails closed with
+// domain.ErrSubmitChoiceConstraintViolated when any entry in chosen names a
+// stage_order that has no submit_choice selector in submitChoiceStages — the
+// no-fallback principle applied to an out-of-scope choice (never a silent
+// accept).
+func validateChosenActorsTargets(chosen []StageChosenActors, submitChoiceStages map[int]domain.ActorSelector) error {
+	for _, c := range chosen {
+		if _, ok := submitChoiceStages[c.StageOrder]; !ok {
+			return domain.ErrSubmitChoiceConstraintViolated
+		}
+	}
+	return nil
+}
+
+// findChosenActors returns the ChosenActors entry targeting stageOrder, if
+// any.
+func findChosenActors(chosen []StageChosenActors, stageOrder int) (StageChosenActors, bool) {
+	for _, c := range chosen {
+		if c.StageOrder == stageOrder {
+			return c, true
+		}
+	}
+	return StageChosenActors{}, false
+}
+
+// resolveSubmitChoiceEligibleIDs applies the submit_choice stage's
+// fail-closed contract for stageOrder: chosen must carry a non-empty entry
+// for it (domain.ErrSubmitChoiceRequired otherwise), and every chosen
+// user_id must satisfy selector's role x area_code constraint
+// (domain.ErrSubmitChoiceConstraintViolated otherwise, via
+// ApprovalRepository.ValidateSubmitChoiceActors). Returns the validated ids
+// for the caller to union into the stage's route-derived eligible pool.
+func resolveSubmitChoiceEligibleIDs(ctx context.Context, tx *sql.Tx, repo infrastructure.ApprovalRepository, tenantID string, selector domain.ActorSelector, chosen []StageChosenActors, stageOrder int) ([]string, error) {
+	entry, ok := findChosenActors(chosen, stageOrder)
+	if !ok || len(entry.UserIDs) == 0 {
+		return nil, domain.ErrSubmitChoiceRequired
+	}
+	return repo.ValidateSubmitChoiceActors(ctx, tx, tenantID, selector, entry.UserIDs)
+}
+
+// unionUserIDs is the pure union+dedup+sort of one or more user_id pools,
+// mirroring infrastructure.unionDedupSort's semantics (deterministic
+// ascending order, never nil) for the application layer's post-resolve
+// submit_choice union — infrastructure's helper is unexported and DB-package
+// scoped, so this is a small, intentional, side-effect-free duplicate rather
+// than a cross-package reach.
+func unionUserIDs(pools ...[]string) []string {
+	seen := make(map[string]struct{})
+	out := make([]string, 0)
+	for _, pool := range pools {
+		for _, id := range pool {
+			if _, ok := seen[id]; !ok {
+				seen[id] = struct{}{}
+				out = append(out, id)
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
 }

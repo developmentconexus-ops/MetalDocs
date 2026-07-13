@@ -193,6 +193,12 @@ type ApprovalRepository interface {
 	// (ascending) order. subjectArea is the submitting document/template's
 	// resolved area — used only by role_in_document_area selectors.
 	ResolveEligibleActorsForSelectors(ctx context.Context, tx db.Tx, tenantID string, selectors []domain.ActorSelector, subjectArea string) ([]string, error)
+	// ValidateSubmitChoiceActors (M4, unit 3.2, slice 5) resolves the
+	// role x area_code constraint pool for a single submit_choice selector and
+	// checks every id in userIDs is a member of it. Fail-closed: any
+	// non-member id returns domain.ErrSubmitChoiceConstraintViolated; success
+	// returns the deduped, ascending-sorted validated ids.
+	ValidateSubmitChoiceActors(ctx context.Context, tx db.Tx, tenantID string, selector domain.ActorSelector, userIDs []string) ([]string, error)
 	// LoadActorDisplayName returns metaldocs.iam_users.display_name for (tenantID,
 	// userID), or "" when the user row is absent. It runs OFF the caller's
 	// transaction (on the pool) so it never executes inside the signoff

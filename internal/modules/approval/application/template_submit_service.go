@@ -110,6 +110,10 @@ type TemplateSubmitRequest struct {
 	TemplateVersionID string // artifact under approval (INSTANCE.subject_key)
 	SubmittedBy       string // user_id
 	IdempotencyKey    string // client Idempotency-Key header, threaded from the handler
+	// ChosenActors mirrors SubmitRequest.ChosenActors (M4, unit 3.2, slice 5):
+	// per-stage caller-chosen actors for stages governed by a submit_choice
+	// actor selector.
+	ChosenActors []StageChosenActors
 }
 
 // TemplateSubmitResult is returned on successful submission.
@@ -223,6 +227,14 @@ func (s *TemplateSubmitService) SubmitTemplateVersionForReview(ctx context.Conte
 			return fmt.Errorf("template submit: %w", err)
 		}
 
+		// submit_choice pre-pass (M4, unit 3.2, slice 5): mirrors
+		// SubmitService.SubmitRevisionForReview's Step 7b. Fail-closed before
+		// any stage instance is created.
+		submitChoiceStages := stagesWithSubmitChoice(route.Stages)
+		if err := validateChosenActorsTargets(req.ChosenActors, submitChoiceStages); err != nil {
+			return err
+		}
+
 		stageInstances := make([]domain.StageInstance, len(route.Stages))
 		for i, stage := range route.Stages {
 			status := domain.StagePending
@@ -234,6 +246,13 @@ func (s *TemplateSubmitService) SubmitTemplateVersionForReview(ctx context.Conte
 			eligibleIDs, err := s.repo.ResolveEligibleActorsForSelectors(ctx, tx, req.TenantID, stage.EffectiveSelectors(), stage.AreaCode)
 			if err != nil {
 				return fmt.Errorf("template submit: resolve eligible actors for stage %d: %w", stage.Order, err)
+			}
+			if sel, ok := submitChoiceStages[stage.Order]; ok {
+				chosenIDs, err := resolveSubmitChoiceEligibleIDs(ctx, tx, s.repo, req.TenantID, sel, req.ChosenActors, stage.Order)
+				if err != nil {
+					return err
+				}
+				eligibleIDs = unionUserIDs(eligibleIDs, chosenIDs)
 			}
 			if len(eligibleIDs) == 0 {
 				return domain.ErrEmptyEligiblePool
