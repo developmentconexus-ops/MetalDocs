@@ -12,6 +12,26 @@
 
 BEGIN;
 
+-- Pre-drop verification (fail-loud, mirrors 0303's end-of-backfill guard).
+-- Dropping the flat columns is only safe once every stage has been migrated to
+-- >=1 child selector; if any stage still lacks one, the selectors table is not
+-- yet the complete source of truth and dropping the flat columns would silently
+-- orphan that stage's actor pool. Fail the migration rather than proceed
+-- (no-fallback principle). Guarded before the DROP so the flat columns survive
+-- for diagnosis if the assertion trips.
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM approval_route_stages s
+         WHERE NOT EXISTS (
+            SELECT 1 FROM approval_route_stage_selectors x
+             WHERE x.route_stage_id = s.id
+         )
+    ) THEN
+        RAISE EXCEPTION 'cannot drop flat columns: stage without selector (0303 backfill incomplete or a stage was inserted without a selector)';
+    END IF;
+END $$;
+
 ALTER TABLE public.approval_route_stages DROP COLUMN IF EXISTS required_role;
 ALTER TABLE public.approval_route_stages DROP COLUMN IF EXISTS area_code;
 
