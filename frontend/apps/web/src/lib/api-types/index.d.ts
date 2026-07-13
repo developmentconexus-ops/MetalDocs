@@ -904,6 +904,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/templates/{id}/versions/{n}/submit-for-approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit template version to the approval kernel
+         * @description Thin kernel entry point (M3 P3.S2b-4, R2a): resolves the template version and delegates to the approval module's subject-generic TemplateSubmitService, which locks the version draft -> under_review and creates an approval_instances row from the template's active approval route. Additive to the legacy submit route above — does not replace it.
+         */
+        post: operations["submitTemplateVersionForApproval"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/templates/{id}/versions/{n}/signoff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a template version approval sign-off
+         * @description Thin kernel entry point (M3 P3.S2b-4, R2a): resolves the template's active approval instance and active stage internally, then delegates to the approval module's subject-generic DecisionService.RecordSignoff. Mirrors POST /documents/{id}/signoff's request shape (decision, reason, password) but omits content_hash — a template version never freezes, so its content identity is read server-side off templates_template_version.content_hash, never echoed by the client.
+         */
+        post: operations["signoffTemplateVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/templates/{id}/archive": {
         parameters: {
             query?: never;
@@ -3496,6 +3536,22 @@ export interface components {
             was_replay: boolean;
             outcome: string;
         };
+        TemplateApprovalSubmitResponse: {
+            data: {
+                /** Format: uuid */
+                instance_id: string;
+                /** @description The template version's status after the kernel submit-lock (always under_review on success). */
+                version_status: string;
+            };
+        };
+        SignoffTemplateVersionRequest: {
+            /** @enum {string} */
+            decision: "approve" | "reject";
+            /** @description Required when decision is reject. */
+            reason?: string;
+            /** @description Re-authentication password for the signature (password_reauth method). */
+            password: string;
+        };
         SignoffApprovalStageRequest: {
             /** @enum {string} */
             decision: "approve" | "reject";
@@ -3746,6 +3802,13 @@ export interface components {
         CreateRouteRequest: {
             profile_code: string;
             name: string;
+            /**
+             * @description M3 kernel extraction (ADR 0082, P2.S3). Optional; omitted defaults to `document`, preserving the legacy (document, profile_code) subject unchanged. A non-document kind is accepted and persisted faithfully but carries no template-specific governance in this slice (Phase 3).
+             * @enum {string}
+             */
+            subject_kind?: "document" | "template";
+            /** @description M3 kernel extraction (ADR 0082, P2.S3). Optional; omitted defaults to `profile_code` when `subject_kind` is `document` (or absent), preserving byte-equal legacy behavior. */
+            subject_key?: string;
             stages: components["schemas"]["StageRequest"][];
         } & {
             [key: string]: unknown;
@@ -3777,6 +3840,13 @@ export interface components {
             /** Format: uuid */
             tenant_id: string;
             profile_code: string;
+            /**
+             * @description M3 kernel extraction (ADR 0082, P2.S3). What this route governs; `document` for every route created via the legacy profile_code path.
+             * @enum {string}
+             */
+            subject_kind?: "document" | "template";
+            /** @description M3 kernel extraction (ADR 0082, P2.S3). The governed entity's key within subject_kind's bounded context; equals profile_code for a document-subject route. */
+            subject_key?: string;
             active: boolean;
             /** @description Monotonic version bumped on each update or deactivation. */
             version: number;
@@ -5099,10 +5169,6 @@ export interface operations {
                     description?: string;
                     /** @description Profile code (e.g. DC, POP). Omit or null for generic templates. */
                     doc_type_code?: string;
-                    /** @description Role binding required to approve this template's versions. Defaults to 'approver' server-side when omitted. */
-                    approver_role?: string;
-                    /** @description Optional role binding required to review this template's versions before approval. */
-                    reviewer_role?: string | null;
                 };
             };
         };
@@ -5501,6 +5567,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApproveTemplateVersionResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    submitTemplateVersionForApproval: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+                n: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateApprovalSubmitResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    signoffTemplateVersion: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+                n: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignoffTemplateVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignoffDocumentResponse"];
                 };
             };
             400: components["responses"]["BadRequest"];

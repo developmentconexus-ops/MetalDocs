@@ -1263,8 +1263,6 @@ paths:
                 name: { type: string }
                 description: { type: string }
                 doc_type_code: { type: string, description: "Profile code (e.g. DC, POP). Omit or null for generic templates." }
-                approver_role: { type: string, description: "Role binding required to approve this template's versions. Defaults to 'approver' server-side when omitted." }
-                reviewer_role: { type: string, nullable: true, description: "Optional role binding required to review this template's versions before approval." }
       responses:
         '201':
           description: created

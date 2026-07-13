@@ -11,17 +11,16 @@ import (
 	"metaldocs/internal/modules/templates/domain"
 )
 
-// CreateTemplateCmd carries the fields needed to create a new template plus
-// the initial approval role bindings for its first draft version.
+// CreateTemplateCmd carries the fields needed to create a new template and
+// its first draft version. ADR 0082 phase (a) part 1: this no longer carries
+// role bindings — CreateTemplate stopped seeding reviewer/approver roles.
 type CreateTemplateCmd struct {
-	TenantID     string
-	ActorUserID  string
-	DocTypeCode  string
-	Key          string
-	Name         string
-	Description  string
-	ApproverRole string
-	ReviewerRole *string
+	TenantID    string
+	ActorUserID string
+	DocTypeCode string
+	Key         string
+	Name        string
+	Description string
 }
 
 // CreateTemplateResult holds the newly created template and its initial
@@ -32,10 +31,10 @@ type CreateTemplateResult struct {
 }
 
 // CreateTemplate creates a new template together with its first draft
-// version (version 1) and approval configuration, and records an
-// AuditCreated event, all inside one transaction. The template key must be
-// unique within the tenant; an existing key is rejected with
-// ErrKeyConflict.
+// version (version 1) and records an AuditCreated event, all inside one
+// transaction. The template key must be unique within the tenant; an
+// existing key is rejected with ErrKeyConflict. ADR 0082 phase (a) part 1:
+// this no longer seeds approval configuration or role bindings.
 func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*CreateTemplateResult, error) {
 	if _, err := s.repo.GetTemplateByKey(ctx, cmd.TenantID, cmd.Key); err == nil {
 		return nil, domain.ErrKeyConflict
@@ -67,8 +66,6 @@ func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*C
 		[]domain.Placeholder{},
 		s.clock.Now(),
 	)
-	version.PendingApproverRole = cmd.ApproverRole
-	version.PendingReviewerRole = cmd.ReviewerRole
 
 	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
 		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateCreate), "tenant"); err != nil {
@@ -78,13 +75,6 @@ func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*C
 			return err
 		}
 		if err := s.repo.CreateVersionTx(ctx, tx, version); err != nil {
-			return err
-		}
-		if err := s.repo.UpsertApprovalConfigTx(ctx, tx, &domain.ApprovalConfig{
-			TemplateID:   template.ID,
-			ApproverRole: cmd.ApproverRole,
-			ReviewerRole: cmd.ReviewerRole,
-		}); err != nil {
 			return err
 		}
 		if err := s.repo.AppendAuditTx(ctx, tx, &domain.AuditEvent{

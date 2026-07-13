@@ -22,8 +22,9 @@ func (h *Handler) ListTemplates(w http.ResponseWriter, r *http.Request, params t
 }
 
 // CreateTemplate handles POST /templates: authorizes CapTemplateCreate,
-// validates the required key/name fields, applies the approver/reviewer
-// role defaults, and creates a new template with its initial draft version.
+// validates the required key/name fields, and creates a new template with
+// its initial draft version. ADR 0082 phase (a) part 1: this no longer
+// accepts or seeds approver/reviewer role bindings.
 func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request, _ templatesapi.CreateTemplateParams) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
@@ -54,28 +55,13 @@ func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request, _ templ
 	if req.DocTypeCode != nil {
 		docTypeCode = strings.TrimSpace(*req.DocTypeCode)
 	}
-	// approver_role is now caller-configurable (F-T4); default to "approver"
-	// server-side when omitted or blank so the creation contract is self-contained
-	// without changing the historical default binding.
-	approverRole := "approver"
-	if req.ApproverRole != nil && strings.TrimSpace(*req.ApproverRole) != "" {
-		approverRole = strings.TrimSpace(*req.ApproverRole)
-	}
-	var reviewerRole *string
-	if req.ReviewerRole != nil {
-		if trimmed := strings.TrimSpace(*req.ReviewerRole); trimmed != "" {
-			reviewerRole = &trimmed
-		}
-	}
 	res, err := h.svc.CreateTemplate(r.Context(), application.CreateTemplateCmd{
-		TenantID:     tenantID,
-		ActorUserID:  actorID,
-		Key:          strings.TrimSpace(req.Key),
-		Name:         strings.TrimSpace(req.Name),
-		Description:  description,
-		DocTypeCode:  docTypeCode,
-		ApproverRole: approverRole,
-		ReviewerRole: reviewerRole,
+		TenantID:    tenantID,
+		ActorUserID: actorID,
+		Key:         strings.TrimSpace(req.Key),
+		Name:        strings.TrimSpace(req.Name),
+		Description: description,
+		DocTypeCode: docTypeCode,
 	})
 	if err != nil {
 		writeMappedErr(w, err)

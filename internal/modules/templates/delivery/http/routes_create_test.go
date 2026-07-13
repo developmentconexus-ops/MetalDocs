@@ -104,6 +104,11 @@ type fakeRepo struct {
 	audit           []*domain.AuditEvent
 	approvalConfigs map[string]*domain.ApprovalConfig
 	lockVersions    map[string]int
+
+	// upsertApprovalConfigTxCalls counts UpsertApprovalConfigTx invocations.
+	// TestCreateTemplate_NoRoleSeeding (ADR 0082 phase (a) part 1) asserts
+	// this stays zero for CreateTemplate now that role seeding is retired.
+	upsertApprovalConfigTxCalls int
 }
 
 func newFakeRepo() *fakeRepo {
@@ -326,6 +331,7 @@ func (r *fakeRepo) UpsertApprovalConfig(_ context.Context, c *domain.ApprovalCon
 }
 
 func (r *fakeRepo) UpsertApprovalConfigTx(_ context.Context, _ db.Tx, c *domain.ApprovalConfig) error {
+	r.upsertApprovalConfigTxCalls++
 	return r.UpsertApprovalConfig(context.Background(), c)
 }
 
@@ -558,80 +564,47 @@ func TestCreateTemplate_KeyConflict(t *testing.T) {
 	}
 }
 
-// TestCreateTemplate_ApproverReviewerRoleBinding is the glue test for the F-T4
-// approver_role/reviewer_role wiring in CreateTemplate (routes_generated.go:50-71):
-//   - omitted  → approver_role defaults to "approver", reviewer_role stays nil
-//   - blank    → same defaults (whitespace trimmed to empty is treated as absent)
-//   - provided → both pass through verbatim (trimmed) to the created version's
-//     PendingApproverRole/PendingReviewerRole binding.
-func TestCreateTemplate_ApproverReviewerRoleBinding(t *testing.T) {
-	reviewer := "reviewer"
-	blank := "   "
-	custom := "  qms_lead  "
-	customReviewer := "  area_reviewer  "
+// TestCreateTemplate_NoRoleSeeding is the regression test for ADR 0082 phase
+// (a) part 1: CreateTemplate must stop seeding reviewer/approver roles and
+// stop writing templates_approval_config. Capability-based authz
+// (CapTemplateCreate) already gates the route (ADR 0022); role-based
+// approval seeding is retired. The contract (CreateTemplateRequest) no
+// longer accepts approver_role/reviewer_role at all — the created version's
+// pending role fields stay zero-valued until a later slice populates them
+// through a capability-based path.
+func TestCreateTemplate_NoRoleSeeding(t *testing.T) {
+	repo := newFakeRepo()
+	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 
-	tests := []struct {
-		name             string
-		approverRole     *string
-		reviewerRole     *string
-		wantApproverRole string
-		wantReviewerRole *string // nil → expect no reviewer bound
-	}{
-		{name: "omitted defaults", wantApproverRole: "approver", wantReviewerRole: nil},
-		{name: "blank defaults", approverRole: &blank, reviewerRole: &blank, wantApproverRole: "approver", wantReviewerRole: nil},
-		{name: "provided passthrough trimmed", approverRole: &custom, reviewerRole: &customReviewer, wantApproverRole: "qms_lead", wantReviewerRole: ptr("area_reviewer")},
-		{name: "approver only", approverRole: &reviewer, wantApproverRole: "reviewer", wantReviewerRole: nil},
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates", bytes.NewReader(createBody("contract-default")))
+	withHeaders(req)
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d body=%s", rr.Code, rr.Body.String())
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			repo := newFakeRepo()
-			mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
+	if repo.upsertApprovalConfigTxCalls != 0 {
+		t.Fatalf("expected UpsertApprovalConfigTx not called, got %d calls", repo.upsertApprovalConfigTxCalls)
+	}
+	if len(repo.approvalConfigs) != 0 {
+		t.Fatalf("expected no approval config written, got %d entries", len(repo.approvalConfigs))
+	}
 
-			body := map[string]any{
-				"key":         "contract-default",
-				"name":        "Contract Template",
-				"description": "Default contract",
-			}
-			if tt.approverRole != nil {
-				body["approver_role"] = *tt.approverRole
-			}
-			if tt.reviewerRole != nil {
-				body["reviewer_role"] = *tt.reviewerRole
-			}
-			raw, _ := json.Marshal(body)
-
-			req := httptest.NewRequest(http.MethodPost, "/api/v1/templates", bytes.NewReader(raw))
-			withHeaders(req)
-			rr := httptest.NewRecorder()
-			mux.ServeHTTP(rr, req)
-			if rr.Code != http.StatusCreated {
-				t.Fatalf("expected 201, got %d body=%s", rr.Code, rr.Body.String())
-			}
-
-			if len(repo.versions) != 1 {
-				t.Fatalf("expected exactly one created version, got %d", len(repo.versions))
-			}
-			var v *domain.TemplateVersion
-			for _, ver := range repo.versions {
-				v = ver
-			}
-			if v.PendingApproverRole != tt.wantApproverRole {
-				t.Errorf("PendingApproverRole=%q, want %q", v.PendingApproverRole, tt.wantApproverRole)
-			}
-			switch {
-			case tt.wantReviewerRole == nil && v.PendingReviewerRole != nil:
-				t.Errorf("PendingReviewerRole=%q, want nil", *v.PendingReviewerRole)
-			case tt.wantReviewerRole != nil && v.PendingReviewerRole == nil:
-				t.Errorf("PendingReviewerRole=nil, want %q", *tt.wantReviewerRole)
-			case tt.wantReviewerRole != nil && *v.PendingReviewerRole != *tt.wantReviewerRole:
-				t.Errorf("PendingReviewerRole=%q, want %q", *v.PendingReviewerRole, *tt.wantReviewerRole)
-			}
-		})
+	if len(repo.versions) != 1 {
+		t.Fatalf("expected exactly one created version, got %d", len(repo.versions))
+	}
+	var v *domain.TemplateVersion
+	for _, ver := range repo.versions {
+		v = ver
+	}
+	if v.PendingApproverRole != "" {
+		t.Errorf("PendingApproverRole=%q, want empty", v.PendingApproverRole)
+	}
+	if v.PendingReviewerRole != nil {
+		t.Errorf("PendingReviewerRole=%q, want nil", *v.PendingReviewerRole)
 	}
 }
-
-func ptr(s string) *string { return &s }
 
 func TestCreateNextVersion_SystemOwnedTemplateImmutable(t *testing.T) {
 	repo := newFakeRepo()

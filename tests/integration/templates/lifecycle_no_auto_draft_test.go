@@ -92,7 +92,9 @@ func versionStatuses(t *testing.T, db *sql.DB, templateID string) map[int]string
 
 // TestLifecycle_NoAutoNextDraft — M1·T2 contract gate.
 //
-// Verifies that after a full create → submit → approve lifecycle:
+// Verifies that after create → direct publish (the KEPT path to published:
+// ADR 0082 phase (a) retired CreateTemplate's approval-config seeding, so the
+// legacy submit → review → approve flow no longer runs on a fresh template):
 //   - exactly ONE version row exists (the published v1)
 //   - the template has published_version_id pointing to v1
 //   - no v2 draft row was created automatically
@@ -107,7 +109,7 @@ func TestLifecycle_NoAutoNextDraft(t *testing.T) {
 	approver := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID)).ID
 
 	// Grant system_admin so authz.Require passes for all template capabilities
-	// (template.create, template.submit, template.approve) without per-cap grants.
+	// (template.create, template.publish) without per-cap grants.
 	testdb.SeedSystemAdmin(t, db, tenant.ID, author, "Integration Test Author")
 	testdb.SeedSystemAdmin(t, db, tenant.ID, approver, "Integration Test Approver")
 
@@ -124,12 +126,11 @@ func TestLifecycle_NoAutoNextDraft(t *testing.T) {
 
 	// ── Step 1: create template with v1 draft ──────────────────────────────
 	createRes, err := svc.CreateTemplate(authorCtx, application.CreateTemplateCmd{
-		TenantID:     tenant.ID,
-		ActorUserID:  author,
-		DocTypeCode:  "po",
-		Key:          "tpl-no-auto-" + testdb.DeterministicID(t, "key")[:8],
-		Name:         "No-Auto-Draft Template",
-		ApproverRole: "approver",
+		TenantID:    tenant.ID,
+		ActorUserID: author,
+		DocTypeCode: "po",
+		Key:         "tpl-no-auto-" + testdb.DeterministicID(t, "key")[:8],
+		Name:        "No-Auto-Draft Template",
 	})
 	if err != nil {
 		t.Fatalf("CreateTemplate: %v", err)
@@ -143,7 +144,7 @@ func TestLifecycle_NoAutoNextDraft(t *testing.T) {
 	}
 
 	// ── Step 2: seed content hash (simulates autosave commit) ─────────────
-	// The approve gate (T-004) requires a non-empty content_hash. Update directly
+	// The publish gate (T-004) requires a non-empty content_hash. Update directly
 	// via SQL since the presigner is a no-op and there is no autosave service here.
 	// content_hash must satisfy chk_template_version_content_hash (length 64) and
 	// chk_template_version_content_hash_non_draft once the version leaves draft.
@@ -166,37 +167,27 @@ func TestLifecycle_NoAutoNextDraft(t *testing.T) {
 		return err
 	})
 
-	// ── Step 3: submit v1 for review ──────────────────────────────────────
-	// No-reviewer path: PendingApproverRole only (no PendingReviewerRole).
-	v1, err := svc.SubmitForReview(authorCtx, application.SubmitForReviewCmd{
-		TenantID:      tenant.ID,
-		ActorUserID:   author,
-		TemplateID:    templateID,
-		VersionNumber: 1,
-	})
-	if err != nil {
-		t.Fatalf("SubmitForReview: %v", err)
-	}
-	if v1.Status != domain.VersionStatusUnderReview {
-		t.Fatalf("after submit: status=%q want=under_review", v1.Status)
-	}
-
-	// ── Step 4: approve → publish ─────────────────────────────────────────
-	// No-reviewer path: Approve (approver ≠ author — SoD satisfied) transitions
-	// directly to published because PendingReviewerRole was not set.
-	approveRes, err := svc.Approve(approverCtx, application.ApproveCmd{
+	// ── Step 3: direct publish ────────────────────────────────────────────
+	// ADR 0082 phase (a) part 1: CreateTemplate no longer seeds an approval
+	// config, so the legacy submit → review → approve flow cannot run against
+	// a fresh template (SubmitForReview reads the retired config). The KEPT
+	// path to published is PublishTemplateVersion on the draft: committed
+	// content hash (T-004), publisher ≠ author (SoD via CheckSegregation),
+	// and capability template.publish. The never-submitted version carries no
+	// pending role binding (RoleBindingFor returns ""), so the capability
+	// tier is the sole gate — no ActorRoles are passed.
+	publishRes, err := svc.PublishTemplateVersion(approverCtx, application.PublishTemplateVersionCmd{
 		TenantID:      tenant.ID,
 		ActorUserID:   approver,
-		ActorRoles:    []string{"approver"},
 		TemplateID:    templateID,
 		VersionNumber: 1,
-		Accept:        true,
+		SchemaKey:     "schemas/no-auto-draft-test.json",
 	})
 	if err != nil {
-		t.Fatalf("Approve: %v", err)
+		t.Fatalf("PublishTemplateVersion: %v", err)
 	}
-	if approveRes.Version.Status != domain.VersionStatusPublished {
-		t.Fatalf("after approve: status=%q want=published", approveRes.Version.Status)
+	if publishRes.PublishedVersion.Status != domain.VersionStatusPublished {
+		t.Fatalf("after publish: status=%q want=published", publishRes.PublishedVersion.Status)
 	}
 
 	// ── M1·T2 assertion: NO auto next-draft ───────────────────────────────
