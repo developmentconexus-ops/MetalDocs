@@ -227,7 +227,7 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 				status = domain.StageActive
 				openedAt = &now
 			}
-			eligibleIDs, err := s.repo.ResolveEligibleActors(ctx, tx, req.TenantID, stage.AreaCode, stage.RequiredRole)
+			eligibleIDs, err := s.repo.ResolveEligibleActorsForSelectors(ctx, tx, req.TenantID, stage.EffectiveSelectors(), areaCode)
 			if err != nil {
 				return fmt.Errorf("submit: resolve eligible actors for stage %d: %w", stage.Order, err)
 			}

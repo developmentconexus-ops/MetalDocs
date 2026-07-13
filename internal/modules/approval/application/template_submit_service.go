@@ -231,7 +231,7 @@ func (s *TemplateSubmitService) SubmitTemplateVersionForReview(ctx context.Conte
 				status = domain.StageActive
 				openedAt = &now
 			}
-			eligibleIDs, err := s.repo.ResolveEligibleActors(ctx, tx, req.TenantID, stage.AreaCode, stage.RequiredRole)
+			eligibleIDs, err := s.repo.ResolveEligibleActorsForSelectors(ctx, tx, req.TenantID, stage.EffectiveSelectors(), stage.AreaCode)
 			if err != nil {
 				return fmt.Errorf("template submit: resolve eligible actors for stage %d: %w", stage.Order, err)
 			}

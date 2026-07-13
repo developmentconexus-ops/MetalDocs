@@ -175,6 +175,41 @@ func (r *phase5Repo) ResolveEligibleActors(ctx context.Context, tx db.Tx, tenant
 	return ids, rows.Err()
 }
 
+// ResolveEligibleActorsForSelectors is called by SubmitRevisionForReview (M4,
+// unit 3.2, slice 3) via stage.EffectiveSelectors(). These scenarios only
+// exercise legacy stages (no explicit Selectors), which synthesize a single
+// role_in_fixed_area selector — delegate to ResolveEligibleActors for that
+// kind.
+func (r *phase5Repo) ResolveEligibleActorsForSelectors(ctx context.Context, tx db.Tx, tenantID string, selectors []domain.ActorSelector, subjectArea string) ([]string, error) {
+	seen := make(map[string]struct{})
+	var ids []string
+	for _, sel := range selectors {
+		var area string
+		switch sel.Kind {
+		case domain.SelectorRoleInFixedArea:
+			area = sel.AreaCode
+		case domain.SelectorRoleInDocumentArea:
+			area = subjectArea
+		default:
+			continue
+		}
+		got, err := r.ResolveEligibleActors(ctx, tx, tenantID, area, sel.Role)
+		if err != nil {
+			return []string{}, err
+		}
+		for _, id := range got {
+			if _, ok := seen[id]; !ok {
+				seen[id] = struct{}{}
+				ids = append(ids, id)
+			}
+		}
+	}
+	if ids == nil {
+		ids = []string{}
+	}
+	return ids, nil
+}
+
 func (r *phase5Repo) LoadPriorSignoffs(ctx context.Context, tx db.Tx, tenantID, instanceID, activeStageID string) ([]domain.Signoff, error) {
 	rows, err := tx.QueryContext(ctx, `
 		SELECT id, approval_instance_id, stage_instance_id,

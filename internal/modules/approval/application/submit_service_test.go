@@ -142,6 +142,41 @@ func (r *fakeSubmitRepo) ResolveEligibleActors(ctx context.Context, tx db.Tx, te
 	return ids, rows.Err()
 }
 
+// ResolveEligibleActorsForSelectors is called by SubmitRevisionForReview (M4,
+// unit 3.2, slice 3) via stage.EffectiveSelectors(). Existing fixtures only
+// exercise legacy stages (no explicit Selectors), which synthesize a single
+// role_in_fixed_area selector — delegate straight to ResolveEligibleActors
+// for that kind; other kinds are not exercised by these fixtures.
+func (r *fakeSubmitRepo) ResolveEligibleActorsForSelectors(ctx context.Context, tx db.Tx, tenantID string, selectors []domain.ActorSelector, subjectArea string) ([]string, error) {
+	seen := make(map[string]struct{})
+	var ids []string
+	for _, sel := range selectors {
+		var area string
+		switch sel.Kind {
+		case domain.SelectorRoleInFixedArea:
+			area = sel.AreaCode
+		case domain.SelectorRoleInDocumentArea:
+			area = subjectArea
+		default:
+			continue
+		}
+		got, err := r.ResolveEligibleActors(ctx, tx, tenantID, area, sel.Role)
+		if err != nil {
+			return []string{}, err
+		}
+		for _, id := range got {
+			if _, ok := seen[id]; !ok {
+				seen[id] = struct{}{}
+				ids = append(ids, id)
+			}
+		}
+	}
+	if ids == nil {
+		ids = []string{}
+	}
+	return ids, nil
+}
+
 // The remaining 4 new interface methods are not called by SubmitRevisionForReview.
 // The embedded infrastructure.ApprovalRepository is nil, so these must be explicitly
 // implemented to avoid a nil-pointer panic if the compiler checks the interface.

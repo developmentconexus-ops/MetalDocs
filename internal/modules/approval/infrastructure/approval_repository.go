@@ -183,6 +183,12 @@ type ApprovalRepository interface {
 	// ErrNoActiveContentHash to ErrContentHashMismatch.
 	LoadFrozenContentHash(ctx context.Context, tx db.Tx, tenantID, instanceID string) (string, error)
 	ResolveEligibleActors(ctx context.Context, tx db.Tx, tenantID, areaCode, requiredRole string) ([]string, error)
+	// ResolveEligibleActorsForSelectors is the selector-union resolver (M4,
+	// unit 3.2, slice 3). It unions the per-selector pools of every selector
+	// in selectors, dedups by user_id, and returns the result in deterministic
+	// (ascending) order. subjectArea is the submitting document/template's
+	// resolved area — used only by role_in_document_area selectors.
+	ResolveEligibleActorsForSelectors(ctx context.Context, tx db.Tx, tenantID string, selectors []domain.ActorSelector, subjectArea string) ([]string, error)
 	// LoadActorDisplayName returns metaldocs.iam_users.display_name for (tenantID,
 	// userID), or "" when the user row is absent. It runs OFF the caller's
 	// transaction (on the pool) so it never executes inside the signoff

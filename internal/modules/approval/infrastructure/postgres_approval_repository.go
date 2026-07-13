@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -1807,6 +1808,96 @@ func (r *postgresApprovalRepository) ResolveEligibleActors(ctx context.Context, 
 		return []string{}, fmt.Errorf("resolveEligibleActors: rows: %w", err)
 	}
 	return ids, nil
+}
+
+// ResolveEligibleActorsForSelectors is the selector-union resolver (M4, unit
+// 3.2, slice 3; spec §4). It resolves each selector's own pool and returns
+// the union, deduped by user_id, in deterministic ascending order (never
+// nil). Kinds:
+//
+//   - named_user: contributes {UserID} only after confirming the user exists
+//     and is active in the tenant (v_active_user_areas membership); an
+//     inactive/absent named user contributes nothing — not an error, the
+//     zero-pool guard at the submit call site handles emptiness.
+//   - role_in_fixed_area: the existing role×area query, verbatim, scoped to
+//     selector.AreaCode.
+//   - role_in_document_area: the same query, scoped to subjectArea (the
+//     submitting document/template's resolved area) instead of a
+//     selector-carried area.
+//   - submit_choice: contributes no pool at snapshot time (slice 5 unions
+//     the caller-chosen actors in at submit) — skipped entirely, never an
+//     error.
+//
+// Single-tx, non-recording read (H-PRE-1): no authz.Require inside.
+func (r *postgresApprovalRepository) ResolveEligibleActorsForSelectors(ctx context.Context, tx db.Tx, tenantID string, selectors []domain.ActorSelector, subjectArea string) ([]string, error) {
+	pools := make([][]string, 0, len(selectors))
+	for _, sel := range selectors {
+		switch sel.Kind {
+		case domain.SelectorNamedUser:
+			active, err := r.isActiveUser(ctx, tx, tenantID, sel.UserID)
+			if err != nil {
+				return []string{}, fmt.Errorf("resolveEligibleActorsForSelectors: named_user: %w", err)
+			}
+			if active {
+				pools = append(pools, []string{sel.UserID})
+			}
+		case domain.SelectorRoleInFixedArea:
+			ids, err := r.ResolveEligibleActors(ctx, tx, tenantID, sel.AreaCode, sel.Role)
+			if err != nil {
+				return []string{}, fmt.Errorf("resolveEligibleActorsForSelectors: role_in_fixed_area: %w", err)
+			}
+			pools = append(pools, ids)
+		case domain.SelectorRoleInDocumentArea:
+			ids, err := r.ResolveEligibleActors(ctx, tx, tenantID, subjectArea, sel.Role)
+			if err != nil {
+				return []string{}, fmt.Errorf("resolveEligibleActorsForSelectors: role_in_document_area: %w", err)
+			}
+			pools = append(pools, ids)
+		case domain.SelectorSubmitChoice:
+			// Contributes nothing at snapshot time (slice 5).
+		}
+	}
+	return unionDedupSort(pools...), nil
+}
+
+// isActiveUser reports whether userID is an active member of tenantID, per
+// metaldocs.v_active_user_areas (the same published active-membership view
+// ResolveEligibleActors trusts).
+func (r *postgresApprovalRepository) isActiveUser(ctx context.Context, tx db.Tx, tenantID, userID string) (bool, error) {
+	var found string
+	err := tx.QueryRowContext(ctx,
+		`SELECT user_id
+		   FROM metaldocs.v_active_user_areas
+		  WHERE tenant_id = $1::uuid
+		    AND user_id   = $2
+		  LIMIT 1`,
+		tenantID, userID,
+	).Scan(&found)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// unionDedupSort is the pure union+dedup+sort core of
+// ResolveEligibleActorsForSelectors, split out so it is unit-testable
+// without a DB. Returns [] (never nil) for no input pools.
+func unionDedupSort(pools ...[]string) []string {
+	seen := make(map[string]struct{})
+	for _, pool := range pools {
+		for _, id := range pool {
+			seen[id] = struct{}{}
+		}
+	}
+	ids := make([]string, 0, len(seen))
+	for id := range seen {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
 }
 
 // LoadControlledDocumentID returns documents.controlled_document_id for
