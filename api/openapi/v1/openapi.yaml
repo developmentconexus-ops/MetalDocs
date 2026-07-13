@@ -7067,16 +7067,14 @@ components:
     StageRequest:
       type: object
       additionalProperties: true
-      required: [order, name, required_role, required_capability, area_code, quorum, drift_policy]
+      required: [order, name, required_capability, quorum, drift_policy, selectors]
       properties:
         order:
           type: integer
           minimum: 1
           description: 1-based stage ordinal. Must equal index+1.
         name: { type: string, minLength: 1, maxLength: 64 }
-        required_role: { type: string, minLength: 1, maxLength: 64, pattern: '^[a-z0-9_-]+$' }
         required_capability: { type: string, minLength: 1, maxLength: 64, pattern: '^[a-z][a-z0-9_]*\.[a-z0-9._]*[a-z0-9]$' }
-        area_code: { type: string, minLength: 1, maxLength: 64, pattern: '^[a-z0-9_-]+$' }
         quorum: { $ref: '#/components/schemas/QuorumKind' }
         quorum_m:
           type: integer
@@ -7093,21 +7091,21 @@ components:
             this field.
         selectors:
           type: array
+          minItems: 1
           items: { $ref: '#/components/schemas/ActorSelector' }
           description: >-
-            M4 ActorSelector (unit 3.2). Optional during the flat-column
-            coexistence window; when omitted the stage's required_role/area_code
-            are synthesized into a single role_in_fixed_area selector.
+            M4 ActorSelector (unit 3.2). REQUIRED — selectors are the sole
+            source of truth for a stage's actor pool. The legacy flat
+            required_role/area_code wire fields have been removed entirely
+            (no fallback, no synthesis).
     StageSummary:
       type: object
       additionalProperties: true
-      required: [order, name, required_role, required_capability, area_code, quorum, drift_policy, quorum_m]
+      required: [order, name, required_capability, quorum, drift_policy, quorum_m, selectors]
       properties:
         order: { type: integer, minimum: 1 }
         name: { type: string }
-        required_role: { type: string }
         required_capability: { type: string }
-        area_code: { type: string }
         quorum: { $ref: '#/components/schemas/QuorumKind' }
         quorum_m:
           type: integer
@@ -7120,8 +7118,12 @@ components:
           description: F0 (spec.md §4/W2) — review vs approval stage; defaults to approval.
         selectors:
           type: array
+          minItems: 1
           items: { $ref: '#/components/schemas/ActorSelector' }
-          description: M4 ActorSelector (unit 3.2). Optional during the flat-column coexistence window.
+          description: >-
+            M4 ActorSelector (unit 3.2). Sole source of truth for the stage's
+            actor pool; always returned. The legacy flat required_role/area_code
+            wire fields have been removed entirely.
     CreateRouteRequest:
       type: object
       additionalProperties: true

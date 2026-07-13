@@ -69,9 +69,7 @@ type RouteStage struct {
 	ID                 string
 	Order              int
 	Name               string
-	RequiredRole       string
 	RequiredCapability string
-	AreaCode           string
 	Quorum             string
 	QuorumM            *int
 	DriftPolicy        string

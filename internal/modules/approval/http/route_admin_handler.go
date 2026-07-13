@@ -224,18 +224,14 @@ func mapListRoute(route infrastructure.Route) contracts.ListRouteItem {
 
 	stages := make([]contracts.ListStageItem, 0, len(route.Stages))
 	for _, stage := range route.Stages {
-		// required_role/area_code are compat wire fields (M4 ActorSelector,
-		// unit 3.2 slice 6b): Selectors is the sole source of truth, so the
-		// flat pair is derived back via FlatRoleArea for a single
-		// role_in_fixed_area stage; multi/other-kind stages emit "" (FE reads
-		// Selectors directly post-slice-7/8).
-		r, a := domain.FlatRoleArea(stage.Selectors)
+		// Selectors is the sole source of truth for a stage's actor pool
+		// (unit 3.2 slice 7a, wire contract extermination): the flat
+		// required_role/area_code wire fields are gone entirely, no
+		// derived-back compat pair.
 		stages = append(stages, contracts.ListStageItem{
 			Order:              stage.Order,
 			Name:               stage.Name,
-			RequiredRole:       r,
 			RequiredCapability: stage.RequiredCapability,
-			AreaCode:           a,
 			Quorum:             contracts.QuorumKind(stage.Quorum),
 			QuorumM:            stage.QuorumM,
 			DriftPolicy:        contracts.DriftPolicyKind(stage.DriftPolicy),
@@ -267,23 +263,10 @@ func mapStageRequests(stages []contracts.StageRequest) []domain.Stage {
 		// so no silent default is needed (and a defaulted code may not even be
 		// a registered capability).
 		cap := strings.TrimSpace(s.RequiredCapability)
-		// Selectors is the sole source of truth for domain.Stage post-slice-6b
-		// (required_role/area_code dropped from the route-stage DB layer and
-		// the domain.Stage struct). The wire still carries the flat compat
-		// fields (FE sends them until slices 7/8 migrate it), so this is the
-		// sole surviving flat->selector synthesis site — the old domain
-		// EffectiveSelectors bridge, relocated to the HTTP boundary: if the
-		// wire supplied explicit selectors they win, else synthesize the
-		// single role_in_fixed_area selector the 0303 backfill would have
-		// produced. Net: stage.Selectors is always non-empty after mapping.
-		selectors := mapSelectorsFromWire(s.Selectors)
-		if len(selectors) == 0 {
-			selectors = []domain.ActorSelector{{
-				Kind:     domain.SelectorRoleInFixedArea,
-				Role:     strings.ToLower(strings.TrimSpace(s.RequiredRole)),
-				AreaCode: strings.ToLower(strings.TrimSpace(s.AreaCode)),
-			}}
-		}
+		// Selectors is the sole source of truth for domain.Stage (unit 3.2
+		// slice 7a, wire contract extermination): the wire's selectors field
+		// is contract-required and non-empty (validateStages), so no
+		// flat->selector synthesis is needed or performed here anymore.
 		out = append(out, domain.Stage{
 			Order:              s.Order,
 			Name:               s.Name,
@@ -296,7 +279,7 @@ func mapStageRequests(stages []contracts.StageRequest) []domain.Stage {
 			// migration 0286 DEFAULT 'approval'); a supplied review makes a
 			// review-kind stage. Validated as review|approval|"" in contracts.
 			Kind:      domain.StageKind(s.StageKind),
-			Selectors: selectors,
+			Selectors: mapSelectorsFromWire(s.Selectors),
 		})
 	}
 	return out

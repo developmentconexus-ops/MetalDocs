@@ -16,11 +16,11 @@ import (
 )
 
 // TestCreateRoute_SelectorRoundTrip pins the M4 ActorSelector contract wiring
-// (unit 3.2, slice 4) end-to-end at the wire boundary: a stage carrying an
-// explicit named_user selector (alongside the still-required
-// required_role/area_code, per the flat-column coexistence window) decodes
-// through CreateRouteHandler into a domain.Stage.Selectors slice, and the
-// same selector shape read back through ListRoutesHandler's wire mapping
+// (unit 3.2 slice 7a, wire contract extermination) end-to-end at the wire
+// boundary: a stage carrying only an explicit named_user selector (the flat
+// required_role/area_code wire fields no longer exist at all) decodes through
+// CreateRouteHandler into a domain.Stage.Selectors slice, and the same
+// selector shape read back through ListRoutesHandler's wire mapping
 // round-trips byte-for-byte.
 func TestCreateRoute_SelectorRoundTrip(t *testing.T) {
 	svc := &fakeRouteAdminService{
@@ -29,7 +29,7 @@ func TestCreateRoute_SelectorRoundTrip(t *testing.T) {
 	h := &Handler{routeAdmin: svc}
 	mux := routeAdminTestMux(h)
 
-	body := `{"profile_code":"ops","name":"Ops Route","stages":[{"order":1,"name":"Review","required_role":"approver","required_capability":"document.signoff","area_code":"ops","quorum":"any_1_of","drift_policy":"reduce_quorum","selectors":[{"kind":"named_user","user_id":"user-42"}]}]}`
+	body := `{"profile_code":"ops","name":"Ops Route","stages":[{"order":1,"name":"Review","required_capability":"document.signoff","quorum":"any_1_of","drift_policy":"reduce_quorum","selectors":[{"kind":"named_user","user_id":"user-42"}]}]}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/routes", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
@@ -63,8 +63,8 @@ func TestCreateRoute_SelectorRoundTrip(t *testing.T) {
 				Active: true, Version: 1, Total: 1,
 				Stages: []infrastructure.RouteStage{
 					{
-						Order: 1, Name: "Review", RequiredRole: "approver", RequiredCapability: "document.signoff",
-						AreaCode: "ops", Quorum: "any_1_of", DriftPolicy: "reduce_quorum",
+						Order: 1, Name: "Review", RequiredCapability: "document.signoff",
+						Quorum: "any_1_of", DriftPolicy: "reduce_quorum",
 						Selectors: []domain.ActorSelector{{Kind: domain.SelectorNamedUser, UserID: "user-42"}},
 					},
 				},

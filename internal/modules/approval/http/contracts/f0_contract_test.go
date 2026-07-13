@@ -25,9 +25,11 @@ func TestInstanceStatusWireEnumComplete(t *testing.T) {
 // free-text kind, an unpersistable value slips through to the DB.
 func TestStageRequestStageKindValidation(t *testing.T) {
 	base := StageRequest{
-		Order: 1, Name: "Revisão", RequiredRole: "approver",
-		RequiredCapability: "document.signoff", AreaCode: "ops",
-		Quorum: QuorumKindAny1Of, DriftPolicy: DriftPolicyKindReduceQuorum,
+		Order:              1,
+		Name:               "Revisão",
+		RequiredCapability: "document.signoff",
+		Quorum:             QuorumKindAny1Of, DriftPolicy: DriftPolicyKindReduceQuorum,
+		Selectors: []ActorSelector{{Kind: SelectorKindRoleInFixedArea, Role: "approver", AreaCode: "ops"}},
 	}
 	cases := []struct {
 		name    string

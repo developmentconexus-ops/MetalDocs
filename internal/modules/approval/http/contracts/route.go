@@ -103,9 +103,7 @@ func (s ActorSelector) Validate() error {
 type StageRequest struct {
 	Order              int             `json:"order"`
 	Name               string          `json:"name"`
-	RequiredRole       string          `json:"required_role"`
 	RequiredCapability string          `json:"required_capability"`
-	AreaCode           string          `json:"area_code"`
 	Quorum             QuorumKind      `json:"quorum"`
 	QuorumM            *int            `json:"quorum_m,omitempty"`
 	DriftPolicy        DriftPolicyKind `json:"drift_policy"`
@@ -115,10 +113,11 @@ type StageRequest struct {
 	// are unchanged. A review-kind route is only creatable once this field can
 	// be supplied.
 	StageKind StageKind `json:"stage_kind,omitempty"`
-	// Selectors (M4 ActorSelector, unit 3.2). Optional during the flat-column
-	// coexistence window; when empty, RequiredRole/AreaCode still govern via
-	// the domain EffectiveSelectors bridge.
-	Selectors []ActorSelector `json:"selectors,omitempty"`
+	// Selectors (M4 ActorSelector, unit 3.2) is the REQUIRED sole source of
+	// truth for the stage's actor pool. The legacy flat required_role/area_code
+	// wire fields have been removed entirely — no fallback, no synthesis
+	// (unit 3.2 slice 7a, "wire contract extermination").
+	Selectors []ActorSelector `json:"selectors"`
 }
 
 // CreateRouteRequest is the decoded body for the create-route endpoint.
@@ -190,25 +189,10 @@ func validateStages(stages []StageRequest) error {
 			return fmt.Errorf("stages[%d].name duplicates an earlier stage", i)
 		}
 		seenNames[stage.Name] = struct{}{}
-		if err := validateRequired(fmt.Sprintf("stages[%d].required_role", i), stage.RequiredRole); err != nil {
-			return err
-		}
-		if err := validateRouteCode(fmt.Sprintf("stages[%d].required_role", i), stage.RequiredRole); err != nil {
-			return err
-		}
-		if err := validateAreaRole(fmt.Sprintf("stages[%d].required_role", i), stage.RequiredRole); err != nil {
-			return err
-		}
 		if err := validateRequired(fmt.Sprintf("stages[%d].required_capability", i), stage.RequiredCapability); err != nil {
 			return err
 		}
 		if err := validateRequiredCapability(fmt.Sprintf("stages[%d].required_capability", i), stage.RequiredCapability); err != nil {
-			return err
-		}
-		if err := validateRequired(fmt.Sprintf("stages[%d].area_code", i), stage.AreaCode); err != nil {
-			return err
-		}
-		if err := validateRouteCode(fmt.Sprintf("stages[%d].area_code", i), stage.AreaCode); err != nil {
 			return err
 		}
 		switch stage.Quorum {
@@ -238,14 +222,25 @@ func validateStages(stages []StageRequest) error {
 		default:
 			return fmt.Errorf("stages[%d].stage_kind must be one of: review, approval", i)
 		}
-		// Selectors are optional during the flat-column coexistence window
-		// (M4, unit 3.2): an empty slice is not an error here — the
-		// EffectiveSelectors bridge + domain Route.Validate cover the ≥1
-		// selector rule downstream. When present, each selector must be
-		// internally consistent for its kind.
+		// Selectors are the REQUIRED sole source of truth for the stage's
+		// actor pool (M4, unit 3.2 slice 7a — flat required_role/area_code
+		// wire fields are gone, no fallback/synthesis). Each selector must be
+		// internally consistent for its kind, and any selector kind that
+		// carries a role (role_in_fixed_area, role_in_document_area,
+		// submit_choice — everything but named_user) re-homes the ADR 0022
+		// registry binding formerly applied to the flat required_role field:
+		// the role must be a canonical AREA role.
+		if len(stage.Selectors) == 0 {
+			return fmt.Errorf("stages[%d].selectors must contain at least one selector", i)
+		}
 		for j, sel := range stage.Selectors {
 			if err := sel.Validate(); err != nil {
 				return fmt.Errorf("stages[%d].selectors[%d]: %w", i, j, err)
+			}
+			if sel.Kind == SelectorKindRoleInFixedArea || sel.Kind == SelectorKindRoleInDocumentArea || sel.Kind == SelectorKindSubmitChoice {
+				if err := validateAreaRole(fmt.Sprintf("stages[%d].selectors[%d].role", i, j), sel.Role); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -262,14 +257,19 @@ func validateRouteCode(field, value string) error {
 	return nil
 }
 
-// validateAreaRole binds a stage's required_role to the IAM role registry: it
-// must be a canonical AREA role (a value a user can actually hold in
-// user_process_areas, against which approval eligibility is resolved). Without
-// this, required_role was free text — an admin could configure a stage requiring
-// a role no user can ever hold (a phantom or a typo), producing a silently
-// unsatisfiable stage (empty eligible pool → blocked approvals). The value has
-// already passed the lowercase [a-z0-9_-]+ format check (ADR 0022 — role strings
-// bound to the registry, not free text).
+// validateAreaRole binds a role string to the IAM role registry: it must be a
+// canonical AREA role (a value a user can actually hold in
+// user_process_areas, against which approval eligibility is resolved).
+// Applied to every actor-selector kind that carries a role
+// (role_in_fixed_area, role_in_document_area, submit_choice — everything but
+// named_user; see validateStages). Without this, a role string was free text —
+// an admin could configure a stage requiring a role no user can ever hold (a
+// phantom or a typo), producing a silently unsatisfiable stage (empty
+// eligible pool → blocked approvals). The value has already passed the
+// lowercase [a-z0-9_-]+ format check (ADR 0022 — role strings bound to the
+// registry, not free text). Formerly applied to the flat required_role field;
+// re-homed onto selector.role in unit 3.2 slice 7a when that field was
+// removed from the wire entirely.
 func validateAreaRole(field, value string) error {
 	if iamdomain.IsAreaRole(iamdomain.Role(value)) {
 		return nil
@@ -320,32 +320,30 @@ type RouteResponse struct {
 type StageResponse struct {
 	Order              int             `json:"order"`
 	Name               string          `json:"name"`
-	RequiredRole       string          `json:"required_role"`
 	RequiredCapability string          `json:"required_capability"`
-	AreaCode           string          `json:"area_code"`
 	Quorum             QuorumKind      `json:"quorum"`
 	QuorumM            *int            `json:"quorum_m,omitempty"`
 	DriftPolicy        DriftPolicyKind `json:"drift_policy"`
 	StageKind          StageKind       `json:"stage_kind"`
-	// Selectors (M4 ActorSelector, unit 3.2). Optional during the flat-column
-	// coexistence window.
-	Selectors []ActorSelector `json:"selectors,omitempty"`
+	// Selectors (M4 ActorSelector, unit 3.2) is the sole source of truth for
+	// the stage's actor pool; always populated (legacy required_role/area_code
+	// wire fields removed entirely).
+	Selectors []ActorSelector `json:"selectors"`
 }
 
 // ListStageItem is the wire representation of one stage within a ListRouteItem.
 type ListStageItem struct {
 	Order              int             `json:"order"`
 	Name               string          `json:"name"`
-	RequiredRole       string          `json:"required_role"`
 	RequiredCapability string          `json:"required_capability"`
-	AreaCode           string          `json:"area_code"`
 	Quorum             QuorumKind      `json:"quorum"`
 	QuorumM            *int            `json:"quorum_m,omitempty"`
 	DriftPolicy        DriftPolicyKind `json:"drift_policy"`
 	StageKind          StageKind       `json:"stage_kind"`
-	// Selectors (M4 ActorSelector, unit 3.2). Optional during the flat-column
-	// coexistence window.
-	Selectors []ActorSelector `json:"selectors,omitempty"`
+	// Selectors (M4 ActorSelector, unit 3.2) is the sole source of truth for
+	// the stage's actor pool; always populated (legacy required_role/area_code
+	// wire fields removed entirely).
+	Selectors []ActorSelector `json:"selectors"`
 }
 
 // ListRouteItem is one row of the list-routes response.

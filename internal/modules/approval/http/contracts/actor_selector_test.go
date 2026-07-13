@@ -53,9 +53,10 @@ func TestActorSelectorValidate(t *testing.T) {
 // rejected with a stages[i].selectors[j]-scoped error.
 func TestValidateStages_SelectorsField(t *testing.T) {
 	baseStage := StageRequest{
-		Order: 1, Name: "Review", RequiredRole: "approver",
-		RequiredCapability: "document.signoff", AreaCode: "ops",
-		Quorum: QuorumKindAny1Of, DriftPolicy: DriftPolicyKindReduceQuorum,
+		Order:              1,
+		Name:               "Review",
+		RequiredCapability: "document.signoff",
+		Quorum:             QuorumKindAny1Of, DriftPolicy: DriftPolicyKindReduceQuorum,
 	}
 
 	t.Run("valid named_user selector accepted", func(t *testing.T) {
@@ -74,10 +75,14 @@ func TestValidateStages_SelectorsField(t *testing.T) {
 		}
 	})
 
-	t.Run("empty selectors accepted (coexistence bridge)", func(t *testing.T) {
+	// unit 3.2 slice 7a (wire contract extermination): selectors is now the
+	// REQUIRED sole source of truth — an empty slice is rejected, not
+	// silently bridged from flat required_role/area_code (which no longer
+	// exist on the wire).
+	t.Run("empty selectors rejected", func(t *testing.T) {
 		s := baseStage
-		if err := validateStages([]StageRequest{s}); err != nil {
-			t.Fatalf("validateStages() = %v, want nil", err)
+		if err := validateStages([]StageRequest{s}); err == nil {
+			t.Fatalf("validateStages() = nil, want error for empty selectors")
 		}
 	})
 }
