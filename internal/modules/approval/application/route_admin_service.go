@@ -286,7 +286,7 @@ func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in
 			return fmt.Errorf("insert route: %w", mapped)
 		}
 
-		if err := insertRouteStages(ctx, tx, routeID, in.Stages); err != nil {
+		if err := insertRouteStages(ctx, tx, in.TenantID, routeID, in.Stages); err != nil {
 			return err
 		}
 
@@ -510,7 +510,7 @@ func (s *RouteAdminService) updateInPlaceOrSupersede(ctx context.Context, tx *sq
 			if _, err := tx.ExecContext(ctx, `DELETE FROM approval_route_stages WHERE route_id = $1`, in.RouteID); err != nil {
 				return "", 0, fmt.Errorf("delete stages: %w", err)
 			}
-			if err := insertRouteStages(ctx, tx, in.RouteID, in.Stages); err != nil {
+			if err := insertRouteStages(ctx, tx, in.TenantID, in.RouteID, in.Stages); err != nil {
 				return "", 0, err
 			}
 		}
@@ -559,7 +559,7 @@ func (s *RouteAdminService) updateInPlaceOrSupersede(ctx context.Context, tx *sq
 		return "", 0, fmt.Errorf("insert superseding route version: %w", infrastructure.MapPgError(err, infrastructure.MapHints{}))
 	}
 
-	if err := insertRouteStages(ctx, tx, routeID, in.Stages); err != nil {
+	if err := insertRouteStages(ctx, tx, in.TenantID, routeID, in.Stages); err != nil {
 		return "", 0, err
 	}
 
@@ -804,7 +804,14 @@ func lockRouteForUpdate(ctx context.Context, tx *sql.Tx, tenantID, routeID strin
 	return state, nil
 }
 
-func insertRouteStages(ctx context.Context, tx *sql.Tx, routeID string, stages []domain.Stage) error {
+// insertRouteStages persists the flat approval_route_stages rows, then
+// insertRouteStageSelectors persists the ActorSelector rows that govern each
+// stage's eligible-actor pool (unit 3.2 M4, B2 DB expand). Every stage's
+// EffectiveSelectors() is written — for a legacy stage carrying only
+// RequiredRole/AreaCode this synthesizes the single role_in_fixed_area
+// selector the 0303 backfill would have produced, keeping newly-written
+// routes consistent with backfilled ones during the coexistence window.
+func insertRouteStages(ctx context.Context, tx *sql.Tx, tenantID, routeID string, stages []domain.Stage) error {
 	if len(stages) == 0 {
 		return nil
 	}
@@ -843,6 +850,74 @@ func insertRouteStages(ctx context.Context, tx *sql.Tx, routeID string, stages [
 		VALUES ` + strings.Join(placeholders, ",")
 	if _, err := tx.ExecContext(ctx, query, args...); err != nil {
 		return fmt.Errorf("route_admin: insert stages: %w", infrastructure.MapPgError(err, infrastructure.MapHints{}))
+	}
+
+	if err := insertRouteStageSelectors(ctx, tx, tenantID, routeID, stages); err != nil {
+		return err
+	}
+	return nil
+}
+
+// insertRouteStageSelectors writes the approval_route_stage_selectors rows
+// for every stage's EffectiveSelectors(). It correlates each selector row to
+// its parent approval_route_stages row entirely in SQL — a single INSERT
+// ... SELECT ... JOIN keyed on (route_id, stage_order) — rather than a
+// round-trip to fetch the just-inserted stage ids, since the batched stage
+// INSERT above has no RETURNING clause.
+func insertRouteStageSelectors(ctx context.Context, tx *sql.Tx, tenantID, routeID string, stages []domain.Stage) error {
+	type selectorRow struct {
+		stageOrder int
+		order      int
+		kind       string
+		userID     any
+		role       any
+		areaCode   any
+	}
+
+	var rows []selectorRow
+	for _, st := range stages {
+		for i, sel := range st.EffectiveSelectors() {
+			rows = append(rows, selectorRow{
+				stageOrder: st.Order,
+				order:      i + 1,
+				kind:       string(sel.Kind),
+				userID:     nullableString(sel.UserID),
+				role:       nullableString(sel.Role),
+				areaCode:   nullableString(sel.AreaCode),
+			})
+		}
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+
+	const colsPerRow = 6
+	placeholders := make([]string, 0, len(rows))
+	args := make([]any, 0, len(rows)*colsPerRow+2)
+	args = append(args, tenantID)
+	for i, rr := range rows {
+		base := i*colsPerRow + 2
+		placeholders = append(placeholders, fmt.Sprintf(
+			"($%d::int,$%d::int,$%d::text,$%d::text,$%d::text,$%d::text)",
+			base, base+1, base+2, base+3, base+4, base+5,
+		))
+		args = append(args, rr.stageOrder, rr.order, rr.kind, rr.userID, rr.role, rr.areaCode)
+	}
+	routeIDPlaceholder := len(args) + 1
+	args = append(args, routeID)
+
+	query := fmt.Sprintf(`
+		INSERT INTO approval_route_stage_selectors
+			(tenant_id, route_stage_id, selector_order, kind, user_id, role, area_code)
+		SELECT $1::uuid, s.id, v.selector_order, v.kind, v.user_id, v.role, v.area_code
+		  FROM approval_route_stages s
+		  JOIN (VALUES %s) AS v(stage_order, selector_order, kind, user_id, role, area_code)
+		    ON s.stage_order = v.stage_order
+		 WHERE s.route_id = $%d::uuid`,
+		strings.Join(placeholders, ","), routeIDPlaceholder,
+	)
+	if _, err := tx.ExecContext(ctx, query, args...); err != nil {
+		return fmt.Errorf("route_admin: insert stage selectors: %w", infrastructure.MapPgError(err, infrastructure.MapHints{}))
 	}
 	return nil
 }

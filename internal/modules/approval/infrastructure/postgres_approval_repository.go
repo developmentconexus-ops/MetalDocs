@@ -1926,7 +1926,7 @@ func (r *postgresApprovalRepository) LoadRoute(ctx context.Context, tx db.Tx, te
 	route.Subject = domain.Subject{Kind: domain.SubjectKind(subjectKind), Key: subjectKey}
 
 	rows, err := tx.QueryContext(ctx, `
-		SELECT ars.stage_order, ars.name, ars.required_role, ars.required_capability,
+		SELECT ars.id, ars.stage_order, ars.name, ars.required_role, ars.required_capability,
 		       ars.area_code, ars.quorum, ars.quorum_m, ars.on_eligibility_drift,
 		       ars.stage_kind, ars.due_in_days
 		  FROM approval_route_stages ars
@@ -1942,13 +1942,15 @@ func (r *postgresApprovalRepository) LoadRoute(ctx context.Context, tx db.Tx, te
 	}
 	defer rows.Close()
 
+	var stageIDs []string
 	for rows.Next() {
 		var stage domain.Stage
+		var stageID string
 		var quorumM sql.NullInt32
 		var dueInDays sql.NullInt32
 		var kindStr string
 		if err := rows.Scan(
-			&stage.Order, &stage.Name, &stage.RequiredRole, &stage.RequiredCapability,
+			&stageID, &stage.Order, &stage.Name, &stage.RequiredRole, &stage.RequiredCapability,
 			&stage.AreaCode, &stage.Quorum, &quorumM, &stage.OnEligibilityDrift,
 			&kindStr, &dueInDays,
 		); err != nil {
@@ -1964,12 +1966,66 @@ func (r *postgresApprovalRepository) LoadRoute(ctx context.Context, tx db.Tx, te
 			stage.DueInDays = &v
 		}
 		route.Stages = append(route.Stages, stage)
+		stageIDs = append(stageIDs, stageID)
 	}
 	if err := rows.Err(); err != nil {
 		return domain.Route{}, err
 	}
 
+	if len(stageIDs) > 0 {
+		selectorsByStageID, err := loadRouteStageSelectors(ctx, tx, stageIDs)
+		if err != nil {
+			return domain.Route{}, err
+		}
+		for i, stageID := range stageIDs {
+			route.Stages[i].Selectors = selectorsByStageID[stageID]
+		}
+	}
+
 	return route, nil
+}
+
+// loadRouteStageSelectors batch-loads the ActorSelector rows for every stage
+// id in stageIDs (unit 3.2 M4, B2 DB expand), keyed by route_stage_id and
+// ordered by selector_order — the single-query idiom already used elsewhere
+// in this file for batch-by-ids loads (e.g. LoadInstancesByIDs), avoiding an
+// N+1 per stage.
+func loadRouteStageSelectors(ctx context.Context, tx db.Tx, stageIDs []string) (map[string][]domain.ActorSelector, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT route_stage_id, kind, user_id, role, area_code
+		  FROM approval_route_stage_selectors
+		 WHERE route_stage_id = ANY($1)
+		 ORDER BY route_stage_id, selector_order ASC`,
+		pq.Array(stageIDs),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("load route stage selectors: %w", err)
+	}
+	defer rows.Close()
+
+	out := make(map[string][]domain.ActorSelector, len(stageIDs))
+	for rows.Next() {
+		var stageID, kind string
+		var userID, role, areaCode sql.NullString
+		if err := rows.Scan(&stageID, &kind, &userID, &role, &areaCode); err != nil {
+			return nil, fmt.Errorf("scan route stage selector: %w", err)
+		}
+		sel := domain.ActorSelector{Kind: domain.SelectorKind(kind)}
+		if userID.Valid {
+			sel.UserID = userID.String
+		}
+		if role.Valid {
+			sel.Role = role.String
+		}
+		if areaCode.Valid {
+			sel.AreaCode = areaCode.String
+		}
+		out[stageID] = append(out[stageID], sel)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate route stage selectors: %w", err)
+	}
+	return out, nil
 }
 
 // ── F9 delegation (ADR 0077) ─────────────────────────────────────────────────
