@@ -4,9 +4,11 @@ import { buildTemplateApprovalChain } from './templateApprovalChain';
 import type { VersionDTO } from '../api/templates';
 
 // Field-to-field guard for the template → shared ApprovalChainItem[] mapping.
-// Parity with documents/lib/approvalWorkflow.test.ts: templates are NOT
-// signoff-less, so this asserts the same three-step submit→review→approve chain
-// the shared cockpit flow-viz renders, with honest-omit (no fabricated names).
+// Kernel rebuild (unit 3.1a S3): three steps — Submissão → Aprovação →
+// Publicação — driven solely by status + submitted_at/approved_at/published_at.
+// The Aprovação/Publicação steps honest-omit the actor: the kernel completion
+// writer never populates reviewer_id/approver_id, and VersionDTO carries no
+// publisher-id field at all, so showing them would fabricate a signer.
 
 function makeVersion(overrides: Partial<VersionDTO> = {}): VersionDTO {
   return {
@@ -35,35 +37,37 @@ function makeVersion(overrides: Partial<VersionDTO> = {}): VersionDTO {
 }
 
 describe('buildTemplateApprovalChain', () => {
-  it('always produces a stable three-step submit→review→approve chain', () => {
+  it('always produces a stable three-step Submissão→Aprovação→Publicação chain', () => {
     const chain = buildTemplateApprovalChain(makeVersion());
     expect(chain).toHaveLength(3);
     expect(chain.map((s) => s.stageIndex)).toEqual([0, 1, 2]);
-    expect(chain.map((s) => s.label)).toEqual(['Autoria', 'Revisão técnica', 'Aprovação']);
-    expect(chain.map((s) => s.roleLabel)).toEqual(['Autoria', 'Revisão técnica', 'Aprovação']);
+    expect(chain.map((s) => s.label)).toEqual(['Submissão', 'Aprovação', 'Publicação']);
+    expect(chain.map((s) => s.roleLabel)).toEqual(['Submissão', 'Aprovação', 'Publicação']);
   });
 
-  it('draft: authoring is current, downstream stages pending, no decisions/timestamps', () => {
-    const [submit, review, approve] = buildTemplateApprovalChain(makeVersion({ status: 'draft' }));
+  it('draft: submission is current, downstream stages pending/waiting, no decisions/timestamps', () => {
+    const [submit, approve, publish] = buildTemplateApprovalChain(makeVersion({ status: 'draft' }));
 
     expect(submit.flowState).toBe('current');
     expect(submit.status).toBe('active');
     expect(submit.decision).toBeNull();
     expect(submit.signedAt).toBeNull();
     expect(submit.actorUserId).toBe('author-1');
+    expect(submit.actorDisplay).toBe('author-1');
 
-    expect(review.flowState).toBe('pending');
-    expect(review.decision).toBeNull();
     expect(approve.flowState).toBe('pending');
+    expect(approve.status).toBe('waiting');
     expect(approve.decision).toBeNull();
+    expect(publish.flowState).toBe('pending');
+    expect(publish.status).toBe('waiting');
+    expect(publish.decision).toBeNull();
   });
 
-  it('under_review: submit sent, review current, approve pending; pending role fills actorDisplay', () => {
-    const [submit, review, approve] = buildTemplateApprovalChain(
+  it('under_review: submit sent, approve current, publish pending — honest-omit actor', () => {
+    const [submit, approve, publish] = buildTemplateApprovalChain(
       makeVersion({
         status: 'under_review',
         submitted_at: '2026-01-02T10:00:00Z',
-        pending_reviewer_role: 'quality-reviewer',
       }),
     );
 
@@ -72,51 +76,62 @@ describe('buildTemplateApprovalChain', () => {
     expect(submit.decision).toBe('submitted');
     expect(submit.signedAt).toBe('2026-01-02T10:00:00Z');
 
-    expect(review.flowState).toBe('current');
-    // Honest-omit: no reviewer_id yet, so the pending role stands in for the actor.
-    expect(review.actorUserId).toBeNull();
-    expect(review.actorDisplay).toBe('quality-reviewer');
-    expect(review.signedAt).toBeNull();
+    expect(approve.flowState).toBe('current');
+    expect(approve.status).toBe('active');
+    // Honest-omit: the kernel completion writer never populates reviewer_id/
+    // approver_id, so there is no real signer identity to show yet.
+    expect(approve.actorUserId).toBeNull();
+    expect(approve.actorDisplay).toBeNull();
+    expect(approve.signedAt).toBeNull();
+    expect(approve.decision).toBeNull();
 
-    expect(approve.flowState).toBe('pending');
+    expect(publish.flowState).toBe('pending');
   });
 
-  it('approved: submit sent, review approved (done), approve current', () => {
-    const [submit, review, approve] = buildTemplateApprovalChain(
+  it('approved: submit sent, approve done, publish current — approve step still honest-omits the actor', () => {
+    const [submit, approve, publish] = buildTemplateApprovalChain(
       makeVersion({
         status: 'approved',
         submitted_at: '2026-01-02T10:00:00Z',
-        reviewed_at: '2026-01-03T10:00:00Z',
-        reviewer_id: 'reviewer-1',
-      }),
-    );
-
-    expect(submit.flowState).toBe('sent');
-    expect(review.flowState).toBe('approved');
-    expect(review.decision).toBe('approved');
-    expect(review.actorUserId).toBe('reviewer-1');
-    expect(review.actorDisplay).toBe('reviewer-1');
-    expect(review.signedAt).toBe('2026-01-03T10:00:00Z');
-    expect(approve.flowState).toBe('current');
-  });
-
-  it('published: all three stages resolved as done', () => {
-    const [submit, review, approve] = buildTemplateApprovalChain(
-      makeVersion({
-        status: 'published',
-        submitted_at: '2026-01-02T10:00:00Z',
-        reviewed_at: '2026-01-03T10:00:00Z',
-        approved_at: '2026-01-04T10:00:00Z',
+        approved_at: '2026-01-03T10:00:00Z',
         reviewer_id: 'reviewer-1',
         approver_id: 'approver-1',
       }),
     );
 
     expect(submit.flowState).toBe('sent');
-    expect(review.flowState).toBe('approved');
     expect(approve.flowState).toBe('approved');
+    expect(approve.status).toBe('approved');
     expect(approve.decision).toBe('approved');
-    expect(approve.actorDisplay).toBe('approver-1');
-    expect(approve.signedAt).toBe('2026-01-04T10:00:00Z');
+    // Even though reviewer_id/approver_id are set on the fixture, the mapper
+    // never reads them — the kernel writer that produced this real state
+    // never actually populates those columns (see module header).
+    expect(approve.actorUserId).toBeNull();
+    expect(approve.actorDisplay).toBeNull();
+    expect(approve.signedAt).toBe('2026-01-03T10:00:00Z');
+
+    expect(publish.flowState).toBe('current');
+    expect(publish.status).toBe('active');
+    expect(publish.decision).toBeNull();
+  });
+
+  it('published: all three stages resolved as done', () => {
+    const [submit, approve, publish] = buildTemplateApprovalChain(
+      makeVersion({
+        status: 'published',
+        submitted_at: '2026-01-02T10:00:00Z',
+        approved_at: '2026-01-03T10:00:00Z',
+        published_at: '2026-01-04T10:00:00Z',
+      }),
+    );
+
+    expect(submit.flowState).toBe('sent');
+    expect(approve.flowState).toBe('approved');
+    expect(publish.flowState).toBe('approved');
+    expect(publish.status).toBe('approved');
+    expect(publish.decision).toBe('published');
+    expect(publish.actorUserId).toBeNull();
+    expect(publish.actorDisplay).toBeNull();
+    expect(publish.signedAt).toBe('2026-01-04T10:00:00Z');
   });
 });

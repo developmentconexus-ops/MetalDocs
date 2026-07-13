@@ -5,16 +5,23 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mocks — must be hoisted before any imports that pull the real modules
 // ---------------------------------------------------------------------------
 
+const authState = vi.hoisted(() => ({
+  capabilities: ['template.submit', 'template.approve', 'template.publish'] as string[],
+}));
+
 vi.mock('../../../store/auth.store', () => ({
   useAuthStore: (
-    selector: (state: { user: { userId: string; displayName: string; roles: string[]; capabilities: string[] } }) => unknown,
+    selector: (state: {
+      user: { userId: string; displayName: string; username: string; email: string | null; capabilities: string[] };
+    }) => unknown,
   ) =>
     selector({
       user: {
         userId: 'actor-1',
         displayName: 'Test Actor',
-        roles: ['reviewer', 'approver'],
-        capabilities: ['template.submit', 'template.review', 'template.approve'],
+        username: 'test.actor',
+        email: 'test.actor@example.com',
+        capabilities: authState.capabilities,
       },
     }),
 }));
@@ -77,13 +84,22 @@ function makeVersion(overrides: Record<string, unknown> = {}) {
 
 function makeHandlers(): TemplateApprovalHandlers {
   return {
-    runReview: vi.fn(),
-    runApprove: vi.fn(),
+    runSignoff: vi.fn(),
+    runPublish: vi.fn(),
   };
 }
 
 function makeDecisionSubmit() {
   return vi.fn().mockResolvedValue(undefined);
+}
+
+function mockDetail(status: string, overrides: Record<string, unknown> = {}) {
+  vi.mocked(useTemplateDetailQuery).mockReturnValue({
+    data: { template: BASE_TEMPLATE, latest_version: makeVersion({ status, ...overrides }) },
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  } as never);
 }
 
 // ---------------------------------------------------------------------------
@@ -93,15 +109,11 @@ function makeDecisionSubmit() {
 describe('useTemplateApprovalArtifact', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useTemplateDetailQuery).mockReturnValue({
-      data: { template: BASE_TEMPLATE, latest_version: makeVersion() },
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    } as never);
+    authState.capabilities = ['template.submit', 'template.approve', 'template.publish'];
+    mockDetail('draft');
   });
 
-  it('returns model.kind === "template" and a 3-step submit→review→approve chain', () => {
+  it('returns model.kind === "template" and a 3-step Submissão→Aprovação→Publicação chain', () => {
     const { result } = renderHook(() =>
       useTemplateApprovalArtifact('tpl-1', makeHandlers(), makeDecisionSubmit()),
     );
@@ -111,50 +123,61 @@ describe('useTemplateApprovalArtifact', () => {
     const chain = result.current.model.approvalChain;
     expect(chain).not.toBeNull();
     expect(chain).toHaveLength(3);
-    expect(chain?.map((s) => s.label)).toEqual(['Autoria', 'Revisão técnica', 'Aprovação']);
-    // Draft: authoring is the current step, downstream stages still pending.
+    expect(chain?.map((s) => s.label)).toEqual(['Submissão', 'Aprovação', 'Publicação']);
+    // Draft: submission is the current step, downstream stages still pending.
     expect(chain?.[0].flowState).toBe('current');
     expect(chain?.[1].flowState).toBe('pending');
     expect(chain?.[2].flowState).toBe('pending');
   });
 
-  it('for under_review WITH reviewer + fully-capable actor → model.actions has 2 items, both available:true', () => {
-    vi.mocked(useTemplateDetailQuery).mockReturnValue({
-      data: {
-        template: BASE_TEMPLATE,
-        latest_version: makeVersion({
-          status: 'under_review',
-          pending_reviewer_role: 'reviewer',
-          pending_approver_role: 'approver',
-        }),
-      },
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    } as never);
+  it('for under_review + capable actor → decision is offered and actions[] is suppressed (empty)', () => {
+    mockDetail('under_review');
+
+    const { result } = renderHook(() =>
+      useTemplateApprovalArtifact('tpl-1', makeHandlers(), makeDecisionSubmit()),
+    );
+
+    // ArtifactApprovalScreen renders an "Outras ações" band for whatever is left
+    // in actions[] even while a decision is offered — without this suppression
+    // under_review would show the accept/reject pair twice (decision panel +
+    // plain-action band).
+    expect(result.current.model.decision).toBeDefined();
+    expect(result.current.model.actions).toEqual([]);
+  });
+
+  it('for under_review + actor WITHOUT template.approve → decision is undefined and the disabled accept/reject fallback surfaces', () => {
+    authState.capabilities = ['template.submit'];
+    mockDetail('under_review');
+
+    const { result } = renderHook(() =>
+      useTemplateApprovalArtifact('tpl-1', makeHandlers(), makeDecisionSubmit()),
+    );
+
+    expect(result.current.model.decision).toBeUndefined();
+    const { actions } = result.current.model;
+    expect(actions).toHaveLength(2);
+    expect(actions[0].key).toBe('accept');
+    expect(actions[0].available).toBe(false);
+    expect(actions[1].key).toBe('reject');
+    expect(actions[1].available).toBe(false);
+  });
+
+  it('for approved + capable actor → model.actions offers a single available "publish" action', () => {
+    mockDetail('approved');
 
     const { result } = renderHook(() =>
       useTemplateApprovalArtifact('tpl-1', makeHandlers(), makeDecisionSubmit()),
     );
 
     const { actions } = result.current.model;
-    expect(actions).toHaveLength(2);
-    expect(actions[0].key).toBe('accept');
+    expect(actions).toHaveLength(1);
+    expect(actions[0].key).toBe('publish');
+    expect(actions[0].label).toBe('Publicar');
     expect(actions[0].available).toBe(true);
-    expect(actions[1].key).toBe('reject');
-    expect(actions[1].available).toBe(true);
   });
 
   it('for published version → model.actions is []', () => {
-    vi.mocked(useTemplateDetailQuery).mockReturnValue({
-      data: {
-        template: BASE_TEMPLATE,
-        latest_version: makeVersion({ status: 'published' }),
-      },
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    } as never);
+    mockDetail('published');
 
     const { result } = renderHook(() =>
       useTemplateApprovalArtifact('tpl-1', makeHandlers(), makeDecisionSubmit()),
@@ -164,15 +187,7 @@ describe('useTemplateApprovalArtifact', () => {
   });
 
   it('returns the raw version and surfaces isLoading/isError from the base', () => {
-    vi.mocked(useTemplateDetailQuery).mockReturnValue({
-      data: {
-        template: BASE_TEMPLATE,
-        latest_version: makeVersion({ status: 'under_review', pending_reviewer_role: 'reviewer' }),
-      },
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    } as never);
+    mockDetail('under_review');
 
     const { result } = renderHook(() =>
       useTemplateApprovalArtifact('tpl-1', makeHandlers(), makeDecisionSubmit()),
@@ -216,20 +231,8 @@ describe('useTemplateApprovalArtifact', () => {
   // ── FE-02: model.decision is the single ArtifactDecisionModel construction path
   // (previously built inline in TemplateApprovalRoute) ─────────────────────────
 
-  it('for under_review WITH reviewer + fully-capable actor → model.decision offers accept/reject with no password/legal/signer', () => {
-    vi.mocked(useTemplateDetailQuery).mockReturnValue({
-      data: {
-        template: BASE_TEMPLATE,
-        latest_version: makeVersion({
-          status: 'under_review',
-          pending_reviewer_role: 'reviewer',
-          pending_approver_role: 'approver',
-        }),
-      },
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    } as never);
+  it('for under_review + capable actor → model.decision offers accept/reject with password + signer, no legal', () => {
+    mockDetail('under_review');
 
     const { result } = renderHook(() =>
       useTemplateApprovalArtifact('tpl-1', makeHandlers(), makeDecisionSubmit()),
@@ -238,41 +241,19 @@ describe('useTemplateApprovalArtifact', () => {
     const { decision } = result.current.model;
     expect(decision).toBeDefined();
     expect(decision?.options.map((o) => o.key)).toEqual(['accept', 'reject']);
-    expect(decision?.options.find((o) => o.key === 'accept')?.label).toBe('Aprovar revisão');
+    expect(decision?.options.find((o) => o.key === 'accept')?.label).toBe('Assinar aprovação');
     expect(decision?.options.find((o) => o.key === 'reject')?.requiresReason).toBe(true);
-    expect(decision?.password).toBeNull();
+    expect(decision?.password).toEqual({ label: 'Senha' });
     expect(decision?.legal).toBeNull();
-    expect(decision?.signer).toBeNull();
+    expect(decision?.signer).toEqual({
+      name: 'Test Actor',
+      detail: 'test.actor@example.com',
+      note: 'Assinatura digital gerada no ato da confirmação.',
+    });
   });
 
-  it('for approved status → model.decision offers "Publicar" as the accept label', () => {
-    vi.mocked(useTemplateDetailQuery).mockReturnValue({
-      data: {
-        template: BASE_TEMPLATE,
-        latest_version: makeVersion({ status: 'approved' }),
-      },
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    } as never);
-
-    const { result } = renderHook(() =>
-      useTemplateApprovalArtifact('tpl-1', makeHandlers(), makeDecisionSubmit()),
-    );
-
-    expect(result.current.model.decision?.options.find((o) => o.key === 'accept')?.label).toBe('Publicar');
-  });
-
-  it('for published version → model.decision is undefined (accept.available is false: no actions)', () => {
-    vi.mocked(useTemplateDetailQuery).mockReturnValue({
-      data: {
-        template: BASE_TEMPLATE,
-        latest_version: makeVersion({ status: 'published' }),
-      },
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    } as never);
+  it('for approved status → model.decision is undefined (publish has no signature ceremony)', () => {
+    mockDetail('approved');
 
     const { result } = renderHook(() =>
       useTemplateApprovalArtifact('tpl-1', makeHandlers(), makeDecisionSubmit()),
@@ -281,23 +262,29 @@ describe('useTemplateApprovalArtifact', () => {
     expect(result.current.model.decision).toBeUndefined();
   });
 
-  it('decision.submit calls the injected decisionSubmit with (accept, reason)', async () => {
-    vi.mocked(useTemplateDetailQuery).mockReturnValue({
-      data: {
-        template: BASE_TEMPLATE,
-        latest_version: makeVersion({ status: 'approved' }),
-      },
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    } as never);
+  it('for published version → model.decision is undefined', () => {
+    mockDetail('published');
+
+    const { result } = renderHook(() =>
+      useTemplateApprovalArtifact('tpl-1', makeHandlers(), makeDecisionSubmit()),
+    );
+
+    expect(result.current.model.decision).toBeUndefined();
+  });
+
+  it('decision.submit calls the injected decisionSubmit with (accept, reason, password)', async () => {
+    mockDetail('under_review');
 
     const decisionSubmit = makeDecisionSubmit();
     const { result } = renderHook(() =>
       useTemplateApprovalArtifact('tpl-1', makeHandlers(), decisionSubmit),
     );
 
-    await result.current.model.decision?.submit({ optionKey: 'reject', reason: 'Conteúdo incorreto', password: '' });
-    expect(decisionSubmit).toHaveBeenCalledWith(false, 'Conteúdo incorreto');
+    await result.current.model.decision?.submit({
+      optionKey: 'reject',
+      reason: 'Conteúdo incorreto',
+      password: 'segredo123',
+    });
+    expect(decisionSubmit).toHaveBeenCalledWith(false, 'Conteúdo incorreto', 'segredo123');
   });
 });

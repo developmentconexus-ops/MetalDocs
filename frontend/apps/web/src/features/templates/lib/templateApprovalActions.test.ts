@@ -31,164 +31,112 @@ function makeVersion(overrides: Partial<VersionDTO> = {}): VersionDTO {
 
 function makeActor(overrides: Partial<ActorContext> = {}): ActorContext {
   return {
-    roles: ['reviewer', 'approver'],
-    capabilities: ['template.submit', 'template.review', 'template.approve'],
+    capabilities: ['template.submit', 'template.approve', 'template.publish'],
     ...overrides,
   };
 }
 
 function makeHandlers(): TemplateApprovalHandlers & {
-  runReview: ReturnType<typeof vi.fn>;
-  runApprove: ReturnType<typeof vi.fn>;
+  runSignoff: ReturnType<typeof vi.fn>;
+  runPublish: ReturnType<typeof vi.fn>;
 } {
   return {
-    runReview: vi.fn(),
-    runApprove: vi.fn(),
+    runSignoff: vi.fn(),
+    runPublish: vi.fn(),
   };
 }
 
 describe('buildTemplateApprovalActions', () => {
   describe('draft status', () => {
     // R1: the template editor is the sole author submit surface — the cockpit
-    // yields no actions for draft versions (finding 14: no second submit trigger).
-    it('emits no actions (no "submit" key survives in the cockpit)', () => {
+    // yields no actions for draft versions.
+    it('emits no actions', () => {
       const actions = buildTemplateApprovalActions(makeVersion(), makeActor(), makeHandlers());
       expect(actions).toEqual([]);
-      expect(actions.find((a) => a.key === 'submit')).toBeUndefined();
     });
   });
 
-  describe('under_review WITH pending_reviewer_role', () => {
-    it('emits two actions: accept (label "Aprovar revisão") and reject', () => {
-      const version = makeVersion({
-        status: 'under_review',
-        pending_reviewer_role: 'reviewer',
-        pending_approver_role: 'approver',
-      });
-      const actor = makeActor({ roles: ['reviewer'], capabilities: ['template.review'] });
-      const actions = buildTemplateApprovalActions(version, actor, makeHandlers());
+  describe('under_review status', () => {
+    it('emits accept ("Assinar aprovação") and reject ("Rejeitar")', () => {
+      const version = makeVersion({ status: 'under_review' });
+      const actions = buildTemplateApprovalActions(version, makeActor(), makeHandlers());
 
       expect(actions).toHaveLength(2);
       expect(actions[0].key).toBe('accept');
-      expect(actions[0].label).toBe('Aprovar revisão');
+      expect(actions[0].label).toBe('Assinar aprovação');
       expect(actions[0].variant).toBe('primary');
       expect(actions[1].key).toBe('reject');
       expect(actions[1].label).toBe('Rejeitar');
       expect(actions[1].variant).toBe('danger');
     });
 
-    it('both actions are available when actor has template.review + matching role', () => {
-      const version = makeVersion({
-        status: 'under_review',
-        pending_reviewer_role: 'reviewer',
-      });
-      const actor = makeActor({ roles: ['reviewer'], capabilities: ['template.review'] });
+    it('both actions available when actor has template.approve', () => {
+      const version = makeVersion({ status: 'under_review' });
+      const actor = makeActor({ capabilities: ['template.approve'] });
       const actions = buildTemplateApprovalActions(version, actor, makeHandlers());
 
       expect(actions[0].available).toBe(true);
       expect(actions[1].available).toBe(true);
     });
 
-    it('clicking accept calls runReview with true', () => {
-      const version = makeVersion({
-        status: 'under_review',
-        pending_reviewer_role: 'reviewer',
-      });
-      const actor = makeActor({ roles: ['reviewer'], capabilities: ['template.review'] });
-      const handlers = makeHandlers();
-      const actions = buildTemplateApprovalActions(version, actor, handlers);
-
-      actions[0].run();
-      expect(handlers.runReview).toHaveBeenCalledWith(true);
-      expect(handlers.runApprove).not.toHaveBeenCalled();
-    });
-
-    it('clicking reject calls runReview with false', () => {
-      const version = makeVersion({
-        status: 'under_review',
-        pending_reviewer_role: 'reviewer',
-      });
-      const actor = makeActor({ roles: ['reviewer'], capabilities: ['template.review'] });
-      const handlers = makeHandlers();
-      const actions = buildTemplateApprovalActions(version, actor, handlers);
-
-      actions[1].run();
-      expect(handlers.runReview).toHaveBeenCalledWith(false);
-    });
-  });
-
-  describe('under_review WITHOUT pending_reviewer_role (no-reviewer flow)', () => {
-    it('emits accept with label "Publicar" and reject', () => {
-      const version = makeVersion({
-        status: 'under_review',
-        pending_reviewer_role: null,
-        pending_approver_role: 'approver',
-      });
-      const actor = makeActor({ roles: ['approver'], capabilities: ['template.approve'] });
+    it('both actions denied when actor lacks template.approve', () => {
+      const version = makeVersion({ status: 'under_review' });
+      const actor = makeActor({ capabilities: [] });
       const actions = buildTemplateApprovalActions(version, actor, makeHandlers());
 
-      expect(actions).toHaveLength(2);
-      expect(actions[0].key).toBe('accept');
-      expect(actions[0].label).toBe('Publicar');
-      expect(actions[0].available).toBe(true);
-      expect(actions[1].key).toBe('reject');
+      expect(actions[0].available).toBe(false);
+      expect(actions[0].reason).toBeTruthy();
+      expect(actions[1].available).toBe(false);
     });
 
-    it('clicking accept calls runApprove with true', () => {
-      const version = makeVersion({
-        status: 'under_review',
-        pending_reviewer_role: null,
-        pending_approver_role: 'approver',
-      });
-      const actor = makeActor({ roles: ['approver'], capabilities: ['template.approve'] });
+    it('clicking accept calls runSignoff(true)', () => {
+      const version = makeVersion({ status: 'under_review' });
       const handlers = makeHandlers();
-      const actions = buildTemplateApprovalActions(version, actor, handlers);
+      const actions = buildTemplateApprovalActions(version, makeActor(), handlers);
 
       actions[0].run();
-      expect(handlers.runApprove).toHaveBeenCalledWith(true);
-      expect(handlers.runReview).not.toHaveBeenCalled();
+      expect(handlers.runSignoff).toHaveBeenCalledWith(true);
+      expect(handlers.runPublish).not.toHaveBeenCalled();
+    });
+
+    it('clicking reject calls runSignoff(false)', () => {
+      const version = makeVersion({ status: 'under_review' });
+      const handlers = makeHandlers();
+      const actions = buildTemplateApprovalActions(version, makeActor(), handlers);
+
+      actions[1].run();
+      expect(handlers.runSignoff).toHaveBeenCalledWith(false);
     });
   });
 
   describe('approved status', () => {
-    it('emits accept with label "Publicar" and reject, both available', () => {
-      const version = makeVersion({
-        status: 'approved',
-        pending_approver_role: 'approver',
-      });
-      const actor = makeActor({ roles: ['approver'], capabilities: ['template.approve'] });
-      const actions = buildTemplateApprovalActions(version, actor, makeHandlers());
+    it('emits a single "publish" action labeled "Publicar"', () => {
+      const version = makeVersion({ status: 'approved' });
+      const actions = buildTemplateApprovalActions(version, makeActor(), makeHandlers());
 
-      expect(actions).toHaveLength(2);
-      expect(actions[0].key).toBe('accept');
+      expect(actions).toHaveLength(1);
+      expect(actions[0].key).toBe('publish');
       expect(actions[0].label).toBe('Publicar');
+      expect(actions[0].variant).toBe('primary');
       expect(actions[0].available).toBe(true);
-      expect(actions[1].key).toBe('reject');
-      expect(actions[1].available).toBe(true);
     });
 
-    it('clicking accept calls runApprove with true', () => {
-      const version = makeVersion({
-        status: 'approved',
-        pending_approver_role: 'approver',
-      });
+    it('denied when actor lacks template.publish (template.approve alone is not enough)', () => {
+      const version = makeVersion({ status: 'approved' });
+      const actor = makeActor({ capabilities: ['template.approve'] });
+      const actions = buildTemplateApprovalActions(version, actor, makeHandlers());
+
+      expect(actions[0].available).toBe(false);
+    });
+
+    it('clicking publish calls runPublish()', () => {
+      const version = makeVersion({ status: 'approved' });
       const handlers = makeHandlers();
       const actions = buildTemplateApprovalActions(version, makeActor(), handlers);
 
       actions[0].run();
-      expect(handlers.runApprove).toHaveBeenCalledWith(true);
-    });
-
-    it('clicking reject calls runApprove with false', () => {
-      const version = makeVersion({
-        status: 'approved',
-        pending_approver_role: 'approver',
-      });
-      const handlers = makeHandlers();
-      const actions = buildTemplateApprovalActions(version, makeActor(), handlers);
-
-      actions[1].run();
-      expect(handlers.runApprove).toHaveBeenCalledWith(false);
+      expect(handlers.runPublish).toHaveBeenCalledTimes(1);
+      expect(handlers.runSignoff).not.toHaveBeenCalled();
     });
   });
 

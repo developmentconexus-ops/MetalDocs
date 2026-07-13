@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MetalDocsEditor, type MetalDocsEditorRef } from '@metaldocs/editor-ui';
-import { type TemplateSchemas, type VersionDTO, submitForReview } from '../api/templates';
+import { type TemplateSchemas, type VersionDTO, submitVersionForApproval } from '../api/templates';
 import { useTemplateDraft } from '../hooks/useTemplateDraft';
 import { useTemplateAutosave } from '../hooks/useTemplateAutosave';
 import { useTemplateSchemas } from '../hooks/useTemplateSchemas';
@@ -76,9 +76,7 @@ export function TemplateEditorPage({
   const isDraft = currentVersion?.status === 'draft';
 
   const user = useAuthStore((s) => s.user);
-  const actor: ActorContext = user
-    ? { roles: user.roles ?? [], capabilities: user.capabilities ?? [] }
-    : { roles: [], capabilities: [] };
+  const actor: ActorContext = { capabilities: user?.capabilities ?? [] };
   const submitGate = currentVersion ? canSubmit(currentVersion, actor) : null;
 
   const refreshTokenUsage = useCallback(() => {
@@ -157,11 +155,15 @@ export function TemplateEditorPage({
           return;
         }
       }
-      const updated = await submitForReview(templateId, versionNum, crypto.randomUUID());
-      setLiveVersion(updated);
-      setSubmitMsg({ kind: 'success', text: 'Enviado para revisão.' });
+      await submitVersionForApproval(templateId, versionNum, crypto.randomUUID());
+      // The kernel response carries only {instance_id, version_status} — no
+      // full VersionDTO to patch locally. Refetch (same idiom handleImportFile
+      // uses below) rather than fabricate the rest of the version's fields;
+      // the existing draft.version effect above resyncs `liveVersion`.
+      draft.refetch();
+      setSubmitMsg({ kind: 'success', text: 'Enviado para aprovação.' });
     } catch (err) {
-      setSubmitMsg({ kind: 'error', text: resolveQueryError(err, 'Falha ao submeter para revisão.') });
+      setSubmitMsg({ kind: 'error', text: resolveQueryError(err, 'Falha ao submeter para aprovação.') });
     } finally {
       setSubmitting(false);
     }
@@ -309,7 +311,7 @@ export function TemplateEditorPage({
                       disabled={submitting || !(submitGate?.allowed ?? false)}
                       title={submitGate && !submitGate.allowed ? submitGate.reason : undefined}
                     >
-                      {submitting ? 'Enviando...' : 'Submeter para revisão'}
+                      {submitting ? 'Enviando...' : 'Submeter para aprovação'}
                     </button>
                   </>
                 )}
