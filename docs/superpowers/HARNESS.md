@@ -45,11 +45,12 @@ Mechanics facts (probe-verified 2026-07-12):
   inside a symlinked node_modules (dep changes = `REQUEST` to the hub).
 - Unchanged worktrees auto-clean on completion; changed ones persist for the hub to merge.
 - The unit agent CAN dispatch nested sonnet/haiku workers (§4 obligations apply unreduced) —
-  but ONLY synchronously (`run_in_background: false`). Background nested children have a
-  parent-wake race (hit twice on the first real unit, 2026-07-13): the parent stops believing
-  the child is live, the child's completion never re-invokes it, and the unit deadlocks until
-  the hub pokes it. Unit-agent turns end ONLY with a §2 event, never with "waiting on my
-  worker" narration.
+  but ONLY synchronously (`run_in_background: false`). Confirmed mechanics (3.1a, 2026-07-13):
+  a BACKGROUND nested child's completion routes to the HUB session's main loop, never to the
+  parent agent — the parent stops "waiting" and deadlocks until the hub pokes it. Not a race;
+  deterministic misrouting. Hub side: a child-agent notification arriving at the hub = relay
+  its result to the parent via SendMessage immediately (parent must not re-implement). Unit-
+  agent turns end ONLY with a §2 event, never with "waiting on my worker" narration.
 - Crash model: background agents die with the hub session. Recovery = repo truth: commit per
   green slice on the worktree branch is mandatory, and hub boot (harness-hub skill) scans
   `worktree-agent-*` branches + `.claude/worktrees/agent-*` for orphaned in-flight work.
