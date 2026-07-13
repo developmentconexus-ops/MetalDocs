@@ -89,6 +89,40 @@ in force unchanged. Only ruling (a) — "approval stays nested" — is supersede
 - **Superseded trigger.** ADR 0072's promotion trigger is now consumed; no further "promote approval"
   decision is pending.
 
+### Transitional coexistence — M3 delivers the kernel, ROADMAP 3.1a retires the legacy path (operator-ratified 2026-07-12)
+
+M3 makes the kernel the **backend truth** for template approval (subject-generic instances/signoffs,
+subject-discriminated tripwire per [ADR 0083](0083-subject-discriminated-capability-tripwire.md), two
+additive contract-first routes `POST /templates/{id}/versions/{n}/submit-for-approval` + `/signoff`,
+validated by service- and repository-level real-DB integration). It does **not** yet make the kernel
+the *sole* path. During #11 close-out, investigation verified two facts that make an in-M3 "delete all
+legacy, no fallback" retirement non-executable without scope beyond this milestone:
+
+1. **The role-based model is not confined to the 4 legacy approval routes.** `templates_approval_config`
+   (`template_id` PK, `reviewer_role`, `approver_role`), `domain.ApprovalConfig`, the version
+   `PendingReviewerRole`/`PendingApproverRole` fields, `RoleBindingFor`, and `CheckSegregation` are
+   **still load-bearing** for two non-legacy paths: `CreateTemplate` seeds the approver/reviewer *role*
+   and writes the config table at creation (`application/create.go:83`), and `PublishTemplateVersion`
+   performs role-based SoD + role-binding tier-2 on the direct-publish path (`application/lifecycle.go:421-427`).
+   The table/type therefore cannot be dropped without also migrating create + publish off the role
+   model — a materially larger change than the 4 named routes.
+2. **The frontend has zero kernel-route consumer.** `TemplateApprovalRoute.tsx` / `TemplateEditorPage.tsx`
+   call only the legacy routes; no FE code calls the kernel routes. Deleting the legacy backend routes
+   in M3 would 404 the entire template-approval UI with no replacement.
+
+**Ratified resolution (Option A):** defer the full retirement to a sequenced dedicated follow-on milestone
+(**ROADMAP 3.1a**, "template legacy-approval retirement" — distinct from 3.2 ActorSelector), which does,
+atomically and in order: (a) migrate `CreateTemplate` (stop seeding roles) and `PublishTemplateVersion`
+(kernel-driven completion, remove role-SoD) off the role model; (b) rebuild the template-approval frontend
+onto the kernel routes; (c) then delete the legacy path (4 routes + handlers + `Service.SubmitForReview/Review/Approve/UpsertApprovalConfig`
++ `approval_config.go` + `GetApprovalConfig`/non-Tx `UpsertApprovalConfig` repo methods + legacy tests + FE
+consumers) and drop `templates_approval_config` behind a pre-drop emptiness assert. Until M4, the kernel and
+the legacy role-based path **coexist**; this is a named, tracked transitional debt, not a silent fallback —
+the kernel is the target sole path (decision unchanged), M4 is where legacy dies. Orphan bookkeeping to fold
+into M4: capability `CapTemplateReview` becomes functionally unreferenced once the legacy `review` route is
+deleted (registry + `arms.go` allowlist cleanup), and `domain.ApprovalConfig`/`ErrInvalidApprovalConfig`
+collapse once create + publish stop consuming them.
+
 ## Alternatives considered
 
 - **Keep the nested exception, add templates as a third intra-documents nest** — rejected: templates is

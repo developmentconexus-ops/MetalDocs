@@ -38,8 +38,8 @@
 | P3.S2b-3b-iii-a signoff tripwire discriminator | 2026-07-12 | sonnet | sonnet ACCEPT | parent-lookup CASE; byte-identity 3×; disjoint+fail-closed; live-DB integration | 4c311f16 | DONE |
 | P3.S2b-3b-iii-b template version lifecycle (submit-lock + signoff) | 2026-07-12 | sonnet | sonnet ACCEPT | STOP→hub Option-a; doc path byte-equal; boundary OK; neg-control P0001 role-indep | 0657cf04 | DONE |
 | P3.S2b-4 template HTTP entry points | 2026-07-12 | sonnet | sonnet (indep) REQUEST-CHANGES→ACCEPT | api-lint 0; boundary OK; api.gen regen empty-diff; delegation+cap-parity verified; blocker=untested integrity read → fixed | 9918848a + 88c25b0a | DONE |
-| P3.S3 config→route migration | — | sonnet | sonnet (indep) | cutover rule applied | — | pending |
-| P3.S4 retire parallel path | — | sonnet | sonnet (indep) | contract diff | — | pending |
+| P3.S3 config→route migration | 2026-07-12 | main (scout) | — | NO-OP: 0 configs (R4/P3.S1); `templates_approval_config(template_id PK, reviewer_role, approver_role)` has inbound FK→templates_template, ZERO outbound dependents → clean DROP folded into #11 behind pre-drop emptiness assert; no ceremonial empty migration | (evidence) | DONE (folded→#11) |
+| P3.S4 retire parallel path | 2026-07-12 | main (scout+verify) | operator decision | STOP — 2 verified blockers: (1) role model shared by CreateTemplate (create.go:83 seeds roles + writes table) + PublishTemplateVersion (lifecycle.go:421-427 role-SoD) → table not droppable; (2) FE has 0 kernel consumer → delete 404s UI. Operator ratified Option A: **DEFER retirement to sequenced M4**. No deletion in M3. Recorded in ADR 0082 §Transitional coexistence | (ADR 0082 note) | DEFERRED→M4 |
 
 ## Gate results (fill per slice)
 
