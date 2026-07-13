@@ -9,6 +9,18 @@
 - 2026-07-12 — ESCALATION sent (commit ffe604c6 base). ACK: R1 additive route-admin contract; R2(a)
   thin template entry points, retire parallel path; R3 3-phase relocate-then-generalize; R4 count
   in-flight first then hard-cutover/drain. openapi edits authorized within R1/R2 shapes.
+- 2026-07-12 — **R2(a) retirement scope RATIFIED (operator): "aposentar e deletar tudo legado, sem
+  fallback."** #11 deletes the ENTIRE role-based templates approval path with NO fallback/compat shim:
+  all 4 legacy routes (`/templates/{id}/versions/{n}/submit`, `/review`, `/approve`,
+  `/templates/{id}/approval-config`) + their handlers (`routes_lifecycle.go`
+  submitForReview/review/approve/upsertApprovalConfig) + the backing legacy services
+  (`Service.SubmitForReview/Review/Approve/UpsertApprovalConfig`) + role inputs
+  (`ActorRoles`/reviewer_role/approver_role) + route→cap entries + generated code + frontend consumers,
+  and the `template_approval_config` table/columns if orphaned after the data migration (#10; R4 found
+  0 configs in-flight → #10 is a clean drop, not a live backfill). Kernel flow
+  (route-admin → submit-for-approval → signoff, capability-based) becomes the SOLE template approval
+  path. Aligns [[no-fallback-principle]] + ADR 0022 (authz = capabilities never roles). #19 unaffected
+  (purely additive).
 
 ## Dispatch ledger (HARNESS §4.4)
 
