@@ -24,6 +24,21 @@ func insertUserRoleForTenant(t *testing.T, userID, role, tenantID string) {
 	ctx := context.Background()
 
 	withBypass(t, db, func(tx *sql.Tx) {
+		// Shared-DB hardening: this suite runs against the shared `metaldocs`
+		// database (testdb.DSN returns the raw DATABASE_URL — no per-test clone)
+		// with deterministic user IDs and manual t.Cleanup teardown. A prior run
+		// killed mid-test leaves an (user_id, role_code) row behind. The upsert
+		// below keys on (tenant_id, user_id), which does NOT cover the table PK
+		// (user_id, role_code): with a fresh random tenant per run the ON CONFLICT
+		// arm misses the leftover and the INSERT collides on iam_user_roles_pkey
+		// (23505). Clear any leftover rows for this deterministic user first so
+		// the seed is self-healing regardless of prior-run pollution.
+		if _, err := tx.ExecContext(ctx,
+			`DELETE FROM metaldocs.iam_user_roles WHERE user_id = $1`, userID,
+		); err != nil {
+			t.Fatalf("pre-clean iam_user_roles: %v", err)
+		}
+
 		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO metaldocs.iam_users (user_id, display_name, tenant_id)
 			 VALUES ($1, $2, $3::uuid)
@@ -116,6 +131,14 @@ VALUES ($1, 'Alice Admin', TRUE)
 ON CONFLICT (user_id) DO NOTHING
 `, userID); err != nil {
 			t.Fatalf("seed iam_users: %v", err)
+		}
+		// Shared-DB hardening (see insertUserRoleForTenant): clear leftover
+		// deterministic-user rows so a fresh random tenant can't collide on the
+		// iam_user_roles_pkey (user_id, role_code) uncovered by ON CONFLICT below.
+		if _, err := tx.ExecContext(ctx,
+			`DELETE FROM metaldocs.iam_user_roles WHERE user_id = $1`, userID,
+		); err != nil {
+			t.Fatalf("pre-clean iam_user_roles: %v", err)
 		}
 		if _, err := tx.ExecContext(ctx, `
 INSERT INTO metaldocs.iam_user_roles (user_id, tenant_id, role_code)

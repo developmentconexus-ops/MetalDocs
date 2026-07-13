@@ -58,6 +58,23 @@ func TestSequenceAllocatorNextAndIncrement_Concurrent(t *testing.T) {
 	// tripwire config in the test file — R1). Same effect the service layer's
 	// authz.Require has: the asserted-caps GUC set transaction-locally.
 	testdb.SetCapsOnTx(t, setupTx, `[{"cap":"taxonomy.manage"},{"cap":"controlled_documents.create"}]`)
+	// Shared-DB hardening: document_profiles.family_code FKs document_families(code);
+	// the 'quality' family was historically dev-seeded, but this suite runs against
+	// the shared metaldocs database (no per-test clone) whose seed state is not
+	// guaranteed → FK violation (23503). Provision the family in-fixture (idempotent;
+	// document_families carries trg_require_cap_asserted requiring taxonomy.manage,
+	// already asserted on this tx) so the setup is hermetic w.r.t. the FK parent.
+	if _, err := setupTx.ExecContext(context.Background(), `
+		INSERT INTO metaldocs.document_families
+			(code, tenant_id, name)
+		VALUES
+			('quality', $1, 'Quality')
+		ON CONFLICT (code) DO NOTHING`,
+		tenantID,
+	); err != nil {
+		_ = setupTx.Rollback()
+		t.Fatalf("seed family: %v", err)
+	}
 	if _, err := setupTx.ExecContext(context.Background(), `
 		INSERT INTO metaldocs.document_profiles
 			(code, tenant_id, family_code, name, description, review_interval_days, editable_by_role, alias)

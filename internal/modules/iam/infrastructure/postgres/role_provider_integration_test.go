@@ -66,12 +66,49 @@ func seedWithCapsIAM(t *testing.T, db *sql.DB, capsJSON string, fn func(tx *sql.
 //	(ii) 00000000-0000-0000-0000-000000000000 / system tenant → false (nil UUID)
 func TestRoleProvider_UserActiveInTenant_Live(t *testing.T) {
 	db := openLiveIAMDB(t)
-	defer db.Close()
+	// Register close as a t.Cleanup (not defer) so it runs AFTER the seed-teardown
+	// Cleanup below — t.Cleanup is LIFO and this is registered first, so the DELETE
+	// runs while the pool is still open (a plain `defer db.Close()` would close the
+	// pool before any t.Cleanup, breaking the teardown with "database is closed").
+	t.Cleanup(func() { db.Close() })
 
 	provider := iampg.NewRoleProvider(db)
 	ctx := context.Background()
 
 	const systemTenant = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+
+	// Shared-DB hardening: this Live probe reads a dev-seeded `admin` identity,
+	// but runs against the shared metaldocs database whose seed state is not
+	// guaranteed (testdb.DSN — no per-test clone; a rebuilt DB may omit it).
+	// Provision an active admin in the system tenant if absent and remove ONLY
+	// what we created, so the probe is hermetic while still validating the real
+	// EXISTS query. iam_users carries trg_require_cap_asserted (SEC-05 / 0259,
+	// user.manage) — seed with that capability asserted.
+	seededAdmin := false
+	seedWithCapsIAM(t, db, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
+		res, err := tx.ExecContext(ctx,
+			`INSERT INTO metaldocs.iam_users (user_id, display_name, tenant_id)
+			 VALUES ('admin', 'Seeded Admin Probe', $1::uuid)
+			 ON CONFLICT (user_id) DO NOTHING`,
+			systemTenant,
+		)
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 1 {
+			seededAdmin = true
+		}
+		return nil
+	})
+	if seededAdmin {
+		t.Cleanup(func() {
+			seedWithCapsIAM(t, db, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
+				_, err := tx.ExecContext(context.Background(),
+					`DELETE FROM metaldocs.iam_users WHERE user_id = 'admin'`)
+				return err
+			})
+		})
+	}
 
 	// (i) Known admin user must be active in system tenant.
 	active, err := provider.UserActiveInTenant(ctx, systemTenant, "admin")
