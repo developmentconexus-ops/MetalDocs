@@ -715,7 +715,11 @@ func (r *postgresApprovalRepository) ListRoutes(ctx context.Context, tenantID st
 		return nil, MapPgError(err, MapHints{})
 	}
 	defer rows.Close()
-	return scanRouteListRows(rows)
+	routes, err := scanRouteListRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	return hydrateRouteListSelectors(ctx, r.db, routes)
 }
 
 // ListRoutesTx is the transaction-scoped variant used by the route admin
@@ -727,7 +731,40 @@ func (r *postgresApprovalRepository) ListRoutesTx(ctx context.Context, tx db.Tx,
 		return nil, MapPgError(err, MapHints{})
 	}
 	defer rows.Close()
-	return scanRouteListRows(rows)
+	routes, err := scanRouteListRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	return hydrateRouteListSelectors(ctx, tx, routes)
+}
+
+// hydrateRouteListSelectors batch-loads the ActorSelector rows for every
+// stage across every route in one query (M4, unit 3.2, slice 4), reusing
+// loadRouteStageSelectors exactly as LoadRoute does — no N+1 per route or
+// per stage. querier is either the pooled *sql.DB (ListRoutes) or the
+// caller's tx (ListRoutesTx); both satisfy db.Tx structurally.
+func hydrateRouteListSelectors(ctx context.Context, querier db.Tx, routes []Route) ([]Route, error) {
+	var stageIDs []string
+	for _, route := range routes {
+		for _, stage := range route.Stages {
+			if stage.ID != "" {
+				stageIDs = append(stageIDs, stage.ID)
+			}
+		}
+	}
+	if len(stageIDs) == 0 {
+		return routes, nil
+	}
+	selectorsByStageID, err := loadRouteStageSelectors(ctx, querier, stageIDs)
+	if err != nil {
+		return nil, err
+	}
+	for i := range routes {
+		for j := range routes[i].Stages {
+			routes[i].Stages[j].Selectors = selectorsByStageID[routes[i].Stages[j].ID]
+		}
+	}
+	return routes, nil
 }
 
 // LoadActorDisplayName returns the approver's display name via the iam-owned
@@ -740,7 +777,7 @@ func (r *postgresApprovalRepository) LoadActorDisplayName(ctx context.Context, t
 
 const listRoutesQuery = `
 		SELECT r.id, r.name, r.tenant_id::text, r.profile_code, r.subject_kind, r.subject_key, r.active, r.version, r.created_at, r.created_at AS updated_at,
-		       s.stage_order, s.name, s.required_role, s.required_capability, s.area_code, s.quorum, s.quorum_m, s.on_eligibility_drift,
+		       s.id, s.stage_order, s.name, s.required_role, s.required_capability, s.area_code, s.quorum, s.quorum_m, s.on_eligibility_drift,
 		       s.stage_kind, s.due_in_days,
 		       (SELECT COUNT(*) FROM approval_routes WHERE tenant_id = $1::uuid) AS total_count
 		  FROM approval_routes r
@@ -761,6 +798,7 @@ func scanRouteListRows(rows *sql.Rows) ([]Route, error) {
 			version                                        int
 			createdAt, updatedAt                           time.Time
 			stage                                          RouteStage
+			stageID                                        string
 			stageName, stageRole, stageCapability          sql.NullString
 			stageArea, stageQuorum, stageDrift             sql.NullString
 			stageQuorumM                                   sql.NullInt64
@@ -770,12 +808,13 @@ func scanRouteListRows(rows *sql.Rows) ([]Route, error) {
 		)
 		if err := rows.Scan(
 			&routeID, &routeName, &routeTenantID, &profileCode, &subjectKind, &subjectKey, &active, &version, &createdAt, &updatedAt,
-			&stage.Order, &stageName, &stageRole, &stageCapability, &stageArea, &stageQuorum, &stageQuorumM, &stageDrift,
+			&stageID, &stage.Order, &stageName, &stageRole, &stageCapability, &stageArea, &stageQuorum, &stageQuorumM, &stageDrift,
 			&stageKind, &stageDueInDays,
 			&totalCount,
 		); err != nil {
 			return nil, fmt.Errorf("scan approval route list row: %w", err)
 		}
+		stage.ID = stageID
 
 		route := routeMap[routeID]
 		if route == nil {

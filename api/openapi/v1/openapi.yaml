@@ -7009,6 +7009,19 @@ components:
       type: string
       description: Behaviour applied when an actor loses eligibility mid-stage.
       enum: [reduce_quorum, fail_stage, keep_snapshot]
+    ActorSelector:
+      type: object
+      additionalProperties: true
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [named_user, role_in_fixed_area, role_in_document_area, submit_choice] }
+        user_id: { type: string, minLength: 1, maxLength: 64 }
+        role: { type: string, minLength: 1, maxLength: 64, pattern: '^[a-z0-9_-]+$' }
+        area_code: { type: string, minLength: 1, maxLength: 64, pattern: '^[a-z0-9_-]+$' }
+      description: >-
+        M4 ActorSelector (unit 3.2). Discriminated union by `kind`; per-kind field
+        presence enforced in domain + DB (named_user→user_id; role_in_fixed_area→role+area_code;
+        role_in_document_area→role; submit_choice→role+area_code).
     StageRequest:
       type: object
       additionalProperties: true
@@ -7036,6 +7049,13 @@ components:
             (signoff) stage. Optional; omitted defaults to approval at
             persistence. A review-kind route is only creatable by supplying
             this field.
+        selectors:
+          type: array
+          items: { $ref: '#/components/schemas/ActorSelector' }
+          description: >-
+            M4 ActorSelector (unit 3.2). Optional during the flat-column
+            coexistence window; when omitted the stage's required_role/area_code
+            are synthesized into a single role_in_fixed_area selector.
     StageSummary:
       type: object
       additionalProperties: true
@@ -7056,6 +7076,10 @@ components:
           type: string
           enum: [review, approval]
           description: F0 (spec.md §4/W2) — review vs approval stage; defaults to approval.
+        selectors:
+          type: array
+          items: { $ref: '#/components/schemas/ActorSelector' }
+          description: M4 ActorSelector (unit 3.2). Optional during the flat-column coexistence window.
     CreateRouteRequest:
       type: object
       additionalProperties: true

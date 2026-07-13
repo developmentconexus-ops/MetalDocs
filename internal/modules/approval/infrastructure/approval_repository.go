@@ -66,6 +66,7 @@ type Route struct {
 
 // RouteStage is the repository projection for an approval route stage.
 type RouteStage struct {
+	ID                 string
 	Order              int
 	Name               string
 	RequiredRole       string
@@ -76,6 +77,9 @@ type RouteStage struct {
 	DriftPolicy        string
 	Kind               string
 	DueInDays          *int
+	// Selectors (M4 ActorSelector, unit 3.2). Batch-loaded alongside the list
+	// query via loadRouteStageSelectors, the same helper LoadRoute uses.
+	Selectors []domain.ActorSelector
 }
 
 // ApprovalRepository defines all persistence operations for the approval subsystem.

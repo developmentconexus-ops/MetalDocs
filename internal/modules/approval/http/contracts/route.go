@@ -42,6 +42,63 @@ const (
 	StageKindApproval StageKind = "approval"
 )
 
+// SelectorKind is the wire representation of an ActorSelector's discriminator
+// (M4 ActorSelector, unit 3.2). Mirrors domain.SelectorKind exactly.
+type SelectorKind string
+
+// SelectorKind values.
+const (
+	SelectorKindNamedUser          SelectorKind = "named_user"
+	SelectorKindRoleInFixedArea    SelectorKind = "role_in_fixed_area"
+	SelectorKindRoleInDocumentArea SelectorKind = "role_in_document_area"
+	SelectorKindSubmitChoice       SelectorKind = "submit_choice"
+)
+
+// ActorSelector is the wire representation of one way a Stage may resolve its
+// eligible actor pool (M4 ActorSelector, unit 3.2). Kind discriminates which
+// of UserID/Role/AreaCode are meaningful; an empty field mirrors an absent
+// value, matching domain.ActorSelector.
+type ActorSelector struct {
+	Kind     SelectorKind `json:"kind"`
+	UserID   string       `json:"user_id,omitempty"`
+	Role     string       `json:"role,omitempty"`
+	AreaCode string       `json:"area_code,omitempty"`
+}
+
+// Validate mirrors domain.ActorSelector.Validate's exact field
+// presence/absence contract for s.Kind:
+//
+//   - named_user: UserID set, Role and AreaCode absent.
+//   - role_in_fixed_area: Role and AreaCode set, UserID absent.
+//   - role_in_document_area: Role set, UserID and AreaCode absent.
+//   - submit_choice: Role and AreaCode set, UserID absent.
+//
+// An unrecognized Kind or a recognized Kind with the wrong fields
+// present/absent returns a descriptive error.
+func (s ActorSelector) Validate() error {
+	switch s.Kind {
+	case SelectorKindNamedUser:
+		if s.UserID != "" && s.Role == "" && s.AreaCode == "" {
+			return nil
+		}
+	case SelectorKindRoleInFixedArea:
+		if s.Role != "" && s.AreaCode != "" && s.UserID == "" {
+			return nil
+		}
+	case SelectorKindRoleInDocumentArea:
+		if s.Role != "" && s.AreaCode == "" && s.UserID == "" {
+			return nil
+		}
+	case SelectorKindSubmitChoice:
+		if s.Role != "" && s.AreaCode != "" && s.UserID == "" {
+			return nil
+		}
+	default:
+		return fmt.Errorf("kind must be one of: named_user, role_in_fixed_area, role_in_document_area, submit_choice")
+	}
+	return fmt.Errorf("fields invalid for kind %q", s.Kind)
+}
+
 // StageRequest is the wire representation of one stage in a create/update route request.
 type StageRequest struct {
 	Order              int             `json:"order"`
@@ -58,6 +115,10 @@ type StageRequest struct {
 	// are unchanged. A review-kind route is only creatable once this field can
 	// be supplied.
 	StageKind StageKind `json:"stage_kind,omitempty"`
+	// Selectors (M4 ActorSelector, unit 3.2). Optional during the flat-column
+	// coexistence window; when empty, RequiredRole/AreaCode still govern via
+	// the domain EffectiveSelectors bridge.
+	Selectors []ActorSelector `json:"selectors,omitempty"`
 }
 
 // CreateRouteRequest is the decoded body for the create-route endpoint.
@@ -177,6 +238,16 @@ func validateStages(stages []StageRequest) error {
 		default:
 			return fmt.Errorf("stages[%d].stage_kind must be one of: review, approval", i)
 		}
+		// Selectors are optional during the flat-column coexistence window
+		// (M4, unit 3.2): an empty slice is not an error here — the
+		// EffectiveSelectors bridge + domain Route.Validate cover the ≥1
+		// selector rule downstream. When present, each selector must be
+		// internally consistent for its kind.
+		for j, sel := range stage.Selectors {
+			if err := sel.Validate(); err != nil {
+				return fmt.Errorf("stages[%d].selectors[%d]: %w", i, j, err)
+			}
+		}
 	}
 	return nil
 }
@@ -256,6 +327,9 @@ type StageResponse struct {
 	QuorumM            *int            `json:"quorum_m,omitempty"`
 	DriftPolicy        DriftPolicyKind `json:"drift_policy"`
 	StageKind          StageKind       `json:"stage_kind"`
+	// Selectors (M4 ActorSelector, unit 3.2). Optional during the flat-column
+	// coexistence window.
+	Selectors []ActorSelector `json:"selectors,omitempty"`
 }
 
 // ListStageItem is the wire representation of one stage within a ListRouteItem.
@@ -269,6 +343,9 @@ type ListStageItem struct {
 	QuorumM            *int            `json:"quorum_m,omitempty"`
 	DriftPolicy        DriftPolicyKind `json:"drift_policy"`
 	StageKind          StageKind       `json:"stage_kind"`
+	// Selectors (M4 ActorSelector, unit 3.2). Optional during the flat-column
+	// coexistence window.
+	Selectors []ActorSelector `json:"selectors,omitempty"`
 }
 
 // ListRouteItem is one row of the list-routes response.
