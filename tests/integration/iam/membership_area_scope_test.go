@@ -115,6 +115,31 @@ func seedAreaAdminMembership(t *testing.T, db *sql.DB, userID, areaCode string) 
 	t.Cleanup(func() { closeAllActive(db, userID) })
 }
 
+// seedProcessAreas provisions the document_process_areas parent rows these tests
+// depend on. user_process_areas carries an FK to document_process_areas(tenant_id,
+// code); the areas were historically supplied by the dev seeder, but this suite
+// runs against the shared `metaldocs` database (testdb.DSN — no per-test clone)
+// whose dev-seed state is not guaranteed. Provisioning the areas in-fixture makes
+// the test hermetic w.r.t. the FK parent (idempotent — safe to call every run).
+// document_process_areas carries trg_require_cap_asserted, so seed via the
+// scheduler bypass GUC.
+func seedProcessAreas(t *testing.T, db *sql.DB, codes ...string) {
+	t.Helper()
+	ctx := context.Background()
+	withBypass(t, db, func(tx *sql.Tx) {
+		for _, code := range codes {
+			if _, err := tx.ExecContext(ctx,
+				`INSERT INTO metaldocs.document_process_areas (tenant_id, code, name)
+				 VALUES ($1::uuid, $2, $2)
+				 ON CONFLICT (tenant_id, code) DO NOTHING`,
+				devTenant, code,
+			); err != nil {
+				t.Fatalf("seed document_process_areas %s: %v", code, err)
+			}
+		}
+	})
+}
+
 // withBypass runs fn inside a transaction with the scheduler authz bypass set,
 // committing on success. Used only for test seeding of tripwire-guarded tables.
 func withBypass(t *testing.T, db *sql.DB, fn func(tx *sql.Tx)) {
@@ -184,6 +209,7 @@ func TestMembershipAreaScope_AreaAdmin_WithinManagedArea(t *testing.T) {
 	svc := newAreaMembershipService(db)
 	ctx := context.Background()
 
+	seedProcessAreas(t, db, areaManaged, areaUnmanaged)
 	areaAdmin := testdb.DeterministicID(t, "area-admin")
 	target := testdb.DeterministicID(t, "target")
 	seedIdentity(t, db, areaAdmin)
@@ -212,6 +238,7 @@ func TestMembershipAreaScope_AreaAdmin_OutsideManagedArea(t *testing.T) {
 	svc := newAreaMembershipService(db)
 	ctx := context.Background()
 
+	seedProcessAreas(t, db, areaManaged, areaUnmanaged)
 	areaAdmin := testdb.DeterministicID(t, "area-admin")
 	target := testdb.DeterministicID(t, "target")
 	seedIdentity(t, db, areaAdmin)
@@ -257,6 +284,7 @@ func TestMembershipAreaScope_SystemAdmin_BypassNotBlockedByMissingArea(t *testin
 	svc := newAreaMembershipService(db)
 	ctx := context.Background()
 
+	seedProcessAreas(t, db, areaManaged, areaUnmanaged)
 	sysAdmin := testdb.DeterministicID(t, "sys-admin")
 	target := testdb.DeterministicID(t, "target")
 	seedIdentity(t, db, sysAdmin)
@@ -287,6 +315,7 @@ func TestMembershipDirectory_AreaAdminScopedInSQL(t *testing.T) {
 	repo := pgrepo.NewUserAreaRepository(db)
 	ctx := context.Background()
 
+	seedProcessAreas(t, db, areaManaged, areaUnmanaged)
 	areaAdmin := testdb.DeterministicID(t, "area-admin")
 	target := testdb.DeterministicID(t, "target")
 	seedIdentity(t, db, areaAdmin)
