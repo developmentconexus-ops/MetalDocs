@@ -44,7 +44,12 @@ Mechanics facts (probe-verified 2026-07-12):
   `node_modules` from the main checkout: unit agents NEVER run `pnpm install`/`npm install`
   inside a symlinked node_modules (dep changes = `REQUEST` to the hub).
 - Unchanged worktrees auto-clean on completion; changed ones persist for the hub to merge.
-- The unit agent CAN dispatch nested sonnet/haiku workers (§4 obligations apply unreduced).
+- The unit agent CAN dispatch nested sonnet/haiku workers (§4 obligations apply unreduced) —
+  but ONLY synchronously (`run_in_background: false`). Background nested children have a
+  parent-wake race (hit twice on the first real unit, 2026-07-13): the parent stops believing
+  the child is live, the child's completion never re-invokes it, and the unit deadlocks until
+  the hub pokes it. Unit-agent turns end ONLY with a §2 event, never with "waiting on my
+  worker" narration.
 - Crash model: background agents die with the hub session. Recovery = repo truth: commit per
   green slice on the worktree branch is mandatory, and hub boot (harness-hub skill) scans
   `worktree-agent-*` branches + `.claude/worktrees/agent-*` for orphaned in-flight work.
