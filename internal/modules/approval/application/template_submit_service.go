@@ -247,8 +247,9 @@ func (s *TemplateSubmitService) SubmitTemplateVersionForReview(ctx context.Conte
 			if err != nil {
 				return fmt.Errorf("template submit: resolve eligible actors for stage %d: %w", stage.Order, err)
 			}
+			var chosenIDs []string
 			if sel, ok := submitChoiceStages[stage.Order]; ok {
-				chosenIDs, err := resolveSubmitChoiceEligibleIDs(ctx, tx, s.repo, req.TenantID, sel, req.ChosenActors, stage.Order)
+				chosenIDs, err = resolveSubmitChoiceEligibleIDs(ctx, tx, s.repo, req.TenantID, sel, req.ChosenActors, stage.Order)
 				if err != nil {
 					return err
 				}
@@ -273,6 +274,7 @@ func (s *TemplateSubmitService) SubmitTemplateVersionForReview(ctx context.Conte
 				Status:                     status,
 				OpenedAt:                   openedAt,
 				DueInDaysSnapshot:          stage.DueInDays,
+				SelectorsSnapshot:          materializeSelectorsSnapshot(stage.EffectiveSelectors(), chosenIDs),
 			}
 		}
 

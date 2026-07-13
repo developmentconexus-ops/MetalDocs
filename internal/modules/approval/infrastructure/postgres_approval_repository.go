@@ -99,17 +99,18 @@ func (r *postgresApprovalRepository) InsertStageInstances(ctx context.Context, t
 	}
 
 	// Build multi-row VALUES clause.
-	const colCount = 16
+	const colCount = 17
 	placeholders := make([]string, 0, len(stages))
 	args := make([]any, 0, len(stages)*colCount)
 
 	for i, s := range stages {
 		base := i * colCount
 		placeholders = append(placeholders, fmt.Sprintf(
-			"($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,%s)",
+			"($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,%s)",
 			base+1, base+2, base+3, base+4, base+5,
 			base+6, base+7, base+8, base+9, base+10,
 			base+11, base+12, base+13, base+14, base+15,
+			base+16,
 			// due_at (F8, spec.md §4/W4): computed here, not passed as a bind
 			// param, so the DB's own clock is authoritative for the SLA start
 			// point — mirrors UpdateStageStatus's activation CASE, which uses
@@ -119,7 +120,7 @@ func (r *postgresApprovalRepository) InsertStageInstances(ctx context.Context, t
 			// needs a due_at computed at INSERT time; pending stages have no
 			// opened_at yet, so due_at stays NULL until their own activation
 			// UPDATE runs.
-			// $base+16::int casts: DueInDaysSnapshot is only ever referenced
+			// $base+17::int casts: DueInDaysSnapshot is only ever referenced
 			// inside this CASE expression, never bound to a typed column, so
 			// when a stage has no SLA configured (*int is nil -> untyped
 			// NULL), Postgres cannot infer the param's type and the whole
@@ -128,12 +129,24 @@ func (r *postgresApprovalRepository) InsertStageInstances(ctx context.Context, t
 			// gives Postgres a type for the NULL case; (n || ' days')::interval
 			// semantics are unaffected since int concatenated with text still
 			// yields the same text before the interval cast.
-			fmt.Sprintf("CASE WHEN $%d = 'active' AND $%d::int IS NOT NULL THEN now() + ($%d::int || ' days')::interval ELSE NULL END", base+13, base+16, base+16),
+			fmt.Sprintf("CASE WHEN $%d = 'active' AND $%d::int IS NOT NULL THEN now() + ($%d::int || ' days')::interval ELSE NULL END", base+13, base+17, base+17),
 		))
 
 		eligibleJSON, err := json.Marshal(s.EligibleActorIDs)
 		if err != nil {
 			return fmt.Errorf("marshal eligible_actor_ids for stage %s: %w", s.ID, err)
+		}
+
+		// selectorsJSON (M4, unit 3.2 slice 6a / Option C′): the stage's frozen
+		// actor selectors snapshot, the SOLE source the drift path re-resolves
+		// from post-cutover. Default to an empty array rather than persisting
+		// SQL NULL into the NOT NULL jsonb column.
+		selectorsJSON, err := json.Marshal(s.SelectorsSnapshot)
+		if err != nil {
+			return fmt.Errorf("marshal selectors_snapshot for stage %s: %w", s.ID, err)
+		}
+		if s.SelectorsSnapshot == nil {
+			selectorsJSON = []byte("[]")
 		}
 
 		// stage_kind is NOT NULL DEFAULT 'approval'; an empty domain zero-value
@@ -159,6 +172,7 @@ func (r *postgresApprovalRepository) InsertStageInstances(ctx context.Context, t
 			string(s.Status),
 			string(kind),
 			s.DueInDaysSnapshot,
+			selectorsJSON,
 			s.DueInDaysSnapshot,
 		)
 	}
@@ -168,7 +182,7 @@ func (r *postgresApprovalRepository) InsertStageInstances(ctx context.Context, t
 		 required_role_snapshot, required_capability_snapshot, area_code_snapshot,
 		 quorum_snapshot, quorum_m_snapshot, on_eligibility_drift_snapshot,
 		 eligible_actor_ids, effective_denominator, status, stage_kind,
-		 due_in_days_snapshot, due_at)
+		 due_in_days_snapshot, selectors_snapshot, due_at)
 		VALUES ` + strings.Join(placeholders, ",")
 
 	_, err := tx.ExecContext(ctx, query, args...)
@@ -910,7 +924,7 @@ func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx 
 		       on_eligibility_drift_snapshot,
 		       eligible_actor_ids, effective_denominator,
 		       status, opened_at, completed_at, skip_reason,
-		       stage_kind, due_at, due_in_days_snapshot
+		       stage_kind, due_at, due_in_days_snapshot, selectors_snapshot
 		FROM approval_stage_instances
 		WHERE approval_instance_id = $1
 		  AND EXISTS (
@@ -939,6 +953,7 @@ func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx 
 		var skipReason sql.NullString
 		var kindStr string
 		var dueInDaysSnapshot sql.NullInt32
+		var selectorsJSON []byte
 
 		err := rows.Scan(
 			&s.ID, &s.ApprovalInstanceID, &s.StageOrder, &s.NameSnapshot,
@@ -947,7 +962,7 @@ func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx 
 			&s.OnEligibilityDriftSnapshot,
 			&eligibleJSON, &effectiveDenominator,
 			&s.Status, &openedAt, &completedAt, &skipReason,
-			&kindStr, &dueAt, &dueInDaysSnapshot,
+			&kindStr, &dueAt, &dueInDaysSnapshot, &selectorsJSON,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan stage instance for approval instance %s: %w", instanceID, err)
@@ -982,6 +997,11 @@ func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx 
 		if len(eligibleJSON) > 0 {
 			if err := json.Unmarshal(eligibleJSON, &s.EligibleActorIDs); err != nil {
 				return nil, fmt.Errorf("unmarshal eligible_actor_ids for stage %s: %w", s.ID, err)
+			}
+		}
+		if len(selectorsJSON) > 0 {
+			if err := json.Unmarshal(selectorsJSON, &s.SelectorsSnapshot); err != nil {
+				return nil, fmt.Errorf("unmarshal selectors_snapshot for stage %s: %w", s.ID, err)
 			}
 		}
 
@@ -1177,7 +1197,7 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 		       on_eligibility_drift_snapshot,
 		       eligible_actor_ids, effective_denominator,
 		       status, opened_at, completed_at, skip_reason,
-		       stage_kind, due_at, due_in_days_snapshot
+		       stage_kind, due_at, due_in_days_snapshot, selectors_snapshot
 		FROM approval_stage_instances
 		WHERE approval_instance_id = ANY($1)
 		  AND EXISTS (
@@ -1205,6 +1225,7 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 		var skipReason sql.NullString
 		var kindStr string
 		var dueInDaysSnapshot sql.NullInt32
+		var selectorsJSON []byte
 		if err := stageRows.Scan(
 			&s.ID, &s.ApprovalInstanceID, &s.StageOrder, &s.NameSnapshot,
 			&s.RequiredRoleSnapshot, &s.RequiredCapabilitySnapshot, &s.AreaCodeSnapshot,
@@ -1212,7 +1233,7 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 			&s.OnEligibilityDriftSnapshot,
 			&eligibleJSON, &effectiveDenominator,
 			&s.Status, &openedAt, &completedAt, &skipReason,
-			&kindStr, &dueAt, &dueInDaysSnapshot,
+			&kindStr, &dueAt, &dueInDaysSnapshot, &selectorsJSON,
 		); err != nil {
 			return nil, fmt.Errorf("scan stage instance in batch load: %w", err)
 		}
@@ -1244,6 +1265,11 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 		if len(eligibleJSON) > 0 {
 			if err := json.Unmarshal(eligibleJSON, &s.EligibleActorIDs); err != nil {
 				return nil, fmt.Errorf("unmarshal eligible_actor_ids for stage %s: %w", s.ID, err)
+			}
+		}
+		if len(selectorsJSON) > 0 {
+			if err := json.Unmarshal(selectorsJSON, &s.SelectorsSnapshot); err != nil {
+				return nil, fmt.Errorf("unmarshal selectors_snapshot for stage %s: %w", s.ID, err)
 			}
 		}
 		stagesByInst[s.ApprovalInstanceID] = append(stagesByInst[s.ApprovalInstanceID], s)

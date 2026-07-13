@@ -71,6 +71,14 @@ type StageInstance struct {
 	// stays pinned to the config the instance started with even if the
 	// route is later re-versioned (F2) before this stage activates.
 	DueInDaysSnapshot *int
+	// SelectorsSnapshot (M4, unit 3.2 slice 6 / Option C′) freezes the stage's
+	// actor selectors onto the instance at submit, with submit_choice already
+	// materialized into concrete named_user selectors. It is the SOLE source the
+	// drift path (decision/review) re-resolves eligibility from — pool kinds
+	// (role_in_fixed_area, role_in_document_area) re-resolve live; named_user
+	// (exempt) ids are unioned unconditionally. Mirrors the self-contained-freeze
+	// intent of the other *Snapshot fields (see DueInDaysSnapshot).
+	SelectorsSnapshot []ActorSelector
 	Signoffs          []*Signoff
 }
 

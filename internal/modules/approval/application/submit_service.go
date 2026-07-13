@@ -259,8 +259,9 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 			if err != nil {
 				return fmt.Errorf("submit: resolve eligible actors for stage %d: %w", stage.Order, err)
 			}
+			var chosenIDs []string
 			if sel, ok := submitChoiceStages[stage.Order]; ok {
-				chosenIDs, err := resolveSubmitChoiceEligibleIDs(ctx, tx, s.repo, req.TenantID, sel, req.ChosenActors, stage.Order)
+				chosenIDs, err = resolveSubmitChoiceEligibleIDs(ctx, tx, s.repo, req.TenantID, sel, req.ChosenActors, stage.Order)
 				if err != nil {
 					return err
 				}
@@ -295,6 +296,7 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 				// (F2 route-version pinning: in-flight instances stay pinned
 				// to the version they started on).
 				DueInDaysSnapshot: stage.DueInDays,
+				SelectorsSnapshot: materializeSelectorsSnapshot(stage.EffectiveSelectors(), chosenIDs),
 			}
 		}
 
@@ -614,5 +616,26 @@ func unionUserIDs(pools ...[]string) []string {
 		}
 	}
 	sort.Strings(out)
+	return out
+}
+
+// materializeSelectorsSnapshot builds the per-stage selectors snapshot frozen
+// onto the StageInstance at submit (M4, unit 3.2 slice 6 / Option C′). Every
+// submit_choice selector is materialized into one concrete named_user selector
+// per validated chosen id (chosenIDs) — post-submit the instance carries only
+// named_user (exempt) + role_in_fixed_area/role_in_document_area (pool), so the
+// drift path never needs the caller's choice again. All other selectors pass
+// through unchanged.
+func materializeSelectorsSnapshot(selectors []domain.ActorSelector, chosenIDs []string) []domain.ActorSelector {
+	out := make([]domain.ActorSelector, 0, len(selectors))
+	for _, sel := range selectors {
+		if sel.Kind == domain.SelectorSubmitChoice {
+			for _, id := range chosenIDs {
+				out = append(out, domain.ActorSelector{Kind: domain.SelectorNamedUser, UserID: id})
+			}
+			continue
+		}
+		out = append(out, sel)
+	}
 	return out
 }

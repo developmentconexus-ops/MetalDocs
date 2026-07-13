@@ -16,10 +16,10 @@ const (
 // Kind discriminates which fields are meaningful; an empty string in
 // UserID/Role/AreaCode mirrors an absent (nullable) DB column.
 type ActorSelector struct {
-	Kind     SelectorKind
-	UserID   string
-	Role     string
-	AreaCode string
+	Kind     SelectorKind `json:"kind"`
+	UserID   string       `json:"user_id,omitempty"`
+	Role     string       `json:"role,omitempty"`
+	AreaCode string       `json:"area_code,omitempty"`
 }
 
 // Validate enforces the exact field presence/absence contract for s.Kind:

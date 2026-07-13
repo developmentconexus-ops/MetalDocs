@@ -492,7 +492,7 @@ func (s *DecisionService) recordSignoffInTx(ctx context.Context, tx *sql.Tx, req
 	approvals, rejections := splitSignoffs(allStageSignoffs)
 	currentEligible := activeStage.EligibleActorIDs
 	if activeStage.OnEligibilityDriftSnapshot != domain.DriftKeepSnapshot {
-		currentEligible, err = s.repo.ResolveEligibleActors(ctx, tx, req.TenantID, activeStage.AreaCodeSnapshot, activeStage.RequiredRoleSnapshot)
+		currentEligible, err = resolveCurrentEligibleForDrift(ctx, tx, s.repo, s.cdRead, req.TenantID, *activeStage, instance.Subject)
 		if err != nil {
 			return SignoffResult{}, nil, fmt.Errorf("recordSignoff: resolve current eligible actors: %w", err)
 		}

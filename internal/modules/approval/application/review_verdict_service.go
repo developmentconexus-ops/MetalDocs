@@ -243,7 +243,7 @@ func (s *ReviewVerdictService) recordVerdictInTx(ctx context.Context, tx *sql.Tx
 
 		currentEligible := activeStage.EligibleActorIDs
 		if activeStage.OnEligibilityDriftSnapshot != domain.DriftKeepSnapshot {
-			currentEligible, err = s.repo.ResolveEligibleActors(ctx, tx, req.TenantID, activeStage.AreaCodeSnapshot, activeStage.RequiredRoleSnapshot)
+			currentEligible, err = resolveCurrentEligibleForDrift(ctx, tx, s.repo, s.cdRead, req.TenantID, *activeStage, instance.Subject)
 			if err != nil {
 				return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: resolve current eligible actors: %w", err)
 			}
