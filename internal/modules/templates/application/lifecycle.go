@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -364,12 +363,13 @@ type ArchiveCmd struct {
 	TenantID, ActorUserID, TemplateID string
 }
 
-// PublishTemplateVersionCmd identifies the draft template version to publish
-// directly (bypassing the review/approve workflow), along with the derived
-// schema object key to record on the resulting AuditPublished event.
+// PublishTemplateVersionCmd identifies the template version to publish —
+// either directly from draft (bypassing the review/approve workflow) or
+// completing a version the kernel signoff flow already brought to approved
+// (ADR 0082) — along with the derived schema object key to record on the
+// resulting AuditPublished event.
 type PublishTemplateVersionCmd struct {
 	TenantID, ActorUserID, TemplateID string
-	ActorRoles                        []string
 	VersionNumber                     int
 	SchemaKey                         string
 }
@@ -381,21 +381,21 @@ type PublishTemplateVersionResult struct {
 	PublishedVersion *domain.TemplateVersion
 }
 
-// PublishTemplateVersion publishes a draft version directly, without going
-// through the review/approve workflow. The version must be a draft with a
-// committed content hash (ErrContentHashMismatch otherwise) and the actor
-// must pass segregation-of-duties (publisher must not be the author or
-// reviewer) and hold the version's pending approver role binding — a role
-// mismatch is audited as AuditPublishForbiddenRole (best-effort, non-fatal)
-// before returning ErrForbiddenRole. On success, the version is published,
-// the template's PublishedVersionID is updated (ADR 0065 — revision/number
+// PublishTemplateVersion publishes a version that is either a draft
+// (bypassing the review/approve workflow entirely) or already approved
+// (completing the kernel signoff flow, which ends at approved — ADR 0082).
+// The version must carry a committed content hash (ErrContentHashMismatch
+// otherwise) and the actor must pass segregation-of-duties (publisher must
+// not be the author or reviewer) — identity-based, not role-based (ADR 0022:
+// authz is capabilities, never roles). Any other source status is rejected
+// with ErrInvalidStateTransition. On success, the version is published, the
+// template's PublishedVersionID is updated (ADR 0065 — revision/number
 // projected onto the read model, not stored on the aggregate), the previously
 // published version (if any) is transitioned to obsolete, and AuditPublished
-// (plus AuditObsoleted
-// when applicable) events are appended — all atomically in one transaction.
-// A CAS conflict from a concurrent transition is remapped to
-// ErrConcurrentTransition (409 instead of 412). Publish no longer spawns the
-// next revision (M1·T2); callers use CreateNextVersion for that.
+// (plus AuditObsoleted when applicable) events are appended — all atomically
+// in one transaction. A CAS conflict from a concurrent transition is remapped
+// to ErrConcurrentTransition (409 instead of 412). Publish no longer spawns
+// the next revision (M1·T2); callers use CreateNextVersion for that.
 func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplateVersionCmd) (*PublishTemplateVersionResult, error) {
 	template, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID)
 	if err != nil {
@@ -408,7 +408,12 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 	if err != nil {
 		return nil, err
 	}
-	if version.Status != domain.VersionStatusDraft {
+	// Publish accepts two source statuses: draft (direct publish, bypassing
+	// review/approve entirely) and approved (completing the kernel signoff
+	// flow, which ends at approved — ADR 0082; legacy Approve, which used to
+	// own approved->published, is retired in a later slice). Any other status
+	// is rejected unchanged.
+	if version.Status != domain.VersionStatusDraft && version.Status != domain.VersionStatusApproved {
 		return nil, domain.ErrInvalidStateTransition
 	}
 
@@ -417,42 +422,27 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 		return nil, domain.ErrContentHashMismatch
 	}
 
-	// T-004: SoD — publisher must not be the author or the reviewer.
+	// T-004: SoD — publisher must not be the author or the reviewer. This is
+	// identity-based (actor user ID vs. author/reviewer user IDs), not
+	// role-based, so it stands on its own under ADR 0022 (authz is
+	// capabilities, never roles) — unlike the role-binding tier-2 check this
+	// used to sit beside, which is deleted (ADR 0082 §Transitional
+	// coexistence, unit 3.1a slice S2). Capability (Tier 1,
+	// CapTemplatePublish) is enforced inside the tx below.
 	if err := domain.CheckSegregation(domain.SegregationRoleApprover, cmd.ActorUserID, version.AuthorID, version.ReviewerID); err != nil {
 		return nil, err
-	}
-	// T-004 (residual): Tier 2 authz — actor must hold the version's pending
-	// approver role binding, mirroring Service.Approve. Capability (Tier 1) is
-	// enforced inside the tx below; both must pass for the publish to commit.
-	if role := version.RoleBindingFor(domain.VersionStatusPublished); role != "" && !containsRole(cmd.ActorRoles, role) {
-		denied, auditErr := newAuditEvent(
-			cmd.TenantID,
-			cmd.TemplateID,
-			cmd.ActorUserID,
-			&version.ID,
-			domain.AuditPublishForbiddenRole,
-			map[string]any{
-				"required_role": role,
-				"actor_roles":   cmd.ActorRoles,
-			},
-			s.clock.Now(),
-		)
-		if auditErr != nil {
-			return nil, wrapAppErr("templates publish: build denied audit", auditErr)
-		}
-		// Audit infrastructure errors must not swallow the security denial:
-		// the caller (and the HTTP layer) must always observe ErrForbiddenRole
-		// so the actor sees a stable 403 forbidden_role response. A failed
-		// audit append is best-effort observability and logged separately.
-		if appendErr := s.repo.AppendAudit(ctx, denied); appendErr != nil {
-			slog.Warn("templates publish: append denied audit failed", "err", appendErr)
-		}
-		return nil, domain.ErrForbiddenRole
 	}
 	now := s.clock.Now()
 	version.Status = domain.VersionStatusPublished
 	version.PublishedAt = &now
-	version.ApprovedAt = &now
+	// Direct publish (draft source) stamps ApprovedAt at publish time —
+	// preserved legacy behavior. Kernel completion (approved source) must NOT
+	// clobber the true approval time already stamped by
+	// ApprovalCompletionWriter.MarkTemplateVersionApproved at signoff
+	// completion (reviewer finding, unit 3.1a S2).
+	if version.ApprovedAt == nil {
+		version.ApprovedAt = &now
+	}
 
 	// Capture the template's currently-published version (if any) BEFORE
 	// overwriting the pointer below — this is the version ObsoletePreviousPublishedTx

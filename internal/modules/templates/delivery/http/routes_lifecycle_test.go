@@ -399,23 +399,31 @@ func TestArchiveTemplate_SystemOwnedTemplateImmutable(t *testing.T) {
 	}
 }
 
-// TestPublishTemplateVersion_ForbiddenRoleRFC9457 verifies that POST /publish
-// rejects an actor who holds the template.publish capability but lacks the
-// version's PendingApproverRole binding, returning RFC 9457 problem+json with
-// `code: "FORBIDDEN_CAPABILITY"` and HTTP 403. Closes residual T-004 contract gap.
-func TestPublishTemplateVersion_ForbiddenRoleRFC9457(t *testing.T) {
+// TestPublishTemplateVersion_SelfPublishForbiddenRFC9457 verifies that POST
+// /publish rejects an actor attempting to publish a version they authored,
+// returning RFC 9457 problem+json with `code: "ISO_SEGREGATION_VIOLATION"`
+// and HTTP 403. This is the surviving identity-based SoD gate (CheckSegregation).
+//
+// Formerly TestPublishTemplateVersion_ForbiddenRoleRFC9457, which asserted the
+// role-binding tier-2 gate (RoleBindingFor(Published) + containsRole). ADR
+// 0082 unit 3.1a slice S2 deletes that gate — a capability holder with no
+// matching role now publishes successfully (see
+// TestPublishTemplateVersion_NoRoles_CapabilityAlone in lifecycle_test.go for
+// the application-layer equivalent). No other HTTP-level test in this module
+// asserted the identity-SoD 403 shape, so this test is rewritten rather than
+// deleted to close that coverage gap.
+func TestPublishTemplateVersion_SelfPublishForbiddenRFC9457(t *testing.T) {
 	repo := newFakeRepo()
 	templateID := "11111111-1111-1111-1111-111111111111"
 	repo.templates[templateID] = &domain.Template{ID: templateID, TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", LatestVersion: 1}
 	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
-		ID:                  "22222222-2222-4222-8222-222222222222",
-		TemplateID:          templateID,
-		VersionNumber:       1,
-		Status:              domain.VersionStatusDraft,
-		DocxStorageKey:      "templates/" + templateID + "/versions/1.docx",
-		ContentHash:         "hash_ok",
-		AuthorID:            "author-1",
-		PendingApproverRole: "approver",
+		ID:             "22222222-2222-4222-8222-222222222222",
+		TemplateID:     templateID,
+		VersionNumber:  1,
+		Status:         domain.VersionStatusDraft,
+		DocxStorageKey: "templates/" + templateID + "/versions/1.docx",
+		ContentHash:    "hash_ok",
+		AuthorID:       "user-a", // matches withHeaders' actor id below -> self-publish
 	}
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 
@@ -423,9 +431,7 @@ func TestPublishTemplateVersion_ForbiddenRoleRFC9457(t *testing.T) {
 		"schema_key": "templates/" + templateID + "/versions/1.schema.json",
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates/"+templateID+"/versions/1/publish", bytes.NewReader(body))
-	withHeaders(req)
-	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "publisher-1", []iamdomain.Role{}))
-	withActorRoles(req, "editor") // capability holder, NOT the required approver role
+	withHeaders(req) // sets actor "user-a" -- the version's own AuthorID
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
@@ -439,16 +445,16 @@ func TestPublishTemplateVersion_ForbiddenRoleRFC9457(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Code != "FORBIDDEN_CAPABILITY" {
-		t.Fatalf("expected error.code=FORBIDDEN_CAPABILITY, got %q (body=%s)", out.Code, rr.Body.String())
+	if out.Code != "ISO_SEGREGATION_VIOLATION" {
+		t.Fatalf("expected error.code=ISO_SEGREGATION_VIOLATION, got %q (body=%s)", out.Code, rr.Body.String())
 	}
 
 	stored := repo.versions["22222222-2222-4222-8222-222222222222"]
 	if stored.Status != domain.VersionStatusDraft {
 		t.Fatalf("expected version status unchanged (draft), got %q", stored.Status)
 	}
-	if len(repo.audit) != 1 || repo.audit[0].Action != domain.AuditPublishForbiddenRole {
-		t.Fatalf("expected one publish_forbidden_role audit event, got %+v", repo.audit)
+	if len(repo.audit) != 0 {
+		t.Fatalf("expected no audit events on a segregation-blocked publish, got %+v", repo.audit)
 	}
 }
 

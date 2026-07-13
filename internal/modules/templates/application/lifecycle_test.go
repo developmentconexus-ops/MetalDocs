@@ -881,7 +881,6 @@ func TestPublishTemplateVersionReturnsConcurrentTransitionWhenVersionMoved(t *te
 	_, err := svc.PublishTemplateVersion(context.Background(), application.PublishTemplateVersionCmd{
 		TenantID:      "tenant-a",
 		ActorUserID:   "approver-1",
-		ActorRoles:    []string{"approver"},
 		TemplateID:    template.ID,
 		VersionNumber: 2,
 		SchemaKey:     "tenants/tenant-a/templates/tpl-1/versions/2.schema.json",
@@ -918,7 +917,6 @@ func TestPublishTemplateVersion_NoAutoNextDraft(t *testing.T) {
 	res, err := svc.PublishTemplateVersion(context.Background(), application.PublishTemplateVersionCmd{
 		TenantID:      "tenant-a",
 		ActorUserID:   "approver-1",
-		ActorRoles:    []string{"approver"},
 		TemplateID:    template.ID,
 		VersionNumber: 1,
 		SchemaKey:     "templates/tpl-1/versions/1.schema.json",
@@ -982,7 +980,6 @@ func TestPublishTemplateVersion_ObsoletesPreviousAndAudits(t *testing.T) {
 	res, err := svc.PublishTemplateVersion(context.Background(), application.PublishTemplateVersionCmd{
 		TenantID:      "tenant-a",
 		ActorUserID:   "approver-1",
-		ActorRoles:    []string{"approver"},
 		TemplateID:    template.ID,
 		VersionNumber: 2,
 		SchemaKey:     "templates/tpl-1/versions/2.schema.json",
@@ -1047,7 +1044,6 @@ func TestPublishTemplateVersion_FirstPublishNoObsoletedAudit(t *testing.T) {
 	_, err := svc.PublishTemplateVersion(context.Background(), application.PublishTemplateVersionCmd{
 		TenantID:      "tenant-a",
 		ActorUserID:   "approver-1",
-		ActorRoles:    []string{"approver"},
 		TemplateID:    template.ID,
 		VersionNumber: 1,
 		SchemaKey:     "templates/tpl-1/versions/1.schema.json",
@@ -1125,5 +1121,129 @@ func TestApprove_Accept_ObsoletesInSameTxCommitEnvelope(t *testing.T) {
 	}
 	if len(repo.audit) != 2 {
 		t.Fatalf("expected 2 audit events (published + obsoleted), got %v", repo.audit)
+	}
+}
+
+// TestPublishTemplateVersion_FromApproved_KernelCompletion pins ADR 0082
+// slice S2: PublishTemplateVersion must also accept approved -> published,
+// completing a version the kernel signoff flow already brought to approved
+// (the kernel flow ends at approved; legacy Approve, which used to own
+// approved->published, is retired in a later slice). Before S2 this hard-
+// required draft and rejected an approved version with
+// ErrInvalidStateTransition.
+func TestPublishTemplateVersion_FromApproved_KernelCompletion(t *testing.T) {
+	repo := newFakeRepo()
+	template := &domain.Template{
+		ID:            "tpl-1",
+		TenantID:      "tenant-a",
+		LatestVersion: 1,
+	}
+	// Kernel signoff completion stamped the TRUE approval time; publish must
+	// preserve it, not clobber it with the publish timestamp (reviewer
+	// finding, unit 3.1a S2).
+	kernelApprovedAt := time.Date(2026, 7, 1, 10, 0, 0, 0, time.UTC)
+	version := &domain.TemplateVersion{
+		ID:             "ver-1",
+		TemplateID:     "tpl-1",
+		VersionNumber:  1,
+		Status:         domain.VersionStatusApproved,
+		DocxStorageKey: "templates/tpl-1/versions/1.docx",
+		ContentHash:    "hash_ok",
+		AuthorID:       "author-1",
+		ApprovedAt:     &kernelApprovedAt,
+	}
+	repo.templates[template.ID] = template
+	repo.versions[version.ID] = version
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
+
+	res, err := svc.PublishTemplateVersion(context.Background(), application.PublishTemplateVersionCmd{
+		TenantID:      "tenant-a",
+		ActorUserID:   "publisher-1", // != author-1
+		TemplateID:    template.ID,
+		VersionNumber: 1,
+		SchemaKey:     "templates/tpl-1/versions/1.schema.json",
+	})
+	if err != nil {
+		t.Fatalf("PublishTemplateVersion returned error: %v", err)
+	}
+	if res.PublishedVersion.Status != domain.VersionStatusPublished {
+		t.Fatalf("expected published status, got %q", res.PublishedVersion.Status)
+	}
+	if res.PublishedVersion.ApprovedAt == nil || !res.PublishedVersion.ApprovedAt.Equal(kernelApprovedAt) {
+		t.Fatalf("expected kernel-stamped ApprovedAt %v preserved, got %v", kernelApprovedAt, res.PublishedVersion.ApprovedAt)
+	}
+	if res.PublishedVersion.PublishedAt == nil || res.PublishedVersion.PublishedAt.Equal(kernelApprovedAt) {
+		t.Fatalf("expected PublishedAt stamped at publish time, distinct from ApprovedAt; got %v", res.PublishedVersion.PublishedAt)
+	}
+}
+
+// TestPublishTemplateVersion_NoRoles_CapabilityAlone pins ADR 0082 slice S2:
+// the role-binding tier-2 gate (RoleBindingFor(Published) + containsRole) is
+// deleted, so an actor holding only the template.publish capability — no
+// roles at all — must publish a draft that carries a pending approver role
+// binding. Before S2 this exact fixture (a non-empty PendingApproverRole with
+// no matching actor role) was rejected with ErrForbiddenRole.
+func TestPublishTemplateVersion_NoRoles_CapabilityAlone(t *testing.T) {
+	repo := newFakeRepo()
+	template := &domain.Template{ID: "tpl-1", TenantID: "tenant-a", LatestVersion: 1}
+	version := &domain.TemplateVersion{
+		ID:                  "ver-1",
+		TemplateID:          template.ID,
+		VersionNumber:       1,
+		Status:              domain.VersionStatusDraft,
+		DocxStorageKey:      "templates/tpl-1/versions/1.docx",
+		ContentHash:         "hash_ok",
+		AuthorID:            "author-1",
+		PendingApproverRole: "approver", // binding configured; actor holds no roles
+	}
+	repo.templates[template.ID] = template
+	repo.versions[version.ID] = version
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
+
+	res, err := svc.PublishTemplateVersion(context.Background(), application.PublishTemplateVersionCmd{
+		TenantID:      "tenant-a",
+		ActorUserID:   "publisher-1", // holds no roles; capability is the sole gate
+		TemplateID:    template.ID,
+		VersionNumber: 1,
+		SchemaKey:     "templates/tpl-1/versions/1.schema.json",
+	})
+	if err != nil {
+		t.Fatalf("PublishTemplateVersion returned error: %v", err)
+	}
+	if res.PublishedVersion.Status != domain.VersionStatusPublished {
+		t.Fatalf("expected published status, got %q", res.PublishedVersion.Status)
+	}
+}
+
+// TestPublishTemplateVersion_SegregationViolation_SelfPublish pins the
+// surviving identity-SoD gate: an actor cannot publish a version they
+// authored, regardless of role/capability. This is unaffected by the S2
+// role-gate removal — CheckSegregation is identity-based (user IDs), not
+// role-based, and runs before the (now-deleted) role-binding check.
+func TestPublishTemplateVersion_SegregationViolation_SelfPublish(t *testing.T) {
+	repo := newFakeRepo()
+	template := &domain.Template{ID: "tpl-1", TenantID: "tenant-a", LatestVersion: 1}
+	version := &domain.TemplateVersion{
+		ID:             "ver-1",
+		TemplateID:     template.ID,
+		VersionNumber:  1,
+		Status:         domain.VersionStatusDraft,
+		DocxStorageKey: "templates/tpl-1/versions/1.docx",
+		ContentHash:    "hash_ok",
+		AuthorID:       "author-1",
+	}
+	repo.templates[template.ID] = template
+	repo.versions[version.ID] = version
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+
+	_, err := svc.PublishTemplateVersion(context.Background(), application.PublishTemplateVersionCmd{
+		TenantID:      "tenant-a",
+		ActorUserID:   "author-1", // == AuthorID: self-publish
+		TemplateID:    template.ID,
+		VersionNumber: 1,
+		SchemaKey:     "templates/tpl-1/versions/1.schema.json",
+	})
+	if !errors.Is(err, domain.ErrISOSegregationViolation) {
+		t.Fatalf("expected ErrISOSegregationViolation, got %v", err)
 	}
 }
