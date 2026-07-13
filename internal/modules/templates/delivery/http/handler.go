@@ -34,6 +34,10 @@ import (
 // substitute a fake without exercising the real signature-reauth/DB path.
 type approvalSubmitService interface {
 	SubmitTemplateVersionForReview(ctx context.Context, runner platformdb.TxRunner, req approvalapp.TemplateSubmitRequest) (approvalapp.TemplateSubmitResult, error)
+	// PreviewRoute (SLICE 8a, unit 3.2) is the read-only route-preview method
+	// GetTemplateVersionApprovalPreview calls — resolves the same active
+	// route SubmitTemplateVersionForReview would, without submitting.
+	PreviewRoute(ctx context.Context, runner platformdb.TxRunner, tenantID, templateID string) (approvalapp.RoutePreview, error)
 }
 
 type approvalDecisionService interface {

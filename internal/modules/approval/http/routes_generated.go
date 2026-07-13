@@ -92,3 +92,9 @@ func (h *Handler) ListApprovalRoutes(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) RecordApprovalFastForward(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID, stageId openapi_types.UUID, params approvalapi.RecordApprovalFastForwardParams) {
 	h.FastForwardHandler(w, r)
 }
+
+// GetDocumentApprovalPreview is the spec-generated adapter for the SLICE 8a
+// (unit 3.2) read-only route-preview operation.
+func (h *Handler) GetDocumentApprovalPreview(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	h.DocumentApprovalPreviewHandler(w, r)
+}

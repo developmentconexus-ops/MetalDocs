@@ -384,3 +384,21 @@ func (r DeactivateRouteRequest) Validate() error {
 	}
 	return nil
 }
+
+// ApprovalRoutePreviewStage is one stage of an ApprovalRoutePreviewResponse
+// (SLICE 8a, unit 3.2).
+type ApprovalRoutePreviewStage struct {
+	StageOrder int             `json:"stage_order"`
+	Label      string          `json:"label"`
+	Selectors  []ActorSelector `json:"selectors"`
+}
+
+// ApprovalRoutePreviewResponse is the wire shape of GET
+// /documents/{id}/approval-preview (SLICE 8a, unit 3.2; OpenAPI schema
+// `ApprovalRoutePreview`). RouteID/RouteName are nil when no active route
+// resolves for the document yet — informational absence, not an error.
+type ApprovalRoutePreviewResponse struct {
+	RouteID   *string                     `json:"route_id"`
+	RouteName *string                     `json:"route_name"`
+	Stages    []ApprovalRoutePreviewStage `json:"stages"`
+}

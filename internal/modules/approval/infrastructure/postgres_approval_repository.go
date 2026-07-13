@@ -2078,11 +2078,11 @@ func (r *postgresApprovalRepository) LoadRoute(ctx context.Context, tx db.Tx, te
 	var subjectKind, subjectKey string
 	var profileCode sql.NullString
 	err := tx.QueryRowContext(ctx, `
-		SELECT id, tenant_id, profile_code, version, subject_kind, subject_key
+		SELECT id, name, tenant_id, profile_code, version, subject_kind, subject_key
 		FROM approval_routes
 		WHERE id = $1 AND tenant_id = $2 AND active = TRUE`,
 		routeID, tenantID,
-	).Scan(&route.ID, &route.TenantID, &profileCode, &route.Version, &subjectKind, &subjectKey)
+	).Scan(&route.ID, &route.Name, &route.TenantID, &profileCode, &route.Version, &subjectKind, &subjectKey)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.Route{}, fmt.Errorf("route %s not found for tenant %s", routeID, tenantID)

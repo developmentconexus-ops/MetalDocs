@@ -66,7 +66,12 @@ type Stage struct {
 
 // Route is the per-profile approval route configuration.
 type Route struct {
-	ID          string
+	ID   string
+	// Name is the route's configured display name (approval_routes.name).
+	// Populated by LoadRoute (SLICE 8a, unit 3.2) for read paths that surface
+	// it (e.g. RoutePreview); not read or asserted by the submit-time
+	// resolution/validation path, which never needed it.
+	Name        string
 	TenantID    string
 	ProfileCode string
 	// Subject generalizes what this route governs (M3 kernel extraction, ADR
