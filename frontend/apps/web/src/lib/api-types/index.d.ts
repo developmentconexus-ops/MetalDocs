@@ -5314,13 +5314,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": {
-                    schema_key: string;
-                };
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description version published */
             200: {

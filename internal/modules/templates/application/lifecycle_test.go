@@ -883,7 +883,6 @@ func TestPublishTemplateVersionReturnsConcurrentTransitionWhenVersionMoved(t *te
 		ActorUserID:   "approver-1",
 		TemplateID:    template.ID,
 		VersionNumber: 2,
-		SchemaKey:     "tenants/tenant-a/templates/tpl-1/versions/2.schema.json",
 	})
 	if !errors.Is(err, domain.ErrConcurrentTransition) {
 		t.Fatalf("expected ErrConcurrentTransition (409-class), got %v", err)
@@ -919,7 +918,6 @@ func TestPublishTemplateVersion_NoAutoNextDraft(t *testing.T) {
 		ActorUserID:   "approver-1",
 		TemplateID:    template.ID,
 		VersionNumber: 1,
-		SchemaKey:     "templates/tpl-1/versions/1.schema.json",
 	})
 	if err != nil {
 		t.Fatalf("PublishTemplateVersion returned error: %v", err)
@@ -982,7 +980,6 @@ func TestPublishTemplateVersion_ObsoletesPreviousAndAudits(t *testing.T) {
 		ActorUserID:   "approver-1",
 		TemplateID:    template.ID,
 		VersionNumber: 2,
-		SchemaKey:     "templates/tpl-1/versions/2.schema.json",
 	})
 	if err != nil {
 		t.Fatalf("PublishTemplateVersion returned error: %v", err)
@@ -1046,13 +1043,52 @@ func TestPublishTemplateVersion_FirstPublishNoObsoletedAudit(t *testing.T) {
 		ActorUserID:   "approver-1",
 		TemplateID:    template.ID,
 		VersionNumber: 1,
-		SchemaKey:     "templates/tpl-1/versions/1.schema.json",
 	})
 	if err != nil {
 		t.Fatalf("PublishTemplateVersion returned error: %v", err)
 	}
 	if len(repo.audit) != 1 || repo.audit[0].Action != domain.AuditPublished {
 		t.Fatalf("expected exactly 1 published audit event (no obsoleted), got %v", repo.audit)
+	}
+}
+
+// TestPublishTemplateVersion_AuditSchemaKeyIsServerDerived pins unit 3.1a S2b:
+// the AuditPublished event's schema_key detail is always the server-derived
+// key (application.TemplateVersionSchemaKey), never a caller-supplied value —
+// client-supplied audit metadata is an integrity smell (no-fallback
+// principle: audit truth is derived truth).
+func TestPublishTemplateVersion_AuditSchemaKeyIsServerDerived(t *testing.T) {
+	repo := newFakeRepo()
+	template := &domain.Template{ID: "tpl-1", TenantID: "tenant-a", LatestVersion: 1}
+	version := &domain.TemplateVersion{
+		ID:                  "ver-1",
+		TemplateID:          template.ID,
+		VersionNumber:       1,
+		Status:              domain.VersionStatusDraft,
+		DocxStorageKey:      "templates/tpl-1/versions/1.docx",
+		ContentHash:         "hash_ok",
+		AuthorID:            "author-1",
+		PendingApproverRole: "approver",
+	}
+	repo.templates[template.ID] = template
+	repo.versions[version.ID] = version
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
+
+	_, err := svc.PublishTemplateVersion(context.Background(), application.PublishTemplateVersionCmd{
+		TenantID:      "tenant-a",
+		ActorUserID:   "approver-1",
+		TemplateID:    template.ID,
+		VersionNumber: 1,
+	})
+	if err != nil {
+		t.Fatalf("PublishTemplateVersion returned error: %v", err)
+	}
+	if len(repo.audit) != 1 || repo.audit[0].Action != domain.AuditPublished {
+		t.Fatalf("expected exactly 1 published audit event, got %v", repo.audit)
+	}
+	want := application.TemplateVersionSchemaKey("tenant-a", template.ID, version.VersionNumber)
+	if got := repo.audit[0].Details["schema_key"]; got != want {
+		t.Fatalf("expected derived schema_key %q, got %v", want, got)
 	}
 }
 
@@ -1161,7 +1197,6 @@ func TestPublishTemplateVersion_FromApproved_KernelCompletion(t *testing.T) {
 		ActorUserID:   "publisher-1", // != author-1
 		TemplateID:    template.ID,
 		VersionNumber: 1,
-		SchemaKey:     "templates/tpl-1/versions/1.schema.json",
 	})
 	if err != nil {
 		t.Fatalf("PublishTemplateVersion returned error: %v", err)
@@ -1205,7 +1240,6 @@ func TestPublishTemplateVersion_NoRoles_CapabilityAlone(t *testing.T) {
 		ActorUserID:   "publisher-1", // holds no roles; capability is the sole gate
 		TemplateID:    template.ID,
 		VersionNumber: 1,
-		SchemaKey:     "templates/tpl-1/versions/1.schema.json",
 	})
 	if err != nil {
 		t.Fatalf("PublishTemplateVersion returned error: %v", err)
@@ -1241,7 +1275,6 @@ func TestPublishTemplateVersion_SegregationViolation_SelfPublish(t *testing.T) {
 		ActorUserID:   "author-1", // == AuthorID: self-publish
 		TemplateID:    template.ID,
 		VersionNumber: 1,
-		SchemaKey:     "templates/tpl-1/versions/1.schema.json",
 	})
 	if !errors.Is(err, domain.ErrISOSegregationViolation) {
 		t.Fatalf("expected ErrISOSegregationViolation, got %v", err)

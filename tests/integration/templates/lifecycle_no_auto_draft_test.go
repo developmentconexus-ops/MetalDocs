@@ -181,7 +181,6 @@ func TestLifecycle_NoAutoNextDraft(t *testing.T) {
 		ActorUserID:   approver,
 		TemplateID:    templateID,
 		VersionNumber: 1,
-		SchemaKey:     "schemas/no-auto-draft-test.json",
 	})
 	if err != nil {
 		t.Fatalf("PublishTemplateVersion: %v", err)

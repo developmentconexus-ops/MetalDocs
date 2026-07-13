@@ -94,7 +94,6 @@ func TestGeneratedTemplatesRoutes_RejectInvalidBodies(t *testing.T) {
 	}{
 		{name: "create unknown field", method: http.MethodPost, path: "/api/v1/templates", body: `{"key":"contract","name":"Contract","extra":true}`},
 		{name: "create missing key", method: http.MethodPost, path: "/api/v1/templates", body: `{"name":"Contract"}`},
-		{name: "publish unknown field", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/publish", body: `{"schema_key":"s","extra":true}`},
 		{name: "schema missing expected_lock_version", method: http.MethodPut, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/schema", body: `{"metadata_schema":{},"placeholder_schema":[]}`},
 		{name: "schema negative expected_lock_version", method: http.MethodPut, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/schema", body: `{"metadata_schema":{},"placeholder_schema":[],"expected_lock_version":-1}`},
 	}
@@ -179,7 +178,6 @@ func TestGeneratedTemplatesRoutes_RejectValidation(t *testing.T) {
 		{name: "getTemplateVersion invalid version", method: http.MethodGet, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/not-int"},
 		{name: "presignTemplateDocxUploadUrl invalid version", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/not-int/docx-upload-url"},
 		{name: "presignTemplateSchemaUploadUrl invalid version", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/not-int/schema-upload-url"},
-		{name: "publish missing schema_key", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/publish", body: `{}`},
 	}
 
 	for _, tt := range tests {
@@ -216,7 +214,7 @@ func TestGeneratedTemplatesRoutes_IdempotencyKeyRequired(t *testing.T) {
 		body   string
 	}{
 		{name: "create", method: http.MethodPost, path: "/api/v1/templates", body: `{"key":"k1","name":"n1"}`},
-		{name: "publish", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/publish", body: `{"schema_key":"s"}`},
+		{name: "publish", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/publish"},
 		{name: "submit", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/submit", body: `{}`},
 		{name: "review", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/review", body: `{"accept":true}`},
 		{name: "approve", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/approve", body: `{"accept":true}`},

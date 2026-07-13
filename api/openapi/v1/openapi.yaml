@@ -1390,15 +1390,6 @@ paths:
           in: header
           required: true
           schema: { type: string, format: uuid }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [schema_key]
-              properties:
-                schema_key: { type: string }
       responses:
         '200':
           description: version published

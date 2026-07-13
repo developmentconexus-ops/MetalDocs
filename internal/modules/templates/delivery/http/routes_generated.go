@@ -191,9 +191,9 @@ func (h *Handler) presignTemplateUpload(w http.ResponseWriter, r *http.Request, 
 }
 
 // PublishTemplateVersion handles POST /templates/{id}/versions/{n}/publish:
-// authorizes CapTemplatePublish, requires a non-blank schema_key in the
-// request body, and publishes the given approved version via the
-// application service, returning the published version's id.
+// authorizes CapTemplatePublish and publishes the given approved version via
+// the application service (bodyless — the schema object key is derived
+// server-side), returning the published version's id.
 func (h *Handler) PublishTemplateVersion(w http.ResponseWriter, r *http.Request, id string, n int, _ templatesapi.PublishTemplateVersionParams) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
@@ -206,23 +206,11 @@ func (h *Handler) PublishTemplateVersion(w http.ResponseWriter, r *http.Request,
 		return
 	}
 
-	var req templatesapi.PublishTemplateVersionJSONRequestBody
-	if err := readStrictJSON(r, &req); err != nil {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, err.Error())
-		return
-	}
-	schemaKey := strings.TrimSpace(req.SchemaKey)
-	if schemaKey == "" {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, "field schema_key is required")
-		return
-	}
-
 	res, err := h.svc.PublishTemplateVersion(r.Context(), application.PublishTemplateVersionCmd{
 		TenantID:      tenantID,
 		ActorUserID:   actorID,
 		TemplateID:    id,
 		VersionNumber: n,
-		SchemaKey:     schemaKey,
 	})
 	if err != nil {
 		writeMappedErr(w, err)

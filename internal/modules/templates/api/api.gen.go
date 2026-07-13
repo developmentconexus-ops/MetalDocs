@@ -411,11 +411,6 @@ type CommitTemplateAutosaveJSONBody struct {
 	ExpectedContentHash string `json:"expected_content_hash"`
 }
 
-// PublishTemplateVersionJSONBody defines parameters for PublishTemplateVersion.
-type PublishTemplateVersionJSONBody struct {
-	SchemaKey string `json:"schema_key"`
-}
-
 // PublishTemplateVersionParams defines parameters for PublishTemplateVersion.
 type PublishTemplateVersionParams struct {
 	IdempotencyKey openapi_types.UUID `json:"Idempotency-Key"`
@@ -454,9 +449,6 @@ type CreateTemplateJSONRequestBody CreateTemplateJSONBody
 
 // CommitTemplateAutosaveJSONRequestBody defines body for CommitTemplateAutosave for application/json ContentType.
 type CommitTemplateAutosaveJSONRequestBody CommitTemplateAutosaveJSONBody
-
-// PublishTemplateVersionJSONRequestBody defines body for PublishTemplateVersion for application/json ContentType.
-type PublishTemplateVersionJSONRequestBody PublishTemplateVersionJSONBody
 
 // UpdateTemplateSchemaJSONRequestBody defines body for UpdateTemplateSchema for application/json ContentType.
 type UpdateTemplateSchemaJSONRequestBody UpdateTemplateSchemaJSONBody
@@ -3215,7 +3207,6 @@ type PublishTemplateVersionRequestObject struct {
 	Id     string `json:"id"`
 	N      int    `json:"n"`
 	Params PublishTemplateVersionParams
-	Body   *PublishTemplateVersionJSONRequestBody
 }
 
 type PublishTemplateVersionResponseObject interface {
@@ -4591,13 +4582,6 @@ func (sh *strictHandler) PublishTemplateVersion(w http.ResponseWriter, r *http.R
 	request.N = n
 	request.Params = params
 
-	var body PublishTemplateVersionJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-		return
-	}
-	request.Body = &body
-
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.PublishTemplateVersion(ctx, request.(PublishTemplateVersionRequestObject))
 	}
@@ -4884,28 +4868,28 @@ var swaggerSpec = []string{
 	"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",
-	"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",
-	"B9SzXMLcQanPodtqK+ZGAvoliK7fXf9fAAAA//8=",
+	"UvxeX4JHocvzByHV4fwyPXMk2OrdDoKgzuVUx0D/wUyEw8Nd4Bo+pXOHMsWh1suRPfd4lg2zrzatDRVT",
+	"t/UQ1hf9Rrbsa1v+4B/87f2DY3n0Hmz1z2erO+q/K79gi2uHY66y1sHlaZ3A5GvyBd4sYecweddIWlmb",
+	"/et94+CadHN0wWnlIswLIjEhPEvUJSnU9yD40Mf3O0r9NUgJFU6Ydbv0UhtfHQkm2xnm5Amv0n24Or+M",
+	"TJ4PzHvIvB8d7KB2Bd6A/H1obI6NNzKj3gq3Fxm3cXk5+fHg9Hpwev1WTi+fO9Ms2ae5vpr8GjXp998h",
+	"obx6ZAS5lmuXXRj2fjqCk6PJ6eE8eRTD60Oyf1w9dqA6OeW/UeCyHTWxyFVeIJvT2BfaDFh1tmS2jk0n",
+	"HHxCMVRVUtK6k1xkJTO9q9ISVlJdMHzmH/oxeKUpTl5jKmTmn1CawE/UPpflM7mF0418o8BrWT7l5F71",
+	"elAMLuourt8/2od5qUHY3JXtM0d70XqYEdpnXl5IxI+oXL76piXQDC3TdC8bkcyfsCaKZvZmPwSS5fue",
+	"J+3RqwzPmK6Ey1xnkJfaJK6TKO7xt/D7Ul+tKXqHF243Xtna+KrXPZ9Qj72U9qBFfU4T2HCmEJOouZxh",
+	"SIlh0Ldk71WGpBHFxr119bDvH1xQX+P+c9R/Zy4o9wTbQsik2r6fUa1qWAXPbqMl1baMhdrrSnXmFpGe",
+	"q04OeKd2Jr+Ws9kRdl+WMwC4KHkFpGFdZ3XOU5Di0qXq3qIX2is3E3hiHSkXdR56M7e0elHEVQIyFxdo",
+	"VaxMoLLZPOxLmikCDSk4IT73QsjqhuIDy/sNWd7Iw4sPnO/eOd+AfTgOtZEhctKkpvO/plf141fXU5RN",
+	"csdgeTvVsDtw6/yoE822EnnbHdpL4f3LO0OszlxyW9g6JCKfrNs+seZnMZbtu/fCreEuNg1xDC75sHuE",
+	"xxpSLgdXYl/OK6SY46TZf6abaJjd62Vl2jmrN0Wl2pmzzGg2GWEMNkdhDO20jDFUuYwdEPYCYis1Ymt4",
+	"SvLA6G9cmiV7KyyxWZrBJYO03blFUJ1JZFQH+jn1SwA1g1XO0k1tYkOokhLabqv1Ap92sNV/vZShIazJ",
+	"26Qu7mV+Mj37pJ1gk3a2uu3UDPRd2TeNHR1XxG9w7DiTR3H36nQp62R6fqxmL2wax+cwtEiq8hi6u6Z+",
+	"nCplYrvn6iHwYcdPhwmdW/nUrCwWGQJhTKR9gIMprzfA7tkhX3aoz4cZxlClMo7byVT8pIYEtWnE0KTa",
+	"CYuhSmdZZ68Tc0bdRV5DqDbNy16GXOSUEy2kTZz3Pfg0LsK+dHWOmX1QK5nNHh3utyFr51keAneCMqkT",
+	"JkM7ZSfYdPYWJuerKeXCaCB7NtnYFNoZP2EKOZHn9gH4/QmcSPGP1hsmSzM/btPCuwzqzeN0Hh9Js8jz",
+	"kmcMYc/P5Wh/AqfIFom9j9yaVzdf6ShLcPlwMmofeSXSUapb+iTDBeU2mU5pPfpwZfq+rhVBF8VvEx4b",
+	"xj6Bp6171nZO9qq1fXvIKotTN9xZM9zE8cDWczA26SHRcHqSHLQ3hZMNw3k86eiPKq79i2ZHe/vZk2Vg",
+	"yzQP2XXYX6UYBohVCqUaOnVZWjuczXwINPyRXiA3XN9AYuiA2l9WfLTHdqmGo1COTc9yCXMHpT4/baut",
+	"mBsJ6Jcgun53/X8BAAD//w==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

@@ -366,12 +366,10 @@ type ArchiveCmd struct {
 // PublishTemplateVersionCmd identifies the template version to publish —
 // either directly from draft (bypassing the review/approve workflow) or
 // completing a version the kernel signoff flow already brought to approved
-// (ADR 0082) — along with the derived schema object key to record on the
-// resulting AuditPublished event.
+// (ADR 0082).
 type PublishTemplateVersionCmd struct {
 	TenantID, ActorUserID, TemplateID string
 	VersionNumber                     int
-	SchemaKey                         string
 }
 
 // PublishTemplateVersionResult holds the now-published version. Publish no
@@ -392,8 +390,9 @@ type PublishTemplateVersionResult struct {
 // template's PublishedVersionID is updated (ADR 0065 — revision/number
 // projected onto the read model, not stored on the aggregate), the previously
 // published version (if any) is transitioned to obsolete, and AuditPublished
-// (plus AuditObsoleted when applicable) events are appended — all atomically
-// in one transaction. A CAS conflict from a concurrent transition is remapped
+// (schema_key detail always server-derived, never client input; plus
+// AuditObsoleted when applicable) events are appended — all atomically in one
+// transaction. A CAS conflict from a concurrent transition is remapped
 // to ErrConcurrentTransition (409 instead of 412). Publish no longer spawns
 // the next revision (M1·T2); callers use CreateNextVersion for that.
 func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplateVersionCmd) (*PublishTemplateVersionResult, error) {
@@ -454,7 +453,8 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 	// model projects revision/number/status from the version row on read.
 	template.PublishedVersionID = &version.ID
 
-	audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditPublished, map[string]any{"schema_key": cmd.SchemaKey}, now)
+	schemaKey := templateSchemaKey(cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
+	audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditPublished, map[string]any{"schema_key": schemaKey}, now)
 	if err != nil {
 		return nil, err
 	}
