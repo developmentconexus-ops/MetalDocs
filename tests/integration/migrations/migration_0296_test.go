@@ -108,8 +108,15 @@ func TestMigration0296_ApprovalInstances_CheckRejectsInvalidSubjectKind(t *testi
 	doc := testdb.NewDocument(t, db, testdb.WithStatus("approved"))
 	route := testdb.NewApprovalRoute(t, db, testdb.WithTenant(doc.TenantID))
 
+	// NOTE (0299, ADR 0083): enforce_capability_asserted()'s nested
+	// CASE NEW.subject_kind fires as a BEFORE INSERT row trigger, so for
+	// approval_instances an out-of-enum subject_kind now hits the
+	// discriminator's fail-closed ELSE branch (P0001) BEFORE the row ever
+	// reaches the CHECK constraint. This is the correct precedence — the
+	// tripwire is the first line of defense — so the assertion is realigned
+	// to the discriminator's fail-closed error rather than the CHECK.
 	err := insertInstanceWithSubject(t, db, doc, route, "invalid", "whatever")
-	assertCheckViolation(t, err)
+	assertSubjectDiscriminatorFailClosed(t, err)
 }
 
 // NOTE: template-subject INSERTABILITY (route + instance) is proven by
@@ -258,10 +265,11 @@ func insertInstanceWithSubject(t *testing.T, db *sql.DB, doc testdb.Document, ro
 	); err != nil {
 		t.Fatalf("set tenant_id GUC: %v", err)
 	}
+	assertedCap := capForSubject(subjectKind)
 	if _, err := tx.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', $1, true)`, `[{"cap":"document.submit"}]`,
+		`SELECT set_config('metaldocs.asserted_caps', $1, true)`, `[{"cap":"`+assertedCap+`"}]`,
 	); err != nil {
-		t.Fatalf("assert document.submit cap: %v", err)
+		t.Fatalf("assert %s cap: %v", assertedCap, err)
 	}
 
 	id := uuid.NewString()
@@ -278,6 +286,44 @@ func insertInstanceWithSubject(t *testing.T, db *sql.DB, doc testdb.Document, ro
 		return err
 	}
 	return tx.Commit()
+}
+
+// capForSubject returns the capability string enforce_capability_asserted()'s
+// subject-discriminated approval_instances/INSERT arm (0299, ADR 0083)
+// requires for the given subject_kind: document rows need document.submit,
+// template rows need template.submit (never unioned — arms.go entries #1a/
+// #1b). Any other subject_kind is not a discriminated arm at all (it hits
+// the trigger's fail-closed ELSE before the asserted cap is even consulted),
+// so the fallback value here is inert for those callers.
+func capForSubject(subjectKind string) string {
+	if subjectKind == "template" {
+		return "template.submit"
+	}
+	return "document.submit"
+}
+
+// assertSubjectDiscriminatorFailClosed asserts the P0001 raised by
+// enforce_capability_asserted()'s nested CASE NEW.subject_kind ELSE branch
+// (migration 0299, ADR 0083) for an approval_instances row whose subject_kind
+// is outside the discriminated set ('document' | 'template'). This trigger
+// fires as a BEFORE INSERT row trigger, so it intercepts an invalid
+// subject_kind before the row ever reaches the CHECK constraint.
+func assertSubjectDiscriminatorFailClosed(t *testing.T, err error) {
+	t.Helper()
+	if err == nil {
+		t.Fatal("expected the subject discriminator to fail-closed, got nil error")
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		if pgErr.Code != "P0001" {
+			t.Fatalf("expected SQLSTATE P0001 (subject discriminator fail-closed), got %s: %v", pgErr.Code, err)
+		}
+		if !strings.Contains(pgErr.Message, "no discriminated arm") {
+			t.Fatalf("expected a 'no discriminated arm' fail-closed message, got: %v", pgErr.Message)
+		}
+		return
+	}
+	t.Fatalf("expected a *pgconn.PgError P0001, got: %v", err)
 }
 
 func assertCheckViolation(t *testing.T, err error) {

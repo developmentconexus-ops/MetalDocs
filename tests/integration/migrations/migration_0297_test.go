@@ -295,10 +295,16 @@ func insertInstanceFull(t *testing.T, db *sql.DB, tenantID, routeID, submittedBy
 	); err != nil {
 		t.Fatalf("set tenant_id GUC: %v", err)
 	}
+	// capForSubject (migration_0296_test.go, same package) mirrors the
+	// subject-discriminated approval_instances/INSERT arm (0299, ADR 0083):
+	// document rows need document.submit, template rows need template.submit
+	// — never unioned, so the wrong constant here fail-closes P0001 before
+	// the row-shape assertion this test is actually about.
+	assertedCap := capForSubject(subjectKind)
 	if _, err := tx.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', $1, true)`, `[{"cap":"document.submit"}]`,
+		`SELECT set_config('metaldocs.asserted_caps', $1, true)`, `[{"cap":"`+assertedCap+`"}]`,
 	); err != nil {
-		t.Fatalf("assert document.submit cap: %v", err)
+		t.Fatalf("assert %s cap: %v", assertedCap, err)
 	}
 
 	id := uuid.NewString()
