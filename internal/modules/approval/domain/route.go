@@ -63,6 +63,26 @@ type Stage struct {
 	OnEligibilityDrift DriftPolicy
 	Kind               StageKind
 	DueInDays          *int
+	Selectors          []ActorSelector
+}
+
+// EffectiveSelectors returns the actor selectors that govern this stage during
+// the flat-column → selector coexistence window. If explicit Selectors are set
+// they win; otherwise a legacy stage's RequiredRole/AreaCode is synthesized
+// into a single role_in_fixed_area selector — the in-memory mirror of the 0303
+// backfill. A stage with neither returns nil (rejected by Route.Validate).
+//
+// TRANSITION bridge: deleted in slice 6 / migration 0304 when the flat
+// RequiredRole/RequiredCapability/AreaCode columns drop and Selectors becomes
+// the sole source of truth.
+func (s Stage) EffectiveSelectors() []ActorSelector {
+	if len(s.Selectors) >= 1 {
+		return s.Selectors
+	}
+	if s.RequiredRole != "" {
+		return []ActorSelector{{Kind: SelectorRoleInFixedArea, Role: s.RequiredRole, AreaCode: s.AreaCode}}
+	}
+	return nil
 }
 
 // Route is the per-profile approval route configuration.
@@ -131,6 +151,22 @@ func (r Route) Validate(policy taxonomydomain.RoutePolicy) error {
 			return fmt.Errorf("duplicate stage name %q in route", s.Name)
 		}
 		names[s.Name] = true
+
+		// Every stage must name at least one way to resolve its eligible
+		// actor pool (M4, unit 3.2), and every effective selector must be
+		// internally consistent for its kind. EffectiveSelectors bridges the
+		// coexistence window: an explicit-Selectors stage validates on those;
+		// a legacy RequiredRole/AreaCode stage validates on the synthesized
+		// role_in_fixed_area selector.
+		effective := s.EffectiveSelectors()
+		if len(effective) == 0 {
+			return ErrStageNoSelector
+		}
+		for _, sel := range effective {
+			if err := sel.Validate(); err != nil {
+				return fmt.Errorf("stage %q: %w", s.Name, err)
+			}
+		}
 	}
 
 	// Per-profile governance route-signature policy (G1). Belt-and-suspenders to

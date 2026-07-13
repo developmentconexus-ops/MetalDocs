@@ -37,3 +37,17 @@ var ErrFastForwardStageNotCompleted = errors.New("approval: fast-forward verdict
 // the actor is not in the next stage's eligible pool). The signoff leg is
 // never attempted in this case.
 var ErrFastForwardNotEligible = errors.New("approval: fast-forward not eligible on the now-active stage")
+
+// ErrInvalidSelectorKind is returned by ActorSelector.Validate for any Kind
+// other than the four SelectorKind values (M4, unit 3.2).
+var ErrInvalidSelectorKind = errors.New("approval: invalid actor selector kind")
+
+// ErrSelectorFieldsInvalid is returned by ActorSelector.Validate when the
+// UserID/Role/AreaCode fields don't match the presence/absence contract for
+// the selector's Kind.
+var ErrSelectorFieldsInvalid = errors.New("approval: actor selector fields invalid for its kind")
+
+// ErrStageNoSelector is returned by Route.Validate when a stage has zero
+// ActorSelectors — every stage must name at least one way to resolve its
+// eligible actor pool.
+var ErrStageNoSelector = errors.New("approval: stage must have at least one actor selector")
