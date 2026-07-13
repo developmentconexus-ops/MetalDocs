@@ -53,8 +53,11 @@ import (
 // no direct subject_kind column, so the trigger SELECTs the parent
 // approval_instances row's subject_kind and CASEs on the looked-up value;
 // document-parent rows require document.signoff, template-parent rows
-// require template.approve, never unioned).
-const tripwireMigrationPath = "db/migrations/0300_tripwire_signoff_parent_discriminator.sql"
+// require template.approve, never unioned), then to 0301 (ADR 0082 phase c,
+// unit 3.1a S5: templates_template_version arm drops template.review — the
+// legacy reviewer stage was deleted in S4 and the capability is retired from
+// the IAM registry in the same change-set).
+const tripwireMigrationPath = "db/migrations/0301_tripwire_template_review_retired.sql"
 
 // gatedTableSet returns the set of table names present in TripwireArms — the
 // tables TRIPWIRE-ARM-DRIFT restricts its attention to (contract §1.5.b: "only

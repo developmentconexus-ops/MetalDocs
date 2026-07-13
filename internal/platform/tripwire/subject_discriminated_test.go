@@ -1,8 +1,6 @@
 package tripwire
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -69,80 +67,17 @@ func TestRenderMigration_ApprovalInstancesSubjectDiscriminated(t *testing.T) {
 	}
 }
 
-// TestRenderMigration_UntouchedArmsByteIdenticalToPriorGolden pins the
-// critical ADR 0083 invariant: every non-approval_instances CASE branch must
-// render BYTE-IDENTICAL to the prior golden migration (0283). We prove this
-// by stripping the approval_instances branch out of both the prior golden
-// file and the freshly rendered migration, then diffing the remainder.
-//
-// This test predates the 0300 slice (M3 P3.S2b-3b-iii-a): it was written
-// when approval_instances was the only discriminated branch and every other
-// branch (including approval_signoffs) was untouched relative to 0283. 0300
-// intentionally changes the approval_signoffs branch too, so this test now
-// additionally strips approval_signoffs before comparing — see
-// TestRenderMigration_UntouchedArmsByteIdenticalToPrior0299Golden below for
-// the 0300-scoped proof (approval_signoffs is the ONLY branch that changed
-// between 0299 and 0300).
-func TestRenderMigration_UntouchedArmsByteIdenticalToPriorGolden(t *testing.T) {
-	repoRoot, err := findRepoRoot()
-	if err != nil {
-		t.Fatalf("locate repo root: %v", err)
-	}
-	priorPath := filepath.Join(repoRoot, "db", "migrations", "0283_tripwire_delete_return_old.sql")
-	prior, err := os.ReadFile(priorPath)
-	if err != nil {
-		t.Fatalf("read prior golden %s: %v", priorPath, err)
-	}
-
-	rendered := RenderMigration()
-
-	priorMinusApproval := stripBranch(t, stripBranch(t, string(prior), "approval_instances"), "approval_signoffs")
-	renderedMinusApproval := stripBranch(t, stripBranch(t, rendered, "approval_instances"), "approval_signoffs")
-
-	// The function header/DECLARE block differs only by the migration-header
-	// comment, the DECLARE block (0300 adds v_parent_subject_kind), and the
-	// schema_migrations version/description literal, which we normalize out
-	// before comparing the CASE-branch bodies.
-	priorBody := extractCaseBody(t, priorMinusApproval)
-	renderedBody := extractCaseBody(t, renderedMinusApproval)
-
-	if priorBody != renderedBody {
-		t.Errorf("non-approval_instances/non-approval_signoffs CASE branches changed vs prior golden 0283 (ADR 0083 requires byte-identity for untouched arms).\n--- prior ---\n%s\n--- rendered ---\n%s", priorBody, renderedBody)
-	}
-}
-
-// TestRenderMigration_UntouchedArmsByteIdenticalToPrior0299Golden pins the
-// M3 P3.S2b-3b-iii-a invariant precisely: going from 0299 (the immediately
-// prior golden, already carrying the approval_instances subject
-// discrimination) to the freshly rendered 0300, the ONLY CASE branch allowed
-// to change is approval_signoffs. We prove this by stripping the
-// approval_signoffs branch out of both 0299 and the freshly rendered
-// migration, then diffing the remainder — the approval_instances branch is
-// included in this comparison (unlike the 0283-scoped test above) precisely
-// because it must NOT have changed again in this slice.
-func TestRenderMigration_UntouchedArmsByteIdenticalToPrior0299Golden(t *testing.T) {
-	repoRoot, err := findRepoRoot()
-	if err != nil {
-		t.Fatalf("locate repo root: %v", err)
-	}
-	priorPath := filepath.Join(repoRoot, "db", "migrations", "0299_tripwire_subject_discriminated_arms.sql")
-	prior, err := os.ReadFile(priorPath)
-	if err != nil {
-		t.Fatalf("read prior golden %s: %v", priorPath, err)
-	}
-
-	rendered := RenderMigration()
-
-	priorMinusSignoffs := stripBranch(t, string(prior), "approval_signoffs")
-	renderedMinusSignoffs := stripBranch(t, rendered, "approval_signoffs")
-
-	priorBody := extractCaseBody(t, priorMinusSignoffs)
-	renderedBody := extractCaseBody(t, renderedMinusSignoffs)
-
-	if priorBody != renderedBody {
-		t.Errorf("non-approval_signoffs CASE branches changed vs prior golden 0299 (M3 P3.S2b-3b-iii-a requires byte-identity for every other arm, including approval_instances).\n--- prior ---\n%s\n--- rendered ---\n%s", priorBody, renderedBody)
-	}
-}
+// NOTE (unit 3.1a S5): the two slice-scoped golden-diff tests that lived here
+// (TestRenderMigration_UntouchedArmsByteIdenticalToPriorGolden vs 0283 and
+// ...ToPrior0299Golden vs 0299) were deleted with the 0301 re-render. Each
+// pinned "only branch X changed in THIS slice" — a property of the 0299/0300
+// re-renders, not a standing invariant — and re-broke by design on every
+// legitimate later arm change. The standing invariants remain pinned by
+// TestRenderMigration_MatchesCommittedFile (byte-parity with the committed
+// latest golden, also enforced as the blocking TRIPWIRE-ARM-PARITY api-lint
+// rule) and TestTripwireArms_MatchesContractTable (exact arm→caps table);
+// per-slice minimality is proven at review time by diffing the committed
+// goldens (0300 vs 0301: templates_template_version branch + ledger only).
 
 // TestRenderMigration_ApprovalSignoffsParentLookupDiscriminated pins the M3
 // P3.S2b-3b-iii-a core correctness property (ADR 0083 follow-on):
@@ -230,20 +165,6 @@ func extractBranch(t *testing.T, sql string, table string) string {
 	return rest[:end]
 }
 
-// stripBranch removes the WHEN TG_TABLE_NAME = '<table>' ... branch (and its
-// body) from sql entirely, returning the remainder.
-func stripBranch(t *testing.T, sql string, table string) string {
-	t.Helper()
-	marker := "WHEN TG_TABLE_NAME = '" + table + "'"
-	start := strings.Index(sql, marker)
-	if start < 0 {
-		t.Fatalf("branch marker %q not found in SQL", marker)
-	}
-	rest := sql[start:]
-	end := nextBranchOffset(rest)
-	return sql[:start] + sql[start+end:]
-}
-
 // nextBranchOffset finds the offset of the next top-level "    WHEN " or
 // "    ELSE" (4-space indent, the outer CASE's branch indent) after the
 // start of the current branch's own "WHEN " keyword.
@@ -259,20 +180,4 @@ func nextBranchOffset(branchAndRest string) int {
 		return len(branchAndRest)
 	}
 	return searchFrom + idx + 1 // +1 to include leading \n in the stripped branch, excluded from the next
-}
-
-// extractCaseBody returns the substring between "BEGIN\n  CASE" and
-// "END CASE;" so header-comment/version-literal differences outside the CASE
-// don't pollute the byte-identity comparison.
-func extractCaseBody(t *testing.T, sql string) string {
-	t.Helper()
-	start := strings.Index(sql, "BEGIN\n  CASE")
-	if start < 0 {
-		t.Fatalf("CASE body start marker not found")
-	}
-	end := strings.Index(sql, "END CASE;")
-	if end < 0 {
-		t.Fatalf("CASE body end marker not found")
-	}
-	return sql[start:end]
 }

@@ -1,9 +1,9 @@
 // Command gen-tripwire writes the machine-generated tripwire migration SQL
 // (internal/platform/tripwire.RenderMigration()) to the latest canonical
-// migration path (0300 as of M3 P3.S2b-3b-iii-a, ADR 0083 follow-on:
-// approval_signoffs arm splits into parent-lookup-discriminated
-// document/template entries — a SELECT of the parent approval_instances
-// row's subject_kind followed by a nested CASE on the looked-up value).
+// migration path (0301 as of unit 3.1a S5, ADR 0082 phase c:
+// templates_template_version arm drops 'template.review' — the legacy
+// reviewer stage was deleted in S4 and the capability is retired from the
+// IAM registry in the same change-set).
 //
 // Usage: go run ./cmd/gen-tripwire [output-path]
 // With no argument, writes to the canonical path relative to the repo root
@@ -18,7 +18,7 @@ import (
 	"metaldocs/internal/platform/tripwire"
 )
 
-const defaultRelPath = "db/migrations/0300_tripwire_signoff_parent_discriminator.sql"
+const defaultRelPath = "db/migrations/0301_tripwire_template_review_retired.sql"
 
 func main() {
 	out := defaultRelPath

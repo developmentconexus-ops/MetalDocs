@@ -10,17 +10,16 @@ import (
 // TenantDataPort is the templates module's M7 F7.3 TenantDataPort. It owns
 // public.templates_template and public.templates_template_version.
 //
-// Erase order handles two same-module wrinkles neither table's own FK
-// solves automatically:
-//   - templates_template.published_version_id -> templates_template_version.id
-//     and templates_template_version.template_id -> templates_template.id form
-//     a two-table cycle (no ON DELETE CASCADE either direction). published_version_id
-//     is nulled out first so templates_template_version can then be deleted.
-//   - public.templates_approval_config (template_id -> templates_template.id,
-//     no cascade, no tenant_id column of its own — out of this port's
-//     Tables() census but an in-module child table, so invariant 6 still
-//     permits touching it here) is deleted before templates_template or the
-//     final DELETE would fail on a dangling-reference violation.
+// Erase order handles one same-module wrinkle the tables' own FKs don't
+// solve automatically: templates_template.published_version_id ->
+// templates_template_version.id and templates_template_version.template_id ->
+// templates_template.id form a two-table cycle (no ON DELETE CASCADE either
+// direction). published_version_id is nulled out first so
+// templates_template_version can then be deleted. (A second wrinkle —
+// public.templates_approval_config as a non-cascading in-module child — was
+// retired with the legacy template-approval path: the table is dropped by
+// db/migrations/0302_drop_templates_approval_config.sql, ADR 0082 phase c /
+// unit 3.1a S5.)
 //
 // Cross-module FK note (orchestrator concern): controlled_documents and
 // metaldocs.document_profiles both reference templates_template_version(id)
@@ -67,17 +66,6 @@ func (p *TenantDataPort) EraseTenantData(ctx context.Context, tx *sql.Tx, tenant
 UPDATE public.templates_template
    SET published_version_id = NULL
  WHERE tenant_id = $1::uuid AND published_version_id IS NOT NULL`, tenantID); err != nil {
-		return nil, err
-	}
-
-	// templates_approval_config has no tenant_id of its own (not in
-	// Tables()) but is an in-module child of templates_template that would
-	// otherwise block the final DELETE.
-	if _, err := tx.ExecContext(ctx, `
-DELETE FROM public.templates_approval_config
- WHERE template_id IN (SELECT id FROM public.templates_template WHERE tenant_id = $1::uuid)`,
-		tenantID,
-	); err != nil {
 		return nil, err
 	}
 

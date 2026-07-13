@@ -68,9 +68,12 @@ func TestTripwireArms_MatchesContractTable(t *testing.T) {
 			iamdomain.CapTemplateCreate, iamdomain.CapTemplateEdit, iamdomain.CapTemplateSubmit,
 			iamdomain.CapTemplateApprove, iamdomain.CapTemplatePublish, iamdomain.CapTemplateArchive,
 		},
+		// ADR 0082 phase c / unit 3.1a S5: template.review dropped — the legacy
+		// reviewer stage (its only asserting writer, added by 0269) was deleted
+		// in S4 and the capability is retired from the IAM registry.
 		{"templates_template_version", OpAny, ""}: {
 			iamdomain.CapTemplateCreate, iamdomain.CapTemplateEdit, iamdomain.CapTemplateSubmit,
-			iamdomain.CapTemplateReview, iamdomain.CapTemplateApprove, iamdomain.CapTemplatePublish,
+			iamdomain.CapTemplateApprove, iamdomain.CapTemplatePublish,
 		},
 		{"iam_users", OpAny, ""}:         {iamdomain.CapUserManage},
 		{"iam_groups", OpAny, ""}:        {iamdomain.CapUserManage},
@@ -131,7 +134,10 @@ func TestTripwireArms_MatchesContractTable(t *testing.T) {
 // collision — migrate.Apply dedupes by 4-digit prefix only), then to
 // db/migrations/0300_*.sql (ADR 0083 follow-on, M3 P3.S2b-3b-iii-a:
 // approval_signoffs/INSERT arm parent-lookup-discriminated via a SELECT of
-// the parent approval_instances row's subject_kind + a nested CASE), so the
+// the parent approval_instances row's subject_kind + a nested CASE), then to
+// db/migrations/0301_*.sql (ADR 0082 phase c, unit 3.1a S5:
+// templates_template_version arm drops template.review — legacy reviewer
+// stage deleted in S4, capability retired from the IAM registry), so the
 // golden target advances with the latest rendered migration (M7
 // validation-contract.md §5, M6 §3, M2 §1.4/§1.5.a, ADR 0083 + follow-on).
 func TestRenderMigration_MatchesCommittedFile(t *testing.T) {
@@ -139,7 +145,7 @@ func TestRenderMigration_MatchesCommittedFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("locate repo root: %v", err)
 	}
-	migrationPath := filepath.Join(repoRoot, "db", "migrations", "0300_tripwire_signoff_parent_discriminator.sql")
+	migrationPath := filepath.Join(repoRoot, "db", "migrations", "0301_tripwire_template_review_retired.sql")
 
 	committed, err := os.ReadFile(migrationPath)
 	if err != nil {

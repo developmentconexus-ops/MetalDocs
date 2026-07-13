@@ -56,10 +56,10 @@ var hgOwnerByTable = map[string]string{
 	// audit (cross-cutting platform append-sink — read projections exempt via D3d)
 	"audit_events":      "audit",
 	"audit_export_jobs": "audit",
-	// templates
+	// templates (templates_approval_config dropped by migration 0302,
+	// ADR 0082 phase c / unit 3.1a S5)
 	"templates_template":         "templates",
 	"templates_template_version": "templates",
-	"templates_approval_config":  "templates",
 	// jobs
 	"idempotency_keys": "jobs",
 	// notifications

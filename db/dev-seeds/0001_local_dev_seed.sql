@@ -172,7 +172,7 @@ VALUES
   -- 'approver'-role row is impossible: partial unique index
   -- ux_user_process_areas_one_active allows ONE active row per
   -- (user, tenant, area). qms_admin's capability set is a superset of
-  -- approver's document/template caps (template.approve, template.review,
+  -- approver's document/template caps (template.approve,
   -- document.signoff, ...), so the superset role is the safe single choice.
   -- domain.CheckSegregation is untouched (SoD compares user_id, not role);
   -- role='approver' coverage stays exercised by approver-test above.

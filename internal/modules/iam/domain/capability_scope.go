@@ -62,7 +62,6 @@ var capabilityScopes = map[Capability]CapabilityScope{
 	CapTemplateCreate:   ScopeTenant,
 	CapTemplateEdit:     ScopeTenant,
 	CapTemplateSubmit:   ScopeTenant,
-	CapTemplateReview:   ScopeTenant,
 	CapTemplateApprove:  ScopeTenant,
 	CapTemplatePublish:  ScopeTenant,
 	CapTemplateArchive:  ScopeTenant,

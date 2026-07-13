@@ -103,7 +103,6 @@ const (
 	CapTemplateCreate  Capability = "template.create"
 	CapTemplateEdit    Capability = "template.edit"
 	CapTemplateSubmit  Capability = "template.submit"
-	CapTemplateReview  Capability = "template.review"
 	CapTemplateApprove Capability = "template.approve"
 	CapTemplatePublish Capability = "template.publish"
 	CapTemplateArchive Capability = "template.archive"
@@ -175,7 +174,6 @@ var validCapabilities = map[Capability]struct{}{
 	CapTemplateCreate:              {},
 	CapTemplateEdit:                {},
 	CapTemplateSubmit:              {},
-	CapTemplateReview:              {},
 	CapTemplateApprove:             {},
 	CapTemplatePublish:             {},
 	CapTemplateArchive:             {},

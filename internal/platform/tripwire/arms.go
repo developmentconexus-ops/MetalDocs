@@ -222,14 +222,18 @@ var TripwireArms = []Arm{
 			iamdomain.CapTemplateArchive,
 		},
 	},
-	{ // 14
+	{ // 14 — 'template.review' removed (ADR 0082 phase c, unit 3.1a S5): the
+		// legacy reviewer stage (Service.Review) — the only writer that asserted
+		// it on this table (added by 0269) — was deleted with the legacy
+		// template-approval path, and CapTemplateReview is retired from the IAM
+		// registry in the same change-set. Re-rendered as
+		// db/migrations/0301_tripwire_template_review_retired.sql.
 		Table: "templates_template_version",
 		Op:    OpAny,
 		Caps: []iamdomain.Capability{
 			iamdomain.CapTemplateCreate,
 			iamdomain.CapTemplateEdit,
 			iamdomain.CapTemplateSubmit,
-			iamdomain.CapTemplateReview,
 			iamdomain.CapTemplateApprove,
 			iamdomain.CapTemplatePublish,
 		},
