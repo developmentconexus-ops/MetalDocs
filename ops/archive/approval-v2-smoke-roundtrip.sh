@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# ARCHIVED 2026-07-13 — NOT RUNNABLE against the current stack.
+# Targets the retired Approval-v2/K8s-canary API shape (/api/v2/*, /internal/test/seed,
+# /internal/admin/cleanup-tenant) — none of these routes exist in the v1 API.
+# Kept as reference for a future synthetic-probe design only. See ops/archive/approval-v2-k8s-canary.md.
+#
 # approval_roundtrip.sh — Synthetic approval smoke test
 # Creates disposable tenant, submits + auto-signs + publishes + cleans up.
 # Each step must complete within STEP_TIMEOUT seconds.
