@@ -37,7 +37,7 @@
 | P3.S2a repository subject truth | 2026-07-12 | sonnet | sonnet ACCEPT | hard-require + 5-site hydration scan-order verified; template round-trip real; doc byte-equal | ec922e97 | DONE |
 | P3.S2b-3b-iii-a signoff tripwire discriminator | 2026-07-12 | sonnet | sonnet ACCEPT | parent-lookup CASE; byte-identity 3×; disjoint+fail-closed; live-DB integration | 4c311f16 | DONE |
 | P3.S2b-3b-iii-b template version lifecycle (submit-lock + signoff) | 2026-07-12 | sonnet | sonnet ACCEPT | STOP→hub Option-a; doc path byte-equal; boundary OK; neg-control P0001 role-indep | 0657cf04 | DONE |
-| P3.S2b-4 template HTTP entry points | — | sonnet | sonnet (indep) | R2a thin routes, contract-first | — | pending |
+| P3.S2b-4 template HTTP entry points | 2026-07-12 | sonnet | sonnet (indep) REQUEST-CHANGES→ACCEPT | api-lint 0; boundary OK; api.gen regen empty-diff; delegation+cap-parity verified; blocker=untested integrity read → fixed | 9918848a + 88c25b0a | DONE |
 | P3.S3 config→route migration | — | sonnet | sonnet (indep) | cutover rule applied | — | pending |
 | P3.S4 retire parallel path | — | sonnet | sonnet (indep) | contract diff | — | pending |
 
