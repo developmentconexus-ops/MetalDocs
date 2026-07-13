@@ -13,46 +13,79 @@ in WHAT order, with WHAT evidence.
 | Role | Model | Does | Never does |
 |---|---|---|---|
 | **Design/synthesis** | Fable (rare, expensive) | Architecture decisions, system-impact gates, spec ratification support, roadmap surgery | Implementation, bulk file reading, worker duty |
-| **Orchestrator** | Standing dispatch session (operator's hub) | Builds per-unit context pack → creates spawn_task chip (self-contained prompt: files, constraints, done-criteria, budget) → operator clicks to launch → acceptance-reviews returned evidence → integrates → next chip. Chips ALWAYS (operator-ratified 2026-07-10): every unit runs as its own observable session the operator can open and follow | Writing large code diffs itself when a worker fits; reviewing its own dispatched work |
-| **Unit session** | **Opus** (operator selects at launch; medium effort default) | Runs one unit end-to-end per its chip prompt: spec→plan→TDD→verify→evidence→commit | Scope beyond its chip; pushing; flipping statuses past HS-1 |
+| **Orchestrator** | Standing dispatch session (operator's hub) | Builds per-unit context pack → dispatches the unit AGENT (Transport A, §2: Agent tool, Opus, worktree isolation, background — zero operator clicks) → answers its events → acceptance-reviews returned evidence → integrates → auto-advances to the next actionable unit. Transport B (spawn_task chip the operator launches) only on the fallback triggers in §2 | Writing large code diffs itself when a worker fits; reviewing its own dispatched work |
+| **Unit agent/session** | **Opus** (hub sets `model: opus` on dispatch; Transport B: operator selects at launch, medium effort) | Runs one unit end-to-end per its dispatch prompt: spec→plan→TDD→verify→evidence→commit; dispatches its own nested sonnet/haiku workers (verified capability 2026-07-12) | Scope beyond its prompt; pushing; flipping statuses past HS-1; touching shared infra (:80 stack) |
 | **Implement worker** | Sonnet subagent (inside the unit session) | One TDD slice per dispatch, per written plan task | Scope beyond its task card; touching files outside its slice |
 | **Reviewer** | Sonnet subagent (independent — never the implementer) | Two-stage review per slice (see §4) | Generating new scope (anti-circle: reviews VERIFY, they don't renegotiate the plan) |
 | **Mechanical** | Haiku | Renames, comment sweeps, format-preserving tweaks | Anything requiring judgment |
-| **Browser QA persona** | Fresh session via `spawn_task` | §6 protocol — validates as a USER, from zero context | Reading implementation diffs first (would bias); fixing anything |
+| **Browser QA persona** | Fresh background QA agent (zero inherited context, browser tools); `spawn_task` fallback if the agent env cannot render (F-UI-1 class) | §6 protocol — validates as a USER, from zero context | Reading implementation diffs first (would bias); fixing anything |
 
 Concurrency ≤15 workers. Fable never a worker.
 
 ## 2. Unit execution loop (every ROADMAP unit)
 
-**Dispatch mechanics (operator-ratified 2026-07-10):** every unit dispatches as a spawn_task
-CHIP — a real standalone session the operator can open, watch turn-by-turn, and intervene in.
-The orchestrator hub authors the chip's self-contained context pack (exact files, constraints,
-done-criteria, budget); the operator launches it on Opus. On completion the hub runs per-unit
-acceptance review (accept / reject / block; 2× reject = redesign, new chip). Rejection = new
-corrective chip with the findings. Shared-resource rule: one owner of the :80 stack at a time.
-Note: chip sessions run in fresh worktrees — untracked runtime files (.env, .env.local) must be
-copied from the main checkout (never printed). Chip prompts must state this.
+**Dispatch mechanics v2 (operator-directed 2026-07-12: "automation focus" — restructure ratified).**
+Two transports, same logic, same event grammar:
 
-**Chip prompt template MUST carry, verbatim-strength:** (a) the §4 subagent obligations 1–6 as
-numbered instructions, not a passing mention; (b) "read docs/superpowers/HARNESS.md §4–§5 before
-implementing"; (c) the evidence.md dispatch-ledger requirement — the hub rejects closures whose
-evidence lists no implementer/reviewer dispatches; (d) the task-board obligation — create the
-native task board from the plan before any dispatch, keep statuses live; (e) the hub comms
-contract below, including the hub's `HUB_SESSION_ID` so the chip can address it from turn one.
-The id must be the hub's REAL registry id — verified via the `from="local_…"` attribute of a
-cross-session message the hub previously sent (search chip transcripts), NEVER derived from the
-scratchpad/transcript-dir UUID (that is a different UUID; a dead address forces every chip onto
-the title-match fallback). Always embed the fallback alongside the id.
+**Transport A — unit agent (DEFAULT, fully autonomous).** The hub dispatches the unit as a
+background subagent: `Agent(subagent_type: general-purpose, model: opus, isolation: worktree,
+run_in_background: true)` with the same self-contained context pack a chip would get. Zero
+operator clicks: no launch click, no message-approval clicks (agent events are turn-returns;
+hub replies via the native `SendMessage` tool — both verified prompt-free 2026-07-12).
+Mechanics facts (probe-verified 2026-07-12):
+- Worktree is auto-created at `.claude/worktrees/agent-<agentId>` on branch
+  `worktree-agent-<agentId>`; the path is DETERMINISTIC from the agentId in the spawn result —
+  immediately after spawning, the hub copies `.env` (+`.env.local` if present) from the main
+  checkout into that worktree (file copy only, contents never printed/read). The agent verifies
+  `.env` exists before any DB/integration work; missing = `REQUEST env` event, never hand-set
+  connection strings.
+- `worktree.baseRef = "head"` in `.claude/settings.json` is MANDATORY — the default ("fresh")
+  forks from `origin/main`, which is hundreds of commits stale here. `symlinkDirectories` shares
+  `node_modules` from the main checkout: unit agents NEVER run `pnpm install`/`npm install`
+  inside a symlinked node_modules (dep changes = `REQUEST` to the hub).
+- Unchanged worktrees auto-clean on completion; changed ones persist for the hub to merge.
+- The unit agent CAN dispatch nested sonnet/haiku workers (§4 obligations apply unreduced).
+- Crash model: background agents die with the hub session. Recovery = repo truth: commit per
+  green slice on the worktree branch is mandatory, and hub boot (harness-hub skill) scans
+  `worktree-agent-*` branches + `.claude/worktrees/agent-*` for orphaned in-flight work.
 
-**Hub–chip comms protocol (operator-ratified 2026-07-11).** Chips are not fire-and-forget: every
-chip session talks to the hub over `mcp__ccd_session_mgmt__send_message` (target =
-`HUB_SESSION_ID` from the chip prompt; fallback: `list_sessions` and match the hub by cwd = repo
-root + hub title). Messages are structured events, not chat — one message per event, header line
-first:
+**Transport B — spawn_task chip (fallback).** A real standalone session the operator launches
+and can watch turn-by-turn. Triggers: (1) operator explicitly wants an observable/intervenable
+session for the unit; (2) agent tooling fails for the unit class (e.g. browser rendering F-UI-1);
+(3) corrective redesign after 2× reject where the operator wants eyes on. All chip rules from
+the 2026-07-10/11 ratifications stay binding for B: operator launches on Opus; `.env` copy note
+in the prompt; comms over `mcp__ccd_session_mgmt__send_message` to `HUB_SESSION_ID` (real
+registry id verified via a previously-sent message's `from="local_…"` attribute, never the
+scratchpad UUID; title-match fallback embedded) — accepting the confirmed client limitation that
+the operator approves each send (Ctrl+Enter), messages few and batched.
+
+**Auto-advance (the automation core):** when a unit's acceptance completes green (merge + ladder
++ rebuild + smoke + board + cleanup), the hub IMMEDIATELY dispatches the next actionable ROADMAP
+unit on Transport A — no operator authorization per dispatch. Exceptions that hold the queue:
+(a) the ROADMAP row is marked `OPERATOR-GATE` (needs ratification/spec sign-off first);
+(b) an ordering lock or pending HS-1 blocks it; (c) the operator said "pause dispatch" (resumes
+only on explicit "resume"). The hub reports each dispatch and each acceptance to the operator as
+they happen; the operator retains: HS-1 gates, ratifications (AskUserQuestion), push decisions,
+pause/resume. Genuine human authority stays human; launch/relay friction dies.
+
+**Unit prompt template MUST carry, verbatim-strength (both transports):** (a) the §4 subagent
+obligations 1–6 as numbered instructions, not a passing mention; (b) "read
+docs/superpowers/HARNESS.md §4–§5 before implementing"; (c) the evidence.md dispatch-ledger
+requirement — the hub rejects closures whose evidence lists no implementer/reviewer dispatches;
+(d) the task-board obligation — create the native task board from the plan before any dispatch,
+keep statuses live; (e) the comms contract below — Transport A: "end your turn with exactly ONE
+event header when you have something for the hub; the hub's reply arrives as your next message";
+Transport B: the `HUB_SESSION_ID` + fallback.
+
+**Hub–unit comms protocol (event grammar identical on both transports).** Units are not
+fire-and-forget. Transport A: an event = the agent ENDS ITS TURN with the event as its final
+message (this pauses the unit — no budget burns past a block); the hub answers via `SendMessage`
+(context resumes intact). Transport B: an event = one `mcp__ccd_session_mgmt__send_message`.
+One event per message, header line first:
 
 | Event | When | Payload (keep caveman-brief) |
 |---|---|---|
-| `CLOSED` | unit done, commits in place | unit id · branch + commit range · gates run + results · defers · HS-1 items. **Mandatory** — the closure report travels as a message, never sits waiting in the chip transcript. |
+| `CLOSED` | unit done, commits in place | unit id · branch + commit range · gates run + results · defers · HS-1 items. **Mandatory** — the closure report travels as the event itself, never sits waiting in a transcript. |
 | `BLOCKED` | stop-rule hit (architecture contradiction, broken prerequisite, budget ceiling) | what blocked, evidence, smallest unblock ask. Send IMMEDIATELY — do not burn budget waiting or patching around it. |
 | `ESCALATION` | out-of-scope defect found (pre-existing debt, product defect) | classification + reproduction pointer; keep fixing in-scope work meanwhile if possible. |
 | `REQUEST` | needs a shared resource | e.g. :80 stack rebuild/restart, DB reseed — the hub owns shared infra; chips never take it. |
@@ -67,29 +100,27 @@ running session occupies the path via `list_sessions` first) and safe-deletes th
 until the operator decides). Worktrees are execution scratch, not archives — evidence lives in
 merged docs, not in leftover checkouts. `BLOCKED`/`ESCALATION` get
 a decision or an operator escalation, not silence; ACCEPT-WITH-CONDITIONS / REJECT findings go
-back **to the same chip session** via `send_message` — context is intact there, so remediation is
-a message, not a new chip (a new corrective chip only on 2× reject = redesign). Reviewer
+back **to the same unit** (Transport A: `SendMessage` to the agent, context resumes intact;
+Transport B: `send_message` to the chip session) — remediation is a message, not a new unit
+(a new corrective dispatch only on 2× reject = redesign). Reviewer
 subagents dispatched by the hub are **git read-only** (diff/show/log; never checkout/apply/stash
-— an acceptance reviewer once contaminated the main index via checkout). Comms autonomy:
-`mcp__ccd_session_mgmt__send_message` (+ `list_sessions`, `get_session`,
-`search_session_transcripts`) are allowlisted in the committed `.claude/settings.json`
-`permissions.allow`, but the desktop client hard-enforces per-send confirmation regardless of
-permission mode ("requires explicit approval regardless of permission mode" — verified
-2026-07-12). Known friction, CONFIRMED client limitation: the operator approves each
-`send_message` with one click (Ctrl+Enter); never reroute comms through side-channel files to
-dodge it. Sessions keep protocol messages few and batched — one event message per state change,
-no chatter. Chip→hub delivery remains next-turn-processed.
+— an acceptance reviewer once contaminated the main index via checkout). Transport B comms
+caveat (confirmed client limitation 2026-07-12): the desktop client hard-enforces per-send
+confirmation on `mcp__ccd_session_mgmt__send_message` regardless of permission mode — the
+operator approves each with one click; never reroute comms through side-channel files to dodge
+it; messages few and batched. Transport A has no such prompt — which is why it is the default.
 
 **Hub bootstrap:** any fresh session becomes the hub via the `harness-hub` skill
 (`.claude/skills/harness-hub/SKILL.md`) — it reconstructs hub state from repo truth (this file,
-ROADMAP, git, task board, live chip sessions, :80 stack health) and runs the loop below. One hub
-at a time; a new hub first confirms the old hub session is not mid-merge.
+ROADMAP, git incl. orphaned `worktree-agent-*` branches, task board, live chip sessions, :80
+stack health) and runs the loop below. One hub at a time; a new hub first confirms the old hub
+session is not mid-merge.
 
 **Hub instrumentation:** the hub mirrors the ROADMAP queue as its own native task board
-(one task per unit, blockedBy = the roadmap's ordering locks), may read a chip session's
-transcript mid-flight (`list_events`, operator-approved) for audit, may inject corrections into
-a running chip (`send_message`, operator-confirmed), and push-notifies the operator when a unit
-returns for acceptance or an HS-1 gate is waiting.
+(one task per unit, blockedBy = the roadmap's ordering locks), may inspect a running unit
+agent's transcript (`TaskOutput`) or a chip's (`list_events`, operator-approved) for audit,
+may inject mid-flight corrections (`SendMessage` to agents; `send_message` to chips), and
+push-notifies the operator when an HS-1 gate or ratification is waiting on them.
 
 ```
 ROADMAP.md → take topmost actionable unit → open ONLY its listed context files
@@ -230,9 +261,12 @@ lock-holding tx) · OpenAPI ↔ generated ↔ handler parity.
 protocol on the changed surface. Curl-only = FAIL (M2c lesson: F8's curl QA was false-green; the
 stage_kind violation was only caught by rendered-UI operator QA).
 
-**Mechanics:** `spawn_task` a FRESH session (zero inherited context — that's the point: it can't
-trust anything the implementer believed). Session must have browser tooling; if the spawned env
-can't render (F-UI-1 class), the task reports CANNOT immediately — never fakes a pass from curl.
+**Mechanics:** dispatch a FRESH QA persona with zero inherited context — that's the point: it
+can't trust anything the implementer believed. Default: background QA agent (browser tools
+verified available to agents 2026-07-12); the hub keeps its own browser pane hands-off while QA
+runs (one pane per session — serialize). Fallback: `spawn_task` a fresh session. Either way the
+persona must have working browser tooling; if its env can't render (F-UI-1 class), it reports
+CANNOT immediately — never fakes a pass from curl.
 
 **The spawned prompt carries (self-contained):**
 1. Persona + mission: "You are a user-level QA operator. You did not build this. Validate by
@@ -261,9 +295,9 @@ QA self-sufficiency; operator-manual steps are a last resort for genuinely non-s
 
 ## 7. Context & handoff discipline
 
-- Fresh Opus session per milestone; fresh spawn per QA. Handoff state lives ONLY in: ROADMAP.md
-  row, unit evidence.md, milestone.md status, memory index. If it isn't written there, it didn't
-  happen.
+- Fresh Opus unit agent (or chip) per unit; fresh QA persona per QA. Handoff state lives ONLY in:
+  ROADMAP.md row, unit evidence.md, milestone.md status, memory index. If it isn't written there,
+  it didn't happen. Commit per green slice is the crash-recovery contract for Transport A.
 - Sessions open only the unit's listed context files; bulk reads → sonnet inventory agent
   returning compressed report.
 - Self-compact at 200k main-session tokens: flush durable state first.
@@ -276,8 +310,8 @@ QA self-sufficiency; operator-manual steps are a last resort for genuinely non-s
   ladder from L0 — no partial re-verification of "just the failing bit".
 - Same slice fails review twice: escalate to orchestrator redesign of the slice, not a third patch.
 - Contradiction with an invariant/ADR: STOP, write the finding, operator decides (AS-1/AS-2 shape).
-- Any stop-rule hit inside a chip session: send `BLOCKED` (or `ESCALATION` for out-of-scope
-  defects) to the hub immediately per the §2 comms protocol — never wait silently in the chip
-  transcript for the operator to notice.
-- Never: skip hooks, force-push, fake evidence, widen scope to "fix while here" (spawn_task chip
-  for out-of-scope findings instead).
+- Any stop-rule hit inside a unit: emit `BLOCKED` (or `ESCALATION` for out-of-scope defects) to
+  the hub immediately per the §2 comms protocol — Transport A: end the turn with the event now;
+  Transport B: send the message now. Never wait silently for someone to notice.
+- Never: skip hooks, force-push, fake evidence, widen scope to "fix while here" (out-of-scope
+  findings go to the hub as `ESCALATION` for their own future unit dispatch instead).
