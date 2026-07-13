@@ -3419,6 +3419,12 @@ export interface components {
              * @enum {string}
              */
             reason_category?: "content" | "corrective" | "regulatory" | "periodic_review" | "administrative";
+            /** @description Per-stage caller-chosen actors (M4, unit 3.2, slice 5). Required only for stages governed by a submit_choice actor selector: a matching entry with a non-empty user_ids is mandatory for such a stage (422 otherwise), and every chosen user is validated server-side against the selector's role x area_code constraint (422 on violation). An entry naming a stage_order with no submit_choice selector is also rejected (422, fail-closed). */
+            chosen_actors?: components["schemas"]["SubmitChosenActors"][];
+        };
+        SubmitChosenActors: {
+            stage_order: number;
+            user_ids: string[];
         };
         SubmitDocumentResponse: {
             /** Format: uuid */
@@ -3448,6 +3454,10 @@ export interface components {
                 /** @description The template version's status after the kernel submit-lock (always under_review on success). */
                 version_status: string;
             };
+        };
+        TemplateSubmitForApprovalRequest: {
+            /** @description Per-stage caller-chosen actors (M4, unit 3.2, slice 5), symmetric with SubmitDocumentRequest.chosen_actors. Optional body: existing callers that never submit a submit_choice-governed route may omit it entirely. */
+            chosen_actors?: components["schemas"]["SubmitChosenActors"][];
         };
         SignoffTemplateVersionRequest: {
             /** @enum {string} */
@@ -3668,13 +3678,21 @@ export interface components {
          * @enum {string}
          */
         DriftPolicy: "reduce_quorum" | "fail_stage" | "keep_snapshot";
+        /** @description M4 ActorSelector (unit 3.2). Discriminated union by `kind`; per-kind field presence enforced in domain + DB (named_user→user_id; role_in_fixed_area→role+area_code; role_in_document_area→role; submit_choice→role+area_code). */
+        ActorSelector: {
+            /** @enum {string} */
+            kind: "named_user" | "role_in_fixed_area" | "role_in_document_area" | "submit_choice";
+            user_id?: string;
+            role?: string;
+            area_code?: string;
+        } & {
+            [key: string]: unknown;
+        };
         StageRequest: {
             /** @description 1-based stage ordinal. Must equal index+1. */
             order: number;
             name: string;
-            required_role: string;
             required_capability: string;
-            area_code: string;
             quorum: components["schemas"]["QuorumKind"];
             /** @description Required when `quorum` is `m_of_n`; must be omitted otherwise. */
             quorum_m?: number;
@@ -3684,15 +3702,15 @@ export interface components {
              * @enum {string}
              */
             stage_kind?: "review" | "approval";
+            /** @description M4 ActorSelector (unit 3.2). REQUIRED — selectors are the sole source of truth for a stage's actor pool. The legacy flat required_role/area_code wire fields have been removed entirely (no fallback, no synthesis). */
+            selectors: components["schemas"]["ActorSelector"][];
         } & {
             [key: string]: unknown;
         };
         StageSummary: {
             order: number;
             name: string;
-            required_role: string;
             required_capability: string;
-            area_code: string;
             quorum: components["schemas"]["QuorumKind"];
             quorum_m: number | null;
             drift_policy: components["schemas"]["DriftPolicy"];
@@ -3701,6 +3719,8 @@ export interface components {
              * @enum {string}
              */
             stage_kind?: "review" | "approval";
+            /** @description M4 ActorSelector (unit 3.2). Sole source of truth for the stage's actor pool; always returned. The legacy flat required_role/area_code wire fields have been removed entirely. */
+            selectors: components["schemas"]["ActorSelector"][];
         } & {
             [key: string]: unknown;
         };
@@ -5395,7 +5415,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["TemplateSubmitForApprovalRequest"];
+            };
+        };
         responses: {
             /** @description ok */
             200: {

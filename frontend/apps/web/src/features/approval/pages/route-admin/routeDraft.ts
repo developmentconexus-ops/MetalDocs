@@ -2,8 +2,11 @@
 import { v4 as uuidv4 } from 'uuid';
 
 import type { RouteSummary, StageRequest } from '../../api/routeAdminApi';
+import type { components } from '../../../../lib/api-types';
 import { validateSignaturePolicy, validateStageOrder, type GovernanceClass } from './routeGovernance';
-import type { StageDraft } from './StageCard';
+import { defaultSelector, type SelectorDraft, type StageDraft } from './StageCard';
+
+type ActorSelector = components['schemas']['ActorSelector'];
 
 export interface RouteDraft {
   name: string;
@@ -15,13 +18,22 @@ export function defaultStage(): StageDraft {
   return {
     uid: uuidv4() as string,
     label: '',
-    requiredRole: '',
     requiredCapability: 'doc.signoff',
-    areaCode: '',
+    selectors: [defaultSelector()],
     quorumKind: 'any_1_of',
     m: '1',
     driftPolicy: 'reduce_quorum',
     stageKind: 'approval',
+  };
+}
+
+function toSelectorDraft(selector: ActorSelector): SelectorDraft {
+  return {
+    uid: uuidv4() as string,
+    kind: selector.kind,
+    userId: selector.user_id ?? '',
+    role: selector.role ?? '',
+    areaCode: selector.area_code ?? '',
   };
 }
 
@@ -35,9 +47,11 @@ export function toDraft(route: RouteSummary | null): RouteDraft {
     stages: route.stages.map((stage) => ({
       uid: uuidv4() as string,
       label: stage.name,
-      requiredRole: stage.required_role ?? '',
       requiredCapability: stage.required_capability || 'doc.signoff',
-      areaCode: stage.area_code ?? '',
+      selectors:
+        stage.selectors && stage.selectors.length > 0
+          ? stage.selectors.map(toSelectorDraft)
+          : [defaultSelector()],
       quorumKind: stage.quorum,
       m: String(stage.quorum_m ?? 1),
       driftPolicy: stage.drift_policy,
@@ -46,17 +60,34 @@ export function toDraft(route: RouteSummary | null): RouteDraft {
   };
 }
 
+function toWireSelector(selector: SelectorDraft): ActorSelector {
+  switch (selector.kind) {
+    case 'named_user':
+      return { kind: 'named_user', user_id: selector.userId.trim() };
+    case 'role_in_fixed_area':
+    case 'submit_choice':
+      return {
+        kind: selector.kind,
+        role: selector.role.trim().toLocaleLowerCase('pt-BR'),
+        area_code: selector.areaCode.trim().toLocaleLowerCase('pt-BR'),
+      };
+    case 'role_in_document_area':
+      return { kind: 'role_in_document_area', role: selector.role.trim().toLocaleLowerCase('pt-BR') };
+    default:
+      return { kind: selector.kind };
+  }
+}
+
 export function toStageRequests(draft: RouteDraft): StageRequest[] {
   return draft.stages.map((stage, index): StageRequest => {
     const payload: StageRequest = {
       order: index + 1,
       name: stage.label.trim(),
-      required_role: stage.requiredRole.trim(),
       required_capability: stage.requiredCapability.trim() || 'doc.signoff',
-      area_code: stage.areaCode.trim(),
       quorum: stage.quorumKind,
       drift_policy: stage.driftPolicy,
       stage_kind: stage.stageKind,
+      selectors: stage.selectors.map(toWireSelector),
     };
     if (stage.quorumKind === 'm_of_n') {
       payload.quorum_m = Number(stage.m);
@@ -92,12 +123,26 @@ export function validateDraft(
     }
     labels.add(normalized);
 
-    if (!stage.requiredRole) {
-      return `A etapa "${label}" deve ter uma role definida.`;
+    if (stage.selectors.length === 0) {
+      return `A etapa "${label}" deve ter ao menos um seletor.`;
     }
-    if (!stage.areaCode) {
-      return `A etapa "${label}" deve ter uma área definida.`;
+    for (const selector of stage.selectors) {
+      if (selector.kind === 'named_user' && !selector.userId.trim()) {
+        return `Na etapa "${label}", selecione um usuário.`;
+      }
+      if (selector.kind === 'role_in_fixed_area' || selector.kind === 'submit_choice') {
+        if (!selector.role.trim()) {
+          return `Na etapa "${label}", selecione uma role.`;
+        }
+        if (!selector.areaCode.trim()) {
+          return `Na etapa "${label}", selecione uma área.`;
+        }
+      }
+      if (selector.kind === 'role_in_document_area' && !selector.role.trim()) {
+        return `Na etapa "${label}", selecione uma role.`;
+      }
     }
+
     if (stage.quorumKind === 'm_of_n') {
       const mValue = Number(stage.m);
       if (!Number.isFinite(mValue) || mValue < 1) {
