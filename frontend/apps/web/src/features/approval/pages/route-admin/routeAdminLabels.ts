@@ -7,6 +7,25 @@ import type { components } from '../../../../lib/api-types';
 
 export type QuorumKind = components['schemas']['QuorumKind'];
 export type DriftPolicy = components['schemas']['DriftPolicy'];
+export type ActorSelectorKind = components['schemas']['ActorSelector']['kind'];
+
+export const ACTOR_SELECTOR_KIND_OPTIONS: ReadonlyArray<ActorSelectorKind> = [
+  'named_user',
+  'role_in_fixed_area',
+  'role_in_document_area',
+  'submit_choice',
+];
+
+const ACTOR_SELECTOR_KIND_LABELS: Record<ActorSelectorKind, string> = {
+  named_user: 'Usuário específico',
+  role_in_fixed_area: 'Papel em área fixa',
+  role_in_document_area: 'Papel na área do documento',
+  submit_choice: 'Escolha no envio',
+};
+
+export function labelForSelectorKind(kind: ActorSelectorKind): string {
+  return ACTOR_SELECTOR_KIND_LABELS[kind] ?? kind;
+}
 
 export const QUORUM_KIND_OPTIONS: ReadonlyArray<QuorumKind> = [
   'any_1_of',

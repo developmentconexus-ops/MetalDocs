@@ -162,9 +162,9 @@ func TestGovernancePolicy_DeferredTrigger_IntraTxDowngrade_RejectedAtCommit(t *t
 	// Intermediate VALID state: controlado route with an approval-kind stage.
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO public.approval_route_stages
-		  (route_id, stage_order, name, required_role, required_capability,
-		   area_code, quorum, on_eligibility_drift, stage_kind)
-		VALUES ($1::uuid, 1, 'Signoff', 'author', 'document.signoff', 'area-1',
+		  (route_id, stage_order, name, required_capability,
+		   quorum, on_eligibility_drift, stage_kind)
+		VALUES ($1::uuid, 1, 'Signoff', 'document.signoff',
 		        'any_1_of', 'reduce_quorum', 'approval')`,
 		routeID,
 	); err != nil {
@@ -263,9 +263,9 @@ func commitRouteWithStages(t *testing.T, db *sql.DB, tenantID, profileCode, owne
 	for i, kind := range stageKinds {
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO public.approval_route_stages
-			  (route_id, stage_order, name, required_role, required_capability,
-			   area_code, quorum, on_eligibility_drift, stage_kind)
-			VALUES ($1::uuid, $2, $3, 'author', 'document.review', 'area-1',
+			  (route_id, stage_order, name, required_capability,
+			   quorum, on_eligibility_drift, stage_kind)
+			VALUES ($1::uuid, $2, $3, 'document.review',
 			        'any_1_of', 'reduce_quorum', $4)`,
 			routeID, i+1, "Stage "+kind, kind,
 		); err != nil {
@@ -301,9 +301,9 @@ func seedInactiveRouteWithStages(t *testing.T, db *sql.DB, tenantID, profileCode
 	for i, kind := range stageKinds {
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO public.approval_route_stages
-			  (route_id, stage_order, name, required_role, required_capability,
-			   area_code, quorum, on_eligibility_drift, stage_kind)
-			VALUES ($1::uuid, $2, $3, 'author', 'document.review', 'area-1',
+			  (route_id, stage_order, name, required_capability,
+			   quorum, on_eligibility_drift, stage_kind)
+			VALUES ($1::uuid, $2, $3, 'document.review',
 			        'any_1_of', 'reduce_quorum', $4)`,
 			routeID, i+1, "Stage "+kind, kind,
 		); err != nil {

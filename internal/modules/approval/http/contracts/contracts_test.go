@@ -186,21 +186,19 @@ func TestCreateRouteRequestValidate(t *testing.T) {
 			{
 				Order:              1,
 				Name:               "Review",
-				RequiredRole:       "approver",
 				RequiredCapability: "document.signoff",
-				AreaCode:           "ops",
 				Quorum:             "any_1_of",
 				DriftPolicy:        "reduce_quorum",
+				Selectors:          []ActorSelector{{Kind: SelectorKindRoleInFixedArea, Role: "approver", AreaCode: "ops"}},
 			},
 			{
 				Order:              2,
 				Name:               "Approval",
-				RequiredRole:       "approver",
 				RequiredCapability: "document.signoff",
-				AreaCode:           "ops",
 				Quorum:             "m_of_n",
 				QuorumM:            &m,
 				DriftPolicy:        "keep_snapshot",
+				Selectors:          []ActorSelector{{Kind: SelectorKindRoleInFixedArea, Role: "approver", AreaCode: "ops"}},
 			},
 		},
 	}
@@ -240,13 +238,15 @@ func TestCreateRouteRequestValidate(t *testing.T) {
 	}
 }
 
-// TestStageRequiredRoleBoundToRegistry locks the ADR 0022 binding: a stage
-// required_role must be a canonical AREA role. A decommissioned phantom
-// ("reviewer") and a valid-but-non-area role ("system_admin", which passes the
-// [a-z0-9_-]+ format check) must both be rejected at config time, so an admin
-// can never create a silently-unsatisfiable stage. Builds fresh requests to
-// avoid the shared-slice aliasing in the sibling tests.
-func TestStageRequiredRoleBoundToRegistry(t *testing.T) {
+// TestStageSelectorRoleBoundToRegistry locks the ADR 0022 binding: a stage
+// selector's role (role_in_fixed_area, role_in_document_area, submit_choice)
+// must be a canonical AREA role. A decommissioned phantom ("reviewer") and a
+// valid-but-non-area role ("system_admin", which passes the [a-z0-9_-]+
+// format check) must both be rejected at config time, so an admin can never
+// create a silently-unsatisfiable stage. Builds fresh requests to avoid the
+// shared-slice aliasing in the sibling tests. Unit 3.2 slice 7a re-homes this
+// binding from the removed flat required_role field onto sel.Role.
+func TestStageSelectorRoleBoundToRegistry(t *testing.T) {
 	build := func(role string) CreateRouteRequest {
 		return CreateRouteRequest{
 			ProfileCode: "ops",
@@ -254,27 +254,26 @@ func TestStageRequiredRoleBoundToRegistry(t *testing.T) {
 			Stages: []StageRequest{{
 				Order:              1,
 				Name:               "Review",
-				RequiredRole:       role,
 				RequiredCapability: "document.signoff",
-				AreaCode:           "ops",
 				Quorum:             "any_1_of",
 				DriftPolicy:        "reduce_quorum",
+				Selectors:          []ActorSelector{{Kind: SelectorKindRoleInFixedArea, Role: role, AreaCode: "ops"}},
 			}},
 		}
 	}
 	for _, bad := range []string{"reviewer", "system_admin"} {
 		req := build(bad)
 		if err := req.Validate(); err == nil {
-			t.Fatalf("create: required_role %q must be rejected (not a canonical area role)", bad)
+			t.Fatalf("create: selector role %q must be rejected (not a canonical area role)", bad)
 		}
 		upd := UpdateRouteRequest{Name: "Route", Stages: req.Stages}
 		if err := upd.Validate(); err == nil {
-			t.Fatalf("update: required_role %q must be rejected", bad)
+			t.Fatalf("update: selector role %q must be rejected", bad)
 		}
 	}
 	for _, good := range []string{"viewer", "editor", "approver", "author", "signer", "area_admin", "qms_admin"} {
 		if err := build(good).Validate(); err != nil {
-			t.Fatalf("required_role %q must be accepted: %v", good, err)
+			t.Fatalf("selector role %q must be accepted: %v", good, err)
 		}
 	}
 }
@@ -286,11 +285,10 @@ func TestUpdateRouteRequestValidate(t *testing.T) {
 			{
 				Order:              1,
 				Name:               "Review",
-				RequiredRole:       "approver",
 				RequiredCapability: "document.signoff",
-				AreaCode:           "ops",
 				Quorum:             "all_of",
 				DriftPolicy:        "fail_stage",
+				Selectors:          []ActorSelector{{Kind: SelectorKindRoleInFixedArea, Role: "approver", AreaCode: "ops"}},
 			},
 		},
 	}

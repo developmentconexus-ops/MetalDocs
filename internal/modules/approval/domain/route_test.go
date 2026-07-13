@@ -13,9 +13,9 @@ func happyRoute() Route {
 	return Route{
 		ID: "r1", TenantID: "t1", ProfileCode: "SOP", Version: 1,
 		Stages: []Stage{
-			{Order: 1, Name: "QA", RequiredRole: "approver", RequiredCapability: "document.signoff", AreaCode: "qa", Quorum: QuorumAny1Of, OnEligibilityDrift: DriftReduceQuorum},
-			{Order: 2, Name: "Manager", RequiredRole: "manager", RequiredCapability: "document.signoff", AreaCode: "mgmt", Quorum: QuorumAllOf, OnEligibilityDrift: DriftKeepSnapshot},
-			{Order: 3, Name: "Director", RequiredRole: "director", RequiredCapability: "document.signoff", AreaCode: "exec", Quorum: QuorumMofN, QuorumM: intPtr(2), OnEligibilityDrift: DriftFailStage},
+			{Order: 1, Name: "QA", RequiredCapability: "document.signoff", Quorum: QuorumAny1Of, OnEligibilityDrift: DriftReduceQuorum, Selectors: []ActorSelector{{Kind: SelectorRoleInFixedArea, Role: "approver", AreaCode: "qa"}}},
+			{Order: 2, Name: "Manager", RequiredCapability: "document.signoff", Quorum: QuorumAllOf, OnEligibilityDrift: DriftKeepSnapshot, Selectors: []ActorSelector{{Kind: SelectorRoleInFixedArea, Role: "manager", AreaCode: "mgmt"}}},
+			{Order: 3, Name: "Director", RequiredCapability: "document.signoff", Quorum: QuorumMofN, QuorumM: intPtr(2), OnEligibilityDrift: DriftFailStage, Selectors: []ActorSelector{{Kind: SelectorRoleInFixedArea, Role: "director", AreaCode: "exec"}}},
 		},
 	}
 }
@@ -96,7 +96,7 @@ func reviewOnlyRoute() Route {
 	return Route{
 		ID: "r1", TenantID: "t1", ProfileCode: "REL", Version: 1,
 		Stages: []Stage{
-			{Order: 1, Name: "Peer review", Quorum: QuorumAny1Of, OnEligibilityDrift: DriftReduceQuorum, Kind: StageKindReview},
+			{Order: 1, Name: "Peer review", Quorum: QuorumAny1Of, OnEligibilityDrift: DriftReduceQuorum, Kind: StageKindReview, Selectors: []ActorSelector{{Kind: SelectorRoleInDocumentArea, Role: "reviewer"}}},
 		},
 	}
 }
@@ -107,8 +107,8 @@ func approvalStageRoute() Route {
 	return Route{
 		ID: "r1", TenantID: "t1", ProfileCode: "POP", Version: 1,
 		Stages: []Stage{
-			{Order: 1, Name: "Review", Quorum: QuorumAny1Of, OnEligibilityDrift: DriftReduceQuorum, Kind: StageKindReview},
-			{Order: 2, Name: "QA signoff", Quorum: QuorumAllOf, OnEligibilityDrift: DriftKeepSnapshot, Kind: StageKindApproval},
+			{Order: 1, Name: "Review", Quorum: QuorumAny1Of, OnEligibilityDrift: DriftReduceQuorum, Kind: StageKindReview, Selectors: []ActorSelector{{Kind: SelectorRoleInDocumentArea, Role: "reviewer"}}},
+			{Order: 2, Name: "QA signoff", Quorum: QuorumAllOf, OnEligibilityDrift: DriftKeepSnapshot, Kind: StageKindApproval, Selectors: []ActorSelector{{Kind: SelectorRoleInFixedArea, Role: "approver", AreaCode: "qa"}}},
 		},
 	}
 }

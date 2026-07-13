@@ -24,6 +24,10 @@ import (
 
 type submitService interface {
 	SubmitRevisionForReview(ctx context.Context, runner db.TxRunner, req application.SubmitRequest) (application.SubmitResult, error)
+	// PreviewRoute (SLICE 8a, unit 3.2) is the read-only route-preview method
+	// DocumentApprovalPreviewHandler calls — resolves the same active route
+	// SubmitRevisionForReview would, without submitting.
+	PreviewRoute(ctx context.Context, runner db.TxRunner, tenantID, documentID string) (application.RoutePreview, error)
 }
 
 type decisionService interface {

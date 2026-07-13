@@ -40,6 +40,15 @@ func (f *fakeApprovalSubmit) SubmitTemplateVersionForReview(_ context.Context, _
 	return f.res, f.err
 }
 
+// PreviewRoute is a no-op stub only to satisfy the approvalSubmitService
+// interface — this fake drives the submit path tests, which never call
+// PreviewRoute. PreviewRoute's own behavior is covered in
+// internal/modules/approval/application/route_preview_test.go and the
+// resolution-parity integration test under tests/integration/approval/.
+func (f *fakeApprovalSubmit) PreviewRoute(_ context.Context, _ platformdb.TxRunner, _, _ string) (approvalapp.RoutePreview, error) {
+	return approvalapp.RoutePreview{}, nil
+}
+
 type fakeApprovalDecision struct {
 	gotReq approvalapp.SignoffRequest
 	res    approvalapp.SignoffResult

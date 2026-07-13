@@ -131,6 +131,10 @@ var routeRules = []routeRule{
 	{method: http.MethodGet, pathExact: "/api/v1/iam/kpi", capability: iamdomain.CapMetricsView, visibility: iamdelivery.VisibilityPermissionGuarded},
 
 	// Templates — GET first, then exact POST, then sub-route POST/PUTs.
+	// SLICE 8a (unit 3.2): the read-only approval-route preview is gated by
+	// CapTemplateSubmit (same capability as submit-for-approval, not
+	// CapTemplateView) — must precede the broad GET catch-all below.
+	{method: http.MethodGet, pathPrefix: "/api/v1/templates", pathSuffix: "/approval-preview", capability: iamdomain.CapTemplateSubmit, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodGet, pathPrefix: "/api/v1/templates", capability: iamdomain.CapTemplateView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathExact: "/api/v1/templates", capability: iamdomain.CapTemplateCreate, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/templates", pathSuffix: "/versions", capability: iamdomain.CapTemplateCreate, visibility: iamdelivery.VisibilityPermissionGuarded},
@@ -153,6 +157,10 @@ var routeRules = []routeRule{
 	{method: http.MethodGet, pathPrefix: "/api/v1/documents", pathSuffix: "/distribution", capability: iamdomain.CapDistributionRead, visibility: iamdelivery.VisibilityPermissionGuarded},
 
 	// Documents — order preserves the original switch semantics (more specific suffixes/contains first).
+	// SLICE 8a (unit 3.2): the read-only approval-route preview is gated by
+	// CapDocumentSubmit (same capability as submit, not CapDocumentView) —
+	// must precede the broad GET catch-all below.
+	{method: http.MethodGet, pathPrefix: "/api/v1/documents", pathSuffix: "/approval-preview", capability: iamdomain.CapDocumentSubmit, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodGet, pathPrefix: "/api/v1/documents", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/archive", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/duplicate", capability: iamdomain.CapDocumentCreate, visibility: iamdelivery.VisibilityPermissionGuarded},

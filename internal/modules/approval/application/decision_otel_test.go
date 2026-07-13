@@ -100,6 +100,12 @@ func (stubApprovalRepo) LoadFrozenContentHash(_ context.Context, _ platformdb.Tx
 func (stubApprovalRepo) ResolveEligibleActors(_ context.Context, _ platformdb.Tx, _, _, _ string) ([]string, error) {
 	return nil, nil
 }
+func (stubApprovalRepo) ResolveEligibleActorsForSelectors(_ context.Context, _ platformdb.Tx, _ string, _ []domain.ActorSelector, _ string) ([]string, error) {
+	return nil, nil
+}
+func (stubApprovalRepo) ValidateSubmitChoiceActors(_ context.Context, _ platformdb.Tx, _ string, _ domain.ActorSelector, _ []string) ([]string, error) {
+	return nil, nil
+}
 func (stubApprovalRepo) LoadActorDisplayName(_ context.Context, _, _ string) (string, error) {
 	return "", errors.New("stub repo")
 }

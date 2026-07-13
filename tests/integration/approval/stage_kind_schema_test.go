@@ -43,9 +43,9 @@ func TestStageKindSchemaExpand_Default(t *testing.T) {
 		}
 		if _, insErr := db.ExecContext(context.Background(), `
 			INSERT INTO public.approval_route_stages
-			  (route_id, stage_order, name, required_role, required_capability,
-			   area_code, quorum, on_eligibility_drift)
-			VALUES ($1::uuid, 1, 'Stage 1', 'author', 'document.review', 'area-1',
+			  (route_id, stage_order, name, required_capability,
+			   quorum, on_eligibility_drift)
+			VALUES ($1::uuid, 1, 'Stage 1', 'document.review',
 			        'any_1_of', 'reduce_quorum')`,
 			route.ID,
 		); insErr != nil {
@@ -99,9 +99,9 @@ func TestStageKindSchemaExpand_RejectsUnknownValue(t *testing.T) {
 
 		_, err := db.ExecContext(context.Background(), `
 			INSERT INTO public.approval_route_stages
-			  (route_id, stage_order, name, required_role, required_capability,
-			   area_code, quorum, on_eligibility_drift, stage_kind)
-			VALUES ($1::uuid, 1, 'Stage 1', 'author', 'document.review', 'area-1',
+			  (route_id, stage_order, name, required_capability,
+			   quorum, on_eligibility_drift, stage_kind)
+			VALUES ($1::uuid, 1, 'Stage 1', 'document.review',
 			        'any_1_of', 'reduce_quorum', 'signature')`,
 			route.ID,
 		)
@@ -129,9 +129,9 @@ func TestStageKindSchemaExpand_RejectsUnknownValue(t *testing.T) {
 		var stageID string
 		if err := db.QueryRowContext(context.Background(), `
 			INSERT INTO public.approval_route_stages
-			  (route_id, stage_order, name, required_role, required_capability,
-			   area_code, quorum, on_eligibility_drift)
-			VALUES ($1::uuid, 1, 'Stage 1', 'author', 'document.review', 'area-1',
+			  (route_id, stage_order, name, required_capability,
+			   quorum, on_eligibility_drift)
+			VALUES ($1::uuid, 1, 'Stage 1', 'document.review',
 			        'any_1_of', 'reduce_quorum')
 			RETURNING id::text`,
 			route.ID,

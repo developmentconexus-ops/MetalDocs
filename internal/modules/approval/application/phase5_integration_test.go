@@ -111,8 +111,8 @@ func (r *phase5Repo) LoadRoute(ctx context.Context, tx db.Tx, tenantID, routeID 
 		return domain.Route{}, err
 	}
 	rows, err := tx.QueryContext(ctx, `
-		SELECT ars.stage_order, ars.name, ars.required_role, ars.required_capability,
-		       ars.area_code, ars.quorum, ars.quorum_m, ars.on_eligibility_drift
+		SELECT ars.stage_order, ars.name, ars.required_capability,
+		       ars.quorum, ars.quorum_m, ars.on_eligibility_drift
 		  FROM approval_route_stages ars
 		  JOIN approval_routes ar
 		    ON ar.id = ars.route_id
@@ -129,8 +129,8 @@ func (r *phase5Repo) LoadRoute(ctx context.Context, tx db.Tx, tenantID, routeID 
 		var stage domain.Stage
 		var quorumM sql.NullInt32
 		if err := rows.Scan(
-			&stage.Order, &stage.Name, &stage.RequiredRole, &stage.RequiredCapability,
-			&stage.AreaCode, &stage.Quorum, &quorumM, &stage.OnEligibilityDrift,
+			&stage.Order, &stage.Name, &stage.RequiredCapability,
+			&stage.Quorum, &quorumM, &stage.OnEligibilityDrift,
 		); err != nil {
 			return domain.Route{}, err
 		}
@@ -138,6 +138,10 @@ func (r *phase5Repo) LoadRoute(ctx context.Context, tx db.Tx, tenantID, routeID 
 			v := int(quorumM.Int32)
 			stage.QuorumM = &v
 		}
+		// Selectors is the sole source of truth post-slice-6b (see
+		// submit_service_test.go's fakeSubmitRepo.LoadRoute for the same
+		// hardcoded-selector pattern this fake repo mirrors).
+		stage.Selectors = []domain.ActorSelector{{Kind: domain.SelectorRoleInFixedArea, Role: "quality_approver", AreaCode: "QA"}}
 		route.Stages = append(route.Stages, stage)
 	}
 	if err := rows.Err(); err != nil {
@@ -173,6 +177,40 @@ func (r *phase5Repo) ResolveEligibleActors(ctx context.Context, tx db.Tx, tenant
 		ids = []string{}
 	}
 	return ids, rows.Err()
+}
+
+// ResolveEligibleActorsForSelectors is called by SubmitRevisionForReview (M4,
+// unit 3.2, slice 3) via stage.Selectors. These scenarios only exercise a
+// single role_in_fixed_area selector — delegate to ResolveEligibleActors for
+// that kind.
+func (r *phase5Repo) ResolveEligibleActorsForSelectors(ctx context.Context, tx db.Tx, tenantID string, selectors []domain.ActorSelector, subjectArea string) ([]string, error) {
+	seen := make(map[string]struct{})
+	var ids []string
+	for _, sel := range selectors {
+		var area string
+		switch sel.Kind {
+		case domain.SelectorRoleInFixedArea:
+			area = sel.AreaCode
+		case domain.SelectorRoleInDocumentArea:
+			area = subjectArea
+		default:
+			continue
+		}
+		got, err := r.ResolveEligibleActors(ctx, tx, tenantID, area, sel.Role)
+		if err != nil {
+			return []string{}, err
+		}
+		for _, id := range got {
+			if _, ok := seen[id]; !ok {
+				seen[id] = struct{}{}
+				ids = append(ids, id)
+			}
+		}
+	}
+	if ids == nil {
+		ids = []string{}
+	}
+	return ids, nil
 }
 
 func (r *phase5Repo) LoadPriorSignoffs(ctx context.Context, tx db.Tx, tenantID, instanceID, activeStageID string) ([]domain.Signoff, error) {

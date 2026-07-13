@@ -203,15 +203,29 @@ func TestFreeze_SubmitApprovalOnlyRoute_PinsHashAtSubmit(t *testing.T) {
 	route := testdb.NewApprovalRoute(t, database, testdb.WithTenant(tenant.ID))
 	// Seed a single approval-kind stage on the route (stage_kind defaults to
 	// 'approval' per migration 0286; route.Stages is loaded by LoadRoute).
-	if _, err := database.ExecContext(ctx, `
+	var stageID string
+	if err := database.QueryRowContext(ctx, `
 		INSERT INTO public.approval_route_stages
-		  (route_id, stage_order, name, required_role, required_capability,
-		   area_code, quorum, on_eligibility_drift, stage_kind)
-		VALUES ($1::uuid, 1, 'Approval Stage', 'approver', 'document.signoff', 'qa',
-		        'any_1_of', 'keep_snapshot', 'approval')`,
+		  (route_id, stage_order, name, required_capability,
+		   quorum, on_eligibility_drift, stage_kind)
+		VALUES ($1::uuid, 1, 'Approval Stage', 'document.signoff',
+		        'any_1_of', 'keep_snapshot', 'approval')
+		RETURNING id`,
 		route.ID,
-	); err != nil {
+	).Scan(&stageID); err != nil {
 		t.Fatalf("seed approval_route_stages: %v", err)
+	}
+	// Selectors is the sole source of truth for a stage's actor pool (unit
+	// 3.2 slice 6b); seed the equivalent role_in_fixed_area selector so
+	// route.Validate (ErrStageNoSelector) and ResolveEligibleActors resolve
+	// the same eligible pool the old flat required_role/area_code drove.
+	if _, err := database.ExecContext(ctx, `
+		INSERT INTO public.approval_route_stage_selectors
+		  (tenant_id, route_stage_id, selector_order, kind, role, area_code)
+		VALUES ($1::uuid, $2::uuid, 1, 'role_in_fixed_area', 'approver', 'qa')`,
+		tenant.ID, stageID,
+	); err != nil {
+		t.Fatalf("seed approval_route_stage_selectors: %v", err)
 	}
 
 	// ResolveEligibleActors (called by SubmitRevisionForReview) reads

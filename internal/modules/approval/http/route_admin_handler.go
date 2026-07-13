@@ -224,16 +224,19 @@ func mapListRoute(route infrastructure.Route) contracts.ListRouteItem {
 
 	stages := make([]contracts.ListStageItem, 0, len(route.Stages))
 	for _, stage := range route.Stages {
+		// Selectors is the sole source of truth for a stage's actor pool
+		// (unit 3.2 slice 7a, wire contract extermination): the flat
+		// required_role/area_code wire fields are gone entirely, no
+		// derived-back compat pair.
 		stages = append(stages, contracts.ListStageItem{
 			Order:              stage.Order,
 			Name:               stage.Name,
-			RequiredRole:       stage.RequiredRole,
 			RequiredCapability: stage.RequiredCapability,
-			AreaCode:           stage.AreaCode,
 			Quorum:             contracts.QuorumKind(stage.Quorum),
 			QuorumM:            stage.QuorumM,
 			DriftPolicy:        contracts.DriftPolicyKind(stage.DriftPolicy),
 			StageKind:          mapStageKind(stage.Kind),
+			Selectors:          mapSelectorsToWire(stage.Selectors),
 		})
 	}
 
@@ -260,12 +263,14 @@ func mapStageRequests(stages []contracts.StageRequest) []domain.Stage {
 		// so no silent default is needed (and a defaulted code may not even be
 		// a registered capability).
 		cap := strings.TrimSpace(s.RequiredCapability)
+		// Selectors is the sole source of truth for domain.Stage (unit 3.2
+		// slice 7a, wire contract extermination): the wire's selectors field
+		// is contract-required and non-empty (validateStages), so no
+		// flat->selector synthesis is needed or performed here anymore.
 		out = append(out, domain.Stage{
 			Order:              s.Order,
 			Name:               s.Name,
-			RequiredRole:       strings.ToLower(strings.TrimSpace(s.RequiredRole)),
 			RequiredCapability: cap,
-			AreaCode:           strings.ToLower(strings.TrimSpace(s.AreaCode)),
 			Quorum:             domain.QuorumPolicy(s.Quorum),
 			QuorumM:            s.QuorumM,
 			OnEligibilityDrift: domain.DriftPolicy(s.DriftPolicy),
@@ -273,7 +278,47 @@ func mapStageRequests(stages []contracts.StageRequest) []domain.Stage {
 			// defaulted to approval at the persistence layer (insertRouteStages,
 			// migration 0286 DEFAULT 'approval'); a supplied review makes a
 			// review-kind stage. Validated as review|approval|"" in contracts.
-			Kind: domain.StageKind(s.StageKind),
+			Kind:      domain.StageKind(s.StageKind),
+			Selectors: mapSelectorsFromWire(s.Selectors),
+		})
+	}
+	return out
+}
+
+// mapSelectorsFromWire maps wire ActorSelectors to domain ActorSelectors
+// (M4, unit 3.2, slice 4). Role and AreaCode are normalized the same way the
+// synthesized flat->selector fallback is above (lowercase + trim); UserID is
+// trimmed only — user ids are not role/area codes and are not lowercased
+// elsewhere in this module.
+func mapSelectorsFromWire(selectors []contracts.ActorSelector) []domain.ActorSelector {
+	if len(selectors) == 0 {
+		return nil
+	}
+	out := make([]domain.ActorSelector, 0, len(selectors))
+	for _, s := range selectors {
+		out = append(out, domain.ActorSelector{
+			Kind:     domain.SelectorKind(s.Kind),
+			UserID:   strings.TrimSpace(s.UserID),
+			Role:     strings.ToLower(strings.TrimSpace(s.Role)),
+			AreaCode: strings.ToLower(strings.TrimSpace(s.AreaCode)),
+		})
+	}
+	return out
+}
+
+// mapSelectorsToWire maps domain ActorSelectors to their wire representation
+// (M4, unit 3.2, slice 4) — the read-side inverse of mapSelectorsFromWire.
+func mapSelectorsToWire(selectors []domain.ActorSelector) []contracts.ActorSelector {
+	if len(selectors) == 0 {
+		return nil
+	}
+	out := make([]contracts.ActorSelector, 0, len(selectors))
+	for _, s := range selectors {
+		out = append(out, contracts.ActorSelector{
+			Kind:     contracts.SelectorKind(s.Kind),
+			UserID:   s.UserID,
+			Role:     s.Role,
+			AreaCode: s.AreaCode,
 		})
 	}
 	return out

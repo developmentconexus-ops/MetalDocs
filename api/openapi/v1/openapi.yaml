@@ -1582,6 +1582,12 @@ paths:
           in: header
           required: true
           schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateSubmitForApprovalRequest'
       responses:
         '200':
           description: ok
@@ -1599,6 +1605,36 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /templates/{id}/versions/{n}/approval-preview:
+    get:
+      summary: Preview the resolved active approval route for a template version
+      description: >-
+        Read-only, submitter-scoped preview (SLICE 8a, unit 3.2): resolves the
+        template's active approval route (ROUTE.subject_key = template id,
+        same governance selector submit-for-approval resolves against)
+        before the caller actually submits, so the client can build a
+        chosen_actors picker for any submit_choice-governed stage. route_id
+        is null and stages is empty when no active route resolves yet.
+      tags: [templates]
+      operationId: getTemplateVersionApprovalPreview
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalRoutePreview'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /templates/{id}/versions/{n}/signoff:
@@ -3392,6 +3428,38 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /documents/{id}/approval-preview:
+    get:
+      summary: Preview the resolved active approval route for a document
+      description: >-
+        Read-only, submitter-scoped preview (SLICE 8a, unit 3.2): resolves the
+        document's active approval route the same way POST .../submit would
+        (ADR 0073), before the caller actually submits, so the client can
+        build a chosen_actors picker for any submit_choice-governed stage.
+        Never mutates state and enforces no If-Match/Idempotency-Key
+        precondition. route_id is null and stages is empty when no active
+        route resolves yet for the document's profile — informational
+        absence, not an error; submit-time resolution remains the sole
+        authority.
+      tags: [approval]
+      operationId: getDocumentApprovalPreview
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalRoutePreview'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /approval/instances/{instance_id}/stages/{stage_id}/signoffs:
@@ -6628,6 +6696,30 @@ components:
           type: string
           enum: [content, corrective, regulatory, periodic_review, administrative]
           description: Optional structured category for the reason-for-change.
+        chosen_actors:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubmitChosenActors'
+          description: >-
+            Per-stage caller-chosen actors (M4, unit 3.2, slice 5). Required
+            only for stages governed by a submit_choice actor selector: a
+            matching entry with a non-empty user_ids is mandatory for such a
+            stage (422 otherwise), and every chosen user is validated
+            server-side against the selector's role x area_code constraint
+            (422 on violation). An entry naming a stage_order with no
+            submit_choice selector is also rejected (422, fail-closed).
+    SubmitChosenActors:
+      type: object
+      required: [stage_order, user_ids]
+      properties:
+        stage_order:
+          type: integer
+          minimum: 1
+        user_ids:
+          type: array
+          minItems: 1
+          items:
+            type: string
     SubmitDocumentResponse:
       type: object
       required: [instance_id, was_replay, etag]
@@ -6682,6 +6774,18 @@ components:
             version_status:
               type: string
               description: The template version's status after the kernel submit-lock (always under_review on success).
+    TemplateSubmitForApprovalRequest:
+      type: object
+      properties:
+        chosen_actors:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubmitChosenActors'
+          description: >-
+            Per-stage caller-chosen actors (M4, unit 3.2, slice 5), symmetric
+            with SubmitDocumentRequest.chosen_actors. Optional body: existing
+            callers that never submit a submit_choice-governed route may omit
+            it entirely.
     SignoffTemplateVersionRequest:
       type: object
       required: [decision, password]
@@ -7009,19 +7113,30 @@ components:
       type: string
       description: Behaviour applied when an actor loses eligibility mid-stage.
       enum: [reduce_quorum, fail_stage, keep_snapshot]
+    ActorSelector:
+      type: object
+      additionalProperties: true
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [named_user, role_in_fixed_area, role_in_document_area, submit_choice] }
+        user_id: { type: string, minLength: 1, maxLength: 64 }
+        role: { type: string, minLength: 1, maxLength: 64, pattern: '^[a-z0-9_-]+$' }
+        area_code: { type: string, minLength: 1, maxLength: 64, pattern: '^[a-z0-9_-]+$' }
+      description: >-
+        M4 ActorSelector (unit 3.2). Discriminated union by `kind`; per-kind field
+        presence enforced in domain + DB (named_user→user_id; role_in_fixed_area→role+area_code;
+        role_in_document_area→role; submit_choice→role+area_code).
     StageRequest:
       type: object
       additionalProperties: true
-      required: [order, name, required_role, required_capability, area_code, quorum, drift_policy]
+      required: [order, name, required_capability, quorum, drift_policy, selectors]
       properties:
         order:
           type: integer
           minimum: 1
           description: 1-based stage ordinal. Must equal index+1.
         name: { type: string, minLength: 1, maxLength: 64 }
-        required_role: { type: string, minLength: 1, maxLength: 64, pattern: '^[a-z0-9_-]+$' }
         required_capability: { type: string, minLength: 1, maxLength: 64, pattern: '^[a-z][a-z0-9_]*\.[a-z0-9._]*[a-z0-9]$' }
-        area_code: { type: string, minLength: 1, maxLength: 64, pattern: '^[a-z0-9_-]+$' }
         quorum: { $ref: '#/components/schemas/QuorumKind' }
         quorum_m:
           type: integer
@@ -7036,16 +7151,23 @@ components:
             (signoff) stage. Optional; omitted defaults to approval at
             persistence. A review-kind route is only creatable by supplying
             this field.
+        selectors:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/ActorSelector' }
+          description: >-
+            M4 ActorSelector (unit 3.2). REQUIRED — selectors are the sole
+            source of truth for a stage's actor pool. The legacy flat
+            required_role/area_code wire fields have been removed entirely
+            (no fallback, no synthesis).
     StageSummary:
       type: object
       additionalProperties: true
-      required: [order, name, required_role, required_capability, area_code, quorum, drift_policy, quorum_m]
+      required: [order, name, required_capability, quorum, drift_policy, quorum_m, selectors]
       properties:
         order: { type: integer, minimum: 1 }
         name: { type: string }
-        required_role: { type: string }
         required_capability: { type: string }
-        area_code: { type: string }
         quorum: { $ref: '#/components/schemas/QuorumKind' }
         quorum_m:
           type: integer
@@ -7056,6 +7178,52 @@ components:
           type: string
           enum: [review, approval]
           description: F0 (spec.md §4/W2) — review vs approval stage; defaults to approval.
+        selectors:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/ActorSelector' }
+          description: >-
+            M4 ActorSelector (unit 3.2). Sole source of truth for the stage's
+            actor pool; always returned. The legacy flat required_role/area_code
+            wire fields have been removed entirely.
+    ApprovalRoutePreviewStage:
+      type: object
+      required: [stage_order, label, selectors]
+      properties:
+        stage_order: { type: integer, minimum: 1 }
+        label: { type: string, description: The stage's configured name. }
+        selectors:
+          type: array
+          items: { $ref: '#/components/schemas/ActorSelector' }
+          description: >-
+            M4 ActorSelector (unit 3.2). Reused verbatim from StageSummary —
+            the same discriminated union a submit_choice picker inspects to
+            learn a stage's role/area_code constraint before the caller
+            supplies chosen_actors.
+    ApprovalRoutePreview:
+      type: object
+      required: [route_id, route_name, stages]
+      properties:
+        route_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: >-
+            The resolved active route's id, or null when no active approval
+            route resolves for this subject yet. Informational only —
+            submit-time resolution (ADR 0073 / ADR 0082) remains the sole
+            authority; a null here does not guarantee submit will also fail
+            (a route could be activated concurrently) and a non-null id does
+            not guarantee submit will succeed (e.g. a concurrently
+            deactivated route).
+        route_name:
+          type: string
+          nullable: true
+          description: The resolved route's configured display name; null when route_id is null.
+        stages:
+          type: array
+          items: { $ref: '#/components/schemas/ApprovalRoutePreviewStage' }
+          description: Empty when route_id is null.
     CreateRouteRequest:
       type: object
       additionalProperties: true

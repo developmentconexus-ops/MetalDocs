@@ -40,13 +40,12 @@ function stageRequestToSummary(
   return {
     order: stage.order,
     name: stage.name,
-    required_role: stage.required_role,
     required_capability: stage.required_capability,
-    area_code: stage.area_code,
     quorum: stage.quorum,
     quorum_m: stage.quorum_m ?? null,
     drift_policy: stage.drift_policy,
     stage_kind: stage.stage_kind,
+    selectors: stage.selectors,
   };
 }
 

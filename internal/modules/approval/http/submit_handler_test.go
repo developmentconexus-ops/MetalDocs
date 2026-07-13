@@ -34,6 +34,15 @@ func (f *fakeSubmitService) SubmitRevisionForReview(_ context.Context, _ db.TxRu
 	return f.result, nil
 }
 
+// PreviewRoute is a no-op stub only to satisfy the submitService interface —
+// this fake drives the submit handler tests, which never call PreviewRoute.
+// PreviewRoute's own behavior is covered in
+// internal/modules/approval/application/route_preview_test.go and the
+// resolution-parity integration test under tests/integration/approval/.
+func (f *fakeSubmitService) PreviewRoute(_ context.Context, _ db.TxRunner, _, _ string) (application.RoutePreview, error) {
+	return application.RoutePreview{}, nil
+}
+
 func submitTestMux(h *Handler) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/documents/{id}/submit", h.SubmitHandler)

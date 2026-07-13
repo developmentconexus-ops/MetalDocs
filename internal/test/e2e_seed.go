@@ -721,16 +721,36 @@ RETURNING id::text`, tenantID, profileCode, actorID).Scan(&routeID)
 		return fmt.Errorf("clear route stages: %w", err)
 	}
 
-	// Eligibility resolves user_process_areas.role == required_role exactly
-	// (ResolveEligibleActors). 'reviewer' is not a valid area role (decommissioned,
-	// ADR 0022) so a 'reviewer' stage is unresolvable — both stages require
-	// 'approver', which the seed grants and which carries document.signoff.
+	// Eligibility resolves user_process_areas.role == the stage's
+	// role_in_fixed_area selector's Role exactly (ResolveEligibleActorsForSelectors).
+	// 'reviewer' is not a valid area role (decommissioned, ADR 0022) so a
+	// 'reviewer' stage is unresolvable — both stages require 'approver', which
+	// the seed grants and which carries document.signoff. Selectors is the
+	// sole source of truth for a route stage's actor pool (unit 3.2 slice 6b):
+	// approval_route_stages.required_role/area_code were dropped by migration
+	// 0305, so each stage's eligible-actor pool is seeded as an explicit
+	// approval_route_stage_selectors row below instead of flat columns.
+	var reviewStageID, approvalStageID string
+	if err := tx.QueryRowContext(ctx, `
+INSERT INTO approval_route_stages (route_id, stage_order, name, required_capability, quorum, quorum_m, on_eligibility_drift)
+VALUES ($1, 1, 'Review', 'document.signoff', 'any_1_of', NULL, 'fail_stage')
+RETURNING id::text`, routeID).Scan(&reviewStageID); err != nil {
+		return fmt.Errorf("insert review stage: %w", err)
+	}
+	if err := tx.QueryRowContext(ctx, `
+INSERT INTO approval_route_stages (route_id, stage_order, name, required_capability, quorum, quorum_m, on_eligibility_drift)
+VALUES ($1, 2, 'Approval', 'document.signoff', 'any_1_of', NULL, 'fail_stage')
+RETURNING id::text`, routeID).Scan(&approvalStageID); err != nil {
+		return fmt.Errorf("insert approval stage: %w", err)
+	}
+
 	if _, err := tx.ExecContext(ctx, `
-INSERT INTO approval_route_stages (route_id, stage_order, name, required_role, required_capability, area_code, quorum, quorum_m, on_eligibility_drift)
+INSERT INTO approval_route_stage_selectors (tenant_id, route_stage_id, selector_order, kind, role, area_code)
 VALUES
-  ($1, 1, 'Review', 'approver', 'document.signoff', $2, 'any_1_of', NULL, 'fail_stage'),
-  ($1, 2, 'Approval', 'approver', 'document.signoff', $2, 'any_1_of', NULL, 'fail_stage')`, routeID, areaCode); err != nil {
-		return fmt.Errorf("insert route stages: %w", err)
+  ($1, $2, 1, 'role_in_fixed_area', 'approver', $4),
+  ($1, $3, 1, 'role_in_fixed_area', 'approver', $4)`,
+		tenantID, reviewStageID, approvalStageID, areaCode); err != nil {
+		return fmt.Errorf("insert route stage selectors: %w", err)
 	}
 
 	return nil

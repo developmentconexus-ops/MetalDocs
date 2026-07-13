@@ -19,6 +19,13 @@ vi.mock('../../../taxonomy/api/taxonomy', () => ({
     { code: 'OPS', name: 'Operações' },
   ]),
 }));
+vi.mock('../../../iam/queries/useUsersQuery', () => ({
+  useUsersQuery: vi.fn(() => ({
+    data: { items: [], page: { next_cursor: null, has_more: false } },
+    isLoading: false,
+    isError: false,
+  })),
+}));
 
 function makeProfile(overrides: Partial<DocumentProfile> = {}): DocumentProfile {
   return {
@@ -49,9 +56,8 @@ function makeRoute(overrides: Partial<RouteSummary> = {}): RouteSummary {
       {
         order: 1,
         name: 'Revisão',
-        required_role: 'approver',
         required_capability: 'doc.signoff',
-        area_code: 'AREA-01',
+        selectors: [{ kind: 'role_in_fixed_area', role: 'approver', area_code: 'AREA-01' }],
         quorum: 'any_1_of',
         quorum_m: null,
         drift_policy: 'reduce_quorum',
@@ -59,9 +65,8 @@ function makeRoute(overrides: Partial<RouteSummary> = {}): RouteSummary {
       {
         order: 2,
         name: 'Aprovação',
-        required_role: 'approver',
         required_capability: 'doc.signoff',
-        area_code: 'AREA-01',
+        selectors: [{ kind: 'role_in_fixed_area', role: 'approver', area_code: 'AREA-01' }],
         quorum: 'all_of',
         quorum_m: null,
         drift_policy: 'reduce_quorum',
@@ -164,7 +169,7 @@ describe('RouteAdminPage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /Salvar rota/i }));
     await waitFor(() =>
       expect(
-        within(dialog).getByText('A etapa "Jurídico" deve ter uma role definida.'),
+        within(dialog).getByText('Na etapa "Jurídico", selecione uma role.'),
       ).toBeTruthy(),
     );
 
@@ -190,10 +195,10 @@ describe('RouteAdminPage', () => {
     });
     await within(dialog).findByRole('option', { name: 'Aprovador' });
     await within(dialog).findByRole('option', { name: 'Área 01 (AREA-01)' });
-    fireEvent.change(within(dialog).getByLabelText('Role requerida da etapa 1'), {
+    fireEvent.change(within(dialog).getByLabelText('Role do seletor 1 da etapa 1'), {
       target: { value: 'approver' },
     });
-    fireEvent.change(within(dialog).getByLabelText('Área da etapa 1'), {
+    fireEvent.change(within(dialog).getByLabelText('Área do seletor 1 da etapa 1'), {
       target: { value: 'AREA-01' },
     });
     fireEvent.click(within(dialog).getByRole('radio', { name: 'M de N' }));
@@ -236,10 +241,10 @@ describe('RouteAdminPage', () => {
     });
     await within(dialog).findByRole('option', { name: 'Aprovador' });
     await within(dialog).findByRole('option', { name: 'Área 01 (AREA-01)' });
-    fireEvent.change(within(dialog).getByLabelText('Role requerida da etapa 1'), {
+    fireEvent.change(within(dialog).getByLabelText('Role do seletor 1 da etapa 1'), {
       target: { value: 'approver' },
     });
-    fireEvent.change(within(dialog).getByLabelText('Área da etapa 1'), {
+    fireEvent.change(within(dialog).getByLabelText('Área do seletor 1 da etapa 1'), {
       target: { value: 'AREA-01' },
     });
 
@@ -317,10 +322,10 @@ describe('RouteAdminPage', () => {
     });
     await within(dialog).findByRole('option', { name: 'Aprovador' });
     await within(dialog).findByRole('option', { name: 'Área 01 (AREA-01)' });
-    fireEvent.change(within(dialog).getByLabelText('Role requerida da etapa 1'), {
+    fireEvent.change(within(dialog).getByLabelText('Role do seletor 1 da etapa 1'), {
       target: { value: 'approver' },
     });
-    fireEvent.change(within(dialog).getByLabelText('Área da etapa 1'), {
+    fireEvent.change(within(dialog).getByLabelText('Área do seletor 1 da etapa 1'), {
       target: { value: 'AREA-01' },
     });
   }
@@ -476,10 +481,10 @@ describe('RouteAdminPage', () => {
     fireEvent.change(within(dialog).getByLabelText('Nome da etapa 2'), {
       target: { value: 'Revisão tardia' },
     });
-    fireEvent.change(within(dialog).getByLabelText('Role requerida da etapa 2'), {
+    fireEvent.change(within(dialog).getByLabelText('Role do seletor 1 da etapa 2'), {
       target: { value: 'approver' },
     });
-    fireEvent.change(within(dialog).getByLabelText('Área da etapa 2'), {
+    fireEvent.change(within(dialog).getByLabelText('Área do seletor 1 da etapa 2'), {
       target: { value: 'AREA-01' },
     });
     // Stage 1 stays 'approval' (default); flip stage 2 (second "Revisão" radio) to review.

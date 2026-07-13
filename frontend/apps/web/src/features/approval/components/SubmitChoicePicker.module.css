@@ -1,0 +1,53 @@
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 8px 0 16px;
+}
+
+.stageFieldset {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.stageLegend {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 4px;
+}
+
+.hint {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.userList {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.userItem {
+  display: flex;
+}
+
+.userLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.error {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--danger);
+}

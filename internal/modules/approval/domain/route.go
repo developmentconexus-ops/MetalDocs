@@ -55,19 +55,23 @@ func (k StageKind) Validate() error {
 type Stage struct {
 	Order              int
 	Name               string
-	RequiredRole       string
 	RequiredCapability string
-	AreaCode           string
 	Quorum             QuorumPolicy
 	QuorumM            *int
 	OnEligibilityDrift DriftPolicy
 	Kind               StageKind
 	DueInDays          *int
+	Selectors          []ActorSelector
 }
 
 // Route is the per-profile approval route configuration.
 type Route struct {
-	ID          string
+	ID   string
+	// Name is the route's configured display name (approval_routes.name).
+	// Populated by LoadRoute (SLICE 8a, unit 3.2) for read paths that surface
+	// it (e.g. RoutePreview); not read or asserted by the submit-time
+	// resolution/validation path, which never needed it.
+	Name        string
 	TenantID    string
 	ProfileCode string
 	// Subject generalizes what this route governs (M3 kernel extraction, ADR
@@ -131,6 +135,22 @@ func (r Route) Validate(policy taxonomydomain.RoutePolicy) error {
 			return fmt.Errorf("duplicate stage name %q in route", s.Name)
 		}
 		names[s.Name] = true
+
+		// Every stage must name at least one way to resolve its eligible
+		// actor pool (M4, unit 3.2), and every selector must be internally
+		// consistent for its kind. Selectors is the sole source of truth
+		// post-slice-6b; the flat RequiredRole/AreaCode → selector synthesis
+		// happens at the HTTP boundary (route_admin_handler.go) before a
+		// Stage ever reaches domain code.
+		effective := s.Selectors
+		if len(effective) == 0 {
+			return ErrStageNoSelector
+		}
+		for _, sel := range effective {
+			if err := sel.Validate(); err != nil {
+				return fmt.Errorf("stage %q: %w", s.Name, err)
+			}
+		}
 	}
 
 	// Per-profile governance route-signature policy (G1). Belt-and-suspenders to

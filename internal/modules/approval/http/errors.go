@@ -88,6 +88,8 @@ const (
 	approvalCodeValidationReviewDueBeforeEffective   problem.Code = "validation.review_due_before_effective"
 	approvalCodeValidationEffectiveToNotAfterFrom    problem.Code = "validation.effective_to_not_after_effective_from"
 	approvalCodeValidationEmptyEligiblePool          problem.Code = "validation.empty_eligible_pool"
+	approvalCodeValidationSubmitChoiceRequired       problem.Code = "validation.submit_choice_required"
+	approvalCodeValidationSubmitChoiceConstraint     problem.Code = "validation.submit_choice_constraint_violated"
 
 	// F9/ADR 0077 — approval delegation.
 	approvalCodeValidationSelfDelegation   problem.Code = "validation.self_delegation"
@@ -315,6 +317,19 @@ func MapErrorToResponse(err error) *problem.Problem {
 		// quorum-evaluation path, which returned this sentinel unmapped before.
 		statusCode = http.StatusUnprocessableEntity
 		code = approvalCodeValidationEmptyEligiblePool
+	case errors.Is(err, domain.ErrSubmitChoiceRequired):
+		// M4, unit 3.2, slice 5: a submit_choice-governed stage has no
+		// matching (or empty) chosen_actors entry — fail-closed business-rule
+		// rejection at submit time, 422 mirroring ErrEmptyEligiblePool above.
+		statusCode = http.StatusUnprocessableEntity
+		code = approvalCodeValidationSubmitChoiceRequired
+	case errors.Is(err, domain.ErrSubmitChoiceConstraintViolated):
+		// M4, unit 3.2, slice 5: either a chosen user does not satisfy the
+		// submit_choice selector's role x area_code constraint, or a
+		// chosen_actors entry targets a stage_order with no submit_choice
+		// selector (no-fallback principle) — both 422.
+		statusCode = http.StatusUnprocessableEntity
+		code = approvalCodeValidationSubmitChoiceConstraint
 	default:
 		var capabilityDenied authz.ErrCapDenied
 		var syntaxErr *json.SyntaxError

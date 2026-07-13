@@ -89,6 +89,21 @@ vi.mock('../components/workspace/AuthorCommentsPanel', () => ({
   ),
 }));
 
+// SLICE 8b (unit 3.2) — submit-time approval-route preview. Mutable so
+// individual tests can control isSuccess/data directly (mirrors the
+// mockCapabilities pattern above), isolating the previewNotReady race guard
+// from a real network round-trip. Default: already resolved, no gating —
+// existing tests above never assert on the "Submeter para revisão" button so
+// this default is a no-op for them.
+let mockPreviewState: { data: unknown; isSuccess: boolean; isLoading: boolean } = {
+  data: { route_id: null, route_name: null, stages: [] },
+  isSuccess: true,
+  isLoading: false,
+};
+vi.mock('../../approval/queries/useDocumentApprovalPreviewQuery', () => ({
+  useDocumentApprovalPreviewQuery: () => mockPreviewState,
+}));
+
 function makeDoc(overrides: Partial<DocumentDetail> = {}): DocumentDetail {
   return {
     id: 'doc-1',
@@ -169,6 +184,7 @@ describe('DocumentWorkspacePage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     mockCapabilities = [];
+    mockPreviewState = { data: { route_id: null, route_name: null, stages: [] }, isSuccess: true, isLoading: false };
     vi.spyOn(documentsApi, 'signedRevisionURL').mockReturnValue('/revisions/rev-1/signed-url');
     vi.spyOn(controlledDocumentsApi, 'fetchActiveDocumentInstance').mockResolvedValue({
       content_hash: 'hash-abc',
@@ -318,6 +334,52 @@ describe('DocumentWorkspacePage', () => {
     expect(screen.queryByRole('button', { name: 'Pronto para aprovação' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Solicitar mudanças' })).not.toBeInTheDocument();
     expect(container.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  // ---------- SLICE 8b (unit 3.2) — submit gated on approval-route preview ----------
+
+  it('author-editing: blocks submit while the preview has not resolved (race case)', async () => {
+    mockPreviewState = { data: undefined, isSuccess: false, isLoading: true };
+    vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(makeDoc({ status: 'draft' }));
+    vi.spyOn(documentsApi, 'getApprovalInstance').mockResolvedValue(
+      makeInstance({
+        status: 'in_progress',
+        viewer: {
+          is_author: true,
+          eligible_for_active_stage: false,
+          has_signed_active_stage: false,
+          via_delegation_from: null,
+        },
+      }),
+    );
+    renderAt();
+
+    const submitBtn = await screen.findByRole('button', { name: 'Carregando rota de aprovação…' });
+    expect(submitBtn).toBeDisabled();
+  });
+
+  it('author-editing: does not block submit once the preview has resolved (control case)', async () => {
+    mockPreviewState = {
+      data: { route_id: 'route-1', route_name: 'Rota padrão', stages: [] },
+      isSuccess: true,
+      isLoading: false,
+    };
+    vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(makeDoc({ status: 'draft' }));
+    vi.spyOn(documentsApi, 'getApprovalInstance').mockResolvedValue(
+      makeInstance({
+        status: 'in_progress',
+        viewer: {
+          is_author: true,
+          eligible_for_active_stage: false,
+          has_signed_active_stage: false,
+          via_delegation_from: null,
+        },
+      }),
+    );
+    renderAt();
+
+    const submitBtn = await screen.findByRole('button', { name: 'Submeter para revisão' });
+    expect(submitBtn).not.toBeDisabled();
   });
 
   it('author-changes-requested: EditorCanvas + teaching-copy banner + RequestedChangesPanel', async () => {

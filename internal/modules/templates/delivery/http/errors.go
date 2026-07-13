@@ -106,6 +106,15 @@ func MapErr(err error) (httpStatus int, code problem.Code) {
 		return http.StatusBadRequest, problem.CodeIdempotencyKeyRequired
 	case errors.Is(err, approvaldomain.ErrEmptyEligiblePool):
 		return http.StatusUnprocessableEntity, codeTplApprovalConflict
+	case errors.Is(err, approvaldomain.ErrSubmitChoiceRequired):
+		// M4, unit 3.2, slice 5: symmetric with the document submit mapping
+		// (approval/http/errors.go) — a submit_choice-governed stage has no
+		// matching/non-empty chosen_actors entry.
+		return http.StatusUnprocessableEntity, codeTplApprovalConflict
+	case errors.Is(err, approvaldomain.ErrSubmitChoiceConstraintViolated):
+		// M4, unit 3.2, slice 5: chosen user fails the role x area_code
+		// constraint, or chosen_actors targets a non-submit_choice stage.
+		return http.StatusUnprocessableEntity, codeTplApprovalConflict
 	case errors.Is(err, approvaldomain.ErrNoActiveStage):
 		return http.StatusConflict, codeTplApprovalConflict
 	case errors.Is(err, approvaldomain.ErrActorNotEligible):

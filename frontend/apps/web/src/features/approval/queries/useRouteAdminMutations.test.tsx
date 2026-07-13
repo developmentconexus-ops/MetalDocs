@@ -38,9 +38,8 @@ function makeWrapperWithClient(client: QueryClient) {
 const createStage = () => ({
   order: 1,
   name: 'Review',
-  required_role: 'approver',
   required_capability: 'doc.signoff',
-  area_code: 'ops',
+  selectors: [{ kind: 'role_in_fixed_area' as const, role: 'approver', area_code: 'ops' }],
   quorum: 'any_1_of' as const,
   drift_policy: 'reduce_quorum' as const,
 });
@@ -106,9 +105,8 @@ describe('useRouteAdminMutations toast behaviour', () => {
             {
               order: 1,
               name: 'Revisão',
-              required_role: 'approver',
               required_capability: 'doc.signoff',
-              area_code: 'ops',
+              selectors: [{ kind: 'role_in_fixed_area', role: 'approver', area_code: 'ops' }],
               quorum: 'any_1_of',
               quorum_m: null,
               drift_policy: 'reduce_quorum',

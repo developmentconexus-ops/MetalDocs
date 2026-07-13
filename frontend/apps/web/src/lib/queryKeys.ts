@@ -75,6 +75,9 @@ export const QK = {
       ['templates', 'by-profile', profileCode, 'published'] as const,
     placeholderCatalog: () => ['templates', 'placeholder-catalog'] as const,
     detail: (id: string) => ['templates', 'detail', id] as const,
+    // SLICE 8b (unit 3.2): submit-time route preview for a template version.
+    versionPreview: (templateId: string, versionNum: number) =>
+      ['templates', 'version-preview', templateId, versionNum] as const,
   },
   tokens: {
     all: ['tokens'] as const,
@@ -90,6 +93,11 @@ export const QK = {
       list: () => ['approval', 'routes', 'list'] as const,
       detail: (id: string) => ['approval', 'routes', 'detail', id] as const,
     },
+    // SLICE 8b (unit 3.2): submit-time route preview, read-only. Keyed apart
+    // from instance()/routes.* — this is the pre-submit resolution, not the
+    // post-submit instance or the admin route catalogue.
+    documentPreview: (documentId: string) =>
+      ['approval', 'document-preview', documentId] as const,
   },
   iam: {
     roles: () => ['iam', 'roles'] as const,

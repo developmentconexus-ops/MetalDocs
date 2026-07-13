@@ -165,14 +165,26 @@ export async function getDocxURL(templateId: string, versionNum: number): Promis
 // Kernel approval flow: draft --submitVersionForApproval--> under_review
 // --signoffVersion--> approved (or back to draft on reject) --publishVersion--> published.
 
+// SLICE 8b (unit 3.2): chosen_actors is optional on the wire — omitted
+// entirely (never sent as []) when the resolved route has no submit_choice
+// stage, mirroring SubmitDocumentRequest.chosen_actors' contract.
+type TemplateSubmitForApprovalRequest = components['schemas']['TemplateSubmitForApprovalRequest'];
+
 export async function submitVersionForApproval(
   templateId: string,
   versionNum: number,
   idempotencyKey: string,
+  chosenActors?: TemplateSubmitForApprovalRequest['chosen_actors'],
 ): Promise<SubmitForApprovalResponse['data']> {
+  const payload: TemplateSubmitForApprovalRequest | undefined =
+    chosenActors && chosenActors.length > 0 ? { chosen_actors: chosenActors } : undefined;
   const body = await apiFetch<SubmitForApprovalResponse>(
     `/api/v1/templates/${templateId}/versions/${versionNum}/submit-for-approval`,
-    { method: 'POST', idempotencyKey },
+    {
+      method: 'POST',
+      idempotencyKey,
+      ...(payload ? { body: JSON.stringify(payload) } : {}),
+    },
   );
   return body.data;
 }

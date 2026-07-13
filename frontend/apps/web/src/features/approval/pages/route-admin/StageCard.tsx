@@ -1,9 +1,16 @@
+// @ts-expect-error uuid package exists in workspace, no typings exposed in this app.
+import { v4 as uuidv4 } from 'uuid';
+
 import type { IamRole } from '../../../../lib/iam/roles';
 import type { ProcessArea } from '../../../taxonomy/types';
+import type { components } from '../../../../lib/api-types';
 import {
+  ACTOR_SELECTOR_KIND_OPTIONS,
   DRIFT_POLICY_OPTIONS,
   describeDriftPolicy,
   labelForDriftPolicy,
+  labelForSelectorKind,
+  type ActorSelectorKind,
   type DriftPolicy,
   type QuorumKind,
 } from './routeAdminLabels';
@@ -13,13 +20,23 @@ import { StageActorSlot } from './StageActorSlot';
 import { StageKindControl } from './StageKindControl';
 import styles from './RouteAdmin.module.css';
 
+export type ManagedUserCore = components['schemas']['ManagedUserCore'];
+
+export interface SelectorDraft {
+  /** Stable id per draft row so React keys stay constant across edits. */
+  uid: string;
+  kind: ActorSelectorKind;
+  userId: string;
+  role: string;
+  areaCode: string;
+}
+
 export interface StageDraft {
   /** Stable id per draft row so React keys stay constant across edits. */
   uid: string;
   label: string;
-  requiredRole: string;
   requiredCapability: string;
-  areaCode: string;
+  selectors: SelectorDraft[];
   quorumKind: QuorumKind;
   m: string;
   driftPolicy: DriftPolicy;
@@ -35,8 +52,20 @@ interface StageCardProps {
   roleOptionsLoading: boolean;
   areaOptions: ProcessArea[];
   areaOptionsLoading: boolean;
+  userOptions: ManagedUserCore[];
+  userOptionsLoading: boolean;
   updateStage: (uid: string, patch: Partial<StageDraft>) => void;
   removeStage: (uid: string) => void;
+}
+
+export function defaultSelector(): SelectorDraft {
+  return {
+    uid: uuidv4() as string,
+    kind: 'role_in_fixed_area',
+    userId: '',
+    role: '',
+    areaCode: '',
+  };
 }
 
 export function StageCard({
@@ -48,11 +77,41 @@ export function StageCard({
   roleOptionsLoading,
   areaOptions,
   areaOptionsLoading,
+  userOptions,
+  userOptionsLoading,
   updateStage,
   removeStage,
 }: StageCardProps) {
   const kindLabelId = `stage-kind-label-${stage.uid}`;
   const quorumLabelId = `stage-quorum-label-${stage.uid}`;
+
+  const setSelectors = (selectors: SelectorDraft[]) => {
+    updateStage(stage.uid, { selectors });
+  };
+
+  const updateSelector = (uid: string, patch: Partial<SelectorDraft>) => {
+    setSelectors(
+      stage.selectors.map((selector) => (selector.uid === uid ? { ...selector, ...patch } : selector)),
+    );
+  };
+
+  const addSelector = () => {
+    setSelectors([...stage.selectors, defaultSelector()]);
+  };
+
+  const removeSelector = (uid: string) => {
+    if (stage.selectors.length === 1) return;
+    setSelectors(stage.selectors.filter((selector) => selector.uid !== uid));
+  };
+
+  const moveSelector = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= stage.selectors.length) return;
+    const next = [...stage.selectors];
+    const [moved] = next.splice(index, 1);
+    next.splice(target, 0, moved);
+    setSelectors(next);
+  };
 
   return (
     <article className={styles.stageCard}>
@@ -92,45 +151,185 @@ export function StageCard({
       />
 
       <StageActorSlot heading={`Quem atua na etapa ${stageNumber}`}>
-        <label className={styles.fieldLabel} htmlFor={`stage-role-${stage.uid}`}>
-          Role requerida da etapa {stageNumber}
-        </label>
-        <select
-          id={`stage-role-${stage.uid}`}
-          className={styles.input}
-          value={stage.requiredRole}
-          onChange={(event) => updateStage(stage.uid, { requiredRole: event.target.value })}
-          disabled={disabled || roleOptionsLoading}
-        >
-          <option value="" disabled>
-            {roleOptionsLoading ? 'Carregando roles…' : 'Selecione a role'}
-          </option>
-          {roleOptions.map((role) => (
-            <option key={role.code} value={role.code} title={role.description}>
-              {role.label}
-            </option>
-          ))}
-        </select>
+        {stage.selectors.map((selector, index) => {
+          const selectorNumber = index + 1;
+          const isOnlySelector = stage.selectors.length === 1;
+          return (
+            <div key={selector.uid} className={styles.selectorRow}>
+              <div className={styles.selectorRowHeader}>
+                <span className={styles.fieldLabel}>
+                  Seletor {selectorNumber} da etapa {stageNumber}
+                </span>
+                <div className={styles.selectorRowActions}>
+                  <button
+                    type="button"
+                    className={styles.linkButton}
+                    onClick={() => moveSelector(index, -1)}
+                    disabled={disabled || index === 0}
+                  >
+                    Subir
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.linkButton}
+                    onClick={() => moveSelector(index, 1)}
+                    disabled={disabled || index === stage.selectors.length - 1}
+                  >
+                    Descer
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.linkButton}
+                    onClick={() => removeSelector(selector.uid)}
+                    disabled={disabled || isOnlySelector}
+                    title={
+                      isOnlySelector ? 'A etapa deve ter ao menos um seletor.' : undefined
+                    }
+                  >
+                    Remover seletor
+                  </button>
+                </div>
+              </div>
 
-        <label className={styles.fieldLabel} htmlFor={`stage-area-${stage.uid}`}>
-          Área da etapa {stageNumber}
-        </label>
-        <select
-          id={`stage-area-${stage.uid}`}
-          className={styles.input}
-          value={stage.areaCode}
-          onChange={(event) => updateStage(stage.uid, { areaCode: event.target.value })}
-          disabled={disabled || areaOptionsLoading}
+              <label
+                className={styles.fieldLabel}
+                htmlFor={`stage-selector-kind-${selector.uid}`}
+              >
+                Tipo do seletor {selectorNumber} da etapa {stageNumber}
+              </label>
+              <select
+                id={`stage-selector-kind-${selector.uid}`}
+                className={styles.input}
+                value={selector.kind}
+                onChange={(event) =>
+                  updateSelector(selector.uid, { kind: event.target.value as ActorSelectorKind })
+                }
+                disabled={disabled}
+              >
+                {ACTOR_SELECTOR_KIND_OPTIONS.map((kind) => (
+                  <option key={kind} value={kind}>
+                    {labelForSelectorKind(kind)}
+                  </option>
+                ))}
+              </select>
+
+              {selector.kind === 'named_user' ? (
+                <>
+                  <label
+                    className={styles.fieldLabel}
+                    htmlFor={`stage-selector-user-${selector.uid}`}
+                  >
+                    Usuário do seletor {selectorNumber} da etapa {stageNumber}
+                  </label>
+                  <select
+                    id={`stage-selector-user-${selector.uid}`}
+                    className={styles.input}
+                    value={selector.userId}
+                    onChange={(event) => updateSelector(selector.uid, { userId: event.target.value })}
+                    disabled={disabled || userOptionsLoading}
+                  >
+                    <option value="" disabled>
+                      {userOptionsLoading ? 'Carregando usuários…' : 'Selecione o usuário'}
+                    </option>
+                    {userOptions.map((user) => (
+                      <option key={user.user_id} value={user.user_id}>
+                        {user.display_name} ({user.username})
+                      </option>
+                    ))}
+                  </select>
+                </>
+              ) : null}
+
+              {selector.kind === 'role_in_fixed_area' || selector.kind === 'submit_choice' ? (
+                <>
+                  <label
+                    className={styles.fieldLabel}
+                    htmlFor={`stage-selector-role-${selector.uid}`}
+                  >
+                    Role do seletor {selectorNumber} da etapa {stageNumber}
+                  </label>
+                  <select
+                    id={`stage-selector-role-${selector.uid}`}
+                    className={styles.input}
+                    value={selector.role}
+                    onChange={(event) => updateSelector(selector.uid, { role: event.target.value })}
+                    disabled={disabled || roleOptionsLoading}
+                  >
+                    <option value="" disabled>
+                      {roleOptionsLoading ? 'Carregando roles…' : 'Selecione a role'}
+                    </option>
+                    {roleOptions.map((role) => (
+                      <option key={role.code} value={role.code} title={role.description}>
+                        {role.label}
+                      </option>
+                    ))}
+                  </select>
+
+                  <label
+                    className={styles.fieldLabel}
+                    htmlFor={`stage-selector-area-${selector.uid}`}
+                  >
+                    Área do seletor {selectorNumber} da etapa {stageNumber}
+                  </label>
+                  <select
+                    id={`stage-selector-area-${selector.uid}`}
+                    className={styles.input}
+                    value={selector.areaCode}
+                    onChange={(event) =>
+                      updateSelector(selector.uid, { areaCode: event.target.value })
+                    }
+                    disabled={disabled || areaOptionsLoading}
+                  >
+                    <option value="" disabled>
+                      {areaOptionsLoading ? 'Carregando áreas…' : 'Selecione a área'}
+                    </option>
+                    {areaOptions.map((area) => (
+                      <option key={area.code} value={area.code}>
+                        {area.name} ({area.code})
+                      </option>
+                    ))}
+                  </select>
+                </>
+              ) : null}
+
+              {selector.kind === 'role_in_document_area' ? (
+                <>
+                  <label
+                    className={styles.fieldLabel}
+                    htmlFor={`stage-selector-role-${selector.uid}`}
+                  >
+                    Role do seletor {selectorNumber} da etapa {stageNumber}
+                  </label>
+                  <select
+                    id={`stage-selector-role-${selector.uid}`}
+                    className={styles.input}
+                    value={selector.role}
+                    onChange={(event) => updateSelector(selector.uid, { role: event.target.value })}
+                    disabled={disabled || roleOptionsLoading}
+                  >
+                    <option value="" disabled>
+                      {roleOptionsLoading ? 'Carregando roles…' : 'Selecione a role'}
+                    </option>
+                    {roleOptions.map((role) => (
+                      <option key={role.code} value={role.code} title={role.description}>
+                        {role.label}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              ) : null}
+            </div>
+          );
+        })}
+
+        <button
+          type="button"
+          className={styles.ghostButton}
+          onClick={addSelector}
+          disabled={disabled}
         >
-          <option value="" disabled>
-            {areaOptionsLoading ? 'Carregando áreas…' : 'Selecione a área'}
-          </option>
-          {areaOptions.map((area) => (
-            <option key={area.code} value={area.code}>
-              {area.name} ({area.code})
-            </option>
-          ))}
-        </select>
+          Adicionar seletor
+        </button>
       </StageActorSlot>
 
       <span id={quorumLabelId} className={styles.fieldLabel}>

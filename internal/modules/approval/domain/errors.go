@@ -37,3 +37,32 @@ var ErrFastForwardStageNotCompleted = errors.New("approval: fast-forward verdict
 // the actor is not in the next stage's eligible pool). The signoff leg is
 // never attempted in this case.
 var ErrFastForwardNotEligible = errors.New("approval: fast-forward not eligible on the now-active stage")
+
+// ErrInvalidSelectorKind is returned by ActorSelector.Validate for any Kind
+// other than the four SelectorKind values (M4, unit 3.2).
+var ErrInvalidSelectorKind = errors.New("approval: invalid actor selector kind")
+
+// ErrSelectorFieldsInvalid is returned by ActorSelector.Validate when the
+// UserID/Role/AreaCode fields don't match the presence/absence contract for
+// the selector's Kind.
+var ErrSelectorFieldsInvalid = errors.New("approval: actor selector fields invalid for its kind")
+
+// ErrStageNoSelector is returned by Route.Validate when a stage has zero
+// ActorSelectors — every stage must name at least one way to resolve its
+// eligible actor pool.
+var ErrStageNoSelector = errors.New("approval: stage must have at least one actor selector")
+
+// ErrSubmitChoiceRequired is returned at submit time (M4, unit 3.2, slice 5)
+// when a stage carries a submit_choice selector but the caller's
+// chosen_actors has no entry for that stage's Order, or the entry's UserIDs
+// is empty. Fail-closed: a submit_choice stage can never silently fall back
+// to an empty pool.
+var ErrSubmitChoiceRequired = errors.New("approval: submit_choice stage requires chosen actors")
+
+// ErrSubmitChoiceConstraintViolated is returned at submit time (M4, unit 3.2,
+// slice 5) when either (a) a chosen user does not satisfy the submit_choice
+// selector's role x area_code constraint (not an active member in that
+// role/area for the tenant), or (b) a chosen_actors entry targets a
+// stage_order that has no submit_choice selector at all. Both are fail-closed
+// per the no-fallback principle — never a silent accept.
+var ErrSubmitChoiceConstraintViolated = errors.New("approval: chosen actor does not satisfy submit_choice constraint")

@@ -164,30 +164,34 @@ func seedTemplateVersion(t *testing.T, dbc *sql.DB, tenantID, actorID, status st
 // TestLoadRoute_TemplateSubject_RoundTrips_RealDB and
 // TestLoadActiveRouteIDBySubject_TemplateSubject_RealDB already established
 // in the P3.S2a/P3.S2b-2 evidence.
-// templateRouteStages mirrors validRouteStages()'s shape (two stages,
-// AreaCode="tenant" area-blind sentinel — P3.S2b-3b-i) but uses
-// RequiredRole values from the real user_process_areas_role_check enum
-// ("approver", "author") rather than validRouteStages()'s route-admin-unit-test-only
-// role labels ("qa_reviewer"/"qa_manager"), which are never persisted against
-// a real DB in that mocked-DB test file and so are not constrained to the
-// enum. This real-DB integration test must grant roles the DB will accept.
+// templateRouteStages mirrors validRouteStages()'s shape (two stages, each a
+// single role_in_fixed_area selector at AreaCode="tenant" area-blind sentinel —
+// P3.S2b-3b-i) but uses role values from the real user_process_areas_role_check
+// enum ("approver", "author") rather than validRouteStages()'s
+// route-admin-unit-test-only role labels ("qa_reviewer"/"qa_manager"), which are
+// never persisted against a real DB in that mocked-DB test file and so are not
+// constrained to the enum. This real-DB integration test must grant roles the
+// DB will accept. (Selectors are the sole actor-pool source of truth since
+// migration 0305 dropped the flat required_role/area_code columns.)
 func templateRouteStages() []domain.Stage {
 	return []domain.Stage{
 		{
 			Order:              1,
 			Name:               "quality",
-			RequiredRole:       "approver",
 			RequiredCapability: "document.signoff",
-			AreaCode:           "tenant",
+			Selectors: []domain.ActorSelector{
+				{Kind: domain.SelectorRoleInFixedArea, Role: "approver", AreaCode: "tenant"},
+			},
 			Quorum:             domain.QuorumAny1Of,
 			OnEligibilityDrift: domain.DriftReduceQuorum,
 		},
 		{
 			Order:              2,
 			Name:               "approval",
-			RequiredRole:       "author",
 			RequiredCapability: "document.signoff",
-			AreaCode:           "tenant",
+			Selectors: []domain.ActorSelector{
+				{Kind: domain.SelectorRoleInFixedArea, Role: "author", AreaCode: "tenant"},
+			},
 			Quorum:             domain.QuorumAllOf,
 			OnEligibilityDrift: domain.DriftFailStage,
 		},

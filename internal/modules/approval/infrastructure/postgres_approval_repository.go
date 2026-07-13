@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -98,17 +99,18 @@ func (r *postgresApprovalRepository) InsertStageInstances(ctx context.Context, t
 	}
 
 	// Build multi-row VALUES clause.
-	const colCount = 16
+	const colCount = 17
 	placeholders := make([]string, 0, len(stages))
 	args := make([]any, 0, len(stages)*colCount)
 
 	for i, s := range stages {
 		base := i * colCount
 		placeholders = append(placeholders, fmt.Sprintf(
-			"($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,%s)",
+			"($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,%s)",
 			base+1, base+2, base+3, base+4, base+5,
 			base+6, base+7, base+8, base+9, base+10,
 			base+11, base+12, base+13, base+14, base+15,
+			base+16,
 			// due_at (F8, spec.md §4/W4): computed here, not passed as a bind
 			// param, so the DB's own clock is authoritative for the SLA start
 			// point — mirrors UpdateStageStatus's activation CASE, which uses
@@ -118,7 +120,7 @@ func (r *postgresApprovalRepository) InsertStageInstances(ctx context.Context, t
 			// needs a due_at computed at INSERT time; pending stages have no
 			// opened_at yet, so due_at stays NULL until their own activation
 			// UPDATE runs.
-			// $base+16::int casts: DueInDaysSnapshot is only ever referenced
+			// $base+17::int casts: DueInDaysSnapshot is only ever referenced
 			// inside this CASE expression, never bound to a typed column, so
 			// when a stage has no SLA configured (*int is nil -> untyped
 			// NULL), Postgres cannot infer the param's type and the whole
@@ -127,12 +129,24 @@ func (r *postgresApprovalRepository) InsertStageInstances(ctx context.Context, t
 			// gives Postgres a type for the NULL case; (n || ' days')::interval
 			// semantics are unaffected since int concatenated with text still
 			// yields the same text before the interval cast.
-			fmt.Sprintf("CASE WHEN $%d = 'active' AND $%d::int IS NOT NULL THEN now() + ($%d::int || ' days')::interval ELSE NULL END", base+13, base+16, base+16),
+			fmt.Sprintf("CASE WHEN $%d = 'active' AND $%d::int IS NOT NULL THEN now() + ($%d::int || ' days')::interval ELSE NULL END", base+13, base+17, base+17),
 		))
 
 		eligibleJSON, err := json.Marshal(s.EligibleActorIDs)
 		if err != nil {
 			return fmt.Errorf("marshal eligible_actor_ids for stage %s: %w", s.ID, err)
+		}
+
+		// selectorsJSON (M4, unit 3.2 slice 6a / Option C′): the stage's frozen
+		// actor selectors snapshot, the SOLE source the drift path re-resolves
+		// from post-cutover. Default to an empty array rather than persisting
+		// SQL NULL into the NOT NULL jsonb column.
+		selectorsJSON, err := json.Marshal(s.SelectorsSnapshot)
+		if err != nil {
+			return fmt.Errorf("marshal selectors_snapshot for stage %s: %w", s.ID, err)
+		}
+		if s.SelectorsSnapshot == nil {
+			selectorsJSON = []byte("[]")
 		}
 
 		// stage_kind is NOT NULL DEFAULT 'approval'; an empty domain zero-value
@@ -158,6 +172,7 @@ func (r *postgresApprovalRepository) InsertStageInstances(ctx context.Context, t
 			string(s.Status),
 			string(kind),
 			s.DueInDaysSnapshot,
+			selectorsJSON,
 			s.DueInDaysSnapshot,
 		)
 	}
@@ -167,7 +182,7 @@ func (r *postgresApprovalRepository) InsertStageInstances(ctx context.Context, t
 		 required_role_snapshot, required_capability_snapshot, area_code_snapshot,
 		 quorum_snapshot, quorum_m_snapshot, on_eligibility_drift_snapshot,
 		 eligible_actor_ids, effective_denominator, status, stage_kind,
-		 due_in_days_snapshot, due_at)
+		 due_in_days_snapshot, selectors_snapshot, due_at)
 		VALUES ` + strings.Join(placeholders, ",")
 
 	_, err := tx.ExecContext(ctx, query, args...)
@@ -714,7 +729,11 @@ func (r *postgresApprovalRepository) ListRoutes(ctx context.Context, tenantID st
 		return nil, MapPgError(err, MapHints{})
 	}
 	defer rows.Close()
-	return scanRouteListRows(rows)
+	routes, err := scanRouteListRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	return hydrateRouteListSelectors(ctx, r.db, routes)
 }
 
 // ListRoutesTx is the transaction-scoped variant used by the route admin
@@ -726,7 +745,40 @@ func (r *postgresApprovalRepository) ListRoutesTx(ctx context.Context, tx db.Tx,
 		return nil, MapPgError(err, MapHints{})
 	}
 	defer rows.Close()
-	return scanRouteListRows(rows)
+	routes, err := scanRouteListRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	return hydrateRouteListSelectors(ctx, tx, routes)
+}
+
+// hydrateRouteListSelectors batch-loads the ActorSelector rows for every
+// stage across every route in one query (M4, unit 3.2, slice 4), reusing
+// loadRouteStageSelectors exactly as LoadRoute does — no N+1 per route or
+// per stage. querier is either the pooled *sql.DB (ListRoutes) or the
+// caller's tx (ListRoutesTx); both satisfy db.Tx structurally.
+func hydrateRouteListSelectors(ctx context.Context, querier db.Tx, routes []Route) ([]Route, error) {
+	var stageIDs []string
+	for _, route := range routes {
+		for _, stage := range route.Stages {
+			if stage.ID != "" {
+				stageIDs = append(stageIDs, stage.ID)
+			}
+		}
+	}
+	if len(stageIDs) == 0 {
+		return routes, nil
+	}
+	selectorsByStageID, err := loadRouteStageSelectors(ctx, querier, stageIDs)
+	if err != nil {
+		return nil, err
+	}
+	for i := range routes {
+		for j := range routes[i].Stages {
+			routes[i].Stages[j].Selectors = selectorsByStageID[routes[i].Stages[j].ID]
+		}
+	}
+	return routes, nil
 }
 
 // LoadActorDisplayName returns the approver's display name via the iam-owned
@@ -739,7 +791,7 @@ func (r *postgresApprovalRepository) LoadActorDisplayName(ctx context.Context, t
 
 const listRoutesQuery = `
 		SELECT r.id, r.name, r.tenant_id::text, r.profile_code, r.subject_kind, r.subject_key, r.active, r.version, r.created_at, r.created_at AS updated_at,
-		       s.stage_order, s.name, s.required_role, s.required_capability, s.area_code, s.quorum, s.quorum_m, s.on_eligibility_drift,
+		       s.id, s.stage_order, s.name, s.required_capability, s.quorum, s.quorum_m, s.on_eligibility_drift,
 		       s.stage_kind, s.due_in_days,
 		       (SELECT COUNT(*) FROM approval_routes WHERE tenant_id = $1::uuid) AS total_count
 		  FROM approval_routes r
@@ -760,8 +812,9 @@ func scanRouteListRows(rows *sql.Rows) ([]Route, error) {
 			version                                        int
 			createdAt, updatedAt                           time.Time
 			stage                                          RouteStage
-			stageName, stageRole, stageCapability          sql.NullString
-			stageArea, stageQuorum, stageDrift             sql.NullString
+			stageID                                        string
+			stageName, stageCapability                     sql.NullString
+			stageQuorum, stageDrift                        sql.NullString
 			stageQuorumM                                   sql.NullInt64
 			stageKind                                      sql.NullString
 			stageDueInDays                                 sql.NullInt64
@@ -769,12 +822,13 @@ func scanRouteListRows(rows *sql.Rows) ([]Route, error) {
 		)
 		if err := rows.Scan(
 			&routeID, &routeName, &routeTenantID, &profileCode, &subjectKind, &subjectKey, &active, &version, &createdAt, &updatedAt,
-			&stage.Order, &stageName, &stageRole, &stageCapability, &stageArea, &stageQuorum, &stageQuorumM, &stageDrift,
+			&stageID, &stage.Order, &stageName, &stageCapability, &stageQuorum, &stageQuorumM, &stageDrift,
 			&stageKind, &stageDueInDays,
 			&totalCount,
 		); err != nil {
 			return nil, fmt.Errorf("scan approval route list row: %w", err)
 		}
+		stage.ID = stageID
 
 		route := routeMap[routeID]
 		if route == nil {
@@ -799,14 +853,8 @@ func scanRouteListRows(rows *sql.Rows) ([]Route, error) {
 		if stageName.Valid {
 			stage.Name = stageName.String
 		}
-		if stageRole.Valid {
-			stage.RequiredRole = stageRole.String
-		}
 		if stageCapability.Valid {
 			stage.RequiredCapability = stageCapability.String
-		}
-		if stageArea.Valid {
-			stage.AreaCode = stageArea.String
 		}
 		if stageQuorum.Valid {
 			stage.Quorum = stageQuorum.String
@@ -870,7 +918,7 @@ func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx 
 		       on_eligibility_drift_snapshot,
 		       eligible_actor_ids, effective_denominator,
 		       status, opened_at, completed_at, skip_reason,
-		       stage_kind, due_at, due_in_days_snapshot
+		       stage_kind, due_at, due_in_days_snapshot, selectors_snapshot
 		FROM approval_stage_instances
 		WHERE approval_instance_id = $1
 		  AND EXISTS (
@@ -899,6 +947,7 @@ func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx 
 		var skipReason sql.NullString
 		var kindStr string
 		var dueInDaysSnapshot sql.NullInt32
+		var selectorsJSON []byte
 
 		err := rows.Scan(
 			&s.ID, &s.ApprovalInstanceID, &s.StageOrder, &s.NameSnapshot,
@@ -907,7 +956,7 @@ func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx 
 			&s.OnEligibilityDriftSnapshot,
 			&eligibleJSON, &effectiveDenominator,
 			&s.Status, &openedAt, &completedAt, &skipReason,
-			&kindStr, &dueAt, &dueInDaysSnapshot,
+			&kindStr, &dueAt, &dueInDaysSnapshot, &selectorsJSON,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan stage instance for approval instance %s: %w", instanceID, err)
@@ -942,6 +991,11 @@ func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx 
 		if len(eligibleJSON) > 0 {
 			if err := json.Unmarshal(eligibleJSON, &s.EligibleActorIDs); err != nil {
 				return nil, fmt.Errorf("unmarshal eligible_actor_ids for stage %s: %w", s.ID, err)
+			}
+		}
+		if len(selectorsJSON) > 0 {
+			if err := json.Unmarshal(selectorsJSON, &s.SelectorsSnapshot); err != nil {
+				return nil, fmt.Errorf("unmarshal selectors_snapshot for stage %s: %w", s.ID, err)
 			}
 		}
 
@@ -1137,7 +1191,7 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 		       on_eligibility_drift_snapshot,
 		       eligible_actor_ids, effective_denominator,
 		       status, opened_at, completed_at, skip_reason,
-		       stage_kind, due_at, due_in_days_snapshot
+		       stage_kind, due_at, due_in_days_snapshot, selectors_snapshot
 		FROM approval_stage_instances
 		WHERE approval_instance_id = ANY($1)
 		  AND EXISTS (
@@ -1165,6 +1219,7 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 		var skipReason sql.NullString
 		var kindStr string
 		var dueInDaysSnapshot sql.NullInt32
+		var selectorsJSON []byte
 		if err := stageRows.Scan(
 			&s.ID, &s.ApprovalInstanceID, &s.StageOrder, &s.NameSnapshot,
 			&s.RequiredRoleSnapshot, &s.RequiredCapabilitySnapshot, &s.AreaCodeSnapshot,
@@ -1172,7 +1227,7 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 			&s.OnEligibilityDriftSnapshot,
 			&eligibleJSON, &effectiveDenominator,
 			&s.Status, &openedAt, &completedAt, &skipReason,
-			&kindStr, &dueAt, &dueInDaysSnapshot,
+			&kindStr, &dueAt, &dueInDaysSnapshot, &selectorsJSON,
 		); err != nil {
 			return nil, fmt.Errorf("scan stage instance in batch load: %w", err)
 		}
@@ -1204,6 +1259,11 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 		if len(eligibleJSON) > 0 {
 			if err := json.Unmarshal(eligibleJSON, &s.EligibleActorIDs); err != nil {
 				return nil, fmt.Errorf("unmarshal eligible_actor_ids for stage %s: %w", s.ID, err)
+			}
+		}
+		if len(selectorsJSON) > 0 {
+			if err := json.Unmarshal(selectorsJSON, &s.SelectorsSnapshot); err != nil {
+				return nil, fmt.Errorf("unmarshal selectors_snapshot for stage %s: %w", s.ID, err)
 			}
 		}
 		stagesByInst[s.ApprovalInstanceID] = append(stagesByInst[s.ApprovalInstanceID], s)
@@ -1809,6 +1869,121 @@ func (r *postgresApprovalRepository) ResolveEligibleActors(ctx context.Context, 
 	return ids, nil
 }
 
+// ResolveEligibleActorsForSelectors is the selector-union resolver (M4, unit
+// 3.2, slice 3; spec §4). It resolves each selector's own pool and returns
+// the union, deduped by user_id, in deterministic ascending order (never
+// nil). Kinds:
+//
+//   - named_user: contributes {UserID} only after confirming the user exists
+//     and is active in the tenant (v_active_user_areas membership); an
+//     inactive/absent named user contributes nothing — not an error, the
+//     zero-pool guard at the submit call site handles emptiness.
+//   - role_in_fixed_area: the existing role×area query, verbatim, scoped to
+//     selector.AreaCode.
+//   - role_in_document_area: the same query, scoped to subjectArea (the
+//     submitting document/template's resolved area) instead of a
+//     selector-carried area.
+//   - submit_choice: contributes no pool at snapshot time (slice 5 unions
+//     the caller-chosen actors in at submit) — skipped entirely, never an
+//     error.
+//
+// Single-tx, non-recording read (H-PRE-1): no authz.Require inside.
+func (r *postgresApprovalRepository) ResolveEligibleActorsForSelectors(ctx context.Context, tx db.Tx, tenantID string, selectors []domain.ActorSelector, subjectArea string) ([]string, error) {
+	pools := make([][]string, 0, len(selectors))
+	for _, sel := range selectors {
+		switch sel.Kind {
+		case domain.SelectorNamedUser:
+			active, err := r.isActiveUser(ctx, tx, tenantID, sel.UserID)
+			if err != nil {
+				return []string{}, fmt.Errorf("resolveEligibleActorsForSelectors: named_user: %w", err)
+			}
+			if active {
+				pools = append(pools, []string{sel.UserID})
+			}
+		case domain.SelectorRoleInFixedArea:
+			ids, err := r.ResolveEligibleActors(ctx, tx, tenantID, sel.AreaCode, sel.Role)
+			if err != nil {
+				return []string{}, fmt.Errorf("resolveEligibleActorsForSelectors: role_in_fixed_area: %w", err)
+			}
+			pools = append(pools, ids)
+		case domain.SelectorRoleInDocumentArea:
+			ids, err := r.ResolveEligibleActors(ctx, tx, tenantID, subjectArea, sel.Role)
+			if err != nil {
+				return []string{}, fmt.Errorf("resolveEligibleActorsForSelectors: role_in_document_area: %w", err)
+			}
+			pools = append(pools, ids)
+		case domain.SelectorSubmitChoice:
+			// Contributes nothing at snapshot time (slice 5).
+		}
+	}
+	return unionDedupSort(pools...), nil
+}
+
+// ValidateSubmitChoiceActors (M4, unit 3.2, slice 5) resolves the constraint
+// pool for a submit_choice selector (the same active role x area_code query
+// ResolveEligibleActors/the role_in_fixed_area branch uses, selector.Role x
+// selector.AreaCode) and checks every id in userIDs is a member of that pool.
+// Fail-closed: if ANY id is not a member, returns
+// domain.ErrSubmitChoiceConstraintViolated and no ids. On success returns the
+// deduped, ascending-sorted validated ids (never nil). Single-tx, non-
+// recording read (H-PRE-1): no authz.Require inside.
+func (r *postgresApprovalRepository) ValidateSubmitChoiceActors(ctx context.Context, tx db.Tx, tenantID string, selector domain.ActorSelector, userIDs []string) ([]string, error) {
+	pool, err := r.ResolveEligibleActors(ctx, tx, tenantID, selector.AreaCode, selector.Role)
+	if err != nil {
+		return nil, fmt.Errorf("validateSubmitChoiceActors: %w", err)
+	}
+	poolSet := make(map[string]struct{}, len(pool))
+	for _, id := range pool {
+		poolSet[id] = struct{}{}
+	}
+	for _, id := range userIDs {
+		if _, ok := poolSet[id]; !ok {
+			return nil, domain.ErrSubmitChoiceConstraintViolated
+		}
+	}
+	return unionDedupSort(userIDs), nil
+}
+
+// isActiveUser reports whether userID is an active member of tenantID, per
+// metaldocs.v_active_user_areas (the same published active-membership view
+// ResolveEligibleActors trusts).
+func (r *postgresApprovalRepository) isActiveUser(ctx context.Context, tx db.Tx, tenantID, userID string) (bool, error) {
+	var found string
+	err := tx.QueryRowContext(ctx,
+		`SELECT user_id
+		   FROM metaldocs.v_active_user_areas
+		  WHERE tenant_id = $1::uuid
+		    AND user_id   = $2
+		  LIMIT 1`,
+		tenantID, userID,
+	).Scan(&found)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// unionDedupSort is the pure union+dedup+sort core of
+// ResolveEligibleActorsForSelectors, split out so it is unit-testable
+// without a DB. Returns [] (never nil) for no input pools.
+func unionDedupSort(pools ...[]string) []string {
+	seen := make(map[string]struct{})
+	for _, pool := range pools {
+		for _, id := range pool {
+			seen[id] = struct{}{}
+		}
+	}
+	ids := make([]string, 0, len(seen))
+	for id := range seen {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
 // LoadControlledDocumentID returns documents.controlled_document_id for
 // (tenantID, documentID) inside the caller's transaction. ok is false when the
 // document row is absent or the controlled-document link is NULL. Plain
@@ -1903,11 +2078,11 @@ func (r *postgresApprovalRepository) LoadRoute(ctx context.Context, tx db.Tx, te
 	var subjectKind, subjectKey string
 	var profileCode sql.NullString
 	err := tx.QueryRowContext(ctx, `
-		SELECT id, tenant_id, profile_code, version, subject_kind, subject_key
+		SELECT id, name, tenant_id, profile_code, version, subject_kind, subject_key
 		FROM approval_routes
 		WHERE id = $1 AND tenant_id = $2 AND active = TRUE`,
 		routeID, tenantID,
-	).Scan(&route.ID, &route.TenantID, &profileCode, &route.Version, &subjectKind, &subjectKey)
+	).Scan(&route.ID, &route.Name, &route.TenantID, &profileCode, &route.Version, &subjectKind, &subjectKey)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.Route{}, fmt.Errorf("route %s not found for tenant %s", routeID, tenantID)
@@ -1926,8 +2101,8 @@ func (r *postgresApprovalRepository) LoadRoute(ctx context.Context, tx db.Tx, te
 	route.Subject = domain.Subject{Kind: domain.SubjectKind(subjectKind), Key: subjectKey}
 
 	rows, err := tx.QueryContext(ctx, `
-		SELECT ars.stage_order, ars.name, ars.required_role, ars.required_capability,
-		       ars.area_code, ars.quorum, ars.quorum_m, ars.on_eligibility_drift,
+		SELECT ars.id, ars.stage_order, ars.name, ars.required_capability,
+		       ars.quorum, ars.quorum_m, ars.on_eligibility_drift,
 		       ars.stage_kind, ars.due_in_days
 		  FROM approval_route_stages ars
 		  JOIN approval_routes ar
@@ -1942,14 +2117,16 @@ func (r *postgresApprovalRepository) LoadRoute(ctx context.Context, tx db.Tx, te
 	}
 	defer rows.Close()
 
+	var stageIDs []string
 	for rows.Next() {
 		var stage domain.Stage
+		var stageID string
 		var quorumM sql.NullInt32
 		var dueInDays sql.NullInt32
 		var kindStr string
 		if err := rows.Scan(
-			&stage.Order, &stage.Name, &stage.RequiredRole, &stage.RequiredCapability,
-			&stage.AreaCode, &stage.Quorum, &quorumM, &stage.OnEligibilityDrift,
+			&stageID, &stage.Order, &stage.Name, &stage.RequiredCapability,
+			&stage.Quorum, &quorumM, &stage.OnEligibilityDrift,
 			&kindStr, &dueInDays,
 		); err != nil {
 			return domain.Route{}, err
@@ -1964,12 +2141,66 @@ func (r *postgresApprovalRepository) LoadRoute(ctx context.Context, tx db.Tx, te
 			stage.DueInDays = &v
 		}
 		route.Stages = append(route.Stages, stage)
+		stageIDs = append(stageIDs, stageID)
 	}
 	if err := rows.Err(); err != nil {
 		return domain.Route{}, err
 	}
 
+	if len(stageIDs) > 0 {
+		selectorsByStageID, err := loadRouteStageSelectors(ctx, tx, stageIDs)
+		if err != nil {
+			return domain.Route{}, err
+		}
+		for i, stageID := range stageIDs {
+			route.Stages[i].Selectors = selectorsByStageID[stageID]
+		}
+	}
+
 	return route, nil
+}
+
+// loadRouteStageSelectors batch-loads the ActorSelector rows for every stage
+// id in stageIDs (unit 3.2 M4, B2 DB expand), keyed by route_stage_id and
+// ordered by selector_order — the single-query idiom already used elsewhere
+// in this file for batch-by-ids loads (e.g. LoadInstancesByIDs), avoiding an
+// N+1 per stage.
+func loadRouteStageSelectors(ctx context.Context, tx db.Tx, stageIDs []string) (map[string][]domain.ActorSelector, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT route_stage_id, kind, user_id, role, area_code
+		  FROM approval_route_stage_selectors
+		 WHERE route_stage_id = ANY($1)
+		 ORDER BY route_stage_id, selector_order ASC`,
+		pq.Array(stageIDs),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("load route stage selectors: %w", err)
+	}
+	defer rows.Close()
+
+	out := make(map[string][]domain.ActorSelector, len(stageIDs))
+	for rows.Next() {
+		var stageID, kind string
+		var userID, role, areaCode sql.NullString
+		if err := rows.Scan(&stageID, &kind, &userID, &role, &areaCode); err != nil {
+			return nil, fmt.Errorf("scan route stage selector: %w", err)
+		}
+		sel := domain.ActorSelector{Kind: domain.SelectorKind(kind)}
+		if userID.Valid {
+			sel.UserID = userID.String
+		}
+		if role.Valid {
+			sel.Role = role.String
+		}
+		if areaCode.Valid {
+			sel.AreaCode = areaCode.String
+		}
+		out[stageID] = append(out[stageID], sel)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate route stage selectors: %w", err)
+	}
+	return out, nil
 }
 
 // ── F9 delegation (ADR 0077) ─────────────────────────────────────────────────

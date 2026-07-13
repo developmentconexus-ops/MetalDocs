@@ -3,6 +3,7 @@ import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { Dialog } from '../../../../components/ui';
 import { resolveErrorMessage } from '../../../../lib/api/problem';
 import { useAreasQuery } from '../../../documents/queries/useAreasQuery';
+import { useUsersQuery } from '../../../iam/queries/useUsersQuery';
 import { useProfilesQuery } from '../../../taxonomy/queries/useProfilesQuery';
 import { useIamRolesQuery } from '../../queries/useIamRolesQuery';
 import type { CreateRouteRequest, RouteSummary, UpdateRouteRequest } from '../../api/routeAdminApi';
@@ -66,10 +67,12 @@ export function RouteEditorDialog({
   const rolesQuery = useIamRolesQuery();
   const areasQuery = useAreasQuery();
   const profilesQuery = useProfilesQuery();
+  const usersQuery = useUsersQuery({ is_active: true });
 
   const roleOptions = rolesQuery.data ?? [];
   const areaOptions = areasQuery.data ?? [];
   const profileOptions = profilesQuery.data ?? [];
+  const userOptions = usersQuery.data?.items ?? [];
   const hasNoProfiles = !profilesQuery.isLoading && !profilesQuery.isError && profileOptions.length === 0;
 
   // Governance class is only known when `draft.profileCode` matches an active
@@ -195,6 +198,12 @@ export function RouteEditorDialog({
         </div>
       ) : null}
 
+      {usersQuery.isError ? (
+        <div className={styles.warningBox} role="alert">
+          Não foi possível carregar a lista de usuários. Recarregue a página para tentar novamente.
+        </div>
+      ) : null}
+
       <form id="route-editor-form" className={styles.form} onSubmit={handleSubmit} noValidate>
         <label className={styles.fieldLabel} htmlFor="route-name">
           Nome da rota
@@ -294,6 +303,8 @@ export function RouteEditorDialog({
               roleOptionsLoading={rolesQuery.isLoading}
               areaOptions={areaOptions}
               areaOptionsLoading={areasQuery.isLoading}
+              userOptions={userOptions}
+              userOptionsLoading={usersQuery.isLoading}
               updateStage={updateStage}
               removeStage={removeStage}
             />

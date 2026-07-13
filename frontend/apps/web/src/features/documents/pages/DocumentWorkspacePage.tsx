@@ -17,6 +17,12 @@ import { deriveWorkspaceMode } from '../../approval/lib/workspaceMode';
 import { deriveFastForwardOffer } from '../../approval/lib/fastForwardOffer';
 import { useSignoffMutation } from '../../approval/hooks/useSignoffMutation';
 import { submit as submitForReviewRequest } from '../../approval/api/approvalApi';
+import { useDocumentApprovalPreviewQuery } from '../../approval/queries/useDocumentApprovalPreviewQuery';
+import {
+  SubmitChoicePicker,
+  isSubmitChoiceSelectionComplete,
+  submitChoiceStagesOf,
+} from '../../approval/components/SubmitChoicePicker';
 import type { DocumentDetail } from '../api/documents';
 import { AutosaveStatus, editorChromeStyles, type AutosaveState } from '../../shared/components/editor-chrome';
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
@@ -65,6 +71,9 @@ const OFFICIAL_PDF_STATUSES = new Set(['approved', 'scheduled', 'published']);
 // via the shared transport) is unchanged; only its host screen moved.
 type SubmitDocumentRequest = components['schemas']['SubmitDocumentRequest'];
 type ReasonCategory = NonNullable<SubmitDocumentRequest['reason_category']>;
+// SLICE 8b (unit 3.2) — the submit_choice picker's emitted shape, symmetric
+// with the request wire field.
+type SubmitChosenActors = components['schemas']['SubmitChosenActors'];
 
 const REASON_CATEGORY_OPTIONS: Array<{ value: ReasonCategory; label: string }> = [
   { value: 'content', label: 'Conteúdo' },
@@ -189,6 +198,21 @@ export function DocumentWorkspacePage() {
   const [reasonCategoryInput, setReasonCategoryInput] = useState('');
   const [reasonCategoryError, setReasonCategoryError] = useState<string | null>(null);
   const skipInitialEditorChangeRef = useRef(false);
+
+  // SLICE 8b (unit 3.2) — submit-time preview so the dialog can build a
+  // chosen_actors picker for any submit_choice-governed stage BEFORE the
+  // caller actually POSTs /submit. Enabled only while the document is still a
+  // draft (the only state submit-for-review is offered from).
+  const approvalPreviewQuery = useDocumentApprovalPreviewQuery(documentId, docStatus === 'draft');
+  const submitChoiceStages = submitChoiceStagesOf(approvalPreviewQuery.data);
+  // Race guard (review MAJOR): submitChoiceStagesOf(undefined) is [] while the
+  // preview is still loading, which would let the fast path submit with
+  // chosen_actors omitted and hit a backend 422 for a submit_choice route.
+  // Block submit for a draft until the preview resolves so the stage set is
+  // authoritative. UX gating only — the backend stays the sole authority.
+  const previewNotReady = docStatus === 'draft' && !approvalPreviewQuery.isSuccess;
+  const [chosenActors, setChosenActors] = useState<SubmitChosenActors[]>([]);
+  const [attemptedSubmitChoice, setAttemptedSubmitChoice] = useState(false);
 
   // Dirty-guard resets whenever the current revision changes (a fresh buffer
   // load is imminent) — mirrors the retired editor's per-buffer reset.
@@ -328,6 +352,8 @@ export function DocumentWorkspacePage() {
       setReasonForChangeError(null);
       setReasonCategoryInput('');
       setReasonCategoryError(null);
+      setChosenActors([]);
+      setAttemptedSubmitChoice(false);
       toast.success('Documento submetido para revisão.');
     } catch (err) {
       if (err instanceof ApiError) {
@@ -348,11 +374,18 @@ export function DocumentWorkspacePage() {
     }
   }
 
+  // Governed-revision fields (title/reason/category) are only required by the
+  // backend for revision_number >= 1 — a brand-new draft's first submission
+  // carries none of them. A submit_choice-governed stage is orthogonal to
+  // that: it can appear on revision 0 too, so the dialog also opens whenever
+  // the resolved preview has any such stage, even for a first submission.
+  const requiresRevisionFields = (doc?.revision_number ?? 0) > 0;
+
   function handleSubmitForReview() {
     if (isSubmitting) return;
-    // First submission of a brand-new draft carries no governed revision reason;
-    // a resubmit of an existing revision requires title + reason via the dialog.
-    if ((doc?.revision_number ?? 0) === 0) {
+    // Never submit while the resolved route is unknown — see previewNotReady.
+    if (previewNotReady) return;
+    if (!requiresRevisionFields && submitChoiceStages.length === 0) {
       void submitForReview({});
       return;
     }
@@ -362,27 +395,48 @@ export function DocumentWorkspacePage() {
     setReasonForChangeError(null);
     setReasonCategoryInput('');
     setReasonCategoryError(null);
+    setChosenActors([]);
+    setAttemptedSubmitChoice(false);
     setRevisionDialogOpen(true);
   }
 
   function handleConfirmSubmitForReview() {
     if (isSubmitting) return;
+    // Defensive: the dialog only opens once the preview resolved, but never
+    // submit against a still-loading route.
+    if (previewNotReady) return;
     const trimmedTitle = revisionTitleInput.trim();
     const trimmedReason = reasonForChangeInput.trim();
     let hasError = false;
-    if (!trimmedTitle) {
-      setRevisionTitleError('Informe o título da revisão para submeter.');
-      hasError = true;
+    if (requiresRevisionFields) {
+      if (!trimmedTitle) {
+        setRevisionTitleError('Informe o título da revisão para submeter.');
+        hasError = true;
+      }
+      if (!trimmedReason) {
+        setReasonForChangeError('Informe o motivo da alteração para submeter.');
+        hasError = true;
+      }
     }
-    if (!trimmedReason) {
-      setReasonForChangeError('Informe o motivo da alteração para submeter.');
+    // Friendly first line mirroring the backend's fail-closed 422: a
+    // submit_choice stage with no (or empty) chosen_actors entry is rejected
+    // server-side. Never bypassed — this only blocks the click early.
+    if (!isSubmitChoiceSelectionComplete(submitChoiceStages, chosenActors)) {
+      setAttemptedSubmitChoice(true);
       hasError = true;
     }
     if (hasError) return;
     const body: SubmitDocumentRequest = {
-      revision_title: trimmedTitle,
-      reason_for_change: trimmedReason,
-      ...(reasonCategoryInput ? { reason_category: reasonCategoryInput as ReasonCategory } : {}),
+      ...(requiresRevisionFields
+        ? {
+            revision_title: trimmedTitle,
+            reason_for_change: trimmedReason,
+            ...(reasonCategoryInput ? { reason_category: reasonCategoryInput as ReasonCategory } : {}),
+          }
+        : {}),
+      // Omit chosen_actors entirely when the route has no submit_choice stage
+      // — no synthesized empty-array fallback.
+      ...(submitChoiceStages.length > 0 ? { chosen_actors: chosenActors } : {}),
     };
     void submitForReview(body);
   }
@@ -496,9 +550,9 @@ export function DocumentWorkspacePage() {
                     type="button"
                     className={editorChromeStyles.primaryBtn}
                     onClick={handleSubmitForReview}
-                    disabled={!canEditContent || isSubmitting || requestedChangesBlocksSubmit}
+                    disabled={!canEditContent || isSubmitting || requestedChangesBlocksSubmit || previewNotReady}
                   >
-                    Submeter para revisão
+                    {previewNotReady ? 'Carregando rota de aprovação…' : 'Submeter para revisão'}
                   </button>
                 </>
               ) : null}
@@ -594,49 +648,62 @@ export function DocumentWorkspacePage() {
       {revisionDialogOpen ? (
         <div className={styles.dialogBackdrop} role="presentation">
           <div className={styles.dialogPanel} role="dialog" aria-modal="true" aria-labelledby="revision-title-dialog-title">
-            <h2 id="revision-title-dialog-title" className={styles.dialogTitle}>Título da revisão</h2>
-            <p className={styles.dialogText}>Informe o motivo governado desta revisão antes de submeter o documento para aprovação.</p>
-            <label className={styles.dialogField}>
-              <span>Título</span>
-              <input
-                type="text"
-                value={revisionTitleInput}
-                onChange={(event) => {
-                  setRevisionTitleInput(event.target.value);
-                  if (revisionTitleError) setRevisionTitleError(null);
-                }}
-                placeholder="Ex.: Ajuste de procedimento operacional"
-              />
-            </label>
-            {revisionTitleError ? <p role="alert" className={styles.dialogError}>{revisionTitleError}</p> : null}
-            <label className={styles.dialogField}>
-              <span>Motivo da alteração</span>
-              <textarea
-                value={reasonForChangeInput}
-                onChange={(event) => {
-                  setReasonForChangeInput(event.target.value);
-                  if (reasonForChangeError) setReasonForChangeError(null);
-                }}
-                placeholder="Descreva o motivo desta alteração governada"
-              />
-            </label>
-            {reasonForChangeError ? <p role="alert" className={styles.dialogError}>{reasonForChangeError}</p> : null}
-            <label className={styles.dialogField}>
-              <span>Categoria</span>
-              <select
-                value={reasonCategoryInput}
-                onChange={(event) => {
-                  setReasonCategoryInput(event.target.value);
-                  if (reasonCategoryError) setReasonCategoryError(null);
-                }}
-              >
-                <option value="">— Selecionar —</option>
-                {REASON_CATEGORY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </label>
-            {reasonCategoryError ? <p role="alert" className={styles.dialogError}>{reasonCategoryError}</p> : null}
+            <h2 id="revision-title-dialog-title" className={styles.dialogTitle}>
+              {requiresRevisionFields ? 'Título da revisão' : 'Submeter para aprovação'}
+            </h2>
+            {requiresRevisionFields ? (
+              <>
+                <p className={styles.dialogText}>Informe o motivo governado desta revisão antes de submeter o documento para aprovação.</p>
+                <label className={styles.dialogField}>
+                  <span>Título</span>
+                  <input
+                    type="text"
+                    value={revisionTitleInput}
+                    onChange={(event) => {
+                      setRevisionTitleInput(event.target.value);
+                      if (revisionTitleError) setRevisionTitleError(null);
+                    }}
+                    placeholder="Ex.: Ajuste de procedimento operacional"
+                  />
+                </label>
+                {revisionTitleError ? <p role="alert" className={styles.dialogError}>{revisionTitleError}</p> : null}
+                <label className={styles.dialogField}>
+                  <span>Motivo da alteração</span>
+                  <textarea
+                    value={reasonForChangeInput}
+                    onChange={(event) => {
+                      setReasonForChangeInput(event.target.value);
+                      if (reasonForChangeError) setReasonForChangeError(null);
+                    }}
+                    placeholder="Descreva o motivo desta alteração governada"
+                  />
+                </label>
+                {reasonForChangeError ? <p role="alert" className={styles.dialogError}>{reasonForChangeError}</p> : null}
+                <label className={styles.dialogField}>
+                  <span>Categoria</span>
+                  <select
+                    value={reasonCategoryInput}
+                    onChange={(event) => {
+                      setReasonCategoryInput(event.target.value);
+                      if (reasonCategoryError) setReasonCategoryError(null);
+                    }}
+                  >
+                    <option value="">— Selecionar —</option>
+                    {REASON_CATEGORY_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+                {reasonCategoryError ? <p role="alert" className={styles.dialogError}>{reasonCategoryError}</p> : null}
+              </>
+            ) : null}
+            <SubmitChoicePicker
+              stages={submitChoiceStages}
+              value={chosenActors}
+              onChange={setChosenActors}
+              showValidation={attemptedSubmitChoice}
+              disabled={isSubmitting}
+            />
             <div className={styles.dialogActions}>
               <button type="button" className={styles.dialogSecondaryBtn} onClick={() => setRevisionDialogOpen(false)}>
                 Cancelar
