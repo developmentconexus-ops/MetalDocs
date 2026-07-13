@@ -73,12 +73,12 @@ subagents dispatched by the hub are **git read-only** (diff/show/log; never chec
 — an acceptance reviewer once contaminated the main index via checkout). Comms autonomy:
 `mcp__ccd_session_mgmt__send_message` (+ `list_sessions`, `get_session`,
 `search_session_transcripts`) are allowlisted in the committed `.claude/settings.json`
-`permissions.allow`, so hub↔chip protocol messages run without per-send operator confirmation;
-chips inherit the allowlist via their worktree checkout (chips forked before that commit still
-prompt — acceptable, they drain out). If the host client hard-enforces a confirmation regardless
-of allowlist, that residual prompt is a client limitation, not doctrine — never reroute comms
-through side-channel files to dodge it. Operator oversight lives in the transcripts: every
-protocol message is visible in both sessions. Chip→hub delivery remains next-turn-processed.
+`permissions.allow`, but the desktop client hard-enforces per-send confirmation regardless of
+permission mode ("requires explicit approval regardless of permission mode" — verified
+2026-07-12). Known friction, CONFIRMED client limitation: the operator approves each
+`send_message` with one click (Ctrl+Enter); never reroute comms through side-channel files to
+dodge it. Sessions keep protocol messages few and batched — one event message per state change,
+no chatter. Chip→hub delivery remains next-turn-processed.
 
 **Hub bootstrap:** any fresh session becomes the hub via the `harness-hub` skill
 (`.claude/skills/harness-hub/SKILL.md`) — it reconstructs hub state from repo truth (this file,
