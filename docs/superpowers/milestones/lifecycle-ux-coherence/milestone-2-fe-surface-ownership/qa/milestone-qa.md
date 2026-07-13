@@ -117,6 +117,6 @@ rev-of-published fixture. Both defers have triggers/owners and do not gate close
 - Handed back to the main session to flip M2 status and present the HS-1 operator gate.
 
 > **Main-session actions (post-verdict, NOT the validator's):**
-> - Operator gate (HS-1): pending
-> - Status flipped in `README.md`: no — main session, only on this PASS
+> - Operator gate (HS-1): **APPROVED 2026-07-13** (operator, hub session)
+> - Status flipped in `README.md`: yes — passed (2026-07-13)
 > - Commits remain local; do not push (program rule); HS-1 before M3.
