@@ -90,7 +90,7 @@ func NewServices(repo infrastructure.ApprovalRepository, emitter EventEmitter, c
 		Supersede:      &SupersedeService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
 		Obsolete:       &ObsoleteService{repo: repo, emitter: emitter, clock: clock},
 		Cancel:         newCancelService(repo, emitter, clock),
-		Read:           newReadService(repo, cdRead),
+		Read:           newReadService(repo, cdRead, nil),
 		RouteAdmin:     &RouteAdminService{repo: repo, emitter: emitter, clock: clock},
 		MarkReviewed:   NewMarkReviewedService(emitter, clock),
 		ReviewVerdict:  reviewVerdict,
@@ -169,6 +169,14 @@ func (s *Services) WithTemplateVersionReader(reader TemplateVersionReader) *Serv
 	// pin during signoff.
 	if s.Decision != nil {
 		s.Decision = s.Decision.WithTemplateVersionReader(reader)
+	}
+	// Unit 4.2: Read's ListWorklist reuses the same port's
+	// LoadTemplateInboxMeta to resolve template-subject rows' display
+	// metadata. The composition root's single WithTemplateVersionReader call
+	// (apps/api/cmd/metaldocs-api/main.go) wires this with no change needed
+	// there.
+	if s.Read != nil {
+		s.Read.templateRead = reader
 	}
 	return s
 }

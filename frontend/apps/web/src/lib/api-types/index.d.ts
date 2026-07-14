@@ -3552,11 +3552,22 @@ export interface components {
         ApprovalInboxItem: {
             /** Format: uuid */
             instance_id: string;
-            /** Format: uuid */
-            document_id: string;
-            /** Format: uuid */
-            controlled_document_id: string;
-            document_title: string;
+            /**
+             * @description Unit 4.2 — the approval instance's subject discriminator (ai.subject_kind).
+             * @enum {string}
+             */
+            subject_kind: "document" | "template";
+            /** @description Unit 4.2 — the kernel subject key (ai.subject_key): documentId for document instances, template version id for template instances. */
+            subject_key: string;
+            /** @description Unit 4.2 — display name: the document name for document instances, the template name for template instances. */
+            subject_title: string;
+            /** @description Unit 4.2 — the FE navigation id: documentId for document instances, templateId for template instances (NOT the version id). */
+            subject_ref: string;
+            /**
+             * Format: uuid
+             * @description Document instances only; always present, null for template instances.
+             */
+            controlled_document_id: string | null;
             area_code: string;
             submitted_by: string;
             /** Format: date-time */
@@ -3568,7 +3579,7 @@ export interface components {
              * @description F8 (spec.md §4/W4) — the actor's pending stage's kind.
              * @enum {string}
              */
-            stage_kind?: "review" | "approval";
+            stage_kind: "review" | "approval";
             /**
              * Format: date-time
              * @description F8 (spec.md §4/W4) — the actor's pending stage's SLA due date, if configured (due_in_days_snapshot non-null). null when no SLA is configured for the stage (no-fallback principle, spec §11: never a substitute default).

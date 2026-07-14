@@ -44,6 +44,15 @@ type TemplateVersionReader interface {
 	// ok is false when no row matches (absent id, cross-tenant id, or an
 	// empty/never-set hash).
 	LoadTemplateVersionContentHash(ctx context.Context, tx db.Tx, tenantID, templateVersionID string) (contentHash string, ok bool, err error)
+
+	// LoadTemplateInboxMeta (Unit 4.2) batch-resolves display metadata for the
+	// worklist/inbox: for each of versionIDs, the owning template's id and
+	// name, scoped to tenantID, read inside the caller's transaction. A
+	// version id absent from versionIDs, not found, or belonging to another
+	// tenant is simply OMITTED from the returned map — not an error — mirroring
+	// the not-found shape of the other two methods on this port (no-fallback
+	// principle: a missing row never resolves to a substitute value).
+	LoadTemplateInboxMeta(ctx context.Context, tx db.Tx, tenantID string, versionIDs []string) (map[string]domain.TemplateInboxMeta, error)
 }
 
 // TemplateVersionSubmitWriter is the approval-owned port through which the

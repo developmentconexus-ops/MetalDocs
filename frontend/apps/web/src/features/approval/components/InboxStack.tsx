@@ -147,9 +147,11 @@ export function InboxStack({
               <div className={styles.queueItemNumber}>{String(idx + 1).padStart(2, '0')}</div>
                 <div className={styles.queueItemMeta}>
                   <div className={styles.queueItemTop}>
-                    <span className={`${styles.queueItemCode} mono`}>{item.controlled_document_id}</span>
+                    <span className={`${styles.queueItemCode} mono`}>
+                      {item.subject_kind === 'document' ? item.controlled_document_id : item.subject_ref}
+                    </span>
                   </div>
-                  <div className={styles.queueItemTitle}>{item.document_title}</div>
+                  <div className={styles.queueItemTitle}>{item.subject_title}</div>
                   <div className={styles.queueItemSub}>
                     <span className={styles.queueItemDeadline}>
                       {new Date(item.submitted_at).toLocaleDateString('pt-BR')}

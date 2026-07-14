@@ -81,3 +81,16 @@ func (s Subject) String() string {
 func (s Subject) Equal(other Subject) bool {
 	return s.Kind == other.Kind && s.Key == other.Key
 }
+
+// TemplateInboxMeta (Unit 4.2) carries the display metadata the worklist/inbox
+// read-model needs for a template-subject approval instance: the owning
+// template's id (TemplateID — the FE navigation target, NOT the version id)
+// and its human name (Title). It lives in domain (a leaf package) so the
+// approval-owned TemplateVersionReader port can return it while the
+// templates-side adapter implements it, without templates/infrastructure
+// having to import approval/application — that edge would cycle with the
+// existing approval test → templates/infrastructure import.
+type TemplateInboxMeta struct {
+	TemplateID string
+	Title      string
+}

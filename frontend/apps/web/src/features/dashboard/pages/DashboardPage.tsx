@@ -52,7 +52,14 @@ function pendingLabel(count: number): string {
 
 function PendingRow({ item, rank }: { item: InboxItem; rank: number }) {
   const navigate = useNavigate();
-  const code = item.controlled_document_id;
+  // Unit 4.2 subject-generic: document rows carry a controlled_document_id
+  // code; template rows carry none (null) and identify by subject_ref
+  // (templateId). controlled_document_id is contractually non-null for every
+  // document row — a null here means the wire drifted, so render an honest
+  // non-value rather than a blank that reads as a working row
+  // (no-fallback-principle).
+  const code =
+    item.subject_kind === 'document' ? (item.controlled_document_id ?? '—') : item.subject_ref;
   const kind = getKindFromCode(code);
   const urgent = isUrgent(item.submitted_at);
   const submittedAgo = formatRelative(item.submitted_at);
@@ -72,7 +79,7 @@ function PendingRow({ item, rank }: { item: InboxItem; rank: number }) {
 
       <div>
         <div className={styles.itemCode}>{code}</div>
-        <h3 className={styles.itemTitle}>{item.document_title}</h3>
+        <h3 className={styles.itemTitle}>{item.subject_title}</h3>
         <div className={styles.itemMeta}>
           <span style={{ color: 'var(--text-soft)', fontWeight: 500 }}>{item.submitted_by}</span>
           <span className={styles.itemMetaSep}>—</span>

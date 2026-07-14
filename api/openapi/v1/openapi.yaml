@@ -6880,12 +6880,33 @@ components:
           description: Final outcome of the signature leg (same vocabulary as signoff).
     ApprovalInboxItem:
       type: object
-      required: [instance_id, document_id, controlled_document_id, document_title, area_code, submitted_by, submitted_at, stage_label, quorum_progress, due_at]
+      required: [instance_id, subject_kind, subject_key, subject_title, subject_ref, controlled_document_id, area_code, submitted_by, submitted_at, stage_label, quorum_progress, stage_kind, due_at]
       properties:
         instance_id: { type: string, format: uuid }
-        document_id: { type: string, format: uuid }
-        controlled_document_id: { type: string, format: uuid }
-        document_title: { type: string }
+        subject_kind:
+          type: string
+          enum: [document, template]
+          description: Unit 4.2 — the approval instance's subject discriminator (ai.subject_kind).
+        subject_key:
+          type: string
+          description: >-
+            Unit 4.2 — the kernel subject key (ai.subject_key): documentId for
+            document instances, template version id for template instances.
+        subject_title:
+          type: string
+          description: >-
+            Unit 4.2 — display name: the document name for document instances,
+            the template name for template instances.
+        subject_ref:
+          type: string
+          description: >-
+            Unit 4.2 — the FE navigation id: documentId for document
+            instances, templateId for template instances (NOT the version id).
+        controlled_document_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Document instances only; always present, null for template instances.
         area_code: { type: string }
         submitted_by: { type: string }
         submitted_at: { type: string, format: date-time }

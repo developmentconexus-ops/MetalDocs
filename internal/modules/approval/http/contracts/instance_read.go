@@ -140,20 +140,40 @@ type SignoffRecord struct {
 	SignatureMeaning string          `json:"signature_meaning"`
 }
 
-// InboxItem is one row of an approver's inbox listing.
+// InboxItem is one row of an approver's inbox listing. Unit 4.2 made this
+// subject-generic: SubjectKind/SubjectKey/SubjectTitle/SubjectRef cover both
+// document and template instances; ControlledDocumentID stays document-only
+// (explicit null for template rows). document_id/document_title were DROPPED (hard
+// break, no relax-to-optional compat — the sole consumer, the approval inbox
+// FE, is updated in the same unit).
 type InboxItem struct {
-	InstanceID           string `json:"instance_id"`
-	DocumentID           string `json:"document_id"`
-	ControlledDocumentID string `json:"controlled_document_id"`
-	DocumentTitle        string `json:"document_title"`
-	AreaCode             string `json:"area_code"`
-	SubmittedBy          string `json:"submitted_by"`
-	SubmittedAt          string `json:"submitted_at"`
-	StageLabel           string `json:"stage_label"`
-	QuorumProgress       string `json:"quorum_progress"`
-	// StageKind (F8, spec.md §4/W4): review or approval, omitted when unknown
-	// (defensive; the service always populates it from the stage snapshot).
-	StageKind string `json:"stage_kind,omitempty"`
+	InstanceID string `json:"instance_id"`
+	// SubjectKind is the instance's subject discriminator: "document" or
+	// "template".
+	SubjectKind string `json:"subject_kind"`
+	// SubjectKey is the kernel subject key: documentId for document
+	// instances, template version id for template instances.
+	SubjectKey string `json:"subject_key"`
+	// SubjectTitle is the display name: document name or template name.
+	SubjectTitle string `json:"subject_title"`
+	// SubjectRef is the FE navigation id: documentId for document instances,
+	// templateId for template instances (NOT the version id).
+	SubjectRef string `json:"subject_ref"`
+	// ControlledDocumentID is document-instance-only. Required-and-nullable on
+	// the wire (present as explicit null, never omitted) — null for template
+	// rows (legacy-fallback-extermination: no relax-to-optional / dropped key).
+	ControlledDocumentID *string `json:"controlled_document_id"`
+	AreaCode             string  `json:"area_code"`
+	SubmittedBy          string  `json:"submitted_by"`
+	SubmittedAt          string  `json:"submitted_at"`
+	StageLabel           string  `json:"stage_label"`
+	QuorumProgress       string  `json:"quorum_progress"`
+	// StageKind (F8, spec.md §4/W4): review or approval. Required on the wire
+	// (unit 4.2) — approval_stage_instances.stage_kind is NOT NULL DEFAULT
+	// 'approval' (0286), so the service always populates it from the stage
+	// snapshot. No omitempty: dropping the key would contradict the openapi
+	// `required` list.
+	StageKind string `json:"stage_kind"`
 	// DueAt (F8, spec.md §4/W4): RFC3339 UTC SLA due date. Required-and-nullable
 	// on the wire (present as explicit null, never omitted) — nil when no SLA is
 	// configured for the stage (no-fallback principle, spec §11).
