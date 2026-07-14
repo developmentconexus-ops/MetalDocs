@@ -124,6 +124,14 @@ ROADMAP, git incl. orphaned `worktree-agent-*` branches, task board, live chip s
 stack health) and runs the loop below. One hub at a time; a new hub first confirms the old hub
 session is not mid-merge.
 
+**Hub commit hygiene (gotcha, 2026-07-14):** launching a Transport-B chip from the hub's OWN main
+checkout can switch that working dir onto the chip's `claude/<name>` scaffold branch — a hub commit
+then lands on the wrong branch. The hub MUST verify `git branch --show-current == main` before
+every commit; if it drifted, `git checkout main` + `git merge --ff-only <scaffold-branch>` to
+absorb the stray (linear) commit, then continue. Scaffold branches the chips don't actually use
+(agents make their own `unit-*` worktrees) are inert — leave them, don't delete a branch a live
+chip session may reference.
+
 **Hub instrumentation:** the hub mirrors the ROADMAP queue as its own native task board
 (one task per unit, blockedBy = the roadmap's ordering locks), may inspect a running unit
 agent's transcript (`TaskOutput`) or a chip's (`list_events`, operator-approved) for audit,
