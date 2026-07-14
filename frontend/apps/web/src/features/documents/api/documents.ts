@@ -35,10 +35,6 @@ export async function renameDocument(id: string, name: string): Promise<void> {
     body: JSON.stringify({ name }),
   });
 }
-export async function archiveDocument(id: string) {
-  return apiFetch(`/api/v1/documents/${id}/archive`, { method: 'POST' });
-}
-
 export async function getDocumentRevisionHistory(id: string): Promise<DocumentRevisionHistoryResponse> {
   return apiFetch<DocumentRevisionHistoryResponse>(`/api/v1/documents/${id}/revision-history`);
 }

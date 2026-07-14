@@ -4,10 +4,6 @@
   height: 100%;
 }
 
-.withActivity {
-  grid-template-columns: 224px minmax(0, 1fr) 300px;
-}
-
 /* ─── Sidebar ─────────────────────────────────────────── */
 .sidebar {
   height: 100%;
@@ -139,7 +135,7 @@
 
 .tableHeader {
   display: grid;
-  grid-template-columns: 120px minmax(180px, 1fr) 100px 110px 120px 56px 36px;
+  grid-template-columns: 120px minmax(180px, 1fr) 100px 110px 120px 56px;
   min-width: 760px;
   gap: var(--sp-4);
   align-items: center;
@@ -155,7 +151,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: 120px minmax(180px, 1fr) 100px 110px 120px 56px 36px;
+  grid-template-columns: 120px minmax(180px, 1fr) 100px 110px 120px 56px;
   min-width: 760px;
   gap: var(--sp-4);
   align-items: center;
@@ -220,28 +216,6 @@
   color: var(--text-muted);
 }
 
-/* ─── More button ─────────────────────────────────────── */
-.moreBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: var(--r-2);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 1rem;
-  line-height: 1;
-  transition: background 0.1s, color 0.1s;
-}
-
-.moreBtn:hover {
-  background: var(--surface-3);
-  color: var(--text);
-}
-
 .dateCell {
   color: var(--text-muted);
   font-size: 0.78rem;
@@ -281,8 +255,7 @@
 
 /* ─── Responsive ──────────────────────────────────────── */
 @media (max-width: 900px) {
-  .root,
-  .withActivity {
+  .root {
     grid-template-columns: 1fr;
   }
   .sidebar {
