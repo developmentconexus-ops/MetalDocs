@@ -17,9 +17,10 @@ import (
 // the legal-transition trigger via session_replication_role.
 func TestTriggerBypassBlocked(t *testing.T) {
 	ctx := context.Background()
-	db, schema := testdb.Open(t)
+	db, dbName := testdb.Open(t)
+	ciDB := testdb.OpenAsCIRole(t, dbName)
 
-	tx, err := db.BeginTx(ctx, nil)
+	tx, err := ciDB.BeginTx(ctx, nil)
 	if err != nil {
 		t.Fatalf("begin tx: %v", err)
 	}
@@ -32,20 +33,20 @@ func TestTriggerBypassBlocked(t *testing.T) {
 		tenantID := testdb.DeterministicID(t, "tenant")
 		docID := testdb.DeterministicID(t, "doc")
 		userID := testdb.DeterministicID(t, "user")
-		testdb.SeedUser(t, ctx, db, schema, userID, "Trigger User")
-		testdb.SeedDocument(t, ctx, db, schema, docID, tenantID, userID)
+		testdb.SeedUser(t, ctx, db, dbName, userID, "Trigger User")
+		testdb.SeedDocument(t, ctx, db, dbName, docID, tenantID, userID)
 
 		if _, err := tx.ExecContext(ctx, fmt.Sprintf(`
 			UPDATE %s
 			   SET status = 'published'
 			 WHERE id = $1::uuid AND tenant_id = $2::uuid`,
-			testdb.Qualified(schema, "documents")),
+			testdb.Qualified(dbName, "documents")),
 			docID, tenantID,
 		); err == nil {
 			var status string
 			if err := tx.QueryRowContext(ctx, fmt.Sprintf(
 				`SELECT status FROM %s WHERE id = $1::uuid`,
-				testdb.Qualified(schema, "documents"),
+				testdb.Qualified(dbName, "documents"),
 			), docID).Scan(&status); err != nil {
 				t.Fatalf("read document status: %v", err)
 			}
