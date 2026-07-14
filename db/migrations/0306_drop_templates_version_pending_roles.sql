@@ -9,10 +9,19 @@
 -- ============================================================================
 -- PREMISE VERIFICATION (runtime truth, not assumed from docs)
 -- ============================================================================
---   - WRITE path: gone. Unit 3.1a S1 removed the create-time role seeding and
---     upsert path; S4 deleted the legacy approval routes/handlers and Service
---     methods that populated these columns. No code has written either column
---     since 3.1a landed.
+--   - WRITE path (product code): gone. Unit 3.1a S1 removed the create-time
+--     role seeding and upsert path; S4 deleted the legacy approval
+--     routes/handlers and Service methods that populated these columns. No Go
+--     code has written either column since 3.1a landed.
+--   - WRITE path (bootstrap seed): co-removed in THIS change-set. The curated
+--     bootstrap reference data (db/reference-data/0001_product_reference_data.sql)
+--     still carried a vestigial pending_approver_role='system' on the published
+--     system-blank-template version row -- a 3.1a-era leftover the role-routing
+--     retirement never cleaned. That write is removed in the same change-set as
+--     this DROP (the seed now omits both columns, taking their DB defaults),
+--     mirroring 0302's co-removal of the templates TenantDataPort DELETE:
+--     landing the DROP alone would have tripped the pre-drop assert on every
+--     fresh bootstrap. This is the only non-Go writer that existed.
 --   - READ path: gone. grep across internal/ apps/ frontend/ finds ZERO
 --     Go/TS non-test readers of pending_reviewer_role or pending_approver_role
 --     on public.templates_template_version -- only wiki/docs/the baseline
@@ -58,7 +67,7 @@ ALTER TABLE public.templates_template_version DROP COLUMN IF EXISTS pending_appr
 
 -- ── schema_migrations ledger ─────────────────────────────────────────────────
 INSERT INTO public.schema_migrations (version, description)
-VALUES ('0306', 'ROADMAP unit 4.4 (schema hygiene): drop public.templates_template_version.pending_reviewer_role/pending_approver_role behind a pre-drop emptiness assert -- legacy per-version role-routing columns retired since 3.1a (ADR 0082 phase c). Write-never since 3.1a S1/S4; read-never, grep-confirmed zero Go/TS non-test readers. The approval kernel route model is the sole approval configuration.')
+VALUES ('0306', 'ROADMAP unit 4.4 (schema hygiene): drop public.templates_template_version.pending_reviewer_role/pending_approver_role behind a pre-drop emptiness assert -- legacy per-version role-routing columns retired since 3.1a (ADR 0082 phase c). Write-never by Go code since 3.1a S1/S4; the curated bootstrap seed''s vestigial pending_approver_role=''system'' is co-removed in this change-set (db/reference-data/0001_product_reference_data.sql). Read-never, grep-confirmed zero Go/TS non-test readers. The approval kernel route model is the sole approval configuration.')
 ON CONFLICT (version) DO NOTHING;
 
 COMMIT;
