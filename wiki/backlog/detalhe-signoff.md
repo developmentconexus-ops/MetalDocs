@@ -1,0 +1,28 @@
+# Backlog — Detalhe Signoff (F5.1)
+
+Deferred-with-trigger items surfaced while building the Detalhe Signoff cockpit
+(`/approvals/:documentId`). Each row names the concrete unblock condition.
+
+| Item | Why deferred | Unblock trigger | Owner |
+|------|--------------|-----------------|-------|
+| Tracked-changes summary list (extractTrackedChanges) | Two-tab diff design retired (2026-06-23). Review redline now lives inline in the suggesting-mode editor via `@eigenpal/docx-editor-react@1.9.0` tracked changes. A future enhancement would extract these changes via Eigenpal's `extractTrackedChanges` API and render a summary list for quick inspection. | Eigenpal exports a stable `extractTrackedChanges(document)` function; FE wires it into a summary panel in the cockpit. Or, a design decision to omit the summary and keep track-changes inspection in-doc only. | Frontend |
+
+## Pre-existing shared-component debt (surfaced by F5.1 reviewers, NOT introduced here)
+
+These live in components the cockpit **consumes** (`ControlledDocumentDetailPanel`,
+`SignoffDialog`, `useDocumentPdfStatus`) or in adjacent inbox code. F5.1 mounted/extended
+them additively only — fixing them means editing shared, separately-tested components,
+which the plan's no-fork guardrail (HS-2) reserves for a follow-up that owns them. The
+cockpit makes some of these more visible, so they are recorded with triggers for the
+operator's HS-1 decision.
+
+| Item | Where | Why deferred | Unblock trigger | Owner |
+|------|-------|--------------|-----------------|-------|
+| Mojibake / missing accents in error strings | `SignoffDialog.tsx` (`error_server`, `error_not_eligible`) | Double-encoded Portuguese (`aprovaÃ§Ã£o`…) and missing accents predate F5.1; file outside the plan's additive scope. | A pass that owns `SignoffDialog` re-saves the strings as UTF-8 (or moves them to `lib/api/errorMessages.ts`). Cheap — fold into the next `SignoffDialog` edit. | Frontend |
+| Native `window.prompt` for cancel reason | `ControlledDocumentDetailPanel.tsx` `handleCancelInstance` | Violates "never raw alert/prompt" (error-ux); replacing it is a structural change to a shared tested component (HS-2 fork territory), not an additive prop. | Follow-up PR that owns the panel replaces it with an inline cancel form / lightweight dialog. | Frontend |
+| Hardcoded error strings bypass `resolveErrorMessage` | `ControlledDocumentDetailPanel.tsx` `handleCancelInstance` / `handleSubmitForReview` catch blocks | Pre-existing; should route `ApiError` through `resolveQueryError`. Out of additive scope. | Same panel-owning follow-up wraps catches with `resolveQueryError(err, fallback)`. | Frontend |
+| Raw-hex (non-token) colors | `ControlledDocumentDetailPanel.module.css` | Entire file uses blue-gray hex absent from the wine token set; predates F5.1. | Panel-owning follow-up maps each hex to a `var(--token)`. | Frontend |
+| Non-label `<span className={styles.label}>` collides with real `<label>` style | `ControlledDocumentDetailPanel.tsx` metadata rows | A11y/semantic collision; pre-existing. | Panel-owning follow-up renames the meta class / uses `<dt>`/`<p>`. | Frontend |
+| `ControlledDocumentDetailPanel` > 400 LOC | `ControlledDocumentDetailPanel.tsx` (446) | Crosses god-component threshold; additive props worsened it marginally. | Follow-up extracts the submit-for-review form + stale-clock hook (~360 LOC after). | Frontend |
+| `useDocumentPdfStatus` polls via `useEffect`+`setTimeout` | `documents/hooks/editor/useDocumentPdfStatus.ts` | Pre-existing anti-pattern (server state should be TanStack Query w/ `refetchInterval`); the cockpit is the first non-editor consumer. | Migrate the hook to `features/documents/queries/` as a Query with `refetchInterval` stopping on ready/failed. | Frontend (documents) |
+| Inbox resolves context via imperative `await fetchActiveDocumentInstance` | `InboxPage.tsx` `openDecisionFlow` / `openDocument` | RESOLVED (FE-10, 2026-07): migrated from the deleted `approvalApi.getActiveDocumentContext` fork to the controlled-documents-owned `fetchActiveDocumentInstance`, closing the split-cache-root defect. The imperative-fetch-vs-warm-cache shape is unchanged — still calls the API function directly rather than `queryClient.fetchQuery`. | A pass that converts both inbox handlers to `queryClient.fetchQuery(QK.controlledDocuments.activeDocument(...))` to hit the warm cache instead of refetching. | Frontend |

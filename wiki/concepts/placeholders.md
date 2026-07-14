@@ -1,0 +1,153 @@
+# Placeholders — Fixed Catalog Model
+
+> _Changelog: 2026-04-26 — rewritten for fixed-catalog model (ADR 0008); dropped legacy fill-in workflow content._
+> _Changelog: 2026-04-27 — composition system deprecated, UI removed (Phase 1)._
+>
+> **Last verified:** 2026-07-01 (DOC-03 drift fix: computed catalog is 8 entries per ADR 0050 — `approval_date` added; single source of truth is `render/domain.ComputedCatalog()`) | **Prior:** 2026-06-28 (SP-2: added `dictionary` value source and `PHDictionary` placeholder type)
+> **Scope:** What a placeholder is, the fixed 8-entry catalog, how tokens stay literal in the editor, and when substitution occurs.
+> **Out of scope:** Substitution engine internals (see `modules/render-fanout.md`), editor plugin wiring (see `modules/editor-ui-eigenpal.md`).
+> **Key files:**
+> - `packages/editor-ui/src/MetalDocsEditor.tsx:55` — eigenpal `templatePlugin` wired here (plugins array, mode-gated)
+> - `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx` — catalog panel, auto-detect via `getVariables()` (renamed from `TemplateAuthorPage` 2026-05-11)
+> - `frontend/apps/web/src/features/templates/placeholder-types.ts` — `CatalogPlaceholder` type
+> - `internal/modules/templates/application/validate_placeholders.go` — `ValidatePlaceholders` rejects non-catalog names
+> - `internal/modules/render/fanout/` — server-side substitution at freeze/finalize (Go)
+> - `internal/modules/render/fanout/resolvers/approvers_resolver.go` — `ApproversResolver`
+
+---
+
+## What a placeholder is
+
+A `{token}` in a template DOCX that gets substituted with a computed value when a document is finalized (frozen). Example: `{doc_code}` → `"QMS-001-v2"`.
+
+Tokens use single-brace `{name}` syntax — docxtemplater standard, detected natively by eigenpal's `templatePlugin`.
+
+## The fixed catalog
+
+MetalDocs defines exactly 8 computed tokens. Template authors may only use names from this list for `PHComputed` placeholders. The backend rejects any other name at schema-save time (`ValidatePlaceholders`). The single source of truth for this catalog is `render/domain.ComputedCatalog()` (ADR 0050); `templates` derives both the authoring palette (`GET /placeholder-catalog`) and `ValidatePlaceholders`'s accepted-name set from it, so drift between what authors can pick and what the backend accepts is structurally impossible.
+
+| Token | Resolver source |
+|---|---|
+| `{doc_code}` | Document code — generated from profile sequence counter |
+| `{doc_title}` | Document title field |
+| `{revision_number}` | Revision counter on the document version |
+| `{author}` | Display name of the document author (creator) |
+| `{effective_date}` | Effective date set during approval/freeze |
+| `{approvers}` | Approver names joined by `", "`; `"[aguardando aprovação]"` if none |
+| `{controlled_by_area}` | Area name (not code) from the document's taxonomy binding |
+| `{approval_date}` | Final approval date of the published document; `"[aguardando aprovação]"` before approval (added ADR 0050) |
+
+All catalog tokens are **computed** — no user input is required. There is no fill-in panel in the document editor.
+
+## Dictionary placeholder source (SP-2)
+
+In addition to the fixed computed catalog, templates may declare **dictionary placeholder references** (`PHDictionary`, `type: "dictionary"`). These reference a per-tenant dictionary entry by `name` (e.g., `{COMPANY_NAME}`).
+
+- A `PHDictionary` entry carries a `name` (the dictionary entry name) and a human-readable `label`. It carries **no value** in the template schema — it is a declared reference.
+- Values are resolved **at document creation** (off-tx via `tokens.DictionaryReader`) and pinned into `document_placeholder_values` with `source='dictionary'`. Render receives pre-resolved values; it does not call the dictionary.
+- Each new document revision re-pins dictionary values at revision-creation time, making each revision immune to later dictionary edits.
+- The `source` column in `document_placeholder_values` now accepts four values: `default`, `user`, `computed`, `dictionary`.
+- Collision prevention: a `PHDictionary` name must not equal any native/computed resolver key (enforced at template-save by `ValidatePlaceholders` and at dictionary-write by `tokens.Service.Create`). See ADR 0049.
+
+## Value sources in `document_placeholder_values`
+
+| `source` | Who sets it | Mutable by author? |
+|---|---|---|
+| `default` | System default at creation | No |
+| `user` | Author input (fill-in panel) | Yes |
+| `computed` | System resolver at creation | No (governed) |
+| `dictionary` | Pinned from tenant dictionary at creation | No (governed) |
+
+## Authoring workflow
+
+1. Template author types `{token}` directly in the DOCX inside the editor (or in Word desktop).
+2. Eigenpal's `templatePlugin` auto-detects the token, highlights it orange, and lists it as a chip in the sidebar.
+3. `TemplateEditorPage` reads `editorRef.current.getAgent().getVariables()` after each editor change and auto-saves detected names as `computed` entries in the template schema.
+4. The catalog panel shows what each detected token resolves to.
+5. Non-catalog names are rejected by `ValidatePlaceholders` when the schema is saved.
+
+## Tokens are literal until freeze
+
+Tokens are **never substituted** in the editor (writer mode). The DOCX stored on disk always contains the raw `{token}` strings until a document is finalized.
+
+Reason: eigenpal autosaves on every change. Calling `applyVariables` in-editor would mutate the DOCX with substituted values, destroying the original tokens on the next autosave cycle. See ADR 0008 for the full rationale and the deferred "preview mode" story.
+
+Substitution happens exclusively at **finalize/freeze** via the existing server fanout pipeline:
+1. `freeze_service.go` resolves each catalog token via its resolver.
+2. The `{name: value}` map is passed to docxtemplater → native substitution.
+3. The frozen DOCX (with resolved values) is archived and rendered to PDF.
+
+## Storage format
+
+> Finalize flow trace (trigger enforcement at `UPDATE documents SET status='under_review'`): see [`wiki/modules/documents.md §6.3`](../modules/documents.md#63-finalizedocument-state-transition----post-apiv2documentsidfinalize).
+
+`placeholder_schema_snapshot` in the `documents` table stores the placeholder schema as **eigenpal-native format**: a raw JSON array.
+
+```json
+[
+  { "id": "...", "type": "computed", "resolver_key": "doc_code" },
+  { "id": "...", "type": "computed", "resolver_key": "approvers" }
+]
+```
+
+This is **not** wrapped as `{"placeholders": [...]}`. `parsePlaceholderSchema()` in `internal/modules/documents/application/fillin_service.go` accepts both formats for backward compatibility with any legacy rows that used the wrapped form.
+
+## `applyVariables` — deferred
+
+The eigenpal `applyVariables` API (browser-side substitution) is intentionally not called in writer mode. It is reserved for a future "preview mode" with a two-buffer story (edit buffer keeps raw tokens; preview buffer holds a substituted copy). See ADR 0008.
+
+## Feature status
+
+| Feature | Status |
+|---|---|
+| Token format | `{name}` — eigenpal native |
+| Editor highlighting | orange via `templatePlugin` |
+| Sidebar chips | eigenpal native |
+| Catalog enforcement | backend `ValidatePlaceholders` rejects non-catalog names |
+| Server substitution | docxtemplater at freeze/finalize |
+| Fill-in panel | not present — all tokens are computed |
+| `applyVariables` in editor | deferred (see ADR 0008) |
+
+## History
+
+- **Pre-2026-04-25:** MetalDocs used `{{uuid}}` double-brace tokens and had user-fill types (text/date/number/select). See `decisions/0003-token-syntax-migration.md`.
+- **2026-04-25:** Migrated to `{name}` single-brace tokens; eigenpal authoring convergence.
+- **2026-04-26:** Replaced user-fill placeholder model with fixed 7-entry computed catalog. See `decisions/0008-placeholder-fixed-catalog.md`.
+- **2026-06-29:** Catalog grew to 8 entries (`approval_date` added) and its single source of truth moved to `render/domain.ComputedCatalog()`. See `decisions/0050-computed-token-catalog-single-source.md` (amends ADR 0008).
+
+## Cross-refs
+
+- [concepts/token-syntax.md](token-syntax.md) — deeper dive on `{name}` vs `{{uuid}}`
+- [modules/editor-ui-eigenpal.md](../modules/editor-ui-eigenpal.md) — how MetalDocsEditor wires eigenpal plugins; seam-isolation policy + mode-gate rule
+- [modules/editor-ui-eigenpal-tech-debt.md](../modules/editor-ui-eigenpal-tech-debt.md) — T-001 (tarball absent) + T-002 (`TemplateEditorPage` bypass) directly affect placeholder pipeline reliability
+- [modules/render-fanout.md](../modules/render-fanout.md) — server substitution code
+- [decisions/0008-placeholder-fixed-catalog.md](../decisions/0008-placeholder-fixed-catalog.md) — fixed catalog ADR (amended by ADR 0050 — catalog is now 8 entries)
+- [decisions/0050-computed-token-catalog-single-source.md](../decisions/0050-computed-token-catalog-single-source.md) — single source of truth `render/domain.ComputedCatalog()`; `approval_date` added
+- [decisions/0003-token-syntax-migration.md](../decisions/0003-token-syntax-migration.md) — token syntax migration ADR
+- [decisions/0049-tenant-dictionary-token-substitution.md](../decisions/0049-tenant-dictionary-token-substitution.md) — SP-2 ADR: creation-time pinning, `PHDictionary`, reserved-name guard, author-overwrite guard
+- [modules/templates.md §8.8](../modules/templates.md) — backend enforcement: `ValidatePlaceholders` rejects non-catalog names at schema save; resolver registry wiring gap (T-008)
+- [modules/controlled-documents.md](../modules/controlled-documents.md) — owns the `controlled_documents` catalog; `{doc_code}` resolver source is the controlled document's `AutoCode` (`{PROFILE}-{AREA}-{NNN}`)
+
+## Composition system (deprecated 2026-04-27)
+
+The MetalDocs custom composition concept (header/footer sub-blocks toggleable per template) was removed from the UI on 2026-04-27. Reasons:
+
+- Two parallel mental models for the same job (placeholders vs composition checkboxes) — UX tax with no benefit
+- Static OOXML fragments hardcoded in `apps/docx-renderer/src/render/subblocks/` — couldn't be customized per template, defeated the template purpose
+- UI catalogue keys (`doc-header`, `approval-footer`, `revision-history`) didn't match registry keys (`doc_header_standard`, `approval_signatures_block`) — silently broken
+- Eigenpal `templatePlugin` already handles all placeholder mechanics — composition reinvented substitution badly
+
+Removed:
+- `frontend/apps/web/src/features/templates/composition-config-panel.tsx`
+- `frontend/apps/web/src/features/templates/__tests__/composition-config-panel.test.tsx`
+- Right rail + right panel from template editor UI
+- All `composition` state/handlers from `TemplateAuthorPage.tsx`
+
+Backend untouched:
+- `documents.composition_config_snapshot` column still receives `{}` — zero data risk
+- `FanoutRequest.Composition` field still passed (empty) — fanout pipeline happy
+- `apps/docx-renderer/src/render/subblocks/` registry remains — no behavior change
+
+Future: when standardized blocks (revision history table, approval signatures) genuinely need to return, implement as **rich-content resolvers** — `{revision_history_table}` resolver returns OOXML table. User drops the placeholder where they want it in the eigenpal editor. One mental model: everything is a placeholder.
+
+**Last verified:** 2026-07-01

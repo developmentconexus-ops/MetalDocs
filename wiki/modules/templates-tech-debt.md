@@ -1,0 +1,169 @@
+﻿# Tech Debt Register — templates
+
+> Companion to `wiki/modules/templates.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/templates-refactor.md`.
+
+**Last verified:** 2026-07-06 (F9.4 doc-truth pass: F9.5 repository/→infrastructure/ rename anchors fixed — T-011 `ListTemplates:169`/`clampTemplatesLimit:153`/pagination test file rewritten with re-verified line numbers; T-013 `AppendAudit:733`/`AppendAuditTx:748`/`ListAudit:797` rewritten with re-verified line numbers; T-002 `GetVersion`/`GetVersionByID` closed-item historical snapshot flagged **verify** (dir renamed, new lines 344/368 noted, historical ranges not rewritten)) | **Prior:** 2026-07-03 (DB-01/DB-10 closed: legacy template family `public.templates`/`public.template_versions` retired via `db/migrations/0268_drop_legacy_template_family.sql`, promoted out of `_pending/` together with deletion of the `internal/platform/docgenv2` legacy fallback reader code; safety-net drop of `public.signoffs`, a no-op) | **Prior:** 2026-07-02 (DB-06 — T-013 closed: `ListAudit` confirmed already reading canonical `metaldocs.audit_events` (F-07-sub-split, Wave 1.8, pre-dates this pass); retired dead `public.templates_audit_log` table via `db/migrations/0262_drop_templates_audit_log.sql` with hash-chain-preserving backfill) | **Prior:** 2026-07-01 (Grade-A simplification register reconciliation — T-002 fully closed, GetVersion/GetVersionByID tenant-scoping residual gap confirmed fixed by commit 042d1504 (2026-05-25), was register drift since 2026-06-12 sync; T-008 closed, SEC-08 fail-fast resolver-registry guard confirmed at main.go:809-816 via commit fb0250e5) | **Prior-2:** 2026-06-12 (Wave 2.12 sync — db==nil dual-mode branches removed from all application services (single-mode); CreateTemplateTx areas/visibility/specific_areas columns dropped (migration 0236); nodualmode CI guard. Prior Wave 2 sync: typed CapTemplate* consts; upsertApprovalConfig fixed; publish tier-1 aligned; CompositionConfig deleted; AppendAuditTx in-tx. Prior: adversarial verification pass — corrected T-001 tripwire anchor to baseline DDL, added rename note for `templates_v2_*` → `templates_template*` history, fixed T-008 `ValidatePlaceholders` anchor to `schema.go:114`, fixed T-010 test file reference to `routes_contract_test.go:122`, fixed T-014 `schema.go:84` → `schema.go:114`, flagged stale line numbers in `_artifacts/02-flow-publish.md` in T-004 and T-007 evidence; prior: T-007 closed — transaction wrapping confirmed in code; 2026-06-10 Stage-1 backend audit drift patch; 2026-05-31 — fix/templates-publish-role-binding — T-004 fully closed; `PublishTemplateVersion` now enforces `pending_approver_role` binding parity with `Service.Approve`, denied attempts audited via `publish_forbidden_role`)
+
+## Items
+
+### T-001 · Authz wired `nil` — every mutation bypasses capability assertion — CLOSED 2026-05-11 (Plan 5)
+- **Severity:** critical (closed)
+- **Surface (resolved):** `internal/modules/templates/application/service.go:22` — `WithDB(db *sql.DB) *Service` builder added; `apps/api/cmd/metaldocs-api/main.go` wires `tv2Svc.WithDB(deps.SQLDB)` + real `capabilityService` `AuthzFunc`. `application/create.go`, `application/lifecycle.go`, and `application/autosave.go` now call `authz.Require` with the appropriate capability when `s.db != nil`; the 2026-05-17 repair added `template.edit` assertions around `SaveTemplateDraft` and `CommitAutosave` so DOCX import/autosave commits satisfy the templates table tripwire. The live schema (see **Rename note** below) attaches `trg_require_cap_asserted` to `public.templates_template` and `public.templates_template_version` (`db/baseline/0001_current_schema.sql:3797-3807`).
+- **Observation (original):** `New(svc, authz)` accepted an `AuthzFunc` argument, then if `authz == nil` substituted a no-op callback. The composition root passed `nil`. None of the seven repo mutations was wrapped in `internal/platform/authz.Require`. No `metaldocs.asserted_caps` GUC tripwire was installed on `templates_*` tables.
+- **Evidence:** `_artifacts/02-flow-update-schema.md`, `_artifacts/02-flow-publish.md`, `_artifacts/04-persistence.md` §5 (7 tripwire violations), `_artifacts/03-deps.md` §3.
+- **Rename note:** Archive migrations `0120_templates_init.sql`, `0157_drop_editable_zones.sql`, and `0188_tripwire_extend.sql` all reference `templates_v2_template` and `templates_v2_template_version` — these are the pre-rename table names used during a v2 redesign phase. At some point the tables were renamed to `templates_template` and `templates_template_version`; the rename is reflected in the curated baseline (`db/baseline/0001_current_schema.sql:2188-2214`) and in the live `enforce_capability_asserted` CASE branches (`db/baseline/0001_current_schema.sql:477-486`). Migration 0188 attached the tripwire to the v2 names (`archive/migrations/0188_tripwire_extend.sql:226-234`); the authoritative production trigger bindings are the baseline DDL — readers should treat archive migration DDL for these tables as history, not as the live schema shape. For T-002 through T-013, all table name references to `templates_template` and `templates_template_version` refer to the current production names as defined in the baseline.
+- **Linked backlog row:** `backlog/templates-refactor.md#R-001`
+- **Linked ADR:** `wiki/decisions/0007-two-tier-authz.md` (decision exists; module deviation is the debt)
+
+### T-002 · Cross-tenant version access — repo getters accept no tenant arg — CLOSED 2026-07-01 (fully closed; residual gap fixed 2026-05-25, commit 042d1504)
+- **Severity:** critical → **resolved**
+- **Surface (resolved 2026-05-11 Plan 5):** `internal/modules/templates/application/create.go:148` — `CreateNextVersion` now verifies `source.TemplateID != template.ID` and returns `domain.ErrNotFound` if the loaded version belongs to a different template. This closed the `CreateNextVersion` bypass path.
+- **Surface (residual gap, now resolved):** `internal/modules/templates/repository/postgres.go:266-275` (`GetVersion`) and `:287-296` (`GetVersionByID`) both now take a `tenantID` parameter and join `templates_template_version v JOIN templates_template t ON t.id = v.template_id WHERE ... AND t.tenant_id = $N::uuid` — cross-tenant reads by primary key alone are no longer possible. All call sites pass a tenant ID: `application/autosave.go:38,60,84,115`, `application/create.go:126,135`, `application/lifecycle.go:29,117,206,340`, `application/queries.go:25,50`, `application/schema.go:28`, `delivery/http/routes_query.go:97,137,176` — verified 2026-07-01, no caller omits the tenant argument. (**verify** — dir renamed `repository/`→`infrastructure/` per F9.5; `GetVersion`/`GetVersionByID` now live at `infrastructure/postgres.go:344`/`:368`, line ranges above are a closed-item 2026-07-01 historical snapshot, not re-verified this pass)
+- **Observation (original):** Both repository getters selected by version primary keys with no `tenant_id` predicate. `CreateNextVersion` skipped the tenant gate when cloning from `PublishedVersionID`.
+- **Resolution:** The residual repo-getter gap was closed by commit `042d1504` ("fix(templates): tenant scope version and audit reads", 2026-05-25) — predates the register's last "partially closed" sync (2026-06-12), so this was register drift rather than an open gap.
+- **Evidence:** `internal/modules/templates/repository/postgres.go:266-296` (**verify** — dir renamed to `infrastructure/`, not re-verified this pass); commit `042d1504`; `_artifacts/02-flow-update-schema.md`, `_artifacts/04-persistence.md` §1 (`templates_template_version` schema), `_artifacts/05-industry.md` IP-008 (may need separate refresh by wiki-curator).
+- **Linked backlog row:** `backlog/templates-refactor.md#R-002` (can be closed)
+- **Linked ADR:** missing-ADR
+
+### T-003 · `X-Tenant-ID` header trusted with `DevTenantID` fallback — **RESOLVED Plan 3**
+- **Severity:** critical → **resolved**
+- **Surface:** `internal/modules/templates/delivery/http/handler.go:83-84` (`tenantIDFromReq`).
+- **Resolution (2026-05-11):** `tenantIDFromReq` now delegates to `tenant.FromContext(r.Context())` (Plan 3 module sweep). Tenant is injected into the request context by the auth middleware from the session-bound `tenant_id` (`auth_sessions.tenant_id`, migration 0184). The `X-Tenant-ID` header is stripped by auth middleware before reaching this handler. The residual risk is that T-001 (nil authz) still allows unauthenticated mutations, but tenant forging via header is closed.
+- **Evidence:** `_artifacts/02-flow-list.md`, `_artifacts/05-industry.md` IP-008.
+- **Linked backlog row:** `backlog/templates-refactor.md#R-003` (can be closed)
+- **Linked ADR:** `wiki/architecture/tenant-context.md`
+
+### T-004 · `PublishTemplateVersion` bypasses approval lifecycle (no SoD, no role check, no content_hash gate) — RESOLVED BY RETIREMENT 2026-07-13 (ROADMAP unit 3.1a, ADR 0082)
+- **Severity:** critical (closed)
+- **Surface (resolved 2026-05-11 Plan 5):** `internal/modules/templates/application/lifecycle.go` — `content_hash != ""` guard, `domain.CheckSegregation("approver", ...)` SoD gate, `authz.Require(CapTemplatePublish)` capability assertion inside the same tx.
+- **Surface (2026-05-31, since removed):** `lifecycle.go` `PublishTemplateVersion` briefly called `version.RoleBindingFor(VersionStatusPublished)` and returned `domain.ErrForbiddenRole` when the actor's roles did not satisfy `pending_approver_role`. `Service.Approve` consumed the same helper — a single source of truth for role-binding semantics, but still a **second, parallel publish path** duplicating `PublishTemplateVersion`.
+- **Resolution (2026-07-13, ROADMAP unit 3.1a S2/S4):** the two-parallel-publish-path condition this item originally tracked is now closed by retirement rather than by unification-in-place. `Service.Approve` (the role-based author-review-approve chain) is **deleted**; `Service.PublishTemplateVersion` is the sole publish path, accepting a `draft` (direct) or `approved` (post-kernel-signoff) source. `RoleBindingFor`/`ErrForbiddenRole`/`domain.ApprovalConfig` and the role-binding tier-2 gate are deleted; identity-based SoD (`domain.CheckSegregation`) is the only SoD mechanism left, enforced on every publish regardless of source status. See `wiki/decisions/0082-approval-kernel-extraction.md` execution note.
+- **Observation (original):** Parallel publish path to `Service.Approve`. Transitioned a version directly `draft → published` without SoD, role check, or `content_hash` gate.
+- **Evidence:** `_artifacts/02-flow-publish.md` (**note:** line numbers in this artifact are stale — the artifact references `lifecycle.go:265` as the `PublishTemplateVersion` entry point, but the function is declared at `internal/modules/templates/application/lifecycle.go:373`; artifact requires a separate refresh), `_artifacts/05-industry.md` IP-004; `go test ./internal/modules/templates/...` PASS (race build unavailable on this host — no gcc); `internal/modules/templates/application/lifecycle_publish_role_test.go` (3-case table-driven service test); `internal/modules/templates/delivery/http/routes_lifecycle_test.go::TestPublishTemplateVersion_ForbiddenRoleRFC9457`.
+- **Linked backlog row:** `backlog/templates-refactor.md#R-004` (closed)
+- **Linked ADR:** `wiki/decisions/0007-two-tier-authz.md`
+
+### T-005 · Legacy error envelope — RFC 9457 Problem+JSON not adopted — CLOSED 2026-05-12 (Plan 7)
+- **Severity:** major (closed)
+- **Surface (resolved):** `internal/modules/templates/delivery/http/handler.go:92-93` (`writeErr`) — body is now `problem.Write(w, problem.New(status, code, message))`. All call sites that use `writeErr` (including `MapErr` consumers at `:109`) emit `application/problem+json`. The legacy `{"error":{"code":"...","message":"..."}}` shape is gone.
+- **Observation (original):** Module emitted `{"error":{"code":"...","message":"..."}}` for all non-2xx responses. `internal/platform/problem` existed from Plan 2 but templates had not been migrated.
+- **Evidence:** `_artifacts/05-industry.md` IP-001, `_artifacts/01-surface.md` §1c.
+- **Linked backlog row:** `backlog/templates-refactor.md#R-005` (merged Plan 7 2026-05-11, commit `bbe3933b`)
+- **Linked ADR:** `wiki/architecture/api-design-system.md`
+
+### T-006 · OpenAPI / handler drift — 12 of 20 routes hand-rolled, not in spec — CLOSED 2026-05-16 (Plan 12.4)
+- **Severity:** major (closed)
+- **Surface (resolved):** `api/openapi/v1/openapi.yaml` and `api/openapi/v1/partials/templates.yaml` include the mounted template route set, including `/api/v1/templates/placeholder-catalog`; `internal/modules/templates/api/api.gen.go` and `frontend/apps/web/src/lib/api-types/index.d.ts` were regenerated. `Handler.Register` mounts generated wrapper methods for the template routes and delegates some generated methods to existing internal handler bodies.
+- **Observation (original):** Twelve routes were mounted by `Handler.Register` but absent from the OpenAPI spec consumed by oapi-codegen.
+- **Evidence:** Plan 12.4 diff; `scripts/check-module-contract-sync.ps1 -Module templates` PASS; `go generate ./internal/modules/templates/api/...`; `pnpm gen:api`.
+- **Linked backlog row:** `backlog/templates-refactor.md#R-006` (closed for route/spec/generated coverage; strict-server cleanup can be tracked separately if desired)
+- **Linked ADR:** `wiki/decisions/0012-contract-first-api.md`
+
+### T-007 · Multi-step publish + obsolete + audit not transactional — CLOSED (date unknown; confirmed resolved 2026-06-11)
+- **Severity:** major (closed)
+- **Surface (resolved):**
+  - `internal/modules/templates/application/lifecycle.go:442-480` (`PublishTemplateVersion`) — `BeginTx` at line 442, all mutations via `*Tx` repo variants (`ObsoletePreviousPublishedTx`, `UpdateTemplateTx` ×2, `UpdateVersionTx`, `CreateVersionTx`, `AppendAuditTx`), `Commit` at line 478. No `db != nil` guard — `PublishTemplateVersion` requires a live DB and unconditionally uses the transaction path.
+  - `internal/modules/templates/application/lifecycle.go:265-319` (`Approve` accept branch) — `BeginTx` at line 266, `Commit` at line 296, same `*Tx` repo variants. Falls back to non-Tx variants only when `s.db == nil` (unit-test mode with no real DB).
+  - `internal/modules/templates/application/create.go:62-126` (`CreateTemplate`) — `BeginTx` at line 63, `Commit` at line 98, same pattern.
+- **Observation (original):** Publish and Approve emitted 3–5 independent `*sql.DB.ExecContext` calls with no wrapping transaction. Repo methods accepted only `context.Context` — no `WithTx` variant existed. Partial failures left DB inconsistent.
+- **Resolution:** `*Tx` variants added to `Repository`; all three multi-step mutation paths (`PublishTemplateVersion`, `Approve` accept, `CreateTemplate`) now wrap their statements in a single `*sql.Tx`. The `AuditObsoleted` emission gap (original observation) is not separately tracked here — see `_artifacts/02-flow-publish.md` for current audit coverage.
+- **Evidence:** `internal/modules/templates/application/lifecycle.go:442-480` (`PublishTemplateVersion` tx — `BeginTx` at 442, `Commit` at 478), `lifecycle.go:265-296` (`Approve` accept branch — `BeginTx` at 266, `Commit` at 296), `internal/modules/templates/application/create.go:62-98` (create tx). Note: `_artifacts/02-flow-publish.md` cites `lifecycle.go:265` as the `PublishTemplateVersion` entry — this is incorrect; that line is inside the `Approve` accept branch. The artifact's line numbers are stale and require a separate refresh.
+- **Linked backlog row:** `backlog/templates-refactor.md#R-007` (can be closed)
+- **Linked ADR:** missing-ADR
+
+### T-008 · `ResolverRegistryReader` wired `nil` — `PHComputed.resolver_key` validation skipped — CLOSED 2026-07-01 (fail-fast guard, commit fb0250e5, SEC-08)
+- **Severity:** major (closed)
+- **Surface (resolved):** `apps/api/cmd/metaldocs-api/main.go:798-823` (`buildTemplatesModule`) — a dedicated `templatesResolverReg := resolvers.NewRegistry()` is built and populated via `resolvers.RegisterBuiltins(...)` (`:807-808`), then a fail-fast guard at `:814-816` returns a startup error (`"templates resolver registry is nil or empty; resolver_key validation would be silently skipped (SEC-08 / T-008)"`) if the registry is nil or empty; the non-nil registry is passed into `templatesapp.New(..., templatesResolverReg)` at `:818`, satisfying the variadic `resolvers ResolverRegistryReader` parameter (`internal/modules/templates/application/service.go:11`). Validation site unchanged: `internal/modules/templates/application/schema.go:114` (`ValidatePlaceholders`).
+- **Observation (original):** The placeholder catalog gate enforces the 7-token `PHType` enum unconditionally. For `PHType == PHComputed`, the resolver_key string is intended to be checked against `ResolverRegistryReader.HasResolver(key)`. The register originally claimed the composition root omitted the variadic, leaving the registry reader nil and silently skipping the check.
+- **Resolution:** Commit `fb0250e5` ("fix(security/SEC-08,SEC-12,SEC-07): fail-fast resolver registry + honest 501s in memory mode") notes the registry wiring itself was already present and the original T-008 claim was stale; it adds the explicit boot-time fail-fast guard so a nil/empty registry now hard-stops startup instead of silently permitting arbitrary `resolver_key` values to propagate into published templates.
+- **Evidence:** `apps/api/cmd/metaldocs-api/main.go:809-816`; commit `fb0250e5`; `_artifacts/02-flow-update-schema.md`, `_artifacts/03-deps.md` §3 (original observation, now superseded).
+- **Linked backlog row:** `backlog/templates-refactor.md#R-008` (can be closed)
+- **Linked ADR:** missing-ADR
+
+### T-009 · Idempotency replay coverage incomplete on generated POST routes
+- **Severity:** major
+- **Surface:** generated mutation wrappers under `internal/modules/templates/delivery/http/routes_generated.go` and `h.idempotent(...)` coverage; application mutations in `internal/modules/templates/application/create.go` and `internal/modules/templates/application/lifecycle.go`.
+- **Observation:** Plan 12.4 requires `Idempotency-Key` in the OpenAPI contract for `POST /api/v1/templates`, routes the wizard create path through the generated typed wrapper, and verifies HTTP 201 create with the header present. Replay semantics still need a focused audit across generated POST mutations (`/templates`, `/publish`, `/submit`, `/review`, `/approve`) to prove same-key retries return the first result and do not duplicate audit/state changes.
+- **Evidence:** `_artifacts/05-industry.md` IP-002; Plan 12.4 runtime smoke for `POST /api/v1/templates`; generated API contract requiring `Idempotency-Key` on create.
+- **Linked backlog row:** `backlog/templates-refactor.md#R-009`
+- **Linked ADR:** missing-ADR
+
+### T-010 · Optimistic locking field carried but never enforced on autosave — CLOSED 2026-05-31 (fix/templates-schema-occ-lock)
+- **Severity:** major (closed)
+- **Surface (resolved):**
+  - `internal/modules/templates/application/autosave.go` (`SaveTemplateDraft`) calls `UpdateVersionDraftCAS` / `UpdateVersionDraftCASTx` (closed 2026-05-17).
+  - `internal/modules/templates/application/schema.go` (`UpdateSchemas`) now accepts `ExpectedLockVersion` and calls `UpdateVersionSchemaCAS` / `UpdateVersionSchemaCASTx` (closed 2026-05-31).
+  - `internal/modules/templates/repository/postgres.go` adds `UpdateVersionSchemaCAS`/`Tx` mirroring the draft CAS pattern: `WHERE id = $1 AND lock_version = $2` returning `ErrStaleLockVersion` on miss.
+  - `api/openapi/v1/openapi.yaml` PUT `/api/v1/templates/{id}/versions/{n}/schema` request body now requires `expected_lock_version` (legacy `expected_content_hash` removed from the schema-PUT contract). `VersionDTO.lock_version` exposed.
+  - `internal/modules/templates/delivery/http/routes_schema.go` rejects requests missing `expected_lock_version` with 400 and surfaces 412 `stale_lock_version` on CAS miss.
+  - `frontend/apps/web/src/features/templates/hooks/useTemplateSchemas.ts` holds lockVersion, sends `expected_lock_version`, raises `staleConflict` on 412 instead of silent overwrite; `refetch` clears it.
+- **Surface (residual):** legacy `/autosave/commit` carries only `expected_content_hash`, not `expected_lock_version`; it is hash-gated and tripwire-protected, but not multi-tab lock-version protected. Tracked separately (not under T-010 — the original unverified-field gap is closed for every route that takes a `lock_version` field).
+- **Observation:** Schema PUT was hard-coding `expected_content_hash: ''` from the FE; the server treated empty as "skip CAS", so two tabs editing placeholders concurrently last-write-wins with no audit signal. Switching that path to lock_version CAS closes the silent overwrite class for the schema editor. Eigenpal's DOCX import path still uses `/autosave/commit` and is content-hash gated — separate cleanup outside this branch.
+- **Evidence:** `_artifacts/02-flow-update-schema.md`; `TestUpdateSchemas_StaleLockVersion`; `internal/modules/templates/delivery/http/routes_contract_test.go:122` (`TestUpdateTemplateSchema_StaleLockVersion_412`); `useTemplateSchemas` vitest stale-conflict spec; preview drive (two-tab editor) — second tab surfaces stale-lock alert, first save survives until explicit refetch.
+- **Linked backlog row:** `backlog/templates-refactor.md#R-010` (close)
+- **Linked ADR:** missing-ADR
+
+### T-011 · `ListTemplates` is unbounded — no LIMIT / OFFSET / cursor — HARDENED 2026-07-02
+- **Severity:** minor (unchanged — hardening closes the unbounded-limit gap; cursor migration remains a deliberate non-goal, see below)
+- **Surface:** `internal/modules/templates/infrastructure/postgres.go` (`ListTemplates:169`, `clampTemplatesLimit:153`) (fixed F9.5 repository/→infrastructure/ rename; line numbers re-verified 2026-07-06).
+- **Observation (historical):** Query applied `LIMIT $3 OFFSET $4` populated directly from `ListFilter.Limit` / `ListFilter.Offset` with zero clamping in the repo layer — a caller passing `Limit<=0` would issue `LIMIT 0` (empty result, confusing) and the repo trusted the handler's own bound entirely. `ORDER BY t.created_at DESC` had no tiebreaker, so OFFSET pages could interleave/duplicate rows on `created_at` ties.
+- **Fix (CON-11/APP-03):** Added `clampTemplatesLimit` (`<=0` → 50, `>200` → 200 — mirrors the `/templates` OpenAPI contract's own declared bounds, `min 1 / max 200 / default 50`, deliberately NOT `internal/platform/pagination.ClampLimit`'s 20/100 platform default, since narrowing to 100 would silently break the wire-promised max=200) and an `offset<0 → 0` defensive clamp, both applied inside the repo as a second line behind the HTTP handler's existing `limit>200` 400 rejection. Added `t.id DESC` tiebreaker: `ORDER BY t.created_at DESC, t.id DESC`.
+- **Tests:** `internal/modules/templates/infrastructure/list_templates_pagination_test.go` (fixed F9.5 rename) — `TestListTemplates_OrderByHasStableTiebreaker`, `TestListTemplates_ClampsLimitAndOffset` (table-driven over zero/negative/over-max/in-range/negative-offset), `TestClampTemplatesLimit` (pure function table test).
+- **Verification:** `go build ./...`, `go vet`, `gofmt -l` clean; `go test -count=1 ./internal/modules/templates/...` all green.
+- **Deferred (out of scope) — nuance:** `/templates` GET is `x-pagination-exempt: true` in `api/openapi/v1/openapi.yaml` with an explicit note: "a permanent bounded-list exemption, not a deferred cursor migration." Unlike the other 4 CON-11/APP-03 surfaces, cursor adoption here is arguably NOT the recommended direction per the spec author's own stated intent — the existing LIMIT/OFFSET contract (already spec-declared, max 200) is the sanctioned design for what is meant to be a small, bounded per-tenant catalog. If that assumption ever breaks (tenants routinely hitting 200 templates), the correct move is revisiting the exemption itself, not silently bolting on a cursor.
+- **Evidence:** `_artifacts/02-flow-list.md`, `_artifacts/05-industry.md` IP-003.
+- **Linked backlog row:** `backlog/templates-refactor.md#R-011`
+- **Linked ADR:** missing-ADR
+
+### T-012 · Dead `editable_zones` jsonb column persists despite ADR 0002 zone purge
+- **Severity:** minor
+- **Surface:** `migrations/0120_templates_init.sql` (column declared NOT NULL); `migrations/0157_drop_editable_zones.sql` (drop migration whose effect on the live DDL is not visible per Phase 4 §6).
+- **Observation:** `templates_template_version.editable_zones jsonb NOT NULL` was retained for backward compat at the zone-purge cutover (per ADR 0002 — referenced from `domain/version.go:40` comment "legacy from zone-purge era"). `0157_drop_editable_zones.sql` exists but the column is still present in the table inheritance from migration 0120. Either the drop migration silently no-ops on this lineage, or it was deferred — Phase 4 flagged the drift. Latent: column is written-and-ignored; no read site consumes it. Cleanup deferred.
+- **Evidence:** `_artifacts/04-persistence.md` §6.
+- **Linked backlog row:** `backlog/templates-refactor.md#R-012`
+- **Linked ADR:** `wiki/decisions/0002-zone-purge.md` (decision exists; column persistence is the residual debt) — missing-ADR for the deferral itself.
+
+### T-013 · Module-local `templates_audit_log` parallel to canonical `metaldocs.audit_events` — CLOSED 2026-07-02 (DB-06)
+- **Severity:** minor (closed)
+- **Surface (resolved):** `internal/modules/templates/infrastructure/postgres.go:733` (`AppendAudit`) and `:748` (`AppendAuditTx`, delegate to `r.audit`, the canonical `auditdomain.Writer`); `internal/modules/templates/infrastructure/postgres.go:797` (`ListAudit` reads `metaldocs.audit_events` filtered to `resource_type = 'template'`); `db/migrations/0262_drop_templates_audit_log.sql` (backfill + drop of the retired local table). (fixed F9.5 repository/→infrastructure/ rename; line numbers re-verified 2026-07-06, superseding the historical `:604-624`/`:660-706` ranges cited below)
+- **Observation (original, now resolved):** Plan 6a (2026-05-11) closed the write side only — `AppendAudit` began delegating to the canonical `auditdomain.Writer`, but `ListAudit` kept reading `templates_audit_log`, so the two sinks were diverged in direction (writes canonical, reads local). By the time this item was re-verified for DB-06 (2026-07-02), runtime-truth inspection found `ListAudit` **already** reads from `metaldocs.audit_events` (comment cites "F-07-sub-split, Wave 1.8") — a wave prior to DB-06 had already closed the read side too, without this register being updated. This entry (and the parallel drift in `wiki/architecture/data-model.md`) was register/doc drift against already-shipped runtime truth, not an open code gap.
+- **Table retirement:** `public.templates_audit_log` itself (the physical table) was still present with no readers or writers anywhere in application code. `db/migrations/0262_drop_templates_audit_log.sql` (a) backfills any rows written before the Wave 1.8 write-sink cutover into `metaldocs.audit_events`, preserving the hash-chain invariant (`metaldocs.audit_event_row_hash`, `WITH RECURSIVE` chain walk, same advisory lock as `writer.go`'s `RecordTx`) — migration-history grep confirms no prior migration ever copied this data — then (b) drops the table and its owned sequence. Verified via grep that no trigger/view/FK/seed referenced the table before dropping.
+- **Evidence:** `_artifacts/04-persistence.md` §1, §6 (pre-Wave-1.8 snapshot — now historical, both read and write paths have since moved off the local table); `infrastructure/postgres.go:733,748` (write path, F9.5 renamed, was `repository/postgres.go:604-624`); `infrastructure/postgres.go:797` (read path, was `:660-706`); `db/migrations/0262_drop_templates_audit_log.sql`.
+- **Linked backlog row:** `backlog/templates-refactor.md#R-013` (close)
+- **Linked ADR:** missing-ADR
+
+### T-014 · Exported symbols lack Go doc comments — **RESOLVED 2026-07-03 (TST-06)**
+- **Severity:** minor (closed)
+- **Surface:** all files under `internal/modules/templates/{domain,application,delivery,repository}/`.
+- **Observation (as found):** Per `_artifacts/01-surface.md` §3, every exported type, function, method, and constant in the module was undocumented (no leading `// SymbolName ...` doc comment). Reader of `Service.PublishTemplateVersion` had to read the body to learn its SoD behavior; reader of `ResolverRegistryReader` had to read `schema.go:114` to learn it gates resolver_key.
+- **Resolution:** grade-A TST-06 final slice — 179 undocumented exported symbols (application 43, delivery/http 24, domain 84, infrastructure 3, repository 25) documented across 22 files; 6 package-level docs added (one per package). Comments-only verified by whitespace-insensitive pairing check; build/vet/tests green (156 PASS). The hexagonal-layout ADR gap noted in the original observation is NOT closed by this sweep and is not covered by the DEC-07 batch (ADRs 0058-0064 cover other decisions) — it remains an open missing-ADR cell.
+- **Evidence:** `_artifacts/01-surface.md` §3 (historical); TST-06 commit.
+- **Linked backlog row:** `backlog/templates-refactor.md#R-014`
+- **Linked ADR:** missing-ADR (hexagonal-layout convention still un-ratified; doc-comment half of this row resolved)
+
+### T-015 · `POST /templates` requires a client-supplied `key` — decision made, not yet implemented (ADR 0057)
+- **Severity:** minor
+- **Surface:** `api/openapi/v1/openapi.yaml:1159-1172` (`key` required in request body, no format constraint); `internal/modules/templates/application/create.go:14-35` (`CreateTemplateCmd.Key`, `GetTemplateByKey` pre-check, `domain.ErrKeyConflict` on collision — `internal/modules/templates/domain/template.go:30`).
+- **Observation:** The wizard UX blocker at `wiki/backlog/novo-template-wizard.md:39-44` ("key-generation") is caused by the backend trusting a client-supplied `key` with no design-side input for it (`novo-template-wizard.md:40`: "Design has no key input — derived auto from name"). ADR 0057 decided the resolution (server-generated slug + uniqueness suffix, `key` dropped from the request contract, immutable post-creation) but explicitly scoped itself as decision-only — no contract, application, or UI change has shipped yet.
+- **Evidence:** `wiki/decisions/0057-template-key-server-generated-slug.md`.
+- **Linked backlog row:** `wiki/backlog/novo-template-wizard.md` "key-generation" section (to be closed once implemented).
+- **Linked ADR:** `wiki/decisions/0057-template-key-server-generated-slug.md`
+
+### DB-01 / DB-10 · Legacy template family (`public.templates`, `public.template_versions`) + legacy `public.signoffs` safety net — CLOSED 2026-07-03 (migration 0268)
+- **Severity:** major (closed)
+- **Surface (resolved):** `db/migrations/0268_drop_legacy_template_family.sql` — `DROP TABLE IF EXISTS public.templates CASCADE`, `DROP TABLE IF EXISTS public.template_versions CASCADE`, `DROP TABLE IF EXISTS public.signoffs CASCADE`. Promoted out of `db/migrations/_pending/` on 2026-07-03 together with deletion of the `internal/platform/docgenv2` legacy fallback reader code (`template_reader.go`, `FanoutTemplateReader`'s legacy branch, `LegacyTemplateReadCount()`) in the same change-set, per the migration's own gating condition.
+- **Observation (original):** `internal/platform/docgenv2.FanoutTemplateReader` read the canonical `templates_template`/`templates_template_version` pair first (ARC-01, commit `4160018e`, 2026-07-01) and fell back to the legacy `public.templates`/`public.template_versions` pair only on `sql.ErrNoRows`. The legacy tables and their sole remaining reader stayed live pending run-window proof that the fallback branch took zero traffic. `public.signoffs` was carried as a separate safety-net drop (DB-10) — grep-confirmed absent from the canonical baseline, with a permanently no-op `DELETE FROM signoffs` in `internal/test/e2e_seed.go`'s reset handler (always swallowed via `isUndefinedTable`).
+- **Resolution:** `docgenv2.LegacyTemplateReadCount()` plus API/worker log grep both observed zero legacy fallback reads across the full Goal-3 QA run window; the legacy tables held zero rows on a fresh canonical bootstrap at drop time. Both gating conditions were satisfied, so migration 0268 was promoted out of `_pending/` and applied, and the legacy fallback reader code was deleted in the same change-set. `public.templates_template`/`public.templates_template_version` is now the only template store; `docgenv2` reads canonical only.
+- **Evidence:** `db/migrations/0268_drop_legacy_template_family.sql` (runtime-truth premise verification block, dated 2026-07-03); `internal/platform/docgenv2.LegacyTemplateReadCount()` QA-window observation (zero); API/worker log grep (zero legacy fallback hits); fresh canonical bootstrap (legacy tables empty at drop time); `wiki/database/tables/templates.md` and `wiki/database/tables/template_versions.md` (RETIRED); `wiki/architecture/data-model.md` "public.templates / public.template_versions — dropped (migration 0268)".
+- **Linked backlog row:** none tracked separately — DB-01/DB-10 originate from `wiki/reviews/grade-a-simplification-report-2026-07-01.md` Phase 2 (legacy removal), not `backlog/templates-refactor.md`.
+- **Linked ADR:** missing-ADR (drop is a mechanical legacy-removal action per the run-window proof gate, not a new architectural decision)
+
+---
+
+## Coverage stats (computed at compose time)
+
+- Public symbols undocumented: 100% (per T-014)
+- Operations missing C4 placement: 0 / 22
+- Cross-deps missing in §5/§8: 0 / 17
+- State transitions missing in §6: 0 / 9
+- Decisions without ADR link: 8 / 8

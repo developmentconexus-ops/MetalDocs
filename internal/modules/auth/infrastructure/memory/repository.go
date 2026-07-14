@@ -1,0 +1,626 @@
+// Test fixture only; not wired by bootstrap.
+package memory
+
+import (
+	"context"
+	"database/sql"
+	"strings"
+	"sync"
+	"time"
+
+	authdomain "metaldocs/internal/modules/auth/domain"
+	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/iamtypes"
+)
+
+// Compile-time assertion that the in-memory adapter satisfies the auth port.
+var _ authdomain.Repository = (*Repository)(nil)
+
+// Repository is an in-memory authdomain.Repository double for tests: not
+// wired by bootstrap, no persistence, safe for concurrent use via its mutex.
+type Repository struct {
+	mu            sync.Mutex
+	users         map[string]authdomain.Identity
+	byLogin       map[string]string
+	sessions      map[string]authdomain.Session
+	tenants       map[string][]string
+	tenantCatalog map[string]authdomain.Tenant
+
+	loginLocksMu sync.Mutex
+	loginLocks   map[string]*sync.Mutex
+}
+
+// NewRepository returns an empty in-memory Repository seeded with the system tenant.
+func NewRepository() *Repository {
+	return &Repository{
+		users:      map[string]authdomain.Identity{},
+		byLogin:    map[string]string{},
+		sessions:   map[string]authdomain.Session{},
+		tenants:    map[string][]string{},
+		loginLocks: map[string]*sync.Mutex{},
+		tenantCatalog: map[string]authdomain.Tenant{
+			"ffffffff-ffff-ffff-ffff-ffffffffffff": {
+				ID:   "ffffffff-ffff-ffff-ffff-ffffffffffff",
+				Name: "System Tenant",
+				Slug: "system",
+			},
+		},
+	}
+}
+
+// FindIdentityByIdentifier implements authdomain.Repository.
+func (r *Repository) FindIdentityByIdentifier(_ context.Context, identifier string) (authdomain.Identity, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	userID, ok := r.byLogin[strings.ToLower(strings.TrimSpace(identifier))]
+	if !ok {
+		return authdomain.Identity{}, authdomain.ErrIdentityNotFound
+	}
+	identity, ok := r.users[userID]
+	if !ok {
+		return authdomain.Identity{}, authdomain.ErrIdentityNotFound
+	}
+	return cloneIdentity(identity), nil
+}
+
+// FindIdentityByUserID implements authdomain.Repository.
+func (r *Repository) FindIdentityByUserID(_ context.Context, userID string) (authdomain.Identity, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	identity, ok := r.users[strings.TrimSpace(userID)]
+	if !ok {
+		return authdomain.Identity{}, authdomain.ErrIdentityNotFound
+	}
+	return cloneIdentity(identity), nil
+}
+
+// CreateSession implements authdomain.Repository.
+func (r *Repository) CreateSession(_ context.Context, session authdomain.Session) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.sessions[session.SessionID] = session
+	return nil
+}
+
+// FindSession implements authdomain.Repository.
+func (r *Repository) FindSession(_ context.Context, sessionID string) (authdomain.Session, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	session, ok := r.sessions[sessionID]
+	if !ok {
+		return authdomain.Session{}, authdomain.ErrSessionNotFound
+	}
+	return session, nil
+}
+
+// TouchSession implements authdomain.Repository. It coalesces writes: LastSeenAt
+// only advances when at least 30s have elapsed since the prior value, to avoid
+// a write on every request.
+func (r *Repository) TouchSession(_ context.Context, sessionID string, seenAt time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	session, ok := r.sessions[sessionID]
+	if !ok {
+		return authdomain.ErrSessionNotFound
+	}
+	if !session.LastSeenAt.Before(seenAt.UTC().Add(-30 * time.Second)) {
+		return nil
+	}
+	session.LastSeenAt = seenAt
+	r.sessions[sessionID] = session
+	return nil
+}
+
+// RevokeSession implements authdomain.Repository.
+func (r *Repository) RevokeSession(_ context.Context, sessionID string, revokedAt time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	session, ok := r.sessions[sessionID]
+	if !ok {
+		return authdomain.ErrSessionNotFound
+	}
+	session.RevokedAt = &revokedAt
+	r.sessions[sessionID] = session
+	return nil
+}
+
+// RevokeSessionsByUserID implements authdomain.Repository. Already-revoked
+// sessions are left untouched (idempotent).
+func (r *Repository) RevokeSessionsByUserID(_ context.Context, userID string, revokedAt time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for sessionID, session := range r.sessions {
+		if session.UserID != userID || session.RevokedAt != nil {
+			continue
+		}
+		revokedAtUTC := revokedAt.UTC()
+		session.RevokedAt = &revokedAtUTC
+		r.sessions[sessionID] = session
+	}
+	return nil
+}
+
+// RecordSuccessfulLogin implements authdomain.Repository: clears failed-attempt
+// count and lockout, and stamps LastLoginAt.
+func (r *Repository) RecordSuccessfulLogin(_ context.Context, userID string, loginAt time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	identity, ok := r.users[userID]
+	if !ok {
+		return authdomain.ErrIdentityNotFound
+	}
+	identity.LastLoginAt = &loginAt
+	identity.FailedLoginAttempts = 0
+	identity.LockedUntil = nil
+	identity.UpdatedAt = loginAt
+	r.users[userID] = identity
+	return nil
+}
+
+// RecordFailedLogin is no longer part of authdomain.Repository (the production
+// failed-attempt write goes through LoginTx.RecordFailedLogin inside the login
+// lock). It is retained as a concrete helper: memoryLoginTx.RecordFailedLogin
+// delegates to it, and tests seed lock state through it.
+func (r *Repository) RecordFailedLogin(_ context.Context, userID string, maxAttempts int, lockDurationSeconds int, _ string) (int, *time.Time, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	identity, ok := r.users[userID]
+	if !ok {
+		return 0, nil, authdomain.ErrIdentityNotFound
+	}
+	identity.FailedLoginAttempts++
+	if identity.FailedLoginAttempts >= maxAttempts {
+		lockedUntil := time.Now().UTC().Add(time.Duration(lockDurationSeconds) * time.Second)
+		identity.LockedUntil = &lockedUntil
+	}
+	identity.UpdatedAt = time.Now().UTC()
+	r.users[userID] = identity
+	return identity.FailedLoginAttempts, identity.LockedUntil, nil
+}
+
+// WithinLoginLock serializes concurrent login attempts per identity using a
+// per-userID mutex, mirroring the Postgres advisory-lock contract so the
+// in-memory dev/test double exhibits the same lockout atomicity.
+func (r *Repository) WithinLoginLock(_ context.Context, userID string, fn func(authdomain.LoginTx) error) error {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return authdomain.ErrIdentityNotFound
+	}
+	lk := r.loginLockFor(userID)
+	lk.Lock()
+	defer lk.Unlock()
+	return fn(memoryLoginTx{r: r})
+}
+
+func (r *Repository) loginLockFor(userID string) *sync.Mutex {
+	r.loginLocksMu.Lock()
+	defer r.loginLocksMu.Unlock()
+	lk, ok := r.loginLocks[userID]
+	if !ok {
+		lk = &sync.Mutex{}
+		r.loginLocks[userID] = lk
+	}
+	return lk
+}
+
+type memoryLoginTx struct {
+	r *Repository
+}
+
+func (m memoryLoginTx) LoadLoginState(ctx context.Context, userID string) (authdomain.LoginState, error) {
+	identity, err := m.r.FindIdentityByUserID(ctx, userID)
+	if err != nil {
+		return authdomain.LoginState{}, err
+	}
+	return authdomain.LoginState{
+		PasswordHash: identity.PasswordHash,
+		IsActive:     identity.IsActive,
+		LockedUntil:  identity.LockedUntil,
+	}, nil
+}
+
+func (m memoryLoginTx) RecordFailedLogin(ctx context.Context, userID string, maxAttempts int, lockDurationSeconds int, ip string) (int, *time.Time, error) {
+	return m.r.RecordFailedLogin(ctx, userID, maxAttempts, lockDurationSeconds, ip)
+}
+
+// CreateUser implements authdomain.Repository. Returns ErrUserAlreadyExists if
+// UserID, Username, or Email collides with an existing user.
+func (r *Repository) CreateUser(_ context.Context, params authdomain.CreateUserParams) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, ok := r.users[params.UserID]; ok {
+		return authdomain.ErrUserAlreadyExists
+	}
+	loginKey := strings.ToLower(params.Username)
+	if loginKey == "" {
+		return authdomain.ErrUserAlreadyExists
+	}
+	if _, ok := r.byLogin[loginKey]; ok {
+		return authdomain.ErrUserAlreadyExists
+	}
+	if emailKey := strings.ToLower(strings.TrimSpace(params.Email)); emailKey != "" {
+		if _, ok := r.byLogin[emailKey]; ok {
+			return authdomain.ErrUserAlreadyExists
+		}
+		r.byLogin[emailKey] = params.UserID
+	}
+	r.byLogin[loginKey] = params.UserID
+	now := time.Now().UTC()
+	r.users[params.UserID] = authdomain.Identity{
+		UserID:             params.UserID,
+		Username:           params.Username,
+		Email:              params.Email,
+		DisplayName:        params.DisplayName,
+		PasswordHash:       params.PasswordHash,
+		PasswordAlgo:       params.PasswordAlgo,
+		MustChangePassword: params.MustChangePassword,
+		IsActive:           params.IsActive,
+		Roles:              append([]iamtypes.Role(nil), params.Roles...),
+		CreatedAt:          now,
+		UpdatedAt:          now,
+	}
+	return nil
+}
+
+// ListUsers implements authdomain.Repository.
+func (r *Repository) ListUsers(_ context.Context) ([]authdomain.ManagedUser, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	out := make([]authdomain.ManagedUser, 0, len(r.users))
+	for _, identity := range r.users {
+		out = append(out, authdomain.ManagedUser{
+			UserID:              identity.UserID,
+			Username:            identity.Username,
+			Email:               identity.Email,
+			DisplayName:         identity.DisplayName,
+			IsActive:            identity.IsActive,
+			MustChangePassword:  identity.MustChangePassword,
+			LastLoginAt:         identity.LastLoginAt,
+			FailedLoginAttempts: identity.FailedLoginAttempts,
+			LockedUntil:         identity.LockedUntil,
+			Roles:               append([]iamtypes.Role(nil), identity.Roles...),
+			CreatedAt:           identity.CreatedAt,
+			UpdatedAt:           identity.UpdatedAt,
+		})
+	}
+	return out, nil
+}
+
+// ListOnlineUsers implements authdomain.Repository.
+func (r *Repository) ListOnlineUsers(_ context.Context, tenantID string, activeSince time.Time) ([]authdomain.OnlineUser, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	cutoff := activeSince.UTC()
+	latestByUser := map[string]time.Time{}
+	for _, session := range r.sessions {
+		if session.RevokedAt != nil {
+			continue
+		}
+		if tenantID != "" && session.TenantID != tenantID {
+			continue
+		}
+		if session.ExpiresAt.Before(time.Now().UTC()) {
+			continue
+		}
+		if session.LastSeenAt.Before(cutoff) {
+			continue
+		}
+		current, ok := latestByUser[session.UserID]
+		if !ok || session.LastSeenAt.After(current) {
+			latestByUser[session.UserID] = session.LastSeenAt
+		}
+	}
+
+	out := make([]authdomain.OnlineUser, 0, len(latestByUser))
+	for userID, lastSeenAt := range latestByUser {
+		identity, ok := r.users[userID]
+		if !ok || !identity.IsActive {
+			continue
+		}
+		out = append(out, authdomain.OnlineUser{
+			UserID:      identity.UserID,
+			Username:    identity.Username,
+			DisplayName: identity.DisplayName,
+			LastSeenAt:  lastSeenAt,
+		})
+	}
+	return out, nil
+}
+
+// UpdateUser implements authdomain.Repository; nil fields in params are left unchanged.
+func (r *Repository) UpdateUser(_ context.Context, params authdomain.UpdateUserParams) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	identity, ok := r.users[params.UserID]
+	if !ok {
+		return authdomain.ErrIdentityNotFound
+	}
+	if params.DisplayName != nil {
+		identity.DisplayName = strings.TrimSpace(*params.DisplayName)
+	}
+	if params.Email != nil {
+		oldEmail := strings.ToLower(strings.TrimSpace(identity.Email))
+		if oldEmail != "" {
+			delete(r.byLogin, oldEmail)
+		}
+		identity.Email = strings.TrimSpace(*params.Email)
+		if newEmail := strings.ToLower(strings.TrimSpace(identity.Email)); newEmail != "" {
+			r.byLogin[newEmail] = identity.UserID
+		}
+	}
+	if params.IsActive != nil {
+		identity.IsActive = *params.IsActive
+	}
+	if params.NewPasswordHash != nil {
+		identity.PasswordHash = *params.NewPasswordHash
+		identity.PasswordAlgo = "bcrypt"
+	}
+	if params.MustChangePassword != nil {
+		identity.MustChangePassword = *params.MustChangePassword
+	}
+	if params.ResetLockState {
+		identity.FailedLoginAttempts = 0
+		identity.LockedUntil = nil
+	}
+	identity.UpdatedAt = time.Now().UTC()
+	r.users[params.UserID] = identity
+	return nil
+}
+
+// BootstrapAdmin implements authdomain.Repository. Returns created=false
+// (no error) if the UserID already exists or any user already holds
+// RoleSystemAdmin — bootstrap is a one-time, idempotent no-op thereafter.
+func (r *Repository) BootstrapAdmin(_ context.Context, params authdomain.BootstrapAdminParams) (bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, ok := r.users[params.UserID]; ok {
+		return false, nil
+	}
+	for _, identity := range r.users {
+		for _, role := range identity.Roles {
+			if role == iamtypes.RoleSystemAdmin {
+				return false, nil
+			}
+		}
+	}
+	now := time.Now().UTC()
+	r.byLogin[strings.ToLower(params.Username)] = params.UserID
+	if email := strings.ToLower(strings.TrimSpace(params.Email)); email != "" {
+		r.byLogin[email] = params.UserID
+	}
+	r.users[params.UserID] = authdomain.Identity{
+		UserID:             params.UserID,
+		Username:           params.Username,
+		Email:              params.Email,
+		DisplayName:        params.DisplayName,
+		PasswordHash:       params.PasswordHash,
+		PasswordAlgo:       params.PasswordAlgo,
+		MustChangePassword: params.MustChangePassword,
+		IsActive:           true,
+		Roles:              []iamtypes.Role{iamtypes.RoleSystemAdmin},
+		CreatedAt:          now,
+		UpdatedAt:          now,
+	}
+	return true, nil
+}
+
+// RolesByUserID implements iamdomain.RoleProvider. Returns ErrUserNotFound,
+// ErrUserInactive, or ErrNoRolesAssigned as appropriate.
+func (r *Repository) RolesByUserID(_ context.Context, userID, _ string) ([]iamtypes.Role, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	identity, ok := r.users[userID]
+	if !ok {
+		return nil, iamdomain.ErrUserNotFound
+	}
+	if !identity.IsActive {
+		return nil, iamdomain.ErrUserInactive
+	}
+	if len(identity.Roles) == 0 {
+		return nil, iamdomain.ErrNoRolesAssigned
+	}
+	return append([]iamtypes.Role(nil), identity.Roles...), nil
+}
+
+// RolesByUserIDs resolves roles for multiple users in a single call (in-memory).
+// Mirrors batch semantics: inactive/absent users are omitted; active users with
+// no roles are present with an empty slice. M-6: tenantID is now honored.
+func (r *Repository) RolesByUserIDs(_ context.Context, tenantID string, userIDs []string) (map[string][]iamtypes.Role, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make(map[string][]iamtypes.Role, len(userIDs))
+	for _, uid := range userIDs {
+		identity, ok := r.users[uid]
+		if !ok || !identity.IsActive {
+			continue
+		}
+		// M-6: only include users that belong to the requested tenant.
+		if !sliceContains(r.tenants[uid], tenantID) {
+			continue
+		}
+		clone := make([]iamtypes.Role, len(identity.Roles))
+		copy(clone, identity.Roles)
+		out[uid] = clone
+	}
+	return out, nil
+}
+
+// UserActiveInTenant returns true iff the user is active and belongs to tenantID.
+func (r *Repository) UserActiveInTenant(_ context.Context, tenantID, userID string) (bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	identity, ok := r.users[userID]
+	if !ok || !identity.IsActive {
+		return false, nil
+	}
+	return sliceContains(r.tenants[userID], tenantID), nil
+}
+
+// sliceContains reports whether s contains v.
+func sliceContains(s []string, v string) bool {
+	for _, e := range s {
+		if e == v {
+			return true
+		}
+	}
+	return false
+}
+
+// UpsertUserAndAssignRole implements iamdomain.RoleAdminRepository: creates
+// the user if absent, adds role if not already held, and activates the user.
+func (r *Repository) UpsertUserAndAssignRole(_ context.Context, userID, displayName, _ string, role iamtypes.Role, _ string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	identity, ok := r.users[userID]
+	if !ok {
+		now := time.Now().UTC()
+		identity = authdomain.Identity{
+			UserID:      userID,
+			Username:    userID,
+			DisplayName: displayName,
+			IsActive:    true,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		}
+		r.byLogin[strings.ToLower(userID)] = userID
+	}
+	if strings.TrimSpace(displayName) != "" {
+		identity.DisplayName = strings.TrimSpace(displayName)
+	}
+	if !containsRole(identity.Roles, role) {
+		identity.Roles = append(identity.Roles, role)
+	}
+	identity.IsActive = true
+	identity.UpdatedAt = time.Now().UTC()
+	r.users[userID] = identity
+	return nil
+}
+
+// HasAnyRole implements iamdomain.RoleAdminRepository.
+func (r *Repository) HasAnyRole(_ context.Context, role iamtypes.Role, _ string) (bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for _, identity := range r.users {
+		for _, assigned := range identity.Roles {
+			if assigned == role {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+// ReplaceUserRoles implements iamdomain.RoleAdminRepository: creates the user
+// if absent, then overwrites its role set with the single given role.
+func (r *Repository) ReplaceUserRoles(_ context.Context, userID, displayName, _ string, role iamtypes.Role, _ string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	identity, ok := r.users[userID]
+	if !ok {
+		now := time.Now().UTC()
+		identity = authdomain.Identity{
+			UserID:      userID,
+			Username:    userID,
+			DisplayName: displayName,
+			IsActive:    true,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		}
+		r.byLogin[strings.ToLower(userID)] = userID
+	}
+	if strings.TrimSpace(displayName) != "" {
+		identity.DisplayName = strings.TrimSpace(displayName)
+	}
+	identity.Roles = []iamtypes.Role{role}
+	identity.IsActive = true
+	identity.UpdatedAt = time.Now().UTC()
+	r.users[userID] = identity
+	return nil
+}
+
+// UpsertUserAndAssignRoleTx is the tx-aware variant. In the memory repo
+// (test fixture only) the *sql.Tx is ignored.
+func (r *Repository) UpsertUserAndAssignRoleTx(ctx context.Context, _ *sql.Tx, userID, displayName, tenantID string, role iamtypes.Role, assignedBy string) error {
+	return r.UpsertUserAndAssignRole(ctx, userID, displayName, tenantID, role, assignedBy)
+}
+
+// ReplaceUserRolesTx is the tx-aware variant. In the memory repo
+// (test fixture only) the *sql.Tx is ignored.
+func (r *Repository) ReplaceUserRolesTx(ctx context.Context, _ *sql.Tx, userID, displayName, tenantID string, role iamtypes.Role, assignedBy string) error {
+	return r.ReplaceUserRoles(ctx, userID, displayName, tenantID, role, assignedBy)
+}
+
+// SeedUserTenants sets the tenant list for a user. Used in tests only.
+// GetUserTenants returns an empty slice until this helper seeds the user.
+func (r *Repository) SeedUserTenants(userID string, tenantIDs []string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.tenants[userID] = append([]string(nil), tenantIDs...)
+	for _, tenantID := range tenantIDs {
+		r.ensureTenantLocked(strings.TrimSpace(tenantID))
+	}
+}
+
+// GetUserTenants implements authdomain.Repository. Returns an empty slice
+// until SeedUserTenants has populated the user (test-only helper).
+func (r *Repository) GetUserTenants(_ context.Context, userID string) ([]string, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	tenants := r.tenants[strings.TrimSpace(userID)]
+	return append([]string(nil), tenants...), nil
+}
+
+// GetTenantByID implements authdomain.Repository. Returns ErrTenantNotFound
+// if tenantID is not in the seeded catalog.
+func (r *Repository) GetTenantByID(_ context.Context, tenantID string) (authdomain.Tenant, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	tenant, ok := r.tenantCatalog[strings.TrimSpace(tenantID)]
+	if !ok {
+		return authdomain.Tenant{}, authdomain.ErrTenantNotFound
+	}
+	return tenant, nil
+}
+
+func cloneIdentity(identity authdomain.Identity) authdomain.Identity {
+	identity.Roles = append([]iamtypes.Role(nil), identity.Roles...)
+	return identity
+}
+
+func containsRole(roles []iamtypes.Role, want iamtypes.Role) bool {
+	for _, role := range roles {
+		if role == want {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *Repository) ensureTenantLocked(tenantID string) {
+	if tenantID == "" {
+		return
+	}
+	if _, ok := r.tenantCatalog[tenantID]; ok {
+		return
+	}
+	r.tenantCatalog[tenantID] = authdomain.Tenant{
+		ID:   tenantID,
+		Name: "Tenant " + tenantID,
+		Slug: strings.ToLower(strings.ReplaceAll(tenantID, "-", "")),
+	}
+}

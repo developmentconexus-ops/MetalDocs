@@ -1,0 +1,75 @@
+# Database Dictionary Index
+
+> **Last verified:** 2026-07-03 (DB-01/DB-10: migration `0268` drop — legacy template family `public.templates` + `public.template_versions` retired (canonical successor `templates_template`/`templates_template_version` is the sole live template store since ARC-01, commit `4160018e`); safety-net drop of `public.signoffs` (no-op, table absent from canonical baseline)) | **Prior:** 2026-07-02 (DB-08/status-tighten/DB-09: migration `0264` promotes `document_process_areas` PK to `(tenant_id, code)` — `document_profiles` PK deliberately left as `code` alone, see its table page + `wiki/modules/taxonomy-tech-debt.md` T-015; migration `0265` tightens `documents_status_check` to 9 live values, drops dead `'finalized'`; migration `0266` adds `audit_events_payload_size_cap` (64 KiB) + hardens `metaldocs_app`'s already-INSERT/SELECT-only grant on `audit_events`) | **Prior:** 2026-07-02 (DB-06: migration 0262 drop — `templates_audit_log` table retired, audit sink unified on `metaldocs.audit_events`) | **Prior:** 2026-06-12 (FE-5: migration 0236 dead-schema drop — `document_subjects` table retired; `templates_template.areas/visibility/specific_areas` + `document_profiles.is_active` columns dropped)
+> **Source:** `db/baseline/0001_current_schema.sql`
+
+| Table | Schema | Owner | Page |
+|---|---|---|---|
+| `audit_events` | `metaldocs` | audit | `wiki/database/tables/audit_events.md` |
+| `auth_identities` | `metaldocs` | auth | `wiki/database/tables/auth_identities.md` |
+| `auth_sessions` | `metaldocs` | auth | `wiki/database/tables/auth_sessions.md` |
+| `tenants` | `metaldocs` | auth/platform | `wiki/database/tables/tenants.md` |
+| `document_attachments` | `metaldocs` | documents | `wiki/database/tables/document_attachments.md` |
+| `document_collaboration_presence` | `metaldocs` | documents | `wiki/database/tables/document_collaboration_presence.md` |
+| `document_departments` | `metaldocs` | taxonomy | `wiki/database/tables/document_departments.md` |
+| `document_edit_locks` | `metaldocs` | documents | `wiki/database/tables/document_edit_locks.md` |
+| `document_families` | `metaldocs` | taxonomy | `wiki/database/tables/document_families.md` |
+| `document_images` | `metaldocs` | documents | `wiki/database/tables/document_images.md` |
+| `document_process_areas` | `metaldocs` | taxonomy | `wiki/database/tables/document_process_areas.md` |
+| `document_profile_governance` | `metaldocs` | taxonomy | `wiki/database/tables/document_profile_governance.md` |
+| `document_profile_schema_versions` | `metaldocs` | taxonomy | `wiki/database/tables/document_profile_schema_versions.md` |
+| `document_profile_template_defaults` | `metaldocs` | taxonomy | `wiki/database/tables/document_profile_template_defaults.md` |
+| `document_profiles` | `metaldocs` | taxonomy | `wiki/database/tables/document_profiles.md` |
+| `document_sequences` | `metaldocs` | unknown-owner | `wiki/database/tables/document_sequences.md` |
+| `document_template_assignments` | `metaldocs` | templates | `wiki/database/tables/document_template_assignments.md` |
+| `document_template_versions` | `metaldocs` | templates | `wiki/database/tables/document_template_versions.md` |
+| `document_template_versions_mddm` | `metaldocs` | templates | `wiki/database/tables/document_template_versions_mddm.md` |
+| `document_type_schema_versions` | `metaldocs` | taxonomy | `wiki/database/tables/document_type_schema_versions.md` |
+| `document_types` | `metaldocs` | taxonomy | `wiki/database/tables/document_types.md` |
+| `document_version_images` | `metaldocs` | documents | `wiki/database/tables/document_version_images.md` |
+| `document_versions` | `metaldocs` | documents | `wiki/database/tables/document_versions.md` |
+| `document_versions_mddm` | `metaldocs` | documents | `wiki/database/tables/document_versions_mddm.md` |
+| `documents` | `metaldocs` | documents | `wiki/database/tables/documents.md` |
+| `iam_group_members` | `metaldocs` | iam | `wiki/database/tables/iam_group_members.md` |
+| `iam_group_roles` | `metaldocs` | iam | `wiki/database/tables/iam_group_roles.md` |
+| `iam_groups` | `metaldocs` | iam | `wiki/database/tables/iam_groups.md` |
+| `iam_user_roles` | `metaldocs` | iam | `wiki/database/tables/iam_user_roles.md` |
+| `iam_users` | `metaldocs` | iam | `wiki/database/tables/iam_users.md` |
+| `idempotency_keys` | `metaldocs` | platform/idempotency | `wiki/database/tables/idempotency_keys.md` |
+| `job_leases` | `metaldocs` | platform/workers | `wiki/database/tables/job_leases.md` |
+| `mddm_shadow_diff_events` | `metaldocs` | documents | `wiki/database/tables/mddm_shadow_diff_events.md` |
+| `notifications` | `metaldocs` | platform/workers | `wiki/database/tables/notifications.md` |
+| `outbox_events` | `metaldocs` | platform/workers | `wiki/database/tables/outbox_events.md` |
+| `pdf_dispatch_outbox` | `metaldocs` | platform/workers | `wiki/database/tables/pdf_dispatch_outbox.md` |
+| `role_capabilities` | `metaldocs` | iam | `wiki/database/tables/role_capabilities.md` |
+| `template_audit_log` | `metaldocs` | templates | `wiki/database/tables/template_audit_log.md` |
+| `template_drafts` | `metaldocs` | templates | `wiki/database/tables/template_drafts.md` |
+| `workflow_approvals` | `metaldocs` | approval | `wiki/database/tables/workflow_approvals.md` |
+| `approval_instances` | `public` | approval | `wiki/database/tables/approval_instances.md` |
+| `auth_failure_counters` | `public` | approval | `wiki/database/tables/auth_failure_counters.md` |
+| `approval_route_stages` | `public` | approval | `wiki/database/tables/approval_route_stages.md` |
+| `approval_routes` | `public` | approval | `wiki/database/tables/approval_routes.md` |
+| `approval_signoffs` | `public` | approval | `wiki/database/tables/approval_signoffs.md` |
+| `approval_stage_instances` | `public` | approval | `wiki/database/tables/approval_stage_instances.md` |
+| `autosave_pending_uploads` | `public` | documents | `wiki/database/tables/autosave_pending_uploads.md` |
+| `cd_sequence_counters` | `public` | controlled-documents | `wiki/database/tables/cd_sequence_counters.md` |
+| `controlled_document_area_grants` | `public` | controlled-documents | `wiki/database/tables/controlled_document_area_grants.md` |
+| `controlled_document_user_grants` | `public` | controlled-documents | `wiki/database/tables/controlled_document_user_grants.md` |
+| `controlled_documents` | `public` | controlled-documents | `wiki/database/tables/controlled_documents.md` |
+| `document_checkpoints` | `public` | documents | `wiki/database/tables/document_checkpoints.md` |
+| `document_comments` | `public` | documents | `wiki/database/tables/document_comments.md` |
+| `document_exports` | `public` | documents | `wiki/database/tables/document_exports.md` |
+| `document_placeholder_values` | `public` | documents | `wiki/database/tables/document_placeholder_values.md` |
+| `document_revisions` | `public` | documents | `wiki/database/tables/document_revisions.md` |
+| `documents` | `public` | documents | `wiki/database/tables/documents.md` |
+| `editor_sessions` | `public` | documents | `wiki/database/tables/editor_sessions.md` |
+| `governance_events` | `public` | audit | `wiki/database/tables/governance_events.md` |
+| `schema_migrations` | `public` | platform/db tooling | `wiki/database/tables/schema_migrations.md` |
+| `template_audit_log` | `public` | templates | `wiki/database/tables/template_audit_log.md` |
+| `template_versions` | `public` | templates | `wiki/database/tables/template_versions.md` (RETIRED 2026-07-03, migration 0268 — canonical successor is `templates_template_version`) |
+| `templates` | `public` | templates | `wiki/database/tables/templates.md` (RETIRED 2026-07-03, migration 0268 — canonical successor is `templates_template`) |
+| `templates_approval_config` | `public` | templates | `wiki/database/tables/templates_approval_config.md` (DROPPED 2026-07-13, migration 0302 — ROADMAP unit 3.1a, ADR 0082) |
+| `templates_audit_log` | `public` | templates | `wiki/database/tables/templates_audit_log.md` (RETIRED 2026-07-02, migration 0262 — audit sink is `metaldocs.audit_events`) |
+| `templates_template` | `public` | templates | `wiki/database/tables/templates_template.md` |
+| `templates_template_version` | `public` | templates | `wiki/database/tables/templates_template_version.md` |
+| `user_process_areas` | `public` | iam | `wiki/database/tables/user_process_areas.md` |
