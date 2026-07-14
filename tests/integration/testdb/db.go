@@ -79,7 +79,9 @@ func Open(t *testing.T) (*sql.DB, string) {
 	}
 	defer adminDB.Close()
 
+	phaseStart := time.Now()
 	ensureTemplateDatabase(t, baseDSN)
+	tracePhase(t, "ensure_template", time.Since(phaseStart))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -88,13 +90,16 @@ func Open(t *testing.T) (*sql.DB, string) {
 	}
 
 	dbName := "metaldocs_test_" + randomSuffix(t)
+	phaseStart = time.Now()
 	if _, err := adminDB.ExecContext(
 		ctx,
 		fmt.Sprintf("CREATE DATABASE %s TEMPLATE %s", quoteIdent(dbName), quoteIdent(templateDBName)),
 	); err != nil {
 		t.Fatalf("create isolated test database %s: %v", dbName, err)
 	}
+	tracePhase(t, "create_database", time.Since(phaseStart))
 
+	phaseStart = time.Now()
 	db, err := openDBWithDatabase(baseDSN, dbName)
 	if err != nil {
 		t.Fatalf("open test db: %v", err)
@@ -103,6 +108,7 @@ func Open(t *testing.T) (*sql.DB, string) {
 		_ = db.Close()
 		t.Fatalf("ping isolated test database %s: %v", dbName, err)
 	}
+	tracePhase(t, "first_ping", time.Since(phaseStart))
 
 	t.Cleanup(func() {
 		_ = db.Close()
@@ -113,9 +119,19 @@ func Open(t *testing.T) (*sql.DB, string) {
 			return
 		}
 		defer dropDB.Close()
-		if err := dropDatabase(dropCtx, dropDB, dbName); err != nil {
+
+		cleanupStart := time.Now()
+		if err := terminateBackends(dropCtx, dropDB, dbName); err != nil {
+			t.Logf("terminate backends on %s: %v", dbName, err)
+			return
+		}
+		tracePhase(t, "terminate_backends", time.Since(cleanupStart))
+
+		cleanupStart = time.Now()
+		if err := dropDatabaseOnly(dropCtx, dropDB, dbName); err != nil {
 			t.Logf("drop isolated test database %s: %v", dbName, err)
 		}
+		tracePhase(t, "drop_database", time.Since(cleanupStart))
 	})
 
 	return db, dbName
@@ -321,20 +337,25 @@ func advisoryKey(fingerprint string) int64 {
 	return int64(k)
 }
 
-func dropDatabase(ctx context.Context, db *sql.DB, name string) error {
-	if _, err := db.ExecContext(ctx,
+// terminateBackends and dropDatabaseOnly are split so the two costs can be
+// timed independently: terminate is a catalog scan whose cost tracks concurrent
+// session count, while DROP is physical file removal whose cost tracks database
+// size. They move in opposite directions under parallelism, so a combined
+// timing hides which one is being paid.
+func terminateBackends(ctx context.Context, db *sql.DB, name string) error {
+	_, err := db.ExecContext(ctx,
 		`SELECT pg_terminate_backend(pid)
 		   FROM pg_stat_activity
 		  WHERE datname = $1
 		    AND pid <> pg_backend_pid()`,
 		name,
-	); err != nil {
-		return err
-	}
-	if _, err := db.ExecContext(ctx, fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", quoteIdent(name))); err != nil {
-		return err
-	}
-	return nil
+	)
+	return err
+}
+
+func dropDatabaseOnly(ctx context.Context, db *sql.DB, name string) error {
+	_, err := db.ExecContext(ctx, fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", quoteIdent(name)))
+	return err
 }
 
 // dropDatabaseConn is dropDatabase pinned to a single *sql.Conn, used by the
