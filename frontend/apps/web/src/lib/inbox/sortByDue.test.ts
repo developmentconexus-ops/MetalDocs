@@ -5,9 +5,11 @@ import type { InboxItem } from '../../features/approval/api/approvalTypes';
 function makeItem(overrides: Partial<InboxItem> = {}): InboxItem {
   return {
     instance_id: 'inst-1',
-    document_id: 'doc-1',
+    subject_kind: 'document',
+    subject_key: 'doc-1',
+    subject_title: 'Doc',
+    subject_ref: 'doc-1',
     controlled_document_id: 'cd-1',
-    document_title: 'Doc',
     area_code: 'QUA',
     submitted_by: 'maria',
     submitted_at: '2026-04-14T10:00:00.000Z',

@@ -6,17 +6,36 @@ import type { InboxItem } from '../api/approvalTypes';
 const items: InboxItem[] = [
   {
     instance_id: 'inst-1',
-    document_id: 'doc-1',
+    subject_kind: 'document',
+    subject_key: 'doc-1',
+    subject_title: 'Documento 1',
+    subject_ref: 'doc-1',
     controlled_document_id: 'CD-001',
-    document_title: 'Documento 1',
     area_code: 'QA',
     submitted_by: 'user-1',
     submitted_at: new Date().toISOString(),
     stage_label: 'Revisão',
     quorum_progress: '0/1',
+    stage_kind: 'review',
     due_at: '2026-07-01T00:00:00Z',
   },
 ];
+
+const templateItem: InboxItem = {
+  instance_id: 'inst-tpl-1',
+  subject_kind: 'template',
+  subject_key: 'tpl-version-1',
+  subject_title: 'Modelo POP',
+  subject_ref: 'tpl-1',
+  controlled_document_id: null,
+  area_code: 'QA',
+  submitted_by: 'user-2',
+  submitted_at: new Date().toISOString(),
+  stage_label: 'Revisão',
+  quorum_progress: '0/1',
+  stage_kind: 'review',
+  due_at: '2026-07-01T00:00:00Z',
+};
 
 // FE-19 N8: A/D keyboard shortcuts were removed — they were empty TODO
 // handlers wired to a live keydown listener with no effect, while the hint
@@ -82,5 +101,23 @@ describe('InboxStack', () => {
 
     expect(onNext).toHaveBeenCalledOnce();
     expect(onPrev).toHaveBeenCalledOnce();
+  });
+
+  // Unit 4.2 slice 2: a template row must render subject_title and a
+  // subject-aware queue code without crashing on the null
+  // controlled_document_id.
+  it('renders a template row using subject_title and subject_ref, no crash on null controlled_document_id', () => {
+    render(
+      <InboxStack
+        items={[templateItem]}
+        selectedIdx={0}
+        onSelect={() => {}}
+        onNext={() => {}}
+        onPrev={() => {}}
+      />,
+    );
+
+    expect(screen.getAllByText('Modelo POP').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('tpl-1').length).toBeGreaterThan(0);
   });
 });

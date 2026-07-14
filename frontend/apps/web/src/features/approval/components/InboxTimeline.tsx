@@ -174,9 +174,11 @@ export function InboxTimeline({ items, onOpenDocument, isLoading, isError, isFil
                           </div>
                           <div className={styles.itemMeta}>
                             <div className={styles.itemMetaTop}>
-                              <span className={`${styles.itemCode} mono`}>{item.controlled_document_id}</span>
+                              <span className={`${styles.itemCode} mono`}>
+                                {item.subject_kind === 'document' ? item.controlled_document_id : item.subject_ref}
+                              </span>
                             </div>
-                            <div className={styles.itemTitle}>{item.document_title}</div>
+                            <div className={styles.itemTitle}>{item.subject_title}</div>
                             <div className={styles.itemAuthLine}>
                               <Avatar name={item.submitted_by} size="xs" />
                               <span>{item.submitted_by}</span>

@@ -24,7 +24,7 @@ export function InboxApprovalCard({
             <div className={`${styles.codeVersion} mono`}>
               {new Date(item.submitted_at).toLocaleString('pt-BR')}
             </div>
-            <h2 className={styles.cardTitle}>{item.document_title}</h2>
+            <h2 className={styles.cardTitle}>{item.subject_title}</h2>
           </div>
         </div>
       </div>
@@ -43,7 +43,9 @@ export function InboxApprovalCard({
           <div className={styles.statCell}>
             <div className="kicker">ÁREA</div>
             <div className={styles.stageName}>{item.area_code}</div>
-            <div className="caption mono">{item.controlled_document_id}</div>
+            {item.subject_kind === 'document' ? (
+              <div className="caption mono">{item.controlled_document_id}</div>
+            ) : null}
           </div>
           <div className={styles.statCell}>
             <div className="kicker">ESTÁGIO</div>
@@ -52,27 +54,39 @@ export function InboxApprovalCard({
           </div>
         </div>
         <div className={styles.cardActions}>
-          <button
-            type="button"
-            className={`${styles.btnOpen} btn`}
-            onClick={onOpenDocument}
-          >
-            <Icon name="eye" size={14} /> Abrir documento
-          </button>
-          <button
-            type="button"
-            className={`${styles.btnReturn} btn`}
-            onClick={onReject}
-          >
-            Devolver
-          </button>
-          <button
-            type="button"
-            className={`${styles.btnApprove} btn btn-primary`}
-            onClick={onApprove}
-          >
-            Aprovar e assinar →
-          </button>
+          {item.subject_kind === 'document' ? (
+            <>
+              <button
+                type="button"
+                className={`${styles.btnOpen} btn`}
+                onClick={onOpenDocument}
+              >
+                <Icon name="eye" size={14} /> Abrir documento
+              </button>
+              <button
+                type="button"
+                className={`${styles.btnReturn} btn`}
+                onClick={onReject}
+              >
+                Devolver
+              </button>
+              <button
+                type="button"
+                className={`${styles.btnApprove} btn btn-primary`}
+                onClick={onApprove}
+              >
+                Aprovar e assinar →
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className={`${styles.btnOpen} btn`}
+              onClick={onOpenDocument}
+            >
+              <Icon name="eye" size={14} /> Abrir revisão do modelo
+            </button>
+          )}
         </div>
       </div>
     </article>

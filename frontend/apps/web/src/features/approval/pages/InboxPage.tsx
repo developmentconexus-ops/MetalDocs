@@ -94,13 +94,26 @@ export function InboxPage() {
   // fetchActiveDocumentInstance-based author-editor route, which sent
   // reviewers/approvers into the writable editor (the W2 vector F3 already
   // killed at the cockpit).
+  // Unit 4.2 slice 2: subject-generic — document rows keep the cockpit route,
+  // template rows open the template approval screen instead.
   function openDocument(item: InboxItem) {
     setActionError(null);
-    navigate(`/documents/${item.document_id}`);
+    if (item.subject_kind === 'template') {
+      navigate(`/templates/${item.subject_ref}/approval`);
+      return;
+    }
+    navigate(`/documents/${item.subject_ref}`);
   }
 
+  // Document-only quick decision flow. Template rows never carry a
+  // controlled_document_id (always null per contract) and are actioned by
+  // opening the template approval route instead — never route a template row
+  // through fetchActiveDocumentInstance.
   async function openDecisionFlow(item: InboxItem, decision: 'approve' | 'reject') {
     setActionError(null);
+    if (item.subject_kind !== 'document' || item.controlled_document_id == null) {
+      return;
+    }
     try {
       const active = await fetchActiveDocumentInstance(item.controlled_document_id);
       if (!active?.document_id) {

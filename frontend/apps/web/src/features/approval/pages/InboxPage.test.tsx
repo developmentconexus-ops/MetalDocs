@@ -32,17 +32,32 @@ import { useInboxQuery } from '../queries/useInboxQuery';
 function makeItem(overrides: Partial<InboxItem> = {}): InboxItem {
   return {
     instance_id: 'inst-1',
-    document_id: 'doc-1',
+    subject_kind: 'document',
+    subject_key: 'doc-1',
+    subject_title: 'POP Limpeza',
+    subject_ref: 'doc-1',
     controlled_document_id: 'cd-1',
-    document_title: 'POP Limpeza',
     area_code: 'QUA',
     submitted_by: 'maria',
     submitted_at: '2026-04-14T10:00:00.000Z',
     stage_label: 'Revisão L2',
     quorum_progress: '1/2',
+    stage_kind: 'review',
     due_at: '2026-04-21T10:00:00.000Z',
     ...overrides,
   };
+}
+
+function makeTemplateItem(overrides: Partial<InboxItem> = {}): InboxItem {
+  return makeItem({
+    instance_id: 'inst-tpl-1',
+    subject_kind: 'template',
+    subject_key: 'tpl-version-1',
+    subject_title: 'Modelo POP',
+    subject_ref: 'tpl-1',
+    controlled_document_id: null,
+    ...overrides,
+  });
 }
 
 function renderPage() {
@@ -126,8 +141,8 @@ describe('InboxPage', () => {
   });
 
   it('renders queue items from API data', async () => {
-    const item1 = makeItem({ instance_id: 'i1', document_title: 'POP Limpeza' });
-    const item2 = makeItem({ instance_id: 'i2', document_title: 'Manual Segurança' });
+    const item1 = makeItem({ instance_id: 'i1', subject_title: 'POP Limpeza' });
+    const item2 = makeItem({ instance_id: 'i2', subject_title: 'Manual Segurança' });
 
     vi.mocked(useInboxQuery).mockReturnValue({
       data: { items: [item1, item2], total: 2 },
@@ -160,8 +175,8 @@ describe('InboxPage', () => {
 
   it('next/prev navigation updates counter', async () => {
     const items = [
-      makeItem({ instance_id: 'i1', document_title: 'Doc 1' }),
-      makeItem({ instance_id: 'i2', document_title: 'Doc 2' }),
+      makeItem({ instance_id: 'i1', subject_title: 'Doc 1' }),
+      makeItem({ instance_id: 'i2', subject_title: 'Doc 2' }),
     ];
 
     vi.mocked(useInboxQuery).mockReturnValue({
@@ -292,7 +307,7 @@ describe('InboxPage', () => {
   // canonical artifact path (`/documents/:id`, ADR 0080).
   it('primary open (Abrir documento) navigates to the document workspace, not the editor', async () => {
     vi.mocked(useInboxQuery).mockReturnValue({
-      data: { items: [makeItem({ document_id: 'doc-cockpit', controlled_document_id: 'cd-cockpit' })], total: 1 },
+      data: { items: [makeItem({ subject_ref: 'doc-cockpit', controlled_document_id: 'cd-cockpit' })], total: 1 },
       isLoading: false,
       isError: false,
       refetch: vi.fn(),
@@ -306,6 +321,42 @@ describe('InboxPage', () => {
     });
     expect(fetchActiveDocumentInstance).not.toHaveBeenCalled();
     expect(navigateMock).not.toHaveBeenCalledWith(expect.stringContaining('/edit'));
+  });
+
+  // Unit 4.2 slice 2: a template row (subject_kind === 'template') opens the
+  // template approval route instead of the document cockpit.
+  it('template row open navigates to the template approval route', async () => {
+    vi.mocked(useInboxQuery).mockReturnValue({
+      data: { items: [makeTemplateItem({ subject_ref: 'tpl-cockpit' })], total: 1 },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useInboxQuery>);
+
+    renderPage();
+    fireEvent.click(screen.getByText('Abrir revisão do modelo'));
+
+    await waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith('/templates/tpl-cockpit/approval');
+    });
+    expect(fetchActiveDocumentInstance).not.toHaveBeenCalled();
+  });
+
+  // A template row's controlled_document_id is always null on the wire — the
+  // document-only quick decision flow must never run for it.
+  it('template row does not trigger the document quick-decision flow', async () => {
+    vi.mocked(useInboxQuery).mockReturnValue({
+      data: { items: [makeTemplateItem()], total: 1 },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useInboxQuery>);
+
+    renderPage();
+
+    expect(screen.queryByRole('button', { name: /Aprovar e assinar/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Devolver/i })).toBeNull();
+    expect(fetchActiveDocumentInstance).not.toHaveBeenCalled();
   });
 
   it('filter selection re-queries useInboxQuery with mapped params', async () => {
@@ -327,9 +378,9 @@ describe('InboxPage', () => {
   });
 
   it('sorts items due-date ascending with null due_at last', async () => {
-    const noDue = makeItem({ instance_id: 'i-none', document_title: 'Sem prazo', due_at: null });
-    const later = makeItem({ instance_id: 'i-later', document_title: 'Prazo distante', due_at: '2026-08-01T00:00:00.000Z' });
-    const sooner = makeItem({ instance_id: 'i-sooner', document_title: 'Prazo próximo', due_at: '2026-04-15T00:00:00.000Z' });
+    const noDue = makeItem({ instance_id: 'i-none', subject_title: 'Sem prazo', due_at: null });
+    const later = makeItem({ instance_id: 'i-later', subject_title: 'Prazo distante', due_at: '2026-08-01T00:00:00.000Z' });
+    const sooner = makeItem({ instance_id: 'i-sooner', subject_title: 'Prazo próximo', due_at: '2026-04-15T00:00:00.000Z' });
 
     vi.mocked(useInboxQuery).mockReturnValue({
       data: { items: [noDue, later, sooner], total: 3 },
@@ -392,7 +443,7 @@ describe('InboxPage', () => {
   it('renders an overdue chip for a past due_at', async () => {
     const overdueItem = makeItem({
       instance_id: 'i-overdue',
-      document_title: 'Doc atrasado',
+      subject_title: 'Doc atrasado',
       due_at: '2020-01-01T00:00:00.000Z',
     });
 
