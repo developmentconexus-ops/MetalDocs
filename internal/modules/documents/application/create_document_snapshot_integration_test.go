@@ -21,19 +21,12 @@ import (
 
 func TestCreateDocumentTx_PopulatesAllSnapshotColumns(t *testing.T) {
 	ctx := context.Background()
-	db, dbName := testdb.Open(t)
+	db, _ := testdb.Open(t)
 
-	// All NEW pool connections must resolve bare runtime tables to public.* (the real
-	// documents / controlled_documents / templates_*); metaldocs.documents is a dead
-	// legacy duplicate lacking controlled_document_id. ALTER DATABASE sets the default
-	// for sessions opened after it, so evict the connection that ran the ALTER (it
-	// predates the new default) and let the pool reopen. More than one connection is
-	// required here: the off-tx UserDisplayNameReader port read and the templates
-	// GetPublishedVersion read both run on the pool while the create tx holds a
-	// connection (H-PRE-1) — a single-connection pool deadlocks.
-	if _, err := db.ExecContext(ctx, `ALTER DATABASE "`+dbName+`" SET search_path TO public, metaldocs`); err != nil {
-		t.Fatalf("alter database search_path: %v", err)
-	}
+	// More than one connection is required here: the off-tx UserDisplayNameReader
+	// port read and the templates GetPublishedVersion read both run on the pool
+	// while the create tx holds a connection (H-PRE-1) — a single-connection pool
+	// deadlocks.
 	db.SetMaxIdleConns(0)
 	db.SetMaxIdleConns(4)
 	db.SetMaxOpenConns(4)

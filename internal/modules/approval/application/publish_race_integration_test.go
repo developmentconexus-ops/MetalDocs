@@ -87,12 +87,7 @@ func TestPublishRace(t *testing.T) {
 func runPublishRaceInterleaving(t *testing.T, seed seedState, manualFirst bool) {
 	ctx := context.Background()
 
-	database, dbName := testdb.Open(t)
-	if _, err := database.ExecContext(ctx,
-		`ALTER DATABASE "`+dbName+`" SET search_path TO public, metaldocs`,
-	); err != nil {
-		t.Fatalf("alter database search_path: %v", err)
-	}
+	database, _ := testdb.Open(t)
 	database.SetMaxIdleConns(0)
 	database.SetMaxIdleConns(4)
 	database.SetMaxOpenConns(4)

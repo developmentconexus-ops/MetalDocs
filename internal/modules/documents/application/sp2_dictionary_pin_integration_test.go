@@ -133,10 +133,6 @@ func queryPlaceholderRow(t *testing.T, db *sql.DB, tenantID, revisionID, placeho
 func openDictDB(t *testing.T) (*sql.DB, string) {
 	t.Helper()
 	db, dbName := testdb.Open(t)
-	ctx := context.Background()
-	if _, err := db.ExecContext(ctx, `ALTER DATABASE "`+dbName+`" SET search_path TO public, metaldocs`); err != nil {
-		t.Fatalf("alter search_path: %v", err)
-	}
 	db.SetMaxIdleConns(0)
 	db.SetMaxIdleConns(4)
 	db.SetMaxOpenConns(4)

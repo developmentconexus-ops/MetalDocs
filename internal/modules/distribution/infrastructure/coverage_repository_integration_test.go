@@ -96,7 +96,7 @@ func seedDistributionGrants(
 }
 
 func TestDistributionCoverage(t *testing.T) {
-	db, _ := testdb.Open(t)
+	db, _ := testdb.OpenFreshDatabase(t)
 	ctx := context.Background()
 
 	tenantID, cdID, userGrantID, areaUserID, areaCode := seedDistributionGrants(t, db)

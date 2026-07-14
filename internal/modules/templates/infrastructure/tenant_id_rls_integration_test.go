@@ -32,13 +32,8 @@ import (
 // NOBYPASSRLS, so this is the faithful way to exercise the deployed policy.
 func TestTemplateVersion_TenantID_RLSParity(t *testing.T) {
 	ctx := context.Background()
-	db, dbName := testdb.Open(t)
+	db, _ := testdb.OpenFreshDatabase(t)
 
-	// Bare runtime tables (templates_*) must resolve to public.*; evict the
-	// connection that ran the ALTER so the pool reopens with the new default.
-	if _, err := db.ExecContext(ctx, `ALTER DATABASE "`+dbName+`" SET search_path TO public, metaldocs`); err != nil {
-		t.Fatalf("alter database search_path: %v", err)
-	}
 	db.SetMaxIdleConns(0)
 	db.SetMaxIdleConns(4)
 	db.SetMaxOpenConns(4)

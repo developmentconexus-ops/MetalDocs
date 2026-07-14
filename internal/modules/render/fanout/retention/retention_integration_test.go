@@ -54,7 +54,7 @@ import (
 // metaldocs-schema staging outbox tables.
 func openRetentionDB(t *testing.T) *sql.DB {
 	t.Helper()
-	db, _ := testdb.Open(t)
+	db, _ := testdb.OpenFreshDatabase(t)
 	db.SetMaxOpenConns(1)
 	if _, err := db.ExecContext(context.Background(), `SET search_path TO metaldocs, public`); err != nil {
 		t.Fatalf("set search_path: %v", err)

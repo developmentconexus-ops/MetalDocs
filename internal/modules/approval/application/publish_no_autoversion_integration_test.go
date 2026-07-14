@@ -27,14 +27,9 @@ func TestPublishApproved_DoesNotAutoCreateNextVersion(t *testing.T) {
 	// -----------------------------------------------------------------------
 	// 1. Open isolated per-test database (ADR 0034 testdb harness).
 	// -----------------------------------------------------------------------
-	database, dbName := testdb.Open(t)
+	database, _ := testdb.Open(t)
 
-	// Set search_path and widen the pool (H-PRE-1: off-tx reads must not deadlock).
-	if _, err := database.ExecContext(ctx,
-		`ALTER DATABASE "`+dbName+`" SET search_path TO public, metaldocs`,
-	); err != nil {
-		t.Fatalf("alter database search_path: %v", err)
-	}
+	// Widen the pool (H-PRE-1: off-tx reads must not deadlock).
 	database.SetMaxIdleConns(0)
 	database.SetMaxIdleConns(4)
 	database.SetMaxOpenConns(4)

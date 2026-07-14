@@ -46,7 +46,9 @@ import (
 // only — never the full suite.
 func TestSeedTxTenant_RLSBackstop_LeakBeforeBlockedAfter(t *testing.T) {
 	ctx := context.Background()
-	db, _ := testdb.Open(t)
+	// OpenFreshDatabase, not Open: this test does CREATE ROLE / SET ROLE / DROP
+	// ROLE. A leased database is reset with DELETE, which cannot undo role DDL.
+	db, _ := testdb.OpenFreshDatabase(t)
 
 	tntA := testdb.NewTenant(t, db)
 	tntB := testdb.NewTenant(t, db)

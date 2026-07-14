@@ -16,7 +16,7 @@ import (
 // INSERT into user_process_areas directly (must use SECURITY DEFINER fn).
 func TestDirectInsertUserProcessAreasBlocked(t *testing.T) {
 	ctx := context.Background()
-	db, schema := testdb.Open(t)
+	db, schema := testdb.OpenFreshDatabase(t)
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {

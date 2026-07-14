@@ -33,12 +33,9 @@ import (
 
 func TestReviewWriteRoundTrip(t *testing.T) {
 	ctx := context.Background()
-	db, dbName := testdb.Open(t)
+	db, _ := testdb.Open(t)
 
-	// Set search_path and widen the pool so off-tx reads (H-PRE-1) don't deadlock.
-	if _, err := db.ExecContext(ctx, `ALTER DATABASE "`+dbName+`" SET search_path TO public, metaldocs`); err != nil {
-		t.Fatalf("alter database search_path: %v", err)
-	}
+	// Widen the pool so off-tx reads (H-PRE-1) don't deadlock.
 	db.SetMaxIdleConns(0)
 	db.SetMaxIdleConns(4)
 	db.SetMaxOpenConns(4)

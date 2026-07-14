@@ -105,12 +105,7 @@ func seedTemplateVersion(t *testing.T, db *sql.DB, tenantID, schemaJSON string) 
 
 func TestLoadFillInSchema_ParityWithRawJoin(t *testing.T) {
 	ctx := context.Background()
-	db, dbName := testdb.Open(t)
-	// Bare templates_*/documents references must resolve to public.*; mirror the
-	// templates reader integration test's search_path fix.
-	if _, err := db.ExecContext(ctx, `ALTER DATABASE "`+dbName+`" SET search_path TO public, metaldocs`); err != nil {
-		t.Fatalf("alter database search_path: %v", err)
-	}
+	db, _ := testdb.Open(t)
 	db.SetMaxIdleConns(0)
 	db.SetMaxIdleConns(4)
 	db.SetMaxOpenConns(4)
