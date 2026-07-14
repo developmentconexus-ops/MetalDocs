@@ -17,12 +17,28 @@ import (
 	"metaldocs/internal/platform/pagination"
 )
 
-// InboxView is the read-model projection for the inbox UI.
+// InboxView is the read-model projection for the inbox UI. Unit 4.2 made
+// this subject-generic: SubjectKind/SubjectKey/SubjectTitle/SubjectRef cover
+// both document and template instances; ControlledDocumentID stays
+// document-only (empty for template rows).
 type InboxView struct {
-	InstanceID           string
-	DocumentID           string
+	InstanceID string
+	// SubjectKind (Unit 4.2) is the instance's subject discriminator
+	// (ai.subject_kind) — "document" or "template".
+	SubjectKind string
+	// SubjectKey (Unit 4.2) is the kernel subject key (ai.subject_key):
+	// documentId for document instances, template version id for template
+	// instances.
+	SubjectKey string
+	// SubjectTitle (Unit 4.2) is the display name: the document name for
+	// document instances (from the documents LEFT JOIN), the template name for
+	// template instances (resolved via TemplateVersionReader.LoadTemplateInboxMeta).
+	SubjectTitle string
+	// SubjectRef (Unit 4.2) is the FE navigation id: documentId for document
+	// instances, templateId for template instances (NOT the version id).
+	SubjectRef string
+	// ControlledDocumentID is document-instance-only; empty for template rows.
 	ControlledDocumentID string
-	DocumentTitle        string
 	AreaCode             string
 	SubmittedBy          string
 	SubmittedAt          time.Time
@@ -60,15 +76,16 @@ type InboxFilter struct {
 
 // ReadService exposes read-only operations for approval HTTP handlers.
 type ReadService struct {
-	repo   infrastructure.ApprovalRepository
-	cdRead controlleddocumentsdomain.CDFieldReader
+	repo         infrastructure.ApprovalRepository
+	cdRead       controlleddocumentsdomain.CDFieldReader
+	templateRead TemplateVersionReader
 }
 
-func newReadService(repo infrastructure.ApprovalRepository, cdRead controlleddocumentsdomain.CDFieldReader) *ReadService {
+func newReadService(repo infrastructure.ApprovalRepository, cdRead controlleddocumentsdomain.CDFieldReader, templateRead TemplateVersionReader) *ReadService {
 	if cdRead == nil {
 		cdRead = controlleddocumentsdomain.NoopCDFieldReader{}
 	}
-	return &ReadService{repo: repo, cdRead: cdRead}
+	return &ReadService{repo: repo, cdRead: cdRead, templateRead: templateRead}
 }
 
 // Read methods intentionally use default (read-write) transactions because
@@ -482,6 +499,12 @@ func (s *ReadService) listInboxItems(ctx context.Context, runner db.TxRunner, te
 			  ON d.id = ai.document_id AND d.tenant_id = ai.tenant_id
 			WHERE ai.tenant_id = $1::uuid
 			  AND ai.status = 'in_progress'
+			  -- Deprecated document-only path: template-subject instances
+			  -- (ai.document_id NULL) must never reach this scan — they are
+			  -- served by the subject-generic ListWorklist. Explicit filter
+			  -- keeps the documented document-only contract true in SQL and
+			  -- prevents a NULL document_id scan (subject_kind NOT NULL since 0296).
+			  AND ai.subject_kind = 'document'
 			  AND asi.eligible_actor_ids @> $2::jsonb
 			  AND ($3 = '' OR asi.area_code_snapshot = $3)
 			ORDER BY ai.submitted_at DESC, ai.id DESC
@@ -494,15 +517,24 @@ func (s *ReadService) listInboxItems(ctx context.Context, runner db.TxRunner, te
 
 		for rows.Next() {
 			var v InboxView
+			var documentID string
 			var signed, required, rowTotal int
 			if err := rows.Scan(
-				&v.InstanceID, &v.DocumentID, &v.ControlledDocumentID, &v.DocumentTitle,
+				&v.InstanceID, &documentID, &v.ControlledDocumentID, &v.SubjectTitle,
 				&v.AreaCode, &v.SubmittedBy, &v.SubmittedAt,
 				&v.StageLabel, &required, &signed, &rowTotal,
 			); err != nil {
 				rows.Close()
 				return fmt.Errorf("list inbox: scan: %w", err)
 			}
+			// Deprecated method (see doc comment): document-only, predates the
+			// Unit 4.2 subject-generic worklist. It never selects
+			// ai.subject_kind/ai.subject_key, so SubjectKind is hardcoded to
+			// "document" here — every existing caller of this deprecated path is
+			// document-scoped.
+			v.SubjectKind = string(domain.SubjectKindDocument)
+			v.SubjectKey = documentID
+			v.SubjectRef = documentID
 			v.QuorumProgress = fmt.Sprintf("%d/%d", signed, required)
 			items = append(items, v)
 			total = rowTotal
@@ -599,6 +631,8 @@ func (s *ReadService) ListWorklist(ctx context.Context, runner db.TxRunner, tena
 		rows, err := tx.QueryContext(ctx, `
 			SELECT
 				ai.id,
+				ai.subject_kind,
+				ai.subject_key,
 				ai.document_id,
 				COALESCE(d.controlled_document_id::text, '') AS controlled_document_id,
 				COALESCE(d.name, '') AS doc_title,
@@ -645,16 +679,26 @@ func (s *ReadService) ListWorklist(ctx context.Context, runner db.TxRunner, tena
 
 		for rows.Next() {
 			var v InboxView
+			var docTitle string
+			// ai.document_id is NULL for template-subject rows (migration 0297
+			// relaxed it) — scan into NullString, never a bare string.
+			var documentID sql.NullString
 			var signed, required, rowTotal int
 			var stageKind string
 			var dueAt sql.NullTime
 			if err := rows.Scan(
-				&v.InstanceID, &v.DocumentID, &v.ControlledDocumentID, &v.DocumentTitle,
+				&v.InstanceID, &v.SubjectKind, &v.SubjectKey, &documentID, &v.ControlledDocumentID, &docTitle,
 				&v.AreaCode, &v.SubmittedBy, &v.SubmittedAt,
 				&v.StageLabel, &required, &signed, &stageKind, &dueAt, &rowTotal,
 			); err != nil {
 				rows.Close()
 				return fmt.Errorf("list worklist: scan: %w", err)
+			}
+			if v.SubjectKind == string(domain.SubjectKindDocument) {
+				// Documents keep the existing LEFT JOIN-sourced title/ref — this
+				// path is UNCHANGED (Unit 4.2 §10 locked constraint 1).
+				v.SubjectTitle = docTitle
+				v.SubjectRef = documentID.String
 			}
 			v.QuorumProgress = fmt.Sprintf("%d/%d", signed, required)
 			v.StageKind = domain.StageKind(stageKind)
@@ -668,6 +712,36 @@ func (s *ReadService) ListWorklist(ctx context.Context, runner db.TxRunner, tena
 		rows.Close()
 		if err := rows.Err(); err != nil {
 			return fmt.Errorf("list worklist: rows: %w", err)
+		}
+
+		// Unit 4.2: resolve template-subject rows' display metadata via the
+		// approval-owned TemplateVersionReader port — the ONLY seam this
+		// crosses into templates (no raw join into templates_template*). A
+		// version id missing from the batch result (not found, or cross-tenant)
+		// simply leaves that row's title/ref empty (no-fallback principle).
+		templateReader := s.templateRead
+		if templateReader != nil {
+			var versionIDs []string
+			for i := range items {
+				if items[i].SubjectKind == string(domain.SubjectKindTemplate) {
+					versionIDs = append(versionIDs, items[i].SubjectKey)
+				}
+			}
+			if len(versionIDs) > 0 {
+				meta, err := templateReader.LoadTemplateInboxMeta(ctx, tx, tenantID, versionIDs)
+				if err != nil {
+					return fmt.Errorf("list worklist: load template inbox meta: %w", err)
+				}
+				for i := range items {
+					if items[i].SubjectKind != string(domain.SubjectKindTemplate) {
+						continue
+					}
+					if m, ok := meta[items[i].SubjectKey]; ok {
+						items[i].SubjectTitle = m.Title
+						items[i].SubjectRef = m.TemplateID
+					}
+				}
+			}
 		}
 
 		return nil

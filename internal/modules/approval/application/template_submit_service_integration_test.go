@@ -73,6 +73,35 @@ func (fakeTemplateVersionReader) LoadTemplateVersionContentHash(ctx context.Cont
 	return hash.String, true, nil
 }
 
+// LoadTemplateInboxMeta (Unit 4.2) mirrors the production adapter's batch
+// resolve of {templateId, name} per version id, scoped to tenantID, read inside
+// tx. Per-id loop (rather than ANY($)) to avoid a pq dependency in this test
+// package; a version id with no matching row is simply absent from the map.
+func (fakeTemplateVersionReader) LoadTemplateInboxMeta(ctx context.Context, tx db.Tx, tenantID string, versionIDs []string) (map[string]domain.TemplateInboxMeta, error) {
+	out := make(map[string]domain.TemplateInboxMeta)
+	for _, versionID := range versionIDs {
+		var templateID, name string
+		err := tx.QueryRowContext(ctx, `
+			SELECT t.id, t.name
+			  FROM templates_template_version tv
+			  JOIN templates_template t
+			    ON t.id = tv.template_id
+			   AND t.tenant_id = tv.tenant_id
+			 WHERE tv.tenant_id = $1
+			   AND tv.id = $2`,
+			tenantID, versionID,
+		).Scan(&templateID, &name)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		out[versionID] = domain.TemplateInboxMeta{TemplateID: templateID, Title: name}
+	}
+	return out, nil
+}
+
 // fakeTemplateVersionSubmitWriter is a test-local double for the approval-owned
 // TemplateVersionSubmitWriter port (M3 P3.S2b-3b-iii-b submit-lock). Like the
 // reader fake it duplicates (rather than imports) the production

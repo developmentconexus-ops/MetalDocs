@@ -8,8 +8,8 @@ import (
 	"errors"
 	"testing"
 
-	approvalrepo "metaldocs/internal/modules/approval/infrastructure"
 	"metaldocs/internal/modules/approval/infrastructure"
+	approvalrepo "metaldocs/internal/modules/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	platformdb "metaldocs/internal/platform/db"
@@ -89,7 +89,7 @@ func grantRoleInArea(t *testing.T, db *sql.DB, tenantID, userID, areaCode, roleC
 func newReadServiceForIntegration(t *testing.T, db *sql.DB) *ReadService {
 	t.Helper()
 	repo := approvalrepo.NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{})
-	return newReadService(repo, testdb.NewCDFieldReader(t))
+	return newReadService(repo, testdb.NewCDFieldReader(t), nil)
 }
 
 func ctxWithIdentity(tenantID, actorID string) context.Context {

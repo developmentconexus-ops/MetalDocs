@@ -69,11 +69,20 @@ func (h *Handler) InboxHandler(w http.ResponseWriter, r *http.Request) {
 			s := v.DueAt.UTC().Format(time.RFC3339)
 			dueAt = &s
 		}
+		// controlled_document_id is required-and-nullable: emit the uuid for
+		// document rows, explicit null (nil pointer) for template rows (empty).
+		var controlledDocID *string
+		if v.ControlledDocumentID != "" {
+			cd := v.ControlledDocumentID
+			controlledDocID = &cd
+		}
 		respItems = append(respItems, contracts.InboxItem{
 			InstanceID:           v.InstanceID,
-			DocumentID:           v.DocumentID,
-			ControlledDocumentID: v.ControlledDocumentID,
-			DocumentTitle:        v.DocumentTitle,
+			SubjectKind:          v.SubjectKind,
+			SubjectKey:           v.SubjectKey,
+			SubjectTitle:         v.SubjectTitle,
+			SubjectRef:           v.SubjectRef,
+			ControlledDocumentID: controlledDocID,
 			AreaCode:             v.AreaCode,
 			SubmittedBy:          v.SubmittedBy,
 			SubmittedAt:          v.SubmittedAt.UTC().Format(time.RFC3339),

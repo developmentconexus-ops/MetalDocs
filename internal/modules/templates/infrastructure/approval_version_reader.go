@@ -5,6 +5,9 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/lib/pq"
+
+	"metaldocs/internal/modules/approval/domain"
 	"metaldocs/internal/platform/db"
 )
 
@@ -78,4 +81,45 @@ func (r *ApprovalVersionReader) LoadTemplateVersionContentHash(ctx context.Conte
 		return "", false, nil
 	}
 	return hash.String, true, nil
+}
+
+// LoadTemplateInboxMeta (Unit 4.2) batch-resolves {templateId, name} for each
+// of versionIDs, scoped to tenantID, read inside tx. One set-based query
+// (tv.id = ANY($1)) joining templates_template_version -> templates_template
+// — the ONLY surface through which approval's worklist read-model resolves
+// template display data; approval never queries these tables directly. A
+// version id with no matching row (absent, or cross-tenant) is simply absent
+// from the returned map.
+func (r *ApprovalVersionReader) LoadTemplateInboxMeta(ctx context.Context, tx db.Tx, tenantID string, versionIDs []string) (map[string]domain.TemplateInboxMeta, error) {
+	out := make(map[string]domain.TemplateInboxMeta)
+	if len(versionIDs) == 0 {
+		return out, nil
+	}
+
+	rows, err := tx.QueryContext(ctx, `
+		SELECT tv.id, t.id, t.name
+		  FROM templates_template_version tv
+		  JOIN templates_template t
+		    ON t.id = tv.template_id
+		   AND t.tenant_id = tv.tenant_id
+		 WHERE tv.tenant_id = $1
+		   AND tv.id = ANY($2)`,
+		tenantID, pq.Array(versionIDs),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var versionID, templateID, name string
+		if err := rows.Scan(&versionID, &templateID, &name); err != nil {
+			return nil, err
+		}
+		out[versionID] = domain.TemplateInboxMeta{TemplateID: templateID, Title: name}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
 }

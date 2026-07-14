@@ -173,8 +173,10 @@ func TestInboxHandler_PopulatesTitleQuorumAndTotal(t *testing.T) {
 	fakeSvc := &fakeReadServiceInbox{
 		views: []application.InboxView{{
 			InstanceID:     "inst-1",
-			DocumentID:     "doc-1",
-			DocumentTitle:  "Doc One",
+			SubjectKind:    "document",
+			SubjectKey:     "doc-1",
+			SubjectTitle:   "Doc One",
+			SubjectRef:     "doc-1",
 			AreaCode:       "finance",
 			SubmittedBy:    "user-1",
 			SubmittedAt:    time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC),
@@ -208,13 +210,13 @@ func TestInboxHandler_PopulatesTitleQuorumAndTotal(t *testing.T) {
 		t.Fatalf("got %d items, want 1", len(resp.Items))
 	}
 	got := resp.Items[0]
-	if got.DocumentTitle != "Doc One" {
-		t.Errorf("DocumentTitle = %q, want %q", got.DocumentTitle, "Doc One")
+	if got.SubjectTitle != "Doc One" {
+		t.Errorf("SubjectTitle = %q, want %q", got.SubjectTitle, "Doc One")
 	}
 	if got.QuorumProgress != "1/2" {
 		t.Errorf("QuorumProgress = %q, want %q", got.QuorumProgress, "1/2")
 	}
-	if got.InstanceID != "inst-1" || got.DocumentID != "doc-1" {
+	if got.InstanceID != "inst-1" || got.SubjectKey != "doc-1" {
 		t.Errorf("ID mapping wrong: %+v", got)
 	}
 	if got.StageLabel != "Stage 1" || got.AreaCode != "finance" {

@@ -91,13 +91,13 @@ func TestListInboxItems_PopulatesTitleAndQuorumProgress(t *testing.T) {
 	if len(items) != 1 {
 		t.Fatalf("got %d items, want 1", len(items))
 	}
-	if items[0].DocumentTitle != "Doc One" {
-		t.Errorf("DocumentTitle = %q, want %q", items[0].DocumentTitle, "Doc One")
+	if items[0].SubjectTitle != "Doc One" {
+		t.Errorf("SubjectTitle = %q, want %q", items[0].SubjectTitle, "Doc One")
 	}
 	if items[0].QuorumProgress != "1/2" {
 		t.Errorf("QuorumProgress = %q, want %q", items[0].QuorumProgress, "1/2")
 	}
-	if items[0].InstanceID != "inst-1" || items[0].DocumentID != "doc-1" {
+	if items[0].InstanceID != "inst-1" || items[0].SubjectKey != "doc-1" {
 		t.Errorf("ID mapping wrong: %+v", items[0])
 	}
 	if items[0].StageLabel != "Stage 1" || items[0].AreaCode != "finance" {
@@ -336,11 +336,11 @@ func TestListWorklist_ZeroFilter_MatchesBaseInboxShape(t *testing.T) {
 
 	submittedAt := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
 	rows := sqlmock.NewRows([]string{
-		"id", "document_id", "controlled_document_id", "doc_title", "area_code",
+		"id", "subject_kind", "subject_key", "document_id", "controlled_document_id", "doc_title", "area_code",
 		"submitted_by", "submitted_at", "stage_label", "required", "signed",
 		"stage_kind", "due_at", "total_count",
 	}).AddRow(
-		"inst-1", "doc-1", "CD-001", "Doc One", "finance",
+		"inst-1", "document", "doc-1", "doc-1", "CD-001", "Doc One", "finance",
 		"user-1", submittedAt, "Stage 1", 2, 1, "approval", nil, 1,
 	)
 
@@ -388,7 +388,7 @@ func TestListWorklist_StageKindFilter_PassesArgThrough(t *testing.T) {
 	mock.ExpectQuery(`asi\.stage_kind = \$6`).
 		WithArgs("tenant-1", sqlmock.AnyArg(), "", 25, 0, "review", sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "document_id", "controlled_document_id", "doc_title", "area_code",
+			"id", "subject_kind", "subject_key", "document_id", "controlled_document_id", "doc_title", "area_code",
 			"submitted_by", "submitted_at", "stage_label", "required", "signed",
 			"stage_kind", "due_at", "total_count",
 		}))
