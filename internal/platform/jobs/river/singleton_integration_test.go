@@ -23,14 +23,11 @@ package riverjobs_test
 
 import (
 	"context"
-	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/rivermigrate"
-	"github.com/riverqueue/river/riverdriver/riverdatabasesql"
 
 	riverjobs "metaldocs/internal/platform/jobs/river"
 	"metaldocs/tests/integration/testdb"
@@ -59,26 +56,13 @@ func (w *countingWorker) Work(_ context.Context, _ *river.Job[singletonProbeArgs
 }
 
 func TestSingleton_P4_HPRE1_ExactlyOnceAcrossTwoClients(t *testing.T) {
+	// testdb.Open returns a private clone whose template already bakes the
+	// River schema into the default schema (ApplyCuratedBootstrap ->
+	// bootstrap.MigrateRiverSchema), so no per-test River migration is needed.
 	db, _ := testdb.Open(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-
-	schema := fmt.Sprintf("river_h_pre_1_%d", time.Now().UTC().UnixNano())
-	if _, err := db.ExecContext(ctx, "CREATE SCHEMA "+schema); err != nil {
-		t.Fatalf("create schema: %v", err)
-	}
-	t.Cleanup(func() {
-		_, _ = db.ExecContext(context.Background(), "DROP SCHEMA "+schema+" CASCADE")
-	})
-
-	migrator, err := rivermigrate.New(riverdatabasesql.New(db), &rivermigrate.Config{Schema: schema})
-	if err != nil {
-		t.Fatalf("new migrator: %v", err)
-	}
-	if _, err := migrator.Migrate(ctx, rivermigrate.DirectionUp, nil); err != nil {
-		t.Fatalf("migrate river schema up: %v", err)
-	}
 
 	var count int64
 	done := make(chan struct{})
@@ -87,7 +71,7 @@ func TestSingleton_P4_HPRE1_ExactlyOnceAcrossTwoClients(t *testing.T) {
 		workers := river.NewWorkers()
 		river.AddWorker(workers, &countingWorker{count: &count, done: done})
 		bundle, err := riverjobs.NewClientBundle(db, riverjobs.Config{
-			Schema:              schema,
+			Schema:              "",
 			SkipUnknownJobCheck: true,
 			Queues: map[string]river.QueueConfig{
 				"maintenance": {MaxWorkers: 2},

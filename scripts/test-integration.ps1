@@ -1,6 +1,6 @@
 param(
   [string]$EnvFile = ".env",
-  [string]$Package = "./...",
+  [string[]]$Package = @("./..."),
   [string]$Run,
   [string[]]$GoFlags = @()
 )
