@@ -571,16 +571,15 @@ DO UPDATE SET tenant_id = EXCLUDED.tenant_id, assigned_at = now(), assigned_by =
 	// granted_by carries an FK (tenant_id, granted_by) -> iam_users; the legacy
 	// 'e2e-seed' sentinel is not a real user. Self-grant (granted_by = userID) —
 	// the user row was upserted above, so it always satisfies the FK in-tenant.
+	// Direct INSERT is the sole path: the old grant_area_membership fallback was
+	// dead code — that SECURITY DEFINER fn's uppercase area_code validation is
+	// unsatisfiable against document_process_areas' lowercase area_code_format
+	// CHECK, so it could never succeed and only masked the real insert error.
 	if _, err := tx.ExecContext(ctx, `
 INSERT INTO user_process_areas (user_id, tenant_id, area_code, role, effective_from, effective_to, granted_by, revoked_by)
 VALUES ($1, $2, $3, $4, now(), NULL, $5, NULL)
 ON CONFLICT (tenant_id, user_id, area_code, role) WHERE effective_to IS NULL DO NOTHING`, userID, tenantID, areaCode, membershipRole, userID); err != nil {
-		if _, fnErr := tx.ExecContext(ctx,
-			`SELECT metaldocs.grant_area_membership($1::uuid, $2, $3, $4, $5)`,
-			tenantID, userID, areaCode, membershipRole, userID,
-		); fnErr != nil {
-			return seededUser{}, "", fmt.Errorf("grant area membership (%s): %w", role, err)
-		}
+		return seededUser{}, "", fmt.Errorf("grant area membership (%s): %w", role, err)
 	}
 
 	cookieValue, err := createSessionValue(ctx, tx, userID, tenantID)
