@@ -5,22 +5,59 @@ package testdb
 
 import (
 	"context"
-	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/binary"
 	"fmt"
 	"sync"
 	"testing"
 	"time"
 )
 
+// resetPolicyVersion identifies the SEMANTICS of resetLeasedDatabase: which
+// tables are delete targets, which are excluded, which are snapshotted, and
+// how sequences are handled. Bump it by hand whenever any of that changes.
+//
+// It is embedded in every lease slot's name (see leaseSlotName) precisely so
+// a process running a NEW reset policy can never adopt a database that was
+// last reset under an OLD policy. Adopting a database whose reset semantics
+// you don't know is exactly how a false green happens: the adopting process
+// would trust resetLeasedDatabase to have restored clone-equivalence, but the
+// database on disk might have been left in a shape only the old policy knew
+// how to fully clean up.
+const resetPolicyVersion = 1
+
+// leaseSlotCount is the number of deterministic, cross-process-adoptable lease
+// slots per (fingerprint, resetPolicyVersion) pair. `go test ./...` defaults
+// -p to NumCPU, so up to that many package processes run concurrently and
+// each needs at least one lease; this is fixed at 16 to match a 16-core
+// default rather than derived at runtime, so the slot-name set (and therefore
+// what a future process can adopt) is stable across machines. Fewer slots
+// than concurrent processes would make processes block on each other
+// indefinitely instead of merely queuing briefly.
+const leaseSlotCount = 16
+
+func init() {
+	if leasedPoolCap > leaseSlotCount {
+		panic("testdb: leasedPoolCap must be <= leaseSlotCount")
+	}
+}
+
 // leasedPoolCap bounds how many physical leased databases a single package
 // test process will ever hold open at once. Grown lazily: the pool starts
-// empty and a new leased database is CREATE DATABASE ... TEMPLATE'd only when
+// empty and a new leased database is claimed (adopted or cloned) only when
 // checkout finds no free lease AND the pool is below cap. This is per-package
 // process (the pool is a package-level var), which is exactly the boundary
 // go test -p=NumCPU already parallelizes across, so it does not need to be
-// cross-process.
+// cross-process by itself — cross-process coordination is what the slot
+// claim (claimSlot) provides.
 const leasedPoolCap = 8
+
+// leaseCreateMu serializes lease slot preparation (see its use in claimSlot).
+// Package-level rather than a leasePool field because it guards a host-level
+// resource — the cluster's ability to clone a database without thrashing — not
+// pool bookkeeping.
+var leaseCreateMu sync.Mutex
 
 // globalLeasePool is the package-process-wide pool of leased databases
 // checked out by Open. It replaces the old one-CREATE-DATABASE/DROP-DATABASE-
@@ -28,26 +65,49 @@ const leasedPoolCap = 8
 // once per test, 16 packages wide under go test's default -p=NumCPU.
 var globalLeasePool = &leasePool{}
 
+// leaseClaimTimeout bounds how long checkout will wait for a cross-process
+// slot to free up before failing loudly. It is a hang-guard against a
+// genuinely saturated cluster (all leaseSlotCount slots held by other live
+// processes), not a normal-path budget — claiming an already-adopted slot is
+// a handful of catalog queries, not a clone.
+const leaseClaimTimeout = 60 * time.Second
+
 type leasePool struct {
-	mu    sync.Mutex
-	cond  *sync.Cond
-	free  []string
-	total int
+	mu   sync.Mutex
+	cond *sync.Cond
+	free []string
+	// held tracks every slot this process has successfully claimed (via
+	// claimSlot's per-slot advisory lock) across the process lifetime,
+	// keyed by slot name. The dedicated *sql.Conn holding each lock is kept
+	// open here — closing it would release the lock — so it lives exactly as
+	// long as this process does. Process death (including a crash) closes
+	// the connection and releases the lock automatically; that IS the
+	// release mechanism for cross-process adoption, deliberately not
+	// replicated via a signal handler or atexit.
+	held map[string]*sql.Conn
+	// adminDB is the shared connection used to issue the per-slot
+	// pg_try_advisory_lock probes and adopt-or-create DDL. Kept open for the
+	// process lifetime alongside held.
+	adminDB *sql.DB
 }
 
 func (p *leasePool) init() {
 	if p.cond == nil {
 		p.cond = sync.NewCond(&p.mu)
 	}
+	if p.held == nil {
+		p.held = make(map[string]*sql.Conn)
+	}
 }
 
 // checkout returns the name of a leased database exclusively owned by the
 // caller until release is called. If a previously-returned lease is free, it
 // is reused (still needs a reset by the caller — checkout does not reset). If
-// none are free and the pool has not reached leasedPoolCap, a new leased
-// database is physically cloned from the template. Otherwise checkout blocks
-// until another test releases a lease.
-func (p *leasePool) checkout(t *testing.T, baseDSN string) string {
+// none are free and this process holds fewer than leasedPoolCap slots, a new
+// slot is claimed cross-process (claimSlot) and adopted-or-created. Otherwise
+// checkout blocks until another test in THIS process releases a lease —
+// cross-process contention is handled inside claimSlot itself.
+func (p *leasePool) checkout(t *testing.T, baseDSN, templateDBName, fingerprint16 string) string {
 	t.Helper()
 	p.mu.Lock()
 	p.init()
@@ -58,17 +118,11 @@ func (p *leasePool) checkout(t *testing.T, baseDSN string) string {
 			p.mu.Unlock()
 			return name
 		}
-		if p.total < leasedPoolCap {
-			p.total++
+		if len(p.held) < leasedPoolCap {
 			p.mu.Unlock()
-			name, err := createLeasedDatabase(baseDSN)
+			name, err := p.claimSlot(baseDSN, templateDBName, fingerprint16)
 			if err != nil {
-				// Give the reserved slot back so a failed create does not
-				// permanently shrink the pool's effective capacity.
-				p.mu.Lock()
-				p.total--
-				p.mu.Unlock()
-				t.Fatalf("create leased test database: %v", err)
+				t.Fatalf("claim leased test database slot: %v", err)
 			}
 			return name
 		}
@@ -76,18 +130,10 @@ func (p *leasePool) checkout(t *testing.T, baseDSN string) string {
 	}
 }
 
-// release returns a leased database to the free list. It is NEVER dropped —
-// that is the entire point of the lease pool. The next checkout resets it
-// (resetLeasedDatabase) before handing it back out.
-//
-// KNOWN GAP (reported, not silently worked around): "never dropped" is correct
-// within a process, but nothing reclaims a lease at process EXIT. Lease names
-// are random (randomHex) and the free list is in-memory, so a subsequent
-// `go test` process cannot adopt an orphan and clones a fresh one instead.
-// A full-suite run therefore leaks roughly one lease per package process and
-// still pays one clone per package. Fixing both at once wants deterministic
-// per-package lease names (reuse across runs, bounded set) rather than a
-// sweeper; that is a design change beyond this slice's authorized scope.
+// release returns a leased database to the free list. It is NEVER dropped and
+// its cross-process claim (the held advisory lock) is NEVER released here —
+// that is the entire point of both the lease pool and slot adoption. The next
+// checkout resets it (resetLeasedDatabase) before handing it back out.
 func (p *leasePool) release(name string) {
 	p.mu.Lock()
 	p.init()
@@ -96,36 +142,224 @@ func (p *leasePool) release(name string) {
 	p.cond.Signal()
 }
 
-func createLeasedDatabase(baseDSN string) (string, error) {
+// claimSlot finds a deterministic lease slot (see leaseSlotName) not already
+// claimed by another process, proven by this process winning that slot's
+// per-slot pg_try_advisory_lock, then ensures the slot's database exists
+// (adopt-or-create) before returning its name. The winning connection is kept
+// open in p.held for the rest of the process lifetime — see the held field's
+// doc comment for why.
+func (p *leasePool) claimSlot(baseDSN, templateDBName, fingerprint16 string) (string, error) {
+	p.mu.Lock()
+	if p.adminDB == nil {
+		db, err := openDBWithDatabase(baseDSN, "postgres")
+		if err != nil {
+			p.mu.Unlock()
+			return "", fmt.Errorf("open admin db for slot claim: %w", err)
+		}
+		p.adminDB = db
+	}
+	adminDB := p.adminDB
+	p.mu.Unlock()
+
+	deadline := time.Now().Add(leaseClaimTimeout)
+	for {
+		for nn := 0; nn < leaseSlotCount; nn++ {
+			slotName := leaseSlotName(fingerprint16, nn)
+
+			p.mu.Lock()
+			_, alreadyHeld := p.held[slotName]
+			p.mu.Unlock()
+			if alreadyHeld {
+				continue
+			}
+
+			claimCtx, claimCancel := context.WithTimeout(context.Background(), 15*time.Second)
+			conn, err := adminDB.Conn(claimCtx)
+			if err != nil {
+				claimCancel()
+				return "", fmt.Errorf("pin conn to probe lease slot %s: %w", slotName, err)
+			}
+
+			var locked bool
+			err = conn.QueryRowContext(claimCtx, "SELECT pg_try_advisory_lock($1)", leaseSlotLockKey(slotName)).Scan(&locked)
+			claimCancel()
+			if err != nil {
+				_ = conn.Close()
+				return "", fmt.Errorf("probe advisory lock for lease slot %s: %w", slotName, err)
+			}
+			if !locked {
+				// Another process holds this slot right now. Try the next one.
+				_ = conn.Close()
+				continue
+			}
+
+			// Won the slot. Record it as held BEFORE any fallible work below,
+			// so a failure here does not leave this process's bookkeeping
+			// unaware that it is (correctly, at the Postgres level) still
+			// holding the lock — a stray retry-the-same-slot loop would
+			// otherwise never make progress.
+			p.mu.Lock()
+			p.held[slotName] = conn
+			p.mu.Unlock()
+
+			// Serialized deliberately. Concurrent CREATE DATABASE is the
+			// measured failure mode, not a theoretical one: with t.Parallel and
+			// -parallel=8, eight goroutines reached this line at once, issued
+			// eight concurrent clones, and every one of them blew the 60s
+			// timeout below (60.02s, repeatedly) on this virtualized-storage
+			// host. Cloning is I/O the host serializes anyway — doing it 8-wide
+			// converts a ~0.9s operation into a timeout for all 8.
+			//
+			// This mutex is the reason t.Parallel is viable at all: the first
+			// process pays N clones back-to-back (~0.9s each, once ever), and
+			// every later process ADOPTS those same slots and pays ~0.02s.
+			// Holding it across adoption too is intentional — adoption is a few
+			// catalog queries, so the contention is irrelevant, and one
+			// unconditional lock is easier to keep correct than a
+			// create-only fast path.
+			leaseCreateMu.Lock()
+			ensureCtx, ensureCancel := context.WithTimeout(context.Background(), 60*time.Second)
+			ensureErr := ensureLeaseSlotDatabase(ensureCtx, baseDSN, templateDBName, fingerprint16, slotName)
+			ensureCancel()
+			leaseCreateMu.Unlock()
+			if ensureErr != nil {
+				return "", fmt.Errorf("prepare lease slot database %s: %w", slotName, ensureErr)
+			}
+
+			return slotName, nil
+		}
+
+		if time.Now().After(deadline) {
+			return "", fmt.Errorf("all %d lease slots are held by other test processes", leaseSlotCount)
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+}
+
+// leaseSlotName is the deterministic slot name two processes running the same
+// code (same fingerprint, same resetPolicyVersion) will compute identically —
+// which is the entire point: it lets a fresh process ADOPT an existing slot
+// database instead of cloning a new one.
+func leaseSlotName(fingerprint16 string, nn int) string {
+	return fmt.Sprintf("metaldocs_test_lease_%s_%d_%02d", fingerprint16, resetPolicyVersion, nn)
+}
+
+// leaseSlotLockKey derives a per-slot advisory lock key from the slot's full
+// name. It is namespaced ("metaldocs-testdb-lease-slot:" prefix) and hashed
+// with sha256 — deliberately distinct in both prefix and algorithm from
+// advisoryKey (db.go), which derives the template BUILD lock's key by
+// reading raw fingerprint bytes — so the two lock spaces cannot collide by
+// construction, not by chance.
+func leaseSlotLockKey(slotName string) int64 {
+	sum := sha256.Sum256([]byte("metaldocs-testdb-lease-slot:" + slotName))
+	return int64(binary.BigEndian.Uint64(sum[:8]))
+}
+
+// leaseMarker is the COMMENT ON DATABASE value written on every lease slot
+// database, proving ownership (fingerprint + reset policy) for both adoption
+// and GCRetiredDatabases. Format: "metaldocs-testdb-lease:<fp16>:<policy>".
+func leaseMarker(fingerprint16 string) string {
+	return fmt.Sprintf("metaldocs-testdb-lease:%s:%d", fingerprint16, resetPolicyVersion)
+}
+
+// ensureLeaseSlotDatabase implements adopt-or-create for a claimed lease
+// slot:
+//
+//   - If the slot's database does not exist, this is the (only) clone: CREATE
+//     DATABASE ... TEMPLATE, take the baseline snapshot while the clone is
+//     still byte-identical to the template, and mark ownership.
+//   - If it already exists, ADOPT it: no drop, no recreate. The per-checkout
+//     reset (resetLeasedDatabase) is what makes an adopted slot clean; this
+//     function's only adoption-path responsibility is making sure the
+//     baseline snapshot schema that reset depends on is actually present —
+//     if a prior run's clone step never completed it, this heals it exactly
+//     as the create path would.
+func ensureLeaseSlotDatabase(ctx context.Context, baseDSN, templateDBName, fingerprint16, slotName string) error {
 	adminDB, err := openDBWithDatabase(baseDSN, "postgres")
 	if err != nil {
-		return "", fmt.Errorf("open admin db: %w", err)
+		return fmt.Errorf("open admin db: %w", err)
 	}
 	defer adminDB.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-
-	suffix, err := randomHex(5)
+	exists, err := databaseExists(ctx, adminDB, slotName)
 	if err != nil {
-		return "", fmt.Errorf("generate lease suffix: %w", err)
-	}
-	name := "metaldocs_test_lease_" + suffix
-	if _, err := adminDB.ExecContext(ctx,
-		fmt.Sprintf("CREATE DATABASE %s TEMPLATE %s", quoteIdent(name), quoteIdent(templateDBName)),
-	); err != nil {
-		return "", fmt.Errorf("create leased database %s: %w", name, err)
+		return fmt.Errorf("check lease slot database existence: %w", err)
 	}
 
-	// Snapshot the baseline NOW, while the clone is by definition still
-	// byte-identical to the template. This is the only moment at which
-	// "which rows are baseline?" is knowable without trusting a hardcoded
-	// list — after the first test runs, baseline and test-created rows are
-	// indistinguishable by inspection.
-	if err := snapshotLeaseBaseline(ctx, baseDSN, name); err != nil {
-		return "", fmt.Errorf("snapshot lease baseline on %s: %w", name, err)
+	if exists {
+		// Adoption is only legitimate if the slot carries a baseline this code
+		// can trust. If it does, adopt it: no drop, no recreate — the
+		// per-checkout reset is what makes it clean, and skipping the clone is
+		// the entire point of deterministic slot names.
+		complete, err := leaseBaselineIsComplete(ctx, baseDSN, slotName)
+		if err != nil {
+			return fmt.Errorf("check baseline snapshot on adopted slot %s: %w", slotName, err)
+		}
+		if !complete {
+			// The slot exists but its baseline is missing or half-written: a
+			// prior owner died between CREATE DATABASE and the snapshot, or the
+			// slot predates the snapshot convention.
+			//
+			// It CANNOT be healed by snapshotting it now. This database may
+			// already have been used, and snapshotting it would enshrine
+			// whatever rows a previous test left behind as the "pristine"
+			// baseline that every future reset restores to — a permanent,
+			// silent false green. Nothing here can distinguish a pristine clone
+			// from a dirty one, and guessing is exactly the assumption this
+			// factory must not make.
+			//
+			// So rebuild it from the template. This is the only DROP DATABASE
+			// on the lease path and it is deliberately bounded: it takes a
+			// crash to reach, it runs under this slot's exclusive
+			// advisory-lock claim (no live process can be using it) and NOT
+			// under the global template-build lock (dropping under that lock is
+			// what wedged the cluster), and leaseCreateMu serializes it against
+			// every other clone. Failing loudly instead would be safe but would
+			// brick this slot for every future run until a human intervened.
+			if _, err := adminDB.ExecContext(ctx,
+				fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", quoteIdent(slotName)),
+			); err != nil {
+				return fmt.Errorf("rebuild lease slot %s (drop incomplete slot): %w", slotName, err)
+			}
+			exists = false
+		}
 	}
-	return name, nil
+
+	if !exists {
+		if _, err := adminDB.ExecContext(ctx,
+			fmt.Sprintf("CREATE DATABASE %s TEMPLATE %s", quoteIdent(slotName), quoteIdent(templateDBName)),
+		); err != nil {
+			return fmt.Errorf("create leased database %s: %w", slotName, err)
+		}
+		// Snapshot the baseline NOW, while the clone is by definition still
+		// byte-identical to the template — see snapshotLeaseBaseline's own
+		// doc comment for why full row content, not just presence, matters.
+		// This is the ONLY path that snapshots, which is precisely what lets
+		// snapshotLeaseBaseline assume a pristine database and fail loudly if
+		// that assumption is ever violated.
+		if err := snapshotLeaseBaseline(ctx, baseDSN, slotName); err != nil {
+			return fmt.Errorf("snapshot lease baseline on %s: %w", slotName, err)
+		}
+	}
+
+	// The database MUST be ownership-marked so GCRetiredDatabases can prove
+	// it owns it before ever touching it. Reasserted unconditionally (not
+	// only on create) so an adopted slot's marker always reflects the
+	// fingerprint/resetPolicyVersion of the code that most recently verified
+	// it — which is what GC's staleness comparison depends on being honest.
+	if _, err := adminDB.ExecContext(ctx, fmt.Sprintf(
+		"COMMENT ON DATABASE %s IS %s", quoteIdent(slotName), quoteLiteral(leaseMarker(fingerprint16)),
+	)); err != nil {
+		return fmt.Errorf("mark leased database %s: %w", slotName, err)
+	}
+	return nil
+}
+
+func databaseExists(ctx context.Context, adminDB *sql.DB, name string) (bool, error) {
+	var exists bool
+	err := adminDB.QueryRowContext(ctx,
+		"SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = $1)", name).Scan(&exists)
+	return exists, err
 }
 
 // snapshotLeaseBaseline copies the FULL ROW CONTENT of the semi-static tables
@@ -166,6 +400,13 @@ func snapshotLeaseBaseline(ctx context.Context, baseDSN, dbName string) error {
 	}
 
 	for _, st := range baselineSnapshotTables {
+		// Plain CREATE TABLE, NOT "IF NOT EXISTS". This function may only ever
+		// run against a database in pristine template-fresh state, and its
+		// callers guarantee that. If a snapshot table already exists, that
+		// guarantee is broken and the correct outcome is a loud 42P07, not a
+		// silent skip: "IF NOT EXISTS" would skip the SELECT entirely and leave
+		// a stale snapshot standing in as the baseline, which every later reset
+		// would restore to. That is a false green by construction.
 		if _, err := db.ExecContext(ctx, fmt.Sprintf(
 			"CREATE TABLE %s AS SELECT * FROM %s", st.snapshot(), st.qualified,
 		)); err != nil {
@@ -175,15 +416,35 @@ func snapshotLeaseBaseline(ctx context.Context, baseDSN, dbName string) error {
 	return nil
 }
 
-// randomHex generates n random bytes hex-encoded, without requiring a
-// *testing.T (unlike randomSuffix), since createLeasedDatabase runs outside
-// any single test's lifecycle — it is shared pool infrastructure.
-func randomHex(n int) (string, error) {
-	b := make([]byte, n)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
+// leaseBaselineIsComplete reports whether dbName carries a baseline snapshot
+// this code can trust: the schema AND every table in baselineSnapshotTables.
+//
+// Presence of the schema alone is not enough. A half-written baseline (the
+// clone step died between two CREATE TABLEs) would pass a schema-only check,
+// and the missing tables would only surface later as a restore error — or, if
+// the set of snapshot tables changed, not surface at all.
+func leaseBaselineIsComplete(ctx context.Context, baseDSN, dbName string) (bool, error) {
+	db, err := openDBWithDatabase(baseDSN, dbName)
+	if err != nil {
+		return false, err
 	}
-	return fmt.Sprintf("%x", b), nil
+	defer db.Close()
+
+	for _, st := range baselineSnapshotTables {
+		var exists bool
+		if err := db.QueryRowContext(ctx,
+			`SELECT EXISTS (
+			   SELECT 1 FROM pg_tables
+			    WHERE schemaname = $1 AND tablename = $2)`,
+			leaseBaselineSchema, st.snapName,
+		).Scan(&exists); err != nil {
+			return false, err
+		}
+		if !exists {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 // leaseBaselineSchema holds the per-lease baseline snapshot. It lives OUTSIDE
