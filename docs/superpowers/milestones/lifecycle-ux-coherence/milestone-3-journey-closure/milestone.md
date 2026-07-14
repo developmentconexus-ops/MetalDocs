@@ -1,7 +1,7 @@
 # M3 — Journey Closure
 
 **Program:** lifecycle-ux-coherence · **Governing spec:** `docs/superpowers/specs/2026-07-06-lifecycle-ux-coherence-design.md` §3 (findings 9–12, 20)
-**Roadmap unit:** 4.1 · **Status:** in progress
+**Roadmap unit:** 4.1 · **Status:** CLOSED (2026-07-14)
 
 ## Objective (outcome)
 Every lifecycle event/screen links to the next action; zero dead FE affordances.
@@ -30,4 +30,11 @@ L3 browser QA is operator-deferred (consolidated session). Feature-unit targeted
 walk attempted only if trivially possible on a free port; CANNOT is acceptable.
 
 ## Close-out
-_(filled at unit close)_
+CLOSED 2026-07-14. Branch `unit-4.1-journey-closure`, base `a684cb4e`, range
+`a684cb4e..daf471a5` (4 commits; F12/F11/F20 slices + 1 restoration fix). Net 17 files,
++177/−380. Gates: L0 tsc exit 0; L1 vitest 81 files / 546 tests passed. Each slice + final
+net diff independently reviewed (cavecrew-reviewer, all "No issues"). One defect found &
+remediated: slice A's `git add -A` on an incomplete worktree checkout committed 2237 spurious
+tracked-file deletions → restored from base in `daf471a5`. F9/F10 already-resolved by ADR 0080
+(evidence-only). L3 browser QA → operator (login-password prohibition). Not pushed.
+Evidence: `docs/superpowers/reports/2026-07-14-unit-4.1-evidence.md`.
