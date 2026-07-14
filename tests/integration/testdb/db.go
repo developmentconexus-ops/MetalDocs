@@ -66,10 +66,73 @@ func DSN(t *testing.T) string {
 	return ""
 }
 
-// Open returns a *sql.DB connected to a per-test isolated database cloned from
-// a curated-baseline template. The returned string is kept for Qualified()
-// compatibility; isolation happens at the database level, not via test schemas.
+// Open returns a *sql.DB connected to a reset-safe leased database checked
+// out of the package-process lease pool (see leasePool below). This is the
+// default ~130-caller path: no per-test CREATE DATABASE / DROP DATABASE, just
+// a TRUNCATE reset of a leased physical database that is returned to the pool
+// (never dropped) on t.Cleanup. The returned string is kept for Qualified()
+// compatibility; isolation happens at the database level, not via test
+// schemas.
+//
+// Tests that genuinely need a fresh, untouched clone (e.g. tests that mutate
+// DDL, or that must prove behavior on a virgin database) should call
+// OpenFreshDatabase instead.
 func Open(t *testing.T) (*sql.DB, string) {
+	t.Helper()
+
+	baseDSN := DSN(t)
+
+	phaseStart := time.Now()
+	ensureTemplateDatabase(t, baseDSN)
+	tracePhase(t, "ensure_template", time.Since(phaseStart))
+
+	phaseStart = time.Now()
+	dbName := globalLeasePool.checkout(t, baseDSN)
+	tracePhase(t, "lease_checkout", time.Since(phaseStart))
+
+	// The DELETE-based reset is measured in single-digit milliseconds (it
+	// touches rows, not relfilenodes — see resetLeasedDatabase). 60s is a
+	// pure hang-guard, not a budget.
+	resetCtx, resetCancel := context.WithTimeout(context.Background(), 60*time.Second)
+	phaseStart = time.Now()
+	if err := resetLeasedDatabase(resetCtx, baseDSN, dbName); err != nil {
+		resetCancel()
+		globalLeasePool.release(dbName)
+		t.Fatalf("reset leased database: %v", err)
+	}
+	resetCancel()
+	tracePhase(t, "reset", time.Since(phaseStart))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	phaseStart = time.Now()
+	db, err := openDBWithDatabase(baseDSN, dbName)
+	if err != nil {
+		globalLeasePool.release(dbName)
+		t.Fatalf("open leased test db: %v", err)
+	}
+	if err := db.PingContext(ctx); err != nil {
+		_ = db.Close()
+		globalLeasePool.release(dbName)
+		t.Fatalf("ping leased test database %s: %v", dbName, err)
+	}
+	tracePhase(t, "first_ping", time.Since(phaseStart))
+
+	t.Cleanup(func() {
+		_ = db.Close()
+		globalLeasePool.release(dbName)
+	})
+
+	return db, dbName
+}
+
+// OpenFreshDatabase returns a *sql.DB connected to a per-test isolated
+// database physically cloned from the curated-baseline template, then DROPped
+// in t.Cleanup. This is the pre-lease-pool Open behaviour, kept for callers
+// that need a virgin database (DDL mutation, schema-lockdown assertions,
+// anything that must not share a physical database with any other test).
+func OpenFreshDatabase(t *testing.T) (*sql.DB, string) {
 	t.Helper()
 
 	baseDSN := DSN(t)
@@ -383,6 +446,15 @@ func openDBWithDatabase(dsn, dbName string) (*sql.DB, error) {
 		return nil, err
 	}
 	cfg.Database = dbName
+	// Connect-time search_path, not ALTER DATABASE ... SET search_path: ~9
+	// test files currently run that ALTER as setup boilerplate, all to this
+	// same value. Supplying it here makes those calls redundant (a later
+	// slice deletes them) without mutating database-level state that a leased
+	// database would then carry across tests.
+	if cfg.RuntimeParams == nil {
+		cfg.RuntimeParams = map[string]string{}
+	}
+	cfg.RuntimeParams["search_path"] = "public, metaldocs"
 	return stdlib.OpenDB(*cfg), nil
 }
 
