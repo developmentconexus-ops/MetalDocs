@@ -75,10 +75,11 @@ func DSN(t *testing.T) string {
 // Open returns a *sql.DB connected to a reset-safe leased database checked
 // out of the package-process lease pool (see leasePool below). This is the
 // default ~130-caller path: no per-test CREATE DATABASE / DROP DATABASE, just
-// a TRUNCATE reset of a leased physical database that is returned to the pool
-// (never dropped) on t.Cleanup. The returned string is kept for Qualified()
-// compatibility; isolation happens at the database level, not via test
-// schemas.
+// a DELETE-based reset (see resetLeasedDatabase — NOT truncate: TRUNCATE
+// rewrites a relfilenode per relation and measured 55x slower here) of a
+// leased physical database that is returned to the pool (never dropped) on
+// t.Cleanup. The returned string is kept for Qualified() compatibility;
+// isolation happens at the database level, not via test schemas.
 //
 // Tests that genuinely need a fresh, untouched clone (e.g. tests that mutate
 // DDL, or that must prove behavior on a virgin database) should call
@@ -720,8 +721,6 @@ var metaldocsOwnedObjects = map[string]struct{}{
 	"document_families":      {},
 	"document_process_areas": {},
 	"document_profiles":      {},
-	"governance_events":      {},
-	"grant_area_membership":  {},
 	"iam_group_members":      {},
 	"iam_group_roles":        {},
 	"iam_groups":             {},
