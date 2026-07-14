@@ -77,6 +77,31 @@ func (previewTemplateVersionReader) LoadTemplateVersionContentHash(ctx context.C
 	return hash.String, true, nil
 }
 
+func (previewTemplateVersionReader) LoadTemplateInboxMeta(ctx context.Context, tx db.Tx, tenantID string, versionIDs []string) (map[string]domain.TemplateInboxMeta, error) {
+	out := make(map[string]domain.TemplateInboxMeta)
+	for _, versionID := range versionIDs {
+		var templateID, name string
+		err := tx.QueryRowContext(ctx,
+			`SELECT t.id, t.name
+			   FROM templates_template_version tv
+			   JOIN templates_template t
+			     ON t.id = tv.template_id
+			    AND t.tenant_id = tv.tenant_id
+			  WHERE tv.tenant_id = $1
+			    AND tv.id = $2`,
+			tenantID, versionID,
+		).Scan(&templateID, &name)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue // absent / cross-tenant rows are omitted, mirroring the port contract
+		}
+		if err != nil {
+			return nil, err
+		}
+		out[versionID] = domain.TemplateInboxMeta{TemplateID: templateID, Title: name}
+	}
+	return out, nil
+}
+
 // previewTemplateVersionWriter satisfies BOTH the submit-lock port
 // (TemplateVersionSubmitWriter, MarkTemplateVersionUnderReview) and the
 // completion port (TemplateCompletionWriter) so a single value wires through
