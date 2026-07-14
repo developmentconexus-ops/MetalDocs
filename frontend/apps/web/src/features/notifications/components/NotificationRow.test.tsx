@@ -1,5 +1,7 @@
+import type { ReactElement } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 
 import { NotificationRow } from './NotificationRow';
 import type { Notification } from '../api/notifications';
@@ -20,29 +22,68 @@ function makeNotification(overrides: Partial<Notification> = {}): Notification {
   };
 }
 
+function renderRow(ui: ReactElement) {
+  return render(<MemoryRouter>{ui}</MemoryRouter>);
+}
+
 describe('NotificationRow', () => {
   it('renders the event chip, title, and message', () => {
-    render(<NotificationRow notification={makeNotification()} />);
+    renderRow(<NotificationRow notification={makeNotification()} />);
     expect(screen.getByText('Publicado')).toBeInTheDocument();
     expect(screen.getByText('Documento publicado')).toBeInTheDocument();
     expect(screen.getByText('O documento ABC foi publicado.')).toBeInTheDocument();
   });
 
-  it('calls onMarkRead with the id when an unread row is clicked', () => {
+  it('deep-links an unread targeted row and marks it read on activation', () => {
     const onMarkRead = vi.fn();
-    render(<NotificationRow notification={makeNotification()} onMarkRead={onMarkRead} />);
-    fireEvent.click(screen.getByRole('button', { name: /marcar como lida/i }));
+    renderRow(<NotificationRow notification={makeNotification()} onMarkRead={onMarkRead} />);
+    const link = screen.getByRole('link', { name: /abrir/i });
+    expect(link).toHaveAttribute('href', '/documents/d-1');
+    fireEvent.click(link);
     expect(onMarkRead).toHaveBeenCalledWith('n-1');
   });
 
-  it('does not render a click target for a read row', () => {
+  it('deep-links a read targeted row but does not re-mark it read', () => {
     const onMarkRead = vi.fn();
-    render(
+    renderRow(
       <NotificationRow
         notification={makeNotification({ status: 'READ', read_at: '2026-06-22T12:00:00.000Z' })}
         onMarkRead={onMarkRead}
       />,
     );
-    expect(screen.queryByRole('button', { name: /marcar como lida/i })).not.toBeInTheDocument();
+    const link = screen.getByRole('link', { name: /abrir/i });
+    expect(link).toHaveAttribute('href', '/documents/d-1');
+    fireEvent.click(link);
+    expect(onMarkRead).not.toHaveBeenCalled();
+  });
+
+  it('keeps the mark-read overlay for an unread non-routable row', () => {
+    const onMarkRead = vi.fn();
+    renderRow(
+      <NotificationRow
+        notification={makeNotification({ resource_type: '', resource_id: '' })}
+        onMarkRead={onMarkRead}
+      />,
+    );
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /marcar como lida/i }));
+    expect(onMarkRead).toHaveBeenCalledWith('n-1');
+  });
+
+  it('has no click target for a read non-routable row', () => {
+    const onMarkRead = vi.fn();
+    renderRow(
+      <NotificationRow
+        notification={makeNotification({
+          resource_type: '',
+          resource_id: '',
+          status: 'READ',
+          read_at: '2026-06-22T12:00:00.000Z',
+        })}
+        onMarkRead={onMarkRead}
+      />,
+    );
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });

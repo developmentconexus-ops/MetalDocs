@@ -1,6 +1,9 @@
+import { Link } from 'react-router-dom';
+
 import type { Notification } from '../api/notifications';
 import { eventTypeLabel } from '../lib/eventTypeLabel';
 import { formatNotificationTimestamp } from '../lib/formatNotificationTimestamp';
+import { notificationDeepLink } from '../lib/notificationDeepLink';
 import styles from './NotificationRow.module.css';
 
 interface NotificationRowProps {
@@ -16,10 +19,12 @@ function isUnread(notification: Notification): boolean {
 }
 
 // NotificationRow is a presentational row: event chip, title, message, relative
-// time, and an unread marker. Clicking an unread row marks it read; read rows
-// are inert. Data fetching and mutation live in the parent.
+// time, and an unread marker. When the notification points at a resource it
+// deep-links there (opening also clears unread); otherwise an unread row keeps
+// the mark-read overlay and read rows are inert. Data fetching lives in the parent.
 export function NotificationRow({ notification, onMarkRead }: NotificationRowProps) {
   const unread = isUnread(notification);
+  const target = notificationDeepLink(notification);
 
   const handleActivate = () => {
     if (unread) onMarkRead?.(notification.id);
@@ -30,7 +35,14 @@ export function NotificationRow({ notification, onMarkRead }: NotificationRowPro
       className={`${styles.row} ${unread ? styles.unread : ''}`}
       data-status={notification.status}
     >
-      {unread ? (
+      {target ? (
+        <Link
+          to={target}
+          className={styles.hit}
+          onClick={handleActivate}
+          aria-label={`Abrir: ${notification.title}`}
+        />
+      ) : unread ? (
         <button
           type="button"
           className={styles.hit}

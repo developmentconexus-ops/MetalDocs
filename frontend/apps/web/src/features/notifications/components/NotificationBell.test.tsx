@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 
 import { NotificationBell } from './NotificationBell';
 import type { Notification } from '../api/notifications';
@@ -55,32 +56,32 @@ beforeEach(() => {
 describe('NotificationBell', () => {
   it('hides the badge when there are no unread', () => {
     unreadMock.mockReturnValue(queryResult({ data: 0 }));
-    render(<NotificationBell />);
+    render(<MemoryRouter><NotificationBell /></MemoryRouter>);
     expect(screen.getByRole('button', { name: 'Notificações' })).toBeInTheDocument();
   });
 
   it('shows the unread count in the badge', () => {
     unreadMock.mockReturnValue(queryResult({ data: 3 }));
-    render(<NotificationBell />);
+    render(<MemoryRouter><NotificationBell /></MemoryRouter>);
     expect(screen.getByRole('button', { name: 'Notificações (3 não lidas)' })).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
   });
 
   it('caps the badge at 9+', () => {
     unreadMock.mockReturnValue(queryResult({ data: 42 }));
-    render(<NotificationBell />);
+    render(<MemoryRouter><NotificationBell /></MemoryRouter>);
     expect(screen.getByText('9+')).toBeInTheDocument();
   });
 
   it('opens the popover on click and lists recent notifications', () => {
-    render(<NotificationBell />);
+    render(<MemoryRouter><NotificationBell /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: 'Notificações' }));
     expect(screen.getByRole('dialog', { name: 'Notificações recentes' })).toBeInTheDocument();
     expect(screen.getByText('Documento publicado')).toBeInTheDocument();
   });
 
   it('opens the spotlight from "Mostrar todas" and closes the popover', () => {
-    render(<NotificationBell />);
+    render(<MemoryRouter><NotificationBell /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: 'Notificações' }));
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar todas' }));
     expect(screen.getByTestId('spotlight')).toBeInTheDocument();

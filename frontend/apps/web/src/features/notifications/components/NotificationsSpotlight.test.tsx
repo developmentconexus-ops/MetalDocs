@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 
 import { NotificationsSpotlight } from './NotificationsSpotlight';
 import type { Notification } from '../api/notifications';
@@ -54,13 +55,13 @@ beforeEach(() => {
 describe('NotificationsSpotlight', () => {
   it('shows the loading state', () => {
     listMock.mockReturnValue(queryResult({ isLoading: true }));
-    render(<NotificationsSpotlight open onClose={vi.fn()} />);
+    render(<MemoryRouter><NotificationsSpotlight open onClose={vi.fn()} /></MemoryRouter>);
     expect(screen.getByText('Carregando notificações…')).toBeInTheDocument();
   });
 
   it('shows the empty state', () => {
     listMock.mockReturnValue(queryResult({ data: { items: [], page: { has_more: false, next_cursor: null } } }));
-    render(<NotificationsSpotlight open onClose={vi.fn()} />);
+    render(<MemoryRouter><NotificationsSpotlight open onClose={vi.fn()} /></MemoryRouter>);
     expect(screen.getByText('Nenhuma notificação.')).toBeInTheDocument();
   });
 
@@ -68,7 +69,7 @@ describe('NotificationsSpotlight', () => {
     listMock.mockReturnValue(
       queryResult({ data: { items: [makeNotification()], page: { has_more: false, next_cursor: null } } }),
     );
-    render(<NotificationsSpotlight open onClose={vi.fn()} />);
+    render(<MemoryRouter><NotificationsSpotlight open onClose={vi.fn()} /></MemoryRouter>);
     expect(screen.getByText('Documento publicado')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Marcar todas como lidas' })).toBeEnabled();
   });
@@ -82,7 +83,7 @@ describe('NotificationsSpotlight', () => {
         },
       }),
     );
-    render(<NotificationsSpotlight open onClose={vi.fn()} />);
+    render(<MemoryRouter><NotificationsSpotlight open onClose={vi.fn()} /></MemoryRouter>);
     expect(screen.getByRole('button', { name: 'Marcar todas como lidas' })).toBeDisabled();
   });
 
@@ -92,7 +93,7 @@ describe('NotificationsSpotlight', () => {
     listMock.mockReturnValue(
       queryResult({ data: { items: [makeNotification()], page: { has_more: false, next_cursor: null } } }),
     );
-    render(<NotificationsSpotlight open onClose={vi.fn()} />);
+    render(<MemoryRouter><NotificationsSpotlight open onClose={vi.fn()} /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: 'Marcar todas como lidas' }));
     expect(mutate).toHaveBeenCalledTimes(1);
   });
