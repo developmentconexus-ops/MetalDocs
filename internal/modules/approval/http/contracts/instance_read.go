@@ -168,9 +168,12 @@ type InboxItem struct {
 	SubmittedAt          string  `json:"submitted_at"`
 	StageLabel           string  `json:"stage_label"`
 	QuorumProgress       string  `json:"quorum_progress"`
-	// StageKind (F8, spec.md §4/W4): review or approval, omitted when unknown
-	// (defensive; the service always populates it from the stage snapshot).
-	StageKind string `json:"stage_kind,omitempty"`
+	// StageKind (F8, spec.md §4/W4): review or approval. Required on the wire
+	// (unit 4.2) — approval_stage_instances.stage_kind is NOT NULL DEFAULT
+	// 'approval' (0286), so the service always populates it from the stage
+	// snapshot. No omitempty: dropping the key would contradict the openapi
+	// `required` list.
+	StageKind string `json:"stage_kind"`
 	// DueAt (F8, spec.md §4/W4): RFC3339 UTC SLA due date. Required-and-nullable
 	// on the wire (present as explicit null, never omitted) — nil when no SLA is
 	// configured for the stage (no-fallback principle, spec §11).
