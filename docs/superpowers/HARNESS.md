@@ -320,3 +320,84 @@ QA self-sufficiency; operator-manual steps are a last resort for genuinely non-s
   Transport B: send the message now. Never wait silently for someone to notice.
 - Never: skip hooks, force-push, fake evidence, widen scope to "fix while here" (out-of-scope
   findings go to the hub as `ESCALATION` for their own future unit dispatch instead).
+
+## 9. Parallel-track execution (ratified 2026-07-14 — operator: finish faster without losing quality)
+
+The "one unit at a time, top-to-bottom" rule of ROADMAP §0 was a *serialization by decree*, not by
+dependency. It is now relaxed: **the hub runs independent units as concurrent tracks.** Order is
+governed by the real dependency DAG, not by row number.
+
+**The only true parallelism axis is hub-dispatched sibling units** — one worktree/branch/session
+each. Sibling units report to the hub *by design* (that is the correct routing), so the nested-child
+misrouting bug (§2) does NOT apply between them. Genuine wall-clock concurrency lives here.
+Intra-unit nested workers stay SYNC (`run_in_background: false`) — used for help, never for
+wall-clock concurrency. A unit that discovers internal parallelism does NOT background its own
+children; it emits `SPLIT-REQUEST` (below) so the hub forks a sibling unit on the real axis.
+
+### 9.1 When the hub may parallelize
+
+Before dispatching, the hub builds a **collision matrix** across candidate units and runs two
+concurrently ONLY when they are disjoint on ALL of:
+
+| Axis | Collision test | Rule if they collide |
+|---|---|---|
+| **Files** | same source file edited by both | serialize, or split ownership so each owns disjoint files |
+| **FE surface** | same `features/<domain>` component tree | serialize the FE-touching pair (merge hell otherwise) |
+| **Contract** | both edit `api/openapi` | serialize contract edits (one owns the spec at a time) |
+| **Migration** | both add a migration | pre-allocate disjoint numbers up front (§9.2) |
+| **DB shape** | both alter the same table / same tenant-port registration | one owns it exclusively; the other `REQUEST`s |
+| **Module** | both mutate the same module's domain/service internals | serialize; cross-module edges are fine (different modules = safe) |
+
+Disjoint on all six → **parallel-safe**, dispatch as concurrent tracks. Any collision → serialize
+that pair (the rest can still parallelize). Test-infra units (harness/testdb) and mechanical
+sweeps are almost always orthogonal to feature units — parallelize them freely.
+
+### 9.2 Coordination protocol (the guardrails that keep quality)
+
+1. **Migration number pre-allocation.** The hub reserves a disjoint block per track BEFORE
+   dispatch and writes it into each unit's prompt (e.g. "you own 0306+"). A track needing an
+   unplanned migration emits `REQUEST migration-number` — never grabs the next free number blind
+   (two blind grabs = duplicate number = merge break).
+2. **Exclusive-owner files.** When two tracks must touch the same shared file (e.g.
+   `TenantDataPort` registration), the hub names ONE owner in the prompts; the other emits
+   `REQUEST` and the hub serializes that edit or relays a patch. No silent concurrent edits to a
+   shared file.
+3. **Contract lock.** Only one in-flight track may edit `api/openapi`. The hub does not dispatch a
+   second contract-touching track until the first merges (or assigns disjoint path sections and
+   accepts a regen conflict it resolves at merge).
+4. **Same base, serial merge-back.** Every track branches off the *same* current main. Merge-back
+   is serialized through the ONE acceptance gate (independent read-only review → merge --no-ff →
+   post-merge ladder → board/ROADMAP → cleanup). **Merge order = smallest/lowest-risk first**
+   (mechanical → test-infra → feature) to minimize rebase pain.
+5. **Rebase-on-merged-main.** After track N merges, any still-in-flight track that shares moved
+   infra (migrations, platform, a shared file) is told to rebase on the new main before its own
+   merge. The hub decides per collision matrix whether a rebase is needed; a purely disjoint track
+   needs none.
+6. **Baseline unchanged.** Zero-new-RED gate holds per track. A track's post-merge ladder runs on
+   the integrated main, not just its branch — a green branch that reddens main = REJECT, remediate.
+
+### 9.3 New event: `SPLIT-REQUEST` (intra-milestone / intra-unit autonomy)
+
+A unit or milestone agent that finds its own work is internally parallel (independent slices on
+disjoint files/modules) does NOT background nested children. It emits:
+
+| Event | When | Payload |
+|---|---|---|
+| `SPLIT-REQUEST` | unit's remaining slices are mutually independent and splitting buys real wall-clock | proposed split: slice groups + their disjoint file/module/migration ownership + which stay in this unit vs fork to a sibling |
+
+Hub side: validate the split against the §9.1 collision matrix; if clean, fork the forked group as
+a **sibling unit** (own worktree/chip, pre-allocated migration block, exclusive-owner assignments)
+and let the requester keep the rest. If the split collides, deny with the reason (requester
+proceeds serially). This is how a milestone gets "autonomia de paralelizar o que conseguir e
+reorganizar se precisar" — the milestone owns the *proposal*; the hub owns the *collision
+adjudication* (so two forks never corrupt each other). Reorganization of a unit's OWN slice order
+needs no request — the agent reslices freely (P2 authority); only a FORK to a concurrent sibling
+routes through `SPLIT-REQUEST`.
+
+### 9.4 Observability under Transport B
+
+Each track = one session the operator launches and watches (chip default). Degree of concurrency =
+operator's attention budget, set per batch (the hub asks when it is non-obvious). The hub prepares
+all parallel-safe chips at once and surfaces them together, each carrying its collision-matrix
+ownership (migration block, exclusive files, contract-lock status) so a launched track cannot
+stray into another's lane.

@@ -1,7 +1,7 @@
 # MetalDocs Consolidated Roadmap
 
 **Reset date:** 2026-07-10 (operator-ordered re-plan; supersedes per-program READMEs as the ORDER of work — program folders remain the source of per-milestone detail).
-**Rule:** work top-to-bottom. One unit at a time. Each unit lists its EXACT context files and a main-session token budget — do not read beyond the listed files without a named reason; delegate bulk reads to sonnet subagents (never fable workers).
+**Rule:** order follows the real dependency DAG, NOT row number. Independent units run as **concurrent tracks** per HARNESS §9 (parallel-track execution, ratified 2026-07-14) — the hub builds a collision matrix (files · FE surface · contract · migration · DB shape · module) and dispatches disjoint units in parallel, serial merge-back through the one acceptance gate (smallest-first). A milestone may `SPLIT-REQUEST` its own independent slices into sibling tracks. Each unit lists its EXACT context files and a main-session token budget — do not read beyond the listed files without a named reason; delegate bulk reads to sonnet subagents (never fable workers).
 
 ---
 
@@ -48,15 +48,34 @@ Research-validated design decisions (operator-locked 2026-07-10): taxonomy owns 
 
 Ordering rationale (locked): G1–G3 land INSIDE the nested kernel BEFORE extraction — extraction then moves complete, ratified-model-conformant code once. Reverse order would extract a kernel that immediately needs domain surgery.
 
-## 4. LATER — lifecycle-ux-coherence tail
+## 4. LATER — lifecycle tail + hygiene (PARALLELIZED 2026-07-14, HARNESS §9)
+
+**Dependency truth (not row order):** 4.2 ⊥ 4.3 ⊥ 4.4 — three near-orthogonal tracks, verified
+disjoint on all six collision axes (only 4.2 touches FE; only 4.2 touches `api/openapi`; only 4.4
+adds a migration). Old "after 4.1/4.2 / after 4.3" ordering was serialization-by-decree, now
+retired. Run concurrently (operator-approved 3 tracks, 2026-07-14):
+
+```
+Track A (feature)     4.2 template inbox        FE approval/InboxPage + approval kernel worklist query + api/openapi
+Track B (test-infra)  4.3 E-PROD zero-baseline  Go tests + testdb-clone; owns TenantDataPort registration exclusively
+Track C (mechanical)  4.4 hygiene (−leak item)  migration 0306 + submit_service idempotency + string sweep
+                              └─ testdb-leak sub-item defers until B merges (or B absorbs it)
+```
+
+**Collision-matrix ownership (written into each chip):** migration block — C owns `0306+`, A/B add
+none (max on main = 0305). Exclusive files — B owns `TenantDataPort` registration; A `REQUEST`s if
+its worklist query needs a new tenant-table port (a read query should not). Contract lock — only A
+edits `api/openapi`. Merge-back — serial through the one acceptance gate, **smallest-first C→B→A**;
+later track rebases on merged main only if shared infra moved. Zero-new-RED holds per track on the
+integrated main.
 
 | # | Unit | Scope | Depends on |
 |---|------|-------|------------|
 | 4.1 | **M3 journey closure** ✅ CLOSED 2026-07-14 (branch `unit-4.1-journey-closure`, base `a684cb4e`, range `a684cb4e..daf471a5`; 4 commits, net 17 files +177/−380; L0 tsc EXIT=0, L1 vitest 81 files/546 tests; each slice + final net diff independently reviewed "No issues"; NOT pushed) | Deep links (cockpit↔detail, notifications, fanout CTA); delete dead FE affordances (findings 9–12, 20). Spec: `2026-07-06-lifecycle-ux-coherence-design.md`. **Runtime-truth:** F9/F10 already satisfied by ADR 0080 (evidence-only); F11 notification deep-link + F12 fanout-CTA route fix BUILT; F20 dead affordances DELETED. One defect found+fixed: slice-A `git add -A` on incomplete worktree checkout committed 2237 spurious deletions → restored `daf471a5`. L3 browser QA → operator (login-password prohibition). Evidence: `docs/superpowers/reports/2026-07-14-unit-4.1-evidence.md`. | 1.1 (M2 HS-1). Independent otherwise — may interleave after §2 screens to avoid same-surface collisions. |
-| 4.2 | **M4 template inbox** | Template reviews in single approver worklist, contract-first (finding 15). | **3.1** — templates rewire onto extracted kernel first; building this before M3 = guaranteed rework. |
+| 4.2 | **M4 template inbox** (Track A) | Template reviews in single approver worklist, contract-first (finding 15). Consumes the EXTRACTED kernel worklist (3.1 done, legacy retired in 3.1a) — not any legacy template-review endpoint. Owns `api/openapi` edits this batch. | **3.1** ✅ (kernel extracted). Parallel-safe with 4.3/4.4 (disjoint surfaces). |
 
-| 4.3 | **E-PROD zero-baseline + testdb-clone isolation** (operator-approved 2026-07-13) | Kill the 9-accepted-RED baseline. Sequenced: (1) migrate the 4 non-isolated packages (`tests/integration/iam`-style shared-DB suites: `controlleddocuments/application`, `jobs/approval_sla_surfacer`, `tests/integration/scenarios`, `tests/integration/tenantdata`) to per-test testdb-clone (ADR 0034 framework, already canonical elsewhere); (2) re-run on clean DB — surviving RED = genuine product defect; (3) fix those at root (incl. registering `approval_delegations` + `approval_review_verdicts` TenantDataPorts). Exit: baseline = 0, gate = binary suite-green. Also kills `OCC_Race_N50` flake. Named trigger for wider sweep: any OTHER package showing pollution-flake migrates immediately. **(4) Suite-runtime budget (operator 2026-07-13: "50min é piada"):** audit the 3 worst packages — `tests/integration/approval` 1471s, `tests/integration/migrations` 1055s, `internal/platform/idempotency` 1041s — for real-sleep waits (janitor/TTL/poll loops) → fake-clock or short-TTL injection; add `t.Parallel()` where per-test clones make it safe; exit budget: full integration ≤ 15 min wall. Platform levers already landed hub-side 2026-07-13: `synchronous_commit=off` on dev postgres (compose) + selective-integration ladder policy + Go test cache re-enabled (HARNESS §5 L1). | after 4.1/4.2 (same-surface avoidance) |
-| 4.4 | **Schema/symbol hygiene** (operator-approved 2026-07-13) | Mechanical sweep: DROP dead `templates_template_version.pending_reviewer_role`/`pending_approver_role` (write-never/read-never since 3.1a, migration + pre-drop assert); M3 idempotency-key drift (`submit_service.go:81` raw-header passthrough — restore derivation or ratify); testdb per-pid template-DB leak (if 4.3 didn't absorb); stale "14 modules" count strings → 15. Cheap, haiku/sonnet workers. | after 4.3 |
+| 4.3 | **E-PROD zero-baseline + testdb-clone isolation** (operator-approved 2026-07-13) | Kill the 9-accepted-RED baseline. Sequenced: (1) migrate the 4 non-isolated packages (`tests/integration/iam`-style shared-DB suites: `controlleddocuments/application`, `jobs/approval_sla_surfacer`, `tests/integration/scenarios`, `tests/integration/tenantdata`) to per-test testdb-clone (ADR 0034 framework, already canonical elsewhere); (2) re-run on clean DB — surviving RED = genuine product defect; (3) fix those at root (incl. registering `approval_delegations` + `approval_review_verdicts` TenantDataPorts). Exit: baseline = 0, gate = binary suite-green. Also kills `OCC_Race_N50` flake. Named trigger for wider sweep: any OTHER package showing pollution-flake migrates immediately. **(4) Suite-runtime budget (operator 2026-07-13: "50min é piada"):** audit the 3 worst packages — `tests/integration/approval` 1471s, `tests/integration/migrations` 1055s, `internal/platform/idempotency` 1041s — for real-sleep waits (janitor/TTL/poll loops) → fake-clock or short-TTL injection; add `t.Parallel()` where per-test clones make it safe; exit budget: full integration ≤ 15 min wall. Platform levers already landed hub-side 2026-07-13: `synchronous_commit=off` on dev postgres (compose) + selective-integration ladder policy + Go test cache re-enabled (HARNESS §5 L1). **Track B: owns `TenantDataPort` registration exclusively this batch; adds no migration.** | none — parallel-safe with 4.2/4.4 (Go test-infra, disjoint from FE + feature surfaces). |
+| 4.4 | **Schema/symbol hygiene** (operator-approved 2026-07-13) | Mechanical sweep: DROP dead `templates_template_version.pending_reviewer_role`/`pending_approver_role` (write-never/read-never since 3.1a, migration + pre-drop assert); M3 idempotency-key drift (`submit_service.go:81` raw-header passthrough — restore derivation or ratify); stale "14 modules" count strings → 15. Cheap, haiku/sonnet workers. **Track C: owns migration `0306+`; the testdb per-pid template-DB leak sub-item defers until Track B (4.3) merges or absorbs it — the other 3 items run now.** | none for the 3 now-items — parallel-safe with 4.2/4.3 (migration number pre-reserved, dropped cols have 0 readers). Leak sub-item: after 4.3. |
 
 Deferred register (findings 18/19/21/22/23): `docs/superpowers/milestones/lifecycle-ux-coherence/README.md`.
 
