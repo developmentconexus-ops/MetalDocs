@@ -232,7 +232,7 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
       label: 'Cobertura',
       value: obligatedCount,
       hint: 'destinatários obrigados · abrir fanout →',
-      href: '/distribution',
+      href: 'distribution',
     },
     {
       key: 'nextReview',

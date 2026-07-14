@@ -51,8 +51,6 @@ type PublishResponse = components['schemas']['PublishDocumentResponse'];
 type SchedulePublishRequest = components['schemas']['SchedulePublishDocumentRequest'];
 type SupersedeRequest = components['schemas']['SupersedeDocumentRequest'];
 type SupersedeResponse = components['schemas']['SupersedeDocumentResponse'];
-type ObsoleteRequest = components['schemas']['ObsoleteDocumentRequest'];
-type ObsoleteResponse = components['schemas']['ObsoleteDocumentResponse'];
 type CancelRequest = components['schemas']['CancelDocumentApprovalRequest'];
 type CancelResponse = components['schemas']['CancelDocumentApprovalResponse'];
 
@@ -197,17 +195,6 @@ export function supersede(
   opts?: MutateOptions,
 ): Promise<SupersedeResponse> {
   return mutate('POST', `${BASE}/documents/${documentId}/supersede`, body, {
-    resourceId: documentId,
-    ...opts,
-  });
-}
-
-export function obsolete(
-  documentId: string,
-  body: ObsoleteRequest,
-  opts?: MutateOptions,
-): Promise<ObsoleteResponse> {
-  return mutate('POST', `${BASE}/documents/${documentId}/obsolete`, body, {
     resourceId: documentId,
     ...opts,
   });

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ActivityPanel } from '../components/ActivityPanel';
 import { AuthorCell } from '../components/AuthorCell';
 import { LibraryFilterTabs } from '../components/LibraryFilterTabs';
 import { LibraryStatCards } from '../components/LibraryStatCards';
@@ -15,7 +14,6 @@ import { useDebouncedValue } from '../../../lib/hooks/useDebouncedValue';
 import styles from './LibraryPage.module.css';
 
 const PAGE_SIZE_KEY = 'metaldocs.library.pageSize';
-const ACTIVITY_OPEN_KEY = 'metaldocs.library.activityOpen';
 const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
 type PageSize = (typeof PAGE_SIZE_OPTIONS)[number];
 
@@ -24,12 +22,6 @@ function readStoredPageSize(): PageSize {
   const raw = window.localStorage.getItem(PAGE_SIZE_KEY);
   const parsed = raw ? Number(raw) : NaN;
   return PAGE_SIZE_OPTIONS.includes(parsed as PageSize) ? (parsed as PageSize) : 20;
-}
-
-function readStoredActivityOpen(): boolean {
-  if (typeof window === 'undefined') return true;
-  const raw = window.localStorage.getItem(ACTIVITY_OPEN_KEY);
-  return raw === null ? true : raw === 'true';
 }
 
 export default function LibraryPage(): JSX.Element {
@@ -42,7 +34,6 @@ export default function LibraryPage(): JSX.Element {
   const [cursorStack, setCursorStack] = useState<string[]>(['']);
   // Lazy init — reads localStorage once on mount, prevents hydration flash.
   const [pageSize, setPageSize] = useState<PageSize>(readStoredPageSize);
-  const [activityOpen, setActivityOpen] = useState<boolean>(readStoredActivityOpen);
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedQuery = useDebouncedValue(searchQuery, 300);
 
@@ -70,12 +61,6 @@ export default function LibraryPage(): JSX.Element {
   function handleAreaChange(code: string | null) {
     setSelectedArea(code);
     resetToFirstPage();
-  }
-
-  function toggleActivity() {
-    const next = !activityOpen;
-    setActivityOpen(next);
-    window.localStorage.setItem(ACTIVITY_OPEN_KEY, String(next));
   }
 
   function openDocument(id: string) {
@@ -116,7 +101,7 @@ export default function LibraryPage(): JSX.Element {
       : null;
 
   return (
-    <div className={`${styles.root} ${activityOpen ? styles.withActivity : ''}`}>
+    <div className={styles.root}>
       <aside className={styles.sidebar}>
         <LibrarySidebar
           activeFilter={activeFilter}
@@ -141,24 +126,6 @@ export default function LibraryPage(): JSX.Element {
                 <span className={styles.metaValue}>{total.toLocaleString('pt-BR')}</span>
                 <span className={styles.metaLabel}>documentos</span>
               </span>
-              <button type="button" className={styles.activityButton} onClick={toggleActivity}>
-                {activityOpen ? (
-                  <>
-                    <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M13 5l-5 5 5 5" />
-                    </svg>
-                    Recolher atividade
-                  </>
-                ) : (
-                  <>
-                    <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <circle cx="10" cy="10" r="7" />
-                      <path d="M10 6v4l3 2" />
-                    </svg>
-                    Mostrar atividade
-                  </>
-                )}
-              </button>
             </div>
           </div>
           <p className={styles.description}>
@@ -183,7 +150,6 @@ export default function LibraryPage(): JSX.Element {
             <span>Estado</span>
             <span>Autor</span>
             <span>Rev.</span>
-            <span />
           </div>
 
           {libraryQuery.isPending ? (
@@ -218,14 +184,6 @@ export default function LibraryPage(): JSX.Element {
               <StatusPill status={d.status} />
               <AuthorCell name={d.created_by} />
               <span className={styles.monoCell}>REV{String(d.revision_number).padStart(2, '0')}</span>
-              <button
-                type="button"
-                className={styles.moreBtn}
-                aria-label="Mais opções"
-                onClick={(e) => e.stopPropagation()}
-              >
-                ···
-              </button>
             </div>
           ))}
 
@@ -257,8 +215,6 @@ export default function LibraryPage(): JSX.Element {
           </footer>
         </section>
       </main>
-
-      {activityOpen ? <ActivityPanel onClose={toggleActivity} /> : null}
     </div>
   );
 }

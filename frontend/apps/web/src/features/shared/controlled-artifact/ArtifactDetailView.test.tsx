@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { ArtifactDetailView } from "./ArtifactDetailView";
 import type { ArtifactViewModel } from "./types";
@@ -40,7 +40,7 @@ function buildModel(overrides: Partial<ArtifactViewModel> = {}): ArtifactViewMod
     },
     kpis: [
       { key: "currentVersion", label: "Versão atual", value: "REV01", hint: "desde 19/05/2026" },
-      { key: "coverage", label: "Cobertura", value: "12", hint: "destinatários obrigados · abrir fanout →", href: "/distribution" },
+      { key: "coverage", label: "Cobertura", value: "12", hint: "destinatários obrigados · abrir fanout →", href: "distribution" },
       { key: "nextReview", label: "Próxima revisão", value: "—", hint: "sem data de revisão definida" },
       { key: "pages", label: "Páginas", value: "1", hint: "metadado do arquivo" },
     ],
@@ -78,7 +78,16 @@ function buildModel(overrides: Partial<ArtifactViewModel> = {}): ArtifactViewMod
 }
 
 function renderView(node: React.ReactNode) {
-  return render(<MemoryRouter>{node}</MemoryRouter>);
+  // Mirrors the real router shape (frontend/apps/web/src/features/documents/routes.tsx):
+  // the view renders as the index route under `documents/:documentId/details`, sibling
+  // of the `distribution` child route, so relative links resolve the same way here.
+  return render(
+    <MemoryRouter initialEntries={["/documents/doc-1/details"]}>
+      <Routes>
+        <Route path="/documents/:documentId/details" element={node} />
+      </Routes>
+    </MemoryRouter>,
+  );
 }
 
 describe("ArtifactDetailView", () => {
@@ -144,14 +153,14 @@ describe("ArtifactDetailView", () => {
     expect(screen.getByText("Nenhuma revisão governada encontrada.")).toBeInTheDocument();
   });
 
-  it("D4 — coverage KPI cell renders '12', links to /distribution, no '%', no progressbar", () => {
+  it("D4 — coverage KPI cell renders '12', links to the distribution child route, no '%', no progressbar", () => {
     renderView(<ArtifactDetailView model={buildModel()} />);
 
     // Coverage value from kpis
     expect(screen.getByText("12")).toBeInTheDocument();
-    // The cell must be a link to /distribution
+    // The cell must be a relative link resolving into the distribution child route
     const link = screen.getByRole("link", { name: /Cobertura|destinatários/ });
-    expect(link).toHaveAttribute("href", "/distribution");
+    expect(link).toHaveAttribute("href", "/documents/doc-1/details/distribution");
     // No fabricated percentage
     expect(screen.queryByText(/%/)).toBeNull();
     // No progress bar
