@@ -1,4 +1,4 @@
-> **Last verified:** 2026-06-03 (fix/iam-memberships-pr1-backend-gaps: `CloseActive` and `GrantAtomic` now set `revoked_by`; `ListByTenant` added; tripwire pairing table updated with correct line numbers and `authz.Require` = YES for all UserAreaRepository write methods)
+> **Last verified:** 2026-07-14 (drift fix — `area_membership.Grant` row: `metaldocs.grant_area_membership` DROPPED by migration 0307, marked DEAD/retired) | **Prior:** 2026-06-03 (fix/iam-memberships-pr1-backend-gaps: `CloseActive` and `GrantAtomic` now set `revoked_by`; `ListByTenant` added; tripwire pairing table updated with correct line numbers and `authz.Require` = YES for all UserAreaRepository write methods)
 
 ## 1) Tables owned
 
@@ -144,7 +144,7 @@ Tripwire attachment check for requested tables:
 | UserAreaRepository.Insert (internal/modules/iam/infrastructure/postgres/user_area_repository.go:89) | YES — at :100 | CapMembershipManage / "tenant" | INSERT | public.user_process_areas |
 | UserAreaRepository.CloseActive (internal/modules/iam/infrastructure/postgres/user_area_repository.go:141) | YES — at :152 | CapMembershipManage / "tenant" | UPDATE (sets effective_to + revoked_by) | public.user_process_areas |
 | UserAreaRepository.GrantAtomic (internal/modules/iam/infrastructure/postgres/user_area_repository.go:185) | YES — at :196 | CapMembershipManage / "tenant" | UPDATE (sets effective_to + revoked_by) + INSERT | public.user_process_areas |
-| area_membership.Grant (internal/modules/iam/area_membership/area_membership.go:53) | NO | N/A | SELECT (calls metaldocs.grant_area_membership) | SECURITY DEFINER path; e2e seed only — not production write path |
+| area_membership.Grant (internal/modules/iam/area_membership/area_membership.go:53) | NO | N/A | SELECT (calls metaldocs.grant_area_membership) | DEAD — `metaldocs.grant_area_membership` DROPPED 2026-07-14 by migration 0307_drop_dead_grant_area_membership_fn.sql (zero product callers, unsatisfiable by construction); this row is retired-row history |
 | area_membership.Revoke (internal/modules/iam/area_membership/area_membership.go:65) | NO | N/A | SELECT (calls metaldocs.revoke_area_membership) | SECURITY DEFINER path; e2e seed only — not production write path |
 
 Notes for listed non-mutators:

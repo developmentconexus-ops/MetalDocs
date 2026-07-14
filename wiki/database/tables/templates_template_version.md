@@ -20,8 +20,6 @@ Current curated-baseline table owned by `templates`. See the owning module wiki 
 | `metadata_schema` | `jsonb` | no | Baseline column. |
 | `placeholder_schema` | `jsonb` | no | Baseline column. |
 | `author_id` | `text` | no | Baseline column. |
-| `pending_reviewer_role` | `text` | yes | Baseline column. |
-| `pending_approver_role` | `text` | no | Baseline column. |
 | `reviewer_id` | `text` | yes | Baseline column. |
 | `approver_id` | `text` | yes | Baseline column. |
 | `submitted_at` | `timestamp with time zone` | yes | Baseline column. |
@@ -45,8 +43,6 @@ id uuid NOT NULL,
     metadata_schema jsonb NOT NULL,
     placeholder_schema jsonb NOT NULL,
     author_id text NOT NULL,
-    pending_reviewer_role text,
-    pending_approver_role text DEFAULT ''::text NOT NULL,
     reviewer_id text,
     approver_id text,
     submitted_at timestamp with time zone,
@@ -70,3 +66,5 @@ Check `db/reference-data/0001_product_reference_data.sql` and `db/dev-seeds/0001
 ## Notes and Debt
 
 Retained in `public` because current runtime/baseline truth still uses it. Do not move schemas without an approved migration plan.
+
+**2026-07-14:** legacy per-version role-routing columns `pending_reviewer_role`/`pending_approver_role` dropped by migration `db/migrations/0306_drop_templates_version_pending_roles.sql` (write-never since ROADMAP unit 3.1a S1/S4, read-never; superseded by the approval kernel route model, ADR 0082 phase c). `db/baseline/0001_current_schema.sql` has not yet been regenerated to reflect the drop — treat the migration, not the baseline dump, as schema truth until it is.
