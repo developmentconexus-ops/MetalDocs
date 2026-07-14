@@ -65,6 +65,11 @@ in the prompt; comms over `mcp__ccd_session_mgmt__send_message` to `HUB_SESSION_
 registry id verified via a previously-sent message's `from="local_…"` attribute, never the
 scratchpad UUID; title-match fallback embedded) — accepting the confirmed client limitation that
 the operator approves each send (Ctrl+Enter), messages few and batched.
+**Current hub session id (operator-corrected 2026-07-14): `local_e4038af3-d645-4828-838e-cb4846cd3c47`**
+— send_message resolves by the FULL sessionId INCLUDING the `local_` prefix, never the raw UUID
+and never the scratchpad-directory UUID (that one returned "Session not found"). Chip prompts
+embed this exact string; if it ever fails, fall back to title-match ("HUB: Implement ratified
+review/approval workflow model").
 
 **Advance (revised 2026-07-13, chip default):** when a unit's acceptance completes green (merge
 + ladder + rebuild + smoke + board + cleanup), the hub PREPARES the next actionable ROADMAP
