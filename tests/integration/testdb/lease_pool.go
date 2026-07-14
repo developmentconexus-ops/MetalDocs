@@ -146,6 +146,13 @@ func createLeasedDatabase(baseDSN string) (string, error) {
 // knowledge and self-heals when columns are added or dropped. Verified: none
 // of these tables has an identity or generated column, so the restoring
 // INSERT ... SELECT * needs no OVERRIDING SYSTEM VALUE.
+//
+// That omission is deliberate and must stay. If one of these tables later gains
+// a GENERATED ALWAYS AS IDENTITY column, the restoring INSERT will fail loudly
+// with 428C9 — which is the outcome we want. Pre-emptively writing OVERRIDING
+// SYSTEM VALUE here would silence that signal and force the snapshot's stored
+// identity values back into a column the schema declares the database owns,
+// which is a correctness question that deserves a human, not a default.
 func snapshotLeaseBaseline(ctx context.Context, baseDSN, dbName string) error {
 	db, err := openDBWithDatabase(baseDSN, dbName)
 	if err != nil {
@@ -392,9 +399,21 @@ type advancedSequence struct {
 // (last_value IS NULL), and a sequence nobody called is already in exactly the
 // state a fresh clone would hand over. Skipping it keeps its catalog state
 // byte-identical to a clone; resetting it could only move it away from that.
+// The predicate is safe under reuse too: after the first reset a sequence reads
+// back last_value = start_value with is_called = false, so it re-enters this
+// list and is reset again. The filter can only ever skip a genuinely virgin
+// sequence.
+//
+// start_value is read per sequence and never assumed to be 1. It is scanned
+// into a NOT NULL Go int64 with no COALESCE default on purpose: pg_sequences
+// declares start_value NOT NULL, so a NULL here would mean the catalog is not
+// what this code believes it is, and the Scan fails loudly. Defaulting to 1
+// would paper over that with a guess — and a wrong start_value is invisible
+// until some test asserts on a specific revision_num or audit_sequence, at
+// which point it reads as a product bug rather than a factory bug.
 func leaseSequences(ctx context.Context, db *sql.DB) ([]advancedSequence, error) {
 	rows, err := db.QueryContext(ctx,
-		`SELECT schemaname, sequencename, coalesce(start_value, 1)
+		`SELECT schemaname, sequencename, start_value
 		   FROM pg_sequences
 		  WHERE schemaname IN ('public', 'metaldocs')
 		    AND last_value IS NOT NULL`)
