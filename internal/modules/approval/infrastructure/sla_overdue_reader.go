@@ -34,10 +34,16 @@ var _ approvaldomain.SLAOverdueReader = (*SLAOverdueReaderPG)(nil)
 // due_at). Both ListOverdueStages and MarkStagesOverdueSurfaced reference
 // this exact fragment so "overdue" cannot drift between reader and writer.
 // Binds `now` as $1 (referenced twice).
-const slaOverdueCorePredicate = `status = 'active'
-   AND due_at IS NOT NULL
-   AND due_at <= $1
-   AND (sla_surfaced_at IS NULL OR sla_surfaced_at < due_at)`
+//
+// Columns are qualified `asi.` (approval_stage_instances) because every call
+// site JOINs approval_instances `ai`, which ALSO has a `status` column — an
+// unqualified `status` is ambiguous (42702) and broke the live River SLA job.
+// All three predicate columns (status, due_at, sla_surfaced_at) live on the
+// stage-instance row, so `asi.` is the correct and only qualifier.
+const slaOverdueCorePredicate = `asi.status = 'active'
+   AND asi.due_at IS NOT NULL
+   AND asi.due_at <= $1
+   AND (asi.sla_surfaced_at IS NULL OR asi.sla_surfaced_at < asi.due_at)`
 
 // ListOverdueStages returns active stage instances whose due_at <= now and
 // not yet surfaced for their current cycle, ordered by due_at ascending,
