@@ -7,7 +7,15 @@ services:
     # in the data dir with fsync — with the testdb-factory's hundreds of test databases
     # on WSL2 that took 40+ min. syncfs syncs each filesystem in one call instead
     # (same durability guarantee, Linux-only, which the container always is).
-    command: ["postgres", "-c", "recovery_init_sync_method=syncfs"]
+    # synchronous_commit=off: dev/test-only durability trade — commits return before
+    # WAL flush, cutting integration-suite wall time (per-test DB clones commit
+    # hundreds of small txs each). No corruption risk (WAL stays ordered); worst
+    # case a crash loses the last few seconds of commits, acceptable for a
+    # disposable dev DB. NEVER copy this flag to a production deployment.
+    # max_connections=300: go test runs one process per package in parallel and each
+    # opens its own pool against a fresh per-test clone DB; the PG16 default (100)
+    # collapses under that fan-out into SASL-auth timeouts that read as test failures.
+    command: ["postgres", "-c", "recovery_init_sync_method=syncfs", "-c", "synchronous_commit=off", "-c", "max_connections=300"]
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
