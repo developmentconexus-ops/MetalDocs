@@ -109,7 +109,10 @@ back **to the same unit** (Transport A: `SendMessage` to the agent, context resu
 Transport B: `send_message` to the chip session) — remediation is a message, not a new unit
 (a new corrective dispatch only on 2× reject = redesign). Reviewer
 subagents dispatched by the hub are **git read-only** (diff/show/log; never checkout/apply/stash
-— an acceptance reviewer once contaminated the main index via checkout). Transport B comms
+— an acceptance reviewer once contaminated the main index via checkout). **Dual-reviewer parity
+(2026-07-14):** hub acceptance runs the independent Claude cavecrew-reviewer AND an independent
+GPT-5.6 SOL pass (Codex rescue, subagent fan-out, git-read-only) on the same diff; merge only when
+both clear, disagreements reconciled in the acceptance note (§4 obligation 2 has the full rule). Transport B comms
 caveat (confirmed client limitation 2026-07-12): the desktop client hard-enforces per-send
 confirmation on `mcp__ccd_session_mgmt__send_message` regardless of permission mode — the
 operator approves each with one click; never reroute comms through side-channel files to dodge
@@ -209,6 +212,17 @@ implementing everything inline).** Unit-session obligations, checkable:
 2. Every slice gets an **independent reviewer subagent** (sonnet — e.g. cavecrew-reviewer, or the
    frontend reviewer agents for FE) BEFORE the next slice starts. The session may NEVER
    self-review as substitute — implementer ≠ reviewer is the non-negotiable, regardless of cost.
+   **Dual-reviewer parity at the final/CLOSED gate (ratified 2026-07-14, operator: "claude and
+   gpt on equal terms"):** before a unit emits `CLOSED`, its final diff is reviewed by BOTH an
+   independent Claude reviewer (cavecrew-reviewer) AND an independent **GPT-5.6 SOL** reviewer via
+   the Codex rescue path (`codex:codex-rescue` agent / `codex:rescue` skill). The GPT reviewer is
+   instructed to **use subagents** to fan out over the changed files/modules (not a single-pass
+   skim) and is **git-read-only** (diff/show/log/`git show <rev>:<path>` — never checkout/edit/
+   stash). Both reviewers are independent of the implementer and of each other. Gate: `CLOSED`
+   only after BOTH clear; on disagreement, BOTH verdicts + the unit's reconciliation travel IN
+   the `CLOSED` event — GPT findings are never silently dropped. evidence.md records both
+   dispositions. (Per-slice mid-unit review stays single Claude reviewer for cost; parity applies
+   at the final gate.)
 3. Mechanical work (renames, comment sweeps, format-only) → **haiku** subagent.
 4. Bulk reading/inventory → sonnet investigator subagent returning compressed report; the unit
    session does not tree-crawl.
