@@ -416,6 +416,21 @@ adjudication* (so two forks never corrupt each other). Reorganization of a unit'
 needs no request — the agent reslices freely (P2 authority); only a FORK to a concurrent sibling
 routes through `SPLIT-REQUEST`.
 
+### 9.3a Shared testdb template collision (Track B field finding, 2026-07-14)
+
+All tracks share the one dev postgres (:5433). `testdb` builds one content-addressed template DB
+per **schema fingerprint** and its stale-template sweep DROPs templates of OTHER fingerprints.
+Consequence: once tracks diverge on migrations (e.g. one track adds `03xx`), each track's sweep
+deletes the other's template → `CREATE DATABASE ... TEMPLATE` fails `3D000`, or CREATE contention
+→ ~10-min timeouts. Rules:
+- **Same fingerprint** (no migration divergence): concurrent integration runs across tracks are safe.
+- **Divergent fingerprints**: hub SERIALIZES cross-track integration runs (the migration-owning
+  track and any full-suite hub ladder never overlap another track's run).
+- Orphan clone DBs from killed runs are harmless — do NOT mass-DROP mid-run; the DROP storm hangs
+  live tracks on CheckpointDone. Clean up only when no track is running.
+- Structural fix candidate (per-track template namespace or port) → file as a debt unit if
+  divergent-migration parallelism becomes routine.
+
 ### 9.4 Observability under Transport B
 
 Each track = one session the operator launches and watches (chip default). Degree of concurrency =
