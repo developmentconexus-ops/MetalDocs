@@ -231,6 +231,17 @@ implementing everything inline).** Unit-session obligations, checkable:
    the `CLOSED` event — GPT findings are never silently dropped. evidence.md records both
    dispositions. (Per-slice mid-unit review stays single Claude reviewer for cost; parity applies
    at the final gate.)
+   **Codex sandbox fallback (field-proven 2026-07-14, unit 4.3):** on this machine codex exec's
+   Windows sandbox is BROKEN machine-wide (`codex-windows-sandbox-setup.exe` missing —
+   `orchestrator_helper_launch_failed`; fix = operator runs interactive `/codex:setup`). Until
+   fixed: units do NOT attempt codex themselves and do NOT waive/hold — they emit close-ready and
+   the HUB runs the GPT-5.6 pass via **stdin evidence-pack** (no exec): hub assembles full diff +
+   `--name-status`/`--stat` + relevant migration DDL + full post-state of key changed files +
+   residual-ref greps, pipes into `codex exec --sandbox read-only -`, GPT reviews from provided
+   text only. Pack must use CURRENT paths (verify with `git grep -l` at the reviewed rev — stale
+   module paths cost one round-trip in 4.3). If GPT flags a pack gap, hub supplements and re-runs
+   only the missing check. Once `/codex:setup` lands, revert to unit-side `codex:codex-rescue`
+   with subagent fan-out.
 3. Mechanical work (renames, comment sweeps, format-only) → **haiku** subagent.
 4. Bulk reading/inventory → sonnet investigator subagent returning compressed report; the unit
    session does not tree-crawl.
