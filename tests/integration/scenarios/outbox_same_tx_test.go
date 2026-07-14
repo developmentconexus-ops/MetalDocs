@@ -6,6 +6,7 @@ package scenarios_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"metaldocs/tests/integration/testdb"
@@ -13,7 +14,7 @@ import (
 
 func TestOutbox_ApprovalInstanceInsertHasGovernanceEvent(t *testing.T) {
 	ctx := context.Background()
-	db := openDirectDB(t)
+	db, schema := testdb.Open(t)
 
 	tenantID := testdb.DeterministicID(t, "tenant")
 	authorID := testdb.DeterministicID(t, "author")
@@ -28,15 +29,15 @@ func TestOutbox_ApprovalInstanceInsertHasGovernanceEvent(t *testing.T) {
 	// seeds iam_users with the correct tenant_id (mirrors this test's own
 	// Cleanup, which already deletes iam_users by tenant_id=tenantID).
 	testdb.SeedSystemAdmin(t, db, tenantID, authorID, "Outbox Author")
-	testdb.SeedDocument(t, ctx, db, "metaldocs", docID, tenantID, authorID)
-	testdb.SeedRouteConfig(t, ctx, db, "metaldocs", routeID, tenantID, "outbox_flow")
+	testdb.SeedDocument(t, ctx, db, schema, docID, tenantID, authorID)
+	testdb.SeedRouteConfig(t, ctx, db, schema, routeID, tenantID, "outbox_flow")
 
 	t.Cleanup(func() {
-		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.approval_instances WHERE id = $1::uuid`, instanceID)
-		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.governance_events WHERE tenant_id = $1::uuid AND event_type = 'doc.submitted' AND resource_id = $2`, tenantID, docID)
-		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.approval_routes WHERE id = $1::uuid`, routeID)
-		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.documents WHERE id = $1::uuid`, docID)
-		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.iam_users WHERE tenant_id = $1::uuid`, tenantID)
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf(`DELETE FROM %s WHERE id = $1::uuid`, testdb.Qualified(schema, "approval_instances")), instanceID)
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf(`DELETE FROM %s WHERE tenant_id = $1::uuid AND event_type = 'doc.submitted' AND resource_id = $2`, testdb.Qualified(schema, "governance_events")), tenantID, docID)
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf(`DELETE FROM %s WHERE id = $1::uuid`, testdb.Qualified(schema, "approval_routes")), routeID)
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf(`DELETE FROM %s WHERE id = $1::uuid`, testdb.Qualified(schema, "documents")), docID)
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf(`DELETE FROM %s WHERE tenant_id = $1::uuid`, testdb.Qualified(schema, "iam_users")), tenantID)
 	})
 
 	tx, err := db.BeginTx(ctx, nil)
@@ -49,11 +50,12 @@ func TestOutbox_ApprovalInstanceInsertHasGovernanceEvent(t *testing.T) {
 		t.Fatalf("set bypass_authz: %v", err)
 	}
 
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO public.approval_instances
+	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`
+		INSERT INTO %s
 			(id, tenant_id, document_id, route_id, route_version_snapshot, status, submitted_by, submitted_at, content_hash_at_submit, idempotency_key)
 		VALUES
 			($1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'in_progress', $5, now(), 'outbox-hash', 'outbox-idem')`,
+		testdb.Qualified(schema, "approval_instances")),
 		instanceID, tenantID, docID, routeID, authorID,
 	); err != nil {
 		_ = tx.Rollback()
@@ -64,11 +66,12 @@ func TestOutbox_ApprovalInstanceInsertHasGovernanceEvent(t *testing.T) {
 		"instance_id": instanceID,
 		"document_id": docID,
 	})
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO public.governance_events
+	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`
+		INSERT INTO %s
 			(tenant_id, event_type, actor_user_id, resource_type, resource_id, reason, payload_json)
 		VALUES
 			($1::uuid, 'doc.submitted', $2, 'document', $3, 'integration outbox pairing', $4::jsonb)`,
+		testdb.Qualified(schema, "governance_events")),
 		tenantID, authorID, docID, string(payload),
 	); err != nil {
 		_ = tx.Rollback()
@@ -80,23 +83,25 @@ func TestOutbox_ApprovalInstanceInsertHasGovernanceEvent(t *testing.T) {
 	}
 
 	var instanceTenant string
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRowContext(ctx, fmt.Sprintf(`
 		SELECT tenant_id::text
-		  FROM public.approval_instances
+		  FROM %s
 		 WHERE id = $1::uuid`,
+		testdb.Qualified(schema, "approval_instances")),
 		instanceID,
 	).Scan(&instanceTenant); err != nil {
 		t.Fatalf("read approval_instance: %v", err)
 	}
 
 	var eventTenant string
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRowContext(ctx, fmt.Sprintf(`
 		SELECT tenant_id::text
-		  FROM public.governance_events
+		  FROM %s
 		 WHERE tenant_id = $1::uuid
 		   AND event_type = 'doc.submitted'
 		   AND resource_type = 'document'
 		   AND resource_id = $2`,
+		testdb.Qualified(schema, "governance_events")),
 		tenantID, docID,
 	).Scan(&eventTenant); err != nil {
 		t.Fatalf("read governance_event: %v", err)
@@ -109,7 +114,8 @@ func TestOutbox_ApprovalInstanceInsertHasGovernanceEvent(t *testing.T) {
 
 func TestOutbox_RollbackOmitsEvent(t *testing.T) {
 	ctx := context.Background()
-	db := openDirectDB(t)
+	db, schema := testdb.Open(t)
+	table := testdb.Qualified(schema, "governance_events")
 
 	tenantID := testdb.DeterministicID(t, "tenant-rollback")
 	resourceID := testdb.DeterministicID(t, "resource-rollback")
@@ -120,11 +126,11 @@ func TestOutbox_RollbackOmitsEvent(t *testing.T) {
 		t.Fatalf("begin tx: %v", err)
 	}
 
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO public.governance_events
+	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`
+		INSERT INTO %s
 			(tenant_id, event_type, actor_user_id, resource_type, resource_id, reason, payload_json)
 		VALUES
-			($1::uuid, 'doc.submitted', $2, 'document', $3, 'rollback-test', '{"rollback":true}'::jsonb)`,
+			($1::uuid, 'doc.submitted', $2, 'document', $3, 'rollback-test', '{"rollback":true}'::jsonb)`, table),
 		tenantID, actorID, resourceID,
 	); err != nil {
 		_ = tx.Rollback()
@@ -136,12 +142,12 @@ func TestOutbox_RollbackOmitsEvent(t *testing.T) {
 	}
 
 	var count int
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRowContext(ctx, fmt.Sprintf(`
 		SELECT count(*)
-		  FROM public.governance_events
+		  FROM %s
 		 WHERE tenant_id = $1::uuid
 		   AND event_type = 'doc.submitted'
-		   AND resource_id = $2`,
+		   AND resource_id = $2`, table),
 		tenantID, resourceID,
 	).Scan(&count); err != nil {
 		t.Fatalf("count events after rollback: %v", err)
@@ -153,24 +159,13 @@ func TestOutbox_RollbackOmitsEvent(t *testing.T) {
 
 func TestOutbox_DedupeKey(t *testing.T) {
 	ctx := context.Background()
-	db := openDirectDB(t)
+	db, schema := testdb.Open(t)
+	table := testdb.Qualified(schema, "governance_events")
 
-	var dedupeColumnExists bool
-	if err := db.QueryRowContext(ctx, `
-		SELECT EXISTS (
-			SELECT 1
-			  FROM information_schema.columns
-			 WHERE table_schema = 'metaldocs'
-			   AND table_name = 'governance_events'
-			   AND column_name = 'dedupe_key'
-		)`,
-	).Scan(&dedupeColumnExists); err != nil {
-		t.Fatalf("check dedupe_key column: %v", err)
-	}
-	if !dedupeColumnExists {
-		t.Skip("governance_events.dedupe_key not present in this database")
-	}
-
+	// governance_events lives in public (db/baseline/0001_current_schema.sql:2268),
+	// not metaldocs; on the factory database dedupe_key is a real, always-present
+	// column (not a feature flag), so this test asserts it directly instead of
+	// probing information_schema and skipping when absent.
 	tenantID := testdb.DeterministicID(t, "tenant-dedupe")
 	actorID := "outbox-dedupe-user"
 	resourceID := "outbox-dedupe-resource"
@@ -178,43 +173,43 @@ func TestOutbox_DedupeKey(t *testing.T) {
 	eventType := "doc.submitted"
 
 	t.Cleanup(func() {
-		_, _ = db.ExecContext(context.Background(), `
-			DELETE FROM public.governance_events
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf(`
+			DELETE FROM %s
 			 WHERE tenant_id = $1::uuid
 			   AND event_type = $2
-			   AND dedupe_key = $3`,
+			   AND dedupe_key = $3`, table),
 			tenantID, eventType, dedupeKey,
 		)
 	})
 
-	if _, err := db.ExecContext(ctx, `
-		INSERT INTO public.governance_events
+	if _, err := db.ExecContext(ctx, fmt.Sprintf(`
+		INSERT INTO %s
 			(tenant_id, event_type, actor_user_id, resource_type, resource_id, reason, payload_json, dedupe_key)
 		VALUES
-			($1::uuid, $2, $3, 'document', $4, 'dedupe-1', '{}'::jsonb, $5)`,
+			($1::uuid, $2, $3, 'document', $4, 'dedupe-1', '{}'::jsonb, $5)`, table),
 		tenantID, eventType, actorID, resourceID, dedupeKey,
 	); err != nil {
 		t.Fatalf("seed dedupe event: %v", err)
 	}
 
-	if _, err := db.ExecContext(ctx, `
-		INSERT INTO public.governance_events
+	if _, err := db.ExecContext(ctx, fmt.Sprintf(`
+		INSERT INTO %s
 			(tenant_id, event_type, actor_user_id, resource_type, resource_id, reason, payload_json, dedupe_key)
 		VALUES
 			($1::uuid, $2, $3, 'document', $4, 'dedupe-2', '{}'::jsonb, $5)
-		ON CONFLICT DO NOTHING`,
+		ON CONFLICT DO NOTHING`, table),
 		tenantID, eventType, actorID, resourceID, dedupeKey,
 	); err != nil {
 		t.Fatalf("insert duplicate dedupe key: %v", err)
 	}
 
 	var count int
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRowContext(ctx, fmt.Sprintf(`
 		SELECT count(*)
-		  FROM public.governance_events
+		  FROM %s
 		 WHERE tenant_id = $1::uuid
 		   AND event_type = $2
-		   AND dedupe_key = $3`,
+		   AND dedupe_key = $3`, table),
 		tenantID, eventType, dedupeKey,
 	).Scan(&count); err != nil {
 		t.Fatalf("count dedupe rows: %v", err)

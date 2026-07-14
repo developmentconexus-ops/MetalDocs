@@ -17,7 +17,6 @@ import (
 	"metaldocs/tests/integration/testdb"
 
 	"github.com/jackc/pgx/v5/pgconn"
-	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 const concurrencyTestSeed = 0xDEADBEEF
@@ -36,7 +35,7 @@ func TestConcurrencyScenarios(t *testing.T) {
 		testSignoffUniqueDuplicateBlocked(t)
 	})
 	t.Run("OCC_Race_N50", func(t *testing.T) {
-		db := openDirectDB(t)
+		db, schema := testdb.Open(t)
 		ctx := context.Background()
 		workers := occRaceWorkers
 		n := 50
@@ -48,7 +47,7 @@ func TestConcurrencyScenarios(t *testing.T) {
 		}
 		for i := 0; i < n; i++ {
 			t.Run(fmt.Sprintf("iter_%02d", i+1), func(t *testing.T) {
-				winners, losers := runSingleOCCRace(t, ctx, db, fmt.Sprintf("n50-%02d", i+1), workers)
+				winners, losers := runSingleOCCRace(t, ctx, db, schema, fmt.Sprintf("n50-%02d", i+1), workers)
 				if winners != 1 || losers != workers-1 {
 					t.Fatalf("expected exactly one winner and %d stale loser(s); got winners=%d losers=%d", workers-1, winners, losers)
 				}
@@ -58,15 +57,15 @@ func TestConcurrencyScenarios(t *testing.T) {
 }
 
 func testOCCStaleRevision(t *testing.T) {
-	db := openDirectDB(t)
+	db, schema := testdb.Open(t)
 	ctx := context.Background()
-	winners, losers := runSingleOCCRace(t, ctx, db, "single", occRaceWorkers)
+	winners, losers := runSingleOCCRace(t, ctx, db, schema, "single", occRaceWorkers)
 	if winners != 1 || losers != occRaceWorkers-1 {
 		t.Fatalf("expected exactly one winner and %d stale loser(s); got winners=%d losers=%d", occRaceWorkers-1, winners, losers)
 	}
 }
 
-func runSingleOCCRace(t *testing.T, ctx context.Context, db *sql.DB, suffix string, workers int) (int, int) {
+func runSingleOCCRace(t *testing.T, ctx context.Context, db *sql.DB, schema, suffix string, workers int) (int, int) {
 	t.Helper()
 	if workers < 2 {
 		t.Fatalf("workers must be >=2, got %d", workers)
@@ -75,11 +74,11 @@ func runSingleOCCRace(t *testing.T, ctx context.Context, db *sql.DB, suffix stri
 	docID := testdb.DeterministicID(t, "doc-"+suffix)
 	userID := testdb.DeterministicID(t, "user-"+suffix)
 
-	testdb.SeedUser(t, ctx, db, "metaldocs", userID, "Race User")
-	testdb.SeedDocument(t, ctx, db, "metaldocs", docID, tenantID, userID)
+	testdb.SeedUser(t, ctx, db, schema, userID, "Race User")
+	testdb.SeedDocument(t, ctx, db, schema, docID, tenantID, userID)
 	t.Cleanup(func() {
-		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.documents WHERE id = $1::uuid`, docID)
-		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.iam_users WHERE tenant_id = $1::uuid`, tenantID)
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf(`DELETE FROM %s WHERE id = $1::uuid`, testdb.Qualified(schema, "documents")), docID)
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf(`DELETE FROM %s WHERE tenant_id = $1::uuid`, testdb.Qualified(schema, "iam_users")), tenantID)
 	})
 
 	start := make(chan struct{})
@@ -104,12 +103,13 @@ func runSingleOCCRace(t *testing.T, ctx context.Context, db *sql.DB, suffix stri
 
 			testdb.SetCapsOnTx(t, tx, `[{"cap":"document.edit"}]`)
 
-			res, err := tx.ExecContext(ctx, `
-				UPDATE public.documents
+			res, err := tx.ExecContext(ctx, fmt.Sprintf(`
+				UPDATE %s
 				   SET revision_version = revision_version + 1
 				 WHERE id = $1::uuid
 				   AND tenant_id = $2::uuid
 				   AND revision_version = $3`,
+				testdb.Qualified(schema, "documents")),
 				docID, tenantID, 1,
 			)
 			if err != nil {
@@ -152,18 +152,19 @@ func runSingleOCCRace(t *testing.T, ctx context.Context, db *sql.DB, suffix stri
 }
 
 func testSkipLockedNoDuplicateProcessing(t *testing.T) {
-	db := openDirectDB(t)
+	db, schema := testdb.Open(t)
 	ctx := context.Background()
 	tenantID := testdb.DeterministicID(t, "tenant-skiplocked")
 	actorID := testdb.DeterministicID(t, "actor-skiplocked")
 	routeTemplate := "POST /integration/skiplocked"
 
 	t.Cleanup(func() {
-		_, _ = db.ExecContext(context.Background(), `
-			DELETE FROM metaldocs.idempotency_keys
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf(`
+			DELETE FROM %s
 			 WHERE tenant_id = $1::uuid
 			   AND actor_user_id = $2
 			   AND route_template = $3`,
+			testdb.Qualified(schema, "idempotency_keys")),
 			tenantID, actorID, routeTemplate,
 		)
 	})
@@ -172,11 +173,12 @@ func testSkipLockedNoDuplicateProcessing(t *testing.T) {
 
 	for i := 0; i < 5; i++ {
 		key := fmt.Sprintf("k-%d", i)
-		_, err := db.ExecContext(ctx, `
-			INSERT INTO metaldocs.idempotency_keys
+		_, err := db.ExecContext(ctx, fmt.Sprintf(`
+			INSERT INTO %s
 				(tenant_id, actor_user_id, route_template, key, payload_hash, response_status, response_body, status, expires_at)
 			VALUES
 				($1::uuid, $2, $3, $4, $5, 200, '\x7b7d'::bytea, 'completed', now() - interval '1 hour')`,
+			testdb.Qualified(schema, "idempotency_keys")),
 			tenantID, actorID, routeTemplate, key, fmt.Sprintf("h-%d", i),
 		)
 		if err != nil {
@@ -213,15 +215,16 @@ func testSkipLockedNoDuplicateProcessing(t *testing.T) {
 			}
 			defer tx.Rollback()
 
-			rows, err := tx.QueryContext(ctx, `
+			rows, err := tx.QueryContext(ctx, fmt.Sprintf(`
 				SELECT tenant_id::text, actor_user_id, route_template, key
-				  FROM metaldocs.idempotency_keys
+				  FROM %s
 				 WHERE tenant_id = $1::uuid
 				   AND actor_user_id = $2
 				   AND route_template = $3
 				   AND status = 'completed'
 				 FOR UPDATE SKIP LOCKED
 				 LIMIT 2`,
+				testdb.Qualified(schema, "idempotency_keys")),
 				tenantID, actorID, routeTemplate,
 			)
 			if err != nil {
@@ -251,14 +254,15 @@ func testSkipLockedNoDuplicateProcessing(t *testing.T) {
 			selected.Wait()
 
 			for _, r := range picked {
-				res, err := tx.ExecContext(ctx, `
-					UPDATE metaldocs.idempotency_keys
+				res, err := tx.ExecContext(ctx, fmt.Sprintf(`
+					UPDATE %s
 					   SET status = 'failed'
 					 WHERE tenant_id = $1::uuid
 					   AND actor_user_id = $2
 					   AND route_template = $3
 					   AND key = $4
 					   AND status = 'completed'`,
+					testdb.Qualified(schema, "idempotency_keys")),
 					r.tenantID, r.actorUserID, r.routeTemplate, r.key,
 				)
 				if err != nil {
@@ -305,7 +309,7 @@ func testSkipLockedNoDuplicateProcessing(t *testing.T) {
 }
 
 func testSignoffUniqueDuplicateBlocked(t *testing.T) {
-	db := openDirectDB(t)
+	db, schema := testdb.Open(t)
 	ctx := context.Background()
 
 	tenantID := testdb.DeterministicID(t, "tenant-signoff")
@@ -324,16 +328,16 @@ func testSignoffUniqueDuplicateBlocked(t *testing.T) {
 	// Cleanup, which already deletes iam_users by tenant_id=tenantID).
 	testdb.SeedSystemAdmin(t, db, tenantID, authorID, "Doc Author")
 	testdb.SeedSystemAdmin(t, db, tenantID, actorID, "Signer")
-	testdb.SeedDocument(t, ctx, db, "metaldocs", docID, tenantID, authorID)
-	testdb.SeedRouteConfig(t, ctx, db, "metaldocs", routeID, tenantID, "int_signoff")
+	testdb.SeedDocument(t, ctx, db, schema, docID, tenantID, authorID)
+	testdb.SeedRouteConfig(t, ctx, db, schema, routeID, tenantID, "int_signoff")
 
 	t.Cleanup(func() {
-		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.approval_signoffs WHERE approval_instance_id = $1::uuid`, instanceID)
-		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.approval_stage_instances WHERE id = $1::uuid`, stageID)
-		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.approval_instances WHERE id = $1::uuid`, instanceID)
-		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.approval_routes WHERE id = $1::uuid`, routeID)
-		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.documents WHERE id = $1::uuid`, docID)
-		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.iam_users WHERE tenant_id = $1::uuid`, tenantID)
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf(`DELETE FROM %s WHERE approval_instance_id = $1::uuid`, testdb.Qualified(schema, "approval_signoffs")), instanceID)
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf(`DELETE FROM %s WHERE id = $1::uuid`, testdb.Qualified(schema, "approval_stage_instances")), stageID)
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf(`DELETE FROM %s WHERE id = $1::uuid`, testdb.Qualified(schema, "approval_instances")), instanceID)
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf(`DELETE FROM %s WHERE id = $1::uuid`, testdb.Qualified(schema, "approval_routes")), routeID)
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf(`DELETE FROM %s WHERE id = $1::uuid`, testdb.Qualified(schema, "documents")), docID)
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf(`DELETE FROM %s WHERE tenant_id = $1::uuid`, testdb.Qualified(schema, "iam_users")), tenantID)
 	})
 
 	tx, err := db.BeginTx(ctx, nil)
@@ -346,22 +350,24 @@ func testSignoffUniqueDuplicateBlocked(t *testing.T) {
 		t.Fatalf("set bypass_authz for setup: %v", err)
 	}
 
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO public.approval_instances
+	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`
+		INSERT INTO %s
 			(id, tenant_id, document_id, route_id, route_version_snapshot, status, submitted_by, submitted_at, content_hash_at_submit, idempotency_key)
 		VALUES
 			($1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'in_progress', $5, now(), 'hash-signoff', 'idem-signoff')`,
+		testdb.Qualified(schema, "approval_instances")),
 		instanceID, tenantID, docID, routeID, authorID,
 	); err != nil {
 		t.Fatalf("seed approval_instance: %v", err)
 	}
 
 	eligible, _ := json.Marshal([]string{actorID})
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO public.approval_stage_instances
+	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`
+		INSERT INTO %s
 			(id, approval_instance_id, stage_order, name_snapshot, required_role_snapshot, required_capability_snapshot, area_code_snapshot, quorum_snapshot, quorum_m_snapshot, on_eligibility_drift_snapshot, eligible_actor_ids, effective_denominator, status, opened_at)
 		VALUES
 			($1::uuid, $2::uuid, 1, 'Stage 1', 'reviewer', 'doc.signoff', 'AREA_INT', 'any_1_of', NULL, 'keep_snapshot', $3::jsonb, 1, 'active', now())`,
+		testdb.Qualified(schema, "approval_stage_instances")),
 		stageID, instanceID, string(eligible),
 	); err != nil {
 		t.Fatalf("seed stage_instance: %v", err)
@@ -394,11 +400,12 @@ func testSignoffUniqueDuplicateBlocked(t *testing.T) {
 				return
 			}
 
-			_, err = tx.ExecContext(ctx, `
-				INSERT INTO public.approval_signoffs
+			_, err = tx.ExecContext(ctx, fmt.Sprintf(`
+				INSERT INTO %s
 					(id, approval_instance_id, stage_instance_id, actor_user_id, actor_tenant_id, actor_display_name_snapshot, decision, comment, signed_at, signature_method, signature_payload, content_hash)
 				VALUES
 					($1::uuid, $2::uuid, $3::uuid, $4, $5::uuid, 'Signer', 'approve', 'integration race', now(), 'password', '{}'::jsonb, 'content-hash')`,
+				testdb.Qualified(schema, "approval_signoffs")),
 				testdb.DeterministicID(t, fmt.Sprintf("signoff-%d", i)), instanceID, stageID, actorID, tenantID,
 			)
 			if err != nil {
@@ -434,12 +441,13 @@ func testSignoffUniqueDuplicateBlocked(t *testing.T) {
 	}
 
 	var count int
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRowContext(ctx, fmt.Sprintf(`
 		SELECT count(*)
-		  FROM public.approval_signoffs
+		  FROM %s
 		 WHERE approval_instance_id = $1::uuid
 		   AND stage_instance_id = $2::uuid
 		   AND actor_user_id = $3`,
+		testdb.Qualified(schema, "approval_signoffs")),
 		instanceID, stageID, actorID,
 	).Scan(&count); err != nil {
 		t.Fatalf("count signoffs: %v", err)
@@ -447,27 +455,6 @@ func testSignoffUniqueDuplicateBlocked(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("expected exactly 1 signoff row, got %d", count)
 	}
-}
-
-func openDirectDB(t *testing.T) *sql.DB {
-	t.Helper()
-	dsn := strings.TrimSpace(os.Getenv("METALDOCS_DATABASE_URL"))
-	if dsn == "" {
-		dsn = strings.TrimSpace(os.Getenv("DATABASE_URL"))
-	}
-	if dsn == "" {
-		t.Skip("DATABASE_URL/METALDOCS_DATABASE_URL not set")
-	}
-
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatalf("sql.Open: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	if err := db.PingContext(context.Background()); err != nil {
-		t.Skipf("integration DB unreachable: %v", err)
-	}
-	return db
 }
 
 func hasSQLState(err error, state string) bool {

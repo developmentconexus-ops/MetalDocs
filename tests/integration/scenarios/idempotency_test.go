@@ -34,7 +34,8 @@ func seedIdempotencyTenant(t *testing.T, db *sql.DB, tenantID string) {
 
 func TestIdempotency_SameKeyReplay(t *testing.T) {
 	ctx := context.Background()
-	db := openDirectDB(t)
+	db, schema := testdb.Open(t)
+	table := testdb.Qualified(schema, "idempotency_keys")
 
 	tenantID := "11111111-1111-1111-1111-111111111181"
 	actorUserID := "idem-user-1"
@@ -44,36 +45,36 @@ func TestIdempotency_SameKeyReplay(t *testing.T) {
 	seedIdempotencyTenant(t, db, tenantID)
 
 	t.Cleanup(func() {
-		_, _ = db.ExecContext(context.Background(), `
-			DELETE FROM metaldocs.idempotency_keys
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf(`
+			DELETE FROM %s
 			 WHERE tenant_id = $1::uuid
 			   AND actor_user_id = $2
 			   AND route_template = $3
-			   AND key = $4`,
+			   AND key = $4`, table),
 			tenantID, actorUserID, routeTemplate, key,
 		)
 	})
 
-	if _, err := db.ExecContext(ctx, `
-		INSERT INTO metaldocs.idempotency_keys
+	if _, err := db.ExecContext(ctx, fmt.Sprintf(`
+		INSERT INTO %s
 			(tenant_id, actor_user_id, route_template, key, payload_hash, response_status, response_body, status, expires_at)
 		VALUES
-			($1::uuid, $2, $3, $4, 'abc', 201, '\x7b7d'::bytea, 'completed', now() + interval '1 day')`,
+			($1::uuid, $2, $3, $4, 'abc', 201, '\x7b7d'::bytea, 'completed', now() + interval '1 day')`, table),
 		tenantID, actorUserID, routeTemplate, key,
 	); err != nil {
 		t.Fatalf("seed insert: %v", err)
 	}
 
 	var payloadHash, status string
-	if err := db.QueryRowContext(ctx, `
-		INSERT INTO metaldocs.idempotency_keys
+	if err := db.QueryRowContext(ctx, fmt.Sprintf(`
+		INSERT INTO %[1]s
 			(tenant_id, actor_user_id, route_template, key, payload_hash, response_status, response_body, status, expires_at)
 		VALUES
 			($1::uuid, $2, $3, $4, 'abc', 201, '\x7b7d'::bytea, 'completed', now() + interval '1 day')
 		ON CONFLICT (tenant_id, actor_user_id, route_template, key)
 		DO UPDATE SET
-			payload_hash = metaldocs.idempotency_keys.payload_hash
-		RETURNING payload_hash, status`,
+			payload_hash = %[1]s.payload_hash
+		RETURNING payload_hash, status`, table),
 		tenantID, actorUserID, routeTemplate, key,
 	).Scan(&payloadHash, &status); err != nil {
 		t.Fatalf("replay insert returning existing row: %v", err)
@@ -84,13 +85,13 @@ func TestIdempotency_SameKeyReplay(t *testing.T) {
 	}
 
 	var count int
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRowContext(ctx, fmt.Sprintf(`
 		SELECT count(*)
-		  FROM metaldocs.idempotency_keys
+		  FROM %s
 		 WHERE tenant_id = $1::uuid
 		   AND actor_user_id = $2
 		   AND route_template = $3
-		   AND key = $4`,
+		   AND key = $4`, table),
 		tenantID, actorUserID, routeTemplate, key,
 	).Scan(&count); err != nil {
 		t.Fatalf("count rows: %v", err)
@@ -102,7 +103,8 @@ func TestIdempotency_SameKeyReplay(t *testing.T) {
 
 func TestIdempotency_SameKeyDifferentPayload(t *testing.T) {
 	ctx := context.Background()
-	db := openDirectDB(t)
+	db, schema := testdb.Open(t)
+	table := testdb.Qualified(schema, "idempotency_keys")
 
 	tenantID := "11111111-1111-1111-1111-111111111182"
 	actorUserID := "idem-user-2"
@@ -112,45 +114,45 @@ func TestIdempotency_SameKeyDifferentPayload(t *testing.T) {
 	seedIdempotencyTenant(t, db, tenantID)
 
 	t.Cleanup(func() {
-		_, _ = db.ExecContext(context.Background(), `
-			DELETE FROM metaldocs.idempotency_keys
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf(`
+			DELETE FROM %s
 			 WHERE tenant_id = $1::uuid
 			   AND actor_user_id = $2
 			   AND route_template = $3
-			   AND key = $4`,
+			   AND key = $4`, table),
 			tenantID, actorUserID, routeTemplate, key,
 		)
 	})
 
-	if _, err := db.ExecContext(ctx, `
-		INSERT INTO metaldocs.idempotency_keys
+	if _, err := db.ExecContext(ctx, fmt.Sprintf(`
+		INSERT INTO %s
 			(tenant_id, actor_user_id, route_template, key, payload_hash, response_status, response_body, status, expires_at)
 		VALUES
-			($1::uuid, $2, $3, $4, 'hash-A', 200, '\x7b7d'::bytea, 'completed', now() + interval '1 day')`,
+			($1::uuid, $2, $3, $4, 'hash-A', 200, '\x7b7d'::bytea, 'completed', now() + interval '1 day')`, table),
 		tenantID, actorUserID, routeTemplate, key,
 	); err != nil {
 		t.Fatalf("seed insert: %v", err)
 	}
 
-	if _, err := db.ExecContext(ctx, `
-		INSERT INTO metaldocs.idempotency_keys
+	if _, err := db.ExecContext(ctx, fmt.Sprintf(`
+		INSERT INTO %s
 			(tenant_id, actor_user_id, route_template, key, payload_hash, response_status, response_body, status, expires_at)
 		VALUES
 			($1::uuid, $2, $3, $4, 'hash-B', 200, '\x7b7d'::bytea, 'completed', now() + interval '1 day')
-		ON CONFLICT (tenant_id, actor_user_id, route_template, key) DO NOTHING`,
+		ON CONFLICT (tenant_id, actor_user_id, route_template, key) DO NOTHING`, table),
 		tenantID, actorUserID, routeTemplate, key,
 	); err != nil {
 		t.Fatalf("conflict insert with different payload hash: %v", err)
 	}
 
 	var payloadHash string
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRowContext(ctx, fmt.Sprintf(`
 		SELECT payload_hash
-		  FROM metaldocs.idempotency_keys
+		  FROM %s
 		 WHERE tenant_id = $1::uuid
 		   AND actor_user_id = $2
 		   AND route_template = $3
-		   AND key = $4`,
+		   AND key = $4`, table),
 		tenantID, actorUserID, routeTemplate, key,
 	).Scan(&payloadHash); err != nil {
 		t.Fatalf("load key row: %v", err)
@@ -162,7 +164,8 @@ func TestIdempotency_SameKeyDifferentPayload(t *testing.T) {
 
 func TestIdempotency_Expired_NewEntry(t *testing.T) {
 	ctx := context.Background()
-	db := openDirectDB(t)
+	db, schema := testdb.Open(t)
+	table := testdb.Qualified(schema, "idempotency_keys")
 
 	tenantID := "11111111-1111-1111-1111-111111111183"
 	actorUserID := "idem-user-3"
@@ -172,45 +175,45 @@ func TestIdempotency_Expired_NewEntry(t *testing.T) {
 	seedIdempotencyTenant(t, db, tenantID)
 
 	t.Cleanup(func() {
-		_, _ = db.ExecContext(context.Background(), `
-			DELETE FROM metaldocs.idempotency_keys
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf(`
+			DELETE FROM %s
 			 WHERE tenant_id = $1::uuid
 			   AND actor_user_id = $2
 			   AND route_template = $3
-			   AND key = $4`,
+			   AND key = $4`, table),
 			tenantID, actorUserID, routeTemplate, key,
 		)
 	})
 
-	if _, err := db.ExecContext(ctx, `
-		INSERT INTO metaldocs.idempotency_keys
+	if _, err := db.ExecContext(ctx, fmt.Sprintf(`
+		INSERT INTO %s
 			(tenant_id, actor_user_id, route_template, key, payload_hash, response_status, response_body, status, expires_at)
 		VALUES
-			($1::uuid, $2, $3, $4, 'old-hash', 200, '\x7b7d'::bytea, 'completed', now() - interval '1 hour')`,
+			($1::uuid, $2, $3, $4, 'old-hash', 200, '\x7b7d'::bytea, 'completed', now() - interval '1 hour')`, table),
 		tenantID, actorUserID, routeTemplate, key,
 	); err != nil {
 		t.Fatalf("seed expired row: %v", err)
 	}
 
-	if _, err := db.ExecContext(ctx, `
-		DELETE FROM metaldocs.idempotency_keys
+	if _, err := db.ExecContext(ctx, fmt.Sprintf(`
+		DELETE FROM %s
 		 WHERE expires_at < now()
 		   AND status = 'completed'
 		   AND tenant_id = $1::uuid
 		   AND actor_user_id = $2
 		   AND route_template = $3
-		   AND key = $4`,
+		   AND key = $4`, table),
 		tenantID, actorUserID, routeTemplate, key,
 	); err != nil {
 		t.Fatalf("janitor delete: %v", err)
 	}
 
 	newExpiry := time.Now().UTC().Add(2 * time.Hour)
-	if _, err := db.ExecContext(ctx, `
-		INSERT INTO metaldocs.idempotency_keys
+	if _, err := db.ExecContext(ctx, fmt.Sprintf(`
+		INSERT INTO %s
 			(tenant_id, actor_user_id, route_template, key, payload_hash, response_status, response_body, status, expires_at)
 		VALUES
-			($1::uuid, $2, $3, $4, 'new-hash', 201, '\x7b7d'::bytea, 'completed', $5)`,
+			($1::uuid, $2, $3, $4, 'new-hash', 201, '\x7b7d'::bytea, 'completed', $5)`, table),
 		tenantID, actorUserID, routeTemplate, key, newExpiry,
 	); err != nil {
 		t.Fatalf("insert new row after janitor cleanup: %v", err)
@@ -218,13 +221,13 @@ func TestIdempotency_Expired_NewEntry(t *testing.T) {
 
 	var payloadHash string
 	var expiresAt time.Time
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRowContext(ctx, fmt.Sprintf(`
 		SELECT payload_hash, expires_at
-		  FROM metaldocs.idempotency_keys
+		  FROM %s
 		 WHERE tenant_id = $1::uuid
 		   AND actor_user_id = $2
 		   AND route_template = $3
-		   AND key = $4`,
+		   AND key = $4`, table),
 		tenantID, actorUserID, routeTemplate, key,
 	).Scan(&payloadHash, &expiresAt); err != nil {
 		t.Fatalf("load new row: %v", err)
@@ -240,7 +243,8 @@ func TestIdempotency_Expired_NewEntry(t *testing.T) {
 
 func TestIdempotency_Concurrent_OnlyOneWins(t *testing.T) {
 	ctx := context.Background()
-	db := openDirectDB(t)
+	db, schema := testdb.Open(t)
+	table := testdb.Qualified(schema, "idempotency_keys")
 
 	tenantID := "11111111-1111-1111-1111-111111111184"
 	actorUserID := "idem-user-4"
@@ -250,12 +254,12 @@ func TestIdempotency_Concurrent_OnlyOneWins(t *testing.T) {
 	seedIdempotencyTenant(t, db, tenantID)
 
 	t.Cleanup(func() {
-		_, _ = db.ExecContext(context.Background(), `
-			DELETE FROM metaldocs.idempotency_keys
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf(`
+			DELETE FROM %s
 			 WHERE tenant_id = $1::uuid
 			   AND actor_user_id = $2
 			   AND route_template = $3
-			   AND key = $4`,
+			   AND key = $4`, table),
 			tenantID, actorUserID, routeTemplate, key,
 		)
 	})
@@ -270,11 +274,11 @@ func TestIdempotency_Concurrent_OnlyOneWins(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			_, err := db.ExecContext(ctx, `
-				INSERT INTO metaldocs.idempotency_keys
+			_, err := db.ExecContext(ctx, fmt.Sprintf(`
+				INSERT INTO %s
 					(tenant_id, actor_user_id, route_template, key, payload_hash, response_status, response_body, status, expires_at)
 				VALUES
-					($1::uuid, $2, $3, $4, $5, 200, '\x7b7d'::bytea, 'completed', now() + interval '1 day')`,
+					($1::uuid, $2, $3, $4, $5, 200, '\x7b7d'::bytea, 'completed', now() + interval '1 day')`, table),
 				tenantID, actorUserID, routeTemplate, key, fmt.Sprintf("concurrent-hash-%d", i),
 			)
 			errs[i] = err
@@ -302,13 +306,13 @@ func TestIdempotency_Concurrent_OnlyOneWins(t *testing.T) {
 	}
 
 	var count int
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRowContext(ctx, fmt.Sprintf(`
 		SELECT count(*)
-		  FROM metaldocs.idempotency_keys
+		  FROM %s
 		 WHERE tenant_id = $1::uuid
 		   AND actor_user_id = $2
 		   AND route_template = $3
-		   AND key = $4`,
+		   AND key = $4`, table),
 		tenantID, actorUserID, routeTemplate, key,
 	).Scan(&count); err != nil {
 		t.Fatalf("count final rows: %v", err)
