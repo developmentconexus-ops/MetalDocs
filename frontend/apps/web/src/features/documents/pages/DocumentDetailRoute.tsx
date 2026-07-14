@@ -267,7 +267,7 @@ export function DocumentDetailRoute() {
         <button
           type='button'
           className={`btn btn-sm ${styles.coverageCardAction}`}
-          onClick={() => navigate('/distribution')}
+          onClick={() => navigate('distribution')}
         >
           Abrir Fanout
           <Icon name='chevron-right' size={14} />

@@ -346,7 +346,7 @@ describe('useDocumentArtifact', () => {
     const coverageCell = model.kpis.find((k) => k.key === 'coverage');
 
     expect(coverageCell?.value).toBe('12');
-    expect(coverageCell?.href).toBe('/distribution');
+    expect(coverageCell?.href).toBe('distribution');
   });
 
   it('D3 — distribution error: coverage cell value is "—" (never fabricated 0)', () => {
