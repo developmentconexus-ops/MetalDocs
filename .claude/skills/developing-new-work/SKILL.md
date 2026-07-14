@@ -3,7 +3,7 @@ name: developing-new-work
 description: >-
   Run BEFORE brainstorming or designing any new MetalDocs backend module or feature — the
   pre-design system-impact orientation gate. Walks a static, pre-baked checklist of the whole
-  system (the 14 bounded-context modules, the 6 non-negotiable invariants, capability and module
+  system (the 15 bounded-context modules, the 6 non-negotiable invariants, capability and module
   wiring touchpoints, reusable platform frameworks, contract + DB conventions, test/QA gates, and
   docs/ADR governance), judges whether the work fits the architecture and whether the foundation is
   sound, then emits a written system-impact analysis plus a Green / Yellow / Red verdict. Red is a
@@ -29,7 +29,7 @@ On Red you stop — design cannot begin until the named redesign gate clears.
 ## The engine: a static checklist, not a rescan
 
 **Do not re-analyze the codebase on every run.** The MetalDocs backend base is mature and frozen
-(Grade-A, signed off 2026-06-21; module boundaries A). The 14 modules, the middleware chain, the
+(Grade-A, signed off 2026-06-21; module boundaries A). The 15 modules, the middleware chain, the
 invariants, and the wiring touchpoints are settled contracts. Re-deriving them per run buys nothing
 and burns thousands of tokens.
 
