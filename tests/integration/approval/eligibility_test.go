@@ -3,7 +3,7 @@
 
 // Package approval_test contains integration tests for approval signoff eligibility enforcement (J1).
 //
-// These tests target the live database (public schema) and verify:
+// These tests target a testdb-leased factory database (public schema) and verify:
 // (a) The DB-level trigger enforce_signoff_eligibility_trg exists on approval_signoffs.
 // (b) The governance_events table schema accepts signoff.rejected audit rows.
 // (c) The eligibility trigger rejects a signoff for a non-eligible actor, and allows an eligible one.
@@ -16,8 +16,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"os"
 	"strings"
 	"testing"
 
@@ -26,27 +24,6 @@ import (
 
 	"metaldocs/tests/integration/testdb"
 )
-
-// openDB connects to the live database using METALDOCS_DATABASE_URL or DATABASE_URL.
-func openDB(t *testing.T) *sql.DB {
-	t.Helper()
-	dsn := strings.TrimSpace(os.Getenv("METALDOCS_DATABASE_URL"))
-	if dsn == "" {
-		dsn = strings.TrimSpace(os.Getenv("DATABASE_URL"))
-	}
-	if dsn == "" {
-		t.Skip("DATABASE_URL/METALDOCS_DATABASE_URL not set")
-	}
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatalf("sql.Open: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	if err := db.PingContext(context.Background()); err != nil {
-		t.Skipf("integration DB unreachable: %v", err)
-	}
-	return db
-}
 
 // hasSQLState returns true when err carries the given PostgreSQL SQLSTATE code.
 func hasSQLState(err error, state string) bool {
@@ -58,9 +35,11 @@ func hasSQLState(err error, state string) bool {
 }
 
 // TestSignoff_Eligibility runs all three spec assertions (a/b/c) for J1.
+// Uses testdb.Open — a leased database built from the migrated factory
+// template (ADR 0034), reset on t.Cleanup — not the shared dev database.
 func TestSignoff_Eligibility(t *testing.T) {
 	ctx := context.Background()
-	db := openDB(t)
+	db, _ := testdb.Open(t)
 
 	// (a) Verify DB trigger present on approval_signoffs — confirms migration 0180 applied.
 	t.Run("trigger_present", func(t *testing.T) {
@@ -124,210 +103,116 @@ func TestSignoff_Eligibility(t *testing.T) {
 	})
 
 	// (c) Trigger blocks non-eligible actor and allows eligible actor.
-	// Uses a single transaction with savepoints so no data is permanently committed.
-	// Seeds the full FK chain: iam_users → templates_template → templates_template_version →
-	//   documents → approval_routes → approval_instances → approval_stage_instances →
-	//   approval_signoffs. Template family is canonical (TST-01); documents.template_version_id
-	//   has no FK to either family, so the choice doesn't affect what this test exercises.
-	// Uses the dev tenant (ffffffff-...) where document_profiles exist for 'dc' profile_code.
+	// Seeds the FK chain via the canonical testdb factory (tenant, author,
+	// eligible/non-eligible actors, document, route, in-progress instance) —
+	// NewDocument free-mints template_version_id (no FK to either template
+	// family, so no templates_template row is needed at all, mirroring
+	// fixtures.go's SeedDocument precedent). approval_stage_instances has no
+	// factory builder yet (mirrors review_verdict_integration_test.go's
+	// seedReviewVerdictFixture), so it stays a raw INSERT with only the
+	// eligible actor in eligible_actor_ids — the non-eligible actor is
+	// deliberately excluded so the trigger has something to reject.
 	t.Run("trigger_blocks_non_eligible_allows_eligible", func(t *testing.T) {
-		const devTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
-		const devProfileCode = "dc" // document_profiles row exists for dev tenant
+		database, _ := testdb.Open(t)
 
-		tx, err := db.BeginTx(ctx, nil)
+		tenant := testdb.NewTenant(t, database)
+		author := testdb.NewUser(t, database, testdb.WithTenant(tenant.ID), testdb.WithDisplayName("Trigger Author"))
+		eligibleActor := testdb.NewUser(t, database, testdb.WithTenant(tenant.ID), testdb.WithDisplayName("Eligible Signoff Actor"))
+		nonEligibleActor := testdb.NewUser(t, database, testdb.WithTenant(tenant.ID), testdb.WithDisplayName("Non-Eligible Signoff Actor"))
+
+		doc := testdb.NewDocument(t, database, testdb.WithTenant(tenant.ID), testdb.WithOwner(author.ID))
+		route := testdb.NewApprovalRoute(t, database, testdb.WithTenant(tenant.ID))
+		instance := testdb.NewApprovalInstance(t, database,
+			testdb.WithDocument(doc),
+			testdb.WithRoute(route),
+			testdb.WithOwner(author.ID),
+			testdb.WithStatus("in_progress"),
+		)
+
+		eligibleJSON, err := json.Marshal([]string{eligibleActor.ID})
 		if err != nil {
-			t.Fatalf("begin tx: %v", err)
-		}
-		defer tx.Rollback() // always rolls back — data is never committed
-
-		// Bypass authz GUC triggers (mirrors outbox_same_tx_test.go pattern).
-		if _, err := tx.ExecContext(ctx,
-			`SELECT set_config('metaldocs.bypass_authz', 'scheduler', true)`,
-		); err != nil {
-			t.Skipf("cannot set bypass_authz GUC: %v", err)
+			t.Fatalf("marshal eligible_actor_ids: %v", err)
 		}
 
-		authorID := testdb.DeterministicID(t, "author-trg-c")
-		docID := testdb.DeterministicID(t, "doc-trg-c")
-		routeID := testdb.DeterministicID(t, "route-trg-c")
-		instanceID := testdb.DeterministicID(t, "inst-trg-c")
-		stageID := testdb.DeterministicID(t, "stage-trg-c")
-		eligibleActorID := "elig-trg-c-actor"
-		nonEligibleActorID := "nonelig-trg-c-actor"
-
-		// Upsert author.
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO metaldocs.iam_users (user_id, tenant_id, display_name, is_active, created_at, updated_at)
-			VALUES ($1, $2::uuid, 'Trigger Author', true, now(), now())
-			ON CONFLICT (user_id) DO NOTHING`,
-			authorID, devTenantID,
-		); err != nil {
-			t.Skipf("cannot seed iam_users: %v", err)
-		}
-
-		// TST-01: seed the CANONICAL templates_template / templates_template_version
-		// family, not the legacy public.templates / template_versions tables. This
-		// test only needs a template_version_id to satisfy documents.template_version_id
-		// NOT NULL (the column carries no FK to either family) — it never reads the
-		// template back through docgenv2.FanoutTemplateReader, so canonical-vs-legacy
-		// doesn't change what's under test (the approval_signoffs eligibility trigger).
-		//
-		// templates_template_version carries trg_template_version_tenant_consistent,
-		// which requires the tx-local metaldocs.tenant_id GUC regardless of the
-		// metaldocs.bypass_authz bypass set above (a separate trigger/GUC).
-		if _, err := tx.ExecContext(ctx,
-			`SELECT set_config('metaldocs.tenant_id', $1, true)`, devTenantID,
-		); err != nil {
-			t.Skipf("cannot set tenant_id GUC: %v", err)
-		}
-
-		// Seed template.
-		var tplID string
-		if err := tx.QueryRowContext(ctx, `
-			INSERT INTO templates_template (tenant_id, doc_type_code, key, name, latest_version, created_by)
-			VALUES ($1::uuid, '', $2, 'Trigger Test Tpl', 1, $3::uuid)
-			ON CONFLICT (tenant_id, key) DO UPDATE SET name = EXCLUDED.name
-			RETURNING id::text`,
-			devTenantID, "trg-elig-tpl-"+docID[:8], authorID,
-		).Scan(&tplID); err != nil {
-			t.Skipf("cannot seed template: %v", err)
-		}
-
-		// Seed template_version. content_hash must be 64-hex for non-draft status
-		// (chk_template_version_content_hash_non_draft); docx_storage_key is globally
-		// unique (uq_templates_template_version_docx_storage_key), so key it off tplID.
-		var tvID string
-		if err := tx.QueryRowContext(ctx, `
-			INSERT INTO templates_template_version
-			  (tenant_id, template_id, version_number, status, docx_storage_key,
-			   content_hash, metadata_schema, placeholder_schema, author_id, published_at)
-			VALUES ($1::uuid, $2::uuid, 1, 'published', 'templates/trg-elig/' || $2 || '/body.docx',
-			        repeat('a', 64), '{}'::jsonb, '{"placeholders":[]}'::jsonb, $3::uuid, now())
-			ON CONFLICT (template_id, version_number) DO UPDATE SET status = EXCLUDED.status
-			RETURNING id::text`,
-			devTenantID, tplID, authorID,
-		).Scan(&tvID); err != nil {
-			t.Skipf("cannot seed template_version: %v", err)
-		}
-
-		// Seed document.
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO documents
-			  (id, tenant_id, name, status, form_data_json, created_by,
-			   template_version_id, revision_version, created_at, updated_at)
-			VALUES ($1::uuid, $2::uuid, 'Trigger Elig Doc', 'draft', '{}', $3::uuid,
-			        $4::uuid, 1, now(), now())
-			ON CONFLICT (id) DO NOTHING`,
-			docID, devTenantID, authorID, tvID,
-		); err != nil {
-			t.Skipf("cannot seed document: %v", err)
-		}
-
-		// Reuse existing approval_route for dev tenant + profile_code 'dc', or create if absent.
-		if err := tx.QueryRowContext(ctx, `
-			SELECT id::text FROM approval_routes
-			WHERE tenant_id = $1::uuid AND profile_code = $2
-			LIMIT 1`,
-			devTenantID, devProfileCode,
-		).Scan(&routeID); err != nil {
-			// No existing route; try inserting.
-			if _, insertErr := tx.ExecContext(ctx, `
-				INSERT INTO approval_routes (id, tenant_id, name, profile_code, active, created_at, created_by)
-				VALUES ($1::uuid, $2::uuid, 'Trigger Route', $3, true, now(), $4::uuid)
-				ON CONFLICT DO NOTHING`,
-				routeID, devTenantID, devProfileCode, authorID,
-			); insertErr != nil {
-				t.Skipf("cannot seed approval_routes: %v", insertErr)
-			}
-		}
-
-		// Seed approval_instance.
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO approval_instances
-			  (id, tenant_id, document_id, route_id, route_version_snapshot,
-			   status, submitted_by, submitted_at, content_hash_at_submit, idempotency_key)
-			VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 1,
-			        'in_progress', $5, now(), 'aabbcc', 'idem-trg-c')
-			ON CONFLICT (id) DO NOTHING`,
-			instanceID, devTenantID, docID, routeID, authorID,
-		); err != nil {
-			t.Skipf("cannot seed approval_instances: %v", err)
-		}
-
-		// Seed eligible actor in iam_users (required by approval_signoffs FK).
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO metaldocs.iam_users (user_id, tenant_id, display_name, is_active, created_at, updated_at)
-			VALUES ($1, $2::uuid, 'Eligible Signoff Actor', true, now(), now())
-			ON CONFLICT (user_id) DO NOTHING`,
-			eligibleActorID, devTenantID,
-		); err != nil {
-			t.Skipf("cannot seed eligible actor in iam_users: %v", err)
-		}
-
-		eligibleJSON, _ := json.Marshal([]string{eligibleActorID})
-
-		// Seed approval_stage_instance.
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO approval_stage_instances
-			  (id, approval_instance_id, stage_order, name_snapshot,
+		var stageID string
+		if err := database.QueryRowContext(ctx, `
+			INSERT INTO public.approval_stage_instances
+			  (approval_instance_id, stage_order, name_snapshot,
 			   required_role_snapshot, required_capability_snapshot, area_code_snapshot,
 			   quorum_snapshot, on_eligibility_drift_snapshot,
 			   eligible_actor_ids, status)
-			VALUES ($1::uuid, $2::uuid, 1, 'QA Review',
-			        'reviewer', 'doc.signoff', 'QA',
+			VALUES ($1::uuid, 1, 'QA Review',
+			        'reviewer', 'document.signoff', 'QA',
 			        'any_1_of', 'keep_snapshot',
-			        $3::jsonb, 'active')
-			ON CONFLICT (id) DO NOTHING`,
-			stageID, instanceID, string(eligibleJSON),
-		); err != nil {
-			t.Skipf("cannot seed approval_stage_instances: %v", err)
+			        $2::jsonb, 'active')
+			RETURNING id::text`,
+			instance.ID, string(eligibleJSON),
+		).Scan(&stageID); err != nil {
+			t.Fatalf("seed approval_stage_instances: %v", err)
 		}
 
 		contentHash := strings.Repeat("a", 64)
 
-		// Non-eligible actor: trigger must block.
-		// Use a savepoint so the transaction remains usable after the expected error.
+		// Non-eligible actor: trigger must block. approval_signoffs carries
+		// trg_require_cap_asserted_signoffs (document.signoff), so the caps
+		// assertion runs tx-local (pool-safe) even for the attempt expected to
+		// fail — a single autocommit statement inside its own short tx means a
+		// failed INSERT never poisons a later statement (unlike a shared,
+		// explicit multi-statement transaction, which Postgres aborts on the
+		// first error).
 		badSignoffID := testdb.DeterministicID(t, "signoff-bad-c")
-		if _, spErr := tx.ExecContext(ctx, `SAVEPOINT sp_bad_signoff`); spErr != nil {
-			t.Skipf("cannot create savepoint: %v", spErr)
-		}
-		_, err = tx.ExecContext(ctx, `
-			INSERT INTO approval_signoffs
-			  (id, approval_instance_id, stage_instance_id, actor_user_id, actor_tenant_id,
-			   decision, signed_at, signature_method, signature_payload, content_hash)
-			VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5::uuid,
-			        'approve', now(), 'password', '{}', $6)`,
-			badSignoffID, instanceID, stageID, nonEligibleActorID, devTenantID, contentHash,
-		)
-		if err == nil {
+		badErr := func() error {
+			tx, txErr := database.BeginTx(ctx, nil)
+			if txErr != nil {
+				t.Fatalf("begin tx (non-eligible signoff): %v", txErr)
+			}
+			defer tx.Rollback()
+			testdb.SetCapsOnTx(t, tx, `[{"cap":"document.signoff"}]`)
+			_, execErr := tx.ExecContext(ctx, `
+				INSERT INTO public.approval_signoffs
+				  (id, approval_instance_id, stage_instance_id, actor_user_id, actor_tenant_id,
+				   actor_display_name_snapshot, decision, signed_at, signature_method,
+				   signature_payload, content_hash)
+				VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5::uuid,
+				        $6, 'approve', now(), 'password', '{}', $7)`,
+				badSignoffID, instance.ID, stageID, nonEligibleActor.ID, tenant.ID,
+				nonEligibleActor.DisplayName, contentHash,
+			)
+			return execErr
+		}()
+		if badErr == nil {
 			t.Fatal("expected trigger to block non-eligible actor; got nil error")
 		}
-		if !hasSQLState(err, "23514") && !strings.Contains(err.Error(), "not in eligible_actor_ids") {
-			t.Fatalf("expected ERRCODE 23514 (check_violation); got: %v", err)
-		}
-		// Rollback to savepoint to recover the transaction.
-		if _, rbErr := tx.ExecContext(ctx, `ROLLBACK TO SAVEPOINT sp_bad_signoff`); rbErr != nil {
-			t.Fatalf("rollback to savepoint failed: %v", rbErr)
+		if !hasSQLState(badErr, "23514") && !strings.Contains(badErr.Error(), "not in eligible_actor_ids") {
+			t.Fatalf("expected ERRCODE 23514 (check_violation); got: %v", badErr)
 		}
 		t.Logf("PASS (c/non-eligible): trigger blocked non-eligible actor → 403-equivalent at DB layer")
 
-		// Eligible actor: must succeed.
+		// Eligible actor: must succeed — the non-vacuity control. Without this
+		// half, a trigger that rejected every signoff (not just non-eligible
+		// ones) would also pass the block above.
 		goodSignoffID := testdb.DeterministicID(t, "signoff-good-c")
-		_, err = tx.ExecContext(ctx, `
-			INSERT INTO approval_signoffs
-			  (id, approval_instance_id, stage_instance_id, actor_user_id, actor_tenant_id,
-			   decision, signed_at, signature_method, signature_payload, content_hash)
-			VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5::uuid,
-			        'approve', now(), 'password', '{}', $6)`,
-			goodSignoffID, instanceID, stageID, eligibleActorID, devTenantID, contentHash,
-		)
+		tx, err := database.BeginTx(ctx, nil)
 		if err != nil {
+			t.Fatalf("begin tx (eligible signoff): %v", err)
+		}
+		defer tx.Rollback()
+		testdb.SetCapsOnTx(t, tx, `[{"cap":"document.signoff"}]`)
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO public.approval_signoffs
+			  (id, approval_instance_id, stage_instance_id, actor_user_id, actor_tenant_id,
+			   actor_display_name_snapshot, decision, signed_at, signature_method,
+			   signature_payload, content_hash)
+			VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5::uuid,
+			        $6, 'approve', now(), 'password', '{}', $7)`,
+			goodSignoffID, instance.ID, stageID, eligibleActor.ID, tenant.ID,
+			eligibleActor.DisplayName, contentHash,
+		); err != nil {
 			t.Fatalf("expected eligible actor to succeed → 200-equivalent; got: %v", err)
 		}
+		if err := tx.Commit(); err != nil {
+			t.Fatalf("commit eligible signoff: %v", err)
+		}
 		t.Log("PASS (c/eligible): eligible actor signoff inserted → 200-equivalent")
-
-		_ = fmt.Sprintf // suppress unused import
-		// tx.Rollback() called by defer — no data committed.
 	})
 }
-
