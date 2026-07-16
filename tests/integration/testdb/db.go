@@ -161,9 +161,16 @@ func OpenFreshDatabase(t *testing.T) (*sql.DB, string) {
 
 	dbName := "metaldocs_test_" + randomSuffix(t)
 	phaseStart = time.Now()
+	// STRATEGY is pinned, not left to the server default, because the default is
+	// a per-version decision this suite cannot afford to inherit silently.
+	// FILE_COPY forces a checkpoint before and after the copy; on this storage
+	// stack a forced checkpoint blocks on IPC:CheckpointDone for an unbounded
+	// time. Measured against this template (12 MB, 3 alternating reps):
+	// WAL_LOG 1.11/1.74/2.56s vs FILE_COPY 5.52/7.78/36.41s. The 36s outlier is
+	// the point — FILE_COPY's cost has no ceiling here, it is not merely 5x.
 	if _, err := adminDB.ExecContext(
 		ctx,
-		fmt.Sprintf("CREATE DATABASE %s TEMPLATE %s", quoteIdent(dbName), quoteIdent(templateDBName)),
+		fmt.Sprintf("CREATE DATABASE %s TEMPLATE %s STRATEGY = WAL_LOG", quoteIdent(dbName), quoteIdent(templateDBName)),
 	); err != nil {
 		t.Fatalf("create isolated test database %s: %v", dbName, err)
 	}

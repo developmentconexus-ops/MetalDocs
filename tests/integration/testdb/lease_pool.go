@@ -326,8 +326,15 @@ func ensureLeaseSlotDatabase(ctx context.Context, baseDSN, templateDBName, finge
 	}
 
 	if !exists {
+		// STRATEGY = WAL_LOG pinned for the same reason as db.go's isolated-clone
+		// site: FILE_COPY forces a checkpoint per clone, which on this storage
+		// stack blocks on IPC:CheckpointDone for an unbounded time (measured
+		// 36.4s worst-case vs WAL_LOG 2.6s worst-case against the 12 MB
+		// template). Lease slots are created once and reused, so this fires far
+		// less often than the isolated site — but a forced-checkpoint stall here
+		// convoys every test waiting on the pool, so the strategy still matters.
 		if _, err := adminDB.ExecContext(ctx,
-			fmt.Sprintf("CREATE DATABASE %s TEMPLATE %s", quoteIdent(slotName), quoteIdent(templateDBName)),
+			fmt.Sprintf("CREATE DATABASE %s TEMPLATE %s STRATEGY = WAL_LOG", quoteIdent(slotName), quoteIdent(templateDBName)),
 		); err != nil {
 			return fmt.Errorf("create leased database %s: %w", slotName, err)
 		}
