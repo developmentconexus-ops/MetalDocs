@@ -7,35 +7,19 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
 	"sync"
 	"testing"
 	"time"
 
-	_ "github.com/lib/pq"
-
 	authdomain "metaldocs/internal/modules/auth/domain"
 	authpostgres "metaldocs/internal/modules/auth/infrastructure/postgres"
+	"metaldocs/tests/integration/testdb"
 )
-
-func openTestDB(t *testing.T) *sql.DB {
-	t.Helper()
-	dsn := os.Getenv("TEST_DATABASE_URL")
-	if dsn == "" {
-		t.Skip("TEST_DATABASE_URL not set; skipping integration test")
-	}
-	db, err := sql.Open("postgres", dsn)
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	return db
-}
 
 // TestUpdateUserResetLockState verifies that UpdateUser runs the UPDATE even
 // when only ResetLockState is set (no Email/NewPasswordHash/MustChangePassword).
 func TestUpdateUserResetLockState(t *testing.T) {
-	db := openTestDB(t)
+	db, _ := testdb.Open(t)
 	ctx := context.Background()
 
 	// Insert a locked test user directly.
@@ -50,9 +34,6 @@ VALUES ($1, $1, NULL, 'Test Unlock', TRUE, 'hash', 'bcrypt', FALSE, 3, $2, NOW()
 	if err != nil {
 		t.Fatalf("insert test user: %v", err)
 	}
-	t.Cleanup(func() {
-		_, _ = db.ExecContext(ctx, `DELETE FROM metaldocs.auth_identities WHERE user_id = $1`, userID)
-	})
 
 	repo := authpostgres.NewRepository(db, nil)
 
@@ -86,7 +67,7 @@ FROM metaldocs.auth_identities WHERE user_id = $1
 // drive failed_login_attempts past the threshold, because once the lock is set
 // the serialized later attempts observe it and short-circuit without recording.
 func TestWithinLoginLock_BoundsConcurrentFailedLogins(t *testing.T) {
-	db := openTestDB(t)
+	db, _ := testdb.Open(t)
 	ctx := context.Background()
 	repo := authpostgres.NewRepository(db, nil)
 
@@ -99,9 +80,6 @@ VALUES ($1, $1, NULL, 'Lock ITest', TRUE, 'hash', 'bcrypt', FALSE, 0, NOW(), NOW
 `, userID); err != nil {
 		t.Fatalf("insert test user: %v", err)
 	}
-	t.Cleanup(func() {
-		_, _ = db.ExecContext(ctx, `DELETE FROM metaldocs.auth_identities WHERE user_id = $1`, userID)
-	})
 
 	const maxAttempts = 5
 	const burst = 40
@@ -139,7 +117,7 @@ SELECT failed_login_attempts FROM metaldocs.auth_identities WHERE user_id = $1
 }
 
 func TestUpdateUserMissingIdentityReturnsNotFound(t *testing.T) {
-	db := openTestDB(t)
+	db, _ := testdb.Open(t)
 	ctx := context.Background()
 	repo := authpostgres.NewRepository(db, nil)
 
@@ -153,12 +131,12 @@ func TestUpdateUserMissingIdentityReturnsNotFound(t *testing.T) {
 }
 
 func TestListOnlineUsers_FiltersByTenant(t *testing.T) {
-	db := openTestDB(t)
+	db, _ := testdb.Open(t)
 	ctx := context.Background()
 	repo := authpostgres.NewRepository(db, nil)
 
-	tenantA := "11111111-1111-1111-1111-111111111111"
-	tenantB := "22222222-2222-2222-2222-222222222222"
+	tenantA := testdb.NewTenant(t, db).ID
+	tenantB := testdb.NewTenant(t, db).ID
 	userA := fmt.Sprintf("tenant-a-user-%d", time.Now().UnixNano())
 	userB := fmt.Sprintf("tenant-b-user-%d", time.Now().UnixNano())
 	sessionA := fmt.Sprintf("session-a-%d", time.Now().UnixNano())
@@ -183,10 +161,6 @@ VALUES ($1, $2, NULL, $3, TRUE, 'hash', 'bcrypt', FALSE, 0, NULL, NOW(), NOW())
 			t.Fatalf("insert auth identity %s: %v", identity.userID, err)
 		}
 	}
-	t.Cleanup(func() {
-		_, _ = db.ExecContext(ctx, `DELETE FROM metaldocs.auth_sessions WHERE session_id IN ($1, $2)`, sessionA, sessionB)
-		_, _ = db.ExecContext(ctx, `DELETE FROM metaldocs.auth_identities WHERE user_id IN ($1, $2)`, userA, userB)
-	})
 
 	for _, session := range []struct {
 		sessionID  string
