@@ -151,10 +151,10 @@ func (h *seedHandler) seed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Areas and profiles are keyed by a globally-unique code (PK is code), but the
-	// per-tenant membership FK (tenant_id, area_code) requires the row to belong to
-	// this tenant. A constant code can therefore live in only one tenant — so the
-	// seed scopes its area/profile codes per tenant.
+	// Areas and profiles are keyed by (tenant_id, code) — a composite PK, so the
+	// same code can exist in multiple tenants without collision. The seed still
+	// scopes its area/profile codes per tenant so concurrent e2e runs sharing a
+	// tenant don't race each other's rows.
 	slug := sanitizeSlug(tenantID)
 	areaCode := e2eAreaCode + "-" + slug
 	profileCode := e2eProfileCode + "-" + slug

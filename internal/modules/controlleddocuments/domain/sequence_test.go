@@ -47,9 +47,10 @@ func TestSequenceAllocatorNextAndIncrement_Concurrent(t *testing.T) {
 	// into the template, and metaldocs.tenants is snapshot-restored by the lease
 	// reset — so it is present on every lease, not merely usually present.
 	tenantID := tenant.DevTenantID
-	// Deterministic, no timestamp: document_profiles' primary key is on (code)
-	// alone, so on the old shared database two runs in the same second collided.
-	// On a private lease this test is the only writer.
+	// Deterministic, no timestamp: document_profiles' primary key is on
+	// (tenant_id, code), so on the old shared database two runs in the same
+	// second under the same tenant collided. On a private lease this test is
+	// the only writer.
 	profileCode := "seqtest"
 	areaCode := "rh"
 
