@@ -533,10 +533,44 @@ func dropDatabaseConn(ctx context.Context, conn *sql.Conn, name string) error {
 	return nil
 }
 
+// classifyGCCandidate is the pure decision core of GCRetiredDatabases: given a
+// database name and its COMMENT marker, decide whether this package can prove
+// ownership of a no-longer-live database (→ drop candidate + which advisory
+// lock proves no live claimant) or must skip it. Extracted so the ownership
+// guard test can falsify the decision without running the checkpoint-forcing
+// drop loop on a hot cluster.
+func classifyGCCandidate(name string, marker sql.NullString, currentFP16, currentPolicy string) (dropCandidate bool, lockKey int64) {
+	if !marker.Valid {
+		return false, 0
+	}
+	switch {
+	case strings.HasPrefix(marker.String, "metaldocs-testdb-retired:"):
+		fp16 := strings.TrimPrefix(marker.String, "metaldocs-testdb-retired:")
+		return true, advisoryKey(fp16)
+	case strings.HasPrefix(marker.String, "metaldocs-testdb-lease:"):
+		rest := strings.TrimPrefix(marker.String, "metaldocs-testdb-lease:")
+		parts := strings.SplitN(rest, ":", 2)
+		if len(parts) != 2 {
+			return false, 0
+		}
+		fp16, policy := parts[0], parts[1]
+		if fp16 == currentFP16 && policy == currentPolicy {
+			// Still current: this slot may be adopted by a live or future
+			// process running today's code. Not stale — must not drop.
+			return false, 0
+		}
+		return true, leaseSlotLockKey(name)
+	default:
+		return false, 0
+	}
+}
+
 // GCRetiredDatabases physically drops databases this package can prove it
 // owns — via a recognised COMMENT ON DATABASE marker — that are no longer
 // live: logically-retired templates (retireStaleTemplates) and lease slots
 // (lease_pool.go) from a stale fingerprint or reset-policy version.
+// Classification is the pure decision in classifyGCCandidate; this function
+// owns only the enumeration, locking, and drop side effects.
 //
 // It is NEVER invoked automatically. Nothing in Open, OpenFreshDatabase,
 // prepareTemplateDatabase, or any init/TestMain path calls this. It exists to
@@ -595,32 +629,12 @@ func GCRetiredDatabases(t *testing.T) (dropped []string, err error) {
 			rows.Close()
 			return nil, scanErr
 		}
-		if !marker.Valid {
+		dropCandidate, lockKey := classifyGCCandidate(name, marker, currentFP16, currentPolicy)
+		if !dropCandidate {
 			skipped = append(skipped, name)
 			continue
 		}
-		switch {
-		case strings.HasPrefix(marker.String, "metaldocs-testdb-retired:"):
-			fp16 := strings.TrimPrefix(marker.String, "metaldocs-testdb-retired:")
-			candidates = append(candidates, candidate{name: name, lockKey: advisoryKey(fp16)})
-		case strings.HasPrefix(marker.String, "metaldocs-testdb-lease:"):
-			rest := strings.TrimPrefix(marker.String, "metaldocs-testdb-lease:")
-			parts := strings.SplitN(rest, ":", 2)
-			if len(parts) != 2 {
-				skipped = append(skipped, name)
-				continue
-			}
-			fp16, policy := parts[0], parts[1]
-			if fp16 == currentFP16 && policy == currentPolicy {
-				// Still current: this slot may be adopted by a live or future
-				// process running today's code. Not stale — must not drop.
-				skipped = append(skipped, name)
-				continue
-			}
-			candidates = append(candidates, candidate{name: name, lockKey: leaseSlotLockKey(name)})
-		default:
-			skipped = append(skipped, name)
-		}
+		candidates = append(candidates, candidate{name: name, lockKey: lockKey})
 	}
 	rows.Close()
 	if rowsErr := rows.Err(); rowsErr != nil {

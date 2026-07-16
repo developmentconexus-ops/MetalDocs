@@ -63,9 +63,8 @@ func uniqueCode(prefix, suffix string, n int) string {
 // TestFamilyCodeResolverRepository_TenantAndSentinelOwnershipResolve: a code owned
 // by the queried tenant and a (distinct) code owned by the sentinel both resolve in
 // one batch — proving the `tenant_id IN (tenant, sentinel)` arm. Distinct codes
-// because document_profiles.code is a GLOBAL primary key (see
-// _CodeIsGlobalPrimaryKey): the same code cannot exist under two tenants, so the
-// precedence tie-break in the impl is unreachable by construction.
+// here just isolate that arm; TestFamilyCodeResolverRepository_TenantPrecedenceOverSentinel
+// below covers the same-code tie-break directly.
 func TestFamilyCodeResolverRepository_TenantAndSentinelOwnershipResolve(t *testing.T) {
 	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
@@ -98,13 +97,14 @@ func TestFamilyCodeResolverRepository_TenantAndSentinelOwnershipResolve(t *testi
 	}
 }
 
-// TestFamilyCodeResolverRepository_CodeIsGlobalPrimaryKey pins the schema invariant
-// that makes the resolver's tenant-vs-sentinel ORDER BY tie-break unreachable: the
-// primary key of metaldocs.document_profiles is (code) alone, so a code cannot be
-// defined under two tenants simultaneously. If this ever changes (PK widened to
-// (tenant_id, code)), this test fails and the precedence becomes live behavior to
-// re-test. (ADR 0038.)
-func TestFamilyCodeResolverRepository_CodeIsGlobalPrimaryKey(t *testing.T) {
+// TestFamilyCodeResolverRepository_CompositeTenantCodePrimaryKey pins the schema
+// invariant that makes the resolver's tenant-vs-sentinel ORDER BY tie-break live
+// behavior: the primary key of metaldocs.document_profiles is (tenant_id, code)
+// (migration 0308), so the same code can be defined under two tenants (or a
+// tenant and the sentinel) simultaneously. See
+// TestFamilyCodeResolverRepository_TenantPrecedenceOverSentinel for the tie-break
+// itself. (ADR 0038.)
+func TestFamilyCodeResolverRepository_CompositeTenantCodePrimaryKey(t *testing.T) {
 	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 	ctx := context.Background()
@@ -131,9 +131,41 @@ ORDER BY a.attname`)
 	if err := rows.Err(); err != nil {
 		t.Fatalf("rows: %v", err)
 	}
-	if len(cols) != 1 || cols[0] != "code" {
-		t.Fatalf("document_profiles primary key = %v, want [code] (global PK; precedence tie-break is unreachable). "+
-			"If the PK was widened, the resolver precedence is now live behavior — re-test it.", cols)
+	want := []string{"code", "tenant_id"}
+	if len(cols) != len(want) || cols[0] != want[0] || cols[1] != want[1] {
+		t.Fatalf("document_profiles primary key = %v, want %v (composite PK; resolver precedence tie-break is live behavior)", cols, want)
+	}
+}
+
+// TestFamilyCodeResolverRepository_TenantPrecedenceOverSentinel: the same code
+// defined under both the queried tenant and the sentinel resolves to the
+// tenant-owned family — proving the ORDER BY tenant-over-sentinel tie-break,
+// which the composite (tenant_id, code) PK makes reachable.
+func TestFamilyCodeResolverRepository_TenantPrecedenceOverSentinel(t *testing.T) {
+	db, _ := testdb.Open(t)
+	db.SetMaxOpenConns(1)
+	ctx := context.Background()
+
+	tenant := testdb.NewTenant(t, db)
+	tenantID := tenant.ID
+	shortID := strings.ReplaceAll(tenantID, "-", "")[:6]
+
+	sharedCode := domain.ProfileCode("pshared-" + shortID)
+	famTenant := "fam-shtenant-" + shortID
+	famSentinel := "fam-shsentinel-" + shortID
+
+	seedFamily(t, db, famTenant)
+	seedFamily(t, db, famSentinel)
+	seedProfile(t, db, string(sharedCode), sentinelTenantID, famSentinel, false) // sentinel-owned
+	seedProfile(t, db, string(sharedCode), tenantID, famTenant, false)           // tenant-owned, same code
+
+	repo := NewFamilyCodeResolverRepository(db)
+	got, err := repo.ResolveFamilyCodes(ctx, tenantID, []domain.ProfileCode{sharedCode})
+	if err != nil {
+		t.Fatalf("ResolveFamilyCodes: %v", err)
+	}
+	if got[sharedCode] != domain.FamilyCode(famTenant) {
+		t.Fatalf("tenant precedence: got family %q, want tenant-owned %q", got[sharedCode], famTenant)
 	}
 }
 
@@ -250,8 +282,9 @@ func TestFamilyCodeResolverRepository_ProfileCodesForFamily(t *testing.T) {
 	codeB := "pfor-" + shortID + "-bb"
 	codeOther := "pother-" + shortID
 
-	// codeA, codeB → fam; codeOther → famOther. Distinct codes (global PK forbids a
-	// code under two tenants); a sentinel-owned member also counts toward the family.
+	// codeA, codeB → fam; codeOther → famOther. Distinct codes here (not required by
+	// the schema, just this test's shape); a sentinel-owned member also counts
+	// toward the family.
 	seedFamily(t, db, fam)
 	seedFamily(t, db, famOther)
 	seedProfile(t, db, codeA, tenantID, fam, false)

@@ -1,0 +1,336 @@
+//go:build integration
+
+package migrations_test
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"os"
+	"strings"
+	"testing"
+
+	"github.com/jackc/pgx/v5/pgconn"
+
+	"metaldocs/internal/modules/iam/authz"
+	"metaldocs/tests/integration/testdb"
+)
+
+// TestMigration0308_DocumentProfilesTenantPK proves both directions of the
+// 0308 tenant-scoped composite PK migration (unit 4.5) against a real,
+// per-test-isolated database:
+//
+//  1. Positive path (bootstrap proof): the curated bootstrap this database
+//     was cloned from already applied baseline + every forward migration
+//     through 0308, so before this test touches anything: the 4 dead
+//     profile-adjacent tables must be gone, document_profiles' PK must be
+//     exactly (tenant_id, code), ux_document_profiles_tenant_code must be
+//     gone, the 3 composite FKs must exist and reference
+//     document_profiles(tenant_id, code), and the '0308' ledger row must be
+//     present exactly once.
+//  2. Behavioral proof: two rows sharing the same code but different
+//     tenant_id must both insert cleanly (tenant-scoped uniqueness); the
+//     same tenant_id+code pair must collide with 23505.
+//  3. Idempotency: re-executing the exact committed migration file bytes
+//     against the already-migrated database must no-op cleanly (DO-block
+//     guards skip work already in target shape) and must not duplicate the
+//     '0308' ledger row (ON CONFLICT DO NOTHING).
+func TestMigration0308_DocumentProfilesTenantPK(t *testing.T) {
+	ctx := context.Background()
+	db, _ := testdb.OpenFreshDatabase(t)
+
+	// (1a) The 4 dead tables must be gone.
+	for _, tbl := range []string{
+		"metaldocs.document_profile_governance",
+		"metaldocs.document_profile_schema_versions",
+		"metaldocs.document_sequences",
+		"metaldocs.document_profile_template_defaults",
+	} {
+		if got := regclass(t, ctx, db, tbl); got.Valid {
+			t.Fatalf("expected %s to be dropped by migration 0308, but it exists as %q", tbl, got.String)
+		}
+	}
+
+	// (1b) document_profiles PK must be exactly (tenant_id, code).
+	assertPrimaryKeyColumns(t, ctx, db, "metaldocs.document_profiles", []string{"tenant_id", "code"})
+
+	// (1c) The redundant unique index must be gone.
+	if got := regclassIndex(t, ctx, db, "metaldocs.ux_document_profiles_tenant_code"); got.Valid {
+		t.Fatalf("expected ux_document_profiles_tenant_code to be dropped by migration 0308, but it exists as %q", got.String)
+	}
+
+	// (1d) The 3 composite FKs must exist and reference document_profiles(tenant_id, code).
+	for _, fk := range []struct {
+		name  string
+		table string
+	}{
+		{"approval_routes_document_profile_fk", "public.approval_routes"},
+		{"cd_sequence_counters_tenant_id_profile_code_fkey", "public.cd_sequence_counters"},
+		{"controlled_documents_tenant_id_profile_code_fkey", "public.controlled_documents"},
+	} {
+		assertForeignKeyTargetsDocumentProfiles(t, ctx, db, fk.name, fk.table)
+	}
+
+	// (1e) Ledger row present exactly once from bootstrap.
+	if n := ledgerCount(t, ctx, db, "0308"); n != 1 {
+		t.Fatalf("expected exactly one schema_migrations row for version '0308' after bootstrap, got %d", n)
+	}
+
+	// (2) Behavioral: same code, different tenant_id -> both succeed;
+	// same tenant_id + code -> 23505.
+	tenantA := testdb.NewTenant(t, db)
+	tenantB := testdb.NewTenant(t, db)
+	const profileCode = "shared-pk-probe"
+	const areaCode = "shared-pk-probe-area"
+	testdb.SeedGovernedTaxonomy(t, db, tenantA.ID, profileCode, areaCode)
+	testdb.SeedGovernedTaxonomy(t, db, tenantB.ID, profileCode, areaCode)
+
+	// SeedGovernedTaxonomy is itself idempotent (ON CONFLICT DO NOTHING), so
+	// re-running it for both tenants above already proves the composite PK
+	// admits the same code under two different tenants. Prove the negative
+	// (same tenant_id + code collides) directly against the tripwire-guarded
+	// table using the same authorized-write path the fixture uses.
+	var dupErr error
+	err := withTaxonomyCapability(ctx, t, db, tenantA.ID, func(tx *sql.Tx) error {
+		_, e := tx.ExecContext(ctx,
+			`INSERT INTO metaldocs.document_profiles
+			    (code, tenant_id, family_code, name, review_interval_days, alias)
+			 VALUES ($1, $2::uuid, 'test-family', $1, 365, $1)`,
+			profileCode, tenantA.ID,
+		)
+		dupErr = e
+		return e
+	})
+	if err == nil {
+		t.Fatal("expected duplicate (tenant_id, code) insert to fail with 23505, but it succeeded")
+	}
+	if !hasSQLState(dupErr, "23505") {
+		t.Fatalf("expected SQLSTATE 23505 for duplicate (tenant_id, code), got: %v", dupErr)
+	}
+}
+
+// TestMigration0308_ReRunIsCleanNoOp proves the committed migration file is
+// safe to replay against a database already in the post-0308 shape (the
+// bootstrap-replay idempotency contract every migration in this repo must
+// satisfy — see db/migrations/README.md and the 0264/0260 precedent files).
+func TestMigration0308_ReRunIsCleanNoOp(t *testing.T) {
+	ctx := context.Background()
+	db, _ := testdb.OpenFreshDatabase(t)
+
+	migrationSQL, err := os.ReadFile("../../../db/migrations/0308_document_profiles_tenant_pk.sql")
+	if err != nil {
+		t.Fatalf("read committed 0308 migration file: %v", err)
+	}
+
+	if _, err := db.ExecContext(ctx, string(migrationSQL)); err != nil {
+		t.Fatalf("0308 must re-apply cleanly against an already-migrated database: %v", err)
+	}
+
+	if n := ledgerCount(t, ctx, db, "0308"); n != 1 {
+		t.Fatalf("re-run must not duplicate the ledger row (ON CONFLICT DO NOTHING): got %d rows for '0308'", n)
+	}
+
+	assertPrimaryKeyColumns(t, ctx, db, "metaldocs.document_profiles", []string{"tenant_id", "code"})
+}
+
+// TestMigration0308_MalformedPrestateAborts proves the F2 fail-closed
+// guard: if metaldocs.document_profiles somehow reaches migration-replay
+// time with NO primary key at all (the composite PK dropped, and the
+// ux_document_profiles_tenant_code index gone -- so guard 1 no-ops because
+// there is no 'code'-only PK to drop, and guard 2 no-ops because there is no
+// ux_document_profiles_tenant_code index left to promote), the migration's
+// final assertion DO block must RAISE and abort the whole file (it runs
+// inside the file's own explicit BEGIN/COMMIT), leaving the table with no
+// PK and, critically, NOT re-inserting the '0308' ledger row.
+func TestMigration0308_MalformedPrestateAborts(t *testing.T) {
+	ctx := context.Background()
+	db, _ := testdb.OpenFreshDatabase(t)
+
+	// Sanity: bootstrap already applied 0308 -- start from the healthy
+	// post-migration shape before corrupting it.
+	assertPrimaryKeyColumns(t, ctx, db, "metaldocs.document_profiles", []string{"tenant_id", "code"})
+	if n := ledgerCount(t, ctx, db, "0308"); n != 1 {
+		t.Fatalf("precondition: expected exactly one '0308' ledger row before corrupting prestate, got %d", n)
+	}
+
+	// Simulate the malformed prestate: drop the 3 composite FKs that depend
+	// on the document_profiles_pkey index (scratch DB -- fine to drop in
+	// test setup), then drop the PK constraint itself. Because
+	// PRIMARY KEY USING INDEX renamed ux_document_profiles_tenant_code to
+	// document_profiles_pkey when 0308 first ran, dropping the constraint
+	// drops that same underlying index -- so afterward there is NEITHER a
+	// primary key NOR a ux_document_profiles_tenant_code index, which is
+	// exactly the shape that makes both of 0308's DO-block guards no-op.
+	for _, stmt := range []string{
+		`ALTER TABLE ONLY public.approval_routes DROP CONSTRAINT approval_routes_document_profile_fk`,
+		`ALTER TABLE ONLY public.cd_sequence_counters DROP CONSTRAINT cd_sequence_counters_tenant_id_profile_code_fkey`,
+		`ALTER TABLE ONLY public.controlled_documents DROP CONSTRAINT controlled_documents_tenant_id_profile_code_fkey`,
+		`ALTER TABLE ONLY metaldocs.document_profiles DROP CONSTRAINT document_profiles_pkey`,
+	} {
+		if _, err := db.ExecContext(ctx, stmt); err != nil {
+			t.Fatalf("corrupt prestate (%s): %v", stmt, err)
+		}
+	}
+
+	// Also remove the ledger row so the migration actually attempts work
+	// instead of short-circuiting on ON CONFLICT DO NOTHING against an
+	// already-present row.
+	if _, err := db.ExecContext(ctx, `DELETE FROM public.schema_migrations WHERE version = '0308'`); err != nil {
+		t.Fatalf("delete '0308' ledger row: %v", err)
+	}
+
+	// Confirm the malformed prestate: no PK, no ux index, no ledger row.
+	var pkCount int
+	if err := db.QueryRowContext(ctx, `
+		SELECT count(*) FROM pg_constraint
+		 WHERE conrelid = 'metaldocs.document_profiles'::regclass AND contype = 'p'`).Scan(&pkCount); err != nil {
+		t.Fatalf("count PK constraints: %v", err)
+	}
+	if pkCount != 0 {
+		t.Fatalf("precondition: expected document_profiles to have no PK after corruption, got %d PK constraints", pkCount)
+	}
+	if got := regclassIndex(t, ctx, db, "metaldocs.ux_document_profiles_tenant_code"); got.Valid {
+		t.Fatalf("precondition: expected ux_document_profiles_tenant_code to be gone, but it exists as %q", got.String)
+	}
+	if n := ledgerCount(t, ctx, db, "0308"); n != 0 {
+		t.Fatalf("precondition: expected zero '0308' ledger rows after delete, got %d", n)
+	}
+
+	migrationSQL, err := os.ReadFile("../../../db/migrations/0308_document_profiles_tenant_pk.sql")
+	if err != nil {
+		t.Fatalf("read committed 0308 migration file: %v", err)
+	}
+
+	_, execErr := db.ExecContext(ctx, string(migrationSQL))
+	if execErr == nil {
+		t.Fatal("expected replaying 0308 against a no-PK prestate to fail the final assertion guard, but it succeeded")
+	}
+	if !strings.Contains(execErr.Error(), "migration 0308 invariant violated") {
+		t.Fatalf("expected the final assertion guard's RAISE message, got: %v", execErr)
+	}
+
+	// The abort must have rolled back the whole file -- no ledger row must
+	// have been (re)inserted.
+	if n := ledgerCount(t, ctx, db, "0308"); n != 0 {
+		t.Fatalf("expected no '0308' ledger row after aborted replay (rollback), got %d", n)
+	}
+}
+
+func regclass(t *testing.T, ctx context.Context, db *sql.DB, qualifiedName string) sql.NullString {
+	t.Helper()
+	var got sql.NullString
+	if err := db.QueryRowContext(ctx, `SELECT to_regclass($1)::text`, qualifiedName).Scan(&got); err != nil {
+		t.Fatalf("to_regclass(%s): %v", qualifiedName, err)
+	}
+	return got
+}
+
+func regclassIndex(t *testing.T, ctx context.Context, db *sql.DB, qualifiedName string) sql.NullString {
+	t.Helper()
+	return regclass(t, ctx, db, qualifiedName)
+}
+
+func ledgerCount(t *testing.T, ctx context.Context, db *sql.DB, version string) int {
+	t.Helper()
+	var n int
+	if err := db.QueryRowContext(ctx, `SELECT count(*) FROM public.schema_migrations WHERE version = $1`, version).Scan(&n); err != nil {
+		t.Fatalf("count schema_migrations rows for %q: %v", version, err)
+	}
+	return n
+}
+
+// assertPrimaryKeyColumns asserts the given table's primary key is backed by
+// exactly the given ordered column list.
+func assertPrimaryKeyColumns(t *testing.T, ctx context.Context, db *sql.DB, qualifiedTable string, wantCols []string) {
+	t.Helper()
+	rows, err := db.QueryContext(ctx, `
+		SELECT a.attname
+		  FROM pg_index i
+		  JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+		 WHERE i.indrelid = $1::regclass
+		   AND i.indisprimary
+		 ORDER BY array_position(i.indkey, a.attnum)`, qualifiedTable)
+	if err != nil {
+		t.Fatalf("query primary key columns for %s: %v", qualifiedTable, err)
+	}
+	defer rows.Close()
+
+	var gotCols []string
+	for rows.Next() {
+		var col string
+		if err := rows.Scan(&col); err != nil {
+			t.Fatalf("scan pk column for %s: %v", qualifiedTable, err)
+		}
+		gotCols = append(gotCols, col)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate pk columns for %s: %v", qualifiedTable, err)
+	}
+
+	if len(gotCols) != len(wantCols) {
+		t.Fatalf("%s primary key columns = %v, want %v", qualifiedTable, gotCols, wantCols)
+	}
+	for i, c := range wantCols {
+		if gotCols[i] != c {
+			t.Fatalf("%s primary key columns = %v, want %v", qualifiedTable, gotCols, wantCols)
+		}
+	}
+}
+
+// assertForeignKeyTargetsDocumentProfiles asserts the named FK constraint on
+// the given table exists and references metaldocs.document_profiles(tenant_id, code).
+func assertForeignKeyTargetsDocumentProfiles(t *testing.T, ctx context.Context, db *sql.DB, constraintName, qualifiedTable string) {
+	t.Helper()
+	var confrelid string
+	var confCols string
+	err := db.QueryRowContext(ctx, `
+		SELECT c.confrelid::regclass::text,
+		       (SELECT string_agg(a.attname, ',' ORDER BY array_position(c.confkey, a.attnum))
+		          FROM pg_attribute a
+		         WHERE a.attrelid = c.confrelid AND a.attnum = ANY(c.confkey))
+		  FROM pg_constraint c
+		 WHERE c.conname = $1
+		   AND c.conrelid = $2::regclass
+		   AND c.contype = 'f'`, constraintName, qualifiedTable).Scan(&confrelid, &confCols)
+	if err != nil {
+		t.Fatalf("query FK constraint %s on %s: %v", constraintName, qualifiedTable, err)
+	}
+	if confrelid != "metaldocs.document_profiles" && confrelid != "document_profiles" {
+		t.Fatalf("FK %s on %s references %q, want metaldocs.document_profiles", constraintName, qualifiedTable, confrelid)
+	}
+	if confCols != "tenant_id,code" {
+		t.Fatalf("FK %s on %s references columns %q, want \"tenant_id,code\"", constraintName, qualifiedTable, confCols)
+	}
+}
+
+// withTaxonomyCapability runs fn inside a transaction that has asserted the
+// taxonomy.manage capability transaction-locally via the production
+// authz.SeedTxTenant helper, matching the tripwire (trg_require_cap_asserted)
+// that guards metaldocs.document_profiles writes — see
+// testdb.SeedGovernedTaxonomy (fixtures.go) for the same idiom.
+func withTaxonomyCapability(ctx context.Context, t *testing.T, db *sql.DB, tenantID string, fn func(tx *sql.Tx) error) error {
+	t.Helper()
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if err := authz.SeedTxTenant(ctx, tx, tenantID); err != nil {
+		return err
+	}
+	testdb.SetCapsOnTx(t, tx, `[{"cap":"taxonomy.manage"}]`)
+	if err := fn(tx); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func hasSQLState(err error, state string) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == state
+	}
+	return strings.Contains(err.Error(), state)
+}

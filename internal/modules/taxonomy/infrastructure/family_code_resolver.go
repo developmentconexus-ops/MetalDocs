@@ -12,11 +12,11 @@ import (
 
 // sentinelTenantID is the global-fallback tenant for document profiles and the
 // DEFAULT for document_profiles.tenant_id (baseline 0001_current_schema.sql:1130):
-// a code owned by this tenant applies to every tenant. Because document_profiles.code
-// is a GLOBAL primary key (baseline 0001:2403), a code lives under exactly one
-// tenant, so the tenant-vs-sentinel ORDER BY below never actually tie-breaks — it
-// is retained verbatim for parity with the search subquery this replaces. Mirrors
-// the literal the search v2 reader hard-coded.
+// a code owned by this tenant applies to every tenant. document_profiles' primary
+// key is (tenant_id, code) (migration 0308), so the same code can legally exist
+// under both a tenant and the sentinel at once — the tenant-vs-sentinel ORDER BY
+// below is live tie-break behavior, not defensive dead code. Mirrors the literal
+// the search v2 reader hard-coded.
 const sentinelTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 
 // FamilyCodeResolverRepository is the taxonomy-owned Postgres implementation of

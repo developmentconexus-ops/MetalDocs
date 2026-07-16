@@ -1,6 +1,6 @@
 # Binary: metaldocs-api
 
-> **Last verified:** 2026-06-11 (Wave 1: chain reorder F-01, timeouts F-16)
+> **Last verified:** 2026-07-16 (ROADMAP unit 4.5 — §7 e2e-seed rewritten: `ensurePODefaultTemplateBinding` deleted, single DB pool) | **Prior:** 2026-06-11 (Wave 1: chain reorder F-01, timeouts F-16)
 > **Scope:** The `metaldocs-api` server binary: entrypoint, responsibilities, config consumed, lifecycle, and runtime constraints. Sister binary `metaldocs-e2e-seed` is covered at the end. For the full middleware chain detail see [../http-kernel.md](../http-kernel.md); for the request flow see [../flows/request-lifecycle.md](../flows/request-lifecycle.md).
 > **Key files:**
 > - `apps/api/cmd/metaldocs-api/main.go` — entrypoint and composition root (943 lines)
@@ -172,12 +172,12 @@ Non-zero exit explicitly calls `deps.Cleanup()` before `os.Exit` because `os.Exi
 
 Entrypoint: `apps/api/cmd/metaldocs-e2e-seed/main.go`. One-shot; not part of normal startup.
 
-**Purpose:** create or reset a known E2E test account and ensure the `po` profile→template default binding exists.
+**Purpose:** create or reset a known E2E test account.
 
-**Sequence:**
+**Sequence (rewritten 2026-07-16, ROADMAP unit 4.5 — `ensurePODefaultTemplateBinding` deleted; `metaldocs.document_profile_template_defaults` dropped by migration 0308, see `wiki/database/tables/document_profile_template_defaults.md`):**
 1. Requires postgres mode (`main.go:32-38`).
-2. `ensurePODefaultTemplateBinding`: opens its own DB connection, verifies `metaldocs.document_template_versions` has `po/po-default-canvas/v1`, then `INSERT ... ON CONFLICT DO NOTHING` into `metaldocs.document_profile_template_defaults` (`main.go:97-156`). Note: this opens a separate DB connection before `BuildAPIDependencies` opens a second pool (`main.go:52-56`) — two pools in one binary is a minor anomaly.
-3. Rebuilds full API dependencies (second DB pool), creates or resets the `e2e-admin` user with password from `METALDOCS_E2E_ADMIN_PASSWORD` (default `E2eAdmin123!`) (`main.go:63-88, 158-166`), and ensures the `system_admin` role (`main.go:90-92`).
+2. Builds API dependencies via `bootstrap.BuildAPIDependencies` — a single DB pool, no longer a separate connection (`main.go:48-52`).
+3. Creates or resets the `e2e-admin` user with password from `METALDOCS_E2E_ADMIN_PASSWORD` (default `E2eAdmin123!`) (`main.go:61-84`), and ensures the `system_admin` role via `iamAdmin.UpsertUserAndAssignRole` (`main.go:86-88`).
 
 Identity config for the seeder:
 
@@ -199,7 +199,6 @@ Identity config for the seeder:
 | `ENABLE_JOB_*` env vars lack the `METALDOCS_` prefix and use opt-out semantics despite an opt-in name | low | — |
 | `AUDIT_RETENTION_DAYS` lacks the `METALDOCS_` prefix; raw `DELETE` SQL lives in the composition root rather than the audit module | low | — |
 | No `ReadTimeout`, `WriteTimeout`, or `IdleTimeout` on `http.Server` | medium | RF-9 |
-| e2e-seed opens two DB pools | info | — |
 | Both `METALDOCS_RATE_LIMIT_ENABLED` and `METALDOCS_CORS_ENABLED` default off — outermost two middleware layers are no-ops in the default environment | low (documented trade-off) | — |
 
 See also: [../legacy-register.md](../legacy-register.md).

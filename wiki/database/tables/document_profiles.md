@@ -3,7 +3,7 @@
 > **Source:** `db/baseline/0001_current_schema.sql`
 > **Schema:** `metaldocs`
 > **Owner:** taxonomy
-> **Last verified:** 2026-06-12 (migration 0236 — `is_active` dropped as dead schema, superseded by `archived_at`; baseline file unchanged, the column is removed by the forward migration)
+> **Last verified:** 2026-07-16 (migration 0308 — PK promoted from `code` alone to composite `(tenant_id, code)`; baseline file unchanged, see Post-baseline note below) | **Prior:** 2026-06-12 (migration 0236 — `is_active` dropped as dead schema, superseded by `archived_at`; baseline file unchanged, the column is removed by the forward migration)
 
 ## Purpose
 Current curated-baseline table owned by `taxonomy`. See the owning module wiki and runtime repositories for business behavior.
@@ -48,6 +48,8 @@ code text NOT NULL,
 );
 ```
 
+**Post-baseline note (migration `0308`, 2026-07-16, ROADMAP unit 4.5, T-015/R-015 half B):** the PRIMARY KEY was promoted from `code` alone to composite `(tenant_id, code)`. The previously separate `ux_document_profiles_tenant_code` unique index on `(tenant_id, code)` was **promoted into the PK** via `ADD CONSTRAINT ... PRIMARY KEY USING INDEX` (keeps the index OID, so the 3 inbound composite FKs bound to it — `approval_routes_document_profile_fk`, `cd_sequence_counters_tenant_id_profile_code_fkey`, `controlled_documents_tenant_id_profile_code_fkey` — stayed valid throughout, no re-pointing needed); the index no longer exists under its old name, renamed to `document_profiles_pkey`. This migration also dropped the 4 tables that previously blocked the promotion (see Notes and Debt) in the same transaction, before the PK swap. This closes the `document_profiles` half of T-015 that the design note below had deferred.
+
 ## Runtime Usage
 
 Use `rg -n "document_profiles" internal apps` and the owning module wiki to verify readers/writers before changing this table.
@@ -60,4 +62,6 @@ Check `db/reference-data/0001_product_reference_data.sql` and `db/dev-seeds/0001
 
 Curated baseline table in the `metaldocs` schema.
 
-**PK left as-is (2026-07-02, DB-08/T-015 audit):** PK remains `code` alone (cross-tenant unique), NOT promoted to `(tenant_id, code)` despite the redundant-looking `(tenant_id, code)` unique index (`ux_document_profiles_tenant_code`). Reason: `document_profiles(code)` has 4 inbound single-column FKs (`document_profile_governance`, `document_profile_schema_versions`, `document_sequences`, and formerly `template_drafts`) from tables that have **no `tenant_id` column and no RLS** — they are global registries keyed purely by `profile_code`, not per-tenant data. Promoting the PK would break those FKs and require a much larger redesign (adding `tenant_id` to 4 more tables, backfilling, adding RLS, deciding whether profile governance/schema-versions/sequence-counters become per-tenant concepts). See `wiki/modules/taxonomy-tech-debt.md` T-015 design note for the full inventory and recommendation. Contrast with `document_process_areas` (same T-015 finding), which WAS promoted — see `wiki/database/tables/document_process_areas.md`.
+**PK promoted (2026-07-16, migration `0308`, ROADMAP unit 4.5, T-015/R-015 half B):** PK is now composite `(tenant_id, code)` — see the Post-baseline note above. This supersedes the 2026-07-02 "PK left as-is" ruling below, which is retained for historical context.
+
+**Historical — PK left as-is (2026-07-02, DB-08/T-015 audit; RESOLVED 2026-07-16 by migration 0308):** PK previously remained `code` alone (cross-tenant unique), NOT promoted to `(tenant_id, code)` despite the redundant-looking `(tenant_id, code)` unique index (`ux_document_profiles_tenant_code`). Reason at the time: `document_profiles(code)` had 4 inbound single-column FKs (`document_profile_governance`, `document_profile_schema_versions`, `document_sequences`, and formerly `template_drafts`) from tables that had **no `tenant_id` column and no RLS** — global registries keyed purely by `profile_code`, not per-tenant data. Migration 0308 closed this by dropping all 4 dead tables (zero readers/writers repo-wide — see `wiki/database/tables/document_profile_governance.md`, `document_profile_schema_versions.md`, `document_sequences.md`, `document_profile_template_defaults.md` for each table's retirement record) and then promoting the PK, since `template_drafts` had already been dropped by migration 0260. See `wiki/modules/taxonomy-tech-debt.md` T-015 for the closure record. Contrast with `document_process_areas` (same T-015 finding), which was promoted earlier — see `wiki/database/tables/document_process_areas.md`.

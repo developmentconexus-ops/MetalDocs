@@ -360,13 +360,13 @@ func TestSP2_DictionaryPin_TwoTenantIsolation(t *testing.T) {
 	actorB := testdb.DeterministicID(t, "actor-iso-b")
 	testdb.SeedSystemAdmin(t, db, tenantA.ID, actorA, "Iso Author A")
 	testdb.SeedSystemAdmin(t, db, tenantB.ID, actorB, "Iso Author B")
-	// document_profiles.code is the table's sole PRIMARY KEY (globally unique
-	// across tenants, not (tenant_id, code) as SeedGovernedTaxonomy's ON
-	// CONFLICT target assumes) — reusing the same profile code "po" for both
-	// tenants collides on document_profiles_pkey, so each tenant gets its own
-	// code here.
-	testdb.SeedGovernedTaxonomy(t, db, tenantA.ID, "po-iso-a", "quality")
-	testdb.SeedGovernedTaxonomy(t, db, tenantB.ID, "po-iso-b", "quality")
+	// document_profiles' PRIMARY KEY is (tenant_id, code) (migration 0308), so
+	// the same profile code legally belongs to more than one tenant — reuse
+	// the identical code "po-iso" across both tenants here to exercise that
+	// shared-code shape directly, rather than sidestepping it with distinct
+	// per-tenant codes.
+	testdb.SeedGovernedTaxonomy(t, db, tenantA.ID, "po-iso", "quality")
+	testdb.SeedGovernedTaxonomy(t, db, tenantB.ID, "po-iso", "quality")
 
 	const phID = "ph-iso"
 	const phName = "company_name"

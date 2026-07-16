@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -21,7 +22,23 @@ import (
 //     marker, ignoring the marker it had just read. That manufactured the very
 //     recognised marker GCRetiredDatabases trusts, laundering an unmarked or
 //     foreign database this factory never built into a droppable one — one hop
-//     upstream of "never drop a database you cannot prove you own".
+//     upstream of "never drop a database you cannot prove you own". The test
+//     pins this three ways: (1) the retirement itself never rewrites either
+//     sentinel's marker, (2) both sentinels are physically alive afterward
+//     (cheap, always run), and (3) classifyGCCandidate — GC's pure decision
+//     core — classifies a laundered-shaped marker (a bare
+//     "metaldocs-testdb-retired:<fp16>" marker, exactly what the pre-fix bug
+//     would have stamped onto either sentinel) as a DROP CANDIDATE, while an
+//     unmarked database and a foreign ready marker classify SKIP. That
+//     classifier assertion is what makes the guard falsifiable: it fails
+//     against the pre-fix laundering behavior even without running a real GC
+//     pass, because "would classify as droppable" is precisely what
+//     laundering manufactures. The full end-to-end GC pass (drop loop +
+//     post-GC survival re-probe) is gated behind TESTDB_GC_E2E=1 — GC is
+//     idle-cluster-only by contract (see GCRetiredDatabases' doc comment);
+//     running it unconditionally mid-full-suite is failure class #3 (GC's
+//     drop loop wall time scales with cluster debris and previously wedged
+//     the package for 9+ minutes under full-suite load).
 //   - TestNonVirginBaselineGuardIsNotBypassable (finding 1): the virgin-sequence
 //     guard in snapshotLeaseBaseline used to run AFTER the baseline snapshot
 //     tables were written. A guard failure left those tables behind;
@@ -41,7 +58,13 @@ func TestRetirementRequiresOwnershipProof(t *testing.T) {
 	}
 	defer admin.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	// Retirement + marker assertions + physical survival probes + the pure
+	// classifier checks are all cheap and serial — 5 minutes is generous
+	// headroom for those alone. The optional e2e GC leg (TESTDB_GC_E2E=1)
+	// gets its own fresh context below, since GC's drop-loop wall time scales
+	// with cluster debris and must never share a budget with the rest of this
+	// test.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	if err := admin.PingContext(ctx); err != nil {
 		t.Skipf("integration DB unreachable: %v", err)
@@ -78,7 +101,7 @@ func TestRetirementRequiresOwnershipProof(t *testing.T) {
 	foreignMarker := readyMarker(foreignFP)
 
 	for _, n := range []string{unmarked, foreign} {
-		if !dbExists(ctx, conn, n) {
+		if !dbExists(ctx, t, conn, n) {
 			if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE DATABASE %s", quoteIdent(n))); err != nil {
 				t.Fatalf("create %s: %v", n, err)
 			}
@@ -114,15 +137,82 @@ func TestRetirementRequiresOwnershipProof(t *testing.T) {
 		t.Errorf("retirement rewrote FOREIGN %s marker to %q, want it left as %q — a database we did not build is not ours to retire", foreign, markerOrNull(m), foreignMarker)
 	}
 
-	// And a real GC pass must leave both physically standing: neither carries a
-	// recognised retired/lease marker, so both are skipped, never dropped.
+	// Both sentinels must be physically alive right now: neither carries a
+	// recognised retired/lease marker, so a correct GC would skip both. Probed
+	// on a fresh bounded context so this — the assertion this test exists
+	// for — never inherits budget consumed by setup above.
+	probeCtx, probeCancel := context.WithTimeout(context.Background(), time.Minute)
+	defer probeCancel()
+	if !dbExists(probeCtx, t, conn, unmarked) {
+		t.Errorf("UNMARKED %s does not exist after retirement — a database with no recognised marker must never be dropped", unmarked)
+	}
+	if !dbExists(probeCtx, t, conn, foreign) {
+		t.Errorf("FOREIGN %s does not exist after retirement — a foreign-ready-marked database is not ours to drop", foreign)
+	}
+
+	// Pure classifier assertions (no DB access): falsify the decision core
+	// GCRetiredDatabases now delegates to. This is the load-bearing
+	// falsifiability pin (GPT finding 2) — a laundered marker (exactly what
+	// the pre-fix retireStaleTemplates bug would have stamped onto either
+	// sentinel above) MUST classify as a drop candidate, proving the guard
+	// assertions above are actually exercising ownership proof and not
+	// something that would pass regardless of what marker retirement leaves
+	// behind. An unmarked database and a foreign ready marker must both
+	// classify SKIP, matching the survival probes above.
+	currentFingerprint, err := schemaFingerprint()
+	if err != nil {
+		t.Fatalf("schema fingerprint: %v", err)
+	}
+	currentFP16 := currentFingerprint[:16]
+	currentPolicy := fmt.Sprintf("%d", resetPolicyVersion)
+
+	if drop, _ := classifyGCCandidate(unmarked, sql.NullString{}, currentFP16, currentPolicy); drop {
+		t.Errorf("classifyGCCandidate: unmarked database classified as drop candidate, want skip")
+	}
+	if drop, _ := classifyGCCandidate(foreign, sql.NullString{String: foreignMarker, Valid: true}, currentFP16, currentPolicy); drop {
+		t.Errorf("classifyGCCandidate: foreign ready marker classified as drop candidate, want skip")
+	}
+	// The falsifiability pin: a synthetic retired marker for the foreign
+	// fingerprint is exactly what laundering would have produced. It MUST
+	// classify as a drop candidate — if it didn't, this test could not tell
+	// a fixed retireStaleTemplates from a laundering one.
+	launderedMarker := "metaldocs-testdb-retired:" + foreignFP
+	if drop, lockKey := classifyGCCandidate(foreign, sql.NullString{String: launderedMarker, Valid: true}, currentFP16, currentPolicy); !drop || lockKey != advisoryKey(foreignFP) {
+		t.Errorf("classifyGCCandidate: laundered retired marker %q did not classify as a drop candidate with lockKey %d, got drop=%v lockKey=%d", launderedMarker, advisoryKey(foreignFP), drop, lockKey)
+	}
+	staleLeaseMarker := "metaldocs-testdb-lease:" + foreignFP + ":999999"
+	if drop, lockKey := classifyGCCandidate(foreign, sql.NullString{String: staleLeaseMarker, Valid: true}, currentFP16, currentPolicy); !drop || lockKey != leaseSlotLockKey(foreign) {
+		t.Errorf("classifyGCCandidate: stale lease marker %q did not classify as a drop candidate with lockKey %d, got drop=%v lockKey=%d", staleLeaseMarker, leaseSlotLockKey(foreign), drop, lockKey)
+	}
+	currentLeaseMarker := fmt.Sprintf("metaldocs-testdb-lease:%s:%s", currentFP16, currentPolicy)
+	if drop, _ := classifyGCCandidate(foreign, sql.NullString{String: currentLeaseMarker, Valid: true}, currentFP16, currentPolicy); drop {
+		t.Errorf("classifyGCCandidate: current-fingerprint+policy lease marker classified as drop candidate, want skip (still adoptable)")
+	}
+
+	// The end-to-end GC pass (real drop loop against the live cluster) is
+	// gated: GC is idle-cluster-only by contract (see GCRetiredDatabases' doc
+	// comment) because DROP DATABASE forces a checkpoint on this host and its
+	// wall time scales with cluster debris — running it unconditionally
+	// mid-full-suite previously wedged this package for 9+ minutes. Run it
+	// deliberately, only on an idle cluster, via TESTDB_GC_E2E=1.
+	if os.Getenv("TESTDB_GC_E2E") != "1" {
+		t.Logf("TestRetirementRequiresOwnershipProof: skipping end-to-end GC pass (set TESTDB_GC_E2E=1 to run it) — GC is idle-cluster-only by contract, never run it mid-full-suite or on a hot cluster")
+		return
+	}
+
 	if _, err := GCRetiredDatabases(t); err != nil {
 		t.Fatalf("GCRetiredDatabases: %v", err)
 	}
-	if !dbExists(ctx, conn, unmarked) {
+	// Fresh budget for the e2e survival re-probe: GC's wall time scales with
+	// how much retired/stale debris the cluster carries (serialized drops,
+	// one forced checkpoint each), so it must never share a budget with any
+	// other phase of this test.
+	verifyCtx, verifyCancel := context.WithTimeout(context.Background(), time.Minute)
+	defer verifyCancel()
+	if !dbExists(verifyCtx, t, conn, unmarked) {
 		t.Errorf("GC dropped UNMARKED %s — a database with no recognised marker must never be dropped", unmarked)
 	}
-	if !dbExists(ctx, conn, foreign) {
+	if !dbExists(verifyCtx, t, conn, foreign) {
 		t.Errorf("GC dropped FOREIGN %s — a foreign-ready-marked database is not ours to drop", foreign)
 	}
 }
@@ -143,7 +233,7 @@ func TestNonVirginBaselineGuardIsNotBypassable(t *testing.T) {
 	}
 	defer admin.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	if err := admin.PingContext(ctx); err != nil {
 		t.Skipf("integration DB unreachable: %v", err)

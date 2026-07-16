@@ -1,6 +1,6 @@
 # HTTP Kernel — Composition Root, Middleware Chain, and Startup
 
-> **Last verified:** 2026-07-02 (§8 outbox relay rows updated for the StagingOutboxWorker consolidation; other §8 anchors verified 2026-06-11) | **Prior:** 2026-06-11 (Wave 1)
+> **Last verified:** 2026-07-16 (ROADMAP unit 4.5 — e2e-seed raw-SQL bullet removed, `ensurePODefaultTemplateBinding` deleted and `document_profile_template_defaults` dropped by migration 0308) | **Prior:** 2026-07-02 (§8 outbox relay rows updated for the StagingOutboxWorker consolidation; other §8 anchors verified 2026-06-11) | **Prior:** 2026-06-11 (Wave 1)
 > **Scope:** The `apps/api` composition root: startup sequence, dependency injection, middleware chain, routing, server lifecycle, graceful shutdown, and tier-1 authorization truth table. Does not cover per-module business logic or persistence owned by domain modules.
 > **Key files:**
 > - `apps/api/cmd/metaldocs-api/main.go` — composition root (config → DI → routes → lifecycle)
@@ -253,8 +253,9 @@ The kernel is mostly persistence-free wiring. Direct database touches:
 - **Migrations ledger:** `migrate.Apply` reads `public.schema_migrations` and executes files from `db/migrations` under advisory lock `0x4D444D4947528000` (`internal/platform/migrate/migrate.go:24, 41-48, 101-119`), invoked at `main.go:191`.
 - **River schema:** `bootstrap.MigrateRiverSchema` migrates the River job-queue schema (`METALDOCS_JOBS_RIVER_SCHEMA`) at `main.go:460` (`internal/platform/bootstrap/jobs.go:69`). The API binary is the sole owner; `BuildJobsDependencies` no longer calls `MigrateRiverSchema` — `jobs` compose service has `depends_on: api(healthy)` so the schema exists before `metaldocs-jobs` starts. (Wave 1, F-19)
 - **Audit retention (raw SQL in the kernel):** daily `DELETE FROM metaldocs.audit_events WHERE occurred_at < $1` when `AUDIT_RETENTION_DAYS > 0` (`main.go:585-587`).
-- **e2e-seed raw SQL:** `SELECT` on `metaldocs.document_template_versions`, `INSERT ON CONFLICT DO NOTHING` into `metaldocs.document_profile_template_defaults` (`apps/api/cmd/metaldocs-e2e-seed/main.go:117-153`).
 - Everything else goes through module repositories constructed here but owned by their respective modules.
+
+**Removed 2026-07-16 (ROADMAP unit 4.5):** the e2e-seed raw-SQL bullet that previously stood here (`SELECT` on `metaldocs.document_template_versions`, `INSERT ON CONFLICT DO NOTHING` into `metaldocs.document_profile_template_defaults`) no longer applies — `ensurePODefaultTemplateBinding` was deleted from `apps/api/cmd/metaldocs-e2e-seed/main.go` and `metaldocs.document_profile_template_defaults` was dropped by migration `0308` (see `wiki/database/tables/document_profile_template_defaults.md`). See `wiki/backend/binaries/api.md` §7 for the current e2e-seed sequence.
 
 ---
 

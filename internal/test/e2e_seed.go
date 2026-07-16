@@ -151,10 +151,10 @@ func (h *seedHandler) seed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Areas and profiles are keyed by a globally-unique code (PK is code), but the
-	// per-tenant membership FK (tenant_id, area_code) requires the row to belong to
-	// this tenant. A constant code can therefore live in only one tenant — so the
-	// seed scopes its area/profile codes per tenant.
+	// Areas and profiles are keyed by (tenant_id, code) — a composite PK, so the
+	// same code can exist in multiple tenants without collision. The seed still
+	// scopes its area/profile codes per tenant so concurrent e2e runs sharing a
+	// tenant don't race each other's rows.
 	slug := sanitizeSlug(tenantID)
 	areaCode := e2eAreaCode + "-" + slug
 	profileCode := e2eProfileCode + "-" + slug
@@ -484,14 +484,15 @@ func normalizeRoles(roles []string) []string {
 }
 
 func ensureAreaAndProfile(ctx context.Context, tx *sql.Tx, tenantID, areaCode, profileCode string) error {
-	// document_process_areas/document_profiles are keyed by a globally-unique code
-	// (PK is code), but the membership FK is (tenant_id, area_code) -> (tenant_id,
-	// code), so a given code can belong to exactly one tenant. Codes are therefore
-	// tenant-scoped by the caller; conflict resolution targets the code PK.
+	// document_process_areas' PK was promoted to (tenant_id, code) by migration
+	// 0264, and document_profiles' PK was promoted to (tenant_id, code) by
+	// migration 0308 (0264's deferred HALF B) -- both tables now key on the
+	// composite, so the same code may legally belong to more than one tenant.
+	// Conflict resolution targets each table's composite PK.
 	if _, err := tx.ExecContext(ctx, `
 INSERT INTO metaldocs.document_process_areas (tenant_id, code, name, description, is_active)
 VALUES ($1, $2, 'QA', 'E2E seed area', TRUE)
-ON CONFLICT (code) DO NOTHING`, tenantID, areaCode); err != nil {
+ON CONFLICT (tenant_id, code) DO NOTHING`, tenantID, areaCode); err != nil {
 		return fmt.Errorf("seed area: %w", err)
 	}
 
@@ -510,7 +511,7 @@ ON CONFLICT (code) DO NOTHING`, tenantID, areaCode); err != nil {
 	if _, err := tx.ExecContext(ctx, `
 INSERT INTO metaldocs.document_profiles (tenant_id, code, family_code, name, description, review_interval_days, alias)
 VALUES ($1, $2, $3, 'Seed Profile', 'E2E seed profile', 365, $4)
-ON CONFLICT (code) DO NOTHING`, tenantID, profileCode, familyCode, alias); err != nil {
+ON CONFLICT (tenant_id, code) DO NOTHING`, tenantID, profileCode, familyCode, alias); err != nil {
 		return fmt.Errorf("seed profile: %w", err)
 	}
 

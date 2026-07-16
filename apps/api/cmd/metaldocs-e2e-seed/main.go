@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"log/slog"
 	"os"
@@ -16,7 +15,6 @@ import (
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/config"
-	pgdb "metaldocs/internal/platform/db/postgres"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -38,10 +36,6 @@ func main() {
 	if repoMode != config.RepositoryPostgres {
 		log.Fatalf("metaldocs-e2e-seed requires postgres repository mode")
 	}
-	if err := ensurePODefaultTemplateBinding(ctx); err != nil {
-		log.Fatalf("ensure po default template binding: %v", err)
-	}
-
 	attachmentsCfg, err := config.LoadAttachmentsConfig()
 	if err != nil {
 		log.Fatalf("invalid attachments config: %v", err)
@@ -94,67 +88,6 @@ func main() {
 	}
 
 	slog.Info("e2e seed ready", "user_id", seed.UserID, "username", seed.Username)
-}
-
-func ensurePODefaultTemplateBinding(ctx context.Context) error {
-	const (
-		profileCode     = "po"
-		templateKey     = "po-default-canvas"
-		templateVersion = 1
-	)
-
-	pgCfg, err := config.LoadPostgresConfig()
-	if err != nil {
-		return fmt.Errorf("load postgres config: %w", err)
-	}
-	db, err := pgdb.Open(ctx, pgCfg.DSN)
-	if err != nil {
-		return fmt.Errorf("open postgres: %w", err)
-	}
-	defer func() {
-		_ = db.Close()
-	}()
-
-	var templateExists bool
-	if err := db.QueryRowContext(
-		ctx,
-		`SELECT EXISTS (
-			SELECT 1
-			FROM metaldocs.document_template_versions
-			WHERE template_key = $1
-			  AND version = $2
-			  AND profile_code = $3
-		)`,
-		templateKey,
-		templateVersion,
-		profileCode,
-	).Scan(&templateExists); err != nil {
-		return fmt.Errorf("check template version existence: %w", err)
-	}
-	if !templateExists {
-		return fmt.Errorf(
-			"template version not found: profile=%s template_key=%s version=%d",
-			profileCode,
-			templateKey,
-			templateVersion,
-		)
-	}
-
-	if _, err := db.ExecContext(
-		ctx,
-		`INSERT INTO metaldocs.document_profile_template_defaults
-			(profile_code, template_key, template_version, assigned_at)
-		VALUES ($1, $2, $3, NOW())
-		ON CONFLICT (profile_code)
-		DO NOTHING`,
-		profileCode,
-		templateKey,
-		templateVersion,
-	); err != nil {
-		return fmt.Errorf("insert profile template default when missing: %w", err)
-	}
-
-	return nil
 }
 
 func loadSeedConfig() seedConfig {
