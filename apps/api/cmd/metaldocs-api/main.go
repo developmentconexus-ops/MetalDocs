@@ -618,6 +618,9 @@ func main() {
 	// M2/F2.4): documents reads fill-in placeholder schema through it instead of
 	// joining templates_template_version to its own table.
 	docDeps.TemplateVersionPort = templatesinfra.NewTemplateVersionReader(deps.SQLDB)
+	// PDFOutboxReader is the render/fanout-owned liveness read-port (QA-1 F13):
+	// pdf_status='failed' derives from dead-lettered materialize/pdf outbox events.
+	docDeps.PDFOutboxReader = fanout.NewPDFPipelineStateReader(deps.SQLDB)
 	if deps.PDFConverter != nil {
 		docDeps.ExportDocgen = deps.PDFConverter
 	}
