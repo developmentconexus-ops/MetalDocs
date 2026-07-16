@@ -13,11 +13,10 @@ import "context"
 // ('ffffffff-ffff-ffff-ffff-ffffffffffff'): a code owned by the sentinel resolves
 // for any querying tenant, and a code owned by the querying tenant resolves for
 // that tenant (tenant_id IN (tenant, sentinel)). The tenant-own "precedence"
-// tie-break in the impl is defensive only and currently unreachable:
-// document_profiles.code is a GLOBAL primary key (baseline
-// 0001_current_schema.sql:2403), so a code cannot exist under two tenants at once
-// — there is never a pair to rank. It is kept for exact parity with the raw
-// subquery it replaced and forward-safety if the PK is ever widened. Neither
+// tie-break in the impl is live behavior: document_profiles' primary key is
+// (tenant_id, code) (migration 0308), so the same code can legally exist under
+// both the querying tenant and the sentinel tenant simultaneously, and the
+// ORDER BY tenant-over-sentinel tie-break picks the tenant-owned row. Neither
 // method filters archived_at — they reproduce the archived-agnostic semantics of
 // the raw subqueries they replace (search's v2 documents reader), NOT the
 // active-only semantics of FamilyRepository.HasActiveProfiles.
