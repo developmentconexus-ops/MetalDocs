@@ -354,6 +354,8 @@ func (fakePresigner) PresignGet(_ context.Context, key string, _ time.Duration) 
 	return "https://presigned/get/" + key, nil
 }
 
+func (fakePresigner) Exists(_ context.Context, _ string) (bool, error) { return true, nil }
+
 func (fakePresigner) Confirm(_ context.Context, _, key, expected string) (objectstore.VerifiedPointer, error) {
 	return objectstore.VerifiedPointer{StorageKey: key, ContentHash: expected, SizeBytes: 1}, nil
 }

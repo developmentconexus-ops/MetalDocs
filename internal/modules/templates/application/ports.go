@@ -43,12 +43,17 @@ type Repository interface {
 // Presigner defines the object-store port used to issue presigned
 // upload/download URLs for template docx and schema objects, confirm
 // completed uploads against an expected content hash, copy objects when
-// spawning a new draft version, and delete objects.
+// spawning a new draft version, check object existence, and delete objects.
 type Presigner interface {
 	PresignPut(ctx context.Context, tenantID, key string, ttl time.Duration) (url string, err error)
 	PresignGet(ctx context.Context, key string, ttl time.Duration) (url string, err error)
 	Confirm(ctx context.Context, tenantID, key, expectedHash string) (objectstore.VerifiedPointer, error)
 	Copy(ctx context.Context, tenantID, srcKey, dstKey string) error
+	// Exists reports whether an object is present at key. Like PresignGet, it
+	// trusts a DB-sourced key (not attacker-influenced) and performs no
+	// tenant assertion of its own. Errors are propagated as-is so callers
+	// can fail closed instead of treating a store failure as "missing".
+	Exists(ctx context.Context, key string) (bool, error)
 	Delete(ctx context.Context, key string) error
 }
 

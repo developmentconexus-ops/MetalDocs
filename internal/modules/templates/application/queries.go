@@ -55,7 +55,9 @@ type GetDocxURLCmd struct {
 
 // GetDocxURL returns a time-limited presigned GET URL for a template
 // version's docx object. Returns ErrUploadMissing if the version has no
-// docx object recorded yet.
+// docx object recorded yet, or if a storage key is recorded but the object
+// itself has not been uploaded yet (blank templates assign a storage key at
+// create time and lazily provision the object on first autosave confirm).
 func (s *Service) GetDocxURL(ctx context.Context, cmd GetDocxURLCmd) (string, error) {
 	if _, err := s.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID); err != nil {
 		return "", err
@@ -65,6 +67,13 @@ func (s *Service) GetDocxURL(ctx context.Context, cmd GetDocxURLCmd) (string, er
 		return "", err
 	}
 	if v.DocxStorageKey == "" {
+		return "", domain.ErrUploadMissing
+	}
+	exists, err := s.presign.Exists(ctx, v.DocxStorageKey)
+	if err != nil {
+		return "", err
+	}
+	if !exists {
 		return "", domain.ErrUploadMissing
 	}
 	return s.presign.PresignGet(ctx, v.DocxStorageKey, docxDownloadTTL)
