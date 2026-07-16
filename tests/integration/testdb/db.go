@@ -408,9 +408,35 @@ func retireStaleTemplates(ctx context.Context, conn *sql.Conn, keep string) erro
 		return err
 	}
 	for _, s := range staleDBs {
-		fp16 := strings.TrimPrefix(s.name, templateNamePrefix)
+		nameFP16 := strings.TrimPrefix(s.name, templateNamePrefix)
+		// OWNERSHIP PROOF, not name-prefix. Retire only a database this factory
+		// can prove it BUILT — one already carrying a recognised ready marker
+		// (metaldocs-testdb-ready:<fp>) whose fingerprint matches the name. An
+		// unmarked or foreign-marked prefix match is NOT ours to touch: writing
+		// the retired marker onto it would MANUFACTURE the recognised marker
+		// GCRetiredDatabases later trusts (db.go:576-579 → gcDropIfIdleAndUnclaimed),
+		// laundering a database we never owned into a droppable one — turning
+		// "never drop a database you cannot prove you own" into a lie one hop
+		// upstream of the drop. Name-prefix is a namespace, not a title deed; the
+		// marker is the deed. Legacy unmarked orphans are the hub sweep's job
+		// (R1), never this path's. (GPT final-round finding 2.)
+		if !s.marker.Valid {
+			continue
+		}
+		fp, ok := strings.CutPrefix(s.marker.String, "metaldocs-testdb-ready:")
+		if !ok {
+			continue // foreign / already-retired / non-ready marker — not ours to retire
+		}
+		// The database name encodes only the first 16 hex of the fingerprint
+		// (templateNamePrefix + fingerprint[:16]); the ready marker carries the
+		// full fingerprint. Tie them on exactly those 16 shared hex — the marker
+		// must be a ready marker whose fingerprint opens with the 16 hex this name
+		// encodes. 16 is all the name can attest to, so 16 is the tie.
+		if len(fp) < 16 || len(nameFP16) < 16 || fp[:16] != nameFP16[:16] {
+			continue // ready marker's fingerprint does not match the database name
+		}
 		_, _ = conn.ExecContext(ctx, fmt.Sprintf(
-			"COMMENT ON DATABASE %s IS %s", quoteIdent(s.name), quoteLiteral(retiredTemplateMarker(fp16)),
+			"COMMENT ON DATABASE %s IS %s", quoteIdent(s.name), quoteLiteral(retiredTemplateMarker(nameFP16)),
 		))
 	}
 	return nil

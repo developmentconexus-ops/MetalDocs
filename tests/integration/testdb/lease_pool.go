@@ -448,38 +448,26 @@ func snapshotLeaseBaseline(ctx context.Context, baseDSN, dbName string) error {
 	}
 	defer db.Close()
 
-	if _, err := db.ExecContext(ctx,
-		"CREATE SCHEMA IF NOT EXISTS "+quoteIdent(leaseBaselineSchema)); err != nil {
-		return fmt.Errorf("create %s schema: %w", leaseBaselineSchema, err)
-	}
-
-	for _, st := range baselineSnapshotTables {
-		// Plain CREATE TABLE, NOT "IF NOT EXISTS". This function may only ever
-		// run against a database in pristine template-fresh state, and its
-		// callers guarantee that. If a snapshot table already exists, that
-		// guarantee is broken and the correct outcome is a loud 42P07, not a
-		// silent skip: "IF NOT EXISTS" would skip the SELECT entirely and leave
-		// a stale snapshot standing in as the baseline, which every later reset
-		// would restore to. That is a false green by construction.
-		if _, err := db.ExecContext(ctx, fmt.Sprintf(
-			"CREATE TABLE %s AS SELECT * FROM %s", st.snapshot(), st.qualified,
-		)); err != nil {
-			return fmt.Errorf("snapshot baseline rows for %s: %w", st.qualified, err)
-		}
-	}
-
-	// Guard the reset's load-bearing assumption at the ONE moment it is
-	// verifiable — here, on the pristine clone, before any test has touched it.
-	// resetLeasedDatabase restores every ADVANCED sequence (last_value IS NOT
-	// NULL) to setval(start_value, false), which reproduces clone semantics ONLY
-	// if every template sequence is virgin (last_value IS NULL) at clone time —
-	// i.e. start_value IS the nextval a fresh clone hands out. That is true today
-	// (verified: all sequences virgin in the template), but it is an assumption,
-	// not an invariant the schema enforces. If a future migration seeds a
-	// sequence, its clone-fresh nextval would be start_value+N while reset would
-	// slam it back to start_value — a silent wrong-nextval that surfaces only
-	// when some test asserts a specific revision_num or audit_sequence, reading
-	// as a product bug. Fail LOUD here instead, so a human decides birth-capture.
+	// Guard the reset's load-bearing assumption BEFORE writing any baseline
+	// state — at the ONE moment it is verifiable, on the pristine clone, before
+	// any test has touched it. resetLeasedDatabase restores every ADVANCED
+	// sequence (last_value IS NOT NULL) to setval(start_value, false), which
+	// reproduces clone semantics ONLY if every template sequence is virgin
+	// (last_value IS NULL) at clone time — i.e. start_value IS the nextval a
+	// fresh clone hands out. That is true today (verified: all sequences virgin
+	// in the template), but it is an assumption, not an invariant the schema
+	// enforces. If a future migration seeds a sequence, its clone-fresh nextval
+	// would be start_value+N while reset would slam it back to start_value — a
+	// silent wrong-nextval that surfaces only when some test asserts a specific
+	// revision_num or audit_sequence, reading as a product bug. Fail LOUD here so
+	// a human decides birth-capture.
+	//
+	// The probe runs FIRST, before CREATE SCHEMA and the snapshot tables, so a
+	// guard failure leaves NO baseline artifacts behind. leaseBaselineIsComplete
+	// keys off exactly those tables, so a failed guard means the next adopter
+	// sees an incomplete baseline, re-runs this function, and hits the same guard
+	// again — the check is non-bypassable across runs, never laundered by debris
+	// a later run mistakes for a finished baseline. (GPT final-round finding 1.)
 	var nonVirgin []string
 	seqRows, err := db.QueryContext(ctx,
 		`SELECT schemaname||'.'||sequencename
@@ -504,6 +492,27 @@ func snapshotLeaseBaseline(ctx context.Context, baseDSN, dbName string) error {
 	if len(nonVirgin) > 0 {
 		return fmt.Errorf("lease baseline on %s: %d template sequence(s) are NON-VIRGIN at clone time (%v) — resetLeasedDatabase restores advanced sequences to setval(start_value), which would hand tests the wrong nextval for these; capture each sequence's birth nextval or exclude it before this can be trusted", dbName, len(nonVirgin), nonVirgin)
 	}
+
+	if _, err := db.ExecContext(ctx,
+		"CREATE SCHEMA IF NOT EXISTS "+quoteIdent(leaseBaselineSchema)); err != nil {
+		return fmt.Errorf("create %s schema: %w", leaseBaselineSchema, err)
+	}
+
+	for _, st := range baselineSnapshotTables {
+		// Plain CREATE TABLE, NOT "IF NOT EXISTS". This function may only ever
+		// run against a database in pristine template-fresh state, and its
+		// callers guarantee that. If a snapshot table already exists, that
+		// guarantee is broken and the correct outcome is a loud 42P07, not a
+		// silent skip: "IF NOT EXISTS" would skip the SELECT entirely and leave
+		// a stale snapshot standing in as the baseline, which every later reset
+		// would restore to. That is a false green by construction.
+		if _, err := db.ExecContext(ctx, fmt.Sprintf(
+			"CREATE TABLE %s AS SELECT * FROM %s", st.snapshot(), st.qualified,
+		)); err != nil {
+			return fmt.Errorf("snapshot baseline rows for %s: %w", st.qualified, err)
+		}
+	}
+
 	return nil
 }
 
