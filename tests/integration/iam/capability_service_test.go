@@ -16,16 +16,16 @@ import (
 
 const devTenant = tenant.DevTenantID
 
+// openDB returns a reset-safe leased clone from the canonical testdb factory
+// (ADR 0034), NOT the shared dev database. Historically this opened
+// sql.Open("pgx", testdb.DSN) — the raw shared DB, 54 migrations vs the 101 in
+// the factory template — and skipped-as-green on ping failure. That was the
+// cluster-4 framework bypass the 4.6 exit gate caught (§11.28). testdb.Open
+// owns t.Helper, the DELETE-based reset, cleanup, and a fail-loud ping (no
+// skip-as-green hatch). Signature preserved so all call sites are unchanged.
 func openDB(t *testing.T) *sql.DB {
 	t.Helper()
-	db, err := sql.Open("pgx", testdb.DSN(t))
-	if err != nil {
-		t.Fatalf("sql.Open: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	if err := db.PingContext(context.Background()); err != nil {
-		t.Skipf("integration DB unreachable: %v", err)
-	}
+	db, _ := testdb.Open(t)
 	return db
 }
 

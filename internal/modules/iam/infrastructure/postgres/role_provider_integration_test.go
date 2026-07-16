@@ -15,8 +15,6 @@ package postgres_test
 import (
 	"context"
 	"database/sql"
-	"os"
-	"strings"
 	"testing"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -25,22 +23,14 @@ import (
 	"metaldocs/tests/integration/testdb"
 )
 
+// openLiveIAMDB returns a reset-safe leased clone from the canonical testdb
+// factory (ADR 0034), NOT a raw sql.Open against the shared dev database. The
+// prior body read DATABASE_URL directly and skipped-as-green when unset — the
+// cluster-4 framework bypass the 4.6 exit gate caught (§11.28). testdb.Open
+// owns t.Helper, the leased-DB reset, cleanup, and a fail-loud ping.
 func openLiveIAMDB(t *testing.T) *sql.DB {
 	t.Helper()
-	dsn := strings.TrimSpace(os.Getenv("DATABASE_URL"))
-	if dsn == "" {
-		dsn = strings.TrimSpace(os.Getenv("METALDOCS_DATABASE_URL"))
-	}
-	if dsn == "" {
-		t.Skip("no DATABASE_URL or METALDOCS_DATABASE_URL set — skipping live DB probe")
-	}
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatalf("sql.Open(pgx): %v", err)
-	}
-	if err := db.PingContext(context.Background()); err != nil {
-		t.Fatalf("db.Ping: %v", err)
-	}
+	db, _ := testdb.Open(t)
 	return db
 }
 
