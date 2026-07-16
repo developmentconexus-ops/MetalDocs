@@ -63,6 +63,11 @@ type Dependencies struct {
 	// templates_template_version to its own table. When nil, the template-schema
 	// fill-in reader is not attached (matching the prior absent-reader behavior).
 	TemplateVersionPort templatesdomain.TemplateVersionPort
+	// PDFOutboxReader is the render/fanout-owned read-port for PDF-pipeline
+	// liveness (dead-lettered materialize/pdf outbox events). ViewService uses
+	// it to derive pdf_status='failed' honestly (QA-1 F13). When nil, dead
+	// letters are invisible and pdf_status stays 'pending'.
+	PDFOutboxReader application.PDFOutboxStateReader
 }
 
 func New(deps Dependencies) *Module {
@@ -124,7 +129,7 @@ func New(deps Dependencies) *Module {
 
 	var viewHandler *dhttp.ViewHandler
 	if deps.ViewPresign != nil && deps.DB != nil {
-		viewSvc := application.NewViewService(db.NewTxRunner(deps.DB), deps.ViewPresign, nil)
+		viewSvc := application.NewViewService(db.NewTxRunner(deps.DB), deps.ViewPresign, deps.PDFOutboxReader)
 		viewHandler = dhttp.NewViewHandler(viewSvc)
 	}
 

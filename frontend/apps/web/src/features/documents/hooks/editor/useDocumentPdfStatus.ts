@@ -7,6 +7,7 @@ type ViewResponse = { pdf_status: PDFStatus; pdf_url?: string };
 export type DocumentPdfStatus = {
   status: PDFStatus;
   url?: string;
+  stalled: boolean;
   retry: () => void;
 };
 
@@ -15,6 +16,7 @@ const TIMEOUT_MS = 60_000;
 
 export function useDocumentPdfStatus(documentID: string, enabled: boolean): DocumentPdfStatus {
   const [data, setData] = useState<{ status: PDFStatus; url?: string }>({ status: 'pending' });
+  const [stalled, setStalled] = useState(false);
   const [tick, setTick] = useState(0);
   const startedAt = useRef(0);
 
@@ -24,6 +26,7 @@ export function useDocumentPdfStatus(documentID: string, enabled: boolean): Docu
     let timer = 0;
     startedAt.current = Date.now();
     setData({ status: 'pending' });
+    setStalled(false);
 
     const poll = async () => {
       try {
@@ -33,19 +36,17 @@ export function useDocumentPdfStatus(documentID: string, enabled: boolean): Docu
         if (cancelled) return;
         setData({ status: v.pdf_status, url: v.pdf_url });
         if (v.pdf_status === 'ready' || v.pdf_status === 'failed') return;
-        if (Date.now() - startedAt.current > TIMEOUT_MS) {
-          setData({ status: 'failed' });
-          return;
-        }
       } catch {
-        if (Date.now() - startedAt.current > TIMEOUT_MS) {
-          if (!cancelled) setData({ status: 'failed' });
-          return;
-        }
+        // Transient fetch failure: keep the last server-reported status and
+        // retry below (unless the poll ceiling has been reached). The server
+        // is the sole source of a 'failed' status.
       }
-      if (!cancelled) {
-        timer = window.setTimeout(poll, POLL_INTERVAL_MS);
+      if (cancelled) return;
+      if (Date.now() - startedAt.current > TIMEOUT_MS) {
+        setStalled(true);
+        return;
       }
+      timer = window.setTimeout(poll, POLL_INTERVAL_MS);
     };
     void poll();
 
@@ -55,5 +56,5 @@ export function useDocumentPdfStatus(documentID: string, enabled: boolean): Docu
     };
   }, [documentID, enabled, tick]);
 
-  return { ...data, retry: () => setTick((n) => n + 1) };
+  return { ...data, stalled, retry: () => setTick((n) => n + 1) };
 }

@@ -39,6 +39,11 @@ export function PdfCanvas({ documentId }: { documentId: string }) {
   return (
     <div role="status" aria-live="polite" className={styles.state}>
       Gerando o PDF oficial…
+      {pdf.stalled ? (
+        <button type="button" className={styles.retry} onClick={pdf.retry}>
+          Tentar novamente
+        </button>
+      ) : null}
     </div>
   );
 }

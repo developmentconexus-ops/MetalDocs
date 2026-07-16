@@ -102,6 +102,7 @@ func NewPDFJobRunnerWithDB(converter PDFConverter, persister PDFPersister, datab
 }
 
 func (r *PDFJobRunner) Handle(ctx context.Context, event messaging.Event) error {
+	ctx = authz.WithBackgroundBypass(ctx)
 	payload, err := messaging.PDFConvertPayloadFrom(event)
 	if err != nil {
 		return fmt.Errorf("pdf job runner: %w", err)
@@ -161,6 +162,10 @@ func (r *PDFJobRunner) Handle(ctx context.Context, event messaging.Event) error 
 	if err := authz.SeedTxTenant(ctx, tx, payload.TenantID); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("pdf job runner: seed tenant: %w", err)
+	}
+	if err := authz.BypassSystem(ctx, tx); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("pdf job runner: bypass system: %w", err)
 	}
 	if err := inTx.WritePDFInTx(ctx, tx, req); err != nil {
 		_ = tx.Rollback()

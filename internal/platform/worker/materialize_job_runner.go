@@ -61,6 +61,7 @@ func NewMaterializeJobRunner(
 }
 
 func (r *MaterializeJobRunner) Handle(ctx context.Context, event messaging.Event) error {
+	ctx = authz.WithBackgroundBypass(ctx)
 	payload, err := messaging.MaterializeFanoutPayloadFrom(event)
 	if err != nil {
 		return fmt.Errorf("materialize job runner: %w", err)
@@ -85,6 +86,10 @@ func (r *MaterializeJobRunner) Handle(ctx context.Context, event messaging.Event
 	if err := authz.SeedTxTenant(ctx, tx, payload.TenantID); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("materialize job runner: seed tenant: %w", err)
+	}
+	if err := authz.BypassSystem(ctx, tx); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("materialize job runner: bypass system: %w", err)
 	}
 	if err := r.finalDocx.WriteFinalDocxInTx(ctx, tx, payload.TenantID, payload.RevisionID, result.FinalDocxS3Key, result.ContentHash); err != nil {
 		_ = tx.Rollback()
