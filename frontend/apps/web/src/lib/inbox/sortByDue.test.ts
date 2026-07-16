@@ -13,6 +13,7 @@ function makeItem(overrides: Partial<InboxItem> = {}): InboxItem {
     area_code: 'QUA',
     submitted_by: 'maria',
     submitted_at: '2026-04-14T10:00:00.000Z',
+    stage_kind: 'review',
     stage_label: 'Revisão',
     quorum_progress: '0/1',
     due_at: null,
