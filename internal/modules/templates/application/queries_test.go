@@ -181,6 +181,111 @@ func TestListAudit_Happy(t *testing.T) {
 	}
 }
 
+func TestGetDocxURL_EmptyStorageKey_ErrUploadMissing(t *testing.T) {
+	repo := newFakeRepo()
+	tpl := &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	ver := &domain.TemplateVersion{ID: "ver-1", TemplateID: tpl.ID, VersionNumber: 1, DocxStorageKey: ""}
+	repo.templates[tpl.ID] = tpl
+	repo.versions[ver.ID] = ver
+
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+
+	url, err := svc.GetDocxURL(context.Background(), application.GetDocxURLCmd{
+		TenantID: "tenant-a", TemplateID: tpl.ID, VersionNumber: 1,
+	})
+	if !errors.Is(err, domain.ErrUploadMissing) {
+		t.Fatalf("expected ErrUploadMissing, got %v", err)
+	}
+	if url != "" {
+		t.Fatalf("expected empty URL, got %q", url)
+	}
+}
+
+func TestGetDocxURL_ObjectMissing_ErrUploadMissing(t *testing.T) {
+	repo := newFakeRepo()
+	tpl := &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	ver := &domain.TemplateVersion{ID: "ver-1", TemplateID: tpl.ID, VersionNumber: 1, DocxStorageKey: "tenant-a/tpl-1/v1.docx"}
+	repo.templates[tpl.ID] = tpl
+	repo.versions[ver.ID] = ver
+
+	notExists := false
+	presign := &fakePresigner{existsResult: &notExists}
+	svc := application.New(repo, presign, fakeClock{}, &fakeUUID{})
+
+	url, err := svc.GetDocxURL(context.Background(), application.GetDocxURLCmd{
+		TenantID: "tenant-a", TemplateID: tpl.ID, VersionNumber: 1,
+	})
+	if !errors.Is(err, domain.ErrUploadMissing) {
+		t.Fatalf("expected ErrUploadMissing, got %v", err)
+	}
+	if url != "" {
+		t.Fatalf("expected empty URL, got %q", url)
+	}
+}
+
+func TestGetDocxURL_ObjectPresent_ReturnsURL(t *testing.T) {
+	repo := newFakeRepo()
+	tpl := &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	key := "tenant-a/tpl-1/v1.docx"
+	ver := &domain.TemplateVersion{ID: "ver-1", TemplateID: tpl.ID, VersionNumber: 1, DocxStorageKey: key}
+	repo.templates[tpl.ID] = tpl
+	repo.versions[ver.ID] = ver
+
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+
+	url, err := svc.GetDocxURL(context.Background(), application.GetDocxURLCmd{
+		TenantID: "tenant-a", TemplateID: tpl.ID, VersionNumber: 1,
+	})
+	if err != nil {
+		t.Fatalf("GetDocxURL returned error: %v", err)
+	}
+	if want := "https://example/get/" + key; url != want {
+		t.Fatalf("expected URL %q, got %q", want, url)
+	}
+}
+
+func TestGetDocxURL_ExistsError_FailsClosed(t *testing.T) {
+	repo := newFakeRepo()
+	tpl := &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	ver := &domain.TemplateVersion{ID: "ver-1", TemplateID: tpl.ID, VersionNumber: 1, DocxStorageKey: "tenant-a/tpl-1/v1.docx"}
+	repo.templates[tpl.ID] = tpl
+	repo.versions[ver.ID] = ver
+
+	storeErr := errors.New("store unreachable")
+	presign := &fakePresigner{existsErr: storeErr}
+	svc := application.New(repo, presign, fakeClock{}, &fakeUUID{})
+
+	url, err := svc.GetDocxURL(context.Background(), application.GetDocxURLCmd{
+		TenantID: "tenant-a", TemplateID: tpl.ID, VersionNumber: 1,
+	})
+	if !errors.Is(err, storeErr) {
+		t.Fatalf("expected store error to propagate, got %v", err)
+	}
+	if url != "" {
+		t.Fatalf("expected empty URL, got %q", url)
+	}
+	if len(presign.getCalls) != 0 {
+		t.Fatalf("expected PresignGet not to be called, got calls %v", presign.getCalls)
+	}
+}
+
+func TestGetDocxURL_CrossTenant(t *testing.T) {
+	repo := newFakeRepo()
+	repo.ignoreTenantOnGetTemplate = true
+	tpl := &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	repo.templates[tpl.ID] = tpl
+	repo.versions["ver-1"] = &domain.TemplateVersion{ID: "ver-1", TemplateID: tpl.ID, VersionNumber: 1, DocxStorageKey: "tenant-a/tpl-1/v1.docx"}
+
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+
+	_, err := svc.GetDocxURL(context.Background(), application.GetDocxURLCmd{
+		TenantID: "tenant-b", TemplateID: tpl.ID, VersionNumber: 1,
+	})
+	if !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+}
+
 func TestListAudit_CrossTenant(t *testing.T) {
 	repo := newFakeRepo()
 	repo.ignoreTenantOnGetTemplate = true

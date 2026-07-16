@@ -293,8 +293,16 @@ func (r *fakeRepo) ListAudit(_ context.Context, tenantID, templateID string, lim
 type fakePresigner struct {
 	PutKeys    []string
 	CopyPairs  [][2]string
+	getCalls   []string
 	confirmErr error
 	copyErr    error
+	// existsResult is a pointer so the zero-value fakePresigner{} (used
+	// pervasively across this package's other tests) defaults Exists to
+	// true — those tests build versions with a non-empty DocxStorageKey and
+	// expect a presigned URL, matching pre-Exists-gate behavior. Tests that
+	// exercise the "object not yet uploaded" path set it explicitly.
+	existsResult *bool
+	existsErr    error
 }
 
 func (f *fakePresigner) PresignPut(_ context.Context, _ string, key string, _ time.Duration) (string, error) {
@@ -303,7 +311,18 @@ func (f *fakePresigner) PresignPut(_ context.Context, _ string, key string, _ ti
 }
 
 func (f *fakePresigner) PresignGet(_ context.Context, key string, _ time.Duration) (string, error) {
+	f.getCalls = append(f.getCalls, key)
 	return "https://example/get/" + key, nil
+}
+
+func (f *fakePresigner) Exists(_ context.Context, _ string) (bool, error) {
+	if f.existsErr != nil {
+		return false, f.existsErr
+	}
+	if f.existsResult != nil {
+		return *f.existsResult, nil
+	}
+	return true, nil
 }
 
 func (f *fakePresigner) Confirm(_ context.Context, _, key, expected string) (objectstore.VerifiedPointer, error) {
