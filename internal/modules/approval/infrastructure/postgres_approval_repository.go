@@ -806,19 +806,20 @@ func scanRouteListRows(rows *sql.Rows) ([]Route, error) {
 	var routeOrder []string
 	for rows.Next() {
 		var (
-			routeID, routeName, routeTenantID, profileCode string
-			subjectKind, subjectKey                        string
-			active                                         bool
-			version                                        int
-			createdAt, updatedAt                           time.Time
-			stage                                          RouteStage
-			stageID                                        string
-			stageName, stageCapability                     sql.NullString
-			stageQuorum, stageDrift                        sql.NullString
-			stageQuorumM                                   sql.NullInt64
-			stageKind                                      sql.NullString
-			stageDueInDays                                 sql.NullInt64
-			totalCount                                     int64
+			routeID, routeName, routeTenantID string
+			profileCode                       sql.NullString
+			subjectKind, subjectKey           string
+			active                            bool
+			version                           int
+			createdAt, updatedAt              time.Time
+			stage                             RouteStage
+			stageID                           string
+			stageName, stageCapability        sql.NullString
+			stageQuorum, stageDrift           sql.NullString
+			stageQuorumM                      sql.NullInt64
+			stageKind                         sql.NullString
+			stageDueInDays                    sql.NullInt64
+			totalCount                        int64
 		)
 		if err := rows.Scan(
 			&routeID, &routeName, &routeTenantID, &profileCode, &subjectKind, &subjectKey, &active, &version, &createdAt, &updatedAt,
@@ -836,7 +837,7 @@ func scanRouteListRows(rows *sql.Rows) ([]Route, error) {
 				ID:          routeID,
 				Name:        routeName,
 				TenantID:    routeTenantID,
-				ProfileCode: profileCode,
+				ProfileCode: profileCode.String,
 				SubjectKind: subjectKind,
 				SubjectKey:  subjectKey,
 				Active:      active,

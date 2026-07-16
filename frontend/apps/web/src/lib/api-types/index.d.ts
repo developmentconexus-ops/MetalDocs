@@ -3794,10 +3794,11 @@ export interface components {
             stages: components["schemas"]["ApprovalRoutePreviewStage"][];
         };
         CreateRouteRequest: {
-            profile_code: string;
+            /** @description Required when `subject_kind` is `document` or absent; must be omitted when `subject_kind` is `template` (a template route has no profile — DB truth: `approval_routes_template_subject_projection_check`, ADR 0082). */
+            profile_code?: string;
             name: string;
             /**
-             * @description M3 kernel extraction (ADR 0082, P2.S3). Optional; omitted defaults to `document`, preserving the legacy (document, profile_code) subject unchanged. A non-document kind is accepted and persisted faithfully but carries no template-specific governance in this slice (Phase 3).
+             * @description M3 kernel extraction (ADR 0082, P2.S3). Optional; omitted defaults to `document`, preserving the legacy (document, profile_code) subject unchanged. Governs whether `profile_code` is required (`document`/absent) or must be omitted (`template`).
              * @enum {string}
              */
             subject_kind?: "document" | "template";
@@ -5647,6 +5648,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             500: components["responses"]["InternalServerError"];
         };
     };

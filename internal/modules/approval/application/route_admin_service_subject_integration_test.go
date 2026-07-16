@@ -354,3 +354,147 @@ func TestRouteAdminCreate_DocumentSubject_ProfileCodePopulated_RealDB(t *testing
 		t.Errorf("profile_code = %+v, want valid %q", profileCode, tax.ProfileCode)
 	}
 }
+
+// TestRouteAdminList_TemplateAndDocumentRoutes_RealDB is the S5 (QR-A dual-gate
+// finding 1) regression closure: List (RouteAdminService.List →
+// infrastructure.scanRouteListRows) must not 500 when the tenant has a NULL
+// profile_code template route mixed in with an ordinary document route. Before
+// the fix, scanRouteListRows scanned r.profile_code into a plain string var —
+// any NULL row aborted rows.Scan for the ENTIRE result set, so one template
+// route broke the whole route-admin listing (CRITICAL finding 1).
+func TestRouteAdminList_TemplateAndDocumentRoutes_RealDB(t *testing.T) {
+	dbc, _ := testdb.Open(t)
+
+	tnt := testdb.NewTenant(t, dbc)
+	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+
+	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
+	svc := &RouteAdminService{repo: repo, emitter: NewSQLEmitter(), clock: RealClock{}}
+	runner := db.NewTxRunner(dbc)
+
+	docOut, err := svc.Create(routeAdminSubjectCtx(tnt.ID, actor.ID), runner, CreateRouteInput{
+		TenantID:    tnt.ID,
+		ProfileCode: tax.ProfileCode,
+		Name:        "List Mix Document Route",
+		ActorUserID: actor.ID,
+		Stages:      validRouteStages(),
+	})
+	if err != nil {
+		t.Fatalf("Create document route: unexpected error: %v", err)
+	}
+
+	tmplOut, err := svc.Create(routeAdminSubjectCtx(tnt.ID, actor.ID), runner, CreateRouteInput{
+		TenantID:    tnt.ID,
+		Name:        "List Mix Template Route",
+		ActorUserID: actor.ID,
+		SubjectKind: "template",
+		SubjectKey:  "tmpl-list-mix-1",
+		Stages:      validRouteStages(),
+	})
+	if err != nil {
+		t.Fatalf("Create template route: unexpected error: %v", err)
+	}
+
+	listOut, err := svc.List(routeAdminSubjectCtx(tnt.ID, actor.ID), runner, tnt.ID, actor.ID)
+	if err != nil {
+		t.Fatalf("List: unexpected error (this is the NULL-scan regression if non-nil): %v", err)
+	}
+	if len(listOut.Routes) != 2 {
+		t.Fatalf("routes len = %d, want 2", len(listOut.Routes))
+	}
+
+	byID := make(map[string]approvalrepo.Route, len(listOut.Routes))
+	for _, r := range listOut.Routes {
+		byID[r.ID] = r
+	}
+
+	docRoute, ok := byID[docOut.RouteID]
+	if !ok {
+		t.Fatalf("document route %q missing from List output", docOut.RouteID)
+	}
+	if docRoute.ProfileCode != tax.ProfileCode {
+		t.Errorf("document route ProfileCode = %q, want %q", docRoute.ProfileCode, tax.ProfileCode)
+	}
+	if docRoute.SubjectKind != "document" {
+		t.Errorf("document route SubjectKind = %q, want document", docRoute.SubjectKind)
+	}
+
+	tmplRoute, ok := byID[tmplOut.RouteID]
+	if !ok {
+		t.Fatalf("template route %q missing from List output", tmplOut.RouteID)
+	}
+	if tmplRoute.ProfileCode != "" {
+		t.Errorf("template route ProfileCode = %q, want empty (NULL collapsed)", tmplRoute.ProfileCode)
+	}
+	if tmplRoute.SubjectKind != "template" {
+		t.Errorf("template route SubjectKind = %q, want template", tmplRoute.SubjectKind)
+	}
+}
+
+// TestRouteAdminUpdate_TemplateRoute_RealDB is the S5 (QR-A dual-gate finding
+// 2) regression closure: updating an ACTIVE template route (profile_code is
+// SQL NULL) must succeed. Before the fix, resolveUpdatePolicy's
+// loadActiveRouteProfileCode scanned profile_code into a plain string var —
+// NULL made the off-tx policy-resolution read fail with a sql.Scan error,
+// which resolveUpdatePolicy propagated, aborting updateTx before the write
+// tx ever opened (CRITICAL finding 2). This requires a non-nil policyReader
+// (stubPolicyReader, package-local from profile_policy_wiring_test.go) —
+// with a nil policyReader, resolveUpdatePolicy short-circuits before ever
+// reaching loadActiveRouteProfileCode and would not exercise the bug.
+func TestRouteAdminUpdate_TemplateRoute_RealDB(t *testing.T) {
+	dbc, _ := testdb.Open(t)
+
+	tnt := testdb.NewTenant(t, dbc)
+	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
+
+	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
+	svc := (&RouteAdminService{repo: repo, emitter: NewSQLEmitter(), clock: RealClock{}}).
+		WithPolicyReader(stubPolicyReader{})
+	runner := db.NewTxRunner(dbc)
+
+	createOut, err := svc.Create(routeAdminSubjectCtx(tnt.ID, actor.ID), runner, CreateRouteInput{
+		TenantID:    tnt.ID,
+		Name:        "Update Template Route",
+		ActorUserID: actor.ID,
+		SubjectKind: "template",
+		SubjectKey:  "tmpl-update-1",
+		Stages:      validRouteStages(),
+	})
+	if err != nil {
+		t.Fatalf("Create: unexpected error: %v", err)
+	}
+
+	updateOut, err := svc.Update(routeAdminSubjectCtx(tnt.ID, actor.ID), runner, UpdateRouteInput{
+		TenantID:        tnt.ID,
+		RouteID:         createOut.RouteID,
+		Name:            "Update Template Route v2",
+		ActorUserID:     actor.ID,
+		ExpectedVersion: 1,
+		Stages:          validRouteStages(),
+	})
+	if err != nil {
+		t.Fatalf("Update: unexpected error (this is the NULL-scan regression if non-nil): %v", err)
+	}
+	if updateOut.RouteID != createOut.RouteID {
+		t.Errorf("RouteID = %q, want %q", updateOut.RouteID, createOut.RouteID)
+	}
+	if updateOut.NewVersion != 2 {
+		t.Errorf("NewVersion = %d, want 2", updateOut.NewVersion)
+	}
+
+	var name string
+	var profileCode sql.NullString
+	if err := dbc.QueryRowContext(context.Background(),
+		`SELECT name, profile_code FROM public.approval_routes WHERE id = $1::uuid AND active = TRUE`,
+		createOut.RouteID,
+	).Scan(&name, &profileCode); err != nil {
+		t.Fatalf("query updated route: %v", err)
+	}
+	if name != "Update Template Route v2" {
+		t.Errorf("name = %q, want %q", name, "Update Template Route v2")
+	}
+	if profileCode.Valid {
+		t.Errorf("profile_code = %q, want SQL NULL to stay preserved across update", profileCode.String)
+	}
+}

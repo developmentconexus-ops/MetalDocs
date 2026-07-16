@@ -14,8 +14,8 @@ import (
 	"metaldocs/internal/modules/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
-	"metaldocs/internal/platform/db"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
+	"metaldocs/internal/platform/db"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/lib/pq"
@@ -416,6 +416,14 @@ func (s *RouteAdminService) resolveUpdatePolicy(ctx context.Context, runner db.T
 	if !found {
 		return "", nil
 	}
+	// A template route has no profile (profile_code is SQL NULL, surfaced here
+	// as "") — there is no per-profile signature policy to resolve, mirroring
+	// createTx's skip for SubjectKindTemplate (S1, F18 dual-gate finding 2).
+	// Looking up an empty profile_code would either miss (empty policy) or,
+	// worse, collide with a real tenant profile keyed by "".
+	if profileCode == "" {
+		return "", nil
+	}
 	return s.policyReader.RoutePolicy(ctx, tenantID, profileCode)
 }
 
@@ -786,9 +794,12 @@ type lockedRouteState struct {
 // with a plain non-recording SELECT (safe in any tx; no authz recording, so it
 // never trips H-PRE-1). Returns found=false when the route is inactive or absent
 // so the G1 friendly check can be skipped in lockstep with the DB trigger's
-// active-only scope.
+// active-only scope. profile_code is SQL NULL for a template route (DB truth:
+// migration 0297 approval_routes_template_subject_projection_check) — that
+// case still reports found=true with code="" so the caller can distinguish
+// "no policy to resolve" (template) from "route not eligible" (absent/inactive).
 func loadActiveRouteProfileCode(ctx context.Context, tx *sql.Tx, tenantID, routeID string) (string, bool, error) {
-	var code string
+	var code sql.NullString
 	err := tx.QueryRowContext(ctx, `
 		SELECT profile_code
 		  FROM approval_routes
@@ -803,7 +814,7 @@ func loadActiveRouteProfileCode(ctx context.Context, tx *sql.Tx, tenantID, route
 	if err != nil {
 		return "", false, fmt.Errorf("route_admin: load route profile_code: %w", err)
 	}
-	return code, true, nil
+	return code.String, true, nil
 }
 
 func lockRouteForUpdate(ctx context.Context, tx *sql.Tx, tenantID, routeID string) (lockedRouteState, error) {
