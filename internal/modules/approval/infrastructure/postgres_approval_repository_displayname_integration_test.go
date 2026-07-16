@@ -19,15 +19,18 @@ import (
 // TestLoadActorDisplayName_ReadsOffTxAgainstLiveSchema is the F1.3 (AC5) runtime
 // proof. It connects DIRECTLY to the live, already-migrated dev database (not a
 // freshly-built throwaway), seeds one metaldocs.iam_users row, and exercises the
-// real off-tx signoff display-name read. Proves, against the live schema + the
-// live RLS NULL-permissive policy (migration 0237) with no GUC set and the
+// real off-tx signoff display-name read. Proves, against the live schema and the
 // explicit tenant_id = $N::uuid predicate, that the contained read on the pool
 // (r.db) — outside any lock-holding signoff transaction (H-PRE-1) — returns the
 // actor's real display_name and is empty-on-missing (AC3).
+//
+// Caveat: the dev DB role is superuser+BYPASSRLS, so RLS (migration 0237) is
+// inert in this environment — this test does NOT prove RLS enforcement, only
+// the off-tx read path against live schema + real rows.
 func TestLoadActorDisplayName_ReadsOffTxAgainstLiveSchema(t *testing.T) {
 	dsn := strings.TrimSpace(os.Getenv("METALDOCS_DATABASE_URL"))
 	if dsn == "" {
-		t.Skip("METALDOCS_DATABASE_URL not set")
+		t.Skip("SKIP (by design): METALDOCS_DATABASE_URL not set — deliberate live-dev-DB probe (F1.3/AC5 off-tx read), intentionally not part of the canonical testdb suite; set METALDOCS_DATABASE_URL to run")
 	}
 
 	ctx := context.Background()

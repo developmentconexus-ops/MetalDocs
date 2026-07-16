@@ -8,10 +8,9 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/lib/pq"
-
 	authdomain "metaldocs/internal/modules/auth/domain"
 	authpostgres "metaldocs/internal/modules/auth/infrastructure/postgres"
+	"metaldocs/tests/integration/testdb"
 )
 
 // TestListActiveSessions_NoIamUsersJoin proves the M4/F4.4 boundary fix: the
@@ -20,13 +19,13 @@ import (
 // JOIN would have dropped it), and tenant scoping is preserved via
 // auth_sessions.tenant_id alone.
 func TestListActiveSessions_NoIamUsersJoin(t *testing.T) {
-	db := openTestDB(t)
+	db, _ := testdb.Open(t)
 	ctx := context.Background()
 	repo := authpostgres.NewRepository(db, nil)
 
-	// Seeded tenants (FK fk_auth_sessions_tenant requires real tenant rows).
-	tenantA := "ffffffff-ffff-ffff-ffff-ffffffffffff"
-	tenantB := "e1f4f8d7-73bd-44bd-b8f5-b01f9cca53e1"
+	// Factory tenants (FK fk_auth_sessions_tenant requires real tenant rows).
+	tenantA := testdb.NewTenant(t, db).ID
+	tenantB := testdb.NewTenant(t, db).ID
 	stamp := time.Now().UnixNano()
 	userNoIam := fmt.Sprintf("f44-no-iam-user-%d", stamp)
 	userOther := fmt.Sprintf("f44-other-user-%d", stamp)
@@ -46,10 +45,6 @@ VALUES ($1, $1, NULL, 'F44 No IAM', TRUE, 'hash', 'bcrypt', FALSE, 0, NULL, NOW(
 			t.Fatalf("insert auth identity %s: %v", uid, err)
 		}
 	}
-	t.Cleanup(func() {
-		_, _ = db.ExecContext(ctx, `DELETE FROM metaldocs.auth_sessions WHERE session_id IN ($1, $2)`, sessionA, sessionB)
-		_, _ = db.ExecContext(ctx, `DELETE FROM metaldocs.auth_identities WHERE user_id IN ($1, $2)`, userNoIam, userOther)
-	})
 
 	for _, s := range []struct {
 		sessionID string
