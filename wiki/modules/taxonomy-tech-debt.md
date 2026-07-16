@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/taxonomy.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/taxonomy-refactor.md`.
 
-**Last verified:** 2026-07-02 (CON-08 closure — T-009 evidence refreshed: closed the remaining spec/wire-truth drift, not "no spec at all" as CON-08 assumed; see T-009 row). Prior: 2026-06-12 (Wave 2.12 sync — T-010 fully closed: DBGovernanceLogger deleted, AuditGovernanceAdapter is sole GovernanceLogger; new CI guards nosqltxindomain + nodualmode; prior Wave 2 sync)
+**Last verified:** 2026-07-16 (ROADMAP unit 4.5, T-015/R-015 half B — `document_profiles` half of T-015 CLOSED by migration `0308`; see T-015 Resolution update). Prior: 2026-07-02 (CON-08 closure — T-009 evidence refreshed: closed the remaining spec/wire-truth drift, not "no spec at all" as CON-08 assumed; see T-009 row). Prior: 2026-06-12 (Wave 2.12 sync — T-010 fully closed: DBGovernanceLogger deleted, AuditGovernanceAdapter is sole GovernanceLogger; new CI guards nosqltxindomain + nodualmode; prior Wave 2 sync)
 
 ## Severity scale
 
@@ -146,9 +146,11 @@ Pick highest trigger. Justify the call in `Observation`.
 - **Evidence:** `_artifacts/04-persistence.md` §4 ("Note: profile + area carry PK on `code` alone … the broader PK is redundant").
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-015`
 - **Linked ADR:** missing-ADR
-- **Resolution status (2026-07-02, DB-08):** SPLIT. `document_process_areas` closed by `db/migrations/0264_process_areas_composite_pk.sql` — PK promoted to `(tenant_id, code)`, `ux_process_areas_tenant_code` dropped as redundant. All 5 inbound FKs were already composite `(tenant_id, area_code|parent_code)`, so no re-pointing was needed. `document_profiles` is **deferred** — see design note below; DO NOT repeat the "M-effort, do both together" framing from R-015, the two tables are architecturally different.
+- **Resolution status (2026-07-02, DB-08):** SPLIT. `document_process_areas` closed by `db/migrations/0264_process_areas_composite_pk.sql` — PK promoted to `(tenant_id, code)`, `ux_process_areas_tenant_code` dropped as redundant. All 5 inbound FKs were already composite `(tenant_id, area_code|parent_code)`, so no re-pointing was needed. `document_profiles` was **deferred** at the time — see design note below (retained for history); it is **CLOSED as of 2026-07-16** — see Resolution update below.
 
-#### Design note: why `document_profiles` PK promotion is deferred (not a quick follow-up)
+- **Resolution update (2026-07-16, ROADMAP unit 4.5, T-015/R-015 half B):** `document_profiles` half CLOSED by `db/migrations/0308_document_profiles_tenant_pk.sql`. The blocker described in the design note below (4 inbound single-column FKs from tenant-less global-registry tables) was removed by dropping all 4 of those tables in the same migration, before the PK swap — `document_profile_governance`, `document_profile_schema_versions`, and `document_sequences` had zero Go references repo-wide (archive-era 0027/0040s dead tables); `document_profile_template_defaults` had zero readers and its sole writer (`ensurePODefaultTemplateBinding` in `apps/api/cmd/metaldocs-e2e-seed/main.go`) was deleted outright by a sibling unit-4.5 slice, superseded by `document_profiles.default_template_version_id`. `template_drafts` (the FK that made 0264's technique inapplicable) had already been dropped by archived migration `0260`. With all 4 dead-table FKs gone, `document_profiles_pkey` (on `code` alone) had zero inbound FKs, so the exact 0264 technique applied: `PRIMARY KEY USING INDEX` promoted `ux_document_profiles_tenant_code` into the PK, keeping the index OID so the 3 remaining composite FKs bound to it (`approval_routes_document_profile_fk`, `cd_sequence_counters_tenant_id_profile_code_fkey`, `controlled_documents_tenant_id_profile_code_fkey`) stayed valid untouched. See `wiki/database/tables/document_profiles.md` and the 4 dropped tables' pages for the per-table record.
+
+#### Design note: why `document_profiles` PK promotion was deferred (historical — resolved 2026-07-16, see Resolution update above)
 
 Unlike `document_process_areas`, `document_profiles(code)` has **4 inbound single-column FKs** from tables that have **no `tenant_id` column at all** (verified against `db/baseline/0001_current_schema.sql`, no RLS/`ENABLE ROW LEVEL SECURITY` on any of the four):
 - `document_profile_governance` (PK `profile_code`) — `document_profile_governance_profile_code_fkey`

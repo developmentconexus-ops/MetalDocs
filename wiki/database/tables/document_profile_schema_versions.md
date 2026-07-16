@@ -3,9 +3,10 @@
 > **Source:** `db/baseline/0001_current_schema.sql`
 > **Schema:** `metaldocs`
 > **Owner:** taxonomy
+> **Last verified:** 2026-07-16 (migration 0308 — table dropped)
 
 ## Purpose
-Current curated-baseline table owned by `taxonomy`. See the owning module wiki and runtime repositories for business behavior.
+**DROPPED** by forward migration `db/migrations/0308_document_profiles_tenant_pk.sql` (ROADMAP unit 4.5, T-015/R-015 half B). This table still appears in the curated baseline snapshot (`db/baseline/0001_current_schema.sql`) below, but that snapshot predates migration 0308; a database migrated forward past 0308 no longer has this table. Zero Go references repo-wide (`grep "document_profile_schema_versions"` across `internal/` `apps/` finds no hits outside the migration and this baseline DDL dump) — an archive-era 0027/0040s table with no reader, no writer, anywhere. See `wiki/modules/taxonomy-tech-debt.md` T-015 and `wiki/database/tables/document_profiles.md` for the PK-promotion context this drop unblocked.
 
 ## Columns
 
@@ -42,4 +43,4 @@ Check `db/reference-data/0001_product_reference_data.sql` and `db/dev-seeds/0001
 
 ## Notes and Debt
 
-Curated baseline table in the `metaldocs` schema.
+**Dropped 2026-07-16** by `db/migrations/0308_document_profiles_tenant_pk.sql` (ROADMAP unit 4.5), in the same transaction as 3 sibling dead tables, immediately before `document_profiles`' PK was promoted from `code` alone to composite `(tenant_id, code)`. This table's sole inbound FK (`document_profile_schema_versions_profile_code_fkey` → `document_profiles(code)`) was one of the things keeping the old single-column PK alive; dropping it (and its 3 siblings) let the PK swap proceed with no re-pointing needed. The table remains in the curated baseline snapshot (`db/baseline/0001_current_schema.sql`) as a pre-0308 artifact — do not resurrect it without reversing that decision.
