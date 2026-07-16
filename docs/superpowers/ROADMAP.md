@@ -7,7 +7,7 @@
 
 ## 0. Standing constraints (apply to every unit)
 
-- **Execution harness is binding:** `docs/superpowers/HARNESS.md` — model matrix, unit loop P0–P7, verification ladder L0–L4, fresh-session browser-QA protocol.
+- **Execution harness is binding:** HARNESS-CORE.md (mnfs-harness plugin 0.2.0) + `docs/HARNESS-PROFILE.md` (repo bindings — binding pair since 2026-07-16) — model matrix, execution loop P1–P8, verification ladder L0–L4, QA-persona protocol. `docs/superpowers/HARNESS.md` is a superseded pointer (GM-fork method addendum still binding).
 - Gates: `developing-new-work` before any new feature/module design; milestone-validator at milestone end; operator HS-1 before status flips; evidence.md before closure.
 - Contract-first (`api/openapi` + oapi-codegen), capabilities-not-roles (ADR 0022), testdb factory, outbox, DB-enforces-invariants, H-PRE-1.
 - Commit after verified work; NEVER push without operator permission. Many sealed programs are local-only — push consolidation is an operator decision (see §5).
@@ -19,10 +19,10 @@
 
 | # | Unit | What's left | Blocker type | Context files (read ONLY these) | Budget |
 |---|------|-------------|--------------|--------------------------------|--------|
-| 1.1 | lifecycle-ux-coherence **M2 HS-1** | Nothing to implement. Operator reviews validator PASS and approves; then flip statuses, scaffold M3. | **Operator action** | `docs/superpowers/milestones/lifecycle-ux-coherence/milestone-2-fe-surface-ownership/qa/milestone-qa.md` | ≤20k |
+| 1.1 | lifecycle-ux-coherence **M2 HS-1** ✅ APPROVED 2026-07-13 (91195a76; §5 item 1) | Done — operator approved validator PASS. | ~~Operator action~~ | `docs/superpowers/milestones/lifecycle-ux-coherence/milestone-2-fe-surface-ownership/qa/milestone-qa.md` | ≤20k |
 | 1.2 | approval-remediation **M2d F2d.8** | UI-rendered live QA walkthrough (browser preview session): review stage shows NO signature panel; full draft→submit→verdict→signoff→publish through UI, no 412. Closes M2c's F4 deviation. Then milestone-validator + HS-1. | Needs browser-preview session | `.../milestone-2d-workflow-coherence-fe/milestone.md`, `.../f8-close-live-qa/qa/live-qa-log.md`, spec §4 `docs/superpowers/specs/2026-07-08-approval-workflow-coherence-design.md` | ≤120k |
 | 1.3 | frontend-screen-completion **M5 F5.2** | **CLOSED 2026-07-10 (verify-only).** Restyle was already delivered by `2a371d60 (FE-14, 2026-07-02)` — page is now `pages/TaxonomyAdminPage.tsx` + tokenized `.module.css`, **0 inline `style=`** (row premise was stale, predated FE-14). Verified: grep=0, tsc EXIT=0, vitest 23/23, rendered UI GREEN, both reviewers APPROVE. Evidence: `.../f5.2-taxonomy-restyle/evidence.md`. **NEXT:** milestone-validator on M5 → HS-1 → mission terminal acceptance (mission-validator, per-screen re-audit fan-out per mission.md §8). | None | `.../frontend-screen-completion/milestone-5-signoff-taxonomy/milestone.md`, `.../f5.2-taxonomy-restyle/evidence.md`, mission.md §7–§8 | ≤100k |
-| 1.4 | **GMR final sign-off** | Terminal acceptance PASSED (run-2 10/10). Operator final sign-off only. | **Operator action** | memory `gmr-program-terminal-acceptance-passed` | — |
+| 1.4 | **GMR final sign-off** ✅ SEALED 2026-07-13 (91195a76; §5 item 2) | Done — terminal acceptance PASSED (run-2 10/10), operator sealed. | ~~Operator action~~ | memory `gmr-program-terminal-acceptance-passed` | — |
 
 ## 2. NEXT — review/approval workflow model (ratified 2026-07-10, gate passed Yellow)
 
