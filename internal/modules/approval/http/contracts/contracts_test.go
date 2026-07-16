@@ -238,6 +238,69 @@ func TestCreateRouteRequestValidate(t *testing.T) {
 	}
 }
 
+// TestCreateRouteRequestValidate_ProfileCodeSubjectKindRule pins the S1 (F18)
+// contract fix: profile_code presence is conditional on subject_kind, mirroring
+// DB truth (migration 0297 approval_routes_template_subject_projection_check,
+// ADR 0082). A template route has no profile — carrying a non-empty
+// profile_code must fail validation (not be silently accepted and later
+// dropped); a document (or absent-kind) route still requires profile_code.
+func TestCreateRouteRequestValidate_ProfileCodeSubjectKindRule(t *testing.T) {
+	stages := func() []StageRequest {
+		return []StageRequest{
+			{
+				Order:              1,
+				Name:               "Review",
+				RequiredCapability: "document.signoff",
+				Quorum:             "any_1_of",
+				DriftPolicy:        "reduce_quorum",
+				Selectors:          []ActorSelector{{Kind: SelectorKindRoleInFixedArea, Role: "approver", AreaCode: "ops"}},
+			},
+		}
+	}
+
+	// (b) template + non-empty profile_code must fail.
+	templateWithProfileCode := CreateRouteRequest{
+		ProfileCode: "ops",
+		Name:        "Template Route",
+		SubjectKind: "template",
+		SubjectKey:  "tmpl-1",
+		Stages:      stages(),
+	}
+	if err := templateWithProfileCode.Validate(); err == nil {
+		t.Fatalf("expected error: profile_code must be absent for template routes")
+	}
+
+	// (b-corollary) template + empty profile_code must succeed.
+	templateNoProfileCode := CreateRouteRequest{
+		Name:        "Template Route",
+		SubjectKind: "template",
+		SubjectKey:  "tmpl-1",
+		Stages:      stages(),
+	}
+	if err := templateNoProfileCode.Validate(); err != nil {
+		t.Fatalf("expected template route with no profile_code to be valid, got: %v", err)
+	}
+
+	// (c) document (absent subject_kind) + empty profile_code must fail.
+	absentKindNoProfileCode := CreateRouteRequest{
+		Name:   "Doc Route",
+		Stages: stages(),
+	}
+	if err := absentKindNoProfileCode.Validate(); err == nil {
+		t.Fatalf("expected error: profile_code required when subject_kind is absent")
+	}
+
+	// (c) document (explicit subject_kind) + empty profile_code must fail.
+	documentKindNoProfileCode := CreateRouteRequest{
+		Name:        "Doc Route",
+		SubjectKind: "document",
+		Stages:      stages(),
+	}
+	if err := documentKindNoProfileCode.Validate(); err == nil {
+		t.Fatalf("expected error: profile_code required when subject_kind is document")
+	}
+}
+
 // TestStageSelectorRoleBoundToRegistry locks the ADR 0022 binding: a stage
 // selector's role (role_in_fixed_area, role_in_document_area, submit_choice)
 // must be a canonical AREA role. A decommissioned phantom ("reviewer") and a

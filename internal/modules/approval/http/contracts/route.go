@@ -136,23 +136,35 @@ type CreateRouteRequest struct {
 	IdempotencyKey string
 }
 
-// Validate enforces ProfileCode and Name are non-empty, ProfileCode matches the
-// route-code pattern, SubjectKind (if supplied) is a known enum value, and
-// Stages passes validateStages.
+// Validate enforces Name is non-empty, SubjectKind (if supplied) is a known
+// enum value, ProfileCode's presence rule follows SubjectKind, and Stages
+// passes validateStages.
+//
+// ProfileCode presence is conditional on the effective subject (DB truth:
+// migration 0297 `approval_routes_template_subject_projection_check`,
+// ADR 0082): a document route (SubjectKind "" or "document") REQUIRES a
+// non-empty ProfileCode matching the route-code pattern; a template route
+// (SubjectKind "template") MUST NOT carry a ProfileCode at all — a template
+// route has no profile, so a non-empty value here is rejected outright
+// rather than silently accepted and dropped (no-fallback).
 func (r CreateRouteRequest) Validate() error {
-	if err := validateRequired("profile_code", r.ProfileCode); err != nil {
-		return wrapValidation(err)
-	}
-	if err := validateRouteCode("profile_code", r.ProfileCode); err != nil {
-		return wrapValidation(err)
+	switch r.SubjectKind {
+	case "", "document":
+		if err := validateRequired("profile_code", r.ProfileCode); err != nil {
+			return wrapValidation(err)
+		}
+		if err := validateRouteCode("profile_code", r.ProfileCode); err != nil {
+			return wrapValidation(err)
+		}
+	case "template":
+		if r.ProfileCode != "" {
+			return wrapValidation(fmt.Errorf("profile_code must be absent for template routes"))
+		}
+	default:
+		return wrapValidation(fmt.Errorf("subject_kind must be one of: document, template"))
 	}
 	if err := validateRequired("name", r.Name); err != nil {
 		return wrapValidation(err)
-	}
-	switch r.SubjectKind {
-	case "", "document", "template":
-	default:
-		return wrapValidation(fmt.Errorf("subject_kind must be one of: document, template"))
 	}
 	return wrapValidation(validateStages(r.Stages))
 }

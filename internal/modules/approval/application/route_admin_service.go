@@ -232,24 +232,31 @@ func resolveCreateRouteSubject(in CreateRouteInput) (domain.Subject, error) {
 
 func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in CreateRouteInput) (CreateRouteResult, error) {
 	var result CreateRouteResult
-	// G1: resolve the per-profile route-signature policy OFF-TX (H-PRE-1) so the
-	// friendly route-shape check runs before the write tx opens.
-	policy, err := s.resolvePolicy(ctx, in.TenantID, in.ProfileCode)
+
+	subject, err := resolveCreateRouteSubject(in)
 	if err != nil {
 		return result, err
+	}
+	if err := subject.Validate(); err != nil {
+		return result, err
+	}
+
+	// G1: resolve the per-profile route-signature policy OFF-TX (H-PRE-1) so the
+	// friendly route-shape check runs before the write tx opens. A template
+	// subject has no profile — there is no per-profile signature policy to
+	// resolve, so skip the reader call entirely rather than looking up an
+	// empty profile_code (S1, F18; DB truth: migration 0297).
+	var policy taxonomydomain.RoutePolicy
+	if subject.Kind != domain.SubjectKindTemplate {
+		policy, err = s.resolvePolicy(ctx, in.TenantID, in.ProfileCode)
+		if err != nil {
+			return result, err
+		}
 	}
 	err = runner.Do(ctx, func(tx *sql.Tx) error {
 		ctx := authz.WithCapCache(ctx)
 
 		if err := authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant"); err != nil {
-			return err
-		}
-
-		subject, err := resolveCreateRouteSubject(in)
-		if err != nil {
-			return err
-		}
-		if err := subject.Validate(); err != nil {
 			return err
 		}
 
@@ -264,13 +271,26 @@ func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in
 			return err
 		}
 
+		// profile_code is NULL for a template route (DB truth: migration 0297
+		// approval_routes_template_subject_projection_check forbids a
+		// non-NULL profile_code when subject_kind='template'). in.ProfileCode
+		// is always "" here for a template subject (contract-enforced), but
+		// bind explicit SQL NULL rather than an empty string to satisfy the
+		// column's semantics precisely.
+		var profileCodeArg any
+		if subject.Kind == domain.SubjectKindTemplate {
+			profileCodeArg = nil
+		} else {
+			profileCodeArg = in.ProfileCode
+		}
+
 		var routeID string
 		err = tx.QueryRowContext(ctx, `
 			INSERT INTO approval_routes
 				(tenant_id, profile_code, name, version, created_by, active, subject_kind, subject_key)
 			VALUES ($1, $2, $3, 1, $4, TRUE, $5, $6)
 			RETURNING id`,
-			in.TenantID, in.ProfileCode, in.Name, in.ActorUserID,
+			in.TenantID, profileCodeArg, in.Name, in.ActorUserID,
 			string(route.Subject.Kind), route.Subject.Key,
 		).Scan(&routeID)
 		if err != nil {

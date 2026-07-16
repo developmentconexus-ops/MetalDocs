@@ -13,6 +13,7 @@ package application
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"testing"
 
@@ -260,5 +261,96 @@ func TestRouteAdminList_ExposesSubjectFields_RealDB(t *testing.T) {
 	got := listOut.Routes[0]
 	if got.SubjectKind != "document" || got.SubjectKey != tax.ProfileCode {
 		t.Fatalf("subject fields = kind=%q key=%q; want kind=document key=%q", got.SubjectKind, got.SubjectKey, tax.ProfileCode)
+	}
+}
+
+// TestRouteAdminCreate_TemplateSubject_ProfileCodeNull_RealDB is the S1 (F18)
+// failing-test-first case (a): a template-subject route created with an empty
+// ProfileCode must succeed and persist profile_code as SQL NULL (not empty
+// string), matching the DB truth in migration 0297
+// (approval_routes_template_subject_projection_check forbids a non-NULL
+// profile_code when subject_kind='template'). Before the S1 fix this either
+// violated the DB check (in.ProfileCode bound as "" is non-NULL) or was
+// unreachable because the contract layer required profile_code
+// unconditionally.
+func TestRouteAdminCreate_TemplateSubject_ProfileCodeNull_RealDB(t *testing.T) {
+	dbc, _ := testdb.Open(t)
+	ctx := context.Background()
+
+	tnt := testdb.NewTenant(t, dbc)
+	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
+
+	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
+	svc := &RouteAdminService{repo: repo, emitter: NewSQLEmitter(), clock: RealClock{}}
+	runner := db.NewTxRunner(dbc)
+
+	out, err := svc.Create(routeAdminSubjectCtx(tnt.ID, actor.ID), runner, CreateRouteInput{
+		TenantID:    tnt.ID,
+		Name:        "Template Route",
+		ActorUserID: actor.ID,
+		SubjectKind: "template",
+		SubjectKey:  "tmpl-version-1",
+		Stages:      validRouteStages(),
+	})
+	if err != nil {
+		t.Fatalf("Create: unexpected error: %v", err)
+	}
+
+	var profileCode sql.NullString
+	var subjectKind, subjectKey string
+	if err := dbc.QueryRowContext(ctx,
+		`SELECT profile_code, subject_kind, subject_key FROM public.approval_routes WHERE id = $1::uuid`,
+		out.RouteID,
+	).Scan(&profileCode, &subjectKind, &subjectKey); err != nil {
+		t.Fatalf("query persisted route: %v", err)
+	}
+	if profileCode.Valid {
+		t.Errorf("profile_code = %q, want SQL NULL", profileCode.String)
+	}
+	if subjectKind != "template" {
+		t.Errorf("subject_kind = %q, want %q", subjectKind, "template")
+	}
+	if subjectKey != "tmpl-version-1" {
+		t.Errorf("subject_key = %q, want %q", subjectKey, "tmpl-version-1")
+	}
+}
+
+// TestRouteAdminCreate_DocumentSubject_ProfileCodePopulated_RealDB is the S1
+// (F18) regression guard, case (d): a document-subject (absent/explicit
+// subject_kind=document) route create with a valid ProfileCode still
+// succeeds and persists profile_code populated — the template-NULL binding
+// introduced by S1 must not regress the pre-existing document path.
+func TestRouteAdminCreate_DocumentSubject_ProfileCodePopulated_RealDB(t *testing.T) {
+	dbc, _ := testdb.Open(t)
+	ctx := context.Background()
+
+	tnt := testdb.NewTenant(t, dbc)
+	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+
+	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
+	svc := &RouteAdminService{repo: repo, emitter: NewSQLEmitter(), clock: RealClock{}}
+	runner := db.NewTxRunner(dbc)
+
+	out, err := svc.Create(routeAdminSubjectCtx(tnt.ID, actor.ID), runner, CreateRouteInput{
+		TenantID:    tnt.ID,
+		ProfileCode: tax.ProfileCode,
+		Name:        "Document Route Regression Guard",
+		ActorUserID: actor.ID,
+		Stages:      validRouteStages(),
+	})
+	if err != nil {
+		t.Fatalf("Create: unexpected error: %v", err)
+	}
+
+	var profileCode sql.NullString
+	if err := dbc.QueryRowContext(ctx,
+		`SELECT profile_code FROM public.approval_routes WHERE id = $1::uuid`,
+		out.RouteID,
+	).Scan(&profileCode); err != nil {
+		t.Fatalf("query persisted route: %v", err)
+	}
+	if !profileCode.Valid || profileCode.String != tax.ProfileCode {
+		t.Errorf("profile_code = %+v, want valid %q", profileCode, tax.ProfileCode)
 	}
 }

@@ -279,6 +279,15 @@ func TestCreateRoute_SubjectFieldsOmitted_NoSubjectKindPassed(t *testing.T) {
 // pass-through with; a template subject's key has no such relationship to
 // profile_code, so it still exercises the same decode/pass-through path
 // without encoding an illegal state.
+//
+// The fixture omits profile_code entirely (S1, F18 repair): under the
+// conditional contract rule (contracts.CreateRouteRequest.Validate, ADR 0082 /
+// migration 0297), a template subject MUST NOT carry a profile_code — a body
+// combining subject_kind=template with a non-empty profile_code is now a
+// validation-error 400, not a legal pass-through fixture (previously this
+// test asserted 201 through a mock that never reaches the DB check —
+// false-green; see TestCreateRoute_TemplateSubjectRejectsProfileCode below
+// for the negative case at the handler layer).
 func TestCreateRoute_SubjectFieldsPassedThrough(t *testing.T) {
 	svc := &fakeRouteAdminService{
 		createResult: application.CreateRouteResult{RouteID: "route-123"},
@@ -286,7 +295,7 @@ func TestCreateRoute_SubjectFieldsPassedThrough(t *testing.T) {
 	h := &Handler{routeAdmin: svc}
 	mux := routeAdminTestMux(h)
 
-	body := `{"profile_code":"ops","name":"Ops Route","subject_kind":"template","subject_key":"tmpl-custom-1","stages":[{"order":1,"name":"Review","required_capability":"document.signoff","quorum":"any_1_of","drift_policy":"reduce_quorum","selectors":[{"kind":"role_in_fixed_area","role":"approver","area_code":"ops"}]}]}`
+	body := `{"name":"Ops Route","subject_kind":"template","subject_key":"tmpl-custom-1","stages":[{"order":1,"name":"Review","required_capability":"document.signoff","quorum":"any_1_of","drift_policy":"reduce_quorum","selectors":[{"kind":"role_in_fixed_area","role":"approver","area_code":"ops"}]}]}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/routes", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
@@ -301,6 +310,37 @@ func TestCreateRoute_SubjectFieldsPassedThrough(t *testing.T) {
 	}
 	if svc.createReq.SubjectKind != "template" || svc.createReq.SubjectKey != "tmpl-custom-1" {
 		t.Fatalf("subject fields not passed through: kind=%q key=%q", svc.createReq.SubjectKind, svc.createReq.SubjectKey)
+	}
+}
+
+// TestCreateRoute_TemplateSubjectRejectsProfileCode pins the S1 (F18) contract
+// fix at the handler layer: a create-route body carrying both
+// subject_kind=template and a non-empty profile_code must be rejected as a
+// 400 validation error before ever reaching the service (contracts layer
+// Validate), never a 201 (the former false-green behavior asserted through a
+// mock service that never touched the DB check).
+func TestCreateRoute_TemplateSubjectRejectsProfileCode(t *testing.T) {
+	svc := &fakeRouteAdminService{
+		createResult: application.CreateRouteResult{RouteID: "route-should-not-be-created"},
+	}
+	h := &Handler{routeAdmin: svc}
+	mux := routeAdminTestMux(h)
+
+	body := `{"profile_code":"ops","name":"Ops Route","subject_kind":"template","subject_key":"tmpl-custom-1","stages":[{"order":1,"name":"Review","required_capability":"document.signoff","quorum":"any_1_of","drift_policy":"reduce_quorum","selectors":[{"kind":"role_in_fixed_area","role":"approver","area_code":"ops"}]}]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/routes", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+	req.Header.Set("Idempotency-Key", "idem-2")
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d (body: %s)", rr.Code, http.StatusBadRequest, rr.Body.String())
+	}
+	if svc.createReq.SubjectKind != "" {
+		t.Fatalf("service must not be invoked when validation fails, got createReq=%+v", svc.createReq)
 	}
 }
 
