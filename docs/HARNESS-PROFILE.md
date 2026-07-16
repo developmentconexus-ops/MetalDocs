@@ -195,7 +195,7 @@ worktrees.
 | Postgres-lease scheduler + `lease-reaper` | M5 | River periodic jobs (ADR 0067/0068) |
 | `DoReadOnly` tx path | G1 (817abd59) | `Do` + api-lint guard (authz.Require needs writable tx) |
 | deep-research workflow | 2026-07 | lean inline research (workflow ≈4M tokens) |
-| Unit-side `codex exec` (broken sandbox) | 2026-07-14 | hub stdin evidence-pack GPT review, until operator `/codex:setup` |
+| ~~Unit-side `codex exec` (broken sandbox)~~ DISCHARGED 2026-07-16 | 2026-07-14→16 | sandbox fixed by operator, hub probe PROBE-OK — unit-side codex legal again per `codex-dispatch` skill; stdin evidence-pack survives as fallback pattern |
 | testdb ownership-gate retirement + mid-suite GC | 2026-07-15/16 | guard-first virginity + `classifyGCCandidate` + `TESTDB_GC_E2E=1` idle-only (§4) |
 | Blanket `-count=1` on integration runs | 2026-07-13 | cache-sound selective policy (§2 L1) |
 
@@ -205,4 +205,6 @@ worktrees.
 2026-07-16 · all sections · ratified · profile created at 4.5 close boundary; content migrated
   from docs/superpowers/HARNESS.md (2026-07-10..14) + memory field findings (GMR M0–M9,
   units 2.x–4.6); no scout-assumed content — everything above is program-proven.
+2026-07-16 · §10 · corrected · codex sandbox fixed by operator; hub probe PROBE-OK — unit-side
+  codex exec DISCHARGED from denylist; stdin evidence-pack retained as fallback pattern.
 ```
