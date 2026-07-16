@@ -111,7 +111,7 @@ func seedInstanceAreaChain(t *testing.T, db *sql.DB, tenantID string, link bool,
 				    required_role_snapshot, required_capability_snapshot, area_code_snapshot,
 				    quorum_snapshot, on_eligibility_drift_snapshot, eligible_actor_ids, status)
 				 VALUES ($1::uuid, $2::uuid, 1, 'S',
-				    'reviewer', 'doc.signoff', $3,
+				    'reviewer', 'document.signoff', $3,
 				    'any_1_of', 'keep_snapshot', '[]'::jsonb, 'active')`,
 				uuid.NewString(), instID, stage.String,
 			); err != nil {

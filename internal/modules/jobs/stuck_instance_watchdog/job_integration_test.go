@@ -158,7 +158,7 @@ func seedActiveStageSnapshot(t *testing.T, db *sql.DB, instanceID, driftPolicy s
 		   required_role_snapshot, required_capability_snapshot, area_code_snapshot,
 		   quorum_snapshot, on_eligibility_drift_snapshot, eligible_actor_ids, status, opened_at)
 		VALUES (gen_random_uuid(), $1::uuid, 1, 'Stage 1',
-		        'reviewer', 'doc.signoff', 'QA',
+		        'reviewer', 'document.signoff', 'QA',
 		        'any_1_of', $2, '[]'::jsonb, 'active', now())`,
 		instanceID, driftPolicy,
 	); err != nil {

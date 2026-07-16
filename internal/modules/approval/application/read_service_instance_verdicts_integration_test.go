@@ -31,7 +31,7 @@ func seedReviewStage(t *testing.T, fx viewerFixture, order int, eligibleActorIDs
 		StageOrder:                 order,
 		NameSnapshot:               "Revisão",
 		RequiredRoleSnapshot:       "reviewer",
-		RequiredCapabilitySnapshot: "doc.signoff",
+		RequiredCapabilitySnapshot: "document.signoff",
 		QuorumSnapshot:             domain.QuorumAllOf,
 		OnEligibilityDriftSnapshot: domain.DriftKeepSnapshot,
 		Kind:                       domain.StageKindReview,
