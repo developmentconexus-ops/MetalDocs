@@ -47,7 +47,10 @@ func TestTemplateRetirementRetiresStaleAndKeepsCurrent(t *testing.T) {
 	}
 	defer admin.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	// 60s was exceeded under full-suite parallel load (CREATE DATABASE + checkpoint
+	// contention); this test's ops are serial and cheap when idle, the budget is
+	// generous headroom, not expected runtime.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	if err := admin.PingContext(ctx); err != nil {
 		t.Skipf("integration DB unreachable: %v", err)
@@ -72,7 +75,7 @@ func TestTemplateRetirementRetiresStaleAndKeepsCurrent(t *testing.T) {
 	// Ensure keep exists (empty is fine — a later Open rebuilds it via the
 	// readiness marker check) and create the orphan.
 	for _, n := range []string{keep, orphan} {
-		if !dbExists(ctx, conn, n) {
+		if !dbExists(ctx, t, conn, n) {
 			if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE DATABASE %s", quoteIdent(n))); err != nil {
 				t.Fatalf("create %s: %v", n, err)
 			}
@@ -113,7 +116,7 @@ func TestTemplateRetirementRetiresStaleAndKeepsCurrent(t *testing.T) {
 		t.Fatalf("retireStaleTemplates: %v", err)
 	}
 
-	if !dbExists(ctx, conn, keep) {
+	if !dbExists(ctx, t, conn, keep) {
 		t.Errorf("retirement dropped the current template %s — it must be kept", keep)
 	}
 	stillReady, err := templateIsReady(ctx, conn, orphan, orphanFP16)
@@ -123,17 +126,20 @@ func TestTemplateRetirementRetiresStaleAndKeepsCurrent(t *testing.T) {
 	if stillReady {
 		t.Errorf("orphan template %s still reads as ready after retirement — a stale template must never be clonable", orphan)
 	}
-	if !dbExists(ctx, conn, orphan) {
+	if !dbExists(ctx, t, conn, orphan) {
 		t.Errorf("retirement physically dropped orphan %s — retirement must be logical only; "+
 			"dropping under the global template lock is what wedged the cluster", orphan)
 	}
 }
 
-func dbExists(ctx context.Context, conn *sql.Conn, name string) bool {
+// dbExists reports whether name exists in pg_database. A query failure (e.g.
+// an expired context under load) must fail LOUD — returning false here once
+// misattributed an infra timeout as "GC dropped an unowned database".
+func dbExists(ctx context.Context, t *testing.T, conn *sql.Conn, name string) bool {
 	var n int
 	if err := conn.QueryRowContext(ctx,
 		"SELECT count(*) FROM pg_database WHERE datname = $1", name).Scan(&n); err != nil {
-		return false
+		t.Fatalf("dbExists(%s): %v", name, err)
 	}
 	return n > 0
 }

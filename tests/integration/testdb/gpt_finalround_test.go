@@ -41,7 +41,10 @@ func TestRetirementRequiresOwnershipProof(t *testing.T) {
 	}
 	defer admin.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	// 60s was exceeded under full-suite parallel load (CREATE DATABASE + checkpoint
+	// contention); this test's ops are serial and cheap when idle, the budget is
+	// generous headroom, not expected runtime.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	if err := admin.PingContext(ctx); err != nil {
 		t.Skipf("integration DB unreachable: %v", err)
@@ -78,7 +81,7 @@ func TestRetirementRequiresOwnershipProof(t *testing.T) {
 	foreignMarker := readyMarker(foreignFP)
 
 	for _, n := range []string{unmarked, foreign} {
-		if !dbExists(ctx, conn, n) {
+		if !dbExists(ctx, t, conn, n) {
 			if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE DATABASE %s", quoteIdent(n))); err != nil {
 				t.Fatalf("create %s: %v", n, err)
 			}
@@ -119,10 +122,10 @@ func TestRetirementRequiresOwnershipProof(t *testing.T) {
 	if _, err := GCRetiredDatabases(t); err != nil {
 		t.Fatalf("GCRetiredDatabases: %v", err)
 	}
-	if !dbExists(ctx, conn, unmarked) {
+	if !dbExists(ctx, t, conn, unmarked) {
 		t.Errorf("GC dropped UNMARKED %s — a database with no recognised marker must never be dropped", unmarked)
 	}
-	if !dbExists(ctx, conn, foreign) {
+	if !dbExists(ctx, t, conn, foreign) {
 		t.Errorf("GC dropped FOREIGN %s — a foreign-ready-marked database is not ours to drop", foreign)
 	}
 }
@@ -143,7 +146,7 @@ func TestNonVirginBaselineGuardIsNotBypassable(t *testing.T) {
 	}
 	defer admin.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	if err := admin.PingContext(ctx); err != nil {
 		t.Skipf("integration DB unreachable: %v", err)
