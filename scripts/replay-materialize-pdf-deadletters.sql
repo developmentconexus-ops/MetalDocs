@@ -44,6 +44,6 @@ SET dead_lettered_at = NULL,
 WHERE event_type IN ('docx_materialize', 'docgen_v2_pdf')
   AND dead_lettered_at IS NOT NULL
   AND last_error LIKE '%ErrCapabilityNotAsserted%'
-RETURNING event_id, event_type;
+RETURNING event_id, event_type, aggregate_id;
 
 COMMIT;

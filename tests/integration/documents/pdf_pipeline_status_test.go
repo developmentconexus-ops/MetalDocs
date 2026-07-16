@@ -169,8 +169,13 @@ func TestPDFPipelineStatus_ViewService_RealOutboxReader(t *testing.T) {
 // "failed": aggregate_id=docID, event_type=eventType (docx_materialize or
 // docgen_v2_pdf), payload->>'tenant_id'=tenantID, dead_lettered_at set. No
 // trg_require_cap_asserted tripwire guards metaldocs.outbox_events, so this is
-// a plain insert (no capability/tenant GUC seeding needed) — matching how the
-// real outbox producers/consumers write this table.
+// a plain insert (no capability/tenant GUC seeding needed). Seeds the final row
+// shape production produces: aggregate_type='document_revision' with aggregate_id
+// carrying the DOCUMENT id (the sole production Pin caller passes
+// instance.DocumentID through the misnamed revisionID param —
+// decision_service.go:562 → workers.go:63); attempt/error/dead-letter columns
+// are written across claim+MarkFailed in production but only the final shape
+// matters to the reader predicate.
 func insertDeadLetteredOutboxEvent(t *testing.T, db *sql.DB, docID, tenantID, eventType string) {
 	t.Helper()
 	eventID := uuid.NewString()
@@ -180,7 +185,7 @@ func insertDeadLetteredOutboxEvent(t *testing.T, db *sql.DB, docID, tenantID, ev
 		   (event_id, event_type, aggregate_type, aggregate_id, occurred_at, version,
 		    idempotency_key, producer, trace_id, payload,
 		    attempt_count, last_error, last_attempt_at, dead_lettered_at)
-		 VALUES ($1, $2, 'document', $3, now(), 1,
+		 VALUES ($1, $2, 'document_revision', $3, now(), 1,
 		         $4, 'test-seed', 'trace-'||$1, $5::jsonb,
 		         5, 'ErrCapabilityNotAsserted: document.edit not asserted', now(), now())`,
 		eventID, eventType, docID, idempotencyKey,
