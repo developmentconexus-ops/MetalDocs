@@ -20,6 +20,16 @@ Intent unchanged; drift is line-number only + one structural fact: production Pr
 `*objectstore.VerifiedStore` injected directly (main.go:567→1065), so adding `Exists` to the
 templates `Presigner` port needs zero adapter code; two test fakes gain the method.
 
+## Model-matrix corrections (hub, 2026-07-16)
+
+- Correction #1 (superseded): codex retired all roles; dual gate = Opus + sonnet. Rows 2–8 ran
+  under this ruling.
+- Correction #2 (binding, profile 0dd1381e): retirement NARROWED to planner+implementer; planner
+  = Opus; **dual gate = cold Opus + GPT-5.6 Sol medium via codex** (gate-only codex). Per hub
+  rule, this unit's sonnet-produced plan (row 2) STANDS — already consumed + reviewed. The
+  completed Opus+sonnet dual gate (rows 7–8) ran under correction #1 while it was binding; the
+  §9 delta re-review of the contract-lock commit runs on the corrected matrix (rows 9–10).
+
 ## Dispatch ledger
 
 | # | Role | Model / effort | Path | Prompt pack | Output artifact | Verdict/result |
@@ -74,14 +84,30 @@ claim, and both arms independently confirmed no-test-theater and comment-warrant
 
 ## Runtime verify (charter §8)
 
-**DEFERRED (bounded, justified).** REQUEST verify-window sent to hub; independent of the
-window, the hub-owned :80 stack runs the pre-fix image — live-driving `GET docx-url` there
-exercises OLD code and cannot verify this change until the stack is rebuilt from this branch
-or post-merge. Behavior is fully pinned at L1: 5 unit tests cover every branch (empty key /
-absent object / present object / store-error fail-closed / cross-tenant) plus the pre-existing
-delivery-mapping pin (errors_test.go:28) and green selective integration (templates pkg +
-guard suites). Defer target: post-merge hub QA drives blank-template create → docx-url → 409
-CodeUploadMissing → autosave Confirm → docx-url → 200 URL.
+**Window GRANTED by hub (2026-07-16); journey EXECUTED — live baseline captured; fix
+verification remains post-merge (stack runs pre-fix code).**
+
+Hub granted the verify-window with stack truth "rebuilt from main @ 1070e94c" — that commit
+does NOT contain this branch's fix (291bce1c, unmerged/unpushed), so the live stack exercises
+the OLD read path by construction. Journey run anyway (conditions honored: `BDOCX-` prefix,
+no container restart/reseed/rebuild, network evidence captured):
+
+1. `POST /api/v1/auth/login` (admin dev-seed, Origin header per origin_protection) → session OK.
+2. `POST /api/v1/templates` (Idempotency-Key, `{"key":"BDOCX-verify-409","name":"BDOCX runtime
+   verify 409"}`) → 201; template `6f326aea-385a-4754-968b-7b22a39e9f95`, version 1 draft,
+   `docx_storage_key` = `tenants/ffffffff-.../templates/6f326aea-.../versions/1.docx`,
+   `content_hash: null` (no object yet) — confirms lazy-provision contract live.
+3. `GET .../versions/1/docx-url` → **200** `{"data":{"url":"http://127.0.0.1:9000/metaldocs-attachments/tenants/.../versions/1.docx?X-Amz-..."}}`
+   — the pre-fix URL-to-nowhere, reproduced live.
+4. `GET <presigned URL>` → **404** `<Code>NoSuchKey</Code>` from MinIO (full XML captured).
+
+**Verdict:** live DEFECT-REPRO baseline PASS — proves the bug this unit fixes is real on the
+current main-built stack and that step 3 flips to `409 problem+json CodeUploadMissing` only
+once this branch merges. The 409 network capture requested by the hub is unsatisfiable
+pre-merge (reported to hub); fix-side live verification defers to post-merge QA:
+same journey → step 3 = 409 CodeUploadMissing → autosave Confirm → docx-url → 200.
+Debris: one template `BDOCX-verify-409` (id 6f326aea-385a-4754-968b-7b22a39e9f95), left for
+QA-1 triage per prefix convention.
 
 ## MinIO orphan cleanup
 
