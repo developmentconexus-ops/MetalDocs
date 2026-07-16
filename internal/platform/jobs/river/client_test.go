@@ -5,7 +5,6 @@ package riverjobs_test
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -13,8 +12,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/rivermigrate"
-	"github.com/riverqueue/river/riverdriver/riverdatabasesql"
 
 	riverjobs "metaldocs/internal/platform/jobs/river"
 	"metaldocs/tests/integration/testdb"
@@ -31,30 +28,16 @@ func TestRiverInsertTxCompatibilityBoundary(t *testing.T) {
 
 	// Open the isolated test DB first; template bootstrap can take minutes on
 	// first run. The 30-second operation timeout below applies only to the
-	// river-specific work after the DB is ready.
+	// river-specific work after the DB is ready. The testdb template already
+	// bakes the River schema into the default schema (ApplyCuratedBootstrap ->
+	// bootstrap.MigrateRiverSchema), so no per-test River migration is needed.
 	db, _ := testdb.Open(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
-	schema := fmt.Sprintf("river_task1_%d", time.Now().UTC().UnixNano())
-
-	if _, err := db.ExecContext(ctx, "CREATE SCHEMA "+schema); err != nil {
-		t.Fatalf("create schema: %v", err)
-	}
-	t.Cleanup(func() {
-		_, _ = db.ExecContext(context.Background(), "DROP SCHEMA "+schema+" CASCADE")
-	})
-
-	migrator, err := rivermigrate.New(riverdatabasesql.New(db), &rivermigrate.Config{Schema: schema})
-	if err != nil {
-		t.Fatalf("new migrator: %v", err)
-	}
-	if _, err := migrator.Migrate(ctx, rivermigrate.DirectionUp, nil); err != nil {
-		t.Fatalf("migrate river schema up: %v", err)
-	}
 
 	bundle, err := riverjobs.NewClientBundle(db, riverjobs.Config{
-		Schema:              schema,
+		Schema:              "",
 		SkipUnknownJobCheck: true,
 	}, nil)
 	if err != nil {
@@ -85,10 +68,10 @@ func TestRiverInsertTxCompatibilityBoundary(t *testing.T) {
 		t.Fatalf("insert tx: %v", err)
 	}
 
-	if got := countRiverJobs(ctx, t, db, schema); got != 0 {
+	if got := countRiverJobs(ctx, t, db); got != 0 {
 		t.Fatalf("visible jobs outside tx before commit = %d, want 0", got)
 	}
-	if got := countRiverJobs(ctx, t, tx, schema); got != 1 {
+	if got := countRiverJobs(ctx, t, tx); got != 1 {
 		t.Fatalf("visible jobs inside tx before commit = %d, want 1", got)
 	}
 
@@ -96,7 +79,7 @@ func TestRiverInsertTxCompatibilityBoundary(t *testing.T) {
 		t.Fatalf("commit tx: %v", err)
 	}
 
-	if got := countRiverJobs(ctx, t, db, schema); got != 1 {
+	if got := countRiverJobs(ctx, t, db); got != 1 {
 		t.Fatalf("visible jobs outside tx after commit = %d, want 1", got)
 	}
 	if insertRes.Job.Queue != "temporal" {
@@ -114,12 +97,11 @@ type queryRower interface {
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
-func countRiverJobs(ctx context.Context, t *testing.T, rower queryRower, schema string) int {
+func countRiverJobs(ctx context.Context, t *testing.T, rower queryRower) int {
 	t.Helper()
 
 	var count int
-	query := fmt.Sprintf("SELECT COUNT(*) FROM %s.river_job", schema)
-	if err := rower.QueryRowContext(ctx, query).Scan(&count); err != nil {
+	if err := rower.QueryRowContext(ctx, "SELECT COUNT(*) FROM river_job").Scan(&count); err != nil {
 		t.Fatalf("count river jobs: %v", err)
 	}
 	return count

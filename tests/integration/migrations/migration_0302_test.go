@@ -36,7 +36,7 @@ import (
 // fixture.
 func TestMigration0302_DropTemplatesApprovalConfig(t *testing.T) {
 	ctx := context.Background()
-	db, _ := testdb.Open(t)
+	db, _ := testdb.OpenFreshDatabase(t)
 
 	// (1) Bootstrap already applied 0302: table gone, ledger row present.
 	if got := regclass0302(t, ctx, db); got.Valid {

@@ -73,16 +73,15 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 
 	// 1b) GET /api/v1/documents/{id} and verify storage_key is populated
 	t.Run("VerifyStorageKeyViaDB", func(t *testing.T) {
-		db := openOptionalDirectDB(t)
-		if db == nil {
-			t.Skip("DATABASE_URL/METALDOCS_DATABASE_URL not set; skipping storage_key verification")
-		}
+		db := openRequiredDirectDB(t)
 		defer db.Close()
 
+		// public.document_revisions (db/baseline/0001_current_schema.sql:2205),
+		// not metaldocs.
 		var storageKey string
 		if err := db.QueryRowContext(context.Background(), `
 			SELECT COALESCE(r.storage_key, '')
-			  FROM metaldocs.document_revisions r
+			  FROM public.document_revisions r
 			 WHERE r.document_id = $1::uuid
 			 ORDER BY r.created_at DESC
 			 LIMIT 1`,
@@ -276,18 +275,19 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 		}
 	})
 
-	// 8) Optional DB-level governance_events assertion when DATABASE_URL is set
-	t.Run("GovernanceEventsCountOptionalDB", func(t *testing.T) {
-		db := openOptionalDirectDB(t)
-		if db == nil {
-			t.Skip("DATABASE_URL/METALDOCS_DATABASE_URL not set; skipping DB verification")
-		}
+	// 8) DB-level governance_events assertion. METALDOCS_E2E_URL is set (the
+	// outer skip already fired otherwise), so the DB DSN pointing at the same
+	// server's database is required, not optional.
+	t.Run("GovernanceEventsCountDB", func(t *testing.T) {
+		db := openRequiredDirectDB(t)
 		defer db.Close()
 
+		// public.governance_events (db/baseline/0001_current_schema.sql:2268),
+		// not metaldocs.
 		var count int
 		if err := db.QueryRowContext(context.Background(), `
 			SELECT count(*)
-			  FROM metaldocs.governance_events
+			  FROM public.governance_events
 			 WHERE tenant_id = $1::uuid
 			   AND resource_type = 'document'
 			   AND resource_id = $2`,
@@ -362,7 +362,17 @@ func getApprovalInstance(t *testing.T, client *http.Client, baseURL, tenantID, u
 	return resp2.StatusCode, raw2
 }
 
-func openOptionalDirectDB(t *testing.T) *sql.DB {
+// openRequiredDirectDB opens a raw DSN connection to the database the live
+// E2E server under test actually writes to. It deliberately does NOT go
+// through testdb.Open: a leased factory database is a different physical
+// database than the one METALDOCS_E2E_URL's server connected to at startup,
+// so routing these DB-verification subtests through the factory would assert
+// against rows the server never wrote. TestE2E_HappyPath_HTTP already gated
+// the whole test on METALDOCS_E2E_URL being set, so once a subtest here runs,
+// the DB DSN naming that same server's database is required, not optional —
+// a missing or unreachable DSN is a real gap in the E2E environment and must
+// fail loud, not read as a skip-shaped green.
+func openRequiredDirectDB(t *testing.T) *sql.DB {
 	t.Helper()
 
 	dsn := strings.TrimSpace(os.Getenv("METALDOCS_DATABASE_URL"))
@@ -370,7 +380,7 @@ func openOptionalDirectDB(t *testing.T) *sql.DB {
 		dsn = strings.TrimSpace(os.Getenv("DATABASE_URL"))
 	}
 	if dsn == "" {
-		return nil
+		t.Fatal("METALDOCS_E2E_URL is set but DATABASE_URL/METALDOCS_DATABASE_URL is not: DB-verification subtests require a direct connection to the server's database")
 	}
 
 	db, err := sql.Open("pgx", dsn)
@@ -379,7 +389,7 @@ func openOptionalDirectDB(t *testing.T) *sql.DB {
 	}
 	if err := db.PingContext(context.Background()); err != nil {
 		_ = db.Close()
-		t.Skipf("integration DB unreachable: %v", err)
+		t.Fatalf("integration DB unreachable: %v", err)
 	}
 	return db
 }

@@ -52,7 +52,7 @@ func ctxForTenant(tenantID string) context.Context {
 }
 
 func TestTenantCrypto_ProvisionEncryptDecrypt_RealDB(t *testing.T) {
-	sqlDB, _ := testdb.Open(t)
+	sqlDB, _ := testdb.OpenFreshDatabase(t)
 	tenant := testdb.NewTenant(t, sqlDB)
 	svc := newTenantCryptoService(t, sqlDB)
 	runner := db.NewTxRunner(sqlDB)
@@ -93,7 +93,7 @@ func TestTenantCrypto_ProvisionEncryptDecrypt_RealDB(t *testing.T) {
 }
 
 func TestTenantCrypto_ProvisionTenantKeyTx_IdempotentRealDB(t *testing.T) {
-	sqlDB, _ := testdb.Open(t)
+	sqlDB, _ := testdb.OpenFreshDatabase(t)
 	tenant := testdb.NewTenant(t, sqlDB)
 	svc := newTenantCryptoService(t, sqlDB)
 	runner := db.NewTxRunner(sqlDB)
@@ -142,7 +142,7 @@ func TestTenantCrypto_ProvisionTenantKeyTx_IdempotentRealDB(t *testing.T) {
 }
 
 func TestTenantCrypto_DestroyTenantKeyTx_ShredsDecryption_RealDB(t *testing.T) {
-	sqlDB, _ := testdb.Open(t)
+	sqlDB, _ := testdb.OpenFreshDatabase(t)
 	tenant := testdb.NewTenant(t, sqlDB)
 	svc := newTenantCryptoService(t, sqlDB)
 	runner := db.NewTxRunner(sqlDB)

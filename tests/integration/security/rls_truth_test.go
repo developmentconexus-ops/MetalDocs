@@ -39,7 +39,7 @@ import (
 )
 
 func TestRLSTruth_NonOwnerRoleEnforcesIsolation(t *testing.T) {
-	db, dbName := testdb.Open(t) // owner handle: metaldocs_app (superuser+bypass) — seeding only.
+	db, dbName := testdb.OpenFreshDatabase(t) // owner handle: metaldocs_app (superuser+bypass) — seeding only.
 
 	// Timeout scopes only this test's own queries — created AFTER Open() so the
 	// one-time template-clone/rebuild (which can take minutes on first run in a

@@ -32,13 +32,8 @@ import (
 // NOBYPASSRLS, so this is the faithful way to exercise the deployed policy.
 func TestTemplateVersion_TenantID_RLSParity(t *testing.T) {
 	ctx := context.Background()
-	db, dbName := testdb.Open(t)
+	db, dbName := testdb.OpenFreshDatabase(t)
 
-	// Bare runtime tables (templates_*) must resolve to public.*; evict the
-	// connection that ran the ALTER so the pool reopens with the new default.
-	if _, err := db.ExecContext(ctx, `ALTER DATABASE "`+dbName+`" SET search_path TO public, metaldocs`); err != nil {
-		t.Fatalf("alter database search_path: %v", err)
-	}
 	db.SetMaxIdleConns(0)
 	db.SetMaxIdleConns(4)
 	db.SetMaxOpenConns(4)
@@ -121,15 +116,28 @@ func TestTemplateVersion_TenantID_RLSParity(t *testing.T) {
 	// ── (b) RLS USING clause filters cross-tenant reads ──────────────────────
 	t.Run("rls_filters_cross_tenant_read", func(t *testing.T) {
 		// Create a NOBYPASSRLS role and grant it read on the table, so FORCE RLS
-		// actually applies (the connection role is a BYPASSRLS superuser).
-		const rlsRole = "rls_tester_tpl_version"
+		// actually applies (the connection role is a BYPASSRLS superuser). The
+		// role name is UNIQUE per fresh-clone database. Roles are cluster-global
+		// but this test's db is a per-run clone: a FIXED global name collides
+		// across runs when a prior clone's DROP DATABASE times out under load and
+		// orphans the clone still holding this role's GRANT — the next run's
+		// DROP ROLE then fails 2BP01 (dependent objects in the surviving orphan;
+		// confirmed via pg_shdepend at the 4.6 exit gate). Deriving the name from
+		// dbName makes every run's role dependency-free at creation. Cleanup does
+		// DROP OWNED BY first so the role's grants in THIS db are revoked before
+		// DROP ROLE — without it the cleanup silently leaks the role every run
+		// (its GRANTs still exist when the cleanup fires, before the db is dropped).
+		rlsRole := "rls_tester_tpl_version_" + dbName
 		if _, err := db.ExecContext(ctx, `DROP ROLE IF EXISTS `+rlsRole); err != nil {
 			t.Fatalf("drop role: %v", err)
 		}
 		if _, err := db.ExecContext(ctx, `CREATE ROLE `+rlsRole+` NOLOGIN NOBYPASSRLS`); err != nil {
 			t.Fatalf("create role: %v", err)
 		}
-		t.Cleanup(func() { _, _ = db.ExecContext(ctx, `DROP ROLE IF EXISTS `+rlsRole) })
+		t.Cleanup(func() {
+			_, _ = db.ExecContext(ctx, `DROP OWNED BY `+rlsRole)
+			_, _ = db.ExecContext(ctx, `DROP ROLE IF EXISTS `+rlsRole)
+		})
 		if _, err := db.ExecContext(ctx, `GRANT USAGE ON SCHEMA public TO `+rlsRole); err != nil {
 			t.Fatalf("grant schema usage: %v", err)
 		}

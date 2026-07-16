@@ -19,13 +19,8 @@ import (
 // controlled-documents override resolution and profile-default adapter depend on.
 func TestTemplateVersionReader_GetTemplateVersionState_Live(t *testing.T) {
 	ctx := context.Background()
-	db, dbName := testdb.Open(t)
+	db, _ := testdb.Open(t)
 
-	// Bare runtime tables must resolve to public.* (templates_*); evict the
-	// connection that ran the ALTER so the pool reopens with the new default.
-	if _, err := db.ExecContext(ctx, `ALTER DATABASE "`+dbName+`" SET search_path TO public, metaldocs`); err != nil {
-		t.Fatalf("alter database search_path: %v", err)
-	}
 	db.SetMaxIdleConns(0)
 	db.SetMaxIdleConns(4)
 	db.SetMaxOpenConns(4)

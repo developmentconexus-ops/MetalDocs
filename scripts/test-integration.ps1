@@ -1,7 +1,8 @@
 param(
   [string]$EnvFile = ".env",
-  [string]$Package = "./...",
-  [string]$Run
+  [string[]]$Package = @("./..."),
+  [string]$Run,
+  [string[]]$GoFlags = @()
 )
 
 # Canonical entrypoint for running integration tests locally.
@@ -55,10 +56,15 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "[test-integration] postgres reachable."
 
+# -GoFlags passes measurement/scheduling flags (-v, -count=1, -p, -parallel)
+# through to `go test` WITHOUT letting callers bypass the DSN derivation and the
+# pg_isready gate above — that chokepoint is the only thing standing between a
+# silent testdb.Open skip and a false green.
 $goArgs = @('test', '-tags=integration')
 if (-not [string]::IsNullOrWhiteSpace($Run)) {
   $goArgs += @('-run', $Run)
 }
+$goArgs += $GoFlags
 $goArgs += $Package
 
 Write-Host "[test-integration] go $($goArgs -join ' ')"

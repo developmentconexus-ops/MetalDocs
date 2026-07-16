@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -44,7 +45,12 @@ var (
 	// every curated bootstrap input, so exactly one template per schema version
 	// exists at a time and the template is reused across processes and runs.
 	templateDBName string
-	templateDBErr  error
+	// templateFingerprint16 is the same 16-char fingerprint embedded in
+	// templateDBName, kept separately so the lease pool (lease_pool.go) can
+	// compute deterministic, cross-process-adoptable slot names without
+	// re-deriving or re-hashing the fingerprint itself.
+	templateFingerprint16 string
+	templateDBErr         error
 )
 
 // DeterministicID returns a deterministic UUID v5 based on test name + suffix.
@@ -66,10 +72,74 @@ func DSN(t *testing.T) string {
 	return ""
 }
 
-// Open returns a *sql.DB connected to a per-test isolated database cloned from
-// a curated-baseline template. The returned string is kept for Qualified()
-// compatibility; isolation happens at the database level, not via test schemas.
+// Open returns a *sql.DB connected to a reset-safe leased database checked
+// out of the package-process lease pool (see leasePool below). This is the
+// default ~130-caller path: no per-test CREATE DATABASE / DROP DATABASE, just
+// a DELETE-based reset (see resetLeasedDatabase — NOT truncate: TRUNCATE
+// rewrites a relfilenode per relation and measured 55x slower here) of a
+// leased physical database that is returned to the pool (never dropped) on
+// t.Cleanup. The returned string is kept for Qualified() compatibility;
+// isolation happens at the database level, not via test schemas.
+//
+// Tests that genuinely need a fresh, untouched clone (e.g. tests that mutate
+// DDL, or that must prove behavior on a virgin database) should call
+// OpenFreshDatabase instead.
 func Open(t *testing.T) (*sql.DB, string) {
+	t.Helper()
+
+	baseDSN := DSN(t)
+
+	phaseStart := time.Now()
+	ensureTemplateDatabase(t, baseDSN)
+	tracePhase(t, "ensure_template", time.Since(phaseStart))
+
+	phaseStart = time.Now()
+	dbName := globalLeasePool.checkout(t, baseDSN, templateDBName, templateFingerprint16)
+	tracePhase(t, "lease_checkout", time.Since(phaseStart))
+
+	// The DELETE-based reset is measured in single-digit milliseconds (it
+	// touches rows, not relfilenodes — see resetLeasedDatabase). 60s is a
+	// pure hang-guard, not a budget.
+	resetCtx, resetCancel := context.WithTimeout(context.Background(), 60*time.Second)
+	phaseStart = time.Now()
+	if err := resetLeasedDatabase(resetCtx, baseDSN, dbName); err != nil {
+		resetCancel()
+		globalLeasePool.release(dbName)
+		t.Fatalf("reset leased database: %v", err)
+	}
+	resetCancel()
+	tracePhase(t, "reset", time.Since(phaseStart))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	phaseStart = time.Now()
+	db, err := openDBWithDatabase(baseDSN, dbName)
+	if err != nil {
+		globalLeasePool.release(dbName)
+		t.Fatalf("open leased test db: %v", err)
+	}
+	if err := db.PingContext(ctx); err != nil {
+		_ = db.Close()
+		globalLeasePool.release(dbName)
+		t.Fatalf("ping leased test database %s: %v", dbName, err)
+	}
+	tracePhase(t, "first_ping", time.Since(phaseStart))
+
+	t.Cleanup(func() {
+		_ = db.Close()
+		globalLeasePool.release(dbName)
+	})
+
+	return db, dbName
+}
+
+// OpenFreshDatabase returns a *sql.DB connected to a per-test isolated
+// database physically cloned from the curated-baseline template, then DROPped
+// in t.Cleanup. This is the pre-lease-pool Open behaviour, kept for callers
+// that need a virgin database (DDL mutation, schema-lockdown assertions,
+// anything that must not share a physical database with any other test).
+func OpenFreshDatabase(t *testing.T) (*sql.DB, string) {
 	t.Helper()
 
 	baseDSN := DSN(t)
@@ -79,7 +149,9 @@ func Open(t *testing.T) (*sql.DB, string) {
 	}
 	defer adminDB.Close()
 
+	phaseStart := time.Now()
 	ensureTemplateDatabase(t, baseDSN)
+	tracePhase(t, "ensure_template", time.Since(phaseStart))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -88,13 +160,23 @@ func Open(t *testing.T) (*sql.DB, string) {
 	}
 
 	dbName := "metaldocs_test_" + randomSuffix(t)
+	phaseStart = time.Now()
+	// STRATEGY is pinned, not left to the server default, because the default is
+	// a per-version decision this suite cannot afford to inherit silently.
+	// FILE_COPY forces a checkpoint before and after the copy; on this storage
+	// stack a forced checkpoint blocks on IPC:CheckpointDone for an unbounded
+	// time. Measured against this template (12 MB, 3 alternating reps):
+	// WAL_LOG 1.11/1.74/2.56s vs FILE_COPY 5.52/7.78/36.41s. The 36s outlier is
+	// the point — FILE_COPY's cost has no ceiling here, it is not merely 5x.
 	if _, err := adminDB.ExecContext(
 		ctx,
-		fmt.Sprintf("CREATE DATABASE %s TEMPLATE %s", quoteIdent(dbName), quoteIdent(templateDBName)),
+		fmt.Sprintf("CREATE DATABASE %s TEMPLATE %s STRATEGY = WAL_LOG", quoteIdent(dbName), quoteIdent(templateDBName)),
 	); err != nil {
 		t.Fatalf("create isolated test database %s: %v", dbName, err)
 	}
+	tracePhase(t, "create_database", time.Since(phaseStart))
 
+	phaseStart = time.Now()
 	db, err := openDBWithDatabase(baseDSN, dbName)
 	if err != nil {
 		t.Fatalf("open test db: %v", err)
@@ -103,6 +185,7 @@ func Open(t *testing.T) (*sql.DB, string) {
 		_ = db.Close()
 		t.Fatalf("ping isolated test database %s: %v", dbName, err)
 	}
+	tracePhase(t, "first_ping", time.Since(phaseStart))
 
 	t.Cleanup(func() {
 		_ = db.Close()
@@ -113,9 +196,19 @@ func Open(t *testing.T) (*sql.DB, string) {
 			return
 		}
 		defer dropDB.Close()
-		if err := dropDatabase(dropCtx, dropDB, dbName); err != nil {
+
+		cleanupStart := time.Now()
+		if err := terminateBackends(dropCtx, dropDB, dbName); err != nil {
+			t.Logf("terminate backends on %s: %v", dbName, err)
+			return
+		}
+		tracePhase(t, "terminate_backends", time.Since(cleanupStart))
+
+		cleanupStart = time.Now()
+		if err := dropDatabaseOnly(dropCtx, dropDB, dbName); err != nil {
 			t.Logf("drop isolated test database %s: %v", dbName, err)
 		}
+		tracePhase(t, "drop_database", time.Since(cleanupStart))
 	})
 
 	return db, dbName
@@ -135,17 +228,20 @@ func ensureTemplateDatabase(t *testing.T, baseDSN string) {
 // database whose name embeds a fingerprint of every curated bootstrap input.
 // The template is shared across test processes and across runs: it is rebuilt
 // only when the schema fingerprint changes, so at most ONE template per schema
-// version exists at a time. A stale-template sweep (under the same advisory
-// lock) drops templates from previous fingerprints, so orphan
-// metaldocs_test_template_* databases cannot accumulate. This replaces the old
-// per-pid template, which was never dropped at process exit and leaked one DB
-// per `go test` package-process (M3 close-out: 144 orphans after ~4h).
+// version exists at a time. A stale-template retirement pass (under the same
+// advisory lock) LOGICALLY retires templates from previous fingerprints — it
+// does not physically drop them; see retireStaleTemplates for why. This
+// replaces the old per-pid template, which was never dropped at process exit
+// and leaked one DB per `go test` package-process (M3 close-out: 144 orphans
+// after ~4h). Physical reclamation of retired templates is a separate,
+// explicit, idle-only step: GCRetiredDatabases.
 func prepareTemplateDatabase(baseDSN string) error {
 	fingerprint, err := schemaFingerprint()
 	if err != nil {
 		return fmt.Errorf("compute schema fingerprint: %w", err)
 	}
-	name := fmt.Sprintf("metaldocs_test_template_%s", fingerprint[:16])
+	fingerprint16 := fingerprint[:16]
+	name := fmt.Sprintf("metaldocs_test_template_%s", fingerprint16)
 	lockKey := advisoryKey(fingerprint)
 
 	adminDB, err := openDBWithDatabase(baseDSN, "postgres")
@@ -179,19 +275,27 @@ func prepareTemplateDatabase(baseDSN string) error {
 		return fmt.Errorf("probe template readiness: %w", err)
 	}
 	if !ready {
+		// This DROP is under the global lock deliberately: it targets ONLY the
+		// exact database name we are about to rebuild (a partial/previous build
+		// of THIS fingerprint), so serializing it here is what prevents two
+		// concurrent processes from racing CREATE DATABASE on the same name.
+		// That is a different thing from dropping OTHER databases under this
+		// lock (see retireStaleTemplates) — the latter is what wedged the
+		// cluster, this is not.
 		if err := buildTemplate(ctx, conn, baseDSN, name, fingerprint); err != nil {
 			return err
 		}
 	}
 
-	// Bound to one template per fingerprint: drop every other test template
-	// (previous schema versions) that has no active connections. Best-effort —
-	// individual drop failures never fail the run.
-	if err := sweepStaleTemplates(ctx, conn, name); err != nil {
-		return fmt.Errorf("sweep stale templates: %w", err)
+	// Bound to one LOGICALLY-live template per fingerprint: mark every other
+	// test template (previous schema versions) as retired. Never drops —
+	// see retireStaleTemplates.
+	if err := retireStaleTemplates(ctx, conn, name); err != nil {
+		return fmt.Errorf("retire stale templates: %w", err)
 	}
 
 	templateDBName = name
+	templateFingerprint16 = fingerprint16
 	return nil
 }
 
@@ -251,14 +355,32 @@ func buildTemplate(ctx context.Context, conn *sql.Conn, baseDSN, name, fingerpri
 	return nil
 }
 
-// sweepStaleTemplates drops every metaldocs_test_template_* database other than
-// keep that has no active connections. This bounds templates to one per schema
-// fingerprint even as the schema evolves across runs. Individual drops are
-// best-effort: another process may claim a template between the SELECT and the
-// DROP, and that race must not fail the run.
-func sweepStaleTemplates(ctx context.Context, conn *sql.Conn, keep string) error {
+// retireStaleTemplates marks every metaldocs_test_template_* database other
+// than keep as LOGICALLY retired by rewriting its COMMENT marker. It does
+// NOT drop them.
+//
+// This function used to drop stale templates outright. That was the observed
+// outage mechanism: it ran on the same pinned conn that holds the global
+// template-build advisory lock (see prepareTemplateDatabase), so a
+// DROP DATABASE that wedged on a forced checkpoint (measured >5 minutes on
+// IPC:CheckpointStart on this Docker Desktop/WSL2 virtualized-storage host)
+// blocked every other test process waiting on that same lock — a
+// cluster-wide stall caused by run-start bookkeeping. So this function no
+// longer drops anything, ever, under any lock. It only rewrites the
+// COMMENT marker so templateIsReady (which matches the exact ready marker,
+// unweakened) never mistakes a retired template for a live one. Physical
+// space reclamation is deliberately deferred to GCRetiredDatabases, which is
+// never called from this path and must be invoked explicitly, idle-only,
+// without holding this global lock.
+func retireStaleTemplates(ctx context.Context, conn *sql.Conn, keep string) error {
+	// A stale-fingerprint template with live backends belongs to a concurrent
+	// run on other code (another branch/worktree sharing this cluster —
+	// HARNESS §9.3a). Retiring it would clear its ready marker and force that
+	// run to rebuild its template mid-flight: two tracks would retire each
+	// other's templates and thrash. Only untouched templates are retired, so
+	// concurrent tracks leave each other alone.
 	rows, err := conn.QueryContext(ctx,
-		`SELECT d.datname
+		`SELECT d.datname, shobj_description(d.oid, 'pg_database')
 		   FROM pg_database d
 		  WHERE d.datname LIKE 'metaldocs_test_template_%'
 		    AND d.datname <> $1
@@ -268,23 +390,69 @@ func sweepStaleTemplates(ctx context.Context, conn *sql.Conn, keep string) error
 	if err != nil {
 		return err
 	}
-	var stale []string
+	type stale struct {
+		name   string
+		marker sql.NullString
+	}
+	var staleDBs []stale
 	for rows.Next() {
-		var n string
-		if err := rows.Scan(&n); err != nil {
+		var s stale
+		if err := rows.Scan(&s.name, &s.marker); err != nil {
 			rows.Close()
 			return err
 		}
-		stale = append(stale, n)
+		staleDBs = append(staleDBs, s)
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	for _, n := range stale {
-		_, _ = conn.ExecContext(ctx, fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", quoteIdent(n)))
+	for _, s := range staleDBs {
+		nameFP16 := strings.TrimPrefix(s.name, templateNamePrefix)
+		// OWNERSHIP PROOF, not name-prefix. Retire only a database this factory
+		// can prove it BUILT — one already carrying a recognised ready marker
+		// (metaldocs-testdb-ready:<fp>) whose fingerprint matches the name. An
+		// unmarked or foreign-marked prefix match is NOT ours to touch: writing
+		// the retired marker onto it would MANUFACTURE the recognised marker
+		// GCRetiredDatabases later trusts (db.go:576-579 → gcDropIfIdleAndUnclaimed),
+		// laundering a database we never owned into a droppable one — turning
+		// "never drop a database you cannot prove you own" into a lie one hop
+		// upstream of the drop. Name-prefix is a namespace, not a title deed; the
+		// marker is the deed. Legacy unmarked orphans are the hub sweep's job
+		// (R1), never this path's. (GPT final-round finding 2.)
+		if !s.marker.Valid {
+			continue
+		}
+		fp, ok := strings.CutPrefix(s.marker.String, "metaldocs-testdb-ready:")
+		if !ok {
+			continue // foreign / already-retired / non-ready marker — not ours to retire
+		}
+		// The database name encodes only the first 16 hex of the fingerprint
+		// (templateNamePrefix + fingerprint[:16]); the ready marker carries the
+		// full fingerprint. Tie them on exactly those 16 shared hex — the marker
+		// must be a ready marker whose fingerprint opens with the 16 hex this name
+		// encodes. 16 is all the name can attest to, so 16 is the tie.
+		if len(fp) < 16 || len(nameFP16) < 16 || fp[:16] != nameFP16[:16] {
+			continue // ready marker's fingerprint does not match the database name
+		}
+		_, _ = conn.ExecContext(ctx, fmt.Sprintf(
+			"COMMENT ON DATABASE %s IS %s", quoteIdent(s.name), quoteLiteral(retiredTemplateMarker(nameFP16)),
+		))
 	}
 	return nil
+}
+
+// templateNamePrefix is the fixed prefix every content-addressed template
+// database name carries; the suffix is the schema fingerprint16.
+const templateNamePrefix = "metaldocs_test_template_"
+
+// retiredTemplateMarker is the COMMENT ON DATABASE value written by
+// retireStaleTemplates. It carries the template's own fingerprint16 (read
+// back from its name, not re-derived) so GCRetiredDatabases can recompute the
+// exact advisory lock key that guarded this template's build without having
+// to trust or re-parse a previous ready marker.
+func retiredTemplateMarker(fingerprint16 string) string {
+	return "metaldocs-testdb-retired:" + fingerprint16
 }
 
 // schemaFingerprint hashes every curated bootstrap input (in load order) plus a
@@ -321,25 +489,34 @@ func advisoryKey(fingerprint string) int64 {
 	return int64(k)
 }
 
-func dropDatabase(ctx context.Context, db *sql.DB, name string) error {
-	if _, err := db.ExecContext(ctx,
+// terminateBackends and dropDatabaseOnly are split so the two costs can be
+// timed independently: terminate is a catalog scan whose cost tracks concurrent
+// session count, while DROP is physical file removal whose cost tracks database
+// size. They move in opposite directions under parallelism, so a combined
+// timing hides which one is being paid.
+func terminateBackends(ctx context.Context, db *sql.DB, name string) error {
+	_, err := db.ExecContext(ctx,
 		`SELECT pg_terminate_backend(pid)
 		   FROM pg_stat_activity
 		  WHERE datname = $1
 		    AND pid <> pg_backend_pid()`,
 		name,
-	); err != nil {
-		return err
-	}
-	if _, err := db.ExecContext(ctx, fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", quoteIdent(name))); err != nil {
-		return err
-	}
-	return nil
+	)
+	return err
 }
 
-// dropDatabaseConn is dropDatabase pinned to a single *sql.Conn, used by the
-// template builder/sweeper which must terminate + drop on the same session that
-// holds the advisory lock.
+func dropDatabaseOnly(ctx context.Context, db *sql.DB, name string) error {
+	_, err := db.ExecContext(ctx, fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", quoteIdent(name)))
+	return err
+}
+
+// dropDatabaseConn is dropDatabase pinned to a single *sql.Conn, used ONLY by
+// buildTemplate to drop a partial/previous database OF ITS OWN EXACT NAME
+// before recreating it, on the same session that holds the global template
+// build lock — serializing that specific drop is precisely why the lock
+// exists. retireStaleTemplates (formerly the "sweeper") no longer drops
+// anything; do not reuse this for dropping any OTHER database under the
+// global lock — that is the mechanism that wedged the cluster.
 func dropDatabaseConn(ctx context.Context, conn *sql.Conn, name string) error {
 	if _, err := conn.ExecContext(ctx,
 		`SELECT pg_terminate_backend(pid)
@@ -356,12 +533,171 @@ func dropDatabaseConn(ctx context.Context, conn *sql.Conn, name string) error {
 	return nil
 }
 
+// GCRetiredDatabases physically drops databases this package can prove it
+// owns — via a recognised COMMENT ON DATABASE marker — that are no longer
+// live: logically-retired templates (retireStaleTemplates) and lease slots
+// (lease_pool.go) from a stale fingerprint or reset-policy version.
+//
+// It is NEVER invoked automatically. Nothing in Open, OpenFreshDatabase,
+// prepareTemplateDatabase, or any init/TestMain path calls this. It exists to
+// be run deliberately (e.g. from a maintenance script) when the cluster is
+// otherwise idle, because DROP DATABASE forces a checkpoint on this
+// virtualized-storage host and a single fsync has been measured at up to
+// ~0.9s — running it opportunistically inside a hot test path is the exact
+// mechanism that wedged the cluster before (see retireStaleTemplates).
+//
+// A database with no recognised marker is SKIPPED and reported, never
+// dropped — "never drop a database you cannot prove you own" is a hard rule,
+// not a style preference. Each surviving candidate is additionally verified
+// idle (zero pg_stat_activity backends) and unclaimed (this call can take its
+// advisory lock) immediately before its own drop; either check failing skips
+// that one database with no force and no wait. Drops are serialized one at a
+// time and never run while holding the global template-build lock — that is
+// the whole point of separating this from prepareTemplateDatabase.
+func GCRetiredDatabases(t *testing.T) (dropped []string, err error) {
+	t.Helper()
+	baseDSN := DSN(t)
+
+	currentFingerprint, err := schemaFingerprint()
+	if err != nil {
+		return nil, fmt.Errorf("compute current schema fingerprint: %w", err)
+	}
+	currentFP16 := currentFingerprint[:16]
+	currentPolicy := fmt.Sprintf("%d", resetPolicyVersion)
+
+	adminDB, err := openDBWithDatabase(baseDSN, "postgres")
+	if err != nil {
+		return nil, fmt.Errorf("open admin db: %w", err)
+	}
+	defer adminDB.Close()
+
+	ctx := context.Background()
+
+	rows, queryErr := adminDB.QueryContext(ctx,
+		`SELECT d.datname, shobj_description(d.oid, 'pg_database')
+		   FROM pg_database d
+		  WHERE d.datname LIKE 'metaldocs_test_template_%'
+		     OR d.datname LIKE 'metaldocs_test_lease_%'`)
+	if queryErr != nil {
+		return nil, fmt.Errorf("list candidate databases: %w", queryErr)
+	}
+
+	type candidate struct {
+		name    string
+		lockKey int64
+	}
+	var candidates []candidate
+	var skipped []string
+	for rows.Next() {
+		var name string
+		var marker sql.NullString
+		if scanErr := rows.Scan(&name, &marker); scanErr != nil {
+			rows.Close()
+			return nil, scanErr
+		}
+		if !marker.Valid {
+			skipped = append(skipped, name)
+			continue
+		}
+		switch {
+		case strings.HasPrefix(marker.String, "metaldocs-testdb-retired:"):
+			fp16 := strings.TrimPrefix(marker.String, "metaldocs-testdb-retired:")
+			candidates = append(candidates, candidate{name: name, lockKey: advisoryKey(fp16)})
+		case strings.HasPrefix(marker.String, "metaldocs-testdb-lease:"):
+			rest := strings.TrimPrefix(marker.String, "metaldocs-testdb-lease:")
+			parts := strings.SplitN(rest, ":", 2)
+			if len(parts) != 2 {
+				skipped = append(skipped, name)
+				continue
+			}
+			fp16, policy := parts[0], parts[1]
+			if fp16 == currentFP16 && policy == currentPolicy {
+				// Still current: this slot may be adopted by a live or future
+				// process running today's code. Not stale — must not drop.
+				skipped = append(skipped, name)
+				continue
+			}
+			candidates = append(candidates, candidate{name: name, lockKey: leaseSlotLockKey(name)})
+		default:
+			skipped = append(skipped, name)
+		}
+	}
+	rows.Close()
+	if rowsErr := rows.Err(); rowsErr != nil {
+		return nil, rowsErr
+	}
+
+	for _, c := range candidates {
+		ok, dropErr := gcDropIfIdleAndUnclaimed(ctx, adminDB, c.name, c.lockKey)
+		if dropErr != nil {
+			err = errors.Join(err, fmt.Errorf("gc %s: %w", c.name, dropErr))
+			continue
+		}
+		if ok {
+			dropped = append(dropped, c.name)
+		}
+	}
+	if len(skipped) > 0 {
+		t.Logf("GCRetiredDatabases: skipped %d database(s) with no actionable/recognised marker: %v", len(skipped), skipped)
+	}
+	return dropped, err
+}
+
+// gcDropIfIdleAndUnclaimed drops name only if, right now, it has zero
+// pg_stat_activity backends AND this call can itself take name's advisory
+// lock (proving no live process — template builder or lease-pool owner —
+// currently claims it). Either check failing skips the drop; there is no
+// force and no wait, because a positive here must be trustworthy enough to
+// justify a checkpoint-forcing DROP DATABASE.
+func gcDropIfIdleAndUnclaimed(ctx context.Context, adminDB *sql.DB, name string, lockKey int64) (bool, error) {
+	var backends int
+	if err := adminDB.QueryRowContext(ctx,
+		`SELECT count(*) FROM pg_stat_activity WHERE datname = $1`, name).Scan(&backends); err != nil {
+		return false, fmt.Errorf("check backends: %w", err)
+	}
+	if backends > 0 {
+		return false, nil
+	}
+
+	conn, err := adminDB.Conn(ctx)
+	if err != nil {
+		return false, fmt.Errorf("pin conn for lock probe: %w", err)
+	}
+	defer conn.Close()
+
+	var locked bool
+	if err := conn.QueryRowContext(ctx, "SELECT pg_try_advisory_lock($1)", lockKey).Scan(&locked); err != nil {
+		return false, fmt.Errorf("probe advisory lock: %w", err)
+	}
+	if !locked {
+		// A live process still owns this template/slot's lock — do not drop.
+		return false, nil
+	}
+	defer func() {
+		_, _ = conn.ExecContext(context.Background(), "SELECT pg_advisory_unlock($1)", lockKey)
+	}()
+
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", quoteIdent(name))); err != nil {
+		return false, fmt.Errorf("drop database: %w", err)
+	}
+	return true, nil
+}
+
 func openDBWithDatabase(dsn, dbName string) (*sql.DB, error) {
 	cfg, err := pgx.ParseConfig(dsn)
 	if err != nil {
 		return nil, err
 	}
 	cfg.Database = dbName
+	// Connect-time search_path, not ALTER DATABASE ... SET search_path: ~9
+	// test files currently run that ALTER as setup boilerplate, all to this
+	// same value. Supplying it here makes those calls redundant (a later
+	// slice deletes them) without mutating database-level state that a leased
+	// database would then carry across tests.
+	if cfg.RuntimeParams == nil {
+		cfg.RuntimeParams = map[string]string{}
+	}
+	cfg.RuntimeParams["search_path"] = "public, metaldocs"
 	return stdlib.OpenDB(*cfg), nil
 }
 
@@ -418,8 +754,6 @@ var metaldocsOwnedObjects = map[string]struct{}{
 	"document_families":      {},
 	"document_process_areas": {},
 	"document_profiles":      {},
-	"governance_events":      {},
-	"grant_area_membership":  {},
 	"iam_group_members":      {},
 	"iam_group_roles":        {},
 	"iam_groups":             {},

@@ -18,17 +18,21 @@ import (
 // trg_require_cap_asserted (user.manage) — seed via the scheduler bypass GUC
 // (withBypass/withBypassErr, shared with membership_area_scope_test.go in this
 // package).
-func insertUserRoleForTenant(t *testing.T, userID, role, tenantID string) {
+//
+// Takes the caller's db: the suite now runs against a per-test leased clone
+// (testdb.Open, ADR 0034), not the shared dev database. tenantID must be a
+// tenants row that exists on THIS db — opening a second openDB(t) here would
+// check out a DIFFERENT leased clone where the caller's tenant does not exist,
+// tripping iam_users_tenant_id_fkey (SQLSTATE 23503).
+func insertUserRoleForTenant(t *testing.T, db *sql.DB, userID, role, tenantID string) {
 	t.Helper()
-	db := openDB(t)
 	ctx := context.Background()
 
 	withBypass(t, db, func(tx *sql.Tx) {
-		// Shared-DB hardening: this suite runs against the shared `metaldocs`
-		// database (testdb.DSN returns the raw DATABASE_URL — no per-test clone)
-		// with deterministic user IDs and manual t.Cleanup teardown. A prior run
-		// killed mid-test leaves an (user_id, role_code) row behind. The upsert
-		// below keys on (tenant_id, user_id), which does NOT cover the table PK
+		// Leftover-row hardening: deterministic user IDs + manual t.Cleanup
+		// teardown mean a prior run killed mid-test can leave an
+		// (user_id, role_code) row behind. The upsert below keys on
+		// (tenant_id, user_id), which does NOT cover the table PK
 		// (user_id, role_code): with a fresh random tenant per run the ON CONFLICT
 		// arm misses the leftover and the INSERT collides on iam_user_roles_pkey
 		// (23505). Clear any leftover rows for this deterministic user first so
@@ -82,7 +86,7 @@ func TestRoleProvider_TenantIsolation(t *testing.T) {
 	tenantA := testdb.NewTenant(t, db).ID
 	tenantB := testdb.NewTenant(t, db).ID
 
-	insertUserRoleForTenant(t, userID, "viewer", tenantA)
+	insertUserRoleForTenant(t, db, userID, "viewer", tenantA)
 
 	provider := iampostgres.NewRoleProvider(db)
 

@@ -49,7 +49,7 @@ import (
 // staging outbox tables.
 func openDispatchDB(t *testing.T) *sql.DB {
 	t.Helper()
-	db, _ := testdb.Open(t)
+	db, _ := testdb.OpenFreshDatabase(t)
 	db.SetMaxOpenConns(1)
 	if _, err := db.ExecContext(context.Background(), `SET search_path TO metaldocs, public`); err != nil {
 		t.Fatalf("set search_path: %v", err)

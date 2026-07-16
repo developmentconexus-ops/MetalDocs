@@ -17,7 +17,7 @@ import (
 // the legal-transition trigger via session_replication_role.
 func TestTriggerBypassBlocked(t *testing.T) {
 	ctx := context.Background()
-	db, dbName := testdb.Open(t)
+	db, dbName := testdb.OpenFreshDatabase(t)
 	ciDB := testdb.OpenAsCIRole(t, dbName)
 
 	tx, err := ciDB.BeginTx(ctx, nil)

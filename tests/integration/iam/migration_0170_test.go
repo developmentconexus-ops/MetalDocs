@@ -20,7 +20,7 @@ import (
 // membership_area_scope_test.go in this package). This test predates migration
 // 0188 and was not updated at the time — drive-by repair, not new breakage.
 func TestMigration0170_FlipsApproverFromSystemAdminToApprover(t *testing.T) {
-	db, _ := testdb.Open(t)
+	db, _ := testdb.OpenFreshDatabase(t)
 	ctx := context.Background()
 
 	const tenantID = tenant.DevTenantID
@@ -80,7 +80,7 @@ VALUES ('approver', $1::uuid, 'system_admin')
 }
 
 func TestMigration0170_Idempotent(t *testing.T) {
-	db, _ := testdb.Open(t)
+	db, _ := testdb.OpenFreshDatabase(t)
 	ctx := context.Background()
 	const tenantID = tenant.DevTenantID
 

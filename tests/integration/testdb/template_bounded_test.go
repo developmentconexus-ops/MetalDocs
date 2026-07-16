@@ -11,17 +11,35 @@ import (
 	"time"
 )
 
-// TestTemplateSweepBoundsOrphans proves the content-addressed template sweep
-// removes orphan templates from previous schema fingerprints while preserving
-// the current one, so metaldocs_test_template_* databases cannot accumulate
-// without bound. This is the regression guard for the M3 close-out leak: under
-// the old per-pid scheme the template was never dropped at process exit, so a
-// single dev machine reached 144 orphan templates after ~4h.
+// TestTemplateRetirementRetiresStaleAndKeepsCurrent proves the content-addressed
+// template sweep neutralises orphan templates from previous schema fingerprints
+// while preserving the current one. This is the regression guard for the M3
+// close-out leak: under the old per-pid scheme the template was never retired at
+// process exit, so a single dev machine reached 144 orphan templates after ~4h.
 //
-// It drives sweepStaleTemplates directly (not via Open) so the assertion is
+// This test used to assert the orphan was physically DROPPED. That assertion is
+// deliberately gone, and the distinction is the entire point of the change it
+// guards:
+//
+//   - Retirement is now LOGICAL. The sweep rewrites the orphan's COMMENT marker
+//     so templateIsReady can never mistake it for a live template. It does not
+//     drop it. Dropping here forced a checkpoint while the sweep held the global
+//     template-build advisory lock, which wedged the whole cluster for >5 minutes
+//     on IPC:CheckpointStart and blocked every other test process.
+//   - Physical space reclamation moved to GCRetiredDatabases, which is idle-only,
+//     never automatic, and never holds that lock.
+//
+// So the correctness invariant (a stale template can never be cloned from) is
+// asserted here, and is what this test owns. The disk-space invariant is NOT
+// asserted here and is no longer automatic: it is GC's job, on purpose. A test
+// that called GC to prove boundedness would itself have to drop every retired
+// database on the cluster — serialized, one forced checkpoint each — which is
+// precisely the hot-path stall this design exists to prevent.
+//
+// It drives retireStaleTemplates directly (not via Open) so the assertion is
 // deterministic and independent of the per-process sync.Once that gates the
 // real build.
-func TestTemplateSweepBoundsOrphans(t *testing.T) {
+func TestTemplateRetirementRetiresStaleAndKeepsCurrent(t *testing.T) {
 	baseDSN := DSN(t)
 	admin, err := openDBWithDatabase(baseDSN, "postgres")
 	if err != nil {
@@ -48,8 +66,8 @@ func TestTemplateSweepBoundsOrphans(t *testing.T) {
 	if err != nil {
 		t.Fatalf("schema fingerprint: %v", err)
 	}
-	keep := fmt.Sprintf("metaldocs_test_template_%s", fingerprint[:16])
-	orphan := "metaldocs_test_template_" + randomSuffix(t) + randomSuffix(t) // 20 hex, distinct from keep
+	keep := templateNamePrefix + fingerprint[:16]
+	orphan := templateNamePrefix + randomSuffix(t) + randomSuffix(t) // 20 hex, distinct from keep
 
 	// Ensure keep exists (empty is fine — a later Open rebuilds it via the
 	// readiness marker check) and create the orphan.
@@ -60,26 +78,54 @@ func TestTemplateSweepBoundsOrphans(t *testing.T) {
 			}
 		}
 	}
+	// Give the orphan a ready marker for a fingerprint that is not the current
+	// one. Without this the test would prove nothing: an unmarked database is
+	// already not-ready, so the retirement assertion below would pass whether or
+	// not retireStaleTemplates did anything at all.
+	orphanFP16 := orphan[len(templateNamePrefix):]
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf(
+		"COMMENT ON DATABASE %s IS %s", quoteIdent(orphan), quoteLiteral(readyMarker(orphanFP16)),
+	)); err != nil {
+		t.Fatalf("mark orphan ready: %v", err)
+	}
+	ready, err := templateIsReady(ctx, conn, orphan, orphanFP16)
+	if err != nil {
+		t.Fatalf("read orphan readiness before sweep: %v", err)
+	}
+	if !ready {
+		t.Fatalf("precondition failed: orphan %s does not read as ready before the sweep — the retirement assertion below would be vacuous", orphan)
+	}
+
 	t.Cleanup(func() {
 		c, err := admin.Conn(context.Background())
 		if err != nil {
 			return
 		}
 		defer c.Close()
-		// Drop only the orphan; keep is the shared real template.
+		// Drop only the orphan this test created; keep is the shared real
+		// template. This is the test cleaning up a database it provably owns,
+		// not the sweep's job — see the doc comment.
 		_, _ = c.ExecContext(context.Background(),
 			fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", quoteIdent(orphan)))
 	})
 
-	if err := sweepStaleTemplates(ctx, conn, keep); err != nil {
-		t.Fatalf("sweepStaleTemplates: %v", err)
+	if err := retireStaleTemplates(ctx, conn, keep); err != nil {
+		t.Fatalf("retireStaleTemplates: %v", err)
 	}
 
 	if !dbExists(ctx, conn, keep) {
-		t.Errorf("sweep dropped the current template %s — it must be kept", keep)
+		t.Errorf("retirement dropped the current template %s — it must be kept", keep)
 	}
-	if dbExists(ctx, conn, orphan) {
-		t.Errorf("sweep left orphan template %s — it must be dropped", orphan)
+	stillReady, err := templateIsReady(ctx, conn, orphan, orphanFP16)
+	if err != nil {
+		t.Fatalf("read orphan readiness after retirement: %v", err)
+	}
+	if stillReady {
+		t.Errorf("orphan template %s still reads as ready after retirement — a stale template must never be clonable", orphan)
+	}
+	if !dbExists(ctx, conn, orphan) {
+		t.Errorf("retirement physically dropped orphan %s — retirement must be logical only; "+
+			"dropping under the global template lock is what wedged the cluster", orphan)
 	}
 }
 
