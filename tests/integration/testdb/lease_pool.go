@@ -607,10 +607,22 @@ func resetLeasedDatabase(ctx context.Context, baseDSN, dbName string) error {
 		return fmt.Errorf("commit reset tx on %s: %w", dbName, err)
 	}
 
-	if err := assertReferenceRowCount(ctx, db, dbName, "metaldocs.tenants", 1); err != nil {
-		return err
+	// Guard the restore: every semi-static table must carry its baseline row
+	// back after the DELETE+snapshot-restore, or the lease has silently
+	// under-seeded (an empty snapshot restores 0 rows without erroring). Drive
+	// the assertion from baselineSnapshotTables itself so the guard can NEVER
+	// again drift from the restore set — the earlier hand-listed form checked
+	// only 2 of the 3 restored tables (templates_template_version was
+	// unguarded), the same one-directional-guard hole recorded in §11.22. All
+	// three tables carry exactly 1 baseline row in the template (lease_pool.go
+	// classification comment: tenants 1, templates_template 1,
+	// templates_template_version 1).
+	for _, st := range baselineSnapshotTables {
+		if err := assertReferenceRowCount(ctx, db, dbName, st.qualified, 1); err != nil {
+			return err
+		}
 	}
-	return assertReferenceRowCount(ctx, db, dbName, "public.templates_template", 1)
+	return nil
 }
 
 // deleteTargets queries pg_tables for every base table in schemas public and
