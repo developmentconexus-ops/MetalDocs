@@ -41,10 +41,12 @@ func TestRetirementRequiresOwnershipProof(t *testing.T) {
 	}
 	defer admin.Close()
 
-	// 60s was exceeded under full-suite parallel load (CREATE DATABASE + checkpoint
-	// contention); this test's ops are serial and cheap when idle, the budget is
-	// generous headroom, not expected runtime.
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	// 60s (then 5m) was exceeded under full-suite parallel load: the GC pass
+	// this test drives serializes checkpoint-forcing drops, so its wall time
+	// scales with cluster debris, not with this test's own serial, cheap-when-
+	// idle operations. The budget is generous headroom, not expected runtime;
+	// the final assertions additionally get their own fresh context below.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	if err := admin.PingContext(ctx); err != nil {
 		t.Skipf("integration DB unreachable: %v", err)
@@ -122,10 +124,17 @@ func TestRetirementRequiresOwnershipProof(t *testing.T) {
 	if _, err := GCRetiredDatabases(t); err != nil {
 		t.Fatalf("GCRetiredDatabases: %v", err)
 	}
-	if !dbExists(ctx, t, conn, unmarked) {
+	// Fresh budget for the final assertions: GC's wall time scales with how
+	// much retired/stale debris the cluster carries (serialized drops, one
+	// forced checkpoint each), so it can exhaust the setup context under
+	// full-suite load. The two existence probes are the assertions this test
+	// exists for — they must never inherit a budget another phase consumed.
+	verifyCtx, verifyCancel := context.WithTimeout(context.Background(), time.Minute)
+	defer verifyCancel()
+	if !dbExists(verifyCtx, t, conn, unmarked) {
 		t.Errorf("GC dropped UNMARKED %s — a database with no recognised marker must never be dropped", unmarked)
 	}
-	if !dbExists(ctx, t, conn, foreign) {
+	if !dbExists(verifyCtx, t, conn, foreign) {
 		t.Errorf("GC dropped FOREIGN %s — a foreign-ready-marked database is not ours to drop", foreign)
 	}
 }
