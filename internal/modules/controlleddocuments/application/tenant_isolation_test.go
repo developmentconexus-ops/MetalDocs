@@ -204,6 +204,16 @@ func TestTenantIsolation_SequenceCounters_CrossTenant(t *testing.T) {
 	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
+	// EnsureCounter writes cd_sequence_counters directly on the pool
+	// (repository.go: no caller-managed tx), and cd_sequence_counters carries
+	// the trg_require_cap_asserted tripwire (controlled_documents.create) —
+	// see sequence_test.go's TestSequenceAllocatorNextAndIncrement_Concurrent
+	// comment for the same finding. A tx-local assertion cannot reach a bare
+	// pool call, so this session-level assertion is required; SetCapsOnDB is
+	// the sanctioned helper for exactly this shape, safe only because
+	// MaxOpenConns(1) above pins the whole test to one physical connection.
+	testdb.SetCapsOnDB(t, db, `[{"cap":"controlled_documents.create"}]`)
+
 	tenantA := testdb.NewTenant(t, db)
 	tenantB := testdb.NewTenant(t, db)
 
