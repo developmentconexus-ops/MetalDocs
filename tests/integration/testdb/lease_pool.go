@@ -53,11 +53,48 @@ func init() {
 // claim (claimSlot) provides.
 const leasedPoolCap = 8
 
-// leaseCreateMu serializes lease slot preparation (see its use in claimSlot).
-// Package-level rather than a leasePool field because it guards a host-level
-// resource — the cluster's ability to clone a database without thrashing — not
-// pool bookkeeping.
-var leaseCreateMu sync.Mutex
+// leaseCloneGateKey is the single cluster-wide advisory-lock key that
+// serializes the checkpoint-forcing CREATE DATABASE clone across ALL processes
+// and goroutines (see withLeaseCloneGate). Namespaced + sha256'd, distinct by
+// construction from the template BUILD key (advisoryKey, db.go — raw fingerprint
+// bytes) and the per-slot claim key (leaseSlotLockKey — "…-lease-slot:" prefix),
+// so the three advisory-lock spaces cannot collide by chance.
+func leaseCloneGateKey() int64 {
+	sum := sha256.Sum256([]byte("metaldocs-testdb-lease-clone-gate"))
+	return int64(binary.BigEndian.Uint64(sum[:8]))
+}
+
+// withLeaseCloneGate runs fn while holding leaseCloneGateKey on a dedicated
+// connection, so at most one CREATE DATABASE clone runs anywhere on the cluster
+// at a time.
+//
+// This SUPERSEDES the old process-local leaseCreateMu (a sync.Mutex).
+// `go test ./...` runs each package as its own OS process, so a process-local
+// mutex serialized clones only WITHIN a package: on a COLD cluster (no slots
+// yet) up to leaseSlotCount package processes each win a DISTINCT slot's
+// advisory lock and issue a concurrent clone — reproducing the exact 8-wide
+// clone storm the mutex was meant to prevent (measured 60s CREATE DATABASE
+// timeouts on this virtualized-storage host). The per-slot lock (claimSlot)
+// prevents two processes cloning the SAME slot; it does nothing about different
+// slots cloned at once. A Postgres advisory lock is held per SESSION, so one
+// dedicated conn here serializes clones across BOTH goroutines (t.Parallel) and
+// processes — the coverage leaseCreateMu could never provide. Adoption (the
+// warm path, no clone) never takes this gate, so steady-state contention is
+// nil; the gate only bites the once-per-cluster cold clone burst.
+func withLeaseCloneGate(ctx context.Context, adminDB *sql.DB, fn func(conn *sql.Conn) error) error {
+	conn, err := adminDB.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("pin conn for clone gate: %w", err)
+	}
+	defer conn.Close()
+	if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", leaseCloneGateKey()); err != nil {
+		return fmt.Errorf("acquire clone gate: %w", err)
+	}
+	defer func() {
+		_, _ = conn.ExecContext(context.Background(), "SELECT pg_advisory_unlock($1)", leaseCloneGateKey())
+	}()
+	return fn(conn)
+}
 
 // globalLeasePool is the package-process-wide pool of leased databases
 // checked out by Open. It replaces the old one-CREATE-DATABASE/DROP-DATABASE-
@@ -202,26 +239,24 @@ func (p *leasePool) claimSlot(baseDSN, templateDBName, fingerprint16 string) (st
 			p.held[slotName] = conn
 			p.mu.Unlock()
 
-			// Serialized deliberately. Concurrent CREATE DATABASE is the
-			// measured failure mode, not a theoretical one: with t.Parallel and
-			// -parallel=8, eight goroutines reached this line at once, issued
-			// eight concurrent clones, and every one of them blew the 60s
-			// timeout below (60.02s, repeatedly) on this virtualized-storage
-			// host. Cloning is I/O the host serializes anyway — doing it 8-wide
-			// converts a ~0.9s operation into a timeout for all 8.
+			// Concurrent CREATE DATABASE is the measured failure mode, not a
+			// theoretical one: with t.Parallel and -parallel=8, eight goroutines
+			// reached this line at once, issued eight concurrent clones, and every
+			// one blew the 60s timeout below (60.02s, repeatedly) on this
+			// virtualized-storage host. Cloning is I/O the host serializes anyway —
+			// doing it 8-wide converts a ~0.9s operation into a timeout for all 8.
 			//
-			// This mutex is the reason t.Parallel is viable at all: the first
-			// process pays N clones back-to-back (~0.9s each, once ever), and
-			// every later process ADOPTS those same slots and pays ~0.02s.
-			// Holding it across adoption too is intentional — adoption is a few
-			// catalog queries, so the contention is irrelevant, and one
-			// unconditional lock is easier to keep correct than a
-			// create-only fast path.
-			leaseCreateMu.Lock()
+			// The serialization now lives INSIDE ensureLeaseSlotDatabase, around
+			// only the clone DDL, as the cluster-wide advisory clone gate
+			// (withLeaseCloneGate) — deliberately NOT a process-local mutex here,
+			// because `go test ./...` runs packages as separate processes and a
+			// mutex would leave cross-process cold-start clones unserialized (see
+			// withLeaseCloneGate's doc). Adoption — the steady state, where the
+			// first run cloned N slots once and every later process pays ~0.02s to
+			// ADOPT them — never touches the gate.
 			ensureCtx, ensureCancel := context.WithTimeout(context.Background(), 60*time.Second)
 			ensureErr := ensureLeaseSlotDatabase(ensureCtx, baseDSN, templateDBName, fingerprint16, slotName)
 			ensureCancel()
-			leaseCreateMu.Unlock()
 			if ensureErr != nil {
 				return "", fmt.Errorf("prepare lease slot database %s: %w", slotName, ensureErr)
 			}
@@ -286,6 +321,7 @@ func ensureLeaseSlotDatabase(ctx context.Context, baseDSN, templateDBName, finge
 		return fmt.Errorf("check lease slot database existence: %w", err)
 	}
 
+	needRebuild := false
 	if exists {
 		// Adoption is only legitimate if the slot carries a baseline this code
 		// can trust. If it does, adopt it: no drop, no recreate — the
@@ -308,24 +344,23 @@ func ensureLeaseSlotDatabase(ctx context.Context, baseDSN, templateDBName, finge
 			// from a dirty one, and guessing is exactly the assumption this
 			// factory must not make.
 			//
-			// So rebuild it from the template. This is the only DROP DATABASE
-			// on the lease path and it is deliberately bounded: it takes a
-			// crash to reach, it runs under this slot's exclusive
-			// advisory-lock claim (no live process can be using it) and NOT
-			// under the global template-build lock (dropping under that lock is
-			// what wedged the cluster), and leaseCreateMu serializes it against
-			// every other clone. Failing loudly instead would be safe but would
-			// brick this slot for every future run until a human intervened.
-			if _, err := adminDB.ExecContext(ctx,
-				fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", quoteIdent(slotName)),
-			); err != nil {
-				return fmt.Errorf("rebuild lease slot %s (drop incomplete slot): %w", slotName, err)
-			}
-			exists = false
+			// So rebuild it from the template (DROP + CREATE below, both under
+			// the clone gate). This is the only DROP DATABASE on the lease path
+			// and it is deliberately bounded: it takes a crash to reach, it runs
+			// under this slot's exclusive advisory-lock claim (no live process
+			// can be using it) and NOT under the global template-build lock
+			// (dropping under that lock is what wedged the cluster). Failing
+			// loudly instead would be safe but would brick this slot for every
+			// future run until a human intervened.
+			needRebuild = true
 		}
 	}
 
-	if !exists {
+	if !exists || needRebuild {
+		// The DROP (rebuild only) and CREATE are the checkpoint-forcing clone
+		// I/O — serialize them across every process and goroutine via the
+		// cluster-wide clone gate, on the gate's own pinned connection.
+		//
 		// STRATEGY = WAL_LOG pinned for the same reason as db.go's isolated-clone
 		// site: FILE_COPY forces a checkpoint per clone, which on this storage
 		// stack blocks on IPC:CheckpointDone for an unbounded time (measured
@@ -333,10 +368,22 @@ func ensureLeaseSlotDatabase(ctx context.Context, baseDSN, templateDBName, finge
 		// template). Lease slots are created once and reused, so this fires far
 		// less often than the isolated site — but a forced-checkpoint stall here
 		// convoys every test waiting on the pool, so the strategy still matters.
-		if _, err := adminDB.ExecContext(ctx,
-			fmt.Sprintf("CREATE DATABASE %s TEMPLATE %s STRATEGY = WAL_LOG", quoteIdent(slotName), quoteIdent(templateDBName)),
-		); err != nil {
-			return fmt.Errorf("create leased database %s: %w", slotName, err)
+		if err := withLeaseCloneGate(ctx, adminDB, func(conn *sql.Conn) error {
+			if needRebuild {
+				if _, err := conn.ExecContext(ctx,
+					fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", quoteIdent(slotName)),
+				); err != nil {
+					return fmt.Errorf("rebuild lease slot %s (drop incomplete slot): %w", slotName, err)
+				}
+			}
+			if _, err := conn.ExecContext(ctx,
+				fmt.Sprintf("CREATE DATABASE %s TEMPLATE %s STRATEGY = WAL_LOG", quoteIdent(slotName), quoteIdent(templateDBName)),
+			); err != nil {
+				return fmt.Errorf("create leased database %s: %w", slotName, err)
+			}
+			return nil
+		}); err != nil {
+			return err
 		}
 		// Snapshot the baseline NOW, while the clone is by definition still
 		// byte-identical to the template — see snapshotLeaseBaseline's own
@@ -419,6 +466,43 @@ func snapshotLeaseBaseline(ctx context.Context, baseDSN, dbName string) error {
 		)); err != nil {
 			return fmt.Errorf("snapshot baseline rows for %s: %w", st.qualified, err)
 		}
+	}
+
+	// Guard the reset's load-bearing assumption at the ONE moment it is
+	// verifiable — here, on the pristine clone, before any test has touched it.
+	// resetLeasedDatabase restores every ADVANCED sequence (last_value IS NOT
+	// NULL) to setval(start_value, false), which reproduces clone semantics ONLY
+	// if every template sequence is virgin (last_value IS NULL) at clone time —
+	// i.e. start_value IS the nextval a fresh clone hands out. That is true today
+	// (verified: all sequences virgin in the template), but it is an assumption,
+	// not an invariant the schema enforces. If a future migration seeds a
+	// sequence, its clone-fresh nextval would be start_value+N while reset would
+	// slam it back to start_value — a silent wrong-nextval that surfaces only
+	// when some test asserts a specific revision_num or audit_sequence, reading
+	// as a product bug. Fail LOUD here instead, so a human decides birth-capture.
+	var nonVirgin []string
+	seqRows, err := db.QueryContext(ctx,
+		`SELECT schemaname||'.'||sequencename
+		   FROM pg_sequences
+		  WHERE schemaname IN ('public', 'metaldocs')
+		    AND last_value IS NOT NULL`)
+	if err != nil {
+		return fmt.Errorf("probe template sequence virginity on %s: %w", dbName, err)
+	}
+	for seqRows.Next() {
+		var name string
+		if err := seqRows.Scan(&name); err != nil {
+			seqRows.Close()
+			return fmt.Errorf("scan non-virgin sequence on %s: %w", dbName, err)
+		}
+		nonVirgin = append(nonVirgin, name)
+	}
+	seqRows.Close()
+	if err := seqRows.Err(); err != nil {
+		return fmt.Errorf("iterate template sequences on %s: %w", dbName, err)
+	}
+	if len(nonVirgin) > 0 {
+		return fmt.Errorf("lease baseline on %s: %d template sequence(s) are NON-VIRGIN at clone time (%v) — resetLeasedDatabase restores advanced sequences to setval(start_value), which would hand tests the wrong nextval for these; capture each sequence's birth nextval or exclude it before this can be trusted", dbName, len(nonVirgin), nonVirgin)
 	}
 	return nil
 }
