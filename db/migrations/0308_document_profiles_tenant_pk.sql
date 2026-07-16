@@ -45,9 +45,13 @@
 -- "REFERENCES metaldocs\.(document_profile_governance|
 -- document_profile_schema_versions|document_sequences|
 -- document_profile_template_defaults)" across the baseline: zero hits), so a
--- flat IF EXISTS ... CASCADE list is safe -- no drop-order dependency among
--- them, and CASCADE only ever needs to clean up each table's own outbound FK
--- to document_profiles(code), which DROP TABLE removes for free.
+-- flat IF EXISTS list is safe -- no drop-order dependency among them. No
+-- CASCADE is used: each table's only FK is its own OUTBOUND reference to
+-- document_profiles(code), which a plain DROP TABLE removes for free without
+-- needing to cascade anywhere. Per the no-fallback principle, CASCADE is
+-- deliberately omitted so that if the zero-inbound-FK evidence above has
+-- drifted since authoring, the DROP fails loud (blocking FK) instead of
+-- silently deleting an unexpected dependent row.
 --
 -- ============================================================================
 -- PK SWAP MECHANICS -- FK-dependency finding that changes the originally
@@ -114,10 +118,10 @@
 
 BEGIN;
 
-DROP TABLE IF EXISTS metaldocs.document_profile_governance CASCADE;
-DROP TABLE IF EXISTS metaldocs.document_profile_schema_versions CASCADE;
-DROP TABLE IF EXISTS metaldocs.document_sequences CASCADE;
-DROP TABLE IF EXISTS metaldocs.document_profile_template_defaults CASCADE;
+DROP TABLE IF EXISTS metaldocs.document_profile_governance;
+DROP TABLE IF EXISTS metaldocs.document_profile_schema_versions;
+DROP TABLE IF EXISTS metaldocs.document_sequences;
+DROP TABLE IF EXISTS metaldocs.document_profile_template_defaults;
 
 DO $$
 DECLARE
@@ -149,6 +153,32 @@ BEGIN
        AND n.nspname = 'metaldocs'
   ) THEN
     EXECUTE 'ALTER TABLE ONLY metaldocs.document_profiles ADD CONSTRAINT document_profiles_pkey PRIMARY KEY USING INDEX ux_document_profiles_tenant_code';
+  END IF;
+END
+$$;
+
+-- Final fail-closed assertion (F2): if the two DO-block guards above both
+-- no-op against a prestate they don't recognize (e.g.
+-- ux_document_profiles_tenant_code missing or malformed at run time), the
+-- table could otherwise be left with NO primary key while the ledger below
+-- still records '0308' as applied -- a silent invariant violation. Introspect
+-- the table's actual primary key and RAISE unless it is exactly the
+-- composite (tenant_id, code) in that column order. This statement runs
+-- inside the file's own explicit BEGIN/COMMIT, so a RAISE here aborts the
+-- entire migration, including the ledger INSERT below.
+DO $$
+DECLARE
+  final_pk_cols text;
+BEGIN
+  SELECT string_agg(a.attname, ',' ORDER BY array_position(c.conkey, a.attnum))
+    INTO final_pk_cols
+    FROM pg_constraint c
+    JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey)
+   WHERE c.conrelid = 'metaldocs.document_profiles'::regclass
+     AND c.contype = 'p';
+
+  IF final_pk_cols IS DISTINCT FROM 'tenant_id,code' THEN
+    RAISE EXCEPTION 'migration 0308 invariant violated: metaldocs.document_profiles primary key must be exactly (tenant_id, code), got %', COALESCE(final_pk_cols, '<none>');
   END IF;
 END
 $$;
