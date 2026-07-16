@@ -195,7 +195,7 @@ worktrees.
 | Postgres-lease scheduler + `lease-reaper` | M5 | River periodic jobs (ADR 0067/0068) |
 | `DoReadOnly` tx path | G1 (817abd59) | `Do` + api-lint guard (authz.Require needs writable tx) |
 | deep-research workflow | 2026-07 | lean inline research (workflow ≈4M tokens) |
-| Codex/GPT subagent dispatch (all roles: planner, implementers, investigator, GPT gate arm) — **operator ruling 2026-07-16, this repo** | 2026-07-16 | Claude workers: **sonnet** = planner + implementer + per-slice reviewer (implementer ≠ reviewer, distinct dispatches), haiku = mechanical/trivial greps, cold Opus = dual-gate arm 1. Dual gate at CLOSED = cold Opus subagent + **independent sonnet reviewer** (clean context, fixed-SHA diff, git read-only) — replaces the GPT-5.6 Sol arm. Sandbox works (PROBE-OK) but codex is retired for MetalDocs by operator preference; `codex-dispatch` skill inapplicable here. |
+| Codex dispatch for PLANNER and IMPLEMENTER roles — **operator ruling 2026-07-16, refined same day** | 2026-07-16 | **Planner = Opus subagent** (one batch P2 pass) · **Implementers = sonnet subagents** (TDD slices) · per-slice reviewer = independent sonnet · investigator = sonnet (haiku trivial greps) · mechanical = haiku. **Dual gate at CLOSED UNCHANGED from core §4: cold Opus subagent + GPT-5.6 Sol medium review (via codex, git read-only, fixed-SHA diff)** — the GPT gate arm is explicitly MAINTAINED; codex stays legal for the dual gate only. |
 | testdb ownership-gate retirement + mid-suite GC | 2026-07-15/16 | guard-first virginity + `classifyGCCandidate` + `TESTDB_GC_E2E=1` idle-only (§4) |
 | Blanket `-count=1` on integration runs | 2026-07-13 | cache-sound selective policy (§2 L1) |
 
@@ -211,4 +211,9 @@ worktrees.
   repo (all roles). Claude-only worker matrix: sonnet plan/implement/review (implementer ≠
   reviewer), haiku mechanical, cold Opus dual-gate arm 1 + independent sonnet arm 2 (replaces
   GPT-5.6 Sol arm). Profile wins over core §1 model matrix (core §0 conflict order).
+2026-07-16 · §10 · REFINED (operator, same hub session — supersedes the entry above) · scope of
+  the codex retirement narrowed to PLANNER + IMPLEMENTER only: planner = Opus subagent,
+  implementers = sonnet subagents. Dual gate at CLOSED reverts to core §4 canon: cold Opus +
+  GPT-5.6 Sol medium via codex (git read-only) — GPT arm MAINTAINED. Codex legal for the dual
+  gate only; per-slice reviewer/investigator stay sonnet, mechanical haiku.
 ```
