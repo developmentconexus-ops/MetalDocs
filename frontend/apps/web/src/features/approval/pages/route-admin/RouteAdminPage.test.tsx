@@ -56,7 +56,7 @@ function makeRoute(overrides: Partial<RouteSummary> = {}): RouteSummary {
       {
         order: 1,
         name: 'Revisão',
-        required_capability: 'doc.signoff',
+        required_capability: 'document.signoff',
         selectors: [{ kind: 'role_in_fixed_area', role: 'approver', area_code: 'AREA-01' }],
         quorum: 'any_1_of',
         quorum_m: null,
@@ -65,7 +65,7 @@ function makeRoute(overrides: Partial<RouteSummary> = {}): RouteSummary {
       {
         order: 2,
         name: 'Aprovação',
-        required_capability: 'doc.signoff',
+        required_capability: 'document.signoff',
         selectors: [{ kind: 'role_in_fixed_area', role: 'approver', area_code: 'AREA-01' }],
         quorum: 'all_of',
         quorum_m: null,
@@ -439,7 +439,7 @@ describe('RouteAdminPage', () => {
     expect(within(dialog).getByRole('radio', { name: 'Todos (N de N)' })).toBeChecked();
   });
 
-  it('submit payload includes stage_kind per stage', async () => {
+  it('submit payload includes stage_kind and the canonical capability per stage', async () => {
     vi.mocked(routeAdminApi.listRoutes).mockResolvedValue(listResponse([]));
 
     renderWithProviders(<RouteAdminPage />);
@@ -459,6 +459,9 @@ describe('RouteAdminPage', () => {
     await waitFor(() => expect(vi.mocked(routeAdminApi.createRoute)).toHaveBeenCalled());
     const body = vi.mocked(routeAdminApi.createRoute).mock.calls[0][0];
     expect(body.stages[0].stage_kind).toBe('approval');
+    // Literal on purpose: pins the default-stage seed to the Go registry
+    // capability so drift in the SIGNOFF_CAPABILITY constant cannot self-green.
+    expect(body.stages[0].required_capability).toBe('document.signoff');
   });
 
   it('rejects a review stage that comes after an approval stage', async () => {
