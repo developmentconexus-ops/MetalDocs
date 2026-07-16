@@ -72,7 +72,7 @@ No genuinely-new cross-cutting concern. (Option A's only new primitive is a serv
 
 ## 8. Test & QA plan
 
-- **Canonical framework:** unit — existing `application/*_test.go` + `fakes_test.go` fakes (extend the `Presigner` fake with `Exists`/`Put` as needed). Integration — `tests/docx_v2/templates_integration_test.go` or a `testdb`-backed guard, `//go:build integration`.
+- **Canonical framework:** unit — existing `application/*_test.go` + `fakes_test.go` fakes (extend the `Presigner` fake with `Exists`/`Put` as needed). Integration — a `testdb`-backed guard, `//go:build integration`. (Original suggestion `tests/docx_v2/templates_integration_test.go` was an inert stub deleted in unit 4.6a, 2026-07-16.)
 - **Guard/test (the pin):**
   - Option B: a test asserting (i) a freshly-created blank template's version has `DocxStorageKey` set, (ii) `GetDocxURL` returns the empty-state contract (`ErrUploadMissing`/409) — **not** a presigned URL — while the object is absent, and (iii) after a `Confirm`/autosave the same call returns a URL.
   - Option A: consumer idempotency test (Put-if-absent; re-run no-ops) + outbox enqueue-in-tx test.
