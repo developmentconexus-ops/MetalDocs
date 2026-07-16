@@ -1,0 +1,125 @@
+# Evidence — unit blank-docx Option B (template docx read-path honesty)
+
+**Date:** 2026-07-16 · **Branch:** `claude/determined-driscoll-2e3140` · **Base:** `4a91aadf`
+(worktree forked from main HEAD; dispatch named base `60d0bf12` — `4a91aadf` is the docs-only
+roadmap commit directly on top of it, contains it)
+**Charter:** `docs/superpowers/analysis/2026-06-29-blank-template-docx-provision-system-impact.md` (Option B, operator-locked)
+
+## Anchor re-verification (charter predates 3.1a/4.2)
+
+| Charter anchor | Verified location 2026-07-16 |
+|---|---|
+| `queries.go:46` GetDocxURL | `internal/modules/templates/application/queries.go:59` |
+| `verified_store.go:113` Exists | `internal/platform/objectstore/verified_store.go:235` (StatObject, unguarded DB-sourced-key trust model, same as PresignGet) |
+| `errors.go:52` ErrUploadMissing/CodeUploadMissing | `domain/errors.go:13` + `delivery/http/errors.go:67` (→409, pinned by errors_test.go:28) |
+| `keys.go:8` templateDocxKey | `application/keys.go:17` |
+| `autosave.go:110` | `application/autosave.go` CommitAutosave→Confirm path intact |
+| create sets key | `application/create.go:63` |
+
+Intent unchanged; drift is line-number only + one structural fact: production Presigner is
+`*objectstore.VerifiedStore` injected directly (main.go:567→1065), so adding `Exists` to the
+templates `Presigner` port needs zero adapter code; two test fakes gain the method.
+
+## Dispatch ledger
+
+| # | Role | Model / effort | Path | Prompt pack | Output artifact | Verdict/result |
+|---|---|---|---|---|---|---|
+| 1 | Feature planner | gpt-5.6-sol / medium | OS-process codex exec | scratchpad `prompt-planner.md` | — | KILLED mid-run — hub correction 2026-07-16 (profile §10 amendment 1070e94c): codex retired for MetalDocs, Claude-only matrix; no output consumed |
+| 2 | Feature planner | claude sonnet subagent | Agent tool (sync) | scratchpad `prompt-planner.md` (same pack) | scratchpad `plan-blank-docx-b.md` | DONE — 2 slices (A code+tests, B wiki); contract finding: docx-url route lacks declared 409 (openapi.yaml:1731-1753) → REQUEST contract-lock sent to hub |
+| 3 | Implement worker (slice A) | claude sonnet subagent | Agent tool (sync) | scratchpad `plan-blank-docx-b.md` slice A | commit `291bce1c` | DONE — TDD (failing test first confirmed), 5 new GetDocxURL tests, build/vet/gofmt/module tests green |
+| 4 | Per-slice reviewer (slice A) | claude sonnet subagent | Agent tool (sync) | REVIEW-STANDARD §14 prompt-pack + diff 291bce1c + L0 report | verdict below | APPROVE, zero findings (G1-G3 clean; fail-closed, cross-tenant, no-test-theater receipts verified) |
+| 5 | Implement worker (slice B, wiki) | claude sonnet subagent | Agent tool (sync) | scratchpad `plan-blank-docx-b.md` slice B | commit `ac9b8391` | DONE — templates.md §8.9a + Last-verified + anchor fix (queries.go:41→:51); tech-debt T-016 appended-closed |
+| 6 | Per-slice reviewer (slice B) | claude sonnet subagent | Agent tool (sync) | §14 prompt-pack + diff ac9b8391 | verdict below | APPROVE — all anchors/claims verified exact vs code; honesty + idiom checks pass; 1 trivial non-blocking (openapi range 1731-1753 vs actual 1751) |
+| 7 | Dual gate — Claude arm | COLD Opus subagent (model=opus, clean context) | Agent tool (sync, parallel with #8) | gate prompt-pack, range 4a91aadf..ac9b8391 | verdict below | APPROVE — 1 suggestion + 1 nit, both optional |
+| 8 | Dual gate — second arm | independent claude sonnet subagent (clean context) | Agent tool (sync, parallel with #7) | same gate prompt-pack, same fixed SHA | verdict below | APPROVE — zero findings |
+
+## Ladder results
+
+- **L0:** `go build ./...` clean · `go vet ./...` clean · gofmt clean · api-lint `-strict` 0 violations ·
+  module-boundaries OK. Pre-existing (NOT this diff, verified file-disjoint): check-test-discipline
+  7 violations (approval module ×4, tests/integration/approval ×1, tests/integration/migrations ×2);
+  cilint hgcrossmodule 4 hits (approval/auth/iam + templates/infrastructure/postgres.go:731 — untouched file).
+- **L1 unit:** `go test ./...` full sweep — zero FAIL.
+- **L1 integration (selective per profile §2; pg_stat_activity window verified clear):**
+  `.\scripts\test-integration.ps1` templates pkg + guard suites — ALL ok:
+  templates application 5.2s · delivery/http 7.8s · domain 1.4s · infrastructure 85.9s · jobs 17.4s ·
+  tenantdata 18.0s · scenarios 286.8s · iam 141.3s. PASS.
+- No migration/platform touch → no full integration sweep (profile §2 L1 selective policy).
+
+## Dual gate
+
+**Fixed range:** `4a91aadf..ac9b8391` (commits 291bce1c code, ac9b8391 wiki). Both arms cold,
+clean-context, git read-only, same prompt-pack (REVIEW-STANDARD order + G1-G3 + anti-slop
+checklist + severity schema).
+
+- **Opus arm (row 7): APPROVE** (LGTM-with-comments). G1 PASS (in-bounds, no new surface,
+  no-fallback honored, single caller routes_query.go:218, blast radius contained); G2 PASS
+  (Option A rejection, unguarded-Exists trust model, integration-omission all documented);
+  G3 NO (409 spec gap = disclosed pending contract-lock). Findings: 1 suggestion
+  (CrossTenant test lands on GetVersion tenant guard, not the new Exists gate — legitimate
+  boundary test, optional rename), 1 nit (fakes_test.go:299-305 comment over-claims what
+  zero-value fakePresigner sites do). Anti-slop: clean, all receipts quoted (fail-closed
+  queries.go:72-77 → MapErr default 500; absent-path :78-80 → errors.go:67 → 409 pinned
+  errors_test.go:28; production satisfaction main.go:567→buildTemplatesModule).
+- **Sonnet arm (row 8): APPROVE.** G1/G2/G3 all pass; ZERO findings survive verification.
+  Receipts: queries.go:61-80 gate logic exact vs charter; verified_store.go:235-244 unchanged
+  pre-existing; diff --stat 7 files all in templates module + 2 wiki, no openapi/migration/FE/
+  parallel-owned test file; 5 tests each hit distinct branch incl. PresignGet-not-called
+  assertion on error path.
+
+**§8 merge + reconciliation:** APPROVE ∧ APPROVE → **APPROVE**. No blocking/important on
+either arm → nothing to reconcile. Opus's suggestion+nit are advisory (test naming, comment
+wording); recorded here, not applied — neither changes behavior, coverage, or a documented
+claim, and both arms independently confirmed no-test-theater and comment-warranted.
+
+## Runtime verify (charter §8)
+
+**DEFERRED (bounded, justified).** REQUEST verify-window sent to hub; independent of the
+window, the hub-owned :80 stack runs the pre-fix image — live-driving `GET docx-url` there
+exercises OLD code and cannot verify this change until the stack is rebuilt from this branch
+or post-merge. Behavior is fully pinned at L1: 5 unit tests cover every branch (empty key /
+absent object / present object / store-error fail-closed / cross-tenant) plus the pre-existing
+delivery-mapping pin (errors_test.go:28) and green selective integration (templates pkg +
+guard suites). Defer target: post-merge hub QA drives blank-template create → docx-url → 409
+CodeUploadMissing → autosave Confirm → docx-url → 200 URL.
+
+## MinIO orphan cleanup
+
+**Result: NOT PRESENT — nothing deleted.** Presence-check 2026-07-16 against container
+`metaldocs-minio` (volume `compose_metaldocs_minio_data`, mounted `/data`): full recursive
+listing of bucket `metaldocs-attachments` contains exactly ONE object —
+`tenants/ffffffff-ffff-ffff-ffff-ffffffffffff/documents/5b8a8db4-.../revisions/4dcd3ee6....docx`
+(system-tenant document revision, unrelated, untouched). No `templates/` prefix exists; no key
+matching `a5e1be9f*` or `ef374718*` anywhere. Volume dir dated Jul 10 — rebuilt after the
+charter's 2026-06-29 snapshot; orphans went with the old volume.
+
+**FINDING (field, for hub ratification):** `minio/minio:latest` container has NO `find`
+binary — `docker exec ... sh -c "find ... 2>/dev/null"` exits 127 silently and reads as
+"no results" (false-empty). Presence checks against MinIO data dirs must use `ls -R` (exists)
+or `mc`; never trust a redirected `find`.
+
+## Defers
+
+1. **Runtime verify vs :80 stack** — see section above. Bounded to post-merge hub QA (stack
+   runs pre-fix image; behavior fully pinned at L1). REQUEST verify-window remains open with
+   hub — if granted pre-merge WITH a rebuild from this branch, chip (or hub) drives the
+   409→autosave→200 sequence live.
+2. **OpenAPI additive `'409'` on docx-url route** — PRE-EXISTING spec gap, not introduced by
+   this diff: delivery already mapped ErrUploadMissing→409 for the empty-DocxStorageKey branch
+   before this unit; this unit only adds a second path to the same modeled error. Additive
+   contract-lock REQUEST open with hub (openapi.yaml:1731-1753 declares 401/403/404/500 only).
+   If granted: one-line spec edit + regen + REVIEW-STANDARD §9 delta re-review.
+
+## Close-out summary
+
+- **Branch:** `claude/determined-driscoll-2e3140` · **Range:** `4a91aadf..ac9b8391`
+  (291bce1c code+tests, ac9b8391 wiki; evidence file committed on top).
+- **Ladder:** L0 all green (pre-existing file-disjoint findings listed above, not this diff);
+  L1 unit full sweep zero FAIL; L1 selective integration ALL ok.
+- **Dual gate:** Opus APPROVE + sonnet APPROVE → merged APPROVE, reconciliation recorded.
+- **MinIO orphan cleanup:** NOT PRESENT, nothing deleted (volume rebuilt Jul 10) + field
+  FINDING (minio container lacks `find` — false-empty trap) for hub ratification.
+- **QA verdict:** PASS at L0/L1 + dual gate; runtime verify deferred (bounded, above).
+- **Constraints honored:** no migration, no openapi edit, no FE, no new capability/module/
+  async surface, tests confined to internal/modules/templates, parallel-owned
+  tests/docx_v2/templates_integration_test.go untouched, nothing pushed.
