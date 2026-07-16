@@ -344,6 +344,43 @@ func TestCreateRoute_TemplateSubjectRejectsProfileCode(t *testing.T) {
 	}
 }
 
+// TestCreateRoute_DocumentSubjectRequiresProfileCode pins the other direction
+// of the S1 (F18) conditional contract at the handler layer: a create-route
+// body with document (or absent) subject_kind and no profile_code must be
+// rejected as a 400 validation error before reaching the service — the
+// profile_code requirement moved from unconditional to conditional, and this
+// guards against it silently becoming optional for document routes.
+func TestCreateRoute_DocumentSubjectRequiresProfileCode(t *testing.T) {
+	svc := &fakeRouteAdminService{
+		createResult: application.CreateRouteResult{RouteID: "route-should-not-be-created"},
+	}
+	h := &Handler{routeAdmin: svc}
+	mux := routeAdminTestMux(h)
+
+	for name, body := range map[string]string{
+		"absent kind":            `{"name":"Ops Route","stages":[{"order":1,"name":"Review","required_capability":"document.signoff","quorum":"any_1_of","drift_policy":"reduce_quorum","selectors":[{"kind":"role_in_fixed_area","role":"approver","area_code":"ops"}]}]}`,
+		"explicit document kind": `{"name":"Ops Route","subject_kind":"document","subject_key":"ops","stages":[{"order":1,"name":"Review","required_capability":"document.signoff","quorum":"any_1_of","drift_policy":"reduce_quorum","selectors":[{"kind":"role_in_fixed_area","role":"approver","area_code":"ops"}]}]}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/routes", strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+			req.Header.Set("Idempotency-Key", "idem-3")
+
+			rr := httptest.NewRecorder()
+			mux.ServeHTTP(rr, req)
+
+			if rr.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d (body: %s)", rr.Code, http.StatusBadRequest, rr.Body.String())
+			}
+			if svc.createReq.Name != "" {
+				t.Fatalf("service must not be invoked when validation fails, got createReq=%+v", svc.createReq)
+			}
+		})
+	}
+}
+
 // TestCreateRoute_DocumentSubjectKeyMismatch_Returns422 verifies the reviewer
 // finding from M3 P3.S2b-2: application.ErrDocumentSubjectKeyMismatch (a
 // document-kind route created with subject_key != profile_code) must map to
