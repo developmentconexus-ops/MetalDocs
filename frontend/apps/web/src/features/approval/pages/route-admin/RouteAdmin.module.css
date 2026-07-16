@@ -12,7 +12,7 @@
   flex-direction: column;
   gap: 20px;
   padding: 24px;
-  max-width: 1100px;
+  max-width: var(--content-max);
   margin: 0 auto;
 }
 

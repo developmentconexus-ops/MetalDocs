@@ -1,7 +1,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--overlay-scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -11,7 +11,7 @@
   background: var(--bg);
   border-radius: 8px;
   padding: 24px;
-  width: 480px;
+  width: var(--dialog-w);
   max-width: 92vw;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 }
