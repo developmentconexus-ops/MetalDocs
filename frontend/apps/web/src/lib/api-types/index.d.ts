@@ -3834,7 +3834,8 @@ export interface components {
             name: string;
             /** Format: uuid */
             tenant_id: string;
-            profile_code: string;
+            /** @description Populated for document routes; null for template routes (ADR 0082). */
+            profile_code: string | null;
             /**
              * @description M3 kernel extraction (ADR 0082, P2.S3). What this route governs; `document` for every route created via the legacy profile_code path.
              * @enum {string}

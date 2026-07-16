@@ -244,7 +244,7 @@ func mapListRoute(route infrastructure.Route) contracts.ListRouteItem {
 		ID:          route.ID,
 		Name:        route.Name,
 		TenantID:    route.TenantID,
-		ProfileCode: route.ProfileCode,
+		ProfileCode: listRouteProfileCode(route),
 		SubjectKind: route.SubjectKind,
 		SubjectKey:  route.SubjectKey,
 		Active:      route.Active,
@@ -253,6 +253,23 @@ func mapListRoute(route infrastructure.Route) contracts.ListRouteItem {
 		CreatedAt:   createdAt,
 		UpdatedAt:   updatedAt,
 	}
+}
+
+// listRouteProfileCode carries the repository scan's NULL-vs-empty truth
+// (postgres_approval_repository.go scanRouteListRows: profile_code sql.NullString
+// collapsed to route.ProfileCode string) back out honestly on the wire. A
+// template route has no profile by DB constraint
+// (approval_routes_template_subject_projection_check, ADR 0082); infrastructure.Route
+// carries SubjectKind alongside ProfileCode on the same scanned row, so
+// SubjectKind=="template" is an exact, row-local proxy for "profile_code was
+// SQL NULL" — no separate Valid flag needs to be threaded through the
+// repository projection to make this honest.
+func listRouteProfileCode(route infrastructure.Route) *string {
+	if route.SubjectKind == string(domain.SubjectKindTemplate) {
+		return nil
+	}
+	code := route.ProfileCode
+	return &code
 }
 
 func mapStageRequests(stages []contracts.StageRequest) []domain.Stage {

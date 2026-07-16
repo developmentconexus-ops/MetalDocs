@@ -7321,7 +7321,12 @@ components:
         id: { type: string, format: uuid }
         name: { type: string }
         tenant_id: { type: string, format: uuid }
-        profile_code: { type: string }
+        profile_code:
+          type: string
+          nullable: true
+          description: >-
+            Populated for document routes; null for template routes (ADR
+            0082).
         subject_kind:
           type: string
           enum: [document, template]

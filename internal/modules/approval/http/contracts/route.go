@@ -360,10 +360,14 @@ type ListStageItem struct {
 
 // ListRouteItem is one row of the list-routes response.
 type ListRouteItem struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	TenantID    string `json:"tenant_id"`
-	ProfileCode string `json:"profile_code"`
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	TenantID string `json:"tenant_id"`
+	// ProfileCode is populated for document routes; null for template routes
+	// (DB truth: approval_routes_template_subject_projection_check, ADR
+	// 0082). A template route has no profile — represent that truthfully as
+	// JSON null, not "" (contract-lock, F18 completion S6).
+	ProfileCode *string `json:"profile_code"`
 	// SubjectKind and SubjectKey generalize what this route governs (M3
 	// kernel extraction, ADR 0082 / P2.S3). document/profile_code for every
 	// route created via the legacy document path.

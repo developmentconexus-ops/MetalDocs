@@ -851,3 +851,77 @@ func TestListRoutes_ExposesSubjectFields(t *testing.T) {
 		t.Fatalf("subject fields = kind=%q key=%q; want kind=document key=ops", out.Routes[0].SubjectKind, out.Routes[0].SubjectKey)
 	}
 }
+
+// TestListRoutes_ProfileCodeNullForTemplateRoutes pins F18 completion S6
+// (hub ruling, contract-lock extended to RouteSummary): a template route has
+// no profile by DB constraint (approval_routes_template_subject_projection_check,
+// ADR 0082) and the list response must represent that truthfully as JSON
+// null — not the "" sentinel. This decodes the raw response body into
+// map[string]any (not the typed contracts.ListRouteItem) because a typed
+// *string decode cannot distinguish an absent/null key from "": the
+// assertion must inspect the wire bytes themselves. A sibling document route
+// in the same response is asserted to keep serializing as a non-empty
+// string, unaffected.
+func TestListRoutes_ProfileCodeNullForTemplateRoutes(t *testing.T) {
+	svc := &fakeRouteAdminService{
+		listResult: application.ListRoutesResult{Routes: []infrastructure.Route{
+			{
+				ID: "r1", Name: "Ops", TenantID: "tenant-1", ProfileCode: "ops",
+				Active: true, Version: 3, Total: 2,
+				SubjectKind: "document",
+				SubjectKey:  "ops",
+				Stages: []infrastructure.RouteStage{
+					{Order: 1, Name: "Review", RequiredCapability: "document.signoff", Quorum: "any_1_of", DriftPolicy: "reduce_quorum"},
+				},
+			},
+			{
+				ID: "r2", Name: "Tmpl", TenantID: "tenant-1", ProfileCode: "",
+				Active: true, Version: 1, Total: 2,
+				SubjectKind: "template",
+				SubjectKey:  "tmpl-1",
+				Stages: []infrastructure.RouteStage{
+					{Order: 1, Name: "Review", RequiredCapability: "template.approve", Quorum: "any_1_of", DriftPolicy: "reduce_quorum"},
+				},
+			},
+		}},
+	}
+	h := &Handler{routeAdmin: svc}
+	mux := routeAdminTestMux(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/approval/routes", nil)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rr.Code)
+	}
+
+	var raw struct {
+		Routes []map[string]json.RawMessage `json:"routes"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &raw); err != nil {
+		t.Fatalf("decode raw: %v", err)
+	}
+	if len(raw.Routes) != 2 {
+		t.Fatalf("routes len = %d, want 2", len(raw.Routes))
+	}
+
+	docCode, ok := raw.Routes[0]["profile_code"]
+	if !ok {
+		t.Fatalf("document route missing profile_code key entirely")
+	}
+	if string(docCode) != `"ops"` {
+		t.Fatalf("document route profile_code raw = %s, want %q", docCode, `"ops"`)
+	}
+
+	tmplCode, ok := raw.Routes[1]["profile_code"]
+	if !ok {
+		t.Fatalf("template route missing profile_code key entirely")
+	}
+	if string(tmplCode) != "null" {
+		t.Fatalf("template route profile_code raw = %s, want null (not the \"\" sentinel)", tmplCode)
+	}
+}

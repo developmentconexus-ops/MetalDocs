@@ -44,7 +44,13 @@ export function toDraft(route: RouteSummary | null): RouteDraft {
   }
   return {
     name: route.name,
-    profileCode: route.profile_code,
+    // route.profile_code is null for a template route (ADR 0082 — a template
+    // route has no profile by DB constraint). RouteDraft.profileCode backs a
+    // controlled text input, which cannot hold null, so it is normalized to
+    // '' here; validateDraft only requires it non-empty on create (isEdit
+    // false), so an edited template route's empty field is expected, not a
+    // silently-hidden distinction.
+    profileCode: route.profile_code ?? '',
     stages: route.stages.map((stage) => ({
       uid: uuidv4() as string,
       label: stage.name,

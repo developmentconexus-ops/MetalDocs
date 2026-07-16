@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import type { RouteSummary } from '../../api/routeAdminApi';
 import { defaultSelector, type SelectorDraft, type StageDraft } from './StageCard';
-import { defaultStage, toStageRequests, validateDraft, type RouteDraft } from './routeDraft';
+import { defaultStage, toDraft, toStageRequests, validateDraft, type RouteDraft } from './routeDraft';
 
 function makeSelector(overrides: Partial<SelectorDraft> = {}): SelectorDraft {
   return { ...defaultSelector(), ...overrides };
@@ -19,6 +20,33 @@ function makeDraft(overrides: Partial<RouteDraft> = {}): RouteDraft {
     ...overrides,
   };
 }
+
+function makeRouteSummary(overrides: Partial<RouteSummary> = {}): RouteSummary {
+  return {
+    id: 'route-1',
+    name: 'Rota Modelo',
+    tenant_id: 'tenant-1',
+    profile_code: null,
+    active: true,
+    version: 1,
+    stages: [],
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
+describe('toDraft profile_code null-safety (F18 completion S6)', () => {
+  it('normalizes a null profile_code (template route, ADR 0082) to an empty string', () => {
+    const draft = toDraft(makeRouteSummary({ profile_code: null, name: 'Rota Modelo' }));
+    expect(draft.profileCode).toBe('');
+  });
+
+  it('carries a document route profile_code through unchanged', () => {
+    const draft = toDraft(makeRouteSummary({ profile_code: 'JUR' }));
+    expect(draft.profileCode).toBe('JUR');
+  });
+});
 
 describe('routeDraft selectors', () => {
   it('validateDraft rejects a stage with an empty-role role_in_fixed_area selector', () => {
