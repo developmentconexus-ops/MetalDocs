@@ -42,6 +42,8 @@ templates `Presigner` port needs zero adapter code; two test fakes gain the meth
 | 6 | Per-slice reviewer (slice B) | claude sonnet subagent | Agent tool (sync) | §14 prompt-pack + diff ac9b8391 | verdict below | APPROVE — all anchors/claims verified exact vs code; honesty + idiom checks pass; 1 trivial non-blocking (openapi range 1731-1753 vs actual 1751) |
 | 7 | Dual gate — Claude arm | COLD Opus subagent (model=opus, clean context) | Agent tool (sync, parallel with #8) | gate prompt-pack, range 4a91aadf..ac9b8391 | verdict below | APPROVE — 1 suggestion + 1 nit, both optional |
 | 8 | Dual gate — second arm | independent claude sonnet subagent (clean context) | Agent tool (sync, parallel with #7) | same gate prompt-pack, same fixed SHA | verdict below | APPROVE — zero findings |
+| 9 | §9 delta re-review — Claude arm | COLD Opus subagent (model=opus, clean context) | Agent tool (sync) | scratchpad `gate-delta-prompt.md`, commit 44a1960c | verdict below | APPROVE — zero findings, 4/4 checks pass with receipts |
+| 10 | §9 delta re-review — GPT arm | gpt-5.6-sol / medium via codex (corrected matrix, gate-only) | OS-process codex exec (stdin closed, teed log) | same `gate-delta-prompt.md` | scratchpad `agent__gate-delta-gpt.last.md` + `.log` | APPROVE — zero findings; independent SHA-256 marker-hash proof that 9 modules' non-swaggerSpec content is byte-identical |
 
 ## Ladder results
 
@@ -81,6 +83,29 @@ checklist + severity schema).
 either arm → nothing to reconcile. Opus's suggestion+nit are advisory (test naming, comment
 wording); recorded here, not applied — neither changes behavior, coverage, or a documented
 claim, and both arms independently confirmed no-test-theater and comment-warranted.
+
+## Contract-lock execution + §9 delta re-review
+
+Hub GRANTED additive contract-lock (409 on docx-url) with conditions (a)-(d). Condition (d)
+triggered: `embedded-spec: true` in every module cfg.yaml means ANY spec edit re-encodes the
+base64 swaggerSpec in all modules' api.gen.go — reported to hub with per-file classification
+(templates = 16 non-swaggerSpec lines, exactly the generated 409 type+visitor; 9 modules =
+zero non-swaggerSpec lines; approval regen no-op). Hub ratified **option A** (spec + all 11
+regens, embedded-spec parity; churn expected). Commit `44a1960c`: openapi.yaml +2 lines
+(`'409': $ref Conflict` on GET /templates/{id}/versions/{n}/docx-url, idiom-matched to
+siblings) + canonical `go generate` regens only, no hand-edits. Post-commit: build clean,
+api-lint -strict 0 violations, templates tests green.
+
+**§9 delta gate (corrected matrix per hub correction #2) — both arms APPROVE, zero findings:**
+- Opus arm (row 9): 4/4 checks pass — additive-only spec edit verified against numstat,
+  machine-plausible generated hunks, no forbidden surface (11 files exact), contract semantics
+  = handler truth (errors.go:67 + errors_test.go:28 → Problem/RFC 9457).
+- GPT-5.6 Sol arm (row 10, via codex read-only): independent proof — replaced each embedded
+  swaggerSpec block with a marker and SHA-256'd parent vs current for the 9 non-templates
+  modules: hashes identical → zero non-embedded-spec change; `git diff --check` clean;
+  Conflict ref resolves to problem+json Problem schema.
+- Merge: APPROVE ∧ APPROVE → **APPROVE**; nothing to reconcile. Contract-lock RELEASED at
+  CLOSED per condition (b).
 
 ## Runtime verify (charter §8)
 
@@ -130,22 +155,31 @@ or `mc`; never trust a redirected `find`.
    runs pre-fix image; behavior fully pinned at L1). REQUEST verify-window remains open with
    hub — if granted pre-merge WITH a rebuild from this branch, chip (or hub) drives the
    409→autosave→200 sequence live.
-2. **OpenAPI additive `'409'` on docx-url route** — PRE-EXISTING spec gap, not introduced by
-   this diff: delivery already mapped ErrUploadMissing→409 for the empty-DocxStorageKey branch
-   before this unit; this unit only adds a second path to the same modeled error. Additive
-   contract-lock REQUEST open with hub (openapi.yaml:1731-1753 declares 401/403/404/500 only).
-   If granted: one-line spec edit + regen + REVIEW-STANDARD §9 delta re-review.
+2. ~~OpenAPI additive `'409'` on docx-url route~~ — **DISCHARGED in-unit**: contract-lock
+   granted (option A), commit 44a1960c, §9 delta gate APPROVE×2 (see section above). No
+   longer a defer.
 
-## Close-out summary
+## Close-out summary (final)
 
-- **Branch:** `claude/determined-driscoll-2e3140` · **Range:** `4a91aadf..ac9b8391`
-  (291bce1c code+tests, ac9b8391 wiki; evidence file committed on top).
-- **Ladder:** L0 all green (pre-existing file-disjoint findings listed above, not this diff);
-  L1 unit full sweep zero FAIL; L1 selective integration ALL ok.
-- **Dual gate:** Opus APPROVE + sonnet APPROVE → merged APPROVE, reconciliation recorded.
-- **MinIO orphan cleanup:** NOT PRESENT, nothing deleted (volume rebuilt Jul 10) + field
-  FINDING (minio container lacks `find` — false-empty trap) for hub ratification.
-- **QA verdict:** PASS at L0/L1 + dual gate; runtime verify deferred (bounded, above).
-- **Constraints honored:** no migration, no openapi edit, no FE, no new capability/module/
-  async surface, tests confined to internal/modules/templates, parallel-owned
-  tests/docx_v2/templates_integration_test.go untouched, nothing pushed.
+- **Branch:** `claude/determined-driscoll-2e3140` · **Final range:** `4a91aadf..HEAD` —
+  291bce1c (code+tests) · ac9b8391 (wiki) · c3d5be9f/665b2bae (evidence) · 44a1960c
+  (contract-lock 409 + full regen) · final evidence commit on top.
+- **Planner provenance (hub correction #2 disclosure):** plan produced by sonnet subagent
+  under then-binding correction #1; stands per hub rule (consumed + reviewed before #2).
+- **Ladder:** L0 all green pre- and post-regen (build/vet/gofmt/api-lint -strict 0/module-
+  boundaries; pre-existing file-disjoint findings listed above, not this diff); L1 unit full
+  sweep zero FAIL; L1 selective integration ALL ok.
+- **Dual gate (base range, correction-#1 matrix):** Opus APPROVE + sonnet APPROVE → APPROVE.
+- **§9 delta gate (44a1960c, correction-#2 matrix):** Opus APPROVE + GPT-5.6 Sol via codex
+  APPROVE → APPROVE. Contract-lock released.
+- **Runtime verify:** window granted + journey executed — live defect-repro baseline PASS
+  (200+URL → MinIO 404 NoSuchKey on pre-fix stack); 409-capture re-scoped by hub as
+  post-merge QA journey (hub-owned). Debris: BDOCX-verify-409 template, disclosed.
+- **MinIO orphan cleanup:** NOT PRESENT, nothing deleted (volume rebuilt Jul 10); `find`
+  false-empty FINDING ratified by hub.
+- **QA verdict:** PASS — L0/L1 + dual gate + delta gate + live baseline.
+- **Remaining defer:** exactly one — post-merge 409 live journey (hub-owned).
+- **Constraints honored:** no migration; openapi touched ONLY under granted contract-lock
+  (additive, canonical regen); no FE; no new capability/module/async surface; tests confined
+  to internal/modules/templates; parallel-owned tests/docx_v2/templates_integration_test.go
+  untouched; nothing pushed.
