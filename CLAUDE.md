@@ -57,7 +57,7 @@ Governing target spec (source of truth when this list drifts): `wiki/architectur
 | QA/close-out | `wiki/quality/qa-operating-system.md` and relevant `wiki/quality/*-checklist.md` |
 | Test framework discipline | `wiki/quality/test-discipline.md`, ADR `wiki/decisions/0034-integration-test-fixture-framework.md` |
 | Starting any new module or feature | `developing-new-work` skill (pre-design system-impact gate; run before brainstorming) |
-| Program/milestone work | `docs/superpowers/HARNESS.md` (binding execution machine) + `docs/superpowers/ROADMAP.md` (ordered queue); MNFS workflow skills (`mnfs-workflow:*`) for mission/milestone mechanics |
+| Program/milestone work | HARNESS-CORE (mnfs-harness plugin, method) + `docs/HARNESS-PROFILE.md` (repo bindings — binding pair since 2026-07-16) + `docs/superpowers/ROADMAP.md` (ordered queue); MNFS workflow skills (`mnfs-workflow:*`) for mission/milestone mechanics |
 | Docs governance/wiki sync | `wiki/standards/documentation-governance.md`, `.claude/agents/wiki-curator.md` |
 
 ## Workflow
