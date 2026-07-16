@@ -91,7 +91,7 @@ func TestMigration0308_DocumentProfilesTenantPK(t *testing.T) {
 	// (same tenant_id + code collides) directly against the tripwire-guarded
 	// table using the same authorized-write path the fixture uses.
 	var dupErr error
-	err := withTaxonomyCapability(ctx, db, tenantA.ID, func(tx *sql.Tx) error {
+	err := withTaxonomyCapability(ctx, t, db, tenantA.ID, func(tx *sql.Tx) error {
 		_, e := tx.ExecContext(ctx,
 			`INSERT INTO metaldocs.document_profiles
 			    (code, tenant_id, family_code, name, review_interval_days, alias)
@@ -225,7 +225,9 @@ func assertForeignKeyTargetsDocumentProfiles(t *testing.T, ctx context.Context, 
 // authz.SeedTxTenant helper, matching the tripwire (trg_require_cap_asserted)
 // that guards metaldocs.document_profiles writes — see
 // testdb.SeedGovernedTaxonomy (fixtures.go) for the same idiom.
-func withTaxonomyCapability(ctx context.Context, db *sql.DB, tenantID string, fn func(tx *sql.Tx) error) error {
+func withTaxonomyCapability(ctx context.Context, t *testing.T, db *sql.DB, tenantID string, fn func(tx *sql.Tx) error) error {
+	t.Helper()
+
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -235,9 +237,7 @@ func withTaxonomyCapability(ctx context.Context, db *sql.DB, tenantID string, fn
 	if err := authz.SeedTxTenant(ctx, tx, tenantID); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `SELECT set_config('metaldocs.asserted_caps', $1, true)`, `[{"cap":"taxonomy.manage"}]`); err != nil {
-		return err
-	}
+	testdb.SetCapsOnTx(t, tx, `[{"cap":"taxonomy.manage"}]`)
 	if err := fn(tx); err != nil {
 		return err
 	}
