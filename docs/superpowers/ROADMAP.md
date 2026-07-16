@@ -25,7 +25,7 @@
 - 🟡 QR-5 HIGH batch: F3/F4/F21 operator-UX unification (design brief in verdict artifact §design-unification, ready for claude.ai/design), F5 invisible reject path, F11 one-click verdict guardrail, F16 notifications 403 poll storm, F17 route builder can't author template routes (compounds F18).
 - 🟡 QR-6 MEDIUM batch: F1, F8, F14 (blank-template 500 leaks constraint names into problem+json — negative-shape defect), F19 inbox raw UUID, F20 decision vocab + legal checkbox, F23 stale header sub-status (derive from document.status × active stage).
 - ⚪ LOW: F6/F7/F10/F15/cross-tenant silent-redirect-home — register only, see artifact.
-**Gate impact:** 1.3 mission terminal acceptance + M5 HS-1 should not seal over 4 live ship-blockers touching J3/J5 surfaces — operator decides: remediate QR-1..QR-4 first (hub recommendation) or seal with documented deviations.
+**Gate impact — OPERATOR RULED 2026-07-16 (Opção 1):** remediate first. Two chips dispatched off `e7826c30`: **QR-A** = QR-1+QR-2 (branch `unit/qr-a-kernel-template-wiring`) · **QR-B** = QR-3+QR-4 (branch `unit/qr-b-pdf-pipeline`). After both merge: hub rebuilds :80, re-drives J2-PDF/J3/J5 + blank-docx live-409 journey (QA-2), THEN M5 milestone-validate → HS-1 → mission terminal acceptance.
 
 | # | Unit | What's left | Blocker type | Context files (read ONLY these) | Budget |
 |---|------|-------------|--------------|--------------------------------|--------|
