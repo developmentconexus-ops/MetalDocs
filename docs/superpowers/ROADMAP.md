@@ -17,6 +17,16 @@
 
 ## 1. NOW — close the nearly-closed (unblocks 3 programs)
 
+**QA-1 consolidated browser QA (2026-07-16) — verdict FAIL (ship-blocked); merged `aaa42348`, artifact `docs/superpowers/reports/2026-07-16-qa1-browser-qa-verdict.md`.** J1/J4/J6/J7/J8/J9 PASS · J2 partial (UI incl. publish PASS / PDF chain dead) · J3+J5 FAIL. Judge-only run, no source touched. **Remediation queue (hub-filed, ordered; every unit re-drives its journey on :80 as exit gate):**
+- 🔴 **QR-1 approval-kernel template wiring (F18+F22 family)** — J3 restorer: (a) template route creation impossible (contract requires `profile_code`, DB check forbids it for templates; mock-only handler test masks it); (b) `apps/api/cmd/metaldocs-api/main.go` ~L737 rebuilds `approvalServices.Decision` dropping template ports set ~L645 → template signoff always 500 ("template version reader not configured"; comment "Decision is finalized above" is false). Fix as ONE unit.
+- 🔴 **QR-2 capability-string drift (F2)** — route builder posts `doc.signoff`; registry expects `document.signoff` → every route save 400 (kills J5). Handler tests mock the wrong value (false-green) — fix tests to assert registry truth, sweep for other drifted capability strings (hand-synced enumeration class, cf. final-architecture-review meta-defect).
+- 🔴 **QR-3 docx-consumer authz GUC (F9)** — materialize consumer never asserts capability GUC → P0001, attempt_count exhausts at 5 → PDF pipeline dead for ALL documents.
+- 🔴 **QR-4 publish/PDF state honesty (F13)** — publish allowed with PDF never materialized + no failed-state surfacing (misleading success). Depends QR-3.
+- 🟡 QR-5 HIGH batch: F3/F4/F21 operator-UX unification (design brief in verdict artifact §design-unification, ready for claude.ai/design), F5 invisible reject path, F11 one-click verdict guardrail, F16 notifications 403 poll storm, F17 route builder can't author template routes (compounds F18).
+- 🟡 QR-6 MEDIUM batch: F1, F8, F14 (blank-template 500 leaks constraint names into problem+json — negative-shape defect), F19 inbox raw UUID, F20 decision vocab + legal checkbox, F23 stale header sub-status (derive from document.status × active stage).
+- ⚪ LOW: F6/F7/F10/F15/cross-tenant silent-redirect-home — register only, see artifact.
+**Gate impact:** 1.3 mission terminal acceptance + M5 HS-1 should not seal over 4 live ship-blockers touching J3/J5 surfaces — operator decides: remediate QR-1..QR-4 first (hub recommendation) or seal with documented deviations.
+
 | # | Unit | What's left | Blocker type | Context files (read ONLY these) | Budget |
 |---|------|-------------|--------------|--------------------------------|--------|
 | 1.1 | lifecycle-ux-coherence **M2 HS-1** ✅ APPROVED 2026-07-13 (91195a76; §5 item 1) | Done — operator approved validator PASS. | ~~Operator action~~ | `docs/superpowers/milestones/lifecycle-ux-coherence/milestone-2-fe-surface-ownership/qa/milestone-qa.md` | ≤20k |
