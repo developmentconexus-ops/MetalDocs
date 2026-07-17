@@ -6,6 +6,11 @@ import (
 	"testing"
 )
 
+// strp is a test-only helper for CreateRouteRequest.ProfileCode's *string
+// literals (QR-A finding B: the field is a pointer so present-but-empty is
+// distinguishable from omitted).
+func strp(s string) *string { return &s }
+
 // TestSubmitRequestReasonField pins the F6.3 structured reason-for-change
 // fields on the submit-for-review request contract (validation-contract.md
 // §5.1/§5.4): reason_for_change (+ optional reason_category) round-trip
@@ -180,7 +185,7 @@ func TestCancelRequestValidate(t *testing.T) {
 func TestCreateRouteRequestValidate(t *testing.T) {
 	m := 2
 	valid := CreateRouteRequest{
-		ProfileCode: "ops",
+		ProfileCode: strp("ops"),
 		Name:        "Default Route",
 		Stages: []StageRequest{
 			{
@@ -206,7 +211,7 @@ func TestCreateRouteRequestValidate(t *testing.T) {
 		t.Fatalf("expected valid request, got error: %v", err)
 	}
 
-	missingStages := CreateRouteRequest{ProfileCode: "ops", Name: "x"}
+	missingStages := CreateRouteRequest{ProfileCode: strp("ops"), Name: "x"}
 	if err := missingStages.Validate(); err == nil {
 		t.Fatalf("expected error for empty stages")
 	}
@@ -238,6 +243,133 @@ func TestCreateRouteRequestValidate(t *testing.T) {
 	}
 }
 
+// TestCreateRouteRequestValidate_ProfileCodeSubjectKindRule pins the S1 (F18)
+// contract fix: profile_code presence is conditional on subject_kind, mirroring
+// DB truth (migration 0297 approval_routes_template_subject_projection_check,
+// ADR 0082). A template route has no profile — carrying a non-empty
+// profile_code must fail validation (not be silently accepted and later
+// dropped); a document (or absent-kind) route still requires profile_code.
+func TestCreateRouteRequestValidate_ProfileCodeSubjectKindRule(t *testing.T) {
+	stages := func() []StageRequest {
+		return []StageRequest{
+			{
+				Order:              1,
+				Name:               "Review",
+				RequiredCapability: "document.signoff",
+				Quorum:             "any_1_of",
+				DriftPolicy:        "reduce_quorum",
+				Selectors:          []ActorSelector{{Kind: SelectorKindRoleInFixedArea, Role: "approver", AreaCode: "ops"}},
+			},
+		}
+	}
+
+	// (b) template + non-empty profile_code must fail.
+	templateWithProfileCode := CreateRouteRequest{
+		ProfileCode: strp("ops"),
+		Name:        "Template Route",
+		SubjectKind: "template",
+		SubjectKey:  "tmpl-1",
+		Stages:      stages(),
+	}
+	if err := templateWithProfileCode.Validate(); err == nil {
+		t.Fatalf("expected error: profile_code must be absent for template routes")
+	}
+
+	// (b-corollary) template + empty profile_code must succeed.
+	templateNoProfileCode := CreateRouteRequest{
+		Name:        "Template Route",
+		SubjectKind: "template",
+		SubjectKey:  "tmpl-1",
+		Stages:      stages(),
+	}
+	if err := templateNoProfileCode.Validate(); err != nil {
+		t.Fatalf("expected template route with no profile_code to be valid, got: %v", err)
+	}
+
+	// (c) document (absent subject_kind) + empty profile_code must fail.
+	absentKindNoProfileCode := CreateRouteRequest{
+		Name:   "Doc Route",
+		Stages: stages(),
+	}
+	if err := absentKindNoProfileCode.Validate(); err == nil {
+		t.Fatalf("expected error: profile_code required when subject_kind is absent")
+	}
+
+	// (c) document (explicit subject_kind) + empty profile_code must fail.
+	documentKindNoProfileCode := CreateRouteRequest{
+		Name:        "Doc Route",
+		SubjectKind: "document",
+		Stages:      stages(),
+	}
+	if err := documentKindNoProfileCode.Validate(); err == nil {
+		t.Fatalf("expected error: profile_code required when subject_kind is document")
+	}
+}
+
+// TestCreateRouteRequestValidate_ProfileCodePresentButEmptyOrNull pins QR-A
+// finding B: ProfileCode is a *string precisely so "present but empty"
+// (`"profile_code":""`) is distinguishable from "omitted" — a plain string
+// could not tell them apart, and both must be rejected for a template route
+// per migration 0297's projection check. A JSON `null` decodes to the same
+// nil pointer as an omitted key (stdlib encoding/json behavior); route.go
+// documents that as a deliberate tolerance, so template+null is accepted as
+// omitted here, and document+null is rejected the same way document+omitted
+// already is.
+func TestCreateRouteRequestValidate_ProfileCodePresentButEmptyOrNull(t *testing.T) {
+	stages := func() []StageRequest {
+		return []StageRequest{
+			{
+				Order:              1,
+				Name:               "Review",
+				RequiredCapability: "document.signoff",
+				Quorum:             "any_1_of",
+				DriftPolicy:        "reduce_quorum",
+				Selectors:          []ActorSelector{{Kind: SelectorKindRoleInFixedArea, Role: "approver", AreaCode: "ops"}},
+			},
+		}
+	}
+
+	// template + `"profile_code":""` (present-but-empty, decoded via JSON so
+	// the pointer is non-nil pointing at "") must fail — the same rule as a
+	// present non-empty value, now also catching the empty-string sentinel.
+	var templateReq CreateRouteRequest
+	body := `{"name":"Template Route","subject_kind":"template","subject_key":"tmpl-1","profile_code":"","stages":[{"order":1,"name":"Review","required_capability":"document.signoff","quorum":"any_1_of","drift_policy":"reduce_quorum","selectors":[{"kind":"role_in_fixed_area","role":"approver","area_code":"ops"}]}]}`
+	if err := json.Unmarshal([]byte(body), &templateReq); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if templateReq.ProfileCode == nil || *templateReq.ProfileCode != "" {
+		t.Fatalf("precondition: ProfileCode should decode to a non-nil pointer to \"\"; got %v", templateReq.ProfileCode)
+	}
+	if err := templateReq.Validate(); err == nil {
+		t.Fatalf("expected error: present-but-empty profile_code must be rejected for template routes")
+	}
+
+	// template + `"profile_code":null` decodes to a nil pointer, identical to
+	// omission — accepted-as-omitted (documented tolerance).
+	templateNull := CreateRouteRequest{
+		ProfileCode: nil,
+		Name:        "Template Route",
+		SubjectKind: "template",
+		SubjectKey:  "tmpl-1",
+		Stages:      stages(),
+	}
+	if err := templateNull.Validate(); err != nil {
+		t.Fatalf("expected template route with profile_code=null (≡ omitted) to be valid, got: %v", err)
+	}
+
+	// document + `"profile_code":null` must fail exactly like document +
+	// omitted already does (null ≡ omitted, both fail the "required" rule).
+	documentNull := CreateRouteRequest{
+		ProfileCode: nil,
+		Name:        "Doc Route",
+		SubjectKind: "document",
+		Stages:      stages(),
+	}
+	if err := documentNull.Validate(); err == nil {
+		t.Fatalf("expected error: profile_code=null (≡ omitted) must fail for a document route")
+	}
+}
+
 // TestStageSelectorRoleBoundToRegistry locks the ADR 0022 binding: a stage
 // selector's role (role_in_fixed_area, role_in_document_area, submit_choice)
 // must be a canonical AREA role. A decommissioned phantom ("reviewer") and a
@@ -249,7 +381,7 @@ func TestCreateRouteRequestValidate(t *testing.T) {
 func TestStageSelectorRoleBoundToRegistry(t *testing.T) {
 	build := func(role string) CreateRouteRequest {
 		return CreateRouteRequest{
-			ProfileCode: "ops",
+			ProfileCode: strp("ops"),
 			Name:        "Route",
 			Stages: []StageRequest{{
 				Order:              1,

@@ -737,9 +737,16 @@ func main() {
 	// Wire materialize outbox into the freeze service so Pin can enqueue async jobs.
 	fanoutCfg.freezeService.WithMaterializeOutbox(pdfDispatchEnqueuer)
 
-	approvalServices.Decision = approvalapp.NewDecisionService(
-		approvalRepo, approvalEmitter, approvalapp.RealClock{},
-	).WithPDFOutbox(pdfDispatchEnqueuer).WithPinInvoker(fanoutCfg.freezeService).
+	// Wire the remaining ports directly onto the existing Decision pointer
+	// (in place — With* return the same *DecisionService) rather than
+	// rebuilding it: pdfDispatchEnqueuer and fanoutCfg.freezeService only
+	// exist from this point on in the composition root, but Decision already
+	// carries the profile-policy/template ports (above) and the lifecycle
+	// enqueuer (:684), and FastForward (built in NewServices) holds this same
+	// pointer. Rebuilding here would silently drop all of that wiring from
+	// Decision while leaving FastForward on the original, divergent instance.
+	approvalServices.Decision = approvalServices.Decision.WithPDFOutbox(pdfDispatchEnqueuer).
+		WithPinInvoker(fanoutCfg.freezeService).
 		WithSignatureRegistry(newSignoffReauthRegistry(deps.AuthRepo, deps.SQLDB)).
 		WithCDFieldReader(cdReader)
 
@@ -763,8 +770,14 @@ func main() {
 	}
 	// M3 P3.S2b-4 (R2a): wire the approval kernel's published services into
 	// the templates HTTP handler so its two thin kernel routes
-	// (submit-for-approval, signoff) can delegate. Must happen after
-	// approvalServices.Decision is finalized above (line ~737-741).
+	// (submit-for-approval, signoff) can delegate. approvalServices.Decision
+	// is wired in place throughout (never rebuilt), so this observes the same
+	// fully-ported instance FastForward and approvalHandler do.
+	if err := approvalServices.Decision.Ready(); err != nil {
+		slog.Error("approval decision service not fully wired", "err", err)
+		deps.Cleanup()
+		os.Exit(1)
+	}
 	templatesModule.WithApprovalKernel(approvalServices.TemplateSubmit, approvalServices.Decision, approvalServices.Read, db.NewTxRunner(deps.SQLDB))
 	templatesModule.Register(mux)
 	signoffIdempStore := approvalinfra.NewPostgresSignoffIdempStore(deps.SQLDB)

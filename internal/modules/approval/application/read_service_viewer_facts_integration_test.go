@@ -74,7 +74,7 @@ func seedActiveStage(t *testing.T, fx viewerFixture, eligibleActorIDs []string) 
 		StageOrder:                 1,
 		NameSnapshot:               "Qualidade",
 		RequiredRoleSnapshot:       "reviewer",
-		RequiredCapabilitySnapshot: "doc.signoff",
+		RequiredCapabilitySnapshot: "document.signoff",
 		QuorumSnapshot:             domain.QuorumAllOf,
 		OnEligibilityDriftSnapshot: domain.DriftKeepSnapshot,
 		Kind:                       domain.StageKindApproval,

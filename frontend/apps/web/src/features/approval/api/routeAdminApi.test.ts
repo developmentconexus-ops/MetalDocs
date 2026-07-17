@@ -31,7 +31,7 @@ function stage(): RouteSummary['stages'][number] {
   return {
     order: 1,
     name: 'Review',
-    required_capability: 'doc.signoff',
+    required_capability: 'document.signoff',
     selectors: [{ kind: 'role_in_fixed_area', role: 'approver', area_code: 'ops' }],
     quorum: 'any_1_of',
     quorum_m: null,
@@ -43,7 +43,7 @@ function reqStage(): StageRequest {
   return {
     order: 1,
     name: 'Review',
-    required_capability: 'doc.signoff',
+    required_capability: 'document.signoff',
     selectors: [{ kind: 'role_in_fixed_area', role: 'approver', area_code: 'ops' }],
     quorum: 'any_1_of',
     drift_policy: 'reduce_quorum',

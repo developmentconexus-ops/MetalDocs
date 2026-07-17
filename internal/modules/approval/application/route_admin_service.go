@@ -14,8 +14,8 @@ import (
 	"metaldocs/internal/modules/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
-	"metaldocs/internal/platform/db"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
+	"metaldocs/internal/platform/db"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/lib/pq"
@@ -148,12 +148,26 @@ type ListRoutesResult struct {
 func (s *RouteAdminService) Create(ctx context.Context, runner db.TxRunner, in CreateRouteInput) (CreateRouteResult, error) {
 	const op = "create"
 
+	// Resolve the effective subject up front (a pure function of client input,
+	// H-PRE-1-safe — no tx, no I/O). It feeds BOTH the idempotency hash below
+	// (QR-A finding A: profile_code alone is "" for every template route, so
+	// two creates sharing an Idempotency-Key + name + stages but DIFFERENT
+	// subject_key used to hash identically and silently replay) and createTx.
+	// A resolution failure (e.g. ErrDocumentSubjectKeyMismatch) is a
+	// deterministic function of the request body — retried identically it
+	// fails identically — so it is reported directly without ever occupying
+	// an idempotency slot.
+	subject, err := resolveCreateRouteSubject(in)
+	if err != nil {
+		return CreateRouteResult{}, wrapRouteAdminErr(op, err)
+	}
+
 	var (
 		committer RouteAdminReplayCommitter
 		replay    *RouteAdminReplay
 	)
 	if s.idempStore != nil && in.IdempotencyKey != "" {
-		hash := computeCreateRoutePayloadHash(in.ProfileCode, in.Name, in.Stages)
+		hash := computeCreateRoutePayloadHash(in.ProfileCode, in.Name, in.Stages, subject)
 		var err error
 		committer, replay, err = s.idempStore.BeginCreateReplay(ctx, in.TenantID, in.ActorUserID, in.IdempotencyKey, hash)
 		if err != nil {
@@ -164,7 +178,7 @@ func (s *RouteAdminService) Create(ctx context.Context, runner db.TxRunner, in C
 		}
 	}
 
-	result, err := s.createTx(ctx, runner, in)
+	result, err := s.createTx(ctx, runner, in, subject)
 	if err != nil {
 		if committer != nil {
 			if ferr := committer.Fail(err); ferr != nil {
@@ -230,26 +244,35 @@ func resolveCreateRouteSubject(in CreateRouteInput) (domain.Subject, error) {
 	return domain.Subject{Kind: kind, Key: key}, nil
 }
 
-func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in CreateRouteInput) (CreateRouteResult, error) {
+// createTx takes the already-resolved subject (Create resolves it once, up
+// front, so both the idempotency hash and this call see the identical
+// value — see resolveCreateRouteSubject's callsite in Create).
+func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in CreateRouteInput, subject domain.Subject) (CreateRouteResult, error) {
 	var result CreateRouteResult
-	// G1: resolve the per-profile route-signature policy OFF-TX (H-PRE-1) so the
-	// friendly route-shape check runs before the write tx opens.
-	policy, err := s.resolvePolicy(ctx, in.TenantID, in.ProfileCode)
-	if err != nil {
+
+	if err := subject.Validate(); err != nil {
 		return result, err
+	}
+
+	// G1: resolve the per-profile route-signature policy OFF-TX (H-PRE-1) so the
+	// friendly route-shape check runs before the write tx opens. A template
+	// subject has no profile — there is no per-profile signature policy to
+	// resolve, so skip the reader call entirely rather than looking up an
+	// empty profile_code (S1, F18; DB truth: migration 0297).
+	var (
+		policy taxonomydomain.RoutePolicy
+		err    error
+	)
+	if subject.Kind != domain.SubjectKindTemplate {
+		policy, err = s.resolvePolicy(ctx, in.TenantID, in.ProfileCode)
+		if err != nil {
+			return result, err
+		}
 	}
 	err = runner.Do(ctx, func(tx *sql.Tx) error {
 		ctx := authz.WithCapCache(ctx)
 
 		if err := authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant"); err != nil {
-			return err
-		}
-
-		subject, err := resolveCreateRouteSubject(in)
-		if err != nil {
-			return err
-		}
-		if err := subject.Validate(); err != nil {
 			return err
 		}
 
@@ -264,13 +287,26 @@ func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in
 			return err
 		}
 
+		// profile_code is NULL for a template route (DB truth: migration 0297
+		// approval_routes_template_subject_projection_check forbids a
+		// non-NULL profile_code when subject_kind='template'). in.ProfileCode
+		// is always "" here for a template subject (contract-enforced), but
+		// bind explicit SQL NULL rather than an empty string to satisfy the
+		// column's semantics precisely.
+		var profileCodeArg any
+		if subject.Kind == domain.SubjectKindTemplate {
+			profileCodeArg = nil
+		} else {
+			profileCodeArg = in.ProfileCode
+		}
+
 		var routeID string
 		err = tx.QueryRowContext(ctx, `
 			INSERT INTO approval_routes
 				(tenant_id, profile_code, name, version, created_by, active, subject_kind, subject_key)
 			VALUES ($1, $2, $3, 1, $4, TRUE, $5, $6)
 			RETURNING id`,
-			in.TenantID, in.ProfileCode, in.Name, in.ActorUserID,
+			in.TenantID, profileCodeArg, in.Name, in.ActorUserID,
 			string(route.Subject.Kind), route.Subject.Key,
 		).Scan(&routeID)
 		if err != nil {
@@ -291,9 +327,23 @@ func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in
 			return err
 		}
 
+		// profile_code is null (never the "" sentinel — hub doctrine, QR-A
+		// finding C) for a template route, mirroring the SQL NULL bound above
+		// via profileCodeArg. subject_kind/subject_key (the canonical
+		// resolved values, not the raw possibly-defaulted input) are new
+		// fields on this event — no legacy template events/responses exist
+		// (creation was impossible before this branch), so this is a
+		// zero-compat-impact addition for every subject kind. A document
+		// route's other payload bytes are unchanged.
+		var eventProfileCode any
+		if subject.Kind != domain.SubjectKindTemplate {
+			eventProfileCode = in.ProfileCode
+		}
 		payload, err := json.Marshal(map[string]any{
 			"route_id":      routeID,
-			"profile_code":  in.ProfileCode,
+			"profile_code":  eventProfileCode,
+			"subject_kind":  string(subject.Kind),
+			"subject_key":   subject.Key,
 			"stage_count":   len(in.Stages),
 			"initial_state": "active",
 		})
@@ -394,6 +444,14 @@ func (s *RouteAdminService) resolveUpdatePolicy(ctx context.Context, runner db.T
 		return "", err
 	}
 	if !found {
+		return "", nil
+	}
+	// A template route has no profile (profile_code is SQL NULL, surfaced here
+	// as "") — there is no per-profile signature policy to resolve, mirroring
+	// createTx's skip for SubjectKindTemplate (S1, F18 dual-gate finding 2).
+	// Looking up an empty profile_code would either miss (empty policy) or,
+	// worse, collide with a real tenant profile keyed by "".
+	if profileCode == "" {
 		return "", nil
 	}
 	return s.policyReader.RoutePolicy(ctx, tenantID, profileCode)
@@ -766,9 +824,12 @@ type lockedRouteState struct {
 // with a plain non-recording SELECT (safe in any tx; no authz recording, so it
 // never trips H-PRE-1). Returns found=false when the route is inactive or absent
 // so the G1 friendly check can be skipped in lockstep with the DB trigger's
-// active-only scope.
+// active-only scope. profile_code is SQL NULL for a template route (DB truth:
+// migration 0297 approval_routes_template_subject_projection_check) — that
+// case still reports found=true with code="" so the caller can distinguish
+// "no policy to resolve" (template) from "route not eligible" (absent/inactive).
 func loadActiveRouteProfileCode(ctx context.Context, tx *sql.Tx, tenantID, routeID string) (string, bool, error) {
-	var code string
+	var code sql.NullString
 	err := tx.QueryRowContext(ctx, `
 		SELECT profile_code
 		  FROM approval_routes
@@ -783,7 +844,7 @@ func loadActiveRouteProfileCode(ctx context.Context, tx *sql.Tx, tenantID, route
 	if err != nil {
 		return "", false, fmt.Errorf("route_admin: load route profile_code: %w", err)
 	}
-	return code, true, nil
+	return code.String, true, nil
 }
 
 func lockRouteForUpdate(ctx context.Context, tx *sql.Tx, tenantID, routeID string) (lockedRouteState, error) {

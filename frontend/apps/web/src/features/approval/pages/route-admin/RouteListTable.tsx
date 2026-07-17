@@ -47,7 +47,10 @@ export function RouteListTable({ routes, isFetching, onEdit, onDeactivate }: Rou
               <tr key={route.id}>
                 <td>{route.name}</td>
                 <td>
-                  <code className={styles.code}>{route.profile_code}</code>
+                  {/* profile_code is null for a template route (ADR 0082 — no
+                      profile by DB constraint); show an em-dash rather than
+                      an empty cell that could read as a loading/data bug. */}
+                  <code className={styles.code}>{route.profile_code ?? '—'}</code>
                 </td>
                 <td>{route.stages.length} etapa(s)</td>
                 <td>

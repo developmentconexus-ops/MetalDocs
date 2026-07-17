@@ -7250,9 +7250,18 @@ components:
     CreateRouteRequest:
       type: object
       additionalProperties: true
-      required: [profile_code, name, stages]
+      required: [name, stages]
       properties:
-        profile_code: { type: string, minLength: 1, maxLength: 64, pattern: '^[a-z0-9_-]+$' }
+        profile_code:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: '^[a-z0-9_-]+$'
+          description: >-
+            Required when `subject_kind` is `document` or absent; must be
+            omitted when `subject_kind` is `template` (a template route has
+            no profile — DB truth: `approval_routes_template_subject_projection_check`,
+            ADR 0082).
         name: { type: string, minLength: 1, maxLength: 200 }
         subject_kind:
           type: string
@@ -7260,9 +7269,8 @@ components:
           description: >-
             M3 kernel extraction (ADR 0082, P2.S3). Optional; omitted defaults
             to `document`, preserving the legacy (document, profile_code)
-            subject unchanged. A non-document kind is accepted and persisted
-            faithfully but carries no template-specific governance in this
-            slice (Phase 3).
+            subject unchanged. Governs whether `profile_code` is required
+            (`document`/absent) or must be omitted (`template`).
         subject_key:
           type: string
           minLength: 1
@@ -7313,7 +7321,12 @@ components:
         id: { type: string, format: uuid }
         name: { type: string }
         tenant_id: { type: string, format: uuid }
-        profile_code: { type: string }
+        profile_code:
+          type: string
+          nullable: true
+          description: >-
+            Populated for document routes; null for template routes (ADR
+            0082).
         subject_kind:
           type: string
           enum: [document, template]

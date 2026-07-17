@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import type { RouteSummary, StageRequest } from '../../api/routeAdminApi';
 import type { components } from '../../../../lib/api-types';
+import { SIGNOFF_CAPABILITY } from './capabilities';
 import { validateSignaturePolicy, validateStageOrder, type GovernanceClass } from './routeGovernance';
 import { defaultSelector, type SelectorDraft, type StageDraft } from './StageCard';
 
@@ -18,7 +19,7 @@ export function defaultStage(): StageDraft {
   return {
     uid: uuidv4() as string,
     label: '',
-    requiredCapability: 'doc.signoff',
+    requiredCapability: SIGNOFF_CAPABILITY,
     selectors: [defaultSelector()],
     quorumKind: 'any_1_of',
     m: '1',
@@ -43,11 +44,17 @@ export function toDraft(route: RouteSummary | null): RouteDraft {
   }
   return {
     name: route.name,
-    profileCode: route.profile_code,
+    // route.profile_code is null for a template route (ADR 0082 — a template
+    // route has no profile by DB constraint). RouteDraft.profileCode backs a
+    // controlled text input, which cannot hold null, so it is normalized to
+    // '' here; validateDraft only requires it non-empty on create (isEdit
+    // false), so an edited template route's empty field is expected, not a
+    // silently-hidden distinction.
+    profileCode: route.profile_code ?? '',
     stages: route.stages.map((stage) => ({
       uid: uuidv4() as string,
       label: stage.name,
-      requiredCapability: stage.required_capability || 'doc.signoff',
+      requiredCapability: stage.required_capability,
       selectors:
         stage.selectors && stage.selectors.length > 0
           ? stage.selectors.map(toSelectorDraft)
@@ -83,7 +90,7 @@ export function toStageRequests(draft: RouteDraft): StageRequest[] {
     const payload: StageRequest = {
       order: index + 1,
       name: stage.label.trim(),
-      required_capability: stage.requiredCapability.trim() || 'doc.signoff',
+      required_capability: stage.requiredCapability.trim(),
       quorum: stage.quorumKind,
       drift_policy: stage.driftPolicy,
       stage_kind: stage.stageKind,

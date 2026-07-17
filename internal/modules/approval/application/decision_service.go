@@ -14,11 +14,11 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	oteltrace "go.opentelemetry.io/otel/trace"
 
+	"metaldocs/internal/modules/approval/domain"
+	"metaldocs/internal/modules/approval/infrastructure"
+	"metaldocs/internal/modules/approval/infrastructure/signature"
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	docapp "metaldocs/internal/modules/documents/application"
-	"metaldocs/internal/modules/approval/domain"
-	"metaldocs/internal/modules/approval/infrastructure/signature"
-	"metaldocs/internal/modules/approval/infrastructure"
 	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -75,9 +75,9 @@ type pdfDispatchEnqueuer interface {
 
 // DecisionService handles approver approve/reject decisions.
 type DecisionService struct {
-	repo       infrastructure.ApprovalRepository
-	emitter    EventEmitter
-	clock      Clock
+	repo        infrastructure.ApprovalRepository
+	emitter     EventEmitter
+	clock       Clock
 	pinInvoker  PinInvoker
 	pdfDispatch pdfDispatchEnqueuer
 	// sigRegistry verifies the e-signature credential before a sign-off is
@@ -166,6 +166,41 @@ func (s *DecisionService) WithTemplateCompletionWriter(writer TemplateCompletion
 func (s *DecisionService) WithTemplateVersionReader(reader TemplateVersionReader) *DecisionService {
 	s.templateVersionReader = reader
 	return s
+}
+
+// Ready reports whether every port required for full runtime function is
+// wired: templateVersionReader, templateCompletion, pdfDispatch, pinInvoker,
+// sigRegistry, and cdRead. Their absence causes a 500 (nil pointer / not
+// found) or a silent skip of a state transition (e.g. the templates_
+// template_version write). lifecycleEnqueuer is excluded — it is best-effort
+// and nil-tolerant (see WithLifecycleEnqueuer), guarded at every call site.
+// A composition root should call Ready before serving traffic so a wiring
+// regression (e.g. rebuilding Decision instead of mutating it in place) fails
+// fast at boot instead of surfacing later as a runtime error.
+func (s *DecisionService) Ready() error {
+	var missing []string
+	if s.templateVersionReader == nil {
+		missing = append(missing, "templateVersionReader")
+	}
+	if s.templateCompletion == nil {
+		missing = append(missing, "templateCompletion")
+	}
+	if s.pdfDispatch == nil {
+		missing = append(missing, "pdfDispatch")
+	}
+	if s.pinInvoker == nil {
+		missing = append(missing, "pinInvoker")
+	}
+	if s.sigRegistry == nil {
+		missing = append(missing, "sigRegistry")
+	}
+	if s.cdRead == nil {
+		missing = append(missing, "cdRead")
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	return fmt.Errorf("decision service missing required ports: %s", strings.Join(missing, ", "))
 }
 
 // resolveSignaturePayload re-authenticates the acting user and returns the

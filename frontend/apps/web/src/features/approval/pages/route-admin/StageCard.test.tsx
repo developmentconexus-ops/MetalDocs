@@ -49,7 +49,7 @@ function makeStage(overrides: Partial<StageDraft> = {}): StageDraft {
   return {
     uid: 'stage-1',
     label: 'Revisão',
-    requiredCapability: 'doc.signoff',
+    requiredCapability: 'document.signoff',
     selectors: [makeSelector()],
     quorumKind: 'any_1_of',
     m: '1',

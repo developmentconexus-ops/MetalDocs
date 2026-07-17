@@ -975,6 +975,145 @@ func TestRouteAdminCreate_IdempotencyKeyConflict(t *testing.T) {
 	}
 }
 
+// TestRouteAdminCreate_IdempotencyKeyConflict_TemplateDifferingSubjectKey pins
+// QR-A finding A: profile_code alone is "" for EVERY template route, so
+// before the fix, two template creates sharing an Idempotency-Key + name +
+// stages but a DIFFERENT subject_key hashed identically and the second call
+// silently replayed the first route (wrong route handed back to the second
+// caller) instead of surfacing an idempotency payload-mismatch conflict.
+// Mirrors TestRouteAdminCreate_IdempotencyKeyConflict's document-route
+// shape, but for the template branch and varying subject_key instead of name.
+func TestRouteAdminCreate_IdempotencyKeyConflict_TemplateDifferingSubjectKey(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: true, createdRouteID: "route-tmpl-1"}
+	db := newRouteAdminTestDB(t, conn)
+	store := newMemoryRouteAdminIdempStore()
+
+	svc := (&RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Now()},
+	}).WithIdempStore(store)
+
+	if _, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
+		TenantID:       "tenant-1",
+		Name:           "Template Route",
+		ActorUserID:    "user-1",
+		SubjectKind:    string(domain.SubjectKindTemplate),
+		SubjectKey:     "tmpl-a",
+		IdempotencyKey: "idem-tmpl-conflict",
+		Stages:         validRouteStages(),
+	}); err != nil {
+		t.Fatalf("first Create: %v", err)
+	}
+
+	_, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
+		TenantID:       "tenant-1",
+		Name:           "Template Route",
+		ActorUserID:    "user-1",
+		SubjectKind:    string(domain.SubjectKindTemplate),
+		SubjectKey:     "tmpl-b", // only field that differs from the first call
+		IdempotencyKey: "idem-tmpl-conflict",
+		Stages:         validRouteStages(),
+	})
+	if !errors.Is(err, idempotency.ErrConflict) {
+		t.Fatalf("expected idempotency.ErrConflict (different subject_key must not replay); got %v", err)
+	}
+}
+
+// TestRouteAdminCreate_IdempotencyKeyConflict_TemplateWhitespaceSubjectKey
+// pins the codex gate round-3 CRITICAL finding: computeCreateRoutePayloadHash
+// used to hash strings.TrimSpace(subject.Key), but the resolved subject key
+// is persisted EXACTLY as given (resolveCreateRouteSubject does no trim, and
+// contracts.CreateRouteRequest.Validate never checks SubjectKey for
+// whitespace). So "tmpl-a" and " tmpl-a " are distinct persisted subjects
+// but used to share a payload hash — a second create reusing the
+// Idempotency-Key with only leading/trailing whitespace added to the subject
+// key would wrongly replay the first route instead of surfacing
+// idempotency.ErrConflict. Mirrors
+// TestRouteAdminCreate_IdempotencyKeyConflict_TemplateDifferingSubjectKey but
+// varies only whitespace around an otherwise-identical key.
+func TestRouteAdminCreate_IdempotencyKeyConflict_TemplateWhitespaceSubjectKey(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: true, createdRouteID: "route-tmpl-ws-1"}
+	db := newRouteAdminTestDB(t, conn)
+	store := newMemoryRouteAdminIdempStore()
+
+	svc := (&RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Now()},
+	}).WithIdempStore(store)
+
+	if _, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
+		TenantID:       "tenant-1",
+		Name:           "Template Route",
+		ActorUserID:    "user-1",
+		SubjectKind:    string(domain.SubjectKindTemplate),
+		SubjectKey:     "tmpl-a",
+		IdempotencyKey: "idem-tmpl-ws-conflict",
+		Stages:         validRouteStages(),
+	}); err != nil {
+		t.Fatalf("first Create: %v", err)
+	}
+
+	_, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
+		TenantID:       "tenant-1",
+		Name:           "Template Route",
+		ActorUserID:    "user-1",
+		SubjectKind:    string(domain.SubjectKindTemplate),
+		SubjectKey:     " tmpl-a ", // only field that differs from the first call — whitespace only
+		IdempotencyKey: "idem-tmpl-ws-conflict",
+		Stages:         validRouteStages(),
+	})
+	if !errors.Is(err, idempotency.ErrConflict) {
+		t.Fatalf("expected idempotency.ErrConflict (whitespace-differing subject_key must not replay); got %v", err)
+	}
+}
+
+// TestRouteAdminCreate_ReplayReturnsPriorResponse_DocumentSubject verifies
+// the QR-A finding A fix does not regress the legacy document-route replay
+// path: a byte-identical repeat of a document create (same body twice, same
+// Idempotency-Key) still replays the cached result rather than re-running
+// the handler, even though the hash now also folds in the resolved subject
+// (kind=document, key=profile_code for this branch — see
+// resolveCreateRouteSubject).
+func TestRouteAdminCreate_ReplayReturnsPriorResponse_DocumentSubject(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: true, createdRouteID: "route-doc-replay-1"}
+	db := newRouteAdminTestDB(t, conn)
+	store := newMemoryRouteAdminIdempStore()
+
+	emitter := &MemoryEmitter{}
+	svc := (&RouteAdminService{
+		emitter: emitter,
+		clock:   fixedClock{t: time.Now()},
+	}).WithIdempStore(store)
+
+	in := CreateRouteInput{
+		TenantID:       "tenant-1",
+		ProfileCode:    "po",
+		Name:           "PO Route",
+		ActorUserID:    "user-1",
+		IdempotencyKey: "idem-doc-replay-1",
+		Stages:         validRouteStages(),
+	}
+
+	first, err := svc.Create(context.Background(), newTxRunner(db), in)
+	if err != nil {
+		t.Fatalf("first Create: %v", err)
+	}
+	if first.RouteID != "route-doc-replay-1" {
+		t.Fatalf("first RouteID = %q", first.RouteID)
+	}
+
+	second, err := svc.Create(context.Background(), newTxRunner(db), in)
+	if err != nil {
+		t.Fatalf("second Create (replay): %v", err)
+	}
+	if second.RouteID != "route-doc-replay-1" {
+		t.Fatalf("second RouteID = %q, want replay of %q", second.RouteID, "route-doc-replay-1")
+	}
+	if len(emitter.Events) != 1 {
+		t.Fatalf("replay must not re-run handler: events=%d want 1", len(emitter.Events))
+	}
+}
+
 func TestRouteAdminDeactivate_RejectsEmptyReason(t *testing.T) {
 	conn := &routeAdminConn{authzGranted: true, routeExists: true}
 	db := newRouteAdminTestDB(t, conn)
@@ -1228,7 +1367,7 @@ func TestRouteAdminCreate_LogsCommitterFailError(t *testing.T) {
 	failErr := errors.New("simulated fail-replay failure")
 	k := memoryIdempKey("tenant-1", "user-1", "idem-fail-log")
 	store.create[k] = &memoryRouteAdminSlot{
-		hash:    computeCreateRoutePayloadHash("po", "PO Route", validRouteStages()),
+		hash:    computeCreateRoutePayloadHash("po", "PO Route", validRouteStages(), domain.Subject{Kind: domain.SubjectKindDocument, Key: "po"}),
 		pending: false,
 		failErr: failErr,
 	}
