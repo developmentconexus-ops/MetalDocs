@@ -264,6 +264,23 @@ services:
       METALDOCS_WORKER_RETRY_MAX_SECONDS: ${METALDOCS_WORKER_RETRY_MAX_SECONDS}
       METALDOCS_FANOUT_URL: http://docx-renderer:3100
       METALDOCS_DOCX_RENDERER_SERVICE_TOKEN: ${DOCX_RENDERER_SERVICE_TOKEN}
+      # Storage + Gotenberg stanza — REQUIRED, not optional: the worker binary
+      # builds the docgen_v2_pdf converter (bootstrap.buildWorkerPDFConverter),
+      # which returns nil when Gotenberg is unconfigured or storage is not
+      # MinIO — and a nil converter means PDF events are consumed without any
+      # PDF being generated. Mirrors the api/jobs storage blocks exactly so
+      # provider truth cannot diverge.
+      METALDOCS_GOTENBERG_URL: http://gotenberg:3000
+      METALDOCS_STORAGE_PROVIDER: ${METALDOCS_STORAGE_PROVIDER}
+      METALDOCS_ATTACHMENTS_SIGNING_SECRET: ${METALDOCS_ATTACHMENTS_SIGNING_SECRET}
+      METALDOCS_ATTACHMENTS_DOWNLOAD_TTL_SECONDS: ${METALDOCS_ATTACHMENTS_DOWNLOAD_TTL_SECONDS}
+      METALDOCS_MINIO_ENDPOINT: minio:9000
+      METALDOCS_MINIO_PUBLIC_ENDPOINT: 127.0.0.1:9000
+      METALDOCS_MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      METALDOCS_MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      METALDOCS_MINIO_BUCKET: ${METALDOCS_MINIO_BUCKET}
+      METALDOCS_MINIO_USE_SSL: ${METALDOCS_MINIO_USE_SSL}
+      METALDOCS_MINIO_AUTO_CREATE_BUCKET: ${METALDOCS_MINIO_AUTO_CREATE_BUCKET}
       PGHOST: postgres
       PGPORT: 5432
       PGDATABASE: ${POSTGRES_DB}
