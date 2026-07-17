@@ -1019,6 +1019,54 @@ func TestRouteAdminCreate_IdempotencyKeyConflict_TemplateDifferingSubjectKey(t *
 	}
 }
 
+// TestRouteAdminCreate_IdempotencyKeyConflict_TemplateWhitespaceSubjectKey
+// pins the codex gate round-3 CRITICAL finding: computeCreateRoutePayloadHash
+// used to hash strings.TrimSpace(subject.Key), but the resolved subject key
+// is persisted EXACTLY as given (resolveCreateRouteSubject does no trim, and
+// contracts.CreateRouteRequest.Validate never checks SubjectKey for
+// whitespace). So "tmpl-a" and " tmpl-a " are distinct persisted subjects
+// but used to share a payload hash — a second create reusing the
+// Idempotency-Key with only leading/trailing whitespace added to the subject
+// key would wrongly replay the first route instead of surfacing
+// idempotency.ErrConflict. Mirrors
+// TestRouteAdminCreate_IdempotencyKeyConflict_TemplateDifferingSubjectKey but
+// varies only whitespace around an otherwise-identical key.
+func TestRouteAdminCreate_IdempotencyKeyConflict_TemplateWhitespaceSubjectKey(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: true, createdRouteID: "route-tmpl-ws-1"}
+	db := newRouteAdminTestDB(t, conn)
+	store := newMemoryRouteAdminIdempStore()
+
+	svc := (&RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Now()},
+	}).WithIdempStore(store)
+
+	if _, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
+		TenantID:       "tenant-1",
+		Name:           "Template Route",
+		ActorUserID:    "user-1",
+		SubjectKind:    string(domain.SubjectKindTemplate),
+		SubjectKey:     "tmpl-a",
+		IdempotencyKey: "idem-tmpl-ws-conflict",
+		Stages:         validRouteStages(),
+	}); err != nil {
+		t.Fatalf("first Create: %v", err)
+	}
+
+	_, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
+		TenantID:       "tenant-1",
+		Name:           "Template Route",
+		ActorUserID:    "user-1",
+		SubjectKind:    string(domain.SubjectKindTemplate),
+		SubjectKey:     " tmpl-a ", // only field that differs from the first call — whitespace only
+		IdempotencyKey: "idem-tmpl-ws-conflict",
+		Stages:         validRouteStages(),
+	})
+	if !errors.Is(err, idempotency.ErrConflict) {
+		t.Fatalf("expected idempotency.ErrConflict (whitespace-differing subject_key must not replay); got %v", err)
+	}
+}
+
 // TestRouteAdminCreate_ReplayReturnsPriorResponse_DocumentSubject verifies
 // the QR-A finding A fix does not regress the legacy document-route replay
 // path: a byte-identical repeat of a document create (same body twice, same

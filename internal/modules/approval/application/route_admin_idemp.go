@@ -56,6 +56,16 @@ type RouteAdminIdempStore interface {
 // envelope persisted pre-deploy and retried post-deploy surfaces
 // ErrConflict (409) instead of a replay until the 24h idempotency TTL
 // expires — fail-safe and time-bounded, never a wrong replay.
+//
+// subject.Key is hashed EXACTLY as resolved/persisted, with NO trimming:
+// resolveCreateRouteSubject does not trim, domain.Subject.Validate only
+// rejects an empty key, and the key is persisted byte-for-byte — so the hash
+// identity must match validation, persistence, and event identity
+// byte-for-byte too. Trimming here would make two distinct persisted
+// subjects (e.g. "tmpl-a" and " tmpl-a ") hash identically, letting a reused
+// Idempotency-Key silently replay across them instead of surfacing
+// ErrConflict (codex gate round-3 CRITICAL). This is another hash-composition
+// change covered by the same documented ≤24h 409 fail-safe described above.
 func computeCreateRoutePayloadHash(profileCode, name string, stages []domain.Stage, subject domain.Subject) string {
 	return sha256Lines(
 		"create",
@@ -63,7 +73,7 @@ func computeCreateRoutePayloadHash(profileCode, name string, stages []domain.Sta
 		strings.TrimSpace(name),
 		canonicalStages(stages),
 		string(subject.Kind),
-		strings.TrimSpace(subject.Key),
+		subject.Key,
 	)
 }
 
