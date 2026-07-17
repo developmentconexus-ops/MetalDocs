@@ -45,7 +45,7 @@ func TestStageRequestStageKindValidation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			s := base
 			s.StageKind = tc.kind
-			req := CreateRouteRequest{ProfileCode: "sop", Name: "SOP", Stages: []StageRequest{s}}
+			req := CreateRouteRequest{ProfileCode: strp("sop"), Name: "SOP", Stages: []StageRequest{s}}
 			err := req.Validate()
 			if tc.wantErr && err == nil {
 				t.Fatalf("stage_kind %q: want validation error, got nil", tc.kind)

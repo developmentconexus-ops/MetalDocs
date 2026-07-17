@@ -313,6 +313,81 @@ func TestCreateRoute_SubjectFieldsPassedThrough(t *testing.T) {
 	}
 }
 
+// TestCreateRoute_ResponseProfileCode pins QR-A finding C: a template-subject
+// create response must serialize "profile_code":null (never the "" sentinel
+// — hub doctrine, already ruled for RouteSummary/ListRouteItem), while a
+// document-subject create response is unchanged (the non-empty profile_code
+// string from the request). Decoded via raw json.RawMessage so the null-vs-
+// missing-vs-empty-string distinction is checked on the actual wire bytes,
+// not through a Go struct that would mask the difference.
+func TestCreateRoute_ResponseProfileCode(t *testing.T) {
+	t.Run("template create emits null", func(t *testing.T) {
+		svc := &fakeRouteAdminService{
+			createResult: application.CreateRouteResult{RouteID: "route-tmpl-1"},
+		}
+		h := &Handler{routeAdmin: svc}
+		mux := routeAdminTestMux(h)
+
+		body := `{"name":"Template Route","subject_kind":"template","subject_key":"tmpl-1","stages":[{"order":1,"name":"Review","required_capability":"document.signoff","quorum":"any_1_of","drift_policy":"reduce_quorum","selectors":[{"kind":"role_in_fixed_area","role":"approver","area_code":"ops"}]}]}`
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/routes", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+		req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+		req.Header.Set("Idempotency-Key", "idem-tmpl-resp")
+
+		rr := httptest.NewRecorder()
+		mux.ServeHTTP(rr, req)
+		if rr.Code != http.StatusCreated {
+			t.Fatalf("status = %d, want %d (body: %s)", rr.Code, http.StatusCreated, rr.Body.String())
+		}
+
+		var raw map[string]json.RawMessage
+		if err := json.Unmarshal(rr.Body.Bytes(), &raw); err != nil {
+			t.Fatalf("decode raw response: %v", err)
+		}
+		code, ok := raw["profile_code"]
+		if !ok {
+			t.Fatalf("response missing profile_code key entirely: %s", rr.Body.String())
+		}
+		if string(code) != "null" {
+			t.Fatalf("template create profile_code raw = %s, want null (not the \"\" sentinel)", code)
+		}
+	})
+
+	t.Run("document create emits the profile code unchanged", func(t *testing.T) {
+		svc := &fakeRouteAdminService{
+			createResult: application.CreateRouteResult{RouteID: "route-doc-1"},
+		}
+		h := &Handler{routeAdmin: svc}
+		mux := routeAdminTestMux(h)
+
+		body := `{"profile_code":"ops","name":"Ops Route","stages":[{"order":1,"name":"Review","required_capability":"document.signoff","quorum":"any_1_of","drift_policy":"reduce_quorum","selectors":[{"kind":"role_in_fixed_area","role":"approver","area_code":"ops"}]}]}`
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/routes", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+		req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+		req.Header.Set("Idempotency-Key", "idem-doc-resp")
+
+		rr := httptest.NewRecorder()
+		mux.ServeHTTP(rr, req)
+		if rr.Code != http.StatusCreated {
+			t.Fatalf("status = %d, want %d (body: %s)", rr.Code, http.StatusCreated, rr.Body.String())
+		}
+
+		var raw map[string]json.RawMessage
+		if err := json.Unmarshal(rr.Body.Bytes(), &raw); err != nil {
+			t.Fatalf("decode raw response: %v", err)
+		}
+		code, ok := raw["profile_code"]
+		if !ok {
+			t.Fatalf("response missing profile_code key entirely: %s", rr.Body.String())
+		}
+		if string(code) != `"ops"` {
+			t.Fatalf("document create profile_code raw = %s, want %q", code, `"ops"`)
+		}
+	})
+}
+
 // TestCreateRoute_TemplateSubjectRejectsProfileCode pins the S1 (F18) contract
 // fix at the handler layer: a create-route body carrying both
 // subject_kind=template and a non-empty profile_code must be rejected as a

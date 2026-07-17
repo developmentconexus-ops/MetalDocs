@@ -122,7 +122,14 @@ type StageRequest struct {
 
 // CreateRouteRequest is the decoded body for the create-route endpoint.
 type CreateRouteRequest struct {
-	ProfileCode string         `json:"profile_code"`
+	// ProfileCode is a pointer so an explicitly-present-but-empty value
+	// (`"profile_code":""`) is distinguishable from an omitted field — both
+	// must be rejected for a template route, and stdlib encoding/json cannot
+	// tell "" apart from a missing key on a plain string (QR-A finding B).
+	// A JSON `null` decodes to a nil pointer, identical to omission; this is a
+	// deliberate, documented tolerance (a RawMessage presence tracker to
+	// distinguish null-from-omitted would be disproportionate for this field).
+	ProfileCode *string        `json:"profile_code,omitempty"`
 	Name        string         `json:"name"`
 	Stages      []StageRequest `json:"stages"`
 	// SubjectKind and SubjectKey generalize what the route governs (M3 kernel
@@ -145,19 +152,22 @@ type CreateRouteRequest struct {
 // ADR 0082): a document route (SubjectKind "" or "document") REQUIRES a
 // non-empty ProfileCode matching the route-code pattern; a template route
 // (SubjectKind "template") MUST NOT carry a ProfileCode at all — a template
-// route has no profile, so a non-empty value here is rejected outright
-// rather than silently accepted and dropped (no-fallback).
+// route has no profile, so ANY present value (including an explicit empty
+// string, `"profile_code":""`) is rejected outright rather than silently
+// accepted and dropped (no-fallback). ProfileCode's pointer type (QR-A
+// finding B) is what makes "present-but-empty" distinguishable from
+// "omitted" here — a plain string could not.
 func (r CreateRouteRequest) Validate() error {
 	switch r.SubjectKind {
 	case "", "document":
-		if err := validateRequired("profile_code", r.ProfileCode); err != nil {
-			return wrapValidation(err)
+		if r.ProfileCode == nil || strings.TrimSpace(*r.ProfileCode) == "" {
+			return wrapValidation(fmt.Errorf("profile_code is required"))
 		}
-		if err := validateRouteCode("profile_code", r.ProfileCode); err != nil {
+		if err := validateRouteCode("profile_code", *r.ProfileCode); err != nil {
 			return wrapValidation(err)
 		}
 	case "template":
-		if r.ProfileCode != "" {
+		if r.ProfileCode != nil {
 			return wrapValidation(fmt.Errorf("profile_code must be absent for template routes"))
 		}
 	default:
@@ -316,9 +326,18 @@ func validateRequiredCapability(field, value string) error {
 }
 
 // RouteResponse is the response body for a successful create/update/get route.
+// ProfileCode is a pointer so a template route (which has no profile) emits
+// JSON null, never the "" sentinel (hub doctrine, already ruled for
+// RouteSummary/ListRouteItem; QR-A finding C). Spec-legal: the generated
+// `RouteResponse` schema (api.gen.go) only requires route_id and declares
+// additionalProperties: true, so this hand-written superset is unaffected.
 type RouteResponse struct {
-	RouteID     string          `json:"route_id"`
-	ProfileCode string          `json:"profile_code"`
+	RouteID string `json:"route_id"`
+	// ProfileCode intentionally has NO omitempty: nil must serialize as JSON
+	// null (a template route has no profile), not be dropped from the body —
+	// dropping it would be indistinguishable from a document route whose
+	// code happened to be empty.
+	ProfileCode *string         `json:"profile_code"`
 	Name        string          `json:"name"`
 	Version     int             `json:"version"`
 	NewVersion  *int            `json:"new_version,omitempty"`

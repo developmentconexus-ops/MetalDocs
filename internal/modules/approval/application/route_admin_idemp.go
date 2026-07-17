@@ -36,17 +36,43 @@ type RouteAdminIdempStore interface {
 }
 
 // computeCreateRoutePayloadHash builds a stable fingerprint from client-supplied
-// inputs only (per ADR 0017): profile_code, name, and the canonical stage
-// sequence. Server-resolved identifiers MUST NOT appear here.
-func computeCreateRoutePayloadHash(profileCode, name string, stages []domain.Stage) string {
+// inputs only (per ADR 0017): profile_code, name, the canonical stage
+// sequence, and the EFFECTIVE subject (kind+key). Server-resolved identifiers
+// MUST NOT appear here.
+//
+// subject must be the already-resolved result of resolveCreateRouteSubject
+// (the same defaulting the service applies: an absent/document kind defaults
+// its key to profileCode) — not the raw, possibly-empty client input. Without
+// the subject lines, every template-subject create hashed identically
+// regardless of subject_key (profileCode is always "" for a template route),
+// so a second create sharing an Idempotency-Key + name + stages but a
+// DIFFERENT subject_key would silently replay the first route's result
+// instead of surfacing an idempotency payload-mismatch conflict (QR-A finding
+// A). For the legacy document case, subject.Key is always profileCode (rail
+// R1), so these two new lines are redundant with the existing profile_code
+// line but harmless — the hash for a byte-identical legacy request is still
+// deterministic and stable across repeats AGAINST THIS CODE VERSION. It is
+// NOT byte-stable across the deploy that introduced the subject lines: an
+// envelope persisted pre-deploy and retried post-deploy surfaces
+// ErrConflict (409) instead of a replay until the 24h idempotency TTL
+// expires — fail-safe and time-bounded, never a wrong replay.
+func computeCreateRoutePayloadHash(profileCode, name string, stages []domain.Stage, subject domain.Subject) string {
 	return sha256Lines(
 		"create",
 		strings.TrimSpace(profileCode),
 		strings.TrimSpace(name),
 		canonicalStages(stages),
+		string(subject.Kind),
+		strings.TrimSpace(subject.Key),
 	)
 }
 
+// computeUpdateRoutePayloadHash has no equivalent subject-omission gap (QR-A
+// finding A only applies to Create). UpdateRouteInput carries no
+// SubjectKind/SubjectKey — a route's subject is immutable post-creation — and
+// routeID is already part of this hash, uniquely identifying which route
+// (and therefore which subject) is being mutated. Two updates differing only
+// in "which route" already hash differently via routeID.
 func computeUpdateRoutePayloadHash(routeID string, expectedVersion int, name string, stages []domain.Stage) string {
 	return sha256Lines(
 		"update",

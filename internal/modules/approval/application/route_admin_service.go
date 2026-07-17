@@ -148,12 +148,26 @@ type ListRoutesResult struct {
 func (s *RouteAdminService) Create(ctx context.Context, runner db.TxRunner, in CreateRouteInput) (CreateRouteResult, error) {
 	const op = "create"
 
+	// Resolve the effective subject up front (a pure function of client input,
+	// H-PRE-1-safe — no tx, no I/O). It feeds BOTH the idempotency hash below
+	// (QR-A finding A: profile_code alone is "" for every template route, so
+	// two creates sharing an Idempotency-Key + name + stages but DIFFERENT
+	// subject_key used to hash identically and silently replay) and createTx.
+	// A resolution failure (e.g. ErrDocumentSubjectKeyMismatch) is a
+	// deterministic function of the request body — retried identically it
+	// fails identically — so it is reported directly without ever occupying
+	// an idempotency slot.
+	subject, err := resolveCreateRouteSubject(in)
+	if err != nil {
+		return CreateRouteResult{}, wrapRouteAdminErr(op, err)
+	}
+
 	var (
 		committer RouteAdminReplayCommitter
 		replay    *RouteAdminReplay
 	)
 	if s.idempStore != nil && in.IdempotencyKey != "" {
-		hash := computeCreateRoutePayloadHash(in.ProfileCode, in.Name, in.Stages)
+		hash := computeCreateRoutePayloadHash(in.ProfileCode, in.Name, in.Stages, subject)
 		var err error
 		committer, replay, err = s.idempStore.BeginCreateReplay(ctx, in.TenantID, in.ActorUserID, in.IdempotencyKey, hash)
 		if err != nil {
@@ -164,7 +178,7 @@ func (s *RouteAdminService) Create(ctx context.Context, runner db.TxRunner, in C
 		}
 	}
 
-	result, err := s.createTx(ctx, runner, in)
+	result, err := s.createTx(ctx, runner, in, subject)
 	if err != nil {
 		if committer != nil {
 			if ferr := committer.Fail(err); ferr != nil {
@@ -230,13 +244,12 @@ func resolveCreateRouteSubject(in CreateRouteInput) (domain.Subject, error) {
 	return domain.Subject{Kind: kind, Key: key}, nil
 }
 
-func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in CreateRouteInput) (CreateRouteResult, error) {
+// createTx takes the already-resolved subject (Create resolves it once, up
+// front, so both the idempotency hash and this call see the identical
+// value — see resolveCreateRouteSubject's callsite in Create).
+func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in CreateRouteInput, subject domain.Subject) (CreateRouteResult, error) {
 	var result CreateRouteResult
 
-	subject, err := resolveCreateRouteSubject(in)
-	if err != nil {
-		return result, err
-	}
 	if err := subject.Validate(); err != nil {
 		return result, err
 	}
@@ -246,7 +259,10 @@ func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in
 	// subject has no profile — there is no per-profile signature policy to
 	// resolve, so skip the reader call entirely rather than looking up an
 	// empty profile_code (S1, F18; DB truth: migration 0297).
-	var policy taxonomydomain.RoutePolicy
+	var (
+		policy taxonomydomain.RoutePolicy
+		err    error
+	)
 	if subject.Kind != domain.SubjectKindTemplate {
 		policy, err = s.resolvePolicy(ctx, in.TenantID, in.ProfileCode)
 		if err != nil {
@@ -311,9 +327,23 @@ func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in
 			return err
 		}
 
+		// profile_code is null (never the "" sentinel — hub doctrine, QR-A
+		// finding C) for a template route, mirroring the SQL NULL bound above
+		// via profileCodeArg. subject_kind/subject_key (the canonical
+		// resolved values, not the raw possibly-defaulted input) are new
+		// fields on this event — no legacy template events/responses exist
+		// (creation was impossible before this branch), so this is a
+		// zero-compat-impact addition for every subject kind. A document
+		// route's other payload bytes are unchanged.
+		var eventProfileCode any
+		if subject.Kind != domain.SubjectKindTemplate {
+			eventProfileCode = in.ProfileCode
+		}
 		payload, err := json.Marshal(map[string]any{
 			"route_id":      routeID,
-			"profile_code":  in.ProfileCode,
+			"profile_code":  eventProfileCode,
+			"subject_kind":  string(subject.Kind),
+			"subject_key":   subject.Key,
 			"stage_count":   len(in.Stages),
 			"initial_state": "active",
 		})

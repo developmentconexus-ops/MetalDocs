@@ -366,7 +366,7 @@ func testSignoffUniqueDuplicateBlocked(t *testing.T) {
 		INSERT INTO %s
 			(id, approval_instance_id, stage_order, name_snapshot, required_role_snapshot, required_capability_snapshot, area_code_snapshot, quorum_snapshot, quorum_m_snapshot, on_eligibility_drift_snapshot, eligible_actor_ids, effective_denominator, status, opened_at)
 		VALUES
-			($1::uuid, $2::uuid, 1, 'Stage 1', 'reviewer', 'doc.signoff', 'AREA_INT', 'any_1_of', NULL, 'keep_snapshot', $3::jsonb, 1, 'active', now())`,
+			($1::uuid, $2::uuid, 1, 'Stage 1', 'reviewer', 'document.signoff', 'AREA_INT', 'any_1_of', NULL, 'keep_snapshot', $3::jsonb, 1, 'active', now())`,
 		testdb.Qualified(schema, "approval_stage_instances")),
 		stageID, instanceID, string(eligible),
 	); err != nil {
