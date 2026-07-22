@@ -212,6 +212,9 @@ Fail-loud (F-QA2-1): `service.go`, `bootstrap/worker.go`. Extermination (Option 
    confirmed both integration files carry the 6-param signature). Round-3 re-runs
    both arms on `f4e76878`, with the codex arm given a writable `GOTMPDIR`/`GOCACHE`
    so its vet gate can actually compile.
-5. **Dual gate** on the final fixed SHA (`f4e76878` + this evidence commit): cold
-   Opus + GPT-5.6 Sol (medium, via codex), both re-run on the same fixed SHA;
-   AGREEMENT required.
+5. **Dual gate** on the final fixed SHA `60ec85f0` (round 3): cold Opus **ACCEPT**
+   + GPT-5.6 Sol (via codex) **ACCEPT** → **P6-DUAL-GATE: AGREEMENT**. Codex's
+   `-tags integration` vet again hit its sandbox temp-dir denial (env limitation,
+   not a code defect; not treated as REJECT by that arm); authoritative real-env
+   vet EXIT=0, and the cold arm confirmed both integration files carry the 6-param
+   signature. Evidence pack: `.mnfs/unit-qr-c/_chip-qr-c/EVIDENCE.md`.
