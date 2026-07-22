@@ -123,17 +123,32 @@ raw-SQL, re-home candidate).
 
 ---
 
-## Test-discipline note (deviation, bounded)
+## Test-discipline note
 
-The F-QA2-2 repo-layer contract is pinned with **sqlmock** tests
-(`pdf_outbox_repository_test.go`: `EnqueuePDF_PersistsFinalDocxKey` asserts the
-INSERT names `final_docx_s3_key` and binds the key as `$4`;
-`EnqueuePDF_EmptyKeyFailsClosed` asserts the guard rejects before any INSERT).
-This follows the **established sibling pattern** for these outbox repos (every
-existing `pdf_outbox_repository_test.go` case is sqlmock, not testdb). A real-DB
-round-trip would only re-prove Postgres stores a `text` column; the meaningful
-contract (column named + arg bound + empty fails closed) is exactly what sqlmock
-pins. Consistency-with-siblings chosen over testdb-factory here.
+Two coverage tiers, both real:
+
+- **Repo-layer contract (sqlmock, sibling pattern)** —
+  `pdf_outbox_repository_test.go`: `EnqueuePDF_PersistsFinalDocxKey` asserts the
+  INSERT names `final_docx_s3_key` and binds the key as `$4`;
+  `EnqueuePDF_EmptyKeyFailsClosed` asserts the guard rejects before any INSERT.
+  Follows the established sibling pattern (every existing
+  `pdf_outbox_repository_test.go` case is sqlmock).
+- **Real-DB round-trip (testdb factory, `//go:build integration`)** —
+  `dispatchjobs/dispatch_integration_test.go` threads a non-empty renderer key
+  through `EnqueuePDFTx` and asserts it (a) persists on
+  `pdf_dispatch_outbox.final_docx_s3_key` (the migration-0309 column) and (b)
+  round-trips onto the published `docgen_v2_pdf` payload end-to-end. This is the
+  real-DB proof of the exact producer→wire path QR-C fixes.
+
+Signature-change caller sweep: `EnqueuePDFTx` gaining the required
+`finalDocxS3Key` param orphaned four callers in
+`dispatch_integration_test.go` and the `noopPDFEnqueuer` fake in
+`materialize_job_runner_integration_test.go`. Both are `//go:build integration`,
+so untagged `go test` never compiled them and the first ladder masked the break;
+both dual-gate arms caught it under `-tags integration`. Repaired in commit
+`503ad2a1`; `go vet -tags integration` on both packages is clean. **Lesson: a
+scoped `go test` without `-tags integration` does not compile integration files —
+always vet the integration lane after any signature change on a producer seam.**
 
 ---
 
@@ -143,6 +158,9 @@ pins. Consistency-with-siblings chosen over testdb-factory here.
 - `go vet ./internal/modules/render/fanout/... ./internal/platform/worker/...
   ./internal/modules/approval/application/... ./internal/modules/documents/infrastructure/...`
   — clean.
+- `go vet -tags integration ./internal/modules/render/fanout/dispatchjobs/...
+  ./internal/platform/worker/...` — clean (integration lane compiles; DB-run
+  deferred to a live drive with DATABASE_URL, per the integration-file header).
 - `go test`:
   - `internal/platform/worker` — ok (incl. both nil-runner fail-loud + producer-a key threading)
   - `internal/modules/render/fanout/...` (+ dispatchjobs, retention) — ok (incl. EnqueuePDF contract + empty-key fail-closed + buildPDFEvent payload threading)
@@ -178,5 +196,7 @@ Fail-loud (F-QA2-1): `service.go`, `bootstrap/worker.go`. Extermination (Option 
 3. **Working-context confirm** — chip operates directly in the main repo dir
    (`C:\Users\leandro.theodoro\Documents\MetalDocs`) on branch
    `unit/qr-c-pdf-event-contract`; hub holds main-branch commits until merge.
-4. Commit on branch (NEVER push) — pending.
-5. **Dual gate** on the final fixed SHA: cold Opus + GPT-5.6 Sol (medium, via codex).
+4. Commit on branch (NEVER push) — done. Round-1 gate arms (both REJECT) caught
+   the integration-lane compile break at `661bec56`; repaired at `503ad2a1`.
+5. **Dual gate** on the final fixed SHA (`503ad2a1` + this evidence commit): cold
+   Opus + GPT-5.6 Sol (medium, via codex), both re-run on the same fixed SHA.
