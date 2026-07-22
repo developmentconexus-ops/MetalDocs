@@ -30,5 +30,9 @@
 --   no docx key at its enqueue time (the docx is produced by the materialize
 --   fanout the event triggers) and is untouched.
 
+BEGIN;
+
 ALTER TABLE metaldocs.pdf_dispatch_outbox
     ADD COLUMN final_docx_s3_key text;
+
+COMMIT;
