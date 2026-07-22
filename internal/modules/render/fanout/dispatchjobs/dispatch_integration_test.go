@@ -30,6 +30,7 @@ package dispatchjobs
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 
 	"github.com/riverqueue/river"
@@ -131,11 +132,12 @@ func TestPDFDispatchWorker_Integration_PublishesAndMarksDispatched(t *testing.T)
 	tenant := testdb.NewTenant(t, db)
 	revisionID := testdb.DeterministicID(t, "pdf-revision")
 	contentHash := []byte{0xAB, 0xCD, 0xEF, 0x01}
+	finalDocxKey := "tenants/" + tenant.ID + "/" + revisionID + "/frozen.docx"
 
 	enqueuer := newTestEnqueuer(t, db)
 
 	tx := seedTenantTx(t, ctx, db, tenant.ID)
-	if err := enqueuer.EnqueuePDFTx(ctx, tx, tenant.ID, revisionID, contentHash); err != nil {
+	if err := enqueuer.EnqueuePDFTx(ctx, tx, tenant.ID, revisionID, contentHash, finalDocxKey); err != nil {
 		_ = tx.Rollback()
 		t.Fatalf("EnqueuePDFTx: %v", err)
 	}
@@ -177,6 +179,9 @@ func TestPDFDispatchWorker_Integration_PublishesAndMarksDispatched(t *testing.T)
 	}
 	if payload == "" {
 		t.Fatal("expected non-empty payload for the pdf-convert outbox event")
+	}
+	if !strings.Contains(payload, finalDocxKey) {
+		t.Fatalf("published pdf-convert payload %q does not carry final_docx_s3_key %q", payload, finalDocxKey)
 	}
 
 	var eventType string
@@ -284,11 +289,12 @@ func TestEnqueuer_Integration_EnqueuePDFTx_InsertsOutboxRowAndRiverJob(t *testin
 	tenant := testdb.NewTenant(t, db)
 	revisionID := testdb.DeterministicID(t, "pdf-insert-proof")
 	contentHash := []byte{0x01}
+	finalDocxKey := "tenants/" + tenant.ID + "/" + revisionID + "/frozen.docx"
 
 	enqueuer := newTestEnqueuer(t, db)
 
 	tx := seedTenantTx(t, ctx, db, tenant.ID)
-	if err := enqueuer.EnqueuePDFTx(ctx, tx, tenant.ID, revisionID, contentHash); err != nil {
+	if err := enqueuer.EnqueuePDFTx(ctx, tx, tenant.ID, revisionID, contentHash, finalDocxKey); err != nil {
 		_ = tx.Rollback()
 		t.Fatalf("EnqueuePDFTx: %v", err)
 	}
@@ -303,6 +309,20 @@ func TestEnqueuer_Integration_EnqueuePDFTx_InsertsOutboxRowAndRiverJob(t *testin
 	}
 	if status != "pending" {
 		t.Fatalf("pdf_dispatch_outbox status = %q, want pending", status)
+	}
+
+	// Round-trip: the renderer-produced key is persisted on the staging row
+	// (migration 0309 column), the event-contract snapshot the dispatch reads.
+	var gotKey string
+	if err := db.QueryRowContext(ctx, `
+		SELECT final_docx_s3_key FROM metaldocs.pdf_dispatch_outbox
+		 WHERE tenant_id = $1::uuid AND revision_id = $2::uuid`,
+		tenant.ID, revisionID,
+	).Scan(&gotKey); err != nil {
+		t.Fatalf("load final_docx_s3_key: %v", err)
+	}
+	if gotKey != finalDocxKey {
+		t.Fatalf("pdf_dispatch_outbox.final_docx_s3_key = %q, want %q", gotKey, finalDocxKey)
 	}
 
 	if n := countRiverJobs(t, ctx, db, "pdf_dispatch"); n != 1 {
@@ -322,11 +342,12 @@ func TestEnqueuer_Integration_DedupSkip_NoSecondRiverInsert(t *testing.T) {
 	tenant := testdb.NewTenant(t, db)
 	revisionID := testdb.DeterministicID(t, "pdf-dedup-revision")
 	contentHash := []byte{0xFE}
+	finalDocxKey := "tenants/" + tenant.ID + "/" + revisionID + "/frozen.docx"
 
 	enqueuer := newTestEnqueuer(t, db)
 
 	tx1 := seedTenantTx(t, ctx, db, tenant.ID)
-	if err := enqueuer.EnqueuePDFTx(ctx, tx1, tenant.ID, revisionID, contentHash); err != nil {
+	if err := enqueuer.EnqueuePDFTx(ctx, tx1, tenant.ID, revisionID, contentHash, finalDocxKey); err != nil {
 		_ = tx1.Rollback()
 		t.Fatalf("first EnqueuePDFTx: %v", err)
 	}
@@ -339,7 +360,7 @@ func TestEnqueuer_Integration_DedupSkip_NoSecondRiverInsert(t *testing.T) {
 	}
 
 	tx2 := seedTenantTx(t, ctx, db, tenant.ID)
-	if err := enqueuer.EnqueuePDFTx(ctx, tx2, tenant.ID, revisionID, contentHash); err != nil {
+	if err := enqueuer.EnqueuePDFTx(ctx, tx2, tenant.ID, revisionID, contentHash, finalDocxKey); err != nil {
 		_ = tx2.Rollback()
 		t.Fatalf("second (dedup) EnqueuePDFTx: %v", err)
 	}
