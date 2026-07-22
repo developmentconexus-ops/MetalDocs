@@ -745,11 +745,6 @@ func main() {
 	// enqueuer (:684), and FastForward (built in NewServices) holds this same
 	// pointer. Rebuilding here would silently drop all of that wiring from
 	// Decision while leaving FastForward on the original, divergent instance.
-	// Note (QR-C): Decision no longer takes a pdf-dispatch seam. The old
-	// WithPDFOutbox path was structurally dead (it required pinInvoker == nil,
-	// but the document-approve path hard-requires pinInvoker != nil) and was
-	// removed; MaterializeJobRunner is the sole pdf producer, fed by
-	// freezeService.WithMaterializeOutbox(pdfDispatchEnqueuer) above (ADR 0015).
 	approvalServices.Decision = approvalServices.Decision.
 		WithPinInvoker(fanoutCfg.freezeService).
 		WithSignatureRegistry(newSignoffReauthRegistry(deps.AuthRepo, deps.SQLDB)).
