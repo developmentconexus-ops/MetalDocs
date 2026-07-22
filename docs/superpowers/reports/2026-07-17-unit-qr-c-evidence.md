@@ -198,5 +198,20 @@ Fail-loud (F-QA2-1): `service.go`, `bootstrap/worker.go`. Extermination (Option 
    `unit/qr-c-pdf-event-contract`; hub holds main-branch commits until merge.
 4. Commit on branch (NEVER push) — done. Round-1 gate arms (both REJECT) caught
    the integration-lane compile break at `661bec56`; repaired at `503ad2a1`.
-5. **Dual gate** on the final fixed SHA (`503ad2a1` + this evidence commit): cold
-   Opus + GPT-5.6 Sol (medium, via codex), both re-run on the same fixed SHA.
+   Round-2: cold Opus **ACCEPT** on `8a3ba0ae`; codex **REJECT** on two grounds —
+   (a) `main.go` was not strictly delete-only (a 5-line explanatory comment was
+   added beside the `.WithPDFOutbox` removal) and (b) its `-tags integration` vet
+   "gate" exited 1. (a) is repaired at `f4e76878` (comment stripped; the sole
+   base-diff is the `.WithPDFOutbox(pdfDispatchEnqueuer)` deletion). (b) was a
+   **codex-sandbox artifact**, not a code defect: the exact failure was
+   `go: creating work dir: mkdir …\Temp\go-build…: Access is denied` — the
+   read-only sandbox could not create Go's temp build dir, so compilation never
+   started. In the real environment `go vet -tags integration
+   ./internal/modules/render/fanout/dispatchjobs/... ./internal/platform/worker/...`
+   exits 0 (recorded in the ladder above; the cold Opus arm independently
+   confirmed both integration files carry the 6-param signature). Round-3 re-runs
+   both arms on `f4e76878`, with the codex arm given a writable `GOTMPDIR`/`GOCACHE`
+   so its vet gate can actually compile.
+5. **Dual gate** on the final fixed SHA (`f4e76878` + this evidence commit): cold
+   Opus + GPT-5.6 Sol (medium, via codex), both re-run on the same fixed SHA;
+   AGREEMENT required.
