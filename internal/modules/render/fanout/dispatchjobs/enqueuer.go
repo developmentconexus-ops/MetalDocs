@@ -13,11 +13,18 @@ import (
 )
 
 // stagingEnqueuer captures the one StagingOutboxRepository method the
-// Enqueuer needs. Kept unexported and minimal so tests can supply a fake
-// without standing up a real *fanout.StagingOutboxRepository, mirroring
-// outboxMarker in workers.go.
+// materialize dispatch path needs. Kept unexported and minimal so tests can
+// supply a fake without standing up a real *fanout.StagingOutboxRepository,
+// mirroring outboxMarker in workers.go.
 type stagingEnqueuer interface {
 	Enqueue(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte) (string, error)
+}
+
+// pdfStagingEnqueuer captures the pdf-specific enqueue, which additionally
+// persists the renderer-produced final_docx_s3_key snapshot (F-QA2-2). Satisfied
+// by *fanout.StagingOutboxRepository.EnqueuePDF.
+type pdfStagingEnqueuer interface {
+	EnqueuePDF(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte, finalDocxS3Key string) (string, error)
 }
 
 // riverInserter captures river.Client[*sql.Tx].InsertTx's exact signature.
@@ -37,7 +44,7 @@ type riverInserter interface {
 // "nothing to dispatch" — no River job is inserted for a dedup skip.
 type Enqueuer struct {
 	client      riverInserter
-	pdfRepo     stagingEnqueuer
+	pdfRepo     pdfStagingEnqueuer
 	matRepo     stagingEnqueuer
 	maxAttempts int
 }
@@ -51,19 +58,36 @@ func NewEnqueuer(client *river.Client[*sql.Tx], pdfRepo, matRepo *fanout.Staging
 }
 
 // newEnqueuerWithInserter is the unexported constructor taking the narrower
-// riverInserter/stagingEnqueuer interfaces, used directly by unit tests to
-// inject fakes; NewEnqueuer is the public entry point for production wiring.
-func newEnqueuerWithInserter(client riverInserter, pdfRepo, matRepo stagingEnqueuer, maxAttempts int) *Enqueuer {
+// riverInserter/pdfStagingEnqueuer/stagingEnqueuer interfaces, used directly by
+// unit tests to inject fakes; NewEnqueuer is the public entry point for
+// production wiring.
+func newEnqueuerWithInserter(client riverInserter, pdfRepo pdfStagingEnqueuer, matRepo stagingEnqueuer, maxAttempts int) *Enqueuer {
 	return &Enqueuer{client: client, pdfRepo: pdfRepo, matRepo: matRepo, maxAttempts: maxAttempts}
 }
 
-// EnqueuePDFTx enqueues a pdf_dispatch_outbox row and, only when a new row
-// was actually inserted (dedup skip returns an empty id), a paired River
-// PDFDispatchArgs job — both inside tx.
-func (e *Enqueuer) EnqueuePDFTx(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte) error {
-	return enqueueTx(ctx, e, tx, e.pdfRepo, tenantID, revisionID, contentHash, func(f dispatchFields) river.JobArgs {
-		return PDFDispatchArgs{f}
-	})
+// EnqueuePDFTx enqueues a pdf_dispatch_outbox row (carrying the renderer-produced
+// finalDocxS3Key snapshot, F-QA2-2) and, only when a new row was actually
+// inserted (dedup skip returns an empty id), a paired River PDFDispatchArgs job
+// threading that key into dispatchFields — both inside tx. finalDocxS3Key is
+// REQUIRED: EnqueuePDF fails closed on an empty key.
+func (e *Enqueuer) EnqueuePDFTx(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte, finalDocxS3Key string) error {
+	id, err := e.pdfRepo.EnqueuePDF(ctx, tx, tenantID, revisionID, contentHash, finalDocxS3Key)
+	if err != nil {
+		return err
+	}
+	if id == "" {
+		// ON CONFLICT DO NOTHING skipped the insert (dedup) — no River job to enqueue.
+		return nil
+	}
+
+	fields := dispatchFields{
+		TenantID:       tenantID,
+		RevisionID:     revisionID,
+		ContentHash:    contentHash,
+		OutboxID:       id,
+		FinalDocxS3Key: finalDocxS3Key,
+	}
+	return e.insertRiverJob(ctx, tx, PDFDispatchArgs{fields})
 }
 
 // EnqueueMaterializeTx enqueues a materialize_dispatch_outbox row and, only
@@ -75,9 +99,10 @@ func (e *Enqueuer) EnqueueMaterializeTx(ctx context.Context, tx db.Tx, tenantID,
 	})
 }
 
-// enqueueTx is the shared body for EnqueuePDFTx/EnqueueMaterializeTx: insert
-// the outbox row, and only on a genuinely new row (non-empty id) insert the
-// paired River job via InsertTx sharing the same *sql.Tx.
+// enqueueTx is the shared body for the materialize dispatch path: insert the
+// outbox row, and only on a genuinely new row (non-empty id) insert the paired
+// River job via InsertTx sharing the same *sql.Tx. (The pdf path is
+// EnqueuePDFTx, which threads the extra final_docx_s3_key snapshot.)
 func enqueueTx(ctx context.Context, e *Enqueuer, tx db.Tx, repo stagingEnqueuer, tenantID, revisionID string, contentHash []byte, argsFn func(dispatchFields) river.JobArgs) error {
 	id, err := repo.Enqueue(ctx, tx, tenantID, revisionID, contentHash)
 	if err != nil {
@@ -88,6 +113,19 @@ func enqueueTx(ctx context.Context, e *Enqueuer, tx db.Tx, repo stagingEnqueuer,
 		return nil
 	}
 
+	fields := dispatchFields{
+		TenantID:    tenantID,
+		RevisionID:  revisionID,
+		ContentHash: contentHash,
+		OutboxID:    id,
+	}
+	return e.insertRiverJob(ctx, tx, argsFn(fields))
+}
+
+// insertRiverJob inserts the paired River job sharing the caller's *sql.Tx.
+// tx must be a *sql.Tx (River's InsertTx requires it) — a non-*sql.Tx fails
+// loud rather than silently skipping the paired insert.
+func (e *Enqueuer) insertRiverJob(ctx context.Context, tx db.Tx, args river.JobArgs) error {
 	sqlTx, ok := tx.(*sql.Tx)
 	if !ok {
 		return fmt.Errorf("staging dispatch: river requires *sql.Tx, got %T", tx)
@@ -98,12 +136,6 @@ func enqueueTx(ctx context.Context, e *Enqueuer, tx db.Tx, repo stagingEnqueuer,
 		opts.MaxAttempts = e.maxAttempts
 	}
 
-	fields := dispatchFields{
-		TenantID:    tenantID,
-		RevisionID:  revisionID,
-		ContentHash: contentHash,
-		OutboxID:    id,
-	}
-	_, err = e.client.InsertTx(ctx, sqlTx, argsFn(fields), opts)
+	_, err := e.client.InsertTx(ctx, sqlTx, args, opts)
 	return err
 }

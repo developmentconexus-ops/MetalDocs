@@ -40,15 +40,17 @@ func (f *fakeFinalDocxPersister) WriteFinalDocxInTx(_ context.Context, _ db.Tx, 
 }
 
 type fakePDFEnqueuer struct {
-	calls int
-	err   error
+	calls             int
+	err               error
+	gotFinalDocxS3Key string
 }
 
-func (f *fakePDFEnqueuer) EnqueuePDFTx(_ context.Context, _ db.Tx, _, _ string, _ []byte) error {
+func (f *fakePDFEnqueuer) EnqueuePDFTx(_ context.Context, _ db.Tx, _, _ string, _ []byte, finalDocxS3Key string) error {
 	if f.err != nil {
 		return f.err
 	}
 	f.calls++
+	f.gotFinalDocxS3Key = finalDocxS3Key
 	return nil
 }
 
@@ -125,6 +127,12 @@ func TestMaterializeJobRunner_Handle_Success(t *testing.T) {
 	}
 	if pdfOutbox.calls != 1 {
 		t.Fatalf("PDF enqueue calls = %d, want 1", pdfOutbox.calls)
+	}
+	// F-QA2-2: the materialize result's FinalDocxS3Key must be threaded into the
+	// pdf-dispatch enqueue so the downstream pdf event carries the key instead of
+	// dead-lettering on "missing final_docx_s3_key".
+	if pdfOutbox.gotFinalDocxS3Key != "final/r.docx" {
+		t.Fatalf("PDF enqueue finalDocxS3Key = %q, want final/r.docx", pdfOutbox.gotFinalDocxS3Key)
 	}
 }
 

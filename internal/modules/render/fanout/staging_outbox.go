@@ -81,6 +81,40 @@ RETURNING id`, r.table),
 	return id, nil
 }
 
+// EnqueuePDF is the pdf-specific enqueue: identical to Enqueue but additionally
+// persists the renderer-produced final_docx_s3_key snapshot column, which only
+// metaldocs.pdf_dispatch_outbox has (F-QA2-2). The key is REQUIRED and must be
+// non-empty — a pdf dispatch with no docx key is a malformed event that would
+// dead-letter at the consumer (pdf_job_runner.go:117), so it fails closed at
+// the write boundary instead. Panics if called on a non-pdf table (programmer
+// error: only the pdf-bound repo may write this column).
+func (r *StagingOutboxRepository) EnqueuePDF(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte, finalDocxS3Key string) (string, error) {
+	if tx == nil {
+		return "", fmt.Errorf("%s enqueue pdf: tx must not be nil", r.name)
+	}
+	if r.table != "metaldocs.pdf_dispatch_outbox" {
+		panic(fmt.Sprintf("staging outbox: EnqueuePDF called on non-pdf table %q", r.table))
+	}
+	if finalDocxS3Key == "" {
+		return "", fmt.Errorf("%s enqueue pdf: final_docx_s3_key must not be empty (renderer-produced key required)", r.name)
+	}
+	var id string
+	err := tx.QueryRowContext(ctx, `
+INSERT INTO metaldocs.pdf_dispatch_outbox (tenant_id, revision_id, content_hash, final_docx_s3_key)
+VALUES ($1::uuid, $2::uuid, $3, $4)
+ON CONFLICT (tenant_id, revision_id) DO NOTHING
+RETURNING id`,
+		tenantID, revisionID, contentHash, finalDocxS3Key).Scan(&id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			// ON CONFLICT DO NOTHING skipped the insert: dedup, not a failure.
+			return "", nil
+		}
+		return "", fmt.Errorf("%s enqueue pdf: %w", r.name, err)
+	}
+	return id, nil
+}
+
 // MarkDispatched records successful dispatch of one outbox row. tenantID
 // (the row's own OutboxRow.TenantID) is seeded via authz.SeedTxTenant in a
 // dedicated per-row tx BEFORE the write, engaging the FORCE RLS backstop for

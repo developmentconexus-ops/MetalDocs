@@ -32,6 +32,59 @@ func TestPDFOutboxRepository_Enqueue_UsesTx(t *testing.T) {
 	}
 }
 
+// TestPDFOutboxRepository_EnqueuePDF_PersistsFinalDocxKey pins F-QA2-2: the
+// pdf-specific enqueue INSERTs the renderer-produced final_docx_s3_key as the
+// 4th column/arg alongside content_hash, so the dispatched pdf event carries
+// the key instead of dead-lettering on "missing final_docx_s3_key".
+func TestPDFOutboxRepository_EnqueuePDF_PersistsFinalDocxKey(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+	mock.ExpectBegin()
+	mock.ExpectQuery(`INSERT INTO metaldocs\.pdf_dispatch_outbox \(tenant_id, revision_id, content_hash, final_docx_s3_key\)`).
+		WithArgs("t1", "r1", []byte("hash"), "tenants/t1/r1/frozen.docx").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("row-1"))
+	mock.ExpectCommit()
+	tx, _ := db.BeginTx(context.Background(), nil)
+	repo := NewPDFOutboxRepository(db)
+	id, err := repo.EnqueuePDF(context.Background(), tx, "t1", "r1", []byte("hash"), "tenants/t1/r1/frozen.docx")
+	if err != nil {
+		t.Fatalf("EnqueuePDF: %v", err)
+	}
+	if id != "row-1" {
+		t.Fatalf("id = %q, want %q", id, "row-1")
+	}
+	_ = tx.Commit()
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
+// TestPDFOutboxRepository_EnqueuePDF_EmptyKeyFailsClosed pins the fail-closed
+// invariant (F-QA2-2 / no-fallback): an empty final_docx_s3_key is a malformed
+// pdf dispatch — the write is rejected before any INSERT runs, never silently
+// enqueuing a row that would dead-letter downstream.
+func TestPDFOutboxRepository_EnqueuePDF_EmptyKeyFailsClosed(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+	// No ExpectQuery: the guard must reject before touching the DB.
+	mock.ExpectBegin()
+	tx, _ := db.BeginTx(context.Background(), nil)
+	repo := NewPDFOutboxRepository(db)
+	id, err := repo.EnqueuePDF(context.Background(), tx, "t1", "r1", []byte("hash"), "")
+	if err == nil {
+		t.Fatal("expected error on empty final_docx_s3_key, got nil")
+	}
+	if id != "" {
+		t.Fatalf("id = %q, want empty on fail-closed", id)
+	}
+}
+
 func TestPDFOutboxRepository_Enqueue_NilTxRejected(t *testing.T) {
 	db, _, err := sqlmock.New()
 	if err != nil {

@@ -13,6 +13,16 @@ import (
 
 var errUnsupportedEventType = errors.New("worker: unsupported event type")
 
+// errPDFRunnerNotConfigured / errMaterializeRunnerNotConfigured are returned
+// when an event of a known type arrives but its runner was never wired
+// (F-QA2-1). A nil runner is a wiring/deploy defect: it must FAIL LOUD so the
+// event takes the normal retry → dead-letter path, never be silently marked
+// published with no work performed.
+var (
+	errPDFRunnerNotConfigured         = errors.New("worker: pdf runner not configured")
+	errMaterializeRunnerNotConfigured = errors.New("worker: materialize runner not configured")
+)
+
 type Service struct {
 	consumer          messaging.Consumer
 	pdfRunner         *PDFJobRunner
@@ -58,11 +68,15 @@ func (s *Service) RunOnce(ctx context.Context, batchSize int) error {
 		var handleErr error
 		switch event.EventType {
 		case messaging.EventTypePDFConvert:
-			if s.pdfRunner != nil {
+			if s.pdfRunner == nil {
+				handleErr = errPDFRunnerNotConfigured
+			} else {
 				handleErr = s.pdfRunner.Handle(ctx, event)
 			}
 		case messaging.EventTypeMaterializeFanout:
-			if s.materializeRunner != nil {
+			if s.materializeRunner == nil {
+				handleErr = errMaterializeRunnerNotConfigured
+			} else {
 				handleErr = s.materializeRunner.Handle(ctx, event)
 			}
 		default:

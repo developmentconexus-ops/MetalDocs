@@ -66,8 +66,13 @@ func BuildWorkerDependencies(ctx context.Context, workerCfg config.WorkerConfig)
 
 // buildWorkerPDFConverter wires the direct Gotenberg PDF path:
 // docx (MinIO) -> Gotenberg LibreOffice -> PDF (MinIO).
-// Returns nil when Gotenberg is not configured or storage is not MinIO, in
-// which case PDF generation simply does not run (the outbox retries later).
+// Returns nil when Gotenberg is not configured or storage is not MinIO. A nil
+// converter yields a nil PDFJobRunner, and the worker service now FAILS LOUD on
+// a PDFConvert event with no runner (F-QA2-1) — the event retries then
+// dead-letters rather than being silently marked published. (The prior claim
+// that "the outbox retries later" was false: the event was marked published and
+// never retried.) PDF generation therefore does not run until the converter is
+// configured; deploys that expect PDFs MUST wire Gotenberg + MinIO storage.
 func buildWorkerPDFConverter() (*servicebus.GotenbergPDFClient, error) {
 	gotenbergCfg, err := config.LoadGotenbergConfig()
 	if err != nil {

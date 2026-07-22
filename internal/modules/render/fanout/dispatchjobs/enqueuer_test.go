@@ -22,6 +22,7 @@ type fakeStagingRepo struct {
 	calls                      int
 	gotTenantID, gotRevisionID string
 	gotContentHash             []byte
+	gotFinalDocxS3Key          string
 }
 
 func (f *fakeStagingRepo) Enqueue(_ context.Context, _ db.Tx, tenantID, revisionID string, contentHash []byte) (string, error) {
@@ -29,6 +30,15 @@ func (f *fakeStagingRepo) Enqueue(_ context.Context, _ db.Tx, tenantID, revision
 	f.gotTenantID = tenantID
 	f.gotRevisionID = revisionID
 	f.gotContentHash = contentHash
+	return f.id, f.err
+}
+
+func (f *fakeStagingRepo) EnqueuePDF(_ context.Context, _ db.Tx, tenantID, revisionID string, contentHash []byte, finalDocxS3Key string) (string, error) {
+	f.calls++
+	f.gotTenantID = tenantID
+	f.gotRevisionID = revisionID
+	f.gotContentHash = contentHash
+	f.gotFinalDocxS3Key = finalDocxS3Key
 	return f.id, f.err
 }
 
@@ -66,7 +76,7 @@ func TestEnqueuer_EnqueuePDFTx_NewRow_InsertsRiverJob(t *testing.T) {
 	client := &fakeRiverInserter{}
 	e := newEnqueuerWithInserter(client, repo, nil, 25)
 
-	err := e.EnqueuePDFTx(context.Background(), &sql.Tx{}, "tenant-1", "revision-1", []byte{0xAB})
+	err := e.EnqueuePDFTx(context.Background(), &sql.Tx{}, "tenant-1", "revision-1", []byte{0xAB}, "tenants/t1/r1/frozen.docx")
 	if err != nil {
 		t.Fatalf("EnqueuePDFTx: %v", err)
 	}
@@ -85,6 +95,15 @@ func TestEnqueuer_EnqueuePDFTx_NewRow_InsertsRiverJob(t *testing.T) {
 	}
 	if args.OutboxID != "outbox-1" || args.TenantID != "tenant-1" || args.RevisionID != "revision-1" {
 		t.Errorf("unexpected dispatchFields: %+v", args.dispatchFields)
+	}
+	// F-QA2-2: the renderer-produced final_docx_s3_key must be threaded through
+	// both the outbox row (repo.gotFinalDocxS3Key) and the River job args
+	// (args.FinalDocxS3Key) so the pdf runner never dead-letters on a missing key.
+	if repo.gotFinalDocxS3Key != "tenants/t1/r1/frozen.docx" {
+		t.Errorf("repo.gotFinalDocxS3Key = %q, want tenants/t1/r1/frozen.docx", repo.gotFinalDocxS3Key)
+	}
+	if args.FinalDocxS3Key != "tenants/t1/r1/frozen.docx" {
+		t.Errorf("args.FinalDocxS3Key = %q, want tenants/t1/r1/frozen.docx", args.FinalDocxS3Key)
 	}
 	if client.gotOpts == nil || client.gotOpts.Queue != "temporal" {
 		t.Errorf("InsertOpts.Queue = %+v, want temporal", client.gotOpts)
@@ -120,7 +139,7 @@ func TestEnqueuer_DedupSkip_NoRiverInsert(t *testing.T) {
 	client := &fakeRiverInserter{}
 	e := newEnqueuerWithInserter(client, repo, nil, 25)
 
-	err := e.EnqueuePDFTx(context.Background(), &sql.Tx{}, "tenant-1", "revision-1", []byte{0xAB})
+	err := e.EnqueuePDFTx(context.Background(), &sql.Tx{}, "tenant-1", "revision-1", []byte{0xAB}, "tenants/t1/r1/frozen.docx")
 	if err != nil {
 		t.Fatalf("EnqueuePDFTx: %v", err)
 	}
@@ -138,7 +157,7 @@ func TestEnqueuer_RepoError_PropagatesAndSkipsRiver(t *testing.T) {
 	client := &fakeRiverInserter{}
 	e := newEnqueuerWithInserter(client, repo, nil, 25)
 
-	err := e.EnqueuePDFTx(context.Background(), &sql.Tx{}, "tenant-1", "revision-1", []byte{0xAB})
+	err := e.EnqueuePDFTx(context.Background(), &sql.Tx{}, "tenant-1", "revision-1", []byte{0xAB}, "tenants/t1/r1/frozen.docx")
 	if !errors.Is(err, repoErr) {
 		t.Fatalf("err = %v, want %v", err, repoErr)
 	}
@@ -156,7 +175,7 @@ func TestEnqueuer_NonSQLTx_FailsLoud(t *testing.T) {
 	client := &fakeRiverInserter{}
 	e := newEnqueuerWithInserter(client, repo, repo, 25)
 
-	err := e.EnqueuePDFTx(context.Background(), fakeDBTx{}, "tenant-1", "revision-1", []byte{0xAB})
+	err := e.EnqueuePDFTx(context.Background(), fakeDBTx{}, "tenant-1", "revision-1", []byte{0xAB}, "tenants/t1/r1/frozen.docx")
 	if err == nil {
 		t.Fatal("expected error for non-*sql.Tx, got nil")
 	}

@@ -27,20 +27,6 @@ func (f *fakePinInvoker) Pin(_ context.Context, _ db.Tx, _, _ string, _ docapp.A
 	return f.err
 }
 
-type fakePDFOutboxEnqueuer struct {
-	calls       int
-	err         error
-	tenantIDs   []string
-	revisionIDs []string
-}
-
-func (f *fakePDFOutboxEnqueuer) EnqueuePDFTx(_ context.Context, _ db.Tx, tenantID, revisionID string, _ []byte) error {
-	f.calls++
-	f.tenantIDs = append(f.tenantIDs, tenantID)
-	f.revisionIDs = append(f.revisionIDs, revisionID)
-	return f.err
-}
-
 type freezeDecisionConn struct {
 	stageSignoffs      []signoffRow
 	authzGranted       bool
@@ -261,7 +247,9 @@ func TestRecordSignoff_PinError_RollsBackTransaction(t *testing.T) {
 
 // TestRecordSignoff_PDFDispatchError_IsBestEffort was deleted: it existed solely
 // to cover the deprecated post-commit pdfDispatcher.Dispatch path, which has been
-// removed. PDF dispatch is now exclusively transactional via pdfOutbox (ADR 0015).
+// removed. The document-approve path Pins via the async-freeze seam (ADR 0015);
+// MaterializeJobRunner is the sole pdf producer. The old synchronous in-tx
+// pdf-dispatch seam on DecisionService was structurally dead and removed in QR-C.
 
 func TestRecordSignoff_WasReplay_DoesNotPin(t *testing.T) {
 	const (
@@ -424,60 +412,6 @@ func TestRecordSignoff_PinInvoker_CallsPin(t *testing.T) {
 	}
 }
 
-func TestRecordSignoff_PinInvoker_PDFOutboxNotEnqueued(t *testing.T) {
-	// When pinInvoker is used, the PDF outbox enqueue is skipped in decision_service
-	// because MaterializeJobRunner handles it after the fanout call succeeds.
-	const (
-		instanceID = "inst-pin-2"
-		stageID    = "stage-pin-2"
-		actorID    = "approver-1"
-		authorID   = "author-1"
-	)
-	signedAt := time.Date(2026, 6, 1, 11, 0, 0, 0, time.UTC)
-	repo := &fakeDecisionRepo{
-		instance:         buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID}),
-		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "sig-pin-2", WasReplay: false},
-	}
-	pdfOutbox := &fakePDFOutboxEnqueuer{}
-	conn := &freezeDecisionConn{
-		actorID: actorID,
-		stageSignoffs: []signoffRow{{
-			id:                 "sig-pin-2",
-			approvalInstanceID: instanceID,
-			stageInstanceID:    stageID,
-			actorUserID:        actorID,
-			actorTenantID:      "tenant-1",
-			decision:           "approve",
-			signedAt:           signedAt,
-			signatureMethod:    "password",
-			signaturePayload:   []byte(`{}`),
-			contentHash:        validContentHash,
-		}},
-	}
-	db := newFreezeDecisionTestDB(t, conn)
-	svc := (&DecisionService{
-		repo:    repo,
-		emitter: &MemoryEmitter{},
-		clock:   fixedClock{t: signedAt},
-	}).WithPinInvoker(&fakePinInvoker{}).WithPDFOutbox(pdfOutbox)
-
-	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
-		TenantID:         "tenant-1",
-		InstanceID:       instanceID,
-		StageInstanceID:  stageID,
-		ActorUserID:      actorID,
-		Decision:         "approve",
-		SignatureMethod:  "password",
-		SignaturePayload: map[string]any{"hash": "abc"},
-		ContentFormData:  map[string]any{"title": "Doc", "_content_hash": validContentHash},
-	})
-	if err != nil {
-		t.Fatalf("RecordSignoff() error = %v", err)
-	}
-	if pdfOutbox.calls != 0 {
-		t.Fatalf("PDF outbox must not be enqueued when pinInvoker is active, got %d calls", pdfOutbox.calls)
-	}
-}
 
 func TestRecordSignoff_RejectPath_AssertsDocumentEditBeforeDocumentWrite(t *testing.T) {
 	const (

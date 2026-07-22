@@ -46,9 +46,10 @@ func buildPDFEvent(f dispatchFields) messaging.Event {
 		AggregateID:    messaging.AggregateID(f.RevisionID),
 		IdempotencyKey: messaging.IdempotencyKey("docgen_v2_pdf:" + f.TenantID + ":" + f.RevisionID),
 		Payload: messaging.PDFConvertPayload{
-			TenantID:    f.TenantID,
-			RevisionID:  f.RevisionID,
-			ContentHash: hex.EncodeToString(f.ContentHash),
+			TenantID:       f.TenantID,
+			RevisionID:     f.RevisionID,
+			ContentHash:    hex.EncodeToString(f.ContentHash),
+			FinalDocxS3Key: f.FinalDocxS3Key,
 		},
 	}
 }
