@@ -1,7 +1,7 @@
 # Milestone 5 — Detalhe Signoff + Taxonomy Admin restyle (net-new / polish — last)
 
 > **Program:** frontend-screen-completion  ·  **Governing spec:** `../mission.md` (§7 M5, §5 inventory rows 13–14, §8 terminal acceptance)
-> **Status:** FEATURES CLOSED (F5.1 reconciled via F5.3) — awaiting milestone-validator re-run + HS-1 (2026-07-10). Spec authored 2026-06-23.
+> **Status:** VALIDATOR PASS (re-run #2, 2026-07-10 — `qa/milestone-qa.md` C7 PASS) — awaiting HS-1 operator gate (presented 2026-07-22). Spec authored 2026-06-23.
 > - **F5.1** original close (`f5.1-signoff-detail/evidence.md`) is **superseded by ADR 0080** — its standalone cockpit was retired 2026-07-07. Reconciled verify-only by **F5.3** below.
 > - **F5.2** closed **verify-only** (`f5.2-taxonomy-restyle/evidence.md`): restyle already delivered by `2a371d60 (FE-14, 2026-07-02)` — the "11 inline `style=`" premise predated FE-14; current page fully tokenized (grep=0), tsc clean, vitest 23/23, rendered GREEN, both reviewers APPROVE. No new F5.2 diff (fabricating one would invent scope on an already-correct base).
 > - **F5.3** (`f5.3-signoff-reconcile/evidence.md`) reconciles F5.1 to ADR-0080 truth: current signoff surface = `DocumentWorkspacePage` approving mode; re-proven by 81/81 current-surface tests (incl. new `useSignoffMutation.test.tsx` re-establishing the `POST /signoff` + If-Match guard), orphan `SignoffDetailPage.module.css` removed, tsc clean, both reviewers APPROVE the current surface. Zero behavior change.
