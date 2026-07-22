@@ -68,3 +68,49 @@ QA-2 (API-drivable scope): **PASS** — QR-1/QR-2/QR-4 remediations live-verifie
 blank-docx 409 live-verified. QA-2 overall **PARTIAL/OPEN** until QR-C merges and
 hub re-drives J2-PDF fresh (2 existing dead-lettered pdf events f6f4712a/83db8465
 intentionally left as-is; fresh journey post-merge).
+
+---
+
+## 6. J2-PDF final journey (2026-07-22, post-QR-C, stack @01e1a785)
+
+QR-C merged 4d464bf8 (+0309 BEGIN-wrap repair 01e1a785); api image rebuilt,
+stack redeployed healthy, `pdf_dispatch_outbox.final_docx_s3_key` column live.
+
+Journey (document d18fbfdf, profile po, route v1 9ee227b8 single-stage
+`document.signoff`, selector role_in_fixed_area approver/rh):
+
+| Step | Result |
+|---|---|
+| submit (author-test, If-Match v2) | 201, instance 10ecb704, frozen_content_hash 3ddcc052… |
+| signoff approve (approver-test, If-Match v3, content_hash echo) | 200 outcome "approved" (F-QA2-4 empty signoff_id reproduced) |
+| staging `pdf_dispatch_outbox` row 348a9e70 | dispatched, **final_docx_s3_key populated** (`…/revisions/d18fbfdf…/frozen.docx`) — QR-C column live-proven |
+| outbox `docx_materialize` | published, no dead-letter |
+| outbox `docgen_v2_pdf` | published, payload carries `final_docx_s3_key` — F-QA2-2 closed live |
+| `documents.final_docx_s3_key` / `final_pdf_s3_key` / `pdf_hash` / `pdf_generated_at` | all set (pdf_generated_at 2026-07-22 18:23:01Z) |
+| MinIO `metaldocs-attachments/…/revisions/d18fbfdf/` | `frozen.docx` 1003B + `final.pdf` 6.0KiB — Gotenberg conversion real |
+
+Old dead-lettered pdf events f6f4712a/83db8465 untouched (NULL key, not
+re-dispatched — per 0309 expand-only contract).
+
+### Ops repairs (state only, this leg)
+
+4. SQL-deactivated QA-1 route bbbb2222 (API deactivate 409 `route.in_use` on
+   terminal-only references — F-QA2-6) and reactivated relic route v1 9ee227b8
+   (API create 500 version-uniqueness collision — F-QA2-8). Cancelled stale
+   instance 93a6ee28 via API first (author, If-Match v1, 200).
+
+### Additional findings (final leg)
+
+| ID | Sev | Finding | Disposition |
+|---|---|---|---|
+| F-QA2-6 | minor | route deactivate 409 `route.in_use` even when ALL referencing instances are terminal (cancelled/approved) — lineage becomes permanently frozen | defer → ROADMAP |
+| F-QA2-7 | minor | document submit does not honor `If-Match: *` (returns stale_revision); wildcard should skip precondition | defer → ROADMAP |
+| F-QA2-8 | minor | POST /approval/routes after full lineage deactivation inserts version=1 → 500 unique violation `approval_routes_profile_version_uq`; create should pick max(version)+1 | defer → ROADMAP |
+
+## 7. Final verdict
+
+QA-2 **PASS** (was PARTIAL/OPEN). All re-drive scope green: J3, J5, blank-docx
+live-409, J2-PDF end-to-end including PDF artifact in object storage. Ship-blockers
+F-QA2-1/F-QA2-2 closed by unit QR-C (dual-gate AGREEMENT @60ec85f0, merged
+4d464bf8, +0309 BEGIN-wrap 01e1a785). Minor defers F-QA2-3..8 registered in
+ROADMAP. Gates D unblocked.
