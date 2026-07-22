@@ -745,7 +745,7 @@ func main() {
 	// enqueuer (:684), and FastForward (built in NewServices) holds this same
 	// pointer. Rebuilding here would silently drop all of that wiring from
 	// Decision while leaving FastForward on the original, divergent instance.
-	approvalServices.Decision = approvalServices.Decision.WithPDFOutbox(pdfDispatchEnqueuer).
+	approvalServices.Decision = approvalServices.Decision.
 		WithPinInvoker(fanoutCfg.freezeService).
 		WithSignatureRegistry(newSignoffReauthRegistry(deps.AuthRepo, deps.SQLDB)).
 		WithCDFieldReader(cdReader)

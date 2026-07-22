@@ -65,21 +65,12 @@ type TemplateCompletionWriter interface {
 	MarkTemplateVersionRejected(ctx context.Context, tx db.Tx, tenantID, templateVersionID string) error
 }
 
-// pdfDispatchEnqueuer is the minimal published interface for the staging
-// pdf dispatch Enqueuer (render/fanout/dispatchjobs), owned here (the
-// consumer) and satisfied by *dispatchjobs.Enqueuer. It inserts the paired
-// (outbox row, River job) atomically inside tx (M5 F5.3 T3).
-type pdfDispatchEnqueuer interface {
-	EnqueuePDFTx(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte) error
-}
-
 // DecisionService handles approver approve/reject decisions.
 type DecisionService struct {
-	repo        infrastructure.ApprovalRepository
-	emitter     EventEmitter
-	clock       Clock
-	pinInvoker  PinInvoker
-	pdfDispatch pdfDispatchEnqueuer
+	repo       infrastructure.ApprovalRepository
+	emitter    EventEmitter
+	clock      Clock
+	pinInvoker PinInvoker
 	// sigRegistry verifies the e-signature credential before a sign-off is
 	// recorded. nil only in tests that exercise non-reauth methods.
 	sigRegistry       *signature.Registry
@@ -110,14 +101,6 @@ func NewDecisionService(
 		emitter: emitter,
 		clock:   clock,
 	}
-}
-
-// WithPDFOutbox sets the transactional staging dispatch Enqueuer, replacing
-// the post-commit dispatcher. Takes the narrow pdfDispatchEnqueuer interface,
-// satisfied by *dispatchjobs.Enqueuer (M5 F5.3 T3).
-func (s *DecisionService) WithPDFOutbox(enqueuer pdfDispatchEnqueuer) *DecisionService {
-	s.pdfDispatch = enqueuer
-	return s
 }
 
 // WithCDFieldReader wires the controlleddocuments read-port used to resolve a
@@ -169,10 +152,10 @@ func (s *DecisionService) WithTemplateVersionReader(reader TemplateVersionReader
 }
 
 // Ready reports whether every port required for full runtime function is
-// wired: templateVersionReader, templateCompletion, pdfDispatch, pinInvoker,
-// sigRegistry, and cdRead. Their absence causes a 500 (nil pointer / not
-// found) or a silent skip of a state transition (e.g. the templates_
-// template_version write). lifecycleEnqueuer is excluded — it is best-effort
+// wired: templateVersionReader, templateCompletion, pinInvoker, sigRegistry,
+// and cdRead. Their absence causes a 500 (nil pointer / not found) or a silent
+// skip of a state transition (e.g. the templates_template_version write).
+// lifecycleEnqueuer is excluded — it is best-effort
 // and nil-tolerant (see WithLifecycleEnqueuer), guarded at every call site.
 // A composition root should call Ready before serving traffic so a wiring
 // regression (e.g. rebuilding Decision instead of mutating it in place) fails
@@ -184,9 +167,6 @@ func (s *DecisionService) Ready() error {
 	}
 	if s.templateCompletion == nil {
 		missing = append(missing, "templateCompletion")
-	}
-	if s.pdfDispatch == nil {
-		missing = append(missing, "pdfDispatch")
 	}
 	if s.pinInvoker == nil {
 		missing = append(missing, "pinInvoker")
@@ -542,10 +522,6 @@ func (s *DecisionService) recordSignoffInTx(ctx context.Context, tx *sql.Tx, req
 		}
 	}
 
-	var shouldDispatchPDF bool
-	var pdfTenantID string
-	var pdfRevisionID string
-
 	switch outcome {
 	case domain.QuorumApprovedStage:
 		// Step 11a: mark stage completed.
@@ -626,9 +602,6 @@ func (s *DecisionService) recordSignoffInTx(ctx context.Context, tx *sql.Tx, req
 					return SignoffResult{}, nil, infrastructure.ErrStaleRevision
 				}
 				result.InstanceApproved = true
-				shouldDispatchPDF = true
-				pdfTenantID = req.TenantID
-				pdfRevisionID = instance.DocumentID
 			}
 		} else {
 			// Activate the next stage that AdvanceStage marked active.
@@ -759,14 +732,13 @@ func (s *DecisionService) recordSignoffInTx(ctx context.Context, tx *sql.Tx, req
 		}
 	}
 
-	// Step 13: enqueue PDF dispatch inside tx (transactional outbox).
-	// Skipped when pinInvoker is active: PDF dispatch is enqueued by MaterializeJobRunner
-	// after the fanout call succeeds (ADR 0015).
-	if shouldDispatchPDF && s.pdfDispatch != nil && s.pinInvoker == nil {
-		if err := s.pdfDispatch.EnqueuePDFTx(ctx, tx, pdfTenantID, pdfRevisionID, []byte(contentHash)); err != nil {
-			return SignoffResult{}, nil, fmt.Errorf("recordSignoff: enqueue pdf outbox: %w", err)
-		}
-	}
+	// PDF dispatch note (F-QA2-2 / QR-C): the document-approve path always Pins
+	// via the async-freeze seam (ADR 0015) — MaterializeJobRunner is the sole pdf
+	// producer, enqueuing PDF dispatch (with the renderer-produced
+	// final_docx_s3_key) after the fanout call succeeds. The old synchronous
+	// in-tx pdf-dispatch block that used to live here was structurally dead
+	// (it required pinInvoker == nil, but the approve branch above hard-requires
+	// pinInvoker != nil) and was removed rather than defensively threaded.
 
 	return result, nil, nil
 }

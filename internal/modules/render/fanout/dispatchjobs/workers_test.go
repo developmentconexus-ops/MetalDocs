@@ -54,10 +54,11 @@ func (f *fakeOutboxMarker) MarkFailed(_ context.Context, tenantID, id, errStr st
 
 func testFields() dispatchFields {
 	return dispatchFields{
-		TenantID:    "tenant-1",
-		RevisionID:  "revision-1",
-		ContentHash: []byte{0xDE, 0xAD, 0xBE, 0xEF},
-		OutboxID:    "outbox-1",
+		TenantID:       "tenant-1",
+		RevisionID:     "revision-1",
+		ContentHash:    []byte{0xDE, 0xAD, 0xBE, 0xEF},
+		OutboxID:       "outbox-1",
+		FinalDocxS3Key: "tenants/tenant-1/revision-1/frozen.docx",
 	}
 }
 
@@ -88,6 +89,11 @@ func TestRun_PDFEvent_PublishSuccess_MarksDispatched(t *testing.T) {
 	wantHash := hex.EncodeToString(fields.ContentHash)
 	if payload.ContentHash != wantHash {
 		t.Errorf("ContentHash = %q, want %q", payload.ContentHash, wantHash)
+	}
+	// F-QA2-2: buildPDFEvent must thread the frozen-docx key into the pdf
+	// payload so the pdf job runner never dead-letters on a missing key.
+	if payload.FinalDocxS3Key != fields.FinalDocxS3Key {
+		t.Errorf("FinalDocxS3Key = %q, want %q", payload.FinalDocxS3Key, fields.FinalDocxS3Key)
 	}
 
 	if repo.dispatchCalls != 1 {

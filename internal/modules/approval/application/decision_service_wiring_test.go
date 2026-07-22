@@ -102,11 +102,11 @@ func TestServices_FastForwardSharesDecisionInstance(t *testing.T) {
 	svc = svc.WithTemplateCompletionWriter(wiringStubTemplateCompletion{})
 	svc = svc.WithLifecycleEnqueuer(wiringStubLifecycleEnqueuer{})
 
-	// The composition-root-only ports (PDF outbox, pin invoker, signature
-	// registry) are wired directly on the DecisionService pointer, exactly as
-	// main.go now does: in place, via the returned same pointer, never via a
-	// fresh NewDecisionService call.
-	svc.Decision = svc.Decision.WithPDFOutbox(&fakePDFOutboxEnqueuer{}).WithPinInvoker(&fakePinInvoker{})
+	// The composition-root-only ports (pin invoker, signature registry) are
+	// wired directly on the DecisionService pointer, exactly as main.go now
+	// does: in place, via the returned same pointer, never via a fresh
+	// NewDecisionService call.
+	svc.Decision = svc.Decision.WithPinInvoker(&fakePinInvoker{})
 
 	if svc.FastForward.decisions != svc.Decision {
 		t.Fatalf("FastForward.decisions and Services.Decision diverged after wiring: FastForward observes a different *DecisionService than the rest of the system")
@@ -149,7 +149,7 @@ func TestDecisionService_Ready_ReportsEveryMissingRequiredPort(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected Ready to report missing ports on a zero-value DecisionService")
 	}
-	for _, port := range []string{"templateVersionReader", "templateCompletion", "pdfDispatch", "pinInvoker", "sigRegistry", "cdRead"} {
+	for _, port := range []string{"templateVersionReader", "templateCompletion", "pinInvoker", "sigRegistry", "cdRead"} {
 		if !strings.Contains(err.Error(), port) {
 			t.Errorf("Ready() error %q does not name missing port %q", err.Error(), port)
 		}
@@ -163,7 +163,6 @@ func TestDecisionService_Ready_NilWhenAllRequiredPortsWired(t *testing.T) {
 	s := &DecisionService{}
 	s = s.WithTemplateVersionReader(wiringStubTemplateReader{}).
 		WithTemplateCompletionWriter(wiringStubTemplateCompletion{}).
-		WithPDFOutbox(&fakePDFOutboxEnqueuer{}).
 		WithPinInvoker(&fakePinInvoker{}).
 		WithCDFieldReader(controlleddocumentsdomain.NoopCDFieldReader{})
 	s.sigRegistry = signature.NewRegistry()

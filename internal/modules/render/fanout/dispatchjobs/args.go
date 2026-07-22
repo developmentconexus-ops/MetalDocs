@@ -9,6 +9,11 @@ type dispatchFields struct {
 	RevisionID  string `json:"revision_id"`
 	ContentHash []byte `json:"content_hash"`
 	OutboxID    string `json:"outbox_id"`
+	// FinalDocxS3Key is the renderer-produced frozen-docx key, carried from the
+	// pdf_dispatch_outbox snapshot into the PDFConvertPayload (F-QA2-2). Set only
+	// on the pdf dispatch path; empty on the materialize dispatch path (which has
+	// no docx key at enqueue time).
+	FinalDocxS3Key string `json:"final_docx_s3_key,omitempty"`
 }
 
 // PDFDispatchArgs is the River job payload for dispatching one pdf staging

@@ -33,7 +33,7 @@ type MaterializeFinalDocxPersister interface {
 // consumer) and satisfied by *dispatchjobs.Enqueuer. It inserts the paired
 // (outbox row, River job) atomically inside tx (M5 F5.3 T3).
 type MaterializePDFEnqueuer interface {
-	EnqueuePDFTx(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte) error
+	EnqueuePDFTx(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte, finalDocxS3Key string) error
 }
 
 // MaterializeJobRunner handles EventTypeMaterializeFanout events.
@@ -95,7 +95,11 @@ func (r *MaterializeJobRunner) Handle(ctx context.Context, event messaging.Event
 		_ = tx.Rollback()
 		return fmt.Errorf("materialize job runner: write final docx: %w", err)
 	}
-	if err := r.pdfOutbox.EnqueuePDFTx(ctx, tx, payload.TenantID, payload.RevisionID, result.ContentHash); err != nil {
+	// result.FinalDocxS3Key is the renderer-produced key written to documents 4
+	// lines above (WriteFinalDocxInTx). Thread it into the pdf dispatch snapshot
+	// so the docgen_v2_pdf event carries it (F-QA2-2); the worker must never
+	// re-derive this key.
+	if err := r.pdfOutbox.EnqueuePDFTx(ctx, tx, payload.TenantID, payload.RevisionID, result.ContentHash, result.FinalDocxS3Key); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("materialize job runner: enqueue pdf outbox: %w", err)
 	}

@@ -291,6 +291,72 @@ func TestWorkerService_RetryableRenderError_SchedulesBackoffLikeBefore(t *testin
 	}
 }
 
+// TestWorkerService_NilPDFRunner_FailsLoud pins F-QA2-1: a PDFConvert event
+// arriving while no pdfRunner is configured must FAIL LOUD (mark the event
+// failed → retry/DLQ), never be silently marked published with no PDF produced.
+func TestWorkerService_NilPDFRunner_FailsLoud(t *testing.T) {
+	consumer := &fakeConsumer{events: []messaging.Event{
+		{
+			EventID:      "pdf-no-runner",
+			EventType:    messaging.EventTypePDFConvert,
+			AttemptCount: 1,
+			Payload: messaging.PDFConvertPayload{
+				TenantID:       "t1",
+				RevisionID:     "r1",
+				FinalDocxS3Key: "tenants/t1/revisions/r1/frozen.docx",
+			},
+		},
+	}}
+
+	cfg := config.WorkerConfig{MaxAttempts: 5, RetryBaseSeconds: 10, RetryMaxSeconds: 300}
+	svc := NewService(consumer, cfg) // no WithPDFRunner — pdfRunner is nil
+
+	if err := svc.RunOnce(context.Background(), 10); err != nil {
+		t.Fatalf("RunOnce: %v", err)
+	}
+	if len(consumer.published) != 0 {
+		t.Fatalf("published = %#v, want none (nil runner must not mark published)", consumer.published)
+	}
+	if len(consumer.failures) != 1 {
+		t.Fatalf("failures = %#v, want one failure", consumer.failures)
+	}
+	if !strings.Contains(consumer.failures[0].LastError, "pdf runner not configured") {
+		t.Fatalf("LastError = %q, want it to name the missing pdf runner", consumer.failures[0].LastError)
+	}
+}
+
+// TestWorkerService_NilMaterializeRunner_FailsLoud pins F-QA2-1 for the
+// materialize arm of the same switch.
+func TestWorkerService_NilMaterializeRunner_FailsLoud(t *testing.T) {
+	consumer := &fakeConsumer{events: []messaging.Event{
+		{
+			EventID:      "materialize-no-runner",
+			EventType:    messaging.EventTypeMaterializeFanout,
+			AttemptCount: 1,
+			Payload: messaging.MaterializeFanoutPayload{
+				TenantID:   "t1",
+				RevisionID: "r1",
+			},
+		},
+	}}
+
+	cfg := config.WorkerConfig{MaxAttempts: 5, RetryBaseSeconds: 10, RetryMaxSeconds: 300}
+	svc := NewService(consumer, cfg) // no WithMaterializeRunner — materializeRunner is nil
+
+	if err := svc.RunOnce(context.Background(), 10); err != nil {
+		t.Fatalf("RunOnce: %v", err)
+	}
+	if len(consumer.published) != 0 {
+		t.Fatalf("published = %#v, want none (nil runner must not mark published)", consumer.published)
+	}
+	if len(consumer.failures) != 1 {
+		t.Fatalf("failures = %#v, want one failure", consumer.failures)
+	}
+	if !strings.Contains(consumer.failures[0].LastError, "materialize runner not configured") {
+		t.Fatalf("LastError = %q, want it to name the missing materialize runner", consumer.failures[0].LastError)
+	}
+}
+
 type failingSecondCallConverter struct {
 	delegate *fakePDFConverter
 }
