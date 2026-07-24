@@ -38,6 +38,7 @@ func (noopPresigner) Confirm(_ context.Context, _, key, hash string) (objectstor
 	return objectstore.VerifiedPointer{StorageKey: key, ContentHash: hash, SizeBytes: 1}, nil
 }
 func (noopPresigner) Copy(_ context.Context, _ string, _, _ string) error { return nil }
+func (noopPresigner) Exists(_ context.Context, _ string) (bool, error)    { return true, nil }
 func (noopPresigner) Delete(_ context.Context, _ string) error            { return nil }
 
 // testClock satisfies application.Clock with a fixed timestamp.
