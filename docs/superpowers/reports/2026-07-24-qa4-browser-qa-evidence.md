@@ -167,12 +167,6 @@ Jornada completa executada num documento com conteúdo autoral real (IT de torno
 CNC, 1854 B, 1 página, autosalvo e verificado na tela do aprovador). Após
 aprovação + publicação, os artefatos congelados:
 
-```
-materialize_dispatch_outbox (revision_id=ba24c4f2…, 2026-07-24 22:36:53)
-  content_hash = e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-  = SHA-256 da STRING VAZIA
-```
-
 Extração direta do objeto no MinIO
 (`tenants/{t}/revisions/ba24c4f2…/frozen.docx`):
 
@@ -190,6 +184,90 @@ artefato a partir do snapshot do template e ignora `current_revision_id`. O
 documento assinado e publicado — o artefato que vale legalmente — não contém o
 texto aprovado. **Blocker de release, sem workaround.** Correção acordada:
 opção (a) do verdict 2026-07-23.
+
+### F-QA4-9 — `form_data_snapshot` opcional no contrato, NOT NULL no banco (500)
+
+`POST /documents/{id}/autosave/commit` sem `form_data_snapshot` (campo **não**
+listado em `required` no contrato, `api/openapi/v1/openapi.yaml:2890`) →
+
+```
+500 null value in column "form_data_json" of relation "documents"
+    violates not-null constraint (SQLSTATE 23502)
+```
+
+Origem: `internal/modules/documents/infrastructure/repository.go:1158` grava
+`form_data_json = $2` com o snapshot nil. Contrato diz opcional, escrita exige
+valor. Um cliente conforme ao contrato derruba a rota de autosave com 500 (não
+400). Melhoria: ou tornar o campo `required` no contrato, ou defaultar para
+`'{}'::jsonb` na escrita — e devolver 400 problem+json, nunca 500.
+
+### F-QA4-10 — `*_dispatch_outbox.content_hash` carrega values_hash (nome enganoso)
+
+A coluna `content_hash` de `materialize_dispatch_outbox` / `pdf_dispatch_outbox`
+**não** é o hash do artefato: é o `values_hash` dos placeholders resolvidos
+(`freeze_service.go:206-218` → `ComputeValuesHash(valMap)` →
+`EnqueueMaterializeTx(..., hashBytes)`). Num template sem placeholders o valor é
+sempre `e3b0c442…` (SHA-256 do mapa vazio) para todos os tenants e documentos —
+inclusive no run VERDE pós-correção. Custou uma leitura errada de evidência
+neste próprio relatório (o `e3b0c442…` foi lido como "artefato vazio"; o
+artefato vazio era real, mas a prova é o objeto no MinIO, não essa coluna).
+Melhoria: renomear para `values_hash` (o hash do artefato já vive em
+`documents.content_hash`) ou passar a gravar o hash real do artefato.
+
+## F-QA3-1 — CORRIGIDO e verificado live (2026-07-27)
+
+Correção implementada (opção (a) do verdict 2026-07-23), commit `e1c0ea28`:
+
+- `SnapshotReader.ReadCurrentRevisionBodyKey` (novo seam) — lê
+  `document_revisions.storage_key` via `documents.current_revision_id`, join
+  tenant-predicado (`snapshot_repository.go:112-133`).
+- `FreezeService.Materialize` passa esse key como `BodyDocxS3Key` no fanout, em
+  vez de `snap.BodyDocxS3Key` (snapshot do template); revisão ausente →
+  **falha fechada** (`materialize: document %s has no current revision body to
+  freeze`), sem fallback silencioso.
+- Testes de fake/asserção atualizados; `go build ./...`,
+  `go vet -tags integration ./...` e testes do módulo `documents` verdes.
+- Imagens `metaldocs-api:dev` / `metaldocs-worker:dev` reconstruídas do commit e
+  containers recriados antes da verificação.
+
+Jornada de verificação (documento novo `IT-USINAGEM-003`, perfil `it` / área
+`usinagem`, id `2930e658-4e5b-43d4-b13a-e45d4463cd02`), com o **mesmo corpo
+autoral** do run que falhou (1854 B, IT de torno CNC):
+
+| Passo | Resultado |
+|---|---|
+| Criar CD + upload do corpo (acquire → presign → PUT → commit) | PASS — `revision_id 2db48d32…`, `file_size_bytes 1854`, `page_count 1` |
+| Submeter (`If-Match: "v0"`) | PASS — `instance_id bc22bb29…`, etag `"v1"` |
+| `active-document` (approver) | PASS — `content_hash b8d4be68…`, `revision_version 1` |
+| Signoff aprovar+assinar (`If-Match: "v1"`) | PASS — `outcome: approved` |
+| Materialize + PDF (worker) | PASS — `pdf_generated_at 22:31:42` |
+
+Artefatos congelados, extraídos direto do MinIO:
+
+```
+documents.content_hash = 8586754f7494761143ace5a5fb30416f800c10867f3f7f5f54612e9f434179fd
+frozen.docx : 1854 bytes  (= byte-a-byte o tamanho do corpo autorado)
+  word/document.xml: 2827 chars; texto extraído: 535 chars
+  "1. OBJETIVO Padronizar o ajuste do torno CNC para usinagem da peca Flange A320.
+   2. ESCOPO … 3. PROCEDIMENTO 3.1 Verificar o desenho tecnico DT-A320-REV3 …
+   4. REGISTROS Ficha de setup FR-USI-002 preenchida a cada troca de lote."
+final.pdf   : 17726 bytes
+```
+
+Comparação com o run pré-correção e com o controle:
+
+| Métrica | Pré-fix (QA-4) | Pós-fix (QA-5) | Controle (export da revisão viva) |
+|---|---|---|---|
+| texto em `frozen.docx` | 18 chars (whitespace) | **535 chars reais** | — |
+| `final.pdf` | 6118 B, em branco | **17726 B** | 17726 B |
+
+O PDF congelado agora é **byte-idêntico em tamanho** ao export de controle. O
+blocker de release F-QA3-1 está fechado no eixo "conteúdo assinado ≠ conteúdo
+congelado".
+
+Escopo restante da opção (a), **não** implementado (defer explícito):
+hashes de linhagem revisão → frozen.docx → PDF, e expurgo dos artefatos
+inválidos já produzidos (`ba24c4f2…`, `45c9e784…`, `d18fbfdf…`).
 
 ## Jornada
 
@@ -217,3 +295,22 @@ F-QA4-5 publicar inalcançável) e cinco de contrato/UX (F-QA4-1, -2, -4, -6, -7
 -8) degradam o onboarding de um cliente novo.
 
 Ordem de correção sugerida: F-QA3-1 → F-QA4-5 → F-QA4-3 → F-QA4-1 → resto.
+
+### Estado dos achados (atualizado 2026-07-27)
+
+| ID | Classe | Estado |
+|---|---|---|
+| F-QA3-1 | Blocker — artefato congelado vazio | **CORRIGIDO** (`e1c0ea28`), verificado live QA-5 |
+| F-QA4-5 | Bloqueio de fluxo — publicar inalcançável na UI | ABERTO |
+| F-QA4-3 | Bloqueio de fluxo — submit 409 silencioso | ABERTO |
+| F-QA4-1 | UX/gating — preview-code 403 engolido (`it-usinagem-???`) | ABERTO |
+| F-QA4-9 | Contrato⊥banco — autosave/commit 500 | ABERTO (novo) |
+| F-QA4-2 | Enums de role hand-synced | ABERTO |
+| F-QA4-4 | Painel IDENTIFICAÇÃO `---` + chips sobrepostos | ABERTO |
+| F-QA4-6 | Idempotency-Key inconsistente | ABERTO |
+| F-QA4-7 | `signoff_id` vazio | ABERTO |
+| F-QA4-8 | UUID no card do inbox / `?` em próximos aprovadores | ABERTO |
+| F-QA4-10 | `content_hash` do outbox = values_hash (nome enganoso) | ABERTO (novo) |
+
+O veredito QA-4 permanece **FAIL** — o blocker caiu, mas F-QA4-5 e F-QA4-3 ainda
+impedem a jornada de completar apenas pela tela.
