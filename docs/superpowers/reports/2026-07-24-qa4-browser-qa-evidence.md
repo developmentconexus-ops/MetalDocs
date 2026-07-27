@@ -128,6 +128,26 @@ Agravante de UX: o rótulo diz "aguardando", sugerindo espera transitória, quan
 mesmo necessário para o If-Match, expor um endpoint de contexto legível por quem
 tem `document.publish`; (c) trocar o rótulo por um motivo real.
 
+**Reteste 2026-07-27 (QA-5) — afordância invertida, confirmada nos dois lados.**
+Mesma ficha (`IT-USINAGEM-003`, `approved`), mesmo build, dois usuários:
+
+```
+admin        (TEM document.publish)  → <button aria-disabled="true"
+                                        title="Aguardando contexto ativo para publicar">
+                                       "A publicação está bloqueada porque o contexto
+                                        ativo desta revisão ainda não foi confirmado."
+author-test  (NÃO tem a capability)  → <button aria-disabled="false">  ← habilitado
+                                       clique → NENHUMA requisição de rede,
+                                       nenhum diálogo, nenhum toast: no-op mudo
+```
+
+Ou seja, o gate está **exatamente invertido**: quem pode publicar vê o botão
+morto; quem não pode vê o botão vivo — e o clique não faz absolutamente nada
+(nem 403, nem feedback). O gate atual só consulta `active-document`; a
+capability do usuário não entra na decisão de renderizar/habilitar. Reforça a
+melhoria (a): o gate tem de ser `status == approved && capability
+document.publish`, e a ação sem capability nem deve ser renderizada.
+
 ### F-QA4-6 — validação de `Idempotency-Key` inconsistente entre rotas irmãs
 
 Mesma família de rotas de mutação de documento, mesmo cliente:
@@ -214,6 +234,38 @@ artefato vazio era real, mas a prova é o objeto no MinIO, não essa coluna).
 Melhoria: renomear para `values_hash` (o hash do artefato já vive em
 `documents.content_hash`) ou passar a gravar o hash real do artefato.
 
+### F-QA4-11 — `values_frozen_at` sempre `null` no contrato (coluna nunca lida)
+
+```
+GET /api/v1/documents/{id}  →  "values_frozen_at": null
+SELECT values_frozen_at ... →  2026-07-27 22:31:17.148056+00
+```
+
+`Repository.GetDocument`
+(`internal/modules/documents/infrastructure/repository.go:291-304`) não inclui
+`d.values_frozen_at` na lista de colunas do SELECT, então o campo do contrato
+(`api.gen.go:250`) é sempre `null` para todo documento — inclusive congelados.
+Campo publicado no contrato que nunca carrega valor: consumidor que decidir
+"está congelado?" por ele erra sempre. Melhoria: incluir a coluna no SELECT (é
+a única correção necessária; o mapeamento em `handler.go:481/532` já existe).
+
+### F-QA4-12 — nav primário: item morto ("Auditoria") e telas de admin sem entrada
+
+`Rail.tsx:19` declara `{ label: 'Auditoria', path: '/audit' }`, mas **nenhuma
+rota `/audit` existe** — não há feature `audit` em
+`frontend/apps/web/src/features/` e o `AppRouter.tsx:35` tem
+`{ path: '*', element: <Navigate to="/" replace /> }`. Clicar em "Auditoria" no
+nav primário devolve silenciosamente o usuário à home, sem erro nem 404.
+
+Espelho do mesmo problema: as telas de administração que a jornada "empresa do
+zero" exige — `/admin/taxonomy`, `/admin/memberships`, `/admin/routes` — **não
+têm nenhuma entrada de navegação**; só se chega a elas digitando a URL. O nav
+mostra o que não existe e esconde o que existe.
+
+Melhoria: (a) remover o item morto ou implementar a tela de auditoria (o feed de
+eventos já existe na home, seção MURMÚRIOS); (b) adicionar um grupo
+"Administração" no rail, filtrado por capability.
+
 ## F-QA3-1 — CORRIGIDO e verificado live (2026-07-27)
 
 Correção implementada (opção (a) do verdict 2026-07-23), commit `e1c0ea28`:
@@ -285,6 +337,19 @@ inválidos já produzidos (`ba24c4f2…`, `45c9e784…`, `d18fbfdf…`).
 | Publicar pela UI | **FAIL** — F-QA4-5 (gate morto); publicado via API para seguir |
 | Artefato congelado (frozen.docx / final.pdf) | **FAIL** — F-QA3-1 reproduzido: conteúdo vazio |
 
+## Jornada QA-5 — pós-publicação (2026-07-27)
+
+| Passo | Resultado |
+|---|---|
+| Ficha completa do documento publicado (`/details`) | PASS — TIPO/ÁREA/TAMANHO/cadeia de aprovação corretos; TAMANHO 1,8 KB = artefato real |
+| Workspace "Visualizando" (mesmo documento) | PASS com defeito — F-QA4-4 persiste: TIPO/ÁREA/VISIBILIDADE `---` na mesma tela em que a ficha os mostra |
+| Botão "Publicar / Agendar" | **FAIL** — F-QA4-5 confirmado nos dois lados (afordância invertida) |
+| Publicar (via API, admin, `If-Match "v2"`) | PASS — `new_status: published` |
+| Biblioteca (`/documents`) | PASS — IT-USINAGEM-003 `PUBLICADO`; contagens coerentes (7 = 1 rascunho + 3 aprovados + 3 publicados) |
+| Distribuição (`/details/distribution`) | PASS (gap declarado) — todas as ações `aria-disabled` com motivo explícito apontando `wiki/backlog/document-distribution-mission.md`. **Este é o padrão correto de gate** — exatamente o que falta em F-QA4-5 |
+| Auditoria pelo nav primário | **FAIL** — F-QA4-12: rota inexistente, redirect mudo para a home |
+| Feed de eventos na home (MURMÚRIOS) | PASS — registra `authz bypass system admin document.publish`, autosave e session acquired com autor e alvo corretos |
+
 ## Verdicto QA-4
 
 **FAIL.** A jornada fim-a-fim "empresa do zero" chega ao fim, mas o produto final
@@ -311,6 +376,8 @@ Ordem de correção sugerida: F-QA3-1 → F-QA4-5 → F-QA4-3 → F-QA4-1 → re
 | F-QA4-7 | `signoff_id` vazio | ABERTO |
 | F-QA4-8 | UUID no card do inbox / `?` em próximos aprovadores | ABERTO |
 | F-QA4-10 | `content_hash` do outbox = values_hash (nome enganoso) | ABERTO (novo) |
+| F-QA4-11 | `values_frozen_at` sempre null (coluna fora do SELECT) | ABERTO (novo) |
+| F-QA4-12 | Nav: item "Auditoria" morto; telas de admin sem entrada | ABERTO (novo) |
 
 O veredito QA-4 permanece **FAIL** — o blocker caiu, mas F-QA4-5 e F-QA4-3 ainda
 impedem a jornada de completar apenas pela tela.
