@@ -97,6 +97,41 @@ func (r *SnapshotRepository) readSnapshot(ctx context.Context, exec DBTX, tenant
 	return s, valuesFrozenAt, err
 }
 
+// ReadCurrentRevisionBodyKey returns the storage key of the document's current
+// editor revision — the authored body the approver actually reviewed.
+//
+// F-QA3-1 (operator ruling: option (a)): the freeze pipeline materializes the
+// EDITOR revision, not the template snapshot. The template snapshot only seeds
+// the initial clone; every later edit lands on document_revisions and becomes
+// the frozen truth. Returns an empty string when the document has no current
+// revision so the caller can fail closed (no-fallback principle) instead of
+// silently rendering an empty template body.
+//
+// document_revisions carries no tenant_id of its own — tenancy is enforced by
+// the join through documents, which is tenant-predicated here.
+func (r *SnapshotRepository) ReadCurrentRevisionBodyKey(ctx context.Context, tenantID, docID string, q ...DBTX) (string, error) {
+	exec := DBTX(r.db)
+	if len(q) > 0 && q[0] != nil {
+		exec = q[0]
+	}
+	var key string
+	err := exec.QueryRowContext(ctx, fmt.Sprintf(`
+		SELECT coalesce(rev.storage_key, '')
+		  FROM %s AS d
+		  LEFT JOIN %s AS rev ON rev.id = d.current_revision_id
+		 WHERE d.tenant_id = $1::uuid AND d.id = $2::uuid`,
+		r.table("documents"), r.table("document_revisions")),
+		tenantID, docID,
+	).Scan(&key)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", fmt.Errorf("document not found: %s", docID)
+		}
+		return "", err
+	}
+	return key, nil
+}
+
 func (r *SnapshotRepository) WriteFreeze(ctx context.Context, tenantID, docID string, valuesHash []byte, frozenAt time.Time, q ...DBTX) error {
 	exec := DBTX(r.db)
 	if len(q) > 0 && q[0] != nil {

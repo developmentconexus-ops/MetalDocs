@@ -22,6 +22,10 @@ type FreezeFinalizer interface {
 type SnapshotReader interface {
 	ReadSnapshotWithFreezeAt(ctx context.Context, tenantID, revisionID string, q ...infrastructure.DBTX) (v2dom.TemplateSnapshot, *time.Time, error)
 	ReadFreezeAt(ctx context.Context, tenantID, revisionID string, q ...infrastructure.DBTX) (*time.Time, error)
+	// ReadCurrentRevisionBodyKey returns the storage key of the document's
+	// current editor revision — the body Materialize freezes (F-QA3-1,
+	// option (a)). Empty string means "no current revision".
+	ReadCurrentRevisionBodyKey(ctx context.Context, tenantID, revisionID string, q ...infrastructure.DBTX) (string, error)
 }
 
 type FanoutClient interface {
@@ -221,6 +225,12 @@ func (s *FreezeService) Pin(ctx context.Context, tx db.Tx, tenantID, revisionID 
 // It reads the already-pinned placeholder values, calls the docx-renderer fanout,
 // and returns the result so the caller can persist it transactionally.
 // The caller (MaterializeJobRunner) is responsible for WriteFinalDocx + PDF enqueue.
+//
+// The rendered BODY is the document's current editor revision, not the template
+// snapshot (F-QA3-1, operator ruling option (a)): the approver signs the content
+// they reviewed in the editor. The template snapshot still supplies the
+// composition config and seeds the initial clone. Placeholder resolution is
+// applied on top of the editor body, unchanged.
 func (s *FreezeService) Materialize(ctx context.Context, tenantID, revisionID string) (MaterializeResult, error) {
 	if s.fanout == nil {
 		return MaterializeResult{}, fmt.Errorf("materialize: fanout client not configured")
@@ -274,10 +284,22 @@ func (s *FreezeService) Materialize(ctx context.Context, tenantID, revisionID st
 		composition = json.RawMessage(`{}`)
 	}
 
+	// Editor truth is frozen truth. Fail closed when the document has no current
+	// revision: rendering the template snapshot instead would produce a signed
+	// artifact that does not carry the reviewed content (F-QA3-1).
+	bodyKey, err := s.snapshots.ReadCurrentRevisionBodyKey(ctx, tenantID, revisionID)
+	if err != nil {
+		return MaterializeResult{}, fmt.Errorf("materialize: read current revision body: %w", err)
+	}
+	if bodyKey == "" {
+		return MaterializeResult{}, fmt.Errorf(
+			"materialize: document %s has no current revision body to freeze", revisionID)
+	}
+
 	resp, err := s.fanout.Fanout(ctx, fanout.FanoutRequest{
 		TenantID:          tenantID,
 		RevisionID:        revisionID,
-		BodyDocxS3Key:     snap.BodyDocxS3Key,
+		BodyDocxS3Key:     bodyKey,
 		PlaceholderValues: placeholderVals,
 		Composition:       json.RawMessage(composition),
 		ResolvedValues:    resolvedForSubblocks,

@@ -28,6 +28,14 @@ type fakeSnapshotReader struct {
 	snap           v2dom.TemplateSnapshot
 	valuesFrozenAt *time.Time
 	err            error
+	// revisionBodyKey is the current editor revision Materialize freezes
+	// (F-QA3-1 option (a)). Empty means "no current revision" — Materialize
+	// must fail closed rather than fall back to the template snapshot.
+	revisionBodyKey string
+}
+
+func (f fakeSnapshotReader) ReadCurrentRevisionBodyKey(_ context.Context, _, _ string, _ ...infrastructure.DBTX) (string, error) {
+	return f.revisionBodyKey, f.err
 }
 
 func (f fakeSnapshotReader) ReadSnapshotWithFreezeAt(_ context.Context, _, _ string, _ ...infrastructure.DBTX) (v2dom.TemplateSnapshot, *time.Time, error) {

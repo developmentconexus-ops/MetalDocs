@@ -141,7 +141,8 @@ func TestFreezeService_Materialize_CallsFanoutAndReturnsResult(t *testing.T) {
 			BodyDocxS3Key:   "templates/body.docx",
 			CompositionJSON: []byte(`{"blocks":[]}`),
 		},
-		valuesFrozenAt: &frozenAt,
+		valuesFrozenAt:  &frozenAt,
+		revisionBodyKey: "documents/d/revisions/abc.docx",
 	}
 	schema := []tmpldom.Placeholder{
 		{ID: "p_user", Name: "user_field", Required: true},
@@ -177,6 +178,40 @@ func TestFreezeService_Materialize_CallsFanoutAndReturnsResult(t *testing.T) {
 	}
 	if bytesToHex(result.ContentHash) != "deadbeef00000000000000000000000000000000000000000000000000000000" {
 		t.Errorf("ContentHash = %s", bytesToHex(result.ContentHash))
+	}
+	// F-QA3-1: the frozen body is the editor revision, never the template
+	// snapshot. Freezing the snapshot is what produced blank signed artifacts.
+	if fanoutClient.req.BodyDocxS3Key != "documents/d/revisions/abc.docx" {
+		t.Errorf("BodyDocxS3Key = %q, want the current editor revision", fanoutClient.req.BodyDocxS3Key)
+	}
+}
+
+// F-QA3-1 fail-closed guard: a document with no current revision must NOT be
+// materialized from the template snapshot — a signed artifact that omits the
+// reviewed content is worse than a failed job.
+func TestFreezeService_Materialize_ErrorsWithoutCurrentRevisionBody(t *testing.T) {
+	frozenAt := time.Now().UTC()
+	fanoutClient := &fakeFanoutClient{}
+	svc := NewFreezeService(
+		fakeSchemaReader{},
+		&fakeFillInWriter{},
+		&fakeValuesReader{},
+		resolvers.NewRegistry(),
+		&fakeFreezeFinalizer{},
+		&fakeResolverContextBuilder{},
+		fakeSnapshotReader{
+			snap:           v2dom.TemplateSnapshot{BodyDocxS3Key: "templates/body.docx"},
+			valuesFrozenAt: &frozenAt,
+		},
+		fanoutClient,
+	)
+
+	_, err := svc.Materialize(context.Background(), "t", "r")
+	if err == nil || !containsStr(err.Error(), "no current revision body") {
+		t.Fatalf("expected no-current-revision error, got %v", err)
+	}
+	if fanoutClient.calls != 0 {
+		t.Fatalf("fanout must not be called without an editor body, got %d calls", fanoutClient.calls)
 	}
 }
 
