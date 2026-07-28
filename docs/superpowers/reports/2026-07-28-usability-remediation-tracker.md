@@ -179,3 +179,18 @@ area-grade avaliado no publish-context); modelo de gate D2 para templates.
   + regen completo, `ValidateKey` backstop (`IDEMPOTENCY_KEY_INVALID`), E2E keys →
   UUID; allowlist seed-chokepoint re-ancorada (drift de 06d0d17e). Commit pendente.
   Follow-up aberto: `review_verdict_handler.go:110` `VerdictID: ""` (mesma classe).
+- 2026-07-28: 2.4/2.5 COMMITTED `123a56db`; api container rebuilt (imagem parcial
+  descartada), smoke pós-restart 200. D4 viewer embutido COMMITTED `ff5d2cea` —
+  modal blob+iframe, download separado, review 1🟡
+  pré-existente (focus-trap classe codebase), FE suite 957/957.
+- 2026-07-28: **ADR 0085 ACEITA, Codex ALIGN (rev 2)** — commit `2e9f9b68`.
+  Rodada 1 do Codex: NOT ALIGN com 8 emendas obrigatórias (chave de geração
+  durável compartilhada + fatos fail-closed; artifact-ready = DOCX+PDF em tx;
+  tx de release completa com lock determinístico de alvos + rollback; split
+  `planned_effective_from`/`effective_from` actual + emenda ADR 0069; backfill
+  executável com Pin-repair; inventário hard-break completo + `document.supersede`
+  retida re-homed p/ autorização na submissão; correções cross-ADR 0067/0069/0082
+  + modelo 8-status/11-arcos; projeção de readiness + atribuição de ator +
+  reconciliação River alert-only). Rev 2 incorporou tudo → ALIGN.
+  Implementação em estágios a seguir (A: núcleo backend; B: retirement +
+  contrato de submissão; C: backfill + projeção + FE).
