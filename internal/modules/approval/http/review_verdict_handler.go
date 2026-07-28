@@ -11,6 +11,7 @@ import (
 	"metaldocs/internal/modules/approval/application"
 	"metaldocs/internal/modules/approval/domain"
 	"metaldocs/internal/modules/approval/http/contracts"
+	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/strictjson"
 )
 
@@ -30,8 +31,10 @@ func (h *Handler) ReviewVerdictHandler(w http.ResponseWriter, r *http.Request) {
 	stageID := r.PathValue("stage_id")
 	idempKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 
-	if idempKey == "" {
-		WriteError(w, ErrIdempotencyRequired)
+	// F-QA4-6: self-managed replay slot (no idempotency.Require wrapper), so the
+	// shared UUID wire rule is enforced here.
+	if err := idempotency.ValidateKey(idempKey); err != nil {
+		WriteError(w, err)
 		return
 	}
 	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
@@ -62,10 +65,7 @@ func (h *Handler) ReviewVerdictHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	payloadHash := reviewVerdictPayloadHash(instanceID, stageID, verdict, body.Comment)
-	var replayHandle interface {
-		Complete(outcome string) error
-		Fail(cause error) error
-	}
+	var replayHandle application.SignoffReplayCommitter
 	if h.idempStore != nil {
 		handle, replay, err := h.idempStore.BeginStageReplay(r.Context(), tenantID, actorID, idempKey, payloadHash)
 		if err != nil {
@@ -101,7 +101,11 @@ func (h *Handler) ReviewVerdictHandler(w http.ResponseWriter, r *http.Request) {
 
 	outcome := reviewVerdictOutcome(result)
 	if replayHandle != nil {
-		if err := replayHandle.Complete(outcome); err != nil {
+		// NOTE: the verdict ledger id is not threaded through
+		// ReviewVerdictResult yet (same class as F-QA4-7, out of this fix's
+		// scope), so only the outcome is persisted here — VerdictID below stays
+		// empty on both the fresh and the replay path.
+		if err := replayHandle.Complete(application.SignoffReplay{Outcome: outcome}); err != nil {
 			slog.Warn("review verdict idempotency record failed (non-fatal)", "err", err)
 		}
 	}

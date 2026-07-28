@@ -628,11 +628,62 @@ func TestRecordSignoff_ApprovePath_QuorumMet(t *testing.T) {
 	if result.InstanceRejected {
 		t.Error("expected InstanceRejected=false")
 	}
+	// F-QA4-7: the approval_signoffs id InsertSignoff returned must be threaded
+	// out on SignoffResult so the HTTP layer can put it on the wire.
+	if result.SignoffID != "signoff-1" {
+		t.Errorf("SignoffID = %q; want %q", result.SignoffID, "signoff-1")
+	}
 	if len(emitter.Events) != 1 {
 		t.Errorf("expected 1 governance event; got %d", len(emitter.Events))
 	}
 	if emitter.Events[0].EventType != "signoff_recorded" {
 		t.Errorf("event type = %q; want %q", emitter.Events[0].EventType, "signoff_recorded")
+	}
+}
+
+// TestRecordSignoff_DBLevelReplayCarriesOriginalSignoffID pins F-QA4-7 on the
+// ON CONFLICT branch: when InsertSignoff detects an existing matching row it
+// returns WasReplay=true plus the ORIGINAL id, and RecordSignoff must surface
+// that id rather than the pre-fix empty SignoffResult{}. The neutral
+// stage/instance flags stay false — the stage must not advance twice.
+func TestRecordSignoff_DBLevelReplayCarriesOriginalSignoffID(t *testing.T) {
+	const (
+		instanceID = "inst-replay"
+		stageID    = "stage-replay"
+		actorID    = "approver-1"
+		authorID   = "author-1"
+	)
+
+	inst := buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID})
+	signedAt := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
+
+	conn := &decisionTestConn{authzGranted: true, areaCode: "QA", actorID: actorID}
+	repo := &fakeDecisionRepo{
+		instance:         inst,
+		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "signoff-original", WasReplay: true},
+	}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, pinInvoker: &fakePinInvoker{}}
+	db := newDecisionTestDB(t, conn)
+
+	result, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
+		TenantID:         "tenant-1",
+		InstanceID:       instanceID,
+		StageInstanceID:  stageID,
+		ActorUserID:      actorID,
+		Decision:         "approve",
+		Comment:          "LGTM",
+		SignatureMethod:  "password",
+		SignaturePayload: map[string]any{"hash": "abc"},
+		ContentFormData:  map[string]any{"title": "Doc", "_content_hash": validContentHash},
+	})
+	if err != nil {
+		t.Fatalf("RecordSignoff: unexpected error: %v", err)
+	}
+	if result.SignoffID != "signoff-original" {
+		t.Errorf("SignoffID = %q; want %q (original row id on replay)", result.SignoffID, "signoff-original")
+	}
+	if result.StageCompleted || result.InstanceApproved || result.InstanceRejected {
+		t.Errorf("replay must not re-advance the stage/instance; got %+v", result)
 	}
 }
 

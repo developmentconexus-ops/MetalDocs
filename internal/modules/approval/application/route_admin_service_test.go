@@ -1301,7 +1301,7 @@ func TestRouteAdminDeactivate_ReplayBeforeReasonValidation(t *testing.T) {
 
 	// Pre-seed a completed replay slot under the empty-reason hash.
 	emptyReasonHash := computeDeactivateRoutePayloadHash("route-1", 2, "")
-	k := memoryIdempKey("tenant-1", "user-1", "idem-replay-empty")
+	k := memoryIdempKey("tenant-1", "user-1", "88888888-8888-4888-8888-888888888888-empty")
 	store.deactivate[k] = &memoryRouteAdminSlot{
 		hash:   emptyReasonHash,
 		replay: &RouteAdminReplay{RouteID: "route-1"},
@@ -1311,7 +1311,7 @@ func TestRouteAdminDeactivate_ReplayBeforeReasonValidation(t *testing.T) {
 		TenantID:        "tenant-1",
 		RouteID:         "route-1",
 		ActorUserID:     "user-1",
-		IdempotencyKey:  "idem-replay-empty",
+		IdempotencyKey:  "88888888-8888-4888-8888-888888888888-empty",
 		Reason:          "", // empty: would fail validation if checked before replay
 		ExpectedVersion: 2,
 	})

@@ -43,7 +43,10 @@ func signoffTestMux(h *Handler) *http.ServeMux {
 }
 
 func TestSignoffHandler_HappyApprove(t *testing.T) {
-	fakeSvc := &fakeDecisionService{result: application.SignoffResult{InstanceApproved: true}}
+	fakeSvc := &fakeDecisionService{result: application.SignoffResult{
+		SignoffID:        "sig-abc-1",
+		InstanceApproved: true,
+	}}
 	h := &Handler{decisionSvc: fakeSvc}
 	mux := signoffTestMux(h)
 
@@ -52,7 +55,7 @@ func TestSignoffHandler_HappyApprove(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
-	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req.Header.Set("If-Match", "v3")
 
 	rr := httptest.NewRecorder()
@@ -68,6 +71,10 @@ func TestSignoffHandler_HappyApprove(t *testing.T) {
 	}
 	if out.Outcome != "approved" {
 		t.Fatalf("outcome = %q, want %q", out.Outcome, "approved")
+	}
+	// F-QA4-7: the persisted approval_signoffs id must reach the wire, not "".
+	if out.SignoffID != "sig-abc-1" {
+		t.Fatalf("signoff_id = %q, want %q", out.SignoffID, "sig-abc-1")
 	}
 	if fakeSvc.gotReq.TenantID != "tenant-1" || fakeSvc.gotReq.InstanceID != "inst-1" || fakeSvc.gotReq.StageInstanceID != "stg-1" || fakeSvc.gotReq.ActorUserID != "actor-1" {
 		t.Fatalf("unexpected request mapped to service: %+v", fakeSvc.gotReq)
@@ -95,7 +102,7 @@ func TestSignoffHandler_HappyReject(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req.Header.Set("If-Match", "v2")
 
 	rr := httptest.NewRecorder()
@@ -121,7 +128,7 @@ func TestSignoffHandler_SoDViolation(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req.Header.Set("If-Match", "v1")
 
 	rr := httptest.NewRecorder()
@@ -140,7 +147,7 @@ func TestSignoffHandler_SignatureInvalid(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req.Header.Set("If-Match", "v1")
 
 	rr := httptest.NewRecorder()
@@ -159,7 +166,7 @@ func TestSignoffHandler_ContentHashMismatch(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req.Header.Set("If-Match", "v1")
 
 	rr := httptest.NewRecorder()
@@ -199,8 +206,8 @@ func TestSignoffHandler_ReplayReturnsCachedOutcome(t *testing.T) {
 	fakeSvc := &fakeDecisionService{}
 	h := &Handler{
 		decisionSvc: fakeSvc,
-		idempStore: &fakeIdempStore{entries: map[string]string{
-			"stage:tenant-1:actor-1:idem-replay": "approved",
+		idempStore: &fakeIdempStore{entries: map[string]application.SignoffReplay{
+			"stage:tenant-1:actor-1:88888888-8888-4888-8888-888888888888": {Outcome: "approved", SignoffID: "sig-replayed-1"},
 		}},
 	}
 	mux := signoffTestMux(h)
@@ -210,7 +217,7 @@ func TestSignoffHandler_ReplayReturnsCachedOutcome(t *testing.T) {
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Idempotency-Key", "idem-replay")
+	req.Header.Set("Idempotency-Key", "88888888-8888-4888-8888-888888888888")
 	req.Header.Set("If-Match", "v3")
 
 	rr := httptest.NewRecorder()
@@ -226,8 +233,49 @@ func TestSignoffHandler_ReplayReturnsCachedOutcome(t *testing.T) {
 	if !out.WasReplay || out.Outcome != "approved" {
 		t.Fatalf("response = %+v, want replay approved", out)
 	}
+	// F-QA4-7: a replay must return the ORIGINAL signoff id, not "".
+	if out.SignoffID != "sig-replayed-1" {
+		t.Fatalf("replayed signoff_id = %q, want %q", out.SignoffID, "sig-replayed-1")
+	}
 	if fakeSvc.gotReq.InstanceID != "" {
 		t.Fatalf("decision service should not run on replay, got %+v", fakeSvc.gotReq)
+	}
+}
+
+// TestSignoffHandler_NonUUIDIdempotencyKey pins F-QA4-6: the stage-signoff route
+// manages its own replay slot (it is NOT wrapped by idempotency.Require), so it
+// must enforce the same UUID wire rule itself and emit the same platform code
+// the middleware emits.
+func TestSignoffHandler_NonUUIDIdempotencyKey(t *testing.T) {
+	fakeSvc := &fakeDecisionService{}
+	h := &Handler{decisionSvc: fakeSvc}
+	mux := signoffTestMux(h)
+
+	body := `{"decision":"approve","reason":"","password_token":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "not-a-uuid")
+	req.Header.Set("If-Match", "v1")
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
+	}
+	if ct := rr.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/problem+json") {
+		t.Fatalf("content-type = %q, want application/problem+json", ct)
+	}
+	var out problem.Problem
+	if err := json.NewDecoder(rr.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Code != problem.CodeIdempotencyKeyInvalid {
+		t.Fatalf("error.code = %q, want %q", out.Code, problem.CodeIdempotencyKeyInvalid)
+	}
+	if fakeSvc.calls != 0 {
+		t.Fatalf("decision service ran %d times, want 0 (rejected before processing)", fakeSvc.calls)
 	}
 }
 
@@ -239,7 +287,7 @@ func TestSignoffHandler_MissingIfMatch(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 
 	rr := httptest.NewRecorder()
 	mux.ServeHTTP(rr, req)
@@ -257,7 +305,7 @@ func TestSignoffHandler_MalformedIfMatch(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req.Header.Set("If-Match", "invalid")
 
 	rr := httptest.NewRecorder()
@@ -334,14 +382,14 @@ func (f *fakeReadService) CountPendingForActor(_ context.Context, _ db.TxRunner,
 // released (Fail), so the record→replay lifecycle is exercised for real.
 type idempSlot struct {
 	hash      string
-	outcome   string
+	replay    application.SignoffReplay
 	completed bool
 }
 
 type fakeIdempStore struct {
-	// Pre-seeded hash-agnostic outcomes, keyed by composite slot key. Used by
-	// tests that assert replay without exercising the record path.
-	entries map[string]string
+	// Pre-seeded hash-agnostic replay envelopes, keyed by composite slot key.
+	// Used by tests that assert replay without exercising the record path.
+	entries map[string]application.SignoffReplay
 
 	// Faithful slot ledger populated by the record path.
 	slots map[string]*idempSlot
@@ -357,7 +405,8 @@ func (f *fakeIdempStore) begin(kind, tenantID, actorID, key, payloadHash string)
 	k := kind + ":" + tenantID + ":" + actorID + ":" + key
 	if v, ok := f.entries[k]; ok {
 		f.completed = true
-		return nil, &application.SignoffReplay{Outcome: v}, nil
+		replay := v
+		return nil, &replay, nil
 	}
 	if f.slots == nil {
 		f.slots = map[string]*idempSlot{}
@@ -368,7 +417,8 @@ func (f *fakeIdempStore) begin(kind, tenantID, actorID, key, payloadHash string)
 		}
 		if s.completed {
 			f.completed = true
-			return nil, &application.SignoffReplay{Outcome: s.outcome}, nil
+			replay := s.replay
+			return nil, &replay, nil
 		}
 	}
 	s := &idempSlot{hash: payloadHash}
@@ -390,9 +440,9 @@ type fakeReplayHandle struct {
 	slot  *idempSlot
 }
 
-func (h *fakeReplayHandle) Complete(outcome string) error {
+func (h *fakeReplayHandle) Complete(replay application.SignoffReplay) error {
 	h.slot.completed = true
-	h.slot.outcome = outcome
+	h.slot.replay = replay
 	h.store.completed = true
 	return nil
 }
@@ -417,12 +467,61 @@ func docCancelTestMux(h *Handler) *http.ServeMux {
 	return mux
 }
 
+// TestSignoffByDocumentHandler_NonUUIDIdempotencyKey pins F-QA4-6 on the
+// document-level signoff route (the one QA exercised): a free-string key is no
+// longer accepted, and the rejection is the platform's problem+json shape.
+func TestSignoffByDocumentHandler_NonUUIDIdempotencyKey(t *testing.T) {
+	decisionSvc := &fakeDecisionService{}
+	h := &Handler{
+		decisionSvc: decisionSvc,
+		readSvc: &fakeReadService{inst: &domain.Instance{
+			ID:       "inst-1",
+			TenantID: "tenant-1",
+			Stages: []domain.StageInstance{{
+				ID:               "stage-1",
+				Status:           domain.StageActive,
+				EligibleActorIDs: []string{"actor-1"},
+			}},
+		}},
+		idempStore: &fakeIdempStore{},
+	}
+	mux := docSignoffTestMux(h)
+
+	body := `{"decision":"approve","reason":"","password":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/signoff", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+	req.Header.Set("Idempotency-Key", "signoff-key-1")
+	req.Header.Set("If-Match", "\"v5\"")
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusBadRequest, rr.Body.String())
+	}
+	if ct := rr.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/problem+json") {
+		t.Fatalf("content-type = %q, want application/problem+json", ct)
+	}
+	var out problem.Problem
+	if err := json.NewDecoder(rr.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Code != problem.CodeIdempotencyKeyInvalid {
+		t.Fatalf("error.code = %q, want %q", out.Code, problem.CodeIdempotencyKeyInvalid)
+	}
+	if decisionSvc.calls != 0 {
+		t.Fatalf("decision service ran %d times, want 0", decisionSvc.calls)
+	}
+}
+
 // TestSignoffByDocumentHandler_ReplayAfterClose verifies that replaying the same
 // Idempotency-Key after the approval instance is already closed returns 200 with
 // was_replay:true instead of 404/500.
 func TestSignoffByDocumentHandler_ReplayAfterEligibility(t *testing.T) {
-	store := &fakeIdempStore{entries: map[string]string{
-		"document:tenant-1:actor-1:idem-replay": "approved",
+	store := &fakeIdempStore{entries: map[string]application.SignoffReplay{
+		"document:tenant-1:actor-1:88888888-8888-4888-8888-888888888888": {Outcome: "approved", SignoffID: "sig-replayed-1"},
 	}}
 	h := &Handler{
 		decisionSvc: &fakeDecisionService{},
@@ -444,7 +543,7 @@ func TestSignoffByDocumentHandler_ReplayAfterEligibility(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
-	req.Header.Set("Idempotency-Key", "idem-replay")
+	req.Header.Set("Idempotency-Key", "88888888-8888-4888-8888-888888888888")
 	req.Header.Set("If-Match", "\"v5\"")
 
 	rr := httptest.NewRecorder()
@@ -471,8 +570,8 @@ func TestSignoffByDocumentHandler_ReplayAfterEligibility(t *testing.T) {
 // so the original actor is no longer eligible. This is the corrected
 // RFC-style idempotency contract — replay before state validation.
 func TestSignoffByDocumentHandler_ReplayWinsOverPostLoadEligibilityChange(t *testing.T) {
-	store := &fakeIdempStore{entries: map[string]string{
-		"document:tenant-1:actor-1:idem-replay": "approved",
+	store := &fakeIdempStore{entries: map[string]application.SignoffReplay{
+		"document:tenant-1:actor-1:88888888-8888-4888-8888-888888888888": {Outcome: "approved", SignoffID: "sig-replayed-1"},
 	}}
 	h := &Handler{
 		decisionSvc: &fakeDecisionService{},
@@ -494,7 +593,7 @@ func TestSignoffByDocumentHandler_ReplayWinsOverPostLoadEligibilityChange(t *tes
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
-	req.Header.Set("Idempotency-Key", "idem-replay")
+	req.Header.Set("Idempotency-Key", "88888888-8888-4888-8888-888888888888")
 	req.Header.Set("If-Match", "\"v5\"")
 
 	rr := httptest.NewRecorder()
@@ -517,7 +616,7 @@ func TestSignoffByDocumentHandler_ReplayWinsOverPostLoadEligibilityChange(t *tes
 // nil returns the terminal-state error. The replay-before-validation reorder
 // must not swallow the error or commit a successful outcome to the slot.
 func TestSignoffByDocumentHandler_FirstCallTerminalStateReturnsError(t *testing.T) {
-	store := &fakeIdempStore{entries: map[string]string{}}
+	store := &fakeIdempStore{entries: map[string]application.SignoffReplay{}}
 	decisionSvc := &fakeDecisionService{}
 	h := &Handler{
 		decisionSvc: decisionSvc,
@@ -539,7 +638,7 @@ func TestSignoffByDocumentHandler_FirstCallTerminalStateReturnsError(t *testing.
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
-	req.Header.Set("Idempotency-Key", "idem-first-terminal")
+	req.Header.Set("Idempotency-Key", "66666666-6666-4666-8666-666666666666")
 	req.Header.Set("If-Match", "\"v5\"")
 
 	rr := httptest.NewRecorder()
@@ -589,7 +688,7 @@ func TestSignoffByDocumentHandler_FingerprintExcludesServerResolvedState(t *test
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
-	req.Header.Set("Idempotency-Key", "idem-fp")
+	req.Header.Set("Idempotency-Key", "77777777-7777-4777-8777-777777777777")
 	req.Header.Set("If-Match", "\"v5\"")
 
 	rr := httptest.NewRecorder()
@@ -618,7 +717,10 @@ func TestSignoffByDocumentHandler_FingerprintExcludesServerResolvedState(t *test
 // live API previously returned 500 on.
 func TestSignoffByDocumentHandler_RecordsThenReplaysAcrossTerminalTransition(t *testing.T) {
 	store := &fakeIdempStore{}
-	decisionSvc := &fakeDecisionService{result: application.SignoffResult{InstanceApproved: true}}
+	decisionSvc := &fakeDecisionService{result: application.SignoffResult{
+		SignoffID:        "sig-doc-1",
+		InstanceApproved: true,
+	}}
 	read := &fakeReadService{inst: &domain.Instance{
 		ID:       "inst-1",
 		TenantID: "tenant-1",
@@ -637,7 +739,7 @@ func TestSignoffByDocumentHandler_RecordsThenReplaysAcrossTerminalTransition(t *
 		req.Header.Set("Content-Type", "application/json")
 		req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 		req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
-		req.Header.Set("Idempotency-Key", "idem-terminal")
+		req.Header.Set("Idempotency-Key", "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
 		req.Header.Set("If-Match", "\"v5\"")
 		return req
 	}
@@ -654,6 +756,10 @@ func TestSignoffByDocumentHandler_RecordsThenReplaysAcrossTerminalTransition(t *
 	}
 	if out1.WasReplay || out1.Outcome != "approved" {
 		t.Fatalf("first response = %+v, want fresh approved", out1)
+	}
+	// F-QA4-7: fresh call carries the persisted approval_signoffs id.
+	if out1.SignoffID != "sig-doc-1" {
+		t.Fatalf("first signoff_id = %q, want %q", out1.SignoffID, "sig-doc-1")
 	}
 
 	// Instance now goes terminal out-of-band (no active stage).
@@ -678,6 +784,12 @@ func TestSignoffByDocumentHandler_RecordsThenReplaysAcrossTerminalTransition(t *
 	}
 	if !out2.WasReplay || out2.Outcome != "approved" {
 		t.Fatalf("retry response = %+v, want was_replay=true outcome=approved", out2)
+	}
+	// F-QA4-7: the replay round-trips the ORIGINAL id through the stored
+	// response envelope — the whole point of persisting SignoffID in the
+	// application.SignoffReplay body rather than recomputing it.
+	if out2.SignoffID != out1.SignoffID {
+		t.Fatalf("replayed signoff_id = %q, want %q (same as first call)", out2.SignoffID, out1.SignoffID)
 	}
 	if decisionSvc.calls != 1 {
 		t.Fatalf("decision service calls = %d, want 1 (replay must not re-run the signoff)", decisionSvc.calls)
@@ -712,7 +824,7 @@ func TestSignoffByDocumentHandler_KeyReuseDifferentBodyConflicts(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 		req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
-		req.Header.Set("Idempotency-Key", "idem-reuse")
+		req.Header.Set("Idempotency-Key", "99999999-9999-4999-8999-999999999999")
 		req.Header.Set("If-Match", "\"v5\"")
 		return req
 	}
@@ -752,7 +864,7 @@ func TestCancelByDocumentHandler_UsesIfMatchRevision(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/cancel", strings.NewReader(`{"reason":"withdrawn"}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req.Header.Set("If-Match", "\"v6\"")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
@@ -777,7 +889,7 @@ func TestCancelByDocumentHandler_RequiresIfMatch(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/cancel", strings.NewReader(`{"reason":"withdrawn"}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 
 	rr := httptest.NewRecorder()
@@ -808,7 +920,7 @@ func TestSignoffByDocumentHandler_UsesIfMatchRevision(t *testing.T) {
 	body := `{"decision":"approve","reason":"","password":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/signoff", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req.Header.Set("If-Match", "\"v7\"")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
@@ -833,7 +945,7 @@ func TestSignoffByDocumentHandler_RequiresIfMatch(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/signoff", strings.NewReader(`{"decision":"approve","password":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 
 	rr := httptest.NewRecorder()
@@ -853,7 +965,7 @@ func TestSignoffByDocumentHandler_RejectsIfMatchV0(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/signoff", strings.NewReader(`{"decision":"approve","password":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req.Header.Set("If-Match", "v0")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 
@@ -898,7 +1010,7 @@ func TestSignoffByDocumentHandler_RequiresValidContentHash(t *testing.T) {
 
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/signoff", strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", "application/json")
-			req.Header.Set("Idempotency-Key", "idem-1")
+			req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 			req.Header.Set("If-Match", "\"v7\"")
 			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
@@ -941,7 +1053,7 @@ func TestSignoffByDocumentHandler_UsesMutationLookupInsteadOfDocumentViewRead(t 
 	body := `{"decision":"approve","reason":"","password":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/signoff", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req.Header.Set("If-Match", "\"v7\"")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
@@ -982,7 +1094,7 @@ func TestCancelByDocumentHandler_UsesMutationLookupInsteadOfDocumentViewRead(t *
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/cancel", strings.NewReader(`{"reason":"withdrawn"}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req.Header.Set("If-Match", "\"v6\"")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))

@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -50,7 +51,7 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 			"X-Tenant-ID":     tenantID,
 			"X-User-ID":       userID,
 			"X-User-Roles":    userRoles,
-			"Idempotency-Key": fmt.Sprintf("e2e-create-%d", time.Now().UnixNano()),
+			"Idempotency-Key": newIdempotencyKey(),
 		})
 		if resp.StatusCode != http.StatusCreated {
 			t.Fatalf("atomic create status=%d body=%s", resp.StatusCode, raw)
@@ -104,7 +105,7 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 		resp, raw := doJSONRequest(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/documents/%s/submit", baseURL, documentID), submitBody, map[string]string{
 			"X-Tenant-ID":      tenantID,
 			"X-User-ID":        userID,
-			"Idempotency-Key":  "e2e-submit-idem-1",
+			"Idempotency-Key":  "11111111-1111-4111-8111-111111111111",
 			"If-Match":         "\"v1\"",
 			"X-User-Roles":     userRoles,
 			"Content-Type":     "application/json",
@@ -140,7 +141,7 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 		resp, raw := doJSONRequest(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/documents/%s/submit", baseURL, documentID), submitBody, map[string]string{
 			"X-Tenant-ID":     tenantID,
 			"X-User-ID":       userID,
-			"Idempotency-Key": "e2e-submit-idem-1",
+			"Idempotency-Key": "11111111-1111-4111-8111-111111111111",
 			"If-Match":        "\"v1\"",
 			"X-User-Roles":    userRoles,
 		})
@@ -206,7 +207,7 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 			map[string]string{
 				"X-Tenant-ID":     tenantID,
 				"X-User-ID":       userID,
-				"Idempotency-Key": "e2e-signoff-1",
+				"Idempotency-Key": "22222222-2222-4222-8222-222222222222",
 				"If-Match":        submitETag,
 				"X-User-Roles":    userRoles,
 			},
@@ -233,7 +234,7 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 			map[string]string{
 				"X-Tenant-ID":     tenantID,
 				"X-User-ID":       userID,
-				"Idempotency-Key": "e2e-signoff-2",
+				"Idempotency-Key": "33333333-3333-4333-8333-333333333333",
 				"If-Match":        submitETag,
 				"X-User-Roles":    userRoles,
 			},
@@ -266,7 +267,7 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 		resp, raw := doJSONRequest(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/documents/%s/publish", baseURL, documentID), nil, map[string]string{
 			"X-Tenant-ID":     tenantID,
 			"X-User-ID":       userID,
-			"Idempotency-Key": "e2e-publish-1",
+			"Idempotency-Key": "44444444-4444-4444-8444-444444444444",
 			"If-Match":        submitETag,
 			"X-User-Roles":    userRoles,
 		})
@@ -299,6 +300,16 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 			t.Fatalf("expected at least one governance event for document %s, got %d", documentID, count)
 		}
 	})
+}
+
+// newIdempotencyKey returns a fresh UUID. The API-wide Idempotency-Key wire
+// rule is UUID-only (F-QA4-6: idempotency.ValidateKey + `format: uuid` on every
+// spec'd Idempotency-Key parameter), so a free-string key like "e2e-create-<ns>"
+// is rejected with 400 before the handler runs. Steps that must not replay
+// across runs use this; steps that deliberately re-send the same key to prove
+// replay use a fixed UUID literal.
+func newIdempotencyKey() string {
+	return uuid.NewString()
 }
 
 func doJSONRequest(t *testing.T, client *http.Client, method, url string, body any, headers map[string]string) (*http.Response, string) {

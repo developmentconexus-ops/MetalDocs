@@ -9,6 +9,7 @@ import (
 	"metaldocs/internal/modules/approval/application"
 	"metaldocs/internal/modules/approval/http/contracts"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/strictjson"
 )
 
@@ -27,11 +28,12 @@ func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 	// The platform idempotency middleware (router.go) already validated presence
 	// and UUID shape; re-read the header to thread the client key into the service
 	// so it becomes approval_instances.idempotency_key (DB UNIQUE backstop, F-D4).
-	// The empty guard mirrors the route-admin sibling and fail-closes if this
-	// handler is ever mounted without the middleware (e.g. in a unit test).
+	// Re-validating through the SHARED rule (F-QA4-6) mirrors the route-admin
+	// sibling and fail-closes if this handler is ever mounted without the
+	// middleware (e.g. in a unit test).
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
-	if idempotencyKey == "" {
-		WriteError(w, ErrIdempotencyRequired)
+	if err := idempotency.ValidateKey(idempotencyKey); err != nil {
+		WriteError(w, err)
 		return
 	}
 

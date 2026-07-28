@@ -10,6 +10,7 @@ import (
 	"metaldocs/internal/modules/approval/domain"
 	"metaldocs/internal/modules/approval/http/contracts"
 	"metaldocs/internal/modules/approval/infrastructure"
+	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/strictjson"
 )
 
@@ -23,8 +24,9 @@ func (h *Handler) CreateRouteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	actorID := actorIDFromRequest(r)
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
-	if idempotencyKey == "" {
-		WriteError(w, ErrIdempotencyRequired)
+	// F-QA4-6: shared Idempotency-Key wire rule (UUID everywhere).
+	if err := idempotency.ValidateKey(idempotencyKey); err != nil {
+		WriteError(w, err)
 		return
 	}
 
@@ -91,8 +93,9 @@ func (h *Handler) UpdateRouteHandler(w http.ResponseWriter, r *http.Request) {
 	actorID := actorIDFromRequest(r)
 	routeID := r.PathValue("id")
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
-	if idempotencyKey == "" {
-		WriteError(w, ErrIdempotencyRequired)
+	// F-QA4-6: shared Idempotency-Key wire rule (UUID everywhere).
+	if err := idempotency.ValidateKey(idempotencyKey); err != nil {
+		WriteError(w, err)
 		return
 	}
 	expectedVersion, err := parseIfMatch(r.Header.Get("If-Match"))
@@ -149,8 +152,9 @@ func (h *Handler) DeactivateRouteHandler(w http.ResponseWriter, r *http.Request)
 	actorID := actorIDFromRequest(r)
 	routeID := r.PathValue("id")
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
-	if idempotencyKey == "" {
-		WriteError(w, ErrIdempotencyRequired)
+	// F-QA4-6: shared Idempotency-Key wire rule (UUID everywhere).
+	if err := idempotency.ValidateKey(idempotencyKey); err != nil {
+		WriteError(w, err)
 		return
 	}
 	expectedVersion, err := parseIfMatch(r.Header.Get("If-Match"))

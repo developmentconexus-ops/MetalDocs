@@ -216,9 +216,17 @@ func MapErrorToResponse(err error) *problem.Problem {
 		statusCode = http.StatusBadRequest
 		code = approvalCodeValidationIfMatchBad
 	case errors.Is(err, ErrIdempotencyRequired),
+		errors.Is(err, idempotency.ErrKeyRequired),
 		errors.Is(err, application.ErrIdempotencyKeyRequired):
 		statusCode = http.StatusBadRequest
 		code = approvalCodeIdempotencyRequired
+	case errors.Is(err, idempotency.ErrKeyInvalid):
+		// F-QA4-6: bespoke-replay handlers enforce the same UUID wire rule the
+		// idempotency.Require middleware enforces, and deliberately surface the
+		// PLATFORM code here (not a module-local dialect) so a malformed key
+		// looks identical to clients whether or not the route is wrapped.
+		statusCode = http.StatusBadRequest
+		code = problem.CodeIdempotencyKeyInvalid
 	case errors.Is(err, idempotency.ErrConflict):
 		// Same Idempotency-Key reused with a different request fingerprint: the
 		// caller must rotate the key for a genuinely new attempt.

@@ -228,6 +228,10 @@ type SignoffRequest struct {
 
 // SignoffResult is returned by RecordSignoff.
 type SignoffResult struct {
+	// SignoffID is the approval_signoffs row id persisted by this call. On the
+	// DB-level idempotent replay branch (ON CONFLICT) it carries the ORIGINAL
+	// row id, so a retrying caller always sees the same identifier (F-QA4-7).
+	SignoffID        string
 	StageCompleted   bool
 	InstanceApproved bool // true when all stages complete
 	InstanceRejected bool // true when a reject decision collapses instance
@@ -492,9 +496,14 @@ func (s *DecisionService) recordSignoffInTx(ctx context.Context, tx *sql.Tx, req
 		}
 		return SignoffResult{}, nil, fmt.Errorf("recordSignoff: insert signoff: %w", err)
 	}
+	// F-QA4-7: carry the persisted approval_signoffs id out of the tx. On the
+	// ON CONFLICT branch InsertSignoff returns the ORIGINAL row's id, so a
+	// retrying caller sees the same identifier instead of an empty string.
+	result.SignoffID = insertResult.ID
 	if insertResult.WasReplay {
-		// Idempotent replay: commit and return neutral result (stage not advanced again).
-		return SignoffResult{}, nil, nil
+		// Idempotent replay: commit and return the otherwise-neutral result
+		// (stage not advanced again), which at this point carries only SignoffID.
+		return result, nil, nil
 	}
 
 	// Step 9: collect all signoffs for the active stage to evaluate quorum.

@@ -91,7 +91,7 @@ func TestPlaceholderFanout_E2E(t *testing.T) {
 			fmt.Sprintf("%s/api/v1/documents/%s/submit", baseURL, documentID), body, map[string]string{
 				"X-Tenant-ID":     tenantID,
 				"X-User-ID":       userID,
-				"Idempotency-Key": "fanout-e2e-submit-1",
+				"Idempotency-Key": "55555555-5555-4555-8555-555555555555",
 				"If-Match":        `"v1"`,
 			})
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {

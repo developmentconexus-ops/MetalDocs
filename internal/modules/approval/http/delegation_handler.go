@@ -7,6 +7,7 @@ import (
 
 	approvalapi "metaldocs/internal/modules/approval/api"
 	"metaldocs/internal/modules/approval/http/contracts"
+	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/strictjson"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -25,9 +26,13 @@ func (h *Handler) CreateApprovalDelegation(w http.ResponseWriter, r *http.Reques
 	}
 	actorID := actorIDFromRequest(r)
 
-	idempotencyKey := strings.TrimSpace(params.IdempotencyKey)
-	if idempotencyKey == "" {
-		WriteError(w, ErrIdempotencyRequired)
+	// F-QA4-6: the spec now declares Idempotency-Key as format: uuid, so the
+	// generated wrapper binds it as a UUID and has already rejected a malformed
+	// value before this handler runs. ValidateKey is the fail-closed backstop
+	// for any mount that bypasses the generated wrapper (e.g. a unit-test mux).
+	idempotencyKey := strings.TrimSpace(params.IdempotencyKey.String())
+	if err := idempotency.ValidateKey(idempotencyKey); err != nil {
+		WriteError(w, err)
 		return
 	}
 

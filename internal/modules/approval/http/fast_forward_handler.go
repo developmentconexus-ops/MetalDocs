@@ -10,6 +10,7 @@ import (
 
 	"metaldocs/internal/modules/approval/application"
 	"metaldocs/internal/modules/approval/http/contracts"
+	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/strictjson"
 )
 
@@ -31,8 +32,10 @@ func (h *Handler) FastForwardHandler(w http.ResponseWriter, r *http.Request) {
 	stageID := r.PathValue("stage_id")
 	idempKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 
-	if idempKey == "" {
-		WriteError(w, ErrIdempotencyRequired)
+	// F-QA4-6: self-managed replay slot (no idempotency.Require wrapper), so the
+	// shared UUID wire rule is enforced here.
+	if err := idempotency.ValidateKey(idempKey); err != nil {
+		WriteError(w, err)
 		return
 	}
 	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
@@ -64,10 +67,7 @@ func (h *Handler) FastForwardHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	payloadHash := fastForwardPayloadHash(instanceID, stageID, body.Comment, body.ContentHash)
-	var replayHandle interface {
-		Complete(outcome string) error
-		Fail(cause error) error
-	}
+	var replayHandle application.SignoffReplayCommitter
 	if h.fastForwardIdempStore != nil {
 		handle, replay, err := h.fastForwardIdempStore.BeginFastForwardReplay(r.Context(), tenantID, actorID, idempKey, payloadHash)
 		if err != nil {
@@ -76,6 +76,7 @@ func (h *Handler) FastForwardHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		if replay != nil {
 			WriteJSON(w, http.StatusOK, contracts.FastForwardResponse{
+				SignoffID: replay.SignoffID,
 				WasReplay: true,
 				Outcome:   replay.Outcome,
 			})
@@ -105,13 +106,16 @@ func (h *Handler) FastForwardHandler(w http.ResponseWriter, r *http.Request) {
 
 	outcome := signoffOutcome(result.Signoff)
 	if replayHandle != nil {
-		if err := replayHandle.Complete(outcome); err != nil {
+		if err := replayHandle.Complete(application.SignoffReplay{
+			Outcome:   outcome,
+			SignoffID: result.Signoff.SignoffID,
+		}); err != nil {
 			slog.Warn("fast forward idempotency record failed (non-fatal)", "err", err)
 		}
 	}
 
 	WriteJSON(w, http.StatusOK, contracts.FastForwardResponse{
-		SignoffID: "",
+		SignoffID: result.Signoff.SignoffID,
 		WasReplay: false,
 		Outcome:   outcome,
 	})

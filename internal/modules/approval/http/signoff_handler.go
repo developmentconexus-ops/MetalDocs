@@ -9,6 +9,7 @@ import (
 	"metaldocs/internal/modules/approval/application"
 	"metaldocs/internal/modules/approval/domain"
 	"metaldocs/internal/modules/approval/http/contracts"
+	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/strictjson"
 )
 
@@ -34,8 +35,10 @@ func (h *Handler) SignoffHandler(w http.ResponseWriter, r *http.Request) {
 	stageID := r.PathValue("stage_id")
 	idempKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 
-	if idempKey == "" {
-		WriteError(w, ErrIdempotencyRequired)
+	// F-QA4-6: this route manages its own replay slot (no idempotency.Require
+	// wrapper), so it enforces the shared UUID wire rule itself.
+	if err := idempotency.ValidateKey(idempKey); err != nil {
+		WriteError(w, err)
 		return
 	}
 	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
@@ -66,10 +69,7 @@ func (h *Handler) SignoffHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	payloadHash := signoffPayloadHash("", instanceID, stageID, decision, body.Reason, body.ContentHash)
-	var replayHandle interface {
-		Complete(outcome string) error
-		Fail(cause error) error
-	}
+	var replayHandle application.SignoffReplayCommitter
 	if h.idempStore != nil {
 		handle, replay, err := h.idempStore.BeginStageReplay(r.Context(), tenantID, actorID, idempKey, payloadHash)
 		if err != nil {
@@ -78,6 +78,7 @@ func (h *Handler) SignoffHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		if replay != nil {
 			WriteJSON(w, http.StatusOK, contracts.SignoffResponse{
+				SignoffID: replay.SignoffID,
 				WasReplay: true,
 				Outcome:   replay.Outcome,
 			})
@@ -108,13 +109,16 @@ func (h *Handler) SignoffHandler(w http.ResponseWriter, r *http.Request) {
 
 	outcome := signoffOutcome(result)
 	if replayHandle != nil {
-		if err := replayHandle.Complete(outcome); err != nil {
+		if err := replayHandle.Complete(application.SignoffReplay{
+			Outcome:   outcome,
+			SignoffID: result.SignoffID,
+		}); err != nil {
 			slog.Warn("signoff idempotency record failed (non-fatal)", "err", err)
 		}
 	}
 
 	WriteJSON(w, http.StatusOK, contracts.SignoffResponse{
-		SignoffID: "",
+		SignoffID: result.SignoffID,
 		WasReplay: false,
 		Outcome:   outcome,
 	})

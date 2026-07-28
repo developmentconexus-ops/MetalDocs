@@ -5,6 +5,12 @@ package application
 // a retrying caller.
 type SignoffReplay struct {
 	Outcome string `json:"outcome"`
+	// SignoffID is the approval_signoffs row id produced by the original
+	// (winning) call, so an Idempotency-Key retry replays the SAME identifier
+	// instead of an empty string (F-QA4-7). Envelopes persisted before this
+	// field existed decode with an empty value — the pre-fix behaviour — which
+	// is why it is omitempty rather than required.
+	SignoffID string `json:"signoff_id,omitempty"`
 }
 
 // SignoffReplayCommitter is the slot handle a winning caller must resolve with
@@ -13,6 +19,6 @@ type SignoffReplay struct {
 // seam unit-testable with an in-memory double. Production impl lives in
 // infrastructure/postgres_signoff_idemp_store.go.
 type SignoffReplayCommitter interface {
-	Complete(outcome string) error
+	Complete(replay SignoffReplay) error
 	Fail(cause error) error
 }

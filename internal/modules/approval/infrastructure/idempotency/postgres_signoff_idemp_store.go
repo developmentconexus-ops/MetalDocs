@@ -32,13 +32,14 @@ type SignoffReplayHandle struct {
 	handle *idempotency.ReplayHandle
 }
 
-// Complete persists outcome as the replay response for this slot, so a retried
-// request with the same Idempotency-Key returns the same outcome.
-func (h *SignoffReplayHandle) Complete(outcome string) error {
+// Complete persists replay as the replay response for this slot, so a retried
+// request with the same Idempotency-Key returns the same outcome AND the same
+// approval_signoffs id (F-QA4-7).
+func (h *SignoffReplayHandle) Complete(replay application.SignoffReplay) error {
 	if h == nil || h.store == nil || h.handle == nil {
 		return errors.New("idempotency store not configured")
 	}
-	body, err := json.Marshal(application.SignoffReplay{Outcome: outcome})
+	body, err := json.Marshal(replay)
 	if err != nil {
 		return fmt.Errorf("signoff idempotency: marshal replay response: %w", err)
 	}

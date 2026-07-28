@@ -18,9 +18,38 @@ var uuidRE = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-
 
 const maxIdempotencyRequestBodyBytes int64 = 1 << 20
 
+// Idempotency-Key header contract sentinels. The wire rule is UUID-everywhere
+// (F-QA4-6): the same shape is enforced by Require below AND by the handlers
+// that manage their own replay slots instead of being wrapped by it. Handlers
+// map these to the same 400 problem+json Require emits — see ValidateKey.
+var (
+	// ErrKeyRequired signals a missing (or blank) Idempotency-Key header.
+	ErrKeyRequired = errors.New("idempotency: Idempotency-Key header required")
+	// ErrKeyInvalid signals a present but non-UUID Idempotency-Key header.
+	ErrKeyInvalid = errors.New("idempotency: Idempotency-Key must be a UUID")
+)
+
 // IsValidKey reports whether an idempotency key matches the required UUID shape.
 func IsValidKey(key string) bool {
 	return uuidRE.MatchString(key)
+}
+
+// ValidateKey is the single Idempotency-Key format rule for the whole API.
+// Both the Require middleware and the bespoke-replay handlers (approval
+// signoff / fast-forward / review-verdict / route-admin / submit) call it, so
+// there is exactly one regex and no handler-specific dialect.
+//
+// It validates only — it does not trim. Callers that accept surrounding
+// whitespace must normalise before calling, which keeps middleware parity
+// exact (Require passes the raw header value).
+func ValidateKey(key string) error {
+	if key == "" {
+		return ErrKeyRequired
+	}
+	if !IsValidKey(key) {
+		return ErrKeyInvalid
+	}
+	return nil
 }
 
 // RequestHash computes a deterministic hash of method + path + query + body.
@@ -89,11 +118,11 @@ func Require(store *Store, actorFromCtx func(context.Context) (string, string), 
 				return
 			}
 			key := r.Header.Get("Idempotency-Key")
-			if key == "" {
+			switch err := ValidateKey(key); {
+			case errors.Is(err, ErrKeyRequired):
 				writeErrJSON(w, 400, problem.CodeIdempotencyKeyRequired, "Idempotency-Key header required")
 				return
-			}
-			if !IsValidKey(key) {
+			case errors.Is(err, ErrKeyInvalid):
 				writeErrJSON(w, 400, problem.CodeIdempotencyKeyInvalid, "Idempotency-Key must be a UUID")
 				return
 			}

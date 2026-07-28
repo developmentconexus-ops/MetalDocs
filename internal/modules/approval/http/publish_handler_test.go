@@ -121,7 +121,7 @@ func TestPublishHandler(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/publish", nil)
 			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
-			req.Header.Set("Idempotency-Key", "idem-1")
+			req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 			req.Header.Set("If-Match", "\"v3\"")
 
 			rr := httptest.NewRecorder()
@@ -201,7 +201,7 @@ func TestSchedulePublishHandler(t *testing.T) {
 			req.Header.Set("Content-Type", "application/json")
 			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
-			req.Header.Set("Idempotency-Key", "idem-1")
+			req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 			req.Header.Set("If-Match", "\"v4\"")
 
 			rr := httptest.NewRecorder()
@@ -254,7 +254,7 @@ func TestSchedulePublishHandler_ResolvesActiveInstanceFromDocument(t *testing.T)
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
-	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req.Header.Set("If-Match", "\"v7\"")
 
 	rr := httptest.NewRecorder()
@@ -294,7 +294,7 @@ func TestSchedulePublishHandler_PassesExpectedRevisionAndSupersededDocumentID(t 
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "admin", []iamdomain.Role{}))
-	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req.Header.Set("If-Match", "\"v2\"")
 
 	rr := httptest.NewRecorder()
@@ -323,7 +323,7 @@ func TestSchedulePublishHandler_ReturnsErrorWhenActiveInstanceLookupFails(t *tes
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "admin", []iamdomain.Role{}))
-	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req.Header.Set("If-Match", "\"v2\"")
 
 	rr := httptest.NewRecorder()

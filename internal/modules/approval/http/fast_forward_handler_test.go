@@ -49,9 +49,9 @@ func fastForwardTestMux(h *Handler) *http.ServeMux {
 
 func TestFastForwardHandler_Happy(t *testing.T) {
 	fakeSvc := &fakeFastForwardService{result: application.FastForwardResult{
-		Signoff: application.SignoffResult{InstanceApproved: true},
+		Signoff: application.SignoffResult{SignoffID: "sig-ff-1", InstanceApproved: true},
 	}}
-	h := &Handler{fastForwardSvc: fakeSvc, fastForwardIdempStore: &fakeIdempStore{entries: map[string]string{}}}
+	h := &Handler{fastForwardSvc: fakeSvc, fastForwardIdempStore: &fakeIdempStore{entries: map[string]application.SignoffReplay{}}}
 	mux := fastForwardTestMux(h)
 
 	body := `{"comment":"fast forward","password_token":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
@@ -59,7 +59,7 @@ func TestFastForwardHandler_Happy(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
-	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req.Header.Set("If-Match", "v3")
 
 	rr := httptest.NewRecorder()
@@ -74,6 +74,10 @@ func TestFastForwardHandler_Happy(t *testing.T) {
 	}
 	if out.Outcome != "approved" {
 		t.Fatalf("outcome = %q, want %q", out.Outcome, "approved")
+	}
+	// F-QA4-7: the signoff leg's persisted id must reach the wire, not "".
+	if out.SignoffID != "sig-ff-1" {
+		t.Fatalf("signoff_id = %q, want %q", out.SignoffID, "sig-ff-1")
 	}
 	if fakeSvc.gotReq.TenantID != "tenant-1" || fakeSvc.gotReq.InstanceID != "inst-1" || fakeSvc.gotReq.StageInstanceID != "stg-1" || fakeSvc.gotReq.ActorUserID != "actor-1" {
 		t.Fatalf("unexpected request mapped to service: %+v", fakeSvc.gotReq)
@@ -115,14 +119,14 @@ func TestFastForwardHandler_MissingIdempotencyKey(t *testing.T) {
 }
 
 func TestFastForwardHandler_StageNotCompleted(t *testing.T) {
-	h := &Handler{fastForwardSvc: &fakeFastForwardService{err: domain.ErrFastForwardStageNotCompleted}, fastForwardIdempStore: &fakeIdempStore{entries: map[string]string{}}}
+	h := &Handler{fastForwardSvc: &fakeFastForwardService{err: domain.ErrFastForwardStageNotCompleted}, fastForwardIdempStore: &fakeIdempStore{entries: map[string]application.SignoffReplay{}}}
 	mux := fastForwardTestMux(h)
 
 	body := `{"comment":"","password_token":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-1/stages/stg-1/fast-forward", strings.NewReader(body))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req.Header.Set("If-Match", "v1")
 
 	rr := httptest.NewRecorder()
@@ -141,14 +145,14 @@ func TestFastForwardHandler_StageNotCompleted(t *testing.T) {
 }
 
 func TestFastForwardHandler_NotEligible(t *testing.T) {
-	h := &Handler{fastForwardSvc: &fakeFastForwardService{err: domain.ErrFastForwardNotEligible}, fastForwardIdempStore: &fakeIdempStore{entries: map[string]string{}}}
+	h := &Handler{fastForwardSvc: &fakeFastForwardService{err: domain.ErrFastForwardNotEligible}, fastForwardIdempStore: &fakeIdempStore{entries: map[string]application.SignoffReplay{}}}
 	mux := fastForwardTestMux(h)
 
 	body := `{"comment":"","password_token":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-1/stages/stg-1/fast-forward", strings.NewReader(body))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req.Header.Set("If-Match", "v1")
 
 	rr := httptest.NewRecorder()
@@ -174,8 +178,8 @@ func TestFastForwardHandler_ReplayReturnsCachedOutcome(t *testing.T) {
 	fakeSvc := &fakeFastForwardService{}
 	h := &Handler{
 		fastForwardSvc: fakeSvc,
-		fastForwardIdempStore: &fakeIdempStore{entries: map[string]string{
-			"fast-forward:tenant-1:actor-1:idem-replay": "approved",
+		fastForwardIdempStore: &fakeIdempStore{entries: map[string]application.SignoffReplay{
+			"fast-forward:tenant-1:actor-1:88888888-8888-4888-8888-888888888888": {Outcome: "approved", SignoffID: "sig-replayed-1"},
 		}},
 	}
 	mux := fastForwardTestMux(h)
@@ -185,7 +189,7 @@ func TestFastForwardHandler_ReplayReturnsCachedOutcome(t *testing.T) {
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Idempotency-Key", "idem-replay")
+	req.Header.Set("Idempotency-Key", "88888888-8888-4888-8888-888888888888")
 	req.Header.Set("If-Match", "v3")
 
 	rr := httptest.NewRecorder()
@@ -201,8 +205,49 @@ func TestFastForwardHandler_ReplayReturnsCachedOutcome(t *testing.T) {
 	if !out.WasReplay || out.Outcome != "approved" {
 		t.Fatalf("response = %+v, want replay approved", out)
 	}
+	// F-QA4-7: a replay must return the ORIGINAL signoff id, not "".
+	if out.SignoffID != "sig-replayed-1" {
+		t.Fatalf("replayed signoff_id = %q, want %q", out.SignoffID, "sig-replayed-1")
+	}
 	if fakeSvc.calls != 0 {
 		t.Fatalf("fast-forward service should not run on replay, got %d calls", fakeSvc.calls)
+	}
+}
+
+// TestFastForwardHandler_NonUUIDIdempotencyKey pins F-QA4-6 on the fast-forward
+// route, which — like the signoff routes — is deliberately excluded from the
+// idempotency.Require middleware and so must enforce the shared UUID wire rule
+// itself.
+func TestFastForwardHandler_NonUUIDIdempotencyKey(t *testing.T) {
+	fakeSvc := &fakeFastForwardService{}
+	h := &Handler{fastForwardSvc: fakeSvc, fastForwardIdempStore: &fakeIdempStore{entries: map[string]application.SignoffReplay{}}}
+	mux := fastForwardTestMux(h)
+
+	body := `{"comment":"","password_token":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-1/stages/stg-1/fast-forward", strings.NewReader(body))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "idem-free-string")
+	req.Header.Set("If-Match", "v1")
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
+	}
+	if ct := rr.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/problem+json") {
+		t.Fatalf("content-type = %q, want application/problem+json", ct)
+	}
+	var out problem.Problem
+	if err := json.NewDecoder(rr.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Code != problem.CodeIdempotencyKeyInvalid {
+		t.Fatalf("error.code = %q, want %q", out.Code, problem.CodeIdempotencyKeyInvalid)
+	}
+	if fakeSvc.calls != 0 {
+		t.Fatalf("fast-forward service ran %d times, want 0", fakeSvc.calls)
 	}
 }
 
@@ -220,7 +265,7 @@ func TestFastForwardHandler_NilIdempStoreFailsClosed(t *testing.T) {
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req.Header.Set("If-Match", "v3")
 
 	rr := httptest.NewRecorder()
@@ -249,7 +294,7 @@ func TestFastForwardHandler_MissingIfMatch(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-1/stages/stg-1/fast-forward", strings.NewReader(body))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 
 	rr := httptest.NewRecorder()
 	mux.ServeHTTP(rr, req)

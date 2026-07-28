@@ -1653,7 +1653,7 @@ paths:
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
-        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
       requestBody:
         required: true
         content:
@@ -3425,7 +3425,7 @@ paths:
           (migration 0142b) is the backstop.
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
         - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>" (N >= 0; a fresh draft is v0) or "*"' }
       requestBody:
         required: true
@@ -3508,7 +3508,7 @@ paths:
       parameters:
         - { name: instance_id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: stage_id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
         - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>"' }
       requestBody:
         required: true
@@ -3564,7 +3564,7 @@ paths:
       parameters:
         - { name: instance_id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: stage_id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
         - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>"' }
       requestBody:
         required: true
@@ -3623,7 +3623,7 @@ paths:
       parameters:
         - { name: instance_id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: stage_id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
         - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>"' }
       requestBody:
         required: true
@@ -3671,7 +3671,7 @@ paths:
           (migration 0142b) is the backstop.
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
         - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>", or "*" to skip the check' }
       responses:
         '200':
@@ -3709,7 +3709,7 @@ paths:
           (migration 0142b) is the backstop.
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
         - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>", or "*" to skip the check' }
       requestBody:
         required: true
@@ -3759,7 +3759,7 @@ paths:
           (migration 0142b) is the backstop.
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
         - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>", or "*" to skip the check' }
       requestBody:
         required: true
@@ -3803,7 +3803,7 @@ paths:
           (migration 0142b) is the backstop.
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
         - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>", or "*" to skip the check' }
       requestBody:
         required: true
@@ -3847,7 +3847,7 @@ paths:
           (migration 0142b) is the backstop.
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
         - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>", or "*" to skip the check' }
       requestBody:
         required: true
@@ -3883,7 +3883,7 @@ paths:
       operationId: cancelApprovalInstance
       parameters:
         - { name: instance_id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
         - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>", or "*" to skip the check' }
       requestBody:
         required: true
@@ -3927,7 +3927,7 @@ paths:
       security:
         - sessionCookie: []
       parameters:
-        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
       requestBody:
         required: true
         content:
@@ -4070,7 +4070,7 @@ paths:
           (migration 0142b) is the backstop.
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
         - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>"' }
       requestBody:
         required: true
@@ -4108,7 +4108,7 @@ paths:
       operationId: cancelDocumentApproval
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
         - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>", or "*" to skip the check' }
       requestBody:
         required: true
@@ -4149,7 +4149,7 @@ paths:
       security:
         - sessionCookie: []
       parameters:
-        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
       requestBody:
         required: true
         content:
@@ -4218,7 +4218,7 @@ paths:
         - sessionCookie: []
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
         - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected route version ETag in the form "v<N>"' }
       requestBody:
         required: true
@@ -4260,7 +4260,7 @@ paths:
         - sessionCookie: []
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
         - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected route version ETag in the form "v<N>"' }
       requestBody:
         required: false

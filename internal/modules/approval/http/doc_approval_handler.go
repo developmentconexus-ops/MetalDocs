@@ -12,6 +12,7 @@ import (
 	"metaldocs/internal/modules/approval/http/contracts"
 	"metaldocs/internal/modules/approval/infrastructure"
 	"metaldocs/internal/platform/db"
+	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/strictjson"
 )
 
@@ -94,8 +95,10 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 	docID := r.PathValue("id")
 	idempKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 
-	if idempKey == "" {
-		WriteError(w, ErrIdempotencyRequired)
+	// F-QA4-6: self-managed replay slot (no idempotency.Require wrapper), so the
+	// shared UUID wire rule is enforced here.
+	if err := idempotency.ValidateKey(idempKey); err != nil {
+		WriteError(w, err)
 		return
 	}
 	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
@@ -142,7 +145,11 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 			return
 		}
 		if replay != nil {
-			WriteJSON(w, http.StatusOK, contracts.SignoffResponse{WasReplay: true, Outcome: replay.Outcome})
+			WriteJSON(w, http.StatusOK, contracts.SignoffResponse{
+				SignoffID: replay.SignoffID,
+				WasReplay: true,
+				Outcome:   replay.Outcome,
+			})
 			return
 		}
 		replayHandle = handle
@@ -191,12 +198,15 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 
 	outcome := signoffOutcome(result)
 	if replayHandle != nil {
-		if err := replayHandle.Complete(outcome); err != nil {
+		if err := replayHandle.Complete(application.SignoffReplay{
+			Outcome:   outcome,
+			SignoffID: result.SignoffID,
+		}); err != nil {
 			slog.Warn("signoff idempotency record failed (non-fatal)", "err", err)
 		}
 	}
 	WriteJSON(w, http.StatusOK, contracts.SignoffResponse{
-		SignoffID: "",
+		SignoffID: result.SignoffID,
 		WasReplay: false,
 		Outcome:   outcome,
 	})

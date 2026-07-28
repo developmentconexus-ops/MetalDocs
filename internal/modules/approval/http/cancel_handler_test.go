@@ -83,7 +83,7 @@ func TestCancelHandler(t *testing.T) {
 			req.Header.Set("Content-Type", "application/json")
 			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
-			req.Header.Set("Idempotency-Key", "idem-1")
+			req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 			req.Header.Set("If-Match", "\"v9\"")
 
 			rr := httptest.NewRecorder()
