@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"net/http"
 
+	approvaldomain "metaldocs/internal/modules/approval/domain"
 	auditdomain "metaldocs/internal/modules/audit/domain"
 	"metaldocs/internal/modules/taxonomy/application"
 	thttp "metaldocs/internal/modules/taxonomy/delivery/http"
@@ -27,6 +28,11 @@ type Dependencies struct {
 	DB          *sql.DB
 	TplChecker  application.TemplateVersionChecker
 	AuditWriter auditdomain.Writer
+
+	// RouteReadinessReader is the approval-owned port backing the profile
+	// listing's has_active_route badge. Must not be nil — taxonomy reports the
+	// badge honestly or errors; it never defaults it to false.
+	RouteReadinessReader approvaldomain.RouteReadinessReader
 }
 
 // New builds a Module: repositories over deps.DB, the audit-backed
@@ -43,11 +49,15 @@ func New(deps Dependencies) *Module {
 	if deps.AuditWriter == nil {
 		panic("taxonomy.module: AuditWriter is required; nil fallback to DBGovernanceLogger was removed (FE / Wave 2.12)")
 	}
+	if deps.RouteReadinessReader == nil {
+		panic("taxonomy.module: RouteReadinessReader is required; wire approval/infrastructure.NewRouteReadinessReaderPG at the composition root")
+	}
 	logger := application.NewAuditGovernanceAdapter(deps.AuditWriter)
 
 	familyRepo := infrastructure.NewFamilyRepository(deps.DB)
 
-	profileService := application.NewProfileService(profileRepo, tplChecker, logger)
+	profileService := application.NewProfileService(profileRepo, tplChecker, logger).
+		WithRouteReadinessReader(deps.RouteReadinessReader)
 	areaService := application.NewAreaService(areaRepo, logger)
 	familyService := application.NewFamilyService(familyRepo, logger)
 	handler := thttp.NewHandler(profileService, areaService, familyService, deps.DB)

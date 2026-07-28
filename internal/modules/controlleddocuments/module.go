@@ -15,10 +15,12 @@ import (
 	"log/slog"
 	"net/http"
 
+	approvaldomain "metaldocs/internal/modules/approval/domain"
 	"metaldocs/internal/modules/controlleddocuments/application"
 	dhttp "metaldocs/internal/modules/controlleddocuments/delivery/http"
 	"metaldocs/internal/modules/controlleddocuments/infrastructure"
 	documentsdomain "metaldocs/internal/modules/documents/domain"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	platformdb "metaldocs/internal/platform/db"
 )
@@ -66,6 +68,25 @@ type Dependencies struct {
 	// TemplateVersionChecker reads template-version state through the
 	// templates-owned port (M4 F4.2). Must not be nil.
 	TemplateVersionChecker application.TemplateVersionChecker
+
+	// RouteReadinessReader answers "does this profile have an active approval
+	// route?" through the approval-owned port
+	// (approval/domain.RouteReadinessReader). It backs the hard creation gate
+	// (D2) and the creation-context read model. Must not be nil — a missing
+	// reader would make Create fail closed for every request.
+	RouteReadinessReader approvaldomain.RouteReadinessReader
+
+	// ProfileLister / AreaLister are the taxonomy catalog-read ports backing the
+	// creation-context read model. Satisfy application.ProfileLister /
+	// application.AreaLister. Must not be nil.
+	ProfileLister application.ProfileLister
+	AreaLister    application.AreaLister
+
+	// AreaCapabilityReader answers "in which areas does this actor hold
+	// controlled_documents.create?" through the iam-owned port
+	// (iam/domain.AreaCapabilityReader), so the creation context narrows areas
+	// server-side instead of shipping the full catalog. Must not be nil.
+	AreaCapabilityReader iamdomain.AreaCapabilityReader
 }
 
 // New builds a Module: the Postgres repository and sequence allocator
@@ -88,6 +109,18 @@ func New(deps Dependencies) *Module {
 	}
 	if deps.TemplateVersionChecker == nil {
 		panic("controlled_documents: TemplateVersionChecker is required (nil provided)")
+	}
+	if deps.RouteReadinessReader == nil {
+		panic("controlled_documents: RouteReadinessReader is required (nil provided)")
+	}
+	if deps.ProfileLister == nil {
+		panic("controlled_documents: ProfileLister is required (nil provided)")
+	}
+	if deps.AreaLister == nil {
+		panic("controlled_documents: AreaLister is required (nil provided)")
+	}
+	if deps.AreaCapabilityReader == nil {
+		panic("controlled_documents: AreaCapabilityReader is required (nil provided)")
 	}
 
 	// documents-owned active-instance read-port: use the injected port or the
@@ -112,6 +145,8 @@ func New(deps Dependencies) *Module {
 	if svc == nil {
 		panic("controlled_documents: service construction returned nil")
 	}
+	svc.WithRouteReadinessReader(deps.RouteReadinessReader)
+	svc.WithCreationContextReaders(deps.ProfileLister, deps.AreaLister, deps.AreaCapabilityReader)
 	h := dhttp.NewHandler(svc, deps.DB)
 	if h == nil {
 		panic("controlled_documents: handler construction returned nil")

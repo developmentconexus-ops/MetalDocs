@@ -212,6 +212,19 @@ var routeRules = []routeRule{
 	{method: http.MethodDelete, pathPrefix: "/api/v1/tokens", capability: iamdomain.CapTokenDictionaryManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 
 	// Controlled documents.
+	// ORDER MATTERS (first match wins): these two literal GET routes are
+	// create-flow endpoints, not document reads, so they must precede the
+	// generic controlled-documents GET prefix rule below.
+	//   - creation-context: the create form's pre-flight read model; its body IS
+	//     the caller's create authorization (which areas), so gating it on
+	//     anything weaker than create would leak the create surface to viewers.
+	//   - preview-code: tier-2 already requires CapControlledDocumentCreate
+	//     (application/service.go PeekSeq); before this row tier-1 inherited
+	//     CapDocumentView from the prefix, so a view-only caller passed tier-1
+	//     and was denied at tier-2 — a tier-1/tier-2 asymmetry (F-QA4-1). The
+	//     two tiers now agree.
+	{method: http.MethodGet, pathExact: "/api/v1/controlled-documents/creation-context", capability: iamdomain.CapControlledDocumentCreate, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathExact: "/api/v1/controlled-documents/preview-code", capability: iamdomain.CapControlledDocumentCreate, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodGet, pathPrefix: "/api/v1/controlled-documents", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathExact: "/api/v1/controlled-documents", capability: iamdomain.CapControlledDocumentCreate, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/controlled-documents", pathSuffix: "/revisions", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},

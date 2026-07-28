@@ -108,7 +108,13 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "controlled documents list", method: http.MethodGet, path: "/api/v1/controlled-documents", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "controlled documents create", method: http.MethodPost, path: "/api/v1/controlled-documents", wantCap: iamdomain.CapControlledDocumentCreate, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "controlled documents revisions create", method: http.MethodPost, path: "/api/v1/controlled-documents/cd-1/revisions", wantCap: iamdomain.CapDocumentEdit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "controlled documents preview code", method: http.MethodGet, path: "/api/v1/controlled-documents/preview-code", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		// Create-flow GETs resolve to CapControlledDocumentCreate, not the
+		// generic CapDocumentView prefix rule: creation-context's body IS the
+		// caller's create authorization, and preview-code's tier-2
+		// (PeekSeq → authz.Require) has always required create — the tier-1
+		// row now agrees instead of admitting view-only callers (F-QA4-1).
+		{name: "controlled documents creation context", method: http.MethodGet, path: "/api/v1/controlled-documents/creation-context", wantCap: iamdomain.CapControlledDocumentCreate, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "controlled documents preview code", method: http.MethodGet, path: "/api/v1/controlled-documents/preview-code", wantCap: iamdomain.CapControlledDocumentCreate, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "controlled documents obsolete", method: http.MethodPut, path: "/api/v1/controlled-documents/cd-1/obsolete", wantCap: iamdomain.CapControlledDocumentObsolete, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "controlled documents supersede", method: http.MethodPut, path: "/api/v1/controlled-documents/cd-1/supersede", wantCap: iamdomain.CapControlledDocumentSupersede, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 
@@ -257,6 +263,7 @@ func TestRouteCoverage(t *testing.T) {
 		{"controlled-documents", http.MethodPost, "/api/v1/controlled-documents"},
 		{"controlled-documents", http.MethodPost, "/api/v1/controlled-documents/cd-1/revisions"},
 		{"controlled-documents", http.MethodGet, "/api/v1/controlled-documents/preview-code"},
+		{"controlled-documents", http.MethodGet, "/api/v1/controlled-documents/creation-context"},
 		{"controlled-documents", http.MethodPut, "/api/v1/controlled-documents/cd-1/obsolete"},
 		{"controlled-documents", http.MethodPut, "/api/v1/controlled-documents/cd-1/supersede"},
 

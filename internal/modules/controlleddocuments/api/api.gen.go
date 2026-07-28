@@ -158,6 +158,13 @@ type ControlledDocument struct {
 // ControlledDocumentStatus defines model for ControlledDocument.Status.
 type ControlledDocumentStatus string
 
+// ControlledDocumentCreationContextResponse defines model for ControlledDocumentCreationContextResponse.
+type ControlledDocumentCreationContextResponse struct {
+	// Areas Process areas in which the caller holds `controlled_documents.create`. Empty means the caller may not create anywhere; the list is computed server-side from the caller's capability grants and is never the full area catalog.
+	Areas    []CreationContextAreaItem    `json:"areas"`
+	Profiles []CreationContextProfileItem `json:"profiles"`
+}
+
 // ControlledDocumentVisibility defines model for ControlledDocumentVisibility.
 type ControlledDocumentVisibility struct {
 	AreaCodes []string                          `json:"area_codes"`
@@ -190,6 +197,21 @@ type CreateRevisionRequest struct {
 	FormData          *map[string]interface{} `json:"form_data,omitempty"`
 	Name              string                  `json:"name"`
 	TemplateVersionId *openapi_types.UUID     `json:"template_version_id,omitempty"`
+}
+
+// CreationContextAreaItem defines model for CreationContextAreaItem.
+type CreationContextAreaItem struct {
+	Code string `json:"code"`
+	Name string `json:"name"`
+}
+
+// CreationContextProfileItem defines model for CreationContextProfileItem.
+type CreationContextProfileItem struct {
+	Code string `json:"code"`
+
+	// HasActiveRoute False when the profile has no active approval route; creating a controlled document under it is rejected with 409 `state.approval_route_missing`.
+	HasActiveRoute bool   `json:"has_active_route"`
+	Name           string `json:"name"`
 }
 
 // CursorPage defines model for CursorPage.
@@ -319,6 +341,9 @@ type ServerInterface interface {
 	// Atomically create controlled document and initial revision
 	// (POST /controlled-documents)
 	AtomicCreateControlledDocument(w http.ResponseWriter, r *http.Request, params AtomicCreateControlledDocumentParams)
+	// Pre-flight context for creating a controlled document
+	// (GET /controlled-documents/creation-context)
+	GetControlledDocumentCreationContext(w http.ResponseWriter, r *http.Request)
 	// Preview the next auto-generated document code without allocating it
 	// (GET /controlled-documents/preview-code)
 	PreviewControlledDocumentCode(w http.ResponseWriter, r *http.Request, params PreviewControlledDocumentCodeParams)
@@ -520,6 +545,26 @@ func (siw *ServerInterfaceWrapper) AtomicCreateControlledDocument(w http.Respons
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.AtomicCreateControlledDocument(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetControlledDocumentCreationContext operation middleware
+func (siw *ServerInterfaceWrapper) GetControlledDocumentCreationContext(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetControlledDocumentCreationContext(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -947,6 +992,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/controlled-documents", wrapper.ListControlledDocuments)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/controlled-documents", wrapper.AtomicCreateControlledDocument)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/controlled-documents/creation-context", wrapper.GetControlledDocumentCreationContext)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/controlled-documents/preview-code", wrapper.PreviewControlledDocumentCode)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/controlled-documents/{id}", wrapper.GetControlledDocument)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/controlled-documents/{id}/active-document", wrapper.GetActiveDocument)
@@ -1168,6 +1214,75 @@ type AtomicCreateControlledDocument500ApplicationProblemPlusJSONResponse struct 
 }
 
 func (response AtomicCreateControlledDocument500ApplicationProblemPlusJSONResponse) VisitAtomicCreateControlledDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetControlledDocumentCreationContextRequestObject struct {
+}
+
+type GetControlledDocumentCreationContextResponseObject interface {
+	VisitGetControlledDocumentCreationContextResponse(w http.ResponseWriter) error
+}
+
+type GetControlledDocumentCreationContext200JSONResponse ControlledDocumentCreationContextResponse
+
+func (response GetControlledDocumentCreationContext200JSONResponse) VisitGetControlledDocumentCreationContextResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetControlledDocumentCreationContext401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetControlledDocumentCreationContext401ApplicationProblemPlusJSONResponse) VisitGetControlledDocumentCreationContextResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetControlledDocumentCreationContext403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetControlledDocumentCreationContext403ApplicationProblemPlusJSONResponse) VisitGetControlledDocumentCreationContextResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetControlledDocumentCreationContext500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetControlledDocumentCreationContext500ApplicationProblemPlusJSONResponse) VisitGetControlledDocumentCreationContextResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1823,6 +1938,9 @@ type StrictServerInterface interface {
 	// Atomically create controlled document and initial revision
 	// (POST /controlled-documents)
 	AtomicCreateControlledDocument(ctx context.Context, request AtomicCreateControlledDocumentRequestObject) (AtomicCreateControlledDocumentResponseObject, error)
+	// Pre-flight context for creating a controlled document
+	// (GET /controlled-documents/creation-context)
+	GetControlledDocumentCreationContext(ctx context.Context, request GetControlledDocumentCreationContextRequestObject) (GetControlledDocumentCreationContextResponseObject, error)
 	// Preview the next auto-generated document code without allocating it
 	// (GET /controlled-documents/preview-code)
 	PreviewControlledDocumentCode(ctx context.Context, request PreviewControlledDocumentCodeRequestObject) (PreviewControlledDocumentCodeResponseObject, error)
@@ -1924,6 +2042,30 @@ func (sh *strictHandler) AtomicCreateControlledDocument(w http.ResponseWriter, r
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(AtomicCreateControlledDocumentResponseObject); ok {
 		if err := validResponse.VisitAtomicCreateControlledDocumentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetControlledDocumentCreationContext operation middleware
+func (sh *strictHandler) GetControlledDocumentCreationContext(w http.ResponseWriter, r *http.Request) {
+	var request GetControlledDocumentCreationContextRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetControlledDocumentCreationContext(ctx, request.(GetControlledDocumentCreationContextRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetControlledDocumentCreationContext")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetControlledDocumentCreationContextResponseObject); ok {
+		if err := validResponse.VisitGetControlledDocumentCreationContextResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -2102,67 +2244,75 @@ func (sh *strictHandler) SupersedeControlledDocument(w http.ResponseWriter, r *h
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

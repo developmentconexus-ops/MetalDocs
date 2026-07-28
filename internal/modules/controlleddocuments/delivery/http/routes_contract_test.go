@@ -147,28 +147,36 @@ func (f fakeGovernanceLogger) LogTx(_ context.Context, _ db.Tx, _ taxonomydomain
 }
 
 type spyControlledDocumentService struct {
-	gotCreate          application.CreateControlledDocumentCmd
-	createResult       *application.CreateResult
-	gotListFilter      application.CDFilter
-	gotListTenantID    string
-	listResult         []controlleddocumentsdomain.ControlledDocument
-	gotRevision        application.CreateRevisionCmd
-	revisionResult     *controlleddocumentsdomain.DocumentRef
-	revisionErr        error
-	gotGetID           string
-	getResult          *controlleddocumentsdomain.ControlledDocument
-	getErr             error
-	gotObsoleteID      string
-	gotSupersedeID     string
-	gotPeekProfile     string
-	gotPeekArea        string
-	peekResult         int
-	activeInstResult   *controlleddocumentsdomain.ActiveDocumentInstance
-	activeInstErr      error
+	gotCreate       application.CreateControlledDocumentCmd
+	createResult    *application.CreateResult
+	createErr       error
+	gotListFilter   application.CDFilter
+	gotListTenantID string
+	listResult      []controlleddocumentsdomain.ControlledDocument
+	gotRevision     application.CreateRevisionCmd
+	revisionResult  *controlleddocumentsdomain.DocumentRef
+	revisionErr     error
+	gotGetID        string
+	getResult       *controlleddocumentsdomain.ControlledDocument
+	getErr          error
+	gotObsoleteID   string
+	gotSupersedeID  string
+	gotPeekProfile  string
+	gotPeekArea     string
+	peekResult      int
+
+	gotCreationContextTenantID string
+	creationContextResult      *application.CreationContext
+	creationContextErr         error
+	activeInstResult           *controlleddocumentsdomain.ActiveDocumentInstance
+	activeInstErr              error
 }
 
 func (s *spyControlledDocumentService) Create(ctx context.Context, cmd application.CreateControlledDocumentCmd) (*application.CreateResult, error) {
 	s.gotCreate = cmd
+	if s.createErr != nil {
+		return nil, s.createErr
+	}
 	if s.createResult != nil {
 		return s.createResult, nil
 	}
@@ -224,6 +232,17 @@ func (s *spyControlledDocumentService) Obsolete(ctx context.Context, tenantID, i
 func (s *spyControlledDocumentService) Supersede(ctx context.Context, tenantID, id string) error {
 	s.gotSupersedeID = id
 	return nil
+}
+
+func (s *spyControlledDocumentService) CreationContext(_ context.Context, tenantID string) (*application.CreationContext, error) {
+	s.gotCreationContextTenantID = tenantID
+	if s.creationContextErr != nil {
+		return nil, s.creationContextErr
+	}
+	if s.creationContextResult != nil {
+		return s.creationContextResult, nil
+	}
+	return &application.CreationContext{}, nil
 }
 
 func (s *spyControlledDocumentService) PeekSeq(ctx context.Context, tenantID, profileCode, areaCode string) (int, error) {

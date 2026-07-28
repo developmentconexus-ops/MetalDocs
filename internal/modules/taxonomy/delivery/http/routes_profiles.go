@@ -67,9 +67,18 @@ func (h *Handler) listProfiles(w http.ResponseWriter, r *http.Request) {
 		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "failed to list profiles")
 		return
 	}
+	// One bulk approval-route readiness read for the whole page (never N+1),
+	// and it fails the request rather than defaulting to false — a wrong badge
+	// would misreport which profiles can accept new documents.
+	ready, err := h.profiles.RouteReadySubjects(r.Context(), tenantID)
+	if err != nil {
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "failed to resolve approval route readiness")
+		return
+	}
 	dtos := make([]taxonomyapi.DocumentProfileItem, len(items))
 	for i := range items {
-		dtos[i] = toDocumentProfileItem(&items[i])
+		_, hasRoute := ready[string(items[i].Code)]
+		dtos[i] = toDocumentProfileItem(&items[i], hasRoute)
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, taxonomyapi.ListDocumentProfilesResponse{Items: dtos})
 }
@@ -116,7 +125,10 @@ func (h *Handler) createProfile(w http.ResponseWriter, r *http.Request) {
 		h.writeProfileError(w, err)
 		return
 	}
-	httpresponse.WriteJSON(w, http.StatusCreated, toDocumentProfileItem(profile))
+	// A just-created profile cannot already have an approval route (routes are
+	// keyed by profile code and created separately), so this is a fact, not a
+	// default.
+	httpresponse.WriteJSON(w, http.StatusCreated, toDocumentProfileItem(profile, false))
 }
 
 func (h *Handler) getProfile(w http.ResponseWriter, r *http.Request) {
@@ -131,7 +143,24 @@ func (h *Handler) getProfile(w http.ResponseWriter, r *http.Request) {
 		h.writeProfileError(w, err)
 		return
 	}
-	httpresponse.WriteJSON(w, http.StatusOK, toDocumentProfileItem(profile))
+	hasRoute, err := h.profileHasActiveRoute(r, tenantID, profile.Code)
+	if err != nil {
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "failed to resolve approval route readiness")
+		return
+	}
+	httpresponse.WriteJSON(w, http.StatusOK, toDocumentProfileItem(profile, hasRoute))
+}
+
+// profileHasActiveRoute resolves the single-profile has_active_route flag from
+// the same bulk readiness read the list route uses, so both surfaces answer
+// from one query shape.
+func (h *Handler) profileHasActiveRoute(r *http.Request, tenantID string, code domain.ProfileCode) (bool, error) {
+	ready, err := h.profiles.RouteReadySubjects(r.Context(), tenantID)
+	if err != nil {
+		return false, err
+	}
+	_, ok := ready[string(code)]
+	return ok, nil
 }
 
 func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
@@ -198,7 +227,12 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 		// Unchanged (or omitted): echo the persisted class in the response.
 		profile.GovernanceClass = current.GovernanceClass
 	}
-	httpresponse.WriteJSON(w, http.StatusOK, toDocumentProfileItem(profile))
+	hasRoute, err := h.profileHasActiveRoute(r, tenantID, profile.Code)
+	if err != nil {
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "failed to resolve approval route readiness")
+		return
+	}
+	httpresponse.WriteJSON(w, http.StatusOK, toDocumentProfileItem(profile, hasRoute))
 }
 
 // governanceClassOrDefault trims the request value and defaults an empty class

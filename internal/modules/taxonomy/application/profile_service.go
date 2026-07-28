@@ -2,9 +2,11 @@ package application
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
+	approvaldomain "metaldocs/internal/modules/approval/domain"
 	"metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/authn"
 )
@@ -26,6 +28,12 @@ type ProfileService struct {
 	tplCheck  TemplateVersionChecker
 	govLogger domain.GovernanceLogger
 	now       func() time.Time
+
+	// routes is the approval-owned route-readiness port backing the admin
+	// has_active_route badge. Wired post-construction via
+	// WithRouteReadinessReader so NewProfileService's signature (and its test
+	// call sites) stays stable; RouteReadySubjects fails closed when nil.
+	routes approvaldomain.RouteReadinessReader
 }
 
 // NewProfileService builds a ProfileService with now defaulted to
@@ -43,6 +51,39 @@ func NewProfileService(
 		panic("taxonomy: ProfileService template checker must not be nil")
 	}
 	return &ProfileService{profiles: profiles, tplCheck: tplCheck, govLogger: govLogger, now: time.Now}
+}
+
+// ErrRouteReadinessUnconfigured is returned by RouteReadySubjects when no
+// route-readiness reader is wired — a composition-root bug. Reporting every
+// profile as "no route" instead would be a silent fallback that mislabels a
+// correctly configured tenant, so this fails closed with an explicit error.
+var ErrRouteReadinessUnconfigured = errors.New("taxonomy: route readiness reader not configured")
+
+// WithRouteReadinessReader wires the approval-owned route-readiness port
+// post-construction. The taxonomy composition root injects it.
+func (s *ProfileService) WithRouteReadinessReader(r approvaldomain.RouteReadinessReader) *ProfileService {
+	if r == nil {
+		panic("taxonomy: ProfileService route readiness reader must not be nil")
+	}
+	s.routes = r
+	return s
+}
+
+// RouteReadySubjects returns the set of profile codes in tenantID that have an
+// active approval route (approval_routes, subject_kind=document). It is the
+// single place taxonomy names the document subject kind; delivery just does a
+// membership test to fill DocumentProfileItem.has_active_route.
+//
+// Readiness only — taxonomy never sees a route id or any route internals.
+func (s *ProfileService) RouteReadySubjects(ctx context.Context, tenantID string) (map[string]struct{}, error) {
+	if s.routes == nil {
+		return nil, ErrRouteReadinessUnconfigured
+	}
+	keys, err := s.routes.ActiveRouteSubjectKeys(ctx, tenantID, string(approvaldomain.SubjectKindDocument))
+	if err != nil {
+		return nil, fmt.Errorf("taxonomy: read approval route readiness: %w", err)
+	}
+	return keys, nil
 }
 
 // List returns profiles for tenantID, including archived ones when

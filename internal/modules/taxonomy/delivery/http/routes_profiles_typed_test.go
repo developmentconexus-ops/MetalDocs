@@ -13,6 +13,22 @@ import (
 
 type fakeProfileServiceWithItems struct {
 	items []domain.DocumentProfile
+	// routeReady is the set of profile codes reported as having an active
+	// approval route (has_active_route); nil means none.
+	routeReady map[string]struct{}
+	// routeReadyErr simulates an approval-readiness read failure; the handler
+	// must 500 rather than default has_active_route to false.
+	routeReadyErr error
+}
+
+func (f fakeProfileServiceWithItems) RouteReadySubjects(_ context.Context, _ string) (map[string]struct{}, error) {
+	if f.routeReadyErr != nil {
+		return nil, f.routeReadyErr
+	}
+	if f.routeReady == nil {
+		return map[string]struct{}{}, nil
+	}
+	return f.routeReady, nil
 }
 
 func (f fakeProfileServiceWithItems) List(_ context.Context, _ string, _ bool) ([]domain.DocumentProfile, error) {

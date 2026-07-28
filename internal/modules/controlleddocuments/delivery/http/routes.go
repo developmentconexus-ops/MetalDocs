@@ -214,6 +214,43 @@ func (h *Handler) PreviewControlledDocumentCode(w http.ResponseWriter, r *http.R
 	})
 }
 
+// GetControlledDocumentCreationContext handles GET
+// /controlled-documents/creation-context: the create form's pre-flight read
+// model — active profiles annotated with approval-route readiness, plus only
+// the process areas the CALLER holds controlled_documents.create in. The area
+// narrowing is server-side (see application.CreationContext); the client never
+// gets the full catalog to filter.
+func (h *Handler) GetControlledDocumentCreationContext(w http.ResponseWriter, r *http.Request) {
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		h.writeDomainError(w, err)
+		return
+	}
+	cc, err := h.svc.CreationContext(r.Context(), tenantID)
+	if err != nil {
+		h.writeDomainError(w, err)
+		return
+	}
+	resp := controlleddocumentsapi.ControlledDocumentCreationContextResponse{
+		Profiles: make([]controlleddocumentsapi.CreationContextProfileItem, 0, len(cc.Profiles)),
+		Areas:    make([]controlleddocumentsapi.CreationContextAreaItem, 0, len(cc.Areas)),
+	}
+	for _, p := range cc.Profiles {
+		resp.Profiles = append(resp.Profiles, controlleddocumentsapi.CreationContextProfileItem{
+			Code:           p.Code,
+			Name:           p.Name,
+			HasActiveRoute: p.HasActiveRoute,
+		})
+	}
+	for _, a := range cc.Areas {
+		resp.Areas = append(resp.Areas, controlleddocumentsapi.CreationContextAreaItem{
+			Code: a.Code,
+			Name: a.Name,
+		})
+	}
+	httpresponse.WriteJSON(w, http.StatusOK, resp)
+}
+
 // CreateControlledDocumentRevision handles POST
 // /controlled-documents/{id}/revisions: creates a new document revision
 // for an existing active controlled document. Requires an
@@ -479,6 +516,13 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 		httpresponse.WriteError(w, http.StatusConflict, "CONTROLLED_DOCUMENT_NOT_ACTIVE", "controlled document is not active")
 	case errors.Is(err, controlleddocumentsdomain.ErrActiveRevisionExists):
 		httpresponse.WriteError(w, http.StatusConflict, "ACTIVE_REVISION_ALREADY_EXISTS", "controlled document already has an active revision")
+	// Hard creation gate (D2): the profile has no active approval route, so the
+	// document could never be submitted. Mirrors the SAME wire contract the
+	// submit path already emits — 409 + "state.approval_route_missing"
+	// (internal/modules/approval/http/errors.go) — so both surfaces are one
+	// contract for the client.
+	case errors.Is(err, controlleddocumentsdomain.ErrApprovalRouteMissing):
+		httpresponse.WriteError(w, http.StatusConflict, "state.approval_route_missing", "profile has no active approval route")
 	case errors.Is(err, controlleddocumentsdomain.ErrCDCodeTaken):
 		httpresponse.WriteError(w, http.StatusConflict, "CONTROLLED_DOCUMENT_CODE_TAKEN", "controlled document code already taken")
 	case errors.Is(err, controlleddocumentsdomain.ErrCDArchivedCodeReuse):
@@ -501,6 +545,8 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 		httpresponse.WriteError(w, http.StatusConflict, "template.artifact_missing", "template artifact missing")
 	case errors.Is(err, application.ErrTemplateArtifactInvariantUnconfigured):
 		httpresponse.WriteError(w, http.StatusInternalServerError, "template.artifact_invariant_unconfigured", "template artifact invariant not configured")
+	case errors.Is(err, application.ErrCreationContextUnconfigured):
+		httpresponse.WriteError(w, http.StatusInternalServerError, "creation_context.unconfigured", "creation context is not configured")
 	case errors.Is(err, application.ErrActorMissing):
 		httpresponse.WriteError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "authentication required")
 	case errors.Is(err, errTenantIDInvalid):

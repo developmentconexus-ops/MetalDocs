@@ -20,6 +20,7 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	oteltrace "go.opentelemetry.io/otel/trace"
 
+	approvaldomain "metaldocs/internal/modules/approval/domain"
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -71,6 +72,22 @@ type ControlledDocumentService struct {
 	areas     AreaReader
 	govLogger taxonomydomain.GovernanceLogger
 	docInit   controlleddocumentsdomain.DocumentInitializer
+
+	// routes is the approval-owned route-readiness port backing the hard
+	// creation gate (D2). Wired post-construction via WithRouteReadinessReader
+	// so the 8-arg NewControlledDocumentService signature (and its ~20 call
+	// sites) stays untouched; the module composition root
+	// (controlleddocuments.New) requires it and panics when absent, so
+	// production can never run ungated. A nil reader here fails CLOSED.
+	routes approvaldomain.RouteReadinessReader
+
+	// Creation-context read model collaborators (GET
+	// /controlled-documents/creation-context). Wired post-construction via
+	// WithCreationContextReaders for the same signature-stability reason as
+	// routes above; CreationContext fails closed when any is nil.
+	profileList ProfileLister
+	areaList    AreaLister
+	areaCaps    iamdomain.AreaCapabilityReader
 
 	// Runtime configuration.
 	now func() time.Time
@@ -183,6 +200,71 @@ func (s *ControlledDocumentService) WithDocumentInitializer(d controlleddocument
 	}
 	s.docInit = d
 	return s
+}
+
+// WithRouteReadinessReader wires the approval-owned route-readiness port
+// post-construction (same builder idiom as WithDocumentInitializer, keeping the
+// NewControlledDocumentService signature stable). The module composition root
+// injects it; when it is absent Create fails closed with
+// ErrApprovalRouteMissing rather than creating an unsubmittable document.
+func (s *ControlledDocumentService) WithRouteReadinessReader(r approvaldomain.RouteReadinessReader) *ControlledDocumentService {
+	if r == nil {
+		panic("controlled_documents: route readiness reader must not be nil")
+	}
+	s.routes = r
+	return s
+}
+
+// WithCreationContextReaders wires the creation-context read model's
+// collaborators post-construction (same builder idiom as
+// WithRouteReadinessReader). All three are required; CreationContext returns
+// ErrCreationContextUnconfigured if any is missing at call time.
+func (s *ControlledDocumentService) WithCreationContextReaders(
+	profiles ProfileLister,
+	areas AreaLister,
+	caps iamdomain.AreaCapabilityReader,
+) *ControlledDocumentService {
+	if profiles == nil {
+		panic("controlled_documents: profile lister must not be nil")
+	}
+	if areas == nil {
+		panic("controlled_documents: area lister must not be nil")
+	}
+	if caps == nil {
+		panic("controlled_documents: area capability reader must not be nil")
+	}
+	s.profileList = profiles
+	s.areaList = areas
+	s.areaCaps = caps
+	return s
+}
+
+// requireActiveApprovalRoute is the hard creation gate (product decision D2):
+// a controlled document may only be created under a profile that already has an
+// active approval route, because without one it could never be submitted for
+// approval (approval/application/submit_service.go raises the same sentinel).
+//
+// It runs INSIDE the create transaction, on the caller's tx, so the readiness it
+// observes is the same snapshot the INSERT commits against. The underlying
+// SELECT is plain and non-recording, which is what makes it safe to run after
+// authz.Require has taken the audit hash-chain advisory lock (HS-PRE-1 bans
+// authz-RECORDING reads inside a lock-holding tx, not plain ones).
+//
+// Fails CLOSED when no reader is wired — mirrors the submit path's nil-resolver
+// guard (approval/application/submit_service.go): a missing dependency is a
+// misconfigured composition root, never a licence to skip governance.
+func (s *ControlledDocumentService) requireActiveApprovalRoute(ctx context.Context, tx *sql.Tx, tenantID, profileCode string) error {
+	if s.routes == nil {
+		return controlleddocumentsdomain.ErrApprovalRouteMissing
+	}
+	ready, err := s.routes.HasActiveRoute(ctx, tx, tenantID, string(approvaldomain.SubjectKindDocument), profileCode)
+	if err != nil {
+		return fmt.Errorf("controlled_documents: check approval route readiness: %w", err)
+	}
+	if !ready {
+		return controlleddocumentsdomain.ErrApprovalRouteMissing
+	}
+	return nil
 }
 
 // Create validates cmd's profile and area are active, resolves the CD
@@ -348,6 +430,10 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 			if err := authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), cmd.ProcessAreaCode); err != nil {
 				return fmt.Errorf("controlled_documents: authz check manual-code create: %w", err)
 			}
+			// Hard creation gate (D2) — same tx, before the insert.
+			if err := s.requireActiveApprovalRoute(ctx, tx, cmd.TenantID, cmd.ProfileCode); err != nil {
+				return err
+			}
 			return s.docs.CreateTx(ctx, tx, doc)
 		}); err != nil {
 			span.RecordError(err)
@@ -424,6 +510,14 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 					return fmt.Errorf("controlled_documents: resolve template version: %w", err)
 				}
 				overrideID = cmd.OverrideTemplateVersionID
+			}
+
+			// Hard creation gate (D2) — after the request-shape validation above
+			// (a 400 must not be masked by a 409) but before the sequence is
+			// consumed and before the insert, so a route-less profile burns no
+			// CD number.
+			if err := s.requireActiveApprovalRoute(ctx, tx, cmd.TenantID, cmd.ProfileCode); err != nil {
+				return err
 			}
 
 			next, err := s.seq.NextAndIncrement(ctx, tx, cmd.TenantID, cmd.ProfileCode, cmd.ProcessAreaCode)

@@ -7,9 +7,11 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 
+	approvaldomain "metaldocs/internal/modules/approval/domain"
 	controlleddocuments "metaldocs/internal/modules/controlleddocuments"
 	"metaldocs/internal/modules/controlleddocuments/application"
 	documentsdomain "metaldocs/internal/modules/documents/domain"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/db"
 )
@@ -33,6 +35,10 @@ func TestModule_New_WithInjectedFakes(t *testing.T) {
 		AreaReader:             fakeAreaReader{},
 		GovernanceLogger:       fakeGovernanceLogger{},
 		TemplateVersionChecker: fakeTemplateVersionChecker{},
+		RouteReadinessReader:   approvaldomain.NoopRouteReadinessReader{},
+		ProfileLister:          fakeProfileLister{},
+		AreaLister:             fakeAreaLister{},
+		AreaCapabilityReader:   iamdomain.NoopAreaCapabilityReader{},
 	})
 
 	if m == nil {
@@ -67,6 +73,10 @@ func TestModule_New_NilGuards(t *testing.T) {
 			AreaReader:             fakeAreaReader{},
 			GovernanceLogger:       fakeGovernanceLogger{},
 			TemplateVersionChecker: fakeTemplateVersionChecker{},
+			RouteReadinessReader:   approvaldomain.NoopRouteReadinessReader{},
+			ProfileLister:          fakeProfileLister{},
+			AreaLister:             fakeAreaLister{},
+			AreaCapabilityReader:   iamdomain.NoopAreaCapabilityReader{},
 		}
 	}
 	assertPanic := func(name string, fn func()) {
@@ -99,6 +109,26 @@ func TestModule_New_NilGuards(t *testing.T) {
 		d.TemplateVersionChecker = nil
 		controlleddocuments.New(d)
 	})
+	assertPanic("nil RouteReadinessReader", func() {
+		d := makeDeps()
+		d.RouteReadinessReader = nil
+		controlleddocuments.New(d)
+	})
+	assertPanic("nil ProfileLister", func() {
+		d := makeDeps()
+		d.ProfileLister = nil
+		controlleddocuments.New(d)
+	})
+	assertPanic("nil AreaLister", func() {
+		d := makeDeps()
+		d.AreaLister = nil
+		controlleddocuments.New(d)
+	})
+	assertPanic("nil AreaCapabilityReader", func() {
+		d := makeDeps()
+		d.AreaCapabilityReader = nil
+		controlleddocuments.New(d)
+	})
 }
 
 // TestModule_New_NilActiveInstanceReader_UsesNoop verifies that a nil
@@ -120,6 +150,10 @@ func TestModule_New_NilActiveInstanceReader_UsesNoop(t *testing.T) {
 		AreaReader:             fakeAreaReader{},
 		GovernanceLogger:       fakeGovernanceLogger{},
 		TemplateVersionChecker: fakeTemplateVersionChecker{},
+		RouteReadinessReader:   approvaldomain.NoopRouteReadinessReader{},
+		ProfileLister:          fakeProfileLister{},
+		AreaLister:             fakeAreaLister{},
+		AreaCapabilityReader:   iamdomain.NoopAreaCapabilityReader{},
 	})
 	if m == nil {
 		t.Fatal("New returned nil with nil ActiveInstanceReader")
@@ -146,9 +180,23 @@ func (fakeAreaReader) GetByCode(_ context.Context, tenantID, code string) (*taxo
 	return &taxonomydomain.ProcessArea{TenantID: tenantID, Code: taxonomydomain.AreaCode(code)}, nil
 }
 
+type fakeProfileLister struct{}
+
+func (fakeProfileLister) ListProfiles(_ context.Context, _ string) ([]taxonomydomain.DocumentProfile, error) {
+	return nil, nil
+}
+
+type fakeAreaLister struct{}
+
+func (fakeAreaLister) ListAreas(_ context.Context, _ string) ([]taxonomydomain.ProcessArea, error) {
+	return nil, nil
+}
+
 type fakeGovernanceLogger struct{}
 
-func (fakeGovernanceLogger) Log(_ context.Context, _ taxonomydomain.GovernanceEvent) error { return nil }
+func (fakeGovernanceLogger) Log(_ context.Context, _ taxonomydomain.GovernanceEvent) error {
+	return nil
+}
 func (fakeGovernanceLogger) LogTx(_ context.Context, _ db.Tx, _ taxonomydomain.GovernanceEvent) error {
 	return nil
 }
@@ -162,6 +210,8 @@ func (fakeTemplateVersionChecker) GetTemplateVersionState(_ context.Context, _, 
 // compile-time interface satisfaction checks
 var _ application.ProfileReader = fakeProfileReader{}
 var _ application.AreaReader = fakeAreaReader{}
+var _ application.ProfileLister = fakeProfileLister{}
+var _ application.AreaLister = fakeAreaLister{}
 var _ taxonomydomain.GovernanceLogger = fakeGovernanceLogger{}
 var _ application.TemplateVersionChecker = fakeTemplateVersionChecker{}
 var _ documentsdomain.ActiveInstanceReader = fakeActiveInstanceReader{}

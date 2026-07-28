@@ -34,6 +34,7 @@ type controlledDocumentService interface {
 	Obsolete(ctx context.Context, tenantID, id string) error
 	Supersede(ctx context.Context, tenantID, id string) error
 	PeekSeq(ctx context.Context, tenantID, profileCode, areaCode string) (int, error)
+	CreationContext(ctx context.Context, tenantID string) (*application.CreationContext, error)
 }
 
 // Handler implements the generated controlled-documents ServerInterface,

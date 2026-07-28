@@ -2342,6 +2342,34 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /controlled-documents/creation-context:
+    get:
+      summary: Pre-flight context for creating a controlled document
+      description: >-
+        Returns everything the create form needs, already narrowed to what the
+        caller may actually do. `profiles` carries the tenant's active document
+        profiles annotated with `has_active_route`, which is false when the
+        profile has no active approval route — creating under such a profile is
+        rejected with 409 `state.approval_route_missing`. `areas` contains ONLY
+        the process areas in which the caller holds
+        `controlled_documents.create`; the filtering is server-side, never a
+        client-side narrowing of a full area catalog.
+      tags: [controlled-documents]
+      operationId: getControlledDocumentCreationContext
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlledDocumentCreationContextResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /controlled-documents/{id}:
     get:
       summary: Get controlled document by ID
@@ -5683,10 +5711,18 @@ components:
             $ref: '#/components/schemas/DocumentFamilyItem'
     DocumentProfileItem:
       type: object
-      required: [code, family_code, name, description, review_interval_days, active_schema_version, workflow_profile, approval_required, retention_days, validity_days, governance_class]
+      required: [code, family_code, name, description, review_interval_days, active_schema_version, workflow_profile, approval_required, retention_days, validity_days, governance_class, has_active_route]
       properties:
         code:
           type: string
+        has_active_route:
+          type: boolean
+          description: >-
+            True when this profile has an active approval route
+            (approval_routes, subject_kind=document). Admin readiness badge:
+            false means documents cannot be created under the profile — the
+            create endpoint rejects it with 409
+            `state.approval_route_missing`.
         family_code:
           type: string
         name:
@@ -6481,6 +6517,42 @@ components:
         area_code: { type: string }
         next_seq: { type: integer, minimum: 1 }
         code: { type: string }
+
+    CreationContextProfileItem:
+      type: object
+      required: [code, name, has_active_route]
+      properties:
+        code: { type: string }
+        name: { type: string }
+        has_active_route:
+          type: boolean
+          description: >-
+            False when the profile has no active approval route; creating a
+            controlled document under it is rejected with 409
+            `state.approval_route_missing`.
+    CreationContextAreaItem:
+      type: object
+      required: [code, name]
+      properties:
+        code: { type: string }
+        name: { type: string }
+    ControlledDocumentCreationContextResponse:
+      type: object
+      required: [profiles, areas]
+      properties:
+        profiles:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreationContextProfileItem'
+        areas:
+          type: array
+          description: >-
+            Process areas in which the caller holds
+            `controlled_documents.create`. Empty means the caller may not create
+            anywhere; the list is computed server-side from the caller's
+            capability grants and is never the full area catalog.
+          items:
+            $ref: '#/components/schemas/CreationContextAreaItem'
 
     ActiveDocumentResponse:
       type: object

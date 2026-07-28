@@ -67,6 +67,14 @@ var (
 	ErrCDCodeRequired           = errors.New("controlled document code must not be empty")
 	ErrCDTitleRequired          = errors.New("controlled document title must not be empty")
 	ErrCDOwnerRequired          = errors.New("controlled document owner user id must not be empty")
+	// ErrApprovalRouteMissing signals the profile a controlled document is
+	// being created under has no active approval route, so the document
+	// could never be submitted for approval. Creation fails CLOSED on this
+	// (product decision D2): no implicit/fallback route, no soft warning.
+	// The HTTP layer maps it to the SAME 409 problem+json code the submit
+	// path already emits — "state.approval_route_missing" (approval/http
+	// errors.go) — so both surfaces speak one wire contract.
+	ErrApprovalRouteMissing = errors.New("controlled document profile has no active approval route")
 )
 
 // NewControlledDocument trims and validates input, returning a sentinel

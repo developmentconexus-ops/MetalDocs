@@ -1012,6 +1012,9 @@ func buildTaxonomyModule(deps bootstrap.APIDependencies) *taxonomy.Module {
 		DB:          deps.SQLDB,
 		TplChecker:  templatesinfra.NewTemplateVersionReader(deps.SQLDB),
 		AuditWriter: deps.AuditWriter,
+		// Approval-owned readiness port for the profile listing's
+		// has_active_route badge (approval owns approval_routes).
+		RouteReadinessReader: approvalrepo.NewRouteReadinessReaderPG(deps.SQLDB),
 	})
 }
 
@@ -1039,6 +1042,16 @@ func buildControlledDocumentsModule(deps bootstrap.APIDependencies) *controlledd
 		// TemplateVersionChecker reads template-version state through the
 		// templates-owned port (M4 F4.2 — H-G reach closed).
 		TemplateVersionChecker: templatesinfra.NewTemplateVersionReader(deps.SQLDB),
+		// RouteReadinessReader is the approval-owned port backing the hard
+		// creation gate (D2) and the creation-context read model. approval owns
+		// approval_routes; CD never touches that table.
+		RouteReadinessReader: approvalrepo.NewRouteReadinessReaderPG(deps.SQLDB),
+		// Creation-context read model: taxonomy catalog listers (same adapter
+		// rationale as ProfileReader/AreaReader above) plus the iam-owned
+		// capability-reach reader that narrows areas server-side.
+		ProfileLister:        cdinfra.NewTaxonomyProfileLister(profileRepo),
+		AreaLister:           cdinfra.NewTaxonomyAreaLister(areaRepo),
+		AreaCapabilityReader: iampg.NewAreaCapabilityReaderPG(deps.SQLDB),
 	})
 }
 

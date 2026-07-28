@@ -28,6 +28,9 @@ type profileService interface {
 	Reclassify(ctx context.Context, tenantID string, profileCode domain.ProfileCode, newClass domain.GovernanceClass, actorID string) error
 	SetDefaultTemplate(ctx context.Context, tenantID string, profileCode domain.ProfileCode, templateVersionID, actorID string) error
 	Archive(ctx context.Context, tenantID string, profileCode domain.ProfileCode, actorID string) error
+	// RouteReadySubjects returns the profile codes with an active approval
+	// route, backing DocumentProfileItem.has_active_route.
+	RouteReadySubjects(ctx context.Context, tenantID string) (map[string]struct{}, error)
 }
 
 type areaService interface {

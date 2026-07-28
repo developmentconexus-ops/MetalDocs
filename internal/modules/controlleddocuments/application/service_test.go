@@ -18,6 +18,52 @@ import (
 	"metaldocs/internal/platform/db"
 )
 
+// fakeRouteReadinessReader stands in for the approval-owned
+// RouteReadinessReader in unit tests. ready controls the D2 creation gate;
+// err (when set) simulates a read failure.
+type fakeRouteReadinessReader struct {
+	ready bool
+	err   error
+	calls int
+
+	// readySet, when non-nil, overrides ready for ActiveRouteSubjectKeys.
+	readySet map[string]struct{}
+
+	// Captured arguments of the last HasActiveRoute call, so the gate's
+	// subject addressing (kind=document, key=profile code) can be asserted.
+	gotTenantID    string
+	gotSubjectKind string
+	gotSubjectKey  string
+	gotExec        db.DB
+}
+
+func (f *fakeRouteReadinessReader) ActiveRouteSubjectKeys(_ context.Context, _, _ string) (map[string]struct{}, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	if f.readySet != nil {
+		return f.readySet, nil
+	}
+	return map[string]struct{}{}, nil
+}
+
+func (f *fakeRouteReadinessReader) HasActiveRoute(_ context.Context, exec db.DB, tenantID, subjectKind, subjectKey string) (bool, error) {
+	f.calls++
+	f.gotExec = exec
+	f.gotTenantID = tenantID
+	f.gotSubjectKind = subjectKind
+	f.gotSubjectKey = subjectKey
+	if f.err != nil {
+		return false, f.err
+	}
+	return f.ready, nil
+}
+
+// routeReady returns a reader that reports every subject as route-ready, for
+// tests whose subject is a create path AFTER the D2 gate. The gate itself has
+// dedicated coverage in creation_gate_test.go.
+func routeReady() *fakeRouteReadinessReader { return &fakeRouteReadinessReader{ready: true} }
+
 func TestNewControlledDocumentService_PanicsOnNilRequiredDependencies(t *testing.T) {
 	validRepo := newFakeControlledDocumentRepository()
 	validSeq := &fakeSequenceAllocator{next: 1}
@@ -69,6 +115,7 @@ func TestCreate_AutoCode(t *testing.T) {
 	logger := &fakeGovernanceLogger{}
 	seq := &fakeSequenceAllocator{next: 1}
 	svc := NewControlledDocumentService(newTxRunner(mockDB), repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, newInvariantReadyDocumentInitializer())
+	svc.WithRouteReadinessReader(routeReady())
 	svc.now = func() time.Time { return time.Date(2026, 4, 21, 10, 0, 0, 0, time.UTC) }
 
 	res, err := svc.Create(authzCtx("tenant-a", "actor-1"), CreateControlledDocumentCmd{
@@ -106,6 +153,7 @@ func TestCreate_ManualCode(t *testing.T) {
 	repo := newFakeControlledDocumentRepository()
 	logger := &fakeGovernanceLogger{}
 	svc := NewControlledDocumentService(newTxRunner(newPermissiveMockDB(t)), repo, &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, newInvariantReadyDocumentInitializer())
+	svc.WithRouteReadinessReader(routeReady())
 
 	res, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:         "tenant-a",
@@ -180,6 +228,7 @@ func TestCreate_UsesControlledDocumentConstructorValidation(t *testing.T) {
 	mock.ExpectRollback()
 
 	svc := NewControlledDocumentService(newTxRunner(mockDB), newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, newInvariantReadyDocumentInitializer())
+	svc.WithRouteReadinessReader(routeReady())
 	_, err = svc.Create(authzCtx("tenant-a", "actor-1"), CreateControlledDocumentCmd{
 		TenantID:        "tenant-a",
 		ProfileCode:     "po",
@@ -230,6 +279,7 @@ func TestCreate_OverrideTemplate_GovernanceEvent(t *testing.T) {
 		"tpl-ovr-1": {status: stringPtr("published"), profileCode: "po"},
 	}}
 	svc := NewControlledDocumentService(newTxRunner(mockDB), repo, &fakeSequenceAllocator{next: 1}, checker, &fakeProfileReader{}, &fakeAreaReader{}, logger, newInvariantReadyDocumentInitializer())
+	svc.WithRouteReadinessReader(routeReady())
 
 	_, err = svc.Create(authzCtx("tenant-a", "actor-1"), CreateControlledDocumentCmd{
 		TenantID:                  "tenant-a",
@@ -559,6 +609,7 @@ func TestControlledDocumentService_Create_AtomicWithDocument(t *testing.T) {
 	}
 
 	svc := NewControlledDocumentService(newTxRunner(db), repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, docInit)
+	svc.WithRouteReadinessReader(routeReady())
 
 	res, err := svc.Create(authzCtx("tenant-a", "actor-1"), CreateControlledDocumentCmd{
 		TenantID:        "tenant-a",

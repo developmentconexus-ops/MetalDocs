@@ -18,6 +18,16 @@ import (
 type fakeProfileService struct {
 	createErr error
 	getErr    error
+	// routeReady is the set of profile codes reported as having an active
+	// approval route (has_active_route); nil means none.
+	routeReady map[string]struct{}
+}
+
+func (f fakeProfileService) RouteReadySubjects(_ context.Context, _ string) (map[string]struct{}, error) {
+	if f.routeReady == nil {
+		return map[string]struct{}{}, nil
+	}
+	return f.routeReady, nil
 }
 
 func (f fakeProfileService) List(ctx context.Context, tenantID string, includeArchived bool) ([]domain.DocumentProfile, error) {
