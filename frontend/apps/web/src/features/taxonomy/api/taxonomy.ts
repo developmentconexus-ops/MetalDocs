@@ -41,6 +41,7 @@ function toDocumentProfile(item: DocumentProfileItem): DocumentProfile {
     ownerUserId: null,
     editableByRole: item.workflow_profile,
     governanceClass: item.governance_class,
+    hasActiveRoute: item.has_active_route,
     archivedAt: null,
     createdAt: "",
   };

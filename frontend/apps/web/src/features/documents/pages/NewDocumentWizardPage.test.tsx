@@ -11,6 +11,29 @@ import type { WizardState } from '../state/wizard.reducer';
 
 const mockNavigate = vi.fn();
 
+// Hoisted so the vi.mock factory below can read it; individual tests swap the
+// returned creation-context payload (e.g. an ineligible seeded profile).
+// beforeEach restores the default — vi.clearAllMocks() only clears call data.
+const { mockCreationContext } = vi.hoisted(() => ({ mockCreationContext: vi.fn() }));
+
+function creationContext(
+  profiles: Array<{ code: string; name: string; has_active_route: boolean }> = [
+    { code: 'PRC', name: 'Procedimento', has_active_route: true },
+  ],
+  areas: Array<{ code: string; name: string }> = [
+    { code: 'TI', name: 'Tecnologia da Informação' },
+  ],
+) {
+  return {
+    data: { profiles, areas },
+    isLoading: false,
+    isError: false,
+    isSuccess: true,
+    error: null,
+    refetch: vi.fn(),
+  };
+}
+
 // Default: URL has step=4 and profile=PRC. Individual tests that need step=1
 // can override via mockReturnValue on useSearchParams.
 vi.mock('react-router-dom', () => ({
@@ -27,6 +50,12 @@ vi.mock('../../../store/auth.store', () => ({
 
 // ── Mock server-state queries ─────────────────────────────────────────────────
 
+// Authority for selectable profiles + caller-narrowed areas (D1+D2).
+vi.mock('../../controlled-documents/queries/useCreationContextQuery', () => ({
+  useCreationContextQuery: () => mockCreationContext(),
+}));
+
+// Display-only enrichment (description / família) for the profile cards.
 vi.mock('../../taxonomy/queries/useProfilesQuery', () => ({
   useProfilesQuery: () => ({
     data: [{ code: 'PRC', name: 'Procedimento', familyCode: 'FAM' }],
@@ -188,6 +217,7 @@ function renderWizardAtConfirmationStep() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockCreationContext.mockReturnValue(creationContext());
 });
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -358,6 +388,38 @@ describe('NewDocumentWizardPage — submit guard via UI', () => {
     });
 
     expect(mockNavigate).not.toHaveBeenCalledWith(expect.stringMatching(/^\/documents\/.+\/edit$/));
+  });
+});
+
+describe('NewDocumentWizardPage — approval-route readiness gate (D1)', () => {
+  it('blocks the whole wizard when the seeded profile has no active route', async () => {
+    // URL seeds ?step=4&profile=PRC. Without this gate the disabled card in
+    // step 1 would be bypassed entirely and the user would reach "Criar
+    // documento" only to eat a 409 state.approval_route_missing.
+    mockCreationContext.mockReturnValue(
+      creationContext([{ code: 'PRC', name: 'Procedimento', has_active_route: false }]),
+    );
+
+    renderWizard();
+
+    expect(screen.queryByTestId('step-confirm')).toBeNull();
+    expect(screen.getByRole('alert').textContent).toContain('não tem rota de aprovação ativa');
+    expect(cdApi.createControlledDocumentAtomic).not.toHaveBeenCalled();
+  });
+
+  it('reaches the confirm step when the seeded profile has an active route', () => {
+    renderWizard();
+
+    expect(screen.getByTestId('step-confirm')).toBeTruthy();
+  });
+
+  it('blocks the wizard when the seeded profile is absent from the creation context', () => {
+    mockCreationContext.mockReturnValue(creationContext([]));
+
+    renderWizard();
+
+    expect(screen.queryByTestId('step-confirm')).toBeNull();
+    expect(screen.getByRole('alert').textContent).toContain('não está mais disponível');
   });
 });
 

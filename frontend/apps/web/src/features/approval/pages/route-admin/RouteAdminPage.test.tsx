@@ -38,6 +38,7 @@ function makeProfile(overrides: Partial<DocumentProfile> = {}): DocumentProfile 
     ownerUserId: null,
     editableByRole: 'admin',
     governanceClass: 'controlado',
+    hasActiveRoute: true,
     archivedAt: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     ...overrides,

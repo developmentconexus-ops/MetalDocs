@@ -63,6 +63,36 @@
   color: var(--text-muted);
 }
 
+/* Ineligible profile (no active approval route). The grid slot holds the
+   disabled card plus its remediation link, stacked — the link cannot live
+   inside the card because SelectableCard renders a disabled <button>. */
+.profileCardBlockedCell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.profileCardBlockedCell > button {
+  flex: 1;
+}
+
+/* "Incompleto — sem rota de aprovação" marker inside the disabled card. */
+.profileBlocked {
+  font-size: var(--font-size-xs);
+  color: var(--warning);
+}
+
+.profileBlockedLink {
+  align-self: flex-start;
+  font-size: var(--font-size-xs-2);
+  color: var(--brand);
+  text-decoration: none;
+}
+
+.profileBlockedLink:hover {
+  text-decoration: underline;
+}
+
 /* Responsive: collapse profile grid at narrow viewports. */
 @media (max-width: 600px) {
   .profileGrid {

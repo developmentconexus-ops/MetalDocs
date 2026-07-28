@@ -73,6 +73,18 @@ export async function createRevision(
   );
 }
 
+// Pre-flight read model for the create-document form. `areas` is ALREADY
+// narrowed server-side to the areas in which the caller holds
+// controlled_documents.create — never re-derive or widen it client-side.
+// `profiles[].has_active_route=false` means creating under that profile is
+// rejected with 409 `state.approval_route_missing`.
+export type CreationContextResponse =
+  components["schemas"]["ControlledDocumentCreationContextResponse"];
+
+export async function fetchCreationContext(): Promise<CreationContextResponse> {
+  return apiFetch<CreationContextResponse>(`${BASE}/creation-context`);
+}
+
 export type PreviewCodeResponse = components["schemas"]["PreviewCodeResponse"];
 
 export async function previewCode(

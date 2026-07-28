@@ -53,6 +53,7 @@ export const QK = {
     activeDocument: (id: string) => ['controlled-documents', 'active-document', id] as const,
     preview: (profileCode: string, areaCode: string) =>
       ['controlled-documents', 'preview', profileCode, areaCode] as const,
+    creationContext: () => ['controlled-documents', 'creation-context'] as const,
   },
   taxonomy: {
     all: ['taxonomy'] as const,

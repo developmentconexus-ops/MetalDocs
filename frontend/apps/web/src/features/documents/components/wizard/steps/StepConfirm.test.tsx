@@ -15,6 +15,7 @@ const profile: DocumentProfile = {
   ownerUserId: null,
   editableByRole: 'admin',
   governanceClass: 'controlado',
+  hasActiveRoute: true,
   archivedAt: null,
   createdAt: '2026-05-19T10:00:00-03:00',
 };

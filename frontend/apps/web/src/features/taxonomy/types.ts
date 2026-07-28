@@ -23,6 +23,12 @@ export interface DocumentProfile {
   ownerUserId: string | null;
   editableByRole: string;
   governanceClass: components["schemas"]["DocumentProfileItem"]["governance_class"];
+  // Approval-route readiness. False means the profile has no active approval
+  // route (approval_routes, subject_kind=document) and creating a controlled
+  // document under it is rejected with 409 `state.approval_route_missing`.
+  // Wire-required on DocumentProfileItem — surfaced as the admin INCOMPLETO
+  // badge and as the wizard's fail-closed profile gate.
+  hasActiveRoute: boolean;
   archivedAt: string | null;
   createdAt: string;
 }

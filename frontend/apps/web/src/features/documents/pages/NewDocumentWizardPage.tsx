@@ -8,8 +8,10 @@ import { useAuthStore } from '../../../store/auth.store';
 import { createControlledDocumentAtomic } from '../../controlled-documents/api/controlledDocuments';
 import type { components } from '../../../lib/api-types';
 import { usePreviewCodeQuery } from '../../controlled-documents/queries/usePreviewCodeQuery';
+import { useCreationContextQuery } from '../../controlled-documents/queries/useCreationContextQuery';
 import { useAreasQuery } from '../queries/useAreasQuery';
 import { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
+import type { DocumentProfile } from '../../taxonomy/types';
 import { useTemplatesByProfileQuery } from '../queries/useTemplatesByProfileQuery';
 import { useBlankTemplateQuery } from '../queries/useBlankTemplateQuery';
 import {
@@ -88,15 +90,52 @@ export function NewDocumentWizardPage(): JSX.Element {
     );
   }, [state.step, setSearchParams]);
 
-  // Server state
-  const profilesQuery = useProfilesQuery();
+  // Server state.
+  //
+  // D1+D2 — /controlled-documents/creation-context is the AUTHORITY for what
+  // this wizard may offer: the selectable profiles (annotated with
+  // approval-route readiness) and the process areas the caller may actually
+  // create into (narrowed server-side from their capability grants). The raw
+  // taxonomy lists below are never the eligibility source:
+  //   * `catalogProfilesQuery` supplies display-only enrichment (description,
+  //     família) that the lean creation-context projection does not carry;
+  //     a missing entry degrades to "—", never to a selectable profile.
+  //   * `areasQuery` (full active catalog) feeds ONLY the restricted-visibility
+  //     picker, which answers "who may READ" — orthogonal to create grants.
+  const creationContextQuery = useCreationContextQuery();
+  const catalogProfilesQuery = useProfilesQuery();
   const areasQuery = useAreasQuery();
   const templatesQuery = useTemplatesByProfileQuery(state.profileCode);
   const blankTemplateQuery = useBlankTemplateQuery();
   const previewCodeQuery = usePreviewCodeQuery(state.profileCode, state.areaCode || null);
 
-  const profiles = profilesQuery.data ?? [];
-  const areas = areasQuery.data ?? [];
+  const profiles = useMemo<DocumentProfile[]>(() => {
+    const enrichment = new Map(
+      (catalogProfilesQuery.data ?? []).map((profile) => [profile.code, profile]),
+    );
+    return (creationContextQuery.data?.profiles ?? []).map((profile) => {
+      const rich = enrichment.get(profile.code);
+      return {
+        code: profile.code,
+        name: profile.name,
+        // Eligibility comes from creation-context only — never from the
+        // enrichment row, so the two sources can never disagree here.
+        hasActiveRoute: profile.has_active_route,
+        familyCode: rich?.familyCode ?? '',
+        description: rich?.description ?? '',
+        reviewIntervalDays: rich?.reviewIntervalDays ?? 0,
+        defaultTemplateVersionId: rich?.defaultTemplateVersionId ?? null,
+        ownerUserId: rich?.ownerUserId ?? null,
+        editableByRole: rich?.editableByRole ?? '',
+        governanceClass: rich?.governanceClass ?? 'controlado',
+        archivedAt: null,
+        createdAt: rich?.createdAt ?? '',
+      };
+    });
+  }, [creationContextQuery.data, catalogProfilesQuery.data]);
+
+  const areas = creationContextQuery.data?.areas ?? [];
+  const visibilityAreas = areasQuery.data ?? [];
   const templates = templatesQuery.data?.templates ?? [];
   const blankTemplate = blankTemplateQuery.data ?? null;
 
@@ -122,9 +161,14 @@ export function NewDocumentWizardPage(): JSX.Element {
   // TanStack Query v5 keeps isSuccess=true after first successful fetch (background refetches
   // use isFetching, not a reset to isSuccess=false), so this condition is stable once true.
   const profileNotFound =
-    profilesQuery.isSuccess &&
+    creationContextQuery.isSuccess &&
     state.profileCode !== null &&
     selectedProfile === null;
+  // D1 fail-closed: `?profile=X&step=3` would otherwise walk straight past the
+  // disabled card in step 1. An ineligible profile blocks the whole wizard, not
+  // just its own card — creating under it is a guaranteed 409.
+  const profileNotSelectable = selectedProfile !== null && !selectedProfile.hasActiveRoute;
+  const profileBlocked = profileNotFound || profileNotSelectable;
 
   function goCancel() {
     navigate('/documents');
@@ -219,10 +263,19 @@ export function NewDocumentWizardPage(): JSX.Element {
 
   return (
     <WizardShell currentStep={state.step} onStepClick={onStepClick}>
-      {state.step === 1 && profileNotFound && (
+      {profileBlocked && (
         <div className="card" role="alert" aria-live="assertive" aria-atomic="true">
-          O perfil pré-selecionado <span className="mono">{state.profileCode}</span> não está mais disponível.
-          {' '}
+          {profileNotSelectable ? (
+            <>
+              O perfil <span className="mono">{state.profileCode}</span> não tem rota de aprovação
+              ativa e não pode receber documentos.
+            </>
+          ) : (
+            <>
+              O perfil pré-selecionado <span className="mono">{state.profileCode}</span> não está
+              mais disponível.
+            </>
+          )}{' '}
           <button
             type="button"
             className="btn btn-sm"
@@ -232,28 +285,29 @@ export function NewDocumentWizardPage(): JSX.Element {
           </button>
         </div>
       )}
-      {state.step === 1 && !profileNotFound && (
+      {!profileBlocked && state.step === 1 && (
         <StepProfile
           profiles={profiles}
-          isLoading={profilesQuery.isLoading}
-          isError={profilesQuery.isError}
-          error={profilesQuery.error}
+          isLoading={creationContextQuery.isLoading}
+          isError={creationContextQuery.isError}
+          error={creationContextQuery.error}
           selectedCode={state.profileCode}
           onSelect={(code) => dispatch({ type: 'selectProfile', code })}
           onAdvance={goAdvance}
           onCancel={goCancel}
           advanceDisabled={!canAdvance(state)}
-          onRetry={() => void profilesQuery.refetch()}
+          onRetry={() => void creationContextQuery.refetch()}
         />
       )}
-      {state.step === 2 && (
+      {!profileBlocked && state.step === 2 && (
         <StepAreaCodeVisibility
           profile={selectedProfile}
           areas={areas}
-          isAreasLoading={areasQuery.isLoading}
-          isAreasError={areasQuery.isError}
-          areasError={areasQuery.error}
-          onAreasRetry={() => void areasQuery.refetch()}
+          visibilityAreas={visibilityAreas}
+          isAreasLoading={creationContextQuery.isLoading}
+          isAreasError={creationContextQuery.isError}
+          areasError={creationContextQuery.error}
+          onAreasRetry={() => void creationContextQuery.refetch()}
           areaCode={state.areaCode}
           title={state.title}
           visibility={state.visibility}
@@ -274,7 +328,7 @@ export function NewDocumentWizardPage(): JSX.Element {
           advanceDisabled={!canAdvance(state)}
         />
       )}
-      {state.step === 3 && (
+      {!profileBlocked && state.step === 3 && (
         <StepTemplate
           profileLabel={
             selectedProfile ? `Perfil ${selectedProfile.code} — ${selectedProfile.name}` : 'Perfil'
@@ -298,7 +352,7 @@ export function NewDocumentWizardPage(): JSX.Element {
           advanceDisabled={!canAdvance(state)}
         />
       )}
-      {state.step === 4 && (
+      {!profileBlocked && state.step === 4 && (
         <StepConfirm
           profile={selectedProfile}
           area={selectedArea}
@@ -311,6 +365,7 @@ export function NewDocumentWizardPage(): JSX.Element {
           blankTemplateName={blankTemplate?.name ?? 'Em branco'}
           previewCode={previewCodeQuery.data?.code ?? null}
           previewCodeLoading={previewCodeQuery.isLoading}
+          previewCodeError={previewCodeQuery.isError}
           authorDisplayName={currentUser?.displayName ?? ''}
           createdAt={new Date()}
           consent={state.consent}

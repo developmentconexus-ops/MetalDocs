@@ -11,7 +11,10 @@ describe('formatCodePreview', () => {
       profileCode: null,
       areaCode: null,
     });
-    expect(result).toBe(`${CODE_PLACEHOLDER}-${CODE_PLACEHOLDER}-${CODE_PLACEHOLDER}`);
+    expect(result).toEqual({
+      text: `${CODE_PLACEHOLDER}-${CODE_PLACEHOLDER}-${CODE_PLACEHOLDER}`,
+      state: 'unselected',
+    });
   });
 
   it('returns profileCode-areaCode-… when ready and loading', () => {
@@ -22,7 +25,7 @@ describe('formatCodePreview', () => {
       profileCode: 'POP',
       areaCode: 'GENERAL',
     });
-    expect(result).toBe('POP-GENERAL-…');
+    expect(result).toEqual({ text: 'POP-GENERAL-…', state: 'loading' });
   });
 
   it('returns the code verbatim when ready, not loading, and code is present', () => {
@@ -33,7 +36,7 @@ describe('formatCodePreview', () => {
       profileCode: 'POP',
       areaCode: 'GENERAL',
     });
-    expect(result).toBe('POP-GENERAL-042');
+    expect(result).toEqual({ text: 'POP-GENERAL-042', state: 'ready' });
   });
 
   it('returns profileCode-areaCode-??? when ready, not loading, and code is null', () => {
@@ -44,6 +47,50 @@ describe('formatCodePreview', () => {
       profileCode: 'POP',
       areaCode: 'GENERAL',
     });
-    expect(result).toBe(`POP-GENERAL-${CODE_PLACEHOLDER}`);
+    expect(result).toEqual({
+      text: `POP-GENERAL-${CODE_PLACEHOLDER}`,
+      state: 'unavailable',
+    });
+  });
+
+  // F-QA4-1: a failed preview must be distinguishable from "nothing selected"
+  // and from "still loading" — all three used to collapse into the ??? text.
+  it('reports the error state when the preview-code query failed', () => {
+    const result = formatCodePreview({
+      ready: true,
+      isLoading: false,
+      isError: true,
+      code: null,
+      profileCode: 'POP',
+      areaCode: 'GENERAL',
+    });
+    expect(result).toEqual({
+      text: `POP-GENERAL-${CODE_PLACEHOLDER}`,
+      state: 'error',
+    });
+  });
+
+  it('keeps loading distinct from error while the query is still in flight', () => {
+    const result = formatCodePreview({
+      ready: true,
+      isLoading: true,
+      isError: true,
+      code: null,
+      profileCode: 'POP',
+      areaCode: 'GENERAL',
+    });
+    expect(result.state).toBe('loading');
+  });
+
+  it('prefers the error state over a stale resolved code', () => {
+    const result = formatCodePreview({
+      ready: true,
+      isLoading: false,
+      isError: true,
+      code: 'POP-GENERAL-042',
+      profileCode: 'POP',
+      areaCode: 'GENERAL',
+    });
+    expect(result.state).toBe('error');
   });
 });

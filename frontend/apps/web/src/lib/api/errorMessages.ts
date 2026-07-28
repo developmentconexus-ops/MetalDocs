@@ -119,7 +119,11 @@ export const errorMessages: Record<string, string> = {
   'signoff.not_eligible': 'Você não está elegível para assinar esta etapa.',
   'sod.cross_stage_duplicate': 'Este usuário já assinou em outra etapa e não pode assinar novamente.',
   'sod.submitter_cannot_sign': 'Você submeteu este documento e não pode aprová-lo. Outro usuário precisa assinar.',
-  'state.approval_route_missing': 'Nenhuma rota de aprovação configurada para este documento.',
+  // Emitted by BOTH the submit-for-approval path and (since the Etapa 1 create
+  // hard gate) the controlled-document create path — the message must read
+  // correctly for either, hence "perfil" rather than "documento".
+  'state.approval_route_missing':
+    'Perfil sem rota de aprovação ativa — configure a rota antes de submeter.',
   'state.instance_completed': 'Este fluxo já foi concluído.',
   'state.route_inactive': 'Esta rota está inativa e não pode ser usada.',
   'validation.effective_to_not_after_effective_from':

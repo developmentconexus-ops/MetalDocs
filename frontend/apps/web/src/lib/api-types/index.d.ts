@@ -1161,6 +1161,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/controlled-documents/creation-context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pre-flight context for creating a controlled document
+         * @description Returns everything the create form needs, already narrowed to what the caller may actually do. `profiles` carries the tenant's active document profiles annotated with `has_active_route`, which is false when the profile has no active approval route — creating under such a profile is rejected with 409 `state.approval_route_missing`. `areas` contains ONLY the process areas in which the caller holds `controlled_documents.create`; the filtering is server-side, never a client-side narrowing of a full area catalog.
+         */
+        get: operations["getControlledDocumentCreationContext"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/controlled-documents/{id}": {
         parameters: {
             query?: never;
@@ -2816,6 +2836,8 @@ export interface components {
         };
         DocumentProfileItem: {
             code: string;
+            /** @description True when this profile has an active approval route (approval_routes, subject_kind=document). Admin readiness badge: false means documents cannot be created under the profile — the create endpoint rejects it with 409 `state.approval_route_missing`. */
+            has_active_route: boolean;
             family_code: string;
             name: string;
             alias?: string;
@@ -3316,6 +3338,21 @@ export interface components {
             area_code: string;
             next_seq: number;
             code: string;
+        };
+        CreationContextProfileItem: {
+            code: string;
+            name: string;
+            /** @description False when the profile has no active approval route; creating a controlled document under it is rejected with 409 `state.approval_route_missing`. */
+            has_active_route: boolean;
+        };
+        CreationContextAreaItem: {
+            code: string;
+            name: string;
+        };
+        ControlledDocumentCreationContextResponse: {
+            profiles: components["schemas"]["CreationContextProfileItem"][];
+            /** @description Process areas in which the caller holds `controlled_documents.create`. Empty means the caller may not create anywhere; the list is computed server-side from the caller's capability grants and is never the full area catalog. */
+            areas: components["schemas"]["CreationContextAreaItem"][];
         };
         ActiveDocumentResponse: {
             /** Format: uuid */
@@ -6244,6 +6281,29 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getControlledDocumentCreationContext: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ControlledDocumentCreationContextResponse"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             500: components["responses"]["InternalServerError"];

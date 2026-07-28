@@ -92,6 +92,27 @@
   font-size: var(--font-size-xs);
 }
 
+/* Approval-route readiness marker, rendered under the active/archived status.
+   Column layout so the INCOMPLETO pill and its optional shortcut stack instead
+   of widening the Status column. */
+.readinessCell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin-top: var(--sp-1);
+}
+
+.readinessLink {
+  font-size: var(--font-size-xs-2);
+  color: var(--brand);
+  text-decoration: none;
+}
+
+.readinessLink:hover {
+  text-decoration: underline;
+}
+
 .actionButton {
   padding: 3px var(--sp-2);
   font-size: var(--font-size-xs-2);

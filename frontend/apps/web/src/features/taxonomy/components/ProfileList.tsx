@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import type { DocumentProfile } from "../types";
 import { useArchiveProfileMutation } from "../queries/useTaxonomyMutations";
+import { useHasCapability } from "../../iam/hooks/useHasCapability";
 import { ProfileEditDialog } from "./ProfileEditDialog";
 import { resolveErrorMessage } from "../../../lib/api/problem";
 import styles from "./TaxonomyList.module.css";
@@ -16,6 +18,10 @@ export function ProfileList({ profiles, includeArchived, onToggleArchived }: Pro
   const [selectedProfile, setSelectedProfile] = useState<DocumentProfile | undefined>(undefined);
   const [actionError, setActionError] = useState("");
   const archiveMutation = useArchiveProfileMutation();
+  // Affordance gate only — the "Configurar rota" shortcut points at a route the
+  // AppShell guard would bounce without this capability. Capabilities, never
+  // roles (ADR 0022); the backend stays the sole authz enforcer.
+  const canManageRoutes = useHasCapability("route.manage");
 
   function openCreate() {
     setSelectedProfile(undefined);
@@ -91,6 +97,24 @@ export function ProfileList({ profiles, includeArchived, onToggleArchived }: Pro
                   <span className={styles.statusArchived}>Arquivado</span>
                 ) : (
                   <span className={styles.statusActive}>Ativo</span>
+                )}
+                {/* Readiness is orthogonal to archived/active: an ACTIVE profile
+                    with no active approval route cannot receive documents at all
+                    (create rejects with 409 state.approval_route_missing). */}
+                {!profile.archivedAt && !profile.hasActiveRoute && (
+                  <span className={styles.readinessCell}>
+                    <span
+                      className="pill pill-review"
+                      title="Sem rota de aprovação ativa"
+                    >
+                      INCOMPLETO
+                    </span>
+                    {canManageRoutes && (
+                      <Link to="/approval-routes" className={styles.readinessLink}>
+                        Configurar rota
+                      </Link>
+                    )}
+                  </span>
                 )}
               </td>
               <td className={styles.cellActions}>

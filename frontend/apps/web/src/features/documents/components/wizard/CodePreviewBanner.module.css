@@ -22,3 +22,11 @@
   color: var(--brand);
   letter-spacing: 0.02em;
 }
+
+/* Failed preview-code lookup. Same slot as .code so the banner does not jump,
+   danger tone so the failure never reads as a resolved code. */
+.errorText {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--danger);
+}

@@ -1,7 +1,7 @@
 import { CodeChip } from '../../../../../components/ui/CodeChip';
 import { StatusPill } from '../../../../../components/ui/StatusPill';
 import { InlineAlert } from '../../../../../components/ui/InlineAlert';
-import type { DocumentProfile, ProcessArea } from '../../../../taxonomy/types';
+import type { DocumentProfile } from '../../../../taxonomy/types';
 import type { TemplateDTO } from '../../../../templates';
 import { VISIBILITY_META, type VisibilityKey } from '../../../lib/visibilityMeta';
 import { DocPaperPreview } from '../DocPaperPreview';
@@ -14,7 +14,9 @@ type SummaryField = { label: string; value: string };
 
 export type StepConfirmProps = {
   profile: DocumentProfile | null;
-  area: ProcessArea | null;
+  // Only code+name are read here, so the caller-narrowed creation-context area
+  // (which carries nothing else) is a valid input; `ProcessArea` still fits.
+  area: { code: string; name: string } | null;
   title: string;
   visibility: VisibilityKey;
   visibilityAreaCodes: string[];
@@ -24,6 +26,7 @@ export type StepConfirmProps = {
   blankTemplateName?: string;
   previewCode: string | null;
   previewCodeLoading: boolean;
+  previewCodeError?: boolean;
   authorDisplayName: string;
   createdAt: Date;
   consent: boolean;
@@ -49,6 +52,7 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
     blankTemplateName = 'Em branco',
     previewCode,
     previewCodeLoading,
+    previewCodeError = false,
     authorDisplayName,
     createdAt,
     consent,
@@ -61,13 +65,16 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
     submitDisabled,
   } = props;
 
+  // `.text` is always code-shaped, so it stays safe to interpolate into the
+  // consent/reservation prose below regardless of the query's outcome.
   const codePreview = formatCodePreview({
     ready: profile != null && area != null,
     isLoading: previewCodeLoading,
+    isError: previewCodeError,
     code: previewCode,
     profileCode: profile?.code ?? null,
     areaCode: area?.code ?? null,
-  });
+  }).text;
   const revisionCode = formatRevisionCode(0);
   const visibilityLabel = buildVisibilityLabel(visibility, visibilityAreaCodes, inviteeCount);
   const profileLabel = profile ? `${profile.code} — ${profile.name}` : '—';

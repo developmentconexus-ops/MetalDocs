@@ -13,9 +13,27 @@ import { PeopleSubcontrols } from './PeopleSubcontrols';
 import { ExternalSubcontrols } from './ExternalSubcontrols';
 import styles from './StepAreaCodeVisibility.module.css';
 
+/**
+ * Minimal shape the wizard's area affordances need. Deliberately narrower than
+ * `ProcessArea` so the caller-narrowed creation-context list (which carries
+ * only code+name) is a first-class input; `ProcessArea` remains assignable.
+ */
+export type WizardAreaOption = { code: string; name: string };
+
 export type StepAreaCodeVisibilityProps = {
   profile: DocumentProfile | null;
-  areas: ProcessArea[];
+  /**
+   * Areas the caller may CREATE in — server-narrowed by
+   * /controlled-documents/creation-context. Never the raw taxonomy catalog.
+   */
+  areas: WizardAreaOption[];
+  /**
+   * Full active taxonomy catalog, used only by the restricted-visibility
+   * picker. Visibility answers "who may READ this document", which is
+   * orthogonal to the author's create grants — narrowing this to `areas` would
+   * silently forbid sharing with areas the author cannot create in.
+   */
+  visibilityAreas: ProcessArea[];
   isAreasLoading: boolean;
   isAreasError: boolean;
   areasError: unknown;
@@ -44,6 +62,7 @@ export function StepAreaCodeVisibility(props: StepAreaCodeVisibilityProps): JSX.
   const {
     profile,
     areas,
+    visibilityAreas,
     isAreasLoading,
     isAreasError,
     areasError,
@@ -108,11 +127,12 @@ export function StepAreaCodeVisibility(props: StepAreaCodeVisibilityProps): JSX.
               </button>
             </div>
           ) : areas.length === 0 ? (
-            <div>
-              <div className="caption">Nenhuma área cadastrada.</div>
-              <a className="btn btn-sm" href="/taxonomy/areas">
-                Cadastrar área
-              </a>
+            // D2: the list is already server-narrowed to areas where the caller
+            // holds controlled_documents.create, so empty means "you may not
+            // create anywhere" — not "the tenant has no areas". Never render a
+            // silently empty dropdown here.
+            <div role="status" className="caption">
+              Você não tem permissão de criação em nenhuma área.
             </div>
           ) : (
             <SelectMenu
@@ -173,7 +193,7 @@ export function StepAreaCodeVisibility(props: StepAreaCodeVisibilityProps): JSX.
 
       {visibility === 'area' ? (
         <AreaVisibilitySubcontrols
-          areas={areas}
+          areas={visibilityAreas}
           documentAreaCode={areaCode}
           selectedCodes={visibilityAreaCodes}
           onSetAreaCodes={onSetVisibilityAreas}

@@ -1,9 +1,13 @@
 import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TaxonomyAdminPage } from './TaxonomyAdminPage';
+import * as taxonomyApi from '../api/taxonomy';
+import type { DocumentProfile } from '../types';
+import { useAuthStore } from '../../../store/auth.store';
 
 vi.mock('../api/taxonomy', () => ({
   fetchFamilies: vi.fn().mockResolvedValue([
@@ -26,8 +30,42 @@ vi.mock('../api/taxonomy', () => ({
 function wrap() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return ({ children }: { children: React.ReactNode }) =>
-    React.createElement(QueryClientProvider, { client: qc }, children);
+    React.createElement(
+      QueryClientProvider,
+      { client: qc },
+      React.createElement(MemoryRouter, null, children),
+    );
 }
+
+function makeProfile(overrides: Partial<DocumentProfile> = {}): DocumentProfile {
+  return {
+    code: 'PRC',
+    familyCode: 'sop',
+    name: 'Procedimento',
+    description: '',
+    reviewIntervalDays: 365,
+    defaultTemplateVersionId: null,
+    ownerUserId: null,
+    editableByRole: 'admin',
+    governanceClass: 'controlado',
+    hasActiveRoute: true,
+    archivedAt: null,
+    createdAt: '',
+    ...overrides,
+  };
+}
+
+async function openProfilesTab() {
+  render(React.createElement(TaxonomyAdminPage), { wrapper: wrap() });
+  await waitFor(() => expect(screen.getByText('Standard Operating Procedure')).toBeTruthy());
+  fireEvent.click(screen.getByRole('tab', { name: 'Perfis' }));
+}
+
+afterEach(() => {
+  useAuthStore.setState({ user: null });
+  // Module-level mockResolvedValue persists across tests in this file.
+  vi.mocked(taxonomyApi.fetchProfiles).mockResolvedValue([]);
+});
 
 describe('TaxonomyAdminPage', () => {
   it('renders the families tab with fetched data by default', async () => {
@@ -45,6 +83,53 @@ describe('TaxonomyAdminPage', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Perfis' }));
 
     await waitFor(() => expect(screen.getByText('Nenhum perfil encontrado.')).toBeTruthy());
+  });
+
+  it('badges an active profile that has no active approval route as INCOMPLETO', async () => {
+    vi.mocked(taxonomyApi.fetchProfiles).mockResolvedValue([
+      makeProfile({ code: 'PRC', name: 'Procedimento', hasActiveRoute: false }),
+    ]);
+
+    await openProfilesTab();
+
+    const badge = await screen.findByText('INCOMPLETO');
+    expect(badge).toHaveAttribute('title', 'Sem rota de aprovação ativa');
+  });
+
+  it('does not badge a profile whose approval route is active', async () => {
+    vi.mocked(taxonomyApi.fetchProfiles).mockResolvedValue([
+      makeProfile({ code: 'PRC', hasActiveRoute: true }),
+    ]);
+
+    await openProfilesTab();
+
+    await waitFor(() => expect(screen.getByText('Procedimento')).toBeTruthy());
+    expect(screen.queryByText('INCOMPLETO')).toBeNull();
+  });
+
+  it('offers the route shortcut only to users holding route.manage', async () => {
+    useAuthStore.setState({
+      user: { userId: 'user-1', capabilities: ['route.manage'] } as never,
+    });
+    vi.mocked(taxonomyApi.fetchProfiles).mockResolvedValue([
+      makeProfile({ hasActiveRoute: false }),
+    ]);
+
+    await openProfilesTab();
+
+    const link = await screen.findByRole('link', { name: 'Configurar rota' });
+    expect(link).toHaveAttribute('href', '/approval-routes');
+  });
+
+  it('hides the route shortcut without route.manage', async () => {
+    vi.mocked(taxonomyApi.fetchProfiles).mockResolvedValue([
+      makeProfile({ hasActiveRoute: false }),
+    ]);
+
+    await openProfilesTab();
+
+    await screen.findByText('INCOMPLETO');
+    expect(screen.queryByRole('link', { name: 'Configurar rota' })).toBeNull();
   });
 
   it('switches to the areas tab and shows the empty state', async () => {
