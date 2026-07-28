@@ -14,6 +14,14 @@ const APPROVAL_BADGE_LABELS: Record<string, string> = {
 
 const MAX_COLLAPSED_HISTORY_ITEMS = 3;
 
+/**
+ * Honest-absence marker. NEVER render a value-shaped placeholder (the old
+ * `---`) for a fact the API does carry — F-QA4-4. When the adapter supplies an
+ * absence reason it becomes the `title` tooltip so the reader learns WHY the
+ * field is empty instead of assuming the screen is broken.
+ */
+const EM_DASH = "—";
+
 function formatPageSizeSummary(pageCount: number | null, fileSizeBytes: number | null): string | null {
   const parts: string[] = [];
   if (typeof pageCount === "number" && Number.isFinite(pageCount) && pageCount > 0) {
@@ -23,6 +31,34 @@ function formatPageSizeSummary(pageCount: number | null, fileSizeBytes: number |
     parts.push(formatFileSize(fileSizeBytes));
   }
   return parts.length ? parts.join(" · ") : null;
+}
+
+/**
+ * One `label: value` identification row. Renders the real value when present,
+ * otherwise an em-dash carrying the adapter-supplied absence reason as its
+ * tooltip.
+ */
+function MetaRow({
+  label,
+  value,
+  absenceReason,
+}: {
+  label: string;
+  value: string | null;
+  absenceReason?: string;
+}) {
+  return (
+    <div className={styles.metaRow}>
+      <span className={styles.metaLabel}>{label}</span>
+      {value ? (
+        <span className={styles.metaValue}>{value}</span>
+      ) : (
+        <span className={styles.metaValue} title={absenceReason} data-absent="true">
+          {EM_DASH}
+        </span>
+      )}
+    </div>
+  );
 }
 
 interface ArtifactMetaSidebarProps {
@@ -61,6 +97,7 @@ export function ArtifactMetaSidebar({
 }: ArtifactMetaSidebarProps) {
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const pageSizeSummary = formatPageSizeSummary(meta.pageCount, meta.fileSizeBytes);
+  const absenceReasons = meta.absenceReasons ?? {};
   const recentNonCurrentHistory = [...lineage]
     .filter((item) => !item.isCurrent)
     .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
@@ -107,23 +144,15 @@ export function ArtifactMetaSidebar({
                       <span className={styles.metaCode}>{code}</span>
                     </div>
                   ) : null}
-                  <div className={styles.metaRow}>
-                    <span className={styles.metaLabel}>Tipo</span>
-                    <span className={styles.metaValue}>{meta.profileLabel ?? "---"}</span>
-                  </div>
-                  <div className={styles.metaRow}>
-                    <span className={styles.metaLabel}>Área responsável</span>
-                    <span className={styles.metaValue}>{meta.areaLabel ?? "---"}</span>
-                  </div>
-                  <div className={styles.metaRow}>
-                    <span className={styles.metaLabel}>Visibilidade</span>
-                    <span className={styles.metaValue}>{meta.visibilityLabel ?? "---"}</span>
-                  </div>
-                  {pageSizeSummary ? (
-                    <div className={styles.metaRow}>
-                      <span className={styles.metaLabel}>Páginas</span>
-                      <span className={styles.metaValue}>{pageSizeSummary}</span>
-                    </div>
+                  <MetaRow label="Tipo" value={meta.profileLabel} absenceReason={absenceReasons.profileLabel} />
+                  <MetaRow label="Área responsável" value={meta.areaLabel} absenceReason={absenceReasons.areaLabel} />
+                  <MetaRow label="Visibilidade" value={meta.visibilityLabel} absenceReason={absenceReasons.visibilityLabel} />
+                  {/* The pages row stays hidden for kinds that carry no file
+                      metadata at all (templates); documents that legitimately
+                      have no page count yet supply an absence reason instead,
+                      so the row appears with an explained em-dash. */}
+                  {pageSizeSummary || absenceReasons.pageCount ? (
+                    <MetaRow label="Páginas" value={pageSizeSummary} absenceReason={absenceReasons.pageCount} />
                   ) : null}
                 </div>
               )}

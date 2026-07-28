@@ -2,15 +2,16 @@
 // Inputs are RFC3339 strings (or null/undefined for missing data); outputs are
 // display strings with em-dash fallback so the page never renders "Invalid Date".
 
+import type { components } from '../../../lib/api-types';
+
 const EM_DASH = '—';
 
 export const DEFAULT_INITIAL_REVISION_TITLE = 'Criação do documento';
 
-type ControlledDocumentVisibility = {
-  scope: 'company' | 'restricted';
-  area_codes: string[];
-  user_ids: string[];
-};
+// ADR 0035 discipline: the visibility shape comes from the generated contract
+// types, never a hand-synced local mirror (the previous inline literal silently
+// drifted from `ControlledDocumentVisibility` in the spec).
+type ControlledDocumentVisibility = components['schemas']['ControlledDocumentVisibility'];
 
 export function hasSettledSidebarIdentity(input: {
   code: string | null | undefined;

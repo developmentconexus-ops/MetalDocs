@@ -92,6 +92,27 @@ export interface ArtifactHeroModel {
 // ---------------------------------------------------------------------------
 
 /**
+ * Identification fields that can carry an explicit "why this is absent" note.
+ * Keys are a subset of `ArtifactMetaModel` field names.
+ */
+export type ArtifactMetaAbsenceField =
+  | "profileLabel"
+  | "areaLabel"
+  | "visibilityLabel"
+  | "pageCount";
+
+/**
+ * Per-field explanation for identification values the API genuinely does not
+ * carry in the artifact's current state.
+ *
+ * The renderer shows an em-dash with this text as the `title` tooltip — an
+ * honest, explained absence instead of a silent placeholder (F-QA4-4). Adapters
+ * that have no explanation simply omit the key; the field then keeps its default
+ * rendering (row hidden, or bare em-dash).
+ */
+export type ArtifactMetaAbsenceReasons = Partial<Record<ArtifactMetaAbsenceField, string>>;
+
+/**
  * Profile / visibility / file-info metadata rendered in the artifact sidebar.
  *
  * All fields are nullable: documents may lack some metadata; templates have no
@@ -121,6 +142,12 @@ export interface ArtifactMetaModel {
    *  this is the per-status copy (e.g. "substituído · publicado em 19 de maio de 2026").
    *  Null for kinds with no governed descriptor. */
   ownerDescriptor: string | null;
+  /**
+   * Optional per-field absence explanations (see `ArtifactMetaAbsenceReasons`).
+   * Omitted by adapters that have nothing to explain — the renderer then keeps
+   * its default treatment for the missing value.
+   */
+  absenceReasons?: ArtifactMetaAbsenceReasons;
 }
 
 // ---------------------------------------------------------------------------

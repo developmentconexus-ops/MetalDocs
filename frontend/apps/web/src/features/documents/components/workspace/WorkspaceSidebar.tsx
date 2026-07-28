@@ -11,6 +11,8 @@ import type { FastForwardOffer } from '../../../approval/lib/fastForwardOffer';
 import { mapApprovalChain } from '../../lib/approvalWorkflow';
 import { formatRevisionCode } from '../../../../lib/labels/revisionCode';
 import { parseDocumentStatus } from '../../lib/parseDocumentStatus';
+import { useDocumentIdentityMeta } from '../../adapters/useDocumentIdentityMeta';
+import { useDocumentRevisionHistoryQuery } from '../../queries/useDocumentRevisionHistoryQuery';
 import type { DocumentDetail } from '../../api/documents';
 import styles from './WorkspaceSidebar.module.css';
 
@@ -76,14 +78,15 @@ export function WorkspaceSidebar({
 }: WorkspaceSidebarProps) {
   const [metaOpen, setMetaOpen] = useState(true);
 
+  // F-QA4-4 — profile / area / visibility come from live query data
+  // (taxonomy lists + the controlled document), not from a hardcoded null.
+  const identity = useDocumentIdentityMeta(doc);
+  const revisionHistoryQuery = useDocumentRevisionHistoryQuery(documentId);
+
   const meta: ArtifactMetaModel = {
-    // Reduced surface:
-    // profile/area/visibility require the taxonomy queries the editor page
-    // composes — out of scope for this thin owner. Honest omission (null),
-    // never fabricated.
-    profileLabel: null,
-    areaLabel: null,
-    visibilityLabel: null,
+    profileLabel: identity.profileLabel,
+    areaLabel: identity.areaLabel,
+    visibilityLabel: identity.visibilityLabel,
     fileSizeBytes: doc.current_revision_file_size_bytes ?? null,
     pageCount: doc.current_revision_page_count ?? null,
     createdAt: doc.created_at ?? null,
@@ -91,22 +94,35 @@ export function WorkspaceSidebar({
     nextReviewAt: doc.review_due_at ?? null,
     ownerName: doc.created_by ?? null,
     ownerDescriptor: null,
+    absenceReasons: identity.absenceReasons,
   };
 
-  // Single-entry lineage from the loaded document itself (no revision-history
-  // query in S2a — the embedded panel still gets an honest "current" row
-  // instead of an empty list).
-  const lineage: VersionHistoryItem[] = [
-    {
-      versionNumber: doc.revision_number ?? 0,
-      revisionNumber: doc.revision_number ?? null,
-      revisionLabel: formatRevisionCode(doc.revision_number),
-      status: parseDocumentStatus(doc.status),
-      title: doc.name ?? null,
-      createdAt: doc.created_at ?? null,
-      isCurrent: true,
-    },
-  ];
+  // Real revision lineage from GET /documents/{id}/revision-history. Until it
+  // resolves (or when it fails) the panel still shows the honest single
+  // "current" row derived from the already-loaded document — same data, no
+  // fabrication, just a narrower view.
+  const historyItems = revisionHistoryQuery.data?.items ?? [];
+  const lineage: VersionHistoryItem[] = historyItems.length
+    ? historyItems.map((item) => ({
+        versionNumber: item.revision_number ?? 0,
+        revisionNumber: item.revision_number ?? null,
+        revisionLabel: formatRevisionCode(item.revision_number),
+        status: parseDocumentStatus(item.status),
+        title: item.revision_title || null,
+        createdAt: item.created_at ?? null,
+        isCurrent: Boolean(item.is_current),
+      }))
+    : [
+        {
+          versionNumber: doc.revision_number ?? 0,
+          revisionNumber: doc.revision_number ?? null,
+          revisionLabel: formatRevisionCode(doc.revision_number),
+          status: parseDocumentStatus(doc.status),
+          title: doc.revision_title || doc.name || null,
+          createdAt: doc.created_at ?? null,
+          isCurrent: true,
+        },
+      ];
 
   const approvalChain = instance ? mapApprovalChain(instance.stages) : null;
 

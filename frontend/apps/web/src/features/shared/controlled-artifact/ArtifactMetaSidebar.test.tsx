@@ -30,6 +30,7 @@ describe("ArtifactMetaSidebar", () => {
 
     expect(screen.getByText("Carregando metadados")).toBeInTheDocument();
     expect(screen.queryByText("---")).not.toBeInTheDocument();
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
     expect(screen.queryByText("pop")).not.toBeInTheDocument();
     expect(screen.queryByText("general")).not.toBeInTheDocument();
   });
@@ -260,6 +261,35 @@ describe("ArtifactMetaSidebar", () => {
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("Identificação")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Identificação do artefato")).not.toBeInTheDocument();
+  });
+
+  it("renders an explained em-dash (never the old `---`) for absent identification values", () => {
+    const meta: ArtifactMetaModel = {
+      ...emptyMeta,
+      absenceReasons: {
+        profileLabel: "Sem perfil no snapshot.",
+        areaLabel: "Sem área no snapshot.",
+        visibilityLabel: "Sem documento controlado vinculado.",
+        pageCount: "PDF oficial ainda não renderizado.",
+      },
+    };
+
+    render(<ArtifactMetaSidebar open onToggle={() => {}} meta={meta} lineage={[]} />);
+
+    expect(screen.queryByText("---")).not.toBeInTheDocument();
+    expect(screen.getByTitle("Sem perfil no snapshot.")).toHaveTextContent("—");
+    expect(screen.getByTitle("Sem área no snapshot.")).toHaveTextContent("—");
+    expect(screen.getByTitle("Sem documento controlado vinculado.")).toHaveTextContent("—");
+    // The pages row only materializes because an absence reason was supplied.
+    expect(screen.getByText("Páginas")).toBeInTheDocument();
+    expect(screen.getByTitle("PDF oficial ainda não renderizado.")).toHaveTextContent("—");
+  });
+
+  it("keeps the pages row hidden for kinds with no page metadata and no absence reason", () => {
+    render(<ArtifactMetaSidebar open onToggle={() => {}} meta={emptyMeta} lineage={[]} />);
+
+    expect(screen.queryByText("Páginas")).not.toBeInTheDocument();
+    expect(screen.queryByText("---")).not.toBeInTheDocument();
   });
 
   it("uses the singular page noun for a one-page artifact", () => {
