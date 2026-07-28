@@ -808,6 +808,16 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return
 	}
+	// form_data_snapshot is optional — absent means "this autosave carries no
+	// form-data change" and the write path preserves the stored form data. When
+	// it IS present the contract types it as an object, so reject null/scalars/
+	// arrays here: persisting one would make every later read of the document
+	// fail to decode form_data_json into the contract's object type (one bad
+	// write poisoning a read path with 500s).
+	if len(req.FormDataSnapshot) > 0 && !isJSONObject(req.FormDataSnapshot) {
+		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
+		return
+	}
 
 	res, err := h.svc.CommitAutosave(r.Context(), application.CommitAutosaveCmd{
 		TenantID:         tenantID,
@@ -1324,6 +1334,12 @@ func isKnownDocumentStatus(status string) bool {
 	default:
 		return status == string(domain.DocStatusArchived)
 	}
+}
+
+// isJSONObject reports whether raw is a JSON object literal. The body was
+// already syntax-validated by the decoder, so the leading token is decisive.
+func isJSONObject(raw json.RawMessage) bool {
+	return strings.HasPrefix(strings.TrimSpace(string(raw)), "{")
 }
 
 func isValidBoundedText(value string, max int) bool {

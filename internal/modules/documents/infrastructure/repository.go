@@ -1144,6 +1144,27 @@ func (r *Repository) CommitUpload(ctx context.Context, tenantID, sessionID, user
 		return nil, domain.ErrContentHashMismatch
 	}
 
+	// form_data_snapshot is OPTIONAL in the contract (commitDocumentAutosave in
+	// api/openapi/v1/openapi.yaml): an autosave that only changes the artifact
+	// carries no form data. Partial-update semantics — absent means "leave the
+	// form data as it is", so the effective snapshot is the document's current
+	// form_data_json. Writing the nil through instead would hit the
+	// documents.form_data_json NOT NULL constraint (a contract-conforming
+	// request turning into a 500), and substituting `{}` would wipe real user
+	// data. The same preserved value is stamped on the new revision so revision
+	// history and checkpoint restore (which copies form_data_snapshot back into
+	// documents.form_data_json) stay coherent. Race-safe: the documents row is
+	// already held FOR UPDATE by the pending-upload lock above, so nothing can
+	// change form_data_json between this read and the UPDATE below.
+	effectiveFormData := formDataSnapshot
+	if len(effectiveFormData) == 0 {
+		if err := tx.QueryRowContext(ctx,
+			`SELECT form_data_json FROM documents WHERE id=$1 AND tenant_id=$2::uuid`, docID, tenantID,
+		).Scan(&effectiveFormData); err != nil {
+			return nil, fmt.Errorf("preserve current form data: %w", err)
+		}
+	}
+
 	var revID string
 	var revNum int64
 	var committedFileSize sql.NullInt64
@@ -1154,14 +1175,14 @@ func (r *Repository) CommitUpload(ctx context.Context, tenantID, sessionID, user
 		   (document_id, parent_revision_id, session_id, storage_key, content_hash, form_data_snapshot, file_size_bytes, page_count, page_count_source)
 		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 		 RETURNING id::text, revision_num, file_size_bytes, page_count, page_count_source`,
-		docID, p.BaseRevisionID, sessionID, p.StorageKey, p.ContentHash, formDataSnapshot, fileSizeBytes, pageCount, pageCountSource,
+		docID, p.BaseRevisionID, sessionID, p.StorageKey, p.ContentHash, effectiveFormData, fileSizeBytes, pageCount, pageCountSource,
 	).Scan(&revID, &revNum, &committedFileSize, &committedPageCount, &committedPageCountSource); err != nil {
 		return nil, fmt.Errorf("insert revision: %w", err)
 	}
 
 	if _, err := tx.ExecContext(ctx,
 		`UPDATE documents SET current_revision_id=$1, form_data_json=$2, updated_at=now() WHERE id=$3 AND tenant_id=$4::uuid`,
-		revID, formDataSnapshot, docID, tenantID,
+		revID, effectiveFormData, docID, tenantID,
 	); err != nil {
 		return nil, err
 	}

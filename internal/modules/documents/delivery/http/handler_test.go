@@ -563,6 +563,63 @@ func TestCommitAutosave_InvalidPageCountUsesProblemEnvelope(t *testing.T) {
 	}
 }
 
+// TestCommitAutosave_AbsentFormDataSnapshotForwardsNil locks F-QA4-9 at the
+// edge: form_data_snapshot is optional in the contract, so omitting it must
+// reach the service as an absent (nil) snapshot — the signal the write path
+// uses to preserve the stored form data — and must succeed, not 500.
+func TestCommitAutosave_AbsentFormDataSnapshotForwardsNil(t *testing.T) {
+	svc := &fakeSvc{commitResult: &application.CommitResult{RevisionID: "bbbbbbbb-bbbb-4bbb-8bbb-000000000001", RevisionNum: 2}}
+	mux := newMux(t, svc)
+
+	body := []byte(`{"session_id":"sess_1","pending_upload_id":"pending_1"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/autosave/commit", bytes.NewReader(body))
+	withAuthHeaders(req, "editor")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	if svc.commitCmd.FormDataSnapshot != nil {
+		t.Fatalf("absent form_data_snapshot must reach the service as nil, got %s", svc.commitCmd.FormDataSnapshot)
+	}
+}
+
+// TestCommitAutosave_NonObjectFormDataSnapshotRejected keeps non-object
+// snapshots out of documents.form_data_json: the contract types the field as an
+// object, and persisting a scalar/array/null would turn every later read of the
+// document into a decode failure.
+func TestCommitAutosave_NonObjectFormDataSnapshotRejected(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body string
+	}{
+		{name: "null", body: `{"session_id":"sess_1","pending_upload_id":"pending_1","form_data_snapshot":null}`},
+		{name: "scalar", body: `{"session_id":"sess_1","pending_upload_id":"pending_1","form_data_snapshot":5}`},
+		{name: "array", body: `{"session_id":"sess_1","pending_upload_id":"pending_1","form_data_snapshot":[]}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := &fakeSvc{}
+			mux := newMux(t, svc)
+
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/autosave/commit", bytes.NewReader([]byte(tc.body)))
+			withAuthHeaders(req, "editor")
+			rr := httptest.NewRecorder()
+
+			mux.ServeHTTP(rr, req)
+			if rr.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d body=%s", rr.Code, rr.Body.String())
+			}
+			if ct := rr.Header().Get("Content-Type"); ct != "application/problem+json" {
+				t.Fatalf("want application/problem+json, got %s", ct)
+			}
+			if svc.commitCmd.PendingUploadID != "" {
+				t.Fatalf("service must not be called for an invalid snapshot: %#v", svc.commitCmd)
+			}
+		})
+	}
+}
+
 // TestForceReleaseSession_HandlerNoLongerRoleGates replaces the former
 // _RequiresAdmin test. The handler no longer enforces a role gate here —
 // authorization is now the tier-1 CapMembershipManage rule (proven in
