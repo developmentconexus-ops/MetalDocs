@@ -15,7 +15,8 @@ revisa decisões estruturais; passo a passo, área por área.
 | D4 | **PDF viewer embutido** na tela; download é ação separada. |
 | D5 | **Push**: autorizado para o fim de 2026-07-28 se build+testes+QA verdes. |
 | D6 | **Rota de templates na configuração** (2026-07-28): re-modelar rota de aprovação de template para a fase de config (nível tenant/perfil, ANTES de existir template); criação de template hard-blocked sem ela, igual documentos. ADR necessário. Substitui o modelo atual keyed por template_id. |
-| D3′ | **D3 SUSPENSO para re-exame**: operador questionou a existência do passo publish pós-aprovado ("no momento que foi aprovado já não era para estar publicado?… isso vem desde o legacy"). Verificar prática de mercado (eQMS) + pipeline atual → proposta. Investigação em andamento. |
+| D3′ | **D3 SUSPENSO para re-exame**: operador questionou a existência do passo publish pós-aprovado ("no momento que foi aprovado já não era para estar publicado?… isso vem desde o legacy"). Verificar prática de mercado (eQMS) + pipeline atual → proposta. **Superseded por D7.** |
+| D7 | **Publish manual MORRE — "ADR + coordenador já"** (2026-07-28): aprovado ⇒ publicado (com gates de data efetiva/prontidão, alinhado a Qualio `effectiveOnApproval`/MasterControl/Veeva). Etapa 2 = ADR do **release coordinator** idempotente (fatos duráveis de outbox: aprovação + artefato pronto; predicado approval×artefato×data-efetiva×supersession-head; transição única via CAS) + implementação. Endpoint/botão/capability `document.publish` DELETADOS (não repropostos); `/supersede` removido ou re-desenhado. Plano de publicação (data efetiva + supersede) declarado na submissão. F-QA4-13/14 corrigidos dentro do redesenho. Push D5 leva só o que fechar verde. |
 
 ## Fila de etapas (executar em ordem; 1 etapa = 1 ciclo implementa→revisa→verifica→commit)
 
@@ -61,8 +62,8 @@ revisa decisões estruturais; passo a passo, área por área.
 
 | Etapa | Estado | Evidência |
 |---|---|---|
-| 1 | EM ANDAMENTO | — |
-| 2 | FILA | — |
+| 1 | **PASSED** | QA live :80 2026-07-28 — ver log |
+| 2 | EM ANDAMENTO (D7: ADR release coordinator) | — |
 | 3 | FILA | — |
 | 4 | FILA | — |
 | 5 | FILA | — |
@@ -149,3 +150,32 @@ area-grade avaliado no publish-context); modelo de gate D2 para templates.
 - 2026-07-28: operador ratificou D6 (rota de template na configuração) e suspendeu D3
   para re-exame (publish pós-aprovado pode ser legacy) → investigação do pipeline
   de publish em andamento; Etapa 2 re-desenha depois da resposta.
+- 2026-07-28: Etapa 1 frontend CORRIGIDO `cc175c01` — wizard consome creation-context
+  como autoridade única de elegibilidade (catalogQueries só enriquecem display),
+  card de perfil sem rota desabilitado + marcador "Incompleto — sem rota de aprovação"
+  + link "Configurar rota" (gated `route.manage`), deep-link protegido, banner
+  preview-code com estado de erro explícito + retry, mensagem PT-BR para 409
+  `state.approval_route_missing`, pill INCOMPLETO na taxonomia admin.
+- 2026-07-28: **operador ratificou D7** ("ADR + coordenador já") após análise
+  Claude+Codex alinhada (task-ms4lce7v-ov1vmy: mercado = approval-driven effectiveness
+  com gates explícitos; correções Codex: frozen_content_hash ≠ artifact-readiness,
+  não existe fato durável "artefato materializado", rota review-verdict bypassa
+  FreezeService.Pin). F-QA4-13 (effective_from gap → docs escapam review periódico)
+  e F-QA4-14 (review-verdict pula materialização) registrados em
+  `2026-07-24-qa4-browser-qa-evidence.md` (commit `2c9b3ee7`).
+- 2026-07-28: **Etapa 1 QA live PASSED** (stack :80 rebuilt):
+  - API: create sob perfil sem rota (`fmea`) → **409 `state.approval_route_missing`**;
+    create sob `it` (com rota) → **201** (controle); creation-context 200 com
+    `has_active_route` + áreas narrowed.
+  - Browser: nav grupo Administração (Taxonomia/Membros/Rotas) visível, Auditoria
+    morta ausente; wizard: card `fmea` disabled + "Incompleto — sem rota de aprovação"
+    + link Configurar rota, clique não seleciona (aria-checked false).
+  - Taxonomia admin aba Perfis: pill `INCOMPLETO` (title "Sem rota de aprovação
+    ativa") + link "Configurar rota" apenas na linha `fmea`; `it`/`po` limpos.
+    Verificado via probe DOM live (pane sem display p/ screenshot — operador remoto).
+- 2026-07-28: 2.4 (signoff_id) + 2.5 (Idempotency-Key UUID) implementados por agente
+  (opus): `SignoffResult.SignoffID` fresh+replay (envelope `SignoffReplay` ganha
+  `signoff_id`, legacy decodável), spec `format: uuid` nos 27 params Idempotency-Key
+  + regen completo, `ValidateKey` backstop (`IDEMPOTENCY_KEY_INVALID`), E2E keys →
+  UUID; allowlist seed-chokepoint re-ancorada (drift de 06d0d17e). Commit pendente.
+  Follow-up aberto: `review_verdict_handler.go:110` `VerdictID: ""` (mesma classe).
