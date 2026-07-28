@@ -381,3 +381,23 @@ Ordem de correção sugerida: F-QA3-1 → F-QA4-5 → F-QA4-3 → F-QA4-1 → re
 
 O veredito QA-4 permanece **FAIL** — o blocker caiu, mas F-QA4-5 e F-QA4-3 ainda
 impedem a jornada de completar apenas pela tela.
+
+## F-QA4-13 — publish imediato não estabelece effective_from; scheduled limpa; predicado M6 exige não-nulo (NOVO, via review Codex 2026-07-28)
+
+Cadeia: `publish_service.go:112` (publish imediato) não escreve `effective_from`;
+`scheduler_service.go:20/133` (scheduled) **limpa** `effective_from` ao publicar;
+`review_due_reader.go:40-45` (dueCorePredicate M6) exige `effective_from <= now`
+não-nulo para elegibilidade de revisão periódica. Consequência: documento
+publicado imediatamente **nunca entra** no ciclo de revisão periódica (compliance
+gap). Correção pertence ao redesenho do release (coordenador) — data de vigência
+efetiva (actual) deve ser gravada em TODA publicação; planejada ≠ efetiva se
+houver hold. Severidade: ALTA (eQMS).
+
+## F-QA4-14 — aprovação via review-verdict não dispara materialização (NOVO, via review Codex 2026-07-28)
+
+`review_verdict_service.go:292` pode levar instância a aprovada sem passar por
+`FreezeService.Pin` (pin+dispatch acontecem no fluxo de signoff/submissão
+regular). Doc aprovado sem artefato congelado/materializado → publish (manual
+hoje, automático no alvo) sem artefato. Cobertura de workflow incompleta;
+release coordinator deve exigir fato "artefato pronto" da geração corrente,
+qualquer que seja a rota de aprovação. Severidade: ALTA.
