@@ -8,7 +8,7 @@
 // `doc` / `activeDocument` / `obligatedCount` / `gating` exports directly. This test
 // mocks only that one adapter hook.
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -22,6 +22,15 @@ vi.mock('../../iam/hooks/useHasCapability', () => ({
 
 vi.mock('../adapters/useDocumentArtifact', () => ({
   useDocumentArtifact: vi.fn(),
+}));
+
+// D4: the embedded viewer owns its own fetch; stub it so this suite asserts the
+// route's wiring (view vs. download separation), not the viewer's internals —
+// those are covered by DocumentPdfViewerDialog.test.tsx.
+vi.mock('../components/DocumentPdfViewerDialog', () => ({
+  DocumentPdfViewerDialog: ({ documentLabel }: { documentLabel: string }) => (
+    <div data-testid='pdf-viewer-dialog'>{documentLabel}</div>
+  ),
 }));
 
 import { useDocumentArtifact } from '../adapters/useDocumentArtifact';
@@ -201,5 +210,38 @@ describe('DocumentDetailRoute — FE-11 capability gating', () => {
     });
     const btn = screen.getByRole('button', { name: /Iniciar revisão/i });
     expect(btn).toHaveAttribute('aria-disabled', 'false');
+  });
+});
+
+describe('DocumentDetailRoute — D4 embedded PDF viewer', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hasCapMock.mockReturnValue(true);
+  });
+
+  it('offers "Visualizar PDF" and "Baixar PDF" as two distinct actions', async () => {
+    mockArtifact({ status: 'published' });
+
+    renderRoute();
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Visualizar PDF' })).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: 'Baixar PDF' })).toBeInTheDocument();
+  });
+
+  it('opens the embedded viewer instead of navigating away or downloading', async () => {
+    mockArtifact({ status: 'published' });
+
+    renderRoute();
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Visualizar PDF' })).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('pdf-viewer-dialog')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Visualizar PDF' }));
+
+    expect(screen.getByTestId('pdf-viewer-dialog')).toHaveTextContent('POP-QUA-0148');
   });
 });

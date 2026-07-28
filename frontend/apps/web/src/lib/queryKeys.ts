@@ -31,6 +31,10 @@ export const QK = {
     stats: () => ['documents', 'stats'] as const,
     detail: (id: string) => ['documents', 'detail', id] as const,
     revisionHistory: (id: string) => ['documents', 'revision-history', id] as const,
+    // D4 (2026-07-28): the rendered PDF artifact fetched as a Blob for the
+    // embedded viewer. Separate from `detail` so closing the viewer never
+    // evicts (or is evicted by) the document metadata cache.
+    pdfExport: (id: string) => ['documents', 'pdf-export', id] as const,
     comments: (id: string) => ['documents', 'comments', id] as const,
     distribution: {
       summary: (id: string) => ['documents', 'distribution', 'summary', id] as const,

@@ -7,14 +7,21 @@ import { ArtifactDetailView } from '../../shared/controlled-artifact/ArtifactDet
 import { useDocumentArtifact } from '../adapters/useDocumentArtifact';
 import { createRevision } from '../../controlled-documents/api/controlledDocuments';
 import { exportPDF } from '../api/exports';
+import { DocumentPdfViewerDialog } from '../components/DocumentPdfViewerDialog';
 import { SupersedePublishDialog } from '../../approval/components/SupersedePublishDialog';
 import { useHasCapability } from '../../iam/hooks/useHasCapability';
 import styles from './DocumentDetailRoute.module.css';
 
 /**
  * Document-specific route wrapper for the shared ArtifactDetailView. Owns only
- * interactive/dialog UI state (revision composer, publish dialog, PDF export, copy
- * link) and injects it as heroActions / aside / extras slots. All queries and
+ * interactive/dialog UI state (revision composer, publish dialog, PDF viewer, PDF
+ * download, copy link) and injects it as heroActions / aside / extras slots.
+ *
+ * D4 (2026-07-28): "Visualizar PDF" opens the embedded `DocumentPdfViewerDialog`
+ * (the PDF is read inside the app); "Baixar PDF" stays a separate, explicit
+ * download action. The two must never be collapsed back into one affordance.
+ *
+ * All queries and
  * lifecycle/capability gating are owned by `useDocumentArtifact` (FE-02) — the route
  * no longer re-fetches the document/approval/active-document/distribution queries or
  * re-derives gating; it consumes `gating` + the raw `doc`/`activeDocument` the adapter
@@ -37,6 +44,7 @@ export function DocumentDetailRoute() {
   const [revisionError, setRevisionError] = useState('');
   const [isCreatingRevision, setIsCreatingRevision] = useState(false);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
+  const [showPdfViewer, setShowPdfViewer] = useState(false);
   const [pdfStatus, setPdfStatus] = useState<
     | { kind: 'idle' }
     | { kind: 'pending' }
@@ -166,6 +174,25 @@ export function DocumentDetailRoute() {
       >
         <Icon name='eye' size={15} />
         Visualizar documento
+      </button>
+      {/*
+        D4 — reading the PDF happens in the embedded viewer, never by leaving the
+        screen. The download below is the separate, explicit alternative.
+      */}
+      <button
+        className='btn'
+        type='button'
+        aria-label='Visualizar PDF'
+        onClick={() => setShowPdfViewer(true)}
+        disabled={isObsolete && !canViewObsolete}
+        title={
+          isObsolete && !canViewObsolete
+            ? 'Sua sessão não inclui a capacidade para visualizar documentos obsoletos.'
+            : 'Visualizar PDF'
+        }
+      >
+        <Icon name='eye' size={13} />
+        Visualizar PDF
       </button>
       <button
         className='btn'
@@ -328,6 +355,13 @@ export function DocumentDetailRoute() {
           </div>
         </div>
       )}
+      {showPdfViewer ? (
+        <DocumentPdfViewerDialog
+          documentId={documentId}
+          documentLabel={code !== '—' ? code : docName}
+          onClose={() => setShowPdfViewer(false)}
+        />
+      ) : null}
       {showPublishDialog && activeDocument?.content_hash ? (
         <SupersedePublishDialog
           documentId={documentId}
