@@ -35,6 +35,7 @@ func TestListDocumentsPaginated_ScansSnapshotAndRevisionColumns(t *testing.T) {
 		"profile_code_snapshot", "process_area_code_snapshot",
 		"revision_version", "revision_number",
 		"effective_from", "effective_to", "review_due_at", "last_reviewed_at", "review_surfaced_at",
+		"values_frozen_at",
 		"total_count",
 	}
 
@@ -53,6 +54,7 @@ func TestListDocumentsPaginated_ScansSnapshotAndRevisionColumns(t *testing.T) {
 			profileCode, areaCode,
 			int64(1), int64(1),
 			nil, nil, reviewDueAt, nil, nil,
+			nil,
 			int64(2),
 		).
 		// Row 2: snapshots NULL (must scan into *string without panicking) and rev 0.
@@ -64,6 +66,7 @@ func TestListDocumentsPaginated_ScansSnapshotAndRevisionColumns(t *testing.T) {
 			nil, nil,
 			int64(0), int64(0),
 			nil, nil, nil, nil, nil,
+			nil,
 			int64(2),
 		)
 

@@ -294,7 +294,8 @@ func (r *Repository) GetDocument(ctx context.Context, tenantID, id string) (*dom
 		        d.controlled_document_id, d.profile_code_snapshot, d.process_area_code_snapshot,
 		        coalesce(d.code,''), d.revision_version, d.revision_number,
 		        cr.file_size_bytes, cr.page_count, cr.page_count_source,
-		        d.effective_from, d.effective_to, d.review_due_at, d.last_reviewed_at, d.review_surfaced_at
+		        d.effective_from, d.effective_to, d.review_due_at, d.last_reviewed_at, d.review_surfaced_at,
+		        d.values_frozen_at
 		 FROM documents d
 		 LEFT JOIN document_revisions cr
 		   ON cr.id = d.current_revision_id
@@ -305,7 +306,8 @@ func (r *Repository) GetDocument(ctx context.Context, tenantID, id string) (*dom
 		&d.CreatedAt, &d.UpdatedAt, &d.CreatedBy, &d.RevisionTitle, &d.ControlledDocumentID, &d.ProfileCodeSnapshot,
 		&d.ProcessAreaCodeSnapshot, &d.Code,
 		&d.RevisionVersion, &d.RevisionNumber, &currentFileSize, &currentPageCount, &currentPageCountSource,
-		&d.EffectiveFrom, &d.EffectiveTo, &d.ReviewDueAt, &d.LastReviewedAt, &d.ReviewSurfacedAt)
+		&d.EffectiveFrom, &d.EffectiveTo, &d.ReviewDueAt, &d.LastReviewedAt, &d.ReviewSurfacedAt,
+		&d.ValuesFrozenAt)
 	if errors.Is(err, sql.ErrNoRows) || isInvalidUUID(err) {
 		return nil, domain.ErrNotFound
 	}
@@ -551,6 +553,7 @@ func (r *Repository) ListDocumentsPaginated(ctx context.Context, tenantID string
 				profile_code_snapshot, process_area_code_snapshot,
 				revision_version, revision_number,
 				effective_from, effective_to, review_due_at, last_reviewed_at, review_surfaced_at,
+				values_frozen_at,
 				COUNT(*) OVER() AS total_count
 			FROM documents
 			WHERE %s
@@ -560,7 +563,8 @@ func (r *Repository) ListDocumentsPaginated(ctx context.Context, tenantID string
 			created_by, controlled_document_id, code,
 			profile_code_snapshot, process_area_code_snapshot,
 			revision_version, revision_number,
-			effective_from, effective_to, review_due_at, last_reviewed_at, review_surfaced_at, total_count
+			effective_from, effective_to, review_due_at, last_reviewed_at, review_surfaced_at,
+			values_frozen_at, total_count
 		FROM filtered%s
 		ORDER BY updated_at DESC, id DESC
 		LIMIT $%d`, where, cursorClause, len(args))
@@ -580,7 +584,8 @@ func (r *Repository) ListDocumentsPaginated(ctx context.Context, tenantID string
 			&d.CreatedAt, &d.UpdatedAt, &d.CreatedBy, &d.ControlledDocumentID, &d.Code,
 			&d.ProfileCodeSnapshot, &d.ProcessAreaCodeSnapshot,
 			&d.RevisionVersion, &d.RevisionNumber,
-			&d.EffectiveFrom, &d.EffectiveTo, &d.ReviewDueAt, &d.LastReviewedAt, &d.ReviewSurfacedAt, &rowTotal); err != nil {
+			&d.EffectiveFrom, &d.EffectiveTo, &d.ReviewDueAt, &d.LastReviewedAt, &d.ReviewSurfacedAt,
+			&d.ValuesFrozenAt, &rowTotal); err != nil {
 			return nil, 0, false, err
 		}
 		total = rowTotal // identical on every row (window over the full filtered set)
