@@ -1100,7 +1100,12 @@ func buildTemplatesModule(deps bootstrap.APIDependencies, capabilityService *iam
 		return nil, nil, nil, errors.New("templates resolver registry is nil or empty; resolver_key validation would be silently skipped (SEC-08 / T-008)")
 	}
 	templatesRepo := templatesrepo.New(deps.SQLDB).WithAudit(deps.AuditWriter)
-	templatesSvc := templatesapp.New(templatesRepo, templatesPresigner, wiring.Clock{}, wiring.UUIDGen{}, templatesResolverReg).WithRunner(db.NewTxRunner(deps.SQLDB))
+	// ADR 0086: the config-first creation gate reads template-route readiness
+	// through the approval-owned port, in the create tx. Without it CreateTemplate
+	// fails closed, so it is wired here (never left nil in production).
+	templatesSvc := templatesapp.New(templatesRepo, templatesPresigner, wiring.Clock{}, wiring.UUIDGen{}, templatesResolverReg).
+		WithRunner(db.NewTxRunner(deps.SQLDB)).
+		WithRouteReadinessReader(approvalrepo.NewRouteReadinessReaderPG(deps.SQLDB))
 	templatesAuthzFn := func(r *http.Request, tenantID, _ string, action string) error {
 		userID := iamdomain.UserIDFromContext(r.Context())
 		return capabilityService.CanDo(r.Context(), userID, tenantID, action)

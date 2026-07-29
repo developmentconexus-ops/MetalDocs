@@ -48,10 +48,12 @@ func NewDocumentSubject(key string) Subject {
 // P3.S2b-3b-ii, ADR 0082 template extension). key is the template version id
 // for an Instance (the artifact under approval) — symmetric with
 // NewDocumentSubject, whose key is the analogous per-call identifier. A
-// template ROUTE's subject key is the template id (the governance selector),
-// set directly by the caller since route creation for templates is a later
-// slice (#19); this constructor is only used for the two-level keying's
-// instance/artifact side.
+// template ROUTE's subject key is the profile code (doc_type_code) the
+// template belongs to, not the template id: a route is configuration and
+// governs every template of that profile, exactly as a document route governs
+// every document of its profile (ADR 0086, DB truth
+// approval_routes_template_subject_key_check). This constructor is only used
+// for the two-level keying's instance/artifact side.
 func NewTemplateSubject(key string) Subject {
 	return Subject{Kind: SubjectKindTemplate, Key: key}
 }

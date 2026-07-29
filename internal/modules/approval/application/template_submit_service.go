@@ -53,6 +53,15 @@ type TemplateVersionReader interface {
 	// the not-found shape of the other two methods on this port (no-fallback
 	// principle: a missing row never resolves to a substitute value).
 	LoadTemplateInboxMeta(ctx context.Context, tx db.Tx, tenantID string, versionIDs []string) (map[string]domain.TemplateInboxMeta, error)
+
+	// LoadTemplateDocTypeCode returns templates_template.doc_type_code for
+	// templateID, scoped to tenantID, read inside the caller's transaction
+	// (ADR 0086). It is the template ROUTE's subject key: routes are keyed by
+	// configuration (the profile), never by the template instance. Fails closed
+	// — an absent/cross-tenant template, or one whose doc_type_code is empty,
+	// returns an error rather than a substitute value, so a mis-configured
+	// template can never silently fall through to some other profile's route.
+	LoadTemplateDocTypeCode(ctx context.Context, tx db.Tx, tenantID, templateID string) (docTypeCode string, err error)
 }
 
 // TemplateVersionSubmitWriter is the approval-owned port through which the
@@ -140,7 +149,7 @@ func NewTemplateSubmitService(repo infrastructure.ApprovalRepository, emitter Ev
 // TemplateSubmitRequest carries all inputs for SubmitTemplateVersionForReview.
 type TemplateSubmitRequest struct {
 	TenantID          string
-	TemplateID        string // route governance selector (ROUTE.subject_key)
+	TemplateID        string // owning template; its doc_type_code is the ROUTE.subject_key (ADR 0086)
 	TemplateVersionID string // artifact under approval (INSTANCE.subject_key)
 	SubmittedBy       string // user_id
 	IdempotencyKey    string // client Idempotency-Key header, threaded from the handler
@@ -238,14 +247,21 @@ func (s *TemplateSubmitService) SubmitTemplateVersionForReview(ctx context.Conte
 			return fmt.Errorf("template submit: lock version under_review: %w", err)
 		}
 
-		// Resolve the active route by the template's own id (the governance
-		// selector) — ROUTE.subject_key = template_id, distinct from
-		// INSTANCE.subject_key = template_version_id (the ratified
-		// two-level keying).
+		// Resolve the active route by the template's PROFILE (doc_type_code) —
+		// ROUTE.subject_key = doc_type_code (ADR 0086: a route is
+		// configuration, one per profile), distinct from INSTANCE.subject_key =
+		// template_version_id (the two-level keying). The doc_type_code is read
+		// in-tx through the approval-owned port and fails closed; PreviewRoute
+		// resolves it through the SAME method so preview and submit can never
+		// disagree about which route governs a template.
 		if s.routeResolver == nil {
 			return fmt.Errorf("template submit: route resolver not configured")
 		}
-		routeID, err := s.routeResolver.LoadActiveRouteIDBySubject(ctx, tx, req.TenantID, string(domain.SubjectKindTemplate), req.TemplateID)
+		docTypeCode, err := s.versionReader.LoadTemplateDocTypeCode(ctx, tx, req.TenantID, req.TemplateID)
+		if err != nil {
+			return fmt.Errorf("template submit: resolve template doc_type_code: %w", err)
+		}
+		routeID, err := s.routeResolver.LoadActiveRouteIDBySubject(ctx, tx, req.TenantID, string(domain.SubjectKindTemplate), docTypeCode)
 		if err != nil {
 			if errors.Is(err, infrastructure.ErrNoActiveApprovalRoute) {
 				return infrastructure.ErrNoActiveApprovalRoute

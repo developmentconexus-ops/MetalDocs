@@ -65,6 +65,51 @@ func TestRouteReadinessReader_ActiveDocumentRoute_RealDB(t *testing.T) {
 	}
 }
 
+// TestRouteReadinessReader_ActiveTemplateRoute_RealDB is the ADR 0086 arm: a
+// template route is keyed by the profile (doc_type_code) it governs, so the
+// SAME port answers the templates creation gate. It also proves the two kinds
+// are independent — a profile with a document route only is NOT template-ready,
+// which is what makes the templates gate reachable rather than vacuously true.
+func TestRouteReadinessReader_ActiveTemplateRoute_RealDB(t *testing.T) {
+	dbc, _ := testdb.Open(t)
+	ctx := context.Background()
+	reader := NewRouteReadinessReaderPG(dbc)
+
+	docRoute := testdb.NewApprovalRoute(t, dbc)
+	tmplTax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(docRoute.TenantID))
+	tmplRoute := testdb.NewApprovalRoute(t, dbc,
+		testdb.WithTenant(docRoute.TenantID),
+		testdb.WithProfile(tmplTax.ProfileCode),
+		testdb.WithSubjectKind(string(domain.SubjectKindTemplate)))
+
+	keys, err := reader.ActiveRouteSubjectKeys(ctx, docRoute.TenantID, string(domain.SubjectKindTemplate))
+	if err != nil {
+		t.Fatalf("ActiveRouteSubjectKeys(template): %v", err)
+	}
+	if _, ok := keys[tmplRoute.ProfileCode]; !ok {
+		t.Fatalf("expected doc type %q in the active template-route set, got %+v", tmplRoute.ProfileCode, keys)
+	}
+	if _, ok := keys[docRoute.ProfileCode]; ok {
+		t.Fatalf("profile %q has only a DOCUMENT route and must not appear in the template set %+v", docRoute.ProfileCode, keys)
+	}
+
+	ready, err := reader.HasActiveRoute(ctx, dbc, tmplRoute.TenantID, string(domain.SubjectKindTemplate), tmplRoute.ProfileCode)
+	if err != nil {
+		t.Fatalf("HasActiveRoute(template, routed): %v", err)
+	}
+	if !ready {
+		t.Fatal("expected the seeded active template route to be reported ready")
+	}
+
+	ready, err = reader.HasActiveRoute(ctx, dbc, docRoute.TenantID, string(domain.SubjectKindTemplate), docRoute.ProfileCode)
+	if err != nil {
+		t.Fatalf("HasActiveRoute(template, document-only profile): %v", err)
+	}
+	if ready {
+		t.Fatalf("profile %q has no TEMPLATE route; the templates creation gate must reject it", docRoute.ProfileCode)
+	}
+}
+
 func TestRouteReadinessReader_CrossTenantIsolation_RealDB(t *testing.T) {
 	dbc, _ := testdb.Open(t)
 	ctx := context.Background()

@@ -75,8 +75,9 @@ func setupTemplateApproval(t *testing.T) templateApprovalFixture {
 	tnt := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
 
-	templateID, versionID := seedTemplateVersion(t, dbc, tnt.ID, actor.ID, "draft")
-	seedTemplateRoute(t, dbc, tnt.ID, actor.ID, templateID)
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+	templateID, versionID := seedTemplateVersion(t, dbc, tnt.ID, actor.ID, tax.ProfileCode, "draft")
+	seedTemplateRoute(t, dbc, tnt.ID, actor.ID, tax.ProfileCode)
 
 	// Signers: system_admin (so authz.Require(template.approve, "tenant")
 	// short-circuits and appends the asserted cap the 0300 signoff tripwire

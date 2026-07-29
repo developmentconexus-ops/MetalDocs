@@ -101,13 +101,15 @@ func (s *SubmitService) PreviewRoute(ctx context.Context, runner db.TxRunner, te
 	return preview, err
 }
 
-// PreviewRoute resolves the active approval route for templateID (the ROUTE
-// governance selector — distinct from a template VERSION id) exactly the way
-// SubmitTemplateVersionForReview would (LoadActiveRouteIDBySubject) and
-// returns its stages+selectors. Gated by CapTemplateSubmit (the same
-// capability the submit endpoint itself requires; no new capability is
-// introduced). Returns a zero-value RoutePreview (not an error) when no
-// active route resolves for the template yet.
+// PreviewRoute resolves the active approval route governing templateID exactly
+// the way SubmitTemplateVersionForReview would — the template's doc_type_code
+// read through the SAME TemplateVersionReader port, then
+// LoadActiveRouteIDBySubject on (template, doc_type_code) (ADR 0086) — and
+// returns its stages+selectors. Resolving through the identical port method is
+// what keeps preview and submit from drifting onto different routes. Gated by
+// CapTemplateSubmit (the same capability the submit endpoint itself requires;
+// no new capability is introduced). Returns a zero-value RoutePreview (not an
+// error) when no active route resolves for the template's profile yet.
 func (s *TemplateSubmitService) PreviewRoute(ctx context.Context, runner db.TxRunner, tenantID, templateID string) (RoutePreview, error) {
 	var preview RoutePreview
 	err := runner.Do(ctx, func(tx *sql.Tx) error {
@@ -122,7 +124,14 @@ func (s *TemplateSubmitService) PreviewRoute(ctx context.Context, runner db.TxRu
 		if s.routeResolver == nil {
 			return fmt.Errorf("preview route: route resolver not configured")
 		}
-		routeID, err := s.routeResolver.LoadActiveRouteIDBySubject(ctx, tx, tenantID, string(domain.SubjectKindTemplate), templateID)
+		if s.versionReader == nil {
+			return fmt.Errorf("preview route: template version reader not configured")
+		}
+		docTypeCode, err := s.versionReader.LoadTemplateDocTypeCode(ctx, tx, tenantID, templateID)
+		if err != nil {
+			return fmt.Errorf("preview route: resolve template doc_type_code: %w", err)
+		}
+		routeID, err := s.routeResolver.LoadActiveRouteIDBySubject(ctx, tx, tenantID, string(domain.SubjectKindTemplate), docTypeCode)
 		if err != nil {
 			if errors.Is(err, infrastructure.ErrNoActiveApprovalRoute) {
 				return nil // preview stays the zero value: nothing to preview yet

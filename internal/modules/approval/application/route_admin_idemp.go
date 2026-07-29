@@ -41,19 +41,19 @@ type RouteAdminIdempStore interface {
 // MUST NOT appear here.
 //
 // subject must be the already-resolved result of resolveCreateRouteSubject
-// (the same defaulting the service applies: an absent/document kind defaults
-// its key to profileCode) — not the raw, possibly-empty client input. Without
-// the subject lines, every template-subject create hashed identically
-// regardless of subject_key (profileCode is always "" for a template route),
-// so a second create sharing an Idempotency-Key + name + stages but a
-// DIFFERENT subject_key would silently replay the first route's result
-// instead of surfacing an idempotency payload-mismatch conflict (QR-A finding
-// A). For the legacy document case, subject.Key is always profileCode (rail
-// R1), so these two new lines are redundant with the existing profile_code
-// line but harmless — the hash for a byte-identical legacy request is still
-// deterministic and stable across repeats AGAINST THIS CODE VERSION. It is
-// NOT byte-stable across the deploy that introduced the subject lines: an
-// envelope persisted pre-deploy and retried post-deploy surfaces
+// (the same defaulting the service applies: an absent key defaults to
+// profileCode for BOTH kinds) — not the raw, possibly-empty client input.
+//
+// The subject_kind line is what carries the discrimination since ADR 0086:
+// every route is profile-keyed, so a document route and a template route on
+// the SAME profile differ ONLY in kind. Without it, two creates sharing an
+// Idempotency-Key + profile + name + stages would hash identically and the
+// second caller would be handed the first caller's route of the WRONG kind
+// instead of an idempotency payload-mismatch conflict (QR-A finding A, whose
+// original template-key axis ADR 0086 removed). The hash for a byte-identical
+// request is deterministic and stable across repeats AGAINST THIS CODE
+// VERSION; it is NOT byte-stable across the deploy that introduced the subject
+// lines: an envelope persisted pre-deploy and retried post-deploy surfaces
 // ErrConflict (409) instead of a replay until the 24h idempotency TTL
 // expires — fail-safe and time-bounded, never a wrong replay.
 //

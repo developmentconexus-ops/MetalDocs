@@ -46,16 +46,10 @@ func (h *Handler) CreateRouteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// req.Validate() has already enforced: document/absent subject_kind ⇒
-	// req.ProfileCode is a non-nil, non-empty pointer; template subject_kind ⇒
-	// req.ProfileCode is nil. application.CreateRouteInput.ProfileCode stays a
-	// plain string (the application/DB layer's own template branch binds SQL
-	// NULL from the effective subject, not from this string being empty), so
-	// deref-or-empty is a safe, information-preserving translation here.
-	profileCode := ""
-	if req.ProfileCode != nil {
-		profileCode = *req.ProfileCode
-	}
+	// req.Validate() has already enforced a non-nil, non-empty ProfileCode for
+	// EVERY subject kind (ADR 0086), so the deref below cannot lose
+	// information; application.CreateRouteInput.ProfileCode is a plain string.
+	profileCode := *req.ProfileCode
 
 	result, err := routeAdminSvc.Create(r.Context(), h.runner, application.CreateRouteInput{
 		TenantID:       tenantID,
@@ -77,9 +71,9 @@ func (h *Handler) CreateRouteHandler(w http.ResponseWriter, r *http.Request) {
 	// name:"", version:0, active:false, stages:null for a fully-persisted
 	// route — indistinguishable from a broken create — for document and
 	// template subjects alike. ProfileCode comes from the row's nullable
-	// column (nil for a template route, no "" sentinel on the wire — QR-A
-	// finding C), which is the same truth req.ProfileCode carried but sourced
-	// from the DB rather than the request.
+	// column — no "" sentinel on the wire (QR-A finding C) — which is the same
+	// truth req.ProfileCode carried but sourced from the DB rather than the
+	// request.
 	WriteJSON(w, http.StatusCreated, mapCreatedRoute(result))
 }
 
@@ -313,19 +307,13 @@ func mapListRoute(route infrastructure.Route) contracts.ListRouteItem {
 	}
 }
 
-// listRouteProfileCode carries the repository scan's NULL-vs-empty truth
-// (postgres_approval_repository.go scanRouteListRows: profile_code sql.NullString
-// collapsed to route.ProfileCode string) back out honestly on the wire. A
-// template route has no profile by DB constraint
-// (approval_routes_template_subject_projection_check, ADR 0082); infrastructure.Route
-// carries SubjectKind alongside ProfileCode on the same scanned row, so
-// SubjectKind=="template" is an exact, row-local proxy for "profile_code was
-// SQL NULL" — no separate Valid flag needs to be threaded through the
-// repository projection to make this honest.
+// listRouteProfileCode projects the scanned profile_code onto the wire's
+// nullable field. Every route carries a profile_code post-ADR-0086 (both
+// subject kinds are profile-keyed, DB truth:
+// approval_routes_template_subject_key_check), so this is always non-nil for
+// well-formed rows; the pointer stays because the column itself is still
+// NULL-able and a NULL must surface as JSON null, never as the "" sentinel.
 func listRouteProfileCode(route infrastructure.Route) *string {
-	if route.SubjectKind == string(domain.SubjectKindTemplate) {
-		return nil
-	}
 	code := route.ProfileCode
 	return &code
 }

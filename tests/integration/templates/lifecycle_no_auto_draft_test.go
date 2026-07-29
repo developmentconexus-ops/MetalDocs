@@ -51,6 +51,21 @@ type testUUID struct{}
 
 func (testUUID) New() string { return uuid.NewString() }
 
+// routeReadyReader satisfies approvaldomain.RouteReadinessReader and reports
+// every subject as route-ready. The ADR 0086 creation gate fails CLOSED, so
+// tests in this package whose subject is the template LIFECYCLE (not the gate)
+// must declare readiness explicitly; the gate itself is pinned by
+// internal/modules/templates/application/creation_gate_test.go.
+type routeReadyReader struct{}
+
+func (routeReadyReader) ActiveRouteSubjectKeys(_ context.Context, _, _ string) (map[string]struct{}, error) {
+	return map[string]struct{}{}, nil
+}
+
+func (routeReadyReader) HasActiveRoute(_ context.Context, _ platformdb.DB, _, _, _ string) (bool, error) {
+	return true, nil
+}
+
 // countVersionRows returns the number of template_version rows for a given template.
 func countVersionRows(t *testing.T, db *sql.DB, templateID string) int {
 	t.Helper()
@@ -123,7 +138,8 @@ func TestLifecycle_NoAutoNextDraft(t *testing.T) {
 
 	repo := infrastructure.New(db)
 	svc := application.New(repo, noopPresigner{}, testClock{}, testUUID{}).
-		WithRunner(platformdb.NewTxRunner(db))
+		WithRunner(platformdb.NewTxRunner(db)).
+		WithRouteReadinessReader(routeReadyReader{})
 
 	// ── Step 1: create template with v1 draft ──────────────────────────────
 	createRes, err := svc.CreateTemplate(authorCtx, application.CreateTemplateCmd{

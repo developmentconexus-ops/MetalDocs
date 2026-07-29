@@ -80,6 +80,7 @@ type ApprovalRoute struct {
 	ID          string
 	TenantID    string
 	ProfileCode string
+	SubjectKind string
 }
 
 type ApprovalInstance struct {
@@ -123,6 +124,7 @@ type Spec struct {
 	Code              string
 	ProfileCode       string
 	GovernanceClass   string
+	SubjectKind       string
 
 	RecipientUserID string
 	EventType       string
@@ -171,6 +173,11 @@ func WithFrozenContentHash(hash string) Opt {
 func WithCode(code string) Opt            { return func(s *Spec) { s.Code = code } }
 func WithProfile(code string) Opt         { return func(s *Spec) { s.ProfileCode = code } }
 func WithGovernanceClass(class string) Opt { return func(s *Spec) { s.GovernanceClass = class } }
+
+// WithSubjectKind selects the approval-route subject kind ("document" or
+// "template"). Both are profile-keyed since ADR 0086, so the factory always
+// binds subject_key := profile_code.
+func WithSubjectKind(kind string) Opt { return func(s *Spec) { s.SubjectKind = kind } }
 func WithRevisionNumber(n int) Opt        { return func(s *Spec) { s.RevisionNumber = n } }
 func WithRecipient(userID string) Opt     { return func(s *Spec) { s.RecipientUserID = userID } }
 func WithEventType(t string) Opt          { return func(s *Spec) { s.EventType = t } }
@@ -553,16 +560,24 @@ func NewApprovalRoute(t *testing.T, db *sql.DB, opts ...Opt) ApprovalRoute {
 	if name == "" {
 		name = "Route"
 	}
+	subjectKind := s.SubjectKind
+	if subjectKind == "" {
+		subjectKind = "document"
+	}
 	id := uuid.NewString()
 	seedTenantOnly(t, db, tenantID, owner, func(tx *sql.Tx) error {
+		// subject_key is bound explicitly rather than left to the alias trigger:
+		// since ADR 0086 BOTH kinds are profile-keyed, and the template arm is
+		// constrained by approval_routes_template_subject_key_check.
 		_, err := tx.ExecContext(context.Background(),
-			`INSERT INTO public.approval_routes (id, tenant_id, name, profile_code, active, created_by)
-			 VALUES ($1::uuid, $2::uuid, $3, $4, true, $5)`,
-			id, tenantID, name, profile, owner,
+			`INSERT INTO public.approval_routes
+			   (id, tenant_id, name, profile_code, subject_kind, subject_key, active, created_by)
+			 VALUES ($1::uuid, $2::uuid, $3, $4, $5, $4, true, $6)`,
+			id, tenantID, name, profile, subjectKind, owner,
 		)
 		return err
 	})
-	return ApprovalRoute{ID: id, TenantID: tenantID, ProfileCode: profile}
+	return ApprovalRoute{ID: id, TenantID: tenantID, ProfileCode: profile, SubjectKind: subjectKind}
 }
 
 // NewApprovalInstance seeds a public.approval_instances row (document.submit

@@ -54,7 +54,8 @@ func TestTripwire_ArchiveWritesTemplateRow(t *testing.T) {
 
 	repo := infrastructure.New(db)
 	svc := application.New(repo, noopPresigner{}, testClock{}, testUUID{}).
-		WithRunner(platformdb.NewTxRunner(db))
+		WithRunner(platformdb.NewTxRunner(db)).
+		WithRouteReadinessReader(routeReadyReader{})
 
 	createRes, err := svc.CreateTemplate(ctx, application.CreateTemplateCmd{
 		TenantID:    tenant.ID,

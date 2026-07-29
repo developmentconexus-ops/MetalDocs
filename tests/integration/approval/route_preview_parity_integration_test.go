@@ -5,8 +5,9 @@
 // guard for TemplateSubmitService.PreviewRoute against a real Postgres.
 //
 // The reviewer's Major: prove the read-only approval-preview resolves the SAME
-// active route, keyed the SAME way (ROUTE.subject_key = template_id, NOT the
-// template VERSION id), and surfaces the SAME stages+selectors — including a
+// active route, keyed the SAME way (ROUTE.subject_key = the template's
+// doc_type_code since ADR 0086, NOT the template id and NOT the template
+// VERSION id), and surfaces the SAME stages+selectors — including a
 // submit_choice selector's role + area_code — that an ACTUAL submit for the
 // same subject resolves. The independent oracle is a real end-to-end
 // SubmitTemplateVersionForReview: preview.RouteID must equal the resulting
@@ -75,6 +76,27 @@ func (previewTemplateVersionReader) LoadTemplateVersionContentHash(ctx context.C
 		return "", false, err
 	}
 	return hash.String, true, nil
+}
+
+// LoadTemplateDocTypeCode mirrors the production adapter: post-ADR-0086 the
+// template ROUTE is keyed by the template's doc_type_code (= profile code),
+// so this is what both preview and submit resolve the route by. Fails closed.
+func (previewTemplateVersionReader) LoadTemplateDocTypeCode(ctx context.Context, tx db.Tx, tenantID, templateID string) (string, error) {
+	var code sql.NullString
+	err := tx.QueryRowContext(ctx,
+		`SELECT doc_type_code FROM templates_template WHERE id = $1 AND tenant_id = $2`,
+		templateID, tenantID,
+	).Scan(&code)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", errors.New("preview parity fake: template not found")
+	}
+	if err != nil {
+		return "", err
+	}
+	if !code.Valid || code.String == "" {
+		return "", errors.New("preview parity fake: template has no doc_type_code")
+	}
+	return code.String, nil
 }
 
 func (previewTemplateVersionReader) LoadTemplateInboxMeta(ctx context.Context, tx db.Tx, tenantID string, versionIDs []string) (map[string]domain.TemplateInboxMeta, error) {
@@ -154,7 +176,10 @@ func (previewTemplateVersionWriter) MarkTemplateVersionRejected(context.Context,
 
 // seedPreviewTemplateVersion inserts a templates_template + draft
 // templates_template_version pair for the tenant/actor, returning both ids.
-func seedPreviewTemplateVersion(t *testing.T, dbc *sql.DB, tenantID, actorID string) (templateID, versionID string) {
+// docTypeCode must be a real profile code (ADR 0086:
+// templates_template_doc_type_code_required_check forbids '') and is the key
+// the template route is looked up by.
+func seedPreviewTemplateVersion(t *testing.T, dbc *sql.DB, tenantID, actorID, docTypeCode string) (templateID, versionID string) {
 	t.Helper()
 	ctx := context.Background()
 	key := "preview-parity-" + uuid.NewString()
@@ -178,9 +203,9 @@ func seedPreviewTemplateVersion(t *testing.T, dbc *sql.DB, tenantID, actorID str
 	if err := tx.QueryRowContext(ctx,
 		`INSERT INTO public.templates_template
 		   (id, tenant_id, doc_type_code, key, name, description, latest_version, created_by, created_at)
-		 VALUES (gen_random_uuid(), $1::uuid, '', $2, 'Preview Parity Template', '', 1, $3::text, now())
+		 VALUES (gen_random_uuid(), $1::uuid, $2, $3, 'Preview Parity Template', '', 1, $4::text, now())
 		 RETURNING id::text`,
-		tenantID, key, actorID,
+		tenantID, docTypeCode, key, actorID,
 	).Scan(&templateID); err != nil {
 		t.Fatalf("seed template version: insert template: %v", err)
 	}
@@ -237,7 +262,8 @@ func TestPreviewRoute_TemplateSubject_ResolutionParity_RealDB(t *testing.T) {
 	tnt := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
 
-	templateID, versionID := seedPreviewTemplateVersion(t, dbc, tnt.ID, actor.ID)
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+	templateID, versionID := seedPreviewTemplateVersion(t, dbc, tnt.ID, actor.ID, tax.ProfileCode)
 
 	repo := approvalrepo.NewPostgresApprovalRepository(dbc, iamdomain.NoopUserDisplayNameReader{})
 	services := application.NewServices(repo, application.NewSQLEmitter(), application.RealClock{}, nil).
@@ -245,28 +271,22 @@ func TestPreviewRoute_TemplateSubject_ResolutionParity_RealDB(t *testing.T) {
 		WithTemplateCompletionWriter(previewTemplateVersionWriter{})
 	runner := db.NewTxRunner(dbc)
 
-	// --- Seed the active route (document-shaped via RouteAdmin.Create) with a
-	// submit_choice stage 2, then flip it to a template subject keyed by
-	// template_id (ROUTE.subject_key = template_id). ---
-	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+	// --- Seed the active TEMPLATE route with a submit_choice stage 2 directly
+	// through RouteAdmin.Create: post-ADR-0086 it persists
+	// (subject_kind='template', subject_key=profile_code), so no raw-UPDATE
+	// subject flip is needed (or permitted by
+	// approval_routes_template_subject_key_check). ---
 	rctx := platformtenant.WithActorID(platformtenant.WithTenantID(ctx, tnt.ID), actor.ID)
 	createOut, err := services.RouteAdmin.Create(rctx, runner, application.CreateRouteInput{
 		TenantID:    tnt.ID,
 		ProfileCode: tax.ProfileCode,
+		SubjectKind: string(domain.SubjectKindTemplate),
 		Name:        "Preview Parity Route",
 		ActorUserID: actor.ID,
 		Stages:      previewParityStages(),
 	})
 	if err != nil {
 		t.Fatalf("seed route: Create: %v", err)
-	}
-	if _, err := dbc.ExecContext(ctx,
-		`UPDATE public.approval_routes
-		    SET subject_kind = 'template', subject_key = $2, profile_code = NULL
-		  WHERE id = $1::uuid`,
-		createOut.RouteID, templateID,
-	); err != nil {
-		t.Fatalf("seed route: flip subject: %v", err)
 	}
 
 	// Eligibility pools: stage 1 approver (area-blind "tenant" matches any real
@@ -328,7 +348,8 @@ func TestPreviewRoute_TemplateSubject_ResolutionParity_RealDB(t *testing.T) {
 	}
 
 	// Parity 1: preview and the real submit resolved the SAME route id from the
-	// SAME subject (template_id, not version_id).
+	// SAME subject (the template's doc_type_code, not the template id and not
+	// the version id).
 	if preview.RouteID != instRouteID {
 		t.Fatalf("preview RouteID %q != submit instance RouteID %q — resolution parity broken", preview.RouteID, instRouteID)
 	}

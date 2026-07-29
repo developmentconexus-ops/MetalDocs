@@ -161,11 +161,9 @@ func clampTemplatesLimit(limit int) int {
 }
 
 // ListTemplates returns non-system templates for the tenant, optionally
-// filtered by doc type code (a nil filter also always includes generic
-// templates, i.e. those with an empty doc_type_code) and, when
-// f.PublishedOnly is true, restricted to templates that currently have a
-// published version, newest first, clamped to the /templates contract's
-// pagination bounds via clampTemplatesLimit.
+// filtered by doc type code and, when f.PublishedOnly is true, restricted to
+// templates that currently have a published version, newest first, clamped to
+// the /templates contract's pagination bounds via clampTemplatesLimit.
 func (r *Repository) ListTemplates(ctx context.Context, f application.ListFilter) ([]*domain.TemplateRead, error) {
 	const q = `
 SELECT
@@ -178,12 +176,11 @@ LEFT JOIN templates_template_version pv ON pv.id = t.published_version_id
 LEFT JOIN templates_template_version lv ON lv.template_id = t.id AND lv.version_number = t.latest_version
 WHERE t.tenant_id = $1::uuid
   AND t.system_owned = false
-  -- A profile filter ($2) returns templates scoped to that profile PLUS generic
-  -- templates (doc_type_code = ''), which by product definition apply to every
-  -- profile — the template wizard's "Genérico" scope promises "templates
-  -- genéricos aparecem para todos os perfis". A NULL filter returns every
-  -- non-system template (management listing).
-  AND ($2::text IS NULL OR t.doc_type_code = $2 OR t.doc_type_code = '')
+  -- A profile filter ($2) returns exactly that profile's templates. Generic
+  -- templates were exterminated by ADR 0086 (migration 0315), so there is no
+  -- profile-less set to union in. A NULL filter returns every non-system
+  -- template (management listing).
+  AND ($2::text IS NULL OR t.doc_type_code = $2)
   -- published=true ($5) restricts to templates that currently have a
   -- published version (the selectable-to-clone set for the new-document
   -- wizard); false/omitted keeps the management view (every status).

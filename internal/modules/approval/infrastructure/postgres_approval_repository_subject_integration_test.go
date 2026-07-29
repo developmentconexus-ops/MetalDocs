@@ -212,34 +212,18 @@ func TestInsertInstance_ZeroSubject_ReturnsError_RealDB(t *testing.T) {
 
 // TestLoadRoute_TemplateSubject_RoundTrips_RealDB proves (b) for routes:
 // LoadRoute hydrates Subject from the real subject_kind/subject_key columns,
-// not by deriving {document, profile_code} from the legacy profile_code
-// column. The route is seeded via the normal factory (document subject, no
-// tripwire on approval_routes INSERT — see testdb.NewApprovalRoute), then
-// UPDATEd directly to a template subject whose key differs from profile_code
-// (UPDATE is not covered by the P2.S1 compat trigger, which only fires
-// BEFORE INSERT, so this exercises exactly the persisted-value case the read
-// path must trust).
+// not by deriving the kind from the legacy profile_code column. Under ADR 0086
+// a template ROUTE is profile-keyed (profile_code = subject_key, enforced by
+// approval_routes_template_subject_key_check, migration 0315), so the
+// discriminator that must survive the round trip is subject_kind: a document
+// route and a template route on the SAME profile are distinguishable only by it.
 func TestLoadRoute_TemplateSubject_RoundTrips_RealDB(t *testing.T) {
-	// P3.S2b-1: repo READ path is now NULL-profile_code tolerant.
-
 	dbc, _ := testdb.Open(t)
 	repo := NewPostgresApprovalRepository(dbc, iamdomain.NoopUserDisplayNameReader{})
 	ctx := context.Background()
 
-	route := testdb.NewApprovalRoute(t, dbc)
-
-	templateKey := "tmpl-route-" + uuid.NewString()
-	if templateKey == route.ProfileCode {
-		t.Fatal("templateKey collided with route.ProfileCode — test setup broken")
-	}
-	// profile_code goes NULL alongside the flip: migration 0297's projection
-	// CHECK forbids a template-subject route from carrying a profile_code.
-	if _, err := dbc.ExecContext(ctx,
-		`UPDATE public.approval_routes SET subject_kind = 'template', subject_key = $2, profile_code = NULL WHERE id = $1::uuid`,
-		route.ID, templateKey,
-	); err != nil {
-		t.Fatalf("update route subject: %v", err)
-	}
+	route := testdb.NewApprovalRoute(t, dbc,
+		testdb.WithSubjectKind(string(domain.SubjectKindTemplate)))
 
 	tx, err := dbc.BeginTx(ctx, nil)
 	if err != nil {
@@ -251,18 +235,22 @@ func TestLoadRoute_TemplateSubject_RoundTrips_RealDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadRoute: %v", err)
 	}
-	if got.Subject.Kind != domain.SubjectKindTemplate || got.Subject.Key != templateKey {
-		t.Fatalf("LoadRoute Subject = %+v, want {template %s} — hydration is still deriving from profile_code", got.Subject, templateKey)
+	if got.Subject.Kind != domain.SubjectKindTemplate || got.Subject.Key != route.ProfileCode {
+		t.Fatalf("LoadRoute Subject = %+v, want {template %s} — hydration is still deriving the kind from profile_code", got.Subject, route.ProfileCode)
 	}
 }
 
-// TestLoadActiveRouteIDBySubject_TemplateSubject_RealDB proves the new
+// TestLoadActiveRouteIDBySubject_TemplateSubject_RealDB proves the
 // subject-generic route-selection method (P3.S2b-2, ADR 0082) selects a
-// template-subject route by (subject_kind, subject_key) — something the
-// legacy profile_code-only LoadActiveRouteIDByProfile can never do (a
-// template route carries no profile_code) — while the document path stays
-// selectable both via the new generic method AND via the now-delegating
-// LoadActiveRouteIDByProfile (delegation-equivalence axis).
+// template-subject route by (subject_kind, subject_key) — something the legacy
+// profile_code-only LoadActiveRouteIDByProfile can never do, because under ADR
+// 0086 both kinds share the profile key and only subject_kind separates them —
+// while the document path stays selectable both via the generic method AND via
+// the now-delegating LoadActiveRouteIDByProfile (delegation-equivalence axis).
+//
+// The two routes are deliberately seeded on the SAME profile: that is the case
+// the rebuilt approval_routes_active_profile_uq index must permit, and the case
+// where a kind-blind selector would return the wrong route.
 func TestLoadActiveRouteIDBySubject_TemplateSubject_RealDB(t *testing.T) {
 	dbc, _ := testdb.Open(t)
 	baseRepo := NewPostgresApprovalRepository(dbc, iamdomain.NoopUserDisplayNameReader{})
@@ -284,19 +272,15 @@ func TestLoadActiveRouteIDBySubject_TemplateSubject_RealDB(t *testing.T) {
 	// Document-subject route via the ordinary factory (active by default).
 	docRoute := testdb.NewApprovalRoute(t, dbc)
 
-	// Template-subject route: seed via factory then flip subject_kind/key,
-	// same technique as TestLoadRoute_TemplateSubject_RoundTrips_RealDB.
-	tmplRoute := testdb.NewApprovalRoute(t, dbc, testdb.WithTenant(docRoute.TenantID))
-	templateKey := "tmpl-route-" + uuid.NewString()
-	if templateKey == tmplRoute.ProfileCode {
-		t.Fatal("templateKey collided with tmplRoute.ProfileCode — test setup broken")
+	// Template-subject route on the SAME profile as the document route.
+	tmplRoute := testdb.NewApprovalRoute(t, dbc,
+		testdb.WithTenant(docRoute.TenantID),
+		testdb.WithProfile(docRoute.ProfileCode),
+		testdb.WithSubjectKind(string(domain.SubjectKindTemplate)))
+	if tmplRoute.ID == docRoute.ID {
+		t.Fatal("factory returned the same route for both kinds — test setup broken")
 	}
-	if _, err := dbc.ExecContext(ctx,
-		`UPDATE public.approval_routes SET subject_kind = 'template', subject_key = $2, profile_code = NULL WHERE id = $1::uuid`,
-		tmplRoute.ID, templateKey,
-	); err != nil {
-		t.Fatalf("update route subject: %v", err)
-	}
+	templateKey := tmplRoute.ProfileCode
 
 	tx, err := dbc.BeginTx(ctx, nil)
 	if err != nil {

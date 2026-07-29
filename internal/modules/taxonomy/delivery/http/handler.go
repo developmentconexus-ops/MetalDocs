@@ -14,6 +14,7 @@ import (
 	"net/http"
 
 	taxonomyapi "metaldocs/internal/modules/taxonomy/api"
+	"metaldocs/internal/modules/taxonomy/application"
 	"metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/idempotency"
@@ -29,8 +30,9 @@ type profileService interface {
 	SetDefaultTemplate(ctx context.Context, tenantID string, profileCode domain.ProfileCode, templateVersionID, actorID string) error
 	Archive(ctx context.Context, tenantID string, profileCode domain.ProfileCode, actorID string) error
 	// RouteReadySubjects returns the profile codes with an active approval
-	// route, backing DocumentProfileItem.has_active_route.
-	RouteReadySubjects(ctx context.Context, tenantID string) (map[string]struct{}, error)
+	// route, per subject kind, backing DocumentProfileItem.has_active_route
+	// and .has_active_template_route.
+	RouteReadySubjects(ctx context.Context, tenantID string) (application.RouteReadiness, error)
 }
 
 type areaService interface {

@@ -23,8 +23,9 @@ func (h *Handler) ListTemplates(w http.ResponseWriter, r *http.Request, params t
 
 // CreateTemplate handles POST /templates: authorizes CapTemplateCreate,
 // validates the required key/name fields, and creates a new template with
-// its initial draft version. ADR 0082 phase (a) part 1: this no longer
-// accepts or seeds approver/reviewer role bindings.
+// its initial draft version. doc_type_code is required too, but is validated
+// in the service so it can carry the spec's 422 (see below). ADR 0082 phase
+// (a) part 1: this no longer accepts or seeds approver/reviewer role bindings.
 func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request, _ templatesapi.CreateTemplateParams) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
@@ -51,17 +52,18 @@ func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request, _ templ
 	if req.Description != nil {
 		description = *req.Description
 	}
-	docTypeCode := ""
-	if req.DocTypeCode != nil {
-		docTypeCode = strings.TrimSpace(*req.DocTypeCode)
-	}
+	// doc_type_code is a required, non-pointer field on the generated body
+	// (ADR 0086 — generic templates no longer exist). A blank/omitted value is
+	// NOT folded into missingCreateTemplateField's 400: the spec declares 422
+	// for it, so it travels to the service and comes back as
+	// domain.ErrDocTypeCodeRequired.
 	res, err := h.svc.CreateTemplate(r.Context(), application.CreateTemplateCmd{
 		TenantID:    tenantID,
 		ActorUserID: actorID,
 		Key:         strings.TrimSpace(req.Key),
 		Name:        strings.TrimSpace(req.Name),
 		Description: description,
-		DocTypeCode: docTypeCode,
+		DocTypeCode: strings.TrimSpace(req.DocTypeCode),
 	})
 	if err != nil {
 		writeMappedErr(w, err)

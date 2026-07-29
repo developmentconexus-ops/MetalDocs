@@ -117,8 +117,113 @@ VALUES
     -- system_admin is the canonical role the 'admin' phantom migrated to.
     'system_admin',
     NULL
+  ),
+  (
+    'it',
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    'quality',
+    'Instrucao de Trabalho',
+    'Perfil seeded para as jornadas de template (ADR 0086).',
+    'IT',
+    365,
+    NULL,
+    'admin',
+    'system_admin',
+    NULL
   )
 ON CONFLICT (tenant_id, code) DO NOTHING;
+
+-- ADR 0086: a template can only be created under a profile that already has an
+-- ACTIVE TEMPLATE approval route (subject_kind='template', subject_key = the
+-- profile code). Without these rows every local POST /templates would fail
+-- closed with 409 APPROVAL_ROUTE_MISSING and the template QA journeys could not
+-- start. Both seeded profiles are governance_class='controlado' (the column
+-- default), so each route needs >= 1 approval-kind stage or
+-- enforce_profile_route_policy rejects it.
+INSERT INTO public.approval_routes (
+  id, tenant_id, profile_code, name, version, created_by, active, subject_kind, subject_key
+)
+VALUES
+  (
+    '00000000-0000-0000-0000-0000000003a1',
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    'po',
+    'Aprovacao de template - PO',
+    1,
+    'admin',
+    TRUE,
+    'template',
+    'po'
+  ),
+  (
+    '00000000-0000-0000-0000-0000000003a2',
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    'it',
+    'Aprovacao de template - IT',
+    1,
+    'admin',
+    TRUE,
+    'template',
+    'it'
+  )
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.approval_route_stages (
+  id, route_id, stage_order, name, required_capability, quorum, quorum_m, on_eligibility_drift, stage_kind
+)
+VALUES
+  (
+    '00000000-0000-0000-0000-0000000003b1',
+    '00000000-0000-0000-0000-0000000003a1',
+    1,
+    'Aprovacao',
+    'template.approve',
+    'any_1_of',
+    NULL,
+    'reduce_quorum',
+    'approval'
+  ),
+  (
+    '00000000-0000-0000-0000-0000000003b2',
+    '00000000-0000-0000-0000-0000000003a2',
+    1,
+    'Aprovacao',
+    'template.approve',
+    'any_1_of',
+    NULL,
+    'reduce_quorum',
+    'approval'
+  )
+ON CONFLICT (id) DO NOTHING;
+
+-- Actor pool: role x fixed area. 'rh' holds the seeded approver memberships
+-- ('approver' as qms_admin, 'approver-test' as approver), so both stages
+-- resolve to a non-empty eligible pool and submit does not 422.
+INSERT INTO public.approval_route_stage_selectors (
+  id, tenant_id, route_stage_id, selector_order, kind, user_id, role, area_code
+)
+VALUES
+  (
+    '00000000-0000-0000-0000-0000000003c1',
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    '00000000-0000-0000-0000-0000000003b1',
+    1,
+    'role_in_fixed_area',
+    NULL,
+    'approver',
+    'rh'
+  ),
+  (
+    '00000000-0000-0000-0000-0000000003c2',
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    '00000000-0000-0000-0000-0000000003b2',
+    1,
+    'role_in_fixed_area',
+    NULL,
+    'approver',
+    'rh'
+  )
+ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.user_process_areas (
   user_id,

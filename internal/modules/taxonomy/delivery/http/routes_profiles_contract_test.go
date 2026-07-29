@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/modules/taxonomy/application"
 	"metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
@@ -20,15 +21,22 @@ type fakeProfileService struct {
 	updateErr error
 	getErr    error
 	// routeReady is the set of profile codes reported as having an active
-	// approval route (has_active_route); nil means none.
+	// DOCUMENT approval route (has_active_route); nil means none.
 	routeReady map[string]struct{}
+	// templateRouteReady is the same for TEMPLATE routes
+	// (has_active_template_route, ADR 0086); nil means none.
+	templateRouteReady map[string]struct{}
 }
 
-func (f fakeProfileService) RouteReadySubjects(_ context.Context, _ string) (map[string]struct{}, error) {
-	if f.routeReady == nil {
-		return map[string]struct{}{}, nil
+func (f fakeProfileService) RouteReadySubjects(_ context.Context, _ string) (application.RouteReadiness, error) {
+	ready := application.RouteReadiness{Documents: f.routeReady, Templates: f.templateRouteReady}
+	if ready.Documents == nil {
+		ready.Documents = map[string]struct{}{}
 	}
-	return f.routeReady, nil
+	if ready.Templates == nil {
+		ready.Templates = map[string]struct{}{}
+	}
+	return ready, nil
 }
 
 func (f fakeProfileService) List(ctx context.Context, tenantID string, includeArchived bool) ([]domain.DocumentProfile, error) {

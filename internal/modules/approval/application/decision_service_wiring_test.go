@@ -28,6 +28,10 @@ func (wiringStubTemplateReader) LoadTemplateInboxMeta(context.Context, db.Tx, st
 	return nil, nil
 }
 
+func (wiringStubTemplateReader) LoadTemplateDocTypeCode(context.Context, db.Tx, string, string) (string, error) {
+	return "", nil
+}
+
 // wiringStubTemplateCompletion is an inert TemplateCompletionWriter used only
 // to assert wiring/identity, not behavior.
 type wiringStubTemplateCompletion struct{}

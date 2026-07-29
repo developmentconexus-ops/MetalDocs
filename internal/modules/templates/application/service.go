@@ -8,7 +8,10 @@
 // stable error vocabulary the HTTP layer maps to responses.
 package application
 
-import "metaldocs/internal/platform/db"
+import (
+	approvaldomain "metaldocs/internal/modules/approval/domain"
+	"metaldocs/internal/platform/db"
+)
 
 // Service is the application-layer facade for the templates module's use
 // cases. It composes the Repository, Presigner, Clock, UUIDGen, and
@@ -21,6 +24,10 @@ type Service struct {
 	uuid      UUIDGen
 	resolvers ResolverRegistryReader
 	runner    db.TxRunner
+	// routes is the approval-owned readiness port used by the ADR 0086
+	// config-first creation gate. Nil means the gate fails CLOSED — see
+	// CreateTemplate's requireActiveTemplateRoute.
+	routes approvaldomain.RouteReadinessReader
 }
 
 // New constructs a Service with the given repository, presigner, clock, UUID
@@ -41,5 +48,18 @@ func New(repo Repository, presign Presigner, clock Clock, uuid UUIDGen, resolver
 // the port at the composition root.
 func (s *Service) WithRunner(runner db.TxRunner) *Service {
 	s.runner = runner
+	return s
+}
+
+// WithRouteReadinessReader wires the approval-owned route-readiness port
+// post-construction (same builder idiom controlleddocuments uses, keeping the
+// New signature stable). The module composition root injects it; when it is
+// absent CreateTemplate fails closed with domain.ErrApprovalRouteMissing
+// rather than creating a template that could never be submitted.
+func (s *Service) WithRouteReadinessReader(r approvaldomain.RouteReadinessReader) *Service {
+	if r == nil {
+		panic("templates: route readiness reader must not be nil")
+	}
+	s.routes = r
 	return s
 }

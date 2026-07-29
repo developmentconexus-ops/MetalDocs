@@ -69,21 +69,38 @@ func (s *ProfileService) WithRouteReadinessReader(r approvaldomain.RouteReadines
 	return s
 }
 
-// RouteReadySubjects returns the set of profile codes in tenantID that have an
-// active approval route (approval_routes, subject_kind=document). It is the
-// single place taxonomy names the document subject kind; delivery just does a
-// membership test to fill DocumentProfileItem.has_active_route.
+// RouteReadiness carries per-subject-kind route readiness for a tenant's
+// profiles. Both routes are profile-keyed (ADR 0086), so each set holds profile
+// codes and delivery fills has_active_route / has_active_template_route with a
+// plain membership test.
+type RouteReadiness struct {
+	Documents map[string]struct{}
+	Templates map[string]struct{}
+}
+
+// RouteReadySubjects returns, for tenantID, the profile codes that have an
+// active DOCUMENT approval route and those that have an active TEMPLATE one
+// (approval_routes, subject_kind=document / template — both keyed on the
+// profile code since ADR 0086). It is the single place taxonomy names either
+// subject kind.
+//
+// Two bulk reads, never a per-profile query: the profile listing annotates its
+// whole page from these two sets.
 //
 // Readiness only — taxonomy never sees a route id or any route internals.
-func (s *ProfileService) RouteReadySubjects(ctx context.Context, tenantID string) (map[string]struct{}, error) {
+func (s *ProfileService) RouteReadySubjects(ctx context.Context, tenantID string) (RouteReadiness, error) {
 	if s.routes == nil {
-		return nil, ErrRouteReadinessUnconfigured
+		return RouteReadiness{}, ErrRouteReadinessUnconfigured
 	}
-	keys, err := s.routes.ActiveRouteSubjectKeys(ctx, tenantID, string(approvaldomain.SubjectKindDocument))
+	documents, err := s.routes.ActiveRouteSubjectKeys(ctx, tenantID, string(approvaldomain.SubjectKindDocument))
 	if err != nil {
-		return nil, fmt.Errorf("taxonomy: read approval route readiness: %w", err)
+		return RouteReadiness{}, fmt.Errorf("taxonomy: read approval route readiness: %w", err)
 	}
-	return keys, nil
+	templates, err := s.routes.ActiveRouteSubjectKeys(ctx, tenantID, string(approvaldomain.SubjectKindTemplate))
+	if err != nil {
+		return RouteReadiness{}, fmt.Errorf("taxonomy: read template approval route readiness: %w", err)
+	}
+	return RouteReadiness{Documents: documents, Templates: templates}, nil
 }
 
 // List returns profiles for tenantID, including archived ones when

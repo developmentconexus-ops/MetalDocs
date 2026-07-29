@@ -265,12 +265,13 @@ func TestCreateRouteRequestValidate(t *testing.T) {
 	}
 }
 
-// TestCreateRouteRequestValidate_ProfileCodeSubjectKindRule pins the S1 (F18)
-// contract fix: profile_code presence is conditional on subject_kind, mirroring
-// DB truth (migration 0297 approval_routes_template_subject_projection_check,
-// ADR 0082). A template route has no profile — carrying a non-empty
-// profile_code must fail validation (not be silently accepted and later
-// dropped); a document (or absent-kind) route still requires profile_code.
+// TestCreateRouteRequestValidate_ProfileCodeSubjectKindRule pins the ADR 0086
+// INVERSION of the S1/F18 rule: profile_code is now REQUIRED for every
+// subject_kind, template included, because a template route is config-first
+// and keyed by the profile (doc_type_code) it governs. DB truth: migration
+// 0315's approval_routes_template_subject_key_check, which replaced 0297's
+// approval_routes_template_subject_projection_check (profile_code IS NULL).
+// The old "template must NOT carry profile_code" rule is gone, not relaxed.
 func TestCreateRouteRequestValidate_ProfileCodeSubjectKindRule(t *testing.T) {
 	stages := func() []StageRequest {
 		return []StageRequest{
@@ -285,27 +286,25 @@ func TestCreateRouteRequestValidate_ProfileCodeSubjectKindRule(t *testing.T) {
 		}
 	}
 
-	// (b) template + non-empty profile_code must fail.
+	// (a) template + non-empty profile_code must SUCCEED (inverted).
 	templateWithProfileCode := CreateRouteRequest{
 		ProfileCode: strp("ops"),
 		Name:        "Template Route",
 		SubjectKind: "template",
-		SubjectKey:  "tmpl-1",
 		Stages:      stages(),
 	}
-	if err := templateWithProfileCode.Validate(); err == nil {
-		t.Fatalf("expected error: profile_code must be absent for template routes")
+	if err := templateWithProfileCode.Validate(); err != nil {
+		t.Fatalf("expected template route with profile_code to be valid, got: %v", err)
 	}
 
-	// (b-corollary) template + empty profile_code must succeed.
+	// (b) template + absent profile_code must FAIL (inverted).
 	templateNoProfileCode := CreateRouteRequest{
 		Name:        "Template Route",
 		SubjectKind: "template",
-		SubjectKey:  "tmpl-1",
 		Stages:      stages(),
 	}
-	if err := templateNoProfileCode.Validate(); err != nil {
-		t.Fatalf("expected template route with no profile_code to be valid, got: %v", err)
+	if err := templateNoProfileCode.Validate(); err == nil {
+		t.Fatalf("expected error: profile_code is required for template routes")
 	}
 
 	// (c) document (absent subject_kind) + empty profile_code must fail.
@@ -326,17 +325,25 @@ func TestCreateRouteRequestValidate_ProfileCodeSubjectKindRule(t *testing.T) {
 	if err := documentKindNoProfileCode.Validate(); err == nil {
 		t.Fatalf("expected error: profile_code required when subject_kind is document")
 	}
+
+	// (d) an unknown subject_kind is still rejected outright.
+	unknownKind := CreateRouteRequest{
+		ProfileCode: strp("ops"),
+		Name:        "Weird Route",
+		SubjectKind: "revision",
+		Stages:      stages(),
+	}
+	if err := unknownKind.Validate(); err == nil {
+		t.Fatalf("expected error: unknown subject_kind must be rejected")
+	}
 }
 
-// TestCreateRouteRequestValidate_ProfileCodePresentButEmptyOrNull pins QR-A
-// finding B: ProfileCode is a *string precisely so "present but empty"
-// (`"profile_code":""`) is distinguishable from "omitted" — a plain string
-// could not tell them apart, and both must be rejected for a template route
-// per migration 0297's projection check. A JSON `null` decodes to the same
-// nil pointer as an omitted key (stdlib encoding/json behavior); route.go
-// documents that as a deliberate tolerance, so template+null is accepted as
-// omitted here, and document+null is rejected the same way document+omitted
-// already is.
+// TestCreateRouteRequestValidate_ProfileCodePresentButEmptyOrNull keeps QR-A
+// finding B's distinction alive under the ADR 0086 rule: ProfileCode is a
+// *string so "present but empty" (`"profile_code":""`) is distinguishable
+// from "omitted". Both are now rejected for BOTH subject kinds — the required
+// rule is uniform, so the empty-string sentinel and the nil pointer fail
+// identically.
 func TestCreateRouteRequestValidate_ProfileCodePresentButEmptyOrNull(t *testing.T) {
 	stages := func() []StageRequest {
 		return []StageRequest{
@@ -352,10 +359,9 @@ func TestCreateRouteRequestValidate_ProfileCodePresentButEmptyOrNull(t *testing.
 	}
 
 	// template + `"profile_code":""` (present-but-empty, decoded via JSON so
-	// the pointer is non-nil pointing at "") must fail — the same rule as a
-	// present non-empty value, now also catching the empty-string sentinel.
+	// the pointer is non-nil pointing at "") must fail the required rule.
 	var templateReq CreateRouteRequest
-	body := `{"name":"Template Route","subject_kind":"template","subject_key":"tmpl-1","profile_code":"","stages":[{"order":1,"name":"Review","required_capability":"document.signoff","quorum":"any_1_of","drift_policy":"reduce_quorum","selectors":[{"kind":"role_in_fixed_area","role":"approver","area_code":"ops"}]}]}`
+	body := `{"name":"Template Route","subject_kind":"template","profile_code":"","stages":[{"order":1,"name":"Review","required_capability":"document.signoff","quorum":"any_1_of","drift_policy":"reduce_quorum","selectors":[{"kind":"role_in_fixed_area","role":"approver","area_code":"ops"}]}]}`
 	if err := json.Unmarshal([]byte(body), &templateReq); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -367,16 +373,15 @@ func TestCreateRouteRequestValidate_ProfileCodePresentButEmptyOrNull(t *testing.
 	}
 
 	// template + `"profile_code":null` decodes to a nil pointer, identical to
-	// omission — accepted-as-omitted (documented tolerance).
+	// omission — and now fails the same required rule.
 	templateNull := CreateRouteRequest{
 		ProfileCode: nil,
 		Name:        "Template Route",
 		SubjectKind: "template",
-		SubjectKey:  "tmpl-1",
 		Stages:      stages(),
 	}
-	if err := templateNull.Validate(); err != nil {
-		t.Fatalf("expected template route with profile_code=null (≡ omitted) to be valid, got: %v", err)
+	if err := templateNull.Validate(); err == nil {
+		t.Fatalf("expected error: profile_code=null (≡ omitted) must fail for a template route")
 	}
 
 	// document + `"profile_code":null` must fail exactly like document +

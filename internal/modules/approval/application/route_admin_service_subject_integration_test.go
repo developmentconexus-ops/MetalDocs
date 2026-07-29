@@ -264,21 +264,20 @@ func TestRouteAdminList_ExposesSubjectFields_RealDB(t *testing.T) {
 	}
 }
 
-// TestRouteAdminCreate_TemplateSubject_ProfileCodeNull_RealDB is the S1 (F18)
-// failing-test-first case (a): a template-subject route created with an empty
-// ProfileCode must succeed and persist profile_code as SQL NULL (not empty
-// string), matching the DB truth in migration 0297
-// (approval_routes_template_subject_projection_check forbids a non-NULL
-// profile_code when subject_kind='template'). Before the S1 fix this either
-// violated the DB check (in.ProfileCode bound as "" is non-NULL) or was
-// unreachable because the contract layer required profile_code
-// unconditionally.
-func TestRouteAdminCreate_TemplateSubject_ProfileCodeNull_RealDB(t *testing.T) {
+// TestRouteAdminCreate_TemplateSubject_ProfileKeyed_RealDB is the ADR 0086
+// inversion of the retired ..._ProfileCodeNull_RealDB case: a template route
+// is CONFIG-FIRST and PROFILE-KEYED, so it is created from a ProfileCode alone
+// (no SubjectKey) and must persist profile_code = subject_key = that code.
+// DB truth: approval_routes_template_subject_key_check (migration 0315), which
+// replaced 0297's approval_routes_template_subject_projection_check
+// (profile_code IS NULL) outright — there is no dual-read.
+func TestRouteAdminCreate_TemplateSubject_ProfileKeyed_RealDB(t *testing.T) {
 	dbc, _ := testdb.Open(t)
 	ctx := context.Background()
 
 	tnt := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
 
 	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
 	svc := &RouteAdminService{repo: repo, emitter: NewSQLEmitter(), clock: RealClock{}}
@@ -286,10 +285,10 @@ func TestRouteAdminCreate_TemplateSubject_ProfileCodeNull_RealDB(t *testing.T) {
 
 	out, err := svc.Create(routeAdminSubjectCtx(tnt.ID, actor.ID), runner, CreateRouteInput{
 		TenantID:    tnt.ID,
+		ProfileCode: tax.ProfileCode,
 		Name:        "Template Route",
 		ActorUserID: actor.ID,
 		SubjectKind: "template",
-		SubjectKey:  "tmpl-version-1",
 		Stages:      validRouteStages(),
 	})
 	if err != nil {
@@ -304,14 +303,96 @@ func TestRouteAdminCreate_TemplateSubject_ProfileCodeNull_RealDB(t *testing.T) {
 	).Scan(&profileCode, &subjectKind, &subjectKey); err != nil {
 		t.Fatalf("query persisted route: %v", err)
 	}
-	if profileCode.Valid {
-		t.Errorf("profile_code = %q, want SQL NULL", profileCode.String)
+	if !profileCode.Valid || profileCode.String != tax.ProfileCode {
+		t.Errorf("profile_code = %+v, want valid %q", profileCode, tax.ProfileCode)
 	}
 	if subjectKind != "template" {
 		t.Errorf("subject_kind = %q, want %q", subjectKind, "template")
 	}
-	if subjectKey != "tmpl-version-1" {
-		t.Errorf("subject_key = %q, want %q", subjectKey, "tmpl-version-1")
+	if subjectKey != tax.ProfileCode {
+		t.Errorf("subject_key = %q, want %q (= profile_code)", subjectKey, tax.ProfileCode)
+	}
+	if out.ProfileCode == nil || *out.ProfileCode != tax.ProfileCode {
+		t.Errorf("result ProfileCode = %v, want %q — a template route never projects NULL now", out.ProfileCode, tax.ProfileCode)
+	}
+}
+
+// TestRouteAdminCreate_TemplateSubject_DivergentSubjectKey_Rejected_RealDB is
+// the negative twin: post-ADR-0086 a template route's subject_key IS its
+// profile code, so an explicit divergent key (the pre-0086 shape — a template
+// INSTANCE id) is rejected with ErrTemplateSubjectKeyMismatch and no row is
+// written.
+func TestRouteAdminCreate_TemplateSubject_DivergentSubjectKey_Rejected_RealDB(t *testing.T) {
+	dbc, _ := testdb.Open(t)
+	ctx := context.Background()
+
+	tnt := testdb.NewTenant(t, dbc)
+	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+
+	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
+	svc := &RouteAdminService{repo: repo, emitter: NewSQLEmitter(), clock: RealClock{}}
+	runner := db.NewTxRunner(dbc)
+
+	_, err := svc.Create(routeAdminSubjectCtx(tnt.ID, actor.ID), runner, CreateRouteInput{
+		TenantID:    tnt.ID,
+		ProfileCode: tax.ProfileCode,
+		Name:        "Divergent Template Route",
+		ActorUserID: actor.ID,
+		SubjectKind: "template",
+		SubjectKey:  "tmpl-version-1",
+		Stages:      validRouteStages(),
+	})
+	if !errors.Is(err, ErrTemplateSubjectKeyMismatch) {
+		t.Fatalf("expected ErrTemplateSubjectKeyMismatch; got %v", err)
+	}
+
+	var count int
+	if err := dbc.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM public.approval_routes WHERE tenant_id = $1::uuid AND name = $2`,
+		tnt.ID, "Divergent Template Route",
+	).Scan(&count); err != nil {
+		t.Fatalf("count check: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("row count for rejected create = %d, want 0", count)
+	}
+}
+
+// TestRouteAdminCreate_TemplateSubject_NoProfileCode_Rejected_RealDB pins the
+// inverted requirement: profile_code is now MANDATORY for a template route
+// (it used to be forbidden). With no ProfileCode the subject key resolves
+// empty and Subject.Validate rejects the create before any write.
+func TestRouteAdminCreate_TemplateSubject_NoProfileCode_Rejected_RealDB(t *testing.T) {
+	dbc, _ := testdb.Open(t)
+	ctx := context.Background()
+
+	tnt := testdb.NewTenant(t, dbc)
+	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
+
+	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
+	svc := &RouteAdminService{repo: repo, emitter: NewSQLEmitter(), clock: RealClock{}}
+	runner := db.NewTxRunner(dbc)
+
+	if _, err := svc.Create(routeAdminSubjectCtx(tnt.ID, actor.ID), runner, CreateRouteInput{
+		TenantID:    tnt.ID,
+		Name:        "Unkeyed Template Route",
+		ActorUserID: actor.ID,
+		SubjectKind: "template",
+		Stages:      validRouteStages(),
+	}); err == nil {
+		t.Fatal("Create with no ProfileCode succeeded; want rejection")
+	}
+
+	var count int
+	if err := dbc.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM public.approval_routes WHERE tenant_id = $1::uuid AND name = $2`,
+		tnt.ID, "Unkeyed Template Route",
+	).Scan(&count); err != nil {
+		t.Fatalf("count check: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("row count for rejected create = %d, want 0", count)
 	}
 }
 
@@ -355,13 +436,12 @@ func TestRouteAdminCreate_DocumentSubject_ProfileCodePopulated_RealDB(t *testing
 	}
 }
 
-// TestRouteAdminList_TemplateAndDocumentRoutes_RealDB is the S5 (QR-A dual-gate
-// finding 1) regression closure: List (RouteAdminService.List →
-// infrastructure.scanRouteListRows) must not 500 when the tenant has a NULL
-// profile_code template route mixed in with an ordinary document route. Before
-// the fix, scanRouteListRows scanned r.profile_code into a plain string var —
-// any NULL row aborted rows.Scan for the ENTIRE result set, so one template
-// route broke the whole route-admin listing (CRITICAL finding 1).
+// TestRouteAdminList_TemplateAndDocumentRoutes_RealDB now doubles as the
+// ADR 0086 coexistence proof: the SAME profile may carry an active document
+// route AND an active template route simultaneously, because migration 0315
+// rebuilt approval_routes_active_profile_uq on
+// (tenant_id, subject_kind, profile_code). It also keeps the S5 (QR-A finding
+// 1) list-scan guard alive — both rows must come back from one List call.
 func TestRouteAdminList_TemplateAndDocumentRoutes_RealDB(t *testing.T) {
 	dbc, _ := testdb.Open(t)
 
@@ -386,10 +466,10 @@ func TestRouteAdminList_TemplateAndDocumentRoutes_RealDB(t *testing.T) {
 
 	tmplOut, err := svc.Create(routeAdminSubjectCtx(tnt.ID, actor.ID), runner, CreateRouteInput{
 		TenantID:    tnt.ID,
+		ProfileCode: tax.ProfileCode,
 		Name:        "List Mix Template Route",
 		ActorUserID: actor.ID,
 		SubjectKind: "template",
-		SubjectKey:  "tmpl-list-mix-1",
 		Stages:      validRouteStages(),
 	})
 	if err != nil {
@@ -424,29 +504,32 @@ func TestRouteAdminList_TemplateAndDocumentRoutes_RealDB(t *testing.T) {
 	if !ok {
 		t.Fatalf("template route %q missing from List output", tmplOut.RouteID)
 	}
-	if tmplRoute.ProfileCode != "" {
-		t.Errorf("template route ProfileCode = %q, want empty (NULL collapsed)", tmplRoute.ProfileCode)
+	if tmplRoute.ProfileCode != tax.ProfileCode {
+		t.Errorf("template route ProfileCode = %q, want %q (profile-keyed since ADR 0086)", tmplRoute.ProfileCode, tax.ProfileCode)
+	}
+	if tmplRoute.SubjectKey != tax.ProfileCode {
+		t.Errorf("template route SubjectKey = %q, want %q", tmplRoute.SubjectKey, tax.ProfileCode)
 	}
 	if tmplRoute.SubjectKind != "template" {
 		t.Errorf("template route SubjectKind = %q, want template", tmplRoute.SubjectKind)
 	}
 }
 
-// TestRouteAdminUpdate_TemplateRoute_RealDB is the S5 (QR-A dual-gate finding
-// 2) regression closure: updating an ACTIVE template route (profile_code is
-// SQL NULL) must succeed. Before the fix, resolveUpdatePolicy's
-// loadActiveRouteProfileCode scanned profile_code into a plain string var —
-// NULL made the off-tx policy-resolution read fail with a sql.Scan error,
-// which resolveUpdatePolicy propagated, aborting updateTx before the write
-// tx ever opened (CRITICAL finding 2). This requires a non-nil policyReader
-// (stubPolicyReader, package-local from profile_policy_wiring_test.go) —
-// with a nil policyReader, resolveUpdatePolicy short-circuits before ever
-// reaching loadActiveRouteProfileCode and would not exercise the bug.
+// TestRouteAdminUpdate_TemplateRoute_RealDB is the ADR 0086 update-path proof:
+// a template route now carries a profile_code, so resolveUpdatePolicy resolves
+// a REAL policy for it (pre-0086 the NULL profile_code made the policy
+// resolution either crash — the S5/QR-A finding 2 NULL-scan bug — or be
+// skipped entirely, meaning RoutePolicy never applied to template routes).
+// The update must succeed AND profile_code must survive unchanged. Requires a
+// non-nil policyReader (stubPolicyReader, package-local from
+// profile_policy_wiring_test.go); with a nil reader resolveUpdatePolicy
+// short-circuits and the path under test is never reached.
 func TestRouteAdminUpdate_TemplateRoute_RealDB(t *testing.T) {
 	dbc, _ := testdb.Open(t)
 
 	tnt := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
 
 	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
 	svc := (&RouteAdminService{repo: repo, emitter: NewSQLEmitter(), clock: RealClock{}}).
@@ -455,10 +538,10 @@ func TestRouteAdminUpdate_TemplateRoute_RealDB(t *testing.T) {
 
 	createOut, err := svc.Create(routeAdminSubjectCtx(tnt.ID, actor.ID), runner, CreateRouteInput{
 		TenantID:    tnt.ID,
+		ProfileCode: tax.ProfileCode,
 		Name:        "Update Template Route",
 		ActorUserID: actor.ID,
 		SubjectKind: "template",
-		SubjectKey:  "tmpl-update-1",
 		Stages:      validRouteStages(),
 	})
 	if err != nil {
@@ -494,7 +577,7 @@ func TestRouteAdminUpdate_TemplateRoute_RealDB(t *testing.T) {
 	if name != "Update Template Route v2" {
 		t.Errorf("name = %q, want %q", name, "Update Template Route v2")
 	}
-	if profileCode.Valid {
-		t.Errorf("profile_code = %q, want SQL NULL to stay preserved across update", profileCode.String)
+	if !profileCode.Valid || profileCode.String != tax.ProfileCode {
+		t.Errorf("profile_code = %+v, want %q preserved across update", profileCode, tax.ProfileCode)
 	}
 }

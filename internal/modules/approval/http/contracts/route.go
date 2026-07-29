@@ -122,22 +122,19 @@ type StageRequest struct {
 
 // CreateRouteRequest is the decoded body for the create-route endpoint.
 type CreateRouteRequest struct {
-	// ProfileCode is a pointer so an explicitly-present-but-empty value
-	// (`"profile_code":""`) is distinguishable from an omitted field — both
-	// must be rejected for a template route, and stdlib encoding/json cannot
-	// tell "" apart from a missing key on a plain string (QR-A finding B).
-	// A JSON `null` decodes to a nil pointer, identical to omission; this is a
-	// deliberate, documented tolerance (a RawMessage presence tracker to
-	// distinguish null-from-omitted would be disproportionate for this field).
+	// ProfileCode stays a pointer so an explicitly-present-but-empty value
+	// (`"profile_code":""`) and an omitted field are both rejected by the same
+	// nil-or-blank branch; stdlib encoding/json cannot tell "" apart from a
+	// missing key on a plain string (QR-A finding B). A JSON `null` decodes to
+	// a nil pointer, identical to omission — the same rejection either way.
 	ProfileCode *string        `json:"profile_code,omitempty"`
 	Name        string         `json:"name"`
 	Stages      []StageRequest `json:"stages"`
 	// SubjectKind and SubjectKey generalize what the route governs (M3 kernel
-	// extraction, ADR 0082 / P2.S3). Both optional on the wire; profile_code
-	// stays required as the backward-compat alias for the document case.
-	// Omitting both preserves the legacy (document, profile_code) subject
-	// byte-equal to pre-P2.S3 behavior — the application service applies that
-	// default, not this contract layer.
+	// extraction, ADR 0082 / P2.S3). Both optional on the wire; profile_code is
+	// required for BOTH subject kinds (ADR 0086). Omitting both preserves the
+	// legacy (document, profile_code) subject byte-equal to pre-P2.S3 behavior
+	// — the application service applies that default, not this contract layer.
 	SubjectKind    string `json:"subject_kind,omitempty"`
 	SubjectKey     string `json:"subject_key,omitempty"`
 	IdempotencyKey string
@@ -147,28 +144,20 @@ type CreateRouteRequest struct {
 // enum value, ProfileCode's presence rule follows SubjectKind, and Stages
 // passes validateStages.
 //
-// ProfileCode presence is conditional on the effective subject (DB truth:
-// migration 0297 `approval_routes_template_subject_projection_check`,
-// ADR 0082): a document route (SubjectKind "" or "document") REQUIRES a
-// non-empty ProfileCode matching the route-code pattern; a template route
-// (SubjectKind "template") MUST NOT carry a ProfileCode at all — a template
-// route has no profile, so ANY present value (including an explicit empty
-// string, `"profile_code":""`) is rejected outright rather than silently
-// accepted and dropped (no-fallback). ProfileCode's pointer type (QR-A
-// finding B) is what makes "present-but-empty" distinguishable from
-// "omitted" here — a plain string could not.
+// ProfileCode is REQUIRED for every subject kind (ADR 0086 — a route is
+// configuration, keyed by profile, never by an instance). DB truth: documents
+// keep `approval_routes_document_subject_projection_check` (profile_code NOT
+// NULL) and templates gained `approval_routes_template_subject_key_check`
+// (profile_code NOT NULL AND profile_code = subject_key, migration 0315,
+// replacing 0297's "template routes have no profile" rule).
 func (r CreateRouteRequest) Validate() error {
 	switch r.SubjectKind {
-	case "", "document":
+	case "", "document", "template":
 		if r.ProfileCode == nil || strings.TrimSpace(*r.ProfileCode) == "" {
 			return wrapValidation(fmt.Errorf("profile_code is required"))
 		}
 		if err := validateRouteCode("profile_code", *r.ProfileCode); err != nil {
 			return wrapValidation(err)
-		}
-	case "template":
-		if r.ProfileCode != nil {
-			return wrapValidation(fmt.Errorf("profile_code must be absent for template routes"))
 		}
 	default:
 		return wrapValidation(fmt.Errorf("subject_kind must be one of: document, template"))
@@ -326,17 +315,17 @@ func validateRequiredCapability(field, value string) error {
 }
 
 // RouteResponse is the response body for a successful create/update/get route.
-// ProfileCode is a pointer so a template route (which has no profile) emits
-// JSON null, never the "" sentinel (hub doctrine, already ruled for
-// RouteSummary/ListRouteItem; QR-A finding C). Spec-legal: the generated
-// `RouteResponse` schema (api.gen.go) only requires route_id and declares
-// additionalProperties: true, so this hand-written superset is unaffected.
+// ProfileCode is a pointer so a NULL column emits JSON null, never the ""
+// sentinel (hub doctrine, already ruled for RouteSummary/ListRouteItem; QR-A
+// finding C). Spec-legal: the generated `RouteResponse` schema (api.gen.go)
+// only requires route_id and declares additionalProperties: true, so this
+// hand-written superset is unaffected.
 type RouteResponse struct {
 	RouteID string `json:"route_id"`
 	// ProfileCode intentionally has NO omitempty: nil must serialize as JSON
-	// null (a template route has no profile), not be dropped from the body —
-	// dropping it would be indistinguishable from a document route whose
-	// code happened to be empty.
+	// null, not be dropped from the body — dropping it would be
+	// indistinguishable from a route whose code happened to be empty. Every
+	// route is profile-keyed post-ADR-0086, so nil signals a data defect.
 	ProfileCode *string         `json:"profile_code"`
 	Name        string          `json:"name"`
 	Version     int             `json:"version"`
@@ -382,10 +371,11 @@ type ListRouteItem struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
 	TenantID string `json:"tenant_id"`
-	// ProfileCode is populated for document routes; null for template routes
-	// (DB truth: approval_routes_template_subject_projection_check, ADR
-	// 0082). A template route has no profile — represent that truthfully as
-	// JSON null, not "" (contract-lock, F18 completion S6).
+	// ProfileCode is populated for every route: both subject kinds are
+	// profile-keyed (ADR 0086, DB truth
+	// approval_routes_template_subject_key_check). The pointer is kept so a
+	// NULL column surfaces as JSON null rather than the "" sentinel
+	// (contract-lock, F18 completion S6).
 	ProfileCode *string `json:"profile_code"`
 	// SubjectKind and SubjectKey generalize what this route governs (M3
 	// kernel extraction, ADR 0082 / P2.S3). document/profile_code for every

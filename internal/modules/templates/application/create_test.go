@@ -16,7 +16,11 @@ import (
 
 func TestCreateTemplate_Happy(t *testing.T) {
 	repo := newFakeRepo()
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).
+		WithRunner(newTxRunner(newPermissiveMockDB(t))).
+		// ADR 0086: creation is gated on an active template route, so the happy
+		// path must declare the doc type route-ready.
+		WithRouteReadinessReader(&fakeTemplateRouteReadinessReader{ready: true})
 
 	cmd := application.CreateTemplateCmd{
 		TenantID:    "tenant-a",
@@ -110,7 +114,9 @@ func TestCreateTemplate_WithDBSetsAuthzContext(t *testing.T) {
 	defer db.Close()
 
 	repo := newFakeRepo()
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(db))
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).
+		WithRunner(newTxRunner(db)).
+		WithRouteReadinessReader(&fakeTemplateRouteReadinessReader{ready: true})
 
 	mock.ExpectBegin()
 	expectTemplateCreateAuthz(mock, "user-a", "11111111-1111-1111-1111-111111111111")

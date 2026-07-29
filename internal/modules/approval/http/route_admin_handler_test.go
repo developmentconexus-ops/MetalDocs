@@ -272,23 +272,12 @@ func TestCreateRoute_SubjectFieldsOmitted_NoSubjectKindPassed(t *testing.T) {
 // TestCreateRoute_SubjectFieldsPassedThrough verifies an explicit
 // subject_kind/subject_key on the wire is decoded and passed to the service.
 //
-// The fixture uses a TEMPLATE subject, not a document one: per rail R1,
-// profile_code is the backward-compat alias for (document, profile_code), so
-// a document-subject route's subject_key must equal its profile_code
-// (application.ErrDocumentSubjectKeyMismatch — M3 P3.S2b-2 regression fix).
-// A document+divergent-key body is no longer a legal shape to prove
-// pass-through with; a template subject's key has no such relationship to
-// profile_code, so it still exercises the same decode/pass-through path
-// without encoding an illegal state.
-//
-// The fixture omits profile_code entirely (S1, F18 repair): under the
-// conditional contract rule (contracts.CreateRouteRequest.Validate, ADR 0082 /
-// migration 0297), a template subject MUST NOT carry a profile_code — a body
-// combining subject_kind=template with a non-empty profile_code is now a
-// validation-error 400, not a legal pass-through fixture (previously this
-// test asserted 201 through a mock that never reaches the DB check —
-// false-green; see TestCreateRoute_TemplateSubjectRejectsProfileCode below
-// for the negative case at the handler layer).
+// The fixture uses a TEMPLATE subject with subject_key == profile_code: since
+// ADR 0086 BOTH kinds are profile-keyed, so a divergent key of either kind is
+// an illegal state (ErrDocumentSubjectKeyMismatch /
+// ErrTemplateSubjectKeyMismatch) and cannot be used to prove pass-through.
+// profile_code is now mandatory here too — see
+// TestCreateRoute_TemplateSubjectRequiresProfileCode for the negative case.
 func TestCreateRoute_SubjectFieldsPassedThrough(t *testing.T) {
 	svc := &fakeRouteAdminService{
 		createResult: application.CreateRouteResult{RouteID: "route-123"},
@@ -296,7 +285,7 @@ func TestCreateRoute_SubjectFieldsPassedThrough(t *testing.T) {
 	h := &Handler{routeAdmin: svc}
 	mux := routeAdminTestMux(h)
 
-	body := `{"name":"Ops Route","subject_kind":"template","subject_key":"tmpl-custom-1","stages":[{"order":1,"name":"Review","required_capability":"document.signoff","quorum":"any_1_of","drift_policy":"reduce_quorum","selectors":[{"kind":"role_in_fixed_area","role":"approver","area_code":"ops"}]}]}`
+	body := `{"profile_code":"ops","name":"Ops Route","subject_kind":"template","subject_key":"ops","stages":[{"order":1,"name":"Review","required_capability":"document.signoff","quorum":"any_1_of","drift_policy":"reduce_quorum","selectors":[{"kind":"role_in_fixed_area","role":"approver","area_code":"ops"}]}]}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/routes", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
@@ -309,32 +298,32 @@ func TestCreateRoute_SubjectFieldsPassedThrough(t *testing.T) {
 	if rr.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want %d", rr.Code, http.StatusCreated)
 	}
-	if svc.createReq.SubjectKind != "template" || svc.createReq.SubjectKey != "tmpl-custom-1" {
+	if svc.createReq.SubjectKind != "template" || svc.createReq.SubjectKey != "ops" {
 		t.Fatalf("subject fields not passed through: kind=%q key=%q", svc.createReq.SubjectKind, svc.createReq.SubjectKey)
+	}
+	if svc.createReq.ProfileCode != "ops" {
+		t.Fatalf("profile_code = %q, want %q for a template route", svc.createReq.ProfileCode, "ops")
 	}
 }
 
-// TestCreateRoute_ResponseProfileCode pins QR-A finding C: a template-subject
-// create response must serialize "profile_code":null (never the "" sentinel
-// — hub doctrine, already ruled for RouteSummary/ListRouteItem), while a
-// document-subject create response carries the non-empty profile_code string.
-// Decoded via raw json.RawMessage so the null-vs-missing-vs-empty-string
-// distinction is checked on the actual wire bytes, not through a Go struct
-// that would mask the difference.
-//
-// Since F-E4-2 the value's SOURCE is the persisted row's nullable
-// profile_code column read back by the service (CreateRouteResult.ProfileCode),
-// not an echo of the request body — so the fixtures below set it on the fake's
-// createResult. The wire contract asserted here is unchanged.
+// TestCreateRoute_ResponseProfileCode keeps QR-A finding C's wire discipline
+// under ADR 0086: the create response's profile_code is read from the
+// persisted row (CreateRouteResult.ProfileCode, F-E4-2), never echoed from the
+// request, and it is a non-empty string for BOTH subject kinds now that
+// template routes are profile-keyed. Decoded via raw json.RawMessage so the
+// null-vs-missing-vs-empty-string distinction is checked on the actual wire
+// bytes. The pointer stays nullable so a data defect would surface honestly as
+// JSON null rather than collapse to "".
 func TestCreateRoute_ResponseProfileCode(t *testing.T) {
-	t.Run("template create emits null", func(t *testing.T) {
+	t.Run("template create emits the profile code", func(t *testing.T) {
+		opsCode := "ops"
 		svc := &fakeRouteAdminService{
-			createResult: application.CreateRouteResult{RouteID: "route-tmpl-1"},
+			createResult: application.CreateRouteResult{RouteID: "route-tmpl-1", ProfileCode: &opsCode},
 		}
 		h := &Handler{routeAdmin: svc}
 		mux := routeAdminTestMux(h)
 
-		body := `{"name":"Template Route","subject_kind":"template","subject_key":"tmpl-1","stages":[{"order":1,"name":"Review","required_capability":"document.signoff","quorum":"any_1_of","drift_policy":"reduce_quorum","selectors":[{"kind":"role_in_fixed_area","role":"approver","area_code":"ops"}]}]}`
+		body := `{"profile_code":"ops","name":"Template Route","subject_kind":"template","subject_key":"ops","stages":[{"order":1,"name":"Review","required_capability":"document.signoff","quorum":"any_1_of","drift_policy":"reduce_quorum","selectors":[{"kind":"role_in_fixed_area","role":"approver","area_code":"ops"}]}]}`
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/routes", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
@@ -355,8 +344,8 @@ func TestCreateRoute_ResponseProfileCode(t *testing.T) {
 		if !ok {
 			t.Fatalf("response missing profile_code key entirely: %s", rr.Body.String())
 		}
-		if string(code) != "null" {
-			t.Fatalf("template create profile_code raw = %s, want null (not the \"\" sentinel)", code)
+		if string(code) != `"ops"` {
+			t.Fatalf("template create profile_code raw = %s, want %q", code, `"ops"`)
 		}
 	})
 
@@ -432,12 +421,12 @@ func TestCreateRoute_ReturnsPersistedProjection(t *testing.T) {
 			wantProfileCode: `"ops"`,
 		},
 		"template subject": {
-			body: `{"name":"Template Route","subject_kind":"template","subject_key":"tmpl-9","stages":[{"order":1,"name":"Review","required_capability":"template.approve","quorum":"m_of_n","quorum_m":2,"drift_policy":"reduce_quorum","selectors":[{"kind":"role_in_fixed_area","role":"approver","area_code":"ops"}]}]}`,
+			body: `{"profile_code":"ops","name":"Template Route","subject_kind":"template","subject_key":"ops","stages":[{"order":1,"name":"Review","required_capability":"template.approve","quorum":"m_of_n","quorum_m":2,"drift_policy":"reduce_quorum","selectors":[{"kind":"role_in_fixed_area","role":"approver","area_code":"ops"}]}]}`,
 			result: application.CreateRouteResult{
-				RouteID: "route-tmpl-9", ProfileCode: nil, Name: "Template Route",
+				RouteID: "route-tmpl-9", ProfileCode: &opsCode, Name: "Template Route",
 				Version: 1, Active: true, InUse: false, CreatedAt: createdAt, Stages: persistedStages,
 			},
-			wantProfileCode: `null`,
+			wantProfileCode: `"ops"`,
 		},
 	}
 
@@ -511,20 +500,19 @@ func TestCreateRoute_ReturnsPersistedProjection(t *testing.T) {
 	}
 }
 
-// TestCreateRoute_TemplateSubjectRejectsProfileCode pins the S1 (F18) contract
-// fix at the handler layer: a create-route body carrying both
-// subject_kind=template and a non-empty profile_code must be rejected as a
-// 400 validation error before ever reaching the service (contracts layer
-// Validate), never a 201 (the former false-green behavior asserted through a
-// mock service that never touched the DB check).
-func TestCreateRoute_TemplateSubjectRejectsProfileCode(t *testing.T) {
+// TestCreateRoute_TemplateSubjectRequiresProfileCode is the ADR 0086
+// inversion of the retired ..._TemplateSubjectRejectsProfileCode case: a
+// create-route body with subject_kind=template and NO profile_code must be
+// rejected as a 400 validation error before ever reaching the service. The
+// old rule (template must not carry profile_code) is gone outright.
+func TestCreateRoute_TemplateSubjectRequiresProfileCode(t *testing.T) {
 	svc := &fakeRouteAdminService{
 		createResult: application.CreateRouteResult{RouteID: "route-should-not-be-created"},
 	}
 	h := &Handler{routeAdmin: svc}
 	mux := routeAdminTestMux(h)
 
-	body := `{"profile_code":"ops","name":"Ops Route","subject_kind":"template","subject_key":"tmpl-custom-1","stages":[{"order":1,"name":"Review","required_capability":"document.signoff","quorum":"any_1_of","drift_policy":"reduce_quorum","selectors":[{"kind":"role_in_fixed_area","role":"approver","area_code":"ops"}]}]}`
+	body := `{"name":"Ops Route","subject_kind":"template","subject_key":"ops","stages":[{"order":1,"name":"Review","required_capability":"document.signoff","quorum":"any_1_of","drift_policy":"reduce_quorum","selectors":[{"kind":"role_in_fixed_area","role":"approver","area_code":"ops"}]}]}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/routes", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
@@ -539,6 +527,31 @@ func TestCreateRoute_TemplateSubjectRejectsProfileCode(t *testing.T) {
 	}
 	if svc.createReq.SubjectKind != "" {
 		t.Fatalf("service must not be invoked when validation fails, got createReq=%+v", svc.createReq)
+	}
+}
+
+// TestCreateRoute_TemplateSubjectKeyMismatch_Returns422 is the template twin
+// of the document mismatch mapping: application.ErrTemplateSubjectKeyMismatch
+// (a template route whose subject_key diverges from profile_code — the
+// pre-ADR-0086 template-instance keying) must surface as 422 problem+json,
+// not a generic 500.
+func TestCreateRoute_TemplateSubjectKeyMismatch_Returns422(t *testing.T) {
+	svc := &fakeRouteAdminService{createErr: application.ErrTemplateSubjectKeyMismatch}
+	h := &Handler{routeAdmin: svc}
+	mux := routeAdminTestMux(h)
+
+	body := `{"profile_code":"ops","name":"Ops Route","subject_kind":"template","subject_key":"tmpl-custom-1","stages":[{"order":1,"name":"Review","required_capability":"document.signoff","quorum":"any_1_of","drift_policy":"reduce_quorum","selectors":[{"kind":"role_in_fixed_area","role":"approver","area_code":"ops"}]}]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/routes", strings.NewReader(body))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "33333333-3333-4333-8333-333333333333")
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want %d (body: %s)", rr.Code, http.StatusUnprocessableEntity, rr.Body.String())
 	}
 }
 
@@ -1050,17 +1063,16 @@ func TestListRoutes_ExposesSubjectFields(t *testing.T) {
 	}
 }
 
-// TestListRoutes_ProfileCodeNullForTemplateRoutes pins F18 completion S6
-// (hub ruling, contract-lock extended to RouteSummary): a template route has
-// no profile by DB constraint (approval_routes_template_subject_projection_check,
-// ADR 0082) and the list response must represent that truthfully as JSON
-// null — not the "" sentinel. This decodes the raw response body into
-// map[string]any (not the typed contracts.ListRouteItem) because a typed
-// *string decode cannot distinguish an absent/null key from "": the
-// assertion must inspect the wire bytes themselves. A sibling document route
-// in the same response is asserted to keep serializing as a non-empty
-// string, unaffected.
-func TestListRoutes_ProfileCodeNullForTemplateRoutes(t *testing.T) {
+// TestListRoutes_ProfileCodeForTemplateRoutes is the ADR 0086 inversion of the
+// retired ..._ProfileCodeNullForTemplateRoutes case: a template route IS
+// profile-keyed (approval_routes_template_subject_key_check, migration 0315),
+// so the list response must carry its profile_code as a non-empty string —
+// the same shape a document route already has, and with the same
+// subject_key == profile_code identity. This still decodes the raw response
+// body (not the typed contracts.ListRouteItem) because a typed *string decode
+// cannot distinguish an absent/null key from "": the assertion must inspect
+// the wire bytes themselves.
+func TestListRoutes_ProfileCodeForTemplateRoutes(t *testing.T) {
 	svc := &fakeRouteAdminService{
 		listResult: application.ListRoutesResult{Routes: []infrastructure.Route{
 			{
@@ -1073,10 +1085,10 @@ func TestListRoutes_ProfileCodeNullForTemplateRoutes(t *testing.T) {
 				},
 			},
 			{
-				ID: "r2", Name: "Tmpl", TenantID: "tenant-1", ProfileCode: "",
+				ID: "r2", Name: "Tmpl", TenantID: "tenant-1", ProfileCode: "sop",
 				Active: true, Version: 1, Total: 2,
 				SubjectKind: "template",
-				SubjectKey:  "tmpl-1",
+				SubjectKey:  "sop",
 				Stages: []infrastructure.RouteStage{
 					{Order: 1, Name: "Review", RequiredCapability: "template.approve", Quorum: "any_1_of", DriftPolicy: "reduce_quorum"},
 				},
@@ -1119,7 +1131,7 @@ func TestListRoutes_ProfileCodeNullForTemplateRoutes(t *testing.T) {
 	if !ok {
 		t.Fatalf("template route missing profile_code key entirely")
 	}
-	if string(tmplCode) != "null" {
-		t.Fatalf("template route profile_code raw = %s, want null (not the \"\" sentinel)", tmplCode)
+	if string(tmplCode) != `"sop"` {
+		t.Fatalf("template route profile_code raw = %s, want %q (profile-keyed since ADR 0086)", tmplCode, `"sop"`)
 	}
 }

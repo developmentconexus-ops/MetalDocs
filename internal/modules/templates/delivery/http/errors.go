@@ -86,6 +86,14 @@ func MapErr(err error) (httpStatus int, code problem.Code) {
 		return http.StatusUnprocessableEntity, codeTplPlaceholderNameInvalid
 	case errors.Is(err, domain.ErrDuplicatePlaceholderName):
 		return http.StatusUnprocessableEntity, codeTplDuplicatePlaceholder
+	case errors.Is(err, domain.ErrDocTypeCodeRequired):
+		// ADR 0086: doc_type_code is mandatory (generic templates are gone).
+		// 422 is declared on createTemplate for exactly this validation.
+		return http.StatusUnprocessableEntity, codeTplInvalidRequest
+	case errors.Is(err, domain.ErrApprovalRouteMissing):
+		// ADR 0086 config-first creation gate — same 409 code the submit path
+		// already raises when no active template route resolves.
+		return http.StatusConflict, codeTplApprovalRouteMissing
 	case errors.Is(err, approvalapp.ErrTemplateVersionNotFound):
 		return http.StatusNotFound, codeTplApprovalNotFound
 	case errors.Is(err, approvalapp.ErrTemplateVersionNotDraft):

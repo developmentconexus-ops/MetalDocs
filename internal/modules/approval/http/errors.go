@@ -79,6 +79,7 @@ const (
 	approvalCodeValidationReasonCategoryInvalid      problem.Code = "validation.reason_category_invalid"
 	approvalCodeValidationRevisionTitleRequired      problem.Code = "validation.revision_title_required"
 	approvalCodeValidationDocumentSubjectKeyMismatch problem.Code = "validation.document_subject_key_mismatch"
+	approvalCodeValidationTemplateSubjectKeyMismatch problem.Code = "validation.template_subject_key_mismatch"
 	approvalCodeStateDocumentNotDraft                problem.Code = "state.document_not_draft"
 	approvalCodeValidationProfileNotConfigured       problem.Code = "validation.profile_not_configured"
 	approvalCodeStateApprovalRouteMissing            problem.Code = "state.approval_route_missing"
@@ -195,6 +196,11 @@ func MapErrorToResponse(err error) *problem.Problem {
 		// title cases above.
 		statusCode = http.StatusUnprocessableEntity
 		code = approvalCodeValidationDocumentSubjectKeyMismatch
+	case errors.Is(err, application.ErrTemplateSubjectKeyMismatch):
+		// ADR 0086: a template route is profile-keyed, so subject_key != profile_code
+		// is the same class of friendly business-rule rejection as the document case.
+		statusCode = http.StatusUnprocessableEntity
+		code = approvalCodeValidationTemplateSubjectKeyMismatch
 	case errors.Is(err, v2dom.ErrDocumentNotDraft):
 		// In-tx submit resolution surfaces the finalize-era sentinels (ADR 0073).
 		// Document not in draft = illegal state for the submit write → 409.

@@ -1257,12 +1257,20 @@ paths:
           application/json:
             schema:
               type: object
-              required: [key, name]
+              required: [key, name, doc_type_code]
               properties:
                 key: { type: string }
                 name: { type: string }
                 description: { type: string }
-                doc_type_code: { type: string, description: "Profile code (e.g. DC, POP). Omit or null for generic templates." }
+                doc_type_code:
+                  type: string
+                  minLength: 1
+                  description: >-
+                    Profile code (e.g. `po`, `it`) this template belongs to.
+                    Required: generic templates no longer exist (ADR 0086).
+                    The profile must already have an active template approval
+                    route, otherwise creation is rejected 409
+                    `APPROVAL_ROUTE_MISSING`.
       responses:
         '201':
           description: created
@@ -1277,7 +1285,17 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '409':
-          $ref: '#/components/responses/Conflict'
+          description: >-
+            Conflict. `conflict.duplicate_key` when the template key already
+            exists in the tenant; `APPROVAL_ROUTE_MISSING` when the declared
+            `doc_type_code` has no active template approval route (ADR 0086
+            config-first gate).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /templates/system/blank:
@@ -5670,7 +5688,7 @@ components:
             $ref: '#/components/schemas/DocumentFamilyItem'
     DocumentProfileItem:
       type: object
-      required: [code, family_code, name, description, review_interval_days, active_schema_version, workflow_profile, approval_required, retention_days, validity_days, governance_class, has_active_route]
+      required: [code, family_code, name, description, review_interval_days, active_schema_version, workflow_profile, approval_required, retention_days, validity_days, governance_class, has_active_route, has_active_template_route]
       properties:
         code:
           type: string
@@ -5682,6 +5700,14 @@ components:
             false means documents cannot be created under the profile — the
             create endpoint rejects it with 409
             `state.approval_route_missing`.
+        has_active_template_route:
+          type: boolean
+          description: >-
+            True when this profile has an active TEMPLATE approval route
+            (approval_routes, subject_kind=template, subject_key=profile
+            code — ADR 0086). Admin readiness badge: false means templates
+            cannot be created under the profile — `POST /templates` rejects
+            it with 409 `APPROVAL_ROUTE_MISSING`.
         family_code:
           type: string
         name:
@@ -7286,7 +7312,7 @@ components:
     CreateRouteRequest:
       type: object
       additionalProperties: true
-      required: [name, stages]
+      required: [profile_code, name, stages]
       properties:
         profile_code:
           type: string
@@ -7294,10 +7320,12 @@ components:
           maxLength: 64
           pattern: '^[a-z0-9_-]+$'
           description: >-
-            Required when `subject_kind` is `document` or absent; must be
-            omitted when `subject_kind` is `template` (a template route has
-            no profile — DB truth: `approval_routes_template_subject_projection_check`,
-            ADR 0082).
+            Required for every `subject_kind`. A route is keyed by
+            configuration, never by an instance: a `template` route governs
+            every template of that profile (ADR 0086), exactly as a `document`
+            route governs every document of it. DB truth:
+            `approval_routes_template_subject_key_check` (template rows must
+            carry `profile_code` and `profile_code = subject_key`).
         name: { type: string, minLength: 1, maxLength: 200 }
         subject_kind:
           type: string
@@ -7305,16 +7333,16 @@ components:
           description: >-
             M3 kernel extraction (ADR 0082, P2.S3). Optional; omitted defaults
             to `document`, preserving the legacy (document, profile_code)
-            subject unchanged. Governs whether `profile_code` is required
-            (`document`/absent) or must be omitted (`template`).
+            subject unchanged. `profile_code` is required for both kinds
+            (ADR 0086).
         subject_key:
           type: string
           minLength: 1
           maxLength: 200
           description: >-
             M3 kernel extraction (ADR 0082, P2.S3). Optional; omitted defaults
-            to `profile_code` when `subject_kind` is `document` (or absent),
-            preserving byte-equal legacy behavior.
+            to `profile_code` for both subject kinds. When present it must
+            equal `profile_code` (ADR 0086); a divergent key is rejected 422.
         stages:
           type: array
           minItems: 1

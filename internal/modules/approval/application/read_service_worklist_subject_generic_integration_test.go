@@ -40,6 +40,10 @@ func (fakeTemplateInboxMetaReader) LoadTemplateVersionContentHash(ctx context.Co
 	return "", false, nil
 }
 
+func (fakeTemplateInboxMetaReader) LoadTemplateDocTypeCode(ctx context.Context, tx db.Tx, tenantID, templateID string) (string, error) {
+	return "", nil
+}
+
 func (fakeTemplateInboxMetaReader) LoadTemplateInboxMeta(ctx context.Context, tx db.Tx, tenantID string, versionIDs []string) (map[string]domain.TemplateInboxMeta, error) {
 	out := make(map[string]domain.TemplateInboxMeta)
 	if len(versionIDs) == 0 {
@@ -149,8 +153,9 @@ func TestListWorklist_TemplateInstance_AppearsWithSubjectTitleAndRef_RealDB(t *t
 	ten := testdb.NewTenant(t, dbc)
 	admin := testdb.NewUser(t, dbc, testdb.WithTenant(ten.ID), testdb.WithRole("system_admin"))
 
-	templateID, versionID := seedTemplateVersion(t, dbc, ten.ID, admin.ID, "draft")
-	seedTemplateRoute(t, dbc, ten.ID, admin.ID, templateID)
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(ten.ID))
+	templateID, versionID := seedTemplateVersion(t, dbc, ten.ID, admin.ID, tax.ProfileCode, "draft")
+	seedTemplateRoute(t, dbc, ten.ID, admin.ID, tax.ProfileCode)
 
 	reviewer := testdb.NewUser(t, dbc, testdb.WithTenant(ten.ID))
 	manager := testdb.NewUser(t, dbc, testdb.WithTenant(ten.ID))
@@ -222,14 +227,15 @@ func TestListWorklist_TemplateInstance_CrossTenantVersion_NoLeak_RealDB(t *testi
 	adminB := testdb.NewUser(t, dbc, testdb.WithTenant(tenB.ID), testdb.WithRole("system_admin"))
 
 	// A real template version that exists ONLY under tenant B.
-	_, versionB := seedTemplateVersion(t, dbc, tenB.ID, adminB.ID, "draft")
+	taxB := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tenB.ID))
+	_, versionB := seedTemplateVersion(t, dbc, tenB.ID, adminB.ID, taxB.ProfileCode, "draft")
 
 	// A tenant-A instance whose subject_key is (illegitimately, for this test)
 	// tenant B's version id — seeded by creating a normal document instance
 	// under tenant A, then flipping it to a template subject pointing at the
-	// cross-tenant version id via raw UPDATE (mirrors seedTemplateRoute's
-	// flip-via-UPDATE technique; the INSERT-time tripwire only fires on
-	// INSERT, so the flip itself needs no capability assertion).
+	// cross-tenant version id via raw UPDATE (the INSTANCE-side subject is not
+	// constrained by ADR 0086, which re-keys ROUTES only; the INSERT-time
+	// tripwire fires only on INSERT, so the flip needs no capability assertion).
 	docA := testdb.NewDocument(t, dbc, testdb.WithTenant(tenA.ID), testdb.WithStatus("approved"))
 	instA := testdb.NewApprovalInstance(t, dbc, testdb.WithDocument(docA), testdb.WithStatus("in_progress"))
 	if _, err := dbc.ExecContext(context.Background(), `

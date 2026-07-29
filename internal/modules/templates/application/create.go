@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
+	approvaldomain "metaldocs/internal/modules/approval/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/templates/domain"
@@ -30,12 +32,47 @@ type CreateTemplateResult struct {
 	Version  *domain.TemplateVersion
 }
 
+// requireActiveTemplateRoute is the ADR 0086 config-first creation gate: a
+// template may only be created under a profile that already has an ACTIVE
+// template approval route, because without one it could never be submitted for
+// approval. Mirrors controlleddocuments' requireActiveApprovalRoute exactly,
+// only with SubjectKindTemplate.
+//
+// It runs INSIDE the create transaction, on the caller's tx, so the readiness
+// it observes is the same snapshot the INSERT commits against. The underlying
+// SELECT is plain and non-recording, which is what makes it safe to run after
+// authz.Require has taken the audit hash-chain advisory lock (H-PRE-1 bans
+// authz-RECORDING reads inside a lock-holding tx, not plain ones).
+//
+// Fails CLOSED when no reader is wired: a missing dependency is a misconfigured
+// composition root, never a licence to skip governance.
+func (s *Service) requireActiveTemplateRoute(ctx context.Context, tx *sql.Tx, tenantID, docTypeCode string) error {
+	if s.routes == nil {
+		return domain.ErrApprovalRouteMissing
+	}
+	ready, err := s.routes.HasActiveRoute(ctx, tx, tenantID, string(approvaldomain.SubjectKindTemplate), docTypeCode)
+	if err != nil {
+		return fmt.Errorf("templates create: check approval route readiness: %w", err)
+	}
+	if !ready {
+		return domain.ErrApprovalRouteMissing
+	}
+	return nil
+}
+
 // CreateTemplate creates a new template together with its first draft
 // version (version 1) and records an AuditCreated event, all inside one
 // transaction. The template key must be unique within the tenant; an
-// existing key is rejected with ErrKeyConflict. ADR 0082 phase (a) part 1:
-// this no longer seeds approval configuration or role bindings.
+// existing key is rejected with ErrKeyConflict. DocTypeCode is mandatory and
+// its profile must already carry an active template approval route (ADR 0086);
+// otherwise the create is rejected with ErrDocTypeCodeRequired (422) or
+// ErrApprovalRouteMissing (409). ADR 0082 phase (a) part 1: this no longer
+// seeds approval configuration or role bindings.
 func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*CreateTemplateResult, error) {
+	if strings.TrimSpace(cmd.DocTypeCode) == "" {
+		return nil, domain.ErrDocTypeCodeRequired
+	}
+
 	if _, err := s.repo.GetTemplateByKey(ctx, cmd.TenantID, cmd.Key); err == nil {
 		return nil, domain.ErrKeyConflict
 	} else if !errors.Is(err, domain.ErrNotFound) {
@@ -70,6 +107,9 @@ func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*C
 	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
 		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateCreate), "tenant"); err != nil {
 			return fmt.Errorf("templates create: authz: %w", err)
+		}
+		if err := s.requireActiveTemplateRoute(ctx, tx, cmd.TenantID, cmd.DocTypeCode); err != nil {
+			return err
 		}
 		if err := s.repo.CreateTemplateTx(ctx, tx, template); err != nil {
 			return err

@@ -14,6 +14,7 @@ import (
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
 
+	approvaldomain "metaldocs/internal/modules/approval/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/templates/application"
 	tmplhttp "metaldocs/internal/modules/templates/delivery/http"
@@ -371,12 +372,34 @@ func newMux(t *testing.T, authz tmplhttp.AuthzFunc, repo *fakeRepo) *http.ServeM
 
 func newMuxWithPresigner(t *testing.T, authz tmplhttp.AuthzFunc, repo *fakeRepo, p application.Presigner) *http.ServeMux {
 	t.Helper()
+	return newMuxWithRouteReadiness(t, authz, repo, p, httpRouteReadinessStub{ready: true})
+}
+
+// newMuxWithRouteReadiness lets a test choose the ADR 0086 creation-gate verdict.
+// The gate fails CLOSED, so every mux that expects a successful create must
+// declare readiness explicitly.
+func newMuxWithRouteReadiness(t *testing.T, authz tmplhttp.AuthzFunc, repo *fakeRepo, p application.Presigner, routes approvaldomain.RouteReadinessReader) *http.ServeMux {
+	t.Helper()
 	db := newPermissiveMockDB(t)
-	svc := application.New(repo, p, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(db))
+	svc := application.New(repo, p, fakeClock{}, &fakeUUID{}).
+		WithRunner(newTxRunner(db)).
+		WithRouteReadinessReader(routes)
 	h := tmplhttp.New(svc, authz, db)
 	mux := http.NewServeMux()
 	h.Register(mux)
 	return mux
+}
+
+// httpRouteReadinessStub satisfies approvaldomain.RouteReadinessReader with a
+// fixed verdict.
+type httpRouteReadinessStub struct{ ready bool }
+
+func (httpRouteReadinessStub) ActiveRouteSubjectKeys(_ context.Context, _, _ string) (map[string]struct{}, error) {
+	return map[string]struct{}{}, nil
+}
+
+func (s httpRouteReadinessStub) HasActiveRoute(_ context.Context, _ db.DB, _, _, _ string) (bool, error) {
+	return s.ready, nil
 }
 
 // mismatchPresigner always returns ErrHashMismatch from Confirm.
@@ -396,10 +419,17 @@ func TestNew_PanicsWithoutAuthz(t *testing.T) {
 }
 
 func createBody(key string) []byte {
+	return createBodyWithDocType(key, "contract")
+}
+
+// createBodyWithDocType builds a createTemplate body. doc_type_code is REQUIRED
+// by the contract since ADR 0086 — generic templates no longer exist.
+func createBodyWithDocType(key, docTypeCode string) []byte {
 	req := map[string]any{
-		"key":         key,
-		"name":        "Contract Template",
-		"description": "Default contract",
+		"key":           key,
+		"name":          "Contract Template",
+		"description":   "Default contract",
+		"doc_type_code": docTypeCode,
 	}
 	raw, _ := json.Marshal(req)
 	return raw
@@ -479,6 +509,68 @@ func TestCreateTemplate_Happy(t *testing.T) {
 	// TemplateDTO uses omitempty — nil published_version_number is omitted, not null.
 	if pvnField, ok := out.Data.Template["published_version_number"]; ok && pvnField != nil {
 		t.Fatalf("expected published_version_number absent or null on freshly created template, got %v", pvnField)
+	}
+}
+
+// TestCreateTemplate_NoActiveTemplateRoute_Returns409 pins the ADR 0086
+// config-first gate at the wire: a doc type with no active template approval
+// route is a 409 APPROVAL_ROUTE_MISSING, the same code the submit path raises.
+func TestCreateTemplate_NoActiveTemplateRoute_Returns409(t *testing.T) {
+	repo := newFakeRepo()
+	mux := newMuxWithRouteReadiness(t,
+		func(_ *http.Request, _, _, _ string) error { return nil },
+		repo, fakePresigner{}, httpRouteReadinessStub{ready: false})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates", bytes.NewReader(createBody("contract-default")))
+	withHeaders(req)
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	var out struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if out.Code != "APPROVAL_ROUTE_MISSING" {
+		t.Fatalf("expected error.code=APPROVAL_ROUTE_MISSING, got %q", out.Code)
+	}
+	if len(repo.templates) != 0 {
+		t.Fatalf("gate must run before insert; repo persisted %d templates", len(repo.templates))
+	}
+}
+
+// TestCreateTemplate_BlankDocTypeCode_Returns422 pins the mandatory
+// doc_type_code declared on createTemplate: a blank value is a 422, never a
+// silently generic template.
+func TestCreateTemplate_BlankDocTypeCode_Returns422(t *testing.T) {
+	repo := newFakeRepo()
+	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates", bytes.NewReader(createBodyWithDocType("contract-default", "")))
+	withHeaders(req)
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422, got %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	var out struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if out.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected error.code=VALIDATION_ERROR, got %q", out.Code)
+	}
+	if len(repo.templates) != 0 {
+		t.Fatalf("repo persisted %d templates, want 0", len(repo.templates))
 	}
 }
 

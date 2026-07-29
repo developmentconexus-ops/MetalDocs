@@ -123,3 +123,37 @@ func (r *ApprovalVersionReader) LoadTemplateInboxMeta(ctx context.Context, tx db
 	}
 	return out, nil
 }
+
+// ErrTemplateDocTypeCodeMissing is returned by LoadTemplateDocTypeCode when the
+// template does not exist for the tenant, or exists with an empty
+// doc_type_code. Both are defects post-ADR-0086 (migration 0315's
+// templates_template_doc_type_code_required_check makes the empty case
+// unreachable for author-created templates), and both must fail closed: the
+// doc_type_code is the template ROUTE's subject key, so any substitute value
+// would silently route the submission through another profile's route.
+var ErrTemplateDocTypeCodeMissing = errors.New("templates: template has no doc_type_code")
+
+// LoadTemplateDocTypeCode returns templates_template.doc_type_code for
+// templateID, scoped to tenantID, read inside tx (ADR 0086). It is the route
+// governance selector for a template submit/preview: ROUTE.subject_key =
+// doc_type_code.
+func (r *ApprovalVersionReader) LoadTemplateDocTypeCode(ctx context.Context, tx db.Tx, tenantID, templateID string) (string, error) {
+	var code sql.NullString
+	err := tx.QueryRowContext(ctx, `
+		SELECT doc_type_code
+		  FROM templates_template
+		 WHERE id = $1
+		   AND tenant_id = $2`,
+		templateID, tenantID,
+	).Scan(&code)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrTemplateDocTypeCodeMissing
+	}
+	if err != nil {
+		return "", err
+	}
+	if !code.Valid || code.String == "" {
+		return "", ErrTemplateDocTypeCodeMissing
+	}
+	return code.String, nil
+}

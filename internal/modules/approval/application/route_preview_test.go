@@ -50,6 +50,9 @@ type fakePreviewResolver struct {
 	profileErr     error
 	subjectRouteID string
 	subjectErr     error
+
+	gotSubjectKind string
+	gotSubjectKey  string
 }
 
 func (f *fakePreviewResolver) LoadControlledDocumentID(_ context.Context, _ db.Tx, _, _ string) (string, bool, error) {
@@ -60,7 +63,9 @@ func (f *fakePreviewResolver) LoadActiveRouteIDByProfile(_ context.Context, _ db
 	return f.profileRouteID, f.profileErr
 }
 
-func (f *fakePreviewResolver) LoadActiveRouteIDBySubject(_ context.Context, _ db.Tx, _, _, _ string) (string, error) {
+func (f *fakePreviewResolver) LoadActiveRouteIDBySubject(_ context.Context, _ db.Tx, _, subjectKind, subjectKey string) (string, error) {
+	f.gotSubjectKind = subjectKind
+	f.gotSubjectKey = subjectKey
 	return f.subjectRouteID, f.subjectErr
 }
 
@@ -170,7 +175,7 @@ func TestTemplatePreviewRoute_NoActiveRoute(t *testing.T) {
 	repo := &fakePreviewRepo{route: previewRouteFixture()}
 	resolver := &fakePreviewResolver{subjectErr: infrastructure.ErrNoActiveApprovalRoute}
 
-	svc := &TemplateSubmitService{repo: repo, emitter: &MemoryEmitter{}, clock: newFixedClock(), routeResolver: resolver}
+	svc := &TemplateSubmitService{repo: repo, emitter: &MemoryEmitter{}, clock: newFixedClock(), routeResolver: resolver, versionReader: &stubTemplateVersionReader{}}
 	database := newSubmitTestDB(t, true)
 
 	preview, err := svc.PreviewRoute(context.Background(), newTxRunner(database), "tenant-uuid-1", "template-uuid-1")
@@ -187,12 +192,15 @@ func TestTemplatePreviewRoute_NoActiveRoute(t *testing.T) {
 
 // TestTemplatePreviewRoute_HappyPath proves the template path resolves via
 // LoadActiveRouteIDBySubject and returns the same stages+selectors shape,
-// including the submit_choice selector.
+// including the submit_choice selector. It also pins the ADR 0086 addressing:
+// the subject key is the template's doc_type_code read through the SAME
+// TemplateVersionReader port the submit path uses — never the template id —
+// which is what keeps preview and submit on the same route.
 func TestTemplatePreviewRoute_HappyPath(t *testing.T) {
 	repo := &fakePreviewRepo{route: previewRouteFixture()}
 	resolver := &fakePreviewResolver{subjectRouteID: "route-uuid-1"}
 
-	svc := &TemplateSubmitService{repo: repo, emitter: &MemoryEmitter{}, clock: newFixedClock(), routeResolver: resolver}
+	svc := &TemplateSubmitService{repo: repo, emitter: &MemoryEmitter{}, clock: newFixedClock(), routeResolver: resolver, versionReader: &stubTemplateVersionReader{}}
 	database := newSubmitTestDB(t, true)
 
 	preview, err := svc.PreviewRoute(context.Background(), newTxRunner(database), "tenant-uuid-1", "template-uuid-1")
@@ -202,6 +210,12 @@ func TestTemplatePreviewRoute_HappyPath(t *testing.T) {
 	assertFixturePreview(t, preview)
 	if repo.gotRouteID != "route-uuid-1" {
 		t.Fatalf("LoadRoute called with routeID %q; want the resolved active route id", repo.gotRouteID)
+	}
+	if resolver.gotSubjectKind != string(domain.SubjectKindTemplate) {
+		t.Errorf("resolver subject_kind = %q; want %q", resolver.gotSubjectKind, domain.SubjectKindTemplate)
+	}
+	if resolver.gotSubjectKey != "po" {
+		t.Errorf("resolver subject_key = %q; want the template's doc_type_code po, not the template id", resolver.gotSubjectKey)
 	}
 }
 

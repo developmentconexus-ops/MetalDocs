@@ -474,15 +474,16 @@ func TestRouteAdminCreate_ReturnsPersistedProjection(t *testing.T) {
 	}
 }
 
-// TestRouteAdminCreate_TemplateSubjectProjectionHasNilProfileCode pins the
-// template arm of the same read-back: a template route's profile_code column
-// is SQL NULL by DB constraint, so the projection must carry a nil pointer
-// (which the handler serializes as JSON null, never the "" sentinel).
-func TestRouteAdminCreate_TemplateSubjectProjectionHasNilProfileCode(t *testing.T) {
+// TestRouteAdminCreate_TemplateSubjectProjectionHasProfileCode pins the
+// template arm of the same read-back: under ADR 0086 a template route is
+// profile-keyed, so profile_code is NOT NULL and equals subject_key, and the
+// projection must carry it (never a nil pointer / JSON null).
+func TestRouteAdminCreate_TemplateSubjectProjectionHasProfileCode(t *testing.T) {
+	tmplProfile := "po"
 	conn := &routeAdminConn{
 		authzGranted:          true,
 		projectionName:        "Template Route",
-		projectionProfileCode: nil,
+		projectionProfileCode: &tmplProfile,
 		stageLoadStages:       validRouteStages(),
 	}
 	db := newRouteAdminTestDB(t, conn)
@@ -494,17 +495,18 @@ func TestRouteAdminCreate_TemplateSubjectProjectionHasNilProfileCode(t *testing.
 
 	out, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
 		TenantID:    "tenant-1",
+		ProfileCode: "po",
 		Name:        "Template Route",
 		ActorUserID: "user-1",
 		SubjectKind: "template",
-		SubjectKey:  "tmpl-1",
+		SubjectKey:  "po",
 		Stages:      validRouteStages(),
 	})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	if out.ProfileCode != nil {
-		t.Errorf("ProfileCode = %v, want nil for a template route", *out.ProfileCode)
+	if out.ProfileCode == nil || *out.ProfileCode != "po" {
+		t.Errorf("ProfileCode = %v, want \"po\" for a template route", out.ProfileCode)
 	}
 	if out.Name != "Template Route" {
 		t.Errorf("Name = %q, want %q", out.Name, "Template Route")
@@ -737,11 +739,43 @@ func TestRouteAdminCreate_ExplicitDocumentSubject(t *testing.T) {
 	}
 }
 
-// TestRouteAdminCreate_SubjectKindTemplate_AcceptedNoGovernance verifies that
-// subject_kind=template with a subject_key is accepted and persisted
-// faithfully (P2.S3 plumbs the field only; no template-specific governance
-// is added in this slice — Phase 3 scope).
-func TestRouteAdminCreate_SubjectKindTemplate_AcceptedNoGovernance(t *testing.T) {
+// TestRouteAdminCreate_SubjectKindTemplate_ProfileKeyed verifies that
+// subject_kind=template is persisted keyed by the profile it governs (ADR
+// 0086): an absent subject_key defaults to ProfileCode, exactly like the
+// document arm.
+func TestRouteAdminCreate_SubjectKindTemplate_ProfileKeyed(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: true}
+	db := newRouteAdminTestDB(t, conn)
+
+	svc := &RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Now()},
+	}
+
+	_, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
+		TenantID:    "tenant-1",
+		ProfileCode: "po",
+		Name:        "PO Route",
+		ActorUserID: "user-1",
+		SubjectKind: string(domain.SubjectKindTemplate),
+		Stages:      validRouteStages(),
+	})
+	if err != nil {
+		t.Fatalf("Create: unexpected error: %v", err)
+	}
+	if conn.capturedSubjectKind != string(domain.SubjectKindTemplate) {
+		t.Errorf("subject_kind = %q, want %q", conn.capturedSubjectKind, domain.SubjectKindTemplate)
+	}
+	if conn.capturedSubjectKey != "po" {
+		t.Errorf("subject_key = %q, want %q", conn.capturedSubjectKey, "po")
+	}
+}
+
+// TestRouteAdminCreate_TemplateSubjectKeyMismatch pins the ADR 0086 twin of the
+// document rule: a template route is looked up by doc_type_code, so a
+// subject_key diverging from profile_code would be unfindable at template
+// submit time and is rejected up front.
+func TestRouteAdminCreate_TemplateSubjectKeyMismatch(t *testing.T) {
 	conn := &routeAdminConn{authzGranted: true}
 	db := newRouteAdminTestDB(t, conn)
 
@@ -759,14 +793,8 @@ func TestRouteAdminCreate_SubjectKindTemplate_AcceptedNoGovernance(t *testing.T)
 		SubjectKey:  "tmpl-1",
 		Stages:      validRouteStages(),
 	})
-	if err != nil {
-		t.Fatalf("Create: unexpected error: %v", err)
-	}
-	if conn.capturedSubjectKind != string(domain.SubjectKindTemplate) {
-		t.Errorf("subject_kind = %q, want %q", conn.capturedSubjectKind, domain.SubjectKindTemplate)
-	}
-	if conn.capturedSubjectKey != "tmpl-1" {
-		t.Errorf("subject_key = %q, want %q", conn.capturedSubjectKey, "tmpl-1")
+	if !errors.Is(err, ErrTemplateSubjectKeyMismatch) {
+		t.Fatalf("expected ErrTemplateSubjectKeyMismatch; got %v", err)
 	}
 }
 
@@ -1173,15 +1201,14 @@ func TestRouteAdminCreate_IdempotencyKeyConflict(t *testing.T) {
 	}
 }
 
-// TestRouteAdminCreate_IdempotencyKeyConflict_TemplateDifferingSubjectKey pins
-// QR-A finding A: profile_code alone is "" for EVERY template route, so
-// before the fix, two template creates sharing an Idempotency-Key + name +
-// stages but a DIFFERENT subject_key hashed identically and the second call
-// silently replayed the first route (wrong route handed back to the second
-// caller) instead of surfacing an idempotency payload-mismatch conflict.
-// Mirrors TestRouteAdminCreate_IdempotencyKeyConflict's document-route
-// shape, but for the template branch and varying subject_key instead of name.
-func TestRouteAdminCreate_IdempotencyKeyConflict_TemplateDifferingSubjectKey(t *testing.T) {
+// TestRouteAdminCreate_IdempotencyKeyConflict_DifferingSubjectKind is the ADR
+// 0086 successor of QR-A finding A. Both kinds are now profile-keyed, so a
+// document route and a template route on the SAME profile differ ONLY in
+// subject_kind — and the payload hash must fold that in. If it did not, two
+// creates sharing an Idempotency-Key + profile + name + stages would hash
+// identically and the second caller would silently be handed the first
+// caller's route of the WRONG kind instead of an idempotency conflict.
+func TestRouteAdminCreate_IdempotencyKeyConflict_DifferingSubjectKind(t *testing.T) {
 	conn := &routeAdminConn{authzGranted: true, createdRouteID: "route-tmpl-1"}
 	db := newRouteAdminTestDB(t, conn)
 	store := newMemoryRouteAdminIdempStore()
@@ -1193,11 +1220,11 @@ func TestRouteAdminCreate_IdempotencyKeyConflict_TemplateDifferingSubjectKey(t *
 
 	if _, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
 		TenantID:       "tenant-1",
-		Name:           "Template Route",
+		ProfileCode:    "po",
+		Name:           "PO Route",
 		ActorUserID:    "user-1",
-		SubjectKind:    string(domain.SubjectKindTemplate),
-		SubjectKey:     "tmpl-a",
-		IdempotencyKey: "idem-tmpl-conflict",
+		SubjectKind:    string(domain.SubjectKindDocument),
+		IdempotencyKey: "idem-kind-conflict",
 		Stages:         validRouteStages(),
 	}); err != nil {
 		t.Fatalf("first Create: %v", err)
@@ -1205,30 +1232,26 @@ func TestRouteAdminCreate_IdempotencyKeyConflict_TemplateDifferingSubjectKey(t *
 
 	_, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
 		TenantID:       "tenant-1",
-		Name:           "Template Route",
+		ProfileCode:    "po",
+		Name:           "PO Route",
 		ActorUserID:    "user-1",
-		SubjectKind:    string(domain.SubjectKindTemplate),
-		SubjectKey:     "tmpl-b", // only field that differs from the first call
-		IdempotencyKey: "idem-tmpl-conflict",
+		SubjectKind:    string(domain.SubjectKindTemplate), // only field that differs
+		IdempotencyKey: "idem-kind-conflict",
 		Stages:         validRouteStages(),
 	})
 	if !errors.Is(err, idempotency.ErrConflict) {
-		t.Fatalf("expected idempotency.ErrConflict (different subject_key must not replay); got %v", err)
+		t.Fatalf("expected idempotency.ErrConflict (different subject_kind must not replay); got %v", err)
 	}
 }
 
 // TestRouteAdminCreate_IdempotencyKeyConflict_TemplateWhitespaceSubjectKey
-// pins the codex gate round-3 CRITICAL finding: computeCreateRoutePayloadHash
-// used to hash strings.TrimSpace(subject.Key), but the resolved subject key
-// is persisted EXACTLY as given (resolveCreateRouteSubject does no trim, and
-// contracts.CreateRouteRequest.Validate never checks SubjectKey for
-// whitespace). So "tmpl-a" and " tmpl-a " are distinct persisted subjects
-// but used to share a payload hash — a second create reusing the
-// Idempotency-Key with only leading/trailing whitespace added to the subject
-// key would wrongly replay the first route instead of surfacing
-// idempotency.ErrConflict. Mirrors
-// TestRouteAdminCreate_IdempotencyKeyConflict_TemplateDifferingSubjectKey but
-// varies only whitespace around an otherwise-identical key.
+// pins the codex gate round-3 CRITICAL finding, re-expressed for ADR 0086: the
+// payload hash must not TrimSpace the subject key, because the resolved key is
+// persisted EXACTLY as given (resolveCreateRouteSubject does no trim). Since a
+// template route's key IS its profile code, the whitespace axis now travels in
+// via ProfileCode: "po" and " po " are distinct persisted subjects, so a second
+// create reusing the Idempotency-Key with only whitespace added must surface
+// idempotency.ErrConflict rather than replay the first route.
 func TestRouteAdminCreate_IdempotencyKeyConflict_TemplateWhitespaceSubjectKey(t *testing.T) {
 	conn := &routeAdminConn{authzGranted: true, createdRouteID: "route-tmpl-ws-1"}
 	db := newRouteAdminTestDB(t, conn)
@@ -1241,10 +1264,10 @@ func TestRouteAdminCreate_IdempotencyKeyConflict_TemplateWhitespaceSubjectKey(t 
 
 	if _, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
 		TenantID:       "tenant-1",
+		ProfileCode:    "tmpl-a",
 		Name:           "Template Route",
 		ActorUserID:    "user-1",
 		SubjectKind:    string(domain.SubjectKindTemplate),
-		SubjectKey:     "tmpl-a",
 		IdempotencyKey: "idem-tmpl-ws-conflict",
 		Stages:         validRouteStages(),
 	}); err != nil {
@@ -1253,15 +1276,15 @@ func TestRouteAdminCreate_IdempotencyKeyConflict_TemplateWhitespaceSubjectKey(t 
 
 	_, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
 		TenantID:       "tenant-1",
+		ProfileCode:    " tmpl-a ", // only field that differs from the first call — whitespace only
 		Name:           "Template Route",
 		ActorUserID:    "user-1",
 		SubjectKind:    string(domain.SubjectKindTemplate),
-		SubjectKey:     " tmpl-a ", // only field that differs from the first call — whitespace only
 		IdempotencyKey: "idem-tmpl-ws-conflict",
 		Stages:         validRouteStages(),
 	})
 	if !errors.Is(err, idempotency.ErrConflict) {
-		t.Fatalf("expected idempotency.ErrConflict (whitespace-differing subject_key must not replay); got %v", err)
+		t.Fatalf("expected idempotency.ErrConflict (whitespace-differing subject key must not replay); got %v", err)
 	}
 }
 

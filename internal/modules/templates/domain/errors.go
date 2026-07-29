@@ -56,6 +56,19 @@ var ErrPlaceholderReservedName = errors.New("dictionary placeholder name is rese
 // sets resolver_key or computed, which are not allowed for that type.
 var ErrPlaceholderDictionaryInvalid = errors.New("dictionary placeholder must not set resolver_key or computed")
 
+// ErrDocTypeCodeRequired is returned when a template is created without a
+// doc_type_code. Generic templates were exterminated by ADR 0086 (migration
+// 0315's templates_template_doc_type_code_required_check is the DB backstop):
+// a template with no profile has no template approval route, so it could never
+// be submitted. HTTP layer maps this to 422.
+var ErrDocTypeCodeRequired = errors.New("templates: doc_type_code_required")
+
+// ErrApprovalRouteMissing is returned when a template is created for a profile
+// that has no ACTIVE template approval route (ADR 0086 config-first gate).
+// Mirrors controlleddocuments' identically-named sentinel; HTTP layer maps it
+// to 409 APPROVAL_ROUTE_MISSING.
+var ErrApprovalRouteMissing = errors.New("templates: approval_route_missing")
+
 // ErrTransactionRequired is returned when an operation that must run inside a
 // transaction is invoked without one.
 var ErrTransactionRequired = errors.New("templates: transaction_required")

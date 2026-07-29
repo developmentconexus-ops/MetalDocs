@@ -45,6 +45,12 @@ func (r *stubTemplateVersionReader) LoadTemplateInboxMeta(context.Context, db.Tx
 	return nil, nil
 }
 
+// LoadTemplateDocTypeCode returns the ADR 0086 template ROUTE subject key. The
+// content guard runs before any route lookup, so the value is inert here.
+func (r *stubTemplateVersionReader) LoadTemplateDocTypeCode(context.Context, db.Tx, string, string) (string, error) {
+	return "po", nil
+}
+
 // recordingSubmitWriter records whether the submit-lock was reached.
 type recordingSubmitWriter struct {
 	calls int

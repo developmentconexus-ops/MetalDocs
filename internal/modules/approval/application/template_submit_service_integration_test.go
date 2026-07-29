@@ -73,6 +73,29 @@ func (fakeTemplateVersionReader) LoadTemplateVersionContentHash(ctx context.Cont
 	return hash.String, true, nil
 }
 
+// LoadTemplateDocTypeCode (ADR 0086) mirrors the production adapter: the
+// template's doc_type_code IS the template ROUTE subject key, so submit
+// resolves the route by profile, not by template instance. Fails closed on a
+// missing/blank code exactly like the real reader.
+func (fakeTemplateVersionReader) LoadTemplateDocTypeCode(ctx context.Context, tx db.Tx, tenantID, templateID string) (string, error) {
+	var code sql.NullString
+	err := tx.QueryRowContext(ctx, `
+		SELECT doc_type_code FROM templates_template
+		 WHERE id = $1 AND tenant_id = $2`,
+		templateID, tenantID,
+	).Scan(&code)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", errors.New("fake reader: template not found")
+	}
+	if err != nil {
+		return "", err
+	}
+	if !code.Valid || code.String == "" {
+		return "", errors.New("fake reader: template has no doc_type_code")
+	}
+	return code.String, nil
+}
+
 // LoadTemplateInboxMeta (Unit 4.2) mirrors the production adapter's batch
 // resolve of {templateId, name} per version id, scoped to tenantID, read inside
 // tx. Per-id loop (rather than ANY($)) to avoid a pq dependency in this test
@@ -154,7 +177,10 @@ func (fakeTemplateVersionSubmitWriter) MarkTemplateVersionUnderReview(ctx contex
 // always seeds 'published'. content_hash is populated regardless of status —
 // chk_template_version_content_hash_non_draft only requires it for non-draft
 // rows, but a fixed 64-hex value is harmless for draft too.
-func seedTemplateVersion(t *testing.T, dbc *sql.DB, tenantID, actorID, status string) (templateID, versionID string) {
+// docTypeCode must be a real profile code: post-ADR-0086
+// templates_template_doc_type_code_required_check rejects '' outright, and it
+// is what the template route is keyed by.
+func seedTemplateVersion(t *testing.T, dbc *sql.DB, tenantID, actorID, docTypeCode, status string) (templateID, versionID string) {
 	t.Helper()
 	ctx := context.Background()
 	key := "tsvc-tmpl-" + uuid.NewString()
@@ -179,9 +205,9 @@ func seedTemplateVersion(t *testing.T, dbc *sql.DB, tenantID, actorID, status st
 	if err := tx.QueryRowContext(ctx,
 		`INSERT INTO public.templates_template
 		   (id, tenant_id, doc_type_code, key, name, description, latest_version, created_by, created_at)
-		 VALUES (gen_random_uuid(), $1::uuid, '', $2, 'Test Template', '', 1, $3::text, now())
+		 VALUES (gen_random_uuid(), $1::uuid, $2, $3, 'Test Template', '', 1, $4::text, now())
 		 RETURNING id::text`,
-		tenantID, key, actorID,
+		tenantID, docTypeCode, key, actorID,
 	).Scan(&templateID); err != nil {
 		t.Fatalf("seedTemplateVersion: insert template: %v", err)
 	}
@@ -207,7 +233,7 @@ func seedTemplateVersion(t *testing.T, dbc *sql.DB, tenantID, actorID, status st
 // row (chk_template_version_content_hash_non_draft demands the 64-char hash
 // only for non-draft statuses), which is precisely why the constraint used to
 // fire at submit time, mid-tx, as a raw 23514 (F-E4-1).
-func seedTemplateVersionNoContent(t *testing.T, dbc *sql.DB, tenantID, actorID string) (templateID, versionID string) {
+func seedTemplateVersionNoContent(t *testing.T, dbc *sql.DB, tenantID, actorID, docTypeCode string) (templateID, versionID string) {
 	t.Helper()
 	ctx := context.Background()
 	key := "tsvc-tmpl-" + uuid.NewString()
@@ -231,9 +257,9 @@ func seedTemplateVersionNoContent(t *testing.T, dbc *sql.DB, tenantID, actorID s
 	if err := tx.QueryRowContext(ctx,
 		`INSERT INTO public.templates_template
 		   (id, tenant_id, doc_type_code, key, name, description, latest_version, created_by, created_at)
-		 VALUES (gen_random_uuid(), $1::uuid, '', $2, 'Test Template', '', 1, $3::text, now())
+		 VALUES (gen_random_uuid(), $1::uuid, $2, $3, 'Test Template', '', 1, $4::text, now())
 		 RETURNING id::text`,
-		tenantID, key, actorID,
+		tenantID, docTypeCode, key, actorID,
 	).Scan(&templateID); err != nil {
 		t.Fatalf("seedTemplateVersionNoContent: insert template: %v", err)
 	}
@@ -253,16 +279,12 @@ func seedTemplateVersionNoContent(t *testing.T, dbc *sql.DB, tenantID, actorID s
 	return templateID, versionID
 }
 
-// seedTemplateRoute creates an ACTIVE approval route with two stages
+// seedTemplateRoute creates an ACTIVE template approval route with two stages
 // (AreaCode="tenant", the area-blind sentinel — P3.S2b-3b-i) through the real
-// RouteAdminService.Create entry point (document-shaped, since Create does
-// not yet null out profile_code for an explicit template subject — a known,
-// out-of-scope gap for a later route-admin slice), then flips the persisted
-// row to (subject_kind='template', subject_key=templateID, profile_code=NULL)
-// via raw UPDATE — the exact technique
-// TestLoadRoute_TemplateSubject_RoundTrips_RealDB and
-// TestLoadActiveRouteIDBySubject_TemplateSubject_RealDB already established
-// in the P3.S2a/P3.S2b-2 evidence.
+// RouteAdminService.Create entry point. Post-ADR-0086 no raw-UPDATE subject
+// flip is needed (nor legal): Create persists
+// (subject_kind='template', subject_key=profile_code) directly, which is what
+// approval_routes_template_subject_key_check now demands.
 // templateRouteStages mirrors validRouteStages()'s shape (two stages, each a
 // single role_in_fixed_area selector at AreaCode="tenant" area-blind sentinel —
 // P3.S2b-3b-i) but uses role values from the real user_process_areas_role_check
@@ -297,11 +319,10 @@ func templateRouteStages() []domain.Stage {
 	}
 }
 
-func seedTemplateRoute(t *testing.T, dbc *sql.DB, tenantID, actorID, templateID string) approvalrepo.Route {
+func seedTemplateRoute(t *testing.T, dbc *sql.DB, tenantID, actorID, profileCode string) approvalrepo.Route {
 	t.Helper()
 	ctx := context.Background()
 
-	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tenantID))
 	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
 	svc := &RouteAdminService{repo: repo, emitter: NewSQLEmitter(), clock: RealClock{}}
 	runner := db.NewTxRunner(dbc)
@@ -311,22 +332,14 @@ func seedTemplateRoute(t *testing.T, dbc *sql.DB, tenantID, actorID, templateID 
 
 	out, err := svc.Create(rctx, runner, CreateRouteInput{
 		TenantID:    tenantID,
-		ProfileCode: tax.ProfileCode,
+		ProfileCode: profileCode,
+		SubjectKind: string(domain.SubjectKindTemplate),
 		Name:        "Template Route",
 		ActorUserID: actorID,
 		Stages:      templateRouteStages(),
 	})
 	if err != nil {
 		t.Fatalf("seed template route: Create: %v", err)
-	}
-
-	if _, err := dbc.ExecContext(ctx,
-		`UPDATE public.approval_routes
-		    SET subject_kind = 'template', subject_key = $2, profile_code = NULL
-		  WHERE id = $1::uuid`,
-		out.RouteID, templateID,
-	); err != nil {
-		t.Fatalf("seed template route: flip subject: %v", err)
 	}
 
 	tx, err := dbc.BeginTx(ctx, nil)
@@ -384,7 +397,8 @@ func newTemplateSubmitCtx(tenantID, actorID string) context.Context {
 
 // TestSubmitTemplateVersionForReview_Success_RealDB is the RED->GREEN target:
 // submit creates an in_progress instance with Subject=(template, versionID),
-// route resolved by template_id (not by version id), N stage instances
+// route resolved by the template's doc_type_code (ADR 0086 — not by template
+// id and not by version id), N stage instances
 // seeded with the first active, and an approval_submitted governance event
 // emitted.
 func TestSubmitTemplateVersionForReview_Success_RealDB(t *testing.T) {
@@ -392,8 +406,9 @@ func TestSubmitTemplateVersionForReview_Success_RealDB(t *testing.T) {
 	tnt := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
 
-	templateID, versionID := seedTemplateVersion(t, dbc, tnt.ID, actor.ID, "draft")
-	route := seedTemplateRoute(t, dbc, tnt.ID, actor.ID, templateID)
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+	templateID, versionID := seedTemplateVersion(t, dbc, tnt.ID, actor.ID, tax.ProfileCode, "draft")
+	route := seedTemplateRoute(t, dbc, tnt.ID, actor.ID, tax.ProfileCode)
 
 	// Eligibility pools for templateRouteStages(): stage 1 role "approver",
 	// stage 2 role "author".
@@ -436,7 +451,7 @@ func TestSubmitTemplateVersionForReview_Success_RealDB(t *testing.T) {
 		t.Fatalf("Subject = %+v, want {template %s}", inst.Subject, versionID)
 	}
 	if inst.RouteID != route.ID {
-		t.Fatalf("RouteID = %q, want %q (resolved by template_id)", inst.RouteID, route.ID)
+		t.Fatalf("RouteID = %q, want %q (resolved by doc_type_code)", inst.RouteID, route.ID)
 	}
 	if inst.Status != domain.InstanceInProgress {
 		t.Fatalf("Status = %q, want in_progress", inst.Status)
@@ -493,8 +508,9 @@ func TestSubmitTemplateVersionForReview_NonDraft_Rejected_RealDB(t *testing.T) {
 	tnt := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
 
-	templateID, versionID := seedTemplateVersion(t, dbc, tnt.ID, actor.ID, "published")
-	seedTemplateRoute(t, dbc, tnt.ID, actor.ID, templateID)
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+	templateID, versionID := seedTemplateVersion(t, dbc, tnt.ID, actor.ID, tax.ProfileCode, "published")
+	seedTemplateRoute(t, dbc, tnt.ID, actor.ID, tax.ProfileCode)
 
 	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
 	svc := NewTemplateSubmitService(repo, NewSQLEmitter(), RealClock{}, fakeTemplateVersionReader{})
@@ -537,8 +553,9 @@ func TestSubmitTemplateVersionForReview_NoContentHash_Rejected_RealDB(t *testing
 	tnt := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
 
-	templateID, versionID := seedTemplateVersionNoContent(t, dbc, tnt.ID, actor.ID)
-	seedTemplateRoute(t, dbc, tnt.ID, actor.ID, templateID)
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+	templateID, versionID := seedTemplateVersionNoContent(t, dbc, tnt.ID, actor.ID, tax.ProfileCode)
+	seedTemplateRoute(t, dbc, tnt.ID, actor.ID, tax.ProfileCode)
 
 	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
 	svc := NewTemplateSubmitService(repo, NewSQLEmitter(), RealClock{}, fakeTemplateVersionReader{})

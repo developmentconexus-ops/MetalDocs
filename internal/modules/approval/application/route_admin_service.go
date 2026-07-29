@@ -85,6 +85,14 @@ var ErrRouteProfileUnknown = errors.New("route_admin: profile_code not registere
 // must be impossible, not merely discouraged.
 var ErrDocumentSubjectKeyMismatch = errors.New("approval: document route subject_key must equal profile_code")
 
+// ErrTemplateSubjectKeyMismatch is the template-subject twin of
+// ErrDocumentSubjectKeyMismatch (ADR 0086). A template ROUTE is keyed by the
+// profile it governs, so subject_key must equal profile_code — the DB enforces
+// it via approval_routes_template_subject_key_check (migration 0315) and the
+// submit/preview paths resolve the route by the template's doc_type_code, so a
+// divergent key would make the route unfindable.
+var ErrTemplateSubjectKeyMismatch = errors.New("approval: template route subject_key must equal profile_code")
+
 // CreateRouteInput carries all inputs for Create.
 type CreateRouteInput struct {
 	TenantID    string
@@ -92,11 +100,10 @@ type CreateRouteInput struct {
 	Name        string
 	ActorUserID string
 	// SubjectKind and SubjectKey generalize what the route governs (M3 kernel
-	// extraction, ADR 0082 / P2.S3). Both empty ⇒ the legacy default
-	// (document, ProfileCode) — byte-equal to pre-P2.S3 behavior. Either may
-	// be supplied without the other: an empty SubjectKey defaults to
-	// ProfileCode only when the effective kind is document; otherwise
-	// route.Subject.Validate() rejects the empty key.
+	// extraction, ADR 0082 / P2.S3). An empty SubjectKind means document.
+	// Post-ADR-0086 BOTH kinds are profile-keyed: an empty SubjectKey defaults
+	// to ProfileCode, and a supplied SubjectKey that diverges from ProfileCode
+	// is rejected (ErrDocumentSubjectKeyMismatch / ErrTemplateSubjectKeyMismatch).
 	SubjectKind    string
 	SubjectKey     string
 	IdempotencyKey string
@@ -111,11 +118,10 @@ type CreateRouteInput struct {
 // never echoed from the request — so create and the read side cannot drift.
 type CreateRouteResult struct {
 	RouteID string
-	// ProfileCode is nil for a template-subject route (profile_code is SQL
-	// NULL by DB constraint, ADR 0082 / migration 0297) and a non-nil code for
-	// a document-subject route. Pointer, not "", so the wire can tell the two
-	// apart — the same honesty rule listRouteProfileCode enforces on the list
-	// projection.
+	// ProfileCode is non-nil for every route post-ADR-0086 (both subject kinds
+	// are profile-keyed). The pointer is kept because the column is still
+	// NULL-able at the DB level: a nil here is a data defect surfaced honestly
+	// as JSON null, never collapsed to the "" sentinel.
 	ProfileCode *string
 	Name        string
 	Version     int
@@ -240,31 +246,46 @@ func (s *RouteAdminService) resolvePolicy(ctx context.Context, tenantID, profile
 // (M3 kernel extraction, ADR 0082 / P2.S3). When both SubjectKind and
 // SubjectKey are absent, this reproduces the pre-P2.S3 default exactly:
 // (document, ProfileCode). An explicit SubjectKind is used as given; an
-// explicit SubjectKey is used as given; either one alone still lets the
-// other default (SubjectKey defaults to ProfileCode only for the document
-// kind — a non-document kind with no key fails Subject.Validate rather than
-// silently defaulting to a document key).
+// absent SubjectKey defaults to ProfileCode for BOTH kinds (ADR 0086), so an
+// empty ProfileCode yields an empty key and fails Subject.Validate rather
+// than persisting an unkeyed route.
 //
 // Rail R1 invariant: profile_code is the backward-compat ALIAS for
 // (document, profile_code). So once defaulting is done, a document-kind
 // subject whose key diverges from ProfileCode is rejected with
 // ErrDocumentSubjectKeyMismatch — an explicit subject_kind=document plus a
 // divergent subject_key would otherwise be silently accepted and become
-// unfindable via the profile-code alias lookup. Template subjects are
-// unaffected: their key has no relationship to profile_code.
+// unfindable via the profile-code alias lookup.
+//
+// ADR 0086 puts template routes under the identical rule: a template ROUTE is
+// keyed by the profile (doc_type_code) it governs, so its key defaults to and
+// must equal ProfileCode too (DB truth:
+// approval_routes_template_subject_key_check, migration 0315). The mismatch
+// sentinel is subject-specific only in its message; both kinds reject the same
+// divergence for the same reason.
 func resolveCreateRouteSubject(in CreateRouteInput) (domain.Subject, error) {
 	kind := domain.SubjectKind(in.SubjectKind)
 	if kind == "" {
 		kind = domain.SubjectKindDocument
 	}
 	key := in.SubjectKey
-	if key == "" && kind == domain.SubjectKindDocument {
+	if key == "" {
 		key = in.ProfileCode
 	}
-	if kind == domain.SubjectKindDocument && key != in.ProfileCode {
+	subject := domain.Subject{Kind: kind, Key: key}
+	// Kind validity is decided FIRST: an unknown subject_kind is a malformed
+	// request (ErrInvalidSubjectKind), not a key mismatch, and must not be
+	// reported as one just because its key also happens to diverge.
+	if err := subject.Validate(); err != nil {
+		return domain.Subject{}, err
+	}
+	if key != in.ProfileCode {
+		if kind == domain.SubjectKindTemplate {
+			return domain.Subject{}, ErrTemplateSubjectKeyMismatch
+		}
 		return domain.Subject{}, ErrDocumentSubjectKeyMismatch
 	}
-	return domain.Subject{Kind: kind, Key: key}, nil
+	return subject, nil
 }
 
 // createTx takes the already-resolved subject (Create resolves it once, up
@@ -278,19 +299,12 @@ func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in
 	}
 
 	// G1: resolve the per-profile route-signature policy OFF-TX (H-PRE-1) so the
-	// friendly route-shape check runs before the write tx opens. A template
-	// subject has no profile — there is no per-profile signature policy to
-	// resolve, so skip the reader call entirely rather than looking up an
-	// empty profile_code (S1, F18; DB truth: migration 0297).
-	var (
-		policy taxonomydomain.RoutePolicy
-		err    error
-	)
-	if subject.Kind != domain.SubjectKindTemplate {
-		policy, err = s.resolvePolicy(ctx, in.TenantID, in.ProfileCode)
-		if err != nil {
-			return result, err
-		}
+	// friendly route-shape check runs before the write tx opens. Every route —
+	// document and template alike — is keyed by a profile (ADR 0086), so the
+	// per-profile signature policy applies to both kinds; there is no skip.
+	policy, err := s.resolvePolicy(ctx, in.TenantID, in.ProfileCode)
+	if err != nil {
+		return result, err
 	}
 	err = runner.Do(ctx, func(tx *sql.Tx) error {
 		ctx := authz.WithCapCache(ctx)
@@ -310,26 +324,13 @@ func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in
 			return err
 		}
 
-		// profile_code is NULL for a template route (DB truth: migration 0297
-		// approval_routes_template_subject_projection_check forbids a
-		// non-NULL profile_code when subject_kind='template'). in.ProfileCode
-		// is always "" here for a template subject (contract-enforced), but
-		// bind explicit SQL NULL rather than an empty string to satisfy the
-		// column's semantics precisely.
-		var profileCodeArg any
-		if subject.Kind == domain.SubjectKindTemplate {
-			profileCodeArg = nil
-		} else {
-			profileCodeArg = in.ProfileCode
-		}
-
 		var routeID string
 		err = tx.QueryRowContext(ctx, `
 			INSERT INTO approval_routes
 				(tenant_id, profile_code, name, version, created_by, active, subject_kind, subject_key)
 			VALUES ($1, $2, $3, 1, $4, TRUE, $5, $6)
 			RETURNING id`,
-			in.TenantID, profileCodeArg, in.Name, in.ActorUserID,
+			in.TenantID, in.ProfileCode, in.Name, in.ActorUserID,
 			string(route.Subject.Kind), route.Subject.Key,
 		).Scan(&routeID)
 		if err != nil {
@@ -350,21 +351,12 @@ func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in
 			return err
 		}
 
-		// profile_code is null (never the "" sentinel — hub doctrine, QR-A
-		// finding C) for a template route, mirroring the SQL NULL bound above
-		// via profileCodeArg. subject_kind/subject_key (the canonical
-		// resolved values, not the raw possibly-defaulted input) are new
-		// fields on this event — no legacy template events/responses exist
-		// (creation was impossible before this branch), so this is a
-		// zero-compat-impact addition for every subject kind. A document
-		// route's other payload bytes are unchanged.
-		var eventProfileCode any
-		if subject.Kind != domain.SubjectKindTemplate {
-			eventProfileCode = in.ProfileCode
-		}
+		// profile_code is always present now (ADR 0086): every route, both
+		// kinds, is keyed by a profile. subject_kind/subject_key carry the
+		// canonical resolved values, not the raw possibly-defaulted input.
 		payload, err := json.Marshal(map[string]any{
 			"route_id":      routeID,
-			"profile_code":  eventProfileCode,
+			"profile_code":  in.ProfileCode,
 			"subject_kind":  string(subject.Kind),
 			"subject_key":   subject.Key,
 			"stage_count":   len(in.Stages),
@@ -426,10 +418,11 @@ func (s *RouteAdminService) loadRouteProjection(ctx context.Context, runner db.T
 
 // scanRouteProjectionTx reads the committed approval_routes row plus its
 // persisted stages (with selectors) inside the caller's tx. profile_code is
-// scanned as a nullable column and carried out as a pointer so a template
-// route's SQL NULL stays NULL on the wire instead of collapsing to the ""
-// sentinel. in_use is computed from approval_instances, tenant-scoped on both
-// sides of the correlation.
+// scanned as a nullable column because the column is still NULL-able at the DB
+// level; post-ADR-0086 every route carries one, so a NULL here is a data defect
+// and stays NULL on the wire instead of collapsing to the "" sentinel. in_use
+// is computed from approval_instances, tenant-scoped on both sides of the
+// correlation.
 func scanRouteProjectionTx(ctx context.Context, tx *sql.Tx, tenantID, routeID string) (CreateRouteResult, error) {
 	var (
 		out         CreateRouteResult
@@ -522,7 +515,8 @@ func (s *RouteAdminService) Update(ctx context.Context, runner db.TxRunner, in U
 // keeping the friendly and authoritative layers identical in scope while the
 // write tx below surfaces any real not-found/stale error. Reading profile_code
 // off-tx is TOCTOU-safe because a route's profile_code is immutable across its
-// life (supersede preserves it).
+// life (supersede preserves it). An active route whose profile_code is empty is
+// a post-ADR-0086 data defect and fails closed here — see below.
 func (s *RouteAdminService) resolveUpdatePolicy(ctx context.Context, runner db.TxRunner, tenantID, routeID string) (taxonomydomain.RoutePolicy, error) {
 	if s.policyReader == nil {
 		return "", nil
@@ -541,13 +535,12 @@ func (s *RouteAdminService) resolveUpdatePolicy(ctx context.Context, runner db.T
 	if !found {
 		return "", nil
 	}
-	// A template route has no profile (profile_code is SQL NULL, surfaced here
-	// as "") — there is no per-profile signature policy to resolve, mirroring
-	// createTx's skip for SubjectKindTemplate (S1, F18 dual-gate finding 2).
-	// Looking up an empty profile_code would either miss (empty policy) or,
-	// worse, collide with a real tenant profile keyed by "".
+	// Post-ADR-0086 every route — both subject kinds — carries a profile_code,
+	// so an active route with an empty one is a data defect (0315's CHECKs make
+	// it unreachable). Fail closed rather than silently skipping the
+	// route-signature policy, which would let a mis-shaped route through.
 	if profileCode == "" {
-		return "", nil
+		return "", fmt.Errorf("route_admin: active route %s has no profile_code (ADR 0086 requires one for every subject kind)", routeID)
 	}
 	return s.policyReader.RoutePolicy(ctx, tenantID, profileCode)
 }
@@ -919,10 +912,10 @@ type lockedRouteState struct {
 // with a plain non-recording SELECT (safe in any tx; no authz recording, so it
 // never trips H-PRE-1). Returns found=false when the route is inactive or absent
 // so the G1 friendly check can be skipped in lockstep with the DB trigger's
-// active-only scope. profile_code is SQL NULL for a template route (DB truth:
-// migration 0297 approval_routes_template_subject_projection_check) — that
-// case still reports found=true with code="" so the caller can distinguish
-// "no policy to resolve" (template) from "route not eligible" (absent/inactive).
+// active-only scope. The column is still NULL-able at the DB level, so a NULL
+// is reported as found=true with code="" — the caller treats that as a data
+// defect (ADR 0086 / migration 0315 require a profile_code on every route),
+// distinct from "route not eligible" (absent/inactive).
 func loadActiveRouteProfileCode(ctx context.Context, tx *sql.Tx, tenantID, routeID string) (string, bool, error) {
 	var code sql.NullString
 	err := tx.QueryRowContext(ctx, `
