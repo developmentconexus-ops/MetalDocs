@@ -1,7 +1,7 @@
 // Package maintenance holds the shared River periodic-job definitions for the
 // maintenance-queue jobs (stuck-instance watchdog, idempotency janitor, audit
-// integrity validator, the M6 F6.2 document review-due surfacer, and the F8
-// approval SLA surfacer). Both
+// integrity validator, the M6 F6.2 document review-due surfacer, the F8
+// approval SLA surfacer, and the ADR 0085 release-hold reconciler). Both
 // metaldocs-api and metaldocs-jobs define these periodic jobs on their River
 // client config so that whichever process wins leader election is the one
 // that enqueues them (River only enqueues periodic jobs from the elected
@@ -19,12 +19,13 @@ import (
 	"metaldocs/internal/modules/jobs/audit_integrity_validator"
 	"metaldocs/internal/modules/jobs/document_review_surfacer"
 	"metaldocs/internal/modules/jobs/idempotency_janitor"
+	"metaldocs/internal/modules/jobs/release_hold_reconciler"
 	"metaldocs/internal/modules/jobs/stuck_instance_watchdog"
 )
 
 // PeriodicJobs returns the River periodic-job definitions for the 3 janitors
-// plus the M6 F6.2 document review-due surfacer and the F8 approval SLA
-// surfacer. It must be included in the
+// plus the M6 F6.2 document review-due surfacer, the F8 approval SLA surfacer
+// and the ADR 0085 release-hold reconciler. It must be included in the
 // Config.PeriodicJobs of every River client that
 // participates in leader election for these jobs (currently metaldocs-api and
 // metaldocs-jobs), regardless of whether that client subscribes the
@@ -65,6 +66,17 @@ func PeriodicJobs() []*river.PeriodicJob {
 				return approval_sla_surfacer.ApprovalSLASurfacerArgs{}, &river.InsertOpts{Queue: "maintenance"}
 			},
 			&river.PeriodicJobOpts{ID: "approval-sla-surfacer", RunOnStart: false},
+		),
+		// ADR 0085 Stage C W2 reconciliation sweep. 15 minutes against a
+		// 30-minute stuck threshold: a hold that crosses the threshold is
+		// surfaced within one tick of crossing it, and no generation can cross
+		// the threshold and be released again between two ticks unobserved.
+		river.NewPeriodicJob(
+			river.PeriodicInterval(15*time.Minute),
+			func() (river.JobArgs, *river.InsertOpts) {
+				return release_hold_reconciler.ReleaseHoldReconcilerArgs{}, &river.InsertOpts{Queue: "maintenance"}
+			},
+			&river.PeriodicJobOpts{ID: "release-hold-reconciler", RunOnStart: false},
 		),
 	}
 }

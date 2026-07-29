@@ -443,6 +443,7 @@ Every component under `features/shared/controlled-artifact/` must obey **all fou
 Logic shared by more than one adapter is extracted once:
 - `frontend/apps/web/src/features/shared/controlled-artifact/resolveOwnerDisplay.ts` — owner-name resolution with current-user fallback; consumed by all four adapters.
 - `frontend/apps/web/src/features/documents/lib/approvalWorkflow.ts` (`mapApprovalChain`) — stage→`ApprovalChainItem` mapping; consumed by both document adapters and the template approval adapter.
+- `frontend/apps/web/src/features/documents/lib/documentReleasePresentation.ts` (`getDocumentReleasePresentation`) — ADR 0085 Stage C: maps the `DocumentDetailResponse.release` readiness-hold projection onto PT-BR copy (tone `released`/`progress`/`scheduled`/`anomaly`); the UI's only source of release status, no client-side readiness inference. Consumed by `useDocumentArtifact.ts`; its types are also imported directly by `features/documents/pages/DocumentDetailRoute.tsx`.
 
 ### 17.7 Decision reference
 

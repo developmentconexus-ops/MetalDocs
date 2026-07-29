@@ -18,6 +18,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DocumentDetailRoute } from './DocumentDetailRoute';
 import type { DocumentDetailGating } from '../adapters/useDocumentArtifact';
+import type { ReleasePresentation } from '../lib/documentReleasePresentation';
 
 const hasCapMock = vi.fn();
 vi.mock('../../iam/hooks/useHasCapability', () => ({
@@ -100,6 +101,8 @@ function mockArtifact(overrides: {
   status?: string;
   gating?: Partial<DocumentDetailGating>;
   doc?: Record<string, unknown>;
+  /** ADR 0085 Stage C — the adapter's release presentation; null = no release block. */
+  release?: ReleasePresentation | null;
 } = {}) {
   const status = overrides.status ?? 'published';
   vi.mocked(useDocumentArtifact).mockReturnValue({
@@ -110,6 +113,7 @@ function mockArtifact(overrides: {
     doc: { ...BASE_DOC, status, ...overrides.doc },
     obligatedCount: '3',
     gating: baseGating(overrides.gating),
+    release: overrides.release ?? null,
   } as never);
 }
 
@@ -206,6 +210,104 @@ describe('DocumentDetailRoute — FE-11 capability gating', () => {
     });
     const btn = screen.getByRole('button', { name: /Iniciar revisão/i });
     expect(btn).toHaveAttribute('aria-disabled', 'false');
+  });
+});
+
+describe('DocumentDetailRoute — ADR 0085 Stage C release projection', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hasCapMock.mockReturnValue(true);
+  });
+
+  it('renders the released state with its release date', async () => {
+    mockArtifact({
+      status: 'published',
+      release: { tone: 'released', title: 'Publicado', detail: 'Liberado em 19 de maio de 2026' },
+    });
+
+    renderRoute();
+
+    await waitFor(() => {
+      expect(screen.getByText('Publicado')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Liberado em 19 de maio de 2026')).toBeInTheDocument();
+  });
+
+  it('renders the in-progress hold as a no-action processing state', async () => {
+    mockArtifact({
+      status: 'approved',
+      gating: { isApproved: true, isPublished: false, canCreateRevision: false },
+      release: { tone: 'progress', title: 'Preparando artefatos finais…', detail: null },
+    });
+
+    renderRoute();
+
+    await waitFor(() => {
+      expect(screen.getByText('Preparando artefatos finais…')).toBeInTheDocument();
+    });
+    // Report-only: no publication CTA is ever offered by the release block.
+    expect(screen.queryByRole('button', { name: /Publicar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Agendar/i })).not.toBeInTheDocument();
+  });
+
+  it('renders the scheduled hold with the planned effective date', async () => {
+    mockArtifact({
+      status: 'approved',
+      gating: { isApproved: true, isPublished: false, canCreateRevision: false },
+      release: {
+        tone: 'scheduled',
+        title: 'Aprovado — vigência programada para 03/08/2026',
+        detail: null,
+      },
+    });
+
+    renderRoute();
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Aprovado — vigência programada para 03/08/2026'),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('renders an anomaly hold with hold_detail and no CTA', async () => {
+    mockArtifact({
+      status: 'approved',
+      gating: { isApproved: true, isPublished: false, canCreateRevision: false },
+      release: {
+        tone: 'anomaly',
+        title: 'Publicação retida — conflito de substituição',
+        detail: 'generation 3 conflita com POP-GENERAL-015',
+      },
+    });
+
+    renderRoute();
+
+    await waitFor(() => {
+      expect(screen.getByText('Publicação retida — conflito de substituição')).toBeInTheDocument();
+    });
+    expect(screen.getByText('generation 3 conflita com POP-GENERAL-015')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Publicar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Resolver/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Tentar novamente/i })).not.toBeInTheDocument();
+  });
+
+  it('renders NO release block when the projection is absent (legacy/never-generated)', async () => {
+    mockArtifact({
+      status: 'approved',
+      gating: { isApproved: true, isPublished: false, canCreateRevision: false },
+      release: null,
+    });
+
+    renderRoute();
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Iniciar revisão/i })).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/Publicação retida/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Preparando/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/vigência programada/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Liberado em 19 de maio de 2026')).not.toBeInTheDocument();
   });
 });
 

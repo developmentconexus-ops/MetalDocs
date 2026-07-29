@@ -28,6 +28,12 @@ import { useAreasQuery } from '../queries/useAreasQuery';
 import { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
 import { formatShortDate } from '../../../lib/format/dates';
 import { getDocumentStatusPresentation } from '../lib/documentStatusPresentation';
+import {
+  LIFECYCLE_POLL_INTERVAL_MS,
+  getDocumentReleasePresentation,
+  isDocumentLifecycleSettling,
+  type ReleasePresentation,
+} from '../lib/documentReleasePresentation';
 import { parseDocumentStatus } from '../lib/parseDocumentStatus';
 import type { DocumentDetail } from '../api/documents';
 import type { fetchActiveDocumentInstance } from '../../controlled-documents/api/controlledDocuments';
@@ -46,7 +52,8 @@ const EM_DASH = '—';
  *
  * ADR 0085 (Stage B): there is no manual publish gate any more. Release is an
  * approval-driven coordinator outcome, so the detail screen only reports the
- * document's status; the readiness projection lands in Stage C.
+ * document's status. ADR 0085 (Stage C): release STATUS comes from the
+ * readiness-hold projection (`DocumentArtifact.release`), never from gating.
  */
 export interface DocumentDetailGating {
   isObsolete: boolean;
@@ -75,6 +82,13 @@ export interface DocumentArtifact {
   obligatedCount: string;
   /** Gating booleans + sibling-CTA copy the route's hero-actions JSX renders directly. */
   gating: DocumentDetailGating;
+  /**
+   * ADR 0085 Stage C — release status derived from the readiness-hold projection
+   * that rides the document detail response (no extra query). `null` when the
+   * document has no release generation at all (draft / in-review / legacy rows
+   * never backfilled): the route then renders no release block whatsoever.
+   */
+  release: ReleasePresentation | null;
 }
 
 /**
@@ -91,16 +105,20 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
   // POST /controlled-documents/{id}/revisions (see documentWorkflow.ts header comment).
   const canInitiateRevision = useHasCapability('document.edit');
 
-  const docQuery = useDocumentDetailQuery(documentId, { pollScheduledLifecycle: true });
-  const shouldPollScheduledLifecycle = docQuery.data?.status === 'scheduled';
-  const scheduledLifecycleRefetchInterval = 5_000;
+  const docQuery = useDocumentDetailQuery(documentId, { pollLifecycleUntilSettled: true });
+  // Same gate the detail query polls on, applied to the sibling queries so the whole
+  // screen advances together. Post-ADR-0085 this covers the coordinator's transient
+  // release holds (document status stays 'approved' while it works), not just the
+  // legacy scheduled wait — see `isDocumentLifecycleSettling` for the transient vs
+  // terminal-anomaly split.
+  const shouldPollLifecycle = isDocumentLifecycleSettling(docQuery.data);
   const approvalQuery = useApprovalInstanceQuery(documentId);
   const controlledDocumentId = docQuery.data?.controlled_document_id ?? null;
   const activeDocumentQuery = useControlledDocumentActiveDocumentQuery(controlledDocumentId, {
-    refetchInterval: shouldPollScheduledLifecycle ? scheduledLifecycleRefetchInterval : false,
+    refetchInterval: shouldPollLifecycle ? LIFECYCLE_POLL_INTERVAL_MS : false,
   });
   const revisionHistoryQuery = useDocumentRevisionHistoryQuery(documentId, {
-    refetchInterval: shouldPollScheduledLifecycle ? scheduledLifecycleRefetchInterval : false,
+    refetchInterval: shouldPollLifecycle ? LIFECYCLE_POLL_INTERVAL_MS : false,
   });
   const areasQuery = useAreasQuery();
   const profilesQuery = useProfilesQuery();
@@ -123,8 +141,15 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
   const areaLabel = areaCode ? resolveAreaLabel(areaCode, areasQuery.data ?? []) : null;
   const profileLabel = profileCode ? resolveProfileLabel(profileCode, profilesQuery.data ?? []) : null;
 
-  const publishedAt = formatPublishedAt(approval?.completed_at ?? undefined);
-  const sinceDateHint = approval?.completed_at ? formatShortDate(approval.completed_at) : EM_DASH;
+  // ADR 0085 Stage C: the release projection is the sole source of the publication
+  // FACT — `released_at` is when the release actually happened. `approval.completed_at`
+  // is approval-COMPLETION time and stands in only for legacy documents that have no
+  // release generation at all (never backfilled). A document that HAS a generation but
+  // is still on hold has no publication date yet, so we render none rather than
+  // relabelling its approval timestamp as a publication date.
+  const publicationTimestamp = doc?.release ? doc.release.released_at : (approval?.completed_at ?? null);
+  const publishedAt = formatPublishedAt(publicationTimestamp);
+  const sinceDateHint = publicationTimestamp ? formatShortDate(publicationTimestamp) : EM_DASH;
   const statusPresentation = getDocumentStatusPresentation(status ?? '', publishedAt);
 
   // Owner name: created_by; if creator is the current user, use displayName (L217-222 parity).
@@ -278,6 +303,11 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
     actions,
   };
 
+  // ADR 0085 Stage C: the coordinator's readiness-hold projection is the ONLY
+  // source of release status. Nothing here infers readiness from content hashes,
+  // capabilities, or the lifecycle status — those answer different questions.
+  const release = getDocumentReleasePresentation(doc?.release);
+
   const gating: DocumentDetailGating = {
     isObsolete,
     isApproved,
@@ -300,5 +330,6 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
     doc: doc ?? null,
     obligatedCount,
     gating,
+    release,
   };
 }

@@ -1,16 +1,19 @@
 # Module: jobs
 
-> **Last verified:** 2026-07-28 (ADR 0085 Stage B — the `apps/jobs` binary's `scheduled_publish_cutover` job (`ScheduledPublishArgs`/`ScheduledPublishWorker`, `internal/modules/documents/approval/jobs/`) is DELETED, along with its upstream `PublishApproved`/`SchedulePublish`/`RunScheduledPublishJob` callers in the `approval` module. Publication is no longer a client-invoked transaction — it is now driven by the ADR 0085 release coordinator's `release_evaluate` job kind (`internal/modules/approval/jobs/release_evaluate_job.go`, `ReleaseEvaluateWorker`), enqueued in the same tx as an approval fact or artifact fact write, on the same `temporal` queue the old cutover job used. §"River job: release evaluation" section (renamed from "scheduled-publish cutover") and Public surface/Persistence rows below rewritten; see [`wiki/modules/approval.md`](approval.md) and [ADR 0085](../decisions/0085-release-coordinator-approval-driven-publication.md).) | prior: 2026-07-04 (M6 F6.2 — ADR 0069: added the `document_review_surfacer` River periodic job, hourly, `maintenance` queue, `RunOnStart:false`; consumes the documents-owned `ReviewDueReader`/`ReviewSurfaceWriter` ports, zero raw SQL on `public.documents`) | prior: 2026-07-04 (ADR 0067/0068 — River is the single async primitive; 3 janitors + lease scheduler retired; watchdog is alert-only. NOTE: this doc's body below still narrates the pre-ADR-0067 lease-scheduler architecture and has not yet been fully rewritten to the post-ADR-0067 shape — treat the River periodic-job facts as current and the Scheduler/lease-reaper narrative as historical pending a full rewrite) | prior: 2026-06-11 (Wave 1)
+> **Last verified:** 2026-07-29 (ADR 0085 Stage C W2 — new River periodic job `release_hold_reconciler` (`internal/modules/jobs/release_hold_reconciler/job.go`, kind `release_hold_reconciler`), 15-min interval on the `maintenance` queue, registered alongside the other 5 periodic jobs in `internal/modules/jobs/maintenance/periodic.go` (dual-define, ADR 0067) and given its Worker only in `apps/jobs/cmd/metaldocs-jobs/main.go`. Alert-only (ADR 0068): sweeps `public.release_generations` for holds stuck >30min via the approval-owned published read-port `ReleaseHoldReader` (`internal/modules/approval/domain/release_hold_port.go` + Postgres adapter `internal/modules/approval/infrastructure/release_hold_reader.go`); emits `release.generation.stuck_alert` governance events; never mutates state, never re-enqueues evaluation. New §"River job: release-hold-reconciler" below; Key files/Public surface/Persistence tables updated; the shared-periodic-jobs count corrected from the stale "4 jobs" to the actual 6 (also fixed the missing `approval-sla-surfacer` row, an F8 addition this doc never caught up on).) | prior: 2026-07-28 (ADR 0085 Stage B — the `apps/jobs` binary's `scheduled_publish_cutover` job (`ScheduledPublishArgs`/`ScheduledPublishWorker`, `internal/modules/documents/approval/jobs/`) is DELETED, along with its upstream `PublishApproved`/`SchedulePublish`/`RunScheduledPublishJob` callers in the `approval` module. Publication is no longer a client-invoked transaction — it is now driven by the ADR 0085 release coordinator's `release_evaluate` job kind (`internal/modules/approval/jobs/release_evaluate_job.go`, `ReleaseEvaluateWorker`), enqueued in the same tx as an approval fact or artifact fact write, on the same `temporal` queue the old cutover job used. §"River job: release evaluation" section (renamed from "scheduled-publish cutover") and Public surface/Persistence rows below rewritten; see [`wiki/modules/approval.md`](approval.md) and [ADR 0085](../decisions/0085-release-coordinator-approval-driven-publication.md).) | prior: 2026-07-04 (M6 F6.2 — ADR 0069: added the `document_review_surfacer` River periodic job, hourly, `maintenance` queue, `RunOnStart:false`; consumes the documents-owned `ReviewDueReader`/`ReviewSurfaceWriter` ports, zero raw SQL on `public.documents`) | prior: 2026-07-04 (ADR 0067/0068 — River is the single async primitive; 3 janitors + lease scheduler retired; watchdog is alert-only. NOTE: this doc's body below still narrates the pre-ADR-0067 lease-scheduler architecture and has not yet been fully rewritten to the post-ADR-0067 shape — treat the River periodic-job facts as current and the Scheduler/lease-reaper narrative as historical pending a full rewrite) | prior: 2026-06-11 (Wave 1)
 > **Status:** active
 > **Maturity:** L0 — Stage-1 audit draft — not yet promoted via metaldocs-module-doc
-> **Scope:** The `internal/modules/jobs` module — the in-API Scheduler, its four maintenance jobs (stuck-instance watchdog, idempotency janitor, audit-integrity validator, lease reaper), the lightweight document sweepers under `internal/modules/documents/jobs`, and the River periodic jobs registered in `internal/modules/jobs/maintenance`. The River-based `ReleaseEvaluateWorker` under `internal/modules/approval/jobs` (ADR 0085) is included because it is a job consumed by the `apps/jobs` binary — it replaces the deleted `ScheduledPublishWorker`/`scheduled_publish_cutover`; the M6 `document_review_surfacer` (`internal/modules/jobs/document_review_surfacer`) is included as the newest River periodic job on the same `maintenance` queue.
+> **Scope:** The `internal/modules/jobs` module — the in-API Scheduler, its four maintenance jobs (stuck-instance watchdog, idempotency janitor, audit-integrity validator, lease reaper), the lightweight document sweepers under `internal/modules/documents/jobs`, and the 6 River periodic jobs registered in `internal/modules/jobs/maintenance` (stuck-instance-watchdog, idempotency-janitor, audit-integrity-validator, document-review-surfacer, approval-sla-surfacer, release-hold-reconciler). The River-based `ReleaseEvaluateWorker` under `internal/modules/approval/jobs` (ADR 0085) is included because it is a job consumed by the `apps/jobs` binary — it replaces the deleted `ScheduledPublishWorker`/`scheduled_publish_cutover`; the newest periodic job is the ADR 0085 Stage C `release_hold_reconciler` (`internal/modules/jobs/release_hold_reconciler`).
 > **Out of scope:** The platform packages that underpin async execution (`internal/platform/worker`, `internal/platform/messaging`, `internal/platform/jobs/river`) — those are documented in [../backend/platform/async-messaging.md](../backend/platform/async-messaging.md). The worker binary itself — [../backend/binaries/worker.md](../backend/binaries/worker.md). The jobs binary — [../backend/binaries/jobs.md](../backend/binaries/jobs.md).
 > **Key files:**
 > - `internal/modules/jobs/stuck_instance_watchdog/job.go` — now a River `WorkerDefaults` job (ADR 0067); the old `internal/modules/jobs/scheduler` lease-scheduler package and `lease_reaper.go` cited in earlier verifications of this doc no longer exist in the tree — retired by ADR 0067 (M5 F5.1), superseded by River periodic jobs. §Scheduler/§Registered maintenance jobs below still narrate the pre-0067 architecture (Known gap, not yet rewritten).
 > - `internal/modules/jobs/idempotency_janitor/job.go`
 > - `internal/modules/jobs/audit_integrity_validator/job.go`
-> - `internal/modules/jobs/maintenance/periodic.go` — shared River `PeriodicJobs()` definitions (4 jobs, `maintenance` queue), consumed by both `metaldocs-api` and `metaldocs-jobs`
+> - `internal/modules/jobs/maintenance/periodic.go` — shared River `PeriodicJobs()` definitions (6 jobs, `maintenance` queue), consumed by both `metaldocs-api` and `metaldocs-jobs`
 > - `internal/modules/jobs/document_review_surfacer/job.go` — M6 F6.2 review-due surfacer (ADR 0069)
+> - `internal/modules/jobs/release_hold_reconciler/job.go` — ADR 0085 Stage C release-hold reconciliation sweep, alert-only (ADR 0068)
+> - `internal/modules/approval/domain/release_hold_port.go` — `ReleaseHoldReader` published read-port (approval-owned)
+> - `internal/modules/approval/infrastructure/release_hold_reader.go` — `ReleaseHoldReaderPG` Postgres adapter
 > - `internal/modules/documents/jobs/session_sweeper.go`
 > - `internal/modules/documents/jobs/orphan_pending_sweeper.go`
 > - `internal/modules/approval/jobs/release_evaluate_job.go` — ADR 0085 `ReleaseEvaluateWorker` (River job kind `release_evaluate`); supersedes the deleted `scheduled_publish_cutover` worker
@@ -158,6 +161,42 @@ Periodic eQMS review/expiry surfacer. Registered as a River periodic job (not th
 
 **Cross-tenant scope by design:** the tx runs under the scheduler bypass with no tenant GUC seeded — `public.documents`' RLS `tenant_isolation` policy treats an unset `metaldocs.tenant_id` GUC as "all tenants" (mirrors `stuck_instance_watchdog.listStuckInstances`), so one tx sweeps every tenant's due documents per tick. This is deliberate: there is one idempotent marker write per due document per cycle and no per-tenant side effect requiring isolation (contrast `stuck_instance_watchdog`'s per-instance governance-event emission, which does iterate).
 
+## River job: release-hold-reconciler (ADR 0085 Stage C W2)
+
+`internal/modules/jobs/release_hold_reconciler/job.go`
+
+Reconciliation sweep over `public.release_generations` for holds that have gone stuck (lost fact, dead-lettered consumer, dead timer) — the safety net behind the `release_evaluate` fact-triggered/timer-triggered evaluation model. Registered as a River periodic job — `PeriodicInterval(15*time.Minute)`, `PeriodicJobOpts{ID: "release-hold-reconciler", RunOnStart: false}`, queue `"maintenance"` (`internal/modules/jobs/maintenance/periodic.go:74-80`). 15 minutes against the 30-minute stuck threshold means a hold that crosses the threshold is surfaced within one tick, and no generation can cross the threshold and be released again between two ticks unobserved. Same dual-define split as the other maintenance jobs: both `metaldocs-api` and `metaldocs-jobs` schedule it via the shared `maintenance.PeriodicJobs()`; only `metaldocs-jobs` registers the `Worker` and executes it (`apps/jobs/cmd/metaldocs-jobs/main.go:145-147`).
+
+**Alert-only, strictly (ADR 0068):** this job never mutates a generation, a document, or a hold reason, and — unlike a self-healing sweep — it deliberately does NOT re-enqueue the coordinator evaluation. `EvaluateRelease` stamps `last_evaluated_at`, which is the very signal this sweep measures; a sweep that re-triggered evaluation on every tick would reset its own detector and turn a chronic hold into a silent oscillation instead of a durable alert. Recovery ("re-run the idempotent evaluation") stays an operator lever layered on top of the alert, not something this job does automatically.
+
+### Types
+
+- `ReleaseHoldReconcilerArgs` (`job.go:85`): empty River job args struct — no per-run parameters, all tick behavior is derived from the database at run time. `Kind()` returns `"release_hold_reconciler"` (`:88`).
+- `ReleaseHoldReconcilerWorker` (`job.go:94`): River `WorkerDefaults[ReleaseHoldReconcilerArgs]`. Cluster-wide single-runner comes from River's leader-elected periodic insert + queue dequeue semantics — no advisory lock (ADR 0067 §H-PRE-1), same pattern as `stuck_instance_watchdog`/`document_review_surfacer`.
+- `NewWorker(database, reader, emitter)` (`job.go:103`) wires the approval-owned `ReleaseHoldReader` published read-port (`internal/modules/approval/domain/release_hold_port.go`) and the approval module's `EventEmitter` — this package holds **zero raw SQL** against `public.release_generations`.
+
+### Execution (`Work` → `run`, `job.go:113-162`)
+
+Two phases per tick, mirroring `approval_sla_surfacer.run`:
+
+1. `authz.WithBackgroundBypass(ctx)` — no HTTP-request identity exists for a periodic job.
+2. **Cross-tenant enumeration:** one bypass tx with NO tenant GUC seeded, calling `reader.ListTenantsWithStuckHolds` (`listTenantsWithStuckHolds`, `job.go:167-187`) — a system-level read, safe unseeded.
+3. **Per-tenant reconciliation:** for EACH tenant returned, a NEW tx seeded `authz.BypassSystem` then `authz.SeedTxTenant(tenantID)` (`reconcileTenant`, `job.go:193-226`) — `governance_events` is tenant-scoped and FORCE RLS, so the seed is what lets the alert write land. Reads that tenant's stuck holds (`reader.ListStuckHolds`, capped at `BatchSize=100`) and emits one `slog.WarnContext` + one governance event per stuck generation (`alertStuckHold`, `job.go:230-277`).
+4. A tenant whose alerts fail does not abort the sweep — the error is `errors.Join`ed and the remaining tenants are still reported (`job.go:143-153`).
+
+### Stuck-hold predicate (owned by the approval module's adapter)
+
+`releaseHoldStuckCorePredicate` (`internal/modules/approval/infrastructure/release_hold_reader.go:58-69`) is the single source of truth referenced by both `ListStuckHolds` and `ListTenantsWithStuckHolds`, so "stuck" cannot drift between the enumeration and the per-tenant read. A generation is stuck when ALL hold:
+
+1. `released_at IS NULL` — the release never happened.
+2. `created_at` older than `HoldStuckAfter` (30 min, `job.go:53`) — not merely in flight.
+3. never evaluated, or `last_evaluated_at` older than the threshold — the "lost fact / dead-lettered consumer" and "dead timer" cases respectively (`HoldReason` reports as `never_evaluated` in the alert payload when never evaluated).
+4. the document is still `approved`/`scheduled` — `EvaluateRelease` no-ops on anything else, so such a generation is not actually waiting for anything.
+5. no future `planned_effective_from`, or one that has already passed — a generation legitimately parked on `awaiting_effective_date` with its timer armed months out is NOT stuck.
+6. the generation is still the document's freeze head (no newer `generation_seq` for the same document) — a superseded generation is permanently unreleasable by design.
+
+Index: `ix_release_generations_open` (migration `0310`), a partial `(tenant_id, last_evaluated_at) WHERE released_at IS NULL` index, makes the per-tenant read a prefix match.
+
 ## Public surface
 
 | Export | Package | Consumers |
@@ -169,6 +208,9 @@ Periodic eQMS review/expiry surfacer. Registered as a River periodic job (not th
 | `StartSessionSweeper`, `StartOrphanPendingSweeper` | `modules/documents/jobs` | `apps/api/cmd/metaldocs-api/main.go` |
 | `NewReleaseEvaluateWorker`, `ReleaseEvaluateArgs`, `ReleaseEvaluateWorker`, `NewReleaseEvaluationEnqueuer`, `DeferredReleaseEvaluationEnqueuer` | `modules/approval/jobs` | `apps/jobs/cmd/metaldocs-jobs/main.go:124` (registration/execution); enqueued from `approval/application/release_facts.go` (fact writes) |
 | `NewWorker`, `DocumentReviewSurfacerArgs`, `DocumentReviewSurfacerWorker`, `JobName`, `BatchSize` | `modules/jobs/document_review_surfacer` | `apps/jobs/cmd/metaldocs-jobs/main.go:67` (registration) |
+| `NewWorker`, `ReleaseHoldReconcilerArgs`, `ReleaseHoldReconcilerWorker`, `JobName`, `HoldStuckAfter`, `BatchSize`, `SystemActor`, `AlertEventType` | `modules/jobs/release_hold_reconciler` | `apps/jobs/cmd/metaldocs-jobs/main.go:145` (registration) |
+| `ReleaseHoldReader`, `StuckReleaseHoldView`, `NoopReleaseHoldReader` | `modules/approval/domain` | `modules/jobs/release_hold_reconciler` (published read-port; the reconciler's only approval-owned surface) |
+| `NewReleaseHoldReaderPG` | `modules/approval/infrastructure` | `apps/jobs/cmd/metaldocs-jobs/main.go:146` (Postgres adapter wiring) |
 | `PeriodicJobs` | `modules/jobs/maintenance` | `apps/jobs/cmd/metaldocs-jobs/main.go`, `apps/api/cmd/metaldocs-api/main.go` (shared periodic-job definitions across both binaries) |
 
 HTTP routes: none. The jobs module exposes no HTTP surface.
@@ -180,12 +222,12 @@ HTTP routes: none. The jobs module exposes no HTTP surface.
 | Table | Written by | Read by | Notes |
 |-------|-----------|---------|-------|
 | `metaldocs.job_leases` | `acquire_lease`, `heartbeat_lease`, `release_lease` (Postgres functions) | `lease_reaper.go` (DELETE on expiry), scheduler goroutines | Schema in `db/baseline/0001_current_schema.sql` |
-| `governance_events` | `stuck_instance_watchdog` (INSERT alert) | — | `lease_reaper` no longer writes here (Wave 1 fix): reclaim is now logged via `slog.WarnContext` |
+| `governance_events` | `stuck_instance_watchdog` (INSERT alert), `release_hold_reconciler` (INSERT `release.generation.stuck_alert` per stuck generation) | — | `lease_reaper` no longer writes here (Wave 1 fix): reclaim is now logged via `slog.WarnContext` |
 | `metaldocs.idempotency_keys` | API handlers (outside this module) | `idempotency_janitor` (DELETE expired rows) | — |
 | `metaldocs.audit_events` | (outside this module) | `audit_integrity_validator` (read-only) | — |
 | `approval_instances` | Approval module | `stuck_instance_watchdog` (read + cancel) | — |
 | `documents` | Approval module | `release_evaluate_job.go`/`ReleaseCoordinator.Evaluate` (UPDATE status, supersede) | ADR 0085; via `approval/application/release_coordinator.go`, replaces the deleted `scheduler_service.go`/`scheduled_publish_cutover` path |
-| `public.release_generations` | Approval module (`RecordApprovalFactTx`/`RecordArtifactFactTx`) | `ReleaseCoordinator.Evaluate` | ADR 0085; migration `0310_release_coordinator.sql` |
+| `public.release_generations` | Approval module (`RecordApprovalFactTx`/`RecordArtifactFactTx`) | `ReleaseCoordinator.Evaluate`; `release_hold_reconciler` (read-only, via `ReleaseHoldReader` — never raw SQL from the jobs module) | ADR 0085; migration `0310_release_coordinator.sql` |
 | `documents` (`review_due_at`, `last_reviewed_at`, `review_surfaced_at`) | Documents module (mark-reviewed) | `document_review_surfacer` (read via `ReviewDueReader`, write via `ReviewSurfaceWriter` — never raw SQL from this module) | ADR 0069, migrations 0274/0276 |
 | River schema tables | `MigrateRiverSchema` at startup | River client | Schema location determined by `METALDOCS_JOBS_RIVER_SCHEMA` |
 

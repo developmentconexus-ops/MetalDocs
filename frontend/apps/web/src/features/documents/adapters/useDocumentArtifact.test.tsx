@@ -42,6 +42,9 @@ import { useApprovalInstanceQuery } from '../queries/useApprovalInstanceQuery';
 import { useControlledDocumentActiveDocumentQuery } from '../queries/useControlledDocumentActiveDocumentQuery';
 import { useDocumentRevisionHistoryQuery } from '../queries/useDocumentRevisionHistoryQuery';
 import { useDistributionSummaryQuery } from '../queries/useDistributionSummaryQuery';
+// NOT mocked — the real settling predicate, so the gate the (mocked) detail query
+// polls on is covered here too.
+import { isDocumentLifecycleSettling } from '../lib/documentReleasePresentation';
 import { useDocumentArtifact } from './useDocumentArtifact';
 
 const BASE_DOC = {
@@ -359,6 +362,232 @@ describe('useDocumentArtifact', () => {
     const coverageCell = model.kpis.find((k) => k.key === 'coverage');
 
     expect(coverageCell?.value).toBe('—');
+  });
+
+  // ── ADR 0085 Stage C: release readiness-hold projection ────────────────────
+  // The projection is the ONLY source of release status. It rides the existing
+  // document-detail response — these cases add no query.
+
+  function withRelease(release: Record<string, unknown> | null) {
+    vi.mocked(useDocumentDetailQuery).mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: { ...BASE_DOC, release },
+      refetch: vi.fn(),
+    } as never);
+    return renderHook(() => useDocumentArtifact('doc-published-1')).result.current;
+  }
+
+  const HOLD_BASE = {
+    generation_id: 'gen-1',
+    state: 'hold',
+    hold_reason: null,
+    hold_detail: null,
+    planned_effective_from: null,
+    released_at: null,
+    last_evaluated_at: '2026-07-28T10:00:00.000Z',
+  };
+
+  it('W4 — released: "Publicado" with the released_at date', () => {
+    const { release } = withRelease({
+      ...HOLD_BASE,
+      state: 'released',
+      hold_reason: null,
+      // Midday UTC so the pt-BR calendar day is stable in any runner timezone.
+      released_at: '2026-05-19T12:00:00.000Z',
+    });
+
+    expect(release).toEqual({
+      tone: 'released',
+      title: 'Publicado',
+      detail: 'Liberado em 19 de maio de 2026',
+    });
+  });
+
+  it('W4 — released without released_at: no fabricated date', () => {
+    const { release } = withRelease({ ...HOLD_BASE, state: 'released' });
+
+    expect(release).toEqual({ tone: 'released', title: 'Publicado', detail: null });
+  });
+
+  it.each(['materializing', 'awaiting_approval_fact'])(
+    'W4 — hold/%s is a transient processing state (no user action)',
+    (holdReason) => {
+      const { release } = withRelease({ ...HOLD_BASE, hold_reason: holdReason });
+
+      expect(release).toEqual({
+        tone: 'progress',
+        title: 'Preparando artefatos finais…',
+        detail: null,
+      });
+    },
+  );
+
+  it('W4 — hold/awaiting_effective_date announces the planned effective date', () => {
+    const { release } = withRelease({
+      ...HOLD_BASE,
+      hold_reason: 'awaiting_effective_date',
+      planned_effective_from: '2026-08-03T12:00:00.000Z',
+    });
+
+    expect(release).toEqual({
+      tone: 'scheduled',
+      title: 'Aprovado — vigência programada para 03/08/2026',
+      detail: null,
+    });
+  });
+
+  it('W4 — hold/awaiting_effective_date without a planned date stays honest', () => {
+    const { release } = withRelease({ ...HOLD_BASE, hold_reason: 'awaiting_effective_date' });
+
+    expect(release).toEqual({
+      tone: 'scheduled',
+      title: 'Aprovado — aguardando a data de vigência',
+      detail: null,
+    });
+  });
+
+  it.each([
+    ['supersede_conflict', 'Publicação retida — conflito de substituição'],
+    ['plan_invalid', 'Publicação retida — plano de publicação inválido'],
+    ['failed', 'Publicação retida — falha no processamento'],
+  ])('W4 — hold/%s is an anomaly carrying hold_detail', (holdReason, title) => {
+    const { release } = withRelease({
+      ...HOLD_BASE,
+      hold_reason: holdReason,
+      hold_detail: 'generation 3 conflita com POP-GENERAL-015',
+    });
+
+    expect(release).toEqual({
+      tone: 'anomaly',
+      title,
+      detail: 'generation 3 conflita com POP-GENERAL-015',
+    });
+  });
+
+  it('W4 — hold not yet evaluated (hold_reason null) is transient, not an anomaly', () => {
+    const { release } = withRelease({ ...HOLD_BASE, last_evaluated_at: null });
+
+    expect(release).toEqual({ tone: 'progress', title: 'Preparando publicação…', detail: null });
+  });
+
+  it('W4 — release null (no generation / legacy row): no release presentation at all', () => {
+    expect(withRelease(null).release).toBeNull();
+  });
+
+  // ── W5: lifecycle settling poll ────────────────────────────────────────────
+  // Post-ADR-0085 a document sits at status='approved' while the coordinator works,
+  // so the old status==='scheduled' gate alone froze the page on "Preparando
+  // artefatos finais…" until a manual reload. ONE predicate
+  // (`isDocumentLifecycleSettling`) drives both consumers: the detail query polls on
+  // it internally (hence the `pollLifecycleUntilSettled` flag asserted below — that
+  // hook is mocked here, so its resolved interval is covered by the predicate test)
+  // and the adapter applies the same predicate to the sibling queries.
+
+  /** Resolved refetchInterval the adapter handed to [activeDocument, revisionHistory]. */
+  function siblingPollIntervals() {
+    return [
+      vi.mocked(useControlledDocumentActiveDocumentQuery).mock.calls.at(-1)?.[1]?.refetchInterval,
+      vi.mocked(useDocumentRevisionHistoryQuery).mock.calls.at(-1)?.[1]?.refetchInterval,
+    ];
+  }
+
+  it('W5 — the detail query is always asked to poll until the lifecycle settles', () => {
+    withRelease({ ...HOLD_BASE, hold_reason: 'materializing' });
+
+    expect(vi.mocked(useDocumentDetailQuery).mock.calls.at(-1)?.[1]).toEqual({ pollLifecycleUntilSettled: true });
+  });
+
+  it.each(['materializing', 'awaiting_approval_fact'])(
+    'W5 — transient hold/%s keeps every lifecycle query polling at 5s',
+    (holdReason) => {
+      withRelease({ ...HOLD_BASE, hold_reason: holdReason });
+
+      expect(siblingPollIntervals()).toEqual([5_000, 5_000]);
+      expect(isDocumentLifecycleSettling({ status: 'approved', release: { ...HOLD_BASE, hold_reason: holdReason } as never })).toBe(true);
+    },
+  );
+
+  it('W5 — a hold the coordinator has not evaluated yet (hold_reason null) keeps polling', () => {
+    withRelease({ ...HOLD_BASE });
+
+    expect(siblingPollIntervals()).toEqual([5_000, 5_000]);
+  });
+
+  it.each(['supersede_conflict', 'plan_invalid', 'failed'])(
+    'W5 — terminal anomaly hold/%s does NOT poll (waiting never resolves it)',
+    (holdReason) => {
+      withRelease({ ...HOLD_BASE, hold_reason: holdReason, hold_detail: 'detalhe do operador' });
+
+      expect(siblingPollIntervals()).toEqual([false, false]);
+      expect(isDocumentLifecycleSettling({ status: 'approved', release: { ...HOLD_BASE, hold_reason: holdReason } as never })).toBe(false);
+    },
+  );
+
+  it('W5 — awaiting_effective_date does NOT poll (date-bounded wait, not a transient hold)', () => {
+    withRelease({
+      ...HOLD_BASE,
+      hold_reason: 'awaiting_effective_date',
+      planned_effective_from: '2026-08-03T12:00:00.000Z',
+    });
+
+    expect(siblingPollIntervals()).toEqual([false, false]);
+  });
+
+  it('W5 — polling stops once the generation is released', () => {
+    withRelease({ ...HOLD_BASE, state: 'released', released_at: '2026-05-19T12:00:00.000Z' });
+
+    expect(siblingPollIntervals()).toEqual([false, false]);
+    expect(
+      isDocumentLifecycleSettling({
+        status: 'published',
+        release: { ...HOLD_BASE, state: 'released', released_at: '2026-05-19T12:00:00.000Z' } as never,
+      }),
+    ).toBe(false);
+  });
+
+  it('W5 — the legacy scheduled-status gate is unchanged (still polls at 5s)', () => {
+    vi.mocked(useDocumentDetailQuery).mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: { ...BASE_DOC, status: 'scheduled', release: null },
+      refetch: vi.fn(),
+    } as never);
+    renderHook(() => useDocumentArtifact('doc-published-1'));
+
+    expect(siblingPollIntervals()).toEqual([5_000, 5_000]);
+    expect(isDocumentLifecycleSettling({ status: 'scheduled', release: null })).toBe(true);
+  });
+
+  // ── W6: publication date source ────────────────────────────────────────────
+  // The projection is the sole source of the release FACT; approval.completed_at is
+  // approval-COMPLETION time and may only stand in for legacy rows with no generation.
+
+  it('W6 — publication date comes from release.released_at, not approval completion', () => {
+    const { model } = withRelease({
+      ...HOLD_BASE,
+      state: 'released',
+      // Deliberately a different day from the approval completion (19 de maio).
+      released_at: '2026-06-02T12:00:00.000Z',
+    });
+
+    expect(model.hero.subtitle).toBe('publicado em 02 de junho de 2026');
+    expect(model.meta.ownerDescriptor).toBe('publicado em 02 de junho de 2026');
+    expect(model.kpis.find((k) => k.key === 'currentVersion')?.hint).toBe('desde 02/06/2026');
+  });
+
+  it('W6 — legacy document with no release generation falls back to approval completion', () => {
+    const { model } = withRelease(null);
+
+    expect(model.hero.subtitle).toBe('publicado em 19 de maio de 2026');
+    expect(model.kpis.find((k) => k.key === 'currentVersion')?.hint).toBe('desde 19/05/2026');
+  });
+
+  it('W6 — a held generation has NO publication date (approval timestamp is not relabelled)', () => {
+    const { model } = withRelease({ ...HOLD_BASE, hold_reason: 'materializing' });
+
+    expect(model.hero.subtitle).toBe('Publicado');
+    expect(model.kpis.find((k) => k.key === 'currentVersion')?.hint).not.toMatch(/desde/);
   });
 
   it('surfaces loading and error from the detail query', () => {

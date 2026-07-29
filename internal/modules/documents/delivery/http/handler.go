@@ -501,6 +501,11 @@ func toDocumentDetailResponse(doc domain.Document) (*documentsapi.DocumentDetail
 		pageCountSource = &v
 	}
 
+	release, err := toDocumentReleaseProjection(doc)
+	if err != nil {
+		return nil, err
+	}
+
 	return &documentsapi.DocumentDetailResponse{
 		ActiveSessionId:                doc.ActiveSessionID,
 		ArchivedAt:                     doc.ArchivedAt,
@@ -521,6 +526,7 @@ func toDocumentDetailResponse(doc domain.Document) (*documentsapi.DocumentDetail
 		ProcessAreaCodeSnapshot:        doc.ProcessAreaCodeSnapshot,
 		ProfileCodeSnapshot:            doc.ProfileCodeSnapshot,
 		ReviewDueAt:                    doc.ReviewDueAt,
+		Release:                        release,
 		ReviewSurfacedAt:               doc.ReviewSurfacedAt,
 		RevisionNumber:                 doc.RevisionNumber,
 		RevisionTitle:                  doc.RevisionTitle,
@@ -530,6 +536,37 @@ func toDocumentDetailResponse(doc domain.Document) (*documentsapi.DocumentDetail
 		TenantId:                       doc.TenantID,
 		UpdatedAt:                      doc.UpdatedAt,
 		ValuesFrozenAt:                 doc.ValuesFrozenAt,
+	}, nil
+}
+
+// toDocumentReleaseProjection maps the ADR 0085 Stage C readiness-hold
+// projection composed by GetDocument onto the generated wire type. Returns
+// (nil, nil) when the document carries no release generation — the wire field
+// is required+nullable, so that serializes as `"release": null` (present-and-
+// null, ADR 0035), never an absent key and never a synthesized hold.
+func toDocumentReleaseProjection(doc domain.Document) (*documentsapi.DocumentReleaseProjection, error) {
+	if doc.Release == nil {
+		return nil, nil
+	}
+	generationID, err := uuid.Parse(doc.Release.GenerationID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid release generation id %q for document %s: %w", doc.Release.GenerationID, doc.ID, err)
+	}
+
+	var holdReason *documentsapi.DocumentReleaseProjectionHoldReason
+	if doc.Release.HoldReason != nil {
+		v := documentsapi.DocumentReleaseProjectionHoldReason(*doc.Release.HoldReason)
+		holdReason = &v
+	}
+
+	return &documentsapi.DocumentReleaseProjection{
+		GenerationId:         generationID,
+		State:                documentsapi.DocumentReleaseProjectionState(doc.Release.State),
+		HoldReason:           holdReason,
+		HoldDetail:           doc.Release.HoldDetail,
+		PlannedEffectiveFrom: doc.Release.PlannedEffectiveFrom,
+		ReleasedAt:           doc.Release.ReleasedAt,
+		LastEvaluatedAt:      doc.Release.LastEvaluatedAt,
 	}, nil
 }
 

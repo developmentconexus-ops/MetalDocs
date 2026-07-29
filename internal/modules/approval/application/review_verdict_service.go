@@ -80,6 +80,11 @@ type ReviewVerdictRequest struct {
 
 // ReviewVerdictResult is returned by RecordVerdict.
 type ReviewVerdictResult struct {
+	// VerdictID is the approval_review_verdicts row id persisted by this call.
+	// On the DB-level idempotent replay branch (ON CONFLICT) it carries the
+	// ORIGINAL row id, so a retrying caller always sees the same identifier
+	// (F-QA4-7 class, mirrors SignoffResult.SignoffID).
+	VerdictID        string
 	StageCompleted   bool
 	InstanceApproved bool // true when all stages complete (ready path only)
 	ChangesRequested bool // true when the instance collapsed to changes_requested
@@ -243,8 +248,14 @@ func (s *ReviewVerdictService) recordVerdictInTx(ctx context.Context, tx *sql.Tx
 		}
 		return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: insert verdict: %w", err)
 	}
+	// Carry the persisted approval_review_verdicts id out of the tx. On the ON
+	// CONFLICT branch InsertVerdict returns the ORIGINAL row's id, so a retrying
+	// caller sees the same identifier instead of an empty string.
+	result.VerdictID = insertResult.ID
 	if insertResult.WasReplay {
-		return ReviewVerdictResult{}, nil, nil
+		// Idempotent replay: the stage is not advanced again, so the result
+		// carries only VerdictID.
+		return result, nil, nil
 	}
 
 	switch req.Verdict {

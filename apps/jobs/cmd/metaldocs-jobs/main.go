@@ -26,6 +26,7 @@ import (
 	"metaldocs/internal/modules/jobs/document_review_surfacer"
 	"metaldocs/internal/modules/jobs/idempotency_janitor"
 	"metaldocs/internal/modules/jobs/maintenance"
+	"metaldocs/internal/modules/jobs/release_hold_reconciler"
 	"metaldocs/internal/modules/jobs/stuck_instance_watchdog"
 	notificationsinfra "metaldocs/internal/modules/notifications/infrastructure"
 	"metaldocs/internal/modules/render/fanout"
@@ -136,6 +137,14 @@ func run(ctx context.Context) error {
 		river.AddWorker(workers, approval_sla_surfacer.NewWorker(db,
 			approvalrepo.NewSLAOverdueReaderPG(db),
 			approvalrepo.NewSLASurfaceWriterPG(db)))
+		// ADR 0085 Stage C W2: reconciliation sweep over release generations
+		// stuck in readiness hold (lost fact, dead-lettered consumer, dead
+		// timer). Alert-only (ADR 0068) — it reads through the approval
+		// module's ReleaseHoldReader port and emits governance alerts; it never
+		// mutates a generation and never re-enqueues an evaluation.
+		river.AddWorker(workers, release_hold_reconciler.NewWorker(db,
+			approvalrepo.NewReleaseHoldReaderPG(db),
+			approvalEmitter))
 
 		// Staging pdf/materialize dispatch workers (M5 F5.3 T3): consume the
 		// River jobs the api/worker Enqueuers insert and run on the already-

@@ -74,6 +74,7 @@ func (h *Handler) ReviewVerdictHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		if replay != nil {
 			WriteJSON(w, http.StatusOK, contracts.ReviewVerdictResponse{
+				VerdictID: replay.SignoffID,
 				WasReplay: true,
 				Outcome:   replay.Outcome,
 			})
@@ -101,17 +102,16 @@ func (h *Handler) ReviewVerdictHandler(w http.ResponseWriter, r *http.Request) {
 
 	outcome := reviewVerdictOutcome(result)
 	if replayHandle != nil {
-		// NOTE: the verdict ledger id is not threaded through
-		// ReviewVerdictResult yet (same class as F-QA4-7, out of this fix's
-		// scope), so only the outcome is persisted here — VerdictID below stays
-		// empty on both the fresh and the replay path.
-		if err := replayHandle.Complete(application.SignoffReplay{Outcome: outcome}); err != nil {
+		if err := replayHandle.Complete(application.SignoffReplay{
+			Outcome:   outcome,
+			SignoffID: result.VerdictID,
+		}); err != nil {
 			slog.Warn("review verdict idempotency record failed (non-fatal)", "err", err)
 		}
 	}
 
 	resp := contracts.ReviewVerdictResponse{
-		VerdictID:           "",
+		VerdictID:           result.VerdictID,
 		WasReplay:           false,
 		Outcome:             outcome,
 		FastForwardEligible: result.FastForwardEligible,

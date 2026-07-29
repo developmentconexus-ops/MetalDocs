@@ -338,4 +338,78 @@ area-grade avaliado no publish-context); modelo de gate D2 para templates.
   QA live pós-rebuild; (14) idempotency_middleware_test derivado de
   router.idempotentRoutes (cobriu /submit,/review omitidos). Ladder green
   (flake TestGoVetPasses = timeout compartilhado, chip task_231e6db1).
-  Rodada 2 Codex em curso.
+- 2026-07-28: **Stage B rodada 2 Codex: 2 findings só-docs** (High-risk tally
+  jobs.md contradizia a própria tabela; matrix C6/C7 ainda prescreviam CTA de
+  publicar) → corrigidos inline (incl. linha lease_reaper igualmente stale).
+  **Stage B COMMITADO `ff5851c7`** (tree limpa). Rebuild api/jobs/worker/web
+  em curso → e2e HTTP live fecha defer F13.
+- 2026-07-29: **Deploy Stage B verificado + F13 = defer limitado.** Stack
+  rebuildada de ff5851c7 e saudável; migração 0311 aplicada live (51/51):
+  0 rows document.publish em metaldocs.role_capabilities, 0 river_job
+  não-terminal de scheduled_publish_cutover. e2e HTTP
+  (TestE2E_HappyPath_HTTP) FALHOU com 401 em todo subtest autenticado —
+  causa: o teste autentica via headers X-Tenant-ID/X-User-ID/X-User-Roles,
+  mas o authn de produção os REMOVE incondicionalmente
+  (internal/modules/iam/delivery/http/middleware.go:70-81, defesa contra
+  identidade fornecida pelo cliente; sem toggle dev). Harness legado
+  pré-sessão — defeito pré-existente, NÃO regressão Stage B. Mitigação: os
+  equivalentes determinísticos do caminho full-release passam em
+  tests/integration/approval/release_coordinator_integration_test.go (incl.
+  hold materializing → release). Chip aberto para modernizar o harness p/
+  login de sessão (task_8f8ac5a3). F13 permanece defer limitado até QA live
+  via login curl dev-seed.
+- 2026-07-29: **Follow-up VerdictID fechado** (opus): id do ledger de verdict
+  agora atravessa ReviewVerdictResult → handler (fresh E replay; replay reusa
+  o slot SignoffID do envelope de idempotência, mecanismo idêntico ao signoff
+  — sem formato novo persistido). Contrato já declarava verdict_id required —
+  zero mudança de spec. NOTE falso removido. +4 testes (incl. primeiro
+  handler test da rota review-verdict). Ladder approval PASS.
+- 2026-07-29: **Stage C design alinhado com Codex (rodada 1 NOT-ALIGN → 6
+  correções aceitas)**: (1) Pin early-return em doc já frozen → backfill usa
+  novo FreezeService.RepairMaterialization (enqueue materialize
+  generation-aware direto); (2) identidade autoritativa = frozen_content_hash
+  da instância (= ContentHashAtSubmit, freeze.go:58) — preflight aborta em
+  NULL/não-pinned, NÃO compara com content_hash atual (produção também não);
+  fast-forward de ponteiros legados EXCLUÍDO do backfill (no-fallback:
+  presença de coluna ≠ readiness; 02bef5ae re-materializa fresh); (3)
+  quarentenados d18fbfdf/45c9e784 FORA do backfill até Etapa 5 (tool com
+  allowlist explícita -docs, re-rodável pós-expurgo); (4) segurança da tool =
+  mesmo caminho background do release_evaluate job (SeedTxTenant +
+  authz.BypassSystem tx-local), testado contra tripwire; (5) sweep de
+  reconciliação (ADR §200-204) NÃO existia → vira entregável Stage C
+  (release-hold-reconciler, alert-only ADR 0068, dual-define ADR 0067); (6)
+  projeção release via LEFT JOIN LATERAL na query única do GetDocument
+  (repository.go:285), não segunda query. Posições: go-run one-shot OK;
+  `state` derivado server-side; enqueue de avaliação imediato (hold
+  materializing honesto). 3 implementadores opus em voo (W1 backfill+repair,
+  W2 sweep, W3 projeção); W4 FE aguarda W3.
+- 2026-07-29: **Stage C implementado (4 pacotes opus) + 2 rodadas Codex →
+  ALIGN.** W1: scripts/release-backfill (go-run, -docs allowlist, dry-run
+  default via rollback de sentinela, SeedTxTenant+BypassSystem, sem
+  fast-forward de ponteiros legados) + FreezeService.RepairMaterialization
+  (:249, fail-closed p/ não-pinned) + 6 testes integração. W2:
+  release-hold-reconciler (15min/threshold 30min, alert-only + evento
+  governança release.generation.stuck_alert; SEM re-enqueue — avaliação
+  carimba last_evaluated_at, o próprio sinal do detector; predicado com 3
+  conjuntos extras testados: status liberável, timer futuro armado não
+  alerta, só freeze-head; read-port ReleaseHoldReader publicado). W3:
+  DocumentDetailResponse.release required+nullable (regra
+  SHAPE-NULLABLE-NOT-REQUIRED) via LEFT JOIN LATERAL na query única
+  GetDocument (precedente active_instance_reader; boundaries OK,
+  contract-sync OK, allowlist seed-chokepoint shift mecânico +65). W4:
+  documentReleasePresentation.ts resolver + bloco InlineAlert sem CTA
+  (anomalia tone=warning por aria); copy PT-BR listada p/ revisão operador.
+  Rodada 1 Codex: 3 findings → fix Major (poll gate único
+  isDocumentLifecycleSettling — holds transientes 5s;
+  awaiting_effective_date não faz poll, data pode estar semanas à frente) +
+  fix Minor (publicationTimestamp = release.released_at; hold = SEM data;
+  fallback approval.completed_at só release null) + Nit dedup de alerta do
+  reconciler = defer bounded. Rodada 2: **ALIGN** (1 hole não-alcançável
+  notado: payload misto scheduled+released impossível pela transição atômica
+  do coordinator). Verificação união: build/vet/vet-integration 0, api-lint
+  0, boundaries OK, ladder pacotes tocados PASS, FE tsc/vitest/eslint verdes
+  (41 testes adapter). Wiki 6 docs sincronizados (jobs 4→6 periodic;
+  CLAUDE.md lista de jobs atualizada); drift pré-existente
+  backend-target-architecture (narra scheduler de lease aposentado) flagado,
+  fora de escopo. Próximo: commit → rebuild stack → backfill live 02bef5ae
+  (quarentenados d18fbfdf/45c9e784 só na Etapa 5).

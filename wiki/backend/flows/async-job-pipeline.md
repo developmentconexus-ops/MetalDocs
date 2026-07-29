@@ -1,6 +1,6 @@
 # Flow: Async Job Pipeline
 
-> **Last verified:** 2026-07-28 (ADR 0085 Stage B — Flow 3 rewritten: `scheduled_publish_cutover` is DELETED, replaced by the release coordinator's `release_evaluate` job kind, triggered by fact writes and an effective-date timer instead of a client-invoked schedule-publish call. See [`wiki/modules/approval.md`](../../modules/approval.md) and [ADR 0085](../../decisions/0085-release-coordinator-approval-driven-publication.md).) | prior: 2026-07-02
+> **Last verified:** 2026-07-29 (ADR 0085 Stage C — §5 gained a note flagging that its table (and the Mermaid diagram above it) narrates the retired pre-ADR-0067 lease scheduler, not the current River periodic-job set, and now lists the 6 live periodic jobs including the new `release_hold_reconciler` alert-only sweep; see [`wiki/modules/jobs.md`](../../modules/jobs.md).) | prior: 2026-07-28 (ADR 0085 Stage B — Flow 3 rewritten: `scheduled_publish_cutover` is DELETED, replaced by the release coordinator's `release_evaluate` job kind, triggered by fact writes and an effective-date timer instead of a client-invoked schedule-publish call. See [`wiki/modules/approval.md`](../../modules/approval.md) and [ADR 0085](../../decisions/0085-release-coordinator-approval-driven-publication.md).) | prior: 2026-07-02
 > **Scope:** End-to-end async flows for all five async subsystems — PDF generation, DOCX materialization, release-coordinator evaluation (ADR 0085), in-API maintenance jobs, and in-API sweepers — with Mermaid sequence diagrams. Includes a jobs-vs-worker comparison table answering why both binaries exist.
 > **Key files:**
 > - `apps/worker/cmd/metaldocs-worker/main.go`
@@ -160,6 +160,8 @@ Key facts:
 ---
 
 ## 5. Flow 4 — In-API maintenance scheduler
+
+> **Drift notice (2026-07-29):** the diagram and table below narrate the pre-ADR-0067 custom Postgres-lease scheduler (`job_leases`, advisory locks), which ADR 0067 (M5 F5.1) retired. All maintenance jobs are now River periodic jobs on the `maintenance` queue — full current list, intervals, and behavior in [`wiki/modules/jobs.md`](../../modules/jobs.md) §"Registered maintenance jobs" / §"River job: ..." sections. As of ADR 0085 Stage C there are 6: `stuck-instance-watchdog` (5m), `idempotency-janitor` (15m), `audit-integrity-validator` (1h), `document-review-surfacer` (1h, ADR 0069), `approval-sla-surfacer` (1h, F8), `release-hold-reconciler` (15m, alert-only, ADR 0085/0068). Retained here as historical context pending a full rewrite of this flow.
 
 ```mermaid
 sequenceDiagram

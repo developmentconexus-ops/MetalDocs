@@ -9,16 +9,16 @@
 # is the only seed and must stay.
 
 internal/modules/documents/infrastructure/repository.go:127  # category A — d.CreatedBy (document owner) is distinct from the ctx actor creating it (CreateDocumentTx)
-internal/modules/documents/infrastructure/repository.go:340  # raw BeginTx — UpdateDocumentNameTx-adjacent path opens its own tx, not chokepoint-covered
-internal/modules/documents/infrastructure/repository.go:672  # raw BeginTx — not chokepoint-covered
-internal/modules/documents/infrastructure/repository.go:707  # raw BeginTx — not chokepoint-covered
-internal/modules/documents/infrastructure/repository.go:790  # raw BeginTx — not chokepoint-covered
-internal/modules/documents/infrastructure/repository.go:823  # raw BeginTx — not chokepoint-covered
-internal/modules/documents/infrastructure/repository.go:1059  # raw BeginTx — not chokepoint-covered
-internal/modules/documents/infrastructure/repository.go:1221  # raw BeginTx — not chokepoint-covered
-internal/modules/documents/infrastructure/repository.go:1347  # raw BeginTx — not chokepoint-covered
-internal/modules/documents/infrastructure/repository.go:1689  # raw BeginTx — not chokepoint-covered
-internal/modules/documents/infrastructure/repository.go:1727  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/infrastructure/repository.go:405  # raw BeginTx — UpdateDocumentNameTx-adjacent path opens its own tx, not chokepoint-covered
+internal/modules/documents/infrastructure/repository.go:737  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/infrastructure/repository.go:772  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/infrastructure/repository.go:855  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/infrastructure/repository.go:888  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/infrastructure/repository.go:1124  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/infrastructure/repository.go:1286  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/infrastructure/repository.go:1412  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/infrastructure/repository.go:1754  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/infrastructure/repository.go:1792  # raw BeginTx — not chokepoint-covered
 
 internal/modules/iam/infrastructure/postgres/role_admin_repository.go:72  # category A — assignedBy (role-grantor) distinct from ctx actor (UpsertUserAndAssignRoleTx)
 internal/modules/iam/infrastructure/postgres/role_admin_repository.go:128  # category A — assignedBy distinct from ctx actor (ReplaceUserRolesTx)

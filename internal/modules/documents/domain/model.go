@@ -64,12 +64,56 @@ type Document struct {
 	// cycle. F6.4 D2 makes this the worklist marker the review-due filter
 	// reads (see buildDocumentFilter's ReviewDue branch in repository.go).
 	ReviewSurfacedAt *time.Time `json:"review_surfaced_at,omitempty"`
+	// Release is the ADR 0085 Stage C readiness-hold projection for this
+	// document's LATEST release generation (public.release_generations,
+	// highest generation_seq). nil when the document has no release
+	// generation at all — pre-approval drafts and legacy rows that were never
+	// backfilled. Composed into the SINGLE detail read query (GetDocument's
+	// LEFT JOIN LATERAL), never a second round-trip.
+	Release *ReleaseProjection `json:"release,omitempty"`
 	// TemplateVersionID is already present above — now semantically write-once after this migration
 
 	// TemplateSnapshot is the frozen template payload. Populated by Service.Create
 	// from SnapshotService.ResolveTemplate before CreateDocument INSERT so all
 	// snapshot columns are written atomically with the documents row.
 	TemplateSnapshot TemplateSnapshot `json:"-"`
+}
+
+// ReleaseState is the coarse, server-derived release status of a release
+// generation (ADR 0085 Stage C readiness-hold projection). It is DERIVED, never
+// stored: released_at IS NOT NULL => ReleaseStateReleased, otherwise
+// ReleaseStateHold. Mirrored by the `state` enum on the OpenAPI
+// DocumentReleaseProjection schema.
+type ReleaseState string
+
+const (
+	// ReleaseStateHold — the coordinator has not (yet) released this
+	// generation. HoldReason carries why, when the coordinator has evaluated it.
+	ReleaseStateHold ReleaseState = "hold"
+	// ReleaseStateReleased — a winning release transaction stamped released_at.
+	ReleaseStateReleased ReleaseState = "released"
+)
+
+// ReleaseProjection is the read-model view of ONE release generation — the
+// latest one for a document. It is a pure projection: every field is read
+// straight out of the row (or, for State, derived from released_at) and the
+// documents module never writes it. The hold_reason vocabulary is owned by the
+// approval module (approval/domain.ReleaseHoldReason, DB-pinned by
+// ck_release_generations_hold_reason in migration 0310) and is carried here as
+// an opaque pass-through string, exactly like CurrentRevisionPageCountSource.
+type ReleaseProjection struct {
+	GenerationID string       `json:"generation_id"`
+	State        ReleaseState `json:"state"`
+	// HoldReason/HoldDetail are nil on a released generation (the release tx
+	// clears them) and on a hold the coordinator has not evaluated yet.
+	HoldReason *string `json:"hold_reason,omitempty"`
+	HoldDetail *string `json:"hold_detail,omitempty"`
+	// PlannedEffectiveFrom is the PLAN half of ADR 0085's planned/actual split
+	// and is sourced from documents.planned_effective_from (NOT from the
+	// generation row). nil means "effective on release".
+	PlannedEffectiveFrom *time.Time `json:"planned_effective_from,omitempty"`
+	ReleasedAt           *time.Time `json:"released_at,omitempty"`
+	LastEvaluatedAt      *time.Time `json:"last_evaluated_at,omitempty"`
 }
 
 type Session struct {

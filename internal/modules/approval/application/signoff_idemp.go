@@ -10,6 +10,10 @@ type SignoffReplay struct {
 	// instead of an empty string (F-QA4-7). Envelopes persisted before this
 	// field existed decode with an empty value — the pre-fix behaviour — which
 	// is why it is omitempty rather than required.
+	//
+	// The review-verdict route reuses this SAME slot for the
+	// approval_review_verdicts row id (it replays through the same envelope and
+	// store) rather than introducing a parallel id field.
 	SignoffID string `json:"signoff_id,omitempty"`
 }
 

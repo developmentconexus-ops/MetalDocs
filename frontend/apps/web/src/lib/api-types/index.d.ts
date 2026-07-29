@@ -2733,6 +2733,43 @@ export interface components {
              * @description Timestamp the periodic review-due surfacer flagged this document for its current review_due_at cycle; NULL means not (yet) surfaced.
              */
             review_surfaced_at: string | null;
+            /** @description ADR 0085 readiness-hold projection for this document's LATEST release generation. NULL when the document has no release generation at all (pre-approval drafts, legacy rows not backfilled). This is the UI's only source of release status. */
+            release: components["schemas"]["DocumentReleaseProjection"] | null;
+        };
+        /** @description ADR 0085 Stage C — the queryable release-coordinator state for a document's latest release generation (public.release_generations, highest generation_seq), projected onto the document read model. `state` is derived server-side from released_at: a generation with released_at set is `released`, everything else is `hold` and carries the reason the coordinator last recorded. */
+        DocumentReleaseProjection: {
+            /**
+             * Format: uuid
+             * @description Identity of the latest release generation for this document.
+             */
+            generation_id: string;
+            /**
+             * @description Derived server-side — `released` when released_at is set, otherwise `hold`.
+             * @enum {string}
+             */
+            state: "hold" | "released";
+            /**
+             * @description Why the coordinator is still holding this generation. NULL once the generation is released (the winning release transaction clears it), and NULL on a hold the coordinator has not yet evaluated.
+             * @enum {string|null}
+             */
+            hold_reason: "awaiting_approval_fact" | "materializing" | "awaiting_effective_date" | "supersede_conflict" | "plan_invalid" | "failed" | null;
+            /** @description Free-form operator detail accompanying hold_reason; NULL when there is nothing further to say. */
+            hold_detail: string | null;
+            /**
+             * Format: date-time
+             * @description The immutable PLAN date declared in the publication plan (documents.planned_effective_from). NULL means "effective on release". The ACTUAL release timestamp is the document's effective_from.
+             */
+            planned_effective_from: string | null;
+            /**
+             * Format: date-time
+             * @description When the winning release transaction stamped the release fact; NULL while the generation is on hold.
+             */
+            released_at: string | null;
+            /**
+             * Format: date-time
+             * @description When the coordinator last evaluated this generation; NULL when it has never been evaluated.
+             */
+            last_evaluated_at: string | null;
         };
         DocumentCommentContentNode: {
             [key: string]: unknown;

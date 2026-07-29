@@ -1,7 +1,7 @@
 # Binary: metaldocs-jobs
 
-> **Last verified:** 2026-07-28 (ADR 0085 Stage B — `scheduled_publish_cutover` is DELETED; the binary now executes the release coordinator's `release_evaluate` job kind, plus the shared maintenance periodic jobs and the other `temporal`-queue workers registered in `apps/jobs/cmd/metaldocs-jobs/main.go`. §3 rewritten below; see [`wiki/modules/approval.md`](../../modules/approval.md) and [ADR 0085](../../decisions/0085-release-coordinator-approval-driven-publication.md).) | prior: 2026-06-11
-> **Scope:** The `apps/jobs` binary — its River-based scheduling model, the business jobs it executes (dominated by the ADR 0085 release coordinator's `release_evaluate` job), configuration, lifecycle, and deployment status. This document also covers the River client factory package and the approval module's River job definitions. It also hosts the shared maintenance periodic jobs (stuck-instance watchdog, idempotency janitor, audit-integrity validator, document-review-surfacer) documented in [`wiki/modules/jobs.md`](../../modules/jobs.md) — not repeated in full here.
+> **Last verified:** 2026-07-29 (ADR 0085 Stage C — the shared maintenance periodic jobs registered in this binary gained a 6th job, `release_hold_reconciler` (15-min alert-only reconciliation sweep over stuck release holds; full detail in [`wiki/modules/jobs.md`](../../modules/jobs.md)); Scope line's job list corrected — it was missing `approval-sla-surfacer` (F8) too.) | prior: 2026-07-28 (ADR 0085 Stage B — `scheduled_publish_cutover` is DELETED; the binary now executes the release coordinator's `release_evaluate` job kind, plus the shared maintenance periodic jobs and the other `temporal`-queue workers registered in `apps/jobs/cmd/metaldocs-jobs/main.go`. §3 rewritten below; see [`wiki/modules/approval.md`](../../modules/approval.md) and [ADR 0085](../../decisions/0085-release-coordinator-approval-driven-publication.md).) | prior: 2026-06-11
+> **Scope:** The `apps/jobs` binary — its River-based scheduling model, the business jobs it executes (dominated by the ADR 0085 release coordinator's `release_evaluate` job), configuration, lifecycle, and deployment status. This document also covers the River client factory package and the approval module's River job definitions. It also hosts the 6 shared maintenance periodic jobs (stuck-instance watchdog, idempotency janitor, audit-integrity validator, document-review-surfacer, approval-sla-surfacer, release-hold-reconciler) documented in [`wiki/modules/jobs.md`](../../modules/jobs.md) — not repeated in full here.
 > **Key files:**
 > - `apps/jobs/cmd/metaldocs-jobs/main.go` — binary entrypoint
 > - `internal/platform/jobs/river/client.go` — River client factory
@@ -10,6 +10,7 @@
 > - `internal/modules/approval/jobs/release_evaluate_job.go` — River worker and enqueuer (ADR 0085)
 > - `internal/modules/approval/jobs/release_evaluate_args.go` — River job args struct
 > - `internal/modules/approval/application/release_coordinator.go` — `ReleaseCoordinator.Evaluate`, execution logic
+> - `internal/modules/jobs/release_hold_reconciler/job.go` — ADR 0085 Stage C release-hold reconciliation sweep (full detail in `wiki/modules/jobs.md`)
 
 ---
 

@@ -282,11 +282,34 @@ func (r *Repository) SeedDictionaryValuesTx(ctx context.Context, tx db.Tx, tenan
 	return nil
 }
 
+// GetDocument is the SINGLE document-detail read-model query. Everything the
+// detail view needs is composed here — including the ADR 0085 Stage C
+// readiness-hold projection, folded in as a LEFT JOIN LATERAL over
+// public.release_generations rather than a second handler-side round-trip.
+//
+// Module-boundary note (REQ-TOP-1): public.release_generations is approval-owned
+// state. Reading it from documents/infrastructure follows the established
+// read-model-composition precedent in this same package —
+// active_instance_reader.go reads the approval-owned public.approval_instances
+// for the same reason (one read model, one query). scripts/check-module-boundaries.ps1
+// governs cross-module Go IMPORTS, not SQL tables, and this adds no new import;
+// the approval module's published Go surface is untouched.
+//
+// Tenancy: RLS (FORCE + tenant_isolation, migration 0310) is the enforcement,
+// but the lateral still carries its own explicit tenant_id predicate — the
+// tenant_isolation policy has a NULL-GUC bypass branch, so RLS-truth discipline
+// says never depend on the GUC alone for a tenant-scoped read.
 func (r *Repository) GetDocument(ctx context.Context, tenantID, id string) (*domain.Document, error) {
 	var d domain.Document
 	var currentFileSize sql.NullInt64
 	var currentPageCount sql.NullInt64
 	var currentPageCountSource sql.NullString
+	var relGenerationID sql.NullString
+	var relHoldReason sql.NullString
+	var relHoldDetail sql.NullString
+	var relPlannedEffectiveFrom sql.NullTime
+	var relReleasedAt sql.NullTime
+	var relLastEvaluatedAt sql.NullTime
 	err := r.db.QueryRowContext(ctx,
 		`SELECT d.id, d.tenant_id, d.template_version_id, d.name, d.status, d.form_data_json,
 		        coalesce(d.current_revision_id::text, ''), coalesce(d.active_session_id::text, ''),
@@ -295,11 +318,21 @@ func (r *Repository) GetDocument(ctx context.Context, tenantID, id string) (*dom
 		        coalesce(d.code,''), d.revision_version, d.revision_number,
 		        cr.file_size_bytes, cr.page_count, cr.page_count_source,
 		        d.effective_from, d.effective_to, d.review_due_at, d.last_reviewed_at, d.review_surfaced_at,
-		        d.values_frozen_at
+		        d.values_frozen_at,
+		        rel.id::text, rel.hold_reason, rel.hold_detail,
+		        d.planned_effective_from, rel.released_at, rel.last_evaluated_at
 		 FROM documents d
 		 LEFT JOIN document_revisions cr
 		   ON cr.id = d.current_revision_id
 		  AND cr.document_id = d.id
+		 LEFT JOIN LATERAL (
+		   SELECT rg.id, rg.hold_reason, rg.hold_detail, rg.released_at, rg.last_evaluated_at
+		     FROM release_generations rg
+		    WHERE rg.tenant_id = d.tenant_id
+		      AND rg.document_id = d.id
+		    ORDER BY rg.generation_seq DESC
+		    LIMIT 1
+		 ) rel ON TRUE
 		 WHERE d.id=$1 AND d.tenant_id=$2`, id, tenantID,
 	).Scan(&d.ID, &d.TenantID, &d.TemplateVersionID, &d.Name, &d.Status, &d.FormDataJSON,
 		&d.CurrentRevisionID, &d.ActiveSessionID, &d.ArchivedAt,
@@ -307,7 +340,9 @@ func (r *Repository) GetDocument(ctx context.Context, tenantID, id string) (*dom
 		&d.ProcessAreaCodeSnapshot, &d.Code,
 		&d.RevisionVersion, &d.RevisionNumber, &currentFileSize, &currentPageCount, &currentPageCountSource,
 		&d.EffectiveFrom, &d.EffectiveTo, &d.ReviewDueAt, &d.LastReviewedAt, &d.ReviewSurfacedAt,
-		&d.ValuesFrozenAt)
+		&d.ValuesFrozenAt,
+		&relGenerationID, &relHoldReason, &relHoldDetail,
+		&relPlannedEffectiveFrom, &relReleasedAt, &relLastEvaluatedAt)
 	if errors.Is(err, sql.ErrNoRows) || isInvalidUUID(err) {
 		return nil, domain.ErrNotFound
 	}
@@ -325,6 +360,36 @@ func (r *Repository) GetDocument(ctx context.Context, tenantID, id string) (*dom
 	if currentPageCountSource.Valid {
 		pageCountSource := currentPageCountSource.String
 		d.CurrentRevisionPageCountSource = &pageCountSource
+	}
+	// The projection exists only when a release generation does. No-fallback:
+	// a document with no generation gets nil, never a synthesized "hold".
+	if relGenerationID.Valid {
+		rel := &domain.ReleaseProjection{
+			GenerationID: relGenerationID.String,
+			State:        domain.ReleaseStateHold,
+		}
+		if relReleasedAt.Valid {
+			rel.State = domain.ReleaseStateReleased
+			releasedAt := relReleasedAt.Time
+			rel.ReleasedAt = &releasedAt
+		}
+		if relHoldReason.Valid {
+			holdReason := relHoldReason.String
+			rel.HoldReason = &holdReason
+		}
+		if relHoldDetail.Valid {
+			holdDetail := relHoldDetail.String
+			rel.HoldDetail = &holdDetail
+		}
+		if relPlannedEffectiveFrom.Valid {
+			plannedEffectiveFrom := relPlannedEffectiveFrom.Time
+			rel.PlannedEffectiveFrom = &plannedEffectiveFrom
+		}
+		if relLastEvaluatedAt.Valid {
+			lastEvaluatedAt := relLastEvaluatedAt.Time
+			rel.LastEvaluatedAt = &lastEvaluatedAt
+		}
+		d.Release = rel
 	}
 	return &d, nil
 }

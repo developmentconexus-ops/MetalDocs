@@ -2,8 +2,10 @@ package application
 
 import (
 	"context"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -219,6 +221,60 @@ func (s *FreezeService) Pin(ctx context.Context, tx db.Tx, tenantID, revisionID 
 		return fmt.Errorf("pin: materialize outbox enqueuer not configured")
 	}
 	return s.materializeOutbox.EnqueueMaterializeTx(ctx, tx, tenantID, revisionID, hashBytes, releaseGenerationID)
+}
+
+// RepairMaterialization re-enqueues the materialize dispatch for a document
+// that is ALREADY pinned but whose final artifact set is missing or incomplete
+// (ADR 0085 Stage C, in-flight disposition). It is the Pin-equivalent repair:
+// same outbox enqueue, same generation tagging, without re-running validation,
+// placeholder resolution, or the freeze write — the freeze is already final and
+// must not be recomputed, because recomputing it would produce a different
+// values_hash than the one the approver signed.
+//
+// It fails closed on an unpinned document (mirroring Materialize's rejection at
+// the site below): a missing values_hash / values_frozen_at means there is no
+// approved snapshot to render from, and the no-fallback principle forbids
+// substituting a fresh freeze for the one that was never taken.
+//
+// The releaseGenerationID tags the dispatch so the produced artifacts are
+// recorded against the right generation. Replaying with the SAME generation is
+// a no-op: the staging outbox dedupe is generation-aware
+// (render/fanout/staging_outbox.go), so no second dedupe is layered here.
+//
+// documentID is passed into the parameter named revisionID: that parameter
+// carries the DOCUMENT id throughout the pin/fanout/worker chain (documents.id
+// is the aggregate the freeze columns live on) — see the note at
+// approval/application/release_terminal_approval.go:156-159. The convention is
+// preserved verbatim, not "corrected", because the whole chain agrees on it.
+func (s *FreezeService) RepairMaterialization(ctx context.Context, tx db.Tx, tenantID, documentID, releaseGenerationID string) error {
+	if tx == nil {
+		return fmt.Errorf("repair_materialization: tx required")
+	}
+	if s.materializeOutbox == nil {
+		return fmt.Errorf("repair materialization: materialize outbox enqueuer not configured")
+	}
+
+	var (
+		hashBytes []byte
+		frozenAt  *time.Time
+	)
+	err := tx.QueryRowContext(ctx, `
+		SELECT values_hash, values_frozen_at
+		  FROM documents
+		 WHERE id = $1::uuid AND tenant_id = $2::uuid`,
+		documentID, tenantID,
+	).Scan(&hashBytes, &frozenAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("repair materialization: document %s not found", documentID)
+	}
+	if err != nil {
+		return fmt.Errorf("repair materialization: read freeze state: %w", err)
+	}
+	if frozenAt == nil || len(hashBytes) == 0 {
+		return fmt.Errorf("repair materialization: document %s not yet pinned", documentID)
+	}
+
+	return s.materializeOutbox.EnqueueMaterializeTx(ctx, tx, tenantID, documentID, hashBytes, releaseGenerationID)
 }
 
 // Materialize is the async half of the freeze split (ADR 0015).

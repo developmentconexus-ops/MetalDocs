@@ -260,3 +260,124 @@ func TestDocumentSummaryAndDetail_ReviewFieldsWireContract(t *testing.T) {
 		}
 	}
 }
+
+// TestDocumentDetail_ReleaseProjectionWireContract pins ADR 0085 Stage C (W3):
+// DocumentDetailResponse.release is required+nullable (present-and-null when
+// the document has no release generation, ADR 0035 — never an absent key and
+// never a synthesized hold), and toDocumentDetailResponse maps every field of
+// the domain projection onto the generated DocumentReleaseProjection.
+func TestDocumentDetail_ReleaseProjectionWireContract(t *testing.T) {
+	// No generation -> "release" present and null.
+	none, err := toDocumentDetailResponse(domain.Document{FormDataJSON: []byte("{}")})
+	if err != nil {
+		t.Fatalf("toDocumentDetailResponse: %v", err)
+	}
+	rawNone, _ := json.Marshal(none)
+	var mNone map[string]json.RawMessage
+	if err := json.Unmarshal(rawNone, &mNone); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	gotRelease, ok := mNone["release"]
+	if !ok {
+		t.Fatalf("DocumentDetailResponse missing required+nullable key \"release\" in wire body %s", rawNone)
+	}
+	if string(gotRelease) != "null" {
+		t.Fatalf("DocumentDetailResponse[release] = %s, want null when the document has no release generation", gotRelease)
+	}
+
+	// Held generation -> state=hold plus every recorded field, unchanged.
+	genID := uuid.New()
+	plannedEffectiveFrom := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
+	lastEvaluatedAt := time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
+	holdReason := "materializing"
+	holdDetail := "final PDF still rendering"
+	held, err := toDocumentDetailResponse(domain.Document{
+		FormDataJSON: []byte("{}"),
+		Release: &domain.ReleaseProjection{
+			GenerationID:         genID.String(),
+			State:                domain.ReleaseStateHold,
+			HoldReason:           &holdReason,
+			HoldDetail:           &holdDetail,
+			PlannedEffectiveFrom: &plannedEffectiveFrom,
+			LastEvaluatedAt:      &lastEvaluatedAt,
+		},
+	})
+	if err != nil {
+		t.Fatalf("toDocumentDetailResponse (held): %v", err)
+	}
+	if held.Release == nil {
+		t.Fatalf("Release = nil, want the held projection")
+	}
+	if held.Release.GenerationId != genID {
+		t.Errorf("GenerationId = %v, want %v", held.Release.GenerationId, genID)
+	}
+	if string(held.Release.State) != string(domain.ReleaseStateHold) {
+		t.Errorf("State = %q, want %q", held.Release.State, domain.ReleaseStateHold)
+	}
+	if held.Release.HoldReason == nil || string(*held.Release.HoldReason) != holdReason {
+		t.Errorf("HoldReason = %v, want %q", held.Release.HoldReason, holdReason)
+	}
+	if held.Release.HoldDetail == nil || *held.Release.HoldDetail != holdDetail {
+		t.Errorf("HoldDetail = %v, want %q", held.Release.HoldDetail, holdDetail)
+	}
+	if held.Release.PlannedEffectiveFrom == nil || !held.Release.PlannedEffectiveFrom.Equal(plannedEffectiveFrom) {
+		t.Errorf("PlannedEffectiveFrom = %v, want %v", held.Release.PlannedEffectiveFrom, plannedEffectiveFrom)
+	}
+	if held.Release.ReleasedAt != nil {
+		t.Errorf("ReleasedAt = %v, want nil while on hold", held.Release.ReleasedAt)
+	}
+	if held.Release.LastEvaluatedAt == nil || !held.Release.LastEvaluatedAt.Equal(lastEvaluatedAt) {
+		t.Errorf("LastEvaluatedAt = %v, want %v", held.Release.LastEvaluatedAt, lastEvaluatedAt)
+	}
+	// The nested projection keeps ADR 0035 shape too: every member is
+	// present on the wire, never omitted, and nullables serialize as null.
+	rawHeld, _ := json.Marshal(held.Release)
+	var mHeld map[string]json.RawMessage
+	if err := json.Unmarshal(rawHeld, &mHeld); err != nil {
+		t.Fatalf("unmarshal release: %v", err)
+	}
+	for _, key := range []string{"generation_id", "state", "hold_reason", "hold_detail", "planned_effective_from", "released_at", "last_evaluated_at"} {
+		if _, ok := mHeld[key]; !ok {
+			t.Errorf("DocumentReleaseProjection missing required key %q in wire body %s", key, rawHeld)
+		}
+	}
+	if string(mHeld["released_at"]) != "null" {
+		t.Errorf("DocumentReleaseProjection[released_at] = %s, want null while on hold", mHeld["released_at"])
+	}
+
+	// Released generation -> state=released + released_at, hold fields null.
+	releasedAt := time.Date(2026, 7, 20, 9, 30, 0, 0, time.UTC)
+	released, err := toDocumentDetailResponse(domain.Document{
+		FormDataJSON: []byte("{}"),
+		Release: &domain.ReleaseProjection{
+			GenerationID: genID.String(),
+			State:        domain.ReleaseStateReleased,
+			ReleasedAt:   &releasedAt,
+		},
+	})
+	if err != nil {
+		t.Fatalf("toDocumentDetailResponse (released): %v", err)
+	}
+	if released.Release == nil {
+		t.Fatalf("Release = nil, want the released projection")
+	}
+	if string(released.Release.State) != string(domain.ReleaseStateReleased) {
+		t.Errorf("State = %q, want %q", released.Release.State, domain.ReleaseStateReleased)
+	}
+	if released.Release.ReleasedAt == nil || !released.Release.ReleasedAt.Equal(releasedAt) {
+		t.Errorf("ReleasedAt = %v, want %v", released.Release.ReleasedAt, releasedAt)
+	}
+	if released.Release.HoldReason != nil || released.Release.HoldDetail != nil {
+		t.Errorf("HoldReason/HoldDetail = %v/%v, want nil/nil once released",
+			released.Release.HoldReason, released.Release.HoldDetail)
+	}
+
+	// Fail-closed: a non-uuid generation id is an error, never a silently
+	// dropped projection.
+	if _, err := toDocumentDetailResponse(domain.Document{
+		FormDataJSON: []byte("{}"),
+		Release:      &domain.ReleaseProjection{GenerationID: "not-a-uuid", State: domain.ReleaseStateHold},
+	}); err == nil {
+		t.Fatalf("toDocumentDetailResponse with a non-uuid generation id = nil error, want an error")
+	}
+}

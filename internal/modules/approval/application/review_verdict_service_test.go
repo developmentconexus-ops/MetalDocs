@@ -12,7 +12,94 @@ import (
 	"time"
 
 	"metaldocs/internal/modules/approval/domain"
+	"metaldocs/internal/modules/approval/infrastructure"
 )
+
+// TestRecordVerdict_CarriesVerdictID pins the F-QA4-7-class fix on the
+// review-verdict path: the approval_review_verdicts row id InsertVerdict
+// returned must be threaded out on ReviewVerdictResult so the HTTP layer can
+// put it on the wire (and persist it in the replay envelope).
+func TestRecordVerdict_CarriesVerdictID(t *testing.T) {
+	const (
+		instanceID = "inst-verdict-id"
+		stageID    = "stage-verdict-id"
+		actorID    = "reviewer-verdict-id"
+		authorID   = "author-verdict-id"
+	)
+
+	inst := buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID})
+	inst.Stages[0].Kind = domain.StageKindReview
+
+	signedAt := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
+	conn := &decisionTestConn{authzGranted: true, areaCode: "QA", actorID: actorID}
+	repo := &fakeDecisionRepo{
+		instance:         inst,
+		insertVerdictRes: infrastructure.VerdictInsertResult{ID: "verdict-1", WasReplay: false},
+		stageVerdicts:    []domain.ReviewVerdict{readyVerdictFor("verdict-1", instanceID, stageID, actorID, signedAt)},
+	}
+	svc := &ReviewVerdictService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, releaseRecorder: &fakeReleaseRecorder{}}
+	db := newDecisionTestDB(t, conn)
+
+	result, err := svc.RecordVerdict(context.Background(), newTxRunner(db), ReviewVerdictRequest{
+		TenantID:        "tenant-1",
+		InstanceID:      instanceID,
+		StageInstanceID: stageID,
+		ActorUserID:     actorID,
+		Verdict:         domain.VerdictReady,
+	})
+	if err != nil {
+		t.Fatalf("RecordVerdict: unexpected error: %v", err)
+	}
+	if result.VerdictID != "verdict-1" {
+		t.Errorf("VerdictID = %q; want %q", result.VerdictID, "verdict-1")
+	}
+	if !result.InstanceApproved {
+		t.Error("expected InstanceApproved=true (single-stage instance)")
+	}
+}
+
+// TestRecordVerdict_DBLevelReplayCarriesOriginalVerdictID pins the ON CONFLICT
+// branch: InsertVerdict returns WasReplay=true plus the ORIGINAL id, and
+// RecordVerdict must surface that id rather than the pre-fix empty
+// ReviewVerdictResult{}. The stage/instance flags stay false — the stage must
+// not advance twice.
+func TestRecordVerdict_DBLevelReplayCarriesOriginalVerdictID(t *testing.T) {
+	const (
+		instanceID = "inst-verdict-replay"
+		stageID    = "stage-verdict-replay"
+		actorID    = "reviewer-verdict-replay"
+		authorID   = "author-verdict-replay"
+	)
+
+	inst := buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID})
+	inst.Stages[0].Kind = domain.StageKindReview
+
+	signedAt := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
+	conn := &decisionTestConn{authzGranted: true, areaCode: "QA", actorID: actorID}
+	repo := &fakeDecisionRepo{
+		instance:         inst,
+		insertVerdictRes: infrastructure.VerdictInsertResult{ID: "verdict-original", WasReplay: true},
+	}
+	svc := &ReviewVerdictService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, releaseRecorder: &fakeReleaseRecorder{}}
+	db := newDecisionTestDB(t, conn)
+
+	result, err := svc.RecordVerdict(context.Background(), newTxRunner(db), ReviewVerdictRequest{
+		TenantID:        "tenant-1",
+		InstanceID:      instanceID,
+		StageInstanceID: stageID,
+		ActorUserID:     actorID,
+		Verdict:         domain.VerdictReady,
+	})
+	if err != nil {
+		t.Fatalf("RecordVerdict: unexpected error: %v", err)
+	}
+	if result.VerdictID != "verdict-original" {
+		t.Errorf("VerdictID = %q; want %q (original row id on replay)", result.VerdictID, "verdict-original")
+	}
+	if result.StageCompleted || result.InstanceApproved || result.ChangesRequested {
+		t.Errorf("replay must not re-advance the stage/instance; got %+v", result)
+	}
+}
 
 // TestRecordVerdict_ReadyOnApprovalStageRejected proves slice 2's service
 // pre-check: a `ready` verdict targeting an approval-kind active stage is

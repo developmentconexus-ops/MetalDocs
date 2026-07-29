@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Icon } from '../../../components/ui/Icon';
 import { CodeChip } from '../../../components/ui/CodeChip';
+import { InlineAlert } from '../../../components/ui/InlineAlert';
 import { resolveQueryError, ApiError } from '../../../lib/api';
 import { ArtifactDetailView } from '../../shared/controlled-artifact/ArtifactDetailView';
 import { useDocumentArtifact } from '../adapters/useDocumentArtifact';
+import type { ReleaseNoticeTone } from '../lib/documentReleasePresentation';
 import { createRevision } from '../../controlled-documents/api/controlledDocuments';
 import { exportPDF } from '../api/exports';
 import { DocumentPdfViewerDialog } from '../components/DocumentPdfViewerDialog';
@@ -22,8 +24,11 @@ import styles from './DocumentDetailRoute.module.css';
  *
  * ADR 0085 (Stage B): there is no manual "Publicar / Agendar" affordance. Release
  * is an approval-driven coordinator outcome (the publication plan travels on
- * submit), so an approved document simply shows its status here; the readiness
- * projection arrives in Stage C.
+ * submit). ADR 0085 (Stage C): where that affordance used to sit, the hero now
+ * REPORTS the coordinator's readiness-hold projection (`release`) — read-only, no
+ * CTA in any state, including the anomaly ones (resolution is operator/backend
+ * work). The lifecycle STATUS chip still comes from `doc.status` via the shared
+ * view; this block only adds the release fact on top of it.
  *
  * All queries and
  * lifecycle/capability gating are owned by `useDocumentArtifact` (FE-02) — the route
@@ -32,6 +37,14 @@ import styles from './DocumentDetailRoute.module.css';
  * already resolved. No kind logic leaks into the shared view — it receives only a
  * composed ArtifactViewModel + ReactNode slots.
  */
+/** Tone → route-local notice class. `anomaly` keeps the neutral-error treatment. */
+const RELEASE_NOTICE_CLASS: Record<ReleaseNoticeTone, string> = {
+  released: styles.releaseNoticeReleased,
+  progress: styles.releaseNoticeProgress,
+  scheduled: styles.releaseNoticeScheduled,
+  anomaly: styles.releaseNoticeAnomaly,
+};
+
 export function DocumentDetailRoute() {
   const { documentId: rawDocumentId } = useParams<{ documentId: string }>();
   const navigate = useNavigate();
@@ -39,7 +52,7 @@ export function DocumentDetailRoute() {
 
   const documentId = rawDocumentId ?? '';
 
-  const { model, isLoading, isError, refetch, doc, obligatedCount, gating } =
+  const { model, isLoading, isError, refetch, doc, obligatedCount, gating, release } =
     useDocumentArtifact(documentId);
 
   const [linkCopied, setLinkCopied] = useState(false);
@@ -245,6 +258,27 @@ export function DocumentDetailRoute() {
         <Icon name={linkCopied ? 'check' : 'link'} size={13} />
         {linkCopied ? 'Link copiado!' : 'Copiar link'}
       </button>
+      {/*
+        ADR 0085 Stage C — release readiness-hold projection, rendered exactly where
+        the deleted "Publicar / Agendar" surface used to live. Report-only: every
+        tone is informational, so it reuses the shared InlineAlert primitive
+        (role=status / aria-live=polite) instead of an interrupting alert. Absent
+        projection (`release === null`) renders nothing at all.
+      */}
+      {release ? (
+        <InlineAlert
+          tone={release.tone === 'anomaly' ? 'warning' : 'info'}
+          className={`${styles.releaseNotice} ${RELEASE_NOTICE_CLASS[release.tone]}`}
+          message={
+            <>
+              <span className={styles.releaseNoticeTitle}>{release.title}</span>
+              {release.detail ? (
+                <span className={styles.releaseNoticeDetail}>{release.detail}</span>
+              ) : null}
+            </>
+          }
+        />
+      ) : null}
     </div>
   );
 
