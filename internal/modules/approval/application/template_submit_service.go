@@ -66,6 +66,16 @@ type TemplateVersionReader interface {
 // approval-instance creation (a version can never be kernel-submitted yet
 // still author-editable).
 type TemplateVersionSubmitWriter interface {
+	// MarkTemplateVersionUnderReview flips the version draft -> under_review.
+	// Implementations MUST carry the committed-content precondition INSIDE the
+	// CAS predicate (not as a preceding read): under Read Committed a
+	// concurrent edit can clear content_hash between this service's fast-path
+	// check and the UPDATE, and only an atomic CAS turns that race into a
+	// clean 0-row miss instead of a raw
+	// chk_template_version_content_hash_non_draft violation. A 0-row CAS
+	// explained by a still-draft row with no committed hash MUST return
+	// ErrTemplateVersionNoContent; every other 0-row cause keeps the
+	// implementation's own stale/conflict error.
 	MarkTemplateVersionUnderReview(ctx context.Context, tx db.Tx, tenantID, templateVersionID string) error
 }
 
@@ -77,6 +87,21 @@ var ErrTemplateVersionNotFound = errors.New("approval: template version not foun
 // is not in the draft status required to enter approval (mirrors the
 // templates module's own draft-guard semantics, domain.VersionStatusDraft).
 var ErrTemplateVersionNotDraft = errors.New("approval: template version is not draft")
+
+// ErrTemplateVersionNoContent is returned when the submitted template version
+// carries no committed content hash (F-E4-1). templates_template_version's
+// chk_template_version_content_hash_non_draft CHECK constraint forbids any
+// non-draft row without a 64-char content_hash, so a submit that flipped the
+// version to under_review with an empty hash surfaced as a raw 23514 →
+// INTERNAL_ERROR 500 with the constraint name leaked into the problem title.
+//
+// Two lines produce it, both mapping to the same sentinel: the friendly
+// fast-path read below (rejects the submit before the transition is attempted)
+// and the submit-lock CAS itself, whose WHERE clause carries the same
+// precondition so a concurrent edit that clears the hash mid-tx loses the CAS
+// instead of tripping the CHECK. The DB constraint remains the authoritative
+// backstop behind both.
+var ErrTemplateVersionNoContent = domain.ErrTemplateVersionNoContent
 
 // TemplateSubmitService creates approval instances for template versions
 // (subject_kind='template'). It is a THIN, subject-generic subset of
@@ -175,6 +200,22 @@ func (s *TemplateSubmitService) SubmitTemplateVersionForReview(ctx context.Conte
 			return ErrTemplateVersionNotDraft
 		}
 
+		// Precondition (F-E4-1): the version must carry committed content
+		// before it can enter approval. This read is the FRIENDLY FAST PATH
+		// only — it is not the enforcement point. Read Committed lets a
+		// concurrent edit clear content_hash after this read and before the
+		// flip below, so the authoritative precondition lives in the
+		// submit-lock CAS predicate itself (see TemplateVersionSubmitWriter),
+		// with the DB's chk_template_version_content_hash_non_draft CHECK as
+		// the backstop behind that. ok is false for an absent row, a
+		// cross-tenant id, or an empty/never-set hash; the row existence case
+		// is already resolved above, so !ok here means "no committed content".
+		if _, ok, err := s.versionReader.LoadTemplateVersionContentHash(ctx, tx, req.TenantID, req.TemplateVersionID); err != nil {
+			return fmt.Errorf("template submit: load template version content hash: %w", err)
+		} else if !ok {
+			return ErrTemplateVersionNoContent
+		}
+
 		// Submit-lock (M3 P3.S2b-3b-iii-b, hub Option (a)): flip the version's
 		// own status column draft -> under_review inside this same tx,
 		// atomically with the approval-instance creation below. This closes
@@ -188,6 +229,12 @@ func (s *TemplateSubmitService) SubmitTemplateVersionForReview(ctx context.Conte
 			return fmt.Errorf("template submit: version submit-writer not configured")
 		}
 		if err := s.versionWriter.MarkTemplateVersionUnderReview(ctx, tx, req.TenantID, req.TemplateVersionID); err != nil {
+			// The CAS lost to a concurrent edit that cleared the content hash:
+			// same condition the fast path above reports, so it surfaces as the
+			// same sentinel (409 UPLOAD_MISSING) rather than an opaque wrap.
+			if errors.Is(err, ErrTemplateVersionNoContent) {
+				return ErrTemplateVersionNoContent
+			}
 			return fmt.Errorf("template submit: lock version under_review: %w", err)
 		}
 

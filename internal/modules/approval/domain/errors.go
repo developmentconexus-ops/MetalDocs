@@ -59,6 +59,15 @@ var ErrStageNoSelector = errors.New("approval: stage must have at least one acto
 // to an empty pool.
 var ErrSubmitChoiceRequired = errors.New("approval: submit_choice stage requires chosen actors")
 
+// ErrTemplateVersionNoContent is returned when a template version carries no
+// committed content hash at the moment it would enter approval. It lives here
+// rather than in the application package because the templates-side submit-lock
+// adapter must speak it across the TemplateVersionSubmitWriter port: that
+// adapter may import approval/domain (it already does) but never
+// approval/application. application.ErrTemplateVersionNoContent aliases this
+// value, so errors.Is holds for both the fast-path guard and the CAS leg.
+var ErrTemplateVersionNoContent = errors.New("approval: template version has no committed content")
+
 // ErrSubmitChoiceConstraintViolated is returned at submit time (M4, unit 3.2,
 // slice 5) when either (a) a chosen user does not satisfy the submit_choice
 // selector's role x area_code constraint (not an active member in that

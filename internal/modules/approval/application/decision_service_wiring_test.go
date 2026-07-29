@@ -32,7 +32,7 @@ func (wiringStubTemplateReader) LoadTemplateInboxMeta(context.Context, db.Tx, st
 // to assert wiring/identity, not behavior.
 type wiringStubTemplateCompletion struct{}
 
-func (wiringStubTemplateCompletion) MarkTemplateVersionApproved(context.Context, db.Tx, string, string) error {
+func (wiringStubTemplateCompletion) MarkTemplateVersionApproved(context.Context, db.Tx, string, string, string) error {
 	return nil
 }
 

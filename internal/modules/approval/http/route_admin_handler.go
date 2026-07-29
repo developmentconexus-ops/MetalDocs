@@ -72,13 +72,52 @@ func (h *Handler) CreateRouteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// RouteResponse.ProfileCode mirrors req.ProfileCode's already-validated
-	// presence rule directly: nil for template, the actual code for document
-	// (QR-A finding C — no "" sentinel on the wire).
-	WriteJSON(w, http.StatusCreated, contracts.RouteResponse{
+	// F-E4-2: serialize the PERSISTED projection the service read back from
+	// the committed row, not a two-field stub. The old body returned
+	// name:"", version:0, active:false, stages:null for a fully-persisted
+	// route — indistinguishable from a broken create — for document and
+	// template subjects alike. ProfileCode comes from the row's nullable
+	// column (nil for a template route, no "" sentinel on the wire — QR-A
+	// finding C), which is the same truth req.ProfileCode carried but sourced
+	// from the DB rather than the request.
+	WriteJSON(w, http.StatusCreated, mapCreatedRoute(result))
+}
+
+// mapCreatedRoute renders a persisted create projection as the wire
+// RouteResponse. NewVersion stays nil: it is the update-only field (spec:
+// "Omitted for create/deactivate"); Version carries the created route's
+// version.
+func mapCreatedRoute(result application.CreateRouteResult) contracts.RouteResponse {
+	return contracts.RouteResponse{
 		RouteID:     result.RouteID,
-		ProfileCode: req.ProfileCode,
-	})
+		ProfileCode: result.ProfileCode,
+		Name:        result.Name,
+		Version:     result.Version,
+		Active:      result.Active,
+		InUse:       result.InUse,
+		Stages:      mapStagesToResponse(result.Stages),
+		CreatedAt:   result.CreatedAt.UTC().Format(time.RFC3339),
+	}
+}
+
+// mapStagesToResponse maps persisted domain stages onto the RouteResponse wire
+// shape. Always a non-nil slice: an empty stage list must serialize as [] (the
+// read side's contract), never null.
+func mapStagesToResponse(stages []domain.Stage) []contracts.StageResponse {
+	out := make([]contracts.StageResponse, 0, len(stages))
+	for _, stage := range stages {
+		out = append(out, contracts.StageResponse{
+			Order:              stage.Order,
+			Name:               stage.Name,
+			RequiredCapability: stage.RequiredCapability,
+			Quorum:             contracts.QuorumKind(stage.Quorum),
+			QuorumM:            stage.QuorumM,
+			DriftPolicy:        contracts.DriftPolicyKind(stage.OnEligibilityDrift),
+			StageKind:          mapStageKind(string(stage.Kind)),
+			Selectors:          mapSelectorsToWire(stage.Selectors),
+		})
+	}
+	return out
 }
 
 // UpdateRouteHandler updates an existing approval route. Requires both an

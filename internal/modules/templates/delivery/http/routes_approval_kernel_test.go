@@ -5,8 +5,10 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -225,6 +227,66 @@ func TestSubmitTemplateVersionForApproval_NoActiveRoute(t *testing.T) {
 	}
 }
 
+// TestSubmitTemplateVersionForApproval_NoContentHash is the F-E4-1 delivery
+// pin: the kernel's ErrTemplateVersionNoContent sentinel must surface as a
+// clean 409 UPLOAD_MISSING problem+json — never the raw 500 that leaked
+// "chk_template_version_content_hash_non_draft (SQLSTATE 23514)" into the
+// title. 409 is declared on this route in api/openapi (422 is not), so the
+// mapping needs no spec change.
+func TestSubmitTemplateVersionForApproval_NoContentHash(t *testing.T) {
+	repo := newFakeRepo()
+	seedDraftTemplateAndVersion(repo)
+	submit := &fakeApprovalSubmit{err: approvalapp.ErrTemplateVersionNoContent}
+	mux := newMuxWithApprovalKernelOnly(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo, submit, &fakeApprovalDecision{}, &fakeApprovalRead{})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates/"+testTemplateID+"/versions/1/submit-for-approval", nil)
+	withHeaders(req)
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	var out struct {
+		Code  string `json:"code"`
+		Title string `json:"title"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if out.Code != "UPLOAD_MISSING" {
+		t.Fatalf("expected error.code=UPLOAD_MISSING, got %q", out.Code)
+	}
+	if strings.Contains(out.Title, "SQLSTATE") || strings.Contains(out.Title, "chk_template_version") {
+		t.Fatalf("title leaks internals: %q", out.Title)
+	}
+}
+
+// TestSubmitTemplateVersionForApproval_UnmappedError_DoesNotLeakInternals is
+// the other half of F-E4-1: whatever unmapped failure reaches the delivery
+// layer, its raw chain (constraint names, SQLSTATE codes) must stay in the
+// server log, not the response body.
+func TestSubmitTemplateVersionForApproval_UnmappedError_DoesNotLeakInternals(t *testing.T) {
+	repo := newFakeRepo()
+	seedDraftTemplateAndVersion(repo)
+	submit := &fakeApprovalSubmit{
+		err: errors.New(`template submit: lock version under_review: ERROR: new row for relation "templates_template_version" violates check constraint "chk_template_version_content_hash_non_draft" (SQLSTATE 23514)`),
+	}
+	mux := newMuxWithApprovalKernelOnly(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo, submit, &fakeApprovalDecision{}, &fakeApprovalRead{})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates/"+testTemplateID+"/versions/1/submit-for-approval", nil)
+	withHeaders(req)
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	if body := rr.Body.String(); strings.Contains(body, "SQLSTATE") || strings.Contains(body, "chk_template_version_content_hash_non_draft") {
+		t.Fatalf("500 body leaks the raw failure chain: %s", body)
+	}
+}
+
 func stageInstance(id string) approvaldomain.StageInstance {
 	return approvaldomain.StageInstance{ID: id, Status: approvaldomain.StageActive}
 }
@@ -244,7 +306,8 @@ func TestSignoffTemplateVersion_Happy(t *testing.T) {
 		Stages: []approvaldomain.StageInstance{stageInstance(uuid.New().String())},
 	}
 	read := &fakeApprovalRead{inst: inst}
-	decision := &fakeApprovalDecision{res: approvalapp.SignoffResult{StageCompleted: true}}
+	signoffID := uuid.New().String()
+	decision := &fakeApprovalDecision{res: approvalapp.SignoffResult{StageCompleted: true, SignoffID: signoffID}}
 
 	var gotAction string
 	authz := func(_ *http.Request, _, _, action string) error {
@@ -282,13 +345,19 @@ func TestSignoffTemplateVersion_Happy(t *testing.T) {
 	}
 
 	var out struct {
-		Outcome string `json:"outcome"`
+		Outcome   string `json:"outcome"`
+		SignoffID string `json:"signoff_id"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
 	if out.Outcome != "stage_completed" {
 		t.Errorf("outcome = %q, want stage_completed", out.Outcome)
+	}
+	// F-E4-3: the persisted approval_signoffs row id must reach the wire; the
+	// templates entry point used to hardcode "".
+	if out.SignoffID != signoffID {
+		t.Errorf("signoff_id = %q, want %q (SignoffResult.SignoffID threaded to the wire)", out.SignoffID, signoffID)
 	}
 }
 

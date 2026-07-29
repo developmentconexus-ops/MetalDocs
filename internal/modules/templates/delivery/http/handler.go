@@ -257,6 +257,17 @@ var friendlyMsg = map[problem.Code]string{
 
 func writeMappedErr(w http.ResponseWriter, err error) {
 	status, code := MapErr(err)
+	// F-E4-1 (second half of the finding): an UNMAPPED error is by definition
+	// an internal fault, and echoing err.Error() into problem.title leaked the
+	// raw failure chain — DB constraint names, SQLSTATE codes, internal call
+	// stacks — to the client. Mapped 4xx errors are curated, caller-facing
+	// sentinels and keep their message; INTERNAL_ERROR gets a fixed, opaque
+	// title and the real cause goes to the server log instead.
+	if code == codeTplInternalError {
+		slog.Error("templates http: unmapped error", "err", err)
+		writeErr(w, status, code, "internal server error")
+		return
+	}
 	msg := friendlyMsg[code]
 	if msg == "" {
 		msg = err.Error()

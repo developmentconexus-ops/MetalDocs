@@ -163,6 +163,31 @@ func (s *routeAdminStmt) Query(args []driver.Value) (driver.Rows, error) {
 			values: []driver.Value{s.conn.createdRouteID},
 		}, nil
 	}
+	// F-E4-2: Create now reads the persisted route back in-tx
+	// (scanRouteProjectionTx) so the 201 body carries the real projection
+	// instead of a two-field stub. Serve that read-back here; the `in_use`
+	// EXISTS subquery on approval_instances makes the query unmistakable.
+	if strings.Contains(lower, "from approval_routes") && strings.Contains(lower, "as in_use") {
+		if s.conn.projectionMissing {
+			return routeAdminEmptyRows{cols: []string{"id", "name", "version", "active", "created_at", "profile_code", "in_use"}}, nil
+		}
+		var profileCode driver.Value
+		if s.conn.projectionProfileCode != nil {
+			profileCode = *s.conn.projectionProfileCode
+		}
+		return &routeAdminRows{
+			cols: []string{"id", "name", "version", "active", "created_at", "profile_code", "in_use"},
+			values: []driver.Value{
+				s.conn.createdRouteID,
+				s.conn.projectionName,
+				int64(s.conn.projectionVersion),
+				s.conn.projectionActive,
+				s.conn.projectionCreatedAt,
+				profileCode,
+				s.conn.projectionInUse,
+			},
+		}, nil
+	}
 	if strings.Contains(lower, "from approval_routes") && strings.Contains(lower, "for update") {
 		if !s.conn.routeExists {
 			return routeAdminEmptyRows{cols: []string{"id", "version", "active"}}, nil
@@ -263,6 +288,16 @@ type routeAdminConn struct {
 	insertRouteErr       error
 	capturedSubjectKind  string
 	capturedSubjectKey   string
+
+	// F-E4-2 create read-back projection (scanRouteProjectionTx).
+	projectionName        string
+	projectionVersion     int
+	projectionActive      bool
+	projectionActiveSet   bool
+	projectionCreatedAt   time.Time
+	projectionProfileCode *string
+	projectionInUse       bool
+	projectionMissing     bool
 }
 
 func (c *routeAdminConn) Prepare(query string) (driver.Stmt, error) {
@@ -299,6 +334,20 @@ func newRouteAdminTestDB(t *testing.T, conn *routeAdminConn) *sql.DB {
 	}
 	if conn.newVersion == 0 {
 		conn.newVersion = 2
+	}
+	// F-E4-2 read-back defaults: a freshly created route is active at
+	// version 1 with no instances referencing it yet.
+	if conn.projectionName == "" {
+		conn.projectionName = "Test Route"
+	}
+	if conn.projectionVersion == 0 {
+		conn.projectionVersion = 1
+	}
+	if !conn.projectionActiveSet {
+		conn.projectionActive = true
+	}
+	if conn.projectionCreatedAt.IsZero() {
+		conn.projectionCreatedAt = time.Date(2026, 7, 29, 10, 0, 0, 0, time.UTC)
 	}
 	name := fmt.Sprintf("route_admin_test_%p", conn)
 	sql.Register(name, &routeAdminDriver{conn: conn})
@@ -360,6 +409,155 @@ func TestRouteAdminCreate_HappyPath(t *testing.T) {
 	}
 	if len(emitter.Events) != 1 || emitter.Events[0].EventType != "route.config.created" {
 		t.Errorf("expected 1 route.config.created event; got %v", emitter.Events)
+	}
+}
+
+// TestRouteAdminCreate_ReturnsPersistedProjection is the F-E4-2 regression
+// pin at the service layer: Create must return the projection it read back
+// from the committed row (name/version/active/in_use/created_at/profile_code/
+// stages), not a RouteID-only stub. The delivery layer serializes exactly this
+// struct, which is why the live create response was all zero values while the
+// DB row was fully persisted.
+func TestRouteAdminCreate_ReturnsPersistedProjection(t *testing.T) {
+	profileCode := "po"
+	createdAt := time.Date(2026, 7, 29, 10, 0, 0, 0, time.UTC)
+	conn := &routeAdminConn{
+		authzGranted:          true,
+		projectionName:        "PO Route",
+		projectionVersion:     1,
+		projectionActive:      true,
+		projectionActiveSet:   true,
+		projectionCreatedAt:   createdAt,
+		projectionProfileCode: &profileCode,
+		stageLoadStages:       validRouteStages(),
+	}
+	db := newRouteAdminTestDB(t, conn)
+
+	svc := &RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: createdAt},
+	}
+
+	out, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
+		TenantID:    "tenant-1",
+		ProfileCode: "po",
+		Name:        "PO Route",
+		ActorUserID: "user-1",
+		Stages:      validRouteStages(),
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if out.Name != "PO Route" {
+		t.Errorf("Name = %q, want %q (was \"\" before F-E4-2)", out.Name, "PO Route")
+	}
+	if out.Version != 1 {
+		t.Errorf("Version = %d, want 1 (was 0 before F-E4-2)", out.Version)
+	}
+	if !out.Active {
+		t.Errorf("Active = false, want true (was false before F-E4-2)")
+	}
+	if out.InUse {
+		t.Errorf("InUse = true, want false (no approval_instances reference a fresh route)")
+	}
+	if !out.CreatedAt.Equal(createdAt) {
+		t.Errorf("CreatedAt = %v, want %v (was the zero time before F-E4-2)", out.CreatedAt, createdAt)
+	}
+	if out.ProfileCode == nil || *out.ProfileCode != "po" {
+		t.Errorf("ProfileCode = %v, want \"po\"", out.ProfileCode)
+	}
+	if len(out.Stages) != 2 {
+		t.Fatalf("Stages len = %d, want 2 (was nil before F-E4-2)", len(out.Stages))
+	}
+	if out.Stages[0].Name != "quality" || out.Stages[1].Name != "approval" {
+		t.Errorf("stage names = %q/%q, want quality/approval", out.Stages[0].Name, out.Stages[1].Name)
+	}
+}
+
+// TestRouteAdminCreate_TemplateSubjectProjectionHasNilProfileCode pins the
+// template arm of the same read-back: a template route's profile_code column
+// is SQL NULL by DB constraint, so the projection must carry a nil pointer
+// (which the handler serializes as JSON null, never the "" sentinel).
+func TestRouteAdminCreate_TemplateSubjectProjectionHasNilProfileCode(t *testing.T) {
+	conn := &routeAdminConn{
+		authzGranted:          true,
+		projectionName:        "Template Route",
+		projectionProfileCode: nil,
+		stageLoadStages:       validRouteStages(),
+	}
+	db := newRouteAdminTestDB(t, conn)
+
+	svc := &RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Now()},
+	}
+
+	out, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
+		TenantID:    "tenant-1",
+		Name:        "Template Route",
+		ActorUserID: "user-1",
+		SubjectKind: "template",
+		SubjectKey:  "tmpl-1",
+		Stages:      validRouteStages(),
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if out.ProfileCode != nil {
+		t.Errorf("ProfileCode = %v, want nil for a template route", *out.ProfileCode)
+	}
+	if out.Name != "Template Route" {
+		t.Errorf("Name = %q, want %q", out.Name, "Template Route")
+	}
+	if len(out.Stages) != 2 {
+		t.Errorf("Stages len = %d, want 2", len(out.Stages))
+	}
+}
+
+// TestRouteAdminCreate_ReplayReturnsPersistedProjection pins that the
+// idempotent-replay branch is NOT a degraded path: the replay envelope stores
+// only the route id, so the service must re-read the same projection rather
+// than returning a RouteID-only stub on the second call.
+func TestRouteAdminCreate_ReplayReturnsPersistedProjection(t *testing.T) {
+	conn := &routeAdminConn{
+		authzGranted:    true,
+		createdRouteID:  "route-replay-projection",
+		projectionName:  "PO Route",
+		stageLoadStages: validRouteStages(),
+	}
+	db := newRouteAdminTestDB(t, conn)
+	store := newMemoryRouteAdminIdempStore()
+
+	svc := (&RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Now()},
+	}).WithIdempStore(store)
+
+	in := CreateRouteInput{
+		TenantID:       "tenant-1",
+		ProfileCode:    "po",
+		Name:           "PO Route",
+		ActorUserID:    "user-1",
+		IdempotencyKey: "idem-create-projection",
+		Stages:         validRouteStages(),
+	}
+
+	first, err := svc.Create(context.Background(), newTxRunner(db), in)
+	if err != nil {
+		t.Fatalf("first Create: %v", err)
+	}
+	second, err := svc.Create(context.Background(), newTxRunner(db), in)
+	if err != nil {
+		t.Fatalf("replay Create: %v", err)
+	}
+	if second.RouteID != first.RouteID {
+		t.Fatalf("replay RouteID = %q, want %q", second.RouteID, first.RouteID)
+	}
+	if second.Name != first.Name || second.Version != first.Version || second.Active != first.Active {
+		t.Fatalf("replay projection = %+v, want the same projection as the first call %+v", second, first)
+	}
+	if len(second.Stages) != len(first.Stages) {
+		t.Fatalf("replay stages len = %d, want %d", len(second.Stages), len(first.Stages))
 	}
 }
 

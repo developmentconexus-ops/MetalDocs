@@ -114,7 +114,8 @@ func (fakeTemplateVersionSubmitWriter) MarkTemplateVersionUnderReview(ctx contex
 	res, err := tx.ExecContext(ctx, `
 		UPDATE templates_template_version
 		   SET status = 'under_review', submitted_at = now(), lock_version = lock_version + 1
-		 WHERE id = $1 AND tenant_id = $2 AND status = 'draft'`,
+		 WHERE id = $1 AND tenant_id = $2 AND status = 'draft'
+		   AND content_hash IS NOT NULL AND content_hash <> ''`,
 		templateVersionID, tenantID,
 	)
 	if err != nil {
@@ -125,6 +126,23 @@ func (fakeTemplateVersionSubmitWriter) MarkTemplateVersionUnderReview(ctx contex
 		return err
 	}
 	if rows == 0 {
+		// Same in-tx disambiguation the production adapter performs: a 0-row
+		// CAS on a still-draft row with no committed hash is the content case,
+		// not a stale-status conflict.
+		var status, contentHash sql.NullString
+		if err := tx.QueryRowContext(ctx, `
+			SELECT status, content_hash FROM templates_template_version
+			 WHERE id = $1 AND tenant_id = $2`,
+			templateVersionID, tenantID,
+		).Scan(&status, &contentHash); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return errors.New("fake submit-lock: version not draft")
+			}
+			return err
+		}
+		if status.String == "draft" && (!contentHash.Valid || contentHash.String == "") {
+			return domain.ErrTemplateVersionNoContent
+		}
 		return errors.New("fake submit-lock: version not draft")
 	}
 	return nil
@@ -179,6 +197,58 @@ func seedTemplateVersion(t *testing.T, dbc *sql.DB, tenantID, actorID, status st
 	}
 	if err := tx.Commit(); err != nil {
 		t.Fatalf("seedTemplateVersion: commit: %v", err)
+	}
+	return templateID, versionID
+}
+
+// seedTemplateVersionNoContent mirrors seedTemplateVersion but leaves
+// content_hash empty — the exact state the legacy docx-upload-url direct-PUT
+// path produces (only autosave/commit sets a hash). This is legal for a draft
+// row (chk_template_version_content_hash_non_draft demands the 64-char hash
+// only for non-draft statuses), which is precisely why the constraint used to
+// fire at submit time, mid-tx, as a raw 23514 (F-E4-1).
+func seedTemplateVersionNoContent(t *testing.T, dbc *sql.DB, tenantID, actorID string) (templateID, versionID string) {
+	t.Helper()
+	ctx := context.Background()
+	key := "tsvc-tmpl-" + uuid.NewString()
+	docxKey := "templates/test-seed/" + key + "/body.docx"
+
+	tx, err := dbc.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("seedTemplateVersionNoContent: begin tx: %v", err)
+	}
+	defer tx.Rollback()
+
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
+		t.Fatalf("seedTemplateVersionNoContent: seed identity: %v", err)
+	}
+	if _, err := tx.ExecContext(ctx,
+		`SELECT set_config('metaldocs.asserted_caps', $1, true)`, `[{"cap":"template.create"}]`,
+	); err != nil {
+		t.Fatalf("seedTemplateVersionNoContent: assert caps: %v", err)
+	}
+
+	if err := tx.QueryRowContext(ctx,
+		`INSERT INTO public.templates_template
+		   (id, tenant_id, doc_type_code, key, name, description, latest_version, created_by, created_at)
+		 VALUES (gen_random_uuid(), $1::uuid, '', $2, 'Test Template', '', 1, $3::text, now())
+		 RETURNING id::text`,
+		tenantID, key, actorID,
+	).Scan(&templateID); err != nil {
+		t.Fatalf("seedTemplateVersionNoContent: insert template: %v", err)
+	}
+	if err := tx.QueryRowContext(ctx,
+		`INSERT INTO public.templates_template_version
+		   (id, tenant_id, template_id, version_number, status, docx_storage_key, content_hash,
+		    metadata_schema, placeholder_schema, author_id)
+		 VALUES (gen_random_uuid(), $1::uuid, $2::uuid, 1, 'draft', $3, '', '{}'::jsonb, '[]'::jsonb, $4::text)
+		 RETURNING id::text`,
+		tenantID, templateID, docxKey, actorID,
+	).Scan(&versionID); err != nil {
+		t.Fatalf("seedTemplateVersionNoContent: insert template version: %v", err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("seedTemplateVersionNoContent: commit: %v", err)
 	}
 	return templateID, versionID
 }
@@ -440,6 +510,61 @@ func TestSubmitTemplateVersionForReview_NonDraft_Rejected_RealDB(t *testing.T) {
 	})
 	if !errors.Is(err, ErrTemplateVersionNotDraft) {
 		t.Fatalf("err = %v, want ErrTemplateVersionNotDraft", err)
+	}
+
+	var count int
+	if err := dbc.QueryRowContext(context.Background(),
+		`SELECT COUNT(*) FROM public.approval_instances WHERE tenant_id = $1::uuid AND subject_kind = 'template' AND subject_key = $2`,
+		tnt.ID, versionID,
+	).Scan(&count); err != nil {
+		t.Fatalf("count check: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("instance count = %d, want 0", count)
+	}
+}
+
+// TestSubmitTemplateVersionForReview_NoContentHash_Rejected_RealDB is the
+// F-E4-1 regression pin against the real DB and the REAL templates-infra
+// reader/writer adapters: a draft version with an empty content_hash is
+// rejected with ErrTemplateVersionNoContent, the version stays draft (the
+// submit-lock never ran), and no approval instance is created. Before the fix
+// the submit reached MarkTemplateVersionUnderReview, tripped
+// chk_template_version_content_hash_non_draft, and surfaced as a raw 500
+// carrying the constraint name.
+func TestSubmitTemplateVersionForReview_NoContentHash_Rejected_RealDB(t *testing.T) {
+	dbc, _ := testdb.Open(t)
+	tnt := testdb.NewTenant(t, dbc)
+	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
+
+	templateID, versionID := seedTemplateVersionNoContent(t, dbc, tnt.ID, actor.ID)
+	seedTemplateRoute(t, dbc, tnt.ID, actor.ID, templateID)
+
+	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
+	svc := NewTemplateSubmitService(repo, NewSQLEmitter(), RealClock{}, fakeTemplateVersionReader{})
+	svc.versionWriter = fakeTemplateVersionSubmitWriter{}
+	runner := db.NewTxRunner(dbc)
+
+	_, err := svc.SubmitTemplateVersionForReview(newTemplateSubmitCtx(tnt.ID, actor.ID), runner, TemplateSubmitRequest{
+		TenantID:          tnt.ID,
+		TemplateID:        templateID,
+		TemplateVersionID: versionID,
+		SubmittedBy:       actor.ID,
+		IdempotencyKey:    "idem-" + uuid.NewString(),
+	})
+	if !errors.Is(err, ErrTemplateVersionNoContent) {
+		t.Fatalf("err = %v, want ErrTemplateVersionNoContent", err)
+	}
+
+	var status string
+	if err := dbc.QueryRowContext(context.Background(),
+		`SELECT status FROM templates_template_version WHERE id = $1::uuid AND tenant_id = $2::uuid`,
+		versionID, tnt.ID,
+	).Scan(&status); err != nil {
+		t.Fatalf("query version status: %v", err)
+	}
+	if status != "draft" {
+		t.Fatalf("version status = %q, want draft (submit-lock must never have run)", status)
 	}
 
 	var count int

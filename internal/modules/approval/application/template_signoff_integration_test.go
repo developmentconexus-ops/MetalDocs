@@ -153,6 +153,24 @@ func templateVersionStatus(t *testing.T, dbc *sql.DB, tenantID, versionID string
 	return status
 }
 
+// templateVersionApproverID reads the attribution columns the terminal
+// completion port writes (F-E4-4). approver_id is TEXT and nullable, so a
+// NULL is reported as "" — which is exactly the live-QA defect state.
+func templateVersionApproverID(t *testing.T, dbc *sql.DB, tenantID, versionID string) string {
+	t.Helper()
+	var approver sql.NullString
+	if err := dbc.QueryRowContext(context.Background(),
+		`SELECT approver_id FROM templates_template_version WHERE id = $1::uuid AND tenant_id = $2::uuid`,
+		versionID, tenantID,
+	).Scan(&approver); err != nil {
+		t.Fatalf("query version approver_id: %v", err)
+	}
+	if !approver.Valid {
+		return ""
+	}
+	return approver.String
+}
+
 func instanceStatusOf(t *testing.T, dbc *sql.DB, instanceID string) string {
 	t.Helper()
 	var status string
@@ -240,6 +258,12 @@ func TestTemplateSignoff_Approve_CompletesVersion_RealDB(t *testing.T) {
 	}
 	if got := templateSignoffRowCount(t, fx.dbc, fx.instanceID); got != 2 {
 		t.Errorf("signoff rows = %d, want 2 (0300 template arm accepted template.approve twice)", got)
+	}
+	// F-E4-4: approved_at without attribution was the live-QA defect. The
+	// deciding actor of the terminal signoff (manager, stage 2) must be
+	// stamped onto approver_id in the very same tx.
+	if got := templateVersionApproverID(t, fx.dbc, fx.tenantID, fx.versionID); got != fx.managerID {
+		t.Errorf("final: approver_id = %q, want %q (deciding actor of the terminal signoff)", got, fx.managerID)
 	}
 }
 

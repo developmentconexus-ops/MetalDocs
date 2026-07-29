@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"reflect"
 	"strings"
+	"time"
 
 	"metaldocs/internal/modules/approval/domain"
 	"metaldocs/internal/modules/approval/infrastructure"
@@ -102,9 +103,28 @@ type CreateRouteInput struct {
 	Stages         []domain.Stage
 }
 
-// CreateRouteResult is returned on successful route creation.
+// CreateRouteResult is returned on successful route creation. Beyond RouteID
+// it carries the route's PERSISTED projection (F-E4-2): the create response
+// used to serialize name:"", version:0, active:false, stages:null while the DB
+// row was fully populated, because the handler had nothing but an id to build
+// RouteResponse from. Every field below is read back from the committed row —
+// never echoed from the request — so create and the read side cannot drift.
 type CreateRouteResult struct {
 	RouteID string
+	// ProfileCode is nil for a template-subject route (profile_code is SQL
+	// NULL by DB constraint, ADR 0082 / migration 0297) and a non-nil code for
+	// a document-subject route. Pointer, not "", so the wire can tell the two
+	// apart — the same honesty rule listRouteProfileCode enforces on the list
+	// projection.
+	ProfileCode *string
+	Name        string
+	Version     int
+	Active      bool
+	// InUse reports whether any approval instance already references the route
+	// (routes are immutable once used — F2/W1).
+	InUse     bool
+	CreatedAt time.Time
+	Stages    []domain.Stage
 }
 
 // UpdateRouteInput carries all inputs for Update.
@@ -174,7 +194,10 @@ func (s *RouteAdminService) Create(ctx context.Context, runner db.TxRunner, in C
 			return CreateRouteResult{}, err
 		}
 		if replay != nil {
-			return CreateRouteResult{RouteID: replay.RouteID}, nil
+			// F-E4-2: a replay must return the SAME body the original create
+			// returned, so it re-reads the persisted projection rather than
+			// echoing a bare route id (the replay envelope stores only the id).
+			return s.loadRouteProjection(ctx, runner, in.TenantID, replay.RouteID)
 		}
 	}
 
@@ -362,13 +385,85 @@ func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in
 			return fmt.Errorf("emit event: %w", err)
 		}
 
-		result = CreateRouteResult{RouteID: routeID}
+		// F-E4-2: build the response from the PERSISTED row + stages, read back
+		// inside this same tx right after the writes above. Reading (rather
+		// than echoing the request) is what makes create's body identical in
+		// shape and content to the read side, and picks up DB-applied values
+		// the request never carried (created_at, the stage_kind NOT NULL
+		// DEFAULT, version).
+		result, err = scanRouteProjectionTx(ctx, tx, in.TenantID, routeID)
+		if err != nil {
+			return err
+		}
 		return nil
 	})
 	if err != nil {
 		return CreateRouteResult{}, err
 	}
 	return result, nil
+}
+
+// loadRouteProjection reads a route's persisted projection in its own short
+// transaction (F-E4-2 replay path). route.manage is asserted here exactly as
+// every other RouteAdminService entry point does — a replayed create is still
+// a route-admin read of tenant configuration, not an unguarded lookup.
+func (s *RouteAdminService) loadRouteProjection(ctx context.Context, runner db.TxRunner, tenantID, routeID string) (CreateRouteResult, error) {
+	var result CreateRouteResult
+	err := runner.Do(ctx, func(tx *sql.Tx) error {
+		ctx := authz.WithCapCache(ctx)
+		if err := authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant"); err != nil {
+			return err
+		}
+		var err error
+		result, err = scanRouteProjectionTx(ctx, tx, tenantID, routeID)
+		return err
+	})
+	if err != nil {
+		return CreateRouteResult{}, wrapRouteAdminErr("create", err)
+	}
+	return result, nil
+}
+
+// scanRouteProjectionTx reads the committed approval_routes row plus its
+// persisted stages (with selectors) inside the caller's tx. profile_code is
+// scanned as a nullable column and carried out as a pointer so a template
+// route's SQL NULL stays NULL on the wire instead of collapsing to the ""
+// sentinel. in_use is computed from approval_instances, tenant-scoped on both
+// sides of the correlation.
+func scanRouteProjectionTx(ctx context.Context, tx *sql.Tx, tenantID, routeID string) (CreateRouteResult, error) {
+	var (
+		out         CreateRouteResult
+		profileCode sql.NullString
+	)
+	err := tx.QueryRowContext(ctx, `
+		SELECT r.id, r.name, r.version, r.active, r.created_at, r.profile_code,
+		       EXISTS (
+		         SELECT 1 FROM approval_instances ai
+		          WHERE ai.route_id = r.id
+		            AND ai.tenant_id = r.tenant_id
+		       ) AS in_use
+		  FROM approval_routes r
+		 WHERE r.id = $1
+		   AND r.tenant_id = $2::uuid`,
+		routeID, tenantID,
+	).Scan(&out.RouteID, &out.Name, &out.Version, &out.Active, &out.CreatedAt, &profileCode, &out.InUse)
+	if errors.Is(err, sql.ErrNoRows) {
+		return CreateRouteResult{}, ErrRouteNotFound
+	}
+	if err != nil {
+		return CreateRouteResult{}, fmt.Errorf("load route projection: %w", infrastructure.MapPgError(err, infrastructure.MapHints{}))
+	}
+	if profileCode.Valid {
+		code := profileCode.String
+		out.ProfileCode = &code
+	}
+
+	stages, err := loadRouteStagesTx(ctx, tx, routeID)
+	if err != nil {
+		return CreateRouteResult{}, err
+	}
+	out.Stages = stages
+	return out, nil
 }
 
 // Update updates route metadata and replaces all route stages atomically.

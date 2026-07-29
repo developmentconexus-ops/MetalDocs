@@ -90,6 +90,16 @@ func MapErr(err error) (httpStatus int, code problem.Code) {
 		return http.StatusNotFound, codeTplApprovalNotFound
 	case errors.Is(err, approvalapp.ErrTemplateVersionNotDraft):
 		return http.StatusConflict, codeTplApprovalConflict
+	case errors.Is(err, approvalapp.ErrTemplateVersionNoContent):
+		// F-E4-1: submitting a version with no committed content_hash used to
+		// reach the DB CHECK constraint and surface as a raw 500. It is a
+		// missing-prerequisite conflict of exactly the same taxonomy family as
+		// APPROVAL_ROUTE_MISSING, and the condition ("this version has no
+		// committed DOCX content") is the one UPLOAD_MISSING already names —
+		// including its friendly message (handler.go friendlyMsg) and the
+		// frontend catalog entry. 409 is declared on the submit route; 422 is
+		// not, so no spec change is involved.
+		return http.StatusConflict, codeTplUploadMissing
 	case errors.Is(err, approvalapp.ErrNoActiveApprovalRoute):
 		return http.StatusConflict, codeTplApprovalRouteMissing
 	case errors.Is(err, approvalapp.ErrDuplicateSubmission):

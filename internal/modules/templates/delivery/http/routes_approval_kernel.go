@@ -185,8 +185,16 @@ func (h *Handler) SignoffTemplateVersion(w http.ResponseWriter, r *http.Request,
 	case res.StageCompleted:
 		outcome = "stage_completed"
 	}
+	// F-E4-3: thread the persisted approval_signoffs row id out to the wire,
+	// exactly as the document signoff delivery does
+	// (approval/http/doc_approval_handler.go). SignoffResult.SignoffID is
+	// already populated by DecisionService.RecordSignoff — including the
+	// ORIGINAL row id on the DB-level replay branch (F-QA4-7) — so the template
+	// entry point was simply dropping it. was_replay stays false here: unlike
+	// the document handler, this route has no application-level replay store;
+	// its idempotency is enforced by the idempotency.Require middleware.
 	resp := templatesapi.SignoffDocumentResponse{
-		SignoffId: "",
+		SignoffId: res.SignoffID,
 		WasReplay: false,
 		Outcome:   outcome,
 	}

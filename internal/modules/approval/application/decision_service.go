@@ -60,8 +60,16 @@ type PinInvoker interface {
 // outcome with this port unset is a wiring error surfaced as an explicit
 // error, never a silent skip of the version transition (mirrors the
 // pinInvoker == nil guard on the document path).
+// approverUserID (F-E4-4) is the deciding actor whose sign-off carried the
+// instance to terminal approval — SignoffRequest.ActorUserID, the same
+// server-derived identity the approval_signoffs ledger row records. It is
+// stamped onto templates_template_version.approver_id so the version row
+// carries approver attribution alongside approved_at, mirroring
+// TerminalApprovalInput.FinalApproverID on the document arm. Never optional
+// and never substituted: an empty value is a wiring fault, not a value to
+// invent (no-fallback principle).
 type TemplateCompletionWriter interface {
-	MarkTemplateVersionApproved(ctx context.Context, tx db.Tx, tenantID, templateVersionID string) error
+	MarkTemplateVersionApproved(ctx context.Context, tx db.Tx, tenantID, templateVersionID, approverUserID string) error
 	MarkTemplateVersionRejected(ctx context.Context, tx db.Tx, tenantID, templateVersionID string) error
 }
 
@@ -574,7 +582,11 @@ func (s *DecisionService) recordSignoffInTx(ctx context.Context, tx *sql.Tx, req
 				if s.templateCompletion == nil {
 					return SignoffResult{}, nil, fmt.Errorf("recordSignoff: template completion writer not configured")
 				}
-				if err := s.templateCompletion.MarkTemplateVersionApproved(ctx, tx, req.TenantID, instance.Subject.Key); err != nil {
+				// F-E4-4: req.ActorUserID is the deciding approver (the same
+				// identity the signoff ledger row and the document arm's
+				// FinalApproverID carry); it is stamped onto the version's
+				// approver_id so approved_at never lands without attribution.
+				if err := s.templateCompletion.MarkTemplateVersionApproved(ctx, tx, req.TenantID, instance.Subject.Key, req.ActorUserID); err != nil {
 					return SignoffResult{}, nil, fmt.Errorf("recordSignoff: mark template version approved: %w", err)
 				}
 				result.InstanceApproved = true

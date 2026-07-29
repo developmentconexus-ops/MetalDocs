@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"metaldocs/internal/modules/approval/application"
 	"metaldocs/internal/modules/approval/domain"
@@ -316,10 +317,15 @@ func TestCreateRoute_SubjectFieldsPassedThrough(t *testing.T) {
 // TestCreateRoute_ResponseProfileCode pins QR-A finding C: a template-subject
 // create response must serialize "profile_code":null (never the "" sentinel
 // — hub doctrine, already ruled for RouteSummary/ListRouteItem), while a
-// document-subject create response is unchanged (the non-empty profile_code
-// string from the request). Decoded via raw json.RawMessage so the null-vs-
-// missing-vs-empty-string distinction is checked on the actual wire bytes,
-// not through a Go struct that would mask the difference.
+// document-subject create response carries the non-empty profile_code string.
+// Decoded via raw json.RawMessage so the null-vs-missing-vs-empty-string
+// distinction is checked on the actual wire bytes, not through a Go struct
+// that would mask the difference.
+//
+// Since F-E4-2 the value's SOURCE is the persisted row's nullable
+// profile_code column read back by the service (CreateRouteResult.ProfileCode),
+// not an echo of the request body — so the fixtures below set it on the fake's
+// createResult. The wire contract asserted here is unchanged.
 func TestCreateRoute_ResponseProfileCode(t *testing.T) {
 	t.Run("template create emits null", func(t *testing.T) {
 		svc := &fakeRouteAdminService{
@@ -355,8 +361,9 @@ func TestCreateRoute_ResponseProfileCode(t *testing.T) {
 	})
 
 	t.Run("document create emits the profile code unchanged", func(t *testing.T) {
+		opsCode := "ops"
 		svc := &fakeRouteAdminService{
-			createResult: application.CreateRouteResult{RouteID: "route-doc-1"},
+			createResult: application.CreateRouteResult{RouteID: "route-doc-1", ProfileCode: &opsCode},
 		}
 		h := &Handler{routeAdmin: svc}
 		mux := routeAdminTestMux(h)
@@ -386,6 +393,122 @@ func TestCreateRoute_ResponseProfileCode(t *testing.T) {
 			t.Fatalf("document create profile_code raw = %s, want %q", code, `"ops"`)
 		}
 	})
+}
+
+// TestCreateRoute_ReturnsPersistedProjection is the F-E4-2 regression pin: the
+// 201 body must carry the real persisted route projection — the same shape the
+// read side returns — not the former two-field stub that emitted
+// name:"", version:0, active:false, in_use:false, stages:null, created_at:""
+// for a fully-persisted row. Both subject kinds go through the same handler,
+// so both are asserted.
+func TestCreateRoute_ReturnsPersistedProjection(t *testing.T) {
+	createdAt := time.Date(2026, 7, 29, 10, 30, 0, 0, time.UTC)
+	quorumM := 2
+	persistedStages := []domain.Stage{{
+		Order:              1,
+		Name:               "Review",
+		RequiredCapability: "document.signoff",
+		Quorum:             domain.QuorumPolicy("m_of_n"),
+		QuorumM:            &quorumM,
+		OnEligibilityDrift: domain.DriftPolicy("reduce_quorum"),
+		Kind:               domain.StageKind("approval"),
+		Selectors: []domain.ActorSelector{
+			{Kind: domain.SelectorRoleInFixedArea, Role: "approver", AreaCode: "ops"},
+		},
+	}}
+
+	opsCode := "ops"
+	cases := map[string]struct {
+		body            string
+		result          application.CreateRouteResult
+		wantProfileCode string // raw JSON bytes
+	}{
+		"document subject": {
+			body: `{"profile_code":"ops","name":"Ops Route","stages":[{"order":1,"name":"Review","required_capability":"document.signoff","quorum":"m_of_n","quorum_m":2,"drift_policy":"reduce_quorum","selectors":[{"kind":"role_in_fixed_area","role":"approver","area_code":"ops"}]}]}`,
+			result: application.CreateRouteResult{
+				RouteID: "route-doc-9", ProfileCode: &opsCode, Name: "Ops Route",
+				Version: 1, Active: true, InUse: false, CreatedAt: createdAt, Stages: persistedStages,
+			},
+			wantProfileCode: `"ops"`,
+		},
+		"template subject": {
+			body: `{"name":"Template Route","subject_kind":"template","subject_key":"tmpl-9","stages":[{"order":1,"name":"Review","required_capability":"template.approve","quorum":"m_of_n","quorum_m":2,"drift_policy":"reduce_quorum","selectors":[{"kind":"role_in_fixed_area","role":"approver","area_code":"ops"}]}]}`,
+			result: application.CreateRouteResult{
+				RouteID: "route-tmpl-9", ProfileCode: nil, Name: "Template Route",
+				Version: 1, Active: true, InUse: false, CreatedAt: createdAt, Stages: persistedStages,
+			},
+			wantProfileCode: `null`,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			svc := &fakeRouteAdminService{createResult: tc.result}
+			h := &Handler{routeAdmin: svc}
+			mux := routeAdminTestMux(h)
+
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/routes", strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+			req.Header.Set("Idempotency-Key", "77777777-7777-4777-8777-777777777777")
+
+			rr := httptest.NewRecorder()
+			mux.ServeHTTP(rr, req)
+			if rr.Code != http.StatusCreated {
+				t.Fatalf("status = %d, want %d (body: %s)", rr.Code, http.StatusCreated, rr.Body.String())
+			}
+
+			var out contracts.RouteResponse
+			if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+				t.Fatalf("decode: %v", err)
+			}
+			if out.RouteID != tc.result.RouteID {
+				t.Errorf("route_id = %q, want %q", out.RouteID, tc.result.RouteID)
+			}
+			if out.Name != tc.result.Name {
+				t.Errorf("name = %q, want %q (was \"\" before F-E4-2)", out.Name, tc.result.Name)
+			}
+			if out.Version != tc.result.Version {
+				t.Errorf("version = %d, want %d (was 0 before F-E4-2)", out.Version, tc.result.Version)
+			}
+			if !out.Active {
+				t.Errorf("active = false, want true (was false before F-E4-2)")
+			}
+			if out.InUse {
+				t.Errorf("in_use = true, want false (a just-created route has no instances)")
+			}
+			if out.CreatedAt != createdAt.Format(time.RFC3339) {
+				t.Errorf("created_at = %q, want %q (was \"\" before F-E4-2)", out.CreatedAt, createdAt.Format(time.RFC3339))
+			}
+			if len(out.Stages) != 1 {
+				t.Fatalf("stages len = %d, want 1 (was null before F-E4-2)", len(out.Stages))
+			}
+			stage := out.Stages[0]
+			if stage.Order != 1 || stage.Name != "Review" || stage.RequiredCapability != "document.signoff" {
+				t.Errorf("stage projection = %+v, want the persisted stage", stage)
+			}
+			if stage.Quorum != contracts.QuorumKind("m_of_n") || stage.QuorumM == nil || *stage.QuorumM != 2 {
+				t.Errorf("stage quorum = %q/%v, want m_of_n/2", stage.Quorum, stage.QuorumM)
+			}
+			if len(stage.Selectors) != 1 || stage.Selectors[0].Role != "approver" {
+				t.Errorf("stage selectors = %+v, want the persisted role_in_fixed_area selector", stage.Selectors)
+			}
+			// new_version is update-only per the spec ("Omitted for
+			// create/deactivate") and must stay absent on create.
+			if out.NewVersion != nil {
+				t.Errorf("new_version = %v, want nil on create", out.NewVersion)
+			}
+
+			var raw map[string]json.RawMessage
+			if err := json.Unmarshal(rr.Body.Bytes(), &raw); err != nil {
+				t.Fatalf("decode raw: %v", err)
+			}
+			if got := string(raw["profile_code"]); got != tc.wantProfileCode {
+				t.Errorf("profile_code raw = %s, want %s", got, tc.wantProfileCode)
+			}
+		})
+	}
 }
 
 // TestCreateRoute_TemplateSubjectRejectsProfileCode pins the S1 (F18) contract

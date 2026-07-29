@@ -110,10 +110,13 @@ func (previewTemplateVersionReader) LoadTemplateInboxMeta(ctx context.Context, t
 type previewTemplateVersionWriter struct{}
 
 func (previewTemplateVersionWriter) MarkTemplateVersionUnderReview(ctx context.Context, tx db.Tx, tenantID, versionID string) error {
+	// Mirrors the production adapter's CAS (content_hash guard in the WHERE)
+	// plus its in-tx disambiguation on 0 rows — the port contract.
 	res, err := tx.ExecContext(ctx,
 		`UPDATE templates_template_version
 		   SET status = 'under_review', submitted_at = now(), lock_version = lock_version + 1
-		 WHERE id = $1 AND tenant_id = $2 AND status = 'draft'`,
+		 WHERE id = $1 AND tenant_id = $2 AND status = 'draft'
+		   AND content_hash IS NOT NULL AND content_hash <> ''`,
 		versionID, tenantID,
 	)
 	if err != nil {
@@ -124,12 +127,25 @@ func (previewTemplateVersionWriter) MarkTemplateVersionUnderReview(ctx context.C
 		return err
 	}
 	if rows == 0 {
+		var status, contentHash sql.NullString
+		if err := tx.QueryRowContext(ctx,
+			`SELECT status, content_hash FROM templates_template_version WHERE id = $1 AND tenant_id = $2`,
+			versionID, tenantID,
+		).Scan(&status, &contentHash); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return errors.New("preview parity fake: version not draft")
+			}
+			return err
+		}
+		if status.String == "draft" && (!contentHash.Valid || contentHash.String == "") {
+			return domain.ErrTemplateVersionNoContent
+		}
 		return errors.New("preview parity fake: version not draft")
 	}
 	return nil
 }
 
-func (previewTemplateVersionWriter) MarkTemplateVersionApproved(context.Context, db.Tx, string, string) error {
+func (previewTemplateVersionWriter) MarkTemplateVersionApproved(context.Context, db.Tx, string, string, string) error {
 	return nil
 }
 func (previewTemplateVersionWriter) MarkTemplateVersionRejected(context.Context, db.Tx, string, string) error {
