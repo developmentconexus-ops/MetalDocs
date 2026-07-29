@@ -521,3 +521,28 @@ area-grade avaliado no publish-context); modelo de gate D2 para templates.
   chave no preview, contratos; r3 1 — redação update; r4 ALIGN).
   **Implementação = unidade própria, enfileirada APÓS gate de push da
   Etapa 5.**
+- 2026-07-29: **Etapa 4.2 fechada — F-E4-1..4 corrigidos, commit
+  `8e6826ad`; ETAPA 4 FECHADA.** F-E4-1: precondição de content_hash
+  entrou no próprio CAS do submit-lock (`MarkTemplateVersionUnderReview`
+  exige draft + hash não-nulo/não-vazio; 0 linhas → releitura na mesma tx
+  desambigua draft-sem-conteúdo → sentinela `ErrTemplateVersionNoContent`
+  em approval/domain → HTTP 409 UPLOAD_MISSING, 422 não declarado na
+  rota). TOCTOU do round 1 do Codex eliminado com prova de regressão
+  (predicado removido → teste de integração reproduz SQLSTATE 23514).
+  `writeMappedErr` não ecoa mais err.Error() em title de erro não mapeado.
+  F-E4-2: CreateRouteResult devolve projeção persistida relida in-tx
+  (inclusive replay idempotente; vale também para rotas de documento).
+  F-E4-3: signoff_id atravessa o mapping de delivery. F-E4-4:
+  `MarkTemplateVersionApproved` recebe ator decisor e falha fechado em
+  branco; reviewer_id deliberadamente não escrito (alargaria conjunto SoD
+  do publish). Review: 3 rodadas Codex (r1 TOCTOU blocking, r2 fixture de
+  parity com CAS velho, r3 ALIGN). Verificação: build/vet/testes unit +
+  integração completa via test-integration.ps1 tudo verde. **Re-QA live
+  (curl dev-seed, api rebuildada):** submit hash NULL → 409 UPLOAD_MISSING
+  sem vazamento; create-route 201 → projeção completa (name, version 1,
+  active, stages, created_at); controle positivo submit com hash → 200
+  under_review; signoff → `signoff_id` UUID real; versão aprovada →
+  `approver_id:"approver"` + approved_at. 4/4 PASS (template QA
+  08f01277 qa-e4-refix, rota bbadcc23 — dado dev, morre no cutover ADR
+  0086). Pendências da etapa transferidas: implementação do ADR 0086 =
+  unidade própria pós-gate de push da Etapa 5.
