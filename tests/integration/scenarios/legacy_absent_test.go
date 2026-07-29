@@ -82,15 +82,9 @@ func TestNoLegacyStatusInTSSource(t *testing.T) {
 	}
 }
 
-func TestGoVetPasses(t *testing.T) {
-	root := repoRootForIntegrationTests()
-	cmd := exec.Command("go", "vet", "./internal/...")
-	cmd.Dir = root
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("go vet ./internal/... failed: %v\n%s", err, strings.TrimSpace(string(out)))
-	}
-}
+// TestGoVetPasses moved to tests/integration/govet (own test binary):
+// cold-cache `go vet ./internal/...` takes minutes and was consuming this
+// package's shared timeout budget alongside the DB scenario suites.
 
 func TestStaticcheckInstalled(t *testing.T) {
 	if _, err := exec.LookPath("staticcheck"); err != nil {
