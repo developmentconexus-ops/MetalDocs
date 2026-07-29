@@ -63,10 +63,10 @@ revisa decisões estruturais; passo a passo, área por área.
 | Etapa | Estado | Evidência |
 |---|---|---|
 | 1 | **PASSED** | QA live :80 2026-07-28 — ver log |
-| 2 | EM ANDAMENTO (D7: ADR release coordinator) | — |
-| 3 | FILA | — |
-| 4 | FILA | — |
-| 5 | FILA | — |
+| 2 | **PASSED** | ADR 0085 release coordinator + QA live — ver log 2026-07-29 |
+| 3 | **PASSED** | QA live dos 3 itens — ver log 2026-07-29 |
+| 4 | **PASSED** | Jornada template E2E + F-E4-1..4 (`8e6826ad`) re-QA 4/4 — ver log |
+| 5 | **PASSED** | 5.1/5.2 `e262ab68` · 5.4 `34ae53e5` · 5.3 expurgo 3/3 (`4042b4f7`+`b1162cad`) — ver log 2026-07-29 |
 
 Log de execução no fim deste arquivo; achados novos continuam em
 `2026-07-24-qa4-browser-qa-evidence.md`.
@@ -546,3 +546,69 @@ area-grade avaliado no publish-context); modelo de gate D2 para templates.
   08f01277 qa-e4-refix, rota bbadcc23 — dado dev, morre no cutover ADR
   0086). Pendências da etapa transferidas: implementação do ADR 0086 =
   unidade própria pós-gate de push da Etapa 5.
+- 2026-07-29: **Etapa 5.1+5.2 fechadas, commit `e262ab68`.** 5.1: colunas
+  `content_hash` dos outboxes de staging renomeadas `values_hash`
+  (migração 0312) e gravando o hash REAL dos valores congelados — mentira
+  semântica exterminada, não rebatizada. 5.2: lineage
+  revisão→frozen.docx→PDF fechado — freeze pina `frozen_revision_id`
+  (migração 0313), `WriteFinalDocx` grava `documents.content_hash` =
+  sha256 do docx congelado, cadeia verificável ponta-a-ponta (resto da
+  opção (a) do F-QA3-1). Review Codex ALIGN; migrações 0312/0313
+  aplicadas no dev; api+worker+jobs rebuildados e sobem saudáveis.
+- 2026-07-29: **Etapa 5.4 fechada, commit `34ae53e5`.** F-QA4-2: enums de
+  role hand-synced no FE/taxonomy exterminados — fonte única = contrato
+  gerado (`api.gen.go` / tipos gerados do OpenAPI); IAM FE
+  (constants/types/roles/presenters) e taxonomy (dialogs/types) derivam
+  do contrato; drift de vocabulário vira erro de compilação, não bug de
+  runtime. Review Codex ALIGN; build+vet+testes verdes. **QA live :80
+  (curl dev-seed admin, 2026-07-29):** grant membership
+  `role=system_admin` → **400 UNKNOWN_ROLE** (antes 23514→500); area
+  update `default_approver_role=reviewer` (phantom) → **422** com lista
+  registry-derived dos 7 area roles; profile PATCH
+  `editable_by_role=admin` (phantom) → **422** com lista dos 8 user
+  roles; controle positivo update válido → 200 (estado dev revertido a
+  null depois). Web image rebuildada pós-commit (estava stale de 04:10)
+  e redeployada healthy; bundle servido contém os 3 labels canônicos
+  PT-BR (Administrador do SGQ/de área/do sistema) e **zero** labels
+  drifted ingleses (QMS admin/Area admin/System admin). 4/4 PASS.
+- 2026-07-29: **Etapa 5.3 — expurgo dos 3 docs COMPLETO.** PO-RH-003
+  (`d18fbfdf…`) e PO-RH-004 (`45c9e784…`) re-materializados via
+  release-backfill default (sessão anterior, cadeia saudável
+  materialize→pdf ~8s). IT-USINAGEM-001 (`ba24c4f2…`, published, sem
+  release_generation) exigiu ferramenta nova: **modo `-repair-only` no
+  release-backfill** (ruling do operador: re-materializa do MESMO
+  revision pinado, sobrescreve artefatos inválidos nas mesmas keys,
+  facts de aprovação intocados — restauração de integridade, não mutação
+  de histórico). Duas iterações ao vivo expuseram a **pilha de swallow de
+  QUATRO camadas** por perna de render: (1) unique index não-parcial do
+  staging outbox + `ON CONFLICT DO NOTHING` devolvendo id-vazio+nil; (2)
+  `metaldocs.outbox_events UNIQUE (idempotency_key)` + publisher `DO
+  NOTHING` nil — eventos published de 07-24 seguravam as keys
+  generation-less `materialize_fanout:<t>:<r>` / `docgen_v2_pdf:<t>:<r>`
+  PARA SEMPRE (tabela de delivery sem retention — chip aberto
+  task_88dd9ffe); (3)+(4) perna pdf repete ambas. Ferramenta: preflight
+  fail-closed (status fechado, pin, freeze completo, prova durável de
+  aprovação), classify+purge de estado terminal nas DUAS camadas
+  (staging `dispatched/failed`; delivery `published/dead-lettered`;
+  qualquer in-flight → recusa total), `RepairMaterialization` re-pina do
+  revision corrente carregando values_hash/values_frozen_at
+  byte-idênticos, verify read-your-own-write fecha corrida
+  check-then-insert. Commits `4042b4f7` (staging, Codex r1-r2 NOT-ALIGN
+  → r3 ALIGN) + `b1162cad` (delivery, r4 NOT-ALIGN → r5 ALIGN); testes
+  de integração real-DB cobrem purge/refuse/dry-run/foreign/
+  generation-aware (mutation-verified). **Cadeia final verificada
+  byte-exata no live:** sha256(frozen.docx) == `documents.content_hash`
+  (`d2bafc89…`), final.pdf %PDF-1.7 17KiB, values_hash/values_frozen_at
+  originais carregados, frozen_revision_id == current_revision_id,
+  facts de aprovação intocados, blanks sobrescritos nas mesmas keys
+  determinísticas, zero órfãos (staging purgado 27edb65e/85d692ee/
+  d7967efa; delivery purgado 28b52117/139aed4f). Ferramenta é `go run`
+  (nenhuma imagem Docker a redeployar).
+- 2026-07-29: **ETAPA 5 FECHADA — todas as 5 etapas do tracker PASSED.**
+  Pendências transferidas para fora do tracker: implementação do ADR
+  0086 (unidade própria), retention de `metaldocs.outbox_events` (chip
+  task_88dd9ffe), semântica do badge RoleCapabilityMatrix (ruling de
+  produto), enum-typing de `ProcessAreaItem.default_approver_role` na
+  resposta (após sweep de dados). **Gate de push:** autorização de push
+  era válida só para 2026-07-28; push de hoje aguarda permissão
+  explícita do operador.
