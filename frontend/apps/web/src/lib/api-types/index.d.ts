@@ -2239,6 +2239,11 @@ export interface components {
          * @enum {string}
          */
         UserRole: "system_admin" | "approver" | "author" | "editor" | "viewer" | "signer" | "area_admin" | "qms_admin";
+        /**
+         * @description Canonical tenant role that can be held as an AREA membership (public.user_process_areas). Every UserRole EXCEPT `system_admin`, which is tenant-wide tier-1 and never an area membership. Mirrors internal/platform/iamtypes.areaRoles and the user_process_areas role CHECK constraint.
+         * @enum {string}
+         */
+        AreaRole: "approver" | "area_admin" | "author" | "editor" | "qms_admin" | "signer" | "viewer";
         AreaMembership: {
             user_id: string;
             area_code: string;
@@ -2269,7 +2274,7 @@ export interface components {
         GrantAreaMembershipRequest: {
             user_id: string;
             area_code: string;
-            role: components["schemas"]["UserRole"];
+            role: components["schemas"]["AreaRole"];
         };
         GrantAreaMembershipResponse: {
             user_id: string;
@@ -2868,7 +2873,7 @@ export interface components {
             review_interval_days: number;
             default_template_version_id?: string | null;
             owner_user_id?: string | null;
-            editable_by_role: string;
+            editable_by_role: components["schemas"]["UserRole"];
             /**
              * @description Per-profile governance classification (G1). Optional on create; the server defaults to controlado. On update, changing this value routes through the reclassification use-case and may 409 if an active approval route would conflict with the new class.
              * @enum {string}
@@ -2884,7 +2889,7 @@ export interface components {
             description: string;
             parent_code?: string | null;
             owner_user_id?: string | null;
-            default_approver_role?: string | null;
+            default_approver_role?: components["schemas"]["AreaRole"] | null;
         };
         TaxonomyFamilyUpsertRequest: {
             code: string;
@@ -5844,6 +5849,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["UnprocessableEntity"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -5988,6 +5994,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["UnprocessableEntity"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -7319,7 +7326,7 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": string;
-                /** @description Expected revision version ETag in the form "v<N>" (N >= 0; a fresh draft is v0) or "*" */
+                /** @description Expected revision version ETag in the form "v<N>" (N >= 0; a fresh draft is v0) */
                 "If-Match": string;
             };
             path: {
@@ -7504,7 +7511,7 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": string;
-                /** @description Expected revision version ETag in the form "v<N>", or "*" to skip the check */
+                /** @description Expected revision version ETag in the form "v<N>" */
                 "If-Match": string;
             };
             path: {
@@ -7541,7 +7548,7 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": string;
-                /** @description Expected revision version ETag in the form "v<N>", or "*" to skip the check */
+                /** @description Expected revision version ETag in the form "v<N>" */
                 "If-Match": string;
             };
             path: {
@@ -7578,7 +7585,7 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": string;
-                /** @description Expected revision version ETag in the form "v<N>", or "*" to skip the check */
+                /** @description Expected revision version ETag in the form "v<N>" */
                 "If-Match": string;
             };
             path: {
@@ -7794,7 +7801,7 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": string;
-                /** @description Expected revision version ETag in the form "v<N>", or "*" to skip the check */
+                /** @description Expected revision version ETag in the form "v<N>" */
                 "If-Match": string;
             };
             path: {

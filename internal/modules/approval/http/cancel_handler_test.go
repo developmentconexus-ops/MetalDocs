@@ -114,3 +114,56 @@ func TestCancelHandler(t *testing.T) {
 		})
 	}
 }
+
+// TestCancelHandlerIfMatchPreconditions pins the OCC precondition contract for
+// cancel. The wildcard case is the regression guard: the spec used to advertise
+// `If-Match: *` as "skip the check", but the parser encoded it as version 0 and
+// CancelService feeds ExpectedRevisionVersion verbatim into
+// `WHERE revision_version = $3`, so the wildcard silently asserted v0 and the
+// live request came back 409 conflict.stale_revision instead of cancelling.
+// The contract no longer offers the wildcard: it is rejected up front as a
+// malformed precondition (400) and never reaches the service, so no caller can
+// mistake a failed OCC guard for a skipped one.
+func TestCancelHandlerIfMatchPreconditions(t *testing.T) {
+	tests := []struct {
+		name         string
+		ifMatch      string
+		wantStatus   int
+		wantSvcCalls bool
+		wantVersion  int
+	}{
+		{name: "wildcard rejected", ifMatch: "*", wantStatus: http.StatusBadRequest},
+		{name: "quoted wildcard rejected", ifMatch: `"*"`, wantStatus: http.StatusBadRequest},
+		{name: "v0 rejected (governed transition)", ifMatch: `"v0"`, wantStatus: http.StatusBadRequest},
+		{name: "missing header rejected", ifMatch: "", wantStatus: http.StatusPreconditionRequired},
+		{name: "concrete version accepted", ifMatch: `"v1"`, wantStatus: http.StatusOK, wantSvcCalls: true, wantVersion: 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fakeSvc := &fakeCancelService{result: application.CancelResult{DocumentID: "doc-4"}}
+
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-4/cancel", strings.NewReader(`{"reason":"request withdrawn"}`))
+			req.Header.Set("Content-Type", "application/json")
+			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+			req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
+			if tt.ifMatch != "" {
+				req.Header.Set("If-Match", tt.ifMatch)
+			}
+
+			rr := httptest.NewRecorder()
+			cancelTestMux(&Handler{cancelSvc: fakeSvc}).ServeHTTP(rr, req)
+
+			if rr.Code != tt.wantStatus {
+				t.Fatalf("If-Match %q: status = %d, want %d (body %s)", tt.ifMatch, rr.Code, tt.wantStatus, rr.Body.String())
+			}
+			if fakeSvc.called != tt.wantSvcCalls {
+				t.Fatalf("If-Match %q: service called = %v, want %v", tt.ifMatch, fakeSvc.called, tt.wantSvcCalls)
+			}
+			if tt.wantSvcCalls && fakeSvc.gotReq.ExpectedRevisionVersion != tt.wantVersion {
+				t.Fatalf("If-Match %q: ExpectedRevisionVersion = %d, want %d", tt.ifMatch, fakeSvc.gotReq.ExpectedRevisionVersion, tt.wantVersion)
+			}
+		})
+	}
+}

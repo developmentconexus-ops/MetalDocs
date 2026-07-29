@@ -46,7 +46,7 @@ type MarkReviewedRequest struct {
 	DocumentID              string
 	ReviewDueAt             time.Time
 	EffectiveTo             *time.Time // optional; nil = leave effective_to unchanged
-	ExpectedRevisionVersion int        // OCC precondition; <=0 means "not provided" (If-Match: *)
+	ExpectedRevisionVersion int        // OCC precondition; the concrete revision the caller expects
 	ReviewedBy              string     // actor user_id triggering the review
 }
 
@@ -140,11 +140,11 @@ func (s *MarkReviewedService) MarkReviewed(ctx context.Context, runner db.TxRunn
 			}
 		}
 
-		expected := req.ExpectedRevisionVersion
-		if expected <= 0 {
-			expected = currentRevisionVersion
-		}
-
+		// OCC precondition is used verbatim. There is no "<=0 means skip" escape
+		// hatch: the If-Match wildcard no longer parses (see parseIfMatchMin),
+		// and substituting the just-read current version would turn the CAS into
+		// a no-op guard — the caller would be told the precondition held against
+		// a revision it never saw.
 		now := s.clock.Now()
 		res, err := tx.ExecContext(ctx, `
 			UPDATE documents
@@ -156,7 +156,7 @@ func (s *MarkReviewedService) MarkReviewed(ctx context.Context, runner db.TxRunn
 			   AND tenant_id        = $5
 			   AND status           = 'published'
 			   AND revision_version = $6`,
-			now, req.ReviewDueAt.UTC(), nullableTime(req.EffectiveTo), req.DocumentID, req.TenantID, expected,
+			now, req.ReviewDueAt.UTC(), nullableTime(req.EffectiveTo), req.DocumentID, req.TenantID, req.ExpectedRevisionVersion,
 		)
 		if err != nil {
 			return fmt.Errorf("markReviewed: update document: %w", err)

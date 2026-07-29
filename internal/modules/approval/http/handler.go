@@ -81,8 +81,8 @@ type routeAdminService interface {
 var (
 	// ErrIfMatchRequired is returned when a write endpoint is called without an If-Match header (OCC precondition).
 	ErrIfMatchRequired = errors.New("precondition: If-Match header required")
-	// ErrIfMatchMalformed is returned when the If-Match header is present but not "v<N>" or "*".
-	ErrIfMatchMalformed = errors.New("precondition: If-Match header malformed; expected \"v<N>\" or \"*\"")
+	// ErrIfMatchMalformed is returned when the If-Match header is present but not "v<N>".
+	ErrIfMatchMalformed = errors.New("precondition: If-Match header malformed; expected \"v<N>\"")
 )
 
 // signoffIdempStore backs idempotent replay for the signoff handlers. Slots are
@@ -188,7 +188,7 @@ func (h *Handler) idempotentHandler(routeTemplate string, next http.Handler) htt
 // already-governed document — signoff, cancel, decision. Those documents have
 // been through submit, which transitions draft→under_review and bumps
 // revision_version to >= 1, so an explicit "v0" precondition is always stale and
-// is rejected as malformed. The "*" wildcard (match-any) maps to 0.
+// is rejected as malformed.
 func parseIfMatch(header string) (int, error) {
 	return parseIfMatchMin(header, 1)
 }
@@ -204,13 +204,20 @@ func parseSubmitIfMatch(header string) (int, error) {
 
 // parseIfMatchMin is the shared If-Match parser; minVersion is the lowest
 // explicit "v<N>" the caller accepts (1 for governed transitions, 0 for submit).
+//
+// The RFC 7232 "*" wildcard is deliberately NOT accepted. It used to be encoded
+// as the sentinel version 0, which is not a separate state but a valid version:
+// only mark-reviewed translated it back to "current", every other OCC site fed
+// it straight into `WHERE revision_version = 0` (so "*" silently meant "expect
+// v0" and 409'd), and on /submit — whose minVersion is 0 — it was flatly
+// indistinguishable from an explicit "v0". Beyond the encoding, a wildcard on a
+// controlled-document lifecycle transition is a request to write regardless of
+// who wrote last, i.e. exactly the lost update the OCC guard exists to prevent.
+// Preconditions on these routes fail closed: send the concrete "v<N>".
 func parseIfMatchMin(header string, minVersion int) (int, error) {
 	value := strings.TrimSpace(header)
 	if value == "" {
 		return -1, ErrIfMatchRequired
-	}
-	if value == "*" {
-		return 0, nil
 	}
 
 	value = strings.Trim(value, "\"")
