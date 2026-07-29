@@ -282,5 +282,10 @@ area-grade avaliado no publish-context); modelo de gate D2 para templates.
   pelo Codex; (10) major: re-read under-lock do revision_version prior era
   condicional em `s.repo != nil` (produção sempre injeta repo — services.go:90 —
   mas branch nil usava valor pré-lock do caller, furo OCC) → repo obrigatório
-  fail-closed, re-read sempre, teste prova valor under-lock no CAS. Rodada 5 =
-  verificação final.
+  fail-closed, re-read sempre, teste prova valor under-lock no CAS.
+- 2026-07-28: **rodada 5 VERDICT: ALIGN** — ciclo adversarial fechado (5
+  rodadas, 8 defeitos corrigidos: 3 blockers, 5 majors). **Stage A COMMITADO
+  `616c82ca`** (63 arquivos, +4796/−364). Deploy: api/jobs/worker rebuilt +
+  up; migração 0310 aplicada live (50/50), ux_documents_published_head
+  presente, logs limpos. Pendente Etapa 2: Stage B (retirement inventory) +
+  Stage C (backfill + readiness projection).
