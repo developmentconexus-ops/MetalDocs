@@ -413,3 +413,32 @@ area-grade avaliado no publish-context); modelo de gate D2 para templates.
   backend-target-architecture (narra scheduler de lease aposentado) flagado,
   fora de escopo. Próximo: commit → rebuild stack → backfill live 02bef5ae
   (quarentenados d18fbfdf/45c9e784 só na Etapa 5).
+
+- 2026-07-29: **Backfill live executado + defeito latente Stage A achado por
+  QA live + fix + RELEASE PROVADO.** Commit Stage C `1f2c6376` deployado;
+  backfill aplicado (doc 02bef5ae, generation 1de1e704); worker materializou
+  docx+pdf frescos (pipeline provado). Avaliação porém falhou 5 tentativas:
+  `taxonomy: tenant context: tenant: not present in context` — preflight do
+  coordinator (release_coordinator.go:219) consulta review interval via
+  taxonomy GetByCode, que é HTTP-shaped em dobro: resolve tenant+actor do
+  ctx Go (authz_guc.go) E exige authz.Require(CapTaxonomyView), que actor
+  system nunca teria. Testes determinísticos mascaravam (suite do
+  coordinator stubba a porta de cadência). Fix (padrão sancionado do próprio
+  phase-1 do coordinator): taxonomy `GetByCodeSystem` — tx curta própria,
+  SeedTxTenant do parâmetro EXPLÍCITO, BypassSystem fail-closed fora de
+  WithBackgroundBypass + auditado F8; adapter de review-interval consome
+  slice estreita nova (boundary intacto, SQL de document_profiles fica no
+  taxonomy). 2 rodadas Codex: r1 NOT-ALIGN com Major real — tx só com
+  rollback apagava o evento de auditoria F8 do bypass (sink escreve NA tx);
+  fix = commit nos caminhos found e not-found + teste que assere linhas
+  audit_events COMMITADAS via conexão metaldocs_ci NOBYPASSRLS separada
+  (0→1→2; negative check confirmou que o guard morde); r2 **ALIGN**. Commit
+  `f773b181`; jobs rebuild+deploy; retry forçado dos jobs 4097/4099 →
+  **completed**. Prova live: generation released_at+last_evaluated_at
+  carimbados, hold NULL; doc `published` effective_from=05:39:42Z; 1 evento
+  governança `document_published` (system:release-coordinator); fanout
+  `document.published` completed (job 4116); bypass audit commitado; e W2
+  provado live — reconciler emitiu `release.generation.stuck_alert` às
+  05:30 enquanto a generation estava presa >30min. **Etapa 2 FECHADA**
+  (F-QA4-13/14 já estruturalmente fechados; quarentenados d18fbfdf/45c9e784
+  → Etapa 5).
