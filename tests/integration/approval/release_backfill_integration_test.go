@@ -8,16 +8,21 @@
 //
 //   - a pinned, approved, legacy document gets its generation (correct 7-column
 //     identity, approval fact stamped, final approver and submitter recorded),
-//     its materialize dispatch tagged with that generation, and its evaluation
-//     enqueued — all in ONE transaction, with the documents tripwire never
-//     firing and the documents row never touched
+//     its freeze lineage re-pinned, its materialize dispatch tagged with that
+//     generation, and its evaluation enqueued — all in ONE transaction, with the
+//     documents tripwire never firing and the approver's signed freeze
+//     (status, values_hash, revision_version) never altered
 //   - replay is a true no-op: same generation, no duplicate outbox row, no
 //     duplicate evaluation job
 //   - dry-run writes nothing at all
 //   - preflight fails closed: an unpinned document and an instance without a
 //     frozen_content_hash are both refused, and refusal leaves no partial state
-//   - FreezeService.RepairMaterialization itself refuses an unpinned document,
-//     so the fail-closed rule holds even if a future caller skips preflight
+//   - FreezeService.RepairMaterialization itself refuses a never-frozen
+//     document, so the fail-closed rule holds even if a future caller skips
+//     preflight
+//   - repair is the sanctioned re-pin path for legacy NULL-pin documents
+//     (migration 0313): it writes frozen_revision_id from the CURRENT revision
+//     in the repair tx, supersedes a stale pin, and never touches values_hash
 //
 // go test -tags=integration ./tests/integration/approval/... -run TestReleaseBackfill
 package approval_test
@@ -191,6 +196,19 @@ func (fx backfillFixture) outboxCount(t *testing.T) int {
 		`SELECT count(*) FROM metaldocs.materialize_dispatch_outbox WHERE revision_id = $1::uuid`, fx.documentID)
 }
 
+// frozenRevisionPin returns documents.frozen_revision_id as text, "" when NULL
+// (the state every pre-0313 freeze is in).
+func (fx backfillFixture) frozenRevisionPin(t *testing.T) string {
+	t.Helper()
+	var pin sql.NullString
+	if err := fx.database.QueryRowContext(context.Background(),
+		`SELECT frozen_revision_id::text FROM public.documents WHERE id = $1::uuid`, fx.documentID,
+	).Scan(&pin); err != nil {
+		t.Fatalf("read frozen_revision_id: %v", err)
+	}
+	return pin.String
+}
+
 func (fx backfillFixture) evaluationJobCount(t *testing.T) int {
 	t.Helper()
 	return countRows(t, fx.database,
@@ -265,7 +283,7 @@ func TestReleaseBackfill_LegacyApprovedDocument_RecordsFactAndArmsPipeline(t *te
 	var outboxGen sql.NullString
 	var outboxHash []byte
 	if err := database.QueryRowContext(ctx, `
-		SELECT release_generation_id::text, content_hash
+		SELECT release_generation_id::text, values_hash
 		  FROM metaldocs.materialize_dispatch_outbox
 		 WHERE tenant_id = $1::uuid AND revision_id = $2::uuid`,
 		fx.tenantID, fx.documentID,
@@ -276,7 +294,7 @@ func TestReleaseBackfill_LegacyApprovedDocument_RecordsFactAndArmsPipeline(t *te
 		t.Fatalf("outbox release_generation_id = %q, want %q", outboxGen.String, res.GenerationID)
 	}
 	if got := strings.ToLower(hex.EncodeToString(outboxHash)); got != backfillValuesHash {
-		t.Fatalf("outbox content_hash = %s, want the document's pinned values_hash %s", got, backfillValuesHash)
+		t.Fatalf("outbox values_hash = %s, want the document's pinned values_hash %s", got, backfillValuesHash)
 	}
 
 	// ── evaluation armed
@@ -284,8 +302,15 @@ func TestReleaseBackfill_LegacyApprovedDocument_RecordsFactAndArmsPipeline(t *te
 		t.Fatalf("release_evaluate jobs = %d, want 1", n)
 	}
 
-	// ── the documents row was never written: the tripwire had nothing to fire
-	// on, and the approver's freeze is byte-identical to what it signed.
+	// ── the freeze lineage is now pinned to the document's current revision:
+	// the legacy row was frozen before migration 0313 and carried no pin, and
+	// repair records the true one instead of leaving materialization dead.
+	if pin := fx.frozenRevisionPin(t); pin != fx.revisionID {
+		t.Fatalf("frozen_revision_id = %q, want the current revision %q", pin, fx.revisionID)
+	}
+
+	// ── nothing the approver signed was rewritten: the tripwire had nothing to
+	// fire on, and status / values_hash / revision_version are untouched.
 	var status string
 	var valuesHash []byte
 	var version int
@@ -400,35 +425,129 @@ func TestReleaseBackfill_InstanceWithoutFrozenHash_Aborts(t *testing.T) {
 	}
 }
 
-// TestReleaseBackfill_RepairMaterialization_RefusesUnpinned pins the fail-closed
-// rule to the freeze service itself, not merely to the tool's preflight: a
-// future caller that skips preflight still cannot dispatch a render for a
-// document that has no approved snapshot.
-func TestReleaseBackfill_RepairMaterialization_RefusesUnpinned(t *testing.T) {
-	database, _ := testdb.Open(t)
-	fx := seedBackfillFixture(t, database, false, releaseContentHash)
-
+// runRepair drives FreezeService.RepairMaterialization exactly as the tool
+// does — same runner, same tenant seed, same system bypass — so the tests
+// exercise the production path and not a hand-rolled transaction.
+func (fx backfillFixture) runRepair(t *testing.T, generationID string) error {
+	t.Helper()
 	ctx := authz.WithBackgroundBypass(context.Background())
-	err := fx.deps.Runner.Do(ctx, func(tx *sql.Tx) error {
+	return fx.deps.Runner.Do(ctx, func(tx *sql.Tx) error {
 		if err := authz.SeedTxTenant(ctx, tx, fx.tenantID); err != nil {
 			return err
 		}
 		if err := authz.BypassSystem(ctx, tx); err != nil {
 			return err
 		}
-		return fx.deps.Freeze.RepairMaterialization(ctx, tx, fx.tenantID, fx.documentID, "")
+		return fx.deps.Freeze.RepairMaterialization(ctx, tx, fx.tenantID, fx.documentID, generationID)
 	})
+}
+
+// TestReleaseBackfill_RepairMaterialization_RefusesNeverFrozen pins the
+// fail-closed rule to the freeze service itself, not merely to the tool's
+// preflight: a future caller that skips preflight still cannot dispatch a render
+// for a document that has no approved snapshot. Repair re-pins lineage, but it
+// never invents the freeze itself.
+func TestReleaseBackfill_RepairMaterialization_RefusesNeverFrozen(t *testing.T) {
+	database, _ := testdb.Open(t)
+	fx := seedBackfillFixture(t, database, false, releaseContentHash)
+
+	err := fx.runRepair(t, "")
 	if err == nil {
-		t.Fatal("RepairMaterialization accepted an unpinned document")
+		t.Fatal("RepairMaterialization accepted a never-frozen document")
 	}
-	if !strings.Contains(err.Error(), "not yet pinned") {
+	if !strings.Contains(err.Error(), "was never frozen") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if n := fx.outboxCount(t); n != 0 {
 		t.Fatalf("refused repair still wrote %d outbox rows", n)
 	}
+	if pin := fx.frozenRevisionPin(t); pin != "" {
+		t.Fatalf("refused repair pinned %q", pin)
+	}
 
 	// Guard the type assertion the tool depends on: Deps.Freeze is the real
 	// FreezeService, not a stand-in.
 	var _ *docsapp.FreezeService = fx.deps.Freeze
+}
+
+// TestReleaseBackfill_RepairMaterialization_PinsLegacyNullPinDocument is the
+// §5.3 unblock: a document frozen BEFORE migration 0313 carries values_hash but
+// no frozen_revision_id, so Materialize fails closed on it forever. Repair —
+// the operator-only path — takes a FRESH pin from the current revision in the
+// repair transaction and only then enqueues, which is what makes those legacy
+// documents renderable again without fabricating history.
+func TestReleaseBackfill_RepairMaterialization_PinsLegacyNullPinDocument(t *testing.T) {
+	database, _ := testdb.Open(t)
+	fx := seedBackfillFixture(t, database, true, releaseContentHash)
+
+	if pin := fx.frozenRevisionPin(t); pin != "" {
+		t.Fatalf("fixture must start unpinned (pre-0313 legacy shape), got %q", pin)
+	}
+
+	if err := fx.runRepair(t, ""); err != nil {
+		t.Fatalf("repair of a legacy NULL-pin document failed: %v", err)
+	}
+
+	if pin := fx.frozenRevisionPin(t); pin != fx.revisionID {
+		t.Fatalf("frozen_revision_id = %q, want the current revision %q", pin, fx.revisionID)
+	}
+	if n := fx.outboxCount(t); n != 1 {
+		t.Fatalf("materialize outbox rows = %d, want 1", n)
+	}
+
+	// The signed freeze is untouched: repair re-pins lineage, it does not
+	// recompute the hash the approver put their name on.
+	var valuesHash []byte
+	if err := database.QueryRowContext(context.Background(),
+		`SELECT values_hash FROM public.documents WHERE id = $1::uuid`, fx.documentID,
+	).Scan(&valuesHash); err != nil {
+		t.Fatalf("reload values_hash: %v", err)
+	}
+	if strings.ToLower(hex.EncodeToString(valuesHash)) != backfillValuesHash {
+		t.Fatalf("repair rewrote values_hash: %s", hex.EncodeToString(valuesHash))
+	}
+}
+
+// TestReleaseBackfill_RepairMaterialization_SupersedesStalePin covers the other
+// half of the ruling: choosing to repair IS the decision to re-freeze, so a
+// document that already carries a pin gets re-pinned to the current revision
+// rather than having the old pin defended.
+func TestReleaseBackfill_RepairMaterialization_SupersedesStalePin(t *testing.T) {
+	database, _ := testdb.Open(t)
+	fx := seedBackfillFixture(t, database, true, releaseContentHash)
+	ctx := context.Background()
+
+	// A second revision that is NOT the head — the stale pin. It reuses the
+	// fixture's editor session (idx_one_active_session_per_doc allows only one
+	// active session per document) and needs its own content_hash
+	// (document_revisions_document_id_content_hash_key).
+	var stale string
+	if err := database.QueryRowContext(ctx, `
+		INSERT INTO public.document_revisions
+			(document_id, parent_revision_id, session_id, storage_key, content_hash, form_data_snapshot)
+		SELECT document_id, id, session_id, '', $2, '{}'
+		  FROM public.document_revisions WHERE id = $1::uuid
+		RETURNING id::text`,
+		fx.revisionID, strings.Repeat("b", 64),
+	).Scan(&stale); err != nil {
+		t.Fatalf("seed stale revision: %v", err)
+	}
+	testdb.SeedWithCaps(t, database, `[{"cap":"document.edit"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx,
+			`UPDATE public.documents SET frozen_revision_id = $1::uuid WHERE id = $2::uuid`,
+			stale, fx.documentID)
+		return err
+	})
+
+	if err := fx.runRepair(t, ""); err != nil {
+		t.Fatalf("repair of an already-pinned document failed: %v", err)
+	}
+
+	pin := fx.frozenRevisionPin(t)
+	if pin == stale {
+		t.Fatal("repair kept the stale pin instead of re-pinning")
+	}
+	if pin != fx.revisionID {
+		t.Fatalf("frozen_revision_id = %q, want the current revision %q", pin, fx.revisionID)
+	}
 }

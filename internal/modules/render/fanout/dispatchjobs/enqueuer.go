@@ -17,14 +17,14 @@ import (
 // supply a fake without standing up a real *fanout.StagingOutboxRepository,
 // mirroring outboxMarker in workers.go.
 type stagingEnqueuer interface {
-	Enqueue(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte, releaseGenerationID string) (string, error)
+	Enqueue(ctx context.Context, tx db.Tx, tenantID, revisionID string, valuesHash []byte, releaseGenerationID string) (string, error)
 }
 
 // pdfStagingEnqueuer captures the pdf-specific enqueue, which additionally
 // persists the renderer-produced final_docx_s3_key snapshot (F-QA2-2). Satisfied
 // by *fanout.StagingOutboxRepository.EnqueuePDF.
 type pdfStagingEnqueuer interface {
-	EnqueuePDF(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte, finalDocxS3Key, releaseGenerationID string) (string, error)
+	EnqueuePDF(ctx context.Context, tx db.Tx, tenantID, revisionID string, frozenDocxHash []byte, finalDocxS3Key, releaseGenerationID string) (string, error)
 }
 
 // riverInserter captures river.Client[*sql.Tx].InsertTx's exact signature.
@@ -68,10 +68,13 @@ func newEnqueuerWithInserter(client riverInserter, pdfRepo pdfStagingEnqueuer, m
 // EnqueuePDFTx enqueues a pdf_dispatch_outbox row (carrying the renderer-produced
 // finalDocxS3Key snapshot, F-QA2-2) and, only when a new row was actually
 // inserted (dedup skip returns an empty id), a paired River PDFDispatchArgs job
-// threading that key into dispatchFields — both inside tx. finalDocxS3Key is
+// threading that key into the args — both inside tx. finalDocxS3Key is
 // REQUIRED: EnqueuePDF fails closed on an empty key.
-func (e *Enqueuer) EnqueuePDFTx(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte, finalDocxS3Key, releaseGenerationID string) error {
-	id, err := e.pdfRepo.EnqueuePDF(ctx, tx, tenantID, revisionID, contentHash, finalDocxS3Key, releaseGenerationID)
+//
+// frozenDocxHash is the materialized frozen-docx hash (F-QA4-10): it lands in
+// pdf_dispatch_outbox.frozen_docx_hash and in PDFDispatchArgs.FrozenDocxHash.
+func (e *Enqueuer) EnqueuePDFTx(ctx context.Context, tx db.Tx, tenantID, revisionID string, frozenDocxHash []byte, finalDocxS3Key, releaseGenerationID string) error {
+	id, err := e.pdfRepo.EnqueuePDF(ctx, tx, tenantID, revisionID, frozenDocxHash, finalDocxS3Key, releaseGenerationID)
 	if err != nil {
 		return err
 	}
@@ -80,32 +83,27 @@ func (e *Enqueuer) EnqueuePDFTx(ctx context.Context, tx db.Tx, tenantID, revisio
 		return nil
 	}
 
-	fields := dispatchFields{
-		TenantID:            tenantID,
-		RevisionID:          revisionID,
-		ContentHash:         contentHash,
-		OutboxID:            id,
-		FinalDocxS3Key:      finalDocxS3Key,
-		ReleaseGenerationID: releaseGenerationID,
-	}
-	return e.insertRiverJob(ctx, tx, PDFDispatchArgs{fields})
-}
-
-// EnqueueMaterializeTx enqueues a materialize_dispatch_outbox row and, only
-// when a new row was actually inserted, a paired River MaterializeDispatchArgs
-// job — both inside tx.
-func (e *Enqueuer) EnqueueMaterializeTx(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte, releaseGenerationID string) error {
-	return enqueueTx(ctx, e, tx, e.matRepo, tenantID, revisionID, contentHash, releaseGenerationID, func(f dispatchFields) river.JobArgs {
-		return MaterializeDispatchArgs{f}
+	return e.insertRiverJob(ctx, tx, PDFDispatchArgs{
+		dispatchFields: dispatchFields{
+			TenantID:            tenantID,
+			RevisionID:          revisionID,
+			OutboxID:            id,
+			ReleaseGenerationID: releaseGenerationID,
+		},
+		FrozenDocxHash: frozenDocxHash,
+		FinalDocxS3Key: finalDocxS3Key,
 	})
 }
 
-// enqueueTx is the shared body for the materialize dispatch path: insert the
-// outbox row, and only on a genuinely new row (non-empty id) insert the paired
-// River job via InsertTx sharing the same *sql.Tx. (The pdf path is
-// EnqueuePDFTx, which threads the extra final_docx_s3_key snapshot.)
-func enqueueTx(ctx context.Context, e *Enqueuer, tx db.Tx, repo stagingEnqueuer, tenantID, revisionID string, contentHash []byte, releaseGenerationID string, argsFn func(dispatchFields) river.JobArgs) error {
-	id, err := repo.Enqueue(ctx, tx, tenantID, revisionID, contentHash, releaseGenerationID)
+// EnqueueMaterializeTx enqueues a materialize_dispatch_outbox row and, only
+// when a new row was actually inserted (dedup skip returns an empty id), a
+// paired River MaterializeDispatchArgs job — both inside tx.
+//
+// valuesHash is the resolved-placeholder values hash pinned at freeze
+// (F-QA4-10): it lands in materialize_dispatch_outbox.values_hash and in
+// MaterializeDispatchArgs.ValuesHash.
+func (e *Enqueuer) EnqueueMaterializeTx(ctx context.Context, tx db.Tx, tenantID, revisionID string, valuesHash []byte, releaseGenerationID string) error {
+	id, err := e.matRepo.Enqueue(ctx, tx, tenantID, revisionID, valuesHash, releaseGenerationID)
 	if err != nil {
 		return err
 	}
@@ -114,14 +112,15 @@ func enqueueTx(ctx context.Context, e *Enqueuer, tx db.Tx, repo stagingEnqueuer,
 		return nil
 	}
 
-	fields := dispatchFields{
-		TenantID:            tenantID,
-		RevisionID:          revisionID,
-		ContentHash:         contentHash,
-		OutboxID:            id,
-		ReleaseGenerationID: releaseGenerationID,
-	}
-	return e.insertRiverJob(ctx, tx, argsFn(fields))
+	return e.insertRiverJob(ctx, tx, MaterializeDispatchArgs{
+		dispatchFields: dispatchFields{
+			TenantID:            tenantID,
+			RevisionID:          revisionID,
+			OutboxID:            id,
+			ReleaseGenerationID: releaseGenerationID,
+		},
+		ValuesHash: valuesHash,
+	})
 }
 
 // insertRiverJob inserts the paired River job sharing the caller's *sql.Tx.

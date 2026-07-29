@@ -18,7 +18,7 @@ func TestSnapshotRepository_WriteMethodsNoRowsReturnError(t *testing.T) {
 		{
 			name: "WriteFreeze",
 			run: func(ctx context.Context, repo *SnapshotRepository) error {
-				return repo.WriteFreeze(ctx, "tenant-1", "doc-1", []byte("hash"), time.Now())
+				return repo.WriteFreeze(ctx, "tenant-1", "doc-1", []byte("hash"), "rev-1", time.Now())
 			},
 		},
 		{

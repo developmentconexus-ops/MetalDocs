@@ -54,20 +54,38 @@ func (f *fakeOutboxMarker) MarkFailed(_ context.Context, tenantID, id, errStr st
 
 func testFields() dispatchFields {
 	return dispatchFields{
-		TenantID:       "tenant-1",
-		RevisionID:     "revision-1",
-		ContentHash:    []byte{0xDE, 0xAD, 0xBE, 0xEF},
-		OutboxID:       "outbox-1",
+		TenantID:   "tenant-1",
+		RevisionID: "revision-1",
+		OutboxID:   "outbox-1",
+	}
+}
+
+// testPDFArgs carries the MATERIALIZED frozen-docx hash (migration 0312:
+// pdf_dispatch_outbox.frozen_docx_hash), not a generic "content hash".
+func testPDFArgs() PDFDispatchArgs {
+	return PDFDispatchArgs{
+		dispatchFields: testFields(),
+		FrozenDocxHash: []byte{0xDE, 0xAD, 0xBE, 0xEF},
 		FinalDocxS3Key: "tenants/tenant-1/revision-1/frozen.docx",
+	}
+}
+
+// testMaterializeArgs carries the resolved-placeholder VALUES hash
+// (migration 0312: materialize_dispatch_outbox.values_hash).
+func testMaterializeArgs() MaterializeDispatchArgs {
+	return MaterializeDispatchArgs{
+		dispatchFields: testFields(),
+		ValuesHash:     []byte{0x01, 0x02, 0x03, 0x04},
 	}
 }
 
 func TestRun_PDFEvent_PublishSuccess_MarksDispatched(t *testing.T) {
 	pub := &fakePublisher{}
 	repo := &fakeOutboxMarker{}
-	fields := testFields()
+	args := testPDFArgs()
+	fields := args.dispatchFields
 
-	err := run(context.Background(), pub, repo, fields, buildPDFEvent, 1, 25)
+	err := run(context.Background(), pub, repo, fields, buildPDFEvent(args), 1, 25)
 	if err != nil {
 		t.Fatalf("run returned error: %v", err)
 	}
@@ -86,14 +104,16 @@ func TestRun_PDFEvent_PublishSuccess_MarksDispatched(t *testing.T) {
 	if !ok {
 		t.Fatalf("Payload type = %T, want messaging.PDFConvertPayload", pub.published.Payload)
 	}
-	wantHash := hex.EncodeToString(fields.ContentHash)
+	// The event contract keeps the name ContentHash; the producer-side value is
+	// the frozen-docx hash (migration 0312).
+	wantHash := hex.EncodeToString(args.FrozenDocxHash)
 	if payload.ContentHash != wantHash {
 		t.Errorf("ContentHash = %q, want %q", payload.ContentHash, wantHash)
 	}
 	// F-QA2-2: buildPDFEvent must thread the frozen-docx key into the pdf
 	// payload so the pdf job runner never dead-letters on a missing key.
-	if payload.FinalDocxS3Key != fields.FinalDocxS3Key {
-		t.Errorf("FinalDocxS3Key = %q, want %q", payload.FinalDocxS3Key, fields.FinalDocxS3Key)
+	if payload.FinalDocxS3Key != args.FinalDocxS3Key {
+		t.Errorf("FinalDocxS3Key = %q, want %q", payload.FinalDocxS3Key, args.FinalDocxS3Key)
 	}
 
 	if repo.dispatchCalls != 1 {
@@ -110,9 +130,9 @@ func TestRun_PDFEvent_PublishSuccess_MarksDispatched(t *testing.T) {
 func TestRun_MaterializeEvent_BuildsExpectedEvent(t *testing.T) {
 	pub := &fakePublisher{}
 	repo := &fakeOutboxMarker{}
-	fields := testFields()
+	args := testMaterializeArgs()
 
-	if err := run(context.Background(), pub, repo, fields, buildMaterializeEvent, 1, 25); err != nil {
+	if err := run(context.Background(), pub, repo, args.dispatchFields, buildMaterializeEvent(args), 1, 25); err != nil {
 		t.Fatalf("run returned error: %v", err)
 	}
 
@@ -129,9 +149,10 @@ func TestRun_PublishFails_NotTerminal_RetriesWithoutDeadLetter(t *testing.T) {
 	publishErr := errors.New("publish boom")
 	pub := &fakePublisher{err: publishErr}
 	repo := &fakeOutboxMarker{}
-	fields := testFields()
+	args := testPDFArgs()
+	fields := args.dispatchFields
 
-	err := run(context.Background(), pub, repo, fields, buildPDFEvent, 1, 25)
+	err := run(context.Background(), pub, repo, fields, buildPDFEvent(args), 1, 25)
 	if !errors.Is(err, publishErr) {
 		t.Fatalf("run error = %v, want %v", err, publishErr)
 	}
@@ -147,9 +168,10 @@ func TestRun_PublishFails_TerminalAttempt_DeadLetters(t *testing.T) {
 	publishErr := errors.New("publish boom terminal")
 	pub := &fakePublisher{err: publishErr}
 	repo := &fakeOutboxMarker{}
-	fields := testFields()
+	args := testPDFArgs()
+	fields := args.dispatchFields
 
-	err := run(context.Background(), pub, repo, fields, buildPDFEvent, 25, 25)
+	err := run(context.Background(), pub, repo, fields, buildPDFEvent(args), 25, 25)
 	if !errors.Is(err, publishErr) {
 		t.Fatalf("run error = %v, want %v", err, publishErr)
 	}
@@ -168,9 +190,10 @@ func TestRun_MarkDispatchedFails_TerminalAttempt_DeadLetters(t *testing.T) {
 	markErr := errors.New("mark dispatched boom")
 	pub := &fakePublisher{}
 	repo := &fakeOutboxMarker{markDispatchedErr: markErr}
-	fields := testFields()
+	args := testPDFArgs()
+	fields := args.dispatchFields
 
-	err := run(context.Background(), pub, repo, fields, buildPDFEvent, 25, 25)
+	err := run(context.Background(), pub, repo, fields, buildPDFEvent(args), 25, 25)
 	if !errors.Is(err, markErr) {
 		t.Fatalf("run error = %v, want %v", err, markErr)
 	}

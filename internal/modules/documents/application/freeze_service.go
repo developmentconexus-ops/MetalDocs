@@ -2,11 +2,13 @@ package application
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	v2dom "metaldocs/internal/modules/documents/domain"
@@ -17,18 +19,50 @@ import (
 	"metaldocs/internal/platform/db"
 )
 
+// NOTE on the `documentID` parameter naming below: the freeze pipeline's
+// identity parameter has always carried documents.id, even where older code
+// named it revisionID (see RepairMaterialization's note). These ports name it
+// documentID so the ONE genuine document_revisions.id in this file — the
+// frozen-revision pin — cannot be confused with it.
 type FreezeFinalizer interface {
-	WriteFreeze(ctx context.Context, tenantID, revisionID string, valuesHash []byte, frozenAt time.Time, q ...infrastructure.DBTX) error
+	// WriteFreeze stamps values_hash + values_frozen_at + the frozen_revision_id
+	// lineage pin in a single update. frozenRevisionID is a
+	// document_revisions.id; empty writes a NULL pin.
+	WriteFreeze(ctx context.Context, tenantID, documentID string, valuesHash []byte, frozenRevisionID string, frozenAt time.Time, q ...infrastructure.DBTX) error
 }
 
 type SnapshotReader interface {
-	ReadSnapshotWithFreezeAt(ctx context.Context, tenantID, revisionID string, q ...infrastructure.DBTX) (v2dom.TemplateSnapshot, *time.Time, error)
-	ReadFreezeAt(ctx context.Context, tenantID, revisionID string, q ...infrastructure.DBTX) (*time.Time, error)
-	// ReadCurrentRevisionBodyKey returns the storage key of the document's
-	// current editor revision — the body Materialize freezes (F-QA3-1,
-	// option (a)). Empty string means "no current revision".
-	ReadCurrentRevisionBodyKey(ctx context.Context, tenantID, revisionID string, q ...infrastructure.DBTX) (string, error)
+	ReadSnapshotWithFreezeAt(ctx context.Context, tenantID, documentID string, q ...infrastructure.DBTX) (v2dom.TemplateSnapshot, *time.Time, error)
+	ReadFreezeAt(ctx context.Context, tenantID, documentID string, q ...infrastructure.DBTX) (*time.Time, error)
+	// ReadCurrentRevisionRef returns the document's current editor revision —
+	// the body Pin pins (F-QA3-1, option (a)). A zero RevisionRef means "no
+	// current revision".
+	ReadCurrentRevisionRef(ctx context.Context, tenantID, documentID string, q ...infrastructure.DBTX) (v2dom.RevisionRef, error)
+	// ReadFrozenRevisionRef returns the revision PINNED at freeze time
+	// (documents.frozen_revision_id). Materialize reads this one, never the
+	// current head. A zero RevisionRef means "nothing was pinned".
+	ReadFrozenRevisionRef(ctx context.Context, tenantID, documentID string, q ...infrastructure.DBTX) (v2dom.RevisionRef, error)
 }
+
+// RevisionBodyReader fetches the raw bytes of a stored revision body so
+// Materialize can verify them against the pinned revision's recorded hash
+// before anything is rendered. Satisfied by *objectstore.VerifiedStore; the
+// tenant-asserted read is deliberate (defense in depth above the SQL tenant
+// scoping — a mis-scoped key must never fetch another tenant's body).
+type RevisionBodyReader interface {
+	AssertedReadObject(ctx context.Context, tenantID, key string, maxBytes int64) ([]byte, error)
+}
+
+// maxRevisionBodyBytes bounds the verification read, mirroring the 25 MiB cap
+// every composition root passes to objectstore.NewVerifiedStore.
+const maxRevisionBodyBytes = 25 * 1024 * 1024
+
+// ErrFrozenBodyHashMismatch is the distinct failure for the fail-closed lineage
+// check: the bytes fetched for the pinned revision do not hash to that
+// revision's recorded content_hash. It is NOT a transient error — retrying
+// cannot fix substituted or corrupted source bytes — and no artifact is
+// produced when it fires.
+var ErrFrozenBodyHashMismatch = errors.New("frozen body hash mismatch")
 
 type FanoutClient interface {
 	Fanout(ctx context.Context, req fanout.FanoutRequest) (fanout.FanoutResponse, error)
@@ -39,7 +73,7 @@ type FanoutClient interface {
 // here (the consumer) and satisfied by *dispatchjobs.Enqueuer. It inserts
 // the paired (outbox row, River job) atomically inside tx (M5 F5.3 T3).
 type materializeDispatchEnqueuer interface {
-	EnqueueMaterializeTx(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte, releaseGenerationID string) error
+	EnqueueMaterializeTx(ctx context.Context, tx db.Tx, tenantID, documentID string, valuesHash []byte, releaseGenerationID string) error
 }
 
 // MaterializeResult is returned by Materialize after a successful fanout call.
@@ -60,6 +94,7 @@ type FreezeService struct {
 	snapshots         SnapshotReader
 	fanout            FanoutClient
 	materializeOutbox materializeDispatchEnqueuer
+	bodies            RevisionBodyReader
 }
 
 type ApproverContext struct {
@@ -99,17 +134,27 @@ func (s *FreezeService) WithMaterializeOutbox(enqueuer materializeDispatchEnqueu
 	return s
 }
 
+// WithRevisionBodyReader wires the blob reader Materialize uses to verify the
+// pinned revision's bytes against its recorded hash. Required by Materialize
+// (which fails closed without it) and unused by Pin, so composition roots that
+// only pin — the API and the release-backfill tool — need not supply one.
+func (s *FreezeService) WithRevisionBodyReader(bodies RevisionBodyReader) *FreezeService {
+	s.bodies = bodies
+	return s
+}
+
 // pinValidateAndHash is the Pin setup path: validates required placeholders,
-// resolves computed ones, computes values_hash, and writes the freeze marker
-// inside tx. Returns the resolved valMap and schema.
+// resolves computed ones, computes values_hash, and writes the freeze marker —
+// including the frozen_revision_id lineage pin — inside tx. Returns the
+// resolved valMap and schema.
 func (s *FreezeService) pinValidateAndHash(
-	ctx context.Context, tx db.Tx, tenantID, revisionID string, approver ApproverContext,
+	ctx context.Context, tx db.Tx, tenantID, documentID string, approver ApproverContext,
 ) (map[string]any, []tmpldom.Placeholder, error) {
-	schema, err := s.schemas.LoadPlaceholderSchema(ctx, tenantID, revisionID)
+	schema, err := s.schemas.LoadPlaceholderSchema(ctx, tenantID, documentID)
 	if err != nil {
 		return nil, nil, err
 	}
-	existing, err := s.valuesRead.ListValues(ctx, tenantID, revisionID)
+	existing, err := s.valuesRead.ListValues(ctx, tenantID, documentID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -132,7 +177,7 @@ func (s *FreezeService) pinValidateAndHash(
 		}
 	}
 
-	resolveIn, err := s.resolveCtx.Build(ctx, tenantID, revisionID, approver)
+	resolveIn, err := s.resolveCtx.Build(ctx, tenantID, documentID, approver)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -156,7 +201,7 @@ func (s *FreezeService) pinValidateAndHash(
 		strVal := fmt.Sprintf("%v", rv.Value)
 		key, ver := *p.ResolverKey, rv.ResolverVer
 		if err := s.values.UpsertValue(ctx, infrastructure.PlaceholderValue{
-			TenantID: tenantID, RevisionID: revisionID, PlaceholderID: p.ID,
+			TenantID: tenantID, RevisionID: documentID, PlaceholderID: p.ID,
 			ValueText: &strVal, Source: "computed",
 			ComputedFrom: &key, ResolverVersion: &ver,
 			InputsHash: rv.InputsHash,
@@ -180,22 +225,36 @@ func (s *FreezeService) pinValidateAndHash(
 	if err != nil {
 		return nil, nil, fmt.Errorf("decode values_hash: %w", err)
 	}
-	if err := s.finalize.WriteFreeze(ctx, tenantID, revisionID, hashBytes, time.Now().UTC(), tx); err != nil {
+	// Lineage pin (F-QA3-1 remainder): record WHICH document_revisions row this
+	// freeze covers, in the SAME update as values_hash. Read in-tx so the pin
+	// and the hash describe one consistent instant — Materialize later renders
+	// this exact revision instead of re-reading a head that may have moved.
+	// A document with no current revision pins NULL: the honest record, which
+	// Materialize refuses rather than substituting another body.
+	current, err := s.snapshots.ReadCurrentRevisionRef(ctx, tenantID, documentID, tx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("read current revision for freeze pin: %w", err)
+	}
+	if err := s.finalize.WriteFreeze(ctx, tenantID, documentID, hashBytes, current.ID, time.Now().UTC(), tx); err != nil {
 		return nil, nil, err
 	}
 	return valMap, schema, nil
 }
 
 // Pin is the in-transaction half of the async freeze split (ADR 0015).
-// It validates, resolves computed placeholders, writes values_hash + frozen_at,
-// and enqueues a materialize_dispatch_outbox row — all inside tx.
+// It validates, resolves computed placeholders, writes values_hash + frozen_at
+// + the frozen_revision_id lineage pin, and enqueues a
+// materialize_dispatch_outbox row — all inside tx.
 // No network calls to docx-renderer. Fast and cheap.
 // tx is mandatory (ADR 0015 amended by Wave Z Z-5).
-func (s *FreezeService) Pin(ctx context.Context, tx db.Tx, tenantID, revisionID string, approver ApproverContext, releaseGenerationID string) error {
+//
+// documentID is documents.id (the parameter the whole pin/fanout/worker chain
+// calls "revisionID"; see RepairMaterialization's note below).
+func (s *FreezeService) Pin(ctx context.Context, tx db.Tx, tenantID, documentID string, approver ApproverContext, releaseGenerationID string) error {
 	if tx == nil {
 		return fmt.Errorf("freeze_service: tx required (ADR 0015 amended by Wave Z Z-5)")
 	}
-	valuesFrozenAt, err := s.snapshots.ReadFreezeAt(ctx, tenantID, revisionID, tx)
+	valuesFrozenAt, err := s.snapshots.ReadFreezeAt(ctx, tenantID, documentID, tx)
 	if err != nil {
 		return fmt.Errorf("pin: read freeze_at: %w", err)
 	}
@@ -203,7 +262,7 @@ func (s *FreezeService) Pin(ctx context.Context, tx db.Tx, tenantID, revisionID 
 		return nil
 	}
 
-	valMap, _, err := s.pinValidateAndHash(ctx, tx, tenantID, revisionID, approver)
+	valMap, _, err := s.pinValidateAndHash(ctx, tx, tenantID, documentID, approver)
 	if err != nil {
 		return fmt.Errorf("pin: %w", err)
 	}
@@ -220,21 +279,40 @@ func (s *FreezeService) Pin(ctx context.Context, tx db.Tx, tenantID, revisionID 
 	if s.materializeOutbox == nil {
 		return fmt.Errorf("pin: materialize outbox enqueuer not configured")
 	}
-	return s.materializeOutbox.EnqueueMaterializeTx(ctx, tx, tenantID, revisionID, hashBytes, releaseGenerationID)
+	return s.materializeOutbox.EnqueueMaterializeTx(ctx, tx, tenantID, documentID, hashBytes, releaseGenerationID)
 }
 
-// RepairMaterialization re-enqueues the materialize dispatch for a document
-// that is ALREADY pinned but whose final artifact set is missing or incomplete
-// (ADR 0085 Stage C, in-flight disposition). It is the Pin-equivalent repair:
-// same outbox enqueue, same generation tagging, without re-running validation,
-// placeholder resolution, or the freeze write — the freeze is already final and
-// must not be recomputed, because recomputing it would produce a different
-// values_hash than the one the approver signed.
+// RepairMaterialization re-pins the freeze lineage and re-enqueues the
+// materialize dispatch for a document whose final artifact set is missing or
+// incomplete (ADR 0085 Stage C, in-flight disposition). It is the operator-only
+// repair path, reached exclusively through scripts/release-backfill.
 //
-// It fails closed on an unpinned document (mirroring Materialize's rejection at
-// the site below): a missing values_hash / values_frozen_at means there is no
-// approved snapshot to render from, and the no-fallback principle forbids
-// substituting a fresh freeze for the one that was never taken.
+// It does NOT re-run validation or placeholder resolution, and it does NOT
+// recompute values_hash: that hash is what the approver signed, and recomputing
+// it would silently replace approved values.
+//
+// It DOES take a fresh lineage pin (operator ruling, Etapa 5 §5.3): it re-reads
+// the current revision ref in this same tx and writes frozen_revision_id
+// through the same WriteFreeze seam Pin uses — no duplicated SQL. Repair is
+// therefore an explicit, operator-sanctioned RE-FREEZE of the body from the
+// current revision with TRUE lineage, never history fabrication: the pin names
+// a revision that really is the body about to be rendered, and Materialize
+// still verifies the fetched bytes against that revision's own content_hash.
+// This is what makes the legacy NULL-pin documents (frozen before migration
+// 0313) repairable at all; a migration-time backfill could only have guessed.
+//
+// A document that already carries a pin is re-pinned too: choosing to repair IS
+// the decision to re-freeze, so the old pin is superseded rather than defended.
+//
+// values_frozen_at is carried over, not restamped: the approval instant is a
+// fact about the past and repair does not get to rewrite it (and gates that
+// read values_frozen_at as "is frozen" must not see this document flicker).
+//
+// It fails closed on a document that was never frozen (missing values_hash /
+// values_frozen_at): there is no approved snapshot to render from, and the
+// no-fallback principle forbids substituting a fresh freeze for one that was
+// never taken. It also fails closed when the document has no current revision —
+// there is no honest body to pin.
 //
 // The releaseGenerationID tags the dispatch so the produced artifacts are
 // recorded against the right generation. Replaying with the SAME generation is
@@ -271,7 +349,19 @@ func (s *FreezeService) RepairMaterialization(ctx context.Context, tx db.Tx, ten
 		return fmt.Errorf("repair materialization: read freeze state: %w", err)
 	}
 	if frozenAt == nil || len(hashBytes) == 0 {
-		return fmt.Errorf("repair materialization: document %s not yet pinned", documentID)
+		return fmt.Errorf("repair materialization: document %s was never frozen", documentID)
+	}
+
+	// Fresh lineage pin, same tx, same seam as Pin.
+	current, err := s.snapshots.ReadCurrentRevisionRef(ctx, tenantID, documentID, tx)
+	if err != nil {
+		return fmt.Errorf("repair materialization: read current revision for re-pin: %w", err)
+	}
+	if current.ID == "" {
+		return fmt.Errorf("repair materialization: document %s has no current revision to pin", documentID)
+	}
+	if err := s.finalize.WriteFreeze(ctx, tenantID, documentID, hashBytes, current.ID, *frozenAt, tx); err != nil {
+		return fmt.Errorf("repair materialization: re-pin frozen revision: %w", err)
 	}
 
 	return s.materializeOutbox.EnqueueMaterializeTx(ctx, tx, tenantID, documentID, hashBytes, releaseGenerationID)
@@ -282,30 +372,38 @@ func (s *FreezeService) RepairMaterialization(ctx context.Context, tx db.Tx, ten
 // and returns the result so the caller can persist it transactionally.
 // The caller (MaterializeJobRunner) is responsible for WriteFinalDocx + PDF enqueue.
 //
-// The rendered BODY is the document's current editor revision, not the template
-// snapshot (F-QA3-1, operator ruling option (a)): the approver signs the content
-// they reviewed in the editor. The template snapshot still supplies the
-// composition config and seeds the initial clone. Placeholder resolution is
-// applied on top of the editor body, unchanged.
-func (s *FreezeService) Materialize(ctx context.Context, tenantID, revisionID string) (MaterializeResult, error) {
+// The rendered BODY is the revision PINNED at freeze time, not the template
+// snapshot and not the current head (F-QA3-1, operator ruling option (a)): the
+// approver signs the content they reviewed in the editor, and
+// documents.frozen_revision_id records exactly which revision that was. The
+// template snapshot still supplies the composition config and seeds the initial
+// clone. Placeholder resolution is applied on top of that body, unchanged.
+//
+// Before anything is rendered, the fetched bytes are verified against the
+// pinned revision's own document_revisions.content_hash. A mismatch fails the
+// job with ErrFrozenBodyHashMismatch and produces NO artifact: silently
+// rendering substituted bytes would put a signature on content nobody approved.
+//
+// documentID is documents.id (the parameter the chain calls "revisionID").
+func (s *FreezeService) Materialize(ctx context.Context, tenantID, documentID string) (MaterializeResult, error) {
 	if s.fanout == nil {
 		return MaterializeResult{}, fmt.Errorf("materialize: fanout client not configured")
 	}
 
-	snap, frozenAt, err := s.snapshots.ReadSnapshotWithFreezeAt(ctx, tenantID, revisionID)
+	snap, frozenAt, err := s.snapshots.ReadSnapshotWithFreezeAt(ctx, tenantID, documentID)
 	if err != nil {
 		return MaterializeResult{}, fmt.Errorf("materialize: read snapshot: %w", err)
 	}
 	if frozenAt == nil {
-		return MaterializeResult{}, fmt.Errorf("materialize: revision %s not yet pinned", revisionID)
+		return MaterializeResult{}, fmt.Errorf("materialize: document %s not yet pinned", documentID)
 	}
 
-	schema, err := s.schemas.LoadPlaceholderSchema(ctx, tenantID, revisionID)
+	schema, err := s.schemas.LoadPlaceholderSchema(ctx, tenantID, documentID)
 	if err != nil {
 		return MaterializeResult{}, fmt.Errorf("materialize: load schema: %w", err)
 	}
 
-	existing, err := s.valuesRead.ListValues(ctx, tenantID, revisionID)
+	existing, err := s.valuesRead.ListValues(ctx, tenantID, documentID)
 	if err != nil {
 		return MaterializeResult{}, fmt.Errorf("materialize: list values: %w", err)
 	}
@@ -340,22 +438,25 @@ func (s *FreezeService) Materialize(ctx context.Context, tenantID, revisionID st
 		composition = json.RawMessage(`{}`)
 	}
 
-	// Editor truth is frozen truth. Fail closed when the document has no current
-	// revision: rendering the template snapshot instead would produce a signed
-	// artifact that does not carry the reviewed content (F-QA3-1).
-	bodyKey, err := s.snapshots.ReadCurrentRevisionBodyKey(ctx, tenantID, revisionID)
+	// Pinned truth is frozen truth. Fail closed when nothing was pinned:
+	// rendering the current head (or the template snapshot) instead would
+	// produce a signed artifact whose provenance nobody can prove (F-QA3-1).
+	pinned, err := s.snapshots.ReadFrozenRevisionRef(ctx, tenantID, documentID)
 	if err != nil {
-		return MaterializeResult{}, fmt.Errorf("materialize: read current revision body: %w", err)
+		return MaterializeResult{}, fmt.Errorf("materialize: read pinned revision: %w", err)
 	}
-	if bodyKey == "" {
+	if pinned.ID == "" || pinned.StorageKey == "" {
 		return MaterializeResult{}, fmt.Errorf(
-			"materialize: document %s has no current revision body to freeze", revisionID)
+			"materialize: document %s has no pinned frozen revision body to freeze", documentID)
+	}
+	if err := s.verifyPinnedBody(ctx, tenantID, documentID, pinned); err != nil {
+		return MaterializeResult{}, err
 	}
 
 	resp, err := s.fanout.Fanout(ctx, fanout.FanoutRequest{
 		TenantID:          tenantID,
-		RevisionID:        revisionID,
-		BodyDocxS3Key:     bodyKey,
+		RevisionID:        documentID,
+		BodyDocxS3Key:     pinned.StorageKey,
 		PlaceholderValues: placeholderVals,
 		Composition:       json.RawMessage(composition),
 		ResolvedValues:    resolvedForSubblocks,
@@ -372,4 +473,33 @@ func (s *FreezeService) Materialize(ctx context.Context, tenantID, revisionID st
 		FinalDocxS3Key: resp.FinalDocxS3Key,
 		ContentHash:    contentHashBytes,
 	}, nil
+}
+
+// verifyPinnedBody fetches the pinned revision's stored bytes and proves they
+// are the bytes that revision recorded at upload time. It is the fail-closed
+// half of the lineage guarantee: the pin says WHICH revision was frozen, this
+// says the object under that revision's key still IS that revision.
+//
+// A missing recorded hash is itself a failure, not a reason to skip the check —
+// "no hash to compare against" is the exact shape of the silent-substitution
+// hole this closes (no-fallback principle).
+func (s *FreezeService) verifyPinnedBody(ctx context.Context, tenantID, documentID string, pinned v2dom.RevisionRef) error {
+	if s.bodies == nil {
+		return fmt.Errorf("materialize: revision body reader not configured (cannot verify frozen lineage)")
+	}
+	if pinned.ContentHash == "" {
+		return fmt.Errorf("%w: document %s pinned revision %s has no recorded content_hash",
+			ErrFrozenBodyHashMismatch, documentID, pinned.ID)
+	}
+	body, err := s.bodies.AssertedReadObject(ctx, tenantID, pinned.StorageKey, maxRevisionBodyBytes)
+	if err != nil {
+		return fmt.Errorf("materialize: read pinned revision body %s: %w", pinned.StorageKey, err)
+	}
+	sum := sha256.Sum256(body)
+	actual := hex.EncodeToString(sum[:])
+	if !strings.EqualFold(actual, pinned.ContentHash) {
+		return fmt.Errorf("%w: document %s pinned revision %s key %s: computed %s, recorded %s",
+			ErrFrozenBodyHashMismatch, documentID, pinned.ID, pinned.StorageKey, actual, pinned.ContentHash)
+	}
+	return nil
 }

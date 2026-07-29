@@ -53,36 +53,43 @@ func dispatchIdempotencyKey(prefix string, f dispatchFields) string {
 
 // buildPDFEvent reproduces, verbatim, the pdf outbox buildEvent closure
 // previously inlined in apps/api/cmd/metaldocs-api/main.go.
-func buildPDFEvent(f dispatchFields) messaging.Event {
+//
+// messaging.PDFConvertPayload.ContentHash is the pdf consumer's own wire field
+// and keeps its name: on that contract it means "hash of the frozen docx being
+// converted", which is exactly what FrozenDocxHash carries (F-QA4-10 renamed the
+// producer-side column and job arg, not the event contract).
+func buildPDFEvent(a PDFDispatchArgs) messaging.Event {
 	return messaging.Event{
 		EventID:        messaging.EventID(uuid.NewString()),
 		EventType:      messaging.EventTypePDFConvert,
 		AggregateType:  messaging.AggregateType("document_revision"),
-		AggregateID:    messaging.AggregateID(f.RevisionID),
-		IdempotencyKey: messaging.IdempotencyKey(dispatchIdempotencyKey("docgen_v2_pdf", f)),
+		AggregateID:    messaging.AggregateID(a.RevisionID),
+		IdempotencyKey: messaging.IdempotencyKey(dispatchIdempotencyKey("docgen_v2_pdf", a.dispatchFields)),
 		Payload: messaging.PDFConvertPayload{
-			TenantID:            f.TenantID,
-			RevisionID:          f.RevisionID,
-			ContentHash:         hex.EncodeToString(f.ContentHash),
-			FinalDocxS3Key:      f.FinalDocxS3Key,
-			ReleaseGenerationID: f.ReleaseGenerationID,
+			TenantID:            a.TenantID,
+			RevisionID:          a.RevisionID,
+			ContentHash:         hex.EncodeToString(a.FrozenDocxHash),
+			FinalDocxS3Key:      a.FinalDocxS3Key,
+			ReleaseGenerationID: a.ReleaseGenerationID,
 		},
 	}
 }
 
 // buildMaterializeEvent reproduces, verbatim, the materialize outbox
 // buildEvent closure previously inlined in apps/api/cmd/metaldocs-api/main.go.
-func buildMaterializeEvent(f dispatchFields) messaging.Event {
+// The values hash is not on this event: the consumer re-reads the pinned freeze
+// state from documents, so nothing downstream consumes ValuesHash off the wire.
+func buildMaterializeEvent(a MaterializeDispatchArgs) messaging.Event {
 	return messaging.Event{
 		EventID:        messaging.EventID(uuid.NewString()),
 		EventType:      messaging.EventTypeMaterializeFanout,
 		AggregateType:  messaging.AggregateType("document_revision"),
-		AggregateID:    messaging.AggregateID(f.RevisionID),
-		IdempotencyKey: messaging.IdempotencyKey(dispatchIdempotencyKey("materialize_fanout", f)),
+		AggregateID:    messaging.AggregateID(a.RevisionID),
+		IdempotencyKey: messaging.IdempotencyKey(dispatchIdempotencyKey("materialize_fanout", a.dispatchFields)),
 		Payload: messaging.MaterializeFanoutPayload{
-			TenantID:            f.TenantID,
-			RevisionID:          f.RevisionID,
-			ReleaseGenerationID: f.ReleaseGenerationID,
+			TenantID:            a.TenantID,
+			RevisionID:          a.RevisionID,
+			ReleaseGenerationID: a.ReleaseGenerationID,
 		},
 	}
 }
@@ -94,10 +101,11 @@ func buildMaterializeEvent(f dispatchFields) messaging.Event {
 // the original error is always returned so River records its own attempt
 // history. A MarkFailed error at that point is intentionally not fatal to
 // the return value — River's discard decision still needs the original err.
-func run(ctx context.Context, pub messaging.Publisher, repo outboxMarker, fields dispatchFields, buildEvent func(dispatchFields) messaging.Event, attempt, maxAttempts int) error {
+// The event is built by the caller (each Args type owns its own hash field, so
+// there is no single shared shape to build from) and handed in ready to publish.
+func run(ctx context.Context, pub messaging.Publisher, repo outboxMarker, fields dispatchFields, evt messaging.Event, attempt, maxAttempts int) error {
 	ctx = authz.WithBackgroundBypass(ctx)
 
-	evt := buildEvent(fields)
 	if err := pub.Publish(ctx, evt); err != nil {
 		terminalDeadLetter(ctx, repo, fields, err, attempt, maxAttempts)
 		return err
@@ -141,7 +149,7 @@ func (w *PDFDispatchWorker) Work(ctx context.Context, job *river.Job[PDFDispatch
 	if job == nil {
 		return ErrPDFDispatchJobNil
 	}
-	return run(ctx, w.pub, w.repo, job.Args.dispatchFields, buildPDFEvent, job.Attempt, job.MaxAttempts)
+	return run(ctx, w.pub, w.repo, job.Args.dispatchFields, buildPDFEvent(job.Args), job.Attempt, job.MaxAttempts)
 }
 
 // MaterializeDispatchWorker is the River worker that dispatches one
@@ -165,7 +173,7 @@ func (w *MaterializeDispatchWorker) Work(ctx context.Context, job *river.Job[Mat
 	if job == nil {
 		return ErrMaterializeDispatchJobNil
 	}
-	return run(ctx, w.pub, w.repo, job.Args.dispatchFields, buildMaterializeEvent, job.Attempt, job.MaxAttempts)
+	return run(ctx, w.pub, w.repo, job.Args.dispatchFields, buildMaterializeEvent(job.Args), job.Attempt, job.MaxAttempts)
 }
 
 // NewWorkers returns the River worker set for staging pdf/materialize

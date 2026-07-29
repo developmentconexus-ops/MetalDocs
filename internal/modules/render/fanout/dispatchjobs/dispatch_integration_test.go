@@ -28,8 +28,10 @@ package dispatchjobs
 // authoring session) — see the commit message for the exact -run commands.
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -131,18 +133,33 @@ func TestPDFDispatchWorker_Integration_PublishesAndMarksDispatched(t *testing.T)
 
 	tenant := testdb.NewTenant(t, db)
 	revisionID := testdb.DeterministicID(t, "pdf-revision")
-	contentHash := []byte{0xAB, 0xCD, 0xEF, 0x01}
+	// Migration 0312: this outbox carries the MATERIALIZED frozen-docx hash.
+	frozenDocxHash := []byte{0xAB, 0xCD, 0xEF, 0x01}
 	finalDocxKey := "tenants/" + tenant.ID + "/" + revisionID + "/frozen.docx"
 
 	enqueuer := newTestEnqueuer(t, db)
 
 	tx := seedTenantTx(t, ctx, db, tenant.ID)
-	if err := enqueuer.EnqueuePDFTx(ctx, tx, tenant.ID, revisionID, contentHash, finalDocxKey, ""); err != nil {
+	if err := enqueuer.EnqueuePDFTx(ctx, tx, tenant.ID, revisionID, frozenDocxHash, finalDocxKey, ""); err != nil {
 		_ = tx.Rollback()
 		t.Fatalf("EnqueuePDFTx: %v", err)
 	}
 	if err := tx.Commit(); err != nil {
 		t.Fatalf("commit business tx: %v", err)
+	}
+
+	// Renamed-column round-trip: the enqueue wrote the hash under
+	// frozen_docx_hash, the name that matches what it actually carries.
+	var gotFrozenDocxHash []byte
+	if err := db.QueryRowContext(ctx, `
+		SELECT frozen_docx_hash FROM metaldocs.pdf_dispatch_outbox
+		 WHERE tenant_id = $1::uuid AND revision_id = $2::uuid`,
+		tenant.ID, revisionID,
+	).Scan(&gotFrozenDocxHash); err != nil {
+		t.Fatalf("read pdf_dispatch_outbox.frozen_docx_hash: %v", err)
+	}
+	if !bytes.Equal(gotFrozenDocxHash, frozenDocxHash) {
+		t.Fatalf("frozen_docx_hash = %x, want %x", gotFrozenDocxHash, frozenDocxHash)
 	}
 
 	pdfRepo := fanout.NewPDFOutboxRepository(db)
@@ -164,16 +181,18 @@ func TestPDFDispatchWorker_Integration_PublishesAndMarksDispatched(t *testing.T)
 	// final_docx_s3_key assertion below is asserting against a fixture the
 	// production path would never produce.
 	fields := dispatchFields{
-		TenantID:       tenant.ID,
-		RevisionID:     revisionID,
-		ContentHash:    contentHash,
-		OutboxID:       outboxID,
-		FinalDocxS3Key: finalDocxKey,
+		TenantID:   tenant.ID,
+		RevisionID: revisionID,
+		OutboxID:   outboxID,
 	}
 
 	if err := worker.Work(ctx, &river.Job[PDFDispatchArgs]{
 		JobRow: &rivertype.JobRow{Attempt: 1, MaxAttempts: 25},
-		Args:   PDFDispatchArgs{dispatchFields: fields},
+		Args: PDFDispatchArgs{
+			dispatchFields: fields,
+			FrozenDocxHash: frozenDocxHash,
+			FinalDocxS3Key: finalDocxKey,
+		},
 	}); err != nil {
 		t.Fatalf("PDFDispatchWorker.Work: %v", err)
 	}
@@ -217,17 +236,31 @@ func TestMaterializeDispatchWorker_Integration_PublishesAndMarksDispatched(t *te
 
 	tenant := testdb.NewTenant(t, db)
 	revisionID := testdb.DeterministicID(t, "materialize-revision")
-	contentHash := []byte{0x11, 0x22, 0x33}
+	// Migration 0312: this outbox carries the resolved-placeholder VALUES hash.
+	valuesHash := []byte{0x11, 0x22, 0x33}
 
 	enqueuer := newTestEnqueuer(t, db)
 
 	tx := seedTenantTx(t, ctx, db, tenant.ID)
-	if err := enqueuer.EnqueueMaterializeTx(ctx, tx, tenant.ID, revisionID, contentHash, ""); err != nil {
+	if err := enqueuer.EnqueueMaterializeTx(ctx, tx, tenant.ID, revisionID, valuesHash, ""); err != nil {
 		_ = tx.Rollback()
 		t.Fatalf("EnqueueMaterializeTx: %v", err)
 	}
 	if err := tx.Commit(); err != nil {
 		t.Fatalf("commit business tx: %v", err)
+	}
+
+	// Renamed-column round-trip for the other table.
+	var gotValuesHash []byte
+	if err := db.QueryRowContext(ctx, `
+		SELECT values_hash FROM metaldocs.materialize_dispatch_outbox
+		 WHERE tenant_id = $1::uuid AND revision_id = $2::uuid`,
+		tenant.ID, revisionID,
+	).Scan(&gotValuesHash); err != nil {
+		t.Fatalf("read materialize_dispatch_outbox.values_hash: %v", err)
+	}
+	if !bytes.Equal(gotValuesHash, valuesHash) {
+		t.Fatalf("values_hash = %x, want %x", gotValuesHash, valuesHash)
 	}
 
 	matRepo := fanout.NewMaterializeOutboxRepository(db)
@@ -244,15 +277,17 @@ func TestMaterializeDispatchWorker_Integration_PublishesAndMarksDispatched(t *te
 	}
 
 	fields := dispatchFields{
-		TenantID:    tenant.ID,
-		RevisionID:  revisionID,
-		ContentHash: contentHash,
-		OutboxID:    outboxID,
+		TenantID:   tenant.ID,
+		RevisionID: revisionID,
+		OutboxID:   outboxID,
 	}
 
 	if err := worker.Work(ctx, &river.Job[MaterializeDispatchArgs]{
 		JobRow: &rivertype.JobRow{Attempt: 1, MaxAttempts: 25},
-		Args:   MaterializeDispatchArgs{dispatchFields: fields},
+		Args: MaterializeDispatchArgs{
+			dispatchFields: fields,
+			ValuesHash:     valuesHash,
+		},
 	}); err != nil {
 		t.Fatalf("MaterializeDispatchWorker.Work: %v", err)
 	}
@@ -294,13 +329,13 @@ func TestEnqueuer_Integration_EnqueuePDFTx_InsertsOutboxRowAndRiverJob(t *testin
 
 	tenant := testdb.NewTenant(t, db)
 	revisionID := testdb.DeterministicID(t, "pdf-insert-proof")
-	contentHash := []byte{0x01}
+	frozenDocxHash := []byte{0x01}
 	finalDocxKey := "tenants/" + tenant.ID + "/" + revisionID + "/frozen.docx"
 
 	enqueuer := newTestEnqueuer(t, db)
 
 	tx := seedTenantTx(t, ctx, db, tenant.ID)
-	if err := enqueuer.EnqueuePDFTx(ctx, tx, tenant.ID, revisionID, contentHash, finalDocxKey, ""); err != nil {
+	if err := enqueuer.EnqueuePDFTx(ctx, tx, tenant.ID, revisionID, frozenDocxHash, finalDocxKey, ""); err != nil {
 		_ = tx.Rollback()
 		t.Fatalf("EnqueuePDFTx: %v", err)
 	}
@@ -334,6 +369,76 @@ func TestEnqueuer_Integration_EnqueuePDFTx_InsertsOutboxRowAndRiverJob(t *testin
 	if n := countRiverJobs(t, ctx, db, "pdf_dispatch"); n != 1 {
 		t.Fatalf("river_job rows of kind pdf_dispatch = %d, want 1", n)
 	}
+
+	// Worker-side arg decode (migration 0312 hard cutover): the args River
+	// persisted must carry the renamed JSON field and decode back into the
+	// typed field the worker reads. Asserting the raw JSON too is deliberate —
+	// a struct-only assertion would still pass if the tag silently reverted.
+	var rawArgs []byte
+	if err := db.QueryRowContext(ctx,
+		`SELECT args FROM river_job WHERE kind = 'pdf_dispatch'`,
+	).Scan(&rawArgs); err != nil {
+		t.Fatalf("load river_job args: %v", err)
+	}
+	if !bytes.Contains(rawArgs, []byte(`"frozen_docx_hash"`)) {
+		t.Fatalf("river_job args %s missing frozen_docx_hash field", rawArgs)
+	}
+	if bytes.Contains(rawArgs, []byte(`"content_hash"`)) {
+		t.Fatalf("river_job args %s still carry the old content_hash field", rawArgs)
+	}
+	var decoded PDFDispatchArgs
+	if err := json.Unmarshal(rawArgs, &decoded); err != nil {
+		t.Fatalf("decode PDFDispatchArgs: %v", err)
+	}
+	if !bytes.Equal(decoded.FrozenDocxHash, frozenDocxHash) {
+		t.Fatalf("decoded FrozenDocxHash = %x, want %x", decoded.FrozenDocxHash, frozenDocxHash)
+	}
+	if decoded.RevisionID != revisionID || decoded.TenantID != tenant.ID {
+		t.Fatalf("decoded identity = (%s, %s), want (%s, %s)",
+			decoded.TenantID, decoded.RevisionID, tenant.ID, revisionID)
+	}
+}
+
+// Materialize-side mirror of the arg-decode proof above: the values hash must
+// travel under values_hash, and the old shared name must be gone.
+func TestEnqueuer_Integration_EnqueueMaterializeTx_ArgsCarryValuesHash(t *testing.T) {
+	ctx := context.Background()
+	db := openDispatchDB(t)
+
+	tenant := testdb.NewTenant(t, db)
+	revisionID := testdb.DeterministicID(t, "materialize-args-proof")
+	valuesHash := []byte{0x0A, 0x0B, 0x0C}
+
+	enqueuer := newTestEnqueuer(t, db)
+
+	tx := seedTenantTx(t, ctx, db, tenant.ID)
+	if err := enqueuer.EnqueueMaterializeTx(ctx, tx, tenant.ID, revisionID, valuesHash, ""); err != nil {
+		_ = tx.Rollback()
+		t.Fatalf("EnqueueMaterializeTx: %v", err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit business tx: %v", err)
+	}
+
+	var rawArgs []byte
+	if err := db.QueryRowContext(ctx,
+		`SELECT args FROM river_job WHERE kind = 'materialize_dispatch'`,
+	).Scan(&rawArgs); err != nil {
+		t.Fatalf("load river_job args: %v", err)
+	}
+	if !bytes.Contains(rawArgs, []byte(`"values_hash"`)) {
+		t.Fatalf("river_job args %s missing values_hash field", rawArgs)
+	}
+	if bytes.Contains(rawArgs, []byte(`"content_hash"`)) {
+		t.Fatalf("river_job args %s still carry the old content_hash field", rawArgs)
+	}
+	var decoded MaterializeDispatchArgs
+	if err := json.Unmarshal(rawArgs, &decoded); err != nil {
+		t.Fatalf("decode MaterializeDispatchArgs: %v", err)
+	}
+	if !bytes.Equal(decoded.ValuesHash, valuesHash) {
+		t.Fatalf("decoded ValuesHash = %x, want %x", decoded.ValuesHash, valuesHash)
+	}
 }
 
 // TestEnqueuer_Integration_DedupSkip_NoSecondRiverInsert enqueues the SAME
@@ -347,13 +452,13 @@ func TestEnqueuer_Integration_DedupSkip_NoSecondRiverInsert(t *testing.T) {
 
 	tenant := testdb.NewTenant(t, db)
 	revisionID := testdb.DeterministicID(t, "pdf-dedup-revision")
-	contentHash := []byte{0xFE}
+	frozenDocxHash := []byte{0xFE}
 	finalDocxKey := "tenants/" + tenant.ID + "/" + revisionID + "/frozen.docx"
 
 	enqueuer := newTestEnqueuer(t, db)
 
 	tx1 := seedTenantTx(t, ctx, db, tenant.ID)
-	if err := enqueuer.EnqueuePDFTx(ctx, tx1, tenant.ID, revisionID, contentHash, finalDocxKey, ""); err != nil {
+	if err := enqueuer.EnqueuePDFTx(ctx, tx1, tenant.ID, revisionID, frozenDocxHash, finalDocxKey, ""); err != nil {
 		_ = tx1.Rollback()
 		t.Fatalf("first EnqueuePDFTx: %v", err)
 	}
@@ -366,7 +471,7 @@ func TestEnqueuer_Integration_DedupSkip_NoSecondRiverInsert(t *testing.T) {
 	}
 
 	tx2 := seedTenantTx(t, ctx, db, tenant.ID)
-	if err := enqueuer.EnqueuePDFTx(ctx, tx2, tenant.ID, revisionID, contentHash, finalDocxKey, ""); err != nil {
+	if err := enqueuer.EnqueuePDFTx(ctx, tx2, tenant.ID, revisionID, frozenDocxHash, finalDocxKey, ""); err != nil {
 		_ = tx2.Rollback()
 		t.Fatalf("second (dedup) EnqueuePDFTx: %v", err)
 	}

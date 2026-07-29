@@ -7,18 +7,22 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 )
 
-func TestPDFOutboxRepository_Enqueue_UsesTx(t *testing.T) {
+// Enqueue is the MATERIALIZE-side write (it inserts values_hash, migration
+// 0312), so it is exercised against the materialize repo. Calling it on the pdf
+// repo is a programmer error and panics by design — see
+// TestStagingOutbox_Enqueue_PanicsOnPDFTable below.
+func TestMaterializeOutboxRepository_Enqueue_UsesTx(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
 	defer db.Close()
 	mock.ExpectBegin()
-	mock.ExpectQuery("INSERT INTO metaldocs.pdf_dispatch_outbox").
+	mock.ExpectQuery(`INSERT INTO metaldocs\.materialize_dispatch_outbox \(tenant_id, revision_id, values_hash, release_generation_id\)`).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("row-1"))
 	mock.ExpectCommit()
 	tx, _ := db.BeginTx(context.Background(), nil)
-	repo := NewPDFOutboxRepository(db)
+	repo := NewMaterializeOutboxRepository(db)
 	id, err := repo.Enqueue(context.Background(), tx, "t1", "r1", []byte("hash"), "")
 	if err != nil {
 		t.Fatalf("Enqueue: %v", err)
@@ -34,8 +38,9 @@ func TestPDFOutboxRepository_Enqueue_UsesTx(t *testing.T) {
 
 // TestPDFOutboxRepository_EnqueuePDF_PersistsFinalDocxKey pins F-QA2-2: the
 // pdf-specific enqueue INSERTs the renderer-produced final_docx_s3_key as the
-// 4th column/arg alongside content_hash, so the dispatched pdf event carries
-// the key instead of dead-lettering on "missing final_docx_s3_key".
+// 4th column/arg alongside frozen_docx_hash (migration 0312), so the dispatched
+// pdf event carries the key instead of dead-lettering on "missing
+// final_docx_s3_key".
 func TestPDFOutboxRepository_EnqueuePDF_PersistsFinalDocxKey(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -43,7 +48,7 @@ func TestPDFOutboxRepository_EnqueuePDF_PersistsFinalDocxKey(t *testing.T) {
 	}
 	defer db.Close()
 	mock.ExpectBegin()
-	mock.ExpectQuery(`INSERT INTO metaldocs\.pdf_dispatch_outbox \(tenant_id, revision_id, content_hash, final_docx_s3_key, release_generation_id\)`).
+	mock.ExpectQuery(`INSERT INTO metaldocs\.pdf_dispatch_outbox \(tenant_id, revision_id, frozen_docx_hash, final_docx_s3_key, release_generation_id\)`).
 		WithArgs("t1", "r1", []byte("hash"), "tenants/t1/r1/frozen.docx", "").
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("row-1"))
 	mock.ExpectCommit()
@@ -109,7 +114,7 @@ func TestPDFOutboxRepository_Enqueue_NilTxRejected(t *testing.T) {
 // translate to an empty id and a nil error — not an error — since dedup is a
 // successful outcome for the caller (dispatchjobs.Enqueuer uses the empty id
 // to skip the paired River insert).
-func TestPDFOutboxRepository_Enqueue_Idempotent(t *testing.T) {
+func TestMaterializeOutboxRepository_Enqueue_Idempotent(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
@@ -117,11 +122,11 @@ func TestPDFOutboxRepository_Enqueue_Idempotent(t *testing.T) {
 	defer db.Close()
 	mock.ExpectBegin()
 	// ON CONFLICT DO NOTHING → 0 rows returned on a duplicate; Enqueue must not error.
-	mock.ExpectQuery("INSERT INTO metaldocs.pdf_dispatch_outbox").
+	mock.ExpectQuery("INSERT INTO metaldocs.materialize_dispatch_outbox").
 		WillReturnRows(sqlmock.NewRows([]string{"id"}))
 	mock.ExpectCommit()
 	tx, _ := db.BeginTx(context.Background(), nil)
-	repo := NewPDFOutboxRepository(db)
+	repo := NewMaterializeOutboxRepository(db)
 	id, err := repo.Enqueue(context.Background(), tx, "t1", "r1", []byte("hash"), "")
 	if err != nil {
 		t.Fatalf("Enqueue: %v", err)
@@ -133,6 +138,44 @@ func TestPDFOutboxRepository_Enqueue_Idempotent(t *testing.T) {
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("expectations: %v", err)
 	}
+}
+
+// Migration 0312 split the two outbox hashes into differently-named columns, so
+// each enqueue is now table-specific. Crossing them is a programmer error and
+// must panic at the call, not silently INSERT a column the table does not have.
+func TestStagingOutbox_Enqueue_PanicsOnPDFTable(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+	mock.ExpectBegin()
+	tx, _ := db.BeginTx(context.Background(), nil)
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("Enqueue on the pdf table must panic (values_hash is materialize-only)")
+		}
+	}()
+	_, _ = NewPDFOutboxRepository(db).Enqueue(context.Background(), tx, "t1", "r1", []byte("hash"), "")
+}
+
+func TestStagingOutbox_EnqueuePDF_PanicsOnMaterializeTable(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+	mock.ExpectBegin()
+	tx, _ := db.BeginTx(context.Background(), nil)
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("EnqueuePDF on the materialize table must panic (frozen_docx_hash is pdf-only)")
+		}
+	}()
+	_, _ = NewMaterializeOutboxRepository(db).EnqueuePDF(
+		context.Background(), tx, "t1", "r1", []byte("hash"), "k", "")
 }
 
 func TestMaterializeOutboxRepository_Enqueue_NilTxRejected(t *testing.T) {

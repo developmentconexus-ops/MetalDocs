@@ -21,23 +21,24 @@ type fakeStagingRepo struct {
 	err                        error
 	calls                      int
 	gotTenantID, gotRevisionID string
-	gotContentHash             []byte
+	gotValuesHash              []byte
+	gotFrozenDocxHash          []byte
 	gotFinalDocxS3Key          string
 }
 
-func (f *fakeStagingRepo) Enqueue(_ context.Context, _ db.Tx, tenantID, revisionID string, contentHash []byte, releaseGenerationID string) (string, error) {
+func (f *fakeStagingRepo) Enqueue(_ context.Context, _ db.Tx, tenantID, revisionID string, valuesHash []byte, releaseGenerationID string) (string, error) {
 	f.calls++
 	f.gotTenantID = tenantID
 	f.gotRevisionID = revisionID
-	f.gotContentHash = contentHash
+	f.gotValuesHash = valuesHash
 	return f.id, f.err
 }
 
-func (f *fakeStagingRepo) EnqueuePDF(_ context.Context, _ db.Tx, tenantID, revisionID string, contentHash []byte, finalDocxS3Key, releaseGenerationID string) (string, error) {
+func (f *fakeStagingRepo) EnqueuePDF(_ context.Context, _ db.Tx, tenantID, revisionID string, frozenDocxHash []byte, finalDocxS3Key, releaseGenerationID string) (string, error) {
 	f.calls++
 	f.gotTenantID = tenantID
 	f.gotRevisionID = revisionID
-	f.gotContentHash = contentHash
+	f.gotFrozenDocxHash = frozenDocxHash
 	f.gotFinalDocxS3Key = finalDocxS3Key
 	return f.id, f.err
 }

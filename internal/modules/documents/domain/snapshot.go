@@ -15,6 +15,26 @@ type TemplateSnapshot struct {
 	BodyDocxS3Key         string
 }
 
+// RevisionRef identifies one document_revisions row together with everything
+// the freeze pipeline needs to render and verify it: where the body lives and
+// what its authored bytes are supposed to hash to.
+//
+// ID is document_revisions.id — NOT the documents.id that the freeze pipeline's
+// `revisionID` parameter has always carried (a long-standing misnomer, see
+// FreezeService.RepairMaterialization's note). The frozen_revision_id pin is
+// this ID.
+//
+// ContentHash is document_revisions.content_hash: lowercase sha256 hex of the
+// revision body bytes, established at upload time by
+// objectstore.VerifiedStore.Confirm. An empty ID means the document has no such
+// revision, and every caller must fail closed rather than substitute another
+// body (no-fallback principle).
+type RevisionRef struct {
+	ID          string
+	StorageKey  string
+	ContentHash string
+}
+
 // SnapshotHashes holds the sha256 digests of each snapshot field.
 type SnapshotHashes struct {
 	PlaceholderSchemaHash []byte

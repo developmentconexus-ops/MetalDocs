@@ -192,6 +192,9 @@ func RunDocument(ctx context.Context, deps Deps, documentID string, dryRun bool)
 
 		// Pin-equivalent repair. Not Pin: the freeze is already final and
 		// re-running it would recompute a values_hash the approver never signed.
+		// It DOES re-pin frozen_revision_id from the current revision in this
+		// same tx (migration 0313 header): that fresh, true pin is what makes
+		// legacy pre-0313 documents materializable again.
 		if err := deps.Freeze.RepairMaterialization(ctx, tx, tenantID, documentID, genID); err != nil {
 			return fmt.Errorf("backfill: repair materialization: %w", err)
 		}

@@ -17,13 +17,23 @@ import (
 
 const snapshotTestTenantID = tenant.DevTenantID
 
-func TestSnapshotRepository_WriteFreeze_PersistsHashAndFrozenAt(t *testing.T) {
+func TestSnapshotRepository_WriteFreeze_PersistsHashFrozenAtAndPin(t *testing.T) {
 	ctx := context.Background()
 	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
 	docID, tnt := testdb.InsertDraftDocument(t, db, "", snapshotTestTenantID)
 	repo := infrastructure.NewSnapshotRepository(db)
+
+	// The seam is what supplies the pin in production, so read it the same way
+	// here — a literal revision id would prove nothing about the join.
+	current, err := repo.ReadCurrentRevisionRef(ctx, tnt, docID)
+	if err != nil {
+		t.Fatalf("ReadCurrentRevisionRef: %v", err)
+	}
+	if current.ID == "" {
+		t.Fatal("fixture document has no current revision; cannot exercise the pin")
+	}
 
 	hash, err := hex.DecodeString("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 	if err != nil {
@@ -34,17 +44,18 @@ func TestSnapshotRepository_WriteFreeze_PersistsHashAndFrozenAt(t *testing.T) {
 	// WriteFreeze updates public.documents — guarded by document.edit tripwire.
 	// Pass the tx via the variadic DBTX parameter; cap set tx-locally via SeedWithCaps.
 	testdb.SeedWithCaps(t, db, `[{"cap":"document.edit"}]`, func(tx *sql.Tx) error {
-		return repo.WriteFreeze(ctx, tnt, docID, hash, frozenAt, tx)
+		return repo.WriteFreeze(ctx, tnt, docID, hash, current.ID, frozenAt, tx)
 	})
 
 	var gotHash []byte
 	var gotFrozenAt *time.Time
+	var gotPin *string
 	if err := db.QueryRowContext(ctx, `
-		SELECT values_hash, values_frozen_at
+		SELECT values_hash, values_frozen_at, frozen_revision_id::text
 		  FROM public.documents
 		 WHERE tenant_id=$1::uuid AND id=$2::uuid`,
 		tnt, docID,
-	).Scan(&gotHash, &gotFrozenAt); err != nil {
+	).Scan(&gotHash, &gotFrozenAt, &gotPin); err != nil {
 		t.Fatalf("read freeze columns: %v", err)
 	}
 	if hex.EncodeToString(gotHash) != hex.EncodeToString(hash) {
@@ -52,6 +63,50 @@ func TestSnapshotRepository_WriteFreeze_PersistsHashAndFrozenAt(t *testing.T) {
 	}
 	if gotFrozenAt == nil || !gotFrozenAt.Equal(frozenAt) {
 		t.Fatalf("values_frozen_at mismatch: got %v want %v", gotFrozenAt, frozenAt)
+	}
+	// Migration 0313: the lineage pin lands in the SAME update as the hash.
+	if gotPin == nil || *gotPin != current.ID {
+		t.Fatalf("frozen_revision_id mismatch: got %v want %s", gotPin, current.ID)
+	}
+
+	// And the frozen-side read must now resolve that pin to the same revision.
+	frozen, err := repo.ReadFrozenRevisionRef(ctx, tnt, docID)
+	if err != nil {
+		t.Fatalf("ReadFrozenRevisionRef: %v", err)
+	}
+	if frozen.ID != current.ID {
+		t.Fatalf("ReadFrozenRevisionRef id = %q, want %q", frozen.ID, current.ID)
+	}
+	if frozen.ContentHash != current.ContentHash || frozen.ContentHash == "" {
+		t.Fatalf("ReadFrozenRevisionRef content_hash = %q, want %q", frozen.ContentHash, current.ContentHash)
+	}
+}
+
+// An unfrozen document has a NULL pin, and the frozen-side read must report
+// that as "nothing pinned" rather than silently resolving to the current head —
+// falling back to the head is the exact drift the pin exists to prevent.
+func TestSnapshotRepository_ReadFrozenRevisionRef_EmptyWhenUnpinned(t *testing.T) {
+	ctx := context.Background()
+	db, _ := testdb.Open(t)
+	db.SetMaxOpenConns(1)
+
+	docID, tnt := testdb.InsertDraftDocument(t, db, "", snapshotTestTenantID)
+	repo := infrastructure.NewSnapshotRepository(db)
+
+	current, err := repo.ReadCurrentRevisionRef(ctx, tnt, docID)
+	if err != nil {
+		t.Fatalf("ReadCurrentRevisionRef: %v", err)
+	}
+	if current.ID == "" {
+		t.Fatal("fixture document has no current revision")
+	}
+
+	frozen, err := repo.ReadFrozenRevisionRef(ctx, tnt, docID)
+	if err != nil {
+		t.Fatalf("ReadFrozenRevisionRef: %v", err)
+	}
+	if frozen.ID != "" || frozen.StorageKey != "" || frozen.ContentHash != "" {
+		t.Fatalf("unpinned document returned %+v, want zero RevisionRef", frozen)
 	}
 }
 

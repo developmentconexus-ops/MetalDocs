@@ -19,12 +19,18 @@ import (
 const nilGenerationLiteral = `'00000000-0000-0000-0000-000000000000'::uuid`
 
 // OutboxRow is the common row shape for all staging dispatch outbox tables.
+//
+// Hash carries the table's own payload hash, which is NOT the same value across
+// the two tables (F-QA4-10): materialize_dispatch_outbox.values_hash carries the
+// resolved-placeholder values hash, pdf_dispatch_outbox.frozen_docx_hash carries
+// the materialized frozen-docx hash. The field is named neutrally here precisely
+// so no reader assumes the two are comparable.
 type OutboxRow struct {
-	ID          string
-	TenantID    string
-	RevisionID  string
-	ContentHash []byte
-	Attempts    int
+	ID         string
+	TenantID   string
+	RevisionID string
+	Hash       []byte
+	Attempts   int
 }
 
 // stagingOutboxAllowlist restricts which tables the generic repo may address,
@@ -66,18 +72,27 @@ func NewStagingOutboxRepository(db *sql.DB, table string) *StagingOutboxReposito
 // successful dedup skip — and is reported to the caller as an empty id with a
 // nil error, letting the caller (the dispatchjobs.Enqueuer) decide to skip
 // the paired River insert.
-func (r *StagingOutboxRepository) Enqueue(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte, releaseGenerationID string) (string, error) {
+//
+// valuesHash is the resolved-placeholder values hash (documents.values_hash),
+// written to materialize_dispatch_outbox.values_hash — renamed from the former
+// misnomer content_hash in migration 0312 (F-QA4-10). Panics if called on a
+// non-materialize table (programmer error): only that table has this column,
+// mirroring EnqueuePDF's guard below.
+func (r *StagingOutboxRepository) Enqueue(ctx context.Context, tx db.Tx, tenantID, revisionID string, valuesHash []byte, releaseGenerationID string) (string, error) {
 	if tx == nil {
 		return "", fmt.Errorf("%s enqueue: tx must not be nil", r.name)
+	}
+	if r.table != "metaldocs.materialize_dispatch_outbox" {
+		panic(fmt.Sprintf("staging outbox: Enqueue called on non-materialize table %q", r.table))
 	}
 	var id string
 	//nolint:gosec // table name is allowlist-validated at construction
 	err := tx.QueryRowContext(ctx, fmt.Sprintf(`
-INSERT INTO %s (tenant_id, revision_id, content_hash, release_generation_id)
+INSERT INTO %s (tenant_id, revision_id, values_hash, release_generation_id)
 VALUES ($1::uuid, $2::uuid, $3, NULLIF($4, '')::uuid)
 ON CONFLICT (tenant_id, revision_id, COALESCE(release_generation_id, %s)) DO NOTHING
 RETURNING id`, r.table, nilGenerationLiteral),
-		tenantID, revisionID, contentHash, releaseGenerationID).Scan(&id)
+		tenantID, revisionID, valuesHash, releaseGenerationID).Scan(&id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			// ON CONFLICT DO NOTHING skipped the insert: dedup, not a failure.
@@ -95,7 +110,13 @@ RETURNING id`, r.table, nilGenerationLiteral),
 // dead-letter at the consumer (pdf_job_runner.go:117), so it fails closed at
 // the write boundary instead. Panics if called on a non-pdf table (programmer
 // error: only the pdf-bound repo may write this column).
-func (r *StagingOutboxRepository) EnqueuePDF(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte, finalDocxS3Key, releaseGenerationID string) (string, error) {
+//
+// frozenDocxHash is the MATERIALIZED frozen-docx hash (the renderer fanout's
+// output hash, also written to documents.content_hash), written to
+// pdf_dispatch_outbox.frozen_docx_hash — renamed from the former misnomer
+// content_hash in migration 0312 (F-QA4-10). It is a different value from the
+// materialize outbox's values_hash; the two are never comparable.
+func (r *StagingOutboxRepository) EnqueuePDF(ctx context.Context, tx db.Tx, tenantID, revisionID string, frozenDocxHash []byte, finalDocxS3Key, releaseGenerationID string) (string, error) {
 	if tx == nil {
 		return "", fmt.Errorf("%s enqueue pdf: tx must not be nil", r.name)
 	}
@@ -107,11 +128,11 @@ func (r *StagingOutboxRepository) EnqueuePDF(ctx context.Context, tx db.Tx, tena
 	}
 	var id string
 	err := tx.QueryRowContext(ctx, fmt.Sprintf(`
-INSERT INTO metaldocs.pdf_dispatch_outbox (tenant_id, revision_id, content_hash, final_docx_s3_key, release_generation_id)
+INSERT INTO metaldocs.pdf_dispatch_outbox (tenant_id, revision_id, frozen_docx_hash, final_docx_s3_key, release_generation_id)
 VALUES ($1::uuid, $2::uuid, $3, $4, NULLIF($5, '')::uuid)
 ON CONFLICT (tenant_id, revision_id, COALESCE(release_generation_id, %s)) DO NOTHING
 RETURNING id`, nilGenerationLiteral),
-		tenantID, revisionID, contentHash, finalDocxS3Key, releaseGenerationID).Scan(&id)
+		tenantID, revisionID, frozenDocxHash, finalDocxS3Key, releaseGenerationID).Scan(&id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			// ON CONFLICT DO NOTHING skipped the insert: dedup, not a failure.

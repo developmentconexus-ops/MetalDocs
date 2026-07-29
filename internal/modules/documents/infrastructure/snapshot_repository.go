@@ -97,51 +97,82 @@ func (r *SnapshotRepository) readSnapshot(ctx context.Context, exec DBTX, tenant
 	return s, valuesFrozenAt, err
 }
 
-// ReadCurrentRevisionBodyKey returns the storage key of the document's current
-// editor revision — the authored body the approver actually reviewed.
+// ReadCurrentRevisionRef returns the document's current editor revision — the
+// authored body the approver actually reviewed — as {id, storage_key,
+// content_hash}. It is the FREEZE-TIME read: Pin uses it to decide which
+// revision to pin.
 //
 // F-QA3-1 (operator ruling: option (a)): the freeze pipeline materializes the
 // EDITOR revision, not the template snapshot. The template snapshot only seeds
 // the initial clone; every later edit lands on document_revisions and becomes
-// the frozen truth. Returns an empty string when the document has no current
+// the frozen truth. Returns a zero RevisionRef when the document has no current
 // revision so the caller can fail closed (no-fallback principle) instead of
 // silently rendering an empty template body.
 //
 // document_revisions carries no tenant_id of its own — tenancy is enforced by
 // the join through documents, which is tenant-predicated here.
-func (r *SnapshotRepository) ReadCurrentRevisionBodyKey(ctx context.Context, tenantID, docID string, q ...DBTX) (string, error) {
+func (r *SnapshotRepository) ReadCurrentRevisionRef(ctx context.Context, tenantID, docID string, q ...DBTX) (domain.RevisionRef, error) {
+	return r.readRevisionRef(ctx, "current_revision_id", tenantID, docID, q...)
+}
+
+// ReadFrozenRevisionRef returns the revision PINNED at freeze time
+// (documents.frozen_revision_id, migration 0313) — the revision Materialize
+// must render and verify. It deliberately does NOT fall back to
+// current_revision_id: a document whose pin is absent (frozen before 0313) has
+// no recorded lineage, and rendering the head instead would re-open exactly the
+// drift window the pin closes.
+func (r *SnapshotRepository) ReadFrozenRevisionRef(ctx context.Context, tenantID, docID string, q ...DBTX) (domain.RevisionRef, error) {
+	return r.readRevisionRef(ctx, "frozen_revision_id", tenantID, docID, q...)
+}
+
+// readRevisionRef is the shared body for the two revision-ref reads above.
+// pointerColumn is a package-internal literal (never caller-supplied), so the
+// Sprintf carries no injection surface.
+func (r *SnapshotRepository) readRevisionRef(ctx context.Context, pointerColumn, tenantID, docID string, q ...DBTX) (domain.RevisionRef, error) {
 	exec := DBTX(r.db)
 	if len(q) > 0 && q[0] != nil {
 		exec = q[0]
 	}
-	var key string
+	var ref domain.RevisionRef
 	err := exec.QueryRowContext(ctx, fmt.Sprintf(`
-		SELECT coalesce(rev.storage_key, '')
+		SELECT coalesce(rev.id::text, ''),
+		       coalesce(rev.storage_key, ''),
+		       coalesce(rev.content_hash, '')
 		  FROM %s AS d
-		  LEFT JOIN %s AS rev ON rev.id = d.current_revision_id
+		  LEFT JOIN %s AS rev ON rev.id = d.%s
 		 WHERE d.tenant_id = $1::uuid AND d.id = $2::uuid`,
-		r.table("documents"), r.table("document_revisions")),
+		r.table("documents"), r.table("document_revisions"), pointerColumn),
 		tenantID, docID,
-	).Scan(&key)
+	).Scan(&ref.ID, &ref.StorageKey, &ref.ContentHash)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return "", fmt.Errorf("document not found: %s", docID)
+			return domain.RevisionRef{}, fmt.Errorf("document not found: %s", docID)
 		}
-		return "", err
+		return domain.RevisionRef{}, err
 	}
-	return key, nil
+	return ref, nil
 }
 
-func (r *SnapshotRepository) WriteFreeze(ctx context.Context, tenantID, docID string, valuesHash []byte, frozenAt time.Time, q ...DBTX) error {
+// WriteFreeze stamps the freeze state on a document: the values hash, the
+// freeze timestamp, and the lineage pin naming WHICH document_revisions row was
+// frozen (migration 0313). All three land in ONE update so a freeze can never
+// be half-recorded — a values_hash without a pin would be a freeze nobody can
+// verify afterwards.
+//
+// frozenRevisionID is a document_revisions.id (NOT the documents.id that the
+// freeze pipeline's `revisionID` parameter carries). An empty string writes a
+// NULL pin, which is the honest record for a document that has no revision at
+// all; Materialize then fails closed on it rather than guessing a body.
+func (r *SnapshotRepository) WriteFreeze(ctx context.Context, tenantID, docID string, valuesHash []byte, frozenRevisionID string, frozenAt time.Time, q ...DBTX) error {
 	exec := DBTX(r.db)
 	if len(q) > 0 && q[0] != nil {
 		exec = q[0]
 	}
 	result, err := exec.ExecContext(ctx, fmt.Sprintf(`
         UPDATE %s
-           SET values_hash=$1, values_frozen_at=$2
-         WHERE tenant_id=$3::uuid AND id=$4::uuid`, r.table("documents")),
-		valuesHash, frozenAt, tenantID, docID)
+           SET values_hash=$1, values_frozen_at=$2, frozen_revision_id=NULLIF($3,'')::uuid
+         WHERE tenant_id=$4::uuid AND id=$5::uuid`, r.table("documents")),
+		valuesHash, frozenAt, frozenRevisionID, tenantID, docID)
 	if err != nil {
 		return fmt.Errorf("write freeze: %w", err)
 	}

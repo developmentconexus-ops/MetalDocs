@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -20,6 +21,7 @@ import (
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/httpclient"
 	riverjobs "metaldocs/internal/platform/jobs/river"
+	"metaldocs/internal/platform/objectstore"
 	"metaldocs/internal/platform/observability"
 	workerapp "metaldocs/internal/platform/worker"
 )
@@ -87,6 +89,29 @@ func (a snapshotPDFTxAdapter) WritePDF(ctx context.Context, req workerapp.PDFWri
 		req.GeneratedAt,
 	)
 }
+
+// buildRevisionBodyReader builds the blob reader Materialize uses to fetch the
+// PINNED revision body and verify its bytes against document_revisions.content_hash
+// before rendering (F-QA3-1 lineage). Returns (nil, nil) when the deployment has
+// no MinIO attachments provider — the caller decides whether that is fatal.
+func buildRevisionBodyReader() (*objectstore.VerifiedStore, error) {
+	attachmentsCfg, err := config.LoadAttachmentsConfig()
+	if err != nil {
+		return nil, fmt.Errorf("invalid attachments config: %w", err)
+	}
+	if attachmentsCfg.Provider != config.StorageProviderMinIO {
+		return nil, nil
+	}
+	minioClient, minioPublicClient, minioBucket, err := bootstrap.BuildMinioClients(attachmentsCfg)
+	if err != nil {
+		return nil, fmt.Errorf("build minio clients: %w", err)
+	}
+	return objectstore.NewVerifiedStore(minioClient, minioPublicClient, minioBucket, maxRevisionBodyBytes), nil
+}
+
+// maxRevisionBodyBytes mirrors the cap the freeze service passes to
+// AssertedReadObject; the store's own cap must not be tighter than the read.
+const maxRevisionBodyBytes = 25 * 1024 * 1024
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
@@ -175,6 +200,25 @@ func main() {
 			resolverReg, snapRepo, nil,
 			snapRepo, fanoutClient,
 		)
+
+		// Materialize verifies the pinned revision's bytes against that
+		// revision's recorded content_hash before rendering anything (F-QA3-1
+		// lineage, fail closed). Without a blob reader it cannot verify, and it
+		// refuses to render rather than skip the check — so a Gotenberg/MinIO-less
+		// deploy fails loudly here instead of silently producing unverified
+		// artifacts.
+		blobs, err := buildRevisionBodyReader()
+		if err != nil {
+			slog.Error("build revision body reader", "err", err)
+			deps.Cleanup()
+			os.Exit(1)
+		}
+		if blobs == nil {
+			slog.Error("materialize requires a MinIO attachments provider to verify frozen lineage")
+			deps.Cleanup()
+			os.Exit(1)
+		}
+		freezeSvc = freezeSvc.WithRevisionBodyReader(blobs)
 
 		pdfOutboxRepo := fanoutpkg.NewPDFOutboxRepository(deps.SQLDB)
 		// The Enqueuer constructor needs both staging outbox repos even though

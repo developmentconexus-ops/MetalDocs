@@ -33,7 +33,7 @@ type MaterializeFinalDocxPersister interface {
 // consumer) and satisfied by *dispatchjobs.Enqueuer. It inserts the paired
 // (outbox row, River job) atomically inside tx (M5 F5.3 T3).
 type MaterializePDFEnqueuer interface {
-	EnqueuePDFTx(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte, finalDocxS3Key, releaseGenerationID string) error
+	EnqueuePDFTx(ctx context.Context, tx db.Tx, tenantID, revisionID string, frozenDocxHash []byte, finalDocxS3Key, releaseGenerationID string) error
 }
 
 // ArtifactFactRecorder is the consumer-owned port onto the approval module's
@@ -145,7 +145,8 @@ func (r *MaterializeJobRunner) Handle(ctx context.Context, event messaging.Event
 	// result.FinalDocxS3Key is the renderer-produced key just written to
 	// documents (WriteFinalDocxInTx). Thread it into the pdf dispatch snapshot
 	// so the docgen_v2_pdf event carries it (F-QA2-2); the worker must never
-	// re-derive this key.
+	// re-derive this key. result.ContentHash is that same artifact's hash — it
+	// lands in pdf_dispatch_outbox.frozen_docx_hash (F-QA4-10, migration 0312).
 	if err := r.pdfOutbox.EnqueuePDFTx(ctx, tx, payload.TenantID, payload.RevisionID, result.ContentHash, result.FinalDocxS3Key, payload.ReleaseGenerationID); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("materialize job runner: enqueue pdf outbox: %w", err)

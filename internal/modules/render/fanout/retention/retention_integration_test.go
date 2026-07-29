@@ -79,6 +79,30 @@ func seedTenantTx(t *testing.T, ctx context.Context, db *sql.DB, tenantID string
 	return tx
 }
 
+// enqueueForTable inserts one pending outbox row through the enqueue that
+// belongs to that table. Migration 0312 gave the two tables differently-named
+// hash columns (values_hash vs frozen_docx_hash), so the generic Enqueue is
+// materialize-only and the pdf table must go through EnqueuePDF — retention
+// itself is table-agnostic, but seeding no longer can be.
+func enqueueForTable(t *testing.T, ctx context.Context, db *sql.DB, table string, repo *fanout.StagingOutboxRepository, tenantID, revisionID string, hash []byte) {
+	t.Helper()
+	tx := seedTenantTx(t, ctx, db, tenantID)
+	var err error
+	if table == "metaldocs.pdf_dispatch_outbox" {
+		_, err = repo.EnqueuePDF(ctx, tx, tenantID, revisionID, hash,
+			"tenants/"+tenantID+"/"+revisionID+"/frozen.docx", "")
+	} else {
+		_, err = repo.Enqueue(ctx, tx, tenantID, revisionID, hash, "")
+	}
+	if err != nil {
+		_ = tx.Rollback()
+		t.Fatalf("enqueue into %s: %v", table, err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit enqueue tx: %v", err)
+	}
+}
+
 // seedDispatchedRow enqueues+commits a pending outbox row for
 // (tenantID, revisionID), then marks it dispatched via the real repo method.
 // If backdateBy is non-zero, the row's dispatched_at is pushed back by that
@@ -88,14 +112,7 @@ func seedTenantTx(t *testing.T, ctx context.Context, db *sql.DB, tenantID string
 func seedDispatchedRow(t *testing.T, ctx context.Context, db *sql.DB, table string, repo *fanout.StagingOutboxRepository, tenantID, revisionID string, backdateBy time.Duration) {
 	t.Helper()
 
-	tx := seedTenantTx(t, ctx, db, tenantID)
-	if _, err := repo.Enqueue(ctx, tx, tenantID, revisionID, []byte{0x01}, ""); err != nil {
-		_ = tx.Rollback()
-		t.Fatalf("enqueue: %v", err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatalf("commit enqueue tx: %v", err)
-	}
+	enqueueForTable(t, ctx, db, table, repo, tenantID, revisionID, []byte{0x01})
 
 	var id string
 	if err := db.QueryRowContext(ctx,
@@ -187,14 +204,7 @@ func TestRetentionPurge_Integration_PurgesOnlyOldDispatchedRows(t *testing.T) {
 
 			// (c) dead-lettered: status='failed', dead_lettered_at set, never
 			// eligible regardless of age.
-			tx := seedTenantTx(t, ctx, db, tenant.ID)
-			if _, err := fx.repo.Enqueue(ctx, tx, tenant.ID, deadRevisionID, []byte{0x03}, ""); err != nil {
-				_ = tx.Rollback()
-				t.Fatalf("enqueue dead-lettered row: %v", err)
-			}
-			if err := tx.Commit(); err != nil {
-				t.Fatalf("commit enqueue tx: %v", err)
-			}
+			enqueueForTable(t, ctx, db, fx.table, fx.repo, tenant.ID, deadRevisionID, []byte{0x03})
 			deadID := lookupOutboxID(t, ctx, db, fx.table, tenant.ID, deadRevisionID)
 			if err := fx.repo.MarkFailed(ctx, tenant.ID, deadID, "boom"); err != nil {
 				t.Fatalf("mark failed: %v", err)

@@ -2,7 +2,10 @@ package application
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
+	"fmt"
 	"time"
 
 	v2dom "metaldocs/internal/modules/documents/domain"
@@ -28,14 +31,47 @@ type fakeSnapshotReader struct {
 	snap           v2dom.TemplateSnapshot
 	valuesFrozenAt *time.Time
 	err            error
-	// revisionBodyKey is the current editor revision Materialize freezes
-	// (F-QA3-1 option (a)). Empty means "no current revision" — Materialize
-	// must fail closed rather than fall back to the template snapshot.
-	revisionBodyKey string
+	// currentRef is the document's head editor revision — what Pin pins.
+	// frozenRef is the revision the pin NAMES — what Materialize renders.
+	// They are separate fields on purpose: tests can make them diverge and
+	// prove Materialize follows the pin instead of the head.
+	currentRef v2dom.RevisionRef
+	frozenRef  v2dom.RevisionRef
 }
 
-func (f fakeSnapshotReader) ReadCurrentRevisionBodyKey(_ context.Context, _, _ string, _ ...infrastructure.DBTX) (string, error) {
-	return f.revisionBodyKey, f.err
+func (f fakeSnapshotReader) ReadCurrentRevisionRef(_ context.Context, _, _ string, _ ...infrastructure.DBTX) (v2dom.RevisionRef, error) {
+	return f.currentRef, f.err
+}
+
+func (f fakeSnapshotReader) ReadFrozenRevisionRef(_ context.Context, _, _ string, _ ...infrastructure.DBTX) (v2dom.RevisionRef, error) {
+	return f.frozenRef, f.err
+}
+
+// fakeRevisionBodyReader serves bytes per storage key. A key that is absent
+// returns an error, so "Materialize read a key nobody staged" surfaces as a
+// failure instead of an empty body that would hash to the empty-string digest.
+type fakeRevisionBodyReader struct {
+	bodies map[string][]byte
+	keys   []string
+	err    error
+}
+
+func (f *fakeRevisionBodyReader) AssertedReadObject(_ context.Context, _, key string, _ int64) ([]byte, error) {
+	f.keys = append(f.keys, key)
+	if f.err != nil {
+		return nil, f.err
+	}
+	body, ok := f.bodies[key]
+	if !ok {
+		return nil, fmt.Errorf("fake body reader: no object at %s", key)
+	}
+	return body, nil
+}
+
+// hashOf is the digest document_revisions.content_hash records for a body.
+func hashOf(body []byte) string {
+	sum := sha256.Sum256(body)
+	return hex.EncodeToString(sum[:])
 }
 
 func (f fakeSnapshotReader) ReadSnapshotWithFreezeAt(_ context.Context, _, _ string, _ ...infrastructure.DBTX) (v2dom.TemplateSnapshot, *time.Time, error) {
@@ -81,14 +117,19 @@ type fakeFreezeFinalizer struct {
 	hash  []byte
 	at    time.Time
 	err   error
+	// pinnedRevisionID captures the document_revisions.id Pin stamped, so
+	// tests can assert the lineage pin is written and is NOT the documents.id
+	// the pipeline's `revisionID` parameter carries.
+	pinnedRevisionID string
 }
 
-func (f *fakeFreezeFinalizer) WriteFreeze(_ context.Context, _, _ string, valuesHash []byte, frozenAt time.Time, _ ...infrastructure.DBTX) error {
+func (f *fakeFreezeFinalizer) WriteFreeze(_ context.Context, _, _ string, valuesHash []byte, frozenRevisionID string, frozenAt time.Time, _ ...infrastructure.DBTX) error {
 	if f.err != nil {
 		return f.err
 	}
 	f.calls++
 	f.hash = append([]byte(nil), valuesHash...)
+	f.pinnedRevisionID = frozenRevisionID
 	f.at = frozenAt
 	return nil
 }
