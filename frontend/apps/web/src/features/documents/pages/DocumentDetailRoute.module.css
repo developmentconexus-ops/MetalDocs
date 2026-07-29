@@ -83,21 +83,6 @@
   flex-wrap: wrap;
 }
 
-.heroNotice {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-height: 2.5rem;
-  max-width: 28rem;
-  padding: 0.625rem 0.875rem;
-  border: 1px solid var(--warning);
-  border-radius: var(--r-2);
-  background: var(--warning-bg);
-  color: var(--warning);
-  font-size: 0.75rem;
-  line-height: 1.4;
-}
-
 .pdfAlert {
   display: inline-block;
   margin-left: var(--sp-2);

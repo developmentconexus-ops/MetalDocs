@@ -18,7 +18,7 @@ interface ArtifactApprovalScreenProps {
   /** Kind-specific sidebar extras rendered BELOW the decision panel / actions (e.g.
    *  document integrity panel / lock badge / timeline). Optional. */
   decisionExtras?: React.ReactNode;
-  /** Route-owned modal dialogs (SupersedePublishDialog, CancelInstanceDialog, …). Optional. */
+  /** Route-owned modal dialogs (CancelInstanceDialog, SignoffDialog, …). Optional. */
   dialogs?: React.ReactNode;
 }
 

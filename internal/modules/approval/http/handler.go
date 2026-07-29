@@ -1,5 +1,5 @@
 // Package approvalhttp implements the approval subsystem's HTTP handlers:
-// submit, decision, read, cancel, obsolete, supersede, and route admin. Every
+// submit, decision, read, cancel, obsolete, and route admin. Every
 // mutating handler enforces the If-Match / Idempotency-Key preconditions
 // (OCC + safe-retry) before invoking the application layer, and errors are
 // mapped to RFC 9457 problem+json via MapErrorToResponse.
@@ -71,10 +71,6 @@ type obsoleteService interface {
 	MarkObsolete(ctx context.Context, runner db.TxRunner, req application.MarkObsoleteRequest) (application.MarkObsoleteResult, error)
 }
 
-type supersedeService interface {
-	PublishSuperseding(ctx context.Context, runner db.TxRunner, req application.SupersedeRequest) (application.SupersedeResult, error)
-}
-
 type routeAdminService interface {
 	Create(ctx context.Context, runner db.TxRunner, in application.CreateRouteInput) (application.CreateRouteResult, error)
 	Update(ctx context.Context, runner db.TxRunner, in application.UpdateRouteInput) (application.UpdateRouteResult, error)
@@ -113,7 +109,7 @@ type fastForwardIdempStore interface {
 var _ fastForwardIdempStore = (*approvalidempinfra.PostgresSignoffIdempStore)(nil)
 
 // Handler implements the approval subsystem's HTTP endpoints (submit, decision,
-// read, cancel, obsolete, supersede, route admin). It wraps *application.Services
+// read, cancel, obsolete, route admin). It wraps *application.Services
 // behind narrow per-endpoint interfaces so handlers can be tested against fakes.
 type Handler struct {
 	services              *application.Services
@@ -126,7 +122,6 @@ type Handler struct {
 	reviewVerdictSvc      reviewVerdictService
 	fastForwardSvc        fastForwardService
 	obsoleteSvc           obsoleteService
-	supersedeSvc          supersedeService
 	routeAdmin            routeAdminService
 	idempStore            signoffIdempStore
 	fastForwardIdempStore fastForwardIdempStore
@@ -157,7 +152,6 @@ func NewHandler(services *application.Services, database *sql.DB, idempStore sig
 		h.reviewVerdictSvc = services.ReviewVerdict
 		h.fastForwardSvc = services.FastForward
 		h.obsoleteSvc = services.Obsolete
-		h.supersedeSvc = services.Supersede
 		h.routeAdmin = services.RouteAdmin
 	}
 	return h

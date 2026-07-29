@@ -19,8 +19,8 @@
 //   - a plan-named CROSS-controlled-document target's lifecycle event carries
 //     ITS controlled document, not the released source's
 //   - a missing artifact holds on `materializing` and releases once it lands
-//   - the DB refuses a second published head per controlled document, so the
-//     still-live legacy publish path cannot break the supersession invariant
+//   - the DB itself refuses a second published head per controlled document, so
+//     no writer — present or future — can break the supersession invariant
 package approval_test
 
 import (
@@ -37,6 +37,7 @@ import (
 	"metaldocs/internal/modules/approval/infrastructure"
 	docsapp "metaldocs/internal/modules/documents/application"
 	docsdomain "metaldocs/internal/modules/documents/domain"
+	"metaldocs/internal/modules/iam/authz"
 	iampostgres "metaldocs/internal/modules/iam/infrastructure/postgres"
 	"metaldocs/internal/platform/db"
 	"metaldocs/tests/integration/testdb"
@@ -946,17 +947,23 @@ func TestRelease_CrossControlledDocumentSupersede_AddressesTargetsOwnCD(t *testi
 	}
 }
 
-// TestRelease_LegacyPublish_CannotCreateSecondPublishedHead pins ADR 0085's
-// supersession-head invariant to the DATABASE. The still-live legacy publish
-// path (PublishService.PublishApproved, retired in Stage B) publishes an
-// approved document WITHOUT superseding the controlled document's existing
-// head; with nothing but application code in the way that produced two
-// published rows for one controlled document, after which the coordinator's
-// re-decision silently no-ops. ux_documents_published_head (migration 0310) is
-// what makes that unrepresentable, and MapPgError turns the 23505 into a
-// conflict rather than a naked 500.
-func TestRelease_LegacyPublish_CannotCreateSecondPublishedHead(t *testing.T) {
+// TestRelease_SecondPublishedHeadRefusedByDB pins ADR 0085's supersession-head
+// invariant to the DATABASE, with no application code in the way at all.
+//
+// Before Stage B this was driven through PublishService.PublishApproved, which
+// published an approved document WITHOUT superseding the controlled document's
+// existing head. That service is gone — publication is now the release
+// coordinator's decision — but the guarantee it accidentally probed is the
+// point and outlives it: no amount of application code, present or future, can
+// create a second published row for one controlled document, because
+// ux_documents_published_head (migration 0310) refuses it, and MapPgError turns
+// the resulting 23505 into a conflict rather than a naked 500.
+//
+// Driving it by raw SQL is deliberate: an assertion about a DB invariant should
+// not be mediated by whichever writer happens to exist this quarter.
+func TestRelease_SecondPublishedHeadRefusedByDB(t *testing.T) {
 	database, _ := testdb.Open(t)
+	ctx := context.Background()
 
 	tenant := testdb.NewTenant(t, database)
 	admin := testdb.NewUser(t, database,
@@ -969,8 +976,8 @@ func TestRelease_LegacyPublish_CannotCreateSecondPublishedHead(t *testing.T) {
 		testdb.WithStatus("published"),
 		testdb.WithRevisionNumber(1))
 
-	// A second revision of the SAME controlled document, approved and pointed
-	// at the legacy publish endpoint.
+	// A second revision of the SAME controlled document, approved and about to
+	// claim the head slot without demoting the incumbent.
 	challenger := testdb.NewDocument(t, database,
 		testdb.WithTenant(tenant.ID),
 		testdb.WithOwner(admin.ID),
@@ -979,28 +986,43 @@ func TestRelease_LegacyPublish_CannotCreateSecondPublishedHead(t *testing.T) {
 		}),
 		testdb.WithStatus("approved"),
 		testdb.WithRevisionNumber(2))
-	instance := testdb.NewApprovalInstance(t, database,
-		testdb.WithDocument(challenger),
-		testdb.WithStatus("approved"))
 
-	repo := infrastructure.NewPostgresApprovalRepository(database, iampostgres.NewUserDisplayNameRepository(database))
-	services := application.NewServices(repo, application.NewSQLEmitter(), application.RealClock{}, nil)
+	tx, err := database.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("begin tx: %v", err)
+	}
+	defer tx.Rollback()
 
-	_, err := services.Publish.PublishApproved(testdb.AuthzCtx(tenant.ID, admin.ID), db.NewTxRunner(database),
-		application.PublishRequest{
-			TenantID:    tenant.ID,
-			InstanceID:  instance.ID,
-			PublishedBy: admin.ID,
-		})
+	if err := authz.SeedTxIdentity(ctx, tx, tenant.ID, admin.ID); err != nil {
+		t.Fatalf("seed identity: %v", err)
+	}
+	if _, err := tx.ExecContext(ctx,
+		`SELECT set_config('metaldocs.asserted_caps', $1, true)`, `[{"cap":"document.edit"}]`,
+	); err != nil {
+		t.Fatalf("assert caps: %v", err)
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		UPDATE public.documents
+		   SET status           = 'published',
+		       effective_from   = now(),
+		       revision_version = revision_version + 1
+		 WHERE id        = $1::uuid
+		   AND tenant_id = $2::uuid`,
+		challenger.ID, tenant.ID)
 	if err == nil {
-		t.Fatal("legacy publish created a SECOND published head — ux_documents_published_head is not enforcing the ADR 0085 supersession-head invariant")
+		t.Fatal("a SECOND published head was accepted — ux_documents_published_head is not enforcing the ADR 0085 supersession-head invariant")
 	}
-	if !errors.Is(err, infrastructure.ErrStaleRevision) {
-		t.Fatalf("error = %v, want infrastructure.ErrStaleRevision (409 conflict), not an unmapped database error", err)
+	mapped := infrastructure.MapPgError(err, infrastructure.MapHints{})
+	if !errors.Is(mapped, infrastructure.ErrStaleRevision) {
+		t.Fatalf("mapped error = %v, want infrastructure.ErrStaleRevision (409 conflict), not an unmapped database error", mapped)
 	}
+	// The unique-index violation aborted the transaction; roll it back so the
+	// assertions below read committed state.
+	_ = tx.Rollback()
 
 	var publishedRows int
-	if err := database.QueryRowContext(context.Background(), `
+	if err := database.QueryRowContext(ctx, `
 		SELECT count(*) FROM public.documents
 		 WHERE tenant_id = $1::uuid AND controlled_document_id = $2::uuid AND status = 'published'`,
 		tenant.ID, head.ControlledDocumentID,
@@ -1011,7 +1033,7 @@ func TestRelease_LegacyPublish_CannotCreateSecondPublishedHead(t *testing.T) {
 		t.Fatalf("published rows for the controlled document = %d, want exactly 1", publishedRows)
 	}
 	if got := documentStatus(t, database, challenger.ID); got != "approved" {
-		t.Fatalf("challenger status = %q, want approved (the whole publish tx must roll back)", got)
+		t.Fatalf("challenger status = %q, want approved (the whole tx must roll back)", got)
 	}
 	if got := documentStatus(t, database, head.ID); got != "published" {
 		t.Fatalf("existing head status = %q, want published (untouched)", got)

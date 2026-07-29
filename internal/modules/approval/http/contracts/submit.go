@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 )
 
 var (
@@ -45,6 +46,24 @@ type SubmitRequest struct {
 	// submit_choice stage is present and the entry is missing, empty, or
 	// targets the wrong stage.
 	ChosenActors []SubmitChosenActors `json:"chosen_actors,omitempty"`
+
+	// Publication plan (ADR 0085). Publication is not an endpoint — the release
+	// coordinator releases an approved revision once every readiness fact holds.
+	// The plan is the author's ONLY input to that decision and is declared here,
+	// at submission, or not at all. Absent plan = release immediately on
+	// readiness.
+	//
+	// PlannedEffectiveFrom is a string (not *time.Time) so a non-UTC offset can
+	// be rejected rather than silently normalized — the same rule the retiring
+	// schedule-publish contract enforced.
+	PlannedEffectiveFrom string     `json:"planned_effective_from,omitempty"`
+	EffectiveTo          *time.Time `json:"effective_to,omitempty"`
+	ReviewDueAt          *time.Time `json:"review_due_at,omitempty"`
+	// SupersededDocumentID names a CROSS-document supersede target: a published
+	// document of a DIFFERENT controlled document this revision retires on
+	// release. Same-controlled-document supersession is implicit (the
+	// coordinator discovers the incumbent head) and naming it is rejected.
+	SupersededDocumentID string `json:"superseded_document_id,omitempty"`
 }
 
 // SubmitChosenActors is the wire shape of one chosen_actors entry: the
@@ -69,6 +88,41 @@ func (r SubmitRequest) Validate() error {
 		if err := validateSHA256Hex("content_hash", r.ContentHash); err != nil {
 			return wrapValidation(err)
 		}
+	}
+	return r.validatePlan()
+}
+
+// validatePlan is the friendly first line for the ADR 0085 publication plan.
+// Every rule below mirrors a DB CHECK the release transaction still enforces
+// against the ACTUAL release instant (ck_documents_effective_window,
+// ck_documents_review_due_sane) — this is a courtesy 400, never the last line.
+// The whole plan is optional; an entirely absent plan validates trivially.
+func (r SubmitRequest) validatePlan() error {
+	if strings.TrimSpace(r.SupersededDocumentID) != "" {
+		if err := validateUUID("superseded_document_id", r.SupersededDocumentID); err != nil {
+			return wrapValidation(err)
+		}
+	}
+
+	planned := strings.TrimSpace(r.PlannedEffectiveFrom)
+	if planned == "" {
+		// No planned date: effective_to / review_due_at have no anchor to be
+		// compared against here. Both remain individually legal and are
+		// re-checked against the actual release instant in the DB.
+		return nil
+	}
+	t, err := time.Parse(time.RFC3339, planned)
+	if err != nil {
+		return wrapValidation(fmt.Errorf("planned_effective_from must be parseable RFC3339: %w", err))
+	}
+	if _, offset := t.Zone(); offset != 0 {
+		return wrapValidation(fmt.Errorf("planned_effective_from must be UTC"))
+	}
+	if r.EffectiveTo != nil && !r.EffectiveTo.After(t) {
+		return wrapValidation(fmt.Errorf("effective_to must be strictly after planned_effective_from"))
+	}
+	if r.ReviewDueAt != nil && r.ReviewDueAt.Before(t) {
+		return wrapValidation(fmt.Errorf("review_due_at must not be before planned_effective_from"))
 	}
 	return nil
 }

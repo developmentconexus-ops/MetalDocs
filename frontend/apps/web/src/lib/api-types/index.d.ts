@@ -1792,40 +1792,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/documents/{id}/publish": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Publish document */
-        post: operations["publishDocument"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/documents/{id}/schedule-publish": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Schedule document publish */
-        post: operations["scheduleDocumentPublish"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/documents/{id}/review": {
         parameters: {
             query?: never;
@@ -1837,26 +1803,9 @@ export interface paths {
         put?: never;
         /**
          * Mark document reviewed
-         * @description Records a periodic-review completion on a live published revision. Sets last_reviewed_at and the next review_due_at (and optionally effective_to) under the document.review capability; not a status transition (status stays published). OCC via the If-Match ETag, consistent with the sibling submit/publish/schedule-publish operations (CON-01).
+         * @description Records a periodic-review completion on a live published revision. Sets last_reviewed_at and the next review_due_at (and optionally effective_to) under the document.review capability; not a status transition (status stays published). OCC via the If-Match ETag, consistent with the sibling submit operation (CON-01).
          */
         post: operations["markDocumentReviewed"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/documents/{id}/supersede": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Supersede document */
-        post: operations["supersedeDocument"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3498,6 +3447,26 @@ export interface components {
             reason_category?: "content" | "corrective" | "regulatory" | "periodic_review" | "administrative";
             /** @description Per-stage caller-chosen actors (M4, unit 3.2, slice 5). Required only for stages governed by a submit_choice actor selector: a matching entry with a non-empty user_ids is mandatory for such a stage (422 otherwise), and every chosen user is validated server-side against the selector's role x area_code constraint (422 on violation). An entry naming a stage_order with no submit_choice selector is also rejected (422, fail-closed). */
             chosen_actors?: components["schemas"]["SubmitChosenActors"][];
+            /**
+             * Format: date-time
+             * @description Publication plan (ADR 0085): RFC3339 UTC instant before which the release coordinator must not release this revision, even once every other readiness fact holds. Non-UTC offsets are rejected. Omit for immediate release on readiness. This is the PLAN; the actual release instant is recorded separately in effective_from.
+             */
+            planned_effective_from?: string;
+            /**
+             * Format: date-time
+             * @description Publication plan (ADR 0085): optional expiry instant carried to the release transaction. Must be strictly after planned_effective_from when both are supplied.
+             */
+            effective_to?: string | null;
+            /**
+             * Format: date-time
+             * @description Publication plan (ADR 0085): optional initial periodic-review due date. Must not be before planned_effective_from when both are supplied. A planned due date that has already passed at the actual release instant is recomputed from the profile's review interval.
+             */
+            review_due_at?: string | null;
+            /**
+             * Format: uuid
+             * @description Publication plan (ADR 0085): optional CROSS-document supersede target — a published document of a DIFFERENT controlled document that this revision retires on release. Same-controlled-document supersession is implicit and must not be named here. Naming a target requires the document.supersede capability on the TARGET's process area, checked in the submit transaction (403 otherwise).
+             */
+            superseded_document_id?: string;
         };
         SubmitChosenActors: {
             stage_order: number;
@@ -3628,28 +3597,6 @@ export interface components {
             /** @description Total pending items for the actor across all pages. */
             total: number;
         };
-        SchedulePublishDocumentRequest: {
-            /**
-             * Format: date-time
-             * @description RFC3339 UTC timestamp the publish takes effect; non-UTC offsets are rejected.
-             */
-            effective_from: string;
-            /**
-             * Format: uuid
-             * @description Optional document to supersede when the scheduled publish fires.
-             */
-            superseded_document_id?: string;
-            /**
-             * Format: date-time
-             * @description Optional expiry date; the publish is no longer effective after this instant.
-             */
-            effective_to?: string | null;
-            /**
-             * Format: date-time
-             * @description Optional initial periodic-review due date set at schedule/publish time.
-             */
-            review_due_at?: string | null;
-        };
         MarkDocumentReviewedRequest: {
             /**
              * Format: date-time
@@ -3665,13 +3612,8 @@ export interface components {
         PublishDocumentResponse: {
             /** Format: uuid */
             document_id: string;
-            /** @description published for immediate publish; scheduled for schedule-publish. */
+            /** @description Document status after the operation. The periodic-review completion is not a status transition, so this echoes the unchanged status (published). */
             new_status: string;
-            /**
-             * Format: date-time
-             * @description Present only for schedule-publish; RFC3339 UTC effective date.
-             */
-            effective_from?: string;
         };
         ObsoleteDocumentRequest: {
             reason: string;
@@ -3711,19 +3653,6 @@ export interface components {
             created_by: string;
             /** Format: date-time */
             created_at: string;
-        };
-        SupersedeDocumentRequest: {
-            /**
-             * Format: uuid
-             * @description Published document this document supersedes.
-             */
-            superseded_document_id: string;
-        };
-        SupersedeDocumentResponse: {
-            /** Format: uuid */
-            document_id: string;
-            /** Format: uuid */
-            superseded_id: string;
         };
         DocumentRevisionHistoryItem: {
             /** Format: uuid */
@@ -7531,76 +7460,6 @@ export interface operations {
             500: components["responses"]["InternalServerError"];
         };
     };
-    publishDocument: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": string;
-                /** @description Expected revision version ETag in the form "v<N>", or "*" to skip the check */
-                "If-Match": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description ok */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PublishDocumentResponse"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            428: components["responses"]["PreconditionRequired"];
-            500: components["responses"]["InternalServerError"];
-        };
-    };
-    scheduleDocumentPublish: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": string;
-                /** @description Expected revision version ETag in the form "v<N>", or "*" to skip the check */
-                "If-Match": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SchedulePublishDocumentRequest"];
-            };
-        };
-        responses: {
-            /** @description ok */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PublishDocumentResponse"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            428: components["responses"]["PreconditionRequired"];
-            500: components["responses"]["InternalServerError"];
-        };
-    };
     markDocumentReviewed: {
         parameters: {
             query?: never;
@@ -7627,43 +7486,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublishDocumentResponse"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            428: components["responses"]["PreconditionRequired"];
-            500: components["responses"]["InternalServerError"];
-        };
-    };
-    supersedeDocument: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": string;
-                /** @description Expected revision version ETag in the form "v<N>", or "*" to skip the check */
-                "If-Match": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SupersedeDocumentRequest"];
-            };
-        };
-        responses: {
-            /** @description ok */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SupersedeDocumentResponse"];
                 };
             };
             400: components["responses"]["BadRequest"];

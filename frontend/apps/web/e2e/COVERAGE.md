@@ -40,7 +40,7 @@ CI gate: `.github/workflows/e2e-coverage-gate.yml` fails build if any invariant 
 | P3-I02 | `draft → under_review` only via submit, not direct UPDATE | `happy_path :: submit triggers state change` | ✅ |
 | P3-I03 | `published` is terminal — no further transitions | `happy_path :: badge stays published` | ✅ |
 | P3-I04 | `rejected → draft` auto-transition on rejection | `reject_flow :: returns to draft` | ✅ |
-| P3-I05 | `scheduled` → `published` via scheduler tick only | `scheduled_publish :: clock-advance publishes` | ✅ |
+| P3-I05 | ~~`scheduled` → `published` via scheduler tick only~~ | _retired (ADR 0085 Stage B — manual schedule-publish endpoint deleted; spec removed)_ | ⛔ |
 
 ## Phase 4 — Governance Events + Audit Trail
 
@@ -85,9 +85,9 @@ CI gate: `.github/workflows/e2e-coverage-gate.yml` fails build if any invariant 
 
 | Invariant ID | Description | Spec ID | Status |
 |---|---|---|---|
-| P8-I01 | Fencing epoch prevents stale leader from publishing | `scheduled_publish :: old leader blocked` | ✅ |
-| P8-I02 | `release_lease` expires in-place, epoch monotonic | `scheduled_publish :: epoch monotonic` | ✅ |
-| P8-I03 | Backpressure SkipOnPressure skips non-critical jobs | `scheduled_publish :: backpressure skip` | ⚠ |
+| P8-I01 | ~~Fencing epoch prevents stale leader from publishing~~ | _retired (ADR 0085 Stage B — spec removed)_ | ⛔ |
+| P8-I02 | ~~`release_lease` expires in-place, epoch monotonic~~ | _retired (ADR 0085 Stage B — spec removed)_ | ⛔ |
+| P8-I03 | ~~Backpressure SkipOnPressure skips non-critical jobs~~ | _retired (ADR 0085 Stage B — spec removed)_ | ⛔ |
 | P8-I04 | Stuck-instance watchdog auto-cancels after 7d | `happy_path :: watchdog cancel` | ⚠ |
 
 ## Phase 9 — Frontend Hardening Fixes (F1-F11)
@@ -104,14 +104,14 @@ CI gate: `.github/workflows/e2e-coverage-gate.yml` fails build if any invariant 
 | F8 | `SignoffDialog` 8-state machine (idle→loading→success→error…) | `happy_path :: signoff dialog states` | ✅ |
 | F9 | `LockBadge` shows lock holder + relative time | `edit_lock :: lock badge shows holder` | ✅ |
 | F10 | `StateBadge` single source for all 9 states | `happy_path :: state badge transitions` | ✅ |
-| F11 | `SupersedePublishDialog` schedule datetime ≥ now+5min validation | `scheduled_publish :: past datetime error` | ✅ |
+| F11 | ~~`SupersedePublishDialog` schedule datetime ≥ now+5min validation~~ | _retired (ADR 0085 Stage B — dialog + spec deleted; no manual publication UI)_ | ⛔ |
 
 ## Phase 10 — Integration Test Invariants
 
 | Invariant ID | Description | Spec ID | Status |
 |---|---|---|---|
 | P10-I01 | OCC race: concurrent updates → one 409, one succeeds | `happy_path :: concurrent occ` | ✅ |
-| P10-I02 | SKIP LOCKED: second worker doesn't process same row | `scheduled_publish :: no double process` | ✅ |
+| P10-I02 | ~~SKIP LOCKED: second worker doesn't process same row~~ | _retired (ADR 0085 Stage B — spec removed)_ | ⛔ |
 | P10-I03 | Cascade: approve chain publishes all versions | `happy_path :: cascade publish` | ✅ |
 | P10-I04 | AST: no BeginTx outside allowed packages | `route_admin :: tx ownership` | ✅ |
 | P10-I05 | Outbox in same tx: rollback drops event | `happy_path :: rollback drops event` | ✅ |

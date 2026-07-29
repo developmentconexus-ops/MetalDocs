@@ -16,7 +16,6 @@ import (
 	auditpg "metaldocs/internal/modules/audit/infrastructure/postgres"
 	approvalapp "metaldocs/internal/modules/approval/application"
 	approvaljobs "metaldocs/internal/modules/approval/jobs"
-	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
 	approvalrepo "metaldocs/internal/modules/approval/infrastructure"
 	documentsrepo "metaldocs/internal/modules/documents/infrastructure"
 	iamapp "metaldocs/internal/modules/iam/application"
@@ -110,13 +109,12 @@ func run(ctx context.Context) error {
 	var releaseCoordinator *approvalapp.ReleaseCoordinator
 
 	deps, err := bootstrap.BuildJobsDependencies(ctx, jobsCfg, func(db *sql.DB) (*river.Workers, []*river.PeriodicJob, error) {
-		// The scheduled-publish job never calls LoadActorDisplayName, but we pass
-		// the real reader so the binary is correct if the code path ever is reached.
+		// No worker in this binary calls LoadActorDisplayName today, but we pass
+		// the real reader so the binary stays correct if one ever does.
 		displayNameRepo := iampg.NewUserDisplayNameRepository(db)
 		repo := approvalrepo.NewPostgresApprovalRepository(db, displayNameRepo)
 		approvalEmitter := approvalapp.NewSQLEmitter()
-		services := approvalapp.NewServices(repo, approvalEmitter, approvalapp.RealClock{}, cdinfra.NewCDFieldReaderPG())
-		workers := approvaljobs.NewWorkers(services.Scheduler, db)
+		workers := river.NewWorkers()
 		// ADR 0085 release coordinator: the single writer of the released
 		// state. Every trigger (approval fact, artifact fact, effective-date
 		// timer) funnels into its idempotent Evaluate through this worker.

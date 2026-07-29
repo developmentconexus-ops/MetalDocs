@@ -62,28 +62,32 @@ func newConflictMockDB(t *testing.T, routeTemplate string) *sql.DB {
 
 // TestGeneratedApprovalRoutes_IdempotencyStoreEngaged is the CON-03 store
 // engagement guard (task requirement 4). It exercises one idempotent approval
-// route — POST /api/v1/documents/{id}/publish — end to end through
+// route — POST /api/v1/documents/{id}/obsolete — end to end through
 // RegisterRoutes so the request traverses the real generated
 // ServerInterfaceWrapper, then router.go's Middlewares closure, then
 // h.idempotentHandler, then idempotency.Require/BeginReplay. The handler body
-// (PublishHandler) is never reached: BeginReplay's scripted conflict returns
+// (ObsoleteHandler) is never reached: BeginReplay's scripted conflict returns
 // before next.ServeHTTP runs, so a bare &Handler{db: db} (no application
 // services wired) is sufficient — exactly as idempotency_middleware_test.go's
 // TestIdempotencyMiddleware_MissingKey/MalformedKey already do for the
 // header-validation path.
+//
+// The exercised route moved off /publish because ADR 0085 stage B deleted that
+// endpoint; any member of router.go's idempotentRoutes set proves the same
+// wiring.
 func TestGeneratedApprovalRoutes_IdempotencyStoreEngaged(t *testing.T) {
-	const routeTemplate = "POST /api/v1/documents/{id}/publish"
+	const routeTemplate = "POST /api/v1/documents/{id}/obsolete"
 
 	db := newConflictMockDB(t, routeTemplate)
 	h := &Handler{db: db}
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-1111-1111-111111111111/publish", bytes.NewBufferString(`{}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-1111-1111-111111111111/obsolete", bytes.NewBufferString(`{}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "33333333-3333-4333-8333-333333333333")
-	// If-Match is contract-required on publish (wire-truth spec repair); the
-	// generated wrapper rejects its absence before the idempotency store runs.
+	// If-Match is contract-required on obsolete; the generated wrapper rejects
+	// its absence before the idempotency store runs.
 	req.Header.Set("If-Match", "v1")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "user-a", []iamdomain.Role{}))

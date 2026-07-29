@@ -26,22 +26,30 @@ import (
 	"metaldocs/tests/integration/testdb"
 )
 
-func TestValidateScheduledSupersedeTarget_RealRows(t *testing.T) {
+// TestValidateCrossDocumentSupersedeTarget_RealRows pins the ADR 0085 stage B
+// plan check against real rows. The predicate INVERTED relative to the retired
+// scheduled-supersede validator it replaces: a target in the SAME controlled
+// document is now the illegal case (that supersession is implicit — the release
+// coordinator discovers the incumbent head itself), and a published document in
+// a DIFFERENT controlled document is the legal one.
+func TestValidateCrossDocumentSupersedeTarget_RealRows(t *testing.T) {
 	db, _ := testdb.Open(t)
 	repo := NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{})
 	ctx := context.Background()
 
-	// Two CD lineages sharing one tenant/owner/taxonomy. The published head and
-	// the approved target live in cd1; otherPub lives in cd2 (a different lineage).
+	// Two CD lineages sharing one tenant/owner/taxonomy. The submitting
+	// revision (source) and its own lineage's published head live in cd1;
+	// otherPub and otherDraft live in cd2 (a different lineage).
 	tn := testdb.NewTenant(t, db)
 	owner := testdb.NewUser(t, db, testdb.WithTenant(tn.ID))
 	tax := testdb.NewTaxonomy(t, db, testdb.WithTenant(tn.ID))
 	cd1 := testdb.NewControlledDoc(t, db, testdb.WithTenant(tn.ID), testdb.WithTaxonomy(tax), testdb.WithOwner(owner.ID))
 	cd2 := testdb.NewControlledDoc(t, db, testdb.WithTenant(tn.ID), testdb.WithTaxonomy(tax), testdb.WithOwner(owner.ID))
 
-	publishedHead := testdb.NewDocument(t, db, testdb.WithControlledDoc(cd1), testdb.WithStatus("published"), testdb.WithRevisionNumber(0))
-	target := testdb.NewDocument(t, db, testdb.WithControlledDoc(cd1), testdb.WithStatus("approved"), testdb.WithRevisionNumber(1))
+	sameLineageHead := testdb.NewDocument(t, db, testdb.WithControlledDoc(cd1), testdb.WithStatus("published"), testdb.WithRevisionNumber(0))
+	source := testdb.NewDocument(t, db, testdb.WithControlledDoc(cd1), testdb.WithStatus("approved"), testdb.WithRevisionNumber(1))
 	otherPub := testdb.NewDocument(t, db, testdb.WithControlledDoc(cd2), testdb.WithStatus("published"), testdb.WithRevisionNumber(0))
+	otherDraft := testdb.NewDocument(t, db, testdb.WithControlledDoc(cd2), testdb.WithStatus("draft"), testdb.WithRevisionNumber(1))
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -49,44 +57,27 @@ func TestValidateScheduledSupersedeTarget_RealRows(t *testing.T) {
 	}
 	defer tx.Rollback()
 
-	if err := repo.ValidateScheduledSupersedeTarget(ctx, tx, tn.ID, target.ID, publishedHead.ID); err != nil {
-		t.Fatalf("valid target: unexpected error: %v", err)
+	// Legal: published head of a DIFFERENT controlled document.
+	if err := repo.ValidateCrossDocumentSupersedeTarget(ctx, tx, tn.ID, source.ID, otherPub.ID); err != nil {
+		t.Fatalf("cross-document published target: unexpected error: %v", err)
 	}
 
-	err = repo.ValidateScheduledSupersedeTarget(ctx, tx, tn.ID, target.ID, otherPub.ID)
-	if !errors.Is(err, ErrInvalidScheduledSupersedeTarget) {
-		t.Fatalf("invalid target error = %v, want ErrInvalidScheduledSupersedeTarget", err)
+	// Illegal: same controlled document — implicit supersession must not be named.
+	err = repo.ValidateCrossDocumentSupersedeTarget(ctx, tx, tn.ID, source.ID, sameLineageHead.ID)
+	if !errors.Is(err, ErrInvalidSupersedeTarget) {
+		t.Fatalf("same-lineage target error = %v, want ErrInvalidSupersedeTarget", err)
 	}
-}
 
-func TestLoadCurrentPublishedHeadForDocument_RealRows(t *testing.T) {
-	db, _ := testdb.Open(t)
-	repo := NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{})
-	ctx := context.Background()
-
-	// One lineage with three revisions: superseded rev0, approved rev1,
-	// published rev2. The current published head is the only published row —
-	// ux_documents_published_head (migration 0310, ADR 0085's one-published-head
-	// invariant) makes the old two-published-rows shape of this fixture
-	// unrepresentable, so what it pins now is that the resolver ignores the
-	// lineage's NON-published siblings on both sides of the head.
-	cd := testdb.NewControlledDoc(t, db)
-	testdb.NewDocument(t, db, testdb.WithControlledDoc(cd), testdb.WithStatus("superseded"), testdb.WithRevisionNumber(0))
-	target := testdb.NewDocument(t, db, testdb.WithControlledDoc(cd), testdb.WithStatus("approved"), testdb.WithRevisionNumber(1))
-	laterHead := testdb.NewDocument(t, db, testdb.WithControlledDoc(cd), testdb.WithStatus("published"), testdb.WithRevisionNumber(2))
-
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("begin tx: %v", err)
+	// Illegal: cross-document but not published — there is nothing to retire.
+	err = repo.ValidateCrossDocumentSupersedeTarget(ctx, tx, tn.ID, source.ID, otherDraft.ID)
+	if !errors.Is(err, ErrInvalidSupersedeTarget) {
+		t.Fatalf("unpublished target error = %v, want ErrInvalidSupersedeTarget", err)
 	}
-	defer tx.Rollback()
 
-	got, err := repo.LoadCurrentPublishedHeadForDocument(ctx, tx, cd.TenantID, target.ID)
-	if err != nil {
-		t.Fatalf("LoadCurrentPublishedHeadForDocument: %v", err)
-	}
-	if got != laterHead.ID {
-		t.Fatalf("current head = %q, want %q", got, laterHead.ID)
+	// Illegal: target does not exist at all (fail closed, not a silent pass).
+	err = repo.ValidateCrossDocumentSupersedeTarget(ctx, tx, tn.ID, source.ID, uuid.NewString())
+	if !errors.Is(err, ErrInvalidSupersedeTarget) {
+		t.Fatalf("missing target error = %v, want ErrInvalidSupersedeTarget", err)
 	}
 }
 

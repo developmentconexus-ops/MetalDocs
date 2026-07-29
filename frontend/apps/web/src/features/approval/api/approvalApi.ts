@@ -35,22 +35,15 @@ interface FastForwardArgs {
 }
 
 // Contract-first: every approval mutation's request/response body is the codegen
-// type from api/openapi/v1/openapi.yaml. The six document-mutation contracts
-// (signoff, publish, schedule-publish, supersede, obsolete, cancel) were repaired
-// in 32c5066e (previously declared bodyless while the Go handlers read/wrote real
-// JSON), so their former hand-rolled types in approvalTypes.ts are gone. Wire
-// facts the aliases encode: publish takes NO request body
-// (operations['publishDocument'].requestBody is never), and schedule-publish
-// returns the same PublishDocumentResponse as immediate publish (new_status +
-// optional effective_from — there is no scheduled_at field).
+// type from api/openapi/v1/openapi.yaml. ADR 0085 (Stage B) deleted the three
+// manual publication endpoints (publish / schedule-publish / supersede) — release
+// is now an approval-driven coordinator outcome, and the publication PLAN travels
+// on SubmitDocumentRequest (planned_effective_from / effective_to / review_due_at /
+// superseded_document_id). There is no client-callable publication mutation.
 type SubmitRequest = components['schemas']['SubmitDocumentRequest'];
 type SubmitResponse = components['schemas']['SubmitDocumentResponse'];
 type SignoffRequest = components['schemas']['SignoffDocumentRequest'];
 type SignoffResponse = components['schemas']['SignoffDocumentResponse'];
-type PublishResponse = components['schemas']['PublishDocumentResponse'];
-type SchedulePublishRequest = components['schemas']['SchedulePublishDocumentRequest'];
-type SupersedeRequest = components['schemas']['SupersedeDocumentRequest'];
-type SupersedeResponse = components['schemas']['SupersedeDocumentResponse'];
 type CancelRequest = components['schemas']['CancelDocumentApprovalRequest'];
 type CancelResponse = components['schemas']['CancelDocumentApprovalResponse'];
 
@@ -163,38 +156,6 @@ export function signoff(
   opts?: MutateOptions,
 ): Promise<SignoffResponse> {
   return mutate('POST', `${BASE}/documents/${documentId}/signoff`, body, {
-    resourceId: documentId,
-    ...opts,
-  });
-}
-
-export function publish(
-  documentId: string,
-  opts?: MutateOptions,
-): Promise<PublishResponse> {
-  return mutate('POST', `${BASE}/documents/${documentId}/publish`, undefined, {
-    resourceId: documentId,
-    ...opts,
-  });
-}
-
-export function schedulePublish(
-  documentId: string,
-  body: SchedulePublishRequest,
-  opts?: MutateOptions,
-): Promise<PublishResponse> {
-  return mutate('POST', `${BASE}/documents/${documentId}/schedule-publish`, body, {
-    resourceId: documentId,
-    ...opts,
-  });
-}
-
-export function supersede(
-  documentId: string,
-  body: SupersedeRequest,
-  opts?: MutateOptions,
-): Promise<SupersedeResponse> {
-  return mutate('POST', `${BASE}/documents/${documentId}/supersede`, body, {
     resourceId: documentId,
     ...opts,
   });

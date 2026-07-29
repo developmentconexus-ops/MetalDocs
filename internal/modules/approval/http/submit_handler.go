@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"metaldocs/internal/modules/approval/application"
 	"metaldocs/internal/modules/approval/http/contracts"
@@ -70,6 +71,20 @@ func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 		reasonCategory = *req.ReasonCategory
 	}
 
+	// ADR 0085 publication plan. planned_effective_from arrives as a string so
+	// req.Validate() can reject a non-UTC offset; it is already known parseable
+	// and UTC by the time we get here.
+	var plannedEffectiveFrom *time.Time
+	if raw := strings.TrimSpace(req.PlannedEffectiveFrom); raw != "" {
+		parsed, perr := time.Parse(time.RFC3339, raw)
+		if perr != nil {
+			WriteError(w, NewValidationError("planned_effective_from must be parseable RFC3339"))
+			return
+		}
+		utc := parsed.UTC()
+		plannedEffectiveFrom = &utc
+	}
+
 	chosenActors := make([]application.StageChosenActors, 0, len(req.ChosenActors))
 	for _, c := range req.ChosenActors {
 		chosenActors = append(chosenActors, application.StageChosenActors{
@@ -90,6 +105,11 @@ func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 		RevisionVersion: expectedRevisionVersion,
 		IdempotencyKey:  idempotencyKey,
 		ChosenActors:    chosenActors,
+
+		PlannedEffectiveFrom: plannedEffectiveFrom,
+		EffectiveTo:          req.EffectiveTo,
+		ReviewDueAt:          req.ReviewDueAt,
+		SupersedeTargetID:    strings.TrimSpace(req.SupersededDocumentID),
 	})
 	if err != nil {
 		WriteError(w, err)

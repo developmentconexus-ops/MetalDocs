@@ -6,7 +6,6 @@ package infrastructure
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"time"
 
@@ -27,22 +26,10 @@ type VerdictInsertResult struct {
 	WasReplay bool // true if ON CONFLICT detected an existing matching verdict
 }
 
-// ErrScheduledSupersedeConflict is returned when a scheduled-publish cutover's
-// recorded supersede target no longer matches the document currently published,
-// meaning another write raced ahead of the schedule; the job should no-op.
-var ErrScheduledSupersedeConflict = errors.New("approval: scheduled supersede target no longer matches the current published head")
-
-// ScheduledPublishRow remains as a persistence-shape helper for tests and
-// shared state assertions, but it is no longer fetched by a legacy scanner path.
-type ScheduledPublishRow struct {
-	DocumentID           string
-	TenantID             string
-	ControlledDocumentID string
-	SupersededDocumentID sql.NullString
-	EffectiveFrom        time.Time
-	RevisionVersion      int
-	ScheduleGeneration   int64
-}
+// ErrScheduledSupersedeConflict is returned when a planned supersede target no
+// longer matches the document currently published, meaning another write raced
+// ahead of the release; the release coordinator holds instead of releasing.
+var ErrScheduledSupersedeConflict = errors.New("approval: planned supersede target no longer matches the current published head")
 
 // Route is the repository projection for approval route administration lists.
 type Route struct {
@@ -112,8 +99,13 @@ type ApprovalRepository interface {
 	// being invisible via LoadActiveInstanceByDocument so a fresh submit can
 	// create a new instance.
 	LoadInstanceByDocumentForView(ctx context.Context, tx db.Tx, tenantID, docID string) (*domain.Instance, error)
-	ValidateScheduledSupersedeTarget(ctx context.Context, tx db.Tx, tenantID, documentID, supersededDocumentID string) error
-	LoadCurrentPublishedHeadForDocument(ctx context.Context, tx db.Tx, tenantID, documentID string) (string, error)
+	// ValidateCrossDocumentSupersedeTarget checks a submit-time publication
+	// plan's cross-document supersede target (ADR 0085): the named target must
+	// exist in the tenant, be currently published, and belong to a DIFFERENT
+	// controlled document than the submitting revision. Same-controlled-document
+	// supersession is implicit — the release coordinator discovers the incumbent
+	// head itself — so naming it is a plan error, not a shortcut.
+	ValidateCrossDocumentSupersedeTarget(ctx context.Context, tx db.Tx, tenantID, documentID, supersededDocumentID string) error
 	LoadCurrentPublishedHead(ctx context.Context, tx db.Tx, tenantID, controlledDocumentID string) (string, error)
 	// LoadCurrentPublishedHeadNoLock is LoadCurrentPublishedHead without the
 	// FOR UPDATE. The ADR 0085 release coordinator DISCOVERS its supersession

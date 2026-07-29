@@ -27,10 +27,10 @@ export type WorkspaceMode =
   | 'observing'
   | 'lifecycle';
 
-// Document statuses at/after approval where the lifecycle surface (publish /
-// schedule / supersede) is the relevant action. The publish CTA itself stays
-// capability-gated (canPublish in useDocumentArtifact) — the mode only decides
-// which panel the screen shows.
+// Document statuses at/after approval where the lifecycle surface is what the
+// screen should show. ADR 0085 (Stage B) removed the manual publish/schedule/
+// supersede actions from that surface — release is an approval-driven coordinator
+// outcome — so the mode now only decides which panel the screen renders.
 const TERMINAL_LIFECYCLE_STATUSES = new Set([
   'approved',
   'scheduled',

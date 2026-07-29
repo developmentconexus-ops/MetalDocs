@@ -178,10 +178,8 @@ INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES (
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'document.obsolete', 'Make a document obsolete') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('area_admin', 'document.supersede', 'Supersede a document with a successor') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'document.supersede', 'Supersede a document with a successor') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('area_admin', 'document.publish', 'Publish an approved document') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'document.publish', 'Publish an approved document') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 -- M6 F6.2 / ADR 0069: document.review — mark-reviewed governance action. Held by
--- the same governance actors as publish/obsolete (area_admin, qms_admin);
+-- the same governance actors as obsolete/supersede (area_admin, qms_admin);
 -- system_admin reaches it via the tier-2 bypass (not seeded explicitly).
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('area_admin', 'document.review', 'Record a periodic-review completion on a published document') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'document.review', 'Record a periodic-review completion on a published document') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;

@@ -3656,88 +3656,6 @@ paths:
           $ref: '#/components/responses/PreconditionRequired'
         '500':
           $ref: '#/components/responses/InternalServerError'
-  /documents/{id}/publish:
-    post:
-      summary: Publish document
-      tags: [approval]
-      operationId: publishDocument
-      x-authz-area:
-        source: tx
-        derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
-        note: >-
-          Area-scoped cap enforced at tier-2 in the tx-layer service via
-          authz.Require with the area resolved from the document row
-          (LoadDocumentAreaCode); never from a request field. Postgres tripwire
-          (migration 0142b) is the backstop.
-      parameters:
-        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
-        - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>", or "*" to skip the check' }
-      responses:
-        '200':
-          description: ok
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PublishDocumentResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '428':
-          $ref: '#/components/responses/PreconditionRequired'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-  /documents/{id}/schedule-publish:
-    post:
-      summary: Schedule document publish
-      tags: [approval]
-      operationId: scheduleDocumentPublish
-      x-authz-area:
-        source: tx
-        derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
-        note: >-
-          Area-scoped cap enforced at tier-2 in the tx-layer service via
-          authz.Require with the area resolved from the document row
-          (LoadDocumentAreaCode); never from a request field. Postgres tripwire
-          (migration 0142b) is the backstop.
-      parameters:
-        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
-        - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>", or "*" to skip the check' }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SchedulePublishDocumentRequest'
-      responses:
-        '200':
-          description: ok
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PublishDocumentResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '428':
-          $ref: '#/components/responses/PreconditionRequired'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
   /documents/{id}/review:
     post:
       summary: Mark document reviewed
@@ -3746,7 +3664,7 @@ paths:
         last_reviewed_at and the next review_due_at (and optionally effective_to)
         under the document.review capability; not a status transition (status
         stays published). OCC via the If-Match ETag, consistent with the sibling
-        submit/publish/schedule-publish operations (CON-01).
+        submit operation (CON-01).
       tags: [approval]
       operationId: markDocumentReviewed
       x-authz-area:
@@ -3774,50 +3692,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PublishDocumentResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '428':
-          $ref: '#/components/responses/PreconditionRequired'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-  /documents/{id}/supersede:
-    post:
-      summary: Supersede document
-      tags: [approval]
-      operationId: supersedeDocument
-      x-authz-area:
-        source: tx
-        derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
-        note: >-
-          Area-scoped cap enforced at tier-2 in the tx-layer service via
-          authz.Require with the area resolved from the document row
-          (LoadDocumentAreaCode); never from a request field. Postgres tripwire
-          (migration 0142b) is the backstop.
-      parameters:
-        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
-        - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>", or "*" to skip the check' }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SupersedeDocumentRequest'
-      responses:
-        '200':
-          description: ok
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SupersedeDocumentResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -6782,6 +6656,42 @@ components:
             server-side against the selector's role x area_code constraint
             (422 on violation). An entry naming a stage_order with no
             submit_choice selector is also rejected (422, fail-closed).
+        planned_effective_from:
+          type: string
+          format: date-time
+          description: >-
+            Publication plan (ADR 0085): RFC3339 UTC instant before which the
+            release coordinator must not release this revision, even once every
+            other readiness fact holds. Non-UTC offsets are rejected. Omit for
+            immediate release on readiness. This is the PLAN; the actual release
+            instant is recorded separately in effective_from.
+        effective_to:
+          type: string
+          format: date-time
+          nullable: true
+          description: >-
+            Publication plan (ADR 0085): optional expiry instant carried to the
+            release transaction. Must be strictly after planned_effective_from
+            when both are supplied.
+        review_due_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: >-
+            Publication plan (ADR 0085): optional initial periodic-review due
+            date. Must not be before planned_effective_from when both are
+            supplied. A planned due date that has already passed at the actual
+            release instant is recomputed from the profile's review interval.
+        superseded_document_id:
+          type: string
+          format: uuid
+          description: >-
+            Publication plan (ADR 0085): optional CROSS-document supersede
+            target — a published document of a DIFFERENT controlled document
+            that this revision retires on release. Same-controlled-document
+            supersession is implicit and must not be named here. Naming a target
+            requires the document.supersede capability on the TARGET's process
+            area, checked in the submit transaction (403 otherwise).
     SubmitChosenActors:
       type: object
       required: [stage_order, user_ids]
@@ -7012,28 +6922,6 @@ components:
         total:
           type: integer
           description: Total pending items for the actor across all pages.
-    SchedulePublishDocumentRequest:
-      type: object
-      required: [effective_from]
-      properties:
-        effective_from:
-          type: string
-          format: date-time
-          description: RFC3339 UTC timestamp the publish takes effect; non-UTC offsets are rejected.
-        superseded_document_id:
-          type: string
-          format: uuid
-          description: Optional document to supersede when the scheduled publish fires.
-        effective_to:
-          type: string
-          format: date-time
-          nullable: true
-          description: Optional expiry date; the publish is no longer effective after this instant.
-        review_due_at:
-          type: string
-          format: date-time
-          nullable: true
-          description: Optional initial periodic-review due date set at schedule/publish time.
     MarkDocumentReviewedRequest:
       type: object
       required: [review_due_at]
@@ -7056,11 +6944,10 @@ components:
           format: uuid
         new_status:
           type: string
-          description: published for immediate publish; scheduled for schedule-publish.
-        effective_from:
-          type: string
-          format: date-time
-          description: Present only for schedule-publish; RFC3339 UTC effective date.
+          description: >-
+            Document status after the operation. The periodic-review completion
+            is not a status transition, so this echoes the unchanged status
+            (published).
     ObsoleteDocumentRequest:
       type: object
       required: [reason]
@@ -7132,24 +7019,6 @@ components:
         created_at:
           type: string
           format: date-time
-    SupersedeDocumentRequest:
-      type: object
-      required: [superseded_document_id]
-      properties:
-        superseded_document_id:
-          type: string
-          format: uuid
-          description: Published document this document supersedes.
-    SupersedeDocumentResponse:
-      type: object
-      required: [document_id, superseded_id]
-      properties:
-        document_id:
-          type: string
-          format: uuid
-        superseded_id:
-          type: string
-          format: uuid
     DocumentRevisionHistoryItem:
       type: object
       required: [document_id, revision_number, revision_title, status, created_at, is_current]

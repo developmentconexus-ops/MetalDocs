@@ -744,48 +744,6 @@ func lockDocumentForRelease(ctx context.Context, tx db.Tx, tenantID, documentID 
 	return st, nil
 }
 
-// lockDocumentRowsInIDOrder takes a row lock on every non-empty id in
-// documentIDs — deduplicated, ascending id order, one statement per id. It is
-// the module's ONE document lock order (see lockAndRedecide) in its minimal
-// form, for the legacy publish/schedule writers that need the lock but not the
-// locked row's state. A single `id = ANY(...) ORDER BY id FOR UPDATE` is NOT
-// equivalent: it gives no guarantee about the order Postgres actually acquires
-// the locks in.
-//
-// Callers must discover their id set lock-free first; a missing row is an
-// error, since every id here is one the caller is about to write or supersede.
-func lockDocumentRowsInIDOrder(ctx context.Context, tx db.Tx, tenantID string, documentIDs ...string) error {
-	ordered := make([]string, 0, len(documentIDs))
-	for _, id := range documentIDs {
-		if id != "" {
-			ordered = append(ordered, id)
-		}
-	}
-	sort.Strings(ordered)
-	previous := "" // never equal to a real document id, so i==0 always locks
-	for _, id := range ordered {
-		if id == previous {
-			continue // sorted, so duplicates are adjacent
-		}
-		previous = id
-		var lockedID string
-		err := tx.QueryRowContext(ctx, `
-			SELECT id::text
-			  FROM documents
-			 WHERE id = $1::uuid AND tenant_id = $2::uuid
-			 FOR UPDATE`,
-			id, tenantID,
-		).Scan(&lockedID)
-		if errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("lock document %s: not found", id)
-		}
-		if err != nil {
-			return fmt.Errorf("lock document %s: %w", id, err)
-		}
-	}
-	return nil
-}
-
 // touchEvaluatedTx records the evaluation outcome on the generation. An empty
 // reason clears the hold.
 func touchEvaluatedTx(ctx context.Context, tx db.Tx, generationID string, reason domain.ReleaseHoldReason) error {

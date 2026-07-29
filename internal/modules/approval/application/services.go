@@ -1,6 +1,6 @@
 // Package application holds the approval subsystem's application services —
-// submit, decision, publish, scheduler, supersede, obsolete, cancel, read, and
-// route-admin — each a thin orchestration layer over infrastructure.ApprovalRepository
+// submit, decision, obsolete, cancel, read, and route-admin — each a thin
+// orchestration layer over infrastructure.ApprovalRepository
 // and domain. All mutating operations run inside a single caller-owned
 // transaction (state-write + governance-event emit + outbox enqueue never
 // span more than one tx), and callers are expected to seed authz identity and
@@ -8,14 +8,12 @@
 package application
 
 import (
-	"context"
 	"errors"
 	"time"
 
 	"metaldocs/internal/modules/approval/infrastructure"
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	docsdomain "metaldocs/internal/modules/documents/domain"
-	"metaldocs/internal/platform/db"
 )
 
 // Clock abstracts time so services can be tested deterministically.
@@ -36,9 +34,6 @@ type Services struct {
 	Submit         *SubmitService
 	TemplateSubmit *TemplateSubmitService
 	Decision       *DecisionService
-	Publish        *PublishService
-	Scheduler      *SchedulerService
-	Supersede      *SupersedeService
 	Obsolete       *ObsoleteService
 	Cancel         *CancelService
 	Read           *ReadService
@@ -50,28 +45,13 @@ type Services struct {
 	clock          Clock
 }
 
-// ScheduledPublishJobInput carries the parameters needed to enqueue a scheduled-publish job.
-type ScheduledPublishJobInput struct {
-	TenantID                string
-	DocumentID              string
-	ExpectedRevisionVersion int
-	ScheduledEffectiveAt    time.Time
-	ScheduleGeneration      int64
-}
-
-// ScheduledPublishEnqueuer enqueues a scheduled-publish job in the same transaction
-// as the state write that scheduled it (transactional outbox pattern).
-type ScheduledPublishEnqueuer interface {
-	EnqueueScheduledPublishTx(ctx context.Context, tx db.Tx, input ScheduledPublishJobInput) error
-}
-
 // ErrContentHashMismatch is returned when the caller-supplied content hash does not
 // match the document's current content hash, indicating a stale read (OCC guard).
 var ErrContentHashMismatch = errors.New("approval: content hash mismatch")
 
 // NewServices constructs a fully wired Services value. cdRead is the
 // controlleddocuments read-port (M2/F2.1) used by the area-grade authz checks in
-// Submit/Publish/Supersede/Decision; a nil reader fail-closes the CD area to "".
+// Submit/Decision; a nil reader fail-closes the CD area to "".
 func NewServices(repo infrastructure.ApprovalRepository, emitter EventEmitter, clock Clock, cdRead controlleddocumentsdomain.CDFieldReader) *Services {
 	// The concrete Postgres repository also satisfies SubmitDefaultsResolver
 	// (in-tx route/hash resolution, ADR 0073). Wire it via assertion so the
@@ -85,9 +65,6 @@ func NewServices(repo infrastructure.ApprovalRepository, emitter EventEmitter, c
 		Submit:         &SubmitService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead, resolver: resolver},
 		TemplateSubmit: NewTemplateSubmitService(repo, emitter, clock, nil),
 		Decision:       decision,
-		Publish:        &PublishService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
-		Scheduler:      &SchedulerService{repo: repo, emitter: emitter, clock: clock},
-		Supersede:      &SupersedeService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
 		Obsolete:       &ObsoleteService{repo: repo, emitter: emitter, clock: clock},
 		Cancel:         newCancelService(repo, emitter, clock),
 		Read:           newReadService(repo, cdRead, nil),
@@ -100,26 +77,11 @@ func NewServices(repo infrastructure.ApprovalRepository, emitter EventEmitter, c
 	}
 }
 
-// WithScheduledPublishEnqueuer wires the scheduled-publish job enqueuer into the
-// Publish service. Call after NewServices.
-func (s *Services) WithScheduledPublishEnqueuer(enqueuer ScheduledPublishEnqueuer) *Services {
-	if s != nil && s.Publish != nil {
-		s.Publish = s.Publish.WithScheduledPublishEnqueuer(enqueuer)
-	}
-	return s
-}
-
-// WithLifecycleEnqueuer wires the F3.3 domain-event enqueuer to all four emit
-// services (Publish, Supersede, Obsolete, Decision). Call after NewServices.
+// WithLifecycleEnqueuer wires the F3.3 domain-event enqueuer to the emit
+// services (Obsolete, Decision, ReviewVerdict). Call after NewServices.
 func (s *Services) WithLifecycleEnqueuer(e docsdomain.LifecycleEventEnqueuer) *Services {
 	if s == nil {
 		return s
-	}
-	if s.Publish != nil {
-		s.Publish = s.Publish.WithLifecycleEnqueuer(e)
-	}
-	if s.Supersede != nil {
-		s.Supersede = s.Supersede.WithLifecycleEnqueuer(e)
 	}
 	if s.Obsolete != nil {
 		s.Obsolete = s.Obsolete.WithLifecycleEnqueuer(e)

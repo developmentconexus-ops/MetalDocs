@@ -49,11 +49,8 @@ func (stubApprovalRepo) LoadActiveInstanceBySubject(_ context.Context, _ platfor
 func (stubApprovalRepo) LoadInstanceByDocumentForView(_ context.Context, _ platformdb.Tx, _, _ string) (*domain.Instance, error) {
 	return nil, nil
 }
-func (stubApprovalRepo) ValidateScheduledSupersedeTarget(_ context.Context, _ platformdb.Tx, _, _, _ string) error {
+func (stubApprovalRepo) ValidateCrossDocumentSupersedeTarget(_ context.Context, _ platformdb.Tx, _, _, _ string) error {
 	return nil
-}
-func (stubApprovalRepo) LoadCurrentPublishedHeadForDocument(_ context.Context, _ platformdb.Tx, _, _ string) (string, error) {
-	return "", nil
 }
 func (stubApprovalRepo) LoadCurrentPublishedHead(_ context.Context, _ platformdb.Tx, _, _ string) (string, error) {
 	return "", nil

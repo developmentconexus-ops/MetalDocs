@@ -40,7 +40,6 @@ var capabilityScopes = map[Capability]CapabilityScope{
 	CapDocumentEdit:                ScopeArea,
 	CapDocumentSubmit:              ScopeArea,
 	CapDocumentSignoff:             ScopeArea,
-	CapDocumentPublish:             ScopeArea,
 	CapDocumentObsolete:            ScopeArea,
 	CapDocumentSupersede:           ScopeArea,
 	CapControlledDocumentCreate:    ScopeArea,

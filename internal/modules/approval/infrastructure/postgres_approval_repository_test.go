@@ -269,35 +269,6 @@ func TestInsertSignoffReplayDetection(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// TestScheduledPublishRowShape — compile + structure test (no real DB)
-// ---------------------------------------------------------------------------
-
-// TestScheduledPublishRowShape verifies the repository surface still exposes the
-// scheduled publish persistence shape needed by approval tests.
-func TestScheduledPublishRowShape(t *testing.T) {
-	t.Parallel()
-	// Compile-time interface conformance check.
-	var _ ApprovalRepository = (*postgresApprovalRepository)(nil)
-
-	// Verify ScheduledPublishRow has the expected fields.
-	row := ScheduledPublishRow{
-		DocumentID:         "doc-1",
-		TenantID:           "tenant-1",
-		EffectiveFrom:      time.Now(),
-		RevisionVersion:    3,
-		ScheduleGeneration: 2,
-	}
-	if row.DocumentID == "" {
-		t.Error("DocumentID should not be empty")
-	}
-	if row.RevisionVersion != 3 {
-		t.Errorf("RevisionVersion: got %d, want 3", row.RevisionVersion)
-	}
-	if row.ScheduleGeneration != 2 {
-		t.Errorf("ScheduleGeneration: got %d, want 2", row.ScheduleGeneration)
-	}
-}
 
 // ---------------------------------------------------------------------------
 // TestSignoffInsertResultFields — basic struct field test

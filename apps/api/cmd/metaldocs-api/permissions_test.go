@@ -49,9 +49,6 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "documents list guarded", method: http.MethodGet, path: "/api/v1/documents", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents submit", method: http.MethodPost, path: "/api/v1/documents/d1/submit", wantCap: iamdomain.CapDocumentSubmit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents signoff", method: http.MethodPost, path: "/api/v1/documents/d1/signoff", wantCap: iamdomain.CapDocumentSignoff, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "documents publish", method: http.MethodPost, path: "/api/v1/documents/d1/publish", wantCap: iamdomain.CapDocumentPublish, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "documents schedule publish", method: http.MethodPost, path: "/api/v1/documents/d1/schedule-publish", wantCap: iamdomain.CapDocumentPublish, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "documents supersede", method: http.MethodPost, path: "/api/v1/documents/d1/supersede", wantCap: iamdomain.CapDocumentSupersede, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents obsolete", method: http.MethodPost, path: "/api/v1/documents/d1/obsolete", wantCap: iamdomain.CapDocumentObsolete, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents session force release", method: http.MethodPost, path: "/api/v1/documents/d1/session/force-release", wantCap: iamdomain.CapMembershipManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents session generic", method: http.MethodPost, path: "/api/v1/documents/d1/session/acquire", wantCap: iamdomain.CapDocumentEdit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
@@ -182,7 +179,6 @@ func TestPublicPathChecker_RespectsPublicAndPrivateBoundaries(t *testing.T) {
 		{name: "auth me not public", method: http.MethodGet, path: "/api/v1/auth/me", want: false},
 		{name: "auth logout not public", method: http.MethodPost, path: "/api/v1/auth/logout", want: false},
 		{name: "documents list not public", method: http.MethodGet, path: "/api/v1/documents", want: false},
-		{name: "publish not public", method: http.MethodPost, path: "/api/v1/documents/d1/publish", want: false},
 
 		// C2 fail-closed regressions: unmatched routes are NEVER public.
 		{name: "unknown route not public", method: http.MethodGet, path: "/api/v1/unknown", want: false},
@@ -276,10 +272,7 @@ func TestRouteCoverage(t *testing.T) {
 		{"documents", http.MethodGet, "/api/v1/documents"},
 		{"documents", http.MethodPost, "/api/v1/documents/d1/submit"},
 		{"documents", http.MethodPost, "/api/v1/documents/d1/signoff"},
-		{"documents", http.MethodPost, "/api/v1/documents/d1/publish"},
-		{"documents", http.MethodPost, "/api/v1/documents/d1/schedule-publish"},
 		{"documents", http.MethodPost, "/api/v1/documents/d1/review"},
-		{"documents", http.MethodPost, "/api/v1/documents/d1/supersede"},
 		{"documents", http.MethodPost, "/api/v1/documents/d1/obsolete"},
 		{"documents", http.MethodPost, "/api/v1/documents/d1/cancel"},
 		{"documents", http.MethodPost, "/api/v1/documents/d1/reconstruct"},

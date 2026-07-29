@@ -42,12 +42,13 @@ export type InboxItem = components['schemas']['ApprovalInboxItem'];
 // FE-03: SubmitRequest/SubmitResponse (formerly hand-rolled here) moved to
 // approvalApi.ts as aliases of the generated
 // components['schemas']['SubmitDocumentRequest']/['SubmitDocumentResponse'].
-// The six approval document-mutation pairs (signoff, publish, schedule-publish,
-// supersede, obsolete, cancel) followed once their OpenAPI contracts were
-// repaired (32c5066e declared real request/response bodies) — approvalApi.ts
-// now aliases the generated SignoffDocument*/PublishDocumentResponse/
-// SchedulePublishDocumentRequest/SupersedeDocument*/ObsoleteDocument*/
-// CancelDocumentApproval* schemas. Publish is bodyless on the wire.
+// The remaining approval document-mutation pairs (signoff, obsolete, cancel)
+// followed once their OpenAPI contracts were repaired (32c5066e declared real
+// request/response bodies) — approvalApi.ts now aliases the generated
+// SignoffDocument*/ObsoleteDocument*/CancelDocumentApproval* schemas.
+// ADR 0085 (Stage B) deleted the manual publish/schedule-publish/supersede
+// operations outright: release is an approval-driven coordinator outcome and
+// the publication plan rides on SubmitDocumentRequest.
 
 // F8/M2c: stage_kind/due_before/scope are already accepted by the
 // listApprovalInbox operation (W4/P2/P3/P8) — this mirrors the generated

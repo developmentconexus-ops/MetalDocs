@@ -1,13 +1,14 @@
 # Flow: Async Job Pipeline
 
-> **Last verified:** 2026-07-02
-> **Scope:** End-to-end async flows for all five async subsystems — PDF generation, DOCX materialization, scheduled-publish cutover, in-API maintenance jobs, and in-API sweepers — with Mermaid sequence diagrams. Includes a jobs-vs-worker comparison table answering why both binaries exist.
+> **Last verified:** 2026-07-28 (ADR 0085 Stage B — Flow 3 rewritten: `scheduled_publish_cutover` is DELETED, replaced by the release coordinator's `release_evaluate` job kind, triggered by fact writes and an effective-date timer instead of a client-invoked schedule-publish call. See [`wiki/modules/approval.md`](../../modules/approval.md) and [ADR 0085](../../decisions/0085-release-coordinator-approval-driven-publication.md).) | prior: 2026-07-02
+> **Scope:** End-to-end async flows for all five async subsystems — PDF generation, DOCX materialization, release-coordinator evaluation (ADR 0085), in-API maintenance jobs, and in-API sweepers — with Mermaid sequence diagrams. Includes a jobs-vs-worker comparison table answering why both binaries exist.
 > **Key files:**
 > - `apps/worker/cmd/metaldocs-worker/main.go`
 > - `apps/jobs/cmd/metaldocs-jobs/main.go`
 > - `internal/platform/worker/service.go`
 > - `internal/platform/messaging/outbox/postgres/consumer.go`
-> - `internal/modules/documents/approval/jobs/scheduled_publish_job.go`
+> - `internal/modules/approval/jobs/release_evaluate_job.go`
+> - `internal/modules/approval/application/release_coordinator.go`
 > - `internal/modules/jobs/scheduler/scheduler.go`
 > - `internal/modules/render/fanout/staging_outbox_worker.go`
 
@@ -21,12 +22,12 @@
 | **Queue storage** | `metaldocs.outbox_events` (custom outbox table) | River Postgres tables (managed by River framework) |
 | **Queue protocol** | Homegrown: `FOR UPDATE SKIP LOCKED` CTE, manual backoff, manual DLQ | River: framework-managed retry, snooze, DLQ |
 | **Work performed** | Heavy I/O: Gotenberg PDF conversion, docx-renderer HTTP call, MinIO read/write | Lightweight domain transaction: Postgres UPDATE + governance INSERT |
-| **Business jobs** | `docgen_v2_pdf` (PDF generation), `docx_materialize` (DOCX fanout) | `scheduled_publish_cutover` (scheduled document publish) |
+| **Business jobs** | `docgen_v2_pdf` (PDF generation), `docx_materialize` (DOCX fanout) | `release_evaluate` (ADR 0085 release-coordinator evaluation — supersedes deleted `scheduled_publish_cutover`) |
 | **Concurrency** | Sequential within batch (no goroutine-per-event) | River worker pool, up to `MaxWorkers=10` |
 | **Graceful shutdown** | Context cancellation — no explicit timeout | `Client.Stop(15 s timeout)` |
-| **Deployment** | `deploy/docker/worker.Dockerfile` + compose `worker` service | **No Dockerfile, absent from compose** — local dev only |
+| **Deployment** | `deploy/docker/worker.Dockerfile` + compose `worker` service | `deploy/docker/jobs.Dockerfile` + compose `jobs` service (`deploy/compose/docker-compose.yml:291-294`) |
 | **Shares code with the other** | None | None |
-| **In-process equivalent** | Outbox relay workers in API process (staging tables → `outbox_events`) | `RiverScheduledPublishEnqueuer` in API process (enqueue side only) |
+| **In-process equivalent** | Outbox relay workers in API process (staging tables → `outbox_events`) | `RecordApprovalFactTx`/`RecordArtifactFactTx` enqueue `release_evaluate` in the fact-writing process (enqueue side only) |
 
 **Summary:** The worker binary exists because PDF and DOCX generation require heavy external I/O that must not run in the API process. The jobs binary exists because River provides durable, transactionally-atomic future scheduling that a simple ticker cannot. The two binaries are completely independent at every layer: different queue storage, different protocol, different work.
 
@@ -119,37 +120,42 @@ sequenceDiagram
 
 ---
 
-## 4. Flow 3 — Scheduled-publish cutover (River, `apps/jobs` binary)
+## 4. Flow 3 — Release-coordinator evaluation (River, `apps/jobs` binary, ADR 0085)
+
+Supersedes the deleted scheduled-publish cutover flow: there is no client-invoked publish call. A document reaches `published` only when a `release_evaluate` job evaluates its generation as ready and wins the release transaction.
 
 ```mermaid
 sequenceDiagram
-    participant User
-    participant API as API Process
-    participant PG_RV as River Postgres tables
-    participant JOBS as apps/jobs (River client)
+    participant Fact as Fact writer (approval/artifact)
+    participant PG_RV as River Postgres tables (temporal queue)
+    participant JOBS as apps/jobs (ReleaseEvaluateWorker)
+    participant PG_GEN as release_generations
     participant PG_DOC as documents table
 
-    User->>API: Schedule document (effectiveDate)
-    API->>PG_RV: InsertTx(ScheduledPublishArgs, ScheduledAt=effectiveDate) [inside approval tx]
-    Note over API,PG_RV: Atomic with document row update
-    JOBS->>PG_RV: River scheduler fires at ScheduledAt
-    JOBS->>PG_DOC: BEGIN tx; SELECT FOR UPDATE (stale-job guard)
-    alt generation/version current
-        JOBS->>PG_DOC: UPDATE status='published'
-        JOBS->>PG_DOC: INSERT governance_events row
-        JOBS->>PG_DOC: COMMIT
-    else stale job (already published/withdrawn)
-        JOBS->>PG_DOC: ROLLBACK (no-op)
+    Fact->>PG_GEN: RecordApprovalFactTx / RecordArtifactFactTx [same tx as the fact]
+    Fact->>PG_RV: EnqueueReleaseEvaluationTx(key, runAt) [inside the same fact tx]
+    Note over Fact,PG_RV: runAt=now (fact just landed) OR runAt=planned_effective_from (future timer)
+    JOBS->>PG_RV: River fires ReleaseEvaluateWorker.Work at ScheduledAt
+    JOBS->>PG_GEN: BEGIN tx; lock generation + document row
+    JOBS->>JOBS: EvaluateRelease(facts, now) -> hold | schedule | release | no-op
+    alt release
+        JOBS->>PG_DOC: source CAS UPDATE approved|scheduled -> published; supersede target(s)
+        JOBS->>PG_GEN: mark released; COMMIT
+    else lost CAS (concurrent evaluation already won)
+        JOBS->>PG_GEN: ROLLBACK (benign no-op)
+    else hold (materializing / awaiting_effective_date / supersede_conflict / plan_invalid)
+        JOBS->>PG_GEN: record hold reason; COMMIT
     end
     JOBS->>PG_RV: Mark job complete
 ```
 
 Key facts:
 
-- Enqueue is atomic with the approval transaction (`scheduled_publish_job.go:57` — `client.InsertTx` inside `EnqueueScheduledPublishTx` which starts at line 56).
-- Execution calls `authz.WithBackgroundBypass(ctx)` — no HTTP session context.
-- Stale-job guard: `FOR UPDATE` + generation check at `internal/modules/documents/approval/application/scheduler_service.go:62-64` (`scheduledJobMatchesState` call in `RunScheduledPublishJob`).
-- **The jobs binary has no Dockerfile and is absent from Docker Compose** — this flow is non-functional in containerised deployments.
+- Enqueue is atomic with the triggering fact write (`RecordArtifactFactTx`, `internal/modules/approval/application/release_facts.go:302`) via `ReleaseEvaluationEnqueuer.EnqueueReleaseEvaluationTx` (`internal/modules/approval/jobs/release_evaluate_job.go:131`) — same-tx transactional outbox, one job kind serves both the immediate-reevaluation trigger and the future effective-date timer.
+- Execution calls `authz.WithBackgroundBypass(ctx)` — no HTTP session context; events are emitted under the system principal `application.ReleaseSystemPrincipal` ("system:release-coordinator").
+- Idempotent by construction: the job payload IS the release generation key, not a cached decision — `ReleaseCoordinator.Evaluate` (`internal/modules/approval/application/release_coordinator.go:123`) re-reads every input, so a stale/delayed delivery decides on current state, not enqueue-time state.
+- Source-CAS guard: the `approved|scheduled -> published` UPDATE inside `releaseTx` (`release_coordinator.go:452,468-501`) is a compare-and-swap; zero rows affected means a concurrent evaluation already won — `errLostReleaseCAS`/`IsLostReleaseCAS` (`release_coordinator.go:534,538`) turns that into a benign no-op, not a retried error.
+- **Corrected 2026-07-28:** the "jobs has no Dockerfile / is absent from compose" claim previously made here and in §8 was stale. `deploy/docker/jobs.Dockerfile` and the compose `jobs` service (`deploy/compose/docker-compose.yml:291-294`) both exist — verified in-tree, not merely assumed.
 
 ---
 
@@ -227,7 +233,7 @@ Both use `authz.WithBackgroundBypass`. No restart logic — if the goroutine exi
 
 ### River scheduled jobs (`apps/jobs`)
 
-River manages retries internally. A `ScheduledPublishWorker.Work` returning an error triggers River's built-in retry with configurable backoff. Stale-job no-ops return `nil` and are counted as success.
+River manages retries internally. A `ReleaseEvaluateWorker.Work` returning an error triggers River's built-in retry with configurable backoff. A `application.ErrReleaseGenerationNotFound` result and a lost release CAS (`IsLostReleaseCAS`) both return `nil` and are counted as success, not retried.
 
 ### Staging outbox tables — retry/terminal contract (APP-07)
 
@@ -268,7 +274,7 @@ Test coverage: `internal/modules/render/fanout/pdf_outbox_repository_test.go` (r
 
 | Flag | Severity | Area |
 |------|----------|------|
-| `apps/jobs` absent from Docker Compose — scheduled-publish non-functional in containers | High | [../binaries/jobs.md](../binaries/jobs.md) |
+| ~~`apps/jobs` absent from Docker Compose~~ | **Closed 2026-07-28** — `jobs.Dockerfile` + compose `jobs` service verified present | [../binaries/jobs.md](../binaries/jobs.md) |
 | `lease_reaper` governance writes silently fail for all scheduler jobs (wrong JOIN) | High | [../binaries/worker.md](../binaries/worker.md) |
 | Two-stage outbox chaining with duplicate claim/retry logic across three tables | Medium | [../platform/async-messaging.md](../platform/async-messaging.md) |
 | `METALDOCS_WORKER_REVIEW_REMINDER_DAYS` loaded but never consumed | Medium | [../binaries/worker.md](../binaries/worker.md) |

@@ -90,7 +90,7 @@ async function submitAsAuthor(page: Page, docId: string): Promise<{ request: Req
     (response) => response.request().method() === 'POST' && response.url().includes(`/api/v1/documents/${docId}/submit`),
   );
 
-  await page.getByRole('button', { name: 'Submeter para revisão' }).click();
+  await page.getByRole('button', { name: 'Submeter para revisï¿½o' }).click();
   await page.getByRole('button', { name: /^Submeter$/ }).click();
 
   const submitRequest = await submitRequestPromise;
@@ -168,8 +168,8 @@ test.describe.serial('happy_path', () => {
     const idempotencyKey = request.headerValue('idempotency-key');
     expect(idempotencyKey).toMatch(UUID_HEADER_RE);
 
-    await expect.poll(() => stateBadgeText(page), { timeout: 5000 }).toBe('Em revisão');
-    await expect(page.getByRole('button', { name: /Documento em revisão/i })).toBeVisible();
+    await expect.poll(() => stateBadgeText(page), { timeout: 5000 }).toBe('Em revisï¿½o');
+    await expect(page.getByRole('button', { name: /Documento em revisï¿½o/i })).toBeVisible();
   });
 
   test('reviewer signs stage 1', async ({ browser, baseURL }) => {
@@ -183,11 +183,20 @@ test.describe.serial('happy_path', () => {
     }
   });
 
-  test('approver signs stage 2 -> doc published', async ({ browser, baseURL }) => {
+  test('approver signs stage 2 -> approval completes (release follows asynchronously)', async ({ browser, baseURL }) => {
     const context = await contextAs(browser, requireBaseURL(baseURL), seeded.cookies, 'approver');
     try {
       const { page } = await reviewerOrApproverSignoff(context, primaryDocId);
-      await expect.poll(() => stateBadgeText(page), { timeout: 5000 }).toBe('Publicado');
+      // ADR 0085: the last signature completes APPROVAL synchronously. Publication is
+      // an approval-driven release-coordinator outcome (River job) that additionally
+      // requires the rendered artifacts, so the document legitimately holds at
+      // "Aprovado" until the coordinator releases it â€” and in an artifact-less harness
+      // it may hold there for good. Assert the outcome the UI guarantees (approval
+      // complete), giving the async release a generous window to land on top of it.
+      // Never assert an unconditional, immediate "Publicado".
+      await expect
+        .poll(() => stateBadgeText(page), { timeout: 30_000 })
+        .toMatch(/^(Aprovado|Publicado)$/);
     } finally {
       await context.close();
     }
@@ -197,14 +206,14 @@ test.describe.serial('happy_path', () => {
     await loginAs(page, seeded.cookies, 'author');
     await page.goto(`/documents/${primaryDocId}`);
 
-    const timelineNodes = page.locator('section[aria-label="Timeline de aprovação"] li');
+    const timelineNodes = page.locator('section[aria-label="Timeline de aprovaï¿½ï¿½o"] li');
     await expect(timelineNodes).toHaveCount(4);
     await expect(page.getByText(seeded.users.author.id)).toBeVisible();
     await expect(page.getByText(seeded.users.reviewer.id)).toBeVisible();
     await expect(page.getByText(seeded.users.approver.id)).toBeVisible();
   });
 
-  test('idempotent replay — same key returns Idempotent-Replay: true', async ({ page, request }) => {
+  test('idempotent replay ï¿½ same key returns Idempotent-Replay: true', async ({ page, request }) => {
     const { request: firstSubmitRequest, responseBody } = await submitAsAuthor(page, secondaryDocId);
     const firstBody = firstSubmitRequest.postDataJSON() as SubmitBody;
     const idempotencyKey = firstSubmitRequest.headerValue('idempotency-key');
@@ -277,24 +286,29 @@ test.describe.serial('happy_path', () => {
     expect(staleResponse.status()).toBe(412);
 
     await expect(page.locator('[data-testid="app-toast-error"], [role="alert"]')).toContainText(/documento foi alterado/i);
-    await expect.poll(() => stateBadgeText(page), { timeout: 5000 }).toBe('Em revisão');
+    await expect.poll(() => stateBadgeText(page), { timeout: 5000 }).toBe('Em revisï¿½o');
   });
 
-  test('governance event chain — exact types and order', async ({ request }) => {
+  test('governance event chain ï¿½ exact types and order', async ({ request }) => {
     const events = await governanceEvents(request, {
       tenantId: seeded.tenantId,
       docId: primaryDocId,
     });
 
-    expect(events.map((event) => event.event_type)).toEqual([
+    // ADR 0085: the approval chain up to the final `stage.passed` is written in the
+    // signoff transaction and is therefore exact and ordered. Release is a separate,
+    // asynchronous coordinator outcome, so any `doc.published` event trails the chain
+    // instead of terminating it â€” assert the synchronous prefix, allow the async tail.
+    const eventTypes = events.map((event) => event.event_type);
+    expect(eventTypes.slice(0, 6)).toEqual([
       'doc.submitted',
       'stage.activated',
       'signoff.recorded',
       'stage.passed',
       'signoff.recorded',
       'stage.passed',
-      'doc.published',
     ]);
+    expect(eventTypes.slice(6).filter((type) => type !== 'doc.published')).toEqual([]);
 
     let previousTimestamp = 0;
     for (const event of events) {

@@ -679,11 +679,10 @@ func main() {
 			SkipUnknownJobCheck: true,
 		}, nil)
 		if err != nil {
-			slog.Error("build scheduled publish enqueuer client", "err", err)
+			slog.Error("build river enqueuer client", "err", err)
 			deps.Cleanup()
 			os.Exit(1)
 		}
-		approvalServices.WithScheduledPublishEnqueuer(approvaljobs.NewScheduledPublishEnqueuer(riverBundle.Client))
 		approvalServices.WithLifecycleEnqueuer(approvaljobs.NewLifecycleEventEnqueuer(riverBundle.Client))
 
 		// M7 F7.3 Task E: tenant export/erase orchestrator. Constructed here

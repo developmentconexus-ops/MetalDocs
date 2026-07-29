@@ -92,7 +92,9 @@ export { expect };
  * Playwright project split for Task 11.1:
  *
  *   parallel-flows: workers=3  (stateless flows — isolation fixture handles tenant separation)
- *   serial-clock:   workers=1  (clock-advance tests — scheduled_publish.spec.ts)
+ *
+ * The former `serial-clock` project (workers=1, clock-advance) was retired with
+ * scheduled_publish.spec.ts under ADR 0085 Stage B.
  *
  * These are configured in playwright.config.ts under `projects`.
  */

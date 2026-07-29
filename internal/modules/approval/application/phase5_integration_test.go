@@ -3,13 +3,16 @@ package application
 // phase5_integration_test.go — cross-service scenario tests for Spec 2 Phase 5.
 //
 // These are NOT database integration tests: no real Postgres is required.
-// They wire Submit, Decision, Publish, and Scheduler services together using
-// the same fake-driver pattern as the per-service tests in this package, then
-// chain real service method calls to prove end-to-end service wiring works.
+// They wire Submit and Decision together using the same fake-driver pattern as
+// the per-service tests in this package, then chain real service method calls
+// to prove end-to-end service wiring works.
 //
 // Two scenarios:
-//   1. FullApprovalAndPublish   — Submit → approve signoff → PublishApproved
-//   2. RejectThenResubmit       — Submit → reject signoff → Submit again (new instance)
+//   1. FullApprovalToTerminal — Submit → approve signoff → terminal approval
+//      handed to the ADR 0085 release seam. There is no publish step left to
+//      chain: publication is the release coordinator's reaction to durable
+//      facts, so recording the approval fact IS the end of the human chain.
+//   2. RejectThenResubmit     — Submit → reject signoff → Submit again (new instance)
 
 import (
 	"context"
@@ -480,21 +483,23 @@ func newPhase5DB(t *testing.T, conn *phase5Conn) *sql.DB {
 }
 
 // ---------------------------------------------------------------------------
-// Scenario 1: FullApprovalAndPublish
+// Scenario 1: FullApprovalToTerminal
 //
-// Flow: Submit → RecordSignoff (approve, quorum met) → PublishApproved
+// Flow: Submit → RecordSignoff (approve, quorum met) → terminal approval
+// recorded on the release seam.
 //
-// After RecordSignoff we expect InstanceApproved=true.
-// After PublishApproved we expect NewStatus="published" and a
-// "document_published" governance event in the emitter.
+// After RecordSignoff we expect InstanceApproved=true and exactly one
+// RecordTerminalApproval call carrying this instance — that hand-off is the
+// ADR 0085 replacement for the retired PublishApproved step. Whether the
+// document then reaches published is the release coordinator's decision, made
+// against durable facts, and is covered by the release integration suite.
 //
-// Each service call gets its own repo/DB pair because:
-//   • RecordSignoff requires instance.Status == InProgress
-//   • PublishApproved requires instance.Status == Approved
-// The shared emitter accumulates events across all three phases.
+// Each service call gets its own repo/DB pair because RecordSignoff requires
+// instance.Status == InProgress. The shared emitter accumulates events across
+// both phases.
 // ---------------------------------------------------------------------------
 
-func TestPhase5_FullApprovalAndPublish(t *testing.T) {
+func TestPhase5_FullApprovalToTerminal(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, 4, 22, 10, 0, 0, 0, time.UTC)
 
@@ -597,7 +602,8 @@ func TestPhase5_FullApprovalAndPublish(t *testing.T) {
 	}
 	decisionConn := &phase5Conn{stageSignoffs: decisionStageSignoffs}
 	decisionDB := newPhase5DB(t, decisionConn)
-	decisionSvc := &DecisionService{repo: decisionRepo, emitter: emitter, clock: clock, releaseRecorder: &fakeReleaseRecorder{}}
+	releaseRecorder := &fakeReleaseRecorder{}
+	decisionSvc := &DecisionService{repo: decisionRepo, emitter: emitter, clock: clock, releaseRecorder: releaseRecorder}
 
 	signoffReq := SignoffRequest{
 		TenantID:         tenantID,
@@ -627,45 +633,21 @@ func TestPhase5_FullApprovalAndPublish(t *testing.T) {
 		t.Errorf("event[1].EventType = %q; want signoff_recorded", emitter.Events[1].EventType)
 	}
 
-	// --- Step 3: PublishApproved ---
-	// LoadInstance must now return an Approved instance (post-signoff DB state).
-	// FrozenContentHash set (F5/F6): publish reads ONLY the frozen pin.
-	publishFrozenHash := validContentHash
-	approvedInstance := &domain.Instance{
-		ID:                instanceID,
-		TenantID:          tenantID,
-		DocumentID:        documentID,
-		Status:            domain.InstanceApproved,
-		RevisionVersion:   1,
-		FrozenContentHash: &publishFrozenHash,
+	// --- Step 3: terminal approval handed to the release seam ---
+	// ADR 0085 stage B: this replaces the retired PublishApproved step. The
+	// human chain ends by recording the approval fact; the release coordinator
+	// decides publication asynchronously against durable facts.
+	if releaseRecorder.calls != 1 {
+		t.Fatalf("RecordTerminalApproval calls = %d; want 1", releaseRecorder.calls)
 	}
-	publishRepo := &phase5Repo{instance: approvedInstance}
-	// UPDATE documents returns rowsAffected=1.
-	publishConn := &phase5Conn{updateResults: []int64{1}}
-	publishDB := newPhase5DB(t, publishConn)
-	publishSvc := &PublishService{repo: publishRepo, emitter: emitter, clock: clock}
-
-	publishReq := PublishRequest{
-		TenantID:    tenantID,
-		InstanceID:  instanceID,
-		PublishedBy: actorID,
+	if releaseRecorder.last.InstanceID != instanceID {
+		t.Errorf("release seam InstanceID = %q; want %q", releaseRecorder.last.InstanceID, instanceID)
 	}
-	publishResult, err := publishSvc.PublishApproved(ctx, newTxRunner(publishDB), publishReq)
-	if err != nil {
-		t.Fatalf("PublishApproved: unexpected error: %v", err)
-	}
-	if publishResult.NewStatus != "published" {
-		t.Errorf("PublishApproved.NewStatus = %q; want published", publishResult.NewStatus)
-	}
-	if publishResult.DocumentID != documentID {
-		t.Errorf("PublishApproved.DocumentID = %q; want %q", publishResult.DocumentID, documentID)
-	}
-	// Total events: submit + signoff + publish = 3.
-	if len(emitter.Events) != 3 {
-		t.Fatalf("after PublishApproved: want 3 events; got %d", len(emitter.Events))
-	}
-	if emitter.Events[2].EventType != "document_published" {
-		t.Errorf("event[2].EventType = %q; want document_published", emitter.Events[2].EventType)
+	// Total events across the human chain: submit + signoff = 2. There is no
+	// third "document_published" event here — that one is emitted by the
+	// release transaction, not by anything a user invokes.
+	if len(emitter.Events) != 2 {
+		t.Fatalf("after terminal approval: want 2 events; got %d", len(emitter.Events))
 	}
 }
 

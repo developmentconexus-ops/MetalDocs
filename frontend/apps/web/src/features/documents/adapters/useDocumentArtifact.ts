@@ -38,11 +38,15 @@ const EM_DASH = '—';
 
 /**
  * Lifecycle/capability gating derived by the adapter for the detail hero's action
- * buttons. The route owns all interactive/dialog state (revision composer, publish
- * dialog, PDF export, copy link) and renders the hero JSX itself — `ArtifactDetailView`
+ * buttons. The route owns all interactive/dialog state (revision composer, PDF
+ * export/viewer, copy link) and renders the hero JSX itself — `ArtifactDetailView`
  * takes `heroActions` as a raw ReactNode slot, not a generic action-button list — but
  * the adapter decides WHICH gates are open in the current state so the route consumes
  * these booleans/labels instead of re-deriving them from a second set of queries.
+ *
+ * ADR 0085 (Stage B): there is no manual publish gate any more. Release is an
+ * approval-driven coordinator outcome, so the detail screen only reports the
+ * document's status; the readiness projection lands in Stage C.
  */
 export interface DocumentDetailGating {
   isObsolete: boolean;
@@ -52,14 +56,10 @@ export interface DocumentDetailGating {
   canInitiateRevision: boolean;
   /** Gated on canInitiateRevision + isPublished + controlled_document_id + no active sibling. */
   canCreateRevision: boolean;
-  /** Gated on canInitiateRevision + isApproved + confirmed active-document content hash. */
-  canPublish: boolean;
   activeSiblingDocumentId: string | null;
   activeSiblingState: ActiveSiblingState | null;
   activeSiblingCtaLabel: string;
   activeSiblingDestination: string | null;
-  /** Human copy explaining why publish is blocked when isApproved and !canPublish. Null when not applicable. */
-  publishContextNotice: string | null;
 }
 
 export interface DocumentArtifact {
@@ -71,15 +71,10 @@ export interface DocumentArtifact {
    *  for the revision composer + PDF export + "Visualizar documento" link — not worth normalizing into the
    *  kind-agnostic model). Null until loaded. */
   doc: DocumentDetail | null;
-  /** Raw active-document context (route needs content_hash/revision_version/published_document_id for the
-   *  SupersedePublishDialog props). Null when no active context. */
-  activeDocument: ControlledDocumentActiveDocument | null;
   /** Distribution coverage count, pre-formatted (EM_DASH on error/missing) — same value as the coverage KPI cell. */
   obligatedCount: string;
   /** Gating booleans + sibling-CTA copy the route's hero-actions JSX renders directly. */
   gating: DocumentDetailGating;
-  /** Imperative refetch bundle for the route's publish-success handler. */
-  refetchAll: () => void;
 }
 
 /**
@@ -208,15 +203,6 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
       : null;
   const canCreateRevision =
     canInitiateRevision && isPublished && Boolean(doc?.controlled_document_id) && activeSiblingDocumentId == null;
-  const canPublish = canInitiateRevision && isApproved && Boolean(activeDocument?.content_hash);
-  const publishContextNotice =
-    isApproved && !canInitiateRevision
-      ? 'Seu perfil atual não pode publicar esta revisão.'
-      : isApproved && activeDocumentQuery.isError
-        ? 'Não foi possível confirmar o contexto ativo de publicação. Atualize a página e tente novamente antes de publicar.'
-        : isApproved && !activeDocument?.content_hash
-          ? 'A publicação está bloqueada porque o contexto ativo desta revisão ainda não foi confirmado.'
-          : null;
 
   // KPI strip cells — fully composed here so the shared view has zero kind awareness.
   // Cell order matches DocumentPublishedPage L579-608: currentVersion, coverage, nextReview, pages.
@@ -298,12 +284,10 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
     isPublished,
     canInitiateRevision,
     canCreateRevision,
-    canPublish,
     activeSiblingDocumentId,
     activeSiblingState,
     activeSiblingCtaLabel,
     activeSiblingDestination,
-    publishContextNotice,
   };
 
   return {
@@ -314,13 +298,7 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
       void docQuery.refetch();
     },
     doc: doc ?? null,
-    activeDocument,
     obligatedCount,
     gating,
-    refetchAll: () => {
-      void docQuery.refetch();
-      void approvalQuery.refetch();
-      void activeDocumentQuery.refetch();
-    },
   };
 }

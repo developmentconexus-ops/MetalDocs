@@ -78,7 +78,6 @@ const (
 	CapDocumentEdit      Capability = "document.edit"
 	CapDocumentSubmit    Capability = "document.submit"
 	CapDocumentSignoff   Capability = "document.signoff"
-	CapDocumentPublish   Capability = "document.publish"
 	CapDocumentObsolete  Capability = "document.obsolete"
 	CapDocumentSupersede Capability = "document.supersede"
 	// CapDocumentReview gates the eQMS periodic-review mark-reviewed workflow
@@ -164,7 +163,6 @@ var validCapabilities = map[Capability]struct{}{
 	CapDocumentEdit:                {},
 	CapDocumentSubmit:              {},
 	CapDocumentSignoff:             {},
-	CapDocumentPublish:             {},
 	CapDocumentObsolete:            {},
 	CapDocumentSupersede:           {},
 	CapDocumentReview:              {},

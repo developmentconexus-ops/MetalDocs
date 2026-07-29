@@ -21,8 +21,8 @@ export interface DocumentPdfViewerDialogProps {
  * and embedded from an object URL — never handed to an `<a download>` and never
  * opened in another tab.
  *
- * Modal chrome mirrors the existing dialog primitive (`CancelInstanceDialog` /
- * `SupersedePublishDialog`): fixed scrim + `role="dialog" aria-modal`, the dialog
+ * Modal chrome mirrors the existing dialog primitive (`CancelInstanceDialog`):
+ * fixed scrim + `role="dialog" aria-modal`, the dialog
  * owns its own read + error state, and the route only toggles visibility.
  *
  * Every state is explicit — loading (`role="status"`), failure (`role="alert"` +

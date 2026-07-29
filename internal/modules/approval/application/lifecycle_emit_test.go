@@ -19,7 +19,9 @@ func (s *spyLifecycleEnqueuer) EnqueueLifecycleEventTx(_ context.Context, _ db.T
 }
 
 // TestWithLifecycleEnqueuer_Services verifies Services.WithLifecycleEnqueuer
-// wires the enqueuer to all 4 emit services and returns the same *Services.
+// wires the enqueuer to every emit service and returns the same *Services.
+// (ADR 0085 stage B retired the Publish and Supersede legs along with the
+// services themselves; the remaining three are the whole set.)
 func TestWithLifecycleEnqueuer_Services(t *testing.T) {
 	spy := &spyLifecycleEnqueuer{}
 	svc := NewServices(nil, &noopSQLEmitter{}, RealClock{}, nil)
@@ -28,17 +30,14 @@ func TestWithLifecycleEnqueuer_Services(t *testing.T) {
 		t.Error("WithLifecycleEnqueuer must return the same *Services pointer")
 	}
 	// Each field must now have the enqueuer set.
-	if svc.Publish.lifecycleEnqueuer != spy {
-		t.Error("Publish.lifecycleEnqueuer not wired")
-	}
-	if svc.Supersede.lifecycleEnqueuer != spy {
-		t.Error("Supersede.lifecycleEnqueuer not wired")
-	}
 	if svc.Obsolete.lifecycleEnqueuer != spy {
 		t.Error("Obsolete.lifecycleEnqueuer not wired")
 	}
 	if svc.Decision.lifecycleEnqueuer != spy {
 		t.Error("Decision.lifecycleEnqueuer not wired")
+	}
+	if svc.ReviewVerdict.lifecycleEnqueuer != spy {
+		t.Error("ReviewVerdict.lifecycleEnqueuer not wired")
 	}
 }
 

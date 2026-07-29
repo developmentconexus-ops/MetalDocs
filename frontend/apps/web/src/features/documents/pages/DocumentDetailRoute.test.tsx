@@ -1,7 +1,11 @@
 // FE-11: revision-initiate gating is capability-based (ADR 0022 — capabilities,
 // never roles). This test drives the route-level hero action button (the only
-// place `canInitiateRevision`/`canCreateRevision`/`canPublish` become observable
-// UI) through `useHasCapability('document.edit')` instead of a role check.
+// place `canInitiateRevision`/`canCreateRevision` become observable UI) through
+// `useHasCapability('document.edit')` instead of a role check.
+//
+// ADR 0085 (Stage B): the manual "Publicar / Agendar" affordance is gone — release
+// is an approval-driven coordinator outcome, so an approved document exposes no
+// publication action here at all.
 //
 // FE-02: DocumentDetailRoute no longer runs its own document/approval/active-document/
 // distribution queries or re-derives gating — it consumes `useDocumentArtifact`'s
@@ -84,12 +88,10 @@ function baseGating(overrides: Partial<DocumentDetailGating> = {}): DocumentDeta
     isPublished: true,
     canInitiateRevision: true,
     canCreateRevision: true,
-    canPublish: false,
     activeSiblingDocumentId: null,
     activeSiblingState: null,
     activeSiblingCtaLabel: 'Iniciar revisão',
     activeSiblingDestination: null,
-    publishContextNotice: null,
     ...overrides,
   };
 }
@@ -98,7 +100,6 @@ function mockArtifact(overrides: {
   status?: string;
   gating?: Partial<DocumentDetailGating>;
   doc?: Record<string, unknown>;
-  activeDocument?: Record<string, unknown> | null;
 } = {}) {
   const status = overrides.status ?? 'published';
   vi.mocked(useDocumentArtifact).mockReturnValue({
@@ -107,13 +108,8 @@ function mockArtifact(overrides: {
     isError: false,
     refetch: vi.fn(),
     doc: { ...BASE_DOC, status, ...overrides.doc },
-    activeDocument:
-      overrides.activeDocument === null
-        ? null
-        : { document_id: 'doc-1', content_hash: 'hash-1', approval_state: status, ...overrides.activeDocument },
     obligatedCount: '3',
     gating: baseGating(overrides.gating),
-    refetchAll: vi.fn(),
   } as never);
 }
 
@@ -169,27 +165,27 @@ describe('DocumentDetailRoute — FE-11 capability gating', () => {
     expect(btn).toHaveAttribute('title', 'Sem permissão para iniciar revisão');
   });
 
-  it('gates "Publicar / Agendar" on document.edit for approved documents', async () => {
-    hasCapMock.mockReturnValue(false);
+  it('ADR 0085 — an approved document exposes NO manual publication action', async () => {
+    // Release is an approval-driven coordinator outcome; the detail screen reports
+    // status only. A resurfaced publish/schedule affordance here is a regression.
+    hasCapMock.mockReturnValue(true);
     mockArtifact({
       status: 'approved',
       gating: {
         isApproved: true,
         isPublished: false,
-        canInitiateRevision: false,
+        canInitiateRevision: true,
         canCreateRevision: false,
-        canPublish: false,
       },
     });
 
     renderRoute();
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Publicar \/ Agendar/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Iniciar revisão/i })).toBeInTheDocument();
     });
-    const btn = screen.getByRole('button', { name: /Publicar \/ Agendar/i });
-    expect(btn).toHaveAttribute('aria-disabled', 'true');
-    expect(btn).toHaveAttribute('title', 'Sem permissão para publicar');
+    expect(screen.queryByRole('button', { name: /Publicar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Agendar/i })).not.toBeInTheDocument();
   });
 
   it('delegates the document.edit capability gate to useDocumentArtifact (not a route-level role check)', async () => {

@@ -19,9 +19,10 @@ func TestRegisterRoutes_AllRoutesRegistered(t *testing.T) {
 	}{
 		{method: http.MethodPost, path: "/api/v1/documents/doc-1/submit"},
 		{method: http.MethodPost, path: "/api/v1/approval/instances/i-1/stages/s-1/signoffs"},
-		{method: http.MethodPost, path: "/api/v1/documents/doc-1/publish"},
-		{method: http.MethodPost, path: "/api/v1/documents/doc-1/schedule-publish"},
-		{method: http.MethodPost, path: "/api/v1/documents/doc-1/supersede"},
+		// ADR 0085 stage B: /publish, /schedule-publish and /supersede are GONE.
+		// Publication is not an endpoint — it is the release coordinator's
+		// reaction to durable facts, and the publication PLAN is stated on
+		// /submit. There is deliberately no route to re-add here.
 		{method: http.MethodPost, path: "/api/v1/documents/doc-1/obsolete"},
 		{method: http.MethodPost, path: "/api/v1/approval/instances/i-1/cancel"},
 		{method: http.MethodGet, path: "/api/v1/approval/instances/i-1"},

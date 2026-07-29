@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 )
 
 // strp is a test-only helper for CreateRouteRequest.ProfileCode's *string
@@ -108,53 +109,74 @@ func TestSignoffRequestValidate(t *testing.T) {
 	}
 }
 
-func TestSchedulePublishRequestValidate(t *testing.T) {
-	valid := SchedulePublishRequest{EffectiveFrom: "2026-12-31T18:00:00Z"}
-	if err := valid.Validate(); err != nil {
-		t.Fatalf("expected valid request, got error: %v", err)
+// TestSubmitRequestPublicationPlanValidate carries the retired
+// schedule-publish/supersede contract guards forward to their ADR 0085 home:
+// the publication plan is declared on SubmitRequest. Every rule that used to
+// live on SchedulePublishRequest.Validate is asserted here, plus the one rule
+// that is genuinely new — the whole plan is OPTIONAL, so an empty submit is
+// valid where an empty schedule-publish was not.
+func TestSubmitRequestPublicationPlanValidate(t *testing.T) {
+	const validUUID = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+
+	// Plan absent entirely = immediate release on readiness. Legal.
+	if err := (SubmitRequest{}).Validate(); err != nil {
+		t.Fatalf("expected empty submit (no plan) to be valid, got error: %v", err)
 	}
 
-	validWithSupersededID := SchedulePublishRequest{
-		EffectiveFrom:        "2026-12-31T18:00:00Z",
-		SupersededDocumentID: "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+	valid := SubmitRequest{PlannedEffectiveFrom: "2026-12-31T18:00:00Z"}
+	if err := valid.Validate(); err != nil {
+		t.Fatalf("expected valid planned_effective_from, got error: %v", err)
+	}
+
+	validWithSupersededID := SubmitRequest{
+		PlannedEffectiveFrom: "2026-12-31T18:00:00Z",
+		SupersededDocumentID: validUUID,
 	}
 	if err := validWithSupersededID.Validate(); err != nil {
 		t.Fatalf("expected valid request with superseded_document_id, got error: %v", err)
 	}
 
-	missing := SchedulePublishRequest{}
-	if err := missing.Validate(); err == nil {
-		t.Fatalf("expected error for missing effective_from")
+	unparseable := SubmitRequest{PlannedEffectiveFrom: "31-12-2026"}
+	if err := unparseable.Validate(); err == nil {
+		t.Fatalf("expected error for unparseable planned_effective_from")
 	}
 
-	invalid := SchedulePublishRequest{EffectiveFrom: "31-12-2026"}
-	if err := invalid.Validate(); err == nil {
-		t.Fatalf("expected error for invalid effective_from")
-	}
-
-	nonUTC := SchedulePublishRequest{EffectiveFrom: "2026-12-31T18:00:00-03:00"}
+	nonUTC := SubmitRequest{PlannedEffectiveFrom: "2026-12-31T18:00:00-03:00"}
 	if err := nonUTC.Validate(); err == nil {
-		t.Fatalf("expected error for non-UTC effective_from")
+		t.Fatalf("expected error for non-UTC planned_effective_from")
 	}
 
-	invalidSupersededID := SchedulePublishRequest{
-		EffectiveFrom:        "2026-12-31T18:00:00Z",
-		SupersededDocumentID: "not-a-uuid",
-	}
+	invalidSupersededID := SubmitRequest{SupersededDocumentID: "not-a-uuid"}
 	if err := invalidSupersededID.Validate(); err == nil {
 		t.Fatalf("expected error for malformed superseded_document_id")
 	}
-}
 
-func TestSupersedeRequestValidate(t *testing.T) {
-	valid := SupersedeRequest{SupersededDocumentID: "3fa85f64-5717-4562-b3fc-2c963f66afa6"}
-	if err := valid.Validate(); err != nil {
-		t.Fatalf("expected valid request, got error: %v", err)
+	planned := time.Date(2026, 12, 31, 18, 0, 0, 0, time.UTC)
+	before := planned.Add(-time.Hour)
+	equal := planned
+
+	effectiveToNotAfter := SubmitRequest{
+		PlannedEffectiveFrom: "2026-12-31T18:00:00Z",
+		EffectiveTo:          &equal,
+	}
+	if err := effectiveToNotAfter.Validate(); err == nil {
+		t.Fatalf("expected error for effective_to equal to planned_effective_from")
 	}
 
-	missing := SupersedeRequest{}
-	if err := missing.Validate(); err == nil {
-		t.Fatalf("expected error for missing superseded_document_id")
+	reviewDueBefore := SubmitRequest{
+		PlannedEffectiveFrom: "2026-12-31T18:00:00Z",
+		ReviewDueAt:          &before,
+	}
+	if err := reviewDueBefore.Validate(); err == nil {
+		t.Fatalf("expected error for review_due_at before planned_effective_from")
+	}
+
+	// Without a planned date there is no anchor to compare against; both
+	// windows stay legal here and are re-checked in the DB against the ACTUAL
+	// release instant.
+	unanchored := SubmitRequest{EffectiveTo: &before, ReviewDueAt: &before}
+	if err := unanchored.Validate(); err != nil {
+		t.Fatalf("expected unanchored window fields to be valid, got error: %v", err)
 	}
 }
 

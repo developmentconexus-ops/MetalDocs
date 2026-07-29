@@ -8,18 +8,22 @@ import { useDocumentArtifact } from '../adapters/useDocumentArtifact';
 import { createRevision } from '../../controlled-documents/api/controlledDocuments';
 import { exportPDF } from '../api/exports';
 import { DocumentPdfViewerDialog } from '../components/DocumentPdfViewerDialog';
-import { SupersedePublishDialog } from '../../approval/components/SupersedePublishDialog';
 import { useHasCapability } from '../../iam/hooks/useHasCapability';
 import styles from './DocumentDetailRoute.module.css';
 
 /**
  * Document-specific route wrapper for the shared ArtifactDetailView. Owns only
- * interactive/dialog UI state (revision composer, publish dialog, PDF viewer, PDF
- * download, copy link) and injects it as heroActions / aside / extras slots.
+ * interactive/dialog UI state (revision composer, PDF viewer, PDF download, copy
+ * link) and injects it as heroActions / aside / extras slots.
  *
  * D4 (2026-07-28): "Visualizar PDF" opens the embedded `DocumentPdfViewerDialog`
  * (the PDF is read inside the app); "Baixar PDF" stays a separate, explicit
  * download action. The two must never be collapsed back into one affordance.
+ *
+ * ADR 0085 (Stage B): there is no manual "Publicar / Agendar" affordance. Release
+ * is an approval-driven coordinator outcome (the publication plan travels on
+ * submit), so an approved document simply shows its status here; the readiness
+ * projection arrives in Stage C.
  *
  * All queries and
  * lifecycle/capability gating are owned by `useDocumentArtifact` (FE-02) — the route
@@ -35,7 +39,7 @@ export function DocumentDetailRoute() {
 
   const documentId = rawDocumentId ?? '';
 
-  const { model, isLoading, isError, refetch, doc, activeDocument, obligatedCount, gating, refetchAll } =
+  const { model, isLoading, isError, refetch, doc, obligatedCount, gating } =
     useDocumentArtifact(documentId);
 
   const [linkCopied, setLinkCopied] = useState(false);
@@ -43,7 +47,6 @@ export function DocumentDetailRoute() {
   const [revisionName, setRevisionName] = useState('');
   const [revisionError, setRevisionError] = useState('');
   const [isCreatingRevision, setIsCreatingRevision] = useState(false);
-  const [showPublishDialog, setShowPublishDialog] = useState(false);
   const [showPdfViewer, setShowPdfViewer] = useState(false);
   const [pdfStatus, setPdfStatus] = useState<
     | { kind: 'idle' }
@@ -79,15 +82,12 @@ export function DocumentDetailRoute() {
   const docName = doc?.name ?? code;
   const {
     isObsolete,
-    isApproved,
     isPublished,
     canCreateRevision,
-    canPublish,
     canInitiateRevision,
     activeSiblingDocumentId,
     activeSiblingCtaLabel,
     activeSiblingDestination,
-    publishContextNotice,
   } = gating;
 
   const handleDownloadPDF = async () => {
@@ -134,10 +134,6 @@ export function DocumentDetailRoute() {
     setShowRevisionForm(false);
     setRevisionName('');
     setRevisionError('');
-  };
-
-  const handlePublishSuccess = () => {
-    refetchAll();
   };
 
   const handleCreateRevision = async () => {
@@ -222,60 +218,33 @@ export function DocumentDetailRoute() {
         <span role='alert' className={styles.pdfAlert}>{pdfStatus.message}</span>
       )}
       {/*
-        Soft-disable: aria-disabled (not native `disabled`) is deliberate — these
-        actions keep keyboard focus so AT users can reach the `title` tooltip that
-        explains WHY the action is unavailable (missing permission / active context).
-        The onClick guards (`if (canPublish) …`) suppress the action itself.
+        Soft-disable: aria-disabled (not native `disabled`) is deliberate — the
+        action keeps keyboard focus so AT users can reach the `title` tooltip that
+        explains WHY it is unavailable (missing permission / active revision).
+        The onClick handler is the guard for the action itself.
       */}
-      {isApproved ? (
-        <button
-          className='btn'
-          type='button'
-          aria-disabled={!canPublish}
-          title={
-            !canInitiateRevision
-              ? 'Sem permissão para publicar'
-              : !activeDocument?.content_hash
-                ? 'Aguardando contexto ativo para publicar'
+      <button
+        className='btn'
+        type='button'
+        aria-disabled={!canCreateRevision && !activeSiblingDocumentId}
+        title={
+          !canInitiateRevision
+            ? 'Sem permissão para iniciar revisão'
+            : activeSiblingDocumentId
+              ? 'Já existe uma revisão ativa para este documento controlado'
+              : !isPublished
+                ? 'Apenas documentos publicados podem iniciar uma nova revisão'
                 : undefined
-          }
-          onClick={() => {
-            if (canPublish) setShowPublishDialog(true);
-          }}
-        >
-          <Icon name='check' size={13} />
-          Publicar / Agendar
-        </button>
-      ) : (
-        <button
-          className='btn'
-          type='button'
-          aria-disabled={!canCreateRevision && !activeSiblingDocumentId}
-          title={
-            !canInitiateRevision
-              ? 'Sem permissão para iniciar revisão'
-              : activeSiblingDocumentId
-                ? 'Já existe uma revisão ativa para este documento controlado'
-                : !isPublished
-                  ? 'Apenas documentos publicados podem iniciar uma nova revisão'
-                  : undefined
-          }
-          onClick={activeSiblingDocumentId ? handleContinueActiveRevision : handleStartRevision}
-        >
-          <Icon name='edit' size={13} />
-          {activeSiblingCtaLabel}
-        </button>
-      )}
+        }
+        onClick={activeSiblingDocumentId ? handleContinueActiveRevision : handleStartRevision}
+      >
+        <Icon name='edit' size={13} />
+        {activeSiblingCtaLabel}
+      </button>
       <button className='btn btn-ghost' type='button' onClick={handleCopyLink} disabled={isObsolete}>
         <Icon name={linkCopied ? 'check' : 'link'} size={13} />
         {linkCopied ? 'Link copiado!' : 'Copiar link'}
       </button>
-      {publishContextNotice ? (
-        <div className={styles.heroNotice} role='status' aria-live='polite'>
-          <Icon name='shield' size={14} />
-          <span>{publishContextNotice}</span>
-        </div>
-      ) : null}
     </div>
   );
 
@@ -303,7 +272,7 @@ export function DocumentDetailRoute() {
     </aside>
   );
 
-  // ── Extras slot: revision composer, publish dialog, obsolete banner ───────
+  // ── Extras slot: revision composer, PDF viewer, obsolete banner ───────────
   const extras = (
     <>
       {isObsolete && (
@@ -360,15 +329,6 @@ export function DocumentDetailRoute() {
           documentId={documentId}
           documentLabel={code !== '—' ? code : docName}
           onClose={() => setShowPdfViewer(false)}
-        />
-      ) : null}
-      {showPublishDialog && activeDocument?.content_hash ? (
-        <SupersedePublishDialog
-          documentId={documentId}
-          revisionVersion={activeDocument.revision_version}
-          publishedDocumentId={activeDocument.published_document_id ?? undefined}
-          onClose={() => setShowPublishDialog(false)}
-          onSuccess={handlePublishSuccess}
         />
       ) : null}
     </>

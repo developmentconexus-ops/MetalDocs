@@ -14,14 +14,18 @@ package application
 //     a neutral result without error.
 //   - Multi-stage progression: completing stage 1 reports StageCompleted while
 //     the instance is not yet approved (stage 2 pending).
-//   - OCC stale-revision conflict on PublishApproved and SchedulePublish.
-//   - Not-found → infrastructure.ErrNoActiveInstance mapping for signoff, publish,
+//   - Not-found → infrastructure.ErrNoActiveInstance mapping for the signoff
 //     and obsolete entrypoints.
-//   - SchedulePublish requires an approved instance.
+//
+// The publish/schedule-publish OCC and state-legality cases that used to live
+// here went with their services in ADR 0085 stage B: publication is no longer
+// an entrypoint, so there is no publish OCC conflict to guard. The equivalent
+// CAS guard now belongs to the release transaction and is covered by the
+// release coordinator suite.
 //
 // All tests use the shared fakes defined in the sibling *_test.go files
-// (decision_service_test.go, submit_service_test.go, publish_service_test.go,
-// obsolete_service_test.go, recording_driver_test.go).
+// (decision_service_test.go, submit_service_test.go, obsolete_service_test.go,
+// recording_driver_test.go).
 
 import (
 	"context"
@@ -473,106 +477,6 @@ func TestRecordSignoff_ActivateNextStage(t *testing.T) {
 	// Second stage still pending → instance NOT approved yet.
 	if result.InstanceApproved {
 		t.Error("expected InstanceApproved=false (second stage pending)")
-	}
-}
-
-// ============================================================
-// PublishApproved / SchedulePublish — OCC and state legality
-// ============================================================
-
-func TestPublishApproved_LoadInstanceNotFound(t *testing.T) {
-	repo := &fakePublishRepo{loadErr: sql.ErrNoRows}
-	svc := &PublishService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
-	db := newPublishTestDB(t, 1)
-
-	_, err := svc.PublishApproved(context.Background(), newTxRunner(db), PublishRequest{
-		TenantID:    "t",
-		InstanceID:  "inst",
-		PublishedBy: "u",
-	})
-	if !errors.Is(err, infrastructure.ErrNoActiveInstance) {
-		t.Errorf("want ErrNoActiveInstance; got %v", err)
-	}
-}
-
-func TestPublishApproved_OCC_StaleRevision(t *testing.T) {
-	// F6 no-fallback: publish reads ONLY the frozen pin, so any
-	// InstanceApproved fixture needs a non-nil FrozenContentHash even when
-	// the assertion under test is a different invariant (here, OCC staleness).
-	frozenHash := validContentHash
-	inst := &domain.Instance{
-		ID:                "inst-stale-pub",
-		TenantID:          "t",
-		DocumentID:        "doc-stale-pub",
-		Status:            domain.InstanceApproved,
-		RevisionVersion:   3,
-		FrozenContentHash: &frozenHash,
-	}
-	repo := &fakePublishRepo{instance: inst}
-	svc := &PublishService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
-	// rowsAffected=0 → OCC conflict.
-	db := newPublishTestDB(t, 0)
-
-	_, err := svc.PublishApproved(context.Background(), newTxRunner(db), PublishRequest{
-		TenantID:    "t",
-		InstanceID:  "inst-stale-pub",
-		PublishedBy: "u",
-	})
-	if !errors.Is(err, infrastructure.ErrStaleRevision) {
-		t.Errorf("want ErrStaleRevision; got %v", err)
-	}
-}
-
-func TestSchedulePublish_InstanceNotApproved(t *testing.T) {
-	now := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
-	future := now.Add(24 * time.Hour)
-
-	inst := &domain.Instance{
-		ID:       "inst-sched-na",
-		TenantID: "t",
-		Status:   domain.InstanceInProgress, // not approved
-	}
-	repo := &fakePublishRepo{instance: inst}
-	svc := &PublishService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: now}}
-	db := newPublishTestDB(t, 1)
-
-	_, err := svc.SchedulePublish(context.Background(), newTxRunner(db), SchedulePublishRequest{
-		TenantID:      "t",
-		InstanceID:    "inst-sched-na",
-		EffectiveDate: future,
-		ScheduledBy:   "u",
-	})
-	if !errors.Is(err, ErrInstanceNotApproved) {
-		t.Errorf("want ErrInstanceNotApproved; got %v", err)
-	}
-}
-
-func TestSchedulePublish_OCC_StaleRevision(t *testing.T) {
-	now := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
-	future := now.Add(24 * time.Hour)
-
-	// F6 no-fallback: publish reads ONLY the frozen pin.
-	frozenHash := validContentHash
-	inst := &domain.Instance{
-		ID:                "inst-sched-stale",
-		TenantID:          "t",
-		DocumentID:        "doc-sched-stale",
-		Status:            domain.InstanceApproved,
-		FrozenContentHash: &frozenHash,
-	}
-	repo := &fakePublishRepo{instance: inst}
-	svc := &PublishService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: now}}
-	// rowsAffected=0 → OCC conflict.
-	db := newPublishTestDB(t, 0)
-
-	_, err := svc.SchedulePublish(context.Background(), newTxRunner(db), SchedulePublishRequest{
-		TenantID:      "t",
-		InstanceID:    "inst-sched-stale",
-		EffectiveDate: future,
-		ScheduledBy:   "u",
-	})
-	if !errors.Is(err, infrastructure.ErrStaleRevision) {
-		t.Errorf("want ErrStaleRevision; got %v", err)
 	}
 }
 

@@ -64,6 +64,25 @@ type SubmitRequest struct {
 	// selector — see resolveSubmitChoiceEligibleIDs for the fail-closed
 	// contract on mismatches.
 	ChosenActors []StageChosenActors
+
+	// Publication plan (ADR 0085). Persisted onto the documents row in the SAME
+	// transaction as the draft→under_review transition, so the release
+	// coordinator reads a plan that is durable the instant the revision enters
+	// governance. All four are optional; a nil/empty plan means "release
+	// immediately once every readiness fact holds".
+	//
+	// PlannedEffectiveFrom is the PLAN. documents.effective_from remains the
+	// ACTUAL release instant and is written only by the release transaction —
+	// this path must never touch it.
+	PlannedEffectiveFrom *time.Time
+	EffectiveTo          *time.Time
+	ReviewDueAt          *time.Time
+	// SupersedeTargetID is a CROSS-document supersede target (a published
+	// document of a DIFFERENT controlled document). Naming one requires
+	// document.supersede on the TARGET's area, checked in this transaction.
+	// "" = none; same-controlled-document supersession is implicit and is
+	// discovered by the coordinator, never named here.
+	SupersedeTargetID string
 }
 
 // StageChosenActors carries the caller-supplied chosen_actors for one stage
@@ -119,6 +138,32 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 		}
 		if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
 			return err
+		}
+
+		// Step 4a-bis (ADR 0085): a publication plan that names a CROSS-document
+		// supersede target requires document.supersede on the TARGET's area —
+		// not the submitting document's. Authority over retiring a document
+		// belongs to that document's area, and this is the one moment the
+		// caller is present to be asked; the release coordinator later acts as
+		// a system principal with no human authority to check.
+		//
+		// H-PRE-1: this authz-recording read runs here, at the top of the tx,
+		// BEFORE any FOR UPDATE. The target validation below it is likewise a
+		// plain non-locking SELECT.
+		if supersedeTargetID := strings.TrimSpace(req.SupersedeTargetID); supersedeTargetID != "" {
+			if supersedeTargetID == req.DocumentID {
+				return infrastructure.ErrInvalidSupersedeTarget
+			}
+			targetAreaCode, err := resolveSubjectAreaCode(ctx, tx, s.cdRead, req.TenantID, domain.NewDocumentSubject(supersedeTargetID))
+			if err != nil {
+				return fmt.Errorf("submit: load supersede target area: %w", err)
+			}
+			if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentSupersede), targetAreaCode); err != nil {
+				return err
+			}
+			if err := s.repo.ValidateCrossDocumentSupersedeTarget(ctx, tx, req.TenantID, req.DocumentID, supersedeTargetID); err != nil {
+				return err
+			}
 		}
 
 		// Step 4b: derive the governed documents.revision_number in-tx (T8b).
@@ -324,25 +369,39 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 			}
 		}
 
-		// Step 8b: transition document draft → under_review. Friendly first-line
-		// legality check (M4/F4.1) mirrors the DB trigger; the OCC WHERE below
-		// remains the atomic CAS + optimistic-lock enforcement.
+		// Step 8b: transition document draft → under_review and persist the ADR
+		// 0085 publication plan in the SAME write. Friendly first-line legality
+		// check (M4/F4.1) mirrors the DB trigger; the OCC WHERE below remains
+		// the atomic CAS + optimistic-lock enforcement.
+		//
+		// The plan columns are set unconditionally, not COALESCEd: the plan is
+		// declared per submission, so a resubmission that omits it clears the
+		// previous submission's plan rather than silently inheriting it (a
+		// stale inherited effective date would hold a release nobody asked to
+		// hold). effective_from is NOT touched here — it is the actual release
+		// instant, owned solely by the release transaction.
 		if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusDraft, docsdomain.DocStatusUnderReview); err != nil {
 			return err
 		}
 		res, err := tx.ExecContext(ctx, `
 			UPDATE documents
-			   SET status            = 'under_review',
-			       revision_title    = $4,
-			       reason_for_change = $5,
-			       reason_category   = $6,
-			       revision_version  = revision_version + 1
+			   SET status                 = 'under_review',
+			       revision_title         = $4,
+			       reason_for_change      = $5,
+			       reason_category        = $6,
+			       planned_effective_from = $7,
+			       effective_to           = $8,
+			       review_due_at          = $9,
+			       superseded_document_id = $10,
+			       revision_version       = revision_version + 1
 			 WHERE id               = $1
 			   AND tenant_id        = $2
 			   AND status           = 'draft'
 			   AND revision_version = $3`,
 			req.DocumentID, req.TenantID, req.RevisionVersion, revisionTitle,
 			nullableString(reasonForChange), nullableString(reasonCategory),
+			nullableTime(req.PlannedEffectiveFrom), nullableTime(req.EffectiveTo),
+			nullableTime(req.ReviewDueAt), nullableString(strings.TrimSpace(req.SupersedeTargetID)),
 		)
 		if err != nil {
 			return fmt.Errorf("submit: transition document to under_review: %w", err)

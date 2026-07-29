@@ -35,7 +35,6 @@ func TestAreaGradeCapabilitySet(t *testing.T) {
 		CapDocumentEdit:                {},
 		CapDocumentSubmit:              {},
 		CapDocumentSignoff:             {},
-		CapDocumentPublish:             {},
 		CapDocumentObsolete:            {},
 		CapDocumentSupersede:           {},
 		CapControlledDocumentCreate:    {},

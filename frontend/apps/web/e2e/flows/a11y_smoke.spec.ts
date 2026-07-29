@@ -146,21 +146,6 @@ test.describe('a11y smoke — all approval routes', () => {
     await expectAxeClean(page, 'SignoffDialog:open');
   });
 
-  test('SupersedePublishDialog open — no critical axe violations', async ({ page }) => {
-    await loginAs(page, seed.cookies, 'admin');
-    await page.goto(`/docs/${seed.docId}`);
-    await page.setViewportSize({ width: 1280, height: 800 });
-
-    const publishBtn = page.getByRole('button', { name: /publicar/i });
-    if (await publishBtn.count() === 0) {
-      test.skip();
-      return;
-    }
-    await publishBtn.click();
-    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 3000 });
-    await expectAxeClean(page, 'SupersedePublishDialog:open');
-  });
-
   test('route admin new route dialog — no critical axe violations', async ({ page }) => {
     await loginAs(page, seed.cookies, 'admin');
     await page.goto('/approval/admin/routes');

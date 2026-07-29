@@ -15,18 +15,6 @@ func (h *Handler) RecordApprovalStageSignoff(w http.ResponseWriter, r *http.Requ
 	h.SignoffHandler(w, r)
 }
 
-func (h *Handler) PublishDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params approvalapi.PublishDocumentParams) {
-	h.PublishHandler(w, r)
-}
-
-func (h *Handler) ScheduleDocumentPublish(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params approvalapi.ScheduleDocumentPublishParams) {
-	h.SchedulePublishHandler(w, r)
-}
-
-func (h *Handler) SupersedeDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params approvalapi.SupersedeDocumentParams) {
-	h.SupersedeHandler(w, r)
-}
-
 // MarkDocumentReviewed is the spec-generated adapter for the F6.2 mark-reviewed
 // operation: records a periodic-review completion on a live published
 // revision (last_reviewed_at + next review_due_at) under CapDocumentReview.

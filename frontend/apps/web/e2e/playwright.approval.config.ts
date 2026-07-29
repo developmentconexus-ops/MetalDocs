@@ -31,14 +31,10 @@ export default defineConfig({
         ...sharedUse,
       },
     },
-    {
-      name: 'serial-clock',
-      workers: 1,
-      testMatch: ['**/scheduled_publish.spec.ts'],
-      use: {
-        ...sharedUse,
-      },
-    },
+    // ADR 0085 (Stage B): the `serial-clock` project is gone with its sole member,
+    // scheduled_publish.spec.ts — the manual schedule-publish endpoint it drove no
+    // longer exists. Add a serial project back only when a real clock-advance spec
+    // does; a project matching nothing is silent dead config.
   ],
   ...(startBackend
     ? {

@@ -13,11 +13,19 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
+
+	approvalapp "metaldocs/internal/modules/approval/application"
+	approvaldomain "metaldocs/internal/modules/approval/domain"
+	approvalinfra "metaldocs/internal/modules/approval/infrastructure"
+	docsdomain "metaldocs/internal/modules/documents/domain"
+	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
+	platformdb "metaldocs/internal/platform/db"
 )
 
 func TestE2E_HappyPath_HTTP(t *testing.T) {
@@ -37,6 +45,12 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 	var instanceID string
 	var submitETag string
 	var stageIDs []string
+
+	// Carried from step 7 into step 7b: the generation the coordinator settled
+	// on, and whether it settled by HOLDING (no artifacts in this harness) — the
+	// only case where step 7b has work to do.
+	var releaseGenerationID string
+	var releaseHeldOnMaterializing bool
 
 	// 1) POST /api/v1/controlled-documents -> atomic create (CD + document)
 	t.Run("CreateControlledDocument", func(t *testing.T) {
@@ -262,17 +276,213 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 		}
 	})
 
-	// 7) POST /api/v1/documents/{id}/publish
-	t.Run("Publish", func(t *testing.T) {
-		resp, raw := doJSONRequest(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/documents/%s/publish", baseURL, documentID), nil, map[string]string{
-			"X-Tenant-ID":     tenantID,
-			"X-User-ID":       userID,
-			"Idempotency-Key": "44444444-4444-4444-8444-444444444444",
-			"If-Match":        submitETag,
-			"X-User-Roles":    userRoles,
-		})
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("publish status=%d body=%s", resp.StatusCode, raw)
+	// 7) Release is NOT an endpoint (ADR 0085): terminal approval writes the
+	// approval fact onto the release generation and the coordinator reacts.
+	// There is nothing to POST — the assertion is that the durable fact
+	// landed and the coordinator reached a legal outcome for this path.
+	//
+	// This e2e never renders the final DOCX+PDF set, so the artifact fact is
+	// absent by construction and the coordinator's honest outcome is the
+	// `materializing` hold. Asserting "published" here would assert a bug.
+	t.Run("ReleaseGenerationApprovalFactDB", func(t *testing.T) {
+		db := openRequiredDirectDB(t)
+		defer db.Close()
+
+		var (
+			generationID   string
+			approvalFactAt sql.NullTime
+			artifactFactAt sql.NullTime
+			releasedAt     sql.NullTime
+			holdReason     sql.NullString
+			docStatus      string
+		)
+
+		// The coordinator runs asynchronously (release_evaluate River job), so
+		// poll rather than read once.
+		deadline := time.Now().Add(30 * time.Second)
+		for {
+			err := db.QueryRowContext(context.Background(), `
+				SELECT g.id::text,
+				       g.approval_fact_at,
+				       g.artifact_fact_at,
+				       g.released_at,
+				       g.hold_reason,
+				       d.status
+				  FROM public.release_generations g
+				  JOIN public.documents d
+				    ON d.id = g.document_id
+				   AND d.tenant_id = g.tenant_id
+				 WHERE g.tenant_id = $1::uuid
+				   AND g.document_id = $2::uuid
+				 ORDER BY g.generation_seq DESC
+				 LIMIT 1`,
+				tenantID, documentID,
+			).Scan(&generationID, &approvalFactAt, &artifactFactAt, &releasedAt, &holdReason, &docStatus)
+			if err == nil && approvalFactAt.Valid && (holdReason.Valid || releasedAt.Valid) {
+				break
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("release generation never settled for document %s (err=%v approval_fact=%v hold=%v released=%v)",
+					documentID, err, approvalFactAt.Valid, holdReason.String, releasedAt.Valid)
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+
+		if releasedAt.Valid {
+			// Only legal if the artifact fact really did land (a renderer is
+			// running against this server); then the document must be published.
+			if !artifactFactAt.Valid {
+				t.Fatalf("released without an artifact fact: released_at=%v", releasedAt.Time)
+			}
+			if docStatus != "published" {
+				t.Fatalf("released generation but document status=%q, want published", docStatus)
+			}
+			return
+		}
+
+		if holdReason.String != "materializing" {
+			t.Fatalf("hold_reason=%q, want materializing (no artifact rendered in this e2e path)", holdReason.String)
+		}
+		if docStatus != "approved" && docStatus != "scheduled" {
+			t.Fatalf("document status=%q while held on %q, want approved/scheduled", docStatus, holdReason.String)
+		}
+
+		releaseGenerationID = generationID
+		releaseHeldOnMaterializing = true
+	})
+
+	// 7b) The other half of ADR 0085, and the half step 7 structurally cannot
+	// reach: the coordinator RELEASES once the generation is artifact-ready.
+	//
+	// Step 7 stops at the honest `materializing` hold because this harness runs
+	// no renderer, so asserting "published" there would assert a bug. That makes
+	// the happy path's terminal state unproven end-to-end. This subtest closes
+	// it deterministically: it completes the readiness predicate through the
+	// SAME production fact producer the render workers use
+	// (application.RecordArtifactFactTx — generation-guarded and idempotent, not
+	// a raw UPDATE), then drives one evaluation through the real coordinator.
+	//
+	// The coordinator is constructed here rather than driven through River: the
+	// River leg is a thin InsertTx/Work wrapper already covered by
+	// tests/integration/approval/release_coordinator_integration_test.go, and
+	// invoking Evaluate directly makes this proof deterministic instead of
+	// racing a background queue.
+	t.Run("CoordinatorReleasesOnceArtifactFactsLand", func(t *testing.T) {
+		if !releaseHeldOnMaterializing {
+			t.Skip("generation already released (this environment renders artifacts); the materializing half of step 7 did not apply, so there is nothing to complete")
+		}
+
+		database := openRequiredDirectDB(t)
+		defer database.Close()
+
+		ctx := context.Background()
+		runner := platformdb.NewTxRunner(database)
+		repo := approvalinfra.NewPostgresApprovalRepository(database, iampg.NewUserDisplayNameRepository(database))
+		enqueuer := &e2eReleaseEnqueuer{}
+		lifecycle := &e2eLifecycleEnqueuer{}
+		coordinator := approvalapp.NewReleaseCoordinator(repo, approvalapp.NewSQLEmitter(), approvalapp.RealClock{}).
+			WithEvaluationEnqueuer(enqueuer).
+			WithLifecycleEnqueuer(lifecycle)
+
+		// Complete the artifact set. Each half lands in its own transaction,
+		// the way the DOCX and PDF workers write them.
+		for _, kind := range []approvalapp.ArtifactKind{approvalapp.ArtifactFinalDocx, approvalapp.ArtifactFinalPDF} {
+			kind := kind
+			if err := runner.Do(ctx, func(tx *sql.Tx) error {
+				_, err := approvalapp.RecordArtifactFactTx(ctx, tx, enqueuer, approvalapp.ArtifactFactInput{
+					TenantID:            tenantID,
+					ReleaseGenerationID: releaseGenerationID,
+					Kind:                kind,
+					S3Key:               fmt.Sprintf("tenants/%s/%s/%s", tenantID, documentID, kind),
+				})
+				return err
+			}); err != nil {
+				t.Fatalf("record %s artifact fact for generation %s: %v", kind, releaseGenerationID, err)
+			}
+		}
+
+		key, artifactFactAt := loadReleaseGenerationIdentity(t, database, tenantID, documentID)
+		if !artifactFactAt.Valid {
+			t.Fatal("artifact_fact_at not stamped after both halves landed — artifact-ready(G) requires DOCX AND PDF")
+		}
+
+		eval, err := coordinator.Evaluate(ctx, runner, key)
+		if err != nil {
+			t.Fatalf("Evaluate (artifact-ready): %v", err)
+		}
+		if eval.Action != approvaldomain.ReleaseActionRelease {
+			t.Fatalf("evaluation = %+v, want release (predicate: approval fact x artifact facts x effective date x supersession head)", eval)
+		}
+
+		// Document truth.
+		var (
+			docStatus     string
+			effectiveFrom sql.NullTime
+		)
+		if err := database.QueryRowContext(ctx,
+			`SELECT status, effective_from FROM public.documents WHERE id = $1::uuid AND tenant_id = $2::uuid`,
+			documentID, tenantID,
+		).Scan(&docStatus, &effectiveFrom); err != nil {
+			t.Fatalf("load released document: %v", err)
+		}
+		if docStatus != "published" {
+			t.Fatalf("document status=%q, want published", docStatus)
+		}
+		if !effectiveFrom.Valid {
+			t.Fatal("published document has no effective_from — the release must stamp the ACTUAL release instant")
+		}
+
+		// Generation truth.
+		var (
+			releasedAt sql.NullTime
+			holdReason sql.NullString
+		)
+		if err := database.QueryRowContext(ctx,
+			`SELECT released_at, hold_reason FROM public.release_generations WHERE id = $1::uuid`,
+			releaseGenerationID,
+		).Scan(&releasedAt, &holdReason); err != nil {
+			t.Fatalf("load released generation: %v", err)
+		}
+		if !releasedAt.Valid {
+			t.Fatal("release generation not stamped released_at")
+		}
+		if holdReason.Valid {
+			t.Fatalf("released generation still carries hold %q", holdReason.String)
+		}
+
+		// Exactly one governance event for the transition, attributed to the
+		// system principal — publication has no human actor under ADR 0085.
+		var governanceEvents int
+		if err := database.QueryRowContext(ctx, `
+			SELECT count(*) FROM public.governance_events
+			 WHERE tenant_id = $1::uuid
+			   AND resource_id = $2
+			   AND event_type = 'document_published'`,
+			tenantID, documentID,
+		).Scan(&governanceEvents); err != nil {
+			t.Fatalf("count document_published governance events: %v", err)
+		}
+		if governanceEvents != 1 {
+			t.Fatalf("document_published governance events = %d, want exactly 1", governanceEvents)
+		}
+		var eventActor string
+		if err := database.QueryRowContext(ctx, `
+			SELECT actor_user_id FROM public.governance_events
+			 WHERE tenant_id = $1::uuid AND resource_id = $2 AND event_type = 'document_published'
+			 ORDER BY created_at DESC LIMIT 1`,
+			tenantID, documentID,
+		).Scan(&eventActor); err != nil {
+			t.Fatalf("load document_published governance event: %v", err)
+		}
+		if eventActor != approvalapp.ReleaseSystemPrincipal {
+			t.Fatalf("release event actor = %q, want %q", eventActor, approvalapp.ReleaseSystemPrincipal)
+		}
+
+		// Exactly one lifecycle (notification-fanout) event for the same
+		// transition — one governance record and one reader notification, never
+		// two of either.
+		if n := lifecycle.count(documentID, docsdomain.EventTypeDocumentPublished); n != 1 {
+			t.Fatalf("published lifecycle events for %s = %d, want exactly 1", documentID, n)
 		}
 	})
 
@@ -300,6 +510,80 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 			t.Fatalf("expected at least one governance event for document %s, got %d", documentID, count)
 		}
 	})
+}
+
+// ── release-coordinator test doubles (step 7b) ──────────────────────────────
+
+// e2eReleaseEnqueuer stands in for the River evaluation enqueuer. Step 7b
+// invokes Evaluate directly, so the outbox leg only needs to not be the reason
+// a fact write fails; what it records is used for nothing but debuggability.
+type e2eReleaseEnqueuer struct {
+	mu   sync.Mutex
+	keys []approvaldomain.ReleaseGenerationKey
+}
+
+func (e *e2eReleaseEnqueuer) EnqueueReleaseEvaluationTx(_ context.Context, _ platformdb.Tx, key approvaldomain.ReleaseGenerationKey, _ time.Time) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.keys = append(e.keys, key)
+	return nil
+}
+
+// e2eLifecycleEnqueuer captures the notification-fanout rows the release
+// transaction enqueues. The River leg is a thin InsertTx wrapper; what step 7b
+// asserts is that the release emits exactly one lifecycle event per affected
+// transition.
+type e2eLifecycleEnqueuer struct {
+	mu     sync.Mutex
+	events []docsdomain.LifecycleEventArgs
+}
+
+func (e *e2eLifecycleEnqueuer) EnqueueLifecycleEventTx(_ context.Context, _ platformdb.Tx, args docsdomain.LifecycleEventArgs) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.events = append(e.events, args)
+	return nil
+}
+
+func (e *e2eLifecycleEnqueuer) count(resourceID, eventType string) int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	n := 0
+	for _, ev := range e.events {
+		if ev.ResourceID == resourceID && ev.EventType == eventType {
+			n++
+		}
+	}
+	return n
+}
+
+// loadReleaseGenerationIdentity reads the document's newest release generation
+// and returns the coordinator key for it, plus artifact_fact_at. The key is
+// read back from the row rather than reconstructed from the document, because
+// the release itself bumps revision_version — driving Evaluate from the
+// document's CURRENT version would key on a generation that does not exist.
+func loadReleaseGenerationIdentity(t *testing.T, database *sql.DB, tenantID, documentID string) (approvaldomain.ReleaseGenerationKey, sql.NullTime) {
+	t.Helper()
+
+	var (
+		key            approvaldomain.ReleaseGenerationKey
+		artifactFactAt sql.NullTime
+	)
+	if err := database.QueryRowContext(context.Background(), `
+		SELECT tenant_id::text, document_id::text, approval_instance_id::text,
+		       revision_id::text, revision_version, frozen_content_hash, artifact_fact_at
+		  FROM public.release_generations
+		 WHERE tenant_id = $1::uuid
+		   AND document_id = $2::uuid
+		 ORDER BY generation_seq DESC
+		 LIMIT 1`,
+		tenantID, documentID,
+	).Scan(&key.TenantID, &key.DocumentID, &key.ApprovalInstanceID,
+		&key.RevisionID, &key.RevisionVersion, &key.FrozenContentHash, &artifactFactAt); err != nil {
+		t.Fatalf("load release generation identity for %s: %v", documentID, err)
+	}
+	key.SubjectKind = approvaldomain.SubjectKindDocument
+	return key, artifactFactAt
 }
 
 // newIdempotencyKey returns a fresh UUID. The API-wide Idempotency-Key wire

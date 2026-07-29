@@ -10,11 +10,6 @@
 pnpm exec playwright test e2e/flows/ --project=parallel-flows
 ```
 
-## Run Scheduled/Clock Flows (Serial)
-```bash
-pnpm exec playwright test e2e/flows/ --project=serial-clock
-```
-
 ## View Playwright Report
 ```bash
 pnpm exec playwright show-report

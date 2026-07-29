@@ -29,10 +29,7 @@ var idempotentRoutes = map[string]bool{
 	"POST /api/v1/approval/instances/{instance_id}/cancel": true,
 	"POST /api/v1/documents/{id}/cancel":                   true,
 	"POST /api/v1/documents/{id}/obsolete":                 true,
-	"POST /api/v1/documents/{id}/publish":                  true,
-	"POST /api/v1/documents/{id}/schedule-publish":         true,
 	"POST /api/v1/documents/{id}/submit":                   true,
-	"POST /api/v1/documents/{id}/supersede":                true,
 	"POST /api/v1/documents/{id}/review":                   true,
 }
 

@@ -46,19 +46,10 @@ export default defineConfig({
         trace: "retain-on-failure",
       },
     },
-    {
-      name: "serial-clock",
-      testDir: "./e2e/flows",
-      testMatch: "*scheduled*",
-      workers: 1,
-      fullyParallel: false,
-      retries: 0,
-      use: {
-        ...devices["Desktop Chrome"],
-        baseURL: e2eBaseURL,
-        trace: "retain-on-failure",
-      },
-    },
+    // ADR 0085 (Stage B): the `serial-clock` project is gone with its sole member,
+    // scheduled_publish.spec.ts — the manual schedule-publish endpoint it drove no
+    // longer exists. Add a serial project back only when a real clock-advance spec
+    // does; a project matching nothing is silent dead config.
   ],
   webServer: {
     command: "go run ./apps/api/cmd/metaldocs-api",

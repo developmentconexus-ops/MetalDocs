@@ -41,7 +41,9 @@ MetalDocs has **two authorization tiers**.
 
 Each of the 29 registry capabilities is classified **tenant-grade** (`ScopeTenant`) or **area-grade** (`ScopeArea`) in `internal/modules/iam/domain/capability_scope.go`. This classification is CI-enforced: the `authz-area-scope-binding` AST guard (`scripts/api-lint`) bans `authz.Require(<areaGradeCap>, "tenant")` — any area-grade cap passed with the `"tenant"` literal is a red build. The `no-rawstring-capability` guard bans raw-string cap arguments to `authz.Require`; only typed consts are permitted.
 
-**Area-grade (11):** `document.create`, `document.edit`, `document.submit`, `document.signoff`, `document.publish`, `document.obsolete`, `document.supersede`, `controlled_documents.create`, `controlled_documents.obsolete`, `controlled_documents.supersede`, `cap:membership.manage`.
+**Area-grade (10):** `document.create`, `document.edit`, `document.submit`, `document.signoff`, `document.obsolete`, `document.supersede`, `controlled_documents.create`, `controlled_documents.obsolete`, `controlled_documents.supersede`, `cap:membership.manage`.
+
+`document.publish` was retired by ADR 0085 stage B: publication is the release coordinator's reaction to durable readiness facts, not a human-invoked action, so there is nothing left for a publish capability to gate. `document.supersede` survives, re-homed to submission time — naming a cross-document supersede target in the publication plan requires it on the **target's** area, checked in the submit transaction.
 
 **Tenant-grade (18):** all `*.view` caps, `template.*` lifecycle caps, `taxonomy.manage`, `user.manage`, `route.manage`, `metrics.view`, `audit.read`, `session.manage`.
 
@@ -50,7 +52,7 @@ Each of the 29 registry capabilities is classified **tenant-grade** (`ScopeTenan
 | Module | tier-2 call sites | tripwire tables |
 |---|---|---|
 | documents | `CreateDocumentTx` (`cap:document.create`); `UpdateDocumentName`, `UpdateDocumentStatus`, `MarkArchived`, `Unarchive` (`cap:document.edit`); `LoadDocumentAreaCode` is the shared DB-derived area helper (one source of truth — `documents/application/document_area.go`) | `public.documents` (INSERT + UPDATE) |
-| approval | `submit_service` (`cap:document.submit`), `signoff_service` (`cap:document.signoff`), `publish_service` (`cap:document.publish`), `obsolete_service` (`cap:document.obsolete`) | `approval_instances`, `approval_signoffs` |
+| approval | `submit_service` (`cap:document.submit`, plus `cap:document.supersede` on the **target's** area when the publication plan names a cross-document supersede target), `signoff_service` (`cap:document.signoff`), `obsolete_service` (`cap:document.obsolete`) | `approval_instances`, `approval_signoffs` |
 | controlled-documents | `Create`, `CreateTx` (`cap:controlled_documents.create`); `changeStatus` (`cap:controlled_documents.obsolete`\|`cap:controlled_documents.supersede`) — area loaded from DB row before the check | `controlled_documents`, `cd_sequence_counters` |
 | taxonomy | `FamilyRepository.Create/Update`, `ProfileRepository.Create/Update`, `AreaRepository.Create/Update` | `document_profiles`, `document_process_areas`, `document_families` |
 | templates | `CreateTemplate`, `SubmitForReview`, `Review`, `Approve`, `PublishTemplateVersion`, `ArchiveTemplate` — all tenant-grade | `templates_template`, `templates_template_version` |

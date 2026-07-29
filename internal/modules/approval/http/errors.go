@@ -39,7 +39,7 @@ const (
 	approvalCodeNotFoundInstanceNotVisible           problem.Code = "not_found.instance_not_visible"
 	approvalCodeConflictDuplicate                    problem.Code = "conflict.duplicate_submission"
 	approvalCodeSignoffDuplicate                     problem.Code = "signoff.duplicate"
-	approvalCodePublishInvalidSupersede              problem.Code = "publish.invalid_supersede_target"
+	approvalCodeSubmitInvalidSupersede               problem.Code = "submit.invalid_supersede_target"
 	approvalCodeStateInstanceCompleted               problem.Code = "state.instance_completed"
 	approvalCodeRouteInUse                           problem.Code = "route.in_use"
 	approvalCodeRouteDuplicateProfile                problem.Code = "route.duplicate_profile"
@@ -149,9 +149,9 @@ func MapErrorToResponse(err error) *problem.Problem {
 	case errors.Is(err, infrastructure.ErrActorAlreadySigned):
 		statusCode = http.StatusConflict
 		code = approvalCodeSignoffDuplicate
-	case errors.Is(err, infrastructure.ErrInvalidScheduledSupersedeTarget):
+	case errors.Is(err, infrastructure.ErrInvalidSupersedeTarget):
 		statusCode = http.StatusConflict
-		code = approvalCodePublishInvalidSupersede
+		code = approvalCodeSubmitInvalidSupersede
 	case errors.Is(err, infrastructure.ErrInstanceCompleted):
 		statusCode = http.StatusConflict
 		code = approvalCodeStateInstanceCompleted
@@ -379,9 +379,6 @@ func MapErrorToResponse(err error) *problem.Problem {
 			statusCode = http.StatusBadRequest
 			code = approvalCodeValidationReasonRequired
 		case errors.Is(err, application.ErrInvalidObsoleteSource):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationRequestInvalid
-		case errors.Is(err, application.ErrEffectiveDateInPast):
 			statusCode = http.StatusBadRequest
 			code = approvalCodeValidationRequestInvalid
 		case errors.Is(err, application.ErrRouteProfileUnknown):

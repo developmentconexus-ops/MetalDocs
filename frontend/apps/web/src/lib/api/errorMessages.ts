@@ -93,6 +93,7 @@ export const errorMessages: Record<string, string> = {
   'internal.db_privilege_missing': 'O servidor não tem privilégio suficiente para concluir esta operação.',
   'internal.db_unknown': 'Falha inesperada no banco de dados. Tente novamente.',
   'internal.signature_misconfigured': 'Falha de configuração na verificação de assinatura. Contate o administrador.',
+  'internal.verdict_wrong_stage_kind': 'Ocorreu um erro interno ao registrar o parecer. Tente novamente.',
   NOT_IMPLEMENTED: 'Funcionalidade ainda não disponível.',
 
   // ─── Templates / documents domain-specific codes ──────────────────────────
@@ -108,11 +109,14 @@ export const errorMessages: Record<string, string> = {
   'conflict.mark_reviewed_stale_revision': 'A revisão mudou; recarregue antes de marcar como revisado.',
   'conflict.stale_revision': 'O documento foi alterado por outro usuário. Atualize e tente novamente.',
   'freeze.effective_date_missing': 'Informe a data de vigência para concluir a publicação.',
+  'not_found.delegation': 'Delegação não encontrada.',
   'not_found.instance': 'Documento não encontrado.',
+  // Deliberately identical to not_found.instance: the backend splits the two so
+  // the "exists but you cannot see it" case never leaks through the copy.
+  'not_found.instance_not_visible': 'Documento não encontrado.',
   'not_found.route': 'Nenhuma rota de aprovação configurada para este perfil. Configure uma rota antes de continuar.',
   'precondition.content_hash_mismatch': 'O conteúdo enviado não corresponde à versão esperada.',
   'precondition.if_match_required': 'A revisão do documento é obrigatória para esta operação.',
-  'publish.invalid_supersede_target': 'A versão alvo de substituição é inválida.',
   'route.duplicate_profile': 'Já existe uma rota para este perfil.',
   'route.in_use': 'Esta rota está em uso e não pode ser alterada.',
   'signoff.duplicate': 'Esta aprovação já foi registrada.',
@@ -124,12 +128,29 @@ export const errorMessages: Record<string, string> = {
   // correctly for either, hence "perfil" rather than "documento".
   'state.approval_route_missing':
     'Perfil sem rota de aprovação ativa — configure a rota antes de submeter.',
+  'state.fast_forward_not_eligible': 'Você não está elegível para aprovar a próxima etapa deste documento.',
+  'state.fast_forward_stage_not_completed':
+    'A etapa atual ainda não foi concluída; não é possível aprovar a próxima etapa agora.',
   'state.instance_completed': 'Este fluxo já foi concluído.',
   'state.route_inactive': 'Esta rota está inativa e não pode ser usada.',
+  'state.verdict_ready_on_approval_stage':
+    'Esta etapa é de aprovação, não de revisão — registre a assinatura em vez de um parecer.',
+  // ADR 0085 (Stage B): the supersede target now travels on the submission's
+  // publication plan (superseded_document_id), so the validation is raised at
+  // submit time — the former 'publish.invalid_supersede_target' code is gone.
+  'submit.invalid_supersede_target': 'A versão alvo de substituição é inválida.',
+  'validation.delegation_window_invalid': 'A janela de vigência da delegação é inválida.',
+  'validation.document_subject_key_mismatch': 'A rota informada não corresponde a este documento.',
   'validation.effective_to_not_after_effective_from':
     'A data de fim de vigência deve ser posterior à de início.',
+  'validation.empty_eligible_pool':
+    'Nenhum usuário elegível para uma das etapas da rota. Ajuste a rota ou os vínculos de área antes de submeter.',
   'validation.review_due_before_effective':
     'A data de revisão não pode ser anterior ao início da vigência.',
+  'validation.self_delegation': 'Não é possível delegar para si mesmo.',
+  'validation.submit_choice_constraint_violated':
+    'Um dos aprovadores escolhidos não atende às restrições da etapa.',
+  'validation.submit_choice_required': 'Escolha os aprovadores das etapas que exigem seleção no envio.',
 
   // ─── Documents (instances / sessions / checkpoints) ───────────────────────
   APPROVAL_ROUTE_MISSING: 'Nenhuma rota de aprovação configurada para este perfil. Configure uma rota antes de continuar.',
@@ -144,6 +165,8 @@ export const errorMessages: Record<string, string> = {
   CONTROLLED_DOCUMENT_CODE_TAKEN: 'Este código de documento já está em uso.',
   CONTROLLED_DOCUMENT_NOT_ACTIVE: 'O documento controlado não está ativo.',
   CONTROLLED_DOCUMENT_NOT_FOUND: 'Documento controlado não encontrado.',
+  'creation_context.unconfigured':
+    'O contexto de criação de documentos não está configurado. Contate o administrador.',
   DEFAULT_TEMPLATE_OBSOLETE: 'O template padrão do perfil está obsoleto.',
   DICTIONARY_TOKEN_MISSING: 'Um token de dicionário referenciado não existe.',
   MANUAL_CODE_REASON_REQUIRED: 'Informe a justificativa para o código manual.',
@@ -161,6 +184,7 @@ export const errorMessages: Record<string, string> = {
   FAMILY_NOT_FOUND: 'Família de processos não encontrada.',
   PROFILE_ALREADY_EXISTS: 'Já existe um perfil com este código.',
   PROFILE_ARCHIVED: 'O perfil está arquivado.',
+  PROFILE_CLASS_ROUTE_CONFLICT: 'A reclassificação conflita com uma rota de aprovação ativa deste perfil.',
   PROFILE_CODE_IMMUTABLE: 'O código do perfil não pode ser alterado.',
   PROFILE_NOT_FOUND: 'Perfil não encontrado.',
   TEMPLATE_NOT_PUBLISHED: 'A versão do template não está publicada.',

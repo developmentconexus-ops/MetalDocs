@@ -1,6 +1,6 @@
 # MetalDocs Backend Atlas
 
-> **Last verified:** 2026-07-02 (StagingOutboxWorker consolidation: outbox relay references updated — `PDFOutboxWorker`/`MaterializeOutboxWorker` are now two instances of generic `fanout.StagingOutboxWorker`) | **Prior:** 2026-06-12 (Wave F coherence pass)
+> **Last verified:** 2026-07-28 (ADR 0085 Stage B — §5 runtime topology diagram: `ScheduledPublishWorker`/`scheduled_publish_cutover` node renamed to `ReleaseEvaluateWorker`/`release_evaluate`, the deleted job's replacement; see [`wiki/modules/approval.md`](../modules/approval.md)) | prior: 2026-07-02 (StagingOutboxWorker consolidation: outbox relay references updated — `PDFOutboxWorker`/`MaterializeOutboxWorker` are now two instances of generic `fanout.StagingOutboxWorker`) | **Prior:** 2026-06-12 (Wave F coherence pass)
 > **Scope:** Atlas entrypoint for the MetalDocs backend Stage-1 truth map. Covers every binary, domain module, platform package, contract surface, and cross-cutting concern. Every behavioral claim carries a `file:line` anchor derived from Stage-1 audit artifacts. Runtime-only behavior tagged `[runtime-unverified]`.
 > **Key files:**
 > - `apps/api/cmd/metaldocs-api/main.go` — composition root (all wiring)
@@ -363,7 +363,7 @@ graph LR
     subgraph Jobs_Proc["metaldocs-jobs (process)"]
         direction TB
         RIVER_C["river.Client\nqueue=temporal\nMaxWorkers=10"]
-        SCHED_PUB["ScheduledPublishWorker\nscheduled_publish_cutover"]
+        RELEASE_EVAL["ReleaseEvaluateWorker\nrelease_evaluate (ADR 0085)"]
     end
 
     subgraph NodeSvc["docx-renderer (process)"]
@@ -414,8 +414,8 @@ graph LR
     MAT_RUN -->|"WriteFinalDocxInTx + pdf_dispatch_outbox.Enqueue"| META_SCHEMA
 
     RIVER_C -->|"poll scheduled jobs"| RIVER_SCHEMA
-    RIVER_C --> SCHED_PUB
-    SCHED_PUB -->|"UPDATE documents.status=published"| PUBLIC_SCHEMA
+    RIVER_C --> RELEASE_EVAL
+    RELEASE_EVAL -->|"UPDATE documents.status=published (release coordinator)"| PUBLIC_SCHEMA
 
     HUB -->|"UPDATE iam_users.last_seen_at"| PUBLIC_SCHEMA
 ```

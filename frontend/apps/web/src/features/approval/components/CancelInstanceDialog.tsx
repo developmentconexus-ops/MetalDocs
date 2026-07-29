@@ -13,7 +13,7 @@ interface CancelInstanceDialogProps {
 /**
  * Modal for cancelling an active approval instance. Collects a required reason,
  * calls the cancel endpoint, and on success notifies the caller (which refetches
- * the instance). Mirrors SupersedePublishDialog / SignoffDialog — the dialog owns
+ * the instance). Mirrors SignoffDialog — the dialog owns
  * its own write + error state; the route only toggles its visibility.
  *
  * Replaces the former window.prompt so the flow stays in-app and accessible.

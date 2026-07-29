@@ -5,7 +5,9 @@ Status: active execution artifact
 Canonical home: `wiki/quality/deep-qa/matrix.md`
 Compatibility path: `wiki/references/documents-approval-deep-qa/matrix.md`
 Proof policy: runtime + contract
-Scope: scenario coverage artifact for canonical `/documents/:id`, `GET /api/v1/controlled-documents/{id}/active-document`, governed lineage in `documents`, approval submit/publish/supersede/scheduler behavior
+Scope: scenario coverage artifact for canonical `/documents/:id`, `GET /api/v1/controlled-documents/{id}/active-document`, governed lineage in `documents`, approval submit/signoff behavior and coordinator-owned release (ADR 0085)
+
+> **Amended 2026-07-28 ([ADR 0085](../../decisions/0085-release-coordinator-approval-driven-publication.md) Stage B).** The manual publish surface this matrix was written against is gone: `POST /documents/{id}/publish`, `/schedule-publish` and `/supersede`, the capability `document.publish`, and the River kind `scheduled_publish_cutover` were all deleted. Publication is now the release coordinator's reaction to durable readiness facts (approval fact × final-DOCX and final-PDF artifact facts × effective-date gate × supersession head), executed by the `release_evaluate` job. The rows below that named a publish/schedule *request* have been restated as coordinator scenarios rather than deleted — the risk each one covers (one winner, no duplicate cutover, no cross-tenant leak, correct timing) still exists; only the trigger changed. None of them had been executed, so no execution record is being rewritten.
 
 This matrix remains scenario-shaped rather than procedural. It records what must be proved, which current boundary owns each scenario, and which evidence standard applies; `Status`, `Classification`, and `Artifact Links` stay blank until execution.
 
@@ -27,7 +29,7 @@ Each non-proved scenario must record:
 - `revision_title` belongs to `documents` and is born at finalize / submit-for-review.
 - `GET /api/v1/controlled-documents/{id}/active-document` uses `documents.status` as the source of truth for `approval_state`.
 - `approval_instance_id` is enriched only for `under_review` and secondary lookup failures are explicit `500`.
-- Published replacement lineage uses `documents.superseded_document_id` and scheduler cutover transitions old head to `superseded`.
+- Published replacement lineage uses `documents.superseded_document_id`; the release coordinator transitions the old head to `superseded` inside the winning release transaction (ADR 0085).
 
 ## Scenario matrix
 
@@ -43,11 +45,11 @@ Each non-proved scenario must record:
 | R8 | Route failure | No active or published lineage row | `documents active-document route` | CD has no documents | GET `active-document` | 404 `NO_ACTIVE_INSTANCE` | runtime |  |  |  |
 | C1 | Canonical screen | Published doc starts revision | `canonical /documents/:id screen` | Viewing `/documents/:id` for `published` doc, no active sibling | Click `Iniciar revisao` | Composer opens with `Nome do documento` prefilled from current name | runtime+api |  |  |  |
 | C2 | Canonical screen | Draft creation wording stays non-governed | `canonical /documents/:id screen` | Same as C1 | Inspect composer copy | UX explains working name only; no claim that governed title is being set | runtime+api |  |  |  |
-| C3 | Canonical screen | Approved doc shows publish CTA | `canonical /documents/:id screen` | Viewing approved current revision | Open `/documents/:id` | `Publicar / Agendar` visible; no create-revision CTA | runtime+api |  |  |  |
+| C3 | Canonical screen | Approved doc shows release state, not a publish CTA | `canonical /documents/:id screen` | Viewing approved current revision | Open `/documents/:id` | Release status (and hold reason, if held) is shown; no create-revision CTA; no user-invocable publish/schedule action — ADR 0085 Stage B removed the routes such a CTA would call | runtime+api |  |  |  |
 | C4 | Canonical screen | Active sibling blocks duplicate revision create | `canonical /documents/:id screen` | Published doc with sibling in `draft` | Open `/documents/:id` | CTA becomes `Continuar rascunho`; no new revision creation path | runtime+api |  |  |  |
 | C5 | Canonical screen | Active sibling under review | `canonical /documents/:id screen` | Published doc with sibling in `under_review` | Open `/documents/:id`; click CTA | CTA becomes `Acompanhar revisao`; navigates to sibling detail | runtime+api |  |  |  |
-| C6 | Canonical screen | Active sibling approved | `canonical /documents/:id screen` | Published doc with sibling in `approved` | Open `/documents/:id`; click CTA | CTA becomes `Publicar revisao aprovada`; navigates to sibling detail | runtime+api |  |  |  |
-| C7 | Canonical screen | Active sibling scheduled | `canonical /documents/:id screen` | Published doc with sibling in `scheduled` | Open `/documents/:id`; click CTA | CTA becomes `Ver publicacao agendada`; navigates to sibling detail | runtime+api |  |  |  |
+| C6 | Canonical screen | Active sibling approved | `canonical /documents/:id screen` | Published doc with sibling in `approved` | Open `/documents/:id`; click CTA | CTA navigates to sibling detail; sibling shows coordinator release status (hold reason if held); **no user-invocable publish action** (ADR 0085 Stage B removed the routes) | runtime+api |  |  |  |
+| C7 | Canonical screen | Active sibling scheduled | `canonical /documents/:id screen` | Published doc with sibling in `scheduled` | Open `/documents/:id`; click CTA | CTA navigates to sibling detail; sibling shows scheduled release status (`planned_effective_from`); release itself is coordinator-only | runtime+api |  |  |  |
 | C8 | Canonical screen | Active sibling rejected | `canonical /documents/:id screen` | Published doc with sibling in `rejected` | Open `/documents/:id`; click CTA | CTA becomes `Retomar revisao rejeitada`; navigates to sibling editor | runtime+api |  |  |  |
 | T1 | Revision-title lifecycle | First governed revision default | `documents finalize flow` | Draft has `revision_number=0`; user submits without title | POST finalize | Transition succeeds; persisted `revision_title='Criacao do documento'` | runtime |  |  |  |
 | T2 | Revision-title lifecycle | Later governed revision requires title | `documents finalize flow` | Draft has `revision_number>=1`; blank title | POST finalize | 4xx domain error; document stays editable; no approval instance created | runtime |  |  |  |
@@ -55,24 +57,24 @@ Each non-proved scenario must record:
 | T4 | Revision-title lifecycle | Draft creation does not pre-write governed title | `documents create-revision flow` | Create revision from published screen | POST create revision | New draft row created without premature governed-title semantics | runtime |  |  |  |
 | L1 | Lineage invariant | Single active sibling invariant | `documents lineage invariant` | Published head exists | Create revision twice concurrently | At most one active sibling survives; loser gets conflict/error | focused automated proof |  |  |  |
 | L2 | Lineage invariant | Governed history source | `documents lineage read model` | Multiple revisions exist | GET revision history | Ordered lineage comes from `documents`; no autosave rows leak in | runtime |  |  |  |
-| L3 | Lineage invariant | Supersede pointer persistence | `publish transition service` | Publish-now or scheduled replacement over existing head | Execute publish path | New replacement records previous head in `superseded_document_id` before cutover completes | contract/integration |  |  |  |
-| L4 | Lineage invariant | Scheduler cutover final state | `scheduled publish jobs runtime` | Scheduled replacement reaches effective time | Run scheduler | Old head becomes `superseded`; scheduled row becomes `published`; pointer cleared or no longer actionable per runtime contract | runtime+api |  |  |  |
+| L3 | Lineage invariant | Supersede pointer persistence | `release coordinator release transaction` | Artifact-ready generation releases over an existing head | Evaluate release | New head records the previous head in `superseded_document_id` inside the same transaction that flips status — never as a follow-up write | contract/integration |  |  |  |
+| L4 | Lineage invariant | Release final state | `release_evaluate jobs runtime` | A held generation reaches its `planned_effective_from` | Run the jobs host | Old head becomes `superseded`; the released row becomes `published` with `effective_from` set and `release_generations.released_at` stamped; `hold_reason` cleared | runtime+api |  |  |  |
 | O1 | OCC/concurrency | Double finalize same revision | `finalize OCC guard` | Two clients submit same draft with same revision version | Race finalize | One succeeds; other gets stale/conflict; no duplicate approval instances | focused automated proof |  |  |  |
 | O2 | OCC/concurrency | Finalize vs autosave race | `editor autosave vs finalize invariant` | Draft open in editor while finalize submitted | Autosave after finalize | Server rejects unsafe write or keeps governed state stable; no status regression to `draft` | focused automated proof |  |  |  |
-| O3 | OCC/concurrency | Publish-now vs second publish-now | `publish OCC guard` | Approved revision published twice concurrently | Race publish | One winner; no duplicated supersede/cutover transitions | focused automated proof |  |  |  |
-| O4 | OCC/concurrency | Scheduler vs manual publish | `publish cutover concurrency boundary` | Scheduled doc is manually changed near cutover | Trigger scheduler around same time | Only one publish transition wins; lineage remains consistent | focused automated proof |  |  |  |
+| O3 | OCC/concurrency | Concurrent release evaluation of one generation | `release coordinator source-CAS guard` | Two `release_evaluate` runs race on the same release generation | Invoke `ReleaseCoordinator.Evaluate` concurrently | Exactly one release winner (source CAS); no duplicated supersede transition; one governance + one lifecycle event | focused automated proof |  |  |  |
+| O4 | OCC/concurrency | Effective-date timer vs late artifact fact | `release evaluation re-entry boundary` | The `planned_effective_from` timer fires at the same moment the final artifact fact lands, each enqueuing an evaluation | Trigger both around the same time | Only one release transition wins; lineage remains consistent | focused automated proof |  |  |  |
 | P1 | Preconditions | Missing snapshot at finalize | `documents finalize preconditions` | Draft lacks required placeholder snapshot | POST finalize | Blocked before under-review transition with contract-appropriate error | runtime |  |  |  |
-| P2 | Preconditions | Missing active publish context | `publish dialog preconditions` | Approved document but active-document lookup missing content hash | Open publish dialog | Publish action blocked with explicit UI explanation | runtime+api |  |  |  |
+| P2 | Preconditions | Approved but not artifact-ready | `release hold surfacing` | Approval fact exists; final DOCX and/or PDF fact missing | Open `/documents/:id` after approval | Document holds at `approved` with `hold_reason = 'materializing'`, surfaced as an explicit in-progress state — never as a failed or user-actionable publish | runtime+api |  |  |  |
 | E1 | Error UX | Create revision server error | `revision composer UX boundary` | API returns validation/conflict/internal error | Submit revision composer | Inline error shown; composer stays open; no false navigation | runtime+api |  |  |  |
 | E2 | Error UX | Active-document route failure on canonical screen | `canonical screen plus active-document route` | `active-document` returns 500 | Open `/documents/:id` | UI degrades visibly and does not offer unsafe action based on missing truth | runtime+api |  |  |  |
 | E3 | Error UX | Finalize blank revision title for REV01+ | `editor finalize UX boundary` | User omits title in editor modal | Submit | Error maps to actionable inline UX; no generic toast-only failure | runtime+api |  |  |  |
 | A1 | Auth/authz | Unauthorized revision create | `revision create authz boundary` | User lacks create capability | Attempt create revision | 403/blocked UI; no draft created | runtime+api |  |  |  |
 | A2 | Auth/authz | Unauthorized finalize | `finalize authz boundary` | User lacks `document.submit` | POST finalize | 403; no approval instance, no status transition | runtime |  |  |  |
-| A3 | Auth/authz | Unauthorized publish/schedule | `publish and schedule authz boundary` | User lacks publish capability | Publish attempt | 403; approved row remains unchanged | runtime |  |  |  |
-| A4 | Auth/authz | Cross-tenant route access | `tenant isolation contract boundary` | Wrong tenant context | GET `active-document`, finalize, publish | No data leakage; 404/403 per contract | contract/integration |  |  |  |
-| S1 | Scheduler timing | Schedule in the past | `schedule-publish validation route` | Approved doc, invalid effective time | Schedule publish | Validation failure; no state transition | runtime |  |  |  |
-| S2 | Scheduler timing | Minimum future time boundary | `schedule-publish contract boundary` | Approved doc, effective time exactly at minimum accepted threshold | Schedule publish | Deterministic accept/reject per contract; document state matches result | contract/integration |  |  |  |
-| S3 | Scheduler timing | Multiple due rows | `scheduled publish jobs runtime` | Several scheduled revisions due simultaneously | Run scheduler | Each row processed independently; one failure does not corrupt others | contract/integration |  |  |  |
+| A3 | Auth/authz | Unauthorized cross-document supersede target | `submit-time supersede authz boundary` | Submission plan names a cross-document supersede target in an area where the submitter lacks `document.supersede` | POST submit | 403 at submit time; no approval instance, no release generation. (There is no publish-authz case left: `document.publish` is retired and the coordinator releases as `system:release-coordinator`.) | runtime |  |  |  |
+| A4 | Auth/authz | Cross-tenant route access | `tenant isolation contract boundary` | Wrong tenant context | GET `active-document`, finalize, submit | No data leakage; 404/403 per contract | contract/integration |  |  |  |
+| S1 | Release timing | Effective date already past at approval | `release effective-date gate` | Approved doc whose `planned_effective_from` is in the past (or unset) | Evaluate release | No `awaiting_effective_date` hold — the gate is open, so an artifact-ready generation releases immediately | runtime |  |  |  |
+| S2 | Release timing | Effective-date boundary | `release effective-date gate boundary` | Artifact-ready generation whose `planned_effective_from` is exactly `now`, then one tick ahead | Evaluate release on each side of the boundary | Deterministic hold vs release per the domain decision table; `hold_reason = 'awaiting_effective_date'` only on the future side | contract/integration |  |  |  |
+| S3 | Release timing | Multiple due generations | `release_evaluate jobs runtime` | Several release generations become due simultaneously | Run the jobs host | Each generation evaluated independently; one failure does not corrupt others | contract/integration |  |  |  |
 | H1 | Historical UX | Published page lineage display | `canonical /documents/:id screen` | Document has REV00..REV03 | Open `/documents/:id` | Timeline displays governed revisions and titles, not placeholder/mock versions | runtime+api |  |  |  |
 | H2 | Historical UX | Current revision marker | `canonical /documents/:id screen` | Current row is published or approved | Open lineage timeline | Exactly one entry marked current | runtime+api |  |  |  |
 
@@ -81,7 +83,7 @@ Each non-proved scenario must record:
 1. Route contract and failure scenarios: `R1-R8`
 2. Canonical screen behavior: `C1-C8`, `E1-E2`, `H1-H2`
 3. Revision-title lifecycle: `T1-T4`, `E3`
-4. Lineage + publish/scheduler invariants: `L1-L4`, `S1-S3`
+4. Lineage + release invariants: `L1-L4`, `S1-S3`
 5. Concurrency and OCC: `O1-O4`
 6. Auth/authz sweep: `A1-A4`
 
@@ -90,7 +92,7 @@ Each non-proved scenario must record:
 - HTTP request/response payloads, status, and error code
 - Relevant DB rows before/after in `documents` and `approval_instances`
 - For lineage scenarios: `controlled_document_id`, `revision_number`, `revision_title`, `status`, `superseded_document_id`
-- For scheduler scenarios: effective timestamp, runner logs, final lineage state
+- For release-timing scenarios: `planned_effective_from`, the `release_generations` fact/hold columns, jobs-host logs, final lineage state
 - For canonical UI scenarios: screenshot or DOM assertion of CTA, label, inline error, and navigation target
 
 ## Stop conditions during QA

@@ -110,7 +110,6 @@ var capabilityDescriptions = map[Capability]string{
 	CapDocumentEdit:                "Editar documentos",
 	CapDocumentSubmit:              "Submeter documento para revisão",
 	CapDocumentSignoff:             "Aprovar/recusar documento",
-	CapDocumentPublish:             "Publicar documento",
 	CapDocumentObsolete:            "Tornar documento obsoleto",
 	CapDocumentSupersede:           "Tornar documento obsoleto/sucessor",
 	CapDocumentReview:              "Registrar revisão periódica de documento publicado",

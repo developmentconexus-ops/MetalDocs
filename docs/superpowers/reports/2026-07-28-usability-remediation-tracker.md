@@ -289,3 +289,53 @@ area-grade avaliado no publish-context); modelo de gate D2 para templates.
   up; migração 0310 aplicada live (50/50), ux_documents_published_head
   presente, logs limpos. Pendente Etapa 2: Stage B (retirement inventory) +
   Stage C (backfill + readiness projection).
+- 2026-07-28: **Stage B1 backend implementado (opus, working tree)**: 3 paths
+  deletados do spec + regen full (11 api.gen.go); SubmitDocumentRequest ganhou
+  plano opcional (planned_effective_from/effective_to/review_due_at/
+  superseded_document_id, wire=coluna 1:1); submit tx persiste plano + authz
+  document.supersede na ÁREA DO ALVO (H-PRE-1 ok) + código problema renomeado
+  submit.invalid_supersede_target; 18 arquivos removidos (services publish/
+  scheduler/supersede + handlers + contracts + job scheduled-publish);
+  capability document.publish extinta (registry+seed+0311 delete
+  role_capabilities 2 rows, golden 112→110 pegou); LoadCurrentPublishedHead-
+  ForDocument deletado; lockDocumentRowsInIDOrder removido (coordinator usa
+  lockDocumentForRelease inline — verificado). Desvio ratificado: predicado
+  ValidateScheduledSupersedeTarget (same-CD) INVERTIDO p/
+  ValidateCrossDocumentSupersedeTarget (CD distinto + published) — ADR 0085 diz
+  same-doc é implícito, nunca nomeado. e2e re-trabalhado p/ fato durável +
+  outcome legal (materializing hold sem artefatos). Ladder: build/vet/
+  vet-integration/api-lint 0/boundaries OK/approval+documents+iam+scenarios
+  PASS. Defer: check-contract-sync-all FAIL pré-existente (/finalize drift,
+  chip task_8bcc6a21). B2 FE em curso.
+- 2026-07-28: **Stage B2 FE implementado (opus, working tree)**: approvalApi
+  publish/schedulePublish/supersede deletados; SupersedePublishDialog (+test
+  +css) deletado; DocumentDetailRoute sem botão Publicar/Agendar/banner;
+  useDocumentArtifact sem canPublish/publishContextNotice/activeDocument/
+  refetchAll (consumidor único era o dialog); tipos FE regenerados (pnpm
+  gen:api — operações/schemas mortos sumiram, SubmitDocumentRequest com plano);
+  error-codes.generated.json regenerado; e2e scheduled_publish.spec deletado +
+  projeto serial-clock removido dos configs; happy_path/quorum aceitam
+  Aprovado|Publicado (coordinator assíncrono). tsc limpo (2 configs), vitest
+  147 files/959 tests PASS, eslint só 4 pré-existentes. **Pendência operador:
+  14 strings PT-BR de erro autoradas** (error-codes.generated.json estava
+  stale, guard false-green; códigos alheios ao 0085 sem mapping) — revisar
+  copy em errorMessages.ts. Defers bounded: playwright não rodado (stack
+  live), e2e fora de tsconfig (pré-existente), mojibake happy_path
+  pré-existente, UI de plano = trabalho futuro.
+- 2026-07-28: **Stage B rodada 1 Codex NOT-ALIGN → 4 fixes (opus)**: (11)
+  blocker: kind River `scheduled_publish_cutover` órfão pós-deploy → 0311
+  ganhou DO block to_regclass-guarded deletando rows não-terminais
+  (state::text — 'pending' pode não existir no enum instalado; 'running'
+  excluído de propósito) + teste replay/idempotência em
+  tests/integration/migrations/migration_0311_test.go; (12) wiki sync 9 docs
+  (documents.md rotas/transições/glossário → modelo coordinator; deep-qa
+  runbook/matrix com banner de emenda datado; corrigida alegação falsa "jobs
+  sem Dockerfile/compose" — ambos existem); (13) prova full-release: subtest
+  CoordinatorReleasesOnceArtifactFactsLand no e2e_happy (facts via
+  RecordArtifactFactTx produção + Evaluate direto → published+released_at+
+  eventos) — NÃO executado localmente (gate METALDOCS_E2E_URL; equivalentes
+  determinísticos passam no release_coordinator_integration_test) → defer p/
+  QA live pós-rebuild; (14) idempotency_middleware_test derivado de
+  router.idempotentRoutes (cobriu /submit,/review omitidos). Ladder green
+  (flake TestGoVetPasses = timeout compartilhado, chip task_231e6db1).
+  Rodada 2 Codex em curso.

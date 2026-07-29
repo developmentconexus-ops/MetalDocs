@@ -25,9 +25,11 @@ type postgresApprovalRepository struct {
 	displayName iamdomain.UserDisplayNameReader
 }
 
-// ErrInvalidScheduledSupersedeTarget is returned when a schedule-publish
-// request names a supersede target that does not exist or is not published.
-var ErrInvalidScheduledSupersedeTarget = errors.New("approval: invalid scheduled supersede target")
+// ErrInvalidSupersedeTarget is returned when a submit-time publication plan
+// names a cross-document supersede target that does not exist, is not
+// published, or belongs to the same controlled document (implicit supersession
+// is the coordinator's job and must not be named — ADR 0085).
+var ErrInvalidSupersedeTarget = errors.New("approval: invalid supersede target")
 
 // NewPostgresApprovalRepository constructs a production Postgres-backed ApprovalRepository.
 // displayName is a required collaborator — use iamdomain.NoopUserDisplayNameReader{} for
@@ -608,19 +610,24 @@ func (r *postgresApprovalRepository) LoadInstanceByDocumentForView(ctx context.C
 	return &inst, nil
 }
 
-func (r *postgresApprovalRepository) ValidateScheduledSupersedeTarget(ctx context.Context, tx db.Tx, tenantID, documentID, supersededDocumentID string) error {
+// ValidateCrossDocumentSupersedeTarget implements the ADR 0085 submit-time plan
+// check. The read is a plain non-locking SELECT: it runs inside the submit
+// transaction alongside authz.Require, and H-PRE-1 forbids an authz-recording
+// read inside a lock-holding section. The authoritative supersession check
+// still happens later, under lock, in the release coordinator.
+func (r *postgresApprovalRepository) ValidateCrossDocumentSupersedeTarget(ctx context.Context, tx db.Tx, tenantID, documentID, supersededDocumentID string) error {
 	var valid bool
 	err := tx.QueryRowContext(ctx, `
 		SELECT EXISTS (
 			SELECT 1
 			  FROM documents candidate
-			  JOIN documents target
-			    ON target.id = $2
-			   AND target.tenant_id = $1
+			  JOIN documents source
+			    ON source.id = $2
+			   AND source.tenant_id = $1
 			 WHERE candidate.id = $3
 			   AND candidate.tenant_id = $1
 			   AND candidate.status = 'published'
-			   AND candidate.controlled_document_id = target.controlled_document_id
+			   AND candidate.controlled_document_id IS DISTINCT FROM source.controlled_document_id
 		)`,
 		tenantID, documentID, supersededDocumentID,
 	).Scan(&valid)
@@ -628,34 +635,9 @@ func (r *postgresApprovalRepository) ValidateScheduledSupersedeTarget(ctx contex
 		return MapPgError(err, MapHints{})
 	}
 	if !valid {
-		return ErrInvalidScheduledSupersedeTarget
+		return ErrInvalidSupersedeTarget
 	}
 	return nil
-}
-
-func (r *postgresApprovalRepository) LoadCurrentPublishedHeadForDocument(ctx context.Context, tx db.Tx, tenantID, documentID string) (string, error) {
-	var publishedDocumentID string
-	err := tx.QueryRowContext(ctx, `
-		SELECT current_head.id
-		  FROM documents target
-		  JOIN documents current_head
-		    ON current_head.tenant_id = target.tenant_id
-		   AND current_head.controlled_document_id = target.controlled_document_id
-		   AND current_head.status = 'published'
-		 WHERE target.tenant_id = $1
-		   AND target.id = $2
-		 ORDER BY current_head.revision_number DESC
-		 LIMIT 1
-		 FOR UPDATE OF current_head`,
-		tenantID, documentID,
-	).Scan(&publishedDocumentID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", nil
-	}
-	if err != nil {
-		return "", MapPgError(err, MapHints{})
-	}
-	return publishedDocumentID, nil
 }
 
 func (r *postgresApprovalRepository) LoadCurrentPublishedHead(ctx context.Context, tx db.Tx, tenantID, controlledDocumentID string) (string, error) {
