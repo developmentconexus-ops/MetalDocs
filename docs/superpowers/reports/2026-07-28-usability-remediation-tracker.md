@@ -502,3 +502,22 @@ area-grade avaliado no publish-context); modelo de gate D2 para templates.
     not_found.revision (editor usa docx-url; questão UX, não flag);
     dev-seed sem persona publicadora (approver não tem template.publish;
     jornada exigiu admin como publicador ⇒ autor teve de ser author-test).
+- 2026-07-29: **D6 fechado — ADR 0086 aceito (Codex-aligned rev 4, commit
+  `4eef7d77`).** Rotas de aprovação de template deixam de ser por
+  template_id e passam a ser config-first por perfil (`subject_key =
+  doc_type_code`), simétricas às rotas de documento: profile_code NOT NULL
+  (substitui CHECK da migração 0297), RoutePolicy (ADR 0081) nos caminhos
+  create E update, criação de template hard-gated 409
+  APPROVAL_ROUTE_MISSING (simetria D2), `doc_type_code` obrigatório (422) —
+  templates genéricos exterminados incluindo o ramo OR do list-by-profile e
+  o create-sem-perfil (comportamento ativo de produto, quebra deliberada
+  ratificada), keying de instância preservado (versão, ADR 0082), os 3
+  pontos de resolução migram juntos (submit + preview via mesmo read port +
+  seletor do handler HTTP; approval_version_reader projeta doc_type_code),
+  mudanças contract-first declaradas (inversão profile_code no create-route
+  + 422/409 no create-template), cutover duro sem fallback. Review: 4
+  rodadas Codex (r1 6 achados — superfícies de resolução, genérico é
+  produto ativo, gap de port, skip de policy no update; r2 3 — fonte da
+  chave no preview, contratos; r3 1 — redação update; r4 ALIGN).
+  **Implementação = unidade própria, enfileirada APÓS gate de push da
+  Etapa 5.**
