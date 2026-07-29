@@ -37,6 +37,50 @@ function groupByStageIndex(chain: ApprovalChainItem[]): ApprovalChainItem[][] {
     .map(([, items]) => items);
 }
 
+/**
+ * Pick the item that speaks for a whole stage in the collapsed "Sign-offs desta
+ * versão" row.
+ *
+ * `group[0]` is NOT that item: the backend emits a stage's actor roster with the
+ * recorded signoffs first, ordered by ascending `signed_at`, and only then the
+ * still-pending actors. On a stage that several people acted on, the head of the
+ * bucket is therefore the EARLIEST decider — for a rejected stage with prior
+ * approvals that is the first approver, so the row would name the wrong person
+ * at the wrong time. Resolve the decisive actor explicitly instead:
+ *   (a) a rejection terminates the stage, so it owns the stage outcome;
+ *   (b) otherwise the LATEST recorded approval is the stage's standing decision;
+ *   (c) otherwise nobody has decided — show whoever is on the clock;
+ *   (d) otherwise fall back to the bucket head (single-slot / roster-less stage).
+ */
+function pickStageDecisiveItem(group: ApprovalChainItem[]): ApprovalChainItem {
+  const rejected = group.find(
+    (item) => item.flowState === "rejected" || item.status === "rejected",
+  );
+  if (rejected) return rejected;
+
+  let latestApproved: ApprovalChainItem | null = null;
+  let latestApprovedAt = Number.NEGATIVE_INFINITY;
+  for (const item of group) {
+    if (item.flowState !== "approved" || item.signedAt == null) continue;
+    const signedAt = new Date(item.signedAt).getTime();
+    // An unparseable timestamp still counts as an approval, it just never wins
+    // the recency comparison against a real one.
+    const rank = Number.isNaN(signedAt) ? Number.NEGATIVE_INFINITY : signedAt;
+    if (latestApproved == null || rank > latestApprovedAt) {
+      latestApproved = item;
+      latestApprovedAt = rank;
+    }
+  }
+  if (latestApproved) return latestApproved;
+
+  const awaiting = group.find(
+    (item) => item.flowState === "current" || item.flowState === "pending",
+  );
+  if (awaiting) return awaiting;
+
+  return group[0];
+}
+
 function toVersionEntries(model: ArtifactViewModel): VersionEntry[] {
   return model.lineage.map((item) => ({
     v: item.revisionLabel ?? `REV${String(item.revisionNumber ?? 0).padStart(2, "0")}`,
@@ -214,8 +258,9 @@ export function ArtifactDetailView({ model, heroActions, aside, extras }: Artifa
                   style={{ left: connectorSide, right: connectorSide }}
                 />
                 {approvalGroups.map((group) => {
-                  // Show first signoff slot per stage (one actor per stage in current workflow).
-                  const item = group[0];
+                  // One row per stage: the actor whose decision the stage stands on
+                  // (see pickStageDecisiveItem — never blindly the bucket head).
+                  const item = pickStageDecisiveItem(group);
                   const signed = item.signedAt != null;
                   return (
                     <div key={item.stageIndex} className={styles.signoffStage}>

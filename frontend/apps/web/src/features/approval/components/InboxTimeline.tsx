@@ -174,8 +174,14 @@ export function InboxTimeline({ items, onOpenDocument, isLoading, isError, isFil
                           </div>
                           <div className={styles.itemMeta}>
                             <div className={styles.itemMetaTop}>
+                              {/* F-QA4-8: the canonical human code is the identity the
+                                  approver recognizes. Falls back to the uuid only when the
+                                  API genuinely has no code (truthful degradation — never a
+                                  fabricated placeholder). */}
                               <span className={`${styles.itemCode} mono`}>
-                                {item.subject_kind === 'document' ? item.controlled_document_id : item.subject_ref}
+                                {item.subject_kind === 'document'
+                                  ? (item.controlled_document_code ?? item.controlled_document_id)
+                                  : item.subject_ref}
                               </span>
                             </div>
                             <div className={styles.itemTitle}>{item.subject_title}</div>

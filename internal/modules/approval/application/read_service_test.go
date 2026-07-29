@@ -336,11 +336,13 @@ func TestListWorklist_ZeroFilter_MatchesBaseInboxShape(t *testing.T) {
 
 	submittedAt := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
 	rows := sqlmock.NewRows([]string{
-		"id", "subject_kind", "subject_key", "document_id", "controlled_document_id", "doc_title", "area_code",
+		"id", "subject_kind", "subject_key", "document_id", "controlled_document_id",
+		"controlled_document_code", "doc_title", "area_code",
 		"submitted_by", "submitted_at", "stage_label", "required", "signed",
 		"stage_kind", "due_at", "total_count",
 	}).AddRow(
-		"inst-1", "document", "doc-1", "doc-1", "CD-001", "Doc One", "finance",
+		"inst-1", "document", "doc-1", "doc-1", "cd-uuid-1",
+		"POP-QUA-0148", "Doc One", "finance",
 		"user-1", submittedAt, "Stage 1", 2, 1, "approval", nil, 1,
 	)
 
@@ -388,7 +390,8 @@ func TestListWorklist_StageKindFilter_PassesArgThrough(t *testing.T) {
 	mock.ExpectQuery(`asi\.stage_kind = \$6`).
 		WithArgs("tenant-1", sqlmock.AnyArg(), "", 25, 0, "review", sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "subject_kind", "subject_key", "document_id", "controlled_document_id", "doc_title", "area_code",
+			"id", "subject_kind", "subject_key", "document_id", "controlled_document_id",
+			"controlled_document_code", "doc_title", "area_code",
 			"submitted_by", "submitted_at", "stage_label", "required", "signed",
 			"stage_kind", "due_at", "total_count",
 		}))

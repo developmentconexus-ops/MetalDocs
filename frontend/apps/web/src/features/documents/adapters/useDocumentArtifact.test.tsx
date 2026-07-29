@@ -90,7 +90,14 @@ describe('useDocumentArtifact', () => {
             stage_index: 0,
             label: 'Qualidade',
             status: 'passed',
-            actors: [],
+            actors: [
+              {
+                user_id: 'approver-1',
+                display_name: 'Ana Souza',
+                status: 'approved',
+                decision: 'approve',
+              },
+            ],
             signoffs: [
               {
                 id: 'so-0',
@@ -172,7 +179,7 @@ describe('useDocumentArtifact', () => {
     expect(model.meta.nextReviewAt).toBeNull();
   });
 
-  it('maps the approval instance stages/signoffs into approvalChain', () => {
+  it('maps the approval instance stage actors into approvalChain with display names', () => {
     const { model } = renderHook(() => useDocumentArtifact('doc-published-1')).result.current;
 
     expect(model.approvalChain).not.toBeNull();
@@ -180,9 +187,10 @@ describe('useDocumentArtifact', () => {
     expect(model.approvalChain?.[0]).toMatchObject({
       stageIndex: 0,
       label: 'Qualidade',
-      status: 'passed',
+      status: 'approved',
       actorUserId: 'approver-1',
-      actorDisplay: 'approver-1',
+      // F-QA4-8: the backend-resolved display name, never the raw user id.
+      actorDisplay: 'Ana Souza',
       decision: 'approve',
       signedAt: '2026-05-19T23:39:00.000Z',
     });

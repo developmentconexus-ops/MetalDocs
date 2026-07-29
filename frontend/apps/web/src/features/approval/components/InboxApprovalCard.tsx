@@ -43,8 +43,11 @@ export function InboxApprovalCard({
           <div className={styles.statCell}>
             <div className="kicker">ÁREA</div>
             <div className={styles.stageName}>{item.area_code}</div>
+            {/* F-QA4-8: canonical human code, uuid only as truthful fallback. */}
             {item.subject_kind === 'document' ? (
-              <div className="caption mono">{item.controlled_document_id}</div>
+              <div className="caption mono">
+                {item.controlled_document_code ?? item.controlled_document_id}
+              </div>
             ) : null}
           </div>
           <div className={styles.statCell}>

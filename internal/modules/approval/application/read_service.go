@@ -39,11 +39,18 @@ type InboxView struct {
 	SubjectRef string
 	// ControlledDocumentID is document-instance-only; empty for template rows.
 	ControlledDocumentID string
-	AreaCode             string
-	SubmittedBy          string
-	SubmittedAt          time.Time
-	StageLabel           string
-	QuorumProgress       string // e.g. "1/2"
+	// ControlledDocumentCode is the canonical human code of the subject's
+	// controlled document (controlled_documents.code, NOT NULL — never the
+	// documents.code snapshot). Document-instance-only; empty for template
+	// rows, and for document rows whose controlled document is unreachable
+	// (no-fallback principle: an empty code surfaces as an explicit null on
+	// the wire, never as a substitute uuid).
+	ControlledDocumentCode string
+	AreaCode               string
+	SubmittedBy            string
+	SubmittedAt            time.Time
+	StageLabel             string
+	QuorumProgress         string // e.g. "1/2"
 	// StageKind (F8, spec.md §4/W4) is the pending/active stage's kind
 	// (review or approval), sourced from the stage's own snapshot column —
 	// never re-derived from route config, so an in-flight instance's worklist
@@ -635,6 +642,7 @@ func (s *ReadService) ListWorklist(ctx context.Context, runner db.TxRunner, tena
 				ai.subject_key,
 				ai.document_id,
 				COALESCE(d.controlled_document_id::text, '') AS controlled_document_id,
+				COALESCE(cd.code, '') AS controlled_document_code,
 				COALESCE(d.name, '') AS doc_title,
 				COALESCE(asi.area_code_snapshot, '') AS area_code,
 				ai.submitted_by,
@@ -663,6 +671,12 @@ func (s *ReadService) ListWorklist(ctx context.Context, runner db.TxRunner, tena
 			 AND asi.status = 'active'
 			LEFT JOIN documents d
 			  ON d.id = ai.document_id AND d.tenant_id = ai.tenant_id
+			-- F-QA4-8: the inbox renders the CANONICAL human code
+			-- (controlled_documents.code, NOT NULL), never the documents.code
+			-- snapshot and never the raw uuid. LEFT JOIN so a template-subject
+			-- row (no document) still returns, with an empty code.
+			LEFT JOIN controlled_documents cd
+			  ON cd.id = d.controlled_document_id AND cd.tenant_id = d.tenant_id
 			WHERE ai.tenant_id = $1::uuid
 			  AND ai.status = 'in_progress'
 			  AND (`+eligibilityPredicate+`)
@@ -687,7 +701,8 @@ func (s *ReadService) ListWorklist(ctx context.Context, runner db.TxRunner, tena
 			var stageKind string
 			var dueAt sql.NullTime
 			if err := rows.Scan(
-				&v.InstanceID, &v.SubjectKind, &v.SubjectKey, &documentID, &v.ControlledDocumentID, &docTitle,
+				&v.InstanceID, &v.SubjectKind, &v.SubjectKey, &documentID,
+				&v.ControlledDocumentID, &v.ControlledDocumentCode, &docTitle,
 				&v.AreaCode, &v.SubmittedBy, &v.SubmittedAt,
 				&v.StageLabel, &required, &signed, &stageKind, &dueAt, &rowTotal,
 			); err != nil {

@@ -6923,7 +6923,7 @@ components:
           description: Final outcome of the signature leg (same vocabulary as signoff).
     ApprovalInboxItem:
       type: object
-      required: [instance_id, subject_kind, subject_key, subject_title, subject_ref, controlled_document_id, area_code, submitted_by, submitted_at, stage_label, quorum_progress, stage_kind, due_at]
+      required: [instance_id, subject_kind, subject_key, subject_title, subject_ref, controlled_document_id, controlled_document_code, area_code, submitted_by, submitted_at, stage_label, quorum_progress, stage_kind, due_at]
       properties:
         instance_id: { type: string, format: uuid }
         subject_kind:
@@ -6950,6 +6950,15 @@ components:
           format: uuid
           nullable: true
           description: Document instances only; always present, null for template instances.
+        controlled_document_code:
+          type: string
+          nullable: true
+          description: >-
+            F-QA4-8 — the canonical human code of the subject's controlled
+            document (controlled_documents.code, never the documents.code
+            snapshot). Always present; null for template instances and for
+            document instances whose controlled document is unreachable
+            (no-fallback principle, spec §11: never substituted by the uuid).
         area_code: { type: string }
         submitted_by: { type: string }
         submitted_at: { type: string, format: date-time }

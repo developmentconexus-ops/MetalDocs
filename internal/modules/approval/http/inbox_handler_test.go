@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -227,5 +228,74 @@ func TestInboxHandler_PopulatesTitleQuorumAndTotal(t *testing.T) {
 	}
 	if got.SubmittedAt != "2026-05-01T12:00:00Z" {
 		t.Errorf("SubmittedAt = %q, want RFC3339 UTC", got.SubmittedAt)
+	}
+}
+
+// TestInboxHandler_ControlledDocumentCode_NullableMapping (F-QA4-8) pins the
+// required-and-nullable wire shape of controlled_document_code: the canonical
+// human code for a document row, explicit null for a subject with none.
+func TestInboxHandler_ControlledDocumentCode_NullableMapping(t *testing.T) {
+	fakeSvc := &fakeReadServiceInbox{
+		views: []application.InboxView{
+			{
+				InstanceID:             "inst-doc",
+				SubjectKind:            "document",
+				SubjectKey:             "doc-1",
+				SubjectTitle:           "Doc One",
+				SubjectRef:             "doc-1",
+				ControlledDocumentID:   "11111111-1111-1111-1111-111111111111",
+				ControlledDocumentCode: "POP-QUA-0148",
+				AreaCode:               "quality",
+				SubmittedBy:            "user-1",
+				SubmittedAt:            time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC),
+				StageLabel:             "Stage 1",
+				QuorumProgress:         "1/2",
+			},
+			{
+				InstanceID:     "inst-tpl",
+				SubjectKind:    "template",
+				SubjectKey:     "tpl-version-1",
+				SubjectTitle:   "Modelo POP",
+				SubjectRef:     "tpl-1",
+				AreaCode:       "quality",
+				SubmittedBy:    "user-2",
+				SubmittedAt:    time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC),
+				StageLabel:     "Stage 1",
+				QuorumProgress: "0/1",
+			},
+		},
+		total: 2,
+	}
+	h := &Handler{readSvc: fakeSvc}
+	mux := inboxTestMux(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/approval/inbox", nil)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", rr.Code, rr.Body.String())
+	}
+
+	// The key must always be present (required-and-nullable), never omitted.
+	if !strings.Contains(rr.Body.String(), `"controlled_document_code"`) {
+		t.Fatalf("body must always carry controlled_document_code; body=%s", rr.Body.String())
+	}
+
+	var resp contracts.InboxResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(resp.Items) != 2 {
+		t.Fatalf("got %d items, want 2", len(resp.Items))
+	}
+	if resp.Items[0].ControlledDocumentCode == nil || *resp.Items[0].ControlledDocumentCode != "POP-QUA-0148" {
+		t.Errorf("document row ControlledDocumentCode = %v, want %q", resp.Items[0].ControlledDocumentCode, "POP-QUA-0148")
+	}
+	if resp.Items[1].ControlledDocumentCode != nil {
+		t.Errorf("template row ControlledDocumentCode = %q, want explicit null", *resp.Items[1].ControlledDocumentCode)
 	}
 }

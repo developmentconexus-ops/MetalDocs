@@ -183,7 +183,11 @@ export interface ApprovalChainItem {
   stageIndex: number;
   /** Human-readable stage label (e.g. "Revisão", "Aprovação"). */
   label: string;
-  /** Stage-level status string (mirrors the API `stage.status` values). */
+  /**
+   * Actor-level status ("approved" | "rejected" | "active" | "waiting" | "sent"),
+   * the vocabulary both kind mappers emit and the sidebar badge labels are keyed
+   * on. Falls back to the raw stage status only for a stage with no actor roster.
+   */
   status: string;
   /** Short role descriptor shown under the actor (e.g. "Autora", "Revisão técnica"). Null when not applicable. */
   roleLabel: string | null;

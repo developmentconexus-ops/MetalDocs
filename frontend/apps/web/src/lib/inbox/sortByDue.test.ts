@@ -10,6 +10,7 @@ function makeItem(overrides: Partial<InboxItem> = {}): InboxItem {
     subject_title: 'Doc',
     subject_ref: 'doc-1',
     controlled_document_id: 'cd-1',
+    controlled_document_code: 'POP-QUA-0001',
     area_code: 'QUA',
     submitted_by: 'maria',
     submitted_at: '2026-04-14T10:00:00.000Z',

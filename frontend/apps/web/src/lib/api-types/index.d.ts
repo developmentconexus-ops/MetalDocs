@@ -3611,6 +3611,8 @@ export interface components {
              * @description Document instances only; always present, null for template instances.
              */
             controlled_document_id: string | null;
+            /** @description F-QA4-8 — the canonical human code of the subject's controlled document (controlled_documents.code, never the documents.code snapshot). Always present; null for template instances and for document instances whose controlled document is unreachable (no-fallback principle, spec §11: never substituted by the uuid). */
+            controlled_document_code: string | null;
             area_code: string;
             submitted_by: string;
             /** Format: date-time */

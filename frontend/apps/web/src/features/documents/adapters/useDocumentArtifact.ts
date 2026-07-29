@@ -193,8 +193,9 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
     ...(code ? [{ label: code }] : []),
   ];
 
-  // Approval chain: one ApprovalChainItem per signoff slot, grouped downstream by stageIndex.
-  // Mirrors the page's "first signoff per stage" timeline (one actor per stage in current workflow).
+  // Approval chain: one ApprovalChainItem per stage ACTOR (F-QA4-8) — decided
+  // actors plus the still-eligible ones, each with its backend-resolved display
+  // name. Consumers group by stageIndex, so a stage may contribute several rows.
   const approvalChain: ApprovalChainItem[] | null = approval ? mapApprovalChain(approval.stages) : null;
 
   const lineage: VersionHistoryItem[] = revisionHistoryItems.map((item) => ({

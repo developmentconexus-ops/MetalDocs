@@ -163,11 +163,19 @@ type InboxItem struct {
 	// the wire (present as explicit null, never omitted) — null for template
 	// rows (legacy-fallback-extermination: no relax-to-optional / dropped key).
 	ControlledDocumentID *string `json:"controlled_document_id"`
-	AreaCode             string  `json:"area_code"`
-	SubmittedBy          string  `json:"submitted_by"`
-	SubmittedAt          string  `json:"submitted_at"`
-	StageLabel           string  `json:"stage_label"`
-	QuorumProgress       string  `json:"quorum_progress"`
+	// ControlledDocumentCode (F-QA4-8) is the canonical human code of the
+	// subject's controlled document (controlled_documents.code — never the
+	// documents.code snapshot). Required-and-nullable on the wire (present as
+	// explicit null, never omitted): null for template rows and for document
+	// rows whose controlled document is unreachable. The inbox UI renders this
+	// instead of the uuid; a null degrades to the previous display rather than
+	// substituting a value (no-fallback principle).
+	ControlledDocumentCode *string `json:"controlled_document_code"`
+	AreaCode               string  `json:"area_code"`
+	SubmittedBy            string  `json:"submitted_by"`
+	SubmittedAt            string  `json:"submitted_at"`
+	StageLabel             string  `json:"stage_label"`
+	QuorumProgress         string  `json:"quorum_progress"`
 	// StageKind (F8, spec.md §4/W4): review or approval. Required on the wire
 	// (unit 4.2) — approval_stage_instances.stage_kind is NOT NULL DEFAULT
 	// 'approval' (0286), so the service always populates it from the stage

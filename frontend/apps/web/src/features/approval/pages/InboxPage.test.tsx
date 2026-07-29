@@ -37,6 +37,9 @@ function makeItem(overrides: Partial<InboxItem> = {}): InboxItem {
     subject_title: 'POP Limpeza',
     subject_ref: 'doc-1',
     controlled_document_id: 'cd-1',
+    // Deliberately NOT the design-mock code ('POP-QUA-0148') that other
+    // assertions here prove is no longer hardcoded in the timeline markup.
+    controlled_document_code: 'POP-QUA-0777',
     area_code: 'QUA',
     submitted_by: 'maria',
     submitted_at: '2026-04-14T10:00:00.000Z',
@@ -56,6 +59,7 @@ function makeTemplateItem(overrides: Partial<InboxItem> = {}): InboxItem {
     subject_title: 'Modelo POP',
     subject_ref: 'tpl-1',
     controlled_document_id: null,
+    controlled_document_code: null,
     ...overrides,
   });
 }
@@ -225,6 +229,10 @@ describe('InboxPage', () => {
     expect(screen.getByText('Revisão L2')).toBeTruthy();
     expect(screen.queryByText('3h 28min')).toBeNull();
     expect(screen.queryByText('POP-QUA-0148')).toBeNull();
+    // F-QA4-8: the row identifies the document by its canonical human code
+    // (controlled_documents.code), never by the controlled-document uuid.
+    expect(screen.getByText('POP-QUA-0777')).toBeTruthy();
+    expect(screen.queryByText('cd-1')).toBeNull();
   });
 
   // NOTE: the three "Abrir documento navigates to the modern editor route" /

@@ -76,20 +76,29 @@ func (h *Handler) InboxHandler(w http.ResponseWriter, r *http.Request) {
 			cd := v.ControlledDocumentID
 			controlledDocID = &cd
 		}
+		// controlled_document_code (F-QA4-8) is required-and-nullable on the
+		// same terms: the canonical human code for document rows, explicit null
+		// when the subject has no controlled document (template rows).
+		var controlledDocCode *string
+		if v.ControlledDocumentCode != "" {
+			code := v.ControlledDocumentCode
+			controlledDocCode = &code
+		}
 		respItems = append(respItems, contracts.InboxItem{
-			InstanceID:           v.InstanceID,
-			SubjectKind:          v.SubjectKind,
-			SubjectKey:           v.SubjectKey,
-			SubjectTitle:         v.SubjectTitle,
-			SubjectRef:           v.SubjectRef,
-			ControlledDocumentID: controlledDocID,
-			AreaCode:             v.AreaCode,
-			SubmittedBy:          v.SubmittedBy,
-			SubmittedAt:          v.SubmittedAt.UTC().Format(time.RFC3339),
-			StageLabel:           v.StageLabel,
-			QuorumProgress:       v.QuorumProgress,
-			StageKind:            string(v.StageKind),
-			DueAt:                dueAt,
+			InstanceID:             v.InstanceID,
+			SubjectKind:            v.SubjectKind,
+			SubjectKey:             v.SubjectKey,
+			SubjectTitle:           v.SubjectTitle,
+			SubjectRef:             v.SubjectRef,
+			ControlledDocumentID:   controlledDocID,
+			ControlledDocumentCode: controlledDocCode,
+			AreaCode:               v.AreaCode,
+			SubmittedBy:            v.SubmittedBy,
+			SubmittedAt:            v.SubmittedAt.UTC().Format(time.RFC3339),
+			StageLabel:             v.StageLabel,
+			QuorumProgress:         v.QuorumProgress,
+			StageKind:              string(v.StageKind),
+			DueAt:                  dueAt,
 		})
 	}
 

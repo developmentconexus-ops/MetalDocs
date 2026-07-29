@@ -98,7 +98,8 @@ func TestListWorklist_DocumentInstance_StillReturnsTitleAndControlledDocID_RealD
 	ten := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(ten.ID))
 
-	doc := testdb.NewDocument(t, dbc, testdb.WithTenant(ten.ID), testdb.WithName("Quality Manual"), testdb.WithStatus("approved"))
+	cd := testdb.NewControlledDoc(t, dbc, testdb.WithTenant(ten.ID), testdb.WithCode("POP-QUA-0148"))
+	doc := testdb.NewDocument(t, dbc, testdb.WithTenant(ten.ID), testdb.WithControlledDoc(cd), testdb.WithName("Quality Manual"), testdb.WithStatus("approved"))
 	inst := testdb.NewApprovalInstance(t, dbc, testdb.WithDocument(doc), testdb.WithStatus("in_progress"))
 	seedActiveStageWithEligibleActor(t, dbc, inst.ID, actor.ID)
 
@@ -131,6 +132,11 @@ func TestListWorklist_DocumentInstance_StillReturnsTitleAndControlledDocID_RealD
 	}
 	if found.ControlledDocumentID != doc.ControlledDocumentID {
 		t.Errorf("ControlledDocumentID = %q, want %q", found.ControlledDocumentID, doc.ControlledDocumentID)
+	}
+	// F-QA4-8: the worklist must carry the CANONICAL human code
+	// (controlled_documents.code) so the inbox stops rendering the uuid.
+	if found.ControlledDocumentCode != cd.Code {
+		t.Errorf("ControlledDocumentCode = %q, want %q", found.ControlledDocumentCode, cd.Code)
 	}
 }
 
@@ -195,6 +201,11 @@ func TestListWorklist_TemplateInstance_AppearsWithSubjectTitleAndRef_RealDB(t *t
 	}
 	if found.ControlledDocumentID != "" {
 		t.Errorf("ControlledDocumentID = %q, want empty for a template instance", found.ControlledDocumentID)
+	}
+	// F-QA4-8: a template subject has no controlled document, hence no code —
+	// empty here, explicit null on the wire (never a substitute value).
+	if found.ControlledDocumentCode != "" {
+		t.Errorf("ControlledDocumentCode = %q, want empty for a template instance", found.ControlledDocumentCode)
 	}
 }
 

@@ -10,7 +10,8 @@ const items: InboxItem[] = [
     subject_key: 'doc-1',
     subject_title: 'Documento 1',
     subject_ref: 'doc-1',
-    controlled_document_id: 'CD-001',
+    controlled_document_id: '11111111-1111-1111-1111-111111111111',
+    controlled_document_code: 'POP-QUA-001',
     area_code: 'QA',
     submitted_by: 'user-1',
     submitted_at: new Date().toISOString(),
@@ -28,6 +29,7 @@ const templateItem: InboxItem = {
   subject_title: 'Modelo POP',
   subject_ref: 'tpl-1',
   controlled_document_id: null,
+  controlled_document_code: null,
   area_code: 'QA',
   submitted_by: 'user-2',
   submitted_at: new Date().toISOString(),
@@ -119,5 +121,22 @@ describe('InboxStack', () => {
 
     expect(screen.getAllByText('Modelo POP').length).toBeGreaterThan(0);
     expect(screen.getAllByText('tpl-1').length).toBeGreaterThan(0);
+  });
+
+  // F-QA4-8: a document row identifies itself by the canonical human code
+  // (controlled_documents.code), never by the controlled-document uuid.
+  it('renders the controlled-document code, not the uuid, for a document row', () => {
+    render(
+      <InboxStack
+        items={items}
+        selectedIdx={0}
+        onSelect={() => {}}
+        onNext={() => {}}
+        onPrev={() => {}}
+      />,
+    );
+
+    expect(screen.getAllByText('POP-QUA-001').length).toBeGreaterThan(0);
+    expect(screen.queryByText('11111111-1111-1111-1111-111111111111')).toBeNull();
   });
 });

@@ -147,8 +147,11 @@ export function InboxStack({
               <div className={styles.queueItemNumber}>{String(idx + 1).padStart(2, '0')}</div>
                 <div className={styles.queueItemMeta}>
                   <div className={styles.queueItemTop}>
+                    {/* F-QA4-8: canonical human code; uuid only as truthful fallback. */}
                     <span className={`${styles.queueItemCode} mono`}>
-                      {item.subject_kind === 'document' ? item.controlled_document_id : item.subject_ref}
+                      {item.subject_kind === 'document'
+                        ? (item.controlled_document_code ?? item.controlled_document_id)
+                        : item.subject_ref}
                     </span>
                   </div>
                   <div className={styles.queueItemTitle}>{item.subject_title}</div>

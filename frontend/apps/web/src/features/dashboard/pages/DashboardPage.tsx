@@ -52,14 +52,17 @@ function pendingLabel(count: number): string {
 
 function PendingRow({ item, rank }: { item: InboxItem; rank: number }) {
   const navigate = useNavigate();
-  // Unit 4.2 subject-generic: document rows carry a controlled_document_id
-  // code; template rows carry none (null) and identify by subject_ref
-  // (templateId). controlled_document_id is contractually non-null for every
-  // document row — a null here means the wire drifted, so render an honest
-  // non-value rather than a blank that reads as a working row
+  // Unit 4.2 subject-generic: document rows carry a controlled document;
+  // template rows carry none (null) and identify by subject_ref (templateId).
+  // F-QA4-8: the canonical human code (controlled_documents.code) is what the
+  // reader recognizes — and what getKindFromCode can actually parse. The uuid
+  // stays as the truthful fallback, and '—' when even that is absent (wire
+  // drift): an honest non-value, never a blank that reads as a working row
   // (no-fallback-principle).
   const code =
-    item.subject_kind === 'document' ? (item.controlled_document_id ?? '—') : item.subject_ref;
+    item.subject_kind === 'document'
+      ? (item.controlled_document_code ?? item.controlled_document_id ?? '—')
+      : item.subject_ref;
   const kind = getKindFromCode(code);
   const urgent = isUrgent(item.submitted_at);
   const submittedAgo = formatRelative(item.submitted_at);

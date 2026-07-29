@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { ArtifactDetailView } from "./ArtifactDetailView";
+import { formatSignedAt } from "../../../lib/format/dates";
 import type { ArtifactViewModel } from "./types";
 
 function buildModel(overrides: Partial<ArtifactViewModel> = {}): ArtifactViewModel {
@@ -131,6 +132,51 @@ describe("ArtifactDetailView", () => {
     expect(screen.getByText("Sign-offs desta versão")).toBeInTheDocument();
     expect(screen.getByText("Qualidade")).toBeInTheDocument();
     expect(screen.getAllByText("approver-1").length).toBeGreaterThan(0);
+  });
+
+  it("shows the rejecting actor for a multi-actor rejected stage, not the earliest approver", () => {
+    // F-QA4-8 emits one chain item per stage actor, and the backend orders a
+    // stage's roster by ascending signed_at — so the earliest APPROVER heads the
+    // bucket even when a later actor rejected and ended the stage. The collapsed
+    // stage row must name the rejecting actor and their timestamp.
+    const APPROVED_AT = "2026-05-19T10:00:00.000Z";
+    const REJECTED_AT = "2026-05-19T18:30:00.000Z";
+
+    renderView(
+      <ArtifactDetailView
+        model={buildModel({
+          approvalChain: [
+            {
+              stageIndex: 0,
+              label: "Qualidade",
+              status: "approved",
+              roleLabel: "Qualidade",
+              flowState: "approved",
+              actorUserId: "user-ana",
+              actorDisplay: "Ana Aprovadora",
+              decision: "approve",
+              signedAt: APPROVED_AT,
+            },
+            {
+              stageIndex: 0,
+              label: "Qualidade",
+              status: "rejected",
+              roleLabel: "Qualidade",
+              flowState: "rejected",
+              actorUserId: "user-rui",
+              actorDisplay: "Rui Rejeitador",
+              decision: "reject",
+              signedAt: REJECTED_AT,
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByText("Rui Rejeitador")).toBeInTheDocument();
+    expect(screen.queryByText("Ana Aprovadora")).toBeNull();
+    expect(screen.getByText(formatSignedAt(REJECTED_AT))).toBeInTheDocument();
+    expect(screen.queryByText(formatSignedAt(APPROVED_AT))).toBeNull();
   });
 
   it("renders the empty approval state when approvalChain is null without crashing", () => {
