@@ -442,3 +442,31 @@ area-grade avaliado no publish-context); modelo de gate D2 para templates.
   05:30 enquanto a generation estava presa >30min. **Etapa 2 FECHADA**
   (F-QA4-13/14 já estruturalmente fechados; quarentenados d18fbfdf/45c9e784
   → Etapa 5).
+- 2026-07-29: **3.3 F-QA4-8 fechado + Etapa 3 FECHADA com QA live dos 3
+  itens.** Inbox/dashboard mostravam UUID cru e avatar "?" porque o FE
+  ignorava o roster de atores que o backend já resolve. Fix: contrato
+  ApprovalInboxItem ganha `controlled_document_code` required+nullable
+  (regen full); ListWorklist faz LEFT JOIN tenant-scoped em
+  controlled_documents; handler mapeia vazio→null explícito (fail closed).
+  FE: `mapApprovalChain` agora emite um item por entrada de
+  `stage.actors[]` (display_name real, flowState por status do ator,
+  signedAt casado por user id); `pickStageDecisiveItem` substitui
+  `group[0]` cego no ArtifactDetailView (backend ordena signoffs por
+  signed_at ascendente ⇒ head = decisor MAIS ANTIGO; prioridade: rejeitado
+  > última aprovação assinada > ativo/pendente > head); render sites
+  preferem `code ?? uuid` (degradação verdadeira). 2 rodadas Codex: r1
+  NOT-ALIGN (P1 group[0] escolhia aprovador mais antigo em estágio
+  rejeitado + 2 P2 de teste); fixes por agente opus; r2 **ALIGN**. Commit
+  `8446f783`; api+web rebuild+deploy. **QA live (padrão curl dev-seed):**
+  (3.3) submit de IT-USINAGEM-004 → inbox do approver-test devolve
+  `controlled_document_code: "IT-USINAGEM-004"` e instance-detail devolve
+  actors com `display_name: "Approver Test"`; instância QA cancelada após
+  a prova (doc voltou a draft). (3.1 F-QA4-9) fluxo autosave completo
+  acquire→presign→PUT MinIO→commit SEM form_data_snapshot → **200**
+  revision 16 (antes 500). (3.2 F-QA4-4) GET /documents/{id} devolve
+  identificação real (code, profile, área, revisão coerente com o
+  autosave recém-commitado). Notas: senhas do wiki local-dev-startup
+  estão stale para `admin`/`author-test` no stack compose (hashes de
+  author-test/approver-test resetados para o valor dev conhecido via DB —
+  prática igual ao seed 0159); If-Match `*` no cancel devolve 409 apesar
+  de o contrato prometer skip (drift contrato×runtime, chip aberto).
