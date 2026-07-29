@@ -33,7 +33,10 @@ const publishedVersion = { ...approvedVersion, status: 'published', approver_id:
 const template = {
   id: TPL_ID,
   tenant_id: 'tenant-1',
-  doc_type_code: null,
+  // ADR 0086: doc_type_code is required and non-blank on every template — a
+  // template is always keyed by the profile it instantiates. 'po' is the
+  // dev-seed profile (Procedimento Operacional) this fixture's key/name model.
+  doc_type_code: 'po',
   key: 'po-e2e',
   name: 'E2E Purchase Order',
   description: null,

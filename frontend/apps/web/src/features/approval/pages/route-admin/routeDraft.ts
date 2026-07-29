@@ -1,7 +1,7 @@
 // @ts-expect-error uuid package exists in workspace, no typings exposed in this app.
 import { v4 as uuidv4 } from 'uuid';
 
-import type { RouteSummary, StageRequest } from '../../api/routeAdminApi';
+import type { CreateRouteRequest, RouteSummary, StageRequest } from '../../api/routeAdminApi';
 import type { components } from '../../../../lib/api-types';
 import { SIGNOFF_CAPABILITY } from './capabilities';
 import { validateSignaturePolicy, validateStageOrder, type GovernanceClass } from './routeGovernance';
@@ -9,8 +9,14 @@ import { defaultSelector, type SelectorDraft, type StageDraft } from './StageCar
 
 type ActorSelector = components['schemas']['ActorSelector'];
 
+/** What a route governs. Immutable after creation (ADR 0082 / ADR 0086). */
+export type RouteSubjectKind = NonNullable<CreateRouteRequest['subject_kind']>;
+
+export const DEFAULT_SUBJECT_KIND: RouteSubjectKind = 'document';
+
 export interface RouteDraft {
   name: string;
+  subjectKind: RouteSubjectKind;
   profileCode: string;
   stages: StageDraft[];
 }
@@ -40,16 +46,26 @@ function toSelectorDraft(selector: ActorSelector): SelectorDraft {
 
 export function toDraft(route: RouteSummary | null): RouteDraft {
   if (!route) {
-    return { name: '', profileCode: '', stages: [defaultStage()] };
+    return {
+      name: '',
+      subjectKind: DEFAULT_SUBJECT_KIND,
+      profileCode: '',
+      stages: [defaultStage()],
+    };
   }
   return {
     name: route.name,
-    // route.profile_code is null for a template route (ADR 0082 — a template
-    // route has no profile by DB constraint). RouteDraft.profileCode backs a
-    // controlled text input, which cannot hold null, so it is normalized to
-    // '' here; validateDraft only requires it non-empty on create (isEdit
-    // false), so an edited template route's empty field is expected, not a
-    // silently-hidden distinction.
+    // `subject_kind` is optional on the wire (routes predating ADR 0082 were
+    // all document routes and the server may omit it); absent means `document`,
+    // which is also the server-side default.
+    subjectKind: route.subject_kind ?? DEFAULT_SUBJECT_KIND,
+    // Post-ADR-0086 every route — document and template alike — carries a
+    // profile_code (a template route is keyed by the profile it governs, with
+    // subject_key = profile_code), and the contract now types it non-nullable.
+    // The `??` stays as a runtime guard only: the Go wire struct still holds a
+    // *string so a malformed (NULL profile_code) row would surface as JSON
+    // null, and RouteDraft.profileCode backs a controlled select that cannot
+    // hold null.
     profileCode: route.profile_code ?? '',
     stages: route.stages.map((stage) => ({
       uid: uuidv4() as string,
@@ -103,6 +119,23 @@ export function toStageRequests(draft: RouteDraft): StageRequest[] {
   });
 }
 
+/**
+ * Builds the create-route wire payload from a validated draft.
+ *
+ * ADR 0086: a route is keyed by configuration, never by an instance, so
+ * `profile_code` is sent for BOTH subject kinds. `subject_key` is deliberately
+ * omitted — the server derives it from `profile_code`, and sending a divergent
+ * key is a 422 (`validation.template_subject_key_mismatch`).
+ */
+export function toCreateRequest(draft: RouteDraft): CreateRouteRequest {
+  return {
+    name: draft.name.trim(),
+    subject_kind: draft.subjectKind,
+    profile_code: draft.profileCode.trim(),
+    stages: toStageRequests(draft),
+  };
+}
+
 export function validateDraft(
   draft: RouteDraft,
   isEdit: boolean,
@@ -111,6 +144,9 @@ export function validateDraft(
   if (!draft.name.trim()) {
     return 'Informe o nome da rota.';
   }
+  // ADR 0086: the profile keys BOTH subject kinds — a template route governs
+  // every template of its profile, exactly as a document route governs every
+  // document of it. Hence the requirement is unconditional on subjectKind.
   if (!isEdit && !draft.profileCode.trim()) {
     return 'Informe o código do perfil.';
   }

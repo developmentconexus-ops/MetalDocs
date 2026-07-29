@@ -98,17 +98,33 @@ export function ProfileList({ profiles, includeArchived, onToggleArchived }: Pro
                 ) : (
                   <span className={styles.statusActive}>Ativo</span>
                 )}
-                {/* Readiness is orthogonal to archived/active: an ACTIVE profile
-                    with no active approval route cannot receive documents at all
-                    (create rejects with 409 state.approval_route_missing). */}
-                {!profile.archivedAt && !profile.hasActiveRoute && (
+                {/* Readiness is orthogonal to archived/active, and the two route
+                    kinds are orthogonal to each other (ADR 0086): an ACTIVE
+                    profile with no active DOCUMENT route cannot receive
+                    documents (create rejects 409 state.approval_route_missing),
+                    and one with no active TEMPLATE route cannot receive
+                    templates (POST /templates rejects 409
+                    APPROVAL_ROUTE_MISSING). Either gap earns its own badge; the
+                    shortcut is rendered once for both. */}
+                {!profile.archivedAt &&
+                  (!profile.hasActiveRoute || !profile.hasActiveTemplateRoute) && (
                   <span className={styles.readinessCell}>
-                    <span
-                      className="pill pill-review"
-                      title="Sem rota de aprovação ativa"
-                    >
-                      INCOMPLETO
-                    </span>
+                    {!profile.hasActiveRoute && (
+                      <span
+                        className="pill pill-review"
+                        title="Sem rota de aprovação ativa"
+                      >
+                        INCOMPLETO
+                      </span>
+                    )}
+                    {!profile.hasActiveTemplateRoute && (
+                      <span
+                        className="pill pill-review"
+                        title="Sem rota de aprovação de template ativa"
+                      >
+                        SEM ROTA DE TEMPLATE
+                      </span>
+                    )}
                     {canManageRoutes && (
                       <Link to="/approval-routes" className={styles.readinessLink}>
                         Configurar rota

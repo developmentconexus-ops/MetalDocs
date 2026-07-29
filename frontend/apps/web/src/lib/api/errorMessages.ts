@@ -151,6 +151,10 @@ export const errorMessages: Record<string, string> = {
   'validation.submit_choice_constraint_violated':
     'Um dos aprovadores escolhidos não atende às restrições da etapa.',
   'validation.submit_choice_required': 'Escolha os aprovadores das etapas que exigem seleção no envio.',
+  // ADR 0086: a template route is keyed by the profile it governs, so
+  // subject_key must equal profile_code — a divergent key is rejected 422.
+  'validation.template_subject_key_mismatch':
+    'A chave do assunto deve ser igual ao código do perfil.',
 
   // ─── Documents (instances / sessions / checkpoints) ───────────────────────
   APPROVAL_ROUTE_MISSING: 'Nenhuma rota de aprovação configurada para este perfil. Configure uma rota antes de continuar.',

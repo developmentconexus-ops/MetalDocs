@@ -105,6 +105,51 @@ describe('fetchProfiles', () => {
     expect(profiles[0].governanceClass).toBe('simples');
   });
 
+  it('maps has_active_template_route (wire) to hasActiveTemplateRoute, independently of has_active_route (ADR 0086)', async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        items: [
+          {
+            code: 'pop',
+            family_code: 'sop',
+            name: 'Procedimento Operacional',
+            description: 'desc',
+            review_interval_days: 365,
+            active_schema_version: 1,
+            workflow_profile: 'editor',
+            approval_required: true,
+            retention_days: 30,
+            validity_days: 365,
+            has_active_route: true,
+            has_active_template_route: false,
+          },
+          {
+            code: 'it',
+            family_code: 'sop',
+            name: 'Instrução de Trabalho',
+            description: 'desc',
+            review_interval_days: 365,
+            active_schema_version: 1,
+            workflow_profile: 'editor',
+            approval_required: true,
+            retention_days: 30,
+            validity_days: 365,
+            has_active_route: false,
+            has_active_template_route: true,
+          },
+        ],
+      },
+      error: undefined,
+    });
+
+    const profiles = await fetchProfiles();
+
+    // The two readiness flags are orthogonal — neither is derived from the
+    // other, and neither may be substituted for the other.
+    expect(profiles[0]).toMatchObject({ hasActiveRoute: true, hasActiveTemplateRoute: false });
+    expect(profiles[1]).toMatchObject({ hasActiveRoute: false, hasActiveTemplateRoute: true });
+  });
+
   it('returns an empty array when items is absent', async () => {
     mockGet.mockResolvedValue({ data: {}, error: undefined });
     const profiles = await fetchProfiles();

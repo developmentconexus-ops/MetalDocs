@@ -1,37 +1,6 @@
-/* ── Scope type cards (generic vs profile) ── */
-
-/* 2-column grid for the two scope choice cards. */
-.scopeGrid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  margin-bottom: var(--sp-4);
-}
-
-/* SelectableCard override for scope cards. */
-.scopeCard {
-  gap: 6px;
-  padding: var(--sp-4);
-}
-
-.scopeCard p {
-  margin: 0;
-}
-
-/* Header row: label + optional check icon. */
-.scopeHeader {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-}
-
-.scopeLabel {
-  flex: 1;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-/* ── Profile section (shown when scopeType === 'profile') ── */
+/* ── Profile section ──
+   ADR 0086 removed generic templates, so step 1 is a pure profile picker and
+   the former scope-type card row is gone. */
 
 .profileSection {
   margin-bottom: var(--sp-2);
@@ -105,8 +74,36 @@
   border-radius: 4px;
 }
 
+/* Blocked (no active template route) cell: card + remediation link stacked.
+   Mirrors the documents wizard StepProfile treatment. */
+.profileCardBlockedCell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.profileCardBlockedCell > button {
+  flex: 1;
+}
+
+/* "Incompleto — sem rota de aprovação de template" marker inside the card. */
+.profileBlocked {
+  font-size: var(--font-size-xs);
+  color: var(--warning);
+}
+
+.profileBlockedLink {
+  align-self: flex-start;
+  font-size: var(--font-size-xs-2);
+  color: var(--brand);
+  text-decoration: none;
+}
+
+.profileBlockedLink:hover {
+  text-decoration: underline;
+}
+
 @media (max-width: 600px) {
-  .scopeGrid,
   .profileGrid {
     grid-template-columns: 1fr;
   }

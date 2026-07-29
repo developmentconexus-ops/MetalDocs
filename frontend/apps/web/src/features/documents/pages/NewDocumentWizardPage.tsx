@@ -121,6 +121,10 @@ export function NewDocumentWizardPage(): JSX.Element {
         // Eligibility comes from creation-context only — never from the
         // enrichment row, so the two sources can never disagree here.
         hasActiveRoute: profile.has_active_route,
+        // Template-route readiness gates the TEMPLATE wizard, never this one.
+        // creation-context does not carry it, so it comes from the enrichment
+        // row and falls closed (false) when the catalog has not resolved.
+        hasActiveTemplateRoute: rich?.hasActiveTemplateRoute ?? false,
         familyCode: rich?.familyCode ?? '',
         description: rich?.description ?? '',
         reviewIntervalDays: rich?.reviewIntervalDays ?? 0,

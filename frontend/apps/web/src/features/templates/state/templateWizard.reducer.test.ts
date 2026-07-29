@@ -10,7 +10,9 @@ import {
 function readyState(overrides: Partial<TemplateWizardState> = {}): TemplateWizardState {
   return {
     ...initialTemplateWizardState,
-    scopeType: 'generic',
+    // ADR 0086: there is no generic scope any more — every template is keyed to
+    // a profile, so a "ready" state always carries one.
+    profileCode: 'POP',
     name: 'Procedimento Operacional',
     description: 'Template padrão para procedimentos.',
     startingPoint: 'blank',
@@ -25,6 +27,29 @@ describe('template wizard identity validation', () => {
     expect(slugifyTemplateName(state.name)).toBe('');
     expect(selectMaxReachableStep(state)).toBe(2);
     expect(templateWizardReducer(state, { type: 'GO_TO_STEP', step: 4 }).step).toBe(2);
+  });
+});
+
+describe('template wizard profile requirement (ADR 0086)', () => {
+  it('starts with no profile chosen', () => {
+    expect(initialTemplateWizardState.profileCode).toBeNull();
+  });
+
+  it('clamps to Step 1 until a profile is chosen — there is no generic escape hatch', () => {
+    const state = readyState({ step: 4, profileCode: null });
+
+    expect(selectMaxReachableStep(state)).toBe(1);
+    expect(templateWizardReducer(state, { type: 'GO_TO_STEP', step: 4 }).step).toBe(1);
+  });
+
+  it('unlocks Step 2 onwards once a profile is selected', () => {
+    const state = templateWizardReducer(readyState({ step: 1, profileCode: null }), {
+      type: 'SET_PROFILE',
+      code: 'POP',
+    });
+
+    expect(state.profileCode).toBe('POP');
+    expect(selectMaxReachableStep(state)).toBe(4);
   });
 });
 

@@ -1,10 +1,8 @@
 import type { DocumentProfile } from '../../../../taxonomy/types';
 import { WizardFooter } from '../../../../shared/components/wizard/WizardFooter';
-import type { ScopeType } from '../../../state/templateWizard.reducer';
 import styles from './StepIdentity.module.css';
 
 export type StepIdentityProps = {
-  scopeType: ScopeType;
   selectedProfile: DocumentProfile | null;
   templateKey: string;
   name: string;
@@ -19,7 +17,6 @@ export type StepIdentityProps = {
 };
 
 export function StepIdentity({
-  scopeType,
   selectedProfile,
   templateKey,
   name,
@@ -32,12 +29,9 @@ export function StepIdentity({
   advanceDisabled,
   keyError = null,
 }: StepIdentityProps): JSX.Element {
-  const kicker =
-    scopeType === 'generic'
-      ? 'Etapa 2 de 4 · Template genérico'
-      : selectedProfile
-        ? `Etapa 2 de 4 · Perfil ${selectedProfile.code} - ${selectedProfile.name}`
-        : 'Etapa 2 de 4';
+  const kicker = selectedProfile
+    ? `Etapa 2 de 4 · Perfil ${selectedProfile.code} - ${selectedProfile.name}`
+    : 'Etapa 2 de 4';
 
   // TODO(novo-template-wizard:next-code-preview): replace the slug key preview
   // with a server sequence only when the next-code endpoint ships.
@@ -46,24 +40,26 @@ export function StepIdentity({
       <div className="kicker">{kicker}</div>
       <h2 className="h2">Identidade do template</h2>
 
-      {/* Scope recap row (profile + version) */}
+      {/* Profile recap row (profile + version) */}
       {(() => {
-        const recap =
-          scopeType === 'profile' && selectedProfile
-            ? {
-                code: selectedProfile.code,
-                name: selectedProfile.name,
-                detail: `Família: ${selectedProfile.familyCode}`,
-              }
-            : {
-                code: 'GEN',
-                name: 'Genérico',
-                detail: 'Aplicável a qualquer perfil de documento.',
-              };
+        // ADR 0086: every template belongs to a profile, so the recap always
+        // names one. The placeholder covers only the transient window where the
+        // profile catalog has not resolved yet — never a "generic" template.
+        const recap = selectedProfile
+          ? {
+              code: selectedProfile.code,
+              name: selectedProfile.name,
+              detail: `Família: ${selectedProfile.familyCode}`,
+            }
+          : {
+              code: '—',
+              name: 'Perfil não carregado',
+              detail: 'Volte à etapa anterior e selecione o perfil.',
+            };
         return (
           <div className={styles.recapRow}>
             <div className={styles.recapField}>
-              <span className="kicker">Escopo selecionado</span>
+              <span className="kicker">Perfil selecionado</span>
               <div className={styles.recapBox}>
                 <span className="code-chip mono">{recap.code}</span>
                 <div className={styles.recapMeta}>
@@ -74,7 +70,7 @@ export function StepIdentity({
                   type="button"
                   className="btn btn-sm btn-ghost"
                   onClick={onChangeScope}
-                  aria-label="Trocar escopo do template"
+                  aria-label="Trocar perfil do template"
                 >
                   Trocar
                 </button>

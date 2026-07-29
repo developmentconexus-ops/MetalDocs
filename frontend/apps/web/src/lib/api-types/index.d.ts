@@ -2829,6 +2829,8 @@ export interface components {
             code: string;
             /** @description True when this profile has an active approval route (approval_routes, subject_kind=document). Admin readiness badge: false means documents cannot be created under the profile — the create endpoint rejects it with 409 `state.approval_route_missing`. */
             has_active_route: boolean;
+            /** @description True when this profile has an active TEMPLATE approval route (approval_routes, subject_kind=template, subject_key=profile code — ADR 0086). Admin readiness badge: false means templates cannot be created under the profile — `POST /templates` rejects it with 409 `APPROVAL_ROUTE_MISSING`. */
+            has_active_template_route: boolean;
             family_code: string;
             name: string;
             alias?: string;
@@ -3804,15 +3806,15 @@ export interface components {
             stages: components["schemas"]["ApprovalRoutePreviewStage"][];
         };
         CreateRouteRequest: {
-            /** @description Required when `subject_kind` is `document` or absent; must be omitted when `subject_kind` is `template` (a template route has no profile — DB truth: `approval_routes_template_subject_projection_check`, ADR 0082). */
-            profile_code?: string;
+            /** @description Required for every `subject_kind`. A route is keyed by configuration, never by an instance: a `template` route governs every template of that profile (ADR 0086), exactly as a `document` route governs every document of it. DB truth: `approval_routes_template_subject_key_check` (template rows must carry `profile_code` and `profile_code = subject_key`). */
+            profile_code: string;
             name: string;
             /**
-             * @description M3 kernel extraction (ADR 0082, P2.S3). Optional; omitted defaults to `document`, preserving the legacy (document, profile_code) subject unchanged. Governs whether `profile_code` is required (`document`/absent) or must be omitted (`template`).
+             * @description M3 kernel extraction (ADR 0082, P2.S3). Optional; omitted defaults to `document`, preserving the legacy (document, profile_code) subject unchanged. `profile_code` is required for both kinds (ADR 0086).
              * @enum {string}
              */
             subject_kind?: "document" | "template";
-            /** @description M3 kernel extraction (ADR 0082, P2.S3). Optional; omitted defaults to `profile_code` when `subject_kind` is `document` (or absent), preserving byte-equal legacy behavior. */
+            /** @description M3 kernel extraction (ADR 0082, P2.S3). Optional; omitted defaults to `profile_code` for both subject kinds. When present it must equal `profile_code` (ADR 0086); a divergent key is rejected 422. */
             subject_key?: string;
             stages: components["schemas"]["StageRequest"][];
         } & {
@@ -3844,8 +3846,8 @@ export interface components {
             name: string;
             /** Format: uuid */
             tenant_id: string;
-            /** @description Populated for document routes; null for template routes (ADR 0082). */
-            profile_code: string | null;
+            /** @description Always populated, for both subject kinds — a route is keyed by configuration, never by an instance (ADR 0086). For a `template` route it equals `subject_key` (the profile's doc_type_code); for a `document` route it equals `subject_key` as well. DB truth: `approval_routes_template_subject_key_check`. */
+            profile_code: string;
             /**
              * @description M3 kernel extraction (ADR 0082, P2.S3). What this route governs; `document` for every route created via the legacy profile_code path.
              * @enum {string}
@@ -5173,8 +5175,8 @@ export interface operations {
                     key: string;
                     name: string;
                     description?: string;
-                    /** @description Profile code (e.g. DC, POP). Omit or null for generic templates. */
-                    doc_type_code?: string;
+                    /** @description Profile code (e.g. `po`, `it`) this template belongs to. Required: generic templates no longer exist (ADR 0086). The profile must already have an active template approval route, otherwise creation is rejected 409 `APPROVAL_ROUTE_MISSING`. */
+                    doc_type_code: string;
                 };
             };
         };
@@ -5191,7 +5193,16 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            409: components["responses"]["Conflict"];
+            /** @description Conflict. `ALREADY_EXISTS` when the template key already exists in the tenant; `APPROVAL_ROUTE_MISSING` when the declared `doc_type_code` has no active template approval route (ADR 0086 config-first gate). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: components["responses"]["UnprocessableEntity"];
             500: components["responses"]["InternalServerError"];
         };
     };

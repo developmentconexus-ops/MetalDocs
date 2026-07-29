@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ApiError, resolveErrorMessage } from '../../../lib/api';
 import { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
 import {
   templateWizardReducer,
@@ -7,7 +8,6 @@ import {
   initialTemplateWizardState,
   slugifyTemplateName,
   type TemplateWizardStep,
-  type ScopeType,
 } from '../state/templateWizard.reducer';
 import { createTemplate, importTemplateDocx } from '../api/templates';
 import { WizardShell } from '../../shared/components/wizard/WizardShell';
@@ -19,13 +19,25 @@ import { StepConfirmation } from '../components/wizard/steps/StepConfirmation';
 
 const EMPTY_SLUG_ERROR = 'Informe um nome com letras ou números para gerar o identificador técnico.';
 
+// Wizard-specific copy for the create-template failures the user can actually
+// act on here. Everything else falls through to `resolveErrorMessage`, the
+// canonical RFC 9457 code -> PT-BR map — matching on `err.code` rather than on
+// the human-readable `message`, which never carries the code.
+const CREATE_ERROR_COPY: Record<string, string> = {
+  // templates MapErr maps domain.ErrKeyConflict -> problem.CodeAlreadyExists.
+  ALREADY_EXISTS: 'Já existe um template com este identificador técnico. Escolha outro nome.',
+  // ADR 0086 config-first gate: the declared profile has no active TEMPLATE
+  // approval route, so no template can be created under it until one exists.
+  APPROVAL_ROUTE_MISSING:
+    'Este perfil não tem rota de aprovação de template ativa. Configure a rota em Rotas de Aprovação antes de criar o template.',
+};
+
 function mapTemplateCreateError(err: unknown): string {
-  if (!(err instanceof Error)) return 'Não foi possível criar o template. Tente novamente.';
-  const msg = err.message;
-  if (/key_conflict/i.test(msg)) return 'Já existe um template com este identificador técnico. Escolha outro nome.';
-  if (/forbidden|authz|unauthorized/i.test(msg)) return 'Você não tem permissão para criar templates.';
-  if (/validation|invalid/i.test(msg)) return 'Os dados informados são inválidos. Revise os campos e tente novamente.';
-  return msg || 'Não foi possível criar o template. Tente novamente.';
+  if (err instanceof ApiError) {
+    return CREATE_ERROR_COPY[err.code] ?? resolveErrorMessage(err);
+  }
+  if (err instanceof Error && err.message) return err.message;
+  return 'Não foi possível criar o template. Tente novamente.';
 }
 
 const TPL_STEPS: StepperStep[] = [
@@ -55,11 +67,11 @@ export function TemplateWizardPage(): JSX.Element {
   // on key_conflict and orphan the first row).
   const createdRef = useRef<{ templateId: string; versionNumber: number } | null>(null);
   const [state, dispatch] = useReducer(templateWizardReducer, undefined, () => {
-    // Initial state has no scope chosen. Clamp deep-links beyond Step 1
+    // Initial state has no profile chosen. Clamp deep-links beyond Step 1
     // to Step 1 - avoids a one-frame paint of placeholder content before
     // the defensive effect runs.
     const parsed = parseStepParam(searchParams.get('step'));
-    const safeStep = initialTemplateWizardState.scopeType === null ? 1 : parsed;
+    const safeStep = initialTemplateWizardState.profileCode === null ? 1 : parsed;
     return { ...initialTemplateWizardState, step: safeStep };
   });
   const goToStep = useCallback((step: TemplateWizardStep) => {
@@ -84,23 +96,19 @@ export function TemplateWizardPage(): JSX.Element {
     );
   }, [state.step, setSearchParams]);
 
-  // Defensive: if URL says ?step=2 but no scope chosen yet, send back to Step 1.
+  // Defensive: if URL says ?step=2 but no profile chosen yet, send back to Step 1.
   useEffect(() => {
-    if (state.step !== 1 && state.scopeType === null) {
+    if (state.step !== 1 && state.profileCode === null) {
       dispatch({ type: 'GO_TO_STEP', step: 1 });
     }
-  }, [state.step, state.scopeType]);
+  }, [state.step, state.profileCode]);
 
   const profilesQuery = useProfilesQuery();
 
   const selectedProfile = useMemo(() => {
-    if (state.scopeType !== 'profile' || !state.profileCode) return null;
+    if (!state.profileCode) return null;
     return profilesQuery.data?.find((p) => p.code === state.profileCode) ?? null;
-  }, [state.scopeType, state.profileCode, profilesQuery.data]);
-
-  function handleSelectScopeType(scopeType: ScopeType) {
-    dispatch({ type: 'SET_SCOPE_TYPE', scopeType });
-  }
+  }, [state.profileCode, profilesQuery.data]);
 
   function handleSelectProfile(code: string) {
     dispatch({ type: 'SET_PROFILE', code });
@@ -109,6 +117,13 @@ export function TemplateWizardPage(): JSX.Element {
   async function handleSubmit() {
     if (!hasValidTemplateKey) {
       setSubmitError(EMPTY_SLUG_ERROR);
+      return;
+    }
+    // ADR 0086: doc_type_code is required (422 when blank). The wizard cannot
+    // reach step 4 without a profile, so this is a fail-closed assertion, not a
+    // user-facing branch.
+    if (!state.profileCode) {
+      setSubmitError('Selecione o perfil do template antes de criar.');
       return;
     }
 
@@ -125,7 +140,7 @@ export function TemplateWizardPage(): JSX.Element {
           key: templateKey,
           name: state.name,
           description: state.description.trim() || undefined,
-          doc_type_code: state.scopeType === 'profile' ? state.profileCode ?? undefined : undefined,
+          doc_type_code: state.profileCode,
           idempotencyKey: idempotencyKeyRef.current,
         });
         templateId = template.id;
@@ -175,8 +190,6 @@ export function TemplateWizardPage(): JSX.Element {
     >
       {state.step === 1 && (
         <StepScope
-          scopeType={state.scopeType}
-          onSelectScopeType={handleSelectScopeType}
           profiles={profilesQuery.data ?? []}
           isLoading={profilesQuery.isLoading}
           isError={profilesQuery.isError}
@@ -189,9 +202,8 @@ export function TemplateWizardPage(): JSX.Element {
           onRetry={() => void profilesQuery.refetch()}
         />
       )}
-      {state.step === 2 && state.scopeType !== null && (
+      {state.step === 2 && state.profileCode !== null && (
         <StepIdentity
-          scopeType={state.scopeType}
           selectedProfile={selectedProfile}
           templateKey={templateKey}
           name={state.name}
@@ -205,7 +217,7 @@ export function TemplateWizardPage(): JSX.Element {
           keyError={keyError}
         />
       )}
-      {state.step === 3 && state.scopeType !== null && (
+      {state.step === 3 && state.profileCode !== null && (
         <StepStructure
           startingPoint={state.startingPoint}
           selectedDocxName={state.selectedDocxName}
@@ -217,7 +229,7 @@ export function TemplateWizardPage(): JSX.Element {
           advanceDisabled={advanceDisabled}
         />
       )}
-      {state.step === 4 && state.scopeType !== null && (
+      {state.step === 4 && state.profileCode !== null && (
         <StepConfirmation
           name={state.name}
           selectedProfile={

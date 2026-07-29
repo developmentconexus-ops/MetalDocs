@@ -49,6 +49,7 @@ function makeProfile(overrides: Partial<DocumentProfile> = {}): DocumentProfile 
     editableByRole: 'admin',
     governanceClass: 'controlado',
     hasActiveRoute: true,
+    hasActiveTemplateRoute: true,
     archivedAt: null,
     createdAt: '',
     ...overrides,
@@ -94,17 +95,54 @@ describe('TaxonomyAdminPage', () => {
 
     const badge = await screen.findByText('INCOMPLETO');
     expect(badge).toHaveAttribute('title', 'Sem rota de aprovação ativa');
+    // Orthogonal: the template-route badge must NOT appear just because the
+    // document route is missing (ADR 0086).
+    expect(screen.queryByText('SEM ROTA DE TEMPLATE')).toBeNull();
   });
 
-  it('does not badge a profile whose approval route is active', async () => {
+  it('badges an active profile that has no active TEMPLATE route, independently of the document route', async () => {
     vi.mocked(taxonomyApi.fetchProfiles).mockResolvedValue([
-      makeProfile({ code: 'PRC', hasActiveRoute: true }),
+      makeProfile({
+        code: 'PRC',
+        name: 'Procedimento',
+        hasActiveRoute: true,
+        hasActiveTemplateRoute: false,
+      }),
+    ]);
+
+    await openProfilesTab();
+
+    const badge = await screen.findByText('SEM ROTA DE TEMPLATE');
+    expect(badge).toHaveAttribute('title', 'Sem rota de aprovação de template ativa');
+    expect(screen.queryByText('INCOMPLETO')).toBeNull();
+  });
+
+  it('badges both readiness gaps when neither route kind is active', async () => {
+    vi.mocked(taxonomyApi.fetchProfiles).mockResolvedValue([
+      makeProfile({
+        code: 'PRC',
+        name: 'Procedimento',
+        hasActiveRoute: false,
+        hasActiveTemplateRoute: false,
+      }),
+    ]);
+
+    await openProfilesTab();
+
+    await screen.findByText('INCOMPLETO');
+    expect(screen.getByText('SEM ROTA DE TEMPLATE')).toBeTruthy();
+  });
+
+  it('does not badge a profile whose approval routes are both active', async () => {
+    vi.mocked(taxonomyApi.fetchProfiles).mockResolvedValue([
+      makeProfile({ code: 'PRC', hasActiveRoute: true, hasActiveTemplateRoute: true }),
     ]);
 
     await openProfilesTab();
 
     await waitFor(() => expect(screen.getByText('Procedimento')).toBeTruthy());
     expect(screen.queryByText('INCOMPLETO')).toBeNull();
+    expect(screen.queryByText('SEM ROTA DE TEMPLATE')).toBeNull();
   });
 
   it('offers the route shortcut only to users holding route.manage', async () => {

@@ -1,12 +1,15 @@
 export type TemplateWizardStep = 1 | 2 | 3 | 4;
-export type ScopeType = 'generic' | 'profile';
 export type StartingPoint = 'docx' | 'blank';
 
 export type TemplateWizardState = {
   step: TemplateWizardStep;
-  /** null = not yet chosen */
-  scopeType: ScopeType | null;
-  /** only meaningful when scopeType === 'profile' */
+  /**
+   * Profile the template belongs to; `null` = not yet chosen.
+   *
+   * ADR 0086 removed generic templates: `doc_type_code` is required on
+   * `POST /templates` (422 when blank), so every template is scoped to exactly
+   * one profile and there is no scope-type choice left to make.
+   */
   profileCode: string | null;
   /** Step 2 - Identidade */
   name: string;
@@ -20,7 +23,6 @@ export type TemplateWizardState = {
 
 export const initialTemplateWizardState: TemplateWizardState = {
   step: 1,
-  scopeType: null,
   profileCode: null,
   name: '',
   description: '',
@@ -42,7 +44,6 @@ export function slugifyTemplateName(name: string): string {
 }
 
 export type TemplateWizardAction =
-  | { type: 'SET_SCOPE_TYPE'; scopeType: ScopeType }
   | { type: 'SET_PROFILE'; code: string }
   | { type: 'SET_NAME'; value: string }
   | { type: 'SET_DESCRIPTION'; value: string }
@@ -65,13 +66,6 @@ function reduceCore(
   action: TemplateWizardAction,
 ): TemplateWizardState {
   switch (action.type) {
-    case 'SET_SCOPE_TYPE':
-      return {
-        ...state,
-        scopeType: action.scopeType,
-        // clear profile when switching to generic
-        profileCode: action.scopeType === 'generic' ? null : state.profileCode,
-      };
     case 'SET_PROFILE':
       return { ...state, profileCode: action.code };
     case 'SET_NAME':
@@ -111,8 +105,7 @@ function reduceCore(
 export function selectMaxReachableStep(
   state: TemplateWizardState,
 ): TemplateWizardStep {
-  if (state.scopeType === null) return 1;
-  if (state.scopeType === 'profile' && state.profileCode === null) return 1;
+  if (state.profileCode === null) return 1;
   if (state.name.trim().length < 3) return 2;
   if (slugifyTemplateName(state.name.trim()).length === 0) return 2;
   if (state.description.trim().length < 3) return 2;

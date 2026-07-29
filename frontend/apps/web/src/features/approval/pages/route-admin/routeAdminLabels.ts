@@ -27,6 +27,36 @@ export function labelForSelectorKind(kind: ActorSelectorKind): string {
   return ACTOR_SELECTOR_KIND_LABELS[kind] ?? kind;
 }
 
+/**
+ * What a route governs (ADR 0082 subject kinds, ADR 0086 keying). Both kinds
+ * are keyed by the profile, so the labels name the governed population, not a
+ * scope: "Documentos" = every document of the profile, "Templates" = every
+ * template of the profile.
+ */
+export type RouteSubjectKindLabelKey = 'document' | 'template';
+
+export const SUBJECT_KIND_OPTIONS: ReadonlyArray<RouteSubjectKindLabelKey> = ['document', 'template'];
+
+const SUBJECT_KIND_LABELS: Record<RouteSubjectKindLabelKey, string> = {
+  document: 'Documentos',
+  template: 'Templates',
+};
+
+const SUBJECT_KIND_DESCRIPTIONS: Record<RouteSubjectKindLabelKey, string> = {
+  document: 'Governa a aprovação dos documentos criados sob o perfil.',
+  template: 'Governa a aprovação dos templates criados sob o perfil.',
+};
+
+export function labelForSubjectKind(kind: RouteSubjectKindLabelKey | undefined): string {
+  // Routes written before subject kinds existed omit the field; they are all
+  // document routes, which is also the server-side default.
+  return SUBJECT_KIND_LABELS[kind ?? 'document'] ?? kind ?? '';
+}
+
+export function describeSubjectKind(kind: RouteSubjectKindLabelKey): string {
+  return SUBJECT_KIND_DESCRIPTIONS[kind] ?? '';
+}
+
 export const QUORUM_KIND_OPTIONS: ReadonlyArray<QuorumKind> = [
   'any_1_of',
   'all_of',

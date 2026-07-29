@@ -9,13 +9,26 @@ import { useIamRolesQuery } from '../../queries/useIamRolesQuery';
 import type { CreateRouteRequest, RouteSummary, UpdateRouteRequest } from '../../api/routeAdminApi';
 import { ApprovalPolicyBadge } from './ApprovalPolicyBadge';
 import {
+  SUBJECT_KIND_OPTIONS,
+  describeSubjectKind,
+  labelForSubjectKind,
+} from './routeAdminLabels';
+import {
   approveNowOverlapNote,
   authorExcludedNote,
   livreBlockedMessage,
   routePolicyFor,
   type GovernanceClass,
 } from './routeGovernance';
-import { defaultStage, toDraft, toStageRequests, validateDraft, type RouteDraft } from './routeDraft';
+import {
+  defaultStage,
+  toCreateRequest,
+  toDraft,
+  toStageRequests,
+  validateDraft,
+  type RouteDraft,
+  type RouteSubjectKind,
+} from './routeDraft';
 import { RouteFlowPreview } from './RouteFlowPreview';
 import { StageCard, type StageDraft } from './StageCard';
 import styles from './RouteAdmin.module.css';
@@ -112,19 +125,12 @@ export function RouteEditorDialog({
       return;
     }
 
-    const stages = toStageRequests(draft);
     const payload: RouteEditorSubmission = isEdit
       ? {
           routeId: route!.id,
-          update: { name: draft.name.trim(), stages },
+          update: { name: draft.name.trim(), stages: toStageRequests(draft) },
         }
-      : {
-          create: {
-            name: draft.name.trim(),
-            profile_code: draft.profileCode.trim(),
-            stages,
-          },
-        };
+      : { create: toCreateRequest(draft) };
 
     try {
       await onSubmit(payload);
@@ -136,8 +142,8 @@ export function RouteEditorDialog({
   const description = useMemo(
     () =>
       isEdit
-        ? 'Edite o nome e as etapas. O código do perfil não pode ser alterado em rotas existentes.'
-        : 'Defina nome, perfil e as etapas de aprovação. Use "Adicionar etapa" para incluir mais etapas.',
+        ? 'Edite o nome e as etapas. O tipo de assunto e o código do perfil não podem ser alterados em rotas existentes.'
+        : 'Defina nome, o que a rota governa, o perfil e as etapas de aprovação. Use "Adicionar etapa" para incluir mais etapas.',
     [isEdit],
   );
 
@@ -216,6 +222,36 @@ export function RouteEditorDialog({
           disabled={isSubmitting}
           autoFocus
         />
+
+        <label className={styles.fieldLabel} htmlFor="route-subject-kind">
+          O que a rota governa
+        </label>
+        <select
+          id="route-subject-kind"
+          className={styles.input}
+          value={draft.subjectKind}
+          onChange={(event) =>
+            setDraft((prev) => ({
+              ...prev,
+              subjectKind: event.target.value as RouteSubjectKind,
+            }))
+          }
+          // Immutable after creation, same as the profile: the subject kind is
+          // half of the route's identity key (subject_kind, subject_key).
+          disabled={isSubmitting || isEdit}
+          aria-describedby="route-subject-kind-help"
+        >
+          {SUBJECT_KIND_OPTIONS.map((kind) => (
+            <option key={kind} value={kind}>
+              {labelForSubjectKind(kind)}
+            </option>
+          ))}
+        </select>
+        <small id="route-subject-kind-help" className={styles.helpText}>
+          {isEdit
+            ? 'O tipo de assunto é imutável após criação.'
+            : describeSubjectKind(draft.subjectKind)}
+        </small>
 
         <label className={styles.fieldLabel} htmlFor="route-profile-code">
           Código do perfil

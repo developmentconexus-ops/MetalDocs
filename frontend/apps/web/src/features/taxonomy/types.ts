@@ -30,6 +30,12 @@ export interface DocumentProfile {
   // Wire-required on DocumentProfileItem — surfaced as the admin INCOMPLETO
   // badge and as the wizard's fail-closed profile gate.
   hasActiveRoute: boolean;
+  // Template-route readiness (ADR 0086). False means the profile has no active
+  // TEMPLATE approval route (approval_routes, subject_kind=template,
+  // subject_key=profile code) and `POST /templates` under it is rejected with
+  // 409 `APPROVAL_ROUTE_MISSING`. Orthogonal to `hasActiveRoute`: a profile can
+  // be ready for documents and not for templates, and vice-versa.
+  hasActiveTemplateRoute: boolean;
   archivedAt: string | null;
   createdAt: string;
 }

@@ -101,7 +101,8 @@
 }
 
 .badgeActive,
-.badgeInactive {
+.badgeInactive,
+.badgeSubjectKind {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -123,6 +124,14 @@
   color: var(--slate-text-muted);
   background: #f1f5f9;
   border: 1px solid #cbd5f5;
+}
+
+/* Subject kind is a neutral classification, not a health signal — it must not
+   compete with the active/inactive status badge in the adjacent column. */
+.badgeSubjectKind {
+  color: var(--slate-text-muted);
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid #e2e8f0;
 }
 
 .badgeDot {

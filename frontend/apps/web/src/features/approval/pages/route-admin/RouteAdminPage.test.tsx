@@ -39,6 +39,7 @@ function makeProfile(overrides: Partial<DocumentProfile> = {}): DocumentProfile 
     editableByRole: 'admin',
     governanceClass: 'controlado',
     hasActiveRoute: true,
+    hasActiveTemplateRoute: true,
     archivedAt: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -500,6 +501,74 @@ describe('RouteAdminPage', () => {
       expect(within(dialog).getByText(stageOrderViolationMessage())).toBeTruthy(),
     );
     expect(vi.mocked(routeAdminApi.createRoute)).not.toHaveBeenCalled();
+  });
+
+  it('lists the subject kind per route (Documentos / Templates)', async () => {
+    vi.mocked(routeAdminApi.listRoutes).mockResolvedValue(
+      listResponse([
+        makeRoute({ id: 'route-doc', name: 'Rota Doc', subject_kind: 'document' }),
+        makeRoute({
+          id: 'route-tpl',
+          name: 'Rota Tpl',
+          subject_kind: 'template',
+          profile_code: 'JUR',
+        }),
+        // Legacy row written before subject kinds existed — reads as a
+        // document route, never as a blank cell.
+        makeRoute({ id: 'route-legacy', name: 'Rota Legada' }),
+      ]),
+    );
+
+    renderWithProviders(<RouteAdminPage />);
+
+    await screen.findByText('Rota Doc');
+    expect(screen.getAllByLabelText('Governa: Documentos')).toHaveLength(2);
+    expect(screen.getByLabelText('Governa: Templates')).toBeTruthy();
+  });
+
+  it('create sends subject_kind=template with profile_code and no subject_key (ADR 0086)', async () => {
+    vi.mocked(routeAdminApi.listRoutes).mockResolvedValue(listResponse([]));
+
+    renderWithProviders(<RouteAdminPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Nova rota' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Criar rota' });
+
+    const subjectKind = within(dialog).getByLabelText('O que a rota governa') as HTMLSelectElement;
+    // Default is the document subject, preserving the legacy create path.
+    expect(subjectKind.value).toBe('document');
+    fireEvent.change(subjectKind, { target: { value: 'template' } });
+
+    fireEvent.change(within(dialog).getByLabelText('Nome da rota'), {
+      target: { value: 'Rota de Templates' },
+    });
+    await within(dialog).findByRole('option', { name: 'Jurídico (JUR)' });
+    fireEvent.change(within(dialog).getByLabelText('Código do perfil'), {
+      target: { value: 'JUR' },
+    });
+    await fillStage1Basics(dialog, 'Aprovação de template');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /Salvar rota/i }));
+    await waitFor(() => expect(vi.mocked(routeAdminApi.createRoute)).toHaveBeenCalled());
+
+    const body = vi.mocked(routeAdminApi.createRoute).mock.calls[0][0];
+    expect(body.subject_kind).toBe('template');
+    // The profile keys BOTH subject kinds; subject_key is server-derived.
+    expect(body.profile_code).toBe('JUR');
+    expect('subject_key' in body).toBe(false);
+  });
+
+  it('subject kind is immutable on edit', async () => {
+    const route = makeRoute({ subject_kind: 'template', profile_code: 'JUR' });
+    vi.mocked(routeAdminApi.listRoutes).mockResolvedValue(listResponse([route]));
+
+    renderWithProviders(<RouteAdminPage />);
+    fireEvent.click(await screen.findByRole('button', { name: `Editar ${route.name}` }));
+    const dialog = await screen.findByRole('dialog', { name: 'Editar rota' });
+
+    const subjectKind = within(dialog).getByLabelText('O que a rota governa') as HTMLSelectElement;
+    expect(subjectKind.value).toBe('template');
+    expect(subjectKind.disabled).toBe(true);
+    expect(within(dialog).getByText('O tipo de assunto é imutável após criação.')).toBeTruthy();
   });
 
   it('editing a route whose profile was archived out of the active list skips client-side signature-policy gating', async () => {

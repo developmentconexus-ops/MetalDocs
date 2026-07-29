@@ -36,7 +36,9 @@ export function StepConfirmation({
   const user = useAuthStore((s) => s.user);
 
   const keyValue = templateKey || 'identificador-pendente';
-  const perfilValue = profileCode ? `${profileCode} - ${selectedProfile?.name ?? ''}` : 'Genérico';
+  // ADR 0086: every template belongs to a profile, so there is no "Genérico"
+  // fallback left — an absent code can only mean the catalog has not resolved.
+  const perfilValue = profileCode ? `${profileCode} - ${selectedProfile?.name ?? ''}` : '—';
   const familiaValue = selectedProfile?.family ?? '-';
   const origemValue =
     startingPoint === 'blank'

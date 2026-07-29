@@ -47,14 +47,15 @@ export async function createTemplate(cmd: {
   key: string;
   name: string;
   description?: string;
-  doc_type_code?: string;
+  /** Profile code. Required since ADR 0086 — generic templates no longer exist. */
+  doc_type_code: string;
   idempotencyKey: string;
 }): Promise<{ template: TemplateDTO; version: VersionDTO }> {
   const payload: CreateTemplateRequest = {
     key: cmd.key,
     name: cmd.name,
     ...(cmd.description ? { description: cmd.description } : {}),
-    ...(cmd.doc_type_code ? { doc_type_code: cmd.doc_type_code } : {}),
+    doc_type_code: cmd.doc_type_code,
   };
   const body = await apiFetch<CreateTemplateResponse>('/api/v1/templates', {
     method: 'POST',

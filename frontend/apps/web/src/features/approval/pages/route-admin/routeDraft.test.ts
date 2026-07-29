@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import type { RouteSummary } from '../../api/routeAdminApi';
 import { defaultSelector, type SelectorDraft, type StageDraft } from './StageCard';
-import { defaultStage, toDraft, toStageRequests, validateDraft, type RouteDraft } from './routeDraft';
+import {
+  defaultStage,
+  toCreateRequest,
+  toDraft,
+  toStageRequests,
+  validateDraft,
+  type RouteDraft,
+} from './routeDraft';
 
 function makeSelector(overrides: Partial<SelectorDraft> = {}): SelectorDraft {
   return { ...defaultSelector(), ...overrides };
@@ -15,6 +22,7 @@ function makeStage(overrides: Partial<StageDraft> = {}): StageDraft {
 function makeDraft(overrides: Partial<RouteDraft> = {}): RouteDraft {
   return {
     name: 'Rota',
+    subjectKind: 'document',
     profileCode: 'JUR',
     stages: [makeStage()],
     ...overrides,
@@ -26,7 +34,7 @@ function makeRouteSummary(overrides: Partial<RouteSummary> = {}): RouteSummary {
     id: 'route-1',
     name: 'Rota Modelo',
     tenant_id: 'tenant-1',
-    profile_code: null,
+    profile_code: 'JUR',
     active: true,
     version: 1,
     stages: [],
@@ -37,14 +45,100 @@ function makeRouteSummary(overrides: Partial<RouteSummary> = {}): RouteSummary {
 }
 
 describe('toDraft profile_code null-safety (F18 completion S6)', () => {
-  it('normalizes a null profile_code (template route, ADR 0082) to an empty string', () => {
-    const draft = toDraft(makeRouteSummary({ profile_code: null, name: 'Rota Modelo' }));
+  it('normalizes a malformed null profile_code to an empty string', () => {
+    // ADR 0086 made profile_code contract-required and non-nullable, so this
+    // input is no longer type-expressible — the cast is deliberate. The guard
+    // it pins is still live: the Go wire struct holds a *string, so a NULL
+    // column on a malformed row would reach the client as JSON null.
+    const draft = toDraft(
+      makeRouteSummary({ name: 'Rota Modelo', profile_code: null as unknown as string }),
+    );
     expect(draft.profileCode).toBe('');
   });
 
   it('carries a document route profile_code through unchanged', () => {
     const draft = toDraft(makeRouteSummary({ profile_code: 'JUR' }));
     expect(draft.profileCode).toBe('JUR');
+  });
+});
+
+describe('toDraft subject kind (ADR 0086)', () => {
+  it('maps an explicit template subject_kind onto the draft', () => {
+    const draft = toDraft(makeRouteSummary({ subject_kind: 'template', profile_code: 'JUR' }));
+    expect(draft.subjectKind).toBe('template');
+  });
+
+  it('maps an explicit document subject_kind onto the draft', () => {
+    const draft = toDraft(makeRouteSummary({ subject_kind: 'document', profile_code: 'JUR' }));
+    expect(draft.subjectKind).toBe('document');
+  });
+
+  it('defaults an absent subject_kind to document (legacy rows predate the field)', () => {
+    const draft = toDraft(makeRouteSummary({ profile_code: 'JUR' }));
+    expect(draft.subjectKind).toBe('document');
+  });
+
+  it('defaults a brand-new draft to document', () => {
+    expect(toDraft(null).subjectKind).toBe('document');
+  });
+});
+
+describe('toCreateRequest (ADR 0086 — routes are keyed by configuration)', () => {
+  it('sends subject_kind + trimmed profile_code and omits subject_key for a document route', () => {
+    const payload = toCreateRequest(
+      makeDraft({ name: '  Rota Doc  ', subjectKind: 'document', profileCode: '  JUR  ' }),
+    );
+
+    expect(payload.name).toBe('Rota Doc');
+    expect(payload.subject_kind).toBe('document');
+    expect(payload.profile_code).toBe('JUR');
+    // The server derives subject_key from profile_code; sending a divergent
+    // key is a 422 (validation.template_subject_key_mismatch).
+    expect('subject_key' in payload).toBe(false);
+  });
+
+  it('sends profile_code for a TEMPLATE route too, and still omits subject_key', () => {
+    const payload = toCreateRequest(
+      makeDraft({ name: 'Rota Tpl', subjectKind: 'template', profileCode: 'JUR' }),
+    );
+
+    expect(payload.subject_kind).toBe('template');
+    expect(payload.profile_code).toBe('JUR');
+    expect('subject_key' in payload).toBe(false);
+  });
+
+  it('carries the draft stages through toStageRequests', () => {
+    const draft = makeDraft({ subjectKind: 'template', stages: [makeStage({ label: 'Revisão' })] });
+    expect(toCreateRequest(draft).stages).toEqual(toStageRequests(draft));
+  });
+});
+
+describe('validateDraft profile requirement (ADR 0086)', () => {
+  it('requires a profile code on create for a document route', () => {
+    expect(validateDraft(makeDraft({ subjectKind: 'document', profileCode: '' }), false, null)).toBe(
+      'Informe o código do perfil.',
+    );
+  });
+
+  it('requires a profile code on create for a TEMPLATE route as well', () => {
+    expect(validateDraft(makeDraft({ subjectKind: 'template', profileCode: '' }), false, null)).toBe(
+      'Informe o código do perfil.',
+    );
+  });
+
+  it('accepts a template route that carries a profile code', () => {
+    const draft = makeDraft({
+      subjectKind: 'template',
+      profileCode: 'JUR',
+      stages: [
+        makeStage({
+          label: 'Aprovação',
+          selectors: [makeSelector({ kind: 'role_in_document_area', role: 'approver' })],
+        }),
+      ],
+    });
+
+    expect(validateDraft(draft, false, null)).toBeNull();
   });
 });
 

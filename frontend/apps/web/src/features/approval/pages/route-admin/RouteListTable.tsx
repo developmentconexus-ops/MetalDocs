@@ -1,6 +1,6 @@
 import { formatISODate } from '../../../../lib/formatDate';
 import type { RouteSummary } from '../../api/routeAdminApi';
-import { tooltipForDisabledEdit } from './routeAdminLabels';
+import { labelForSubjectKind, tooltipForDisabledEdit } from './routeAdminLabels';
 import styles from './RouteAdmin.module.css';
 
 interface RouteListTableProps {
@@ -30,6 +30,7 @@ export function RouteListTable({ routes, isFetching, onEdit, onDeactivate }: Rou
         <thead>
           <tr>
             <th scope="col">Nome</th>
+            <th scope="col">Governa</th>
             <th scope="col">Perfil</th>
             <th scope="col">Etapas</th>
             <th scope="col">Status</th>
@@ -47,9 +48,17 @@ export function RouteListTable({ routes, isFetching, onEdit, onDeactivate }: Rou
               <tr key={route.id}>
                 <td>{route.name}</td>
                 <td>
-                  {/* profile_code is null for a template route (ADR 0082 — no
-                      profile by DB constraint); show an em-dash rather than
-                      an empty cell that could read as a loading/data bug. */}
+                  <span
+                    className={styles.badgeSubjectKind}
+                    aria-label={`Governa: ${labelForSubjectKind(route.subject_kind)}`}
+                  >
+                    {labelForSubjectKind(route.subject_kind)}
+                  </span>
+                </td>
+                <td>
+                  {/* Post-ADR-0086 both subject kinds carry a profile_code; the
+                      em-dash covers only legacy template rows written under ADR
+                      0082, so an empty cell never reads as a loading/data bug. */}
                   <code className={styles.code}>{route.profile_code ?? '—'}</code>
                 </td>
                 <td>{route.stages.length} etapa(s)</td>

@@ -1286,7 +1286,7 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           description: >-
-            Conflict. `conflict.duplicate_key` when the template key already
+            Conflict. `ALREADY_EXISTS` when the template key already
             exists in the tenant; `APPROVAL_ROUTE_MISSING` when the declared
             `doc_type_code` has no active template approval route (ADR 0086
             config-first gate).
@@ -7387,10 +7387,12 @@ components:
         tenant_id: { type: string, format: uuid }
         profile_code:
           type: string
-          nullable: true
           description: >-
-            Populated for document routes; null for template routes (ADR
-            0082).
+            Always populated, for both subject kinds — a route is keyed by
+            configuration, never by an instance (ADR 0086). For a `template`
+            route it equals `subject_key` (the profile's doc_type_code); for a
+            `document` route it equals `subject_key` as well. DB truth:
+            `approval_routes_template_subject_key_check`.
         subject_kind:
           type: string
           enum: [document, template]

@@ -143,6 +143,7 @@
     "validation.revision_title_required",
     "validation.self_delegation",
     "validation.submit_choice_constraint_violated",
-    "validation.submit_choice_required"
+    "validation.submit_choice_required",
+    "validation.template_subject_key_mismatch"
   ]
 }
