@@ -19,7 +19,7 @@ func TestPDFOutboxRepository_Enqueue_UsesTx(t *testing.T) {
 	mock.ExpectCommit()
 	tx, _ := db.BeginTx(context.Background(), nil)
 	repo := NewPDFOutboxRepository(db)
-	id, err := repo.Enqueue(context.Background(), tx, "t1", "r1", []byte("hash"))
+	id, err := repo.Enqueue(context.Background(), tx, "t1", "r1", []byte("hash"), "")
 	if err != nil {
 		t.Fatalf("Enqueue: %v", err)
 	}
@@ -43,13 +43,13 @@ func TestPDFOutboxRepository_EnqueuePDF_PersistsFinalDocxKey(t *testing.T) {
 	}
 	defer db.Close()
 	mock.ExpectBegin()
-	mock.ExpectQuery(`INSERT INTO metaldocs\.pdf_dispatch_outbox \(tenant_id, revision_id, content_hash, final_docx_s3_key\)`).
-		WithArgs("t1", "r1", []byte("hash"), "tenants/t1/r1/frozen.docx").
+	mock.ExpectQuery(`INSERT INTO metaldocs\.pdf_dispatch_outbox \(tenant_id, revision_id, content_hash, final_docx_s3_key, release_generation_id\)`).
+		WithArgs("t1", "r1", []byte("hash"), "tenants/t1/r1/frozen.docx", "").
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("row-1"))
 	mock.ExpectCommit()
 	tx, _ := db.BeginTx(context.Background(), nil)
 	repo := NewPDFOutboxRepository(db)
-	id, err := repo.EnqueuePDF(context.Background(), tx, "t1", "r1", []byte("hash"), "tenants/t1/r1/frozen.docx")
+	id, err := repo.EnqueuePDF(context.Background(), tx, "t1", "r1", []byte("hash"), "tenants/t1/r1/frozen.docx", "")
 	if err != nil {
 		t.Fatalf("EnqueuePDF: %v", err)
 	}
@@ -76,7 +76,7 @@ func TestPDFOutboxRepository_EnqueuePDF_EmptyKeyFailsClosed(t *testing.T) {
 	mock.ExpectBegin()
 	tx, _ := db.BeginTx(context.Background(), nil)
 	repo := NewPDFOutboxRepository(db)
-	id, err := repo.EnqueuePDF(context.Background(), tx, "t1", "r1", []byte("hash"), "")
+	id, err := repo.EnqueuePDF(context.Background(), tx, "t1", "r1", []byte("hash"), "", "")
 	if err == nil {
 		t.Fatal("expected error on empty final_docx_s3_key, got nil")
 	}
@@ -94,7 +94,7 @@ func TestPDFOutboxRepository_Enqueue_NilTxRejected(t *testing.T) {
 	// A nil tx must fail loud, not silently autocommit the outbox row outside the
 	// caller's business transaction (db.Tx contract / transactional-outbox atomicity).
 	repo := NewPDFOutboxRepository(db)
-	id, err := repo.Enqueue(context.Background(), nil, "t1", "r1", []byte("hash"))
+	id, err := repo.Enqueue(context.Background(), nil, "t1", "r1", []byte("hash"), "")
 	if err == nil {
 		t.Fatal("expected error on nil tx, got nil")
 	}
@@ -122,7 +122,7 @@ func TestPDFOutboxRepository_Enqueue_Idempotent(t *testing.T) {
 	mock.ExpectCommit()
 	tx, _ := db.BeginTx(context.Background(), nil)
 	repo := NewPDFOutboxRepository(db)
-	id, err := repo.Enqueue(context.Background(), tx, "t1", "r1", []byte("hash"))
+	id, err := repo.Enqueue(context.Background(), tx, "t1", "r1", []byte("hash"), "")
 	if err != nil {
 		t.Fatalf("Enqueue: %v", err)
 	}
@@ -142,7 +142,7 @@ func TestMaterializeOutboxRepository_Enqueue_NilTxRejected(t *testing.T) {
 	}
 	defer db.Close()
 	repo := NewMaterializeOutboxRepository(db)
-	id, err := repo.Enqueue(context.Background(), nil, "t1", "r1", []byte("hash"))
+	id, err := repo.Enqueue(context.Background(), nil, "t1", "r1", []byte("hash"), "")
 	if err == nil {
 		t.Fatal("expected error on nil tx, got nil")
 	}

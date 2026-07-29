@@ -90,6 +90,14 @@ func MapPgError(err error, hints MapHints) error {
 		case "approval_routes_tenant_profile_key", // pre-F2 single-active-route constraint (dropped by migration 0287, kept here for old-row/rollback safety)
 			"approval_routes_active_profile_uq": // F2/ADR 0074 partial-unique active-per-profile constraint (migration 0287)
 			return ErrDuplicateRouteProfile
+		case "ux_documents_published_head":
+			// ADR 0085's one-published-head invariant, DB-enforced by migration
+			// 0310. Only the legacy publish/schedule writers can hit it (the
+			// release coordinator supersedes the head in the same transaction),
+			// and hitting it means another document already holds the head this
+			// write is trying to take — a lost race, exactly ErrStaleRevision's
+			// meaning, and a 409 rather than a naked 500.
+			return ErrStaleRevision
 		default:
 			if hints.UniqueConstraint != "" && pgErr.ConstraintName == hints.UniqueConstraint {
 				return ErrDuplicateSubmission

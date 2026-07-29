@@ -11,6 +11,13 @@ import (
 	"metaldocs/internal/platform/db"
 )
 
+// nilGenerationLiteral is the sentinel used by the generation-aware dedup
+// unique index (migration 0310). Postgres treats NULLs as distinct in a plain
+// unique index, so legacy generation-less rows would stop deduping entirely;
+// COALESCEing to a fixed nil UUID preserves the old revision-only dedup for
+// them while giving every real generation its own dedup slot.
+const nilGenerationLiteral = `'00000000-0000-0000-0000-000000000000'::uuid`
+
 // OutboxRow is the common row shape for all staging dispatch outbox tables.
 type OutboxRow struct {
 	ID          string
@@ -59,18 +66,18 @@ func NewStagingOutboxRepository(db *sql.DB, table string) *StagingOutboxReposito
 // successful dedup skip — and is reported to the caller as an empty id with a
 // nil error, letting the caller (the dispatchjobs.Enqueuer) decide to skip
 // the paired River insert.
-func (r *StagingOutboxRepository) Enqueue(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte) (string, error) {
+func (r *StagingOutboxRepository) Enqueue(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte, releaseGenerationID string) (string, error) {
 	if tx == nil {
 		return "", fmt.Errorf("%s enqueue: tx must not be nil", r.name)
 	}
 	var id string
 	//nolint:gosec // table name is allowlist-validated at construction
 	err := tx.QueryRowContext(ctx, fmt.Sprintf(`
-INSERT INTO %s (tenant_id, revision_id, content_hash)
-VALUES ($1::uuid, $2::uuid, $3)
-ON CONFLICT (tenant_id, revision_id) DO NOTHING
-RETURNING id`, r.table),
-		tenantID, revisionID, contentHash).Scan(&id)
+INSERT INTO %s (tenant_id, revision_id, content_hash, release_generation_id)
+VALUES ($1::uuid, $2::uuid, $3, NULLIF($4, '')::uuid)
+ON CONFLICT (tenant_id, revision_id, COALESCE(release_generation_id, %s)) DO NOTHING
+RETURNING id`, r.table, nilGenerationLiteral),
+		tenantID, revisionID, contentHash, releaseGenerationID).Scan(&id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			// ON CONFLICT DO NOTHING skipped the insert: dedup, not a failure.
@@ -88,7 +95,7 @@ RETURNING id`, r.table),
 // dead-letter at the consumer (pdf_job_runner.go:117), so it fails closed at
 // the write boundary instead. Panics if called on a non-pdf table (programmer
 // error: only the pdf-bound repo may write this column).
-func (r *StagingOutboxRepository) EnqueuePDF(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte, finalDocxS3Key string) (string, error) {
+func (r *StagingOutboxRepository) EnqueuePDF(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte, finalDocxS3Key, releaseGenerationID string) (string, error) {
 	if tx == nil {
 		return "", fmt.Errorf("%s enqueue pdf: tx must not be nil", r.name)
 	}
@@ -99,12 +106,12 @@ func (r *StagingOutboxRepository) EnqueuePDF(ctx context.Context, tx db.Tx, tena
 		return "", fmt.Errorf("%s enqueue pdf: final_docx_s3_key must not be empty (renderer-produced key required)", r.name)
 	}
 	var id string
-	err := tx.QueryRowContext(ctx, `
-INSERT INTO metaldocs.pdf_dispatch_outbox (tenant_id, revision_id, content_hash, final_docx_s3_key)
-VALUES ($1::uuid, $2::uuid, $3, $4)
-ON CONFLICT (tenant_id, revision_id) DO NOTHING
-RETURNING id`,
-		tenantID, revisionID, contentHash, finalDocxS3Key).Scan(&id)
+	err := tx.QueryRowContext(ctx, fmt.Sprintf(`
+INSERT INTO metaldocs.pdf_dispatch_outbox (tenant_id, revision_id, content_hash, final_docx_s3_key, release_generation_id)
+VALUES ($1::uuid, $2::uuid, $3, $4, NULLIF($5, '')::uuid)
+ON CONFLICT (tenant_id, revision_id, COALESCE(release_generation_id, %s)) DO NOTHING
+RETURNING id`, nilGenerationLiteral),
+		tenantID, revisionID, contentHash, finalDocxS3Key, releaseGenerationID).Scan(&id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			// ON CONFLICT DO NOTHING skipped the insert: dedup, not a failure.

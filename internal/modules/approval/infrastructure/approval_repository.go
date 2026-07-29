@@ -115,6 +115,14 @@ type ApprovalRepository interface {
 	ValidateScheduledSupersedeTarget(ctx context.Context, tx db.Tx, tenantID, documentID, supersededDocumentID string) error
 	LoadCurrentPublishedHeadForDocument(ctx context.Context, tx db.Tx, tenantID, documentID string) (string, error)
 	LoadCurrentPublishedHead(ctx context.Context, tx db.Tx, tenantID, controlledDocumentID string) (string, error)
+	// LoadCurrentPublishedHeadNoLock is LoadCurrentPublishedHead without the
+	// FOR UPDATE. The ADR 0085 release coordinator DISCOVERS its supersession
+	// targets before it takes any document lock, then locks the whole set
+	// (source + targets) in sorted id order — locking during discovery would
+	// acquire rows out of that order and reintroduce the deadlock the sort
+	// exists to prevent. Callers that supersede on the spot (the legacy
+	// scheduler path) keep the locking variant.
+	LoadCurrentPublishedHeadNoLock(ctx context.Context, tx db.Tx, tenantID, controlledDocumentID string) (string, error)
 	GetDocumentRevisionVersion(ctx context.Context, tx db.Tx, documentID, tenantID string) (int, error)
 	// LoadGovernedRevisionNumber reads the document's governed
 	// documents.revision_number inside the caller's transaction (tenant-scoped,

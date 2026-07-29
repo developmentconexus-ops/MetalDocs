@@ -35,6 +35,7 @@ import (
 	securityapp "metaldocs/internal/modules/security/application"
 	securitydomain "metaldocs/internal/modules/security/domain"
 	securitypg "metaldocs/internal/modules/security/infrastructure/postgres"
+	taxonomyrepo "metaldocs/internal/modules/taxonomy/infrastructure"
 	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/config"
 	platformdb "metaldocs/internal/platform/db"
@@ -101,6 +102,13 @@ func run(ctx context.Context) error {
 	// jobs-only execute topology); metaldocs-api only enqueues-when-leader.
 	jobsCfg.Queues["maintenance"] = river.QueueConfig{MaxWorkers: 2}
 
+	// ADR 0085: the release coordinator re-enqueues its own effective-date
+	// timer through River, but the client does not exist until
+	// BuildJobsDependencies returns. The deferred enqueuer (and the lifecycle
+	// enqueuer) are bound to it below, before the client starts working jobs.
+	releaseEnqueuer := approvaljobs.NewDeferredReleaseEvaluationEnqueuer()
+	var releaseCoordinator *approvalapp.ReleaseCoordinator
+
 	deps, err := bootstrap.BuildJobsDependencies(ctx, jobsCfg, func(db *sql.DB) (*river.Workers, []*river.PeriodicJob, error) {
 		// The scheduled-publish job never calls LoadActorDisplayName, but we pass
 		// the real reader so the binary is correct if the code path ever is reached.
@@ -109,6 +117,13 @@ func run(ctx context.Context) error {
 		approvalEmitter := approvalapp.NewSQLEmitter()
 		services := approvalapp.NewServices(repo, approvalEmitter, approvalapp.RealClock{}, cdinfra.NewCDFieldReaderPG())
 		workers := approvaljobs.NewWorkers(services.Scheduler, db)
+		// ADR 0085 release coordinator: the single writer of the released
+		// state. Every trigger (approval fact, artifact fact, effective-date
+		// timer) funnels into its idempotent Evaluate through this worker.
+		releaseCoordinator = approvalapp.NewReleaseCoordinator(repo, approvalEmitter, approvalapp.RealClock{}).
+			WithEvaluationEnqueuer(releaseEnqueuer).
+			WithProfileReviewIntervalReader(approvalrepo.NewProfileReviewIntervalReader(taxonomyrepo.NewProfileRepository(db)))
+		river.AddWorker(workers, approvaljobs.NewReleaseEvaluateWorker(releaseCoordinator, db))
 		river.AddWorker(workers, notificationsinfra.NewNotificationsFanoutWorker(db))
 		river.AddWorker(workers, stuck_instance_watchdog.NewWorker(db, approvalEmitter))
 		river.AddWorker(workers, idempotency_janitor.NewWorker(db))
@@ -158,6 +173,8 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("build jobs dependencies: %w", err)
 	}
 	defer deps.Cleanup()
+	releaseEnqueuer.Bind(deps.River.Client)
+	releaseCoordinator.WithLifecycleEnqueuer(approvaljobs.NewLifecycleEventEnqueuer(deps.River.Client))
 
 	slog.Info("MetalDocs Jobs running", "queues", "temporal")
 	if err := deps.River.Client.Start(ctx); err != nil {

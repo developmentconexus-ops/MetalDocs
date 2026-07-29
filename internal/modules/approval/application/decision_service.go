@@ -44,7 +44,7 @@ const signatureMethodPasswordReauth = "password_reauth"
 // frozen_at, and enqueues a materialize_dispatch_outbox row — all inside tx.
 // No network calls to docx-renderer.
 type PinInvoker interface {
-	Pin(ctx context.Context, tx db.Tx, tenantID, revisionID string, approver docapp.ApproverContext) error
+	Pin(ctx context.Context, tx db.Tx, tenantID, revisionID string, approver docapp.ApproverContext, releaseGenerationID string) error
 }
 
 // TemplateCompletionWriter is the approval-owned completion port for a
@@ -67,10 +67,9 @@ type TemplateCompletionWriter interface {
 
 // DecisionService handles approver approve/reject decisions.
 type DecisionService struct {
-	repo       infrastructure.ApprovalRepository
-	emitter    EventEmitter
-	clock      Clock
-	pinInvoker PinInvoker
+	repo    infrastructure.ApprovalRepository
+	emitter EventEmitter
+	clock   Clock
 	// sigRegistry verifies the e-signature credential before a sign-off is
 	// recorded. nil only in tests that exercise non-reauth methods.
 	sigRegistry       *signature.Registry
@@ -86,11 +85,16 @@ type DecisionService struct {
 	// TemplateSubmitService uses (#24), reused here to read a template
 	// version's real content_hash in place of the document-only freeze pin.
 	templateVersionReader TemplateVersionReader
+	// releaseRecorder is the ADR 0085 terminal-approval seam (approval fact +
+	// async-freeze pin + coordinator evaluation, all on the caller's tx).
+	// Mandatory on the document terminal-approval path.
+	releaseRecorder TerminalApprovalReleaseRecorder
 }
 
-// NewDecisionService builds the approve/reject decision service. The async-freeze
-// seam is wired separately via WithPinInvoker (ADR 0015); RecordSignoff requires
-// a PinInvoker to be set before the approval-quorum path runs.
+// NewDecisionService builds the approve/reject decision service. The
+// terminal-approval seam is wired separately via WithReleaseRecorder (ADR 0015
+// pin + ADR 0085 release facts); RecordSignoff requires it to be set before the
+// approval-quorum path runs.
 func NewDecisionService(
 	repo infrastructure.ApprovalRepository,
 	emitter EventEmitter,
@@ -110,11 +114,13 @@ func (s *DecisionService) WithCDFieldReader(r controlleddocumentsdomain.CDFieldR
 	return s
 }
 
-// WithPinInvoker wires the async-freeze path (ADR 0015): during signoff Pin
-// records the frozen pointer in-tx and the heavy materialize/PDF work is
-// dispatched via the outbox afterward, eliminating any in-tx network call.
-func (s *DecisionService) WithPinInvoker(invoker PinInvoker) *DecisionService {
-	s.pinInvoker = invoker
+// WithReleaseRecorder wires the ADR 0085 terminal-approval seam, which
+// subsumes the ADR 0015 async-freeze path: during signoff the recorder stamps
+// the approval fact, pins the frozen pointer in-tx and enqueues the
+// coordinator evaluation; the heavy materialize/PDF work is dispatched via the
+// outbox afterward, eliminating any in-tx network call.
+func (s *DecisionService) WithReleaseRecorder(recorder TerminalApprovalReleaseRecorder) *DecisionService {
+	s.releaseRecorder = recorder
 	return s
 }
 
@@ -168,8 +174,8 @@ func (s *DecisionService) Ready() error {
 	if s.templateCompletion == nil {
 		missing = append(missing, "templateCompletion")
 	}
-	if s.pinInvoker == nil {
-		missing = append(missing, "pinInvoker")
+	if s.releaseRecorder == nil {
+		missing = append(missing, "releaseRecorder")
 	}
 	if s.sigRegistry == nil {
 		missing = append(missing, "sigRegistry")
@@ -576,14 +582,27 @@ func (s *DecisionService) recordSignoffInTx(ctx context.Context, tx *sql.Tx, req
 				if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
 					return SignoffResult{}, nil, err
 				}
-				if s.pinInvoker == nil {
-					return SignoffResult{}, nil, fmt.Errorf("recordSignoff: pinInvoker not configured")
+				// ADR 0085: approval fact + pin + coordinator evaluation, all
+				// in THIS transaction and all fail-closed. Shared verbatim
+				// with the review-verdict route (F-QA4-14) so the two ways to
+				// reach terminal approval cannot drift apart.
+				if s.releaseRecorder == nil {
+					return SignoffResult{}, nil, fmt.Errorf("decision service missing required ports: releaseRecorder")
 				}
-				if err := s.pinInvoker.Pin(ctx, tx, req.TenantID, instance.DocumentID, docapp.ApproverContext{
-					UserID:       req.ActorUserID,
-					Capabilities: req.Capabilities,
+				if _, err := s.releaseRecorder.RecordTerminalApproval(ctx, tx, TerminalApprovalInput{
+					TenantID:          req.TenantID,
+					DocumentID:        instance.DocumentID,
+					InstanceID:        req.InstanceID,
+					RevisionVersion:   instance.RevisionVersion,
+					FrozenContentHash: derefString(instance.FrozenContentHash),
+					FinalApproverID:   req.ActorUserID,
+					SubmittedBy:       instance.SubmittedBy,
+					Approver: docapp.ApproverContext{
+						UserID:       req.ActorUserID,
+						Capabilities: req.Capabilities,
+					},
 				}); err != nil {
-					return SignoffResult{}, nil, fmt.Errorf("recordSignoff: pin: %w", err)
+					return SignoffResult{}, nil, err
 				}
 				// Transition document under_review → approved. Friendly first-line
 				// legality check (M4/F4.1) mirrors the DB trigger; the OCC WHERE

@@ -15,6 +15,7 @@ type EventType string
 const (
 	EventTypeApprovalInstanceCancelled EventType = "approval.instance_cancelled"
 	EventTypeDocumentPublished         EventType = "document_published"
+	EventTypeDocumentSuperseded        EventType = "document_superseded"
 	EventTypePublishScheduled          EventType = "publish_scheduled"
 	EventTypeSignoffRejected           EventType = "signoff.rejected"
 	EventTypeSignoffRecorded           EventType = "signoff_recorded"

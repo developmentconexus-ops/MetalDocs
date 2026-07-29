@@ -13,10 +13,16 @@ import (
 )
 
 // M3 F3.2 PG-2 (validation-contract.md §2.2 site 3) — RunScheduledPublishJob
-// must call authz.SeedTxTenant with the River-args tenant BEFORE the
-// loadScheduledDocumentState `FOR UPDATE` query (H-PRE-1: seed before any
-// lock). This is a sqlmock ordering test: the seed's set_config statement
-// must be observed before the FOR UPDATE SELECT.
+// must call authz.SeedTxTenant with the River-args tenant BEFORE it touches
+// public.documents at all (H-PRE-1: seed before any lock). This is a sqlmock
+// ordering test: the seed's set_config statement must be observed before the
+// first documents read.
+//
+// Since the ADR 0085 lock-order fix that first read is loadScheduledDocumentState
+// WITHOUT `FOR UPDATE` — the row locks are taken afterwards, by
+// lockDocumentRowsInIDOrder, in sorted id order together with the supersede
+// target. The seed-first ordering this test pins is unchanged, and a
+// document-not-found short-circuits before any lock is attempted.
 
 func TestRunScheduledPublishJob_SeedsTenantBeforeLock(t *testing.T) {
 	mockDB, mock, err := sqlmock.New()
@@ -35,9 +41,9 @@ func TestRunScheduledPublishJob_SeedsTenantBeforeLock(t *testing.T) {
 	//    its own unit tests, so keep this a permissive matcher; ordering
 	//    relative to the seed above is what this test pins.
 	mock.ExpectExec(`set_config`).WillReturnResult(sqlmock.NewResult(0, 1)) // BypassSystem
-	// loadScheduledDocumentState's FOR UPDATE must come strictly after both
-	// of the above (MatchExpectationsInOrder enforces this).
-	mock.ExpectQuery(`FOR UPDATE`).WillReturnError(sql.ErrNoRows)
+	// loadScheduledDocumentState's read must come strictly after both of the
+	// above (MatchExpectationsInOrder enforces this).
+	mock.ExpectQuery(`FROM documents`).WillReturnError(sql.ErrNoRows)
 	// document-not-found is handled as a successful no-op (nil error), so the
 	// runner commits the (no-op) tx rather than rolling back.
 	mock.ExpectCommit()

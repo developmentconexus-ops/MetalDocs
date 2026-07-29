@@ -36,6 +36,21 @@ type outboxMarker interface {
 	MarkFailed(ctx context.Context, tenantID, id, errStr string) error
 }
 
+// dispatchIdempotencyKey widens the delivery idempotency identity from
+// revision-only to generation-aware (ADR 0085). Two approvals of the same
+// revision are two DIFFERENT release generations and must each produce their
+// own artifact set; keying on the revision alone would make the second one a
+// duplicate and leave its generation stuck on the "materializing" hold.
+// Generation-less (legacy, non-approval) renders keep the historical key
+// verbatim, so nothing that already shipped changes shape.
+func dispatchIdempotencyKey(prefix string, f dispatchFields) string {
+	key := prefix + ":" + f.TenantID + ":" + f.RevisionID
+	if f.ReleaseGenerationID != "" {
+		key += ":" + f.ReleaseGenerationID
+	}
+	return key
+}
+
 // buildPDFEvent reproduces, verbatim, the pdf outbox buildEvent closure
 // previously inlined in apps/api/cmd/metaldocs-api/main.go.
 func buildPDFEvent(f dispatchFields) messaging.Event {
@@ -44,12 +59,13 @@ func buildPDFEvent(f dispatchFields) messaging.Event {
 		EventType:      messaging.EventTypePDFConvert,
 		AggregateType:  messaging.AggregateType("document_revision"),
 		AggregateID:    messaging.AggregateID(f.RevisionID),
-		IdempotencyKey: messaging.IdempotencyKey("docgen_v2_pdf:" + f.TenantID + ":" + f.RevisionID),
+		IdempotencyKey: messaging.IdempotencyKey(dispatchIdempotencyKey("docgen_v2_pdf", f)),
 		Payload: messaging.PDFConvertPayload{
-			TenantID:       f.TenantID,
-			RevisionID:     f.RevisionID,
-			ContentHash:    hex.EncodeToString(f.ContentHash),
-			FinalDocxS3Key: f.FinalDocxS3Key,
+			TenantID:            f.TenantID,
+			RevisionID:          f.RevisionID,
+			ContentHash:         hex.EncodeToString(f.ContentHash),
+			FinalDocxS3Key:      f.FinalDocxS3Key,
+			ReleaseGenerationID: f.ReleaseGenerationID,
 		},
 	}
 }
@@ -62,10 +78,11 @@ func buildMaterializeEvent(f dispatchFields) messaging.Event {
 		EventType:      messaging.EventTypeMaterializeFanout,
 		AggregateType:  messaging.AggregateType("document_revision"),
 		AggregateID:    messaging.AggregateID(f.RevisionID),
-		IdempotencyKey: messaging.IdempotencyKey("materialize_fanout:" + f.TenantID + ":" + f.RevisionID),
+		IdempotencyKey: messaging.IdempotencyKey(dispatchIdempotencyKey("materialize_fanout", f)),
 		Payload: messaging.MaterializeFanoutPayload{
-			TenantID:   f.TenantID,
-			RevisionID: f.RevisionID,
+			TenantID:            f.TenantID,
+			RevisionID:          f.RevisionID,
+			ReleaseGenerationID: f.ReleaseGenerationID,
 		},
 	}
 }

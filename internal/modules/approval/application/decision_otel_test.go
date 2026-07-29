@@ -58,6 +58,9 @@ func (stubApprovalRepo) LoadCurrentPublishedHeadForDocument(_ context.Context, _
 func (stubApprovalRepo) LoadCurrentPublishedHead(_ context.Context, _ platformdb.Tx, _, _ string) (string, error) {
 	return "", nil
 }
+func (stubApprovalRepo) LoadCurrentPublishedHeadNoLock(_ context.Context, _ platformdb.Tx, _, _ string) (string, error) {
+	return "", nil
+}
 func (stubApprovalRepo) GetDocumentRevisionVersion(_ context.Context, _ platformdb.Tx, _, _ string) (int, error) {
 	return 0, nil
 }

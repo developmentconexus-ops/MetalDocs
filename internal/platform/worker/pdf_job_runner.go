@@ -67,9 +67,18 @@ func (p SnapshotPDFPersister) WritePDF(ctx context.Context, req PDFWriteRequest)
 }
 
 type PDFJobRunner struct {
-	converter PDFConverter
-	persister PDFPersister
-	db        *sql.DB
+	converter    PDFConverter
+	persister    PDFPersister
+	artifactFact ArtifactFactRecorder
+	db           *sql.DB
+}
+
+// WithArtifactFactRecorder wires the ADR 0085 artifact-fact port. The PDF is
+// the SECOND half of the artifact set, so this is the write that normally
+// completes artifact-ready(G) and releases the document.
+func (r *PDFJobRunner) WithArtifactFactRecorder(rec ArtifactFactRecorder) *PDFJobRunner {
+	r.artifactFact = rec
+	return r
 }
 
 // NewPDFJobRunner constructs a PDFJobRunner using the legacy untransacted
@@ -142,6 +151,12 @@ func (r *PDFJobRunner) Handle(ctx context.Context, event messaging.Event) error 
 
 	if r.db == nil {
 		// Legacy untransacted path (NewPDFJobRunner) — no RLS tenant seed.
+		// A release generation cannot be honoured here: its fact must commit
+		// with the artifact write, and there is no transaction to join. Fail
+		// closed rather than silently dropping the fact.
+		if payload.ReleaseGenerationID != "" {
+			return fmt.Errorf("pdf job runner: release generation %s requires the transacted path (NewPDFJobRunnerWithDB)", payload.ReleaseGenerationID)
+		}
 		if err := r.persister.WritePDF(ctx, req); err != nil {
 			return fmt.Errorf("pdf job runner: persist pdf: %w", err)
 		}
@@ -166,6 +181,25 @@ func (r *PDFJobRunner) Handle(ctx context.Context, event messaging.Event) error 
 	if err := authz.BypassSystem(ctx, tx); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("pdf job runner: bypass system: %w", err)
+	}
+	// ADR 0085: artifact fact in the same transaction as the artifact write,
+	// and the generation guard that refuses a superseded generation's PDF.
+	//
+	// It runs BEFORE the documents-side write, and that order is load-bearing:
+	// the recorder locks release_generations, the write locks documents, and
+	// the release coordinator locks generation → documents. Taking documents
+	// first here would be the reverse order and deadlock against a concurrent
+	// release. The output key is already known, so nothing is lost by going
+	// first.
+	if payload.ReleaseGenerationID != "" {
+		if r.artifactFact == nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("pdf job runner: artifact fact recorder not configured (release generation %s)", payload.ReleaseGenerationID)
+		}
+		if err := r.artifactFact.RecordArtifactFactTx(ctx, tx, payload.TenantID, payload.ReleaseGenerationID, ArtifactKindFinalPDF, string(req.StorageKey)); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("pdf job runner: record final pdf fact: %w", err)
+		}
 	}
 	if err := inTx.WritePDFInTx(ctx, tx, req); err != nil {
 		_ = tx.Rollback()

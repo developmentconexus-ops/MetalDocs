@@ -33,17 +33,45 @@ type MaterializeFinalDocxPersister interface {
 // consumer) and satisfied by *dispatchjobs.Enqueuer. It inserts the paired
 // (outbox row, River job) atomically inside tx (M5 F5.3 T3).
 type MaterializePDFEnqueuer interface {
-	EnqueuePDFTx(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte, finalDocxS3Key string) error
+	EnqueuePDFTx(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte, finalDocxS3Key, releaseGenerationID string) error
 }
+
+// ArtifactFactRecorder is the consumer-owned port onto the approval module's
+// release-generation facts (ADR 0085). Implemented by
+// approval/application.ArtifactFactWriter.
+//
+// It runs INSIDE the artifact-persistence transaction: the artifact pointer
+// and the fact that records it commit together or not at all, and a write
+// belonging to a superseded generation is refused, rolling the whole write
+// back. The worker never touches public.release_generations itself.
+type ArtifactFactRecorder interface {
+	RecordArtifactFactTx(ctx context.Context, tx db.Tx, tenantID, releaseGenerationID, kind, s3Key string) error
+}
+
+// ArtifactKindFinalDocx / ArtifactKindFinalPDF are the two halves of the ADR
+// 0085 artifact set, as the recorder port names them.
+const (
+	ArtifactKindFinalDocx = "final_docx"
+	ArtifactKindFinalPDF  = "final_pdf"
+)
 
 // MaterializeJobRunner handles EventTypeMaterializeFanout events.
 // It calls the docx-renderer fanout and, in a single transaction,
 // persists the final docx key and enqueues the PDF dispatch outbox row.
 type MaterializeJobRunner struct {
-	invoker   MaterializeInvoker
-	finalDocx MaterializeFinalDocxPersister
-	pdfOutbox MaterializePDFEnqueuer
-	db        *sql.DB
+	invoker      MaterializeInvoker
+	finalDocx    MaterializeFinalDocxPersister
+	pdfOutbox    MaterializePDFEnqueuer
+	artifactFact ArtifactFactRecorder
+	db           *sql.DB
+}
+
+// WithArtifactFactRecorder wires the ADR 0085 artifact-fact port. Required for
+// any render that carries a release generation; renders without one (legacy,
+// non-approval) never call it.
+func (r *MaterializeJobRunner) WithArtifactFactRecorder(rec ArtifactFactRecorder) *MaterializeJobRunner {
+	r.artifactFact = rec
+	return r
 }
 
 func NewMaterializeJobRunner(
@@ -91,15 +119,34 @@ func (r *MaterializeJobRunner) Handle(ctx context.Context, event messaging.Event
 		_ = tx.Rollback()
 		return fmt.Errorf("materialize job runner: bypass system: %w", err)
 	}
+	// ADR 0085: the artifact fact is part of THIS transaction. It also acts as
+	// the generation guard — recording refuses a generation that is no longer
+	// the document's freeze head, rolling the artifact write back with it.
+	//
+	// It runs BEFORE the documents-side write, and that order is load-bearing:
+	// the recorder locks release_generations, the write locks documents, and
+	// the release coordinator locks generation → documents. Taking documents
+	// first here would be the reverse order and deadlock against a concurrent
+	// release. The S3 key is already known, so nothing is lost by going first.
+	if payload.ReleaseGenerationID != "" {
+		if r.artifactFact == nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("materialize job runner: artifact fact recorder not configured (release generation %s)", payload.ReleaseGenerationID)
+		}
+		if err := r.artifactFact.RecordArtifactFactTx(ctx, tx, payload.TenantID, payload.ReleaseGenerationID, ArtifactKindFinalDocx, result.FinalDocxS3Key); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("materialize job runner: record final docx fact: %w", err)
+		}
+	}
 	if err := r.finalDocx.WriteFinalDocxInTx(ctx, tx, payload.TenantID, payload.RevisionID, result.FinalDocxS3Key, result.ContentHash); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("materialize job runner: write final docx: %w", err)
 	}
-	// result.FinalDocxS3Key is the renderer-produced key written to documents 4
-	// lines above (WriteFinalDocxInTx). Thread it into the pdf dispatch snapshot
+	// result.FinalDocxS3Key is the renderer-produced key just written to
+	// documents (WriteFinalDocxInTx). Thread it into the pdf dispatch snapshot
 	// so the docgen_v2_pdf event carries it (F-QA2-2); the worker must never
 	// re-derive this key.
-	if err := r.pdfOutbox.EnqueuePDFTx(ctx, tx, payload.TenantID, payload.RevisionID, result.ContentHash, result.FinalDocxS3Key); err != nil {
+	if err := r.pdfOutbox.EnqueuePDFTx(ctx, tx, payload.TenantID, payload.RevisionID, result.ContentHash, result.FinalDocxS3Key, payload.ReleaseGenerationID); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("materialize job runner: enqueue pdf outbox: %w", err)
 	}

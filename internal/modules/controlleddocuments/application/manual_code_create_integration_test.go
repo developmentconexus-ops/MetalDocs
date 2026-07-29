@@ -8,6 +8,7 @@ import (
 	"errors"
 	"testing"
 
+	approvalinfrastructure "metaldocs/internal/modules/approval/infrastructure"
 	controlleddocumentsinfrastructure "metaldocs/internal/modules/controlleddocuments/infrastructure"
 	docrepo "metaldocs/internal/modules/documents/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
@@ -33,6 +34,10 @@ func seedActorWithGrant(t *testing.T, db *sql.DB, role string) (string, string, 
 	tenant := testdb.NewTenant(t, db)
 	tax := testdb.NewTaxonomy(t, db, testdb.WithTenant(tenant.ID))
 	user := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID))
+	// D2 creation gate (90a6fae3): create fails closed without an active
+	// approval route for the profile, so the fixture must provision one.
+	testdb.NewApprovalRoute(t, db,
+		testdb.WithTenant(tenant.ID), testdb.WithProfile(tax.ProfileCode), testdb.WithOwner(user.ID))
 
 	if role != "" {
 		testdb.SeedWithCaps(t, db, `[{"cap":"membership.manage"}]`, func(tx *sql.Tx) error {
@@ -60,7 +65,7 @@ func newManualCodeServiceForIntegration(t *testing.T, db *sql.DB) *ControlledDoc
 		&fakeAreaReader{},
 		&fakeGovernanceLogger{},
 		newInvariantReadyDocumentInitializer(),
-	)
+	).WithRouteReadinessReader(approvalinfrastructure.NewRouteReadinessReaderPG(db))
 }
 
 func manualCmd(tenantID, actorUserID, profile, area string) CreateControlledDocumentCmd {

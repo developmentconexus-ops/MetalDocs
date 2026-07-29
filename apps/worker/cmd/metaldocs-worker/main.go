@@ -8,6 +8,8 @@ import (
 	"syscall"
 	"time"
 
+	approvalapp "metaldocs/internal/modules/approval/application"
+	approvaljobs "metaldocs/internal/modules/approval/jobs"
 	docapp "metaldocs/internal/modules/documents/application"
 	docrepo "metaldocs/internal/modules/documents/infrastructure"
 	fanoutpkg "metaldocs/internal/modules/render/fanout"
@@ -124,11 +126,38 @@ func main() {
 
 	workerSvc := workerapp.NewService(deps.Consumer, workerCfg)
 
+	// ADR 0085: both artifact writers record their release fact through the
+	// approval module's port, in the same transaction as the artifact write.
+	// The enqueue-only River bundle is built once here because BOTH runners
+	// need it (the fact producer enqueues the coordinator evaluation).
+	var artifactFactRecorder *approvalapp.ArtifactFactWriter
+	var sharedRiverBundle *riverjobs.ClientBundle
+	if deps.SQLDB != nil {
+		jobsCfg, err := config.LoadJobsConfig()
+		if err != nil {
+			slog.Error("invalid jobs config", "err", err)
+			deps.Cleanup()
+			os.Exit(1)
+		}
+		sharedRiverBundle, err = riverjobs.NewClientBundle(deps.SQLDB, riverjobs.Config{
+			Schema:              jobsCfg.RiverSchema,
+			SkipUnknownJobCheck: true,
+		}, nil)
+		if err != nil {
+			slog.Error("build release evaluation enqueuer client", "err", err)
+			deps.Cleanup()
+			os.Exit(1)
+		}
+		artifactFactRecorder = approvalapp.NewArtifactFactWriter(
+			approvaljobs.NewReleaseEvaluationEnqueuer(sharedRiverBundle.Client))
+	}
+
 	if deps.PDFConverter != nil && deps.SQLDB != nil {
 		snapRepo := docrepo.NewSnapshotRepository(deps.SQLDB)
 		// M3 F3.2 (validation-contract.md §2.2 site 2): wrap the PDF write in a
 		// SeedTxTenant-seeded tx so the FORCE RLS backstop engages.
-		pdfRunner := workerapp.NewPDFJobRunnerWithDB(deps.PDFConverter, snapshotPDFTxAdapter{repo: snapRepo}, deps.SQLDB)
+		pdfRunner := workerapp.NewPDFJobRunnerWithDB(deps.PDFConverter, snapshotPDFTxAdapter{repo: snapRepo}, deps.SQLDB).
+			WithArtifactFactRecorder(artifactFactRecorder)
 		workerSvc = workerSvc.WithPDFRunner(pdfRunner)
 	}
 
@@ -152,12 +181,6 @@ func main() {
 		// this binary only ever enqueues pdf dispatch (M5 F5.3 T3).
 		materializeOutboxRepo := fanoutpkg.NewMaterializeOutboxRepository(deps.SQLDB)
 
-		jobsCfg, err := config.LoadJobsConfig()
-		if err != nil {
-			slog.Error("invalid jobs config", "err", err)
-			deps.Cleanup()
-			os.Exit(1)
-		}
 		stagingOutboxWorkerCfg, err := config.LoadStagingOutboxWorkerConfig()
 		if err != nil {
 			slog.Error("invalid staging outbox worker config", "err", err)
@@ -165,28 +188,18 @@ func main() {
 			os.Exit(1)
 		}
 
-		// Enqueue-only River client bundle: no Queues, no Workers, no
-		// PeriodicJobs — this binary only calls InsertTx via the Enqueuer, it
-		// never subscribes a queue or executes jobs, mirroring how
-		// metaldocs-api builds its own enqueue-only bundle (which it also
-		// never Starts).
-		riverBundle, err := riverjobs.NewClientBundle(deps.SQLDB, riverjobs.Config{
-			Schema:              jobsCfg.RiverSchema,
-			SkipUnknownJobCheck: true,
-		}, nil)
-		if err != nil {
-			slog.Error("build staging dispatch enqueuer client", "err", err)
-			deps.Cleanup()
-			os.Exit(1)
-		}
-		pdfDispatchEnqueuer := dispatchjobs.NewEnqueuer(riverBundle.Client, pdfOutboxRepo, materializeOutboxRepo, stagingOutboxWorkerCfg.MaxAttempts)
+		// Enqueue-only River client bundle (built once above): no Queues, no
+		// Workers, no PeriodicJobs — this binary only calls InsertTx via the
+		// Enqueuers, it never subscribes a queue or executes jobs, mirroring
+		// how metaldocs-api builds its own enqueue-only bundle.
+		pdfDispatchEnqueuer := dispatchjobs.NewEnqueuer(sharedRiverBundle.Client, pdfOutboxRepo, materializeOutboxRepo, stagingOutboxWorkerCfg.MaxAttempts)
 
 		materializeRunner := workerapp.NewMaterializeJobRunner(
 			materializeInvokerAdapter{svc: freezeSvc},
 			snapshotFinalDocxAdapter{repo: snapRepo},
 			pdfDispatchEnqueuer,
 			deps.SQLDB,
-		)
+		).WithArtifactFactRecorder(artifactFactRecorder)
 		workerSvc = workerSvc.WithMaterializeRunner(materializeRunner)
 		slog.Info("materialize runner active", "fanout_url", deps.FanoutURL)
 	}

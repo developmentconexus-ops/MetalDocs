@@ -131,6 +131,30 @@ Forma proposta:
 Perguntas abertas ao operador: escopo de `document.publish` (tenant-grade via ADR vs
 area-grade avaliado no publish-context); modelo de gate D2 para templates.
 
+## Etapa 4 — fatos D6 (investigador, 2026-07-28)
+
+- Rota de template é keyed **por instância** (`subject_key = template_id`,
+  `subject.go:47-57`), oposto do modelo documento (por perfil). Ninguém cria
+  automaticamente: admin precisa POST /routes manual com subject_kind=template —
+  e o FE route-builder **não suporta** subject_kind=template
+  (`routeDraft.ts:12-16,114` exige profileCode) → hoje só via API crua.
+- `templates_template.doc_type_code` já é a chave de classe taxonômica
+  (== profile code) usada em SetDefaultTemplate + IsPublished
+  (`profile_service.go:277-333`, `template_version_reader.go:15-62`) → alvo
+  natural de re-key para config-first.
+- Re-key toca: `route_admin_service.go:232-301` (branch template pula
+  profile-FK+policy; CHECK 0297 força profile_code NULL em rota template),
+  `template_submit_service.go:201` (lookup literal por template_id), decisão
+  sobre herdar RoutePolicy do perfil, e FE novo.
+- Elegibilidade de criação de documento = `DefaultTemplateVersionID` do perfil
+  apontando p/ versão `published` com doc_type_code igual (`service.go:466`).
+- Release coordinator é document-only por ADR 0085 (`release_coordinator.go:123-129`
+  recusa non-document); publish de template segue `PublishTemplateVersion` direto
+  (5 status draft→under_review→approved→published→obsolete, SoD no publish).
+  D6 = governança de rota (keying), NÃO timing de release, salvo ampliação explícita.
+- Instância de aprovação continua keyed por template_version_id independente do
+  re-key da rota (two-level keying já existente).
+
 ## Log
 
 - 2026-07-28: tracker criado; D1–D5 ratificadas; Etapa 1 iniciada.
@@ -194,3 +218,69 @@ area-grade avaliado no publish-context); modelo de gate D2 para templates.
   reconciliação River alert-only). Rev 2 incorporou tudo → ALIGN.
   Implementação em estágios a seguir (A: núcleo backend; B: retirement +
   contrato de submissão; C: backfill + projeção + FE).
+- 2026-07-28: **Stage A (núcleo backend ADR 0085) IMPLEMENTADO** (~45 arquivos,
+  working tree): migração `0310_release_coordinator.sql` (release_generations
+  identidade 7-col UNIQUE + FORCE RLS; split `planned_effective_from` com data-move
+  + CHECKs published/scheduled; `release_generation_id` nos dois outboxes de
+  dispatch), fatos fail-closed em tx (`release_facts.go`), recorder terminal único
+  em decision+review_verdict (`release_terminal_approval.go` — F-QA4-14
+  estruturalmente irrepresentável), predicado puro (`domain/release.go`),
+  coordinator idempotente CAS + lock ordenado + rollback supersede_conflict
+  (`release_coordinator.go`), River `release-evaluate` (bypass authz de background),
+  facts DOCX/PDF na tx de artefato (materialize/pdf job runners; caminho PDF legacy
+  falha fechado com geração presente), threading generationID em eventos/fanout/
+  dispatch (chaves idempotência legadas byte-idênticas). Verificação: ladder 114
+  pkgs ok, 7 testes integração novos verdes, boundaries OK, api-lint 0.
+  **Desvio aceito**: CHECKs de DB + correção dos caminhos legacy de escrita já em
+  Stage A (F-QA4-13 fechado no nível DB); legacy morre em Stage B.
+  **Defer bounded**: sync db-dictionary → próximo baseline fold.
+  Reparo carona: `manual_code_create_integration_test.go` (quebrado pelo gate D2
+  `90a6fae3`) — fixture semeia rota ativa (`testdb.NewApprovalRoute`) + wire
+  `RouteReadinessReaderPG` real; pacote verde. Review Codex (Sol xhigh) do diff
+  em curso; commit após veredito.
+- 2026-07-28: **Stage A review Codex rodada 1 NOT-ALIGN → 4 fixes (opus)**, todos
+  verificados reais por mim antes de agir: (1) blocker supersede legacy sem
+  `effective_from` (CHECK 0310) → COALESCE(now()); (2) ordem de lock
+  não-determinística (fonte lockada antes da descoberta de alvos;
+  LoadCurrentPublishedHead com FOR UPDATE) → evaluateTx re-estruturado: geração
+  FOR UPDATE primeiro, leitura da fonte SEM lock, lockAndRedecide locka
+  {fonte}∪alvos ordenado 1-a-1 + re-decisão sob lock; novo
+  LoadCurrentPublishedHeadNoLock; (3) AB-BA runners×coordinator →
+  RecordArtifactFactTx ANTES da escrita em documents nos 2 runners
+  (ordem global geração→documento); (4) evento governance `document_superseded`
+  por alvo (constante única EventTypeDocumentSuperseded, meta-defeito de
+  enumeração evitado). Suites approval+worker+integration verdes, boundaries OK.
+- 2026-07-28: **rodada 2 NOT-ALIGN → 3 fixes (opus)**: (5) evento lifecycle do
+  alvo cross-CD carregava CD da fonte → per-target ControlledID retido do lock;
+  (6) legado SchedulePublish/RunScheduledPublishJob lockava head→fonte (AB-BA
+  contra coordinator) → lockDocumentRowsInIDOrder compartilhado (descoberta
+  lock-free + par ordenado + re-read autoritativo); (7) **blocker**: nenhum
+  índice de head published único — legacy PublishApproved podia criar 2
+  published no mesmo CD (Codex provou corrida coordinator-only inalcançável via
+  ux_documents_cd_active) → 0310 §3b pre-repair idempotente + UNIQUE
+  ux_documents_published_head (tenant_id, controlled_document_id) WHERE
+  status='published'; MapPgError 23505→ErrStaleRevision (409 existente, zero
+  churn de contrato). +3 testes integração (cross-CD, double-head, lock-order);
+  fixture pré-existente com 2 heads reparada (estado agora irrepresentável).
+  Residual aceito (morre Stage B): scheduler NULL-target pode bater no índice →
+  River retry loop, não mapeado. Rodada 3 Codex em curso.
+- 2026-07-28: **rodada 3 NOT-ALIGN → 2 fixes (opus)**: (8) **blocker**: 0310
+  §3b pre-repair UPDATEia documents sem setar GUC `metaldocs.asserted_caps` →
+  tripwire trg_require_cap_asserted P0001 em qualquer row legado (arm atual
+  0301:93-104 aceita document.edit, match cap-only) → set_config tx-local
+  '[{"cap":"document.edit"}]' antes do primeiro data-write (precedente
+  0267:49); (9) major: supersede legacy publicava novo ANTES de rebaixar prior
+  → ux_documents_published_head rejeita (endpoint inoperante) + sem lock
+  ordenado + sem MapPgError → lockDocumentRowsInIDOrder({prior,novo}) pós-authz
+  (H-PRE-1), reordena prior→superseded primeiro, ExecContext via MapPgError.
+  Findings 3-5 da rodada = confirmações (per-target CD ok, lock order global ok,
+  repair idempotente ok), sem ação. Fixes 8/9 aplicados: build+vet+vet-integration
+  clean, ladder approval completa PASS (F8 exercitado live — ladder aplica
+  migrations do zero); testes supersede fortalecidos (ordem observada, não
+  assumida).
+- 2026-07-28: **rodada 4 NOT-ALIGN → 1 fix (opus)**: F8/F9 confirmados corretos
+  pelo Codex; (10) major: re-read under-lock do revision_version prior era
+  condicional em `s.repo != nil` (produção sempre injeta repo — services.go:90 —
+  mas branch nil usava valor pré-lock do caller, furo OCC) → repo obrigatório
+  fail-closed, re-read sempre, teste prova valor under-lock no CAS. Rodada 5 =
+  verificação final.

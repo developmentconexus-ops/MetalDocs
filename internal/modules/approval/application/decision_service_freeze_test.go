@@ -11,20 +11,28 @@ import (
 	"testing"
 	"time"
 
-	docapp "metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/approval/infrastructure"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
-type fakePinInvoker struct {
+// fakeReleaseRecorder stands in for the ADR 0085 terminal-approval seam
+// (approval fact + async-freeze pin + coordinator evaluation). Substituting it
+// here keeps the release substrate's SQL out of these driver-level decision
+// tests; the real recorder is exercised by the release integration suite.
+type fakeReleaseRecorder struct {
 	calls int
 	err   error
+	last  TerminalApprovalInput
 }
 
-func (f *fakePinInvoker) Pin(_ context.Context, _ db.Tx, _, _ string, _ docapp.ApproverContext) error {
+func (f *fakeReleaseRecorder) RecordTerminalApproval(_ context.Context, _ db.Tx, in TerminalApprovalInput) (string, error) {
 	f.calls++
-	return f.err
+	f.last = in
+	if f.err != nil {
+		return "", f.err
+	}
+	return "gen-" + in.InstanceID, nil
 }
 
 type freezeDecisionConn struct {
@@ -198,7 +206,7 @@ func TestRecordSignoff_PinError_RollsBackTransaction(t *testing.T) {
 		instance:         buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID}),
 		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "sig-b", WasReplay: false},
 	}
-	pin := &fakePinInvoker{err: errors.New("pin failed")}
+	pin := &fakeReleaseRecorder{err: errors.New("pin failed")}
 	conn := &freezeDecisionConn{
 		actorID: actorID,
 		stageSignoffs: []signoffRow{{
@@ -219,7 +227,7 @@ func TestRecordSignoff_PinError_RollsBackTransaction(t *testing.T) {
 		repo:    repo,
 		emitter: &MemoryEmitter{},
 		clock:   fixedClock{t: signedAt},
-	}).WithPinInvoker(pin)
+	}).WithReleaseRecorder(pin)
 
 	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
 		TenantID:         "tenant-1",
@@ -263,14 +271,14 @@ func TestRecordSignoff_WasReplay_DoesNotPin(t *testing.T) {
 		instance:         buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID}),
 		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "sig-d", WasReplay: true},
 	}
-	pin := &fakePinInvoker{}
+	pin := &fakeReleaseRecorder{}
 	conn := &freezeDecisionConn{actorID: actorID}
 	db := newFreezeDecisionTestDB(t, conn)
 	svc := (&DecisionService{
 		repo:    repo,
 		emitter: &MemoryEmitter{},
 		clock:   fixedClock{t: signedAt},
-	}).WithPinInvoker(pin)
+	}).WithReleaseRecorder(pin)
 
 	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
 		TenantID:        "tenant-1",
@@ -305,7 +313,7 @@ func TestRecordSignoff_UnresolvedComments_NoLongerBlocksApprove(t *testing.T) {
 		instance:         buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID}),
 		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "sig-comments", WasReplay: false},
 	}
-	pin := &fakePinInvoker{}
+	pin := &fakeReleaseRecorder{}
 	conn := &freezeDecisionConn{
 		actorID:            actorID,
 		unresolvedComments: 1,
@@ -327,7 +335,7 @@ func TestRecordSignoff_UnresolvedComments_NoLongerBlocksApprove(t *testing.T) {
 		repo:    repo,
 		emitter: &MemoryEmitter{},
 		clock:   fixedClock{t: signedAt},
-	}).WithPinInvoker(pin)
+	}).WithReleaseRecorder(pin)
 
 	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
 		TenantID:         "tenant-1",
@@ -368,7 +376,7 @@ func TestRecordSignoff_PinInvoker_CallsPin(t *testing.T) {
 		instance:         buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID}),
 		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "sig-pin-1", WasReplay: false},
 	}
-	pin := &fakePinInvoker{}
+	pin := &fakeReleaseRecorder{}
 	conn := &freezeDecisionConn{
 		actorID: actorID,
 		stageSignoffs: []signoffRow{{
@@ -389,7 +397,7 @@ func TestRecordSignoff_PinInvoker_CallsPin(t *testing.T) {
 		repo:    repo,
 		emitter: &MemoryEmitter{},
 		clock:   fixedClock{t: signedAt},
-	}).WithPinInvoker(pin)
+	}).WithReleaseRecorder(pin)
 
 	result, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
 		TenantID:         "tenant-1",
@@ -446,7 +454,7 @@ func TestRecordSignoff_RejectPath_AssertsDocumentEditBeforeDocumentWrite(t *test
 		repo:    repo,
 		emitter: &MemoryEmitter{},
 		clock:   fixedClock{t: signedAt},
-	}).WithPinInvoker(&fakePinInvoker{})
+	}).WithReleaseRecorder(&fakeReleaseRecorder{})
 
 	result, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
 		TenantID:         "tenant-1",

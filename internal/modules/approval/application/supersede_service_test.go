@@ -14,18 +14,57 @@ import (
 
 	"metaldocs/internal/modules/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
+	platformdb "metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
 // ---------------------------------------------------------------------------
+// Fake repository for supersede tests.
+//
+// PublishSuperseding re-reads the prior document's revision_version under the
+// row lock and CASes on THAT value (never on req.PriorRevisionVersion, which is
+// pre-lock and possibly stale). The service therefore requires a wired
+// repository — it fails closed without one — so every test wires this fake.
+// The embedded interface supplies the rest of ApprovalRepository; any method
+// this path unexpectedly starts calling panics with a nil-interface
+// dereference, which is the fail-loud behaviour we want here.
+// ---------------------------------------------------------------------------
+
+type supersedeFakeRepo struct {
+	infrastructure.ApprovalRepository
+
+	revisionVersion int
+	err             error
+
+	calls         int
+	gotDocumentID string
+	gotTenantID   string
+}
+
+func (r *supersedeFakeRepo) GetDocumentRevisionVersion(_ context.Context, _ platformdb.Tx, documentID, tenantID string) (int, error) {
+	r.calls++
+	r.gotDocumentID = documentID
+	r.gotTenantID = tenantID
+	if r.err != nil {
+		return 0, r.err
+	}
+	return r.revisionVersion, nil
+}
+
+// ---------------------------------------------------------------------------
 // Fake driver for supersede tests.
 //
-// Two UPDATE statements are issued per call to PublishSuperseding:
-//   1. UPDATE documents SET status='published'  (new doc OCC)
-//   2. UPDATE documents SET status='superseded' (prior doc OCC)
+// Two UPDATE statements are issued per call to PublishSuperseding, in this
+// order (ADR 0085: the incumbent head must be demoted BEFORE the new document
+// takes the published slot, or ux_documents_published_head is transiently
+// violated inside the transaction):
+//   1. UPDATE documents SET status='superseded' (prior doc OCC)
+//   2. UPDATE documents SET status='published'  (new doc OCC)
 //
-// supersedeTestConn tracks which UPDATE is being executed (via a call counter)
-// and returns the caller-configured rowsAffected for each.
+// supersedeTestConn dispatches on the statement text (not on call order, so the
+// tests genuinely observe the order rather than assuming it), returns the
+// caller-configured rowsAffected for each, and records the position each UPDATE
+// occupied so the happy path can assert prior-before-new.
 // Non-UPDATE statements (BEGIN, COMMIT, governance event INSERT) always succeed.
 // ---------------------------------------------------------------------------
 
@@ -81,18 +120,30 @@ func (s *supersedeTestStmt) Exec(args []driver.Value) (driver.Result, error) {
 		// Non-UPDATE (governance_events INSERT, etc.) always succeed with 1.
 		return supersedeTestResult{rowsAffected: 1}, nil
 	}
-	// Track which UPDATE call this is.
+	// Track which UPDATE call this is, dispatching on the statement itself.
+	// 'superseded' appears only in the prior-document UPDATE's SET clause.
 	s.conn.updateCount++
-	switch s.conn.updateCount {
-	case 1:
-		return supersedeTestResult{rowsAffected: s.conn.newDocRowsAffected}, nil
-	default:
+	if strings.Contains(q, "'superseded'") {
+		s.conn.priorUpdateOrder = s.conn.updateCount
+		s.conn.priorUpdateArgs = append([]driver.Value(nil), args...)
 		return supersedeTestResult{rowsAffected: s.conn.priorDocRowsAffected}, nil
 	}
+	s.conn.newUpdateOrder = s.conn.updateCount
+	s.conn.newUpdateArgs = append([]driver.Value(nil), args...)
+	return supersedeTestResult{rowsAffected: s.conn.newDocRowsAffected}, nil
 }
 
-func (s *supersedeTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
+func (s *supersedeTestStmt) Query(args []driver.Value) (driver.Rows, error) {
 	q := strings.ToLower(s.query)
+	// ADR 0085 lock-order parity: lockDocumentRowsInIDOrder locks one document
+	// row per statement, in sorted id order, and reads back the id it locked.
+	if strings.Contains(q, "for update") && strings.Contains(q, "from documents") {
+		var lockedID any
+		if len(args) > 0 {
+			lockedID = args[0]
+		}
+		return &supersedeSingleValueRows{value: lockedID}, nil
+	}
 	if strings.Contains(q, "from documents") {
 		// Ported area resolver (M2/F2.1): two columns; non-NULL snapshot wins the
 		// COALESCE, so areaCode-as-snapshot with a NULL CD link reproduces prior.
@@ -119,7 +170,11 @@ func (s *supersedeTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 type supersedeTestConn struct {
 	newDocRowsAffected   int64
 	priorDocRowsAffected int64
-	updateCount          int // incremented on each UPDATE exec
+	updateCount          int            // incremented on each UPDATE exec
+	priorUpdateOrder     int            // 1-based position of the prior-doc UPDATE
+	newUpdateOrder       int            // 1-based position of the new-doc UPDATE
+	priorUpdateArgs      []driver.Value // bind args of the prior-doc UPDATE ($1 id, $2 tenant, $3 revision_version)
+	newUpdateArgs        []driver.Value // bind args of the new-doc UPDATE ($1 id, $2 tenant, $3 revision_version)
 	authzGranted         bool
 	areaCode             string
 	actorID              string
@@ -156,6 +211,20 @@ func (c *supersedeTestConn) hasAssertedCap(capability string) bool {
 	return false
 }
 
+// supersedeOCCArg returns the revision_version bind ($3) captured from an
+// UPDATE's args — i.e. the exact value the OCC/CAS predicate compared against.
+func supersedeOCCArg(t *testing.T, args []driver.Value, label string) int64 {
+	t.Helper()
+	if len(args) < 3 {
+		t.Fatalf("%s UPDATE: expected at least 3 bind args, got %d (%v)", label, len(args), args)
+	}
+	v, ok := args[2].(int64)
+	if !ok {
+		t.Fatalf("%s UPDATE: revision_version bind %#v is not int64", label, args[2])
+	}
+	return v
+}
+
 func (c *supersedeTestConn) Prepare(query string) (driver.Stmt, error) {
 	return &supersedeTestStmt{conn: c, query: query}, nil
 }
@@ -169,9 +238,11 @@ type supersedeTestDriver struct{ conn *supersedeTestConn }
 
 func (d *supersedeTestDriver) Open(_ string) (driver.Conn, error) { return d.conn, nil }
 
-// newSupersedeTestDB registers a unique driver and returns a *sql.DB.
-// newRowsAffected controls the first UPDATE; priorRowsAffected controls the second.
-func newSupersedeTestDB(t *testing.T, newRowsAffected, priorRowsAffected int64, authzGranted ...bool) *sql.DB {
+// newSupersedeTestDB registers a unique driver and returns the *sql.DB plus the
+// backing conn (so tests can assert observed statement order). newRowsAffected
+// controls the new-document UPDATE; priorRowsAffected the prior-document one —
+// by statement, independent of which runs first.
+func newSupersedeTestDB(t *testing.T, newRowsAffected, priorRowsAffected int64, authzGranted ...bool) (*sql.DB, *supersedeTestConn) {
 	t.Helper()
 	granted := true
 	if len(authzGranted) > 0 {
@@ -192,7 +263,7 @@ func newSupersedeTestDB(t *testing.T, newRowsAffected, priorRowsAffected int64, 
 		t.Fatalf("open supersede test db: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	return db
+	return db, conn
 }
 
 // ---------------------------------------------------------------------------
@@ -204,9 +275,10 @@ func TestPublishSuperseding_HappyPath(t *testing.T) {
 	emitter := &MemoryEmitter{}
 	clock := fixedClock{t: now}
 
-	svc := &SupersedeService{emitter: emitter, clock: clock}
+	repo := &supersedeFakeRepo{revisionVersion: 7}
+	svc := &SupersedeService{repo: repo, emitter: emitter, clock: clock}
 	// Both UPDATE statements match one row each.
-	db := newSupersedeTestDB(t, 1, 1, true)
+	db, conn := newSupersedeTestDB(t, 1, 1, true)
 
 	req := SupersedeRequest{
 		TenantID:             "tenant-uuid-1",
@@ -244,15 +316,151 @@ func TestPublishSuperseding_HappyPath(t *testing.T) {
 	if ev.TenantID != "tenant-uuid-1" {
 		t.Errorf("event tenant_id = %q; want %q", ev.TenantID, "tenant-uuid-1")
 	}
+
+	// ADR 0085 / migration 0310 ux_documents_published_head: the incumbent head
+	// must be demoted BEFORE the new document takes the published slot, or a
+	// same-controlled-document supersession violates the partial unique index
+	// mid-transaction.
+	if conn.priorUpdateOrder != 1 || conn.newUpdateOrder != 2 {
+		t.Errorf("update order = prior:%d new:%d; want prior:1 new:2 (prior demoted first)",
+			conn.priorUpdateOrder, conn.newUpdateOrder)
+	}
+
+	// The prior document's OCC value must come from the under-lock re-read, not
+	// from the request; the new document's still comes from the request (If-Match).
+	if repo.calls != 1 {
+		t.Errorf("GetDocumentRevisionVersion called %d times; want exactly 1 (under-lock re-read)", repo.calls)
+	}
+	if repo.gotDocumentID != "doc-prior-uuid-1" || repo.gotTenantID != "tenant-uuid-1" {
+		t.Errorf("under-lock re-read scoped to (doc:%q tenant:%q); want (doc:%q tenant:%q)",
+			repo.gotDocumentID, repo.gotTenantID, "doc-prior-uuid-1", "tenant-uuid-1")
+	}
+	if got := supersedeOCCArg(t, conn.priorUpdateArgs, "prior"); got != 7 {
+		t.Errorf("prior-document OCC arg = %d; want 7 (re-read value)", got)
+	}
+	if got := supersedeOCCArg(t, conn.newUpdateArgs, "new"); got != 4 {
+		t.Errorf("new-document OCC arg = %d; want 4 (req.NewRevisionVersion)", got)
+	}
+}
+
+// TestPublishSuperseding_PriorOCCUsesUnderLockReRead is the regression pin for
+// the OCC guarantee the row lock exists to provide: the prior document's CAS
+// predicate must bind the revision_version read from the row AFTER the lock,
+// never the caller-supplied (pre-lock, possibly stale) req.PriorRevisionVersion.
+// The two values are deliberately different here, so a regression that reads the
+// request field again makes the assertion fail rather than pass by coincidence.
+func TestPublishSuperseding_PriorOCCUsesUnderLockReRead(t *testing.T) {
+	emitter := &MemoryEmitter{}
+	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
+
+	const underLockVersion = 42
+	repo := &supersedeFakeRepo{revisionVersion: underLockVersion}
+	svc := &SupersedeService{repo: repo, emitter: emitter, clock: clock}
+	db, conn := newSupersedeTestDB(t, 1, 1, true)
+
+	req := SupersedeRequest{
+		TenantID:             "tenant-uuid-1",
+		NewDocumentID:        "doc-new-occ-1",
+		PriorDocumentID:      "doc-prior-occ-1",
+		SupersededBy:         "user-1",
+		NewRevisionVersion:   4,
+		PriorRevisionVersion: 7, // stale: MUST NOT reach the UPDATE
+	}
+
+	if _, err := svc.PublishSuperseding(context.Background(), newTxRunner(db), req); err != nil {
+		t.Fatalf("PublishSuperseding: unexpected error: %v", err)
+	}
+
+	if repo.calls != 1 {
+		t.Fatalf("GetDocumentRevisionVersion called %d times; want exactly 1", repo.calls)
+	}
+	got := supersedeOCCArg(t, conn.priorUpdateArgs, "prior")
+	if got == int64(req.PriorRevisionVersion) {
+		t.Fatalf("prior-document OCC arg = %d — the stale request value was used; the under-lock re-read (%d) must win",
+			got, underLockVersion)
+	}
+	if got != underLockVersion {
+		t.Errorf("prior-document OCC arg = %d; want %d (under-lock re-read)", got, underLockVersion)
+	}
+}
+
+// TestPublishSuperseding_ReReadFailurePropagates pins fail-closed behaviour: if
+// the under-lock re-read errors there is no substitute OCC value, so the write
+// must not happen and no governance event may be emitted (no-fallback principle).
+func TestPublishSuperseding_ReReadFailurePropagates(t *testing.T) {
+	emitter := &MemoryEmitter{}
+	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
+
+	repo := &supersedeFakeRepo{err: infrastructure.ErrStaleRevision}
+	svc := &SupersedeService{repo: repo, emitter: emitter, clock: clock}
+	db, conn := newSupersedeTestDB(t, 1, 1, true)
+
+	req := SupersedeRequest{
+		TenantID:             "tenant-uuid-1",
+		NewDocumentID:        "doc-new-occ-2",
+		PriorDocumentID:      "doc-prior-occ-2",
+		SupersededBy:         "user-1",
+		NewRevisionVersion:   4,
+		PriorRevisionVersion: 7,
+	}
+
+	_, err := svc.PublishSuperseding(context.Background(), newTxRunner(db), req)
+	if err == nil {
+		t.Fatal("expected the under-lock re-read failure to propagate; got nil")
+	}
+	if !errors.Is(err, infrastructure.ErrStaleRevision) {
+		t.Errorf("expected errors.Is(err, ErrStaleRevision); got %v", err)
+	}
+	if conn.updateCount != 0 {
+		t.Errorf("%d UPDATE(s) ran after the re-read failed; none may run", conn.updateCount)
+	}
+	if len(emitter.Events) != 0 {
+		t.Errorf("no governance event should be emitted when the re-read fails; got %d", len(emitter.Events))
+	}
+}
+
+// TestPublishSuperseding_NilRepoFailsClosed pins the fail-closed guard: with no
+// repository the under-lock re-read is impossible, and falling back to the
+// request's pre-lock value would silently weaken the OCC guarantee. Refusing is
+// the only correct answer.
+func TestPublishSuperseding_NilRepoFailsClosed(t *testing.T) {
+	emitter := &MemoryEmitter{}
+	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
+
+	svc := &SupersedeService{emitter: emitter, clock: clock} // repo deliberately nil
+	db, conn := newSupersedeTestDB(t, 1, 1, true)
+
+	req := SupersedeRequest{
+		TenantID:             "tenant-uuid-1",
+		NewDocumentID:        "doc-new-nilrepo-1",
+		PriorDocumentID:      "doc-prior-nilrepo-1",
+		SupersededBy:         "user-1",
+		NewRevisionVersion:   4,
+		PriorRevisionVersion: 7,
+	}
+
+	_, err := svc.PublishSuperseding(context.Background(), newTxRunner(db), req)
+	if err == nil {
+		t.Fatal("expected PublishSuperseding to fail closed without a repository; got nil")
+	}
+	if !strings.Contains(err.Error(), "repository not wired") {
+		t.Errorf("error = %v; want a 'repository not wired' fail-closed error", err)
+	}
+	if conn.updateCount != 0 {
+		t.Errorf("%d UPDATE(s) ran without a wired repository; none may run", conn.updateCount)
+	}
+	if len(emitter.Events) != 0 {
+		t.Errorf("no governance event should be emitted; got %d", len(emitter.Events))
+	}
 }
 
 func TestPublishSuperseding_OCC_NewConflict(t *testing.T) {
 	emitter := &MemoryEmitter{}
 	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
 
-	svc := &SupersedeService{emitter: emitter, clock: clock}
-	// First UPDATE (new doc) returns 0 — OCC conflict.
-	db := newSupersedeTestDB(t, 0, 1, true)
+	svc := &SupersedeService{repo: &supersedeFakeRepo{revisionVersion: 5}, emitter: emitter, clock: clock}
+	// The new-doc UPDATE (now second) returns 0 — OCC conflict.
+	db, _ := newSupersedeTestDB(t, 0, 1, true)
 
 	req := SupersedeRequest{
 		TenantID:             "tenant-uuid-1",
@@ -279,9 +487,10 @@ func TestPublishSuperseding_OCC_PriorConflict(t *testing.T) {
 	emitter := &MemoryEmitter{}
 	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
 
-	svc := &SupersedeService{emitter: emitter, clock: clock}
-	// First UPDATE (new doc) succeeds; second UPDATE (prior doc) returns 0 — OCC conflict.
-	db := newSupersedeTestDB(t, 1, 0, true)
+	svc := &SupersedeService{repo: &supersedeFakeRepo{revisionVersion: 9}, emitter: emitter, clock: clock}
+	// The prior-doc UPDATE (now first) returns 0 — OCC conflict; the new-doc
+	// UPDATE must never run.
+	db, conn := newSupersedeTestDB(t, 1, 0, true)
 
 	req := SupersedeRequest{
 		TenantID:             "tenant-uuid-1",
@@ -302,6 +511,9 @@ func TestPublishSuperseding_OCC_PriorConflict(t *testing.T) {
 	if len(emitter.Events) != 0 {
 		t.Errorf("no governance event should be emitted on OCC conflict; got %d", len(emitter.Events))
 	}
+	if conn.newUpdateOrder != 0 {
+		t.Errorf("new-document UPDATE ran (position %d) after the prior-head demotion lost its CAS; it must not", conn.newUpdateOrder)
+	}
 }
 
 // TestPublishSuperseding_CapabilityAssertPairsBeforeGatedWrite pins the
@@ -316,7 +528,7 @@ func TestPublishSuperseding_OCC_PriorConflict(t *testing.T) {
 func TestPublishSuperseding_CapabilityAssertPairsBeforeGatedWrite(t *testing.T) {
 	emitter := &MemoryEmitter{}
 	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
-	svc := &SupersedeService{emitter: emitter, clock: clock}
+	svc := &SupersedeService{repo: &supersedeFakeRepo{revisionVersion: 1}, emitter: emitter, clock: clock}
 
 	conn := &supersedeTestConn{
 		newDocRowsAffected:   1,
@@ -357,8 +569,8 @@ func TestPublishSuperseding_CapabilityAssertPairsBeforeGatedWrite(t *testing.T) 
 func TestPublishSuperseding_CapabilityDenied(t *testing.T) {
 	emitter := &MemoryEmitter{}
 	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
-	svc := &SupersedeService{emitter: emitter, clock: clock}
-	db := newSupersedeTestDB(t, 1, 1, false)
+	svc := &SupersedeService{repo: &supersedeFakeRepo{revisionVersion: 1}, emitter: emitter, clock: clock}
+	db, _ := newSupersedeTestDB(t, 1, 1, false)
 
 	req := SupersedeRequest{
 		TenantID:             "tenant-uuid-1",

@@ -37,7 +37,7 @@ type FanoutClient interface {
 // here (the consumer) and satisfied by *dispatchjobs.Enqueuer. It inserts
 // the paired (outbox row, River job) atomically inside tx (M5 F5.3 T3).
 type materializeDispatchEnqueuer interface {
-	EnqueueMaterializeTx(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte) error
+	EnqueueMaterializeTx(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte, releaseGenerationID string) error
 }
 
 // MaterializeResult is returned by Materialize after a successful fanout call.
@@ -189,7 +189,7 @@ func (s *FreezeService) pinValidateAndHash(
 // and enqueues a materialize_dispatch_outbox row — all inside tx.
 // No network calls to docx-renderer. Fast and cheap.
 // tx is mandatory (ADR 0015 amended by Wave Z Z-5).
-func (s *FreezeService) Pin(ctx context.Context, tx db.Tx, tenantID, revisionID string, approver ApproverContext) error {
+func (s *FreezeService) Pin(ctx context.Context, tx db.Tx, tenantID, revisionID string, approver ApproverContext, releaseGenerationID string) error {
 	if tx == nil {
 		return fmt.Errorf("freeze_service: tx required (ADR 0015 amended by Wave Z Z-5)")
 	}
@@ -218,7 +218,7 @@ func (s *FreezeService) Pin(ctx context.Context, tx db.Tx, tenantID, revisionID 
 	if s.materializeOutbox == nil {
 		return fmt.Errorf("pin: materialize outbox enqueuer not configured")
 	}
-	return s.materializeOutbox.EnqueueMaterializeTx(ctx, tx, tenantID, revisionID, hashBytes)
+	return s.materializeOutbox.EnqueueMaterializeTx(ctx, tx, tenantID, revisionID, hashBytes, releaseGenerationID)
 }
 
 // Materialize is the async half of the freeze split (ADR 0015).

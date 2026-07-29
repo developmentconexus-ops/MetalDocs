@@ -109,9 +109,22 @@ func (s *PublishService) PublishApproved(ctx context.Context, runner db.TxRunner
 		if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusApproved, docsdomain.DocStatusPublished); err != nil {
 			return err
 		}
+		// ADR 0085 / F-QA4-13: a published document MUST carry an actual
+		// effective_from (it is what the periodic-review surfacer and the
+		// effective-window CHECK key on). This legacy publish path is retired in
+		// ADR 0085 stage B; until then it stamps the actual instant so
+		// ck_documents_published_effective_from (migration 0310) holds.
+		//
+		// It also does NOT supersede the controlled document's existing
+		// published head — that is precisely what makes it able to produce two
+		// published rows for one CD. ux_documents_published_head (migration
+		// 0310) is the DB enforcement of ADR 0085's one-published-head
+		// invariant; MapPgError turns that 23505 into ErrStaleRevision so the
+		// attempt surfaces as a 409 conflict, not a naked 500.
 		res, err := tx.ExecContext(ctx, `
 			UPDATE documents
 			   SET status           = 'published',
+			       effective_from   = COALESCE(effective_from, now()),
 			       revision_version = revision_version + 1
 			 WHERE id        = $1
 			   AND tenant_id = $2
@@ -120,7 +133,8 @@ func (s *PublishService) PublishApproved(ctx context.Context, runner db.TxRunner
 			instance.DocumentID, req.TenantID, instance.RevisionVersion,
 		)
 		if err != nil {
-			return fmt.Errorf("publishApproved: update document state: %w", err)
+			return fmt.Errorf("publishApproved: update document state: %w",
+				infrastructure.MapPgError(err, infrastructure.MapHints{}))
 		}
 		affected, err := res.RowsAffected()
 		if err != nil {
@@ -279,9 +293,43 @@ func (s *PublishService) SchedulePublish(ctx context.Context, runner db.TxRunner
 		if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
 			return err
 		}
-		supersededDocumentID, err := s.repo.LoadCurrentPublishedHeadForDocument(ctx, tx, req.TenantID, instance.DocumentID)
+		// ADR 0085 lock-order parity. This path used to resolve the head with
+		// `FOR UPDATE OF current_head`, locking the head FIRST and the source
+		// second (the guarded UPDATE below) — the exact opposite of the release
+		// coordinator's sorted-id order, so a source id sorting before the head
+		// id is an AB-BA deadlock between the two writers.
+		//
+		// Discover lock-free, then lock the pair in sorted id order
+		// (release_coordinator.go lockAndRedecide is the reference), then
+		// re-read the head UNDER the lock — the discovery read is a snapshot
+		// and the head may have moved between it and the lock.
+		controlledDocumentID, err := docapp.LoadDocumentControlledDocumentID(ctx, tx, req.TenantID, instance.DocumentID)
 		if err != nil {
-			return fmt.Errorf("schedulePublish: load current published head: %w", err)
+			return fmt.Errorf("schedulePublish: load controlled document: %w", err)
+		}
+		discoveredHead := ""
+		if controlledDocumentID != "" {
+			discoveredHead, err = s.repo.LoadCurrentPublishedHeadNoLock(ctx, tx, req.TenantID, controlledDocumentID)
+			if err != nil {
+				return fmt.Errorf("schedulePublish: load current published head: %w", err)
+			}
+		}
+		if err := lockDocumentRowsInIDOrder(ctx, tx, req.TenantID, instance.DocumentID, discoveredHead); err != nil {
+			return fmt.Errorf("schedulePublish: %w", err)
+		}
+		supersededDocumentID := discoveredHead
+		if controlledDocumentID != "" {
+			supersededDocumentID, err = s.repo.LoadCurrentPublishedHeadNoLock(ctx, tx, req.TenantID, controlledDocumentID)
+			if err != nil {
+				return fmt.Errorf("schedulePublish: re-read current published head: %w", err)
+			}
+			if supersededDocumentID != discoveredHead {
+				// The head moved between discovery and the lock, so the row we
+				// hold is not the one we would be recording. Fail closed rather
+				// than persist a supersede target that was already stale at
+				// write time.
+				return infrastructure.ErrStaleRevision
+			}
 		}
 		if req.SupersededDocumentID != "" {
 			if req.SupersededDocumentID == instance.DocumentID {
@@ -301,11 +349,16 @@ func (s *PublishService) SchedulePublish(ctx context.Context, runner db.TxRunner
 		if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusApproved, docsdomain.DocStatusScheduled); err != nil {
 			return err
 		}
+		// ADR 0085: the future date a human chose is the PLAN
+		// (planned_effective_from). effective_from is the ACTUAL release
+		// instant and stays NULL until the document is really published — see
+		// ck_documents_scheduled_planned_effective_from (migration 0310).
 		var scheduleGeneration int64
 		err = tx.QueryRowContext(ctx, `
 			UPDATE documents
 			   SET status           = 'scheduled',
-			       effective_from   = $1,
+			       planned_effective_from = $1,
+			       effective_from   = NULL,
 			       superseded_document_id = NULLIF($2, '')::uuid,
 			       effective_to     = $6,
 			       review_due_at    = $7,

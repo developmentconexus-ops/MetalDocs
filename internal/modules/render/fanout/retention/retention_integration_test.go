@@ -89,7 +89,7 @@ func seedDispatchedRow(t *testing.T, ctx context.Context, db *sql.DB, table stri
 	t.Helper()
 
 	tx := seedTenantTx(t, ctx, db, tenantID)
-	if _, err := repo.Enqueue(ctx, tx, tenantID, revisionID, []byte{0x01}); err != nil {
+	if _, err := repo.Enqueue(ctx, tx, tenantID, revisionID, []byte{0x01}, ""); err != nil {
 		_ = tx.Rollback()
 		t.Fatalf("enqueue: %v", err)
 	}
@@ -188,7 +188,7 @@ func TestRetentionPurge_Integration_PurgesOnlyOldDispatchedRows(t *testing.T) {
 			// (c) dead-lettered: status='failed', dead_lettered_at set, never
 			// eligible regardless of age.
 			tx := seedTenantTx(t, ctx, db, tenant.ID)
-			if _, err := fx.repo.Enqueue(ctx, tx, tenant.ID, deadRevisionID, []byte{0x03}); err != nil {
+			if _, err := fx.repo.Enqueue(ctx, tx, tenant.ID, deadRevisionID, []byte{0x03}, ""); err != nil {
 				_ = tx.Rollback()
 				t.Fatalf("enqueue dead-lettered row: %v", err)
 			}

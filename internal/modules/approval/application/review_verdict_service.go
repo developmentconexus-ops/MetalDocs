@@ -34,6 +34,20 @@ type ReviewVerdictService struct {
 	clock             Clock
 	cdRead            controlleddocumentsdomain.CDFieldReader
 	lifecycleEnqueuer docsdomain.LifecycleEventEnqueuer
+	// releaseRecorder is the SAME terminal-approval seam DecisionService uses.
+	// Before ADR 0085 this route reached terminal approval without ever
+	// pinning the document, so a document approved via a review verdict never
+	// materialized and could never be published (F-QA4-14). The two routes now
+	// share one terminal-approval implementation, injected from one call site.
+	releaseRecorder TerminalApprovalReleaseRecorder
+}
+
+// WithReleaseRecorder wires the ADR 0085 terminal-approval seam (pin +
+// approval fact + coordinator evaluation). Mandatory for the terminal-approval
+// path — see the releaseRecorder field comment (F-QA4-14).
+func (s *ReviewVerdictService) WithReleaseRecorder(recorder TerminalApprovalReleaseRecorder) *ReviewVerdictService {
+	s.releaseRecorder = recorder
+	return s
 }
 
 // WithCDFieldReader wires the controlleddocuments read-port used to resolve a
@@ -295,6 +309,26 @@ func (s *ReviewVerdictService) recordVerdictInTx(ctx context.Context, tx *sql.Tx
 					return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: complete instance: %w", err)
 				}
 				if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
+					return ReviewVerdictResult{}, nil, err
+				}
+				// F-QA4-14 / ADR 0085: this route is now identical to the
+				// signoff route — same Pin, same approval fact, same
+				// coordinator evaluation, same transaction.
+				if s.releaseRecorder == nil {
+					return ReviewVerdictResult{}, nil, fmt.Errorf("review verdict service missing required ports: releaseRecorder")
+				}
+				if _, err := s.releaseRecorder.RecordTerminalApproval(ctx, tx, TerminalApprovalInput{
+					TenantID:          req.TenantID,
+					DocumentID:        instance.DocumentID,
+					InstanceID:        req.InstanceID,
+					RevisionVersion:   instance.RevisionVersion,
+					FrozenContentHash: derefString(instance.FrozenContentHash),
+					FinalApproverID:   req.ActorUserID,
+					SubmittedBy:       instance.SubmittedBy,
+					Approver: docapp.ApproverContext{
+						UserID: req.ActorUserID,
+					},
+				}); err != nil {
 					return ReviewVerdictResult{}, nil, err
 				}
 				if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusUnderReview, docsdomain.DocStatusApproved); err != nil {

@@ -22,10 +22,16 @@ type SchedulerService struct {
 	clock   Clock
 }
 
+// updateScheduledDocSQL publishes a scheduled document.
+//
+// ADR 0085 / F-QA4-13: effective_from is the ACTUAL release instant, stamped
+// here — it used to be cleared to NULL, which silently excluded every
+// scheduled-then-published document from the periodic-review surfacer. The
+// PLAN (planned_effective_from) is preserved for attribution.
 const updateScheduledDocSQL = `
 UPDATE documents
    SET status = 'published',
-       effective_from = NULL,
+       effective_from = now(),
        revision_version = revision_version + 1
  WHERE id = $1
    AND tenant_id = $2
@@ -38,7 +44,7 @@ type scheduledDocumentState struct {
 	Status               string
 	ControlledDocumentID string
 	SupersededDocumentID sql.NullString
-	EffectiveFrom        sql.NullTime
+	PlannedEffectiveFrom sql.NullTime
 	RevisionVersion      int
 	ScheduleGeneration   int64
 }
@@ -66,6 +72,12 @@ func (s *SchedulerService) RunScheduledPublishJob(ctx context.Context, runner db
 			return fmt.Errorf("scheduler: bypass authz for doc %s: %w", input.DocumentID, err)
 		}
 
+		// ADR 0085 lock-order parity: this read is LOCK-FREE and exists only to
+		// DISCOVER the lock set. The supersede target is knowable only after
+		// reading the source row, so locking the source here would put it ahead
+		// of a lower-sorting target and reintroduce exactly the AB-BA deadlock
+		// the sorted order exists to prevent (release_coordinator.go
+		// lockAndRedecide).
 		state, err := s.loadScheduledDocumentState(ctx, tx, input.TenantID, input.DocumentID)
 		if errors.Is(err, sql.ErrNoRows) {
 			slog.InfoContext(ctx, "scheduler skipping publish job", "document_id", input.DocumentID, "reason", "document_not_found")
@@ -74,11 +86,29 @@ func (s *SchedulerService) RunScheduledPublishJob(ctx context.Context, runner db
 		if err != nil {
 			return fmt.Errorf("scheduler: load scheduled state for doc %s: %w", input.DocumentID, err)
 		}
+
+		if err := lockDocumentRowsInIDOrder(ctx, tx, input.TenantID,
+			state.DocumentID, state.SupersededDocumentID.String); err != nil {
+			return fmt.Errorf("scheduler: %w", err)
+		}
+		// Values may have moved between the unlocked read and the lock, so every
+		// gate below runs on the state read UNDER it. A supersede target that
+		// changed in that window also bumped revision_version (every writer of
+		// documents.superseded_document_id does), so scheduledJobMatchesState
+		// rejects the job as stale rather than acting on a row we did not lock.
+		state, err = s.loadScheduledDocumentState(ctx, tx, input.TenantID, input.DocumentID)
+		if errors.Is(err, sql.ErrNoRows) {
+			slog.InfoContext(ctx, "scheduler skipping publish job", "document_id", input.DocumentID, "reason", "document_not_found")
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("scheduler: re-read scheduled state for doc %s: %w", input.DocumentID, err)
+		}
 		if !scheduledJobMatchesState(state, input) {
 			slog.InfoContext(ctx, "scheduler skipping publish job", "document_id", input.DocumentID, "reason", "stale_job")
 			return nil
 		}
-		if s.clock.Now().UTC().Before(state.EffectiveFrom.Time.UTC()) {
+		if s.clock.Now().UTC().Before(state.PlannedEffectiveFrom.Time.UTC()) {
 			slog.InfoContext(ctx, "scheduler skipping publish job", "document_id", input.DocumentID, "reason", "pre_effective_date")
 			return nil
 		}
@@ -88,7 +118,7 @@ func (s *SchedulerService) RunScheduledPublishJob(ctx context.Context, runner db
 			TenantID:             state.TenantID,
 			ControlledDocumentID: state.ControlledDocumentID,
 			SupersededDocumentID: state.SupersededDocumentID,
-			EffectiveFrom:        state.EffectiveFrom.Time,
+			PlannedEffectiveFrom: state.PlannedEffectiveFrom.Time,
 			RevisionVersion:      state.RevisionVersion,
 			ScheduleGeneration:   state.ScheduleGeneration,
 		})
@@ -106,7 +136,7 @@ type scheduledPublishState struct {
 	TenantID             string
 	ControlledDocumentID string
 	SupersededDocumentID sql.NullString
-	EffectiveFrom        time.Time
+	PlannedEffectiveFrom time.Time
 	RevisionVersion      int
 	ScheduleGeneration   int64
 }
@@ -118,7 +148,11 @@ type scheduledPublishState struct {
 // sentinel to a successful no-op.
 func (s *SchedulerService) publishScheduledDocumentTx(ctx context.Context, tx *sql.Tx, row scheduledPublishState) error {
 	if row.SupersededDocumentID.Valid {
-		currentPublishedID, err := s.repo.LoadCurrentPublishedHead(ctx, tx, row.TenantID, row.ControlledDocumentID)
+		// NoLock: RunScheduledPublishJob already holds this row's lock, taken in
+		// sorted id order with the source. The locking sibling would take it
+		// here instead — after the source read — which is the out-of-order
+		// acquisition ADR 0085's single lock order forbids.
+		currentPublishedID, err := s.repo.LoadCurrentPublishedHeadNoLock(ctx, tx, row.TenantID, row.ControlledDocumentID)
 		if err != nil {
 			return fmt.Errorf("scheduler: load current published head for doc %s: %w", row.DocumentID, err)
 		}
@@ -151,7 +185,7 @@ func (s *SchedulerService) publishScheduledDocumentTx(ctx context.Context, tx *s
 
 	payloadMap := map[string]any{
 		"revision_version": row.RevisionVersion + 1,
-		"effective_date":   row.EffectiveFrom.Format("2006-01-02T15:04:05Z"),
+		"effective_date":   row.PlannedEffectiveFrom.Format("2006-01-02T15:04:05Z"),
 	}
 	if row.SupersededDocumentID.Valid {
 		payloadMap["superseded_document_id"] = row.SupersededDocumentID.String
@@ -179,15 +213,18 @@ func (s *SchedulerService) publishScheduledDocumentTx(ctx context.Context, tx *s
 	return nil
 }
 
+// loadScheduledDocumentState reads the scheduled row WITHOUT locking it. The
+// lock on this row is taken by lockDocumentRowsInIDOrder together with the
+// supersede target, in sorted id order; this helper is called once before that
+// (to discover the target) and once after (to read the authoritative state).
 func (s *SchedulerService) loadScheduledDocumentState(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (scheduledDocumentState, error) {
 	var state scheduledDocumentState
 	err := tx.QueryRowContext(ctx, `
 		SELECT id, tenant_id, status, controlled_document_id, superseded_document_id,
-		       effective_from, revision_version, schedule_generation
+		       planned_effective_from, revision_version, schedule_generation
 		  FROM documents
 		 WHERE tenant_id = $1
-		   AND id = $2
-		 FOR UPDATE`,
+		   AND id = $2`,
 		tenantID, documentID,
 	).Scan(
 		&state.DocumentID,
@@ -195,7 +232,7 @@ func (s *SchedulerService) loadScheduledDocumentState(ctx context.Context, tx *s
 		&state.Status,
 		&state.ControlledDocumentID,
 		&state.SupersededDocumentID,
-		&state.EffectiveFrom,
+		&state.PlannedEffectiveFrom,
 		&state.RevisionVersion,
 		&state.ScheduleGeneration,
 	)
@@ -205,12 +242,12 @@ func (s *SchedulerService) loadScheduledDocumentState(ctx context.Context, tx *s
 func scheduledJobMatchesState(state scheduledDocumentState, input ScheduledPublishJobInput) bool {
 	// Friendly first-line legality check (M4/F4.1) mirrors the DB trigger; the
 	// OCC UPDATE in publishScheduledDocumentTx remains the atomic CAS +
-	// optimistic-lock enforcement. state.Status is loaded fresh under FOR
-	// UPDATE, so this is the authoritative current status for this job run.
+	// optimistic-lock enforcement. state.Status is loaded fresh under the row
+	// lock, so this is the authoritative current status for this job run.
 	if docsdomain.CanTransitionDocumentStatus(docsdomain.DocumentStatus(state.Status), docsdomain.DocStatusPublished) != nil {
 		return false
 	}
-	if !state.EffectiveFrom.Valid {
+	if !state.PlannedEffectiveFrom.Valid {
 		return false
 	}
 	if state.ScheduleGeneration != input.ScheduleGeneration {
@@ -219,5 +256,5 @@ func scheduledJobMatchesState(state scheduledDocumentState, input ScheduledPubli
 	if state.RevisionVersion != input.ExpectedRevisionVersion {
 		return false
 	}
-	return state.EffectiveFrom.Time.UTC().Equal(input.ScheduledEffectiveAt.UTC())
+	return state.PlannedEffectiveFrom.Time.UTC().Equal(input.ScheduledEffectiveAt.UTC())
 }

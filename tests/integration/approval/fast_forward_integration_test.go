@@ -19,23 +19,22 @@ import (
 	"metaldocs/internal/modules/approval/application"
 	"metaldocs/internal/modules/approval/domain"
 	"metaldocs/internal/modules/approval/infrastructure"
-	docsapp "metaldocs/internal/modules/documents/application"
 	iampostgres "metaldocs/internal/modules/iam/infrastructure/postgres"
 	"metaldocs/internal/platform/db"
 	"metaldocs/tests/integration/testdb"
 )
 
-// fakePinInvoker is a no-op application.PinInvoker, mirroring the identical
-// fake in internal/modules/approval/application/decision_service_freeze_test.go.
-// The signoff leg's async-freeze seam (ADR 0015) requires a PinInvoker to be
+// fakeReleaseRecorder is a no-op application.TerminalApprovalReleaseRecorder.
+// The terminal-approval seam (ADR 0015 pin + ADR 0085 release facts) must be
 // wired before RecordSignoff's instance-approved branch runs; a no-op is
 // sufficient here since these tests assert approval's OWN frozen_content_hash
 // pin (F5/F6, set by executeFreeze during the verdict leg), not the
-// documents-module template/placeholder freeze this seam exists for.
-type fakePinInvoker struct{}
+// documents-module template/placeholder freeze or the release generation this
+// seam also drives.
+type fakeReleaseRecorder struct{}
 
-func (fakePinInvoker) Pin(_ context.Context, _ db.Tx, _, _ string, _ docsapp.ApproverContext) error {
-	return nil
+func (fakeReleaseRecorder) RecordTerminalApproval(_ context.Context, _ db.Tx, in application.TerminalApprovalInput) (string, error) {
+	return "gen-" + in.InstanceID, nil
 }
 
 // validFastForwardContentHash matches testdb.NewApprovalInstance's hardcoded
@@ -52,7 +51,7 @@ const validFastForwardContentHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 func fastForwardSvc(database *sql.DB) *application.FastForwardService {
 	repo := infrastructure.NewPostgresApprovalRepository(database, iampostgres.NewUserDisplayNameRepository(database))
 	services := application.NewServices(repo, application.NewSQLEmitter(), application.RealClock{}, nil)
-	services.Decision.WithPinInvoker(fakePinInvoker{})
+	services.WithReleaseRecorder(fakeReleaseRecorder{})
 	return services.FastForward
 }
 

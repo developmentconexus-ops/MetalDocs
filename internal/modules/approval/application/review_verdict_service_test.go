@@ -46,7 +46,7 @@ func TestRecordVerdict_ReadyOnApprovalStageRejected(t *testing.T) {
 		actorID:      actorID,
 	}
 	repo := &fakeDecisionRepo{instance: inst}
-	svc := &ReviewVerdictService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
+	svc := &ReviewVerdictService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, releaseRecorder: &fakeReleaseRecorder{}}
 	db := newDecisionTestDB(t, conn)
 
 	result, err := svc.RecordVerdict(context.Background(), newTxRunner(db), ReviewVerdictRequest{
@@ -120,7 +120,7 @@ func TestRecordVerdict_FastForwardEligible_ActorEligibleOnNextApprovalStage(t *t
 		instance:      inst,
 		stageVerdicts: []domain.ReviewVerdict{readyVerdictFor("verdict-ff-1", instanceID, reviewStageID, actorID, signedAt)},
 	}
-	svc := &ReviewVerdictService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}}
+	svc := &ReviewVerdictService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, releaseRecorder: &fakeReleaseRecorder{}}
 	db := newDecisionTestDB(t, conn)
 
 	result, err := svc.RecordVerdict(context.Background(), newTxRunner(db), ReviewVerdictRequest{
@@ -168,7 +168,7 @@ func TestRecordVerdict_FastForwardIneligible_ActorNotOnNextApprovalStage(t *test
 		instance:      inst,
 		stageVerdicts: []domain.ReviewVerdict{readyVerdictFor("verdict-ff-2", instanceID, reviewStageID, actorID, signedAt)},
 	}
-	svc := &ReviewVerdictService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}}
+	svc := &ReviewVerdictService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, releaseRecorder: &fakeReleaseRecorder{}}
 	db := newDecisionTestDB(t, conn)
 
 	result, err := svc.RecordVerdict(context.Background(), newTxRunner(db), ReviewVerdictRequest{
@@ -217,7 +217,7 @@ func TestRecordVerdict_FastForwardIneligible_NextStageIsReviewKind(t *testing.T)
 		instance:      inst,
 		stageVerdicts: []domain.ReviewVerdict{readyVerdictFor("verdict-ff-3", instanceID, stage1ID, actorID, signedAt)},
 	}
-	svc := &ReviewVerdictService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}}
+	svc := &ReviewVerdictService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, releaseRecorder: &fakeReleaseRecorder{}}
 	db := newDecisionTestDB(t, conn)
 
 	result, err := svc.RecordVerdict(context.Background(), newTxRunner(db), ReviewVerdictRequest{
@@ -268,7 +268,7 @@ func TestRecordVerdict_FastForwardIneligible_QuorumNotYetMet(t *testing.T) {
 		instance:      inst,
 		stageVerdicts: []domain.ReviewVerdict{readyVerdictFor("verdict-ff-4", instanceID, reviewStageID, actorID, signedAt)},
 	}
-	svc := &ReviewVerdictService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}}
+	svc := &ReviewVerdictService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, releaseRecorder: &fakeReleaseRecorder{}}
 	db := newDecisionTestDB(t, conn)
 
 	result, err := svc.RecordVerdict(context.Background(), newTxRunner(db), ReviewVerdictRequest{
@@ -316,7 +316,7 @@ func TestRecordVerdict_FastForwardIneligible_InstanceFullyApproved(t *testing.T)
 		instance:      inst,
 		stageVerdicts: []domain.ReviewVerdict{readyVerdictFor("verdict-ff-5", instanceID, stageID, actorID, signedAt)},
 	}
-	svc := &ReviewVerdictService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}}
+	svc := &ReviewVerdictService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, releaseRecorder: &fakeReleaseRecorder{}}
 	db := newDecisionTestDB(t, conn)
 
 	result, err := svc.RecordVerdict(context.Background(), newTxRunner(db), ReviewVerdictRequest{

@@ -25,7 +25,7 @@ type fakeStagingRepo struct {
 	gotFinalDocxS3Key          string
 }
 
-func (f *fakeStagingRepo) Enqueue(_ context.Context, _ db.Tx, tenantID, revisionID string, contentHash []byte) (string, error) {
+func (f *fakeStagingRepo) Enqueue(_ context.Context, _ db.Tx, tenantID, revisionID string, contentHash []byte, releaseGenerationID string) (string, error) {
 	f.calls++
 	f.gotTenantID = tenantID
 	f.gotRevisionID = revisionID
@@ -33,7 +33,7 @@ func (f *fakeStagingRepo) Enqueue(_ context.Context, _ db.Tx, tenantID, revision
 	return f.id, f.err
 }
 
-func (f *fakeStagingRepo) EnqueuePDF(_ context.Context, _ db.Tx, tenantID, revisionID string, contentHash []byte, finalDocxS3Key string) (string, error) {
+func (f *fakeStagingRepo) EnqueuePDF(_ context.Context, _ db.Tx, tenantID, revisionID string, contentHash []byte, finalDocxS3Key, releaseGenerationID string) (string, error) {
 	f.calls++
 	f.gotTenantID = tenantID
 	f.gotRevisionID = revisionID
@@ -76,7 +76,7 @@ func TestEnqueuer_EnqueuePDFTx_NewRow_InsertsRiverJob(t *testing.T) {
 	client := &fakeRiverInserter{}
 	e := newEnqueuerWithInserter(client, repo, nil, 25)
 
-	err := e.EnqueuePDFTx(context.Background(), &sql.Tx{}, "tenant-1", "revision-1", []byte{0xAB}, "tenants/t1/r1/frozen.docx")
+	err := e.EnqueuePDFTx(context.Background(), &sql.Tx{}, "tenant-1", "revision-1", []byte{0xAB}, "tenants/t1/r1/frozen.docx", "")
 	if err != nil {
 		t.Fatalf("EnqueuePDFTx: %v", err)
 	}
@@ -118,7 +118,7 @@ func TestEnqueuer_EnqueueMaterializeTx_NewRow_InsertsRiverJob(t *testing.T) {
 	client := &fakeRiverInserter{}
 	e := newEnqueuerWithInserter(client, nil, repo, 10)
 
-	err := e.EnqueueMaterializeTx(context.Background(), &sql.Tx{}, "tenant-2", "revision-2", []byte{0xCD})
+	err := e.EnqueueMaterializeTx(context.Background(), &sql.Tx{}, "tenant-2", "revision-2", []byte{0xCD}, "")
 	if err != nil {
 		t.Fatalf("EnqueueMaterializeTx: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestEnqueuer_DedupSkip_NoRiverInsert(t *testing.T) {
 	client := &fakeRiverInserter{}
 	e := newEnqueuerWithInserter(client, repo, nil, 25)
 
-	err := e.EnqueuePDFTx(context.Background(), &sql.Tx{}, "tenant-1", "revision-1", []byte{0xAB}, "tenants/t1/r1/frozen.docx")
+	err := e.EnqueuePDFTx(context.Background(), &sql.Tx{}, "tenant-1", "revision-1", []byte{0xAB}, "tenants/t1/r1/frozen.docx", "")
 	if err != nil {
 		t.Fatalf("EnqueuePDFTx: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestEnqueuer_RepoError_PropagatesAndSkipsRiver(t *testing.T) {
 	client := &fakeRiverInserter{}
 	e := newEnqueuerWithInserter(client, repo, nil, 25)
 
-	err := e.EnqueuePDFTx(context.Background(), &sql.Tx{}, "tenant-1", "revision-1", []byte{0xAB}, "tenants/t1/r1/frozen.docx")
+	err := e.EnqueuePDFTx(context.Background(), &sql.Tx{}, "tenant-1", "revision-1", []byte{0xAB}, "tenants/t1/r1/frozen.docx", "")
 	if !errors.Is(err, repoErr) {
 		t.Fatalf("err = %v, want %v", err, repoErr)
 	}
@@ -175,7 +175,7 @@ func TestEnqueuer_NonSQLTx_FailsLoud(t *testing.T) {
 	client := &fakeRiverInserter{}
 	e := newEnqueuerWithInserter(client, repo, repo, 25)
 
-	err := e.EnqueuePDFTx(context.Background(), fakeDBTx{}, "tenant-1", "revision-1", []byte{0xAB}, "tenants/t1/r1/frozen.docx")
+	err := e.EnqueuePDFTx(context.Background(), fakeDBTx{}, "tenant-1", "revision-1", []byte{0xAB}, "tenants/t1/r1/frozen.docx", "")
 	if err == nil {
 		t.Fatal("expected error for non-*sql.Tx, got nil")
 	}
@@ -183,7 +183,7 @@ func TestEnqueuer_NonSQLTx_FailsLoud(t *testing.T) {
 		t.Fatalf("InsertTx calls = %d, want 0 when tx assertion fails", client.calls)
 	}
 
-	err = e.EnqueueMaterializeTx(context.Background(), fakeDBTx{}, "tenant-1", "revision-1", []byte{0xAB})
+	err = e.EnqueueMaterializeTx(context.Background(), fakeDBTx{}, "tenant-1", "revision-1", []byte{0xAB}, "")
 	if err == nil {
 		t.Fatal("expected error for non-*sql.Tx, got nil")
 	}

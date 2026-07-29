@@ -14,6 +14,11 @@ type dispatchFields struct {
 	// on the pdf dispatch path; empty on the materialize dispatch path (which has
 	// no docx key at enqueue time).
 	FinalDocxS3Key string `json:"final_docx_s3_key,omitempty"`
+	// ReleaseGenerationID is the ADR 0085 release generation this render
+	// belongs to. It widens the dedup identity from revision-only to
+	// generation-aware: a re-approval of the same revision is a NEW generation
+	// and must re-materialize rather than dedup against the previous run.
+	ReleaseGenerationID string `json:"release_generation_id,omitempty"`
 }
 
 // PDFDispatchArgs is the River job payload for dispatching one pdf staging

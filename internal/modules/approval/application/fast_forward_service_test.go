@@ -59,7 +59,7 @@ func TestRecordFastForward_HappyPath_RecordsBothVerdictAndSignoff(t *testing.T) 
 		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "signoff-fastfwd-1", WasReplay: false},
 	}
 	verdicts := &ReviewVerdictService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}}
-	decisions := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, pinInvoker: &fakePinInvoker{}}
+	decisions := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, releaseRecorder: &fakeReleaseRecorder{}}
 	svc := newFastForwardService(verdicts, decisions)
 	db := newDecisionTestDB(t, conn)
 
@@ -121,7 +121,7 @@ func TestRecordFastForward_QuorumPending_StageNotCompleted(t *testing.T) {
 		stageVerdicts: []domain.ReviewVerdict{readyVerdictFor("verdict-fastfwd-2", instanceID, reviewStageID, actorID, signedAt)},
 	}
 	verdicts := &ReviewVerdictService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}}
-	decisions := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, pinInvoker: &fakePinInvoker{}}
+	decisions := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, releaseRecorder: &fakeReleaseRecorder{}}
 	svc := newFastForwardService(verdicts, decisions)
 	db := newDecisionTestDB(t, conn)
 
@@ -169,7 +169,7 @@ func TestRecordFastForward_ActorNotEligibleOnNextStage_NotEligible(t *testing.T)
 		stageVerdicts: []domain.ReviewVerdict{readyVerdictFor("verdict-fastfwd-3", instanceID, reviewStageID, actorID, signedAt)},
 	}
 	verdicts := &ReviewVerdictService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}}
-	decisions := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, pinInvoker: &fakePinInvoker{}}
+	decisions := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, releaseRecorder: &fakeReleaseRecorder{}}
 	svc := newFastForwardService(verdicts, decisions)
 	db := newDecisionTestDB(t, conn)
 
@@ -213,7 +213,7 @@ func TestRecordFastForward_ReadyOnApprovalStage_ErrorPropagated(t *testing.T) {
 	}
 	repo := &fakeDecisionRepo{instance: inst}
 	verdicts := &ReviewVerdictService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
-	decisions := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, pinInvoker: &fakePinInvoker{}}
+	decisions := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, releaseRecorder: &fakeReleaseRecorder{}}
 	svc := newFastForwardService(verdicts, decisions)
 	db := newDecisionTestDB(t, conn)
 
@@ -265,7 +265,7 @@ func TestRecordFastForward_SignoffLegFails_ErrorPropagated(t *testing.T) {
 		insertSignoffErr: wantErr,
 	}
 	verdicts := &ReviewVerdictService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}}
-	decisions := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, pinInvoker: &fakePinInvoker{}}
+	decisions := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, releaseRecorder: &fakeReleaseRecorder{}}
 	svc := newFastForwardService(verdicts, decisions)
 	db := newDecisionTestDB(t, conn)
 

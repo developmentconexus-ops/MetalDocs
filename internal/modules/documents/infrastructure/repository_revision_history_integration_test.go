@@ -137,10 +137,17 @@ func TestListRevisionHistory_ReturnsGovernedDocumentsNotAutosaveRows(t *testing.
 		}
 
 		// Walk firstDocID through the legal status lifecycle to 'published'.
+		// ADR 0085: entering 'published' stamps the ACTUAL release instant;
+		// ck_documents_published_effective_from rejects a published document
+		// without one (that state is F-QA4-13 — invisible to the review surfacer).
 		for _, nextStatus := range []string{"under_review", "approved", "published"} {
+			set := `status = $2`
+			if nextStatus == "published" {
+				set += `, effective_from = '2026-05-10T12:00:00Z'::timestamptz`
+			}
 			if _, err := tx.ExecContext(ctx,
 				`UPDATE `+testdb.Qualified(schema, "documents")+`
-				    SET status = $2
+				    SET `+set+`
 				  WHERE id = $1::uuid`,
 				firstDocID, nextStatus,
 			); err != nil {

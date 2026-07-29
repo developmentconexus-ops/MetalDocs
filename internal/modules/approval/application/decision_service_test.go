@@ -600,7 +600,7 @@ func TestRecordSignoff_ApprovePath_QuorumMet(t *testing.T) {
 	}
 	emitter := &MemoryEmitter{}
 	clock := fixedClock{t: signedAt}
-	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, pinInvoker: &fakePinInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, releaseRecorder: &fakeReleaseRecorder{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -662,7 +662,7 @@ func TestRecordSignoff_DBLevelReplayCarriesOriginalSignoffID(t *testing.T) {
 		instance:         inst,
 		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "signoff-original", WasReplay: true},
 	}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, pinInvoker: &fakePinInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, releaseRecorder: &fakeReleaseRecorder{}}
 	db := newDecisionTestDB(t, conn)
 
 	result, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
@@ -729,7 +729,7 @@ func TestRecordSignoff_ApprovePath_QuorumNotYetMet(t *testing.T) {
 	}
 	emitter := &MemoryEmitter{}
 	clock := fixedClock{t: signedAt}
-	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, pinInvoker: &fakePinInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, releaseRecorder: &fakeReleaseRecorder{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -773,10 +773,10 @@ func TestRecordSignoff_ContentHashEchoesInstanceSubmitHash(t *testing.T) {
 	}
 	repo := &fakeDecisionRepo{instance: inst}
 	svc := &DecisionService{
-		repo:       repo,
-		emitter:    &MemoryEmitter{},
-		clock:      fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
-		pinInvoker: &fakePinInvoker{},
+		repo:            repo,
+		emitter:         &MemoryEmitter{},
+		clock:           fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
+		releaseRecorder: &fakeReleaseRecorder{},
 	}
 	db := newDecisionTestDB(t, conn)
 
@@ -819,10 +819,10 @@ func TestRecordSignoff_ApproveSetsSignatureMeaningApproval(t *testing.T) {
 	}
 	repo := &fakeDecisionRepo{instance: inst}
 	svc := &DecisionService{
-		repo:       repo,
-		emitter:    &MemoryEmitter{},
-		clock:      fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
-		pinInvoker: &fakePinInvoker{},
+		repo:            repo,
+		emitter:         &MemoryEmitter{},
+		clock:           fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
+		releaseRecorder: &fakeReleaseRecorder{},
 	}
 	db := newDecisionTestDB(t, conn)
 
@@ -862,10 +862,10 @@ func TestRecordSignoff_ThreadsActorDisplayNameFromRepo(t *testing.T) {
 	}
 	repo := &fakeDecisionRepo{instance: inst, actorDisplayName: "Alice Approver"}
 	svc := &DecisionService{
-		repo:       repo,
-		emitter:    &MemoryEmitter{},
-		clock:      fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
-		pinInvoker: &fakePinInvoker{},
+		repo:            repo,
+		emitter:         &MemoryEmitter{},
+		clock:           fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
+		releaseRecorder: &fakeReleaseRecorder{},
 	}
 	db := newDecisionTestDB(t, conn)
 
@@ -914,10 +914,10 @@ func TestRecordSignoff_ContentHashMismatchFailsBeforePersisting(t *testing.T) {
 	}
 	repo := &fakeDecisionRepo{instance: inst}
 	svc := &DecisionService{
-		repo:       repo,
-		emitter:    &MemoryEmitter{},
-		clock:      fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
-		pinInvoker: &fakePinInvoker{},
+		repo:            repo,
+		emitter:         &MemoryEmitter{},
+		clock:           fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
+		releaseRecorder: &fakeReleaseRecorder{},
 	}
 	db := newDecisionTestDB(t, conn)
 
@@ -966,10 +966,10 @@ func TestRecordSignoff_NullFrozenHash_FailsClosed(t *testing.T) {
 	}
 	repo := &fakeDecisionRepo{instance: inst}
 	svc := &DecisionService{
-		repo:       repo,
-		emitter:    &MemoryEmitter{},
-		clock:      fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
-		pinInvoker: &fakePinInvoker{},
+		repo:            repo,
+		emitter:         &MemoryEmitter{},
+		clock:           fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
+		releaseRecorder: &fakeReleaseRecorder{},
 	}
 	db := newDecisionTestDB(t, conn)
 
@@ -1035,7 +1035,7 @@ func TestRecordSignoff_RejectPath(t *testing.T) {
 	}
 	emitter := &MemoryEmitter{}
 	clock := fixedClock{t: signedAt}
-	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, pinInvoker: &fakePinInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, releaseRecorder: &fakeReleaseRecorder{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -1126,7 +1126,7 @@ func TestRecordSignoff_RejectSetsSignatureMeaningRejection(t *testing.T) {
 		instance:         inst,
 		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "signoff-sigmeaning-reject", WasReplay: false},
 	}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, pinInvoker: &fakePinInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, releaseRecorder: &fakeReleaseRecorder{}}
 	db := newDecisionTestDB(t, conn)
 
 	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
@@ -1169,7 +1169,7 @@ func TestRecordSignoff_SoDViolation(t *testing.T) {
 	repo := &fakeDecisionRepo{instance: inst}
 	emitter := &MemoryEmitter{}
 	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
-	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, pinInvoker: &fakePinInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, releaseRecorder: &fakeReleaseRecorder{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -1215,7 +1215,7 @@ func TestRecordSignoff_RejectsNonEligibleActor(t *testing.T) {
 	repo := &fakeDecisionRepo{instance: inst}
 	emitter := &MemoryEmitter{}
 	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
-	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, pinInvoker: &fakePinInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, releaseRecorder: &fakeReleaseRecorder{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -1270,7 +1270,7 @@ func TestRecordSignoff_CapabilityDenied(t *testing.T) {
 	repo := &fakeDecisionRepo{instance: inst}
 	emitter := &MemoryEmitter{}
 	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
-	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, pinInvoker: &fakePinInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, releaseRecorder: &fakeReleaseRecorder{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -1345,12 +1345,12 @@ func TestRecordSignoff_FinalApprove_NoLongerGatedByUnresolvedComments(t *testing
 		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "signoff-comments-1", WasReplay: false},
 	}
 	emitter := &MemoryEmitter{}
-	pin := &fakePinInvoker{}
+	pin := &fakeReleaseRecorder{}
 	svc := &DecisionService{
-		repo:       repo,
-		emitter:    emitter,
-		clock:      fixedClock{t: signedAt},
-		pinInvoker: pin,
+		repo:            repo,
+		emitter:         emitter,
+		clock:           fixedClock{t: signedAt},
+		releaseRecorder: pin,
 	}
 	db := newDecisionTestDB(t, conn)
 

@@ -64,10 +64,14 @@ func TestLoadCurrentPublishedHeadForDocument_RealRows(t *testing.T) {
 	repo := NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{})
 	ctx := context.Background()
 
-	// One lineage with three revisions: published rev0, approved rev1, published
-	// rev2. The current published head is the highest-revision published row.
+	// One lineage with three revisions: superseded rev0, approved rev1,
+	// published rev2. The current published head is the only published row —
+	// ux_documents_published_head (migration 0310, ADR 0085's one-published-head
+	// invariant) makes the old two-published-rows shape of this fixture
+	// unrepresentable, so what it pins now is that the resolver ignores the
+	// lineage's NON-published siblings on both sides of the head.
 	cd := testdb.NewControlledDoc(t, db)
-	testdb.NewDocument(t, db, testdb.WithControlledDoc(cd), testdb.WithStatus("published"), testdb.WithRevisionNumber(0))
+	testdb.NewDocument(t, db, testdb.WithControlledDoc(cd), testdb.WithStatus("superseded"), testdb.WithRevisionNumber(0))
 	target := testdb.NewDocument(t, db, testdb.WithControlledDoc(cd), testdb.WithStatus("approved"), testdb.WithRevisionNumber(1))
 	laterHead := testdb.NewDocument(t, db, testdb.WithControlledDoc(cd), testdb.WithStatus("published"), testdb.WithRevisionNumber(2))
 
@@ -205,7 +209,8 @@ func TestScheduleGenerationIncrementsOnScheduledWritePath(t *testing.T) {
 		result, err := tx.ExecContext(ctx, `
 			UPDATE public.documents
 			   SET status = 'scheduled',
-			       effective_from = $1,
+			       planned_effective_from = $1,
+			       effective_from = NULL,
 			       superseded_document_id = NULL,
 			       revision_version = revision_version + 1,
 			       schedule_generation = schedule_generation + 1

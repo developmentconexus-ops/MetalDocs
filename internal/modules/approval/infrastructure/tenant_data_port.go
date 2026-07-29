@@ -65,6 +65,7 @@ func (p *TenantDataPort) Tables() []string {
 		"public.approval_signoffs",
 		"public.approval_review_verdicts",
 		"public.approval_delegations",
+		"public.release_generations",
 	}
 }
 
@@ -93,7 +94,12 @@ func (p *TenantDataPort) ExportTenantData(ctx context.Context, db *sql.DB, tenan
 	if err != nil {
 		return nil, err
 	}
-	return []tenantdata.TableExport{instances, routes, selectors, signoffs, verdicts, delegations}, nil
+	// ADR 0085 release generations: approval-owned, plain tenant_id, no FK.
+	generations, err := tenantdata.ExportTable(ctx, db, "public.release_generations", "tenant_id", tenantID)
+	if err != nil {
+		return nil, err
+	}
+	return []tenantdata.TableExport{instances, routes, selectors, signoffs, verdicts, delegations, generations}, nil
 }
 
 func (p *TenantDataPort) EraseTenantData(ctx context.Context, tx *sql.Tx, tenantID string) (map[string]int64, error) {
@@ -136,6 +142,15 @@ func (p *TenantDataPort) EraseTenantData(ctx context.Context, tx *sql.Tx, tenant
 		return nil, err
 	}
 	counts["public.approval_routes"] = n
+
+	// ADR 0085: no FK in either direction (the generation carries document_id
+	// and approval_instance_id as plain uuids so a purged instance cannot
+	// resurrect a release), so order is unconstrained.
+	n, err = tenantdata.EraseTable(ctx, tx, "public.release_generations", "tenant_id", tenantID)
+	if err != nil {
+		return nil, err
+	}
+	counts["public.release_generations"] = n
 
 	return counts, nil
 }

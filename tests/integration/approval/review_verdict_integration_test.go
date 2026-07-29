@@ -176,6 +176,7 @@ func seedReviewVerdictFixture(t *testing.T, database *sql.DB, stageKind domain.S
 	repo := infrastructure.NewPostgresApprovalRepository(database, iampostgres.NewUserDisplayNameRepository(database))
 	runner := db.NewTxRunner(database)
 	services := application.NewServices(repo, application.NewSQLEmitter(), application.RealClock{}, nil)
+	services.WithReleaseRecorder(fakeReleaseRecorder{})
 
 	return reviewVerdictFixture{
 		tenantID:   tenant.ID,
@@ -306,6 +307,7 @@ func seedReviewThenApprovalFixture(t *testing.T, database *sql.DB, approvalEligi
 	repo := infrastructure.NewPostgresApprovalRepository(database, iampostgres.NewUserDisplayNameRepository(database))
 	runner := db.NewTxRunner(database)
 	services := application.NewServices(repo, application.NewSQLEmitter(), application.RealClock{}, nil)
+	services.WithReleaseRecorder(fakeReleaseRecorder{})
 
 	return reviewThenApprovalFixture{
 		tenantID:        tenant.ID,

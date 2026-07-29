@@ -746,9 +746,19 @@ func main() {
 	// pointer. Rebuilding here would silently drop all of that wiring from
 	// Decision while leaving FastForward on the original, divergent instance.
 	approvalServices.Decision = approvalServices.Decision.
-		WithPinInvoker(fanoutCfg.freezeService).
 		WithSignatureRegistry(newSignoffReauthRegistry(deps.AuthRepo, deps.SQLDB)).
 		WithCDFieldReader(cdReader)
+	// ADR 0085 / F-QA4-14: ONE terminal-approval recorder — approval fact +
+	// async-freeze pin + coordinator evaluation, all on the signoff/verdict
+	// transaction — wired into BOTH terminal-approval routes from this single
+	// call. A document approved through a review verdict must freeze,
+	// materialize and release exactly like one approved through a signoff.
+	if riverBundle != nil {
+		approvalServices.WithReleaseRecorder(approvalapp.NewReleaseFactRecorder(
+			fanoutCfg.freezeService,
+			approvaljobs.NewReleaseEvaluationEnqueuer(riverBundle.Client),
+		))
+	}
 
 	docMod := documents.New(docDeps)
 	// SP-2: pin tenant dictionary values at document creation. tokensModule was

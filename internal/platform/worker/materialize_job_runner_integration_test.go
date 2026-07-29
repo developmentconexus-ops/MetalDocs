@@ -62,7 +62,7 @@ func (f fakeMaterializeInvoker) Materialize(ctx context.Context, tenantID, revis
 // scope (F9 only proves the final-docx write path).
 type noopPDFEnqueuer struct{}
 
-func (noopPDFEnqueuer) EnqueuePDFTx(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte, finalDocxS3Key string) error {
+func (noopPDFEnqueuer) EnqueuePDFTx(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte, finalDocxS3Key, releaseGenerationID string) error {
 	return nil
 }
 

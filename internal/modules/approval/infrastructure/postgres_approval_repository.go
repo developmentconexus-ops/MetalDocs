@@ -680,6 +680,27 @@ func (r *postgresApprovalRepository) LoadCurrentPublishedHead(ctx context.Contex
 	return documentID, nil
 }
 
+func (r *postgresApprovalRepository) LoadCurrentPublishedHeadNoLock(ctx context.Context, tx db.Tx, tenantID, controlledDocumentID string) (string, error) {
+	var documentID string
+	err := tx.QueryRowContext(ctx, `
+		SELECT id
+		  FROM documents
+		 WHERE tenant_id = $1
+		   AND controlled_document_id = $2
+		   AND status = 'published'
+		 ORDER BY revision_number DESC
+		 LIMIT 1`,
+		tenantID, controlledDocumentID,
+	).Scan(&documentID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", MapPgError(err, MapHints{})
+	}
+	return documentID, nil
+}
+
 func (r *postgresApprovalRepository) GetDocumentRevisionVersion(ctx context.Context, tx db.Tx, documentID, tenantID string) (int, error) {
 	var revisionVersion int
 	err := tx.QueryRowContext(ctx, `

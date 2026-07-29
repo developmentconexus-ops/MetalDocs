@@ -163,7 +163,7 @@ func TestSubmitRevisionForReview_ContentHashError(t *testing.T) {
 func TestRecordSignoff_FloatInPayload(t *testing.T) {
 	conn := &decisionTestConn{}
 	repo := &fakeDecisionRepo{}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, pinInvoker: &fakePinInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, releaseRecorder: &fakeReleaseRecorder{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -188,7 +188,7 @@ func TestRecordSignoff_FloatInPayload(t *testing.T) {
 func TestRecordSignoff_LoadInstanceNotFound(t *testing.T) {
 	conn := &decisionTestConn{}
 	repo := &fakeDecisionRepo{loadInstanceErr: sql.ErrNoRows}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, pinInvoker: &fakePinInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, releaseRecorder: &fakeReleaseRecorder{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -211,7 +211,7 @@ func TestRecordSignoff_InstanceAlreadyCompleted(t *testing.T) {
 
 	conn := &decisionTestConn{}
 	repo := &fakeDecisionRepo{instance: inst}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, pinInvoker: &fakePinInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, releaseRecorder: &fakeReleaseRecorder{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -232,7 +232,7 @@ func TestRecordSignoff_StageNotActive(t *testing.T) {
 	inst := buildSingleStageInstance("inst-stale", "stage-1", "author", []string{"actor"})
 	conn := &decisionTestConn{}
 	repo := &fakeDecisionRepo{instance: inst}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, pinInvoker: &fakePinInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, releaseRecorder: &fakeReleaseRecorder{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -253,7 +253,7 @@ func TestRecordSignoff_RequiresStageInstanceID(t *testing.T) {
 	inst := buildSingleStageInstance("inst-missing-stage", "stage-required", "author", []string{"actor"})
 	conn := &decisionTestConn{}
 	repo := &fakeDecisionRepo{instance: inst}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, pinInvoker: &fakePinInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, releaseRecorder: &fakeReleaseRecorder{}}
 	db := newDecisionTestDB(t, conn)
 
 	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
@@ -301,7 +301,7 @@ func TestRecordSignoff_NoActiveStage(t *testing.T) {
 	// Instance status is InProgress but no stage is Active.
 	conn := &decisionTestConn{}
 	repo := &fakeDecisionRepo{instance: inst}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, pinInvoker: &fakePinInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, releaseRecorder: &fakeReleaseRecorder{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -330,7 +330,7 @@ func TestRecordSignoff_ActorAlreadySigned(t *testing.T) {
 		instance:         inst,
 		insertSignoffErr: infrastructure.ErrActorAlreadySigned,
 	}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, pinInvoker: &fakePinInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, releaseRecorder: &fakeReleaseRecorder{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -356,7 +356,7 @@ func TestRecordSignoff_IdempotentReplay(t *testing.T) {
 		instance:         inst,
 		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "signoff-replay", WasReplay: true},
 	}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, pinInvoker: &fakePinInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, releaseRecorder: &fakeReleaseRecorder{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -452,7 +452,7 @@ func TestRecordSignoff_ActivateNextStage(t *testing.T) {
 		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "sig-ts-1", WasReplay: false},
 	}
 	emitter := &MemoryEmitter{}
-	svc := &DecisionService{repo: repo, emitter: emitter, clock: fixedClock{t: signedAt}, pinInvoker: &fakePinInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: emitter, clock: fixedClock{t: signedAt}, releaseRecorder: &fakeReleaseRecorder{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{

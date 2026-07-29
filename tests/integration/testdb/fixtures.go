@@ -363,9 +363,19 @@ func SupersedeActiveDocumentForCD(t *testing.T, db *sql.DB, controlledDocumentID
 		); err != nil {
 			return err
 		}
+		// ADR 0085: a published document without effective_from is exactly
+		// F-QA4-13 (it escapes the periodic-review surfacer) and is now rejected
+		// by ck_documents_published_effective_from. The walk therefore stamps the
+		// ACTUAL release instant when it enters 'published' — and leaves it in
+		// place through 'superseded', where it remains the historical record of
+		// when the document was in force.
 		for _, status := range []string{"under_review", "approved", "published", "superseded"} {
+			set := `status = $2`
+			if status == "published" {
+				set += `, effective_from = COALESCE(effective_from, now())`
+			}
 			if _, err := tx.ExecContext(ctx,
-				`UPDATE `+Qualified("", "documents")+` SET status = $2 WHERE id = $1::uuid`,
+				`UPDATE `+Qualified("", "documents")+` SET `+set+` WHERE id = $1::uuid`,
 				docID, status,
 			); err != nil {
 				return err

@@ -92,17 +92,19 @@ func runPublishRaceInterleaving(t *testing.T, seed seedState, manualFirst bool) 
 	database.SetMaxIdleConns(4)
 	database.SetMaxOpenConns(4)
 
-	// effective_from is only meaningful for the scheduled seed; in the past so
-	// the scheduler's pre-effective-date gate passes. For the approved seed the
-	// document carries no effective_from (NULL), which is exactly what makes the
-	// scheduler no-op there — but the job input still references this timestamp
-	// so the scheduler genuinely attempts (loads state under FOR UPDATE) before
-	// diverging.
+	// The planned effective date is only meaningful for the scheduled seed; in
+	// the past so the scheduler's pre-effective-date gate passes. ADR 0085: the
+	// plan lives in planned_effective_from — effective_from is the ACTUAL
+	// release instant and is stamped only when the publish lands. For the
+	// approved seed the document carries no plan at all, which is exactly what
+	// makes the scheduler no-op there — but the job input still references this
+	// timestamp so the scheduler genuinely attempts (loads state under FOR
+	// UPDATE) before diverging.
 	// Truncated to microseconds: Postgres timestamptz has microsecond resolution,
 	// so a nanosecond-precision time.Now() would not survive the seed round-trip
-	// byte-for-byte and scheduledJobMatchesState's effective_from equality
-	// (state.EffectiveFrom.Equal(input.ScheduledEffectiveAt)) would spuriously fail,
-	// making the scheduler no-op on a row it should publish.
+	// byte-for-byte and scheduledJobMatchesState's planned-date equality
+	// (state.PlannedEffectiveFrom.Equal(input.ScheduledEffectiveAt)) would
+	// spuriously fail, making the scheduler no-op on a row it should publish.
 	effectiveAt := time.Now().UTC().Add(-1 * time.Hour).Truncate(time.Microsecond)
 
 	tnt := testdb.NewTenant(t, database)
@@ -114,7 +116,7 @@ func runPublishRaceInterleaving(t *testing.T, seed seedState, manualFirst bool) 
 		doc = testdb.Scenario{}.ScheduledRevision(t, database, 5,
 			testdb.WithTenant(tnt.ID),
 			testdb.WithOwner(user.ID),
-			testdb.WithEffectiveFrom(effectiveAt),
+			testdb.WithPlannedEffectiveFrom(effectiveAt),
 			testdb.WithRevisionVersion(3),
 		)
 	case seedApproved:

@@ -23,6 +23,10 @@ type PDFConvertPayload struct {
 	RevisionID     string `json:"revision_id"`
 	FinalDocxS3Key string `json:"final_docx_s3_key"`
 	ContentHash    string `json:"content_hash,omitempty"`
+	// ReleaseGenerationID keys the produced artifact to one ADR 0085 release
+	// generation. Empty on legacy/non-approval renders, which produce no
+	// artifact fact.
+	ReleaseGenerationID string `json:"release_generation_id,omitempty"`
 }
 
 func (PDFConvertPayload) eventPayload() {}
@@ -30,6 +34,9 @@ func (PDFConvertPayload) eventPayload() {}
 type MaterializeFanoutPayload struct {
 	TenantID   string `json:"tenant_id"`
 	RevisionID string `json:"revision_id"`
+	// ReleaseGenerationID keys the produced artifact to one ADR 0085 release
+	// generation. Empty on legacy/non-approval renders.
+	ReleaseGenerationID string `json:"release_generation_id,omitempty"`
 }
 
 func (MaterializeFanoutPayload) eventPayload() {}

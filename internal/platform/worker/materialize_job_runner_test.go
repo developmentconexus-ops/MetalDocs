@@ -40,17 +40,19 @@ func (f *fakeFinalDocxPersister) WriteFinalDocxInTx(_ context.Context, _ db.Tx, 
 }
 
 type fakePDFEnqueuer struct {
-	calls             int
-	err               error
-	gotFinalDocxS3Key string
+	calls                  int
+	err                    error
+	gotFinalDocxS3Key      string
+	gotReleaseGenerationID string
 }
 
-func (f *fakePDFEnqueuer) EnqueuePDFTx(_ context.Context, _ db.Tx, _, _ string, _ []byte, finalDocxS3Key string) error {
+func (f *fakePDFEnqueuer) EnqueuePDFTx(_ context.Context, _ db.Tx, _, _ string, _ []byte, finalDocxS3Key, releaseGenerationID string) error {
 	if f.err != nil {
 		return f.err
 	}
 	f.calls++
 	f.gotFinalDocxS3Key = finalDocxS3Key
+	f.gotReleaseGenerationID = releaseGenerationID
 	return nil
 }
 

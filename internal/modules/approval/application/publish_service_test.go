@@ -29,7 +29,7 @@ type fakePublishRepo struct {
 	currentPublishedHeadForDoc    string
 	loadCurrentPublishedHeadErr   error
 	loadCurrentPublishedHeadCalls int
-	loadCurrentPublishedHeadDocID string
+	loadCurrentPublishedHeadCDID  string
 	validateSupersedeCalls        int
 	validateSupersedeTenantID     string
 	validateSupersedeDocumentID   string
@@ -42,10 +42,12 @@ func (r *fakePublishRepo) LoadInstance(_ context.Context, _ db.Tx, _, _ string) 
 	return r.instance, r.loadErr
 }
 
-func (r *fakePublishRepo) LoadCurrentPublishedHeadForDocument(_ context.Context, _ db.Tx, tenantID, documentID string) (string, error) {
+// SchedulePublish discovers the head lock-free (ADR 0085 lock-order parity) and
+// re-reads it under the lock, so this stub is called twice per successful call.
+func (r *fakePublishRepo) LoadCurrentPublishedHeadNoLock(_ context.Context, _ db.Tx, tenantID, controlledDocumentID string) (string, error) {
 	r.loadCurrentPublishedHeadCalls++
 	r.validateSupersedeTenantID = tenantID
-	r.loadCurrentPublishedHeadDocID = documentID
+	r.loadCurrentPublishedHeadCDID = controlledDocumentID
 	return r.currentPublishedHeadForDoc, r.loadCurrentPublishedHeadErr
 }
 
@@ -152,6 +154,21 @@ func (s *publishTestStmt) Query(args []driver.Value) (driver.Rows, error) {
 		}
 		return &publishSingleValueRows{value: s.conn.scheduleGeneration}, nil
 	}
+	// ADR 0085 lock-order parity: lockDocumentRowsInIDOrder locks one document
+	// row per statement, in sorted id order, and reads back the id it locked.
+	if strings.Contains(q, "for update") && strings.Contains(q, "from documents") {
+		var lockedID any
+		if len(args) > 0 {
+			lockedID = args[0]
+		}
+		s.conn.lockedDocumentIDs = append(s.conn.lockedDocumentIDs, fmt.Sprint(lockedID))
+		return &publishSingleValueRows{value: lockedID}, nil
+	}
+	// docapp.LoadDocumentControlledDocumentID — schema-qualified, so it must be
+	// matched before the unqualified area read below.
+	if strings.Contains(q, "from public.documents") {
+		return &publishSingleValueRows{value: s.conn.controlledDocumentID}, nil
+	}
 	if strings.Contains(q, "from documents") {
 		return &docAreaRows{snapshot: s.conn.areaCode}, nil
 	}
@@ -183,6 +200,11 @@ type publishTestConn struct {
 	assertedCaps       []string
 	lastUpdateArgs     []driver.Value
 	scheduleGeneration int64
+	// controlledDocumentID answers docapp.LoadDocumentControlledDocumentID;
+	// lockedDocumentIDs records the order lockDocumentRowsInIDOrder took the
+	// document row locks in.
+	controlledDocumentID string
+	lockedDocumentIDs    []string
 }
 
 func (c *publishTestConn) setAssertedCaps(raw string) {
@@ -257,12 +279,13 @@ func newPublishTestHarness(t *testing.T, rowsAffected int64, authzGranted ...boo
 		granted = authzGranted[0]
 	}
 	conn := &publishTestConn{
-		rowsAffected:       rowsAffected,
-		authzGranted:       granted,
-		areaCode:           "QA",
-		actorID:            "user-1",
-		tenantID:           tenant.DevTenantID,
-		scheduleGeneration: 1,
+		rowsAffected:         rowsAffected,
+		authzGranted:         granted,
+		areaCode:             "QA",
+		actorID:              "user-1",
+		tenantID:             tenant.DevTenantID,
+		scheduleGeneration:   1,
+		controlledDocumentID: "cd-publish-1",
 	}
 	name := fmt.Sprintf("publish_test_%p", conn)
 	sql.Register(name, &publishTestDriver{conn: conn})
@@ -589,8 +612,14 @@ func TestSchedulePublish_PersistsSupersededDocumentID(t *testing.T) {
 	if got := conn.lastUpdateArgs[1]; got != "doc-published-1" {
 		t.Fatalf("superseded document arg = %v, want doc-published-1", got)
 	}
-	if repo.loadCurrentPublishedHeadCalls != 1 {
-		t.Fatalf("LoadCurrentPublishedHeadForDocument calls = %d, want 1", repo.loadCurrentPublishedHeadCalls)
+	// Twice: lock-free discovery, then the authoritative re-read under the
+	// document locks (ADR 0085 lock-order parity).
+	if repo.loadCurrentPublishedHeadCalls != 2 {
+		t.Fatalf("LoadCurrentPublishedHeadNoLock calls = %d, want 2", repo.loadCurrentPublishedHeadCalls)
+	}
+	// Both rows are locked, and in ascending id order — never head-then-source.
+	if got := conn.lockedDocumentIDs; len(got) != 2 || got[0] != "doc-published-1" || got[1] != "doc-sched-supersede-1" {
+		t.Fatalf("locked document ids = %v, want [doc-published-1 doc-sched-supersede-1] (ascending)", got)
 	}
 }
 
@@ -674,8 +703,10 @@ func TestSchedulePublish_ValidatesSupersedeTarget(t *testing.T) {
 	if repo.validateSupersedeTenantID != "tenant-uuid-1" {
 		t.Fatalf("tenant id = %q, want tenant-uuid-1", repo.validateSupersedeTenantID)
 	}
-	if repo.loadCurrentPublishedHeadDocID != "doc-sched-validate-1" {
-		t.Fatalf("document id = %q, want doc-sched-validate-1", repo.loadCurrentPublishedHeadDocID)
+	// The head is now resolved by controlled document (lock-free), not by the
+	// source document id with a FOR UPDATE OF current_head.
+	if repo.loadCurrentPublishedHeadCDID != "cd-publish-1" {
+		t.Fatalf("controlled document id = %q, want cd-publish-1", repo.loadCurrentPublishedHeadCDID)
 	}
 }
 

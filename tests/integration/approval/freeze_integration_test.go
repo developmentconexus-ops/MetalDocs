@@ -245,6 +245,7 @@ func TestFreeze_SubmitApprovalOnlyRoute_PinsHashAtSubmit(t *testing.T) {
 	repo := infrastructure.NewPostgresApprovalRepository(database, iamdomain.NoopUserDisplayNameReader{})
 	runner := db.NewTxRunner(database)
 	services := application.NewServices(repo, application.NewSQLEmitter(), application.RealClock{}, nil)
+	services.WithReleaseRecorder(fakeReleaseRecorder{})
 
 	// authz.Require needs the metaldocs.tenant_id / actor_id GUCs seeded on
 	// the tx; TxRunner.seedTxIdentityFromContext pulls them from ctx.

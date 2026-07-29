@@ -137,7 +137,7 @@ func TestPDFDispatchWorker_Integration_PublishesAndMarksDispatched(t *testing.T)
 	enqueuer := newTestEnqueuer(t, db)
 
 	tx := seedTenantTx(t, ctx, db, tenant.ID)
-	if err := enqueuer.EnqueuePDFTx(ctx, tx, tenant.ID, revisionID, contentHash, finalDocxKey); err != nil {
+	if err := enqueuer.EnqueuePDFTx(ctx, tx, tenant.ID, revisionID, contentHash, finalDocxKey, ""); err != nil {
 		_ = tx.Rollback()
 		t.Fatalf("EnqueuePDFTx: %v", err)
 	}
@@ -158,11 +158,17 @@ func TestPDFDispatchWorker_Integration_PublishesAndMarksDispatched(t *testing.T)
 		t.Fatalf("load pdf_dispatch_outbox row: %v", err)
 	}
 
+	// The worker reads final_docx_s3_key off its OWN job args (EnqueuePDFTx
+	// threads it there); it never re-reads the outbox row. Hand-building the
+	// args here therefore has to mirror what EnqueuePDFTx wrote, or the
+	// final_docx_s3_key assertion below is asserting against a fixture the
+	// production path would never produce.
 	fields := dispatchFields{
-		TenantID:    tenant.ID,
-		RevisionID:  revisionID,
-		ContentHash: contentHash,
-		OutboxID:    outboxID,
+		TenantID:       tenant.ID,
+		RevisionID:     revisionID,
+		ContentHash:    contentHash,
+		OutboxID:       outboxID,
+		FinalDocxS3Key: finalDocxKey,
 	}
 
 	if err := worker.Work(ctx, &river.Job[PDFDispatchArgs]{
@@ -216,7 +222,7 @@ func TestMaterializeDispatchWorker_Integration_PublishesAndMarksDispatched(t *te
 	enqueuer := newTestEnqueuer(t, db)
 
 	tx := seedTenantTx(t, ctx, db, tenant.ID)
-	if err := enqueuer.EnqueueMaterializeTx(ctx, tx, tenant.ID, revisionID, contentHash); err != nil {
+	if err := enqueuer.EnqueueMaterializeTx(ctx, tx, tenant.ID, revisionID, contentHash, ""); err != nil {
 		_ = tx.Rollback()
 		t.Fatalf("EnqueueMaterializeTx: %v", err)
 	}
@@ -294,7 +300,7 @@ func TestEnqueuer_Integration_EnqueuePDFTx_InsertsOutboxRowAndRiverJob(t *testin
 	enqueuer := newTestEnqueuer(t, db)
 
 	tx := seedTenantTx(t, ctx, db, tenant.ID)
-	if err := enqueuer.EnqueuePDFTx(ctx, tx, tenant.ID, revisionID, contentHash, finalDocxKey); err != nil {
+	if err := enqueuer.EnqueuePDFTx(ctx, tx, tenant.ID, revisionID, contentHash, finalDocxKey, ""); err != nil {
 		_ = tx.Rollback()
 		t.Fatalf("EnqueuePDFTx: %v", err)
 	}
@@ -347,7 +353,7 @@ func TestEnqueuer_Integration_DedupSkip_NoSecondRiverInsert(t *testing.T) {
 	enqueuer := newTestEnqueuer(t, db)
 
 	tx1 := seedTenantTx(t, ctx, db, tenant.ID)
-	if err := enqueuer.EnqueuePDFTx(ctx, tx1, tenant.ID, revisionID, contentHash, finalDocxKey); err != nil {
+	if err := enqueuer.EnqueuePDFTx(ctx, tx1, tenant.ID, revisionID, contentHash, finalDocxKey, ""); err != nil {
 		_ = tx1.Rollback()
 		t.Fatalf("first EnqueuePDFTx: %v", err)
 	}
@@ -360,7 +366,7 @@ func TestEnqueuer_Integration_DedupSkip_NoSecondRiverInsert(t *testing.T) {
 	}
 
 	tx2 := seedTenantTx(t, ctx, db, tenant.ID)
-	if err := enqueuer.EnqueuePDFTx(ctx, tx2, tenant.ID, revisionID, contentHash, finalDocxKey); err != nil {
+	if err := enqueuer.EnqueuePDFTx(ctx, tx2, tenant.ID, revisionID, contentHash, finalDocxKey, ""); err != nil {
 		_ = tx2.Rollback()
 		t.Fatalf("second (dedup) EnqueuePDFTx: %v", err)
 	}

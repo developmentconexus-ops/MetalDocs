@@ -129,17 +129,19 @@ type Spec struct {
 	ResourceType    string
 	ResourceID      string
 
-	RevisionNumber     int
-	RevisionVersion    int
-	ScheduleGeneration int64
-	EffectiveFrom      time.Time
+	RevisionNumber       int
+	RevisionVersion      int
+	ScheduleGeneration   int64
+	EffectiveFrom        time.Time
+	PlannedEffectiveFrom time.Time
 
 	FrozenContentHash *string
 
-	hasRevisionVersion    bool
-	hasScheduleGeneration bool
-	hasEffectiveFrom      bool
-	stubSubmitSnapshots   bool
+	hasRevisionVersion      bool
+	hasScheduleGeneration   bool
+	hasEffectiveFrom        bool
+	hasPlannedEffectiveFrom bool
+	stubSubmitSnapshots     bool
 }
 
 type Opt func(*Spec)
@@ -183,6 +185,15 @@ func WithScheduleGen(g int64) Opt {
 }
 func WithEffectiveFrom(at time.Time) Opt {
 	return func(s *Spec) { s.EffectiveFrom = at; s.hasEffectiveFrom = true }
+}
+
+// WithPlannedEffectiveFrom sets documents.planned_effective_from — the
+// IMMUTABLE PLAN date (ADR 0085), which is a different column and a different
+// concept from effective_from (the ACTUAL release instant, stamped by the
+// release coordinator). A scheduled fixture states a plan; only a published one
+// states an actual.
+func WithPlannedEffectiveFrom(at time.Time) Opt {
+	return func(s *Spec) { s.PlannedEffectiveFrom = at; s.hasPlannedEffectiveFrom = true }
 }
 
 // WithSubmitReadySnapshots forces the six enforce_snapshot_on_submit columns to
@@ -451,10 +462,41 @@ func NewDocument(t *testing.T, db *sql.DB, opts ...Opt) Document {
 		casts = append(casts, "")
 		args = append(args, s.EffectiveFrom)
 	}
+	if s.hasPlannedEffectiveFrom {
+		cols = append(cols, "planned_effective_from")
+		casts = append(casts, "")
+		args = append(args, s.PlannedEffectiveFrom)
+	}
 
 	placeholders := make([]string, len(cols))
 	for i := range cols {
 		placeholders[i] = fmt.Sprintf("$%d%s", i+1, casts[i])
+	}
+
+	// ADR 0085 splits the effective date in two: planned_effective_from is the
+	// immutable PLAN, effective_from the ACTUAL release instant. Migration 0310
+	// makes that a DB invariant (ck_documents_published_effective_from,
+	// ck_documents_scheduled_planned_effective_from), so the factory must seed
+	// a coherent row for the two terminal-ish statuses exactly as it already
+	// stubs the enforce_snapshot_on_submit columns below — a fixture that seeds
+	// `published` is asserting the document IS effective, and one that seeds
+	// `scheduled` is asserting a plan exists.
+	switch {
+	case status == "published" && !s.hasEffectiveFrom:
+		cols = append(cols, "effective_from")
+		placeholders = append(placeholders, "now()")
+	case status == "scheduled":
+		// A scheduled document has NOT been released, so it must carry a PLAN
+		// and no ACTUAL date. Stating an actual on a scheduled fixture is a
+		// contradiction, not a shorthand for the plan — say
+		// WithPlannedEffectiveFrom.
+		if s.hasEffectiveFrom {
+			t.Fatalf("NewDocument: WithEffectiveFrom is meaningless for status=scheduled (ADR 0085: the plan lives in planned_effective_from; effective_from is stamped at actual release). Use WithPlannedEffectiveFrom.")
+		}
+		if !s.hasPlannedEffectiveFrom {
+			cols = append(cols, "planned_effective_from")
+			placeholders = append(placeholders, "now() + interval '7 days'")
+		}
 	}
 
 	// enforce_snapshot_on_submit (23514) requires the six snapshot columns for

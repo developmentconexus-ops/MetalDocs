@@ -133,6 +133,25 @@ func (s *Services) WithLifecycleEnqueuer(e docsdomain.LifecycleEventEnqueuer) *S
 	return s
 }
 
+// WithReleaseRecorder wires the ADR 0085 terminal-approval seam into BOTH
+// routes to terminal approval — signoff (Decision) and review verdict
+// (ReviewVerdict). Before ADR 0085 only the signoff route pinned, and the
+// review-verdict route silently produced an approved document that could never
+// materialize (F-QA4-14). One collaborator wired from one call site is what
+// makes that class of asymmetry unrepresentable.
+func (s *Services) WithReleaseRecorder(recorder TerminalApprovalReleaseRecorder) *Services {
+	if s == nil {
+		return s
+	}
+	if s.Decision != nil {
+		s.Decision = s.Decision.WithReleaseRecorder(recorder)
+	}
+	if s.ReviewVerdict != nil {
+		s.ReviewVerdict = s.ReviewVerdict.WithReleaseRecorder(recorder)
+	}
+	return s
+}
+
 // WithProfilePolicyReader wires the G1 approval→taxonomy profile-policy reader
 // into the two route-shape enforcement sites (Submit and RouteAdmin). Call after
 // NewServices. A nil reader leaves the friendly route-shape check disabled; the

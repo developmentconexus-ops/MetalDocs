@@ -51,7 +51,7 @@ func TestScheduledPublishWorker_PublishesWhenTruthMatches(t *testing.T) {
 	effectiveAt := time.Date(2026, 5, 21, 14, 0, 0, 0, time.UTC)
 
 	doc := testdb.Scenario{}.ScheduledRevision(t, db, 2,
-		testdb.WithEffectiveFrom(effectiveAt),
+		testdb.WithPlannedEffectiveFrom(effectiveAt),
 		testdb.WithRevisionVersion(4),
 	)
 
@@ -72,23 +72,29 @@ func TestScheduledPublishWorker_PublishesWhenTruthMatches(t *testing.T) {
 	}
 
 	var status string
-	var effectiveFrom sql.NullTime
+	var effectiveFrom, plannedEffectiveFrom sql.NullTime
 	var revisionVersion int
 	err := db.QueryRowContext(ctx, `
-		SELECT status, effective_from, revision_version
+		SELECT status, effective_from, planned_effective_from, revision_version
 		  FROM public.documents
 		 WHERE tenant_id = $1
 		   AND id = $2`,
 		doc.TenantID, doc.ID,
-	).Scan(&status, &effectiveFrom, &revisionVersion)
+	).Scan(&status, &effectiveFrom, &plannedEffectiveFrom, &revisionVersion)
 	if err != nil {
 		t.Fatalf("load document: %v", err)
 	}
 	if status != "published" {
 		t.Fatalf("status = %q, want published", status)
 	}
-	if effectiveFrom.Valid {
-		t.Fatalf("effective_from should be null after publish")
+	// ADR 0085: publishing stamps the ACTUAL effective_from (a published
+	// document with none is F-QA4-13 — it escapes the periodic-review
+	// surfacer), and leaves the PLAN it was scheduled against untouched.
+	if !effectiveFrom.Valid {
+		t.Fatalf("effective_from is null after publish; want the actual release instant")
+	}
+	if !plannedEffectiveFrom.Valid || !plannedEffectiveFrom.Time.Equal(effectiveAt) {
+		t.Fatalf("planned_effective_from = %v, want the plan %v (immutable)", plannedEffectiveFrom, effectiveAt)
 	}
 	if revisionVersion != 5 {
 		t.Fatalf("revision_version = %d, want 5", revisionVersion)
@@ -104,7 +110,7 @@ func TestScheduledPublishWorker_NoOpWhenGenerationIsStale(t *testing.T) {
 	effectiveAt := time.Date(2026, 5, 21, 14, 0, 0, 0, time.UTC)
 
 	doc := testdb.Scenario{}.ScheduledRevision(t, db, 3,
-		testdb.WithEffectiveFrom(effectiveAt),
+		testdb.WithPlannedEffectiveFrom(effectiveAt),
 		testdb.WithRevisionVersion(7),
 	)
 
@@ -153,7 +159,7 @@ func TestScheduledPublishWorker_NoOpWhenDeliveredBeforeEffectiveTime(t *testing.
 	effectiveAt := time.Date(2026, 5, 21, 14, 0, 0, 0, time.UTC)
 
 	doc := testdb.Scenario{}.ScheduledRevision(t, db, 2,
-		testdb.WithEffectiveFrom(effectiveAt),
+		testdb.WithPlannedEffectiveFrom(effectiveAt),
 		testdb.WithRevisionVersion(4),
 	)
 

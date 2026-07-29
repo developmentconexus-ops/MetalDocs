@@ -78,19 +78,25 @@ func TestSchedulePublish_PersistsEffectiveToAndReviewDueAt(t *testing.T) {
 	}
 
 	var gotStatus string
-	var gotEffectiveFrom, gotEffectiveTo, gotReviewDueAt sql.NullTime
+	var gotPlannedEffectiveFrom, gotEffectiveFrom, gotEffectiveTo, gotReviewDueAt sql.NullTime
 	if err := database.QueryRowContext(ctx,
-		`SELECT status, effective_from, effective_to, review_due_at
+		`SELECT status, planned_effective_from, effective_from, effective_to, review_due_at
 		   FROM public.documents WHERE id = $1::uuid AND tenant_id = $2::uuid`,
 		doc.ID, tnt.ID,
-	).Scan(&gotStatus, &gotEffectiveFrom, &gotEffectiveTo, &gotReviewDueAt); err != nil {
+	).Scan(&gotStatus, &gotPlannedEffectiveFrom, &gotEffectiveFrom, &gotEffectiveTo, &gotReviewDueAt); err != nil {
 		t.Fatalf("read back documents row: %v", err)
 	}
 	if gotStatus != "scheduled" {
 		t.Fatalf("documents.status = %q, want scheduled", gotStatus)
 	}
-	if !gotEffectiveFrom.Valid || !gotEffectiveFrom.Time.Equal(effectiveFrom) {
-		t.Fatalf("documents.effective_from = %v, want %v", gotEffectiveFrom.Time, effectiveFrom)
+	// ADR 0085: the scheduled date is a PLAN. It lands in
+	// planned_effective_from; effective_from stays NULL until an actual
+	// release stamps it.
+	if !gotPlannedEffectiveFrom.Valid || !gotPlannedEffectiveFrom.Time.Equal(effectiveFrom) {
+		t.Fatalf("documents.planned_effective_from = %v, want %v", gotPlannedEffectiveFrom.Time, effectiveFrom)
+	}
+	if gotEffectiveFrom.Valid {
+		t.Fatalf("documents.effective_from = %v, want NULL on a scheduled document", gotEffectiveFrom.Time)
 	}
 	if !gotEffectiveTo.Valid || !gotEffectiveTo.Time.Equal(effectiveTo) {
 		t.Fatalf("documents.effective_to = %v, want %v (F6.2: previously unwritten, now wired)", gotEffectiveTo.Time, effectiveTo)
