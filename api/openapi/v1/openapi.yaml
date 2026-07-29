@@ -5769,8 +5769,9 @@ components:
           type: string
           nullable: true
         default_approver_role:
-          type: string
           nullable: true
+          allOf:
+            - $ref: '#/components/schemas/AreaRole'
         archived_at:
           type: string
           format: date-time

@@ -2857,7 +2857,7 @@ export interface components {
             description: string;
             parent_code: string | null;
             owner_user_id: string | null;
-            default_approver_role: string | null;
+            default_approver_role: components["schemas"]["AreaRole"] | null;
             /** Format: date-time */
             archived_at: string | null;
             /** Format: date-time */
