@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/cookiejar"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -34,17 +36,48 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 		t.Skip("requires running server - set METALDOCS_E2E_URL")
 	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
-	tenantID := envOrDefault("METALDOCS_E2E_TENANT_ID", "00000000-0000-0000-0000-000000000001")
-	userID := envOrDefault("METALDOCS_E2E_USER_ID", "e2e-user")
-	userRoles := envOrDefault("METALDOCS_E2E_USER_ROLES", "admin,document_filler,reviewer,approver")
-	routeID := envOrDefault("METALDOCS_E2E_ROUTE_ID", "22222222-2222-2222-2222-222222222222")
-	contentHash := strings.Repeat("a", 64)
+	// Authenticate the way a real client does. The IAM tier-1 middleware
+	// deliberately strips inbound X-User-ID/X-User-Roles and resolves identity
+	// from the authenticated session context only
+	// (internal/modules/iam/delivery/http/middleware.go:81), so header-supplied
+	// identity yields 401 AUTH_UNAUTHORIZED against any real stack. The session
+	// cookie issued by POST /api/v1/auth/login is the only identity this test
+	// may carry; the cookie jar replays it on every subsequent request.
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatalf("new cookie jar: %v", err)
+	}
+	client := &http.Client{Timeout: 30 * time.Second, Jar: jar}
+
+	userID, tenantID := loginE2E(t, client, baseURL)
+
+	// Profile and area come from the server's own creation context rather than
+	// from constants: `areas` is already narrowed to the ones where THIS caller
+	// holds controlled_documents.create, and `has_active_route` is the flag that
+	// decides whether the later submit can resolve a route at all. Hardcoding
+	// them makes the test assert against a taxonomy the tenant may not have.
+	profileCodes, areaCode := creationContext(t, client, baseURL, userID)
+
+	// Optional pin for environments with more than one active route on the
+	// profile; empty means "let the server resolve it in-tx" (ADR 0073).
+	routeID := strings.TrimSpace(os.Getenv("METALDOCS_E2E_ROUTE_ID"))
 
 	var documentID string
 	var instanceID string
+	var contentHash string
+	var preSubmitETag string
 	var submitETag string
+	var instanceETag string
 	var stageIDs []string
+	var stageActors [][]string
+
+	// Per-run keys. A fixed literal is stored by the idempotency layer against
+	// the FIRST run's payload, so every later run against the same database is
+	// rejected with 422 IDEMPOTENCY_KEY_REUSED before the handler runs. Replay
+	// is still proven: step 2b re-sends submitKey verbatim.
+	submitKey := newIdempotencyKey()
+	stage1Key := newIdempotencyKey()
+	stage2Key := newIdempotencyKey()
 
 	// Carried from step 7 into step 7b: the generation the coordinator settled
 	// on, and whether it settled by HOLDING (no artifacts in this harness) — the
@@ -54,21 +87,46 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 
 	// 1) POST /api/v1/controlled-documents -> atomic create (CD + document)
 	t.Run("CreateControlledDocument", func(t *testing.T) {
-		body := map[string]any{
-			"profileCode":     "PO",
-			"processAreaCode": "quality",
-			"title":           fmt.Sprintf("E2E Happy %d", time.Now().UnixNano()),
-			"ownerUserId":     userID,
-		}
+		// Field names and required set are contract truth
+		// (CreateAtomicRequest, api/openapi/v1/openapi.yaml:6429): snake_case,
+		// with document_name and visibility required.
+		title := fmt.Sprintf("E2E Happy %d", time.Now().UnixNano())
 
-		resp, raw := doJSONRequest(t, client, http.MethodPost, baseURL+"/api/v1/controlled-documents", body, map[string]string{
-			"X-Tenant-ID":     tenantID,
-			"X-User-ID":       userID,
-			"X-User-Roles":    userRoles,
-			"Idempotency-Key": newIdempotencyKey(),
-		})
-		if resp.StatusCode != http.StatusCreated {
+		// Walk the route-bearing profiles until one also has a default template.
+		// A 409 PROFILE_NO_DEFAULT_TEMPLATE is a property of the tenant's
+		// taxonomy, not a failure of the happy path; any other non-201 is.
+		var raw string
+		var attempts []string
+		for _, candidate := range profileCodes {
+			body := map[string]any{
+				"profile_code":      candidate,
+				"process_area_code": areaCode,
+				"title":             title,
+				"owner_user_id":     userID,
+				"document_name":     title,
+				"visibility": map[string]any{
+					"scope":      "company",
+					"area_codes": []string{},
+					"user_ids":   []string{},
+				},
+			}
+
+			var resp *http.Response
+			resp, raw = doJSONRequest(t, client, http.MethodPost, baseURL+"/api/v1/controlled-documents", body, map[string]string{
+				"Idempotency-Key": newIdempotencyKey(),
+			})
+			if resp.StatusCode == http.StatusCreated {
+				break
+			}
+			attempts = append(attempts, fmt.Sprintf("%s -> %d %s", candidate, resp.StatusCode, raw))
+			if resp.StatusCode == http.StatusConflict && strings.Contains(raw, "PROFILE_NO_DEFAULT_TEMPLATE") {
+				raw = ""
+				continue
+			}
 			t.Fatalf("atomic create status=%d body=%s", resp.StatusCode, raw)
+		}
+		if raw == "" {
+			t.Fatalf("no route-bearing profile also carries a default template; attempts: %s", strings.Join(attempts, "; "))
 		}
 
 		var payload map[string]any
@@ -84,6 +142,7 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 		if documentID == "" {
 			t.Fatalf("missing document.id in create response: %s", raw)
 		}
+		contentHash = asString(docRef["content_hash"])
 	})
 
 	// 1b) GET /api/v1/documents/{id} and verify storage_key is populated
@@ -111,17 +170,23 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 
 	// 2) POST /api/v1/documents/{id}/submit with Idempotency-Key + If-Match
 	t.Run("SubmitForReview", func(t *testing.T) {
-		submitBody := map[string]any{
-			"route_id":     routeID,
-			"content_hash": contentHash,
+		// route_id and content_hash are both optional (ADR 0073): omitting them
+		// makes the server resolve the active route and the head revision hash
+		// inside the submit transaction, which is what a real client does and
+		// what closes the wrapper-era TOCTOU.
+		submitBody := map[string]any{}
+		if routeID != "" {
+			submitBody["route_id"] = routeID
 		}
 
+		// If-Match is the document's CURRENT revision version ("v<N>"); a fresh
+		// atomic-created draft is v0, so a hardcoded "v1" is a guaranteed
+		// 409 conflict.stale_revision.
+		preSubmitETag = documentETag(t, client, baseURL, documentID)
+
 		resp, raw := doJSONRequest(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/documents/%s/submit", baseURL, documentID), submitBody, map[string]string{
-			"X-Tenant-ID":      tenantID,
-			"X-User-ID":        userID,
-			"Idempotency-Key":  "11111111-1111-4111-8111-111111111111",
-			"If-Match":         "\"v1\"",
-			"X-User-Roles":     userRoles,
+			"Idempotency-Key":  submitKey,
+			"If-Match":         preSubmitETag,
 			"Content-Type":     "application/json",
 			"Accept":           "application/json",
 			"X-Request-Source": "integration-e2e",
@@ -147,17 +212,20 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 
 	// 2b) Replay submit with same idempotency key; expect replay marker header.
 	t.Run("SubmitReplayHeader", func(t *testing.T) {
-		submitBody := map[string]any{
-			"route_id":     routeID,
-			"content_hash": contentHash,
+		// route_id and content_hash are both optional (ADR 0073): omitting them
+		// makes the server resolve the active route and the head revision hash
+		// inside the submit transaction, which is what a real client does and
+		// what closes the wrapper-era TOCTOU.
+		submitBody := map[string]any{}
+		if routeID != "" {
+			submitBody["route_id"] = routeID
 		}
 
 		resp, raw := doJSONRequest(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/documents/%s/submit", baseURL, documentID), submitBody, map[string]string{
-			"X-Tenant-ID":     tenantID,
-			"X-User-ID":       userID,
-			"Idempotency-Key": "11111111-1111-4111-8111-111111111111",
-			"If-Match":        "\"v1\"",
-			"X-User-Roles":    userRoles,
+			// Same key AND same precondition as the original request — a replay
+			// is a byte-identical retry, not a fresh submit at the new version.
+			"Idempotency-Key": submitKey,
+			"If-Match":        preSubmitETag,
 		})
 
 		if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusConflict {
@@ -172,7 +240,7 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 
 	// 3) GET /api/v1/documents/{id}/approval-instance (fallback to approval instance route)
 	t.Run("GetApprovalInstanceAfterSubmit", func(t *testing.T) {
-		status, raw := getApprovalInstance(t, client, baseURL, tenantID, userID, userRoles, documentID, instanceID)
+		status, raw := getApprovalInstance(t, client, baseURL, documentID, instanceID)
 		if status != http.StatusOK {
 			t.Fatalf("get approval instance status=%d body=%s", status, raw)
 		}
@@ -190,16 +258,46 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 			t.Fatalf("unexpected instance status after submit: %q body=%s", gotStatus, raw)
 		}
 
+		// The signoffs below sign the hash the instance FROZE, not a client-side
+		// guess: frozen_content_hash is the pinned digest (no-fallback principle),
+		// and the instance etag is the concurrency token those writes must carry.
+		if frozen := asString(payload["frozen_content_hash"]); frozen != "" {
+			contentHash = frozen
+		}
+		instanceETag = asString(payload["etag"])
+
+		// Stage identity is `id` per ApprovalStageInstanceResponse
+		// (api/openapi/v1/openapi.yaml:6636) — reading "stage_id" silently
+		// produced an empty list and skipped both signoff steps.
 		if stages, ok := payload["stages"].([]any); ok {
 			for _, stage := range stages {
 				stageMap, ok := stage.(map[string]any)
 				if !ok {
 					continue
 				}
-				stageID := asString(stageMap["stage_id"])
-				if stageID != "" {
-					stageIDs = append(stageIDs, stageID)
+				stageID := asString(stageMap["id"])
+				if stageID == "" {
+					continue
 				}
+				stageIDs = append(stageIDs, stageID)
+
+				// The stage's eligible actors decide WHO may sign it. The
+				// submitting session is the author and is SoD-barred from its own
+				// approval stage (viewer.eligible_for_active_stage is false), so
+				// each signoff runs under the actor's own session.
+				var actors []string
+				if rawActors, ok := stageMap["actors"].([]any); ok {
+					for _, actor := range rawActors {
+						actorMap, ok := actor.(map[string]any)
+						if !ok {
+							continue
+						}
+						if id := asString(actorMap["user_id"]); id != "" {
+							actors = append(actors, id)
+						}
+					}
+				}
+				stageActors = append(stageActors, actors)
 			}
 		}
 	})
@@ -211,23 +309,10 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 			t.Skip("no stage 1 id found in instance response; set METALDOCS_E2E_STAGE1_ID to force this step")
 		}
 
-		resp, raw := doJSONRequest(t, client, http.MethodPost,
-			fmt.Sprintf("%s/api/v1/approval/instances/%s/stages/%s/signoffs", baseURL, instanceID, stageID),
-			map[string]any{
-				"decision":       "approve",
-				"password_token": "e2e-token-1",
-				"content_hash":   contentHash,
-			},
-			map[string]string{
-				"X-Tenant-ID":     tenantID,
-				"X-User-ID":       userID,
-				"Idempotency-Key": "22222222-2222-4222-8222-222222222222",
-				"If-Match":        submitETag,
-				"X-User-Roles":    userRoles,
-			},
-		)
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("stage1 signoff status=%d body=%s", resp.StatusCode, raw)
+		status, raw := signoffStage(t, baseURL, instanceID, stageID, stageActorsAt(stageActors, 0),
+			contentHash, firstNonEmpty(instanceETag, submitETag), stage1Key)
+		if status != http.StatusOK {
+			t.Fatalf("stage1 signoff status=%d body=%s", status, raw)
 		}
 	})
 
@@ -238,29 +323,16 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 			t.Skip("no stage 2 id found in instance response; set METALDOCS_E2E_STAGE2_ID to force this step")
 		}
 
-		resp, raw := doJSONRequest(t, client, http.MethodPost,
-			fmt.Sprintf("%s/api/v1/approval/instances/%s/stages/%s/signoffs", baseURL, instanceID, stageID),
-			map[string]any{
-				"decision":       "approve",
-				"password_token": "e2e-token-2",
-				"content_hash":   contentHash,
-			},
-			map[string]string{
-				"X-Tenant-ID":     tenantID,
-				"X-User-ID":       userID,
-				"Idempotency-Key": "33333333-3333-4333-8333-333333333333",
-				"If-Match":        submitETag,
-				"X-User-Roles":    userRoles,
-			},
-		)
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("stage2 signoff status=%d body=%s", resp.StatusCode, raw)
+		status, raw := signoffStage(t, baseURL, instanceID, stageID, stageActorsAt(stageActors, 1),
+			contentHash, firstNonEmpty(instanceETag, submitETag), stage2Key)
+		if status != http.StatusOK {
+			t.Fatalf("stage2 signoff status=%d body=%s", status, raw)
 		}
 	})
 
 	// 6) GET approval instance and expect completion
 	t.Run("GetApprovalInstanceCompleted", func(t *testing.T) {
-		status, raw := getApprovalInstance(t, client, baseURL, tenantID, userID, userRoles, documentID, instanceID)
+		status, raw := getApprovalInstance(t, client, baseURL, documentID, instanceID)
 		if status != http.StatusOK {
 			t.Fatalf("get approval instance status=%d body=%s", status, raw)
 		}
@@ -596,6 +668,290 @@ func newIdempotencyKey() string {
 	return uuid.NewString()
 }
 
+// loginE2E authenticates against the live server the way real clients do —
+// POST /api/v1/auth/login with the dev-seed credentials
+// (wiki/references/local-dev-startup.md "Credentials"; body field is
+// `identifier`, NOT `username`) — and returns the session's user id and tenant
+// id. The session cookie lands in client.Jar and is replayed on every later
+// request, which is the ONLY identity the IAM middleware honors.
+//
+// The returned tenant id is also what the DB-verification subtests key on:
+// reading it back from the session guarantees the rows asserted belong to the
+// tenant the server actually wrote under, instead of a guessed constant.
+func loginE2E(t *testing.T, client *http.Client, baseURL string) (userID, tenantID string) {
+	t.Helper()
+
+	identifier := envOrDefault("METALDOCS_E2E_IDENTIFIER", "admin")
+	password := envOrDefault("METALDOCS_E2E_PASSWORD", "AdminMetalDocs123!")
+
+	resp, raw := doJSONRequest(t, client, http.MethodPost, baseURL+"/api/v1/auth/login", map[string]any{
+		"identifier": identifier,
+		"password":   password,
+	}, nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("login as %q status=%d body=%s", identifier, resp.StatusCode, raw)
+	}
+
+	var payload struct {
+		User struct {
+			UserID   string `json:"user_id"`
+			TenantID string `json:"tenant_id"`
+		} `json:"user"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		t.Fatalf("decode login response: %v", err)
+	}
+	userID = strings.TrimSpace(payload.User.UserID)
+	tenantID = strings.TrimSpace(payload.User.TenantID)
+	if userID == "" || tenantID == "" {
+		t.Fatalf("login response missing user_id/tenant_id: %s", raw)
+	}
+
+	// A 200 without a session cookie is a broken environment, not a pass: every
+	// subsequent request would fall back to anonymous and 401.
+	parsed, err := url.Parse(baseURL)
+	if err != nil {
+		t.Fatalf("parse base URL %q: %v", baseURL, err)
+	}
+	if len(client.Jar.Cookies(parsed)) == 0 {
+		t.Fatalf("login succeeded but no session cookie was stored for %s", baseURL)
+	}
+	return userID, tenantID
+}
+
+// creationContext asks the server which profile/area this session may actually
+// create a controlled document under. `areas` is already filtered server-side to
+// the areas where the caller holds controlled_documents.create, and
+// has_active_route tells whether a submit under that profile can resolve a
+// route at all — so picking from this response is the only way to choose inputs
+// that are true for the tenant AND for the authenticated caller.
+// It returns EVERY route-bearing profile, not just the first: an active route
+// is necessary but not sufficient — the atomic create also needs the profile to
+// carry a default template (409 PROFILE_NO_DEFAULT_TEMPLATE otherwise), and the
+// creation-context contract exposes no flag for that.
+func creationContext(t *testing.T, client *http.Client, baseURL, author string) (profileCodes []string, areaCode string) {
+	t.Helper()
+
+	resp, raw := doJSONRequest(t, client, http.MethodGet, baseURL+"/api/v1/controlled-documents/creation-context", nil, nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("creation-context status=%d body=%s", resp.StatusCode, raw)
+	}
+
+	var payload struct {
+		Profiles []struct {
+			Code           string `json:"code"`
+			HasActiveRoute bool   `json:"has_active_route"`
+		} `json:"profiles"`
+		Areas []struct {
+			Code string `json:"code"`
+		} `json:"areas"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		t.Fatalf("decode creation-context: %v", err)
+	}
+
+	if forced := strings.TrimSpace(os.Getenv("METALDOCS_E2E_PROFILE_CODE")); forced != "" {
+		profileCodes = []string{forced}
+	} else {
+		for _, p := range payload.Profiles {
+			if p.HasActiveRoute && strings.TrimSpace(p.Code) != "" {
+				profileCodes = append(profileCodes, strings.TrimSpace(p.Code))
+			}
+		}
+	}
+	if len(profileCodes) == 0 {
+		t.Fatalf("no profile with an active approval route in creation-context: %s", raw)
+	}
+
+	if forced := strings.TrimSpace(os.Getenv("METALDOCS_E2E_AREA_CODE")); forced != "" {
+		areaCode = forced
+	} else {
+		// The area decides who may SIGN: document.signoff is capability x area,
+		// so an area where no credentialed approver holds a membership produces a
+		// route whose named actor is denied at tier-2 (403 authz.capability_denied)
+		// and a happy path that can never complete. Prefer an area that has one.
+		signable := areasWithSignableApprover(t, client, baseURL, author)
+		for _, area := range payload.Areas {
+			if _, ok := signable[strings.TrimSpace(area.Code)]; ok {
+				areaCode = strings.TrimSpace(area.Code)
+				break
+			}
+		}
+		if areaCode == "" && len(payload.Areas) > 0 {
+			areaCode = strings.TrimSpace(payload.Areas[0].Code)
+			t.Logf("no creation-context area has a credentialed approver membership; falling back to %q", areaCode)
+		}
+	}
+	if areaCode == "" {
+		t.Fatalf("session holds controlled_documents.create in no process area: %s", raw)
+	}
+	return profileCodes, areaCode
+}
+
+// devSeedCredentials is the sanctioned local QA login set
+// (wiki/references/local-dev-startup.md "Credentials" / the same values seeded
+// by db/dev-seeds/0001_local_dev_seed.sql). Never read from .env — these are
+// documented dev-only accounts, not deployment secrets. Override for a stack
+// whose personas differ with METALDOCS_E2E_CREDENTIALS="user:pass,user:pass".
+var devSeedCredentials = map[string]string{
+	"admin":         "AdminMetalDocs123!",
+	"approver":      "ApproverMetalDocs123!",
+	"author-test":   "AuthorTest123!",
+	"approver-test": "ApproverMetalDocs456!@",
+}
+
+func credentialFor(identifier string) (string, bool) {
+	for _, pair := range strings.Split(os.Getenv("METALDOCS_E2E_CREDENTIALS"), ",") {
+		user, pass, ok := strings.Cut(strings.TrimSpace(pair), ":")
+		if ok && strings.TrimSpace(user) == identifier {
+			return pass, true
+		}
+	}
+	pass, ok := devSeedCredentials[identifier]
+	return pass, ok
+}
+
+// signoffStage records one stage signoff as one of the stage's OWN eligible
+// actors. The submitting session cannot do this: it is the author, and SoD bars
+// an author from signing their own document — so the signer gets its own client,
+// its own login, and its own session cookie. password_token is that signer's
+// real re-authentication password (password_reauth method); a placeholder string
+// is rejected with 401 authn.signature_invalid.
+func signoffStage(t *testing.T, baseURL, instanceID, stageID string, actors []string, contentHash, fallbackETag, idempotencyKey string) (int, string) {
+	t.Helper()
+
+	for _, actor := range actors {
+		password, ok := credentialFor(actor)
+		if !ok {
+			continue
+		}
+
+		jar, err := cookiejar.New(nil)
+		if err != nil {
+			t.Fatalf("new cookie jar for %s: %v", actor, err)
+		}
+		signer := &http.Client{Timeout: 30 * time.Second, Jar: jar}
+
+		resp, raw := doJSONRequest(t, signer, http.MethodPost, baseURL+"/api/v1/auth/login", map[string]any{
+			"identifier": actor,
+			"password":   password,
+		}, nil)
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("login as stage actor %q status=%d body=%s", actor, resp.StatusCode, raw)
+		}
+
+		// Re-read the instance through the signer's session: the If-Match token
+		// must be the version THIS writer observed, not one carried over from a
+		// stage another actor already advanced.
+		etag := fallbackETag
+		if status, instanceRaw := getApprovalInstance(t, signer, baseURL, "", instanceID); status == http.StatusOK {
+			var payload map[string]any
+			if err := json.Unmarshal([]byte(instanceRaw), &payload); err == nil {
+				etag = firstNonEmpty(asString(payload["etag"]), fallbackETag)
+			}
+		}
+
+		resp, raw = doJSONRequest(t, signer, http.MethodPost,
+			fmt.Sprintf("%s/api/v1/approval/instances/%s/stages/%s/signoffs", baseURL, instanceID, stageID),
+			map[string]any{
+				"decision":       "approve",
+				"password_token": password,
+				"content_hash":   contentHash,
+			},
+			map[string]string{
+				"Idempotency-Key": idempotencyKey,
+				"If-Match":        etag,
+			},
+		)
+		return resp.StatusCode, raw
+	}
+
+	t.Fatalf("no credentials available for any eligible actor of stage %s (actors=%v); set METALDOCS_E2E_CREDENTIALS", stageID, actors)
+	return 0, ""
+}
+
+func stageActorsAt(actors [][]string, idx int) []string {
+	if idx >= 0 && idx < len(actors) {
+		return actors[idx]
+	}
+	return nil
+}
+
+// documentETag reads the document's current revision_version and renders it as
+// the If-Match token the write endpoints expect (`"v<N>"`, N >= 0 — a fresh
+// draft is v0).
+func documentETag(t *testing.T, client *http.Client, baseURL, documentID string) string {
+	t.Helper()
+
+	resp, raw := doJSONRequest(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/documents/%s", baseURL, documentID), nil, nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("get document %s status=%d body=%s", documentID, resp.StatusCode, raw)
+	}
+
+	var payload struct {
+		RevisionVersion *int `json:"revision_version"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		t.Fatalf("decode document %s: %v", documentID, err)
+	}
+	if payload.RevisionVersion == nil {
+		t.Fatalf("document %s carries no revision_version: %s", documentID, raw)
+	}
+	return fmt.Sprintf("%q", fmt.Sprintf("v%d", *payload.RevisionVersion))
+}
+
+// areasWithSignableApprover returns the areas that hold an active approver
+// membership for a user this test can actually log in as, excluding the author
+// (SoD bars an author from signing their own document).
+func areasWithSignableApprover(t *testing.T, client *http.Client, baseURL, author string) map[string]struct{} {
+	t.Helper()
+
+	out := map[string]struct{}{}
+	resp, raw := doJSONRequest(t, client, http.MethodGet, baseURL+"/api/v1/iam/area-memberships?role=approver", nil, nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Logf("area-memberships lookup status=%d body=%s — area choice falls back to creation-context order", resp.StatusCode, raw)
+		return out
+	}
+
+	var payload struct {
+		Items []struct {
+			UserID   string `json:"user_id"`
+			AreaCode string `json:"area_code"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		t.Fatalf("decode area-memberships: %v", err)
+	}
+	for _, item := range payload.Items {
+		if item.UserID == author {
+			continue
+		}
+		if _, ok := credentialFor(item.UserID); !ok {
+			continue
+		}
+		out[strings.TrimSpace(item.AreaCode)] = struct{}{}
+	}
+	return out
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
+}
+
+// requestOrigin reduces a request URL to its scheme://host origin.
+func requestOrigin(rawURL string) string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return ""
+	}
+	return parsed.Scheme + "://" + parsed.Host
+}
+
 func doJSONRequest(t *testing.T, client *http.Client, method, url string, body any, headers map[string]string) (*http.Response, string) {
 	t.Helper()
 
@@ -616,6 +972,12 @@ func doJSONRequest(t *testing.T, client *http.Client, method, url string, body a
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	// Origin protection (security.OriginProtection) rejects any cookie-bearing
+	// POST/PUT/PATCH/DELETE that arrives without a same-origin Origin/Referer.
+	// A real browser client always sends one; so must this test.
+	if origin := requestOrigin(url); origin != "" {
+		req.Header.Set("Origin", origin)
+	}
 	for k, v := range headers {
 		if strings.TrimSpace(v) != "" {
 			req.Header.Set(k, v)
@@ -635,13 +997,17 @@ func doJSONRequest(t *testing.T, client *http.Client, method, url string, body a
 	return resp, strings.TrimSpace(string(raw))
 }
 
-func getApprovalInstance(t *testing.T, client *http.Client, baseURL, tenantID, userID, userRoles, documentID, instanceID string) (int, string) {
+func getApprovalInstance(t *testing.T, client *http.Client, baseURL, documentID, instanceID string) (int, string) {
 	t.Helper()
 
-	headers := map[string]string{
-		"X-Tenant-ID":  tenantID,
-		"X-User-ID":    userID,
-		"X-User-Roles": userRoles,
+	// Identity rides the session cookie on client's jar — no identity headers.
+	headers := map[string]string{}
+
+	// Callers that hold only the instance id (a stage signer) skip the
+	// by-document lookup entirely rather than requesting an empty path segment.
+	if strings.TrimSpace(documentID) == "" && strings.TrimSpace(instanceID) != "" {
+		resp, raw := doJSONRequest(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/approval/instances/%s", baseURL, instanceID), nil, headers)
+		return resp.StatusCode, raw
 	}
 
 	resp, raw := doJSONRequest(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/documents/%s/approval-instance", baseURL, documentID), nil, headers)
