@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"metaldocs/internal/platform/iamtypes"
 )
 
 func TestDocumentProfileIsActiveWhenNotArchived(t *testing.T) {
@@ -51,7 +53,7 @@ func TestNewDocumentProfile_NormalizesAndDefaultsAlias(t *testing.T) {
 		Alias:                    " ",
 		DefaultTemplateVersionID: &templateID,
 		OwnerUserID:              &ownerID,
-		EditableByRole:           " manager ",
+		EditableByRole:           " editor ",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -68,8 +70,47 @@ func TestNewDocumentProfile_NormalizesAndDefaultsAlias(t *testing.T) {
 	if profile.OwnerUserID == nil || *profile.OwnerUserID != "owner-1" {
 		t.Fatalf("unexpected owner user id: %#v", profile.OwnerUserID)
 	}
-	if profile.EditableByRole != "manager" {
+	if profile.EditableByRole != "editor" {
 		t.Fatalf("unexpected editableByRole: %q", profile.EditableByRole)
+	}
+}
+
+// F-QA4-2: editable_by_role is a bound vocabulary (iamtypes canonical 8), not
+// free text. The legacy 'admin'/'manager' phantoms and an empty value must all
+// fail closed at construction rather than reach the DB.
+func TestNewDocumentProfile_RejectsNonCanonicalEditableByRole(t *testing.T) {
+	for _, role := range []string{"manager", "admin", "reviewer", "", "   ", "SYSTEM_ADMIN"} {
+		_, err := NewDocumentProfile(DocumentProfile{
+			Code:           "PO-01",
+			TenantID:       "tenant-a",
+			FamilyCode:     "policy",
+			Name:           "Procedure",
+			EditableByRole: role,
+		})
+		if !errors.Is(err, ErrInvalidEditableByRole) {
+			t.Fatalf("role %q: expected ErrInvalidEditableByRole, got %v", role, err)
+		}
+	}
+}
+
+// system_admin IS valid for editable_by_role (document-edit authority is not
+// area-scoped) — the opposite of default_approver_role. Guards the two
+// vocabularies from being collapsed into one.
+func TestNewDocumentProfile_AcceptsAllCanonicalRolesIncludingSystemAdmin(t *testing.T) {
+	for _, role := range iamtypes.Roles() {
+		profile, err := NewDocumentProfile(DocumentProfile{
+			Code:           "PO-01",
+			TenantID:       "tenant-a",
+			FamilyCode:     "policy",
+			Name:           "Procedure",
+			EditableByRole: string(role),
+		})
+		if err != nil {
+			t.Fatalf("role %q: unexpected error: %v", role, err)
+		}
+		if profile.EditableByRole != string(role) {
+			t.Fatalf("role %q: unexpected editableByRole %q", role, profile.EditableByRole)
+		}
 	}
 }
 

@@ -17,6 +17,7 @@ import (
 
 type fakeProfileService struct {
 	createErr error
+	updateErr error
 	getErr    error
 	// routeReady is the set of profile codes reported as having an active
 	// approval route (has_active_route); nil means none.
@@ -46,7 +47,7 @@ func (f fakeProfileService) Create(ctx context.Context, p *domain.DocumentProfil
 }
 
 func (f fakeProfileService) Update(ctx context.Context, p *domain.DocumentProfile) error {
-	return nil
+	return f.updateErr
 }
 
 func (f fakeProfileService) Reclassify(ctx context.Context, tenantID string, profileCode domain.ProfileCode, newClass domain.GovernanceClass, actorID string) error {

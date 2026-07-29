@@ -2,8 +2,11 @@ package domain
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
+
+	"metaldocs/internal/platform/iamtypes"
 )
 
 // DocumentProfile is a per-tenant document type bound to a DocumentFamily.
@@ -43,6 +46,13 @@ var (
 	ErrProfileFamilyRequired   = errors.New("profile family must not be empty")
 	ErrProfileNameRequired     = errors.New("profile name must not be empty")
 	ErrInvalidGovernanceClass  = errors.New("profile governance_class must be one of: controlado, simples, livre")
+	// ErrInvalidEditableByRole is returned when editable_by_role is empty or is
+	// not one of the eight canonical tenant roles. The role vocabulary is
+	// single-sourced from internal/platform/iamtypes (validRoles), which the
+	// UserRole schema in api/openapi/v1/openapi.yaml mirrors — free-text roles
+	// (the legacy 'admin'/'manager' phantoms) are rejected fail-closed rather
+	// than persisted and later resolved against an empty actor pool.
+	ErrInvalidEditableByRole = errors.New("profile editable_by_role must be a canonical tenant role")
 	// ErrClassChangeRouteConflict is returned when a reclassification would
 	// leave an active approval route violating the new governance_class (e.g.
 	// simples→controlado while a review-only route is active). It is the
@@ -94,6 +104,9 @@ func NewDocumentProfile(input DocumentProfile) (*DocumentProfile, error) {
 	if profile.Name == "" {
 		return nil, ErrProfileNameRequired
 	}
+	if err := ValidateEditableByRole(profile.EditableByRole); err != nil {
+		return nil, err
+	}
 	if profile.GovernanceClass == "" {
 		profile.GovernanceClass = GovernanceControlado
 	}
@@ -107,6 +120,18 @@ func NewDocumentProfile(input DocumentProfile) (*DocumentProfile, error) {
 		}
 	}
 	return &profile, nil
+}
+
+// ValidateEditableByRole reports whether role is one of the eight canonical
+// tenant roles (internal/platform/iamtypes — the single source the OpenAPI
+// UserRole enum mirrors). It is exported because the profile UPDATE path does
+// not run NewDocumentProfile (ProfileService.Update takes an already-normalized
+// profile), so both write paths must call it to stay fail-closed.
+func ValidateEditableByRole(role string) error {
+	if iamtypes.IsValidRole(iamtypes.Role(strings.TrimSpace(role))) {
+		return nil
+	}
+	return fmt.Errorf("%w: got %q, want one of %v", ErrInvalidEditableByRole, role, iamtypes.Roles())
 }
 
 // IsActive reports whether the profile has not been archived (ArchivedAt is nil).

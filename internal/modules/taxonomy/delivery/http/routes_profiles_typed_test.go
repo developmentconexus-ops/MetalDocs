@@ -79,7 +79,7 @@ func TestListProfiles_DropsDomainFields(t *testing.T) {
 			Description:    "Quality management",
 			Alias:          "iso",
 			OwnerUserID:    ptrStr("user-123"),
-			EditableByRole: "manager",
+			EditableByRole: "editor",
 		},
 	}}
 	handler := &Handler{profiles: svc}
@@ -130,7 +130,7 @@ func TestGetProfile_DropsDomainFields(t *testing.T) {
 			Description:    "Quality management",
 			Alias:          "iso",
 			OwnerUserID:    ptrStr("user-123"),
-			EditableByRole: "manager",
+			EditableByRole: "editor",
 		},
 	}}
 	handler := &Handler{profiles: svc}

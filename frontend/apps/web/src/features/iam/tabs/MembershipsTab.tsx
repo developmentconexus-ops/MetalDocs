@@ -23,19 +23,14 @@ import GrantMembershipDialog, {
 } from "../components/GrantMembershipDialog";
 import RevokeMembershipDialog from "../components/RevokeMembershipDialog";
 import MembershipKpiStrip from "../components/MembershipKpiStrip";
-import type { IamRole } from "../types";
+import { AREA_ROLES, type AreaRole } from "../../../lib/iam/role-vocabulary";
 import styles from "./MembershipsTab.module.css";
 
-const VALID_ROLE: ReadonlyArray<IamRole> = [
-  "system_admin",
-  "qms_admin",
-  "area_admin",
-  "approver",
-  "author",
-  "editor",
-  "signer",
-  "viewer",
-];
+// This tab filters AREA memberships, so the accepted ?role= values are the
+// area-assignable seven — matching both the filter dropdown (IAM_AREA_ROLES)
+// and the user_process_areas role CHECK. Deriving it also keeps a hand-typed
+// URL from selecting a role no membership row can ever have.
+const VALID_ROLE: ReadonlyArray<AreaRole> = AREA_ROLES;
 const VALID_SORT: ReadonlyArray<MembershipSortKey> = [
   "userLabel",
   "areaCode",

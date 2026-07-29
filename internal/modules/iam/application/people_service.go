@@ -275,7 +275,8 @@ type InviteInput struct {
 }
 
 // InviteAreaInput is one area-membership grant requested as part of Invite.
-// Role must be an area-scoped role (see isAreaScopedRole).
+// Role must be area-assignable (iamdomain.IsAreaRole — the seven canonical
+// roles minus system_admin; see the AreaRole schema in the contract).
 type InviteAreaInput struct {
 	AreaCode string
 	Role     iamdomain.Role
@@ -397,8 +398,14 @@ func (s *PeopleService) validateInvite(ctx context.Context, tenantID string, inp
 		if strings.TrimSpace(m.AreaCode) == "" {
 			return fmt.Errorf("%w: areaCode required", ErrPeopleValidation)
 		}
-		if !isAreaScopedRole(m.Role) {
-			return fmt.Errorf("%w: area role %q must be one of signer|area_admin|qms_admin", ErrPeopleValidation, m.Role)
+		// Same seam as AreaMembershipService.Grant (F-QA4-2): an invite-time
+		// area membership becomes a public.user_process_areas row, whose role
+		// CHECK accepts exactly the seven area-assignable roles. Bind the check
+		// to IsAreaRole so the app layer is the friendly first line over the
+		// invariant the DB enforces, and so the contract (AreaMembershipInput.role
+		// → AreaRole) and the runtime agree on one vocabulary.
+		if !iamdomain.IsAreaRole(m.Role) {
+			return fmt.Errorf("%w: area role %q is not area-assignable (want one of %v)", ErrUnknownRole, m.Role, iamdomain.AreaRoles())
 		}
 		ok, err := s.areaCatalog.AreaCodeExists(ctx, tenantID, m.AreaCode)
 		if err != nil {
@@ -409,17 +416,6 @@ func (s *PeopleService) validateInvite(ctx context.Context, tenantID string, inp
 		}
 	}
 	return nil
-}
-
-// isAreaScopedRole enforces the spec rule that area-membership roles are
-// drawn from the three area-only canonical roles. The tenant role enum is
-// broader (8 values); area roles are a strict subset.
-func isAreaScopedRole(r iamdomain.Role) bool {
-	switch r {
-	case iamdomain.RoleSigner, iamdomain.RoleAreaAdmin, iamdomain.RoleQmsAdmin:
-		return true
-	}
-	return false
 }
 
 // PatchInput mirrors UpdateManagedUserRequest. TenantRole, if provided, drives

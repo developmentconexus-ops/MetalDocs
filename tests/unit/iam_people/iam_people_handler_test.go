@@ -16,6 +16,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -505,23 +506,88 @@ func TestInviteUser_MissingTenantContext(t *testing.T) {
 	}
 }
 
-func TestInviteUser_InvalidAreaRoleReturns400(t *testing.T) {
+// F-QA4-2 (invite path): an invite-time area membership becomes a
+// public.user_process_areas row, whose role CHECK accepts exactly the SEVEN
+// area-assignable roles (every canonical role except system_admin). This test
+// previously pinned the opposite of the truth — it asserted "viewer" was
+// rejected, encoding a hand predicate that admitted only {signer, area_admin,
+// qms_admin}. The contract now types AreaMembershipInput.role as AreaRole and
+// the service validates with iamdomain.IsAreaRole, so the guard is: only
+// system_admin is refused, and it is refused with a friendly 400 UNKNOWN_ROLE —
+// the same problem code POST /iam/area-memberships returns — never a 500 from
+// the DB CHECK.
+func TestInviteUser_SystemAdminAreaRoleReturns400UnknownRole(t *testing.T) {
 	mux, _, _ := newHandlerForTest(t)
 
-	// "viewer" is a canonical tenant role but NOT in the area-only subset
-	// {signer, area_admin, qms_admin}.
 	body := `{
 		"username":"x.user",
 		"email":"x.user@example.com",
 		"display_name":"X User",
 		"tenant_role":"author",
-		"area_memberships":[{"area_code":"AREA1","role":"viewer"}]
+		"area_memberships":[{"area_code":"AREA1","role":"system_admin"}]
 	}`
 	req := withTenant(httptest.NewRequest(http.MethodPost, "/api/v1/iam/users/invite", strings.NewReader(body)), testTenantID)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 for invalid area role, got %d body=%s", rec.Code, rec.Body.String())
+		t.Fatalf("expected 400 for system_admin area role, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var prob struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &prob); err != nil {
+		t.Fatalf("decode problem: %v body=%s", err, rec.Body.String())
+	}
+	if prob.Code != "UNKNOWN_ROLE" {
+		t.Fatalf("problem code = %q, want UNKNOWN_ROLE (body=%s)", prob.Code, rec.Body.String())
+	}
+}
+
+// TestInviteUser_UnknownAreaRoleReturns400 pins that a non-canonical role
+// string fails on the same seam, so the gate is not system_admin-specific.
+func TestInviteUser_UnknownAreaRoleReturns400(t *testing.T) {
+	mux, _, _ := newHandlerForTest(t)
+
+	body := `{
+		"username":"y.user",
+		"email":"y.user@example.com",
+		"display_name":"Y User",
+		"tenant_role":"author",
+		"area_memberships":[{"area_code":"AREA1","role":"ghost"}]
+	}`
+	req := withTenant(httptest.NewRequest(http.MethodPost, "/api/v1/iam/users/invite", strings.NewReader(body)), testTenantID)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for unknown area role, got %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+// The complement: every area-assignable role must invite successfully, so the
+// narrowing cannot be over-tightened back into the old three-role predicate.
+func TestInviteUser_AcceptsEveryAreaAssignableRole(t *testing.T) {
+	roles := iamdomain.AreaRoles()
+	if len(roles) != 7 {
+		t.Fatalf("area-assignable roles = %d, want 7: %v", len(roles), roles)
+	}
+	for i, role := range roles {
+		t.Run(string(role), func(t *testing.T) {
+			mux, _, _ := newHandlerForTest(t)
+			username := fmt.Sprintf("area.user%d", i)
+			body := fmt.Sprintf(`{
+				"username":%q,
+				"email":"%s@example.com",
+				"display_name":"Area User",
+				"tenant_role":"author",
+				"area_memberships":[{"area_code":"AREA1","role":%q}]
+			}`, username, username, role)
+			req := withTenant(httptest.NewRequest(http.MethodPost, "/api/v1/iam/users/invite", strings.NewReader(body)), testTenantID)
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+			if rec.Code != http.StatusCreated {
+				t.Fatalf("area role %q: status = %d body=%s", role, rec.Code, rec.Body.String())
+			}
+		})
 	}
 }
 

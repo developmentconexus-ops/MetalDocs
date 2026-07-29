@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/authn"
+	"metaldocs/internal/platform/iamtypes"
 )
 
 type listAreasResponse struct {
@@ -156,6 +157,18 @@ func areaCodePtr(v *string) *domain.AreaCode {
 	return &code
 }
 
+// defaultApproverRoleMessage renders the friendly 422 detail from the canonical
+// area-role registry so the message can never drift from the AreaRole enum the
+// contract publishes.
+func defaultApproverRoleMessage() string {
+	roles := iamtypes.AreaRoles()
+	codes := make([]string, 0, len(roles))
+	for _, r := range roles {
+		codes = append(codes, string(r))
+	}
+	return "default_approver_role must be one of: " + strings.Join(codes, ", ")
+}
+
 func (h *Handler) writeAreaError(w http.ResponseWriter, err error) {
 	var pgErr *pgconn.PgError
 	switch {
@@ -169,6 +182,8 @@ func (h *Handler) writeAreaError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "parentCode is required")
 	case errors.Is(err, domain.ErrAreaCodeImmutable):
 		writeError(w, http.StatusBadRequest, "AREA_CODE_IMMUTABLE", "area code is immutable")
+	case errors.Is(err, domain.ErrInvalidDefaultApproverRole):
+		writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", defaultApproverRoleMessage())
 	case errors.As(err, &pgErr) && pgErr.Code == "23514":
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "request violates data constraints")
 	case errors.As(err, &pgErr) && pgErr.Code == "23505":

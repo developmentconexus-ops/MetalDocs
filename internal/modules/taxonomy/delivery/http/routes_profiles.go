@@ -12,6 +12,7 @@ import (
 	"metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/httpresponse"
+	"metaldocs/internal/platform/iamtypes"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
@@ -305,6 +306,17 @@ func (h *Handler) archiveProfile(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// editableByRoleMessage renders the friendly 422 detail from the canonical role
+// registry so the message can never drift from the enum the contract publishes.
+func editableByRoleMessage() string {
+	roles := iamtypes.Roles()
+	codes := make([]string, 0, len(roles))
+	for _, r := range roles {
+		codes = append(codes, string(r))
+	}
+	return "editable_by_role must be one of: " + strings.Join(codes, ", ")
+}
+
 func (h *Handler) writeProfileError(w http.ResponseWriter, err error) {
 	var pgErr *pgconn.PgError
 	switch {
@@ -320,6 +332,8 @@ func (h *Handler) writeProfileError(w http.ResponseWriter, err error) {
 		httpresponse.WriteError(w, http.StatusBadRequest, codeTaxProfileCodeImmutable, "profile code is immutable")
 	case errors.Is(err, domain.ErrInvalidGovernanceClass):
 		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, "governance_class must be one of: controlado, simples, livre")
+	case errors.Is(err, domain.ErrInvalidEditableByRole):
+		httpresponse.WriteError(w, http.StatusUnprocessableEntity, problem.CodeValidationError, editableByRoleMessage())
 	case errors.Is(err, domain.ErrClassChangeRouteConflict):
 		httpresponse.WriteError(w, http.StatusConflict, codeTaxProfileClassRouteConflict, "reclassification conflicts with an active approval route")
 	case errors.As(err, &pgErr) && pgErr.Code == "23514":

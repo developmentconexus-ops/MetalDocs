@@ -110,7 +110,12 @@ VALUES
     365,
     '00000000-0000-0000-0000-000000000102',
     'admin',
-    'admin',
+    -- owner_user_id above is the 'admin' USERNAME; editable_by_role below is a
+    -- ROLE and is now a bound vocabulary (F-QA4-2): the taxonomy domain
+    -- validates it against internal/platform/iamtypes, so the legacy 'admin'
+    -- phantom would make this seeded profile un-editable through the API.
+    -- system_admin is the canonical role the 'admin' phantom migrated to.
+    'system_admin',
     NULL
   )
 ON CONFLICT (tenant_id, code) DO NOTHING;

@@ -1,4 +1,5 @@
 import type { components } from "../../lib/api-types";
+import type { AreaRole, UserRole } from "../../lib/iam/role-vocabulary";
 
 // App-level (camelCase) taxonomy types. These are the shapes consumed across
 // features (documents, templates, approval) and by this feature's own UI.
@@ -66,14 +67,16 @@ export interface CreateProfileRequest {
   name: string;
   description?: string;
   reviewIntervalDays: number;
-  editableByRole?: string;
+  // Required by the contract (TaxonomyProfileUpsertRequest) and validated
+  // fail-closed by the backend — no phantom default (F-QA4-2).
+  editableByRole: UserRole;
 }
 
 export interface UpdateProfileRequest {
   familyCode: string;
   name?: string;
   description?: string;
-  editableByRole?: string;
+  editableByRole: UserRole;
   reviewIntervalDays?: number;
 }
 
@@ -86,14 +89,14 @@ export interface CreateAreaRequest {
   name: string;
   description?: string;
   parentCode?: string;
-  defaultApproverRole?: string;
+  defaultApproverRole?: AreaRole;
 }
 
 export interface UpdateAreaRequest {
   name?: string;
   description?: string;
   parentCode?: string | null;
-  defaultApproverRole?: string | null;
+  defaultApproverRole?: AreaRole | null;
 }
 
 export interface CreateFamilyRequest {

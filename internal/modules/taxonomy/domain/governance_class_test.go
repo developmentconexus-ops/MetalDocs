@@ -60,6 +60,7 @@ func TestNewDocumentProfileDefaultsGovernanceClass(t *testing.T) {
 		FamilyCode:         "fam",
 		Name:               "POP",
 		ReviewIntervalDays: 365,
+		EditableByRole:     "editor",
 	})
 	if err != nil {
 		t.Fatalf("NewDocumentProfile() error = %v", err)
@@ -76,6 +77,7 @@ func TestNewDocumentProfileRejectsInvalidGovernanceClass(t *testing.T) {
 		FamilyCode:         "fam",
 		Name:               "POP",
 		ReviewIntervalDays: 365,
+		EditableByRole:     "editor",
 		GovernanceClass:    GovernanceClass("mystery"),
 	})
 	if !errors.Is(err, ErrInvalidGovernanceClass) {

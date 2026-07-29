@@ -24,6 +24,7 @@ import {
   matchesStatusFacet,
 } from "../presenters/user-status-presenter";
 import type { IamRole } from "../types";
+import { USER_ROLES } from "../../../lib/iam/role-vocabulary";
 import styles from "./PeopleTab.module.css";
 
 type BulkActionKind = "deactivate" | "force-logout" | "unlock";
@@ -34,16 +35,7 @@ const VALID_STATUS: ReadonlyArray<StatusFacet> = [
   "suspended",
   "locked",
 ];
-const VALID_ROLE: ReadonlyArray<IamRole> = [
-  "system_admin",
-  "qms_admin",
-  "area_admin",
-  "approver",
-  "author",
-  "editor",
-  "signer",
-  "viewer",
-];
+const VALID_ROLE: ReadonlyArray<IamRole> = USER_ROLES;
 const VALID_MFA: ReadonlyArray<MfaFacet> = ["on", "off"];
 const VALID_LAST: ReadonlyArray<LastLoginFacet> = ["24h", "7d", "30d", "90d"];
 

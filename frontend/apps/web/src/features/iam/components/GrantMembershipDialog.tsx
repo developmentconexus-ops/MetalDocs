@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { Dialog } from "../../../components/ui/Dialog";
 import { resolveQueryError } from "../../../lib/api/resolveQueryError";
 import { IAM_AREA_ROLES } from "../constants";
-import type { IamRole } from "../types";
+import { isAreaRole, type AreaRole } from "../../../lib/iam/role-vocabulary";
 import styles from "./GrantMembershipDialog.module.css";
 
 export interface GrantUserOption {
@@ -14,7 +14,9 @@ export interface GrantUserOption {
 export interface GrantMembershipPayload {
   userId: string;
   areaCode: string;
-  role: IamRole;
+  // AreaRole, not UserRole: this dialog writes a user_process_areas row, which
+  // cannot hold system_admin (F-QA4-2 — the contract now says so too).
+  role: AreaRole;
 }
 
 interface GrantMembershipDialogProps {
@@ -30,7 +32,7 @@ interface GrantMembershipDialogProps {
 interface FormState {
   userId: string;
   areaCode: string;
-  role: IamRole;
+  role: AreaRole;
 }
 
 const INITIAL: FormState = {
@@ -202,9 +204,11 @@ export default function GrantMembershipDialog({
             id="grant-role"
             className={styles.select}
             value={form.role}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, role: e.target.value as IamRole }))
-            }
+            onChange={(e) => {
+              const next = e.target.value;
+              if (!isAreaRole(next)) return;
+              setForm((f) => ({ ...f, role: next }));
+            }}
             aria-required="true"
           >
             {IAM_AREA_ROLES.map(([v, label]) => (

@@ -15,6 +15,7 @@ import (
 
 type fakeAreaService struct {
 	createErr error
+	updateErr error
 	getErr    error
 }
 
@@ -34,7 +35,7 @@ func (f fakeAreaService) Create(ctx context.Context, a *domain.ProcessArea) erro
 }
 
 func (f fakeAreaService) Update(ctx context.Context, a *domain.ProcessArea) error {
-	return nil
+	return f.updateErr
 }
 
 func (f fakeAreaService) Archive(ctx context.Context, tenantID string, areaCode domain.AreaCode, actorID string) error {

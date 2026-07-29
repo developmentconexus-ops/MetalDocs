@@ -157,7 +157,15 @@ func (s *AreaMembershipService) Grant(
 	role domain.Role,
 	grantedBy string,
 ) error {
-	if _, err := domain.ParseRole(string(role)); err != nil {
+	// F-QA4-2: an area membership is a public.user_process_areas row, and that
+	// table's role CHECK accepts exactly the seven area-assignable roles. The
+	// former ParseRole check admitted all EIGHT canonical roles, so a
+	// `system_admin` grant passed the app layer and was then rejected by the DB
+	// as 23514 — a 500 for what is a plain vocabulary violation. Binding the
+	// check to IsAreaRole makes the app layer the friendly first line over the
+	// same invariant the DB enforces, and matches the AreaRole enum the contract
+	// now declares for GrantAreaMembershipRequest.role.
+	if !domain.IsAreaRole(role) {
 		return ErrUnknownRole
 	}
 

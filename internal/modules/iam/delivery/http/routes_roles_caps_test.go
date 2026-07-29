@@ -49,15 +49,19 @@ func TestListRolesReturnsCanonicalEight(t *testing.T) {
 	if got, want := len(resp.Items), 8; got != want {
 		t.Fatalf("items = %d, want %d", got, want)
 	}
+	// F-QA4-2: these constants gained a `UserRole` prefix when the contract grew
+	// the sibling `AreaRole` enum — oapi-codegen only emits bare value names
+	// while they are unambiguous, and `system_admin`/`approver`/… now appear in
+	// two enums. The prefixed names are the generator's collision-safe form.
 	wantCodes := map[iamapi.UserRole]struct{}{
-		iamapi.SystemAdmin: {},
-		iamapi.Approver:    {},
-		iamapi.Author:      {},
-		iamapi.Editor:      {},
-		iamapi.Viewer:      {},
-		iamapi.Signer:      {},
-		iamapi.AreaAdmin:   {},
-		iamapi.QmsAdmin:    {},
+		iamapi.UserRoleSystemAdmin: {},
+		iamapi.UserRoleApprover:    {},
+		iamapi.UserRoleAuthor:      {},
+		iamapi.UserRoleEditor:      {},
+		iamapi.UserRoleViewer:      {},
+		iamapi.UserRoleSigner:      {},
+		iamapi.UserRoleAreaAdmin:   {},
+		iamapi.UserRoleQmsAdmin:    {},
 	}
 	for _, item := range resp.Items {
 		if _, ok := wantCodes[item.Code]; !ok {

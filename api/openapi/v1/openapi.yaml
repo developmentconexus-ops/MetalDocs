@@ -4641,7 +4641,7 @@ components:
       required: [area_code, role]
       properties:
         area_code: { type: string }
-        role: { $ref: '#/components/schemas/UserRole' }
+        role: { $ref: '#/components/schemas/AreaRole' }
     AreaMembershipRow:
       type: object
       description: Active area membership row returned by the tenant-scoped /iam/area-memberships listing.

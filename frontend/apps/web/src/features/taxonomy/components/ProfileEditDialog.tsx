@@ -8,7 +8,12 @@ import {
 import { useFamiliesQuery } from "../queries/useFamiliesQuery";
 import { usePublishedTemplatesQuery } from "../queries/usePublishedTemplatesQuery";
 import { resolveErrorMessage } from "../../../lib/api/problem";
+import { USER_ROLES, getRoleLabel, isUserRole, type UserRole } from "../../../lib/iam/role-vocabulary";
 import styles from "./TaxonomyDialog.module.css";
+
+// The role that may edit documents of a new profile. `editor` is the least
+// privileged role that can actually author document content.
+const DEFAULT_EDITABLE_BY_ROLE: UserRole = "editor";
 
 type Props = {
   mode: "create" | "edit";
@@ -16,15 +21,19 @@ type Props = {
   onClose: () => void;
 };
 
-const EDITABLE_ROLE_OPTIONS = ["viewer", "editor", "author", "approver", "system_admin"];
-
 export function ProfileEditDialog({ mode, profile, onClose }: Props) {
   const [code, setCode] = useState(profile?.code ?? "");
   const [familyCode, setFamilyCode] = useState(profile?.familyCode ?? "");
   const [name, setName] = useState(profile?.name ?? "");
   const [description, setDescription] = useState(profile?.description ?? "");
   const [reviewIntervalDays, setReviewIntervalDays] = useState(String(profile?.reviewIntervalDays ?? 365));
-  const [editableByRole, setEditableByRole] = useState(profile?.editableByRole ?? "admin");
+  // editable_by_role is a bound vocabulary (F-QA4-2) and the backend now rejects
+  // anything outside it with a 422. Legacy rows can still carry the retired
+  // "admin" phantom, so an unrecognized stored value falls back to the default
+  // rather than pre-loading the form with a value the API will refuse.
+  const [editableByRole, setEditableByRole] = useState<UserRole>(
+    isUserRole(profile?.editableByRole) ? profile.editableByRole : DEFAULT_EDITABLE_BY_ROLE,
+  );
   const [templateVersionId, setTemplateVersionId] = useState(profile?.defaultTemplateVersionId ?? "");
   const [error, setError] = useState("");
   const [templateError, setTemplateError] = useState("");
@@ -49,7 +58,7 @@ export function ProfileEditDialog({ mode, profile, onClose }: Props) {
           name: name.trim(),
           description: description.trim() || undefined,
           reviewIntervalDays: Number(reviewIntervalDays),
-          editableByRole: editableByRole.trim() || undefined,
+          editableByRole,
         });
       } else {
         await updateMutation.mutateAsync({
@@ -58,7 +67,7 @@ export function ProfileEditDialog({ mode, profile, onClose }: Props) {
             familyCode: familyCode.trim(),
             name: name.trim(),
             description: description.trim() || undefined,
-            editableByRole: editableByRole.trim() || undefined,
+            editableByRole,
             reviewIntervalDays: Number(reviewIntervalDays),
           },
         });
@@ -157,12 +166,12 @@ export function ProfileEditDialog({ mode, profile, onClose }: Props) {
             <label className={styles.label}>Role editora *</label>
             <select
               value={editableByRole}
-              onChange={(e) => setEditableByRole(e.target.value)}
+              onChange={(e) => setEditableByRole(e.target.value as UserRole)}
               required
               className={styles.select}
             >
-              {EDITABLE_ROLE_OPTIONS.map((role) => (
-                <option key={role} value={role}>{role}</option>
+              {USER_ROLES.map((role) => (
+                <option key={role} value={role}>{getRoleLabel(role)}</option>
               ))}
             </select>
           </div>

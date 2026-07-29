@@ -9,6 +9,7 @@ import (
 
 	"metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
+	"metaldocs/internal/platform/iamtypes"
 )
 
 // noopMembershipTx satisfies MembershipTx for unit tests; Commit is a no-op.
@@ -285,6 +286,41 @@ func TestGrant_UnknownRole(t *testing.T) {
 	err := service.Grant(context.Background(), "u1", "t1", "A1", domain.Role("ghost"), "admin")
 	if !errors.Is(err, ErrUnknownRole) {
 		t.Fatalf("expected ErrUnknownRole, got %v", err)
+	}
+}
+
+// F-QA4-2: an area membership is a user_process_areas row, whose role CHECK
+// accepts exactly the seven area-assignable roles. system_admin is a CANONICAL
+// role — it passes IsValidRole — so the old ParseRole gate let it through to
+// the database, which rejected it as 23514 and surfaced a 500. The app layer
+// must be the friendly first line over the same invariant.
+func TestGrant_SystemAdminIsNotAreaAssignable(t *testing.T) {
+	repo := &userAreaWriteRepoStub{}
+	service := NewAreaMembershipService(repo, &membershipLoggerStub{})
+
+	err := service.Grant(context.Background(), "u1", "t1", "A1", domain.RoleSystemAdmin, "admin")
+	if !errors.Is(err, ErrUnknownRole) {
+		t.Fatalf("expected ErrUnknownRole for system_admin, got %v", err)
+	}
+}
+
+// The complement: every area-assignable role must still be grantable, so the
+// narrowing above cannot be over-tightened into a regression.
+func TestGrant_AcceptsEveryAreaAssignableRole(t *testing.T) {
+	roles := iamtypes.AreaRoles()
+	if len(roles) != 7 {
+		t.Fatalf("area-assignable roles = %d, want 7: %v", len(roles), roles)
+	}
+	for _, role := range roles {
+		t.Run(string(role), func(t *testing.T) {
+			repo := &userAreaWriteRepoStub{}
+			service := NewAreaMembershipService(repo, &membershipLoggerStub{})
+
+			err := service.Grant(context.Background(), "u1", "t1", "A1", domain.Role(role), "admin")
+			if errors.Is(err, ErrUnknownRole) {
+				t.Fatalf("area role %q was rejected as unknown", role)
+			}
+		})
 	}
 }
 

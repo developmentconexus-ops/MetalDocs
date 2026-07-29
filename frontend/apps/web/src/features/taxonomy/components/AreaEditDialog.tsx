@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ProcessArea } from "../types";
 import { useCreateAreaMutation, useUpdateAreaMutation } from "../queries/useTaxonomyMutations";
 import { resolveErrorMessage } from "../../../lib/api/problem";
+import { AREA_ROLES, getRoleLabel, isAreaRole, type AreaRole } from "../../../lib/iam/role-vocabulary";
 import styles from "./TaxonomyDialog.module.css";
 
 type Props = {
@@ -11,22 +12,20 @@ type Props = {
   onClose: () => void;
 };
 
-const APPROVER_ROLE_OPTIONS = [
-  "viewer",
-  "editor",
-  "author",
-  "approver",
-  "signer",
-  "area_admin",
-  "qms_admin",
-];
-
 export function AreaEditDialog({ mode, area, areas, onClose }: Props) {
   const [code, setCode] = useState(area?.code ?? "");
   const [name, setName] = useState(area?.name ?? "");
   const [description, setDescription] = useState(area?.description ?? "");
   const [parentCode, setParentCode] = useState(area?.parentCode ?? "");
-  const [defaultApproverRole, setDefaultApproverRole] = useState(area?.defaultApproverRole ?? "");
+  // default_approver_role is a bound vocabulary (F-QA4-2): the 7 AREA-assignable
+  // roles, or "" for none. system_admin is deliberately NOT offered — it is
+  // tenant-wide tier-1 and can never be an area membership, so configuring it
+  // would resolve to an empty approver pool. An unrecognized stored value
+  // (legacy free-text) falls back to "none" rather than pre-loading a value the
+  // API would now reject with a 422.
+  const [defaultApproverRole, setDefaultApproverRole] = useState<AreaRole | "">(
+    isAreaRole(area?.defaultApproverRole) ? area.defaultApproverRole : "",
+  );
   const [error, setError] = useState("");
   const createMutation = useCreateAreaMutation();
   const updateMutation = useUpdateAreaMutation();
@@ -44,7 +43,7 @@ export function AreaEditDialog({ mode, area, areas, onClose }: Props) {
           name: name.trim(),
           description: description.trim() || undefined,
           parentCode: parentCode.trim() || undefined,
-          defaultApproverRole: defaultApproverRole.trim() || undefined,
+          defaultApproverRole: defaultApproverRole || undefined,
         });
       } else {
         await updateMutation.mutateAsync({
@@ -53,7 +52,7 @@ export function AreaEditDialog({ mode, area, areas, onClose }: Props) {
             name: name.trim(),
             description: description.trim() || undefined,
             parentCode: parentCode.trim() || null,
-            defaultApproverRole: defaultApproverRole.trim() || null,
+            defaultApproverRole: defaultApproverRole || null,
           },
         });
       }
@@ -121,12 +120,12 @@ export function AreaEditDialog({ mode, area, areas, onClose }: Props) {
             <label className={styles.label}>Role de aprovador padrão</label>
             <select
               value={defaultApproverRole}
-              onChange={(e) => setDefaultApproverRole(e.target.value)}
+              onChange={(e) => setDefaultApproverRole(e.target.value as AreaRole | "")}
               className={styles.select}
             >
               <option value="">— Nenhuma —</option>
-              {APPROVER_ROLE_OPTIONS.map((role) => (
-                <option key={role} value={role}>{role}</option>
+              {AREA_ROLES.map((role) => (
+                <option key={role} value={role}>{getRoleLabel(role)}</option>
               ))}
             </select>
           </div>

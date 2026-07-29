@@ -156,8 +156,13 @@ func (s *ProfileService) Create(ctx context.Context, p *domain.DocumentProfile) 
 // inside a single transaction; any failure rolls the transaction back.
 // Unlike Create, Update does not re-validate p through
 // domain.NewDocumentProfile — callers must pass an already-normalized
-// profile.
+// profile. The one exception is editable_by_role: it is a bound role
+// vocabulary (F-QA4-2), so BOTH write paths validate it and an update cannot
+// smuggle a free-text role past the constructor that Create runs.
 func (s *ProfileService) Update(ctx context.Context, p *domain.DocumentProfile) error {
+	if err := domain.ValidateEditableByRole(p.EditableByRole); err != nil {
+		return fmt.Errorf("taxonomy: validate profile update: %w", err)
+	}
 	tx, err := s.profiles.BeginTx(ctx)
 	if err != nil {
 		return fmt.Errorf("taxonomy: begin profile update tx: %w", err)

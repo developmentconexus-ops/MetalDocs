@@ -424,6 +424,11 @@ func (h *PeopleHandler) writePeopleError(w http.ResponseWriter, err error) {
 		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, err.Error()))
 	case errors.Is(err, iamapp.ErrAreaUnknown):
 		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, err.Error()))
+	case errors.Is(err, iamapp.ErrUnknownRole):
+		// Invite carries area memberships, so it shares the membership route's
+		// vocabulary failure (F-QA4-2). Same sentinel → same 400 UNKNOWN_ROLE
+		// as POST /iam/area-memberships, never a 23514-driven 500.
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeUnknownRole, "Unknown role"))
 	case errors.Is(err, authdomain.ErrUserAlreadyExists):
 		h.writeProblem(w, problem.New(http.StatusConflict, problem.CodeConflict, "User already exists"))
 	case errors.Is(err, authdomain.ErrIdentityNotFound):

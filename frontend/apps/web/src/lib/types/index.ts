@@ -10,20 +10,13 @@ export type DocumentStatus =
   | "published"
   | "obsolete";
 export type Classification = "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
-// Canonical 8-role backend enum. The legacy FE-only phantoms "admin" and
-// "reviewer" were removed in PR-12b — their last consumers were migrated to
-// system_admin (DocumentPublishedPage) and to plain workflow-role strings
-// (templates). features/iam uses the narrower IamRole alias declared next to
-// the IAM admin code.
-export type UserRole =
-  | "system_admin"
-  | "approver"
-  | "author"
-  | "editor"
-  | "viewer"
-  | "signer"
-  | "area_admin"
-  | "qms_admin";
+// Canonical 8-role backend enum, re-exported from the generated contract type
+// (F-QA4-2 — the hand-written union that used to live here is gone; the spec's
+// UserRole schema is now the only definition). The legacy FE-only phantoms
+// "admin" and "reviewer" were removed in PR-12b.
+// Runtime values live in lib/iam/role-vocabulary (USER_ROLES).
+import type { UserRole } from "../iam/role-vocabulary";
+export type { UserRole };
 
 export interface CurrentUser {
   userId: string;

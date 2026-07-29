@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"metaldocs/internal/platform/iamtypes"
 )
 
 func TestProcessAreaIsActiveWhenNotArchived(t *testing.T) {
@@ -42,7 +44,7 @@ func TestProcessAreaArchiveReturnsErrorWhenAlreadyArchived(t *testing.T) {
 func TestNewProcessArea_NormalizesAndValidates(t *testing.T) {
 	parent := AreaCode(" ROOT ")
 	owner := " owner-1 "
-	role := " manager "
+	role := " approver "
 	area, err := NewProcessArea(ProcessArea{
 		Code:                " AR-01 ",
 		TenantID:            " tenant-a ",
@@ -64,8 +66,71 @@ func TestNewProcessArea_NormalizesAndValidates(t *testing.T) {
 	if area.OwnerUserID == nil || *area.OwnerUserID != "owner-1" {
 		t.Fatalf("unexpected owner user id: %#v", area.OwnerUserID)
 	}
-	if area.DefaultApproverRole == nil || *area.DefaultApproverRole != "manager" {
+	if area.DefaultApproverRole == nil || *area.DefaultApproverRole != "approver" {
 		t.Fatalf("unexpected default approver role: %#v", area.DefaultApproverRole)
+	}
+}
+
+// F-QA4-2: default_approver_role is bound to the AREA-assignable subset. Free
+// text and the legacy phantoms fail closed; crucially so does system_admin,
+// which is tenant-wide tier-1 and can never be a user_process_areas membership
+// — configuring it would resolve to an empty approver pool at runtime.
+func TestNewProcessArea_RejectsNonAreaAssignableDefaultApproverRole(t *testing.T) {
+	for _, role := range []string{"system_admin", "manager", "admin", "reviewer", "APPROVER"} {
+		r := role
+		_, err := NewProcessArea(ProcessArea{
+			Code:                "AR-01",
+			TenantID:            "tenant-a",
+			Name:                "Finance",
+			DefaultApproverRole: &r,
+		})
+		if !errors.Is(err, ErrInvalidDefaultApproverRole) {
+			t.Fatalf("role %q: expected ErrInvalidDefaultApproverRole, got %v", role, err)
+		}
+	}
+}
+
+// The field is optional: nil and blank-collapsing-to-nil stay valid.
+func TestNewProcessArea_AllowsAbsentDefaultApproverRole(t *testing.T) {
+	blank := "   "
+	for _, in := range []*string{nil, &blank} {
+		area, err := NewProcessArea(ProcessArea{
+			Code:                "AR-01",
+			TenantID:            "tenant-a",
+			Name:                "Finance",
+			DefaultApproverRole: in,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if area.DefaultApproverRole != nil {
+			t.Fatalf("expected nil default approver role, got %#v", area.DefaultApproverRole)
+		}
+	}
+}
+
+// Every area-assignable role is accepted, and the set is exactly 7 (all
+// canonical roles minus system_admin) — the same shape the AreaRole schema
+// publishes in api/openapi/v1/openapi.yaml.
+func TestNewProcessArea_AcceptsEveryAreaAssignableRole(t *testing.T) {
+	roles := iamtypes.AreaRoles()
+	if len(roles) != 7 {
+		t.Fatalf("expected 7 area-assignable roles, got %d: %v", len(roles), roles)
+	}
+	for _, role := range roles {
+		r := string(role)
+		area, err := NewProcessArea(ProcessArea{
+			Code:                "AR-01",
+			TenantID:            "tenant-a",
+			Name:                "Finance",
+			DefaultApproverRole: &r,
+		})
+		if err != nil {
+			t.Fatalf("role %q: unexpected error: %v", role, err)
+		}
+		if area.DefaultApproverRole == nil || *area.DefaultApproverRole != r {
+			t.Fatalf("role %q: unexpected default approver role %#v", role, area.DefaultApproverRole)
+		}
 	}
 }
 

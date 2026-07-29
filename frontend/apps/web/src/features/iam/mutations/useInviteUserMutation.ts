@@ -2,10 +2,14 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../../lib/api/client";
 import { QK } from "../../../lib/queryKeys";
 import type { IamRole } from "../types";
+import type { AreaRole } from "../../../lib/iam/role-vocabulary";
 
+// F-QA4-2: an invite-time area membership becomes a user_process_areas row, so
+// its role is drawn from AreaRole (the seven area-assignable roles), NOT the
+// broader 8-value tenant enum. Mirrors AreaMembershipInput.role in the contract.
 type AreaMembershipInput = {
   areaCode: string;
-  role: IamRole;
+  role: AreaRole;
 };
 
 type InviteUserBody = {

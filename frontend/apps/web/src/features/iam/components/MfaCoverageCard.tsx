@@ -1,14 +1,26 @@
 import { resolveQueryError } from "../../../lib/api/resolveQueryError";
 import { useMfaCoverageQuery } from "../queries/useMfaCoverageQuery";
 import { getRoleLabel } from "../presenters/role-label-presenter";
+import type { UserRole } from "../../../lib/iam/role-vocabulary";
 import styles from "./MfaCoverageCard.module.css";
 
-const CRITICAL_ROLES: ReadonlySet<string> = new Set([
+// A deliberate SEMANTIC SUBSET, not a copy of the role vocabulary: these are the
+// roles whose MFA gap is a compliance risk (they sign, approve, or administer),
+// so their coverage bar is highlighted. It is authored, not derived — a new
+// canonical role is not automatically "critical".
+//
+// F-QA4-2: the literal is typed against the generated `UserRole` so a typo or a
+// retired role fails tsc, while the Set stays `ReadonlySet<string>` because it
+// is probed with `slice.role` straight off the wire (which may carry a value
+// this build does not know about) — narrowing that would need a cast, and a
+// cast is exactly the kind of unchecked assertion this feature removes.
+const CRITICAL_ROLES: ReadonlyArray<UserRole> = [
   "signer",
   "approver",
   "system_admin",
   "qms_admin",
-]);
+];
+const CRITICAL_ROLE_SET: ReadonlySet<string> = new Set(CRITICAL_ROLES);
 
 const pctFmt = new Intl.NumberFormat("pt-BR", {
   maximumFractionDigits: 1,
@@ -64,7 +76,7 @@ export default function MfaCoverageCard() {
 
           <div className={styles.roles} role="list">
             {data.by_role.map((slice) => {
-              const isCritical = CRITICAL_ROLES.has(slice.role);
+              const isCritical = CRITICAL_ROLE_SET.has(slice.role);
               const labelClass = isCritical
                 ? `${styles.roleLabel} ${styles.critical}`
                 : styles.roleLabel;

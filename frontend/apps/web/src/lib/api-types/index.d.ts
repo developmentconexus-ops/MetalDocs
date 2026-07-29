@@ -2254,7 +2254,7 @@ export interface components {
         };
         AreaMembershipInput: {
             area_code: string;
-            role: components["schemas"]["UserRole"];
+            role: components["schemas"]["AreaRole"];
         };
         /** @description Active area membership row returned by the tenant-scoped /iam/area-memberships listing. */
         AreaMembershipRow: {

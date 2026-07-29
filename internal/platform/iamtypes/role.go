@@ -52,6 +52,17 @@ func IsValidRole(role Role) bool {
 	return ok
 }
 
+// Roles returns the canonical tenant roles, sorted — for validation messages
+// and diagnostics. Mirrors the UserRole enum in api/openapi/v1/openapi.yaml.
+func Roles() []Role {
+	out := make([]Role, 0, len(validRoles))
+	for r := range validRoles {
+		out = append(out, r)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
+}
+
 // areaRoles is the subset of canonical roles assignable as an AREA membership
 // (a public.user_process_areas row). It is every canonical role EXCEPT
 // system_admin: system_admin is a tenant-wide tier-1 role that bypasses tier-2

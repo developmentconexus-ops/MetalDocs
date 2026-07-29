@@ -16,10 +16,11 @@ func TestProfileServiceCreate_UsesDomainConstructorNormalizationAndValidation(t 
 	service := NewProfileService(repo, &fakeTemplateVersionChecker{}, &fakeGovernanceLogger{})
 
 	in := &domain.DocumentProfile{
-		Code:       " PO-01 ",
-		TenantID:   " tenant-a ",
-		FamilyCode: " policy ",
-		Name:       " Procedure ",
+		Code:           " PO-01 ",
+		TenantID:       " tenant-a ",
+		FamilyCode:     " policy ",
+		Name:           " Procedure ",
+		EditableByRole: "editor",
 	}
 	if err := service.Create(context.Background(), in); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -35,12 +36,33 @@ func TestProfileServiceCreate_UsesDomainConstructorNormalizationAndValidation(t 
 		t.Fatalf("caller pointer mutated: %#v", in)
 	}
 	if err := service.Create(context.Background(), &domain.DocumentProfile{
-		Code:       "PO",
-		TenantID:   "tenant-a",
-		FamilyCode: "policy",
-		Name:       " ",
+		Code:           "PO",
+		TenantID:       "tenant-a",
+		FamilyCode:     "policy",
+		Name:           " ",
+		EditableByRole: "editor",
 	}); !errors.Is(err, domain.ErrProfileNameRequired) {
 		t.Fatalf("expected ErrProfileNameRequired, got %v", err)
+	}
+}
+
+// F-QA4-2: Update does NOT run domain.NewDocumentProfile, so without an
+// explicit guard a free-text editable_by_role could bypass the constructor that
+// Create runs. Both write paths must fail closed on the bound vocabulary.
+func TestProfileServiceUpdate_RejectsNonCanonicalEditableByRole(t *testing.T) {
+	repo := newFakeProfileRepository()
+	repo.put(&domain.DocumentProfile{Code: "po", TenantID: "tenant-a", EditableByRole: "editor"})
+	service := NewProfileService(repo, &fakeTemplateVersionChecker{}, &fakeGovernanceLogger{})
+
+	err := service.Update(context.Background(), &domain.DocumentProfile{
+		Code:           "po",
+		TenantID:       "tenant-a",
+		FamilyCode:     "policy",
+		Name:           "Procedure",
+		EditableByRole: "manager",
+	})
+	if !errors.Is(err, domain.ErrInvalidEditableByRole) {
+		t.Fatalf("expected ErrInvalidEditableByRole, got %v", err)
 	}
 }
 

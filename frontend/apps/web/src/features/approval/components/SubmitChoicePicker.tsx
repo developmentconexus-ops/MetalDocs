@@ -1,47 +1,20 @@
 import { useUsersQuery } from '../../iam/queries/useUsersQuery';
 import type { components } from '../../../lib/api-types';
+import { isUserRole } from '../../../lib/iam/role-vocabulary';
 import styles from './SubmitChoicePicker.module.css';
 
 export type ApprovalRoutePreview = components['schemas']['ApprovalRoutePreview'];
 export type ApprovalRoutePreviewStage = components['schemas']['ApprovalRoutePreviewStage'];
 export type ActorSelector = components['schemas']['ActorSelector'];
 export type SubmitChosenActors = components['schemas']['SubmitChosenActors'];
-type UserRole = components['schemas']['UserRole'];
-
-// The known IAM roles the listUsers filter accepts. Kept in sync with the
-// generated UserRole union (a compile-time exhaustiveness check below fails
-// the build if the enum ever drifts).
-const USER_ROLES: readonly UserRole[] = [
-  'system_admin',
-  'approver',
-  'author',
-  'editor',
-  'viewer',
-  'signer',
-  'area_admin',
-  'qms_admin',
-];
-// Exhaustiveness guard: if UserRole gains/loses a member, USER_ROLES stops
-// being assignable to UserRole[] here and tsc fails, forcing a resync.
-const _USER_ROLES_EXHAUSTIVE: Record<UserRole, true> = {
-  system_admin: true,
-  approver: true,
-  author: true,
-  editor: true,
-  viewer: true,
-  signer: true,
-  area_admin: true,
-  qms_admin: true,
-};
-void _USER_ROLES_EXHAUSTIVE;
-
+// F-QA4-2: the role vocabulary and its exhaustiveness guard used to be
+// duplicated here. Both now come from the one canonical runtime module, which
+// derives from the same generated enum and fails the build on drift.
+//
 // ActorSelector.role is a free-form pattern-constrained string on the wire
 // (api/openapi ActorSelector schema). The FE-only listUsers filter narrows to
-// the closed UserRole union, so an unknown role degrades to `undefined`
-// (graceful empty pool) rather than an unchecked cast.
-function isUserRole(role: string | undefined): role is UserRole {
-  return role != null && (USER_ROLES as readonly string[]).includes(role);
-}
+// the closed UserRole union via isUserRole, so an unknown role degrades to
+// `undefined` (graceful empty pool) rather than an unchecked cast.
 
 /**
  * SLICE 8b (unit 3.2): the stages a submit-time chosen_actors picker must

@@ -95,7 +95,7 @@ export async function createProfile(req: CreateProfileRequest): Promise<Document
     name: req.name,
     description: req.description ?? "",
     review_interval_days: req.reviewIntervalDays,
-    editable_by_role: req.editableByRole ?? "admin",
+    editable_by_role: req.editableByRole,
   };
   const { data, error } = await api.POST("/taxonomy/profiles", {
     params: { header: { "Idempotency-Key": crypto.randomUUID() } },
@@ -113,7 +113,7 @@ export async function updateProfile(code: string, req: UpdateProfileRequest): Pr
     name: req.name ?? "",
     description: req.description ?? "",
     review_interval_days: req.reviewIntervalDays ?? 0,
-    editable_by_role: req.editableByRole ?? "admin",
+    editable_by_role: req.editableByRole,
   };
   const { data, error } = await api.PATCH("/taxonomy/profiles/{code}", {
     params: { path: { code } },

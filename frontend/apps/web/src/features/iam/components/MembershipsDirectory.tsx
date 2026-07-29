@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { resolveQueryError } from "../../../lib/api/resolveQueryError";
-import { IAM_AREA_ROLES, SP_DATE_TIME_FORMATTER } from "../constants";
+import { SP_DATE_TIME_FORMATTER } from "../constants";
+import { getRoleLabel } from "../presenters/role-label-presenter";
 import type { IamRole } from "../types";
 import styles from "./MembershipsDirectory.module.css";
 
@@ -34,10 +35,6 @@ interface MembershipsDirectoryProps {
 }
 
 const SKELETON_ROWS = 8;
-
-const ROLE_LABELS: Record<IamRole, string> = Object.fromEntries(
-  IAM_AREA_ROLES.map(([value, label]) => [value, label]),
-) as Record<IamRole, string>;
 
 const COLUMNS: ReadonlyArray<{
   key: MembershipSortKey | "_actions";
@@ -201,7 +198,7 @@ export default function MembershipsDirectory({
                 <span className={styles.areaCode}>{row.areaCode}</span>
               </div>
               <div role="cell" className={styles.cell}>
-                <span className={styles.roleBadge}>{ROLE_LABELS[row.role] ?? row.role}</span>
+                <span className={styles.roleBadge}>{getRoleLabel(row.role)}</span>
               </div>
               <div role="cell" className={`${styles.cell} ${styles.muted}`}>
                 {formatGrantedAt(row.effectiveFrom)}

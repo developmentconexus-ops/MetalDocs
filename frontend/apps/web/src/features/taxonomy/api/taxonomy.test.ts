@@ -154,6 +154,7 @@ describe('createProfile / updateProfile', () => {
       familyCode: 'sop',
       name: 'Procedimento Operacional',
       reviewIntervalDays: 180,
+      editableByRole: 'editor',
     });
 
     expect(profile.code).toBe('pop');
@@ -166,7 +167,7 @@ describe('createProfile / updateProfile', () => {
         name: 'Procedimento Operacional',
         description: '',
         review_interval_days: 180,
-        editable_by_role: 'admin',
+        editable_by_role: 'editor',
       },
     });
   });
@@ -188,7 +189,7 @@ describe('createProfile / updateProfile', () => {
       error: undefined,
     });
 
-    const profile = await updateProfile('pop', { familyCode: 'sop', name: 'Novo nome', reviewIntervalDays: 90 });
+    const profile = await updateProfile('pop', { familyCode: 'sop', name: 'Novo nome', reviewIntervalDays: 90, editableByRole: 'editor' });
 
     expect(profile.name).toBe('Novo nome');
     expect(mockPatch).toHaveBeenCalledWith(
@@ -200,7 +201,7 @@ describe('createProfile / updateProfile', () => {
   it('throws ApiError with an empty-response fallback when the server sends no body', async () => {
     mockPost.mockResolvedValue({ data: undefined, error: undefined });
     await expect(
-      createProfile({ code: 'pop', familyCode: 'sop', name: 'x', reviewIntervalDays: 1 }),
+      createProfile({ code: 'pop', familyCode: 'sop', name: 'x', reviewIntervalDays: 1, editableByRole: 'editor' }),
     ).rejects.toBeInstanceOf(ApiError);
   });
 });

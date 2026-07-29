@@ -1,7 +1,7 @@
 import { useId } from "react";
 import { Dialog } from "../../../components/ui/Dialog";
 import { resolveQueryError } from "../../../lib/api/resolveQueryError";
-import { IAM_AREA_ROLES } from "../constants";
+import { getRoleLabel } from "../presenters/role-label-presenter";
 import type { MembershipRow } from "./MembershipsDirectory";
 import styles from "./RevokeMembershipDialog.module.css";
 
@@ -14,8 +14,6 @@ interface RevokeMembershipDialogProps {
   error: unknown;
 }
 
-const ROLE_LABELS: Record<string, string> = Object.fromEntries(IAM_AREA_ROLES);
-
 export default function RevokeMembershipDialog({
   target,
   onConfirm,
@@ -24,7 +22,7 @@ export default function RevokeMembershipDialog({
   error,
 }: RevokeMembershipDialogProps) {
   const errorId = useId();
-  const roleLabel = target ? (ROLE_LABELS[target.role] ?? target.role) : "";
+  const roleLabel = target ? getRoleLabel(target.role) : "";
 
   return (
     <Dialog
