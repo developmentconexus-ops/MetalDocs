@@ -101,10 +101,15 @@ function New-ModuleConfig {
                     'internal/modules/documents/http/view_handler.go'
                 )
                 RuntimePatterns = @('documentsapi.HandlerWithOptions')
+                # ADR 0073: POST /documents/{id}/finalize was removed (spec, generated
+                # backend, generated FE types, FE wrapper) in favour of the canonical
+                # POST /documents/{id}/submit, which resolves route_id/content_hash
+                # in-tx. The presence expectations below no longer name it; the runtime
+                # forbid stays as an anti-regression guard against a hand-mounted revival.
                 RuntimeForbiddenPatterns = @('mux.HandleFunc("GET /api/v1/documents"', 'mux.HandleFunc("POST /api/v1/documents/{id}/finalize"')
                 OpenApiFile = 'api/openapi/v1/openapi.yaml'
                 # AD-1: spec path keys are relative.
-                OpenApiPatterns = @('/documents:', '/documents/{id}:', '/documents/{id}/finalize:')
+                OpenApiPatterns = @('/documents:', '/documents/{id}:')
                 # The old forbid ("`n  /documents:") matched the CORRECT relative key
                 # post-AD-1, inverting the check (it would always DRIFT on a clean spec).
                 # No legacy-duplicate hazard remains: PATH-BASE-PREFIX (scripts/api-lint)
@@ -112,13 +117,13 @@ function New-ModuleConfig {
                 # duplicate cannot exist in a passing spec. Forbid retired.
                 OpenApiForbiddenPatterns = @()
                 BackendFile = 'internal/modules/documents/api/api.gen.go'
-                BackendPatterns = @('ListDocuments', 'GetDocument', 'FinalizeDocument')
+                BackendPatterns = @('ListDocuments', 'GetDocument')
                 FrontendTypesFile = 'frontend/apps/web/src/lib/api-types/index.d.ts'
-                FrontendTypesPatterns = @('"/documents":', '"/documents/{id}":', '"/documents/{id}/finalize":')
+                FrontendTypesPatterns = @('"/documents":', '"/documents/{id}":')
                 FrontendWrapperFile = 'frontend/apps/web/src/features/documents/api/documents.ts'
-                FrontendWrapperPatterns = @('/api/v1/documents', 'listDocuments', 'getDocument', 'finalizeDocument')
+                FrontendWrapperPatterns = @('/api/v1/documents', 'listDocuments', 'getDocument')
                 RouteFamilies = @('/api/v1/documents')
-                OwnedOpenApiPaths = @('/api/v1/documents', '/api/v1/documents/{id}', '/api/v1/documents/{id}/finalize')
+                OwnedOpenApiPaths = @('/api/v1/documents', '/api/v1/documents/{id}')
                 UsesGeneratedBoundary = $true
                 WikiFile = 'wiki/modules/documents.md'
             }
