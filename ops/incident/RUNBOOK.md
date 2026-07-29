@@ -74,15 +74,18 @@ The old Postgres-lease scheduler and `job_leases` flow are **retired** — perio
    SELECT id, kind, state, attempt, errors FROM river_job
    WHERE state IN ('retryable','running') ORDER BY id DESC LIMIT 20;
    ```
-3. Outbox backlog:
+3. Outbox backlog and dead-letter queue (`processed_at` does not exist on this table — the delivery columns are `published_at` / `dead_lettered_at`):
    ```sql
-   SELECT count(*) FROM metaldocs.outbox_events WHERE processed_at IS NULL;
+   SELECT count(*) FILTER (WHERE published_at IS NULL AND dead_lettered_at IS NULL) AS backlog,
+          count(*) FILTER (WHERE dead_lettered_at IS NOT NULL)                      AS dead_lettered
+     FROM metaldocs.outbox_events;
    ```
 
 **Mitigation:**
 - Restart the affected service: `docker compose restart jobs` (or `worker`). Consumers are idempotent by invariant; restart is safe.
 - Poison job (high `attempt`, repeating error) → read the error, fix the cause; River discards after max attempts.
 - The stuck-instance watchdog is **alert-only** (ADR 0068): it surfaces stuck approval instances, it never auto-cancels. Stuck instances are resolved by an operator decision in the product UI, not by SQL.
+- Dead-lettered `outbox_events` rows are retained **90 days**, then purged by the `outbox-events-retention` job; published rows are purged after 7 days. Investigate the DLQ before that window closes. A row that is neither published nor dead-lettered is never purged at any age, so a backlog is never silently eaten by retention. Semantics: [`wiki/database/tables/outbox_events.md`](../../wiki/database/tables/outbox_events.md) §Retention.
 
 ---
 

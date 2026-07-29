@@ -13,10 +13,10 @@ import (
 
 	"github.com/riverqueue/river"
 
-	auditpg "metaldocs/internal/modules/audit/infrastructure/postgres"
 	approvalapp "metaldocs/internal/modules/approval/application"
-	approvaljobs "metaldocs/internal/modules/approval/jobs"
 	approvalrepo "metaldocs/internal/modules/approval/infrastructure"
+	approvaljobs "metaldocs/internal/modules/approval/jobs"
+	auditpg "metaldocs/internal/modules/audit/infrastructure/postgres"
 	documentsrepo "metaldocs/internal/modules/documents/infrastructure"
 	iamapp "metaldocs/internal/modules/iam/application"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
@@ -26,6 +26,7 @@ import (
 	"metaldocs/internal/modules/jobs/document_review_surfacer"
 	"metaldocs/internal/modules/jobs/idempotency_janitor"
 	"metaldocs/internal/modules/jobs/maintenance"
+	"metaldocs/internal/modules/jobs/outbox_retention"
 	"metaldocs/internal/modules/jobs/release_hold_reconciler"
 	"metaldocs/internal/modules/jobs/stuck_instance_watchdog"
 	notificationsinfra "metaldocs/internal/modules/notifications/infrastructure"
@@ -159,6 +160,13 @@ func run(ctx context.Context) error {
 		// Staging outbox retention purge (M5 F5.4 T2): reuses the same pdfRepo/
 		// matRepo instances built above for the dispatch workers.
 		river.AddWorker(workers, retention.NewPurgeWorker(pdfRepo, matRepo))
+
+		// Relay outbox retention purge: the second stage of the same chain.
+		// The staging purge above bounds pdf_dispatch_outbox /
+		// materialize_dispatch_outbox; this one bounds metaldocs.outbox_events,
+		// which had no retention at all and so pinned every terminal row's
+		// idempotency_key against the publisher's ON CONFLICT dedup forever.
+		river.AddWorker(workers, outbox_retention.NewWorker(outboxpg.NewRetention(db)))
 
 		// M7 F7.3 Task E: tenant lifecycle (export/erase) worker. Consumes
 		// iamdomain.TenantLifecycleJobArgs jobs the api binary's

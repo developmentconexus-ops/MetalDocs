@@ -1,7 +1,8 @@
 // Package maintenance holds the shared River periodic-job definitions for the
 // maintenance-queue jobs (stuck-instance watchdog, idempotency janitor, audit
 // integrity validator, the M6 F6.2 document review-due surfacer, the F8
-// approval SLA surfacer, and the ADR 0085 release-hold reconciler). Both
+// approval SLA surfacer, the ADR 0085 release-hold reconciler, and the
+// outbox_events terminal-row retention purge). Both
 // metaldocs-api and metaldocs-jobs define these periodic jobs on their River
 // client config so that whichever process wins leader election is the one
 // that enqueues them (River only enqueues periodic jobs from the elected
@@ -19,13 +20,15 @@ import (
 	"metaldocs/internal/modules/jobs/audit_integrity_validator"
 	"metaldocs/internal/modules/jobs/document_review_surfacer"
 	"metaldocs/internal/modules/jobs/idempotency_janitor"
+	"metaldocs/internal/modules/jobs/outbox_retention"
 	"metaldocs/internal/modules/jobs/release_hold_reconciler"
 	"metaldocs/internal/modules/jobs/stuck_instance_watchdog"
 )
 
 // PeriodicJobs returns the River periodic-job definitions for the 3 janitors
-// plus the M6 F6.2 document review-due surfacer, the F8 approval SLA surfacer
-// and the ADR 0085 release-hold reconciler. It must be included in the
+// plus the M6 F6.2 document review-due surfacer, the F8 approval SLA surfacer,
+// the ADR 0085 release-hold reconciler and the outbox_events terminal-row
+// retention purge. It must be included in the
 // Config.PeriodicJobs of every River client that
 // participates in leader election for these jobs (currently metaldocs-api and
 // metaldocs-jobs), regardless of whether that client subscribes the
@@ -77,6 +80,17 @@ func PeriodicJobs() []*river.PeriodicJob {
 				return release_hold_reconciler.ReleaseHoldReconcilerArgs{}, &river.InsertOpts{Queue: "maintenance"}
 			},
 			&river.PeriodicJobOpts{ID: "release-hold-reconciler", RunOnStart: false},
+		),
+		// Terminal-row retention for metaldocs.outbox_events. Daily, matching
+		// the staging-outbox purge cadence (both stages of the two-stage
+		// outbox chain age out on the same clock) and far finer than either
+		// retention window, so a tick missed to a restart costs nothing.
+		river.NewPeriodicJob(
+			river.PeriodicInterval(24*time.Hour),
+			func() (river.JobArgs, *river.InsertOpts) {
+				return outbox_retention.Args{}, &river.InsertOpts{Queue: "maintenance"}
+			},
+			&river.PeriodicJobOpts{ID: outbox_retention.JobName, RunOnStart: false},
 		),
 	}
 }
