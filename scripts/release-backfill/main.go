@@ -19,14 +19,21 @@
 // history mutation. Artifact keys are deterministic per revision, so the fresh
 // render overwrites the invalid bytes in place.
 //
-// Part of that expurgo is deleting the TERMINAL (dispatched/failed) staging
-// rows in metaldocs.materialize_dispatch_outbox and
-// metaldocs.pdf_dispatch_outbox that recorded the dispatch of those invalid
-// artifacts: both outboxes dedupe on a generation-aware key, so leaving them
-// would silently swallow the repair's enqueues. Rows still in flight
-// (pending/processing) are never deleted — the repair refuses instead. Purged
-// row ids are printed on the outcome line. See backfill's package doc for the
-// literal write set.
+// Part of that expurgo is freeing the keys that would otherwise swallow the
+// re-dispatch, on BOTH layers and BOTH legs:
+//
+//   - the TERMINAL (dispatched/failed) staging rows in
+//     metaldocs.materialize_dispatch_outbox and metaldocs.pdf_dispatch_outbox,
+//     which dedupe on a generation-aware unique index; and
+//   - the TERMINAL (published/dead-lettered) metaldocs.outbox_events rows on the
+//     two delivery idempotency keys those dispatch jobs publish on.
+//
+// Leaving either layer in place makes the repair a successful-looking no-op —
+// that is not a theory, it is what a live run did. Anything still in flight
+// (pending/processing staging rows, unpublished events) is never deleted: the
+// repair refuses instead. Every purged id is printed on the outcome line, and
+// dry-run prints the same set as a plan. See backfill's package doc for the full
+// swallow stack and the literal write set.
 //
 // The DSN comes from -dsn or, when that is empty, the DATABASE_URL environment
 // variable. This tool never reads .env and never prints the DSN: every error it
@@ -55,7 +62,7 @@ import (
 func main() {
 	docsFlag := flag.String("docs", "", "REQUIRED comma-separated document UUIDs to backfill (explicit allowlist; there is no 'all approved' mode)")
 	dryRun := flag.Bool("dry-run", true, "plan only and write nothing; pass -dry-run=false to actually write")
-	repairOnly := flag.Bool("repair-only", false, "re-materialize a frozen, post-approval document from its current revision (invalid-artifact expurgo); purges the terminal materialize/pdf staging rows that would swallow the re-dispatch, records NO approval fact and enqueues NO release evaluation")
+	repairOnly := flag.Bool("repair-only", false, "re-materialize a frozen, post-approval document from its current revision (invalid-artifact expurgo); purges the terminal materialize/pdf staging rows AND the terminal delivery outbox_events that would swallow the re-dispatch, records NO approval fact and enqueues NO release evaluation")
 	dsnFlag := flag.String("dsn", "", "Postgres DSN; when empty the DATABASE_URL environment variable is used (never read from .env, never printed)")
 	flag.Parse()
 

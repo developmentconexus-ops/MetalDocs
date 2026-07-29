@@ -40,6 +40,41 @@
 // approval instance, its signoffs and any release generation — is left
 // untouched. Only step 4 (RepairMaterialization) runs; steps 3 and 5 do not.
 //
+// # The swallow stack
+//
+// Re-dispatching a document that was already rendered once is not one dedupe
+// hop but THREE, and each of them reports its skip as success. All three were
+// found the hard way — the third only after a live run printed `repaired`,
+// completed its River job, and rendered nothing. Per leg:
+//
+//  1. STAGING dedupe — metaldocs.{materialize,pdf}_dispatch_outbox unique on
+//     (tenant_id, revision_id, COALESCE(release_generation_id, nil-uuid)),
+//     NOT partial, so it covers every status (migration 0310 §5). The INSERT is
+//     ON CONFLICT DO NOTHING and a skip returns an empty id with a nil error
+//     (render/fanout/staging_outbox.go:93, :133), which the enqueuer reads as
+//     "nothing to dispatch" — no River job at all
+//     (render/fanout/dispatchjobs/enqueuer.go:110-113).
+//  2. DELIVERY dedupe — metaldocs.outbox_events is UNIQUE on idempotency_key
+//     (baseline 0001_current_schema.sql:2535-2536) and the publisher is also
+//     ON CONFLICT DO NOTHING returning nil
+//     (platform/messaging/outbox/postgres/publisher.go:35, :43-57). The key is
+//     built by dispatchjobs.dispatchIdempotencyKey (workers.go:46-52), and for a
+//     GENERATION-LESS render it is the historical revision-only shape —
+//     "materialize_fanout:<tenant>:<document>" — deliberately preserved verbatim
+//     by ADR 0085 so nothing already shipped changed. A stale published event on
+//     that key makes the River job succeed while publishing nothing: run()
+//     treats the nil error as a successful publish and marks the staging row
+//     dispatched (workers.go:104-117).
+//  3. The PDF leg repeats BOTH of the above. The worker's own downstream
+//     EnqueuePDFTx runs on the same staging key
+//     (platform/worker/materialize_job_runner.go:146), and its dispatch job
+//     publishes on "docgen_v2_pdf:<tenant>:<document>" — so a repair that
+//     clears only the materialize side lands a fresh frozen.docx next to the
+//     original blank final.pdf.
+//
+// Repair-only clears layers 1 and 2 on both legs, and refuses when anything on
+// either layer is still in flight.
+//
 // Literal write set of one repair transaction, stated at SQL level so nobody
 // has to infer it:
 //
@@ -48,6 +83,12 @@
 //     metaldocs.pdf_dispatch_outbox. Those rows are the ops provenance of the
 //     invalid artifacts, not audit facts — purging them IS the expurgo. See
 //     purgeStaleDispatch for why both tables and why terminal-only.
+//   - DELETE of the TERMINAL (published or dead-lettered) metaldocs.outbox_events
+//     rows on this repair's two delivery idempotency keys. Same expurgo, one
+//     layer down: outbox_events is the DELIVERY ledger of the very dispatch the
+//     staging purge already covers. It is NOT an audit table — audit facts live
+//     in metaldocs.audit_events with their own hash chain, and this tool never
+//     reads or writes them. See classifyStaleDeliveryEvents.
 //   - UPDATE public.documents SET values_hash, values_frozen_at,
 //     frozen_revision_id (snapshot_repository.go:166-175, one statement). Only
 //     frozen_revision_id CHANGES; values_hash and values_frozen_at are
@@ -294,8 +335,11 @@ func RunDocument(ctx context.Context, deps Deps, documentID string, opts Options
 // caller's already-seeded, already-bypassed transaction.
 //
 // Sequence, all in the caller's transaction: repairPreflight (which classifies
-// the stale staging rows) → purgeStaleDispatch → RepairMaterialization →
-// requireMaterializeEnqueued.
+// BOTH the stale staging rows and the stale delivery events, refusing outright
+// if anything on either layer is still in flight) → purgeStaleDispatch →
+// purgeStaleDeliveryEvents → RepairMaterialization → requireMaterializeEnqueued.
+// The two purges run before the re-dispatch because their whole purpose is to
+// free the keys that dispatch is about to write on.
 //
 // The only production seam it drives is FreezeService.RepairMaterialization,
 // which re-pins documents.frozen_revision_id from the CURRENT revision in this
@@ -351,6 +395,10 @@ func runRepairOnly(ctx context.Context, tx db.Tx, deps Deps, tenantID, documentI
 		return err
 	}
 
+	if err := purgeStaleDeliveryEvents(ctx, tx, pre.staleEvents); err != nil {
+		return err
+	}
+
 	if err := deps.Freeze.RepairMaterialization(ctx, tx, tenantID, documentID, pre.generationID); err != nil {
 		return fmt.Errorf("backfill: repair materialization: %w", err)
 	}
@@ -361,8 +409,11 @@ func runRepairOnly(ctx context.Context, tx db.Tx, deps Deps, tenantID, documentI
 	}
 
 	res.Outcome = OutcomeRepaired
-	res.Detail = fmt.Sprintf("re-pinned frozen_revision_id=%s, %s, re-dispatched materialization (outbox=%s status=pending, document status=%s); approval facts untouched",
-		pre.revisionID, describePurge(pre.staleDispatch, "purged"), outboxID, pre.status)
+	res.Detail = fmt.Sprintf("re-pinned frozen_revision_id=%s, %s, %s, re-dispatched materialization (outbox=%s status=pending, document status=%s); approval facts untouched",
+		pre.revisionID,
+		describePurge(pre.staleDispatch, "purged"),
+		describeEventPurge(pre.staleEvents, "purged"),
+		outboxID, pre.status)
 	return nil
 }
 
@@ -375,6 +426,9 @@ type repairPreflightData struct {
 	// that the write path will purge. Empty is the common case. A non-terminal
 	// row never reaches here — preflight refuses instead.
 	staleDispatch []dispatchRow
+	// staleEvents are the TERMINAL delivery-ledger rows on this repair's two
+	// idempotency keys, purged by the same write path and under the same rule.
+	staleEvents []deliveryEventRow
 }
 
 func (p repairPreflightData) plan() string {
@@ -382,8 +436,11 @@ func (p repairPreflightData) plan() string {
 	if generation == "" {
 		generation = "none (legacy, generation-less)"
 	}
-	return fmt.Sprintf("would re-pin frozen_revision_id from current revision %s, %s, and re-dispatch materialization for a %s document (generation=%s); no approval fact, no release evaluation",
-		p.revisionID, describePurge(p.staleDispatch, "would purge"), p.status, generation)
+	return fmt.Sprintf("would re-pin frozen_revision_id from current revision %s, %s, %s, and re-dispatch materialization for a %s document (generation=%s); no approval fact, no release evaluation",
+		p.revisionID,
+		describePurge(p.staleDispatch, "would purge"),
+		describeEventPurge(p.staleEvents, "would purge"),
+		p.status, generation)
 }
 
 // repairOnlyStatuses is the CLOSED post-approval status set repair-only
@@ -448,6 +505,12 @@ func repairPreflight(ctx context.Context, tx db.Tx, tenantID, documentID string)
 	}
 
 	pre.staleDispatch, err = classifyStaleDispatch(ctx, tx, tenantID, documentID, pre.generationID)
+	if err != nil {
+		return repairPreflightData{}, err
+	}
+
+	pre.staleEvents, err = classifyStaleDeliveryEvents(ctx, tx, documentID,
+		repairDeliveryKeys(tenantID, documentID, pre.generationID))
 	if err != nil {
 		return repairPreflightData{}, err
 	}
@@ -628,6 +691,157 @@ func purgeStaleDispatch(ctx context.Context, tx db.Tx, stale []dispatchRow) erro
 	return nil
 }
 
+// deliveryEventRow is one metaldocs.outbox_events row on a delivery idempotency
+// key this repair needs free. The table is UNIQUE on idempotency_key, so at most
+// one row exists per key and a repair sees at most two.
+type deliveryEventRow struct {
+	eventID        string
+	idempotencyKey string
+	published      bool
+	deadLettered   bool
+}
+
+// terminal reports whether the event's delivery is OVER: published or
+// dead-lettered.
+//
+// Its negation is a deliberately CONSERVATIVE SUPERSET of the currently
+// claimable set, not its exact complement. The consumer claims on
+// published_at IS NULL AND dead_lettered_at IS NULL AND
+// (next_attempt_at IS NULL OR next_attempt_at <= NOW())
+// (platform/messaging/outbox/postgres/consumer.go:41-46), so an unpublished row
+// with a FUTURE next_attempt_at is backing off — not claimable this second, but
+// re-claimable the moment its timer expires. This treats it as in-flight and
+// refuses, which is the correct call: the row is alive, and deleting it would
+// drop a message that was about to be retried. The partial index
+// idx_outbox_claimable (baseline 0001_current_schema.sql:3078) indexes only the
+// first two predicates, which is why they alone are the durable "is this event
+// finished" question.
+func (e deliveryEventRow) terminal() bool { return e.published || e.deadLettered }
+
+func (e deliveryEventRow) state() string {
+	switch {
+	case e.deadLettered:
+		return "dead-lettered"
+	case e.published:
+		return "published"
+	default:
+		return "unpublished"
+	}
+}
+
+// repairDeliveryKeys builds the two delivery idempotency keys this repair's
+// dispatch jobs will publish on, in the SAME shape as
+// dispatchjobs.dispatchIdempotencyKey (render/fanout/dispatchjobs/workers.go:46-52):
+// "<prefix>:<tenant>:<revision>", with ":<generation>" appended only when the
+// render is generation-aware. The revision leg carries documents.id (the known
+// column misnomer that runs through the whole pin/fanout/worker chain), which is
+// what the dispatch args are built from.
+//
+// The prefixes are the two the workers use verbatim: "materialize_fanout"
+// (workers.go:88) and "docgen_v2_pdf" (workers.go:66).
+//
+// This is a DELIBERATE DUPLICATION of a production key function across a module
+// boundary, and it is the tool's weakest seam: it cannot import
+// dispatchIdempotencyKey (unexported) and there is no lint pinning the two
+// together. If workers.go:46-52 ever changes shape — a new prefix, a new
+// component, a different separator — this function MUST be changed with it, or
+// repair will purge keys nobody publishes on and silently stop clearing the
+// delivery layer. Anyone touching that function should treat this comment as the
+// callback.
+func repairDeliveryKeys(tenantID, documentID, generationID string) []string {
+	build := func(prefix string) string {
+		key := prefix + ":" + tenantID + ":" + documentID
+		if generationID != "" {
+			key += ":" + generationID
+		}
+		return key
+	}
+	return []string{build("materialize_fanout"), build("docgen_v2_pdf")}
+}
+
+// classifyStaleDeliveryEvents is layer 2 of the swallow stack (see the package
+// doc). metaldocs.outbox_events is UNIQUE on idempotency_key and the publisher
+// is ON CONFLICT DO NOTHING returning nil
+// (platform/messaging/outbox/postgres/publisher.go:35, :43-57), so a leftover
+// event on one of this repair's keys makes the dispatch job publish NOTHING and
+// still report success — it then marks the staging row dispatched
+// (dispatchjobs/workers.go:104-117) and the operator sees a completed River job
+// with no work behind it. That is exactly how the live run of this tool rendered
+// nothing while printing `repaired`.
+//
+// Verdict per row, same discipline as the staging classifier: terminal
+// (published or dead-lettered) → purge; anything else → refuse the whole repair,
+// because deleting an event the consumer may still deliver — now, or once its
+// backoff expires; see deliveryEventRow.terminal — would drop a live message
+// rather than free a dead key.
+//
+// Purging here is expurgo, not audit mutation. outbox_events is the DELIVERY
+// ledger of the same invalid dispatch the staging purge already covers; the
+// audit chain lives in metaldocs.audit_events, a different table this tool never
+// touches. Worth knowing when judging the cost: unlike the staging rows, which
+// retention eventually deletes (staging_outbox.go:257-264), NOTHING purges
+// outbox_events today — no retention job addresses it — so a stale published
+// event holds its key forever and every future repair on that key is swallowed
+// until someone removes it.
+func classifyStaleDeliveryEvents(ctx context.Context, tx db.Tx, documentID string, keys []string) ([]deliveryEventRow, error) {
+	if len(keys) != 2 {
+		return nil, fmt.Errorf("repair preflight: expected exactly 2 delivery idempotency keys, got %d", len(keys))
+	}
+	rows, err := tx.QueryContext(ctx, `
+		SELECT event_id, idempotency_key,
+		       (published_at IS NOT NULL)     AS published,
+		       (dead_lettered_at IS NOT NULL) AS dead_lettered
+		  FROM metaldocs.outbox_events
+		 WHERE idempotency_key IN ($1, $2)`,
+		keys[0], keys[1],
+	)
+	if err != nil {
+		return nil, fmt.Errorf("repair preflight: load delivery outbox events: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var stale []deliveryEventRow
+	for rows.Next() {
+		var e deliveryEventRow
+		if err := rows.Scan(&e.eventID, &e.idempotencyKey, &e.published, &e.deadLettered); err != nil {
+			return nil, fmt.Errorf("repair preflight: scan delivery outbox event: %w", err)
+		}
+		if !e.terminal() {
+			return nil, fmt.Errorf("repair preflight: document %s has an IN-FLIGHT delivery event on idempotency_key %q (event_id=%s, neither published nor dead-lettered, so the consumer can still deliver it — now or after its backoff); repair would drop a live message — wait for that delivery to finish, then re-run",
+				documentID, e.idempotencyKey, e.eventID)
+		}
+		stale = append(stale, e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("repair preflight: iterate delivery outbox events: %w", err)
+	}
+	return stale, nil
+}
+
+// purgeStaleDeliveryEvents frees the delivery keys, inside the repair
+// transaction, by PRIMARY KEY (outbox_events_pkey on event_id, baseline
+// 0001_current_schema.sql:2543-2544). No tenant predicate is possible or needed:
+// outbox_events carries NO tenant_id column at all (baseline :1335-1352) — the
+// tenant lives inside the idempotency key and the payload — and the ids came
+// from classifyStaleDeliveryEvents' key-scoped read earlier in this same tx.
+func purgeStaleDeliveryEvents(ctx context.Context, tx db.Tx, stale []deliveryEventRow) error {
+	for _, e := range stale {
+		res, err := tx.ExecContext(ctx,
+			`DELETE FROM metaldocs.outbox_events WHERE event_id = $1`, e.eventID)
+		if err != nil {
+			return fmt.Errorf("repair purge: delete outbox event %s (key %q): %w", e.eventID, e.idempotencyKey, err)
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("repair purge: rows affected for outbox event %s: %w", e.eventID, err)
+		}
+		if n != 1 {
+			return fmt.Errorf("repair purge: expected to delete exactly 1 outbox event %s, deleted %d", e.eventID, n)
+		}
+	}
+	return nil
+}
+
 // requireMaterializeEnqueued is the read-your-own-write proof that the repair
 // actually dispatched something, and it closes the check-then-insert race that
 // classifyStaleDispatch alone cannot.
@@ -648,6 +862,20 @@ func purgeStaleDispatch(ctx context.Context, tx db.Tx, stale []dispatchRow) erro
 // status='pending' predicate matters: it is the enqueue state
 // (staging_outbox.go:91-95), so a row left over in any other state cannot be
 // mistaken for this repair's dispatch.
+//
+// LIMIT, stated plainly: this proves layer 1 ONLY — that the staging row and its
+// River job exist. It cannot prove layer 2. The delivery publish happens later,
+// in the River job's own transaction, long after this one commits
+// (dispatchjobs/workers.go:104-117), so no read in this tx can observe it. What
+// makes that later publish land is the delivery purge, not a check:
+// purgeStaleDeliveryEvents removes the rows holding those idempotency keys, so
+// the publisher's ON CONFLICT DO NOTHING has nothing to conflict with and the
+// INSERT actually writes. The verification available here is the strongest one
+// available here; the layer below is made safe by construction instead.
+//
+// Also worth stating: the pdf leg is unverifiable from this tool in principle.
+// Its staging row and its event are both created by the WORKER, after a
+// successful render. Repair frees both of its keys and stops there.
 func requireMaterializeEnqueued(ctx context.Context, tx db.Tx, tenantID, documentID, generationID string) (string, error) {
 	var id string
 	err := tx.QueryRowContext(ctx, `
@@ -679,6 +907,19 @@ func describePurge(stale []dispatchRow, verb string) string {
 		parts = append(parts, fmt.Sprintf("%s(id=%s status=%s)", strings.TrimPrefix(r.table, "metaldocs."), r.id, r.status))
 	}
 	return fmt.Sprintf("%s %d stale dispatch row(s): %s", verb, len(stale), strings.Join(parts, ", "))
+}
+
+// describeEventPurge renders the delivery-ledger purge set for the outcome line,
+// naming each event id and the key it was holding.
+func describeEventPurge(stale []deliveryEventRow, verb string) string {
+	if len(stale) == 0 {
+		return "no stale delivery events to purge"
+	}
+	parts := make([]string, 0, len(stale))
+	for _, e := range stale {
+		parts = append(parts, fmt.Sprintf("outbox_events(event_id=%s key=%s state=%s)", e.eventID, e.idempotencyKey, e.state()))
+	}
+	return fmt.Sprintf("%s %d stale delivery event(s): %s", verb, len(stale), strings.Join(parts, ", "))
 }
 
 // lookupTenant resolves the owning tenant of documentID.

@@ -34,6 +34,11 @@
 //     metaldocs.pdf_dispatch_outbox — while an in-flight (pending/processing)
 //     row on either side refuses the whole repair, and dry-run only reports the
 //     purge plan
+//   - it purges the DELIVERY layer under the same rule: terminal
+//     (published/dead-lettered) metaldocs.outbox_events rows on the two dispatch
+//     idempotency keys are removed so the next publish can land, an unpublished
+//     (still claimable) event refuses the whole repair, and the purge is KEYED —
+//     foreign documents and other key shapes are untouched
 //
 // NOT covered here, by design: the concurrent check-then-insert race between two
 // simultaneous repair invocations. The integration harness cannot drive two
@@ -52,6 +57,9 @@ import (
 	"encoding/hex"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/google/uuid"
 
 	docsapp "metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/iam/authz"
@@ -301,6 +309,84 @@ func (fx backfillFixture) markDispatched(t *testing.T, id string) {
 		 WHERE id = $1::uuid`, id); err != nil {
 		t.Fatalf("mark dispatched: %v", err)
 	}
+}
+
+// deliveryKey rebuilds one of the two delivery idempotency keys the dispatch
+// jobs publish on, in the generation-less shape a legacy document uses:
+// "<prefix>:<tenant>:<document>" (dispatchjobs/workers.go:46-52 — the revision
+// leg carries documents.id). Spelled out literally here ON PURPOSE: if the
+// production key function drifts, this test must fail rather than follow it.
+func (fx backfillFixture) deliveryKey(prefix string) string {
+	return prefix + ":" + fx.tenantID + ":" + fx.documentID
+}
+
+// deliveryKeyForGeneration is the SAME key one release generation later: the
+// generation id is appended, which is the whole point of ADR 0085's widening —
+// two approvals of one revision are two different artifact sets and must not
+// dedupe into each other (workers.go:38-52). A repair on a document that HAS a
+// generation head must speak this shape, not the legacy one.
+func (fx backfillFixture) deliveryKeyForGeneration(prefix, generationID string) string {
+	return fx.deliveryKey(prefix) + ":" + generationID
+}
+
+// seedDeliveryEvent plants a metaldocs.outbox_events row holding one of this
+// document's generation-less delivery keys — the layer-2 swallow.
+func (fx backfillFixture) seedDeliveryEvent(t *testing.T, prefix, state string) string {
+	t.Helper()
+	return fx.seedDeliveryEventKeyed(t, fx.deliveryKey(prefix), prefix, state)
+}
+
+// seedDeliveryEventKeyed is seedDeliveryEvent with an explicit key, so tests can
+// plant events on the generation-aware shape (or on a deliberately foreign one).
+// state selects the row's disposition: "published" and "dead-lettered" are
+// terminal (purgeable); "unpublished" is still deliverable (must refuse).
+func (fx backfillFixture) seedDeliveryEventKeyed(t *testing.T, key, prefix, state string) string {
+	t.Helper()
+	eventID := uuid.NewString()
+	var publishedAt, deadLetteredAt sql.NullTime
+	switch state {
+	case "published":
+		publishedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+	case "dead-lettered":
+		deadLetteredAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+	case "unpublished":
+		// both NULL: the row the consumer can still deliver
+		// (platform/messaging/outbox/postgres/consumer.go:41-46).
+	default:
+		t.Fatalf("seedDeliveryEvent: unknown state %q", state)
+	}
+	eventType := "docx_materialize"
+	if prefix == "docgen_v2_pdf" {
+		eventType = "docgen_v2_pdf"
+	}
+	payload := `{"tenant_id":"` + fx.tenantID + `","revision_id":"` + fx.documentID + `"}`
+	if _, err := fx.database.ExecContext(context.Background(), `
+		INSERT INTO metaldocs.outbox_events (
+		  event_id, event_type, aggregate_type, aggregate_id, occurred_at, version,
+		  idempotency_key, producer, trace_id, payload, published_at, dead_lettered_at
+		)
+		VALUES ($1, $2, 'document_revision', $3, now(), 1, $4, 'release-backfill-test',
+		        'trace-'||$1, $5::jsonb, $6, $7)`,
+		eventID, eventType, fx.documentID, key, payload, publishedAt, deadLetteredAt,
+	); err != nil {
+		t.Fatalf("seed delivery event (%s/%s): %v", key, state, err)
+	}
+	return eventID
+}
+
+func (fx backfillFixture) deliveryEventExists(t *testing.T, eventID string) bool {
+	t.Helper()
+	return countRows(t, fx.database,
+		`SELECT count(*) FROM metaldocs.outbox_events WHERE event_id = $1`, eventID) == 1
+}
+
+// deliveryEventCount counts every event still holding one of this document's
+// two delivery keys — the number that must be 0 for a re-dispatch to land.
+func (fx backfillFixture) deliveryEventCount(t *testing.T) int {
+	t.Helper()
+	return countRows(t, fx.database,
+		`SELECT count(*) FROM metaldocs.outbox_events WHERE idempotency_key IN ($1, $2)`,
+		fx.deliveryKey("materialize_fanout"), fx.deliveryKey("docgen_v2_pdf"))
 }
 
 // frozenRevisionPin returns documents.frozen_revision_id as text, "" when NULL
@@ -1157,5 +1243,274 @@ func TestReleaseBackfill_RepairOnly_NoCurrentRevision_Refuses(t *testing.T) {
 	}
 	if pin := fx.frozenRevisionPin(t); pin != "" {
 		t.Fatalf("aborted repair pinned %q", pin)
+	}
+}
+
+// ── layer 2: the DELIVERY ledger ────────────────────────────────────────────
+//
+// metaldocs.outbox_events is UNIQUE on idempotency_key and the publisher is
+// ON CONFLICT DO NOTHING returning nil (publisher.go:35, :43-57), so a leftover
+// event on one of the repair's two keys makes the River dispatch job publish
+// NOTHING and still succeed — it marks the staging row dispatched and the
+// operator sees a completed job with no work behind it. Not a theory: it is what
+// a live run of this tool did before the delivery purge existed.
+
+// TestReleaseBackfill_RepairOnly_StaleDeliveryEvents_Purged mirrors the LIVE
+// state of the expurgo target: a dispatched staging row plus both stale delivery
+// events still holding the legacy generation-less keys. One published, one
+// dead-lettered — both terminal, both purgeable.
+func TestReleaseBackfill_RepairOnly_StaleDeliveryEvents_Purged(t *testing.T) {
+	database, _ := testdb.Open(t)
+	fx := seedBackfillFixture(t, database, true, releaseContentHash)
+	fx.publish(t)
+	ctx := context.Background()
+
+	staleStaging := fx.seedStaleMaterializeDispatch(t, "dispatched")
+	materializeEvent := fx.seedDeliveryEvent(t, "materialize_fanout", "published")
+	pdfEvent := fx.seedDeliveryEvent(t, "docgen_v2_pdf", "dead-lettered")
+
+	res := backfill.RunDocument(ctx, fx.deps, fx.documentID, backfill.Options{RepairOnly: true})
+	if res.Err != nil {
+		t.Fatalf("repair-only over stale delivery events: unexpected error: %v", res.Err)
+	}
+	if res.Outcome != backfill.OutcomeRepaired {
+		t.Fatalf("outcome = %s, want %s", res.Outcome, backfill.OutcomeRepaired)
+	}
+
+	// ── both delivery keys are free, so the next publish can actually land.
+	if fx.deliveryEventExists(t, materializeEvent) {
+		t.Fatalf("published materialize event %s survived; the re-dispatch would publish nothing", materializeEvent)
+	}
+	if fx.deliveryEventExists(t, pdfEvent) {
+		t.Fatalf("dead-lettered pdf event %s survived; the pdf leg would publish nothing", pdfEvent)
+	}
+	if n := fx.deliveryEventCount(t); n != 0 {
+		t.Fatalf("events still holding this document's delivery keys = %d, want 0", n)
+	}
+
+	// ── the staging layer behaved exactly as before: purged and re-enqueued.
+	if fx.dispatchRowExists(t, "materialize", staleStaging) {
+		t.Fatalf("stale staging row %s survived the purge", staleStaging)
+	}
+	if n := fx.outboxCount(t); n != 1 {
+		t.Fatalf("materialize outbox rows = %d, want the single fresh row", n)
+	}
+	freshID, freshStatus := fx.materializeDispatch(t)
+	if freshID == staleStaging || freshStatus != "pending" {
+		t.Fatalf("staging row not replaced: id=%s status=%s", freshID, freshStatus)
+	}
+
+	// ── the purge is auditable: every purged id is on the outcome line.
+	for _, id := range []string{staleStaging, materializeEvent, pdfEvent} {
+		if !strings.Contains(res.Detail, id) {
+			t.Fatalf("outcome detail must report purged id %s, got %q", id, res.Detail)
+		}
+	}
+
+	fx.assertApprovalHistoryUntouched(t)
+}
+
+// TestReleaseBackfill_RepairOnly_InFlightDeliveryEvent_Refuses is the fail-closed
+// half of the delivery purge: an unpublished, non-dead-lettered event is still
+// claimable by the outbox consumer (consumer.go:41-44), so deleting it would
+// drop a live message. The repair refuses entirely instead.
+func TestReleaseBackfill_RepairOnly_InFlightDeliveryEvent_Refuses(t *testing.T) {
+	for _, prefix := range []string{"materialize_fanout", "docgen_v2_pdf"} {
+		t.Run(prefix, func(t *testing.T) {
+			database, _ := testdb.Open(t)
+			fx := seedBackfillFixture(t, database, true, releaseContentHash)
+			fx.publish(t)
+			ctx := context.Background()
+
+			liveEvent := fx.seedDeliveryEvent(t, prefix, "unpublished")
+
+			res := backfill.RunDocument(ctx, fx.deps, fx.documentID, backfill.Options{RepairOnly: true})
+			if res.Outcome != backfill.OutcomeFailed || res.Err == nil {
+				t.Fatalf("in-flight delivery event must abort the repair, got outcome=%s err=%v", res.Outcome, res.Err)
+			}
+			if !strings.Contains(res.Err.Error(), "IN-FLIGHT delivery event") ||
+				!strings.Contains(res.Err.Error(), liveEvent) ||
+				!strings.Contains(res.Err.Error(), fx.deliveryKey(prefix)) {
+				t.Fatalf("error should name the live event and its key: %v", res.Err)
+			}
+
+			// Total refusal: the event stands and nothing was written.
+			if !fx.deliveryEventExists(t, liveEvent) {
+				t.Fatalf("refused repair deleted the in-flight event %s", liveEvent)
+			}
+			if n := fx.outboxCount(t); n != 0 {
+				t.Fatalf("refused repair wrote %d staging rows", n)
+			}
+			if pin := fx.frozenRevisionPin(t); pin != "" {
+				t.Fatalf("refused repair pinned %q", pin)
+			}
+		})
+	}
+}
+
+// TestReleaseBackfill_RepairOnly_DryRun_ReportsDeliveryEventPurgePlan proves the
+// dry-run is honest about the delivery layer too.
+func TestReleaseBackfill_RepairOnly_DryRun_ReportsDeliveryEventPurgePlan(t *testing.T) {
+	database, _ := testdb.Open(t)
+	fx := seedBackfillFixture(t, database, true, releaseContentHash)
+	fx.publish(t)
+	ctx := context.Background()
+
+	materializeEvent := fx.seedDeliveryEvent(t, "materialize_fanout", "published")
+	pdfEvent := fx.seedDeliveryEvent(t, "docgen_v2_pdf", "published")
+
+	res := backfill.RunDocument(ctx, fx.deps, fx.documentID, backfill.Options{RepairOnly: true, DryRun: true})
+	if res.Err != nil {
+		t.Fatalf("repair-only dry-run: unexpected error: %v", res.Err)
+	}
+	if res.Outcome != backfill.OutcomePlanned {
+		t.Fatalf("outcome = %s, want %s", res.Outcome, backfill.OutcomePlanned)
+	}
+	if !strings.Contains(res.Detail, "would purge") ||
+		!strings.Contains(res.Detail, materializeEvent) ||
+		!strings.Contains(res.Detail, pdfEvent) {
+		t.Fatalf("dry-run plan must name both delivery events it would purge, got %q", res.Detail)
+	}
+
+	if !fx.deliveryEventExists(t, materializeEvent) || !fx.deliveryEventExists(t, pdfEvent) {
+		t.Fatal("dry-run deleted a delivery event")
+	}
+	if n := fx.outboxCount(t); n != 0 {
+		t.Fatalf("dry-run wrote %d staging rows", n)
+	}
+}
+
+// TestReleaseBackfill_RepairOnly_GenerationAwareDeliveryKeys_Purged is the key-
+// PARITY test: a document that HAS a release generation head must have its
+// delivery layer cleared on the GENERATION-SUFFIXED keys, because that is what
+// its dispatch jobs will publish on (dispatchjobs/workers.go:46-52). Repair
+// computes those keys itself; if it ever computed the legacy generation-less
+// shape instead, this document's real keys would stay held and the re-dispatch
+// would publish nothing — the exact failure the delivery purge exists to end.
+//
+// The generation is created by the REAL Stage C backfill rather than hand-
+// inserted, so the identity under test is the production one.
+func TestReleaseBackfill_RepairOnly_GenerationAwareDeliveryKeys_Purged(t *testing.T) {
+	database, _ := testdb.Open(t)
+	fx := seedBackfillFixture(t, database, true, releaseContentHash)
+	ctx := context.Background()
+
+	// ── give the document a real generation head + its generation-tagged staging
+	// row, then let the worker "consume" that dispatch.
+	first := backfill.RunDocument(ctx, fx.deps, fx.documentID, backfill.Options{})
+	if first.Err != nil || first.Outcome != backfill.OutcomeBackfilled {
+		t.Fatalf("stage C backfill: outcome=%s err=%v", first.Outcome, first.Err)
+	}
+	generationID := first.GenerationID
+	stagingRow, _ := fx.materializeDispatch(t)
+	fx.markDispatched(t, stagingRow)
+
+	// ── the two events the dispatch jobs published for THIS generation.
+	genMaterializeEvent := fx.seedDeliveryEventKeyed(t,
+		fx.deliveryKeyForGeneration("materialize_fanout", generationID), "materialize_fanout", "published")
+	genPDFEvent := fx.seedDeliveryEventKeyed(t,
+		fx.deliveryKeyForGeneration("docgen_v2_pdf", generationID), "docgen_v2_pdf", "published")
+
+	// ── and the legacy generation-LESS events for the same document, left over
+	// from a pre-ADR-0085 render. They are NOT on this repair's keys, so a keyed
+	// purge must leave them alone; deleting them would prove the tool is
+	// sweeping by document instead of by key.
+	legacyMaterializeEvent := fx.seedDeliveryEvent(t, "materialize_fanout", "published")
+	legacyPDFEvent := fx.seedDeliveryEvent(t, "docgen_v2_pdf", "published")
+
+	res := backfill.RunDocument(ctx, fx.deps, fx.documentID, backfill.Options{RepairOnly: true})
+	if res.Err != nil || res.Outcome != backfill.OutcomeRepaired {
+		t.Fatalf("repair-only on a generation-aware document: outcome=%s err=%v", res.Outcome, res.Err)
+	}
+	if res.GenerationID != generationID {
+		t.Fatalf("repair reported generation %q, want the head %q", res.GenerationID, generationID)
+	}
+
+	// ── the generation-suffixed keys are free.
+	if fx.deliveryEventExists(t, genMaterializeEvent) {
+		t.Fatalf("generation-aware materialize event %s survived; the re-dispatch would publish nothing", genMaterializeEvent)
+	}
+	if fx.deliveryEventExists(t, genPDFEvent) {
+		t.Fatalf("generation-aware pdf event %s survived; the pdf leg would publish nothing", genPDFEvent)
+	}
+	for _, id := range []string{genMaterializeEvent, genPDFEvent} {
+		if !strings.Contains(res.Detail, id) {
+			t.Fatalf("outcome detail must report purged event %s, got %q", id, res.Detail)
+		}
+	}
+
+	// ── the legacy keys are untouched: the purge is keyed, not swept.
+	if !fx.deliveryEventExists(t, legacyMaterializeEvent) || !fx.deliveryEventExists(t, legacyPDFEvent) {
+		t.Fatal("purge deleted the generation-LESS events; it is keying on the document, not on the generation-aware key")
+	}
+
+	// ── and the staging layer stayed generation-tagged through the repair.
+	freshRow, freshStatus := fx.materializeDispatch(t)
+	if freshRow == stagingRow || freshStatus != "pending" {
+		t.Fatalf("staging row not replaced: id=%s status=%s", freshRow, freshStatus)
+	}
+	var outboxGen sql.NullString
+	if err := database.QueryRowContext(ctx,
+		`SELECT release_generation_id::text FROM metaldocs.materialize_dispatch_outbox WHERE id = $1::uuid`, freshRow,
+	).Scan(&outboxGen); err != nil {
+		t.Fatalf("load fresh staging row: %v", err)
+	}
+	if outboxGen.String != generationID {
+		t.Fatalf("fresh staging row release_generation_id = %q, want the head %q", outboxGen.String, generationID)
+	}
+
+	// ── repair recorded no NEW approval fact: the generation count is still the
+	// one the Stage C pass created.
+	if n := fx.generationCount(t); n != 1 {
+		t.Fatalf("release_generations rows = %d, want the single Stage C generation", n)
+	}
+}
+
+// TestReleaseBackfill_RepairOnly_ForeignDeliveryEvents_Untouched pins the blast
+// radius of the delivery purge: it is KEYED, not swept. An event belonging to
+// another document — and an event on a different key SHAPE for this same
+// document, such as a generation-aware one — are both left alone.
+func TestReleaseBackfill_RepairOnly_ForeignDeliveryEvents_Untouched(t *testing.T) {
+	database, _ := testdb.Open(t)
+	fx := seedBackfillFixture(t, database, true, releaseContentHash)
+	fx.publish(t)
+	ctx := context.Background()
+
+	mine := fx.seedDeliveryEvent(t, "materialize_fanout", "published")
+
+	otherDocument := uuid.NewString()
+	foreignKeys := []string{
+		"materialize_fanout:" + fx.tenantID + ":" + otherDocument,
+		"materialize_fanout:" + fx.tenantID + ":" + fx.documentID + ":" + uuid.NewString(),
+	}
+	foreignIDs := make([]string, 0, len(foreignKeys))
+	for _, key := range foreignKeys {
+		eventID := uuid.NewString()
+		if _, err := database.ExecContext(ctx, `
+			INSERT INTO metaldocs.outbox_events (
+			  event_id, event_type, aggregate_type, aggregate_id, occurred_at, version,
+			  idempotency_key, producer, trace_id, payload, published_at
+			)
+			VALUES ($1, 'docx_materialize', 'document_revision', $2, now(), 1, $3,
+			        'release-backfill-test', 'trace-'||$1, '{}'::jsonb, now())`,
+			eventID, otherDocument, key,
+		); err != nil {
+			t.Fatalf("seed foreign delivery event: %v", err)
+		}
+		foreignIDs = append(foreignIDs, eventID)
+	}
+
+	res := backfill.RunDocument(ctx, fx.deps, fx.documentID, backfill.Options{RepairOnly: true})
+	if res.Err != nil || res.Outcome != backfill.OutcomeRepaired {
+		t.Fatalf("repair-only: outcome=%s err=%v", res.Outcome, res.Err)
+	}
+
+	if fx.deliveryEventExists(t, mine) {
+		t.Fatalf("this document's stale event %s survived", mine)
+	}
+	for i, id := range foreignIDs {
+		if !fx.deliveryEventExists(t, id) {
+			t.Fatalf("purge deleted a foreign event on key %q (event %s)", foreignKeys[i], id)
+		}
 	}
 }
