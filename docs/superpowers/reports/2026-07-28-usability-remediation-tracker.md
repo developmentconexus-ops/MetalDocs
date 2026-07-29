@@ -470,3 +470,35 @@ area-grade avaliado no publish-context); modelo de gate D2 para templates.
   author-test/approver-test resetados para o valor dev conhecido via DB —
   prática igual ao seed 0159); If-Match `*` no cancel devolve 409 apesar
   de o contrato prometer skip (drift contrato×runtime, chip aberto).
+- 2026-07-29: **Etapa 4.1 — jornada template-do-zero executada E2E pela
+  primeira vez (curl dev-seed, 3 atores).** Fluxo provado: author-test cria
+  template (perfil it) → autosave presign/PUT/commit registra content_hash →
+  admin cria rota `subject_kind=template` via API crua (FE route-builder não
+  suporta — fato D6) → submit → inbox do approver mostra item de template
+  (code null verdadeiro) → signoff approver (password reauth) → publish
+  admin (SoD 403 ISO_SEGREGATION_VIOLATION corretamente bloqueou publish
+  pelo autor) → wizard lista template publicado (`?doc_type=it&published=
+  true`) → IT-USINAGEM-005 criado com clone **byte-idêntico** (sha256 igual
+  ao docx do template). Segunda rodada com v2 contendo tokens de sistema
+  ({{doc_code}} etc.): validação de tokens no publish passou, IT-USINAGEM-006
+  criado; fill-in-schema vazio é correto (tokens de sistema ≠ fill-in).
+  **Achados (4.2):**
+  - F-E4-1 (P1): submit com content_hash NULL → **500 cru** vazando
+    constraint `chk_template_version_content_hash_non_draft`; caminho
+    docx-upload-url deixa hash NULL (armadilha beco-sem-saída); precisa
+    precondição 4xx problem+json ANTES do lock.
+  - F-E4-2 (P2): createApprovalRoute 201 devolve projeção quase vazia
+    (name "", version 0, active false, stages null) enquanto o DB está
+    completo e ativo — runtime mente pro cliente.
+  - F-E4-3 (P2): signoff de template devolve `signoff_id: ""` (mesma
+    classe do gap VerdictID já corrigido).
+  - F-E4-4 (P2): versão pós-aprovação com `approver_id: null` apesar de
+    approved_at carimbado (atribuição eQMS ausente na superfície).
+  - D6 (estrutural, ADR): rota por template_id obriga admin a criar rota
+    nova via API crua PARA CADA template; gate existe só no submit (409
+    APPROVAL_ROUTE_MISSING), não na criação (assimetria com D2 de
+    documentos). Evidência viva pro ADR config-first re-key.
+  - Notas: /documents/{id}/view em draft recém-criado → 404
+    not_found.revision (editor usa docx-url; questão UX, não flag);
+    dev-seed sem persona publicadora (approver não tem template.publish;
+    jornada exigiu admin como publicador ⇒ autor teve de ser author-test).
