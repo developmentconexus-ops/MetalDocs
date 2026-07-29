@@ -23,6 +23,25 @@
 //   - repair is the sanctioned re-pin path for legacy NULL-pin documents
 //     (migration 0313): it writes frozen_revision_id from the CURRENT revision
 //     in the repair tx, supersedes a stale pin, and never touches values_hash
+//   - -repair-only (Options.RepairOnly) is the operator-ratified invalid-artifact
+//     expurgo: a PUBLISHED, frozen document is re-pinned and re-dispatched with
+//     NO approval fact, NO release generation and NO evaluation; its dry-run
+//     writes nothing; a never-frozen document, one with no current revision and
+//     one with no approved approval instance are all refused; and the default
+//     pass still rejects published documents in preflight
+//   - the expurgo purges the STALE TERMINAL staging rows that would otherwise
+//     swallow it — in BOTH metaldocs.materialize_dispatch_outbox and
+//     metaldocs.pdf_dispatch_outbox — while an in-flight (pending/processing)
+//     row on either side refuses the whole repair, and dry-run only reports the
+//     purge plan
+//
+// NOT covered here, by design: the concurrent check-then-insert race between two
+// simultaneous repair invocations. The integration harness cannot drive two
+// competing transactions deterministically without heavy scaffolding, and the
+// race is closed STRUCTURALLY instead — requireMaterializeEnqueued re-reads the
+// dedupe key inside the same transaction after the enqueue, so a swallowed
+// insert rolls the repair back rather than reporting success (see its doc
+// comment in scripts/release-backfill/backfill/backfill.go).
 //
 // go test -tags=integration ./tests/integration/approval/... -run TestReleaseBackfill
 package approval_test
@@ -196,6 +215,94 @@ func (fx backfillFixture) outboxCount(t *testing.T) int {
 		`SELECT count(*) FROM metaldocs.materialize_dispatch_outbox WHERE revision_id = $1::uuid`, fx.documentID)
 }
 
+func (fx backfillFixture) pdfOutboxCount(t *testing.T) int {
+	t.Helper()
+	return countRows(t, fx.database,
+		`SELECT count(*) FROM metaldocs.pdf_dispatch_outbox WHERE revision_id = $1::uuid`, fx.documentID)
+}
+
+// seedStaleMaterializeDispatch plants the row shape the LIVE expurgo target
+// carries: a generation-less materialize dispatch left behind by the render that
+// produced the blank artifacts. status is a knob so the tests can pin both the
+// terminal (purged) and the in-flight (refused) verdicts.
+func (fx backfillFixture) seedStaleMaterializeDispatch(t *testing.T, status string) string {
+	t.Helper()
+	var id string
+	if err := fx.database.QueryRowContext(context.Background(), `
+		INSERT INTO metaldocs.materialize_dispatch_outbox
+		  (tenant_id, revision_id, values_hash, release_generation_id, status, dispatched_at)
+		VALUES ($1::uuid, $2::uuid, decode($3, 'hex'), NULL, $4,
+		        CASE WHEN $4 = 'dispatched' THEN now() ELSE NULL END)
+		RETURNING id::text`,
+		fx.tenantID, fx.documentID, backfillValuesHash, status,
+	).Scan(&id); err != nil {
+		t.Fatalf("seed stale materialize dispatch (%s): %v", status, err)
+	}
+	return id
+}
+
+// seedStalePdfDispatch plants the SECOND stale row of the live target. It is the
+// non-obvious half of the swallow: the worker's downstream EnqueuePDFTx runs on
+// the same (tenant, revision, generation) key, so this row would leave a
+// repaired frozen.docx paired with the original blank final.pdf.
+func (fx backfillFixture) seedStalePdfDispatch(t *testing.T, status string) string {
+	t.Helper()
+	var id string
+	if err := fx.database.QueryRowContext(context.Background(), `
+		INSERT INTO metaldocs.pdf_dispatch_outbox
+		  (tenant_id, revision_id, frozen_docx_hash, final_docx_s3_key, release_generation_id, status, dispatched_at)
+		VALUES ($1::uuid, $2::uuid, decode($3, 'hex'), 'legacy/blank/frozen.docx', NULL, $4,
+		        CASE WHEN $4 = 'dispatched' THEN now() ELSE NULL END)
+		RETURNING id::text`,
+		fx.tenantID, fx.documentID, backfillValuesHash, status,
+	).Scan(&id); err != nil {
+		t.Fatalf("seed stale pdf dispatch (%s): %v", status, err)
+	}
+	return id
+}
+
+// dispatchRowExists answers whether a specific staging row survived.
+func (fx backfillFixture) dispatchRowExists(t *testing.T, table, id string) bool {
+	t.Helper()
+	var query string
+	switch table {
+	case "materialize":
+		query = `SELECT count(*) FROM metaldocs.materialize_dispatch_outbox WHERE id = $1::uuid`
+	case "pdf":
+		query = `SELECT count(*) FROM metaldocs.pdf_dispatch_outbox WHERE id = $1::uuid`
+	default:
+		t.Fatalf("dispatchRowExists: unknown table %q", table)
+	}
+	return countRows(t, fx.database, query, id) == 1
+}
+
+// materializeDispatch returns the single materialize row's (id, status).
+func (fx backfillFixture) materializeDispatch(t *testing.T) (string, string) {
+	t.Helper()
+	var id, status string
+	if err := fx.database.QueryRowContext(context.Background(), `
+		SELECT id::text, status
+		  FROM metaldocs.materialize_dispatch_outbox
+		 WHERE tenant_id = $1::uuid AND revision_id = $2::uuid`,
+		fx.tenantID, fx.documentID,
+	).Scan(&id, &status); err != nil {
+		t.Fatalf("load materialize dispatch row: %v", err)
+	}
+	return id, status
+}
+
+// markDispatched moves a staging row to the terminal state the real consumer
+// leaves behind (staging_outbox.go MarkDispatched).
+func (fx backfillFixture) markDispatched(t *testing.T, id string) {
+	t.Helper()
+	if _, err := fx.database.ExecContext(context.Background(), `
+		UPDATE metaldocs.materialize_dispatch_outbox
+		   SET status = 'dispatched', dispatched_at = now()
+		 WHERE id = $1::uuid`, id); err != nil {
+		t.Fatalf("mark dispatched: %v", err)
+	}
+}
+
 // frozenRevisionPin returns documents.frozen_revision_id as text, "" when NULL
 // (the state every pre-0313 freeze is in).
 func (fx backfillFixture) frozenRevisionPin(t *testing.T) string {
@@ -209,6 +316,64 @@ func (fx backfillFixture) frozenRevisionPin(t *testing.T) string {
 	return pin.String
 }
 
+// publish moves the seeded document into the legacy PUBLISHED shape: an actual
+// effective_from is mandatory (ck_documents_published_effective_from, migration
+// 0310). This is the state the repair-only expurgo exists for — a released
+// document whose frozen artifacts are blank.
+func (fx backfillFixture) publish(t *testing.T) {
+	t.Helper()
+	testdb.SeedWithCaps(t, fx.database, `[{"cap":"document.edit"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(context.Background(), `
+			UPDATE public.documents
+			   SET status         = 'published',
+			       effective_from = now()
+			 WHERE id = $1::uuid`, fx.documentID)
+		return err
+	})
+}
+
+// freezePin returns the (values_hash hex, values_frozen_at) pair the approver
+// signed. Repair must carry both over byte-for-byte.
+func (fx backfillFixture) freezePin(t *testing.T) (string, sql.NullTime) {
+	t.Helper()
+	var (
+		valuesHash []byte
+		frozenAt   sql.NullTime
+	)
+	if err := fx.database.QueryRowContext(context.Background(),
+		`SELECT values_hash, values_frozen_at FROM public.documents WHERE id = $1::uuid`, fx.documentID,
+	).Scan(&valuesHash, &frozenAt); err != nil {
+		t.Fatalf("read freeze pin: %v", err)
+	}
+	return strings.ToLower(hex.EncodeToString(valuesHash)), frozenAt
+}
+
+// assertApprovalHistoryUntouched proves the repair changed nothing the approver
+// signed or the approval kernel owns: no release generation was created, the
+// instance keeps its status and its freeze pin, and the signoff still stands.
+func (fx backfillFixture) assertApprovalHistoryUntouched(t *testing.T) {
+	t.Helper()
+	if n := fx.generationCount(t); n != 0 {
+		t.Fatalf("repair-only created %d release_generations rows; it must record no approval fact", n)
+	}
+	var (
+		status     string
+		frozenHash sql.NullString
+	)
+	if err := fx.database.QueryRowContext(context.Background(),
+		`SELECT status, frozen_content_hash FROM public.approval_instances WHERE id = $1::uuid`, fx.instanceID,
+	).Scan(&status, &frozenHash); err != nil {
+		t.Fatalf("reload approval instance: %v", err)
+	}
+	if status != "approved" || frozenHash.String != releaseContentHash {
+		t.Fatalf("approval instance mutated: status=%s frozen_content_hash=%q", status, frozenHash.String)
+	}
+	if n := countRows(t, fx.database,
+		`SELECT count(*) FROM public.approval_signoffs WHERE approval_instance_id = $1::uuid`, fx.instanceID); n != 1 {
+		t.Fatalf("approval signoffs = %d, want the original 1", n)
+	}
+}
+
 func (fx backfillFixture) evaluationJobCount(t *testing.T) int {
 	t.Helper()
 	return countRows(t, fx.database,
@@ -220,7 +385,7 @@ func TestReleaseBackfill_LegacyApprovedDocument_RecordsFactAndArmsPipeline(t *te
 	fx := seedBackfillFixture(t, database, true, releaseContentHash)
 	ctx := context.Background()
 
-	res := backfill.RunDocument(ctx, fx.deps, fx.documentID, false)
+	res := backfill.RunDocument(ctx, fx.deps, fx.documentID, backfill.Options{})
 	if res.Err != nil {
 		t.Fatalf("backfill: unexpected error: %v", res.Err)
 	}
@@ -332,12 +497,12 @@ func TestReleaseBackfill_Replay_IsIdempotent(t *testing.T) {
 	fx := seedBackfillFixture(t, database, true, releaseContentHash)
 	ctx := context.Background()
 
-	first := backfill.RunDocument(ctx, fx.deps, fx.documentID, false)
+	first := backfill.RunDocument(ctx, fx.deps, fx.documentID, backfill.Options{})
 	if first.Err != nil || first.Outcome != backfill.OutcomeBackfilled {
 		t.Fatalf("first run: outcome=%s err=%v", first.Outcome, first.Err)
 	}
 
-	second := backfill.RunDocument(ctx, fx.deps, fx.documentID, false)
+	second := backfill.RunDocument(ctx, fx.deps, fx.documentID, backfill.Options{})
 	if second.Err != nil {
 		t.Fatalf("replay: unexpected error: %v", second.Err)
 	}
@@ -364,7 +529,7 @@ func TestReleaseBackfill_DryRun_WritesNothing(t *testing.T) {
 	fx := seedBackfillFixture(t, database, true, releaseContentHash)
 	ctx := context.Background()
 
-	res := backfill.RunDocument(ctx, fx.deps, fx.documentID, true)
+	res := backfill.RunDocument(ctx, fx.deps, fx.documentID, backfill.Options{DryRun: true})
 	if res.Err != nil {
 		t.Fatalf("dry-run: unexpected error: %v", res.Err)
 	}
@@ -391,7 +556,7 @@ func TestReleaseBackfill_UnpinnedDocument_Aborts(t *testing.T) {
 	fx := seedBackfillFixture(t, database, false, releaseContentHash)
 	ctx := context.Background()
 
-	res := backfill.RunDocument(ctx, fx.deps, fx.documentID, false)
+	res := backfill.RunDocument(ctx, fx.deps, fx.documentID, backfill.Options{})
 	if res.Outcome != backfill.OutcomeFailed || res.Err == nil {
 		t.Fatalf("unpinned document must abort, got outcome=%s err=%v", res.Outcome, res.Err)
 	}
@@ -413,7 +578,7 @@ func TestReleaseBackfill_InstanceWithoutFrozenHash_Aborts(t *testing.T) {
 	fx := seedBackfillFixture(t, database, true, "")
 	ctx := context.Background()
 
-	res := backfill.RunDocument(ctx, fx.deps, fx.documentID, false)
+	res := backfill.RunDocument(ctx, fx.deps, fx.documentID, backfill.Options{})
 	if res.Outcome != backfill.OutcomeFailed || res.Err == nil {
 		t.Fatalf("instance without frozen hash must abort, got outcome=%s err=%v", res.Outcome, res.Err)
 	}
@@ -549,5 +714,448 @@ func TestReleaseBackfill_RepairMaterialization_SupersedesStalePin(t *testing.T) 
 	}
 	if pin != fx.revisionID {
 		t.Fatalf("frozen_revision_id = %q, want the current revision %q", pin, fx.revisionID)
+	}
+}
+
+// ── repair-only mode (operator-ratified invalid-artifact expurgo) ────────────
+//
+// A document frozen BEFORE the frozen-body fix carries blank frozen.docx /
+// final.pdf artifacts. Artifact keys are deterministic per revision id, so
+// re-materializing from the SAME current revision with a fresh lineage pin
+// replaces those bytes in place. This is integrity restoration of invalid
+// artifacts, NOT history mutation: no approval fact is recorded, no release
+// generation is created, and the values_hash / values_frozen_at the approver
+// signed are carried over unchanged.
+
+// TestReleaseBackfill_RepairOnly_PublishedDocument_RematerializesInPlace is the
+// ratified case: a PUBLISHED, frozen document — which the default pass refuses
+// outright — is re-pinned and re-dispatched, and nothing the approval kernel
+// owns moves.
+func TestReleaseBackfill_RepairOnly_PublishedDocument_RematerializesInPlace(t *testing.T) {
+	database, _ := testdb.Open(t)
+	fx := seedBackfillFixture(t, database, true, releaseContentHash)
+	fx.publish(t)
+	ctx := context.Background()
+
+	hashBefore, frozenAtBefore := fx.freezePin(t)
+
+	res := backfill.RunDocument(ctx, fx.deps, fx.documentID, backfill.Options{RepairOnly: true})
+	if res.Err != nil {
+		t.Fatalf("repair-only: unexpected error: %v", res.Err)
+	}
+	if res.Outcome != backfill.OutcomeRepaired {
+		t.Fatalf("outcome = %s, want %s", res.Outcome, backfill.OutcomeRepaired)
+	}
+
+	// ── the freeze lineage is pinned to the document's current revision, which
+	// is what makes the fresh render reproduce the approved body.
+	if pin := fx.frozenRevisionPin(t); pin != fx.revisionID {
+		t.Fatalf("frozen_revision_id = %q, want the current revision %q", pin, fx.revisionID)
+	}
+
+	// ── the signed freeze is byte-for-byte what it was.
+	hashAfter, frozenAtAfter := fx.freezePin(t)
+	if hashAfter != hashBefore || hashAfter != backfillValuesHash {
+		t.Fatalf("values_hash changed: %s -> %s", hashBefore, hashAfter)
+	}
+	if !frozenAtAfter.Valid || !frozenAtAfter.Time.Equal(frozenAtBefore.Time) {
+		t.Fatalf("values_frozen_at changed: %v -> %v", frozenAtBefore, frozenAtAfter)
+	}
+
+	// ── the document itself was not re-published, demoted or re-versioned.
+	var status string
+	var version int
+	if err := database.QueryRowContext(ctx,
+		`SELECT status, revision_version FROM public.documents WHERE id = $1::uuid`, fx.documentID,
+	).Scan(&status, &version); err != nil {
+		t.Fatalf("reload document: %v", err)
+	}
+	if status != "published" || version != fx.revisionVer {
+		t.Fatalf("document mutated: status=%s revision_version=%d", status, version)
+	}
+
+	// ── materialization dispatched, carrying the signed values_hash and NO
+	// generation (this legacy document has none — repair never invents one).
+	var outboxGen sql.NullString
+	var outboxHash []byte
+	if err := database.QueryRowContext(ctx, `
+		SELECT release_generation_id::text, values_hash
+		  FROM metaldocs.materialize_dispatch_outbox
+		 WHERE tenant_id = $1::uuid AND revision_id = $2::uuid`,
+		fx.tenantID, fx.documentID,
+	).Scan(&outboxGen, &outboxHash); err != nil {
+		t.Fatalf("load materialize outbox row: %v", err)
+	}
+	if outboxGen.Valid {
+		t.Fatalf("outbox release_generation_id = %q, want NULL for a generation-less legacy document", outboxGen.String)
+	}
+	if got := strings.ToLower(hex.EncodeToString(outboxHash)); got != backfillValuesHash {
+		t.Fatalf("outbox values_hash = %s, want the document's pinned values_hash %s", got, backfillValuesHash)
+	}
+
+	// ── approval history untouched, and no release evaluation armed: a
+	// published document evaluates to a no-op, so the tool does not enqueue one
+	// (see runRepairOnly's ruling).
+	fx.assertApprovalHistoryUntouched(t)
+	if n := fx.evaluationJobCount(t); n != 0 {
+		t.Fatalf("repair-only enqueued %d release_evaluate jobs, want 0", n)
+	}
+}
+
+// TestReleaseBackfill_RepairOnly_DryRun_WritesNothing pins the dry-run
+// guarantee to the repair path too: the plan is printed, the pin is not moved
+// and no dispatch is enqueued.
+func TestReleaseBackfill_RepairOnly_DryRun_WritesNothing(t *testing.T) {
+	database, _ := testdb.Open(t)
+	fx := seedBackfillFixture(t, database, true, releaseContentHash)
+	fx.publish(t)
+	ctx := context.Background()
+
+	res := backfill.RunDocument(ctx, fx.deps, fx.documentID, backfill.Options{RepairOnly: true, DryRun: true})
+	if res.Err != nil {
+		t.Fatalf("repair-only dry-run: unexpected error: %v", res.Err)
+	}
+	if res.Outcome != backfill.OutcomePlanned {
+		t.Fatalf("dry-run outcome = %s, want %s", res.Outcome, backfill.OutcomePlanned)
+	}
+	if res.Detail == "" {
+		t.Fatal("dry-run reported no plan")
+	}
+
+	if pin := fx.frozenRevisionPin(t); pin != "" {
+		t.Fatalf("dry-run wrote frozen_revision_id = %q", pin)
+	}
+	if n := fx.outboxCount(t); n != 0 {
+		t.Fatalf("dry-run wrote %d materialize outbox rows", n)
+	}
+	if n := fx.generationCount(t); n != 0 {
+		t.Fatalf("dry-run wrote %d release_generations rows", n)
+	}
+}
+
+// TestReleaseBackfill_RepairOnly_NeverFrozenDocument_Aborts is the fail-closed
+// half: repair re-pins lineage, it never invents a freeze, so a document with
+// no values_hash / values_frozen_at is refused before anything is written.
+func TestReleaseBackfill_RepairOnly_NeverFrozenDocument_Aborts(t *testing.T) {
+	database, _ := testdb.Open(t)
+	fx := seedBackfillFixture(t, database, false, releaseContentHash)
+	fx.publish(t)
+	ctx := context.Background()
+
+	res := backfill.RunDocument(ctx, fx.deps, fx.documentID, backfill.Options{RepairOnly: true})
+	if res.Outcome != backfill.OutcomeFailed || res.Err == nil {
+		t.Fatalf("never-frozen document must abort, got outcome=%s err=%v", res.Outcome, res.Err)
+	}
+	if !strings.Contains(res.Err.Error(), "not frozen") {
+		t.Fatalf("error should name the freeze: %v", res.Err)
+	}
+	if n := fx.outboxCount(t); n != 0 {
+		t.Fatalf("aborted repair wrote %d outbox rows", n)
+	}
+	if pin := fx.frozenRevisionPin(t); pin != "" {
+		t.Fatalf("aborted repair pinned %q", pin)
+	}
+}
+
+// TestReleaseBackfill_PublishedDocument_DefaultModeStillRejects guards the
+// unchanged behaviour of the default pass: -repair-only is the ONLY way a
+// published document is accepted, so the Stage C backfill can never
+// accidentally re-record an approval fact for one.
+func TestReleaseBackfill_PublishedDocument_DefaultModeStillRejects(t *testing.T) {
+	database, _ := testdb.Open(t)
+	fx := seedBackfillFixture(t, database, true, releaseContentHash)
+	fx.publish(t)
+	ctx := context.Background()
+
+	res := backfill.RunDocument(ctx, fx.deps, fx.documentID, backfill.Options{})
+	if res.Outcome != backfill.OutcomeFailed || res.Err == nil {
+		t.Fatalf("default mode must reject a published document, got outcome=%s err=%v", res.Outcome, res.Err)
+	}
+	if !strings.Contains(res.Err.Error(), "is published, not approved") {
+		t.Fatalf("error should name the status: %v", res.Err)
+	}
+	if n := fx.generationCount(t); n != 0 {
+		t.Fatalf("rejected run wrote %d generations", n)
+	}
+	if n := fx.outboxCount(t); n != 0 {
+		t.Fatalf("rejected run wrote %d outbox rows", n)
+	}
+}
+
+// TestReleaseBackfill_RepairOnly_StaleTerminalDispatchRows_PurgedAndRedispatched
+// is the LIVE target's shape: the document still carries both stale dispatched
+// staging rows from the render that produced the blank artifacts. Both outboxes
+// dedupe on (tenant_id, revision_id, COALESCE(release_generation_id, nil-uuid))
+// with ON CONFLICT DO NOTHING (migration 0310 §5), and a skipped insert is
+// reported as a nil error — so leaving either row in place makes the repair a
+// successful-looking no-op (materialize side) or a half-repair with a stale
+// blank final.pdf (pdf side). The purge is the expurgo.
+func TestReleaseBackfill_RepairOnly_StaleTerminalDispatchRows_PurgedAndRedispatched(t *testing.T) {
+	database, _ := testdb.Open(t)
+	fx := seedBackfillFixture(t, database, true, releaseContentHash)
+	fx.publish(t)
+	ctx := context.Background()
+
+	staleMaterialize := fx.seedStaleMaterializeDispatch(t, "dispatched")
+	stalePDF := fx.seedStalePdfDispatch(t, "dispatched")
+
+	res := backfill.RunDocument(ctx, fx.deps, fx.documentID, backfill.Options{RepairOnly: true})
+	if res.Err != nil {
+		t.Fatalf("repair-only over stale rows: unexpected error: %v", res.Err)
+	}
+	if res.Outcome != backfill.OutcomeRepaired {
+		t.Fatalf("outcome = %s, want %s", res.Outcome, backfill.OutcomeRepaired)
+	}
+
+	// ── both stale rows are gone, and the pdf side is left EMPTY so the worker's
+	// own downstream EnqueuePDFTx can land.
+	if fx.dispatchRowExists(t, "materialize", staleMaterialize) {
+		t.Fatalf("stale materialize row %s survived the purge", staleMaterialize)
+	}
+	if fx.dispatchRowExists(t, "pdf", stalePDF) {
+		t.Fatalf("stale pdf row %s survived the purge", stalePDF)
+	}
+	if n := fx.pdfOutboxCount(t); n != 0 {
+		t.Fatalf("pdf outbox rows = %d, want 0 (repair enqueues no pdf; the worker does)", n)
+	}
+
+	// ── exactly one FRESH pending materialize row replaced it.
+	if n := fx.outboxCount(t); n != 1 {
+		t.Fatalf("materialize outbox rows = %d, want the single fresh row", n)
+	}
+	freshID, freshStatus := fx.materializeDispatch(t)
+	if freshID == staleMaterialize {
+		t.Fatal("materialize row was not replaced: the repair reused the stale row's id")
+	}
+	if freshStatus != "pending" {
+		t.Fatalf("fresh materialize row status = %q, want pending", freshStatus)
+	}
+
+	// ── the purge is operator-auditable: the outcome line names both ids.
+	if !strings.Contains(res.Detail, staleMaterialize) || !strings.Contains(res.Detail, stalePDF) {
+		t.Fatalf("outcome detail must report the purged row ids, got %q", res.Detail)
+	}
+
+	// ── and none of this touched what the approver signed.
+	if pin := fx.frozenRevisionPin(t); pin != fx.revisionID {
+		t.Fatalf("frozen_revision_id = %q, want the current revision %q", pin, fx.revisionID)
+	}
+	fx.assertApprovalHistoryUntouched(t)
+}
+
+// TestReleaseBackfill_RepairOnly_InFlightDispatchRow_Refuses is the fail-closed
+// half of the purge: a pending/processing row is live work whose River job may
+// still fire, so deleting it would orphan the job and repairing around it would
+// be swallowed. The tool refuses the whole repair and names the row.
+func TestReleaseBackfill_RepairOnly_InFlightDispatchRow_Refuses(t *testing.T) {
+	cases := []struct {
+		name   string
+		table  string
+		status string
+	}{
+		{name: "materialize_pending", table: "materialize", status: "pending"},
+		{name: "materialize_processing", table: "materialize", status: "processing"},
+		{name: "pdf_pending", table: "pdf", status: "pending"},
+		{name: "pdf_processing", table: "pdf", status: "processing"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			database, _ := testdb.Open(t)
+			fx := seedBackfillFixture(t, database, true, releaseContentHash)
+			fx.publish(t)
+			ctx := context.Background()
+
+			var rowID string
+			if tc.table == "materialize" {
+				rowID = fx.seedStaleMaterializeDispatch(t, tc.status)
+			} else {
+				rowID = fx.seedStalePdfDispatch(t, tc.status)
+			}
+
+			res := backfill.RunDocument(ctx, fx.deps, fx.documentID, backfill.Options{RepairOnly: true})
+			if res.Outcome != backfill.OutcomeFailed || res.Err == nil {
+				t.Fatalf("in-flight %s row must abort the repair, got outcome=%s err=%v", tc.table, res.Outcome, res.Err)
+			}
+			if !strings.Contains(res.Err.Error(), "IN-FLIGHT") || !strings.Contains(res.Err.Error(), rowID) {
+				t.Fatalf("error should name the in-flight row %s: %v", rowID, res.Err)
+			}
+
+			// The refusal is total: the row stands and nothing was written.
+			if !fx.dispatchRowExists(t, tc.table, rowID) {
+				t.Fatalf("refused repair deleted the in-flight %s row %s", tc.table, rowID)
+			}
+			if pin := fx.frozenRevisionPin(t); pin != "" {
+				t.Fatalf("refused repair pinned %q", pin)
+			}
+			if tc.table == "pdf" && fx.outboxCount(t) != 0 {
+				t.Fatal("refused repair enqueued a materialize row anyway")
+			}
+		})
+	}
+}
+
+// TestReleaseBackfill_RepairOnly_DryRun_ReportsPurgePlan proves the dry-run is
+// honest about the destructive half too: it names the rows it WOULD purge and
+// deletes none of them.
+func TestReleaseBackfill_RepairOnly_DryRun_ReportsPurgePlan(t *testing.T) {
+	database, _ := testdb.Open(t)
+	fx := seedBackfillFixture(t, database, true, releaseContentHash)
+	fx.publish(t)
+	ctx := context.Background()
+
+	staleMaterialize := fx.seedStaleMaterializeDispatch(t, "dispatched")
+	stalePDF := fx.seedStalePdfDispatch(t, "failed")
+
+	res := backfill.RunDocument(ctx, fx.deps, fx.documentID, backfill.Options{RepairOnly: true, DryRun: true})
+	if res.Err != nil {
+		t.Fatalf("repair-only dry-run: unexpected error: %v", res.Err)
+	}
+	if res.Outcome != backfill.OutcomePlanned {
+		t.Fatalf("outcome = %s, want %s", res.Outcome, backfill.OutcomePlanned)
+	}
+	if !strings.Contains(res.Detail, "would purge") ||
+		!strings.Contains(res.Detail, staleMaterialize) ||
+		!strings.Contains(res.Detail, stalePDF) {
+		t.Fatalf("dry-run plan must name both rows it would purge, got %q", res.Detail)
+	}
+
+	if !fx.dispatchRowExists(t, "materialize", staleMaterialize) || !fx.dispatchRowExists(t, "pdf", stalePDF) {
+		t.Fatal("dry-run deleted a staging row")
+	}
+	if n := fx.outboxCount(t); n != 1 {
+		t.Fatalf("materialize outbox rows = %d, want the untouched stale row only", n)
+	}
+	if pin := fx.frozenRevisionPin(t); pin != "" {
+		t.Fatalf("dry-run wrote frozen_revision_id = %q", pin)
+	}
+}
+
+// TestReleaseBackfill_RepairOnly_Replay pins the honest replay semantics, which
+// follow from the purge rule rather than being chosen for convenience:
+//
+//   - immediately after a repair the fresh row is PENDING — live work — so a
+//     second repair refuses rather than orphaning its River job;
+//   - once that dispatch is terminal, re-repairing is purge-and-redo: repeated
+//     integrity restoration of the same document is idempotent by construction
+//     (same revision, same values_hash, deterministic artifact keys), so there
+//     is nothing to protect against.
+//
+// The replay leg carries BOTH tables, not just the materialize one: by the time
+// a repair is replayed the worker has normally landed its own downstream pdf
+// dispatch, so purge-and-redo has to clear the pdf row too or the second repair
+// re-creates the half-repair the purge exists to prevent.
+func TestReleaseBackfill_RepairOnly_Replay(t *testing.T) {
+	database, _ := testdb.Open(t)
+	fx := seedBackfillFixture(t, database, true, releaseContentHash)
+	fx.publish(t)
+	ctx := context.Background()
+
+	first := backfill.RunDocument(ctx, fx.deps, fx.documentID, backfill.Options{RepairOnly: true})
+	if first.Err != nil || first.Outcome != backfill.OutcomeRepaired {
+		t.Fatalf("first repair: outcome=%s err=%v", first.Outcome, first.Err)
+	}
+	firstRow, firstStatus := fx.materializeDispatch(t)
+	if firstStatus != "pending" {
+		t.Fatalf("first repair left status %q, want pending", firstStatus)
+	}
+
+	// ── replay while the dispatch is still in flight: refused.
+	second := backfill.RunDocument(ctx, fx.deps, fx.documentID, backfill.Options{RepairOnly: true})
+	if second.Outcome != backfill.OutcomeFailed || second.Err == nil {
+		t.Fatalf("replay over a pending dispatch must abort, got outcome=%s err=%v", second.Outcome, second.Err)
+	}
+	if !strings.Contains(second.Err.Error(), "IN-FLIGHT") {
+		t.Fatalf("error should name the in-flight dispatch: %v", second.Err)
+	}
+	if n := fx.outboxCount(t); n != 1 {
+		t.Fatalf("materialize outbox rows = %d, want the single row from the first repair", n)
+	}
+
+	// ── the worker consumed that dispatch and landed its own pdf dispatch, which
+	// then dispatched too: the real state a replayed repair meets.
+	fx.markDispatched(t, firstRow)
+	workerPDFRow := fx.seedStalePdfDispatch(t, "dispatched")
+
+	// ── re-repair purges BOTH terminal rows and redoes the materialization.
+	third := backfill.RunDocument(ctx, fx.deps, fx.documentID, backfill.Options{RepairOnly: true})
+	if third.Err != nil || third.Outcome != backfill.OutcomeRepaired {
+		t.Fatalf("re-repair over dispatched rows: outcome=%s err=%v", third.Outcome, third.Err)
+	}
+	if !strings.Contains(third.Detail, firstRow) || !strings.Contains(third.Detail, workerPDFRow) {
+		t.Fatalf("re-repair must report both purged rows (%s, %s), got %q", firstRow, workerPDFRow, third.Detail)
+	}
+	if fx.dispatchRowExists(t, "pdf", workerPDFRow) {
+		t.Fatalf("re-repair left the worker's pdf row %s in place; the next pdf enqueue would be swallowed", workerPDFRow)
+	}
+	if n := fx.pdfOutboxCount(t); n != 0 {
+		t.Fatalf("pdf outbox rows = %d after purge-and-redo, want 0", n)
+	}
+	if n := fx.outboxCount(t); n != 1 {
+		t.Fatalf("materialize outbox rows = %d, want exactly one after purge-and-redo", n)
+	}
+	thirdRow, thirdStatus := fx.materializeDispatch(t)
+	if thirdRow == firstRow || thirdStatus != "pending" {
+		t.Fatalf("re-repair did not replace the dispatch: id=%s status=%s", thirdRow, thirdStatus)
+	}
+	fx.assertApprovalHistoryUntouched(t)
+}
+
+// TestReleaseBackfill_RepairOnly_NoApprovedInstance_Refuses proves "post-approval"
+// is proved by the DURABLE approval record, not by the mutable status column: a
+// document sitting in a post-approval status with no approved approval_instance
+// is refused, because repairing its artifacts would render content nobody signed.
+func TestReleaseBackfill_RepairOnly_NoApprovedInstance_Refuses(t *testing.T) {
+	database, _ := testdb.Open(t)
+	fx := seedBackfillFixture(t, database, true, releaseContentHash)
+	fx.publish(t)
+	ctx := context.Background()
+
+	if _, err := database.ExecContext(ctx,
+		`UPDATE public.approval_instances SET status = 'cancelled' WHERE id = $1::uuid`, fx.instanceID,
+	); err != nil {
+		t.Fatalf("cancel approval instance: %v", err)
+	}
+
+	res := backfill.RunDocument(ctx, fx.deps, fx.documentID, backfill.Options{RepairOnly: true})
+	if res.Outcome != backfill.OutcomeFailed || res.Err == nil {
+		t.Fatalf("document without an approved instance must abort, got outcome=%s err=%v", res.Outcome, res.Err)
+	}
+	if !strings.Contains(res.Err.Error(), "never completed approval") {
+		t.Fatalf("error should name the missing approval: %v", res.Err)
+	}
+	if n := fx.outboxCount(t); n != 0 {
+		t.Fatalf("aborted repair wrote %d outbox rows", n)
+	}
+	if pin := fx.frozenRevisionPin(t); pin != "" {
+		t.Fatalf("aborted repair pinned %q", pin)
+	}
+}
+
+// TestReleaseBackfill_RepairOnly_NoCurrentRevision_Refuses: the repair re-pins
+// from the CURRENT revision, so a document without one has nothing to pin. It is
+// refused in preflight rather than reaching RepairMaterialization.
+func TestReleaseBackfill_RepairOnly_NoCurrentRevision_Refuses(t *testing.T) {
+	database, _ := testdb.Open(t)
+	fx := seedBackfillFixture(t, database, true, releaseContentHash)
+	ctx := context.Background()
+
+	testdb.SeedWithCaps(t, database, `[{"cap":"document.edit"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx,
+			`UPDATE public.documents SET current_revision_id = NULL WHERE id = $1::uuid`, fx.documentID)
+		return err
+	})
+
+	res := backfill.RunDocument(ctx, fx.deps, fx.documentID, backfill.Options{RepairOnly: true})
+	if res.Outcome != backfill.OutcomeFailed || res.Err == nil {
+		t.Fatalf("document without a current revision must abort, got outcome=%s err=%v", res.Outcome, res.Err)
+	}
+	if !strings.Contains(res.Err.Error(), "no current_revision_id") {
+		t.Fatalf("error should name the missing revision: %v", res.Err)
+	}
+	if n := fx.outboxCount(t); n != 0 {
+		t.Fatalf("aborted repair wrote %d outbox rows", n)
+	}
+	if pin := fx.frozenRevisionPin(t); pin != "" {
+		t.Fatalf("aborted repair pinned %q", pin)
 	}
 }

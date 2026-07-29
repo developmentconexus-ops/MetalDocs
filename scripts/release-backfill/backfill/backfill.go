@@ -28,6 +28,41 @@
 // Replay is a no-op at every write: the generation identity upserts, the
 // staging outbox dedupe is generation-aware, and an already-backfilled
 // document is detected in preflight and skipped.
+//
+// # Repair-only mode
+//
+// Options.RepairOnly is the SECOND, operator-ratified pass: integrity
+// restoration of INVALID artifacts, not history mutation. A document that was
+// frozen before the frozen-body fix carries a blank frozen.docx / final.pdf;
+// re-materializing it from the SAME current revision with a fresh lineage pin
+// replaces those bytes in place (artifact keys are deterministic per revision
+// id) while the approver's signed freeze — values_hash, values_frozen_at, the
+// approval instance, its signoffs and any release generation — is left
+// untouched. Only step 4 (RepairMaterialization) runs; steps 3 and 5 do not.
+//
+// Literal write set of one repair transaction, stated at SQL level so nobody
+// has to infer it:
+//
+//   - DELETE of the TERMINAL (dispatched/failed) staging rows that match this
+//     repair's dedupe key, in metaldocs.materialize_dispatch_outbox AND
+//     metaldocs.pdf_dispatch_outbox. Those rows are the ops provenance of the
+//     invalid artifacts, not audit facts — purging them IS the expurgo. See
+//     purgeStaleDispatch for why both tables and why terminal-only.
+//   - UPDATE public.documents SET values_hash, values_frozen_at,
+//     frozen_revision_id (snapshot_repository.go:166-175, one statement). Only
+//     frozen_revision_id CHANGES; values_hash and values_frozen_at are
+//     re-assigned byte- and timestamp-identical, read back out of the same row
+//     earlier in the same tx (freeze_service.go:337-353). The invariant holds —
+//     the approver's signed freeze survives the repair — but the UPDATE does
+//     name those columns, so do not read this as "untouched at SQL level".
+//   - INSERT of one pending metaldocs.materialize_dispatch_outbox row, plus the
+//     paired River dispatch job the enqueuer inserts in the same tx when (and
+//     only when) that outbox INSERT returns an id
+//     (render/fanout/dispatchjobs/enqueuer.go:105-123).
+//
+// Nothing else is written: no approval fact, no release generation, no signoff,
+// no status change, no artifact pointer. The fresh artifacts are produced later
+// by the production worker.
 package backfill
 
 import (
@@ -43,9 +78,25 @@ import (
 	approvalapp "metaldocs/internal/modules/approval/application"
 	approvaldom "metaldocs/internal/modules/approval/domain"
 	docapp "metaldocs/internal/modules/documents/application"
+	docdom "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/db"
 )
+
+// Options selects which of the two operator-ratified passes RunDocument
+// performs and whether it is allowed to write.
+type Options struct {
+	// RepairOnly runs ONLY FreezeService.RepairMaterialization: a frozen,
+	// post-approval document is re-pinned to its current revision and its
+	// materialization re-dispatched, so the worker renders fresh artifacts over
+	// the invalid ones. No approval fact is recorded and no release evaluation
+	// is enqueued (see runRepairOnly for the evaluation ruling and its
+	// evidence). Default false = the ADR 0085 Stage C backfill.
+	RepairOnly bool
+	// DryRun plans only and writes nothing. Enforced by construction in both
+	// modes: every dry-run path ends in errDryRunRollback.
+	DryRun bool
+}
 
 // Deps is the minimal object graph the per-document core needs. Wire builds
 // the production one; tests may build it from their own pool.
@@ -78,6 +129,10 @@ const (
 	// OutcomeAlreadyBackfilled means a generation for this exact identity
 	// already exists; replaying wrote nothing.
 	OutcomeAlreadyBackfilled Outcome = "already-backfilled"
+	// OutcomeRepaired is the repair-only verdict: the freeze lineage was
+	// re-pinned and materialization re-dispatched; no approval fact and no
+	// release generation were written.
+	OutcomeRepaired Outcome = "repaired"
 	// OutcomePlanned is the dry-run verdict: preflight passed, nothing written.
 	OutcomePlanned Outcome = "planned"
 	// OutcomeFailed means preflight (or a write) rejected this document. The
@@ -116,11 +171,17 @@ func (r Result) String() string {
 // discipline: every dry-run path ends in a rollback.
 var errDryRunRollback = errors.New("backfill: dry-run rollback")
 
+// nilGenerationUUID is the sentinel the generation-aware staging-outbox dedupe
+// indexes COALESCE a NULL release_generation_id to (migration 0310 §5,
+// render/fanout/staging_outbox.go:19). Legacy, generation-less rows live in
+// this slot, so any query that has to speak the dedupe key must use it too.
+const nilGenerationUUID = "00000000-0000-0000-0000-000000000000"
+
 // RunDocument backfills exactly one document. It never panics on bad input and
 // never leaks a partial write: every failure rolls the whole transaction back
 // and is reported on the returned Result, so the caller can continue with the
 // next document in the allowlist.
-func RunDocument(ctx context.Context, deps Deps, documentID string, dryRun bool) Result {
+func RunDocument(ctx context.Context, deps Deps, documentID string, opts Options) Result {
 	res := Result{DocumentID: documentID, Outcome: OutcomeFailed}
 
 	if err := deps.validate(); err != nil {
@@ -156,6 +217,10 @@ func RunDocument(ctx context.Context, deps Deps, documentID string, dryRun bool)
 			return fmt.Errorf("backfill: bypass: %w", err)
 		}
 
+		if opts.RepairOnly {
+			return runRepairOnly(ctx, tx, deps, tenantID, documentID, opts.DryRun, &res)
+		}
+
 		pre, err := preflight(ctx, tx, tenantID, documentID)
 		if err != nil {
 			return err
@@ -165,13 +230,13 @@ func RunDocument(ctx context.Context, deps Deps, documentID string, dryRun bool)
 			res.Outcome = OutcomeAlreadyBackfilled
 			res.GenerationID = pre.existingGenerationID
 			res.Detail = "already backfilled"
-			if dryRun {
+			if opts.DryRun {
 				return errDryRunRollback
 			}
 			return nil
 		}
 
-		if dryRun {
+		if opts.DryRun {
 			res.Outcome = OutcomePlanned
 			res.Detail = pre.plan()
 			return errDryRunRollback
@@ -223,6 +288,397 @@ func RunDocument(ctx context.Context, deps Deps, documentID string, dryRun bool)
 	default:
 		return res
 	}
+}
+
+// runRepairOnly is the operator-ratified expurgo pass, executed inside the
+// caller's already-seeded, already-bypassed transaction.
+//
+// Sequence, all in the caller's transaction: repairPreflight (which classifies
+// the stale staging rows) → purgeStaleDispatch → RepairMaterialization →
+// requireMaterializeEnqueued.
+//
+// The only production seam it drives is FreezeService.RepairMaterialization,
+// which re-pins documents.frozen_revision_id from the CURRENT revision in this
+// same tx, carries values_hash / values_frozen_at over unchanged (re-assigned
+// identical — see the package doc's literal write set), and enqueues
+// materialization. The worker then verifies the fetched bytes against the
+// pinned revision's document_revisions.content_hash before writing any artifact
+// (freeze_service.go Materialize), so a repair can never put a signature on
+// substituted content.
+//
+// Deliberately absent — RecordApprovalFactTx. Repair restores invalid
+// artifacts; it does not re-approve, and it must not manufacture or re-stamp an
+// approval fact for a document whose approval history is already correct.
+//
+// Deliberately absent — EnqueueReleaseEvaluationTx. Two independent reasons,
+// both fail-closed rather than optimistic:
+//
+//   - For a PUBLISHED document the evaluation is a provable no-op that
+//     converges nothing: EvaluateRelease returns ReleaseActionNoop because
+//     `published` is not in the releasable status set
+//     (approval/domain/release.go:124-127 + :165-167), and the coordinator's
+//     only write on that branch is touchEvaluatedTx — last_evaluated_at plus a
+//     hold_reason clear (approval/application/release_coordinator.go:319-320).
+//     It never demotes the document and never inserts a generation row (only
+//     RecordApprovalFactTx does that, release_facts.go:158-174), so including
+//     it would be SAFE — merely pointless.
+//   - Repair-only holds no generation key to enqueue with. A legacy
+//     generation-less document has no release_generations row at all, and a
+//     synthesized key resolves to ErrReleaseGenerationNotFound
+//     (release_facts.go:26, release_coordinator.go:140), which the worker logs
+//     and skips (approval/jobs/release_evaluate_job.go:56-60). Enqueuing a job
+//     that is known to find nothing is noise, not convergence.
+//
+// Convergence for the case that actually needs it stays owned by the production
+// path: when the repaired render lands both artifacts, RecordArtifactFactTx
+// enqueues the evaluation itself, in the artifact-persistence transaction
+// (release_facts.go:377-387).
+func runRepairOnly(ctx context.Context, tx db.Tx, deps Deps, tenantID, documentID string, dryRun bool, res *Result) error {
+	pre, err := repairPreflight(ctx, tx, tenantID, documentID)
+	if err != nil {
+		return err
+	}
+
+	res.GenerationID = pre.generationID
+
+	if dryRun {
+		res.Outcome = OutcomePlanned
+		res.Detail = pre.plan()
+		return errDryRunRollback
+	}
+
+	if err := purgeStaleDispatch(ctx, tx, pre.staleDispatch); err != nil {
+		return err
+	}
+
+	if err := deps.Freeze.RepairMaterialization(ctx, tx, tenantID, documentID, pre.generationID); err != nil {
+		return fmt.Errorf("backfill: repair materialization: %w", err)
+	}
+
+	outboxID, err := requireMaterializeEnqueued(ctx, tx, tenantID, documentID, pre.generationID)
+	if err != nil {
+		return err
+	}
+
+	res.Outcome = OutcomeRepaired
+	res.Detail = fmt.Sprintf("re-pinned frozen_revision_id=%s, %s, re-dispatched materialization (outbox=%s status=pending, document status=%s); approval facts untouched",
+		pre.revisionID, describePurge(pre.staleDispatch, "purged"), outboxID, pre.status)
+	return nil
+}
+
+// repairPreflightData is what the repair-only preflight proved.
+type repairPreflightData struct {
+	status       string
+	revisionID   string
+	generationID string
+	// staleDispatch are the TERMINAL staging rows on this repair's dedupe key
+	// that the write path will purge. Empty is the common case. A non-terminal
+	// row never reaches here — preflight refuses instead.
+	staleDispatch []dispatchRow
+}
+
+func (p repairPreflightData) plan() string {
+	generation := p.generationID
+	if generation == "" {
+		generation = "none (legacy, generation-less)"
+	}
+	return fmt.Sprintf("would re-pin frozen_revision_id from current revision %s, %s, and re-dispatch materialization for a %s document (generation=%s); no approval fact, no release evaluation",
+		p.revisionID, describePurge(p.staleDispatch, "would purge"), p.status, generation)
+}
+
+// repairOnlyStatuses is the CLOSED post-approval status set repair-only
+// accepts. `approved` and `published` are the two states in which the
+// document's artifact set is the governing one and the approval history is
+// already terminal, so re-rendering it restores integrity instead of changing
+// history. Every other status — including `scheduled`, `superseded`, `obsolete`
+// and anything pre-terminal — is refused: no operator ruling covers them, and
+// guessing would be exactly the fallback this tool refuses to have.
+var repairOnlyStatuses = map[string]struct{}{
+	string(docdom.DocStatusApproved):  {},
+	string(docdom.DocStatusPublished): {},
+}
+
+// repairPreflight proves every precondition the repair write path assumes.
+// Fail-closed throughout: nothing is inferred, defaulted or substituted.
+func repairPreflight(ctx context.Context, tx db.Tx, tenantID, documentID string) (repairPreflightData, error) {
+	var (
+		pre        repairPreflightData
+		revisionID sql.NullString
+		valuesHash []byte
+		frozenAt   *time.Time
+	)
+	err := tx.QueryRowContext(ctx, `
+		SELECT status, current_revision_id::text, values_hash, values_frozen_at
+		  FROM documents
+		 WHERE id = $1::uuid AND tenant_id = $2::uuid`,
+		documentID, tenantID,
+	).Scan(&pre.status, &revisionID, &valuesHash, &frozenAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return repairPreflightData{}, fmt.Errorf("repair preflight: document %s not found", documentID)
+	}
+	if err != nil {
+		return repairPreflightData{}, fmt.Errorf("repair preflight: load document: %w", err)
+	}
+	if _, ok := repairOnlyStatuses[pre.status]; !ok {
+		return repairPreflightData{}, fmt.Errorf("repair preflight: document %s is %s; repair-only accepts only approved or published documents", documentID, pre.status)
+	}
+	if !revisionID.Valid || revisionID.String == "" {
+		return repairPreflightData{}, fmt.Errorf("repair preflight: document %s has no current_revision_id to re-pin", documentID)
+	}
+	pre.revisionID = revisionID.String
+	// Frozen means BOTH columns, the same rule the backfill preflight and
+	// RepairMaterialization itself apply. Repair re-pins lineage; it never
+	// invents the freeze.
+	if frozenAt == nil || len(valuesHash) == 0 {
+		return repairPreflightData{}, fmt.Errorf("repair preflight: document %s is not frozen (values_hash/values_frozen_at)", documentID)
+	}
+
+	// Post-approval is proved by the DURABLE approval record, not by the
+	// mutable status column alone: an approved approval_instance is the fact
+	// that the document crossed the approval boundary. No uniqueness is
+	// required here (unlike the backfill preflight) because repair derives no
+	// generation identity from it — it only needs the existence proof.
+	if err := requireApprovedInstance(ctx, tx, tenantID, documentID); err != nil {
+		return repairPreflightData{}, err
+	}
+
+	pre.generationID, err = loadHeadGeneration(ctx, tx, tenantID, documentID)
+	if err != nil {
+		return repairPreflightData{}, err
+	}
+
+	pre.staleDispatch, err = classifyStaleDispatch(ctx, tx, tenantID, documentID, pre.generationID)
+	if err != nil {
+		return repairPreflightData{}, err
+	}
+
+	return pre, nil
+}
+
+// requireApprovedInstance fails closed when the document has no approved
+// approval instance: repairing artifacts for a document that never completed
+// approval would render content nobody signed.
+func requireApprovedInstance(ctx context.Context, tx db.Tx, tenantID, documentID string) error {
+	var exists bool
+	err := tx.QueryRowContext(ctx, `
+		SELECT EXISTS (
+		    SELECT 1 FROM approval_instances
+		     WHERE tenant_id = $1::uuid AND document_id = $2::uuid AND status = 'approved'
+		)`,
+		tenantID, documentID,
+	).Scan(&exists)
+	if err != nil {
+		return fmt.Errorf("repair preflight: load approved instances: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("repair preflight: document %s has no approved approval instance; it never completed approval", documentID)
+	}
+	return nil
+}
+
+// loadHeadGeneration returns the document's CURRENT freeze-head generation id,
+// or "" when the document has none (the legacy, pre-ADR-0085 shape).
+//
+// Threading the true id matters twice: the worker's RecordArtifactFactTx records
+// the repaired artifacts against that generation (and refuses any generation
+// that is not the head, release_facts.go:314-321), and the materialize outbox
+// dedupe key is generation-aware (migration 0310 §5). Passing "" while a
+// generation exists would be a lie in both places.
+func loadHeadGeneration(ctx context.Context, tx db.Tx, tenantID, documentID string) (string, error) {
+	var id string
+	err := tx.QueryRowContext(ctx, `
+		SELECT id::text
+		  FROM release_generations
+		 WHERE tenant_id = $1::uuid AND document_id = $2::uuid
+		 ORDER BY generation_seq DESC
+		 LIMIT 1`,
+		tenantID, documentID,
+	).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("repair preflight: load head release generation: %w", err)
+	}
+	return id, nil
+}
+
+// dispatchRow is one staging-outbox row that collides with this repair's dedupe
+// key. The generation-aware unique index (migration 0310 §5) makes at most one
+// such row exist per table, so a repair sees at most two.
+type dispatchRow struct {
+	table  string
+	id     string
+	status string
+}
+
+// terminalDispatchStatuses are the two statuses that mean the row's work is
+// OVER: the dispatch either succeeded ('dispatched') or was dead-lettered
+// ('failed') — staging_outbox.go:151-199. 'pending' and 'processing', the other
+// two members of the CHECK constraint (baseline 0001_current_schema.sql:1256,
+// :1372), mean work is in flight and are never purged.
+var terminalDispatchStatuses = map[string]struct{}{
+	"dispatched": {},
+	"failed":     {},
+}
+
+// classifyStaleDispatch resolves what stands between this repair and a real
+// re-render, and refuses rather than guessing.
+//
+// Both staging outboxes dedupe on
+// (tenant_id, revision_id, COALESCE(release_generation_id, nil-uuid)) with
+// ON CONFLICT DO NOTHING (migration 0310 §5 — the unique indexes are NOT
+// partial, they cover every status; render/fanout/staging_outbox.go:93 and
+// :133), and a skipped insert is reported as an empty id with a NIL error,
+// which the dispatch enqueuer reads as "nothing to dispatch"
+// (render/fanout/dispatchjobs/enqueuer.go:110-113). A colliding row therefore
+// turns an enqueue into a successful-looking no-op.
+//
+// Both tables matter, and the pdf one is the non-obvious half. Even a
+// successful materialize enqueue only gets the frozen.docx re-rendered: the
+// worker's own downstream EnqueuePDFTx runs on the SAME key — same tenant, same
+// revision_id (= document id), same generation id off the job payload
+// (platform/worker/materialize_job_runner.go:146) — so a stale
+// pdf_dispatch_outbox row swallows it too, leaving a repaired frozen.docx
+// paired with the original blank final.pdf. Purging only the materialize side
+// would produce exactly that half-repair.
+//
+// Verdict per row: terminal → purge it in the write path (operator-ratified
+// expurgo: these are ops staging rows in the metaldocs schema recording the
+// dispatch of the INVALID artifacts, not audit facts, and their retention purge
+// — PurgeDispatched, staging_outbox.go:257-264 — would delete them anyway);
+// anything else → refuse the whole repair, loudly and with the row named,
+// because a pending/processing row is live work whose River job may still fire
+// and whose removal would orphan it.
+//
+// revision_id carries documents.id here (the known column misnomer), which is
+// what RepairMaterialization enqueues with.
+func classifyStaleDispatch(ctx context.Context, tx db.Tx, tenantID, documentID, generationID string) ([]dispatchRow, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT 'metaldocs.materialize_dispatch_outbox' AS tbl, id::text, status
+		  FROM metaldocs.materialize_dispatch_outbox
+		 WHERE tenant_id = $1::uuid
+		   AND revision_id = $2::uuid
+		   AND COALESCE(release_generation_id, $4::uuid) = COALESCE(NULLIF($3, '')::uuid, $4::uuid)
+		 UNION ALL
+		SELECT 'metaldocs.pdf_dispatch_outbox' AS tbl, id::text, status
+		  FROM metaldocs.pdf_dispatch_outbox
+		 WHERE tenant_id = $1::uuid
+		   AND revision_id = $2::uuid
+		   AND COALESCE(release_generation_id, $4::uuid) = COALESCE(NULLIF($3, '')::uuid, $4::uuid)`,
+		tenantID, documentID, generationID, nilGenerationUUID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("repair preflight: load staging dispatch rows: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var stale []dispatchRow
+	for rows.Next() {
+		var r dispatchRow
+		if err := rows.Scan(&r.table, &r.id, &r.status); err != nil {
+			return nil, fmt.Errorf("repair preflight: scan staging dispatch row: %w", err)
+		}
+		if _, ok := terminalDispatchStatuses[r.status]; !ok {
+			return nil, fmt.Errorf("repair preflight: document %s has an IN-FLIGHT dispatch row on this generation key (%s id=%s status=%s); repair would either be swallowed by it or orphan its River job — wait for that dispatch to finish, then re-run",
+				documentID, r.table, r.id, r.status)
+		}
+		stale = append(stale, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("repair preflight: iterate staging dispatch rows: %w", err)
+	}
+	return stale, nil
+}
+
+// purgeStaleDispatch deletes the terminal staging rows classifyStaleDispatch
+// approved, inside the repair transaction — so a later failure (including the
+// requireMaterializeEnqueued check) rolls the purge back with everything else.
+//
+// Deletion is by PRIMARY KEY alone, one statement per row, against a CONSTANT
+// table name chosen by a closed switch: no dynamic SQL, and no way for a scanned
+// value to address a table this tool is not allowed to touch. No tenant
+// predicate is repeated here because the id came from classifyStaleDispatch's
+// tenant-keyed read earlier in this same transaction, and the tenant GUC seeded
+// at the top of the tx keeps the RLS policy engaged for the DELETE regardless
+// (baseline 0001_current_schema.sql:4320, :4334).
+func purgeStaleDispatch(ctx context.Context, tx db.Tx, stale []dispatchRow) error {
+	for _, r := range stale {
+		var stmt string
+		switch r.table {
+		case "metaldocs.materialize_dispatch_outbox":
+			stmt = `DELETE FROM metaldocs.materialize_dispatch_outbox WHERE id = $1::uuid`
+		case "metaldocs.pdf_dispatch_outbox":
+			stmt = `DELETE FROM metaldocs.pdf_dispatch_outbox WHERE id = $1::uuid`
+		default:
+			return fmt.Errorf("repair purge: refusing unknown staging table %q", r.table)
+		}
+		res, err := tx.ExecContext(ctx, stmt, r.id)
+		if err != nil {
+			return fmt.Errorf("repair purge: delete %s id=%s: %w", r.table, r.id, err)
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("repair purge: rows affected for %s id=%s: %w", r.table, r.id, err)
+		}
+		if n != 1 {
+			return fmt.Errorf("repair purge: expected to delete exactly 1 row from %s id=%s, deleted %d", r.table, r.id, n)
+		}
+	}
+	return nil
+}
+
+// requireMaterializeEnqueued is the read-your-own-write proof that the repair
+// actually dispatched something, and it closes the check-then-insert race that
+// classifyStaleDispatch alone cannot.
+//
+// classifyStaleDispatch reads the dedupe key; RepairMaterialization inserts on
+// it later. Two concurrent repair invocations can both pass the read with no
+// pre-existing row, after which one INSERT wins and the other hits ON CONFLICT
+// DO NOTHING — empty id, nil error, no River job
+// (render/fanout/dispatchjobs/enqueuer.go:110-113) — and would print "repaired"
+// having dispatched nothing. (The purge narrows this window for the
+// pre-existing-row case, since DELETE takes a row lock, but cannot close the
+// no-row case: there is nothing to lock.)
+//
+// Re-reading the key inside the same transaction is deterministic: the row this
+// SELECT sees is either the one this tx just inserted or a committed one from a
+// competing repair. Both outcomes are honest — a pending row exists and WILL
+// render — and absence is a hard failure that rolls the whole repair back. The
+// status='pending' predicate matters: it is the enqueue state
+// (staging_outbox.go:91-95), so a row left over in any other state cannot be
+// mistaken for this repair's dispatch.
+func requireMaterializeEnqueued(ctx context.Context, tx db.Tx, tenantID, documentID, generationID string) (string, error) {
+	var id string
+	err := tx.QueryRowContext(ctx, `
+		SELECT id::text
+		  FROM metaldocs.materialize_dispatch_outbox
+		 WHERE tenant_id = $1::uuid
+		   AND revision_id = $2::uuid
+		   AND COALESCE(release_generation_id, $4::uuid) = COALESCE(NULLIF($3, '')::uuid, $4::uuid)
+		   AND status = 'pending'`,
+		tenantID, documentID, generationID, nilGenerationUUID,
+	).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", fmt.Errorf("repair verify: document %s has no pending materialize dispatch row after RepairMaterialization — the enqueue was swallowed by the generation-aware dedupe (ON CONFLICT DO NOTHING) and nothing will render; rolling back", documentID)
+	}
+	if err != nil {
+		return "", fmt.Errorf("repair verify: load materialize dispatch row: %w", err)
+	}
+	return id, nil
+}
+
+// describePurge renders the purge set for the operator-facing outcome line.
+// Row ids are printed so the expurgo is auditable after the fact.
+func describePurge(stale []dispatchRow, verb string) string {
+	if len(stale) == 0 {
+		return "no stale dispatch rows to purge"
+	}
+	parts := make([]string, 0, len(stale))
+	for _, r := range stale {
+		parts = append(parts, fmt.Sprintf("%s(id=%s status=%s)", strings.TrimPrefix(r.table, "metaldocs."), r.id, r.status))
+	}
+	return fmt.Sprintf("%s %d stale dispatch row(s): %s", verb, len(stale), strings.Join(parts, ", "))
 }
 
 // lookupTenant resolves the owning tenant of documentID.

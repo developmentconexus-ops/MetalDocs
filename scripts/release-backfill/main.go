@@ -10,6 +10,23 @@
 //
 //	go run ./scripts/release-backfill -docs <uuid>[,<uuid>...]              # dry-run (default)
 //	go run ./scripts/release-backfill -docs <uuid>[,<uuid>...] -dry-run=false
+//	go run ./scripts/release-backfill -docs <uuid> -repair-only -dry-run=false
+//
+// -repair-only is the operator-ratified expurgo pass for documents whose frozen
+// artifacts are INVALID (blank frozen.docx / final.pdf produced before the
+// frozen-body fix). It re-materializes from the SAME current revision with a
+// fresh lineage pin and touches no approval fact — integrity restoration, not
+// history mutation. Artifact keys are deterministic per revision, so the fresh
+// render overwrites the invalid bytes in place.
+//
+// Part of that expurgo is deleting the TERMINAL (dispatched/failed) staging
+// rows in metaldocs.materialize_dispatch_outbox and
+// metaldocs.pdf_dispatch_outbox that recorded the dispatch of those invalid
+// artifacts: both outboxes dedupe on a generation-aware key, so leaving them
+// would silently swallow the repair's enqueues. Rows still in flight
+// (pending/processing) are never deleted — the repair refuses instead. Purged
+// row ids are printed on the outcome line. See backfill's package doc for the
+// literal write set.
 //
 // The DSN comes from -dsn or, when that is empty, the DATABASE_URL environment
 // variable. This tool never reads .env and never prints the DSN: every error it
@@ -38,6 +55,7 @@ import (
 func main() {
 	docsFlag := flag.String("docs", "", "REQUIRED comma-separated document UUIDs to backfill (explicit allowlist; there is no 'all approved' mode)")
 	dryRun := flag.Bool("dry-run", true, "plan only and write nothing; pass -dry-run=false to actually write")
+	repairOnly := flag.Bool("repair-only", false, "re-materialize a frozen, post-approval document from its current revision (invalid-artifact expurgo); purges the terminal materialize/pdf staging rows that would swallow the re-dispatch, records NO approval fact and enqueues NO release evaluation")
 	dsnFlag := flag.String("dsn", "", "Postgres DSN; when empty the DATABASE_URL environment variable is used (never read from .env, never printed)")
 	flag.Parse()
 
@@ -81,11 +99,17 @@ func main() {
 	if !*dryRun {
 		mode = "APPLY (writes committed per document)"
 	}
-	fmt.Printf("release-backfill: %s, %d document(s)\n", mode, len(docs))
+	pass := "BACKFILL (approval fact + materialization + evaluation)"
+	if *repairOnly {
+		pass = "REPAIR-ONLY (re-materialization only; approval facts untouched)"
+	}
+	fmt.Printf("release-backfill: %s, %s, %d document(s)\n", pass, mode, len(docs))
+
+	opts := backfill.Options{RepairOnly: *repairOnly, DryRun: *dryRun}
 
 	var failed int
 	for _, id := range docs {
-		res := backfill.RunDocument(ctx, deps, id, *dryRun)
+		res := backfill.RunDocument(ctx, deps, id, opts)
 		if res.Err != nil {
 			res.Err = fmt.Errorf("%s", redact(res.Err.Error(), dsn))
 			failed++
