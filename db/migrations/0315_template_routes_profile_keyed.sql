@@ -41,6 +41,12 @@
 --     row trigger NEW is NULL, so the trigger SILENTLY CANCELS every route
 --     delete. trg_route_config_immutable_del is therefore disabled around the
 --     purge and re-enabled after, with a hard post-condition assertion.
+--   * trg_route_profile_policy / trg_route_stage_profile_policy (0295) are
+--     DEFERRABLE INITIALLY DEFERRED constraint triggers armed for DELETE;
+--     left enabled they queue deferred events during the purge and the next
+--     ALTER TABLE on approval_routes fails with SQLSTATE 55006 (pending
+--     trigger events). Disabled around the purge, re-enabled after — no
+--     events queue while disabled, so the later ALTERs run clean.
 --   * templates_template and templates_template_version carry
 --     trg_require_cap_asserted armed for DELETE (0283 returns OLD but still
 --     demands metaldocs.asserted_caps). Disabled around the generic-template
@@ -88,12 +94,16 @@ END $$;
 -- ── 2. Purge template-subject routes (immutability trigger disabled) ────────
 
 ALTER TABLE public.approval_routes DISABLE TRIGGER trg_route_config_immutable_del;
+ALTER TABLE public.approval_routes DISABLE TRIGGER trg_route_profile_policy;
+ALTER TABLE public.approval_route_stages DISABLE TRIGGER trg_route_stage_profile_policy;
 
 -- approval_route_stages (and their selectors) cascade from approval_routes.
 DELETE FROM public.approval_routes
       WHERE subject_kind = 'template';
 
 ALTER TABLE public.approval_routes ENABLE TRIGGER trg_route_config_immutable_del;
+ALTER TABLE public.approval_routes ENABLE TRIGGER trg_route_profile_policy;
+ALTER TABLE public.approval_route_stages ENABLE TRIGGER trg_route_stage_profile_policy;
 
 DO $$
 DECLARE
