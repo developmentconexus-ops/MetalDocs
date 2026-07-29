@@ -6,21 +6,33 @@ import (
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 )
 
+// taxonomySystemProfileGetter is the narrow background read slice of the
+// taxonomy profile repository. It is deliberately separate from
+// taxonomyProfileGetter: the system read seeds its tenant from the explicit
+// parameter and is fail-closed outside a background context, so depending on
+// the slice keeps the request-path reader and the job-path reader from sharing
+// a surface (interface segregation).
+type taxonomySystemProfileGetter interface {
+	GetByCodeSystem(ctx context.Context, tenantID string, code taxonomydomain.ProfileCode) (*taxonomydomain.DocumentProfile, error)
+}
+
 // ProfileReviewIntervalReader adapts the canonical taxonomy profile repository
 // to the approval application.ProfileReviewIntervalReader port (ADR 0085).
 //
-// It reuses the same narrow taxonomyProfileGetter slice as ProfilePolicyReader,
-// for the same reason: the read runs in taxonomy's own short transaction on a
-// separate connection, so it never sits inside an approval lock-holding tx
-// (H-PRE-1) — which is exactly why the release coordinator calls it in its
-// off-lock preflight and never inside the release transaction.
+// Its ONLY consumer is the release coordinator's preflight, which runs in the
+// River release_evaluate job and therefore carries no HTTP identity — hence the
+// system read slice rather than the identity-gated GetByCode. The read still
+// runs in taxonomy's own short transaction on a separate connection, so it never
+// sits inside an approval lock-holding tx (H-PRE-1) — which is exactly why the
+// coordinator calls it in its off-lock preflight and never inside the release
+// transaction.
 type ProfileReviewIntervalReader struct {
-	profiles taxonomyProfileGetter
+	profiles taxonomySystemProfileGetter
 }
 
 // NewProfileReviewIntervalReader builds the adapter over the canonical
 // taxonomy profile repository.
-func NewProfileReviewIntervalReader(profiles taxonomyProfileGetter) *ProfileReviewIntervalReader {
+func NewProfileReviewIntervalReader(profiles taxonomySystemProfileGetter) *ProfileReviewIntervalReader {
 	return &ProfileReviewIntervalReader{profiles: profiles}
 }
 
@@ -28,7 +40,7 @@ func NewProfileReviewIntervalReader(profiles taxonomyProfileGetter) *ProfileRevi
 // A read error propagates unchanged so the caller fails closed rather than
 // silently releasing a document with no review cycle.
 func (r *ProfileReviewIntervalReader) ReviewIntervalDays(ctx context.Context, tenantID, profileCode string) (int, error) {
-	profile, err := r.profiles.GetByCode(ctx, tenantID, taxonomydomain.ProfileCode(profileCode))
+	profile, err := r.profiles.GetByCodeSystem(ctx, tenantID, taxonomydomain.ProfileCode(profileCode))
 	if err != nil {
 		return 0, err
 	}

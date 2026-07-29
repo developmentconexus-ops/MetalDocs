@@ -89,33 +89,22 @@ func (r *ProfileRepository) BeginTx(ctx context.Context) (domain.FamilyTx, error
 	return taxonomyTx{tx: tx}, nil
 }
 
-// GetByCode reads the profile for (tenantID, code) inside a short-lived
-// read transaction, seeding the authz GUCs and requiring CapTaxonomyView.
-// Returns domain.ErrProfileNotFound if no such row exists.
-func (r *ProfileRepository) GetByCode(ctx context.Context, tenantID string, code domain.ProfileCode) (*domain.DocumentProfile, error) {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("begin get profile tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if err := setAuthzGUC(ctx, tx); err != nil {
-		return nil, fmt.Errorf("query profile %q: %w", code, err)
-	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyView), "tenant"); err != nil {
-		return nil, fmt.Errorf("taxonomy: authz check Get profile: %w", err)
-	}
-
-	const q = `
+// profileByCodeQuery is the single (tenantID, code) profile read shared by the
+// identity-gated GetByCode and the background GetByCodeSystem; both scan it
+// through scanProfileRow, so the column list exists once.
+const profileByCodeQuery = `
 SELECT code, tenant_id, family_code, name, description, alias, review_interval_days,
        default_template_version_id, owner_user_id, editable_by_role, governance_class, archived_at, created_at
 FROM metaldocs.document_profiles
 WHERE tenant_id = $1 AND code = $2`
 
+// scanProfileRow scans one profileByCodeQuery row, mapping sql.ErrNoRows to
+// domain.ErrProfileNotFound.
+func scanProfileRow(row *sql.Row) (*domain.DocumentProfile, error) {
 	var profile domain.DocumentProfile
 	var defaultTemplateVersionID sql.NullString
 	var ownerUserID sql.NullString
-	err = tx.QueryRowContext(ctx, q, tenantID, code).Scan(
+	err := row.Scan(
 		&profile.Code,
 		&profile.TenantID,
 		&profile.FamilyCode,
@@ -139,6 +128,72 @@ WHERE tenant_id = $1 AND code = $2`
 	profile.DefaultTemplateVersionID = nullStringPtr(defaultTemplateVersionID)
 	profile.OwnerUserID = nullStringPtr(ownerUserID)
 	return &profile, nil
+}
+
+// GetByCode reads the profile for (tenantID, code) inside a short-lived
+// read transaction, seeding the authz GUCs and requiring CapTaxonomyView.
+// Returns domain.ErrProfileNotFound if no such row exists.
+func (r *ProfileRepository) GetByCode(ctx context.Context, tenantID string, code domain.ProfileCode) (*domain.DocumentProfile, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin get profile tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := setAuthzGUC(ctx, tx); err != nil {
+		return nil, fmt.Errorf("query profile %q: %w", code, err)
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyView), "tenant"); err != nil {
+		return nil, fmt.Errorf("taxonomy: authz check Get profile: %w", err)
+	}
+
+	return scanProfileRow(tx.QueryRowContext(ctx, profileByCodeQuery, tenantID, code))
+}
+
+// GetByCodeSystem reads the profile for (tenantID, code) on the background
+// system path: River workers carry no HTTP identity, so setAuthzGUC's ctx
+// tenant/actor resolution and the CapTaxonomyView check cannot apply. Instead
+// the tenant GUC is seeded from the EXPLICIT tenantID parameter (RLS scoping,
+// never ctx), and authz.BypassSystem stands in for tier-2 — it is fail-closed
+// (ErrBypassNotBackground unless ctx carries authz.WithBackgroundBypass, so
+// this method is unreachable from any HTTP path) and audits every invocation
+// per ADR 0022 Phase 11 F8. Precedent: the release coordinator's own phase-1
+// preflight tx (SeedTxTenant + BypassSystem, release_coordinator.go).
+// Returns domain.ErrProfileNotFound if no such row exists.
+//
+// COMMIT CONSTRAINT — this read transaction is NOT throwaway: BypassSystem's F8
+// bypass-audit event is written by the sink INSIDE this tx (bypass_audit.go
+// RecordBypass), so returning without Commit would roll the audit record back
+// and let the bypass happen unaudited. Every exit AFTER a successful
+// BypassSystem therefore commits first — including the not-found path, where the
+// bypass and the read attempt still happened. The deferred Rollback stays as the
+// safety net for the pre-bypass and infrastructure-error paths (a Rollback after
+// Commit is a no-op).
+func (r *ProfileRepository) GetByCodeSystem(ctx context.Context, tenantID string, code domain.ProfileCode) (*domain.DocumentProfile, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin get profile system tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := authz.SeedTxTenant(ctx, tx, tenantID); err != nil {
+		return nil, fmt.Errorf("taxonomy: seed tenant for system profile read %q: %w", code, err)
+	}
+	if err := authz.BypassSystem(ctx, tx); err != nil {
+		return nil, fmt.Errorf("taxonomy: system profile read %q: %w", code, err)
+	}
+
+	profile, scanErr := scanProfileRow(tx.QueryRowContext(ctx, profileByCodeQuery, tenantID, code))
+	if scanErr != nil && !errors.Is(scanErr, domain.ErrProfileNotFound) {
+		return nil, scanErr
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit system profile read %q: %w", code, err)
+	}
+	if scanErr != nil {
+		return nil, scanErr
+	}
+	return profile, nil
 }
 
 // List returns profiles for tenantID, ordered by code, capped at
