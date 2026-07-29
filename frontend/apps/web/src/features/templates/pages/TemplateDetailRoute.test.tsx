@@ -197,11 +197,11 @@ describe("TemplateDetailRoute", () => {
     });
   });
 
-  it("shows 'Editar modelo' primary and disabled 'Criar nova versão' when status is draft", () => {
+  it("shows 'Editar template' primary and disabled 'Criar nova versão' when status is draft", () => {
     setupDraft();
     renderRoute();
 
-    const editBtn = screen.getByRole("button", { name: /editar modelo/i });
+    const editBtn = screen.getByRole("button", { name: /editar template/i });
     expect(editBtn).toBeInTheDocument();
     expect(editBtn).not.toBeDisabled();
 
@@ -226,7 +226,7 @@ describe("TemplateDetailRoute", () => {
 
     renderRoute();
 
-    expect(screen.getByText(/carregando modelo/i)).toBeInTheDocument();
+    expect(screen.getByText(/carregando template/i)).toBeInTheDocument();
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
 

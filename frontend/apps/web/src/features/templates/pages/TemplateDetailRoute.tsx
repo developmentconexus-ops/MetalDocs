@@ -32,7 +32,7 @@ export function TemplateDetailRoute() {
     return (
       <div className={styles.state} role="status" aria-live="polite">
         <Icon name="docs" size={24} />
-        <span>Carregando modelo…</span>
+        <span>Carregando template…</span>
       </div>
     );
   }
@@ -42,7 +42,7 @@ export function TemplateDetailRoute() {
     return (
       <div className={styles.state} role="alert">
         <Icon name="x" size={20} />
-        <span>Modelo não encontrado ou sem permissão de acesso.</span>
+        <span>Template não encontrado ou sem permissão de acesso.</span>
       </div>
     );
   }
@@ -127,7 +127,7 @@ export function TemplateDetailRoute() {
         <div className={styles.heroActions}>
           <button className="btn btn-primary btn-lg" type="button" onClick={handleEdit}>
             <Icon name="edit" size={15} />
-            Editar modelo
+            Editar template
           </button>
           <button
             className="btn"

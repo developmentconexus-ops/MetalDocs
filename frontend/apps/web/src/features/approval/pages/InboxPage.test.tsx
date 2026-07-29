@@ -342,7 +342,7 @@ describe('InboxPage', () => {
     } as unknown as ReturnType<typeof useInboxQuery>);
 
     renderPage();
-    fireEvent.click(screen.getByText('Abrir revisão do modelo'));
+    fireEvent.click(screen.getByText('Abrir revisão do template'));
 
     await waitFor(() => {
       expect(navigateMock).toHaveBeenCalledWith('/templates/tpl-cockpit/approval');

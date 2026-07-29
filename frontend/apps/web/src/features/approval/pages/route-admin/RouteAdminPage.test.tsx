@@ -116,7 +116,7 @@ describe('RouteAdminPage', () => {
     renderWithProviders(<RouteAdminPage />);
 
     expect(await screen.findByText('Rota Jurídica')).toBeTruthy();
-    expect(screen.getByText('2 etapa(s)')).toBeTruthy();
+    expect(screen.getByText('2 etapas')).toBeTruthy();
     expect(screen.getByLabelText('Status: ativa')).toBeTruthy();
   });
 

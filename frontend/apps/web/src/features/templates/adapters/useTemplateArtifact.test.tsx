@@ -108,11 +108,11 @@ describe('useTemplateArtifact', () => {
     expect(typeBadge?.variant).toBe('type');
   });
 
-  it('builds hero breadcrumb with Modelos root and template name', () => {
+  it('builds hero breadcrumb with Templates root and template name', () => {
     const { model } = renderHook(() => useTemplateArtifact('tpl-1')).result.current;
 
     expect(model.hero.breadcrumb).toEqual([
-      { label: 'Modelos', href: '/templates' },
+      { label: 'Templates', href: '/templates' },
       { label: 'Procedimento de Onboarding' },
     ]);
   });

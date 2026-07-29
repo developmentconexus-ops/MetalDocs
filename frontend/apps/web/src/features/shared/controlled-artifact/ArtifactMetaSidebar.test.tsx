@@ -43,13 +43,13 @@ describe("ArtifactMetaSidebar", () => {
         loading
         code="MODELO-001"
         meta={emptyMeta}
-        ariaLabel="Identificação do modelo"
-        loadingLabel="Carregando metadados do modelo"
+        ariaLabel="Identificação do template"
+        loadingLabel="Carregando metadados do template"
       />,
     );
 
-    expect(screen.getByLabelText("Identificação do modelo")).toBeInTheDocument();
-    expect(screen.getByText("Carregando metadados do modelo")).toBeInTheDocument();
+    expect(screen.getByLabelText("Identificação do template")).toBeInTheDocument();
+    expect(screen.getByText("Carregando metadados do template")).toBeInTheDocument();
     expect(screen.queryByLabelText("Identificação do artefato")).not.toBeInTheDocument();
   });
 

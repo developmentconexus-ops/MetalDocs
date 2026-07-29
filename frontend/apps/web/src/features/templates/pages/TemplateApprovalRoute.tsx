@@ -107,7 +107,7 @@ export function TemplateApprovalRoute() {
     return <div className={styles.state} role="status" aria-live="polite">Carregando aprovação…</div>;
   }
   if (isError || versionNum == null) {
-    return <div className={styles.state} role="alert">Não foi possível carregar esta versão do modelo.</div>;
+    return <div className={styles.state} role="alert">Não foi possível carregar esta versão do template.</div>;
   }
 
   const decision = model.decision;

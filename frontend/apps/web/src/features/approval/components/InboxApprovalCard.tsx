@@ -51,7 +51,7 @@ export function InboxApprovalCard({
             ) : null}
           </div>
           <div className={styles.statCell}>
-            <div className="kicker">ESTÁGIO</div>
+            <div className="kicker">ETAPA</div>
             <div className={styles.stageName}>{item.stage_label}</div>
             <div className="caption mono">{item.quorum_progress}</div>
           </div>
@@ -87,7 +87,7 @@ export function InboxApprovalCard({
               className={`${styles.btnOpen} btn`}
               onClick={onOpenDocument}
             >
-              <Icon name="eye" size={14} /> Abrir revisão do modelo
+              <Icon name="eye" size={14} /> Abrir revisão do template
             </button>
           )}
         </div>

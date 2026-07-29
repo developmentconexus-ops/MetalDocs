@@ -17,7 +17,7 @@ export function TemplateReviewCanvas({ templateId, versionNum }: TemplateReviewC
   const draft = useTemplateDraft(templateId, versionNum);
 
   if (draft.loading) {
-    return <div className={styles.state} role="status" aria-live="polite">Carregando conteúdo do modelo…</div>;
+    return <div className={styles.state} role="status" aria-live="polite">Carregando conteúdo do template…</div>;
   }
   if (draft.error) {
     return (

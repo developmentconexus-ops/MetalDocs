@@ -61,7 +61,9 @@ export function RouteListTable({ routes, isFetching, onEdit, onDeactivate }: Rou
                       0082, so an empty cell never reads as a loading/data bug. */}
                   <code className={styles.code}>{route.profile_code ?? '—'}</code>
                 </td>
-                <td>{route.stages.length} etapa(s)</td>
+                <td>
+                  {route.stages.length} {route.stages.length === 1 ? 'etapa' : 'etapas'}
+                </td>
                 <td>
                   <span
                     className={route.active ? styles.badgeActive : styles.badgeInactive}

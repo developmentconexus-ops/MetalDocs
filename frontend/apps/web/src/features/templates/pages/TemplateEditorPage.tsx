@@ -425,8 +425,8 @@ export function TemplateEditorPage({
           meta={metaModel.meta}
           approvalChain={null}
           lineage={metaModel.lineage}
-          ariaLabel="Identificação do modelo"
-          loadingLabel="Carregando metadados do modelo"
+          ariaLabel="Identificação do template"
+          loadingLabel="Carregando metadados do template"
         />
       </div>
 

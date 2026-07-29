@@ -19,36 +19,11 @@ interface RoleDescriptor {
   description?: string;
 }
 
-// Roles badged "Tenant" rather than "Área" in the matrix.
-//
-// F-QA4-2 typed this literal against the generated `UserRole` so a typo or a
-// retired role fails tsc. It is deliberately NOT derived from the contract
-// vocabulary, because no contract-derivable partition matches it — and the
-// current membership is very likely WRONG:
-//
-//   * `user_process_areas.role` (DB CHECK) accepts all 8 canonical roles EXCEPT
-//     system_admin, so the only role that is tenant-ONLY is system_admin.
-//   * the tenant role assignment (iam AdminService) accepts all 8, so the other
-//     seven are BOTH tenant-assignable and area-assignable.
-//
-// That makes the binary badge unsound as specified: it currently claims
-// approver/author/editor/viewer are tenant-scoped and qms_admin/area_admin/
-// signer are area-scoped, which matches neither table. Fixing it needs a
-// product ruling on what the badge is asserting ("primary scope"? "grantable
-// at"?) — outside a vocabulary-single-sourcing change, so it is reported rather
-// than silently re-derived into a different wrong answer.
-const TENANT_ROLES: ReadonlyArray<UserRole> = [
-  "system_admin",
-  "approver",
-  "author",
-  "editor",
-  "viewer",
-];
-const TENANT_ROLE_SET: ReadonlySet<string> = new Set(TENANT_ROLES);
-
-function getRoleScope(code: string): "tenant" | "area" {
-  return TENANT_ROLE_SET.has(code) ? "tenant" : "area";
-}
+// Operator ruling (2026-07-29): only `system_admin` is tenant-exclusive
+// (`user_process_areas.role` DB CHECK excludes it). Every other role is both
+// tenant- and area-assignable, so no binary scope badge is rendered for them —
+// only `system_admin` gets a "Somente tenant" tag.
+const TENANT_ONLY_ROLE: UserRole = "system_admin";
 
 interface CapabilityDescriptor {
   code: string;
@@ -78,10 +53,7 @@ interface RoleCapabilityMatrixProps {
   selectedCell?: SelectedCell | null;
 }
 
-const SCOPE_LABEL: Record<string, string> = {
-  tenant: "Tenant",
-  area: "Área",
-};
+const TENANT_ONLY_LABEL = "Somente tenant";
 
 type DomainGradeMap = Map<CapabilityGrade, number>;
 type RoleMatrix = Map<CapabilityDomain, DomainGradeMap>;
@@ -170,7 +142,7 @@ export default function RoleCapabilityMatrix({
           <tbody>
             {roles.map((role) => {
               const matrix: RoleMatrix = perRoleMatrix.get(role.code) ?? new Map();
-              const scope = SCOPE_LABEL[getRoleScope(role.code)];
+              const isTenantOnly = role.code === TENANT_ONLY_ROLE;
               return (
                 <tr key={role.code} className={styles.row}>
                   <th scope="row" className={styles.roleHeader}>
@@ -182,7 +154,9 @@ export default function RoleCapabilityMatrix({
                     >
                       <span className={styles.roleLabel}>{getRoleLabel(role.code)}</span>
                       <span className={styles.roleCode}>{role.code}</span>
-                      {scope ? <span className={styles.roleScopeTag}>{scope}</span> : null}
+                      {isTenantOnly ? (
+                        <span className={styles.roleScopeTag}>{TENANT_ONLY_LABEL}</span>
+                      ) : null}
                     </button>
                   </th>
                   {CAPABILITY_DOMAINS.map((domain) => {

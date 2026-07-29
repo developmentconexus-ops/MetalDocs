@@ -69,9 +69,9 @@ interface ArtifactMetaSidebarProps {
   meta: ArtifactMetaModel;
   approvalChain?: ApprovalChainItem[] | null;
   lineage?: VersionHistoryItem[];
-  /** Kind-specific a11y label for the panel; caller supplies "documento"/"modelo". */
+  /** Kind-specific a11y label for the panel; caller supplies "documento"/"template". */
   ariaLabel?: string;
-  /** Kind-specific loading copy; caller supplies "documento"/"modelo". */
+  /** Kind-specific loading copy; caller supplies "documento"/"template". */
   loadingLabel?: string;
   /**
    * Layout variant. Default (`false`) is the standalone editor drawer: a fixed

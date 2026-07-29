@@ -92,7 +92,7 @@ vi.mock("../adapters/useTemplateApprovalArtifact", () => ({
             decision: {
               kicker: "Decisão requerida",
               heading: "Registrar decisão",
-              description: "Revise o conteúdo do modelo e confirme sua senha para registrar a decisão.",
+              description: "Revise o conteúdo do template e confirme sua senha para registrar a decisão.",
               options: [
                 {
                   key: "accept",
@@ -105,14 +105,14 @@ vi.mock("../adapters/useTemplateApprovalArtifact", () => ({
                 {
                   key: "reject",
                   label: "Rejeitar",
-                  description: "Devolve o modelo para rascunho · requer motivo.",
+                  description: "Devolve o template para rascunho · requer motivo.",
                   tone: "reject",
                   submitLabel: "Rejeitar",
                   requiresReason: true,
                 },
               ],
               reasonLabel: "Motivo",
-              reasonPlaceholder: "Comentário registrado na trilha do modelo…",
+              reasonPlaceholder: "Comentário registrado na trilha do template…",
               password: { label: "Senha" },
               legal: null,
               signer: {

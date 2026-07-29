@@ -23,7 +23,7 @@ const EM_DASH = '—';
  * - `publish`   → approved: primary "Publicar versão" + secondary "Ver no editor".
  * - `newVersion`→ published: primary "Criar nova versão" (route-owned mutation) +
  *                 secondary "Ver no editor".
- * - `editOnly`  → draft: primary "Editar modelo" + disabled "Criar nova versão" hint.
+ * - `editOnly`  → draft: primary "Editar template" + disabled "Criar nova versão" hint.
  * - `readOnly`  → obsolete / unknown: single "Ver no editor" entry.
  */
 export type TemplateDetailHeroKind = 'review' | 'publish' | 'newVersion' | 'editOnly' | 'readOnly';
@@ -99,7 +99,7 @@ export function useTemplateArtifact(templateId: string): TemplateArtifact {
   }
 
   const breadcrumb: BreadcrumbItem[] = [
-    { label: 'Modelos', href: '/templates' },
+    { label: 'Templates', href: '/templates' },
     ...(template?.name ? [{ label: template.name }] : []),
   ];
 
