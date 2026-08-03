@@ -54,16 +54,16 @@ func TestTripwireArms_MatchesContractTable(t *testing.T) {
 		// requires exactly template.approve, never unioned.
 		{"approval_signoffs", OpInsert, "document"}: {iamdomain.CapDocumentSignoff},
 		{"approval_signoffs", OpInsert, "template"}: {iamdomain.CapTemplateApprove},
-		{"iam_user_roles", OpAny, ""}:                {iamdomain.CapUserManage},
-		{"user_process_areas", OpAny, ""}:            {iamdomain.CapMembershipManage},
-		{"documents", OpInsert, ""}:                  {iamdomain.CapDocumentCreate},
-		{"documents", OpUpdate, ""}:                  {iamdomain.CapDocumentEdit, iamdomain.CapDocumentObsolete, iamdomain.CapMembershipManage, iamdomain.CapDocumentReview},
-		{"controlled_documents", OpInsert, ""}:       {iamdomain.CapControlledDocumentCreate},
-		{"controlled_documents", OpUpdate, ""}:       {iamdomain.CapControlledDocumentObsolete, iamdomain.CapControlledDocumentSupersede},
-		{"cd_sequence_counters", OpAny, ""}:          {iamdomain.CapControlledDocumentCreate},
-		{"document_profiles", OpAny, ""}:             {iamdomain.CapTaxonomyManage},
-		{"document_process_areas", OpAny, ""}:        {iamdomain.CapTaxonomyManage},
-		{"document_families", OpAny, ""}:             {iamdomain.CapTaxonomyManage},
+		{"iam_user_roles", OpAny, ""}:               {iamdomain.CapUserManage},
+		{"user_process_areas", OpAny, ""}:           {iamdomain.CapMembershipManage},
+		{"documents", OpInsert, ""}:                 {iamdomain.CapDocumentCreate},
+		{"documents", OpUpdate, ""}:                 {iamdomain.CapDocumentEdit, iamdomain.CapDocumentObsolete, iamdomain.CapMembershipManage, iamdomain.CapDocumentReview},
+		{"controlled_documents", OpInsert, ""}:      {iamdomain.CapControlledDocumentCreate},
+		{"controlled_documents", OpUpdate, ""}:      {iamdomain.CapControlledDocumentObsolete, iamdomain.CapControlledDocumentSupersede},
+		{"cd_sequence_counters", OpAny, ""}:         {iamdomain.CapControlledDocumentCreate},
+		{"document_profiles", OpAny, ""}:            {iamdomain.CapTaxonomyManage},
+		{"document_process_areas", OpAny, ""}:       {iamdomain.CapTaxonomyManage},
+		{"document_families", OpAny, ""}:            {iamdomain.CapTaxonomyManage},
 		{"templates_template", OpAny, ""}: {
 			iamdomain.CapTemplateCreate, iamdomain.CapTemplateEdit, iamdomain.CapTemplateSubmit,
 			iamdomain.CapTemplateApprove, iamdomain.CapTemplatePublish, iamdomain.CapTemplateArchive,
@@ -140,23 +140,34 @@ func TestTripwireArms_MatchesContractTable(t *testing.T) {
 // stage deleted in S4, capability retired from the IAM registry), so the
 // golden target advances with the latest rendered migration (M7
 // validation-contract.md §5, M6 §3, M2 §1.4/§1.5.a, ADR 0083 + follow-on).
+//
+// Since the 2026-07-29 migration fold the golden no longer lives in
+// db/migrations/ (0257-0315 were squashed into db/baseline and archived under
+// archive/migrations/post-baseline-2026-07-fold/, which is immutable): the
+// regenerable artifact was re-homed to internal/platform/tripwire/golden/,
+// written by cmd/gen-tripwire and read by scripts/api-lint's
+// TRIPWIRE-ARM-PARITY rule from the same path. Any future tripwire vocabulary
+// change ships as a NEW forward migration in db/migrations/ regenerated to a
+// new version — see internal/platform/tripwire/golden/README.md.
+const goldenRelPath = "internal/platform/tripwire/golden/0301_tripwire_template_review_retired.sql"
+
 func TestRenderMigration_MatchesCommittedFile(t *testing.T) {
 	repoRoot, err := findRepoRoot()
 	if err != nil {
 		t.Fatalf("locate repo root: %v", err)
 	}
-	migrationPath := filepath.Join(repoRoot, "db", "migrations", "0301_tripwire_template_review_retired.sql")
+	goldenPath := filepath.Join(repoRoot, filepath.FromSlash(goldenRelPath))
 
-	committed, err := os.ReadFile(migrationPath)
+	committed, err := os.ReadFile(goldenPath)
 	if err != nil {
-		t.Fatalf("read committed migration %s: %v (has it been generated via cmd/gen-tripwire?)", migrationPath, err)
+		t.Fatalf("read committed golden %s: %v (has it been generated via cmd/gen-tripwire?)", goldenPath, err)
 	}
 
 	rendered := RenderMigration()
 
 	if rendered != string(committed) {
 		t.Errorf("RenderMigration() does not byte-equal committed %s.\n--- rendered len=%d ---\n%s\n--- committed len=%d ---\n%s",
-			migrationPath, len(rendered), rendered, len(committed), string(committed))
+			goldenPath, len(rendered), rendered, len(committed), string(committed))
 	}
 }
 

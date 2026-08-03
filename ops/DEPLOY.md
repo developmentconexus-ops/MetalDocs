@@ -127,6 +127,28 @@ login + session cookie, `/api/v1/auth/me`, and the target route (default
 Do **not** pass `-StartApi` when verifying the Compose stack — that switch drives the local
 non-container dev flow (`scripts/dev-api.ps1`), not compose.
 
+### Post-bootstrap checklist (first bring-up of a new database volume)
+
+1. **Rotate the `metaldocs_ci` password — required on every non-dev environment.**
+   `db/grants/0001_role_grants.sql` creates the non-owner, `NOSUPERUSER` + `NOBYPASSRLS`
+   `metaldocs_ci` role with the **non-secret dev fixture password** `metaldocs_ci_dev`, so a
+   fresh bootstrap always has a known-password login role in the cluster. It is DML-only and
+   RLS-bound, but a published password is still a published password. On any environment that
+   is not a throwaway dev box, rotate it immediately after the first bootstrap:
+
+   ```bash
+   docker compose -f deploy/compose/docker-compose.yml exec postgres \
+     psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+     -c "ALTER ROLE metaldocs_ci PASSWORD '<deployment-secret>'"
+   ```
+
+   Then point the integration suite at the rotated secret via `METALDOCS_CI_DB_PASSWORD`
+   (`tests/integration/testdb/ci_role.go`). Re-running the grants stage never resets the
+   password — the `CREATE ROLE` is guarded on the role being absent — so the rotation survives
+   every subsequent API start. If the role is not needed at all on this environment, `DROP ROLE
+   metaldocs_ci` instead; the grants stage will recreate it only if the app's DB user holds
+   `CREATEROLE`, and skips cleanly with a `NOTICE` otherwise.
+
 ---
 
 ## Observability — metrics listener isolation (F-R1, Dim-9)

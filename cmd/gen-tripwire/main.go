@@ -1,13 +1,29 @@
-// Command gen-tripwire writes the machine-generated tripwire migration SQL
-// (internal/platform/tripwire.RenderMigration()) to the latest canonical
-// migration path (0301 as of unit 3.1a S5, ADR 0082 phase c:
-// templates_template_version arm drops 'template.review' — the legacy
+// Command gen-tripwire writes the machine-generated tripwire SQL
+// (internal/platform/tripwire.RenderMigration()) to the committed golden render
+// at internal/platform/tripwire/golden/ (0301 as of unit 3.1a S5, ADR 0082
+// phase c: templates_template_version arm drops 'template.review' — the legacy
 // reviewer stage was deleted in S4 and the capability is retired from the
 // IAM registry in the same change-set).
 //
+// The default target is a GOLDEN, not a migration: the 2026-07-29 fold squashed
+// migrations 0257-0315 into db/baseline and archived the files under
+// archive/migrations/post-baseline-2026-07-fold/ (immutable historical record),
+// so the regenerable artifact now lives next to the renderer. Both consumers —
+// scripts/api-lint's TRIPWIRE-ARM-PARITY rule and
+// internal/platform/tripwire.TestRenderMigration_MatchesCommittedFile — read
+// that same path.
+//
+// Any future tripwire vocabulary change ships as a NEW forward migration in
+// db/migrations/ regenerated to a new version:
+//
+//	go run ./cmd/gen-tripwire db/migrations/<NNNN>_<slug>.sql
+//
+// and then advances defaultRelPath + both consumers in lockstep. See
+// internal/platform/tripwire/golden/README.md.
+//
 // Usage: go run ./cmd/gen-tripwire [output-path]
-// With no argument, writes to the canonical path relative to the repo root
-// (found by walking up from the working directory for go.mod).
+// With no argument, writes to the canonical golden path relative to the repo
+// root (found by walking up from the working directory for go.mod).
 package main
 
 import (
@@ -18,7 +34,7 @@ import (
 	"metaldocs/internal/platform/tripwire"
 )
 
-const defaultRelPath = "db/migrations/0301_tripwire_template_review_retired.sql"
+const defaultRelPath = "internal/platform/tripwire/golden/0301_tripwire_template_review_retired.sql"
 
 func main() {
 	out := defaultRelPath

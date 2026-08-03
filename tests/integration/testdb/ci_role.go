@@ -14,15 +14,18 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 )
 
-// ciRoleName is the dedicated non-owner, NOSUPERUSER + NOBYPASSRLS role created
-// by migration 0284_ci_rls_role.sql. Connecting through it makes RLS genuinely
-// filter tenant reads (metaldocs_app — the owner/superuser/bypass role the rest
-// of the harness uses for setup and seeding — has RLS triply inert).
+// ciRoleName is the dedicated non-owner, NOSUPERUSER + NOBYPASSRLS role
+// provisioned by the bootstrap grants stage, db/grants/0001_role_grants.sql
+// (re-homed there from the now-folded migration 0284_ci_rls_role.sql by the
+// 2026-07-29 fold). Connecting through it makes RLS genuinely filter tenant
+// reads (metaldocs_app — the owner/superuser/bypass role the rest of the
+// harness uses for setup and seeding — has RLS triply inert).
 const ciRoleName = "metaldocs_ci"
 
 // ciRoleDevPassword mirrors the non-secret dev/CI fixture password baked into
-// migration 0284. It is deliberately overridable so a prod-like run can point
-// at a role whose password was rotated via `ALTER ROLE metaldocs_ci PASSWORD`.
+// db/grants/0001_role_grants.sql. It is deliberately overridable so a prod-like
+// run can point at a role whose password was rotated via
+// `ALTER ROLE metaldocs_ci PASSWORD`.
 const ciRoleDevPassword = "metaldocs_ci_dev"
 
 // OpenAsCIRole returns a *sql.DB connected to an already-created per-test

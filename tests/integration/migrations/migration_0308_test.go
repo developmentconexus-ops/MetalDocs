@@ -6,7 +6,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"os"
 	"strings"
 	"testing"
 
@@ -31,10 +30,13 @@ import (
 //  2. Behavioral proof: two rows sharing the same code but different
 //     tenant_id must both insert cleanly (tenant-scoped uniqueness); the
 //     same tenant_id+code pair must collide with 23505.
-//  3. Idempotency: re-executing the exact committed migration file bytes
-//     against the already-migrated database must no-op cleanly (DO-block
-//     guards skip work already in target shape) and must not duplicate the
-//     '0308' ledger row (ON CONFLICT DO NOTHING).
+//
+// The former replay tests in this file (TestMigration0308_ReRunIsCleanNoOp and
+// TestMigration0308_MalformedPrestateAborts, both of which re-executed the
+// committed migration file bytes) were deleted with the 2026-07-29 fold: 0308
+// is folded into db/baseline/0001_current_schema.sql and archived under
+// archive/migrations/post-baseline-2026-07-fold/, so it is never applied to any
+// database again and its replay/abort behaviour guards nothing.
 func TestMigration0308_DocumentProfilesTenantPK(t *testing.T) {
 	ctx := context.Background()
 	db, _ := testdb.OpenFreshDatabase(t)
@@ -106,113 +108,6 @@ func TestMigration0308_DocumentProfilesTenantPK(t *testing.T) {
 	}
 	if !hasSQLState(dupErr, "23505") {
 		t.Fatalf("expected SQLSTATE 23505 for duplicate (tenant_id, code), got: %v", dupErr)
-	}
-}
-
-// TestMigration0308_ReRunIsCleanNoOp proves the committed migration file is
-// safe to replay against a database already in the post-0308 shape (the
-// bootstrap-replay idempotency contract every migration in this repo must
-// satisfy — see db/migrations/README.md and the 0264/0260 precedent files).
-func TestMigration0308_ReRunIsCleanNoOp(t *testing.T) {
-	ctx := context.Background()
-	db, _ := testdb.OpenFreshDatabase(t)
-
-	migrationSQL, err := os.ReadFile("../../../db/migrations/0308_document_profiles_tenant_pk.sql")
-	if err != nil {
-		t.Fatalf("read committed 0308 migration file: %v", err)
-	}
-
-	if _, err := db.ExecContext(ctx, string(migrationSQL)); err != nil {
-		t.Fatalf("0308 must re-apply cleanly against an already-migrated database: %v", err)
-	}
-
-	if n := ledgerCount(t, ctx, db, "0308"); n != 1 {
-		t.Fatalf("re-run must not duplicate the ledger row (ON CONFLICT DO NOTHING): got %d rows for '0308'", n)
-	}
-
-	assertPrimaryKeyColumns(t, ctx, db, "metaldocs.document_profiles", []string{"tenant_id", "code"})
-}
-
-// TestMigration0308_MalformedPrestateAborts proves the F2 fail-closed
-// guard: if metaldocs.document_profiles somehow reaches migration-replay
-// time with NO primary key at all (the composite PK dropped, and the
-// ux_document_profiles_tenant_code index gone -- so guard 1 no-ops because
-// there is no 'code'-only PK to drop, and guard 2 no-ops because there is no
-// ux_document_profiles_tenant_code index left to promote), the migration's
-// final assertion DO block must RAISE and abort the whole file (it runs
-// inside the file's own explicit BEGIN/COMMIT), leaving the table with no
-// PK and, critically, NOT re-inserting the '0308' ledger row.
-func TestMigration0308_MalformedPrestateAborts(t *testing.T) {
-	ctx := context.Background()
-	db, _ := testdb.OpenFreshDatabase(t)
-
-	// Sanity: bootstrap already applied 0308 -- start from the healthy
-	// post-migration shape before corrupting it.
-	assertPrimaryKeyColumns(t, ctx, db, "metaldocs.document_profiles", []string{"tenant_id", "code"})
-	if n := ledgerCount(t, ctx, db, "0308"); n != 1 {
-		t.Fatalf("precondition: expected exactly one '0308' ledger row before corrupting prestate, got %d", n)
-	}
-
-	// Simulate the malformed prestate: drop the 3 composite FKs that depend
-	// on the document_profiles_pkey index (scratch DB -- fine to drop in
-	// test setup), then drop the PK constraint itself. Because
-	// PRIMARY KEY USING INDEX renamed ux_document_profiles_tenant_code to
-	// document_profiles_pkey when 0308 first ran, dropping the constraint
-	// drops that same underlying index -- so afterward there is NEITHER a
-	// primary key NOR a ux_document_profiles_tenant_code index, which is
-	// exactly the shape that makes both of 0308's DO-block guards no-op.
-	for _, stmt := range []string{
-		`ALTER TABLE ONLY public.approval_routes DROP CONSTRAINT approval_routes_document_profile_fk`,
-		`ALTER TABLE ONLY public.cd_sequence_counters DROP CONSTRAINT cd_sequence_counters_tenant_id_profile_code_fkey`,
-		`ALTER TABLE ONLY public.controlled_documents DROP CONSTRAINT controlled_documents_tenant_id_profile_code_fkey`,
-		`ALTER TABLE ONLY metaldocs.document_profiles DROP CONSTRAINT document_profiles_pkey`,
-	} {
-		if _, err := db.ExecContext(ctx, stmt); err != nil {
-			t.Fatalf("corrupt prestate (%s): %v", stmt, err)
-		}
-	}
-
-	// Also remove the ledger row so the migration actually attempts work
-	// instead of short-circuiting on ON CONFLICT DO NOTHING against an
-	// already-present row.
-	if _, err := db.ExecContext(ctx, `DELETE FROM public.schema_migrations WHERE version = '0308'`); err != nil {
-		t.Fatalf("delete '0308' ledger row: %v", err)
-	}
-
-	// Confirm the malformed prestate: no PK, no ux index, no ledger row.
-	var pkCount int
-	if err := db.QueryRowContext(ctx, `
-		SELECT count(*) FROM pg_constraint
-		 WHERE conrelid = 'metaldocs.document_profiles'::regclass AND contype = 'p'`).Scan(&pkCount); err != nil {
-		t.Fatalf("count PK constraints: %v", err)
-	}
-	if pkCount != 0 {
-		t.Fatalf("precondition: expected document_profiles to have no PK after corruption, got %d PK constraints", pkCount)
-	}
-	if got := regclassIndex(t, ctx, db, "metaldocs.ux_document_profiles_tenant_code"); got.Valid {
-		t.Fatalf("precondition: expected ux_document_profiles_tenant_code to be gone, but it exists as %q", got.String)
-	}
-	if n := ledgerCount(t, ctx, db, "0308"); n != 0 {
-		t.Fatalf("precondition: expected zero '0308' ledger rows after delete, got %d", n)
-	}
-
-	migrationSQL, err := os.ReadFile("../../../db/migrations/0308_document_profiles_tenant_pk.sql")
-	if err != nil {
-		t.Fatalf("read committed 0308 migration file: %v", err)
-	}
-
-	_, execErr := db.ExecContext(ctx, string(migrationSQL))
-	if execErr == nil {
-		t.Fatal("expected replaying 0308 against a no-PK prestate to fail the final assertion guard, but it succeeded")
-	}
-	if !strings.Contains(execErr.Error(), "migration 0308 invariant violated") {
-		t.Fatalf("expected the final assertion guard's RAISE message, got: %v", execErr)
-	}
-
-	// The abort must have rolled back the whole file -- no ledger row must
-	// have been (re)inserted.
-	if n := ledgerCount(t, ctx, db, "0308"); n != 0 {
-		t.Fatalf("expected no '0308' ledger row after aborted replay (rollback), got %d", n)
 	}
 }
 

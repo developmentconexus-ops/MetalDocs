@@ -1,5 +1,6 @@
 // Package migrate applies post-baseline forward SQL files from a configured
-// migrations directory. It is not responsible for fresh database bootstrap;
+// migrations directory (Apply), plus the ledger-less privilege/role grants
+// stage (ApplyGrants). It is not responsible for fresh database bootstrap;
 // curated baseline bootstrap is owned by scripts/dev-bootstrap-baseline.ps1.
 package migrate
 
@@ -91,6 +92,80 @@ func Apply(ctx context.Context, db *sql.DB, dir string, log *slog.Logger) (retEr
 		ran++
 	}
 	log.Info("migrations done", "applied_now", ran, "already_applied", skipped, "total", len(files))
+	return nil
+}
+
+// ApplyGrants runs every *.sql file in dir, in lexical order, on every startup —
+// unconditionally, with no schema_migrations ledger row and no skip check.
+//
+// The grants stage (db/grants) re-homes the privilege effects the curated
+// baseline cannot carry (pg_dump --no-privileges emits no ACLs, and role
+// creation is cluster-global so it is never dumped at all — see
+// db/grants/0001_role_grants.sql). Those files were previously applied ONLY at
+// fresh bootstrap (compose initdb.d, scripts/dev-bootstrap-baseline.ps1,
+// tests/integration/testdb), so a long-lived volume never saw a later edit to
+// the privilege posture. Running them here closes that gap: every file is
+// idempotent by construction (guarded DO blocks + GRANT/REVOKE, which are
+// themselves set-semantics), so replay is a no-op and a ledger row would only
+// re-open the "edit never lands" hole.
+//
+// A missing or empty dir is a fatal error, not a silent pass: an API booting
+// without the privilege stage is exactly the failure this function exists to
+// prevent (no-fallback principle).
+func ApplyGrants(ctx context.Context, db *sql.DB, dir string, log *slog.Logger) (retErr error) {
+	if log == nil {
+		log = slog.Default()
+	}
+	// Resolve the stage before touching the database so a packaging mistake
+	// (image missing db/grants, wrong METALDOCS_GRANTS_DIR) fails fast and
+	// unambiguously rather than mid-connection.
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return fmt.Errorf("read grants dir %q: %w", dir, err)
+	}
+	var names []string
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") {
+			continue
+		}
+		names = append(names, e.Name())
+	}
+	if len(names) == 0 {
+		return fmt.Errorf("grants dir %q contains no .sql files; the privilege stage is mandatory", dir)
+	}
+	sort.Strings(names)
+
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("migrate: acquire connection: %w", err)
+	}
+	defer conn.Close()
+
+	// Same advisory lock as Apply: the grants stage runs immediately before it,
+	// and two replicas booting together must not interleave DDL/ACL work.
+	if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_lock($1)`, migrateLockKey); err != nil {
+		return fmt.Errorf("migrate: acquire advisory lock: %w", err)
+	}
+	defer func() {
+		if _, err := conn.ExecContext(context.Background(), `SELECT pg_advisory_unlock($1)`, migrateLockKey); err != nil && retErr == nil {
+			retErr = fmt.Errorf("migrate: release advisory lock: %w", err)
+		}
+	}()
+
+	for _, name := range names {
+		body, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			return fmt.Errorf("read %s: %w", name, err)
+		}
+		if err := requireExplicitTransactionGuard(string(body)); err != nil {
+			return fmt.Errorf("apply grants %s: %w", name, err)
+		}
+		log.Info("applying grants stage", "file", name)
+		if _, err := conn.ExecContext(ctx, string(body)); err != nil {
+			return fmt.Errorf("apply grants %s: %w", name, err)
+		}
+	}
+	log.Info("grants stage done", "files", len(names))
 	return nil
 }
 

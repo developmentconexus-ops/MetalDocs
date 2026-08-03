@@ -4,6 +4,13 @@
 -- db/reference-data/0001_product_reference_data.sql (the GRANT ... ON ALL
 -- TABLES statements below need every table to already exist).
 --
+-- ALSO re-applied unconditionally at every metaldocs-api startup, before
+-- migrations, by internal/platform/migrate.ApplyGrants — no schema_migrations
+-- ledger row, by design. Fresh-bootstrap-only application meant an edit to this
+-- file never reached a long-lived volume. Every statement below is therefore
+-- required to be idempotent AND to degrade cleanly (skip, never error) when the
+-- executing role lacks CREATEROLE or does not own the target objects.
+--
 -- WHY THIS FILE EXISTS
 -- The curated baseline is regenerated with `pg_dump --schema-only --no-owner
 -- --no-privileges`, which deliberately carries no ACLs, and role creation is
@@ -29,35 +36,48 @@
 BEGIN;
 
 -- ── metaldocs_ci: non-owner, non-bypass DML role (from 0284) ────────────────
--- Roles are cluster-global, so this is a no-op on a cluster that already has
--- it. The dev password is a non-secret DML-only fixture; a deployment rotates
--- it with `ALTER ROLE metaldocs_ci PASSWORD '<deployment-secret>'` and points
--- the suite at it via METALDOCS_CI_DB_PASSWORD.
+-- Roles are cluster-global, so the CREATE is a no-op on a cluster that already
+-- has it. The dev password is a non-secret DML-only fixture; a deployment
+-- rotates it with `ALTER ROLE metaldocs_ci PASSWORD '<deployment-secret>'` and
+-- points the suite at it via METALDOCS_CI_DB_PASSWORD. Re-running this file
+-- NEVER resets an already-rotated password: the CREATE only runs when the role
+-- is absent.
+--
+-- The whole block (create + grants) is conditional on the role existing or
+-- being creatable. Under ApplyGrants this file runs at every API startup, and
+-- in an environment where the app's DB user lacks CREATEROLE and the CI role
+-- was never provisioned, a bare CREATE ROLE -- or the GRANTs that name a
+-- non-existent grantee -- would turn startup into a hard failure over a
+-- test-only role. That case skips cleanly with a NOTICE. It does not swallow
+-- anything else: any other error still aborts the file (and the transaction).
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_ci') THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_roles
+       WHERE rolname = current_user AND (rolcreaterole OR rolsuper)
+    ) THEN
+      RAISE NOTICE 'metaldocs_ci is absent and % lacks CREATEROLE -- skipping CI role provisioning', current_user;
+      RETURN;
+    END IF;
     EXECUTE 'CREATE ROLE metaldocs_ci NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT LOGIN PASSWORD ''metaldocs_ci_dev''';
   END IF;
-END
-$$;
 
--- Schema access.
-GRANT USAGE ON SCHEMA metaldocs TO metaldocs_ci;
-GRANT USAGE ON SCHEMA public   TO metaldocs_ci;
+  -- Schema access.
+  EXECUTE 'GRANT USAGE ON SCHEMA metaldocs TO metaldocs_ci';
+  EXECUTE 'GRANT USAGE ON SCHEMA public   TO metaldocs_ci';
 
--- DML on all existing tables in both schemas (covers every tenant-scoped
--- table + everything else -- the app role reads/writes ordinary tables too;
--- RLS is what enforces tenant isolation, not the grant surface).
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA metaldocs TO metaldocs_ci;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public   TO metaldocs_ci;
+  -- DML on all existing tables in both schemas (covers every tenant-scoped
+  -- table + everything else -- the app role reads/writes ordinary tables too;
+  -- RLS is what enforces tenant isolation, not the grant surface).
+  EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA metaldocs TO metaldocs_ci';
+  EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public   TO metaldocs_ci';
 
--- Sequences (serial/identity defaults on INSERT).
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA metaldocs TO metaldocs_ci;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public   TO metaldocs_ci;
+  -- Sequences (serial/identity defaults on INSERT).
+  EXECUTE 'GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA metaldocs TO metaldocs_ci';
+  EXECUTE 'GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public   TO metaldocs_ci';
 
--- Future objects created by the app role inherit the same grants.
-DO $$
-BEGIN
+  -- Future objects created by the app role inherit the same grants.
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_app') THEN
     EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE metaldocs_app IN SCHEMA metaldocs GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO metaldocs_ci';
     EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE metaldocs_app IN SCHEMA public   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO metaldocs_ci';
@@ -68,10 +88,13 @@ END
 $$;
 
 -- ── audit_events insert/select-only hardening (from 0266 part a) ────────────
--- Runs AFTER the metaldocs_ci block on purpose: the blanket
--- "GRANT ... ON ALL TABLES" above would otherwise re-grant UPDATE/DELETE on
--- audit_events to metaldocs_ci. metaldocs_ci keeps DML there (it is a test
--- role and audit-chain tests need it); the revoke targets the app role, which
+-- Ordering constraint for this whole file: it must run AFTER the baseline (and
+-- reference data), because every GRANT/REVOKE below names tables that must
+-- already exist. Ordering WITHIN the file is free -- the blanket
+-- "GRANT ... ON ALL TABLES" above targets metaldocs_ci, while this REVOKE
+-- targets metaldocs_app, so the two never touch the same (grantee, object)
+-- pair and neither can undo the other. metaldocs_ci deliberately keeps DML on
+-- audit_events (it is a test role and audit-chain tests need it); the app role
 -- must never mutate or truncate the hash chain.
 DO $$
 BEGIN

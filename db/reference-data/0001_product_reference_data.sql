@@ -355,13 +355,13 @@ INSERT INTO public.templates_template (
 INSERT INTO public.templates_template_version (
   id, template_id, tenant_id, version_number, status, docx_storage_key, content_hash, metadata_schema,
   -- pending_reviewer_role/pending_approver_role deliberately omitted: the legacy
-  -- per-version role-routing columns are retired (ADR 0082 phase c) and dropped
-  -- by migration 0306, which runs after this seed in the curated bootstrap. This
-  -- seed formerly wrote a vestigial pending_approver_role='system' here; that
-  -- write is removed in the same change-set as the DROP (mirrors 0302's
-  -- co-removal of the TenantDataPort DELETE) so 0306's pre-drop emptiness assert
-  -- holds. The columns still exist at seed time (baseline schema), so omitting
-  -- them just takes their DB defaults (reviewer NULL, approver '').
+  -- per-version role-routing columns are retired (ADR 0082 phase c). Migration
+  -- 0306 dropped them and was folded into db/baseline/0001_current_schema.sql by
+  -- the 2026-07-29 fold, so the columns no longer exist at seed time at all --
+  -- naming them here would fail. (Historically they did exist when this seed ran
+  -- and 0306 dropped them afterwards; the write of a vestigial
+  -- pending_approver_role='system' was removed in the same change-set as the DROP
+  -- so 0306's pre-drop emptiness assert held. Kept as provenance only.)
   placeholder_schema, author_id, reviewer_id,
   approver_id, submitted_at, reviewed_at, approved_at, published_at, obsoleted_at, lock_version
 ) VALUES (

@@ -233,6 +233,17 @@ func main() {
 		os.Exit(1)
 	}
 	if deps.SQLDB != nil && !migrationCfg.Skip {
+		// The grants stage runs BEFORE migrations and unconditionally (no
+		// ledger): db/grants carries the privilege/role posture pg_dump
+		// --no-privileges cannot put in the baseline, and it was previously
+		// applied only at fresh bootstrap — so an existing volume never saw an
+		// edit. Every file is idempotent by construction; a missing/empty dir
+		// is fatal. See internal/platform/migrate.ApplyGrants.
+		if err := migrate.ApplyGrants(ctx, deps.SQLDB, migrationCfg.GrantsDir, slog.Default()); err != nil {
+			slog.Error("apply grants stage", "err", err)
+			deps.Cleanup()
+			os.Exit(1)
+		}
 		if err := migrate.Apply(ctx, deps.SQLDB, migrationCfg.Dir, slog.Default()); err != nil {
 			slog.Error("apply startup migrations", "err", err)
 			deps.Cleanup()

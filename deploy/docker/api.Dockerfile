@@ -11,6 +11,10 @@ RUN addgroup -g 10001 -S metaldocs && adduser -u 10001 -S -G metaldocs -H -s /sb
 WORKDIR /app
 COPY --from=builder --chown=metaldocs:metaldocs /out/metaldocs-api /app/metaldocs-api
 COPY --chown=metaldocs:metaldocs db/migrations /app/db/migrations
+# db/grants is the ledger-less privilege/role stage metaldocs-api re-applies on
+# every start (internal/platform/migrate.ApplyGrants) — a missing directory is
+# a fatal startup error, so it must ship in the image alongside db/migrations.
+COPY --chown=metaldocs:metaldocs db/grants /app/db/grants
 EXPOSE 8081
 USER metaldocs
 ENTRYPOINT ["/app/metaldocs-api"]

@@ -66,3 +66,17 @@ object classes. The `schema_migrations` ledgers are identical (108 versions: the
 `baseline-2026-05-14` marker + 53 rows from the 2026-06 fold + 54 rows from this one).
 ACLs, which the gate deliberately does not compare, were verified separately (67 tables +
 4 default-ACL entries + both schema ACLs match).
+
+### Known benign ledger delta: pre-fold volumes carry an extra `0309` row
+
+A **fresh** bootstrap seeds `0309_pdf_dispatch_outbox_final_docx_key` from the reference-data
+ledger block like every other folded version. A **pre-fold** volume can also have a `0309` row,
+but it got there out-of-band: because 0309 never self-registered (see the note above), it
+re-applied on every `metaldocs-api` start, and the operator fix was to insert the ledger row by
+hand to stop the loop. Both databases therefore end up with the same version present.
+
+Where they differ is the total count when the two ledgers are diffed version-for-version at
+different points in that history — a volume patched before the fold and one bootstrapped after
+it can show a **one-row delta around `0309`**. It is benign and expected: the schema effect of
+0309 is in the baseline either way, and the row is a bookkeeping marker with no replay
+consequence. Do not "reconcile" it by deleting or re-inserting rows.

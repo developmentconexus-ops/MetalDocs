@@ -6,9 +6,10 @@ package main
 // binding). Both are blocking; there is no reported-only tier (main.go).
 //
 // TRIPWIRE-ARM-PARITY (a) binds internal/platform/tripwire.TripwireArms to the
-// registry (every cap real) and to the generated migration (RenderMigration()
-// byte-equal to the latest committed tripwire migration, db/migrations/0279_*.sql
-// as of M7 F7.3) — a Go map / registry / generated-SQL three-way drift catcher.
+// registry (every cap real) and to the generated SQL (RenderMigration()
+// byte-equal to the committed golden render, internal/platform/tripwire/golden/
+// as of the 2026-07-29 migration fold) — a Go map / registry / generated-SQL
+// three-way drift catcher.
 //
 // TRIPWIRE-ARM-DRIFT (b) is the function-local generalization of
 // checkTripwirePairing (code_rules.go): pairing checks *presence* of
@@ -35,8 +36,18 @@ import (
 	"metaldocs/internal/platform/tripwire"
 )
 
-// tripwireMigrationPath is the committed golden file TRIPWIRE-ARM-PARITY
-// compares tripwire.RenderMigration() against. Advances with the latest
+// tripwireGoldenPath is the committed golden file TRIPWIRE-ARM-PARITY
+// compares tripwire.RenderMigration() against. It is a GOLDEN, not a migration:
+// the 2026-07-29 fold squashed migrations 0257-0315 into db/baseline and moved
+// the files to archive/migrations/post-baseline-2026-07-fold/ (conceptually
+// immutable), so the regenerable artifact was re-homed next to the renderer at
+// internal/platform/tripwire/golden/. cmd/gen-tripwire writes the same path and
+// internal/platform/tripwire.TestRenderMigration_MatchesCommittedFile reads it.
+// Any future tripwire vocabulary change ships as a NEW forward migration in
+// db/migrations/ regenerated to a new version, with this golden advanced in
+// lockstep — see internal/platform/tripwire/golden/README.md.
+//
+// Advances with the latest
 // rendered tripwire migration: M2 pinned 0271; M6 F6.2 re-rendered it to 0275
 // (documents/UPDATE gains document.review); M7 F7.2 re-rendered it to 0277
 // (tenants/INSERT arm gated on tenant.onboard + attachment, ADR 0070); M7 F7.3
@@ -57,7 +68,7 @@ import (
 // unit 3.1a S5: templates_template_version arm drops template.review — the
 // legacy reviewer stage was deleted in S4 and the capability is retired from
 // the IAM registry in the same change-set).
-const tripwireMigrationPath = "db/migrations/0301_tripwire_template_review_retired.sql"
+const tripwireGoldenPath = "internal/platform/tripwire/golden/0301_tripwire_template_review_retired.sql"
 
 // gatedTableSet returns the set of table names present in TripwireArms — the
 // tables TRIPWIRE-ARM-DRIFT restricts its attention to (contract §1.5.b: "only
@@ -124,15 +135,15 @@ func unionArmCapsFor(arms []tripwire.Arm, table string, op tripwire.Op) ([]iamdo
 
 // checkTripwireArmParity implements contract §1.5.a: every capability
 // referenced by tripwire.TripwireArms is a real registry capability, and
-// tripwire.RenderMigration() byte-equals the committed 0271 migration under
-// modulesRoot. modulesRoot must be the repo root (RenderMigration is a pure
+// tripwire.RenderMigration() byte-equals the committed golden render under
+// modulesRoot (tripwireGoldenPath). modulesRoot must be the repo root (RenderMigration is a pure
 // function of the imported TripwireArms — always the real, compiled-in arms —
 // so this rule cannot be pointed at a synthetic arm set; the NEGATIVE fixtures
 // for this rule construct a local, non-registry capability check + a
 // tree-with-a-mutated-migration-file check instead, see
 // tripwire_arm_rules_test.go).
 //
-// A missing 0271 file follows the same requireCoreFile convention as every
+// A missing golden file follows the same requireCoreFile convention as every
 // other core-registry helper in this package (parseCapabilityConsts,
 // checkSeedRegistryParity, ...): under strict (production/CI root) it is a
 // hard error, not a silent pass; under non-strict (unit-test/table-driven
@@ -156,11 +167,11 @@ func checkTripwireArmParity(modulesRoot string, strict bool) ([]Violation, error
 	}
 
 	// (ii) the generated migration must byte-equal the committed 0271 file.
-	migPath := filepath.Join(modulesRoot, filepath.FromSlash(tripwireMigrationPath))
+	migPath := filepath.Join(modulesRoot, filepath.FromSlash(tripwireGoldenPath))
 	committed, err := os.ReadFile(migPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if cerr := requireCoreFile(strict, "db/migrations/0271 (tripwire golden migration)", migPath); cerr != nil {
+			if cerr := requireCoreFile(strict, "internal/platform/tripwire/golden (tripwire golden render)", migPath); cerr != nil {
 				return nil, cerr
 			}
 			return out, nil
@@ -173,7 +184,7 @@ func checkTripwireArmParity(modulesRoot string, strict bool) ([]Violation, error
 			File:    migPath,
 			Line:    0,
 			Rule:    "TRIPWIRE-ARM-PARITY",
-			Message: fmt.Sprintf("%s does not byte-equal internal/platform/tripwire.RenderMigration(); the committed SQL has drifted from the Go TripwireArms source of truth (hand-edit or stale regeneration) — regenerate and recommit", tripwireMigrationPath),
+			Message: fmt.Sprintf("%s does not byte-equal internal/platform/tripwire.RenderMigration(); the committed SQL has drifted from the Go TripwireArms source of truth (hand-edit or stale regeneration) — regenerate with `go run ./cmd/gen-tripwire` and recommit", tripwireGoldenPath),
 		})
 	}
 

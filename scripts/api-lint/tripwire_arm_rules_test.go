@@ -62,7 +62,7 @@ func TestTripwireArmParity_NonRegistryCapFiresDirectly(t *testing.T) {
 // production against a tree whose committed SQL has drifted.
 func TestTripwireArmParity_MutatedMigrationFires(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, tripwireMigrationPath, "-- hand-edited, does not match RenderMigration()\n")
+	writeFile(t, dir, tripwireGoldenPath, "-- hand-edited, does not match RenderMigration()\n")
 	got, err := checkTripwireArmParity(dir, false)
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -411,7 +411,7 @@ func TestRenderMigration_Deterministic(t *testing.T) {
 // turning the PARITY rule green via checkTripwireArmParity's missing-file
 // violation not firing for the wrong reason).
 func TestCommittedTripwireMigrationExists(t *testing.T) {
-	path := filepath.Join(repoRoot(t), filepath.FromSlash(tripwireMigrationPath))
+	path := filepath.Join(repoRoot(t), filepath.FromSlash(tripwireGoldenPath))
 	info, err := os.Stat(path)
 	if err != nil {
 		t.Fatalf("stat %s: %v", path, err)
