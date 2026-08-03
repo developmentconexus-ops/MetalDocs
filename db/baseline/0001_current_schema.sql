@@ -1,39 +1,52 @@
 -- MetalDocs curated current-state schema baseline.
 -- This file contains product schema only. Product reference data belongs in
--- db/reference-data/0001_product_reference_data.sql. Local-only seed data belongs
--- in db/dev-seeds/0001_local_dev_seed.sql.
+-- db/reference-data/0001_product_reference_data.sql. Role/privilege posture
+-- belongs in db/grants/0001_role_grants.sql. Local-only seed data belongs in
+-- db/dev-seeds/0001_local_dev_seed.sql.
 --
--- Last regenerated/folded: 2026-07-16 (ROADMAP unit 4.5) -- folded db/migrations
--- 0260, 0306, 0307 and 0308 into this file:
---   - 0260: drop dead tables metaldocs.template_drafts (+ its
---     document_profiles(code) FK and indexes), metaldocs.document_template_versions_mddm
---     (+ trg_template_immutable trigger; the prevent_published_template_mutation
---     function survives, per DROP TABLE semantics), public.template_audit_log
---     (+ its index and RLS artifacts); metaldocs.documents was already absent.
---     0260's fold was pulled forward into this unit (hub ruling 2026-07-16)
---     because 0308's PK promotion requires template_drafts' single-column FK
---     on document_profiles(code) to be gone before the (code) PK can be
---     replaced by the composite PK in a from-scratch bootstrap.
---   - 0306: drop templates_template_version.pending_reviewer_role/pending_approver_role.
---   - 0307: drop dead metaldocs.grant_area_membership fn.
---   - 0308: metaldocs.document_profiles PK is (tenant_id, code) directly
---     (the promoted ux_document_profiles_tenant_code index exists only AS
---     document_profiles_pkey now -- no separate unique index); dead tables
---     document_profile_governance, document_profile_schema_versions,
---     document_sequences, document_profile_template_defaults dropped with
---     their PKs/FKs/indexes.
--- All four migration files remain in db/migrations/ (IF EXISTS / DO-block
--- guarded; verified to replay as clean no-ops against this folded shape) --
--- unlike the 2026-06-30 fold, they were NOT archived out of the replay chain.
+-- Last regenerated/folded: 2026-07-29 -- folded the entire post-baseline tail
+-- db/migrations/0257..0315 (55 files; 0261, 0280, 0289 and 0291 never existed)
+-- into this file. 0309 self-registered no schema_migrations row upstream, so
+-- the seeded ledger gains 54 rows, not 55 -- same class as 0224 in the
+-- 2026-06 fold. The file was regenerated wholesale by pg_dump --schema-only
+-- --no-owner --no-privileges from a reference database that applied
+-- prerequisites -> the previous baseline -> reference-data -> every one of
+-- those migrations in lexical order, then curated back to the conventions
+-- below (BEGIN/COMMIT wrap, session SETs stripped, extensions re-homed to
+-- db/prerequisites, CREATE SCHEMA IF NOT EXISTS). Equivalence against that
+-- reference database was proven by scripts/check-baseline-equivalence.ps1
+-- across columns, constraints, indexes, triggers, functions, extensions,
+-- tables, RLS flags, policies, views and sequences.
+--
+-- The folded migration files were archived to
+-- archive/migrations/post-baseline-2026-07-fold/ and their ledger rows seeded
+-- into db/reference-data/0001_product_reference_data.sql, so a fresh bootstrap
+-- ledger-skips them. db/migrations/ is intentionally empty (README.md only)
+-- until the next forward migration lands.
+--
+-- Privilege/role effects of the folded range (0266 audit_events REVOKE, 0284
+-- metaldocs_ci role + DML grants, 0314 outbox_events DELETE grant) are NOT
+-- carried by a --no-privileges dump; they were re-homed verbatim (guarded,
+-- idempotent form) into db/grants/0001_role_grants.sql, a new bootstrap stage
+-- applied after reference-data.
+--
+-- Prior folds retained for provenance:
+--   - 2026-07-16 (ROADMAP unit 4.5): 0260 dead-table drops, 0306
+--     templates_template_version pending_*_role drops, 0307 dead
+--     metaldocs.grant_area_membership drop, 0308 document_profiles composite
+--     (tenant_id, code) PK promotion + 4 dead profile-adjacent table drops.
+--     Those four files stayed in db/migrations/ at the time; they are part of
+--     the 2026-07-29 archive move.
+--   - 2026-06-30: migrations 0203..0256 (archived under
+--     archive/migrations/post-baseline-2026-06-fold/).
 
 BEGIN;
 
 SET check_function_bodies = false;
+
 --
 -- PostgreSQL database dump
 --
-
-
 
 
 --
@@ -41,26 +54,6 @@ SET check_function_bodies = false;
 --
 
 CREATE SCHEMA IF NOT EXISTS metaldocs;
-
-
---
---
-
-
-
---
---
-
-
-
---
---
-
-
-
---
---
-
 
 
 --
@@ -73,106 +66,6 @@ CREATE TYPE metaldocs.mddm_version_status AS ENUM (
     'released',
     'archived'
 );
-
-
---
--- Name: acquire_lease(text, text, interval); Type: FUNCTION; Schema: metaldocs; Owner: -
---
-
-CREATE FUNCTION metaldocs.acquire_lease(_job text, _leader text, _ttl interval) RETURNS TABLE(acquired boolean, epoch bigint)
-    LANGUAGE plpgsql SECURITY DEFINER
-    SET search_path TO 'metaldocs', 'pg_temp'
-    AS $$
-DECLARE
-    v_now TIMESTAMPTZ := now();
-    v_lease metaldocs.job_leases%ROWTYPE;
-BEGIN
-    SELECT *
-    INTO v_lease
-    FROM metaldocs.job_leases
-    WHERE job_name = _job
-    FOR UPDATE SKIP LOCKED;
-
-    IF NOT FOUND THEN
-        IF EXISTS (
-            SELECT 1
-            FROM metaldocs.job_leases
-            WHERE job_name = _job
-        ) THEN
-            RETURN QUERY SELECT false, -1::bigint;
-            RETURN;
-        END IF;
-
-        BEGIN
-            INSERT INTO metaldocs.job_leases (
-                job_name,
-                leader_id,
-                lease_epoch,
-                acquired_at,
-                heartbeat_at,
-                expires_at
-            )
-            VALUES (_job, _leader, 1, v_now, v_now, v_now + _ttl);
-
-            RETURN QUERY SELECT true, 1::bigint;
-            RETURN;
-        EXCEPTION
-            WHEN unique_violation THEN
-                RETURN QUERY SELECT false, -1::bigint;
-                RETURN;
-        END;
-    END IF;
-
-    IF v_lease.expires_at < v_now THEN
-        UPDATE metaldocs.job_leases
-        SET
-            leader_id = _leader,
-            lease_epoch = v_lease.lease_epoch + 1,
-            acquired_at = v_now,
-            heartbeat_at = v_now,
-            expires_at = v_now + _ttl
-        WHERE job_name = _job;
-
-        RETURN QUERY SELECT true, (v_lease.lease_epoch + 1)::bigint;
-        RETURN;
-    END IF;
-
-    IF v_lease.leader_id = _leader THEN
-        UPDATE metaldocs.job_leases
-        SET
-            heartbeat_at = v_now,
-            expires_at = v_now + _ttl
-        WHERE job_name = _job;
-
-        RETURN QUERY SELECT true, v_lease.lease_epoch;
-        RETURN;
-    END IF;
-
-    RETURN QUERY SELECT false, -1::bigint;
-END;
-$$;
-
-
---
--- Name: assert_lease_epoch(text, bigint); Type: FUNCTION; Schema: metaldocs; Owner: -
---
-
-CREATE FUNCTION metaldocs.assert_lease_epoch(_job text, _epoch bigint) RETURNS void
-    LANGUAGE plpgsql SECURITY DEFINER
-    SET search_path TO 'metaldocs', 'pg_temp'
-    AS $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-        FROM metaldocs.job_leases
-        WHERE job_name = _job
-          AND lease_epoch = _epoch
-    ) THEN
-        RAISE EXCEPTION 'ErrLeaseEpochStale: job % epoch % no longer current', _job, _epoch
-            USING ERRCODE = 'P0001';
-    END IF;
-END;
-$$;
 
 
 --
@@ -205,28 +98,6 @@ $$;
 
 
 --
--- Name: heartbeat_lease(text, text, bigint); Type: FUNCTION; Schema: metaldocs; Owner: -
---
-
-CREATE FUNCTION metaldocs.heartbeat_lease(_job text, _leader text, _epoch bigint) RETURNS boolean
-    LANGUAGE plpgsql SECURITY DEFINER
-    SET search_path TO 'metaldocs', 'pg_temp'
-    AS $$
-BEGIN
-    UPDATE metaldocs.job_leases
-    SET
-        heartbeat_at = now(),
-        expires_at = now() + interval '5 minutes'
-    WHERE job_name = _job
-      AND leader_id = _leader
-      AND lease_epoch = _epoch;
-
-    RETURN FOUND;
-END;
-$$;
-
-
---
 -- Name: prevent_published_template_mutation(); Type: FUNCTION; Schema: metaldocs; Owner: -
 --
 
@@ -238,28 +109,6 @@ BEGIN
     RAISE EXCEPTION 'Cannot modify content_blocks of a published template version (id=%)', OLD.id;
   END IF;
   RETURN NEW;
-END;
-$$;
-
-
---
--- Name: release_lease(text, text, bigint); Type: FUNCTION; Schema: metaldocs; Owner: -
---
-
-CREATE FUNCTION metaldocs.release_lease(_job text, _leader text, _epoch bigint) RETURNS void
-    LANGUAGE plpgsql SECURITY DEFINER
-    SET search_path TO 'metaldocs', 'pg_temp'
-    AS $$
-BEGIN
-    -- Mark the lease as immediately expired rather than deleting the row.
-    -- The next acquire_lease call will hit the "expired" branch and increment
-    -- the epoch, ensuring lease_epoch is strictly monotonic for the lifetime
-    -- of the job_name key.
-    UPDATE metaldocs.job_leases
-    SET expires_at = now() - interval '1 second'
-    WHERE job_name  = _job
-      AND leader_id = _leader
-      AND lease_epoch = _epoch;
 END;
 $$;
 
@@ -329,6 +178,35 @@ $_$;
 
 
 --
+-- Name: assert_route_shape(uuid, text, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.assert_route_shape(p_route_id uuid, p_class text, p_prefix text) RETURNS void
+    LANGUAGE plpgsql
+    SET search_path TO 'pg_catalog', 'pg_temp'
+    AS $$
+DECLARE
+    v_has_approval boolean;
+BEGIN
+    IF p_class = 'livre' THEN
+        RAISE EXCEPTION '%: profile is livre; no approval route is permitted (route %)',
+            p_prefix, p_route_id USING ERRCODE = 'P0001';
+    ELSIF p_class = 'controlado' THEN
+        SELECT EXISTS (
+            SELECT 1 FROM public.approval_route_stages s
+             WHERE s.route_id = p_route_id AND s.stage_kind = 'approval'
+        ) INTO v_has_approval;
+        IF NOT v_has_approval THEN
+            RAISE EXCEPTION '%: profile is controlado; route % must contain at least one approval-kind stage',
+                p_prefix, p_route_id USING ERRCODE = 'P0001';
+        END IF;
+    END IF;
+    -- simples (and any unexpected value): no route-shape constraint.
+END;
+$$;
+
+
+--
 -- Name: check_document_tenant_consistency(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -360,6 +238,66 @@ $$;
 
 
 --
+-- Name: default_approval_subject(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.default_approval_subject() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'pg_catalog', 'pg_temp'
+    AS $$
+BEGIN
+    IF TG_TABLE_NAME = 'approval_routes' THEN
+        IF NEW.subject_kind IS NULL THEN
+            NEW.subject_kind := 'document';
+        END IF;
+        IF NEW.subject_key IS NULL THEN
+            NEW.subject_key := NEW.profile_code;
+        END IF;
+    ELSIF TG_TABLE_NAME = 'approval_instances' THEN
+        IF NEW.subject_kind IS NULL THEN
+            NEW.subject_kind := 'document';
+        END IF;
+        IF NEW.subject_key IS NULL THEN
+            NEW.subject_key := NEW.document_id::text;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: enforce_approval_sod(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_approval_sod() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'pg_catalog', 'pg_temp'
+    AS $$
+DECLARE
+  author_id TEXT;
+BEGIN
+  SELECT d.created_by INTO author_id
+    FROM public.approval_instances i
+    JOIN public.documents d ON d.id = i.document_id
+   WHERE i.id = NEW.approval_instance_id;
+
+  IF NEW.actor_user_id = author_id THEN
+    RAISE EXCEPTION 'SoD: author cannot sign own revision'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF NEW.on_behalf_of_user_id IS NOT NULL AND NEW.on_behalf_of_user_id = author_id THEN
+    RAISE EXCEPTION 'SoD: delegate cannot act on behalf of the document author'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: enforce_capability_asserted(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -375,50 +313,127 @@ DECLARE
   v_tenant_id     UUID;
   v_cap_found     BOOLEAN := FALSE;
   v_element       JSONB;
+  v_parent_subject_kind TEXT;
 BEGIN
   CASE
     WHEN TG_TABLE_NAME = 'approval_instances' AND TG_OP = 'INSERT' THEN
-      v_required_caps := ARRAY['document.submit'];
-      v_tenant_id     := NEW.tenant_id;
+      -- 0299 (ADR 0083): approval_instances is a shared (subject_kind,
+      -- subject_key) kernel table (ADR 0082); the required capability is
+      -- subject-discriminated so a flat match-one arm cannot express
+      -- "document rows require document.submit; template rows require
+      -- template.submit" without a cross-subject security regression
+      -- (ADR 0083 "why the obvious widen is a security regression").
+      -- Nested CASE on NEW.subject_kind; the two subjects' capability
+      -- sets are never unioned.
+      CASE NEW.subject_kind
+        WHEN 'document' THEN
+          v_required_caps := ARRAY['document.submit'];
+        WHEN 'template' THEN
+          v_required_caps := ARRAY['template.submit'];
+        ELSE
+          RAISE EXCEPTION 'ErrCapabilityNotAsserted: no capability mapping for approval_instances subject_kind %, op %; enforce_capability_asserted has no discriminated arm for this subject', NEW.subject_kind, TG_OP
+            USING ERRCODE = 'P0001';
+      END CASE;
+      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);
     WHEN TG_TABLE_NAME = 'approval_signoffs' AND TG_OP = 'INSERT' THEN
-      v_required_caps := ARRAY['document.signoff'];
+      -- 0300 (ADR 0083 follow-on, M3 P3.S2b-3b-iii-a): approval_signoffs has
+      -- no direct subject_kind column of its own; the subject is resolved
+      -- via the parent approval_instances row (NEW.approval_instance_id).
+      -- Nested CASE on the looked-up parent subject_kind; the two
+      -- subjects' capability sets are never unioned.
+      SELECT subject_kind INTO v_parent_subject_kind FROM public.approval_instances WHERE id = NEW.approval_instance_id;
+      CASE v_parent_subject_kind
+        WHEN 'document' THEN
+          v_required_caps := ARRAY['document.signoff'];
+        WHEN 'template' THEN
+          v_required_caps := ARRAY['template.approve'];
+        ELSE
+          RAISE EXCEPTION 'ErrCapabilityNotAsserted: no capability mapping for approval_signoffs parent subject_kind %, op %; enforce_capability_asserted has no discriminated arm for this parent subject (parent lookup via % = NEW.%)', v_parent_subject_kind, TG_OP, 'approval_instances', 'approval_instance_id'
+            USING ERRCODE = 'P0001';
+      END CASE;
       v_tenant_id     := NEW.actor_tenant_id;
     WHEN TG_TABLE_NAME = 'iam_user_roles' THEN
       v_required_caps := ARRAY['user.manage'];
-      v_tenant_id     := NEW.tenant_id;
+      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);
     WHEN TG_TABLE_NAME = 'user_process_areas' THEN
       v_required_caps := ARRAY['membership.manage'];
-      v_tenant_id     := NEW.tenant_id;
+      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);
     WHEN TG_TABLE_NAME = 'documents' AND TG_OP = 'INSERT' THEN
       v_required_caps := ARRAY['document.create'];
-      v_tenant_id     := NEW.tenant_id;
+      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);
     WHEN TG_TABLE_NAME = 'documents' AND TG_OP = 'UPDATE' THEN
-      v_required_caps := ARRAY['document.edit'];
-      v_tenant_id     := NEW.tenant_id;
+      -- 0271: 'document.obsolete' and 'membership.manage' added — two
+      -- function-local write-paths assert only one of these caps (no
+      -- co-asserted document.edit) and were fail-closed P0001 for every
+      -- actor: ForceReleaseSession/ForceReleaseSessionTx
+      -- (documents/repository/repository.go:798,828) and MarkObsolete
+      -- (documents/approval/application/obsolete_service.go:88->93).
+      -- 0275 (M6 F6.2): 'document.review' added — the mark-reviewed
+      -- workflow asserts only document.review then UPDATEs documents
+      -- (last_reviewed_at + review_due_at); see file header.
+      v_required_caps := ARRAY['document.edit', 'document.obsolete', 'membership.manage', 'document.review'];
+      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);
     WHEN TG_TABLE_NAME = 'controlled_documents' AND TG_OP = 'INSERT' THEN
       v_required_caps := ARRAY['controlled_documents.create'];
-      v_tenant_id     := NEW.tenant_id;
+      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);
     WHEN TG_TABLE_NAME = 'controlled_documents' AND TG_OP = 'UPDATE' THEN
       v_required_caps := ARRAY['controlled_documents.obsolete', 'controlled_documents.supersede'];
-      v_tenant_id     := NEW.tenant_id;
+      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);
     WHEN TG_TABLE_NAME = 'cd_sequence_counters' THEN
       v_required_caps := ARRAY['controlled_documents.create'];
-      v_tenant_id     := NEW.tenant_id;
+      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);
     WHEN TG_TABLE_NAME = 'document_profiles' THEN
       v_required_caps := ARRAY['taxonomy.manage'];
-      v_tenant_id     := NEW.tenant_id;
+      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);
     WHEN TG_TABLE_NAME = 'document_process_areas' THEN
       v_required_caps := ARRAY['taxonomy.manage'];
-      v_tenant_id     := NEW.tenant_id;
+      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);
     WHEN TG_TABLE_NAME = 'document_families' THEN
       v_required_caps := ARRAY['taxonomy.manage'];
-      v_tenant_id     := NULL;
+      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);
     WHEN TG_TABLE_NAME = 'templates_template' THEN
-      v_required_caps := ARRAY['template.create', 'template.edit', 'template.submit', 'template.approve', 'template.publish'];
-      v_tenant_id     := NEW.tenant_id;
+      -- 0270: 'template.archive' added — Service.ArchiveTemplate updates this
+      -- table under CapTemplateArchive; see file header.
+      v_required_caps := ARRAY['template.create', 'template.edit', 'template.submit', 'template.approve', 'template.publish', 'template.archive'];
+      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);
     WHEN TG_TABLE_NAME = 'templates_template_version' THEN
+      -- 0269: 'template.review' added — the reviewer stage (Service.Review)
+      -- writes this table under CapTemplateReview; see file header.
+      -- 0301 (ADR 0082 phase c, unit 3.1a S5): 'template.review' removed —
+      -- the legacy reviewer stage was deleted and the capability retired;
+      -- see file header.
       v_required_caps := ARRAY['template.create', 'template.edit', 'template.submit', 'template.approve', 'template.publish'];
-      v_tenant_id     := NEW.tenant_id;
+      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);
+    -- ── New branches (SEC-05 / T-004 residual) ──────────────────────────────
+    WHEN TG_TABLE_NAME = 'iam_users' THEN
+      v_required_caps := ARRAY['user.manage'];
+      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);
+    WHEN TG_TABLE_NAME = 'iam_groups' THEN
+      v_required_caps := ARRAY['user.manage'];
+      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);
+    WHEN TG_TABLE_NAME = 'iam_group_members' THEN
+      v_required_caps := ARRAY['user.manage'];
+      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);
+    WHEN TG_TABLE_NAME = 'iam_group_roles' THEN
+      v_required_caps := ARRAY['user.manage'];
+      -- iam_group_roles has no tenant_id column (scoped transitively via
+      -- group_id -> iam_groups.tenant_id); mirrors the document_families
+      -- (pre-0258) / templates_v2_template_version (0188) precedent for
+      -- tenant_id-less tables.
+      v_tenant_id     := NULL;
+    WHEN TG_TABLE_NAME = 'tenants' AND TG_OP = 'INSERT' THEN
+      -- 0277 (M7 F7.2, ADR 0070): tenant onboarding — OnboardTenant asserts
+      -- tenant.onboard then INSERTs metaldocs.tenants. tenants has no
+      -- tenant_id column: NEW.id IS the tenant id (the row being
+      -- provisioned is the tenant itself).
+      v_required_caps := ARRAY['tenant.onboard'];
+      v_tenant_id     := NEW.id;
+    WHEN TG_TABLE_NAME = 'tenant_lifecycle_jobs' AND TG_OP = 'INSERT' THEN
+      -- 0279 (M7 F7.3, ADR 0070): the export/erase handlers each assert
+      -- exactly one of tenant.export / tenant.erase then INSERT
+      -- metaldocs.tenant_lifecycle_jobs (kind discriminates which).
+      v_required_caps := ARRAY['tenant.export', 'tenant.erase'];
+      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);
     ELSE
       -- Fail-closed: a table carrying this trigger with no capability mapping is a
       -- wiring error, not a license to pass through. Refuse the write loudly.
@@ -437,7 +452,7 @@ BEGIN
           'authz.bypass_used',
           'system:scheduler',
           TG_TABLE_NAME,
-          COALESCE(NEW.id::TEXT, 'unknown'),
+          COALESCE(NEW.id::TEXT, OLD.id::TEXT, 'unknown'),
           'scheduler bypass for ' || v_required_caps[1],
           pg_catalog.to_jsonb(jsonb_build_object(
             'required_caps', to_jsonb(v_required_caps),
@@ -449,6 +464,12 @@ BEGIN
       EXCEPTION WHEN others THEN
         RAISE NOTICE 'enforce_capability_asserted: governance_events insert failed: %', SQLERRM;
       END;
+      -- BEFORE-trigger return contract: returning NEW on a DELETE returns
+      -- NULL (NEW is unassigned for DELETE), which SILENTLY CANCELS the
+      -- row deletion. 0283 root-cause fix: return OLD for DELETE.
+      IF TG_OP = 'DELETE' THEN
+        RETURN OLD;
+      END IF;
       RETURN NEW;
     ELSE
       RAISE EXCEPTION 'ErrCapabilityNotAsserted: unrecognised bypass token; caps % required on %', v_required_caps, TG_TABLE_NAME
@@ -486,6 +507,10 @@ BEGIN
       USING ERRCODE = 'P0001';
   END IF;
 
+  -- Same BEFORE-trigger return contract as the bypass path above (0283).
+  IF TG_OP = 'DELETE' THEN
+    RETURN OLD;
+  END IF;
   RETURN NEW;
 END;
 $$;
@@ -517,13 +542,13 @@ BEGIN
     IF NOT (
       -- Spec 2 graph
       (OLD.status = 'draft'        AND NEW.status =  'under_review') OR
-      (OLD.status = 'under_review' AND NEW.status IN ('approved','rejected')) OR
-      (OLD.status = 'rejected'     AND NEW.status =  'draft') OR
+      (OLD.status = 'under_review' AND NEW.status =  'approved') OR
       (OLD.status = 'approved'     AND NEW.status IN ('published','scheduled','draft')) OR
       (OLD.status = 'scheduled'    AND NEW.status IN ('published','draft')) OR
       (OLD.status = 'published'    AND NEW.status IN ('superseded','obsolete')) OR
       (OLD.status = 'superseded'   AND NEW.status =  'obsolete')
       -- Note: compat window (draft→finalized, finalized→archived) removed by 0142_disable_legacy_compat.sql
+      -- Note: 'rejected' arcs (under_review→rejected, rejected→draft) removed by 0272_documents_remove_rejected.sql
     ) THEN
       RAISE EXCEPTION 'illegal status transition % -> %', OLD.status, NEW.status
         USING ERRCODE = 'check_violation';
@@ -560,6 +585,90 @@ $$;
 
 
 --
+-- Name: enforce_profile_route_policy(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_profile_route_policy() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'pg_catalog', 'pg_temp'
+    AS $$
+DECLARE
+    v_route_id  uuid;
+    v_tenant_id uuid;
+    v_profile   text;
+    v_active    boolean;
+    v_class     text;
+BEGIN
+    IF TG_TABLE_NAME = 'approval_route_stages' THEN
+        -- Direction A: a stage write. Re-validate the affected route.
+        IF TG_OP = 'DELETE' THEN
+            v_route_id := OLD.route_id;
+        ELSE
+            v_route_id := NEW.route_id;
+        END IF;
+
+        SELECT r.tenant_id, r.profile_code, r.active
+          INTO v_tenant_id, v_profile, v_active
+          FROM public.approval_routes r
+         WHERE r.id = v_route_id;
+        IF NOT FOUND OR NOT v_active THEN
+            RETURN NULL; -- route removed or inactive: nothing to enforce.
+        END IF;
+
+        SELECT p.governance_class INTO v_class
+          FROM metaldocs.document_profiles p
+         WHERE p.tenant_id = v_tenant_id AND p.code = v_profile;
+        IF NOT FOUND THEN
+            RETURN NULL; -- FK should prevent this; be lenient.
+        END IF;
+
+        PERFORM public.assert_route_shape(v_route_id, v_class, 'ErrRouteViolatesProfilePolicy');
+        RETURN NULL;
+
+    ELSIF TG_TABLE_NAME = 'approval_routes' THEN
+        -- Direction A' (route row): an insert or activation. Validate the route
+        -- shape whenever the committed row is active. Covers the zero-stage and
+        -- activate-later paths the stage trigger cannot see.
+        IF TG_OP = 'DELETE' THEN
+            RETURN NULL; -- route removed: nothing to enforce.
+        END IF;
+        IF NOT NEW.active THEN
+            RETURN NULL; -- inactive route: no shape constraint.
+        END IF;
+
+        SELECT p.governance_class INTO v_class
+          FROM metaldocs.document_profiles p
+         WHERE p.tenant_id = NEW.tenant_id AND p.code = NEW.profile_code;
+        IF NOT FOUND THEN
+            RETURN NULL; -- FK should prevent this; be lenient.
+        END IF;
+
+        PERFORM public.assert_route_shape(NEW.id, v_class, 'ErrRouteViolatesProfilePolicy');
+        RETURN NULL;
+
+    ELSIF TG_TABLE_NAME = 'document_profiles' THEN
+        -- Direction B: reclassification guard. Only when the class changed.
+        IF NEW.governance_class IS NOT DISTINCT FROM OLD.governance_class THEN
+            RETURN NULL;
+        END IF;
+        FOR v_route_id IN
+            SELECT r.id
+              FROM public.approval_routes r
+             WHERE r.tenant_id = NEW.tenant_id
+               AND r.profile_code = NEW.code
+               AND r.active
+        LOOP
+            PERFORM public.assert_route_shape(v_route_id, NEW.governance_class, 'ErrClassChangeRouteConflict');
+        END LOOP;
+        RETURN NULL;
+    END IF;
+
+    RETURN NULL;
+END;
+$$;
+
+
+--
 -- Name: enforce_revision_version_monotonic(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -587,15 +696,31 @@ CREATE FUNCTION public.enforce_route_immutable() RETURNS trigger
     SET search_path TO 'pg_catalog', 'pg_temp'
     AS $$
 BEGIN
-  IF EXISTS (
-    SELECT 1
-      FROM public.approval_instances
-     WHERE route_id = OLD.id
-  ) THEN
-    RAISE EXCEPTION 'ErrRouteInUse: route % is referenced by one or more approval instances and cannot be modified', OLD.id
-      USING ERRCODE = 'P0001';
-  END IF;
-  RETURN NEW; -- for UPDATE; DELETE triggers ignore return value
+    -- Always allow an UPDATE that touches only active/superseded_at (or neither,
+    -- e.g. a no-op UPDATE) — this is the supersede step that retires a row.
+    IF NEW.name IS NOT DISTINCT FROM OLD.name
+       AND NEW.profile_code IS NOT DISTINCT FROM OLD.profile_code
+       AND NEW.version IS NOT DISTINCT FROM OLD.version
+       AND NEW.tenant_id IS NOT DISTINCT FROM OLD.tenant_id
+       AND NEW.created_at IS NOT DISTINCT FROM OLD.created_at
+       AND NEW.created_by IS NOT DISTINCT FROM OLD.created_by
+    THEN
+        RETURN NEW;
+    END IF;
+
+    -- Any other column change (definition columns) is blocked once the row is
+    -- in use by an instance OR already inactive (a historical/superseded row
+    -- must never be edited).
+    IF NOT OLD.active OR EXISTS (
+        SELECT 1
+          FROM public.approval_instances
+         WHERE route_id = OLD.id
+    ) THEN
+        RAISE EXCEPTION 'ErrRouteInUse: route % is referenced by one or more approval instances (or is already inactive) and cannot be modified', OLD.id
+            USING ERRCODE = 'P0001';
+    END IF;
+
+    RETURN NEW;
 END;
 $$;
 
@@ -832,12 +957,13 @@ CREATE FUNCTION public.reject_user_process_areas_delete() RETURNS trigger
     SET search_path TO 'pg_catalog', 'pg_temp'
     AS $$
 BEGIN
+  IF NULLIF(current_setting('metaldocs.tenant_erasure', true), '') IS NOT NULL THEN
+    RETURN OLD;
+  END IF;
   RAISE EXCEPTION 'user_process_areas rows cannot be deleted (revoke via UPDATE effective_to)'
     USING ERRCODE = 'check_violation';
 END;
 $$;
-
-
 
 
 --
@@ -856,7 +982,10 @@ CREATE TABLE metaldocs.audit_events (
     tenant_id text DEFAULT ''::text NOT NULL,
     audit_sequence bigint NOT NULL,
     prev_hash text DEFAULT ''::text NOT NULL,
-    row_hash text DEFAULT ''::text NOT NULL
+    row_hash text DEFAULT ''::text NOT NULL,
+    CONSTRAINT audit_events_payload_size_cap CHECK ((octet_length((payload)::text) <= 65536)),
+    CONSTRAINT audit_events_prev_hash_shape CHECK (((prev_hash = ''::text) OR (prev_hash ~ '^[0-9a-f]{64}$'::text))),
+    CONSTRAINT audit_events_row_hash_shape CHECK (((row_hash = ''::text) OR (row_hash ~ '^[0-9a-f]{64}$'::text)))
 );
 
 ALTER TABLE ONLY metaldocs.audit_events FORCE ROW LEVEL SECURITY;
@@ -972,8 +1101,11 @@ CREATE TABLE metaldocs.document_families (
     name text NOT NULL,
     description text DEFAULT ''::text NOT NULL,
     is_active boolean DEFAULT true NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    tenant_id uuid DEFAULT 'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid NOT NULL
 );
+
+ALTER TABLE ONLY metaldocs.document_families FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -1030,7 +1162,9 @@ CREATE TABLE metaldocs.document_profiles (
     owner_user_id text,
     editable_by_role text DEFAULT 'admin'::text NOT NULL,
     archived_at timestamp with time zone,
+    governance_class text DEFAULT 'controlado'::text NOT NULL,
     CONSTRAINT chk_document_profiles_alias_length CHECK (((char_length(alias) >= 1) AND (char_length(alias) <= 24))),
+    CONSTRAINT document_profiles_governance_class_check CHECK ((governance_class = ANY (ARRAY['controlado'::text, 'simples'::text, 'livre'::text]))),
     CONSTRAINT document_profiles_review_interval_days_check CHECK ((review_interval_days > 0)),
     CONSTRAINT profile_code_format CHECK ((code ~ '^[a-z][a-z0-9_-]{1,63}$'::text))
 );
@@ -1223,20 +1357,6 @@ ALTER TABLE ONLY metaldocs.idempotency_keys FORCE ROW LEVEL SECURITY;
 
 
 --
--- Name: job_leases; Type: TABLE; Schema: metaldocs; Owner: -
---
-
-CREATE TABLE metaldocs.job_leases (
-    job_name text NOT NULL,
-    leader_id text NOT NULL,
-    lease_epoch bigint DEFAULT 0 NOT NULL,
-    acquired_at timestamp with time zone DEFAULT now() NOT NULL,
-    heartbeat_at timestamp with time zone DEFAULT now() NOT NULL,
-    expires_at timestamp with time zone NOT NULL
-);
-
-
---
 -- Name: materialize_dispatch_outbox; Type: TABLE; Schema: metaldocs; Owner: -
 --
 
@@ -1244,7 +1364,7 @@ CREATE TABLE metaldocs.materialize_dispatch_outbox (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     tenant_id uuid NOT NULL,
     revision_id uuid NOT NULL,
-    content_hash bytea NOT NULL,
+    values_hash bytea NOT NULL,
     status text DEFAULT 'pending'::text NOT NULL,
     attempts integer DEFAULT 0 NOT NULL,
     last_error text,
@@ -1253,6 +1373,7 @@ CREATE TABLE metaldocs.materialize_dispatch_outbox (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     dispatched_at timestamp with time zone,
     dead_lettered_at timestamp with time zone,
+    release_generation_id uuid,
     CONSTRAINT materialize_dispatch_outbox_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'dispatched'::text, 'failed'::text])))
 );
 
@@ -1360,7 +1481,7 @@ CREATE TABLE metaldocs.pdf_dispatch_outbox (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     tenant_id uuid NOT NULL,
     revision_id uuid NOT NULL,
-    content_hash bytea NOT NULL,
+    frozen_docx_hash bytea NOT NULL,
     status text DEFAULT 'pending'::text NOT NULL,
     attempts integer DEFAULT 0 NOT NULL,
     last_error text,
@@ -1369,6 +1490,8 @@ CREATE TABLE metaldocs.pdf_dispatch_outbox (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     dispatched_at timestamp with time zone,
     dead_lettered_at timestamp with time zone,
+    final_docx_s3_key text,
+    release_generation_id uuid,
     CONSTRAINT pdf_dispatch_outbox_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'dispatched'::text, 'failed'::text])))
 );
 
@@ -1387,6 +1510,41 @@ CREATE TABLE metaldocs.role_capabilities (
     CONSTRAINT ck_cap_format CHECK ((capability ~ '^[a-z][a-z0-9._]*[a-z0-9]$'::text)),
     CONSTRAINT ck_cap_not_legacy CHECK ((capability <> ALL (ARRAY['document.finalize'::text, 'document.archive'::text])))
 );
+
+
+--
+-- Name: tenant_keys; Type: TABLE; Schema: metaldocs; Owner: -
+--
+
+CREATE TABLE metaldocs.tenant_keys (
+    tenant_id uuid NOT NULL,
+    wrapped_dek bytea NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    destroyed_at timestamp with time zone
+);
+
+ALTER TABLE ONLY metaldocs.tenant_keys FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: tenant_lifecycle_jobs; Type: TABLE; Schema: metaldocs; Owner: -
+--
+
+CREATE TABLE metaldocs.tenant_lifecycle_jobs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    tenant_id uuid NOT NULL,
+    kind text NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    requested_by text NOT NULL,
+    object_key text,
+    error text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    completed_at timestamp with time zone,
+    CONSTRAINT tenant_lifecycle_jobs_kind_check CHECK ((kind = ANY (ARRAY['export'::text, 'erase'::text]))),
+    CONSTRAINT tenant_lifecycle_jobs_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'running'::text, 'ready'::text, 'failed'::text])))
+);
+
+ALTER TABLE ONLY metaldocs.tenant_lifecycle_jobs FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -1455,6 +1613,7 @@ CREATE TABLE metaldocs.tenants (
     slug text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    erased_at timestamp with time zone,
     CONSTRAINT tenants_name_not_blank CHECK ((length(btrim(name)) > 0)),
     CONSTRAINT tenants_slug_not_blank CHECK ((length(btrim(slug)) > 0))
 );
@@ -1744,6 +1903,18 @@ CREATE TABLE public.documents (
     revision_title text,
     schedule_generation bigint DEFAULT 0 NOT NULL,
     superseded_document_id uuid,
+    review_due_at timestamp with time zone,
+    last_reviewed_at timestamp with time zone,
+    reason_for_change text,
+    reason_category text,
+    review_surfaced_at timestamp with time zone,
+    planned_effective_from timestamp with time zone,
+    frozen_revision_id uuid,
+    CONSTRAINT ck_documents_effective_window CHECK (((effective_to IS NULL) OR (effective_from IS NULL) OR (effective_to > effective_from))),
+    CONSTRAINT ck_documents_published_effective_from CHECK (((status <> 'published'::text) OR (effective_from IS NOT NULL))),
+    CONSTRAINT ck_documents_reason_category CHECK (((reason_category IS NULL) OR (reason_category = ANY (ARRAY['content'::text, 'corrective'::text, 'regulatory'::text, 'periodic_review'::text, 'administrative'::text])))),
+    CONSTRAINT ck_documents_review_due_sane CHECK (((review_due_at IS NULL) OR (effective_from IS NULL) OR (review_due_at >= effective_from))),
+    CONSTRAINT ck_documents_scheduled_planned_effective_from CHECK (((status <> 'scheduled'::text) OR ((planned_effective_from IS NOT NULL) AND (effective_from IS NULL)))),
     CONSTRAINT documents_body_docx_hash_len CHECK (((body_docx_hash IS NULL) OR (octet_length(body_docx_hash) = 32))),
     CONSTRAINT documents_composition_config_hash_len CHECK (((composition_config_hash IS NULL) OR (octet_length(composition_config_hash) = 32))),
     CONSTRAINT documents_content_hash_len CHECK (((content_hash IS NULL) OR (octet_length(content_hash) = 32))),
@@ -1751,7 +1922,7 @@ CREATE TABLE public.documents (
     CONSTRAINT documents_pdf_hash_len CHECK (((pdf_hash IS NULL) OR (octet_length(pdf_hash) = 32))),
     CONSTRAINT documents_placeholder_schema_hash_len CHECK (((placeholder_schema_hash IS NULL) OR (octet_length(placeholder_schema_hash) = 32))),
     CONSTRAINT documents_reconstruction_attempts_is_array CHECK ((jsonb_typeof(reconstruction_attempts) = 'array'::text)),
-    CONSTRAINT documents_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'finalized'::text, 'archived'::text, 'under_review'::text, 'approved'::text, 'rejected'::text, 'scheduled'::text, 'published'::text, 'superseded'::text, 'obsolete'::text]))),
+    CONSTRAINT documents_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'under_review'::text, 'approved'::text, 'scheduled'::text, 'published'::text, 'superseded'::text, 'obsolete'::text, 'archived'::text]))),
     CONSTRAINT documents_values_hash_len CHECK (((values_hash IS NULL) OR (octet_length(values_hash) = 32)))
 );
 
@@ -1759,10 +1930,31 @@ ALTER TABLE ONLY public.documents FORCE ROW LEVEL SECURITY;
 
 
 --
+-- Name: COLUMN documents.effective_from; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.documents.effective_from IS 'ADR 0085: ACTUAL effective timestamp, written by the winning release transaction at coordinator-evaluation time and never cleared. NULL while the document is not yet released (scheduled rows carry their plan in planned_effective_from).';
+
+
+--
 -- Name: COLUMN documents.schedule_generation; Type: COMMENT; Schema: public; Owner: -
 --
 
 COMMENT ON COLUMN public.documents.schedule_generation IS 'Monotonic generation used to invalidate stale scheduled publish jobs after reschedule or cancel.';
+
+
+--
+-- Name: COLUMN documents.planned_effective_from; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.documents.planned_effective_from IS 'ADR 0085: immutable PLAN date declared in the publication plan at submission (NULL = effective on release). Never mutated by release; the actual release timestamp is effective_from.';
+
+
+--
+-- Name: COLUMN documents.frozen_revision_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.documents.frozen_revision_id IS 'document_revisions.id pinned at freeze time (ADR 0015 Pin phase). Materialize renders THIS revision, not current_revision_id, and verifies the fetched bytes against its document_revisions.content_hash. NULL means no pin was recorded (pre-0313 freezes) and materialization fails closed.';
 
 
 --
@@ -1813,13 +2005,34 @@ COMMENT ON VIEW metaldocs.v_process_area_name IS 'Published taxonomy per-area hu
 
 
 --
+-- Name: approval_delegations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.approval_delegations (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    tenant_id uuid NOT NULL,
+    delegator_id text NOT NULL,
+    delegate_id text NOT NULL,
+    starts_at timestamp with time zone NOT NULL,
+    ends_at timestamp with time zone NOT NULL,
+    reason text NOT NULL,
+    created_by text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT approval_delegations_no_self CHECK ((delegator_id <> delegate_id)),
+    CONSTRAINT approval_delegations_window_chk CHECK ((ends_at > starts_at))
+);
+
+ALTER TABLE ONLY public.approval_delegations FORCE ROW LEVEL SECURITY;
+
+
+--
 -- Name: approval_instances; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.approval_instances (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     tenant_id uuid NOT NULL,
-    document_id uuid NOT NULL,
+    document_id uuid,
     route_id uuid NOT NULL,
     route_version_snapshot integer NOT NULL,
     status text NOT NULL,
@@ -1828,10 +2041,58 @@ CREATE TABLE public.approval_instances (
     completed_at timestamp with time zone,
     content_hash_at_submit text NOT NULL,
     idempotency_key text NOT NULL,
-    CONSTRAINT approval_instances_status_check CHECK ((status = ANY (ARRAY['in_progress'::text, 'approved'::text, 'rejected'::text, 'cancelled'::text])))
+    frozen_content_hash text,
+    cancel_reason text,
+    subject_kind text NOT NULL,
+    subject_key text NOT NULL,
+    CONSTRAINT approval_instances_document_subject_projection_check CHECK (((subject_kind <> 'document'::text) OR (document_id IS NOT NULL))),
+    CONSTRAINT approval_instances_frozen_content_hash_check CHECK (((frozen_content_hash IS NULL) OR (frozen_content_hash ~ '^[0-9a-f]{64}$'::text))),
+    CONSTRAINT approval_instances_status_check CHECK ((status = ANY (ARRAY['in_progress'::text, 'approved'::text, 'rejected'::text, 'cancelled'::text, 'changes_requested'::text]))),
+    CONSTRAINT approval_instances_subject_kind_check CHECK ((subject_kind = ANY (ARRAY['document'::text, 'template'::text]))),
+    CONSTRAINT approval_instances_template_subject_projection_check CHECK (((subject_kind <> 'template'::text) OR (document_id IS NULL)))
 );
 
 ALTER TABLE ONLY public.approval_instances FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: approval_review_verdicts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.approval_review_verdicts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    approval_instance_id uuid NOT NULL,
+    stage_instance_id uuid NOT NULL,
+    actor_user_id text NOT NULL,
+    actor_tenant_id uuid NOT NULL,
+    verdict text NOT NULL,
+    comment text,
+    verdict_at timestamp with time zone DEFAULT now() NOT NULL,
+    actor_display_name_snapshot text NOT NULL,
+    on_behalf_of_user_id text,
+    CONSTRAINT approval_review_verdicts_display_name_nonempty CHECK ((actor_display_name_snapshot <> ''::text)),
+    CONSTRAINT approval_review_verdicts_verdict_check CHECK ((verdict = ANY (ARRAY['ready'::text, 'request_changes'::text])))
+);
+
+ALTER TABLE ONLY public.approval_review_verdicts FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: approval_route_stage_selectors; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.approval_route_stage_selectors (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    tenant_id uuid NOT NULL,
+    route_stage_id uuid NOT NULL,
+    selector_order integer NOT NULL,
+    kind text NOT NULL,
+    user_id text,
+    role text,
+    area_code text,
+    CONSTRAINT approval_route_stage_selectors_fields_consistent CHECK ((((kind = 'named_user'::text) AND (user_id IS NOT NULL) AND (role IS NULL) AND (area_code IS NULL)) OR ((kind = 'role_in_fixed_area'::text) AND (role IS NOT NULL) AND (area_code IS NOT NULL) AND (user_id IS NULL)) OR ((kind = 'role_in_document_area'::text) AND (role IS NOT NULL) AND (area_code IS NULL) AND (user_id IS NULL)) OR ((kind = 'submit_choice'::text) AND (role IS NOT NULL) AND (area_code IS NOT NULL) AND (user_id IS NULL)))),
+    CONSTRAINT approval_route_stage_selectors_kind_check CHECK ((kind = ANY (ARRAY['named_user'::text, 'role_in_fixed_area'::text, 'role_in_document_area'::text, 'submit_choice'::text])))
+);
 
 
 --
@@ -1843,15 +2104,17 @@ CREATE TABLE public.approval_route_stages (
     route_id uuid NOT NULL,
     stage_order integer NOT NULL,
     name text NOT NULL,
-    required_role text NOT NULL,
     required_capability text NOT NULL,
-    area_code text NOT NULL,
     quorum text NOT NULL,
     quorum_m integer,
     on_eligibility_drift text NOT NULL,
+    stage_kind text DEFAULT 'approval'::text NOT NULL,
+    due_in_days integer,
+    CONSTRAINT approval_route_stages_due_in_days_check CHECK (((due_in_days IS NULL) OR (due_in_days > 0))),
     CONSTRAINT approval_route_stages_on_eligibility_drift_check CHECK ((on_eligibility_drift = ANY (ARRAY['reduce_quorum'::text, 'fail_stage'::text, 'keep_snapshot'::text]))),
     CONSTRAINT approval_route_stages_quorum_check CHECK ((quorum = ANY (ARRAY['any_1_of'::text, 'all_of'::text, 'm_of_n'::text]))),
     CONSTRAINT approval_route_stages_quorum_m_consistent CHECK ((((quorum = 'm_of_n'::text) AND (quorum_m IS NOT NULL) AND (quorum_m >= 1)) OR ((quorum <> 'm_of_n'::text) AND (quorum_m IS NULL)))),
+    CONSTRAINT approval_route_stages_stage_kind_check CHECK ((stage_kind = ANY (ARRAY['review'::text, 'approval'::text]))),
     CONSTRAINT approval_route_stages_stage_order_check CHECK ((stage_order >= 1))
 );
 
@@ -1863,12 +2126,19 @@ CREATE TABLE public.approval_route_stages (
 CREATE TABLE public.approval_routes (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     tenant_id uuid NOT NULL,
-    profile_code text NOT NULL,
+    profile_code text,
     name text NOT NULL,
     version integer DEFAULT 1 NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     created_by text NOT NULL,
-    active boolean DEFAULT true NOT NULL
+    active boolean DEFAULT true NOT NULL,
+    superseded_at timestamp with time zone,
+    subject_kind text NOT NULL,
+    subject_key text NOT NULL,
+    CONSTRAINT approval_routes_document_subject_key_alias_check CHECK (((subject_kind <> 'document'::text) OR (subject_key = profile_code))),
+    CONSTRAINT approval_routes_document_subject_projection_check CHECK (((subject_kind <> 'document'::text) OR (profile_code IS NOT NULL))),
+    CONSTRAINT approval_routes_subject_kind_check CHECK ((subject_kind = ANY (ARRAY['document'::text, 'template'::text]))),
+    CONSTRAINT approval_routes_template_subject_key_check CHECK (((subject_kind <> 'template'::text) OR ((profile_code IS NOT NULL) AND (profile_code = subject_key))))
 );
 
 ALTER TABLE ONLY public.approval_routes FORCE ROW LEVEL SECURITY;
@@ -1890,9 +2160,15 @@ CREATE TABLE public.approval_signoffs (
     signature_method text NOT NULL,
     signature_payload jsonb NOT NULL,
     content_hash text NOT NULL,
-    actor_display_name_snapshot text,
-    CONSTRAINT approval_signoffs_decision_check CHECK ((decision = ANY (ARRAY['approve'::text, 'reject'::text])))
+    actor_display_name_snapshot text NOT NULL,
+    signature_meaning text DEFAULT 'approval'::text NOT NULL,
+    on_behalf_of_user_id text,
+    CONSTRAINT approval_signoffs_decision_check CHECK ((decision = ANY (ARRAY['approve'::text, 'reject'::text]))),
+    CONSTRAINT approval_signoffs_display_name_nonempty CHECK ((actor_display_name_snapshot <> ''::text)),
+    CONSTRAINT approval_signoffs_signature_meaning_check CHECK ((signature_meaning = ANY (ARRAY['approval'::text, 'rejection'::text])))
 );
+
+ALTER TABLE ONLY public.approval_signoffs FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -1916,8 +2192,15 @@ CREATE TABLE public.approval_stage_instances (
     opened_at timestamp with time zone,
     completed_at timestamp with time zone,
     skip_reason text,
+    stage_kind text DEFAULT 'approval'::text NOT NULL,
+    due_at timestamp with time zone,
+    due_in_days_snapshot integer,
+    sla_surfaced_at timestamp with time zone,
+    selectors_snapshot jsonb DEFAULT '[]'::jsonb NOT NULL,
+    CONSTRAINT approval_stage_instances_due_in_days_snapshot_check CHECK (((due_in_days_snapshot IS NULL) OR (due_in_days_snapshot > 0))),
     CONSTRAINT approval_stage_instances_on_eligibility_drift_snapshot_check CHECK ((on_eligibility_drift_snapshot = ANY (ARRAY['reduce_quorum'::text, 'fail_stage'::text, 'keep_snapshot'::text]))),
     CONSTRAINT approval_stage_instances_quorum_snapshot_check CHECK ((quorum_snapshot = ANY (ARRAY['any_1_of'::text, 'all_of'::text, 'm_of_n'::text]))),
+    CONSTRAINT approval_stage_instances_stage_kind_check CHECK ((stage_kind = ANY (ARRAY['review'::text, 'approval'::text]))),
     CONSTRAINT approval_stage_instances_stage_order_check CHECK ((stage_order >= 1)),
     CONSTRAINT approval_stage_instances_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'active'::text, 'completed'::text, 'skipped'::text, 'rejected_here'::text, 'cancelled'::text])))
 );
@@ -2134,94 +2417,47 @@ ALTER TABLE ONLY public.governance_events FORCE ROW LEVEL SECURITY;
 
 
 --
--- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
+-- Name: release_generations; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.schema_migrations (
-    version text NOT NULL,
-    applied_at timestamp with time zone DEFAULT now() NOT NULL,
-    description text
-);
-
-
---
--- Name: template_versions; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.template_versions (
+CREATE TABLE public.release_generations (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
-    template_id uuid NOT NULL,
-    version_num integer NOT NULL,
-    status text NOT NULL,
-    grammar_version integer DEFAULT 1 NOT NULL,
-    docx_storage_key text NOT NULL,
-    schema_storage_key text NOT NULL,
-    docx_content_hash text NOT NULL,
-    schema_content_hash text NOT NULL,
-    published_at timestamp with time zone,
-    published_by text,
-    deprecated_at timestamp with time zone,
-    lock_version integer DEFAULT 0 NOT NULL,
+    generation_seq bigint NOT NULL,
+    tenant_id uuid NOT NULL,
+    subject_kind text DEFAULT 'document'::text NOT NULL,
+    document_id uuid NOT NULL,
+    approval_instance_id uuid NOT NULL,
+    revision_id uuid NOT NULL,
+    revision_version integer NOT NULL,
+    frozen_content_hash text NOT NULL,
+    approval_fact_at timestamp with time zone,
+    final_approver_id text,
+    submitted_by text,
+    final_docx_s3_key text,
+    final_pdf_s3_key text,
+    artifact_fact_at timestamp with time zone,
+    hold_reason text,
+    hold_detail text,
+    released_at timestamp with time zone,
+    last_evaluated_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    created_by text NOT NULL,
-    CONSTRAINT template_versions_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'published'::text, 'deprecated'::text])))
+    CONSTRAINT ck_release_generations_artifact_fact_full_set CHECK (((artifact_fact_at IS NULL) OR ((final_docx_s3_key IS NOT NULL) AND (final_pdf_s3_key IS NOT NULL)))),
+    CONSTRAINT ck_release_generations_frozen_hash CHECK ((frozen_content_hash ~ '^[0-9a-f]{64}$'::text)),
+    CONSTRAINT ck_release_generations_hold_reason CHECK (((hold_reason IS NULL) OR (hold_reason = ANY (ARRAY['awaiting_approval_fact'::text, 'materializing'::text, 'awaiting_effective_date'::text, 'supersede_conflict'::text, 'plan_invalid'::text, 'failed'::text])))),
+    CONSTRAINT ck_release_generations_released_implies_facts CHECK (((released_at IS NULL) OR ((approval_fact_at IS NOT NULL) AND (artifact_fact_at IS NOT NULL)))),
+    CONSTRAINT ck_release_generations_revision_version CHECK ((revision_version >= 0)),
+    CONSTRAINT ck_release_generations_subject_kind CHECK ((subject_kind = 'document'::text))
 );
 
-
---
--- Name: templates; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.templates (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    tenant_id uuid NOT NULL,
-    key text NOT NULL,
-    name text NOT NULL,
-    description text,
-    current_published_version_id uuid,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    created_by text NOT NULL
-);
-
-ALTER TABLE ONLY public.templates FORCE ROW LEVEL SECURITY;
+ALTER TABLE ONLY public.release_generations FORCE ROW LEVEL SECURITY;
 
 
 --
--- Name: templates_approval_config; Type: TABLE; Schema: public; Owner: -
+-- Name: release_generations_generation_seq_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.templates_approval_config (
-    template_id uuid NOT NULL,
-    reviewer_role text,
-    approver_role text NOT NULL
-);
-
-
---
--- Name: templates_audit_log; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.templates_audit_log (
-    id bigint NOT NULL,
-    tenant_id uuid NOT NULL,
-    template_id uuid NOT NULL,
-    version_id uuid,
-    actor_id text NOT NULL,
-    action text NOT NULL,
-    details jsonb DEFAULT '{}'::jsonb NOT NULL,
-    occurred_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-ALTER TABLE ONLY public.templates_audit_log FORCE ROW LEVEL SECURITY;
-
-
---
--- Name: templates_audit_log_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.templates_audit_log_id_seq
+CREATE SEQUENCE public.release_generations_generation_seq_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -2230,10 +2466,21 @@ CREATE SEQUENCE public.templates_audit_log_id_seq
 
 
 --
--- Name: templates_audit_log_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: release_generations_generation_seq_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
-ALTER SEQUENCE public.templates_audit_log_id_seq OWNED BY public.templates_audit_log.id;
+ALTER SEQUENCE public.release_generations_generation_seq_seq OWNED BY public.release_generations.generation_seq;
+
+
+--
+-- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.schema_migrations (
+    version text NOT NULL,
+    applied_at timestamp with time zone DEFAULT now() NOT NULL,
+    description text
+);
 
 
 --
@@ -2252,7 +2499,9 @@ CREATE TABLE public.templates_template (
     created_by text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     archived_at timestamp with time zone,
-    system_owned boolean DEFAULT false NOT NULL
+    system_owned boolean DEFAULT false NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT templates_template_doc_type_code_required_check CHECK (((system_owned = true) OR ((doc_type_code IS NOT NULL) AND (doc_type_code <> ''::text))))
 );
 
 ALTER TABLE ONLY public.templates_template FORCE ROW LEVEL SECURITY;
@@ -2314,10 +2563,10 @@ ALTER TABLE ONLY public.document_revisions ALTER COLUMN revision_num SET DEFAULT
 
 
 --
--- Name: templates_audit_log id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: release_generations generation_seq; Type: DEFAULT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.templates_audit_log ALTER COLUMN id SET DEFAULT nextval('public.templates_audit_log_id_seq'::regclass);
+ALTER TABLE ONLY public.release_generations ALTER COLUMN generation_seq SET DEFAULT nextval('public.release_generations_generation_seq_seq'::regclass);
 
 
 --
@@ -2326,22 +2575,6 @@ ALTER TABLE ONLY public.templates_audit_log ALTER COLUMN id SET DEFAULT nextval(
 
 ALTER TABLE ONLY metaldocs.audit_events
     ADD CONSTRAINT audit_events_pkey PRIMARY KEY (id);
-
-
---
--- Name: audit_events audit_events_prev_hash_shape; Type: CHECK CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE metaldocs.audit_events
-    ADD CONSTRAINT audit_events_prev_hash_shape CHECK (((prev_hash = ''::text) OR (prev_hash ~ '^[0-9a-f]{64}$'::text))) NOT VALID;
-
-
---
--- Name: audit_events audit_events_row_hash_shape; Type: CHECK CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE metaldocs.audit_events
-    ADD CONSTRAINT audit_events_row_hash_shape CHECK (((row_hash = ''::text) OR (row_hash ~ '^[0-9a-f]{64}$'::text))) NOT VALID;
 
 
 --
@@ -2405,7 +2638,7 @@ ALTER TABLE ONLY metaldocs.document_images
 --
 
 ALTER TABLE ONLY metaldocs.document_process_areas
-    ADD CONSTRAINT document_process_areas_pkey PRIMARY KEY (code);
+    ADD CONSTRAINT document_process_areas_pkey PRIMARY KEY (tenant_id, code);
 
 
 --
@@ -2497,14 +2730,6 @@ ALTER TABLE ONLY metaldocs.idempotency_keys
 
 
 --
--- Name: job_leases job_leases_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.job_leases
-    ADD CONSTRAINT job_leases_pkey PRIMARY KEY (job_name);
-
-
---
 -- Name: materialize_dispatch_outbox materialize_dispatch_outbox_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
 --
 
@@ -2561,6 +2786,22 @@ ALTER TABLE ONLY metaldocs.role_capabilities
 
 
 --
+-- Name: tenant_keys tenant_keys_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE ONLY metaldocs.tenant_keys
+    ADD CONSTRAINT tenant_keys_pkey PRIMARY KEY (tenant_id);
+
+
+--
+-- Name: tenant_lifecycle_jobs tenant_lifecycle_jobs_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE ONLY metaldocs.tenant_lifecycle_jobs
+    ADD CONSTRAINT tenant_lifecycle_jobs_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: tenant_plans tenant_plans_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
 --
 
@@ -2601,19 +2842,11 @@ ALTER TABLE ONLY metaldocs.iam_user_roles
 
 
 --
--- Name: materialize_dispatch_outbox ux_materialize_dispatch_outbox_revision; Type: CONSTRAINT; Schema: metaldocs; Owner: -
+-- Name: approval_delegations approval_delegations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY metaldocs.materialize_dispatch_outbox
-    ADD CONSTRAINT ux_materialize_dispatch_outbox_revision UNIQUE (tenant_id, revision_id);
-
-
---
--- Name: pdf_dispatch_outbox ux_pdf_dispatch_outbox_revision; Type: CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.pdf_dispatch_outbox
-    ADD CONSTRAINT ux_pdf_dispatch_outbox_revision UNIQUE (tenant_id, revision_id);
+ALTER TABLE ONLY public.approval_delegations
+    ADD CONSTRAINT approval_delegations_pkey PRIMARY KEY (id);
 
 
 --
@@ -2630,6 +2863,38 @@ ALTER TABLE ONLY public.approval_instances
 
 ALTER TABLE ONLY public.approval_instances
     ADD CONSTRAINT approval_instances_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: approval_review_verdicts approval_review_verdicts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.approval_review_verdicts
+    ADD CONSTRAINT approval_review_verdicts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: approval_review_verdicts approval_review_verdicts_stage_actor_uq; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.approval_review_verdicts
+    ADD CONSTRAINT approval_review_verdicts_stage_actor_uq UNIQUE (stage_instance_id, actor_user_id);
+
+
+--
+-- Name: approval_route_stage_selectors approval_route_stage_selectors_order_uq; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.approval_route_stage_selectors
+    ADD CONSTRAINT approval_route_stage_selectors_order_uq UNIQUE (route_stage_id, selector_order);
+
+
+--
+-- Name: approval_route_stage_selectors approval_route_stage_selectors_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.approval_route_stage_selectors
+    ADD CONSTRAINT approval_route_stage_selectors_pkey PRIMARY KEY (id);
 
 
 --
@@ -2654,14 +2919,6 @@ ALTER TABLE ONLY public.approval_route_stages
 
 ALTER TABLE ONLY public.approval_routes
     ADD CONSTRAINT approval_routes_pkey PRIMARY KEY (id);
-
-
---
--- Name: approval_routes approval_routes_tenant_profile_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.approval_routes
-    ADD CONSTRAINT approval_routes_tenant_profile_key UNIQUE (tenant_id, profile_code);
 
 
 --
@@ -2857,51 +3114,19 @@ ALTER TABLE ONLY public.governance_events
 
 
 --
+-- Name: release_generations release_generations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.release_generations
+    ADD CONSTRAINT release_generations_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.schema_migrations
     ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
-
-
---
--- Name: template_versions template_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.template_versions
-    ADD CONSTRAINT template_versions_pkey PRIMARY KEY (id);
-
-
---
--- Name: template_versions template_versions_template_num_unique; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.template_versions
-    ADD CONSTRAINT template_versions_template_num_unique UNIQUE (template_id, version_num);
-
-
---
--- Name: templates_approval_config templates_approval_config_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.templates_approval_config
-    ADD CONSTRAINT templates_approval_config_pkey PRIMARY KEY (template_id);
-
-
---
--- Name: templates_audit_log templates_audit_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.templates_audit_log
-    ADD CONSTRAINT templates_audit_log_pkey PRIMARY KEY (id);
-
-
---
--- Name: templates templates_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.templates
-    ADD CONSTRAINT templates_pkey PRIMARY KEY (id);
 
 
 --
@@ -2937,19 +3162,19 @@ ALTER TABLE ONLY public.templates_template_version
 
 
 --
--- Name: templates templates_tenant_key_unique; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.templates
-    ADD CONSTRAINT templates_tenant_key_unique UNIQUE (tenant_id, key);
-
-
---
 -- Name: user_process_areas user_process_areas_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.user_process_areas
     ADD CONSTRAINT user_process_areas_pkey PRIMARY KEY (user_id, area_code, effective_from);
+
+
+--
+-- Name: release_generations ux_release_generations_identity; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.release_generations
+    ADD CONSTRAINT ux_release_generations_identity UNIQUE (tenant_id, subject_kind, document_id, approval_instance_id, revision_id, revision_version, frozen_content_hash);
 
 
 --
@@ -3128,6 +3353,13 @@ CREATE INDEX ix_pdf_dispatch_outbox_pending ON metaldocs.pdf_dispatch_outbox USI
 
 
 --
+-- Name: ix_tenant_lifecycle_jobs_tenant_id; Type: INDEX; Schema: metaldocs; Owner: -
+--
+
+CREATE INDEX ix_tenant_lifecycle_jobs_tenant_id ON metaldocs.tenant_lifecycle_jobs USING btree (tenant_id);
+
+
+--
 -- Name: mddm_shadow_diff_events_recorded_at_idx; Type: INDEX; Schema: metaldocs; Owner: -
 --
 
@@ -3170,6 +3402,13 @@ CREATE UNIQUE INDEX uq_token_dictionary_tenant_name ON metaldocs.token_dictionar
 
 
 --
+-- Name: ux_document_families_tenant_code; Type: INDEX; Schema: metaldocs; Owner: -
+--
+
+CREATE UNIQUE INDEX ux_document_families_tenant_code ON metaldocs.document_families USING btree (tenant_id, code);
+
+
+--
 -- Name: ux_iam_users_tenant_user; Type: INDEX; Schema: metaldocs; Owner: -
 --
 
@@ -3184,10 +3423,38 @@ CREATE UNIQUE INDEX ux_iam_users_tenant_user_active ON metaldocs.iam_users USING
 
 
 --
--- Name: ux_process_areas_tenant_code; Type: INDEX; Schema: metaldocs; Owner: -
+-- Name: ux_materialize_dispatch_outbox_generation; Type: INDEX; Schema: metaldocs; Owner: -
 --
 
-CREATE UNIQUE INDEX ux_process_areas_tenant_code ON metaldocs.document_process_areas USING btree (tenant_id, code);
+CREATE UNIQUE INDEX ux_materialize_dispatch_outbox_generation ON metaldocs.materialize_dispatch_outbox USING btree (tenant_id, revision_id, COALESCE(release_generation_id, '00000000-0000-0000-0000-000000000000'::uuid));
+
+
+--
+-- Name: ux_pdf_dispatch_outbox_generation; Type: INDEX; Schema: metaldocs; Owner: -
+--
+
+CREATE UNIQUE INDEX ux_pdf_dispatch_outbox_generation ON metaldocs.pdf_dispatch_outbox USING btree (tenant_id, revision_id, COALESCE(release_generation_id, '00000000-0000-0000-0000-000000000000'::uuid));
+
+
+--
+-- Name: approval_delegations_active_lookup_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX approval_delegations_active_lookup_idx ON public.approval_delegations USING btree (tenant_id, delegate_id, starts_at, ends_at);
+
+
+--
+-- Name: approval_routes_active_profile_uq; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX approval_routes_active_profile_uq ON public.approval_routes USING btree (tenant_id, subject_kind, profile_code) WHERE active;
+
+
+--
+-- Name: approval_routes_profile_version_uq; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX approval_routes_profile_version_uq ON public.approval_routes USING btree (tenant_id, subject_kind, profile_code, version);
 
 
 --
@@ -3275,13 +3542,6 @@ CREATE UNIQUE INDEX idx_one_active_session_per_doc ON public.editor_sessions USI
 
 
 --
--- Name: idx_one_draft_per_template; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_one_draft_per_template ON public.template_versions USING btree (template_id) WHERE (status = 'draft'::text);
-
-
---
 -- Name: idx_pending_expired; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3296,24 +3556,10 @@ CREATE INDEX idx_revisions_doc_num ON public.document_revisions USING btree (doc
 
 
 --
--- Name: idx_templates_audit_template_time; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_templates_audit_template_time ON public.templates_audit_log USING btree (template_id, occurred_at DESC);
-
-
---
 -- Name: idx_templates_template_tenant_doctype; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_templates_template_tenant_doctype ON public.templates_template USING btree (tenant_id, doc_type_code);
-
-
---
--- Name: idx_templates_tenant; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_templates_tenant ON public.templates USING btree (tenant_id);
 
 
 --
@@ -3335,6 +3581,27 @@ CREATE INDEX ix_approval_instances_inbox ON public.approval_instances USING btre
 --
 
 CREATE INDEX ix_approval_instances_tenant_document_id ON public.approval_instances USING btree (tenant_id, document_id);
+
+
+--
+-- Name: ix_approval_instances_tenant_subject; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_approval_instances_tenant_subject ON public.approval_instances USING btree (tenant_id, subject_kind, subject_key);
+
+
+--
+-- Name: ix_approval_route_stage_selectors_route_stage_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_approval_route_stage_selectors_route_stage_id ON public.approval_route_stage_selectors USING btree (route_stage_id);
+
+
+--
+-- Name: ix_approval_route_stage_selectors_tenant_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_approval_route_stage_selectors_tenant_id ON public.approval_route_stage_selectors USING btree (tenant_id);
 
 
 --
@@ -3384,6 +3651,20 @@ CREATE INDEX ix_governance_events_resource ON public.governance_events USING btr
 --
 
 CREATE INDEX ix_governance_events_tenant_type ON public.governance_events USING btree (tenant_id, event_type, created_at DESC);
+
+
+--
+-- Name: ix_release_generations_document; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_release_generations_document ON public.release_generations USING btree (tenant_id, document_id, generation_seq DESC);
+
+
+--
+-- Name: ix_release_generations_open; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_release_generations_open ON public.release_generations USING btree (tenant_id, last_evaluated_at) WHERE (released_at IS NULL);
 
 
 --
@@ -3443,6 +3724,27 @@ CREATE UNIQUE INDEX ux_approval_instances_active_document_id ON public.approval_
 
 
 --
+-- Name: ux_approval_instances_active_subject; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ux_approval_instances_active_subject ON public.approval_instances USING btree (tenant_id, subject_kind, subject_key) WHERE (status = 'in_progress'::text);
+
+
+--
+-- Name: ux_approval_instances_subject_idempotency; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ux_approval_instances_subject_idempotency ON public.approval_instances USING btree (tenant_id, subject_kind, subject_key, idempotency_key) WHERE (idempotency_key IS NOT NULL);
+
+
+--
+-- Name: ux_approval_routes_tenant_subject; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ux_approval_routes_tenant_subject ON public.approval_routes USING btree (tenant_id, subject_kind, subject_key) WHERE active;
+
+
+--
 -- Name: ux_documents_cd_active; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3454,6 +3756,13 @@ CREATE UNIQUE INDEX ux_documents_cd_active ON public.documents USING btree (cont
 --
 
 CREATE UNIQUE INDEX ux_documents_cd_revision ON public.documents USING btree (controlled_document_id, revision_number) WHERE (controlled_document_id IS NOT NULL);
+
+
+--
+-- Name: ux_documents_published_head; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ux_documents_published_head ON public.documents USING btree (tenant_id, controlled_document_id) WHERE ((status = 'published'::text) AND (controlled_document_id IS NOT NULL));
 
 
 --
@@ -3513,6 +3822,13 @@ CREATE TRIGGER trg_process_areas_code_immutable BEFORE UPDATE ON metaldocs.docum
 
 
 --
+-- Name: document_profiles trg_profile_reclassify_route_policy; Type: TRIGGER; Schema: metaldocs; Owner: -
+--
+
+CREATE CONSTRAINT TRIGGER trg_profile_reclassify_route_policy AFTER UPDATE ON metaldocs.document_profiles DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.enforce_profile_route_policy();
+
+
+--
 -- Name: document_families trg_reject_families_code_update; Type: TRIGGER; Schema: metaldocs; Owner: -
 --
 
@@ -3541,10 +3857,52 @@ CREATE TRIGGER trg_require_cap_asserted BEFORE INSERT OR DELETE OR UPDATE ON met
 
 
 --
+-- Name: iam_group_members trg_require_cap_asserted; Type: TRIGGER; Schema: metaldocs; Owner: -
+--
+
+CREATE TRIGGER trg_require_cap_asserted BEFORE INSERT OR DELETE OR UPDATE ON metaldocs.iam_group_members FOR EACH ROW EXECUTE FUNCTION public.enforce_capability_asserted();
+
+
+--
+-- Name: iam_group_roles trg_require_cap_asserted; Type: TRIGGER; Schema: metaldocs; Owner: -
+--
+
+CREATE TRIGGER trg_require_cap_asserted BEFORE INSERT OR DELETE OR UPDATE ON metaldocs.iam_group_roles FOR EACH ROW EXECUTE FUNCTION public.enforce_capability_asserted();
+
+
+--
+-- Name: iam_groups trg_require_cap_asserted; Type: TRIGGER; Schema: metaldocs; Owner: -
+--
+
+CREATE TRIGGER trg_require_cap_asserted BEFORE INSERT OR DELETE OR UPDATE ON metaldocs.iam_groups FOR EACH ROW EXECUTE FUNCTION public.enforce_capability_asserted();
+
+
+--
 -- Name: iam_user_roles trg_require_cap_asserted; Type: TRIGGER; Schema: metaldocs; Owner: -
 --
 
 CREATE TRIGGER trg_require_cap_asserted BEFORE INSERT OR DELETE OR UPDATE ON metaldocs.iam_user_roles FOR EACH ROW EXECUTE FUNCTION public.enforce_capability_asserted();
+
+
+--
+-- Name: iam_users trg_require_cap_asserted; Type: TRIGGER; Schema: metaldocs; Owner: -
+--
+
+CREATE TRIGGER trg_require_cap_asserted BEFORE INSERT OR DELETE OR UPDATE OF display_name, is_active, tenant_id, deactivated_at ON metaldocs.iam_users FOR EACH ROW EXECUTE FUNCTION public.enforce_capability_asserted();
+
+
+--
+-- Name: tenant_lifecycle_jobs trg_require_cap_asserted; Type: TRIGGER; Schema: metaldocs; Owner: -
+--
+
+CREATE TRIGGER trg_require_cap_asserted BEFORE INSERT ON metaldocs.tenant_lifecycle_jobs FOR EACH ROW EXECUTE FUNCTION public.enforce_capability_asserted();
+
+
+--
+-- Name: tenants trg_require_cap_asserted; Type: TRIGGER; Schema: metaldocs; Owner: -
+--
+
+CREATE TRIGGER trg_require_cap_asserted BEFORE INSERT ON metaldocs.tenants FOR EACH ROW EXECUTE FUNCTION public.enforce_capability_asserted();
 
 
 --
@@ -3566,6 +3924,20 @@ CREATE TRIGGER enforce_signoff_eligibility_trg BEFORE INSERT ON public.approval_
 --
 
 CREATE TRIGGER enforce_snapshot_on_submit_trg BEFORE INSERT OR UPDATE ON public.documents FOR EACH ROW EXECUTE FUNCTION public.enforce_snapshot_on_submit();
+
+
+--
+-- Name: approval_instances trg_approval_instances_default_subject; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_approval_instances_default_subject BEFORE INSERT ON public.approval_instances FOR EACH ROW EXECUTE FUNCTION public.default_approval_subject();
+
+
+--
+-- Name: approval_routes trg_approval_routes_default_subject; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_approval_routes_default_subject BEFORE INSERT ON public.approval_routes FOR EACH ROW EXECUTE FUNCTION public.default_approval_subject();
 
 
 --
@@ -3646,6 +4018,13 @@ CREATE TRIGGER trg_require_cap_asserted_signoffs BEFORE INSERT ON public.approva
 
 
 --
+-- Name: approval_review_verdicts trg_review_verdict_sod; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_review_verdict_sod BEFORE INSERT ON public.approval_review_verdicts FOR EACH ROW EXECUTE FUNCTION public.enforce_approval_sod();
+
+
+--
 -- Name: approval_routes trg_route_config_immutable_del; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -3660,6 +4039,20 @@ CREATE TRIGGER trg_route_config_immutable_upd BEFORE UPDATE ON public.approval_r
 
 
 --
+-- Name: approval_routes trg_route_profile_policy; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE CONSTRAINT TRIGGER trg_route_profile_policy AFTER INSERT OR DELETE OR UPDATE ON public.approval_routes DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.enforce_profile_route_policy();
+
+
+--
+-- Name: approval_route_stages trg_route_stage_profile_policy; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE CONSTRAINT TRIGGER trg_route_stage_profile_policy AFTER INSERT OR DELETE OR UPDATE ON public.approval_route_stages DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.enforce_profile_route_policy();
+
+
+--
 -- Name: approval_signoffs trg_signoff_immutable; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -3670,7 +4063,7 @@ CREATE TRIGGER trg_signoff_immutable BEFORE UPDATE ON public.approval_signoffs F
 -- Name: approval_signoffs trg_signoff_sod; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER trg_signoff_sod BEFORE INSERT ON public.approval_signoffs FOR EACH ROW EXECUTE FUNCTION public.enforce_signoff_sod();
+CREATE TRIGGER trg_signoff_sod BEFORE INSERT ON public.approval_signoffs FOR EACH ROW EXECUTE FUNCTION public.enforce_approval_sod();
 
 
 --
@@ -3806,6 +4199,22 @@ ALTER TABLE ONLY metaldocs.iam_users
 
 
 --
+-- Name: tenant_keys tenant_keys_tenant_id_fkey; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE ONLY metaldocs.tenant_keys
+    ADD CONSTRAINT tenant_keys_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES metaldocs.tenants(id);
+
+
+--
+-- Name: tenant_lifecycle_jobs tenant_lifecycle_jobs_tenant_id_fkey; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE ONLY metaldocs.tenant_lifecycle_jobs
+    ADD CONSTRAINT tenant_lifecycle_jobs_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES metaldocs.tenants(id);
+
+
+--
 -- Name: tenant_plans tenant_plans_tenant_id_fkey; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
 --
 
@@ -3835,6 +4244,14 @@ ALTER TABLE ONLY public.approval_instances
 
 ALTER TABLE ONLY public.approval_instances
     ADD CONSTRAINT approval_instances_submitted_by_tenant_fkey FOREIGN KEY (tenant_id, submitted_by) REFERENCES metaldocs.iam_users(tenant_id, user_id);
+
+
+--
+-- Name: approval_route_stage_selectors approval_route_stage_selectors_route_stage_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.approval_route_stage_selectors
+    ADD CONSTRAINT approval_route_stage_selectors_route_stage_id_fkey FOREIGN KEY (route_stage_id) REFERENCES public.approval_route_stages(id) ON DELETE CASCADE;
 
 
 --
@@ -4054,6 +4471,14 @@ ALTER TABLE ONLY public.documents
 
 
 --
+-- Name: documents documents_frozen_revision_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.documents
+    ADD CONSTRAINT documents_frozen_revision_id_fkey FOREIGN KEY (frozen_revision_id) REFERENCES public.document_revisions(id);
+
+
+--
 -- Name: documents documents_superseded_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4094,14 +4519,6 @@ ALTER TABLE ONLY public.document_exports
 
 
 --
--- Name: templates fk_templates_current_published; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.templates
-    ADD CONSTRAINT fk_templates_current_published FOREIGN KEY (current_published_version_id) REFERENCES public.template_versions(id) DEFERRABLE;
-
-
---
 -- Name: templates_template fk_templates_published_version; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4115,22 +4532,6 @@ ALTER TABLE ONLY public.templates_template
 
 ALTER TABLE ONLY public.templates_template_version
     ADD CONSTRAINT fk_templates_template_version_tenant FOREIGN KEY (tenant_id) REFERENCES metaldocs.tenants(id) ON DELETE CASCADE;
-
-
---
--- Name: template_versions template_versions_template_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.template_versions
-    ADD CONSTRAINT template_versions_template_id_fkey FOREIGN KEY (template_id) REFERENCES public.templates(id) ON DELETE CASCADE;
-
-
---
--- Name: templates_approval_config templates_approval_config_template_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.templates_approval_config
-    ADD CONSTRAINT templates_approval_config_template_id_fkey FOREIGN KEY (template_id) REFERENCES public.templates_template(id);
 
 
 --
@@ -4182,6 +4583,12 @@ ALTER TABLE metaldocs.audit_export_jobs ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE metaldocs.auth_sessions ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: document_families; Type: ROW SECURITY; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE metaldocs.document_families ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: document_process_areas; Type: ROW SECURITY; Schema: metaldocs; Owner: -
@@ -4265,6 +4672,13 @@ CREATE POLICY tenant_isolation ON metaldocs.auth_sessions USING (((NULLIF(curren
 
 
 --
+-- Name: document_families tenant_isolation; Type: POLICY; Schema: metaldocs; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON metaldocs.document_families USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
 -- Name: document_process_areas tenant_isolation; Type: POLICY; Schema: metaldocs; Owner: -
 --
 
@@ -4335,6 +4749,20 @@ CREATE POLICY tenant_isolation ON metaldocs.pdf_dispatch_outbox USING (((NULLIF(
 
 
 --
+-- Name: tenant_keys tenant_isolation; Type: POLICY; Schema: metaldocs; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON metaldocs.tenant_keys USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: tenant_lifecycle_jobs tenant_isolation; Type: POLICY; Schema: metaldocs; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON metaldocs.tenant_lifecycle_jobs USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
 -- Name: tenant_plans tenant_isolation; Type: POLICY; Schema: metaldocs; Owner: -
 --
 
@@ -4349,6 +4777,18 @@ CREATE POLICY tenant_isolation ON metaldocs.token_dictionary_entries USING (((NU
 
 
 --
+-- Name: tenant_keys; Type: ROW SECURITY; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE metaldocs.tenant_keys ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: tenant_lifecycle_jobs; Type: ROW SECURITY; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE metaldocs.tenant_lifecycle_jobs ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: tenant_plans; Type: ROW SECURITY; Schema: metaldocs; Owner: -
 --
 
@@ -4361,16 +4801,34 @@ ALTER TABLE metaldocs.tenant_plans ENABLE ROW LEVEL SECURITY;
 ALTER TABLE metaldocs.token_dictionary_entries ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: approval_delegations; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.approval_delegations ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: approval_instances; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
 ALTER TABLE public.approval_instances ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: approval_review_verdicts; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.approval_review_verdicts ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: approval_routes; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
 ALTER TABLE public.approval_routes ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: approval_signoffs; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.approval_signoffs ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: cd_sequence_counters; Type: ROW SECURITY; Schema: public; Owner: -
@@ -4433,16 +4891,10 @@ ALTER TABLE public.editor_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.governance_events ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: templates; Type: ROW SECURITY; Schema: public; Owner: -
+-- Name: release_generations; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
-ALTER TABLE public.templates ENABLE ROW LEVEL SECURITY;
-
---
--- Name: templates_audit_log; Type: ROW SECURITY; Schema: public; Owner: -
---
-
-ALTER TABLE public.templates_audit_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.release_generations ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: templates_template; Type: ROW SECURITY; Schema: public; Owner: -
@@ -4457,6 +4909,13 @@ ALTER TABLE public.templates_template ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.templates_template_version ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: approval_delegations tenant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON public.approval_delegations USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
 -- Name: approval_instances tenant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -4464,10 +4923,24 @@ CREATE POLICY tenant_isolation ON public.approval_instances USING (((NULLIF(curr
 
 
 --
+-- Name: approval_review_verdicts tenant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON public.approval_review_verdicts USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (actor_tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
 -- Name: approval_routes tenant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
 CREATE POLICY tenant_isolation ON public.approval_routes USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: approval_signoffs tenant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON public.approval_signoffs USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (actor_tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
 
 
 --
@@ -4541,17 +5014,10 @@ CREATE POLICY tenant_isolation ON public.governance_events USING (((NULLIF(curre
 
 
 --
--- Name: templates tenant_isolation; Type: POLICY; Schema: public; Owner: -
+-- Name: release_generations tenant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY tenant_isolation ON public.templates USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
-
-
---
--- Name: templates_audit_log tenant_isolation; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY tenant_isolation ON public.templates_audit_log USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+CREATE POLICY tenant_isolation ON public.release_generations USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
 
 
 --
@@ -4584,7 +5050,5 @@ ALTER TABLE public.user_process_areas ENABLE ROW LEVEL SECURITY;
 --
 -- PostgreSQL database dump complete
 --
-
-
 
 COMMIT;

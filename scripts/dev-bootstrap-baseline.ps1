@@ -68,6 +68,9 @@ if (-not $ready) {
 Invoke-DbSqlFile -Path "db/prerequisites/0001_extensions.sql"
 Invoke-DbSqlFile -Path "db/baseline/0001_current_schema.sql"
 Invoke-DbSqlFile -Path "db/reference-data/0001_product_reference_data.sql"
+# Stage 4: role/privilege posture. Must run after the baseline (its
+# GRANT ... ON ALL TABLES statements need every table to exist).
+Invoke-DbSqlFile -Path "db/grants/0001_role_grants.sql"
 
 if ($WithDevSeed) {
   Invoke-DbSqlFile -Path "db/dev-seeds/0001_local_dev_seed.sql"

@@ -796,14 +796,20 @@ func listSQLFiles(dir string) ([]string, error) {
 
 // curatedBundlePaths returns the ordered list of SQL files the curated
 // bootstrap applies: prerequisites, curated schema, product reference data,
-// then the forward migration tail. It is the single source of both what
-// ApplyCuratedBootstrap executes and what schemaFingerprint hashes, so the
-// fingerprint can never drift from the actual template contents.
+// role/privilege posture, then the forward migration tail. It is the single
+// source of both what ApplyCuratedBootstrap executes and what
+// schemaFingerprint hashes, so the fingerprint can never drift from the actual
+// template contents.
+//
+// The migration tail is legitimately empty after the 2026-07-29 baseline fold
+// (archive/migrations/post-baseline-2026-07-fold/); listSQLFiles returns an
+// empty slice for a directory that holds only README.md.
 func curatedBundlePaths(root string) ([]string, error) {
 	paths := []string{
 		filepath.Join(root, "db", "prerequisites", "0001_extensions.sql"),
 		filepath.Join(root, "db", "baseline", "0001_current_schema.sql"),
 		filepath.Join(root, "db", "reference-data", "0001_product_reference_data.sql"),
+		filepath.Join(root, "db", "grants", "0001_role_grants.sql"),
 	}
 	migrationFiles, err := listSQLFiles(filepath.Join(root, "db", "migrations"))
 	if err != nil {
