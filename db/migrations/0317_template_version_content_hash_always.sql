@@ -171,7 +171,12 @@ BEGIN
         -- ── 1. referential assert: fail loud rather than rewire config ──────
         SELECT count(*) INTO v_blocked
           FROM tmp_0317_contentless d
-         WHERE EXISTS (SELECT 1 FROM public.document_profiles p
+         -- document_profiles lives in the metaldocs schema, not public (see
+         -- db/baseline/0001_current_schema.sql:619); the other three tables here
+         -- really are public. PL/pgSQL resolves names at execution, so this
+         -- mis-qualification stayed invisible until a database with content-less
+         -- rows actually entered the ELSE branch.
+         WHERE EXISTS (SELECT 1 FROM metaldocs.document_profiles p
                         WHERE p.default_template_version_id = d.id)
             OR EXISTS (SELECT 1 FROM public.controlled_documents c
                         WHERE c.override_template_version_id = d.id)
