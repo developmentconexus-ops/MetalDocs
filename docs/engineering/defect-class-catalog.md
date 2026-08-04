@@ -87,12 +87,22 @@ that they do. They diverge silently.
   hitting those conditions see a raw code instead of a message.
 - OpenAPI `Problem.code` is `type: string` with description *"Machine-readable code from
   canonical taxonomy"* (`api/openapi/v1/openapi.yaml:7190`) — the spec names a taxonomy
-  it does not encode. No enum.
+  it does not encode. No enum. **Closed 2026-08-04:** the field now carries a `pattern`
+  for the vocabulary's shape, kept in sync with the registry by a test.
 - `wiki/architecture/api-design-system.md:88` documents `IDEMPOTENCY_KEY_CONFLICT`, which
   exists nowhere. Real constant is `IDEMPOTENCY_KEY_REUSED` (`codes.go:26`).
 - Historic instances: capability registry size, authz tripwire arms (closed in GMR M2 by
   generating the arms from the Go registry + 2 blocking drift/parity lints — the correct
   fix, and proof the pattern generalizes).
+
+**Status in this repo: CLOSED for error codes (ADR 0089, 2026-08-04).** The evidence
+above is preserved as observed. `dump-error-codes.go` is deleted; `cmd/problem-codes-dump`
+reads the runtime registry and generates both the FE snapshot and the wiki table, with a
+CI job (`problem-codes-freshness`) that regenerates and byte-compares. The spec now
+carries a `pattern` — deliberately not the enum this catalog originally called for, since
+an enum makes adding an error code a breaking change; see the ADR's Implementation record.
+The wiki table is no longer hand-written at all, which is why its 15 stale rows could
+happen and now cannot.
 
 **Root cause.** Duplication across a language boundary, where no compiler spans both sides.
 
@@ -124,6 +134,21 @@ covers 7 packages. Not guarded: **all of `approval/http`** (67 codes), the
 
 The guard does not merely miss the drift. It **legitimizes** it. Every later reader sees
 a sanctioned second standard.
+
+**Status in this repo: CLOSED (ADR 0089, 2026-08-04)** — and the way it closed is the
+lesson. The guard was not widened; it was **deleted**, because `problem.Code` became a
+type no other package can construct, which moves the check from rung 3 to rung 1 and
+leaves no list to be absent from. Two live defects were found in exactly the unguarded
+packages: wrong and unregistered codes in `platform/idempotency`, and the approval
+module's `dot.notation` — which the exclusion comment called a deviation and which turned
+out to be the *better* convention, later adopted repo-wide. Read that twice: the allowlist
+was not just hiding drift, it was blessing the wrong standard as the default.
+
+The same trap was then re-encountered while *building* the replacement: a first draft of
+the frontend vocabulary guard flagged profile codes and role codes as false positives, and
+the obvious remedy was an allow-list. It was rejected for a narrower signal instead. A
+check that cries wolf earns an allow-list, and an allow-list is how drift becomes
+legitimate — so precision in the rule is not polish, it is what keeps the rule honest.
 
 **Root cause.** Introducing a guard into a non-conforming codebase, and choosing
 allowlist (cheap, ships today) over blocklist-with-expiry (honest).
@@ -407,6 +432,21 @@ underlying one open.
 the encoding is generated, so maintenance cost is zero. Enum + generation solve each
 other; either one alone is a trap.
 
+**Status in this repo: CLOSED (ADR 0089, 2026-08-04), with a correction to the advice
+above.** Encoding the constraint as an **enum of all 141 codes** was specified and then
+rejected during implementation, because it makes **adding an error code a breaking
+change** for strict clients. Errors are the part of a contract that grows most, and a
+design whose safe move is "reuse a vaguer existing code" pushes straight back toward the
+vocabulary collisions of Class 19. What shipped is a `pattern` encoding the vocabulary's
+**shape** (`<family>.<name>` over ten closed families), which is also the part a client
+can usefully branch on — `permission.*` is 403 whichever member it is.
+
+Refined factory rule: **encode the constraint at the granularity that is stable.** Shape
+is stable; membership grows. Encode shape in the contract, enforce membership at the
+boundary that can be regenerated without a client migration (here, the generated frontend
+snapshot). And when the copy is unavoidable — a spec cannot import code — pair it with a
+test that fails on divergence, or the encoding becomes Class 2.
+
 **Detection.** Grep spec descriptions for "one of", "must be", "from the", "canonical",
 "valid values". Each is a constraint that should be a schema keyword.
 
@@ -585,6 +625,20 @@ solved it locally — correctly, in isolation, and incompatibly.
 boundary and that *both sides must agree on* needs a registry from day 0. Retrofitting
 one costs a repo-wide hard break; building one costs an afternoon.
 
+**Status in this repo: CLOSED (ADR 0089, 2026-08-04).** The retrofit was paid: 155 codes
+→ 141, 111 removed, 108 added, 26 status rulings, one hard break with no compatibility
+layer. Prevention steps 1, 2 and 4 shipped as written; step 3 shipped with the Class 13
+correction above (`pattern`, not enum). Two costs the plan did not predict, both worth
+recording for the next retrofit:
+
+- **The registry creates a new failure mode.** A registering package nobody imports never
+  runs its init, so its codes vanish from every artifact with nothing looking wrong. Needs
+  its own lint (`PROBLEM-DUMP-IMPORT`); budget for it.
+- **The rename's damage was on the consumer side, not the producer side** — see Class 21.
+  The backend was protected by the new type on day one. Ten frontend branches were dead
+  and nothing failed. Retrofitting a registry is only half the job if consumers compare
+  against the old vocabulary in a medium the type cannot reach.
+
 ---
 
 ## Class 20 — Irreversible Artifact With a Reversible-Feeling Workflow
@@ -623,6 +677,58 @@ those two is invisible at the moment of the mistake.
 **Detection.** For each artifact your workflow produces, ask: after it leaves this
 machine, can I reach every copy? If no, it is write-once, regardless of what the tool's
 buttons say.
+
+---
+
+## Class 21 — The Rename That Leaves a Dead Branch, Not a Broken One
+
+**Symptom.** A shared identifier is renamed across a system. Every *declaration* of it
+moves; every *comparison* against it keeps compiling and keeps running, and simply stops
+being true. Nothing fails. A branch that used to fire never fires again, silently and
+permanently.
+
+**Evidence.** ADR 0089 renamed 111 Problem codes. The backend was safe by construction —
+`problem.Code` is a closed type, so a stale code does not compile. The frontend was not:
+`if (error.code === 'AUTH_UNAUTHORIZED')` is a comparison between two strings, and after
+the rename it is merely a comparison that is always false. **Ten such branches were dead**
+when the guard was written, including session-expiry detection in `lib/api/client.ts` —
+the app had stopped recognizing its own expired sessions. The existing coverage test could
+not see any of it: it compared the *message map* against the code snapshot, and these
+codes were in control flow, not in the map. Two further branches tested codes **no backend
+had ever registered** — dead from the day they were written.
+
+Same class, other instances: a renamed feature-flag key still checked by an
+`if (flags['old_name'])`; a renamed event name in an analytics `switch`; a renamed CSS
+class in a `classList.contains`; a renamed enum value compared as a string across a
+process boundary.
+
+**Root cause.** The rename is type-safe on **one side of a boundary only**. Wherever the
+identifier crosses into a medium with no shared type — JSON on the wire, a string
+comparison, a config file, a database value — the compiler stops helping, and the failure
+mode inverts: instead of *breaking loudly*, the code *succeeds at doing nothing*. A
+comparison that is always false is indistinguishable from a condition that never occurs.
+
+**Prevention.**
+- **Rung 3 — a lint that reads the other side's generated truth.** The consumer already
+  receives a generated artifact listing the valid vocabulary (`error-codes.generated.json`).
+  A test that scans consumer source for literals in identifier positions and checks them
+  against that artifact turns the silent case into a build failure.
+- **Make the signal narrow, deliberately.** The obvious rule — flag every literal assigned
+  to a field named `code` — cried wolf immediately: this codebase also has profile codes,
+  area codes, and role codes. **A check that cries wolf earns an allow-list, and an
+  allow-list is how drift becomes legitimate (Class 3).** The rule that shipped matches
+  unambiguous *positions* (`.code === '…'`, known constructors) plus any literal carrying
+  one of the ten closed family prefixes — so it is precise by construction rather than by
+  exception. Its exemption list is three named files, each with a written reason.
+- **Rung 1 where the boundary allows it.** If the consumer is typed (TypeScript), generate
+  a union type from the same artifact so the comparison itself fails to typecheck. This
+  is strictly better than a test and should be preferred when the codegen path exists.
+
+**Detection.** Grep the consumer for string literals compared against values that a
+generator owns. For each: is there anything that would fail if that literal became
+obsolete? If the honest answer is "the branch would just stop running", it is this class.
+Note that **code coverage will not find it** — the line is still executed, it just always
+evaluates false.
 
 ---
 
@@ -669,13 +775,13 @@ Derived directly from the classes above. Each line prevents a class already obse
 
 ## Appendix B — Recurring Root Causes
 
-The 20 classes reduce to five underlying causes. Useful when classifying a *new* defect
+The 21 classes reduce to five underlying causes. Useful when classifying a *new* defect
 that does not obviously match a class above.
 
 1. **A guarantee was asserted, not enforced.** Comments, docs, and conventions standing in
    for compilers, generators, and gates. → §1, §3, §12, §13
 2. **Two things that must agree, maintained separately.** No compiler spans the boundary.
-   → §2, §7, §10, §11, §19
+   → §2, §7, §10, §11, §19, §21
 3. **Absence used to carry meaning.** Unfalsifiable, indistinguishable from failure.
    → §4, §5, §6
 4. **The local fix was cheaper than the right fix,** and the incentive gradient always
