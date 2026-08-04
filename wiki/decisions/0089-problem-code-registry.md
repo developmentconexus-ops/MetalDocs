@@ -1,8 +1,6 @@
 # ADR 0089 — Problem codes are a registry, not a convention
 
-> **Status:** Proposed 2026-08-04 (operator ratified the three governing rulings:
-> single dotted semantic taxonomy; status bound to the code; full scope —
-> registry + rename + generation + CI gate).
+> **Status:** Accepted and implemented 2026-08-04. See `## Status history`.
 > **Supersedes:** the flat `SCREAMING_SNAKE` catalog in
 > `internal/platform/problem/codes.go`, the module-local dotted taxonomies
 > (`approval/http/errors.go`, `taxonomy/.../routes_profiles.go`,
@@ -17,6 +15,15 @@
 > `docs/superpowers/analysis/2026-08-04-problem-code-registry-mapping.md` —
 > §1 families, §2 the complete 155-row rename table, §3 the 26 status rulings,
 > §4 registry shape. The annex is the executable detail; this ADR is the policy.
+
+## Status history
+
+- **2026-08-04 — Proposed.** Operator ratified the three governing rulings:
+  single dotted semantic taxonomy; status bound to the code; full scope
+  (registry + rename + generation + CI gate).
+- **2026-08-04 — Accepted and implemented.** 141 codes, one recorded deviation
+  on decision 6 (a spec `pattern` rather than an `enum`). Details in the
+  Implementation record at the end of this file.
 
 ## Context
 
@@ -185,3 +192,62 @@ mechanism**. Every module solved it locally, correctly, and incompatibly.
   existing exclusions have already hardened into a documented second standard.
 - **Alias old codes to new for one release.** Two live vocabularies, and the
   compatibility layer becomes permanent because nothing forces its removal.
+
+---
+
+## Implementation record — 2026-08-04
+
+Executed in five commits: `db24944f` (the closed type), `75c03821` (platform
+catalog), `2aa0615a` (approval), `a4e8e70b` (the remaining five modules),
+`58500670` (generation + gates), plus `9f4e56e9` (spec pattern).
+
+**Final counts.** 155 codes pre-sweep → **141** post-sweep, not the ≈124
+estimated in decision 5. The estimate assumed the 24 collision classes would
+collapse to one code each. Most did, but 14 collapses were reversed on review:
+they were conditions sharing a code only because no distinct code existed, and
+merging them would have re-created the defect the sweep removes — a code that
+cannot tell the user which of two things went wrong. Those 14 got their own code
+and their own Portuguese, which is where R-6/R-18/R-25/R-26 came from. 33 codes
+survived unchanged, 111 were removed, 108 added, 26 status rulings recorded, 13
+non-default statuses documented with mandatory reasons. `RegisterLegacy` has
+**zero uses** outside the platform package — the escape hatch was never needed.
+
+**Deviation from decision 6 — a `pattern`, not an `enum`.** Decision 6 said the
+OpenAPI `Problem.code` would be a generated enum, and the Consequences section
+promised clients an exhaustive switch. Implemented as a regex `pattern` over the
+family alternation instead. Reasoning:
+
+- An enum makes **adding an error code a breaking change** for strict clients.
+  Errors are the part of a contract that grows most, and a design where the safe
+  move is "reuse a vaguer existing code" pushes back toward the collisions this
+  ADR removed.
+- It would force a full embedded-spec regeneration on every new code — a known
+  churn class in this repo (all module `swaggerSpec` blobs change together).
+- It buys nothing over the generated FE snapshot, which already enforces
+  membership at the one boundary where membership matters, in both directions.
+- The shape is the part a client can usefully branch on: `permission.*` is 403
+  whichever member it is. That is the exhaustive switch worth generating.
+
+The promise of an exhaustive per-code switch is therefore **withdrawn**;
+`wiki/references/problem-codes.md` is the generated catalog for humans, and
+`error-codes.generated.json` for tooling.
+
+**The prevention ladder, as built.** Decision 1 moved code-validity from a
+review finding to a compile error (rung 1). Decisions 2/6 moved the catalog from
+hand-maintenance to generation (rung 2). What remained needed rung 3, and two
+gates were added that the ADR did not anticipate:
+
+- `PROBLEM-DUMP-IMPORT` (api-lint) — a registering package nobody imports never
+  runs its init, so its codes are silently absent from every artifact and
+  *nothing looks wrong*. This failure mode is created by the registry design and
+  did not exist under the scraper; it is the one honest cost of the change.
+- `problemCodeVocabulary.test.ts` (frontend) — codes hard-coded into control
+  flow, which the message-map coverage test could never see. A renamed code does
+  not break `if (error.code === 'X')`, it makes the branch stop firing, silently
+  and permanently. **Ten branches were already dead** when the guard was
+  introduced, including session-expiry detection in `lib/api/client.ts`, and two
+  more tested codes no backend has ever registered. This is a defect class the
+  ADR did not name and is recorded in `docs/engineering/defect-class-catalog.md`.
+
+Both gates were verified by negative control — deliberately broken, observed to
+fail with a message naming the fix, restored.
