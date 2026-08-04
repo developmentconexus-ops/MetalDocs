@@ -988,7 +988,12 @@ func loadInstanceAreaCode(ctx context.Context, tx *sql.Tx, cdRead controlleddocu
 		       d.process_area_code_snapshot,
 		       d.controlled_document_id
 		  FROM approval_instances ai
-		  JOIN documents d
+		  -- LEFT, not INNER: a template instance has document_id IS NULL (M3
+		  -- kernel extraction, ADR 0082). The repository below this layer was
+		  -- corrected then; this pre-check was missed and 404'd every template
+		  -- instance. The precedence switch below already handles the NULL
+		  -- document columns — a template resolves on the stage snapshot.
+		  LEFT JOIN documents d
 		    ON d.id = ai.document_id
 		   AND d.tenant_id = ai.tenant_id
 		  LEFT JOIN approval_stage_instances asi
