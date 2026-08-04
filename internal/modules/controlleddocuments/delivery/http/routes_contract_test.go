@@ -394,8 +394,8 @@ func TestWriteDomainError_TemplateArtifactMissingIs409(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("unmarshal: %v; body=%s", err, rec.Body.String())
 	}
-	if body.Code != "template.artifact_missing" {
-		t.Fatalf("code = %q, want %q", body.Code, "template.artifact_missing")
+	if body.Code != "state.template_artifact_missing" {
+		t.Fatalf("code = %q, want %q", body.Code, "state.template_artifact_missing")
 	}
 }
 
@@ -458,8 +458,8 @@ func TestWriteDomainError_TemplateArtifactInvariantUnconfiguredIs500(t *testing.
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("unmarshal: %v; body=%s", err, rec.Body.String())
 	}
-	if body.Code != "template.artifact_invariant_unconfigured" {
-		t.Fatalf("code = %q, want %q", body.Code, "template.artifact_invariant_unconfigured")
+	if body.Code != "internal.template_artifact_invariant_unconfigured" {
+		t.Fatalf("code = %q, want %q", body.Code, "internal.template_artifact_invariant_unconfigured")
 	}
 }
 
@@ -898,8 +898,8 @@ func TestCreateControlledDocumentRevision_ActiveSiblingConflict_Returns409(t *te
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want 409; body = %s", rec.Code, rec.Body.String())
 	}
-	if !strings.Contains(rec.Body.String(), "ACTIVE_REVISION_ALREADY_EXISTS") {
-		t.Fatalf("body %q does not mention ACTIVE_REVISION_ALREADY_EXISTS", rec.Body.String())
+	if !strings.Contains(rec.Body.String(), "state.active_revision_exists") {
+		t.Fatalf("body %q does not mention state.active_revision_exists", rec.Body.String())
 	}
 }
 
@@ -1300,10 +1300,10 @@ func TestActiveDocument_InvalidPathUUID_Returns400(t *testing.T) {
 	}
 }
 
-// TestGetActiveDocument_ServiceReturnsErrNoActiveInstance_WiresNO_ACTIVE_INSTANCE
+// TestGetActiveDocument_ServiceReturnsErrNoActiveInstance_WiresNotFoundActiveDocumentInstance
 // asserts that ErrNoActiveInstance (returned by the service for the denied/absent
-// paths) is mapped to 404 NO_ACTIVE_INSTANCE — not CONTROLLED_DOCUMENT_NOT_FOUND.
-func TestGetActiveDocument_ServiceReturnsErrNoActiveInstance_WiresNO_ACTIVE_INSTANCE(t *testing.T) {
+// paths) is mapped to 404 notfound.active_document_instance — not notfound.controlled_document.
+func TestGetActiveDocument_ServiceReturnsErrNoActiveInstance_WiresNotFoundActiveDocumentInstance(t *testing.T) {
 	spy := &spyControlledDocumentService{
 		activeInstErr: controlleddocumentsdomain.ErrNoActiveInstance,
 	}
@@ -1325,7 +1325,7 @@ func TestGetActiveDocument_ServiceReturnsErrNoActiveInstance_WiresNO_ACTIVE_INST
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("unmarshal: %v; body=%s", err, rec.Body.String())
 	}
-	if body.Code != "NO_ACTIVE_INSTANCE" {
-		t.Fatalf("code=%q, want NO_ACTIVE_INSTANCE", body.Code)
+	if body.Code != "notfound.active_document_instance" {
+		t.Fatalf("code=%q, want notfound.active_document_instance", body.Code)
 	}
 }

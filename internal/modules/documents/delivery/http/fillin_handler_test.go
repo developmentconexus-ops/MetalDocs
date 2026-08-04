@@ -92,10 +92,7 @@ func TestFillInHandler_PutPlaceholderValue(t *testing.T) {
 }
 
 func TestFillInHandler_MapErrorInternal(t *testing.T) {
-	status, code := mapFillInError(errors.New("boom"))
-	if status != http.StatusInternalServerError {
-		t.Fatalf("status=%d", status)
-	}
+	code := mapFillInError(errors.New("boom"))
 	if code.String() != "internal.unknown" {
 		t.Fatalf("code=%q", code)
 	}

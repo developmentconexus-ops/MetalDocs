@@ -6,34 +6,44 @@ import (
 	"testing"
 
 	"metaldocs/internal/modules/templates/domain"
-	"metaldocs/internal/platform/problem"
 )
 
 func TestMapErr(t *testing.T) {
 	t.Parallel()
 
+	// wantCode carries the LITERAL wire string from the ADR 0089 annex rename
+	// table (§2.1 / §2.3 / §2.8), not a problem.Code* var from the source under
+	// test. An assertion derived from the code under test only ratifies whatever
+	// that code says; a literal from the annex independently checks that the
+	// table was executed.
 	tests := []struct {
 		name       string
 		err        error
 		wantStatus int
-		wantCode   problem.Code
+		wantCode   string
 	}{
-		{name: "not found", err: domain.ErrNotFound, wantStatus: http.StatusNotFound, wantCode: problem.CodeNotFoundResource},
-		{name: "key conflict", err: domain.ErrKeyConflict, wantStatus: http.StatusConflict, wantCode: problem.CodeConflictAlreadyExists},
-		{name: "invalid state transition", err: domain.ErrInvalidStateTransition, wantStatus: http.StatusConflict, wantCode: problem.CodeStateTransitionInvalid},
-		{name: "stale base", err: domain.ErrStaleBase, wantStatus: http.StatusConflict, wantCode: problem.CodeConflictStaleBase},
-		{name: "stale lock version", err: domain.ErrStaleLockVersion, wantStatus: http.StatusPreconditionFailed, wantCode: problem.CodeConflictConcurrentModification},
-		{name: "concurrent transition", err: domain.ErrConcurrentTransition, wantStatus: http.StatusConflict, wantCode: problem.CodeStateTransitionInvalid},
-		{name: "content hash mismatch", err: domain.ErrContentHashMismatch, wantStatus: http.StatusConflict, wantCode: problem.CodeConflictGeneric},
-		{name: "upload missing", err: domain.ErrUploadMissing, wantStatus: http.StatusConflict, wantCode: problem.CodeStateUploadMissing},
-		{name: "upload too large", err: domain.ErrUploadTooLarge, wantStatus: http.StatusRequestEntityTooLarge, wantCode: problem.CodeRequestBodyTooLarge},
-		{name: "iso segregation violation", err: domain.ErrISOSegregationViolation, wantStatus: http.StatusForbidden, wantCode: problem.CodePermissionISOSegregationViolation},
-		{name: "forbidden", err: domain.ErrForbidden, wantStatus: http.StatusForbidden, wantCode: problem.CodePermissionDenied},
-		{name: "system template immutable", err: domain.ErrSystemTemplateImmutable, wantStatus: http.StatusConflict, wantCode: problem.CodeStateSystemTemplateImmutable},
-		{name: "archived", err: domain.ErrArchived, wantStatus: http.StatusConflict, wantCode: problem.CodeStateTransitionInvalid},
-		{name: "placeholder name invalid", err: domain.ErrPlaceholderNameInvalid, wantStatus: http.StatusUnprocessableEntity, wantCode: problem.CodeRequestInvalid},
-		{name: "duplicate placeholder name", err: domain.ErrDuplicatePlaceholderName, wantStatus: http.StatusUnprocessableEntity, wantCode: problem.CodeConflictAlreadyExists},
-		{name: "default", err: errors.New("boom"), wantStatus: http.StatusInternalServerError, wantCode: problem.CodeInternalUnknown},
+		{name: "not found", err: domain.ErrNotFound, wantStatus: http.StatusNotFound, wantCode: "notfound.resource"},
+		{name: "key conflict", err: domain.ErrKeyConflict, wantStatus: http.StatusConflict, wantCode: "conflict.already_exists"},
+		{name: "invalid state transition", err: domain.ErrInvalidStateTransition, wantStatus: http.StatusConflict, wantCode: "state.transition_invalid"},
+		{name: "stale base", err: domain.ErrStaleBase, wantStatus: http.StatusConflict, wantCode: "conflict.stale_base"},
+		// annex #159 / R-7.
+		{name: "stale lock version", err: domain.ErrStaleLockVersion, wantStatus: http.StatusPreconditionFailed, wantCode: "precondition.lock_version_stale"},
+		{name: "concurrent transition", err: domain.ErrConcurrentTransition, wantStatus: http.StatusConflict, wantCode: "state.transition_invalid"},
+		// R-2 (precondition.content_hash_mismatch @412) is NOT applied here: that
+		// code's single registration lives in approval/http, which templates may
+		// not import. See the sweep report.
+		{name: "content hash mismatch", err: domain.ErrContentHashMismatch, wantStatus: http.StatusConflict, wantCode: "conflict.generic"},
+		{name: "upload missing", err: domain.ErrUploadMissing, wantStatus: http.StatusConflict, wantCode: "state.upload_missing"},
+		{name: "upload too large", err: domain.ErrUploadTooLarge, wantStatus: http.StatusRequestEntityTooLarge, wantCode: "request.body_too_large"},
+		{name: "iso segregation violation", err: domain.ErrISOSegregationViolation, wantStatus: http.StatusForbidden, wantCode: "permission.iso_segregation_violation"},
+		{name: "forbidden", err: domain.ErrForbidden, wantStatus: http.StatusForbidden, wantCode: "permission.denied"},
+		{name: "system template immutable", err: domain.ErrSystemTemplateImmutable, wantStatus: http.StatusConflict, wantCode: "state.system_template_immutable"},
+		{name: "archived", err: domain.ErrArchived, wantStatus: http.StatusConflict, wantCode: "state.transition_invalid"},
+		// annex #161 / R-6.
+		{name: "placeholder name invalid", err: domain.ErrPlaceholderNameInvalid, wantStatus: http.StatusUnprocessableEntity, wantCode: "validation.placeholder_name_invalid"},
+		// annex #162 / R-18.
+		{name: "duplicate placeholder name", err: domain.ErrDuplicatePlaceholderName, wantStatus: http.StatusUnprocessableEntity, wantCode: "validation.placeholder_name_duplicate"},
+		{name: "default", err: errors.New("boom"), wantStatus: http.StatusInternalServerError, wantCode: "internal.unknown"},
 	}
 
 	for _, tc := range tests {
@@ -44,8 +54,8 @@ func TestMapErr(t *testing.T) {
 			if status != tc.wantStatus {
 				t.Fatalf("status: got %d want %d", status, tc.wantStatus)
 			}
-			if code != tc.wantCode {
-				t.Fatalf("code: got %q want %q", code, tc.wantCode)
+			if code.String() != tc.wantCode {
+				t.Fatalf("code: got %q want %q", code.String(), tc.wantCode)
 			}
 		})
 	}

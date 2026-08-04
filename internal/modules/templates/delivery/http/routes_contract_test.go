@@ -150,8 +150,11 @@ func TestUpdateTemplateSchema_StaleLockVersion_412(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &problem); err != nil {
 		t.Fatalf("decode problem: %v", err)
 	}
-	if problem.Code != "conflict.concurrent_modification" {
-		t.Fatalf("expected code CONCURRENT_MODIFICATION, got %q", problem.Code)
+	// ADR 0089 annex #159 / R-7: this site has always answered 412, but carried
+	// CONCURRENT_MODIFICATION, whose registered default is the 409 documents
+	// still emits. The wire string below is the annex's, not the source's.
+	if problem.Code != "precondition.lock_version_stale" {
+		t.Fatalf("expected code precondition.lock_version_stale, got %q", problem.Code)
 	}
 }
 

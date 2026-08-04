@@ -77,27 +77,30 @@ func TestPlaceholderOptions_SelectType_Returns200WithSchemaOptions(t *testing.T)
 	}
 }
 
-func TestPlaceholderOptions_TextType_Returns400(t *testing.T) {
+// 422, not the pre-ADR-0089 400: annex row #117 / ruling R-19 — the request
+// parses and the addressed placeholder is the wrong kind, which is a supplied
+// value failing a business rule.
+func TestPlaceholderOptions_TextType_Returns422(t *testing.T) {
 	schema := []templatesdomain.Placeholder{{ID: "p-text", Type: templatesdomain.PHText}}
 	h := NewPlaceholderOptionsHandler(fakeOptionsSchemaReader{phs: schema}, fakeOptionsIAMReader{})
 	rec := httptest.NewRecorder()
 	h.HandleGetOptions(rec, newOptionsReq("doc-1", "p-text"))
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status=%d, want 400", rec.Code)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status=%d, want 422", rec.Code)
 	}
 	var body map[string]any
 	_ = json.Unmarshal(rec.Body.Bytes(), &body)
-	if body["code"] != "not_a_choice_placeholder" {
-		t.Errorf("code=%v, want not_a_choice_placeholder", body["code"])
+	if body["code"] != "validation.placeholder_not_choice" {
+		t.Errorf("code=%v, want validation.placeholder_not_choice", body["code"])
 	}
 }
 
-func TestPlaceholderOptions_UnknownPID_Returns400(t *testing.T) {
+func TestPlaceholderOptions_UnknownPID_Returns422(t *testing.T) {
 	schema := []templatesdomain.Placeholder{{ID: "p-text", Type: templatesdomain.PHText}}
 	h := NewPlaceholderOptionsHandler(fakeOptionsSchemaReader{phs: schema}, fakeOptionsIAMReader{})
 	rec := httptest.NewRecorder()
 	h.HandleGetOptions(rec, newOptionsReq("doc-1", "nonexistent"))
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status=%d, want 400", rec.Code)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status=%d, want 422", rec.Code)
 	}
 }

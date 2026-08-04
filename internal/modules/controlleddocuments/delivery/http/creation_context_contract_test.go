@@ -175,8 +175,8 @@ func TestGetControlledDocumentCreationContext_Unconfigured_Returns500(t *testing
 	if err := json.Unmarshal(rec.Body.Bytes(), &problemBody); err != nil {
 		t.Fatalf("decode problem body: %v (body=%s)", err, rec.Body.String())
 	}
-	if problemBody.Code != "creation_context.unconfigured" {
-		t.Fatalf("code = %q, want creation_context.unconfigured", problemBody.Code)
+	if problemBody.Code != "internal.creation_context_unconfigured" {
+		t.Fatalf("code = %q, want internal.creation_context_unconfigured", problemBody.Code)
 	}
 }
 

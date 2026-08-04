@@ -16,12 +16,12 @@ import (
 var ErrNotFound = errors.New("tokens: entry not found")
 
 // ErrImmutableName signals an attempt to change name on update. Maps to 422 with
-// code immutable_field, distinct from generic validation.
+// code validation.field_immutable, distinct from generic validation.
 var ErrImmutableName = errors.New("tokens: name is immutable")
 
 // ErrReservedName signals an attempt to create a dictionary entry whose name
 // collides with a native/computed token name (the render resolver registry).
-// Maps to 422 reserved_name. Primary collision guard (SP-2 D4).
+// Maps to 422 validation.name_reserved. Primary collision guard (SP-2 D4).
 var ErrReservedName = errors.New("tokens: name is reserved (native token)")
 
 // ValidationError is a friendly first-line field validation failure. The DB

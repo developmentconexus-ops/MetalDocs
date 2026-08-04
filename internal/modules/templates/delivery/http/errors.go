@@ -11,30 +11,55 @@ import (
 	"metaldocs/internal/platform/problem"
 )
 
-// Aliases onto the canonical catalog — this package introduces no wire strings
-// of its own. ADR 0089 step 3: problem.Code is now a closed struct type issued
-// only by the registry, so a catalog code is a `var`, and an alias to one cannot
-// be `const`. Bindings are unchanged; annex §2.3 re-points them in step 11.
+// Catalog aliases + the four codes templates genuinely owns.
+//
+// ADR 0089 execution step 11 (annex §2.3 + §2.8 rows #159, #161, #162, #163).
+// Most bindings here are aliases onto the platform catalog and introduce no wire
+// string of their own; the four problem.Register calls below are the conditions
+// annex §3 ruled were being flattened onto a catalog code whose family or status
+// contradicted them.
 var (
 	codeTplNotFound               = problem.CodeNotFoundResource
 	codeTplKeyConflict            = problem.CodeConflictAlreadyExists
 	codeTplInvalidStateTransition = problem.CodeStateTransitionInvalid
 	codeTplStaleBase              = problem.CodeConflictStaleBase
-	codeTplStaleLockVersion       = problem.CodeConflictConcurrentModification
-	codeTplContentHashMismatch    = problem.CodeConflictGeneric
-	codeTplUploadMissing          = problem.CodeStateUploadMissing
-	codeTplUploadTooLarge         = problem.CodeRequestBodyTooLarge
-	codeTplISOSegregation         = problem.CodePermissionISOSegregationViolation
-	codeTplForbidden              = problem.CodePermissionDenied
-	codeTplSystemImmutable        = problem.CodeStateSystemTemplateImmutable
-	codeTplArchived               = problem.CodeStateTransitionInvalid
-	codeTplPlaceholderNameInvalid = problem.CodeRequestInvalid
-	codeTplDuplicatePlaceholder   = problem.CodeConflictAlreadyExists
-	codeTplInternalError          = problem.CodeInternalUnknown
-	codeTplInvalidRequest         = problem.CodeRequestInvalid
-	codeTplInvalidBody            = problem.CodeRequestInvalid
-	codeTplInvalidLimit           = problem.CodeRequestInvalid
-	codeTplInvalidParam           = problem.CodeRequestInvalid
+
+	// annex #159 / R-7: domain.ErrStaleLockVersion is an OCC precondition on a
+	// caller-SUPPLIED lock version, and this site has always answered 412 — but
+	// it carried CONCURRENT_MODIFICATION, whose 409 documents still emits. The
+	// name now matches the status class instead of contradicting it.
+	codeTplStaleLockVersion = problem.Register("templates", "precondition.lock_version_stale", 412)
+
+	codeTplContentHashMismatch = problem.CodeConflictGeneric
+	codeTplUploadMissing       = problem.CodeStateUploadMissing
+	codeTplUploadTooLarge      = problem.CodeRequestBodyTooLarge
+	codeTplISOSegregation      = problem.CodePermissionISOSegregationViolation
+	codeTplForbidden           = problem.CodePermissionDenied
+	codeTplSystemImmutable     = problem.CodeStateSystemTemplateImmutable
+	codeTplArchived            = problem.CodeStateTransitionInvalid
+
+	// annex #161 / R-6: these three sites answer 422 while carrying
+	// VALIDATION_ERROR, whose registered default is 400 (request.invalid). One
+	// code cannot default to both, so the semantic rejection gets its own.
+	codeTplPlaceholderNameInvalid = problem.Register("templates", "validation.placeholder_name_invalid", 422)
+
+	// annex #162 / R-18: the duplicate is inside the caller's OWN payload, so it
+	// is a content defect (422), not a collision with stored state — which is
+	// what ALREADY_EXISTS (409) claimed.
+	codeTplDuplicatePlaceholder = problem.Register("templates", "validation.placeholder_name_duplicate", 422)
+
+	codeTplInternalError = problem.CodeInternalUnknown
+
+	// annex #163 / R-6: the ADR 0086 doc_type_code gate answered 422 on
+	// VALIDATION_ERROR (400). codeTplInvalidRequest below stays bound to the
+	// generic 400 code for the genuinely request-shaped rejection at
+	// handler.go:207.
+	codeTplDocTypeCodeRequired = problem.Register("templates", "validation.doc_type_code_required", 422)
+
+	codeTplInvalidRequest = problem.CodeRequestInvalid
+	codeTplInvalidBody    = problem.CodeRequestInvalid
+	codeTplInvalidLimit   = problem.CodeRequestInvalid
+	codeTplInvalidParam   = problem.CodeRequestInvalid
 
 	// Approval-kernel entry point codes (M3 P3.S2b-4, R2a): the thin
 	// submit-for-approval/signoff handlers delegate to
@@ -93,7 +118,7 @@ func MapErr(err error) (httpStatus int, code problem.Code) {
 	case errors.Is(err, domain.ErrDocTypeCodeRequired):
 		// ADR 0086: doc_type_code is mandatory (generic templates are gone).
 		// 422 is declared on createTemplate for exactly this validation.
-		return http.StatusUnprocessableEntity, codeTplInvalidRequest
+		return http.StatusUnprocessableEntity, codeTplDocTypeCodeRequired
 	case errors.Is(err, domain.ErrApprovalRouteMissing):
 		// ADR 0086 config-first creation gate — same 409 code the submit path
 		// already raises when no active template route resolves.

@@ -128,60 +128,78 @@ var ErrBadContentType = errors.New("content-type must be application/json")
 
 // Fill-in taxonomy codes.
 //
-// ADR 0089 step 3: these were RAW STRING LITERALS at the emit sites below —
-// legal only because the old `type Code string` accepted untyped string
-// constants. problem.Code is now a closed struct type, so every code must come
-// from the registry and gets exactly one declaration site. Wire strings and
-// statuses are unchanged; annex §2.4 renames them in execution step 8.
+// ADR 0089 execution step 8 (annex §2.4, rows #116-#125). Before step 3 these
+// were RAW STRING LITERALS at the emit sites below — legal only because the old
+// `type Code string` accepted untyped string constants. Step 3 gave each one
+// declaration site; this step gives each a family from the closed semantic set
+// and BINDS its status to the code.
 //
-// The four bound to problem.CodeShared* are wire strings the approval module
-// also emits; the registry's duplicate guard forbids declaring them twice, so
-// their single registration lives in the platform catalog's shared block.
+// One status moved (annex R-19): not_a_choice_placeholder was 400, but the JSON
+// parses and the addressed placeholder is simply the wrong kind — a supplied
+// value failing a business rule, which is `validation.` @422.
+//
+// The codes bound to a problem.Code* platform var are wire strings the approval
+// module also emits; the registry's duplicate guard forbids declaring them
+// twice and documents may not import approval's delivery package, so their
+// single registration lives in the platform catalog's shared block.
 var (
 	codeFillCapabilityDenied     = problem.CodePermissionCapabilityDenied
-	codeFillNotChoicePlaceholder = problem.RegisterLegacy("documents", "not_a_choice_placeholder", 400)
-	codeFillNotFoundRevision     = problem.RegisterLegacy("documents", "not_found.revision", 404)
-	codeFillNotAuthorEditable    = problem.RegisterLegacy("documents", "state.placeholder_not_author_editable", 409)
-	codeFillRevisionNotDraft     = problem.RegisterLegacy("documents", "state.revision_not_draft", 409)
-	codeFillValidationFailed     = problem.RegisterLegacy("documents", "validation.failed", 422)
+	codeFillNotChoicePlaceholder = problem.Register("documents", "validation.placeholder_not_choice", 422)
+	codeFillNotFoundRevision     = problem.Register("documents", "notfound.revision", 404)
+	codeFillNotAuthorEditable    = problem.Register("documents", "state.placeholder_not_author_editable", 409)
+	codeFillRevisionNotDraft     = problem.Register("documents", "state.revision_not_draft", 409)
+	codeFillValidationFailed     = problem.Register("documents", "validation.failed", 422)
 	codeFillEmptyBody            = problem.CodeRequestEmptyBody
-	codeFillBadContentType       = problem.RegisterLegacy("documents", "validation.bad_content_type", 415)
-	codeFillJSONDecode           = problem.CodeRequestJSONDecode
-	codeFillInternalUnknown      = problem.CodeInternalUnknown
+
+	// STOP (annex §2.4 row #123 / C-16). The target name
+	// `request.content_type_unsupported` is already registered by approval
+	// (annex row #86, `approval/http/errors.go`). One wire string may have only
+	// one registration and documents may not import approval's delivery package,
+	// so the collapse needs a shared home in the platform catalog — a move annex
+	// §2.10 did not record for this string and this sweep is not authorised to
+	// make. Left legacy deliberately; see the sweep report.
+	codeFillBadContentType = problem.RegisterLegacy("documents", "validation.bad_content_type", 415)
+
+	codeFillJSONDecode      = problem.CodeRequestJSONDecode
+	codeFillInternalUnknown = problem.CodeInternalUnknown
 )
 
-// mapFillInError maps a service error to its RFC 9457 (status, code) pair. The
-// codes are the module's dot-notation taxonomy (see internal/platform/problem).
-func mapFillInError(err error) (int, problem.Code) {
+// mapFillInError maps a service error to its RFC 9457 problem code.
+//
+// ADR 0089 decision 3: the status is BOUND to the code at registration, so this
+// mapper no longer returns one. A per-arm status was exactly how the same
+// condition ended up carrying different statuses in different modules.
+func mapFillInError(err error) problem.Code {
 	switch {
 	case errors.As(err, &authz.ErrCapDenied{}):
-		return http.StatusForbidden, codeFillCapabilityDenied
+		return codeFillCapabilityDenied
 	case errors.As(err, &notChoicePlaceholderError{}):
-		return http.StatusBadRequest, codeFillNotChoicePlaceholder
+		return codeFillNotChoicePlaceholder
 	case errors.Is(err, v2domain.ErrNotFound):
-		return http.StatusNotFound, codeFillNotFoundRevision
+		return codeFillNotFoundRevision
 	case errors.Is(err, v2domain.ErrPlaceholderNotAuthorEditable):
-		return http.StatusConflict, codeFillNotAuthorEditable
+		return codeFillNotAuthorEditable
 	case errors.Is(err, v2domain.ErrInvalidStateTransition):
-		return http.StatusConflict, codeFillRevisionNotDraft
+		return codeFillRevisionNotDraft
 	case errors.Is(err, v2domain.ErrValidationFailed):
-		return http.StatusUnprocessableEntity, codeFillValidationFailed
+		return codeFillValidationFailed
 	case errors.Is(err, io.EOF):
-		return http.StatusBadRequest, codeFillEmptyBody
+		return codeFillEmptyBody
 	case errors.Is(err, ErrBadContentType):
-		return http.StatusUnsupportedMediaType, codeFillBadContentType
+		return codeFillBadContentType
 	case looksLikeDecodeError(err):
-		return http.StatusBadRequest, codeFillJSONDecode
+		return codeFillJSONDecode
 	default:
-		return http.StatusInternalServerError, codeFillInternalUnknown
+		return codeFillInternalUnknown
 	}
 }
 
 // writeFillInError emits the unified RFC 9457 application/problem+json error
 // shape (AD-2). The request id, when present, rides in the Problem `instance`.
 func writeFillInError(w http.ResponseWriter, reqID string, err error) {
-	status, code := mapFillInError(err)
-	prob := problem.New(status, code, errorMessage(err, status))
+	code := mapFillInError(err)
+	status, _ := problem.StatusFor(code)
+	prob := problem.NewFor(code, errorMessage(err, status))
 	if reqID != "" {
 		prob = prob.WithInstance(reqID)
 	}

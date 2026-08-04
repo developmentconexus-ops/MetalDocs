@@ -30,19 +30,22 @@ type UpdateCommand = application.UpdateCommand
 
 // Domain-specific error codes emitted by this handler.
 //
-// ADR 0089 step 3: problem.Code is now a closed struct type issued only by the
-// registry, so these are `var` bindings instead of `const … problem.Code = "…"`.
+// ADR 0089 execution step 9 (annex §2.7, rows #155-#158).
 //
 // ALREADY_EXISTS and NOT_FOUND were REDECLARATIONS of catalog strings (annex
 // collision C-4): this package declared its own constants carrying the exact
 // wire strings the platform catalog already owns. The registry's duplicate guard
-// makes that a build break, so they now reference the catalog registrations —
-// same wire strings, same statuses, one declaration site.
+// makes that a build break, so they reference the catalog registrations — same
+// wire strings, same statuses, one declaration site.
+//
+// The two OWN codes were bare lower_snake, outside every family. They are
+// re-homed under validation. (the request parses; a supplied value fails a
+// business rule), which is also their existing 422 — so no status changes.
 var (
 	CodeTokenAlreadyExists  = problem.CodeConflictAlreadyExists
 	CodeTokenNotFound       = problem.CodeNotFoundResource
-	CodeTokenImmutableField = problem.RegisterLegacy("tokens", "immutable_field", 422)
-	CodeTokenReservedName   = problem.RegisterLegacy("tokens", "reserved_name", 422)
+	CodeTokenImmutableField = problem.Register("tokens", "validation.field_immutable", 422)
+	CodeTokenReservedName   = problem.Register("tokens", "validation.name_reserved", 422)
 )
 
 // TokenService is the port the handler depends on. It matches the application

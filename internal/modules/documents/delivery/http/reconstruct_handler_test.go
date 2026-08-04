@@ -95,8 +95,8 @@ func TestReconstructHandler_NotFoundReturns404(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body["code"] != "not_found.revision" {
-		t.Fatalf("code=%v, want not_found.revision", body["code"])
+	if body["code"] != "notfound.revision" {
+		t.Fatalf("code=%v, want notfound.revision", body["code"])
 	}
 }
 

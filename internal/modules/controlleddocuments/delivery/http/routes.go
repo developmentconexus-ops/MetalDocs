@@ -346,7 +346,7 @@ func (h *Handler) GetActiveDocument(w http.ResponseWriter, r *http.Request, id o
 		return
 	}
 	if inst == nil {
-		httpresponse.WriteError(w, http.StatusNotFound, codeCDNoActiveInstance, "no active document instance for this controlled document")
+		httpresponse.WriteError(w, http.StatusNotFound, codeCDNotFoundActiveInstance, "no active document instance for this controlled document")
 		return
 	}
 
@@ -500,41 +500,60 @@ func optionalUUID(value *string) (*openapi_types.UUID, error) {
 
 // Controlled-documents domain codes.
 //
-// ADR 0089 step 3: every one of these was a RAW STRING LITERAL at its emit site
-// in writeDomainError below — 26 of them, in three competing naming conventions,
-// legal only because the old `type Code string` accepted untyped string
-// constants. That is the exact hole the closed Code type closes: a code now has
-// one declaration site and comes from the registry.
+// ADR 0089 execution step 7 (annex §2.5, rows #126-#146). Before step 3 every
+// one of these was a RAW STRING LITERAL at its emit site in writeDomainError
+// below — 26 of them, in three competing naming conventions, legal only because
+// the old `type Code string` accepted untyped string constants. Step 3 gave each
+// one declaration site; this step gives each a semantic family from the closed
+// set and BINDS its status to the code, so `RegisterLegacy` is gone from this
+// file.
 //
-// Wire strings and statuses are unchanged here; annex §2.5 renames them in
-// execution step 7. RegisterLegacy skips the semantic-family validation these
-// pre-taxonomy names would fail.
+// Families are never module-named (ADR 0089 decision 4): `template.` and
+// `creation_context.` were local dialects that told the client nothing about
+// what to do, so they are re-homed to `state.` / `internal.` per annex §1.3.
 //
-// state.approval_route_missing, PROFILE_NOT_FOUND and PROFILE_ARCHIVED are not
-// in this block: they are wire strings the approval and taxonomy modules also
-// emit, so their single registration lives in the platform catalog's shared
-// block (collisions C-9 and C-15) and the emit sites reference it directly.
+// Three codes moved 400 -> 422 (annex R-20): manual-code reason, override reason
+// and visibility scope all PARSE fine and fail a business rule over a supplied
+// value, which is `validation.` @422, not a request-shape defect.
+//
+// state.approval_route_missing, notfound.document_profile,
+// state.document_profile_archived, notfound.process_area and
+// state.process_area_archived are not declared here: they are wire strings the
+// approval and taxonomy modules also emit, so their single registration lives in
+// the platform catalog's shared block (annex §2.10 S-5..S-9, collisions C-9,
+// C-15, C-19) and the emit sites reference it directly.
 var (
-	codeCDNoActiveInstance                      = problem.RegisterLegacy("controlleddocuments", "NO_ACTIVE_INSTANCE", 404)
-	codeCDNotFound                              = problem.RegisterLegacy("controlleddocuments", "CONTROLLED_DOCUMENT_NOT_FOUND", 404)
-	codeCDNotActive                             = problem.RegisterLegacy("controlleddocuments", "CONTROLLED_DOCUMENT_NOT_ACTIVE", 409)
-	codeCDActiveRevisionExists                  = problem.RegisterLegacy("controlleddocuments", "ACTIVE_REVISION_ALREADY_EXISTS", 409)
-	codeCDCodeTaken                             = problem.RegisterLegacy("controlleddocuments", "CONTROLLED_DOCUMENT_CODE_TAKEN", 409)
-	codeCDCodeArchived                          = problem.RegisterLegacy("controlleddocuments", "CONTROLLED_DOCUMENT_CODE_ARCHIVED", 409)
-	codeCDManualCodeReasonRequired              = problem.RegisterLegacy("controlleddocuments", "MANUAL_CODE_REASON_REQUIRED", 400)
-	codeCDOverrideReasonRequired                = problem.RegisterLegacy("controlleddocuments", "OVERRIDE_REASON_REQUIRED", 400)
-	codeCDVisibilityScopeInvalid                = problem.RegisterLegacy("controlleddocuments", "VISIBILITY_SCOPE_INVALID", 400)
-	codeCDOverrideTemplateDeleted               = problem.RegisterLegacy("controlleddocuments", "OVERRIDE_TEMPLATE_DELETED", 409)
-	codeCDOverrideTemplateNotPublished          = problem.RegisterLegacy("controlleddocuments", "OVERRIDE_TEMPLATE_NOT_PUBLISHED", 409)
-	codeCDDictionaryTokenMissing                = problem.RegisterLegacy("controlleddocuments", "DICTIONARY_TOKEN_MISSING", 422)
-	codeCDTemplateInvalid                       = problem.RegisterLegacy("controlleddocuments", "template_invalid", 422)
-	codeCDTemplateArtifactMissing               = problem.RegisterLegacy("controlleddocuments", "template.artifact_missing", 409)
-	codeCDTemplateArtifactInvariantUnconfigured = problem.RegisterLegacy("controlleddocuments", "template.artifact_invariant_unconfigured", 500)
-	codeCDCreationContextUnconfigured           = problem.RegisterLegacy("controlleddocuments", "creation_context.unconfigured", 500)
-	codeCDProfileNoDefaultTemplate              = problem.RegisterLegacy("controlleddocuments", "PROFILE_NO_DEFAULT_TEMPLATE", 409)
-	codeCDDefaultTemplateObsolete               = problem.RegisterLegacy("controlleddocuments", "DEFAULT_TEMPLATE_OBSOLETE", 409)
-	codeCDAreaNotFound                          = problem.CodeNotFoundProcessArea
-	codeCDAreaArchived                          = problem.CodeStateProcessAreaArchived
+	codeCDNotFoundActiveInstance       = problem.Register("controlleddocuments", "notfound.active_document_instance", 404)
+	codeCDNotFoundControlledDocument   = problem.Register("controlleddocuments", "notfound.controlled_document", 404)
+	codeCDStateNotActive               = problem.Register("controlleddocuments", "state.controlled_document_not_active", 409)
+	codeCDStateActiveRevisionExists    = problem.Register("controlleddocuments", "state.active_revision_exists", 409)
+	codeCDConflictCodeTaken            = problem.Register("controlleddocuments", "conflict.controlled_document_code_taken", 409)
+	codeCDConflictCodeArchived         = problem.Register("controlleddocuments", "conflict.controlled_document_code_archived", 409)
+	codeCDValidationManualCodeReason   = problem.Register("controlleddocuments", "validation.manual_code_reason_required", 422)
+	codeCDValidationOverrideReason     = problem.Register("controlleddocuments", "validation.override_reason_required", 422)
+	codeCDValidationVisibilityScope    = problem.Register("controlleddocuments", "validation.visibility_scope_invalid", 422)
+	codeCDStateOverrideTplDeleted      = problem.Register("controlleddocuments", "state.override_template_deleted", 409)
+	codeCDStateOverrideTplNotPublished = problem.Register("controlleddocuments", "state.override_template_not_published", 409)
+	codeCDValidationDictionaryToken    = problem.Register("controlleddocuments", "validation.dictionary_token_missing", 422)
+
+	// STOP (annex §2.5 row #139 / C-14). The target name
+	// `validation.template_profile_mismatch` is ALSO the target of taxonomy row
+	// #150 (`TEMPLATE_PROFILE_MISMATCH`). Two modules cannot both register one
+	// wire string (record()'s duplicate guard panics at init) and a module may
+	// not import another module's delivery package, so the collapse needs a
+	// single home in the platform catalog — a decision annex §2.10 did not
+	// record for this string and this sweep is not authorised to make.
+	// Left legacy deliberately; see the sweep report.
+	codeCDTemplateInvalid = problem.RegisterLegacy("controlleddocuments", "template_invalid", 422)
+
+	codeCDStateTemplateArtifactMissing         = problem.Register("controlleddocuments", "state.template_artifact_missing", 409)
+	codeCDInternalTemplateArtifactUnconfigured = problem.Register("controlleddocuments", "internal.template_artifact_invariant_unconfigured", 500)
+	codeCDInternalCreationContextUnconfigured  = problem.Register("controlleddocuments", "internal.creation_context_unconfigured", 500)
+	codeCDStateProfileNoDefaultTemplate        = problem.Register("controlleddocuments", "state.profile_no_default_template", 409)
+	codeCDStateDefaultTemplateObsolete         = problem.Register("controlleddocuments", "state.default_template_obsolete", 409)
+
+	codeCDAreaNotFound = problem.CodeNotFoundProcessArea
+	codeCDAreaArchived = problem.CodeStateProcessAreaArchived
 )
 
 func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
@@ -542,19 +561,19 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 	switch {
 	// ADR 0022 tier-2: an in-tx authz.Require denial (e.g. PeekSeq's preview-code
 	// create check) is "you lack this capability" — surface it as 403
-	// FORBIDDEN_CAPABILITY problem+json, the same client-visible code the documents
+	// permission.capability_denied problem+json, the same client-visible code the documents
 	// module emits, never the default 500. (Without this case the wrapped denial
-	// fell through to INTERNAL_ERROR.)
+	// fell through to internal.unknown.)
 	case errors.As(err, &capDenied):
 		httpresponse.WriteError(w, http.StatusForbidden, problem.CodePermissionCapabilityDenied, "you do not have the required capability in this area")
 	case errors.Is(err, controlleddocumentsdomain.ErrNoActiveInstance):
-		httpresponse.WriteError(w, http.StatusNotFound, codeCDNoActiveInstance, "no active document instance for this controlled document")
+		httpresponse.WriteError(w, http.StatusNotFound, codeCDNotFoundActiveInstance, "no active document instance for this controlled document")
 	case errors.Is(err, controlleddocumentsdomain.ErrCDNotFound):
-		httpresponse.WriteError(w, http.StatusNotFound, codeCDNotFound, "controlled document not found")
+		httpresponse.WriteError(w, http.StatusNotFound, codeCDNotFoundControlledDocument, "controlled document not found")
 	case errors.Is(err, controlleddocumentsdomain.ErrCDNotActive):
-		httpresponse.WriteError(w, http.StatusConflict, codeCDNotActive, "controlled document is not active")
+		httpresponse.WriteError(w, http.StatusConflict, codeCDStateNotActive, "controlled document is not active")
 	case errors.Is(err, controlleddocumentsdomain.ErrActiveRevisionExists):
-		httpresponse.WriteError(w, http.StatusConflict, codeCDActiveRevisionExists, "controlled document already has an active revision")
+		httpresponse.WriteError(w, http.StatusConflict, codeCDStateActiveRevisionExists, "controlled document already has an active revision")
 	// Hard creation gate (D2): the profile has no active approval route, so the
 	// document could never be submitted. Mirrors the SAME wire contract the
 	// submit path already emits — 409 + "state.approval_route_missing"
@@ -563,29 +582,32 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 	case errors.Is(err, controlleddocumentsdomain.ErrApprovalRouteMissing):
 		httpresponse.WriteError(w, http.StatusConflict, problem.CodeStateApprovalRouteMissing, "profile has no active approval route")
 	case errors.Is(err, controlleddocumentsdomain.ErrCDCodeTaken):
-		httpresponse.WriteError(w, http.StatusConflict, codeCDCodeTaken, "controlled document code already taken")
+		httpresponse.WriteError(w, http.StatusConflict, codeCDConflictCodeTaken, "controlled document code already taken")
 	case errors.Is(err, controlleddocumentsdomain.ErrCDArchivedCodeReuse):
-		httpresponse.WriteError(w, http.StatusConflict, codeCDCodeArchived, "cannot reuse code from archived controlled document")
+		httpresponse.WriteError(w, http.StatusConflict, codeCDConflictCodeArchived, "cannot reuse code from archived controlled document")
+	// annex R-20: the three reason/scope rejections moved 400 -> 422 with the
+	// rename, so the status now comes from the registration (NewFor) instead of
+	// being restated at the call site — ADR 0089 decision 3.
 	case errors.Is(err, controlleddocumentsdomain.ErrManualCodeReasonRequired):
-		httpresponse.WriteError(w, http.StatusBadRequest, codeCDManualCodeReasonRequired, "manual code reason is required")
+		_ = problem.Write(w, problem.NewFor(codeCDValidationManualCodeReason, "manual code reason is required"))
 	case errors.Is(err, controlleddocumentsdomain.ErrOverrideReasonRequired):
-		httpresponse.WriteError(w, http.StatusBadRequest, codeCDOverrideReasonRequired, "override reason is required")
+		_ = problem.Write(w, problem.NewFor(codeCDValidationOverrideReason, "override reason is required"))
 	case errors.Is(err, controlleddocumentsdomain.ErrVisibilityScopeInvalid):
-		httpresponse.WriteError(w, http.StatusBadRequest, codeCDVisibilityScopeInvalid, "visibility scope is invalid")
+		_ = problem.Write(w, problem.NewFor(codeCDValidationVisibilityScope, "visibility scope is invalid"))
 	case errors.Is(err, controlleddocumentsdomain.ErrOverrideTemplateDeleted):
-		httpresponse.WriteError(w, http.StatusConflict, codeCDOverrideTemplateDeleted, "override template deleted")
+		httpresponse.WriteError(w, http.StatusConflict, codeCDStateOverrideTplDeleted, "override template deleted")
 	case errors.Is(err, controlleddocumentsdomain.ErrOverrideNotPublished):
-		httpresponse.WriteError(w, http.StatusConflict, codeCDOverrideTemplateNotPublished, "override template is not published")
+		httpresponse.WriteError(w, http.StatusConflict, codeCDStateOverrideTplNotPublished, "override template is not published")
 	case errors.Is(err, controlleddocumentsdomain.ErrDictionaryTokenMissing):
-		httpresponse.WriteError(w, http.StatusUnprocessableEntity, codeCDDictionaryTokenMissing, "a referenced dictionary token does not exist")
+		httpresponse.WriteError(w, http.StatusUnprocessableEntity, codeCDValidationDictionaryToken, "a referenced dictionary token does not exist")
 	case errors.Is(err, controlleddocumentsdomain.ErrTemplateProfileMismatch):
 		_ = problem.Write(w, problem.New(http.StatusUnprocessableEntity, codeCDTemplateInvalid, "template version does not match the document profile"))
 	case errors.Is(err, application.ErrTemplateArtifactMissing):
-		httpresponse.WriteError(w, http.StatusConflict, codeCDTemplateArtifactMissing, "template artifact missing")
+		httpresponse.WriteError(w, http.StatusConflict, codeCDStateTemplateArtifactMissing, "template artifact missing")
 	case errors.Is(err, application.ErrTemplateArtifactInvariantUnconfigured):
-		httpresponse.WriteError(w, http.StatusInternalServerError, codeCDTemplateArtifactInvariantUnconfigured, "template artifact invariant not configured")
+		httpresponse.WriteError(w, http.StatusInternalServerError, codeCDInternalTemplateArtifactUnconfigured, "template artifact invariant not configured")
 	case errors.Is(err, application.ErrCreationContextUnconfigured):
-		httpresponse.WriteError(w, http.StatusInternalServerError, codeCDCreationContextUnconfigured, "creation context is not configured")
+		httpresponse.WriteError(w, http.StatusInternalServerError, codeCDInternalCreationContextUnconfigured, "creation context is not configured")
 	case errors.Is(err, application.ErrActorMissing):
 		httpresponse.WriteError(w, http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "authentication required")
 	case errors.Is(err, errTenantIDInvalid):
@@ -595,9 +617,9 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 		)
 		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
 	case errors.Is(err, controlleddocumentsdomain.ErrProfileHasNoDefaultTemplate):
-		httpresponse.WriteError(w, http.StatusConflict, codeCDProfileNoDefaultTemplate, "profile has no default template")
+		httpresponse.WriteError(w, http.StatusConflict, codeCDStateProfileNoDefaultTemplate, "profile has no default template")
 	case errors.Is(err, controlleddocumentsdomain.ErrDefaultObsolete):
-		httpresponse.WriteError(w, http.StatusConflict, codeCDDefaultTemplateObsolete, "default template is obsolete")
+		httpresponse.WriteError(w, http.StatusConflict, codeCDStateDefaultTemplateObsolete, "default template is obsolete")
 	case errors.Is(err, taxonomydomain.ErrProfileNotFound):
 		httpresponse.WriteError(w, http.StatusNotFound, problem.CodeNotFoundDocumentProfile, "profile not found")
 	case errors.Is(err, taxonomydomain.ErrAreaNotFound):

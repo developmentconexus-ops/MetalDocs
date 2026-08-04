@@ -71,7 +71,7 @@ func problemCode(t *testing.T, b []byte) string {
 }
 
 // TestHTTP_CreateToken_ReservedName_Author_422 verifies POST /api/v1/tokens with
-// a native name ("author") returns HTTP 422 and problem code "reserved_name".
+// a native name ("author") returns HTTP 422 and problem code "validation.name_reserved".
 func TestHTTP_CreateToken_ReservedName_Author_422(t *testing.T) {
 	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
@@ -86,14 +86,17 @@ func TestHTTP_CreateToken_ReservedName_Author_422(t *testing.T) {
 	if rr.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, want 422 (body=%s)", rr.Code, rr.Body.String())
 	}
-	if c := problemCode(t, rr.Body.Bytes()); c != tokenshttp.CodeTokenReservedName.String() {
-		t.Fatalf("code = %q, want %q", c, tokenshttp.CodeTokenReservedName)
+	// ADR 0089 annex row #158: the wire string is asserted as a LITERAL taken from
+	// the rename table, not from tokenshttp.CodeTokenReservedName — an assertion
+	// derived from the source under test only ratifies whatever that source says.
+	if c := problemCode(t, rr.Body.Bytes()); c != "validation.name_reserved" {
+		t.Fatalf("code = %q, want %q", c, "validation.name_reserved")
 	}
 }
 
 // TestHTTP_CreateToken_ReservedName_ApprovalDate_422 verifies approval_date
 // (registry-only; absent from templates' static placeholder catalog) is also
-// blocked at the HTTP edge with 422 reserved_name (guards SP-2 N1).
+// blocked at the HTTP edge with 422 validation.name_reserved (guards SP-2 N1).
 func TestHTTP_CreateToken_ReservedName_ApprovalDate_422(t *testing.T) {
 	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
@@ -108,8 +111,11 @@ func TestHTTP_CreateToken_ReservedName_ApprovalDate_422(t *testing.T) {
 	if rr.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, want 422 (body=%s)", rr.Code, rr.Body.String())
 	}
-	if c := problemCode(t, rr.Body.Bytes()); c != tokenshttp.CodeTokenReservedName.String() {
-		t.Fatalf("code = %q, want %q", c, tokenshttp.CodeTokenReservedName)
+	// ADR 0089 annex row #158: the wire string is asserted as a LITERAL taken from
+	// the rename table, not from tokenshttp.CodeTokenReservedName — an assertion
+	// derived from the source under test only ratifies whatever that source says.
+	if c := problemCode(t, rr.Body.Bytes()); c != "validation.name_reserved" {
+		t.Fatalf("code = %q, want %q", c, "validation.name_reserved")
 	}
 }
 

@@ -93,7 +93,7 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 		title := fmt.Sprintf("E2E Happy %d", time.Now().UnixNano())
 
 		// Walk the route-bearing profiles until one also has a default template.
-		// A 409 PROFILE_NO_DEFAULT_TEMPLATE is a property of the tenant's
+		// A 409 state.profile_no_default_template is a property of the tenant's
 		// taxonomy, not a failure of the happy path; any other non-201 is.
 		var raw string
 		var attempts []string
@@ -119,7 +119,7 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 				break
 			}
 			attempts = append(attempts, fmt.Sprintf("%s -> %d %s", candidate, resp.StatusCode, raw))
-			if resp.StatusCode == http.StatusConflict && strings.Contains(raw, "PROFILE_NO_DEFAULT_TEMPLATE") {
+			if resp.StatusCode == http.StatusConflict && strings.Contains(raw, "state.profile_no_default_template") {
 				raw = ""
 				continue
 			}
@@ -727,7 +727,7 @@ func loginE2E(t *testing.T, client *http.Client, baseURL string) (userID, tenant
 // that are true for the tenant AND for the authenticated caller.
 // It returns EVERY route-bearing profile, not just the first: an active route
 // is necessary but not sufficient — the atomic create also needs the profile to
-// carry a default template (409 PROFILE_NO_DEFAULT_TEMPLATE otherwise), and the
+// carry a default template (409 state.profile_no_default_template otherwise), and the
 // creation-context contract exposes no flag for that.
 func creationContext(t *testing.T, client *http.Client, baseURL, author string) (profileCodes []string, areaCode string) {
 	t.Helper()

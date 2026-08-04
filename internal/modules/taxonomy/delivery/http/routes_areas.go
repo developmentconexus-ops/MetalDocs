@@ -178,11 +178,13 @@ func (h *Handler) writeAreaError(w http.ResponseWriter, err error) {
 	case errors.Is(err, domain.ErrAreaArchived):
 		writeError(w, http.StatusConflict, codeTaxAreaArchived, "process area is archived")
 	case errors.Is(err, domain.ErrAreaParentCycle):
-		writeError(w, http.StatusBadRequest, codeTaxAreaParentCycle, "area parent assignment creates cycle")
+		// R-25: 400 -> 422, bound to validation.area_parent_cycle.
+		writeError(w, http.StatusUnprocessableEntity, codeTaxAreaParentCycle, "area parent assignment creates cycle")
 	case errors.Is(err, domain.ErrAreaParentCodeRequired):
 		writeError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "parentCode is required")
 	case errors.Is(err, domain.ErrAreaCodeImmutable):
-		writeError(w, http.StatusBadRequest, codeTaxAreaCodeImmutable, "area code is immutable")
+		// R-25: 400 -> 422, bound to validation.area_code_immutable.
+		writeError(w, http.StatusUnprocessableEntity, codeTaxAreaCodeImmutable, "area code is immutable")
 	case errors.Is(err, domain.ErrInvalidDefaultApproverRole):
 		writeError(w, http.StatusUnprocessableEntity, problem.CodeRequestInvalid, defaultApproverRoleMessage())
 	case errors.As(err, &pgErr) && pgErr.Code == "23514":

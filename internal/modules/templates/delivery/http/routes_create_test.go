@@ -584,8 +584,10 @@ func TestCreateTemplate_BlankDocTypeCode_Returns422(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Code != "request.invalid" {
-		t.Fatalf("expected error.code=VALIDATION_ERROR, got %q", out.Code)
+	// ADR 0089 annex #163 / R-6: the ADR 0086 doc_type_code gate answers 422, so
+	// it may not carry request.invalid, whose registered default is 400.
+	if out.Code != "validation.doc_type_code_required" {
+		t.Fatalf("expected error.code=validation.doc_type_code_required, got %q", out.Code)
 	}
 	if len(repo.templates) != 0 {
 		t.Fatalf("repo persisted %d templates, want 0", len(repo.templates))

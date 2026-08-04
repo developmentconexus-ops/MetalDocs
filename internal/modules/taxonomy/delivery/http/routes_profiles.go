@@ -22,43 +22,73 @@ var (
 	writeError = httpresponse.WriteError
 )
 
-// Taxonomy profile codes. ADR 0089 step 3: problem.Code is now a closed struct
-// type issued only by the registry, so these are `var` registrations instead of
-// `const … problem.Code = "…"`. Strings and statuses are unchanged; RegisterLegacy
-// skips the family validation these SCREAMING_SNAKE names would fail. Annex §2.6
-// renames them in execution step 9.
+// Taxonomy document-profile codes.
 //
-// PROFILE_NOT_FOUND / PROFILE_ARCHIVED are also emitted as raw literals by
-// controlleddocuments, so their single registration lives in the shared block of
-// the platform catalog (collision C-15) — the registry forbids declaring one wire
-// string twice.
+// ADR 0089 execution step 9 (annex §2.6, rows #147-#154): the SCREAMING_SNAKE
+// names and their RegisterLegacy escape hatch are gone. Every code now carries a
+// semantic family prefix from the closed set, and its status is BOUND to the
+// code rather than decided per call site.
+//
+// PROFILE_NOT_FOUND / PROFILE_ARCHIVED are also emitted by controlleddocuments,
+// so their single registration lives in the shared block of the platform catalog
+// (collision C-15) — the registry forbids declaring one wire string twice, and a
+// module may not import another module's delivery package.
 var (
-	codeTaxProfileNotFound           = problem.CodeNotFoundDocumentProfile
-	codeTaxProfileArchived           = problem.CodeStateDocumentProfileArchived
-	codeTaxTemplateNotPublished      = problem.RegisterLegacy("taxonomy", "TEMPLATE_NOT_PUBLISHED", 409)
-	codeTaxTemplateProfileMismatch   = problem.RegisterLegacy("taxonomy", "TEMPLATE_PROFILE_MISMATCH", 409)
-	codeTaxProfileCodeImmutable      = problem.RegisterLegacy("taxonomy", "PROFILE_CODE_IMMUTABLE", 400)
-	codeTaxProfileAlreadyExists      = problem.RegisterLegacy("taxonomy", "PROFILE_ALREADY_EXISTS", 409)
-	codeTaxFamilyNotFound            = problem.RegisterLegacy("taxonomy", "FAMILY_NOT_FOUND", 409)
-	codeTaxProfileClassRouteConflict = problem.RegisterLegacy("taxonomy", "PROFILE_CLASS_ROUTE_CONFLICT", 409)
+	codeTaxProfileNotFound      = problem.CodeNotFoundDocumentProfile
+	codeTaxProfileArchived      = problem.CodeStateDocumentProfileArchived
+	codeTaxTemplateNotPublished = problem.Register("taxonomy", "state.template_not_published", 409)
+
+	// annex #150 / R-22 / C-14: "this template version does not belong to that
+	// document profile" was 409 here and 422 (`template_invalid`) in
+	// controlleddocuments. The caller supplied an invalid template/profile pair;
+	// nothing is racing, so 422 wins and the two codes collapse onto this one.
+	codeTaxTemplateProfileMismatch = problem.Register("taxonomy", "validation.template_profile_mismatch", 422)
+
+	// annex #151 / R-20: the body parses and a supplied value fails a business
+	// rule (the code may not change after creation) — 422, not the pre-0089 400.
+	codeTaxProfileCodeImmutable = problem.Register("taxonomy", "validation.profile_code_immutable", 422)
+
+	codeTaxProfileAlreadyExists = problem.Register("taxonomy", "conflict.document_profile_exists", 409)
+
+	// annex #153b / R-26 (ratified into ADR 0089 decision 3): FAMILY_NOT_FOUND
+	// named two different conditions. Here the family_code is a value REFERENCED
+	// INSIDE a profile body that does not resolve (the 23503 FK arm), which is a
+	// supplied-value rejection — 422, not the pre-0089 409. The other condition,
+	// where the family IS the request target, keeps 404 as
+	// codeTaxFamilyNotFound below.
+	codeTaxFamilyUnknown = problem.Register("taxonomy", "validation.family_unknown", 422)
+
+	codeTaxProfileClassRouteConflict = problem.Register("taxonomy", "state.profile_class_route_conflict", 409)
 )
 
-// Process-area and document-family codes. These were raw string literals in
-// routes_areas.go / routes_families.go and are NOT in annex §2.6, which counted
-// only this file's eight const declarations — see the report accompanying ADR
-// 0089 step 3. Strings and statuses are unchanged.
+// Process-area and document-family codes (annex §2.6b, rows #166-#173 — the
+// codes the original §2.6 inventory missed because it read only this file).
 //
-// AREA_NOT_FOUND / AREA_ARCHIVED are also emitted by controlleddocuments, so
-// they share the platform catalog's single registration.
+// AREA_NOT_FOUND / AREA_ARCHIVED are also emitted by controlleddocuments
+// (collision C-19), so they share the platform catalog's single registration.
 var (
-	codeTaxAreaNotFound          = problem.CodeNotFoundProcessArea
-	codeTaxAreaArchived          = problem.CodeStateProcessAreaArchived
-	codeTaxAreaParentCycle       = problem.RegisterLegacy("taxonomy", "AREA_PARENT_CYCLE", 400)
-	codeTaxAreaCodeImmutable     = problem.RegisterLegacy("taxonomy", "AREA_CODE_IMMUTABLE", 400)
-	codeTaxAreaAlreadyExists     = problem.RegisterLegacy("taxonomy", "AREA_ALREADY_EXISTS", 409)
-	codeTaxFamilyAlreadyInactive = problem.RegisterLegacy("taxonomy", "FAMILY_ALREADY_INACTIVE", 409)
-	codeTaxFamilyHasProfiles     = problem.RegisterLegacy("taxonomy", "FAMILY_HAS_PROFILES", 409)
-	codeTaxFamilyAlreadyExists   = problem.RegisterLegacy("taxonomy", "FAMILY_ALREADY_EXISTS", 409)
+	codeTaxAreaNotFound = problem.CodeNotFoundProcessArea
+	codeTaxAreaArchived = problem.CodeStateProcessAreaArchived
+
+	// annex #168/#169 / R-25: both requests parse and a supplied value fails a
+	// business rule — a parent_code that would close a cycle, and a code that is
+	// immutable after creation. Neither is a syntax/shape defect, so both move
+	// 400 -> 422. #169 is the exact sibling of #151 above, which R-20 already
+	// moved; leaving it at 400 would recreate the same-condition-different-status
+	// defect inside one module.
+	codeTaxAreaParentCycle   = problem.Register("taxonomy", "validation.area_parent_cycle", 422)
+	codeTaxAreaCodeImmutable = problem.Register("taxonomy", "validation.area_code_immutable", 422)
+
+	codeTaxAreaAlreadyExists = problem.Register("taxonomy", "conflict.process_area_exists", 409)
+
+	// annex #153a / R-26: the family IS the request target of
+	// /taxonomy/families/{code} (§1.4 rule 5), so this half of the old
+	// FAMILY_NOT_FOUND keeps 404. See codeTaxFamilyUnknown above for the other.
+	codeTaxFamilyNotFound = problem.Register("taxonomy", "notfound.document_family", 404)
+
+	codeTaxFamilyAlreadyInactive = problem.Register("taxonomy", "state.document_family_already_inactive", 409)
+	codeTaxFamilyHasProfiles     = problem.Register("taxonomy", "state.document_family_has_profiles", 409)
+	codeTaxFamilyAlreadyExists   = problem.Register("taxonomy", "conflict.document_family_exists", 409)
 )
 
 type profileUpsertRequest struct {
@@ -358,9 +388,11 @@ func (h *Handler) writeProfileError(w http.ResponseWriter, err error) {
 	case errors.Is(err, domain.ErrTemplateNotPublished):
 		httpresponse.WriteError(w, http.StatusConflict, codeTaxTemplateNotPublished, "template version is not published")
 	case errors.Is(err, domain.ErrTemplateProfileMismatch):
-		httpresponse.WriteError(w, http.StatusConflict, codeTaxTemplateProfileMismatch, "template version belongs to different profile")
+		// R-22: 409 -> 422, bound to validation.template_profile_mismatch.
+		httpresponse.WriteError(w, http.StatusUnprocessableEntity, codeTaxTemplateProfileMismatch, "template version belongs to different profile")
 	case errors.Is(err, domain.ErrProfileCodeImmutable):
-		httpresponse.WriteError(w, http.StatusBadRequest, codeTaxProfileCodeImmutable, "profile code is immutable")
+		// R-20: 400 -> 422, bound to validation.profile_code_immutable.
+		httpresponse.WriteError(w, http.StatusUnprocessableEntity, codeTaxProfileCodeImmutable, "profile code is immutable")
 	case errors.Is(err, domain.ErrInvalidGovernanceClass):
 		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "governance_class must be one of: controlado, simples, livre")
 	case errors.Is(err, domain.ErrInvalidEditableByRole):
@@ -372,7 +404,9 @@ func (h *Handler) writeProfileError(w http.ResponseWriter, err error) {
 	case errors.As(err, &pgErr) && pgErr.Code == "23505":
 		httpresponse.WriteError(w, http.StatusConflict, codeTaxProfileAlreadyExists, "profile code already exists")
 	case errors.As(err, &pgErr) && pgErr.Code == "23503":
-		httpresponse.WriteError(w, http.StatusConflict, codeTaxFamilyNotFound, "referenced family does not exist")
+		// R-26 / annex #153b: the referenced family_code is a supplied value that
+		// does not resolve — 409 -> 422 (behaviour-visible, ratified).
+		httpresponse.WriteError(w, http.StatusUnprocessableEntity, codeTaxFamilyUnknown, "referenced family does not exist")
 	default:
 		slog.Error("taxonomy profile error", "err", err)
 		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
