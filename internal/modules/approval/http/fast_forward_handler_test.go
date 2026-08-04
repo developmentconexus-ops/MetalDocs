@@ -113,8 +113,8 @@ func TestFastForwardHandler_MissingIdempotencyKey(t *testing.T) {
 	if err := json.NewDecoder(rr.Body).Decode(&out); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if out.Code.String() != "idempotency.key_required" {
-		t.Fatalf("error.code = %q, want %q", out.Code, "idempotency.key_required")
+	if out.Code.String() != "request.idempotency_key_required" {
+		t.Fatalf("error.code = %q, want %q", out.Code, "request.idempotency_key_required")
 	}
 }
 

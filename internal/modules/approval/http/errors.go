@@ -24,20 +24,25 @@ import (
 
 const internalErrorMessage = "internal error"
 
-// Module-local typed codes for the approval domain (dot-notation taxonomy).
+// Module-owned problem codes for the approval bounded context.
 //
-// ADR 0089 step 3: these were `const … problem.Code = "…"`. problem.Code is now a
-// closed struct type that only the registry can issue, so they are package-level
-// `var` registrations. Strings and statuses are unchanged. RegisterLegacy skips
-// the semantic-family validation these pre-taxonomy names would fail; execution
-// steps 6 and 10 rename them per annex §2.2 and delete RegisterLegacy.
+// ADR 0089 execution step 6 (annex §2.2, rows #48-#115): every RegisterLegacy is
+// gone. Each code now carries a semantic family prefix from the closed set and
+// its status is BOUND to the code, so the same condition cannot answer 409 here
+// and 412 elsewhere. Families are never module-named — the wire code tells the
+// client what to do, and `signoff.` / `sod.` / `route.` / `approval.` / `submit.`
+// / `freeze.` became lies the moment approval was extracted to a top-level module
+// (ADR 0082). They are re-homed per annex §1.3.
 //
-// The five codes bound to problem.CodeShared* are wire strings ALSO emitted by
-// another module; the registry's duplicate guard forbids declaring them twice.
+// Codes bound to a problem.Code* platform var are wire strings shared with
+// another bounded context (annex §2.9 collision classes C-1, C-3, C-5, C-6, C-7,
+// C-8, C-9, C-13, C-16); the registry's duplicate guard forbids declaring them
+// twice, and a module may not import another module's delivery package, so the
+// platform catalog is their single legal declaration site.
 var (
 	approvalCodeInternalUnknown       = problem.CodeInternalUnknown
-	approvalCodeConflictStaleRevision = problem.RegisterLegacy("approval", "conflict.stale_revision", 409)
-	approvalCodeNotFoundInstance      = problem.RegisterLegacy("approval", "not_found.instance", 404)
+	approvalCodeConflictStaleRevision = problem.Register("approval", "conflict.stale_revision", 409)
+	approvalCodeNotFoundInstance      = problem.Register("approval", "notfound.approval_instance", 404)
 	// approvalCodeNotFoundInstanceNotVisible (F8, spec.md §6.3) is the
 	// DISTINCT 404 code for infrastructure.ErrInstanceNotVisible —
 	// deliberately its own code (not approvalCodeNotFoundInstance) so
@@ -45,81 +50,129 @@ var (
 	// "instance exists but is outside this actor's visibility boundary",
 	// even though both return the same 404 status to the client (the client
 	// response body must not leak which case it is).
-	approvalCodeNotFoundInstanceNotVisible           = problem.RegisterLegacy("approval", "not_found.instance_not_visible", 404)
-	approvalCodeConflictDuplicate                    = problem.RegisterLegacy("approval", "conflict.duplicate_submission", 409)
-	approvalCodeSignoffDuplicate                     = problem.RegisterLegacy("approval", "signoff.duplicate", 409)
-	approvalCodeSubmitInvalidSupersede               = problem.RegisterLegacy("approval", "submit.invalid_supersede_target", 409)
-	approvalCodeStateInstanceCompleted               = problem.RegisterLegacy("approval", "state.instance_completed", 409)
-	approvalCodeRouteInUse                           = problem.RegisterLegacy("approval", "route.in_use", 409)
-	approvalCodeRouteDuplicateProfile                = problem.RegisterLegacy("approval", "route.duplicate_profile", 409)
-	approvalCodeSignoffNotEligible                   = problem.RegisterLegacy("approval", "signoff.not_eligible", 403)
-	approvalCodeSodSubmitterCannotSign               = problem.RegisterLegacy("approval", "sod.submitter_cannot_sign", 403)
-	approvalCodeSodCrossStageDuplicate               = problem.RegisterLegacy("approval", "sod.cross_stage_duplicate", 403)
-	approvalCodeFreezeEffDateMissing                 = problem.RegisterLegacy("approval", "freeze.effective_date_missing", 422)
-	approvalCodePreconditionIfMatch                  = problem.RegisterLegacy("approval", "precondition.if_match_required", 428)
-	approvalCodeValidationIfMatchBad                 = problem.RegisterLegacy("approval", "validation.if_match_malformed", 400)
-	approvalCodeIdempotencyRequired                  = problem.RegisterLegacy("approval", "idempotency.key_required", 400)
-	approvalCodeIdempotencyKeyConflict               = problem.RegisterLegacy("approval", "idempotency.key_conflict", 409)
-	approvalCodePreconditionHashMismatch             = problem.RegisterLegacy("approval", "precondition.content_hash_mismatch", 412)
-	approvalCodeAuthnSignatureInvalid                = problem.RegisterLegacy("approval", "authn.signature_invalid", 401)
-	approvalCodeAuthnRateLimited                     = problem.RegisterLegacy("approval", "authn.rate_limited", 429)
-	approvalCodeInternalDBPrivilege                  = problem.RegisterLegacy("approval", "internal.db_privilege_missing", 500)
-	approvalCodeInternalDBUnknown                    = problem.RegisterLegacy("approval", "internal.db_unknown", 500)
-	approvalCodeInternalSigMisconfigured             = problem.RegisterLegacy("approval", "internal.signature_misconfigured", 500)
-	approvalCodeValidationParamFormat                = problem.RegisterLegacy("approval", "validation.param_format", 400)
-	approvalCodeValidationParamUnmarshal             = problem.RegisterLegacy("approval", "validation.param_unmarshal", 400)
-	approvalCodeValidationParamRequired              = problem.RegisterLegacy("approval", "validation.param_required", 400)
-	approvalCodeValidationHeaderRequired             = problem.RegisterLegacy("approval", "validation.header_required", 400)
-	approvalCodeValidationParamTooMany               = problem.RegisterLegacy("approval", "validation.param_too_many_values", 400)
-	approvalCodeAuthzCapDenied                       = problem.CodePermissionCapabilityDenied
-	approvalCodeApprovalUnresolved                   = problem.RegisterLegacy("approval", "approval.unresolved_comments", 409)
-	approvalCodeValidationReasonRequired             = problem.RegisterLegacy("approval", "validation.reason_required", 400)
-	approvalCodeNotFoundRoute                        = problem.RegisterLegacy("approval", "not_found.route", 404)
-	approvalCodeStateRouteInactive                   = problem.RegisterLegacy("approval", "state.route_inactive", 409)
-	approvalCodeTimeout                              = problem.RegisterLegacy("approval", "timeout", 504)
-	approvalCodeValidationJSONDecode                 = problem.CodeRequestJSONDecode
-	approvalCodeValidationJSONTypeError              = problem.RegisterLegacy("approval", "validation.json_type_error", 400)
-	approvalCodeValidationEmptyBody                  = problem.CodeRequestEmptyBody
-	approvalCodeValidationContentType                = problem.RegisterLegacy("approval", "validation.content_type", 415)
-	approvalCodeValidationBodyTooLarge               = problem.RegisterLegacy("approval", "validation.body_too_large", 413)
-	approvalCodeValidationRequestInvalid             = problem.RegisterLegacy("approval", "validation.request_invalid", 400)
-	approvalCodeValidationProfileUnknown             = problem.RegisterLegacy("approval", "validation.profile_unknown", 422)
-	approvalCodeValidationReasonForChangeRequired    = problem.RegisterLegacy("approval", "validation.reason_for_change_required", 422)
-	approvalCodeValidationReasonCategoryInvalid      = problem.RegisterLegacy("approval", "validation.reason_category_invalid", 422)
-	approvalCodeValidationRevisionTitleRequired      = problem.RegisterLegacy("approval", "validation.revision_title_required", 422)
-	approvalCodeValidationDocumentSubjectKeyMismatch = problem.RegisterLegacy("approval", "validation.document_subject_key_mismatch", 422)
-	approvalCodeValidationTemplateSubjectKeyMismatch = problem.RegisterLegacy("approval", "validation.template_subject_key_mismatch", 422)
-	approvalCodeStateDocumentNotDraft                = problem.RegisterLegacy("approval", "state.document_not_draft", 409)
-	approvalCodeValidationProfileNotConfigured       = problem.RegisterLegacy("approval", "validation.profile_not_configured", 400)
-	approvalCodeStateApprovalRouteMissing            = problem.CodeStateApprovalRouteMissing
-	approvalCodeNotFoundDocument                     = problem.RegisterLegacy("approval", "not_found.document", 404)
-	approvalCodeStateDocumentNotPublished            = problem.RegisterLegacy("approval", "state.document_not_published", 409)
-	approvalCodeConflictMarkReviewedStaleRevision    = problem.RegisterLegacy("approval", "conflict.mark_reviewed_stale_revision", 409)
-	approvalCodeValidationReviewDueBeforeEffective   = problem.RegisterLegacy("approval", "validation.review_due_before_effective", 422)
-	approvalCodeValidationEffectiveToNotAfterFrom    = problem.RegisterLegacy("approval", "validation.effective_to_not_after_effective_from", 422)
-	approvalCodeValidationEmptyEligiblePool          = problem.RegisterLegacy("approval", "validation.empty_eligible_pool", 422)
-	approvalCodeValidationSubmitChoiceRequired       = problem.RegisterLegacy("approval", "validation.submit_choice_required", 422)
-	approvalCodeValidationSubmitChoiceConstraint     = problem.RegisterLegacy("approval", "validation.submit_choice_constraint_violated", 422)
+	approvalCodeNotFoundInstanceNotVisible = problem.Register("approval", "notfound.approval_instance_not_visible", 404)
+	approvalCodeConflictDuplicate          = problem.Register("approval", "conflict.duplicate_submission", 409)
+	approvalCodeSignoffDuplicate           = problem.Register("approval", "conflict.signoff_duplicate", 409)
+
+	// annex R-13: the caller supplied a supersede target id that fails a business
+	// rule. No race is asserted, so 409 was wrong — 422 (RFC 9110 §15.5.21).
+	approvalCodeValidationSupersedeTargetInvalid = problem.Register("approval", "validation.supersede_target_invalid", 422)
+
+	approvalCodeStateInstanceCompleted = problem.Register("approval", "state.approval_instance_completed", 409)
+
+	// annex R-14 / §2.8 #164: "no active stage" and "instance completed" are
+	// different conditions with different operator remedies, so domain.ErrNoActiveStage
+	// no longer folds onto state.approval_instance_completed.
+	approvalCodeStateApprovalStageNotActive = problem.Register("approval", "state.approval_stage_not_active", 409)
+
+	approvalCodeRouteInUse             = problem.Register("approval", "state.approval_route_in_use", 409)
+	approvalCodeRouteDuplicateProfile  = problem.Register("approval", "conflict.approval_route_duplicate_profile", 409)
+	approvalCodeSignoffNotEligible     = problem.Register("approval", "permission.signoff_actor_not_eligible", 403)
+	approvalCodeSodSubmitterCannotSign = problem.Register("approval", "permission.sod_submitter_cannot_sign", 403)
+	approvalCodeSodCrossStageDuplicate = problem.Register("approval", "permission.sod_cross_stage_duplicate", 403)
+	approvalCodeFreezeEffDateMissing   = problem.Register("approval", "validation.effective_date_required", 422)
+
+	approvalCodePreconditionIfMatch = problem.RegisterWithStatus("approval", "precondition.if_match_required", 428,
+		"428 Precondition Required (RFC 6585 §3): no precondition FAILED — the server refuses to act "+
+			"without one, which is the opposite of the 412 the precondition. family defaults to")
+
+	approvalCodeValidationIfMatchBad = problem.Register("approval", "request.if_match_malformed", 400)
+
+	// C-8 / C-13: the Idempotency-Key contract is a platform contract, not an
+	// approval dialect — a caller must see the same code whether or not the route
+	// is wrapped by the idempotency middleware.
+	approvalCodeIdempotencyRequired    = problem.CodeRequestIdempotencyKeyRequired
+	approvalCodeIdempotencyKeyConflict = problem.CodeConflictIdempotencyKeyReused
+
+	approvalCodePreconditionHashMismatch = problem.Register("approval", "precondition.content_hash_mismatch", 412)
+	approvalCodeAuthnSignatureInvalid    = problem.Register("approval", "auth.signature_invalid", 401)
+
+	// C-6: a throttle is a throttle. The signature re-auth limiter emits the one
+	// platform ratelimit code rather than an authn.* dialect.
+	approvalCodeAuthnRateLimited = problem.CodeRateLimitExceeded
+
+	approvalCodeInternalDBPrivilege      = problem.Register("approval", "internal.db_privilege_missing", 500)
+	approvalCodeInternalDBUnknown        = problem.Register("approval", "internal.db_unknown", 500)
+	approvalCodeInternalSigMisconfigured = problem.Register("approval", "internal.signature_misconfigured", 500)
+
+	// The five oapi-codegen parameter/header binding failures are request-SHAPE
+	// defects (annex §1.4 rule 1), not value rejections — hence request., not
+	// validation.
+	approvalCodeValidationParamFormat    = problem.Register("approval", "request.param_format", 400)
+	approvalCodeValidationParamUnmarshal = problem.Register("approval", "request.param_unmarshal", 400)
+	approvalCodeValidationParamRequired  = problem.Register("approval", "request.param_required", 400)
+	approvalCodeValidationHeaderRequired = problem.Register("approval", "request.header_required", 400)
+	approvalCodeValidationParamTooMany   = problem.Register("approval", "request.param_too_many_values", 400)
+
+	approvalCodeAuthzCapDenied     = problem.CodePermissionCapabilityDenied
+	approvalCodeApprovalUnresolved = problem.Register("approval", "state.approval_blocked_unresolved_comments", 409)
+
+	// annex R-15: the sibling reason codes (validation.reason_for_change_required,
+	// validation.reason_category_invalid) are already 422; 400 vs 422 for the same
+	// field class was incoherent.
+	approvalCodeValidationReasonRequired = problem.Register("approval", "validation.reason_required", 422)
+
+	approvalCodeNotFoundRoute     = problem.Register("approval", "notfound.approval_route", 404)
+	approvalCodeStateRouteInactive = problem.Register("approval", "state.approval_route_inactive", 409)
+
+	approvalCodeTimeout = problem.RegisterWithStatus("approval", "internal.upstream_timeout", 504,
+		"504 Gateway Timeout: the deadline was exceeded waiting on a dependency, which is a narrower "+
+			"server fault than the internal. family default of 500")
+
+	approvalCodeValidationJSONDecode    = problem.CodeRequestJSONDecode
+	approvalCodeValidationJSONTypeError = problem.Register("approval", "request.json_type_error", 400)
+	approvalCodeValidationEmptyBody     = problem.CodeRequestEmptyBody
+
+	approvalCodeValidationContentType = problem.RegisterWithStatus("approval", "request.content_type_unsupported", 415,
+		"415 Unsupported Media Type is the dedicated status for a rejected Content-Type (RFC 9110 §15.5.16)")
+
+	// C-5 / C-1: both collapse onto platform codes.
+	approvalCodeValidationBodyTooLarge  = problem.CodeRequestBodyTooLarge
+	approvalCodeValidationRequestInvalid = problem.CodeRequestInvalid
+
+	approvalCodeValidationProfileUnknown             = problem.Register("approval", "validation.profile_unknown", 422)
+	approvalCodeValidationReasonForChangeRequired    = problem.Register("approval", "validation.reason_for_change_required", 422)
+	approvalCodeValidationReasonCategoryInvalid      = problem.Register("approval", "validation.reason_category_invalid", 422)
+	approvalCodeValidationRevisionTitleRequired      = problem.Register("approval", "validation.revision_title_required", 422)
+	approvalCodeValidationDocumentSubjectKeyMismatch = problem.Register("approval", "validation.document_subject_key_mismatch", 422)
+	approvalCodeValidationTemplateSubjectKeyMismatch = problem.Register("approval", "validation.template_subject_key_mismatch", 422)
+	approvalCodeStateDocumentNotDraft                = problem.Register("approval", "state.document_not_draft", 409)
+
+	// annex R-16: same class as validation.profile_unknown (422); the 400 was
+	// inherited from the removed finalize handler.
+	approvalCodeValidationProfileNotConfigured = problem.Register("approval", "validation.profile_not_configured", 422)
+
+	approvalCodeStateApprovalRouteMissing          = problem.CodeStateApprovalRouteMissing
+	approvalCodeNotFoundDocument                   = problem.Register("approval", "notfound.document", 404)
+	approvalCodeStateDocumentNotPublished          = problem.Register("approval", "state.document_not_published", 409)
+	approvalCodeConflictMarkReviewedStaleRevision  = problem.Register("approval", "conflict.mark_reviewed_stale_revision", 409)
+	approvalCodeValidationReviewDueBeforeEffective = problem.Register("approval", "validation.review_due_before_effective", 422)
+	approvalCodeValidationEffectiveToNotAfterFrom  = problem.Register("approval", "validation.effective_to_not_after_effective_from", 422)
+	approvalCodeValidationEmptyEligiblePool        = problem.Register("approval", "validation.empty_eligible_pool", 422)
+	approvalCodeValidationSubmitChoiceRequired     = problem.Register("approval", "validation.submit_choice_required", 422)
+	approvalCodeValidationSubmitChoiceConstraint   = problem.Register("approval", "validation.submit_choice_constraint_violated", 422)
 
 	// Route-shape policy rejections (per-profile governance policy, G1/ADR 0081,
 	// livre arm superseded by ADR 0087). All 422: the request is well-formed,
 	// the resulting route shape is not permitted for the profile's class.
-	approvalCodeValidationRouteStagesNotPermitted = problem.RegisterLegacy("approval", "validation.route_stages_not_permitted", 422)
-	approvalCodeValidationApprovalStageRequired   = problem.RegisterLegacy("approval", "validation.approval_stage_required", 422)
-	approvalCodeValidationRouteStageRequired      = problem.RegisterLegacy("approval", "validation.route_stage_required", 422)
+	approvalCodeValidationRouteStagesNotPermitted = problem.Register("approval", "validation.route_stages_not_permitted", 422)
+	approvalCodeValidationApprovalStageRequired   = problem.Register("approval", "validation.approval_stage_required", 422)
+	approvalCodeValidationRouteStageRequired      = problem.Register("approval", "validation.route_stage_required", 422)
 
 	// F9/ADR 0077 — approval delegation.
-	approvalCodeValidationSelfDelegation   = problem.RegisterLegacy("approval", "validation.self_delegation", 422)
-	approvalCodeValidationDelegationWindow = problem.RegisterLegacy("approval", "validation.delegation_window_invalid", 422)
-	approvalCodeNotFoundDelegation         = problem.RegisterLegacy("approval", "not_found.delegation", 404)
+	approvalCodeValidationSelfDelegation   = problem.Register("approval", "validation.self_delegation", 422)
+	approvalCodeValidationDelegationWindow = problem.Register("approval", "validation.delegation_window_invalid", 422)
+	approvalCodeNotFoundDelegation         = problem.Register("approval", "notfound.delegation", 404)
 
-	// R3/G2 — review-verdict stage-kind guard.
-	approvalCodeStateVerdictReadyOnApprovalStage = problem.RegisterLegacy("approval", "state.verdict_ready_on_approval_stage", 422)
-	approvalCodeInternalVerdictWrongStageKind    = problem.RegisterLegacy("approval", "internal.verdict_wrong_stage_kind", 500)
+	// R3/G2 — review-verdict stage-kind guard. annex R-17: the old state. prefix
+	// contradicted both the 422 and the condition, which rejects a SUPPLIED
+	// verdict rather than reporting a lifecycle state.
+	approvalCodeStateVerdictReadyOnApprovalStage = problem.Register("approval", "validation.verdict_ready_on_approval_stage", 422)
+	approvalCodeInternalVerdictWrongStageKind    = problem.Register("approval", "internal.verdict_wrong_stage_kind", 500)
 
 	// R5/unit 2.3 G3 — fast-forward ("Aprovar já") composition guards.
-	approvalCodeStateFastForwardStageNotCompleted = problem.RegisterLegacy("approval", "state.fast_forward_stage_not_completed", 409)
-	approvalCodeStateFastForwardNotEligible       = problem.RegisterLegacy("approval", "state.fast_forward_not_eligible", 409)
+	approvalCodeStateFastForwardStageNotCompleted = problem.Register("approval", "state.fast_forward_stage_not_completed", 409)
+	approvalCodeStateFastForwardNotEligible       = problem.Register("approval", "state.fast_forward_not_eligible", 409)
 )
 
 // ValidationError is a generic request-validation failure mapped to HTTP 400
@@ -168,7 +221,7 @@ func MapErrorToResponse(err error) *problem.Problem {
 		code = approvalCodeSignoffDuplicate
 	case errors.Is(err, infrastructure.ErrInvalidSupersedeTarget):
 		statusCode = http.StatusConflict
-		code = approvalCodeSubmitInvalidSupersede
+		code = approvalCodeValidationSupersedeTargetInvalid
 	case errors.Is(err, infrastructure.ErrInstanceCompleted):
 		statusCode = http.StatusConflict
 		code = approvalCodeStateInstanceCompleted

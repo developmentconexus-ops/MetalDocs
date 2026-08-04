@@ -83,8 +83,8 @@ func TestRegisterRoutes_WrapperValidationError(t *testing.T) {
 	if body.Status != http.StatusBadRequest {
 		t.Errorf("body.status: got %d, want 400", body.Status)
 	}
-	if body.Code != "validation.param_format" {
-		t.Errorf("body.code: got %q, want validation.param_format", body.Code)
+	if body.Code != "request.param_format" {
+		t.Errorf("body.code: got %q, want request.param_format", body.Code)
 	}
 	if body.Title == "" {
 		t.Error("body.title: empty")

@@ -197,8 +197,8 @@ func TestSignoffHandler_MissingIdempotencyKey(t *testing.T) {
 	if err := json.NewDecoder(rr.Body).Decode(&out); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if out.Code.String() != "idempotency.key_required" {
-		t.Fatalf("error.code = %q, want %q", out.Code, "idempotency.key_required")
+	if out.Code.String() != "request.idempotency_key_required" {
+		t.Fatalf("error.code = %q, want %q", out.Code, "request.idempotency_key_required")
 	}
 }
 
@@ -845,8 +845,8 @@ func TestSignoffByDocumentHandler_KeyReuseDifferentBodyConflicts(t *testing.T) {
 	if err := json.NewDecoder(rr2.Body).Decode(&prob); err != nil {
 		t.Fatalf("decode conflict: %v", err)
 	}
-	if prob.Code.String() != "idempotency.key_conflict" {
-		t.Fatalf("error.code = %q, want %q", prob.Code, "idempotency.key_conflict")
+	if prob.Code.String() != "conflict.idempotency_key_reused" {
+		t.Fatalf("error.code = %q, want %q", prob.Code, "conflict.idempotency_key_reused")
 	}
 }
 

@@ -40,7 +40,7 @@ func TestMapErrorToResponse(t *testing.T) {
 			name:       "repository no active instance",
 			err:        infrastructure.ErrNoActiveInstance,
 			wantStatus: http.StatusNotFound,
-			wantCode:   "not_found.instance",
+			wantCode:   "notfound.approval_instance",
 			wantTitle:  infrastructure.ErrNoActiveInstance.Error(),
 		},
 		{
@@ -54,28 +54,28 @@ func TestMapErrorToResponse(t *testing.T) {
 			name:       "repository actor already signed",
 			err:        infrastructure.ErrActorAlreadySigned,
 			wantStatus: http.StatusConflict,
-			wantCode:   "signoff.duplicate",
+			wantCode:   "conflict.signoff_duplicate",
 			wantTitle:  infrastructure.ErrActorAlreadySigned.Error(),
 		},
 		{
 			name:       "repository instance completed",
 			err:        infrastructure.ErrInstanceCompleted,
 			wantStatus: http.StatusConflict,
-			wantCode:   "state.instance_completed",
+			wantCode:   "state.approval_instance_completed",
 			wantTitle:  infrastructure.ErrInstanceCompleted.Error(),
 		},
 		{
 			name:       "domain no active stage",
 			err:        domain.ErrNoActiveStage,
 			wantStatus: http.StatusConflict,
-			wantCode:   "state.instance_completed",
+			wantCode:   "state.approval_instance_completed",
 			wantTitle:  domain.ErrNoActiveStage.Error(),
 		},
 		{
 			name:       "R3/G2 verdict ready on approval stage",
 			err:        domain.ErrVerdictReadyOnApprovalStage,
 			wantStatus: http.StatusUnprocessableEntity,
-			wantCode:   "state.verdict_ready_on_approval_stage",
+			wantCode:   "validation.verdict_ready_on_approval_stage",
 			wantTitle:  domain.ErrVerdictReadyOnApprovalStage.Error(),
 		},
 		{
@@ -89,35 +89,35 @@ func TestMapErrorToResponse(t *testing.T) {
 			name:       "repository route in use",
 			err:        infrastructure.ErrRouteInUse,
 			wantStatus: http.StatusConflict,
-			wantCode:   "route.in_use",
+			wantCode:   "state.approval_route_in_use",
 			wantTitle:  infrastructure.ErrRouteInUse.Error(),
 		},
 		{
 			name:       "repository duplicate route profile",
 			err:        infrastructure.ErrDuplicateRouteProfile,
 			wantStatus: http.StatusConflict,
-			wantCode:   "route.duplicate_profile",
+			wantCode:   "conflict.approval_route_duplicate_profile",
 			wantTitle:  infrastructure.ErrDuplicateRouteProfile.Error(),
 		},
 		{
 			name:       "domain sod submitter cannot sign",
 			err:        domain.ErrAuthorCannotSign,
 			wantStatus: http.StatusForbidden,
-			wantCode:   "sod.submitter_cannot_sign",
+			wantCode:   "permission.sod_submitter_cannot_sign",
 			wantTitle:  domain.ErrAuthorCannotSign.Error(),
 		},
 		{
 			name:       "domain sod cross-stage duplicate",
 			err:        domain.ErrActorAlreadySigned,
 			wantStatus: http.StatusForbidden,
-			wantCode:   "sod.cross_stage_duplicate",
+			wantCode:   "permission.sod_cross_stage_duplicate",
 			wantTitle:  domain.ErrActorAlreadySigned.Error(),
 		},
 		{
 			name:       "freeze effective date missing",
 			err:        v2dom.ErrEffectiveDateMissing,
 			wantStatus: http.StatusUnprocessableEntity,
-			wantCode:   "freeze.effective_date_missing",
+			wantCode:   "validation.effective_date_required",
 			wantTitle:  v2dom.ErrEffectiveDateMissing.Error(),
 		},
 		{
@@ -189,7 +189,7 @@ func TestMapErrorToResponse(t *testing.T) {
 			name:       "approval blocked by unresolved comments",
 			err:        application.ErrApprovalBlockedByUnresolvedComments,
 			wantStatus: http.StatusConflict,
-			wantCode:   "approval.unresolved_comments",
+			wantCode:   "state.approval_blocked_unresolved_comments",
 			wantTitle:  application.ErrApprovalBlockedByUnresolvedComments.Error(),
 		},
 		{
@@ -203,21 +203,21 @@ func TestMapErrorToResponse(t *testing.T) {
 			name:       "application route not found",
 			err:        application.ErrRouteNotFound,
 			wantStatus: http.StatusNotFound,
-			wantCode:   "not_found.route",
+			wantCode:   "notfound.approval_route",
 			wantTitle:  application.ErrRouteNotFound.Error(),
 		},
 		{
 			name:       "application route already inactive",
 			err:        application.ErrRouteAlreadyInactive,
 			wantStatus: http.StatusConflict,
-			wantCode:   "state.route_inactive",
+			wantCode:   "state.approval_route_inactive",
 			wantTitle:  application.ErrRouteAlreadyInactive.Error(),
 		},
 		{
 			name:       "context deadline exceeded",
 			err:        context.DeadlineExceeded,
 			wantStatus: http.StatusGatewayTimeout,
-			wantCode:   "timeout",
+			wantCode:   "internal.upstream_timeout",
 			wantTitle:  "internal error",
 		},
 		{
@@ -239,7 +239,7 @@ func TestMapErrorToResponse(t *testing.T) {
 				return json.Unmarshal([]byte(`{"n":"x"}`), &v)
 			}(),
 			wantStatus: http.StatusBadRequest,
-			wantCode:   "validation.json_type_error",
+			wantCode:   "request.json_type_error",
 			wantTitle:  "json: cannot unmarshal string into Go struct field .n of type int",
 		},
 		{
@@ -253,14 +253,14 @@ func TestMapErrorToResponse(t *testing.T) {
 			name:       "strictjson content type",
 			err:        strictjson.ErrContentType,
 			wantStatus: http.StatusUnsupportedMediaType,
-			wantCode:   "validation.content_type",
+			wantCode:   "request.content_type_unsupported",
 			wantTitle:  strictjson.ErrContentType.Error(),
 		},
 		{
 			name:       "strictjson body too large",
 			err:        strictjson.ErrBodyTooLarge,
 			wantStatus: http.StatusRequestEntityTooLarge,
-			wantCode:   "validation.body_too_large",
+			wantCode:   "request.body_too_large",
 			wantTitle:  strictjson.ErrBodyTooLarge.Error(),
 		},
 		{
@@ -281,14 +281,14 @@ func TestMapErrorToResponse(t *testing.T) {
 			name:       "if-match malformed",
 			err:        ErrIfMatchMalformed,
 			wantStatus: http.StatusBadRequest,
-			wantCode:   "validation.if_match_malformed",
+			wantCode:   "request.if_match_malformed",
 			wantTitle:  ErrIfMatchMalformed.Error(),
 		},
 		{
 			name:       "idempotency key required",
 			err:        ErrIdempotencyRequired,
 			wantStatus: http.StatusBadRequest,
-			wantCode:   "idempotency.key_required",
+			wantCode:   "request.idempotency_key_required",
 			wantTitle:  ErrIdempotencyRequired.Error(),
 		},
 		{
@@ -302,14 +302,14 @@ func TestMapErrorToResponse(t *testing.T) {
 			name:       "signature invalid",
 			err:        approvalsignature.ErrInvalidCredentials,
 			wantStatus: http.StatusUnauthorized,
-			wantCode:   "authn.signature_invalid",
+			wantCode:   "auth.signature_invalid",
 			wantTitle:  approvalsignature.ErrInvalidCredentials.Error(),
 		},
 		{
 			name:       "generic validation error",
 			err:        NewValidationError("route_id is required"),
 			wantStatus: http.StatusBadRequest,
-			wantCode:   "validation.request_invalid",
+			wantCode:   "request.invalid",
 			wantTitle:  "route_id is required",
 		},
 		{
@@ -365,8 +365,8 @@ func TestMapErrorToResponse_ErrNoActiveStage(t *testing.T) {
 	if prob.Status != http.StatusConflict {
 		t.Fatalf("status = %d, want %d", prob.Status, http.StatusConflict)
 	}
-	if prob.Code.String() != "state.instance_completed" {
-		t.Fatalf("code = %q, want %q", prob.Code, "state.instance_completed")
+	if prob.Code.String() != "state.approval_instance_completed" {
+		t.Fatalf("code = %q, want %q", prob.Code, "state.approval_instance_completed")
 	}
 }
 
