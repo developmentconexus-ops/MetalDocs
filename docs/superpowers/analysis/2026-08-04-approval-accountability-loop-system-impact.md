@@ -5,6 +5,8 @@
 **Work type:** feature
 **Author:** developing-new-work skill
 **Verdict:** 🟡 Yellow *(see §10)*
+**Amended:** 2026-08-04, after a code-level sweep of every impacted module. See §2a — the amendment
+materially narrows the work and moves the global-maximum question. Read §2a before §3.
 
 > Same ten sections for module and feature work. Module-only rows are marked **N/A** with a one-line
 > reason rather than deleted — the record should show the question was asked.
@@ -75,6 +77,62 @@
   account by name." Whether to add a claim step is a design question for brainstorming; this analysis
   only records that visibility-of-the-pool is the prerequisite for it either way, and must not be
   designed in a way that forecloses it.
+
+## 2a. Amendment — what the module-by-module sweep found
+
+§2 was written from the system map and was directionally right but materially wrong about *what is
+missing*. A code-level read of `approval`, `notifications`, `documents/domain`, `iam` and the
+frontend changes the shape of the work. Runtime truth beats the map, so the amendment governs.
+
+**Already built — do not design it again.**
+`GET /approval/instances/{id}` already returns, per stage, `actors[]` carrying `user_id`,
+`display_name` and a status of `active` / `waiting` / `approved` / `rejected`, alongside `due_at` and
+`submitted_at` (`get_instance_handler.go:56-166`). Display names already resolve through the
+iam-owned `UserDisplayNameReader` port with a userID fallback and already do so off-tx
+(`get_instance_handler.go:169-210`, comment cites M4/F4.1 and H-PRE-1). The web client already
+renders that roster (`frontend/apps/web/src/features/documents/lib/approvalWorkflow.ts:117`). So the
+"expose who holds it, by name" half of the intent exists and works — for documents.
+
+**The three real gaps.**
+
+- **G-A — submit emits no notification, and the envelope cannot express one.** Confirmed at runtime
+  (0 rows in `metaldocs.notifications`, 0 `notification_fanout` jobs after two real submits). The
+  deeper finding is structural: `LifecycleEventArgs` (`documents/domain/notification_events.go:14`)
+  is *document-shaped* — `ControlledDocumentID`, `SubmittedBy`, five `document.*` event types — and
+  the consumer computes recipients **inside itself**, from either
+  `metaldocs.v_cd_obligated_readers` or the single author (`fanout_worker.go:93-121`). **There is no
+  "notify this explicit set of user ids" path.** The worker's `switch` also ends in
+  `default: return nil` (`fanout_worker.go:56`), so an unrecognised event type is dropped silently,
+  with no error and no dead-letter.
+- **G-B — the SLA engine is complete but unreachable through the contract.** `due_at` is computed at
+  stage activation from `due_in_days_snapshot`, stays NULL when no SLA is configured (no-fallback,
+  correct), and is exposed on the stage view, on the inbox, and as a `due_before` filter. But
+  `due_in_days` appears in `api/openapi/v1/openapi.yaml` **only inside description prose** (lines
+  6691, 7033) — it is not a settable field on any route-configuration schema. It can only be set by
+  raw SQL. That is why it is NULL everywhere and why `approval_sla_surfacer` has completed 18 clean
+  ticks finding nothing. This gap is contract/configuration work, not engine work.
+- **G-C — the template 404** (`read_service.go:986`) hides a roster that already works.
+
+**Where the global maximum actually sits — corrected.**
+§2 placed the global-maximum question on the BPMN claim step. That question is real but secondary.
+The load-bearing one is G-A: ADR 0082 promoted `approval` to a top-level module, but the lifecycle
+event envelope stayed behind in `documents/domain`, still shaped around a controlled document. A
+template approval has no controlled document at all. Adding an `approval.pending` event type to that
+envelope — with `ControlledDocumentID` empty and the recipient list smuggled in somehow — is
+precisely "optimizing inside a patch": it would ratify a boundary that ADR 0082 already moved, and it
+would put approval-specific recipient logic inside a worker that today only knows documents.
+
+The global-maximum structure is instead: **an explicit-recipient lifecycle event owned by the module
+that knows the recipients.** Concretely — the envelope carries the resolved recipient list, the
+emitter (`approval`) supplies it from the `eligible_actor_ids` snapshot it already holds, and
+`notifications` stops being the place where "who gets this" is decided for events it does not own.
+The trade-off is one migration of the event contract plus a versioned consumer, against permanently
+forking recipient resolution across two modules. The operator decides; this analysis records that
+taking the cheap path here is a known local maximum, not an oversight.
+
+**AS-2 is raised but resolved-by-choice, not unresolved:** the work *would* optimize inside a patch
+if it took the cheap path, so the design must choose the envelope question explicitly rather than
+default into it. Recording it here is what keeps the verdict at Yellow rather than Red.
 
 ## 3. Invariant alignment
 
