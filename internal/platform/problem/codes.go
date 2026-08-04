@@ -22,6 +22,21 @@ package problem
 // emit; it is documentation and lint metadata only and NEVER reaches the wire
 // (see Registration.Module).
 //
+// TWO KINDS of `shared` code live here, and the second is why this block keeps
+// growing after the module sweeps:
+//
+//  1. Wire strings that were ALREADY byte-identical in two modules before the
+//     rename — annex §2.10's nine (S-1..S-9).
+//  2. Wire strings that CONVERGE only AFTER the rename, because two modules
+//     describe the same condition and the semantic taxonomy correctly gives that
+//     condition one name (C-10..C-14, C-16..C-18, R-2/R-4/R-6/R-14/R-22).
+//
+// Both land in the same place for the same reason: Register panics at init on a
+// duplicate, and a module may not import another module's delivery package, so
+// the platform catalog is the only legal single declaration site. That is annex
+// §2.10's own argument applied to a set it did not enumerate — not a new
+// decision, but ADR 0089 decision 2 plus the module-boundary invariant.
+//
 // Do NOT add module-owned codes here — a new code belongs in its owning module,
 // registered with problem.Register under a semantic family.
 
@@ -54,6 +69,13 @@ var (
 	// the documents fill-in surface (annex §2.10 S-2/S-3, C-16).
 	CodeRequestJSONDecode = Register("shared", "request.json_decode", 400)
 	CodeRequestEmptyBody  = Register("shared", "request.empty_body", 400)
+
+	// CodeRequestContentTypeUnsupported is the third leg of C-16: approval (annex
+	// row #86) and the documents fill-in surface (row #123) both rename onto this
+	// one wire string at the same 415, so it can no longer be declared twice.
+	// Status is unchanged in both modules.
+	CodeRequestContentTypeUnsupported = RegisterWithStatus("shared", "request.content_type_unsupported", 415,
+		"415 Unsupported Media Type is the dedicated status for a rejected Content-Type (RFC 9110 §15.5.16)")
 )
 
 // ---------------------------------------------------------------------------
@@ -99,6 +121,15 @@ var (
 
 	CodePermissionOriginForbidden         = Register("platform", "permission.origin_forbidden", 403)
 	CodePermissionISOSegregationViolation = Register("platform", "permission.iso_segregation_violation", 403)
+
+	// The two sign-off eligibility denials below are emitted by BOTH approval (its
+	// own handlers) and templates (which classifies the approval kernel's published
+	// application/domain error surface at its own delivery edge). templates used to
+	// flatten both onto the generic capability denial — annex C-11 / C-12, R-4.
+	// A module may not import another module's delivery package, so the shared
+	// platform catalog is the single legal declaration site.
+	CodePermissionSignoffActorNotEligible = Register("shared", "permission.signoff_actor_not_eligible", 403)
+	CodePermissionSodSubmitterCannotSign  = Register("shared", "permission.sod_submitter_cannot_sign", 403)
 )
 
 // ---------------------------------------------------------------------------
@@ -141,6 +172,16 @@ var (
 	// Shared with controlleddocuments and taxonomy (annex §2.10 S-7/S-9).
 	CodeStateDocumentProfileArchived = Register("shared", "state.document_profile_archived", 409)
 	CodeStateProcessAreaArchived     = Register("shared", "state.process_area_archived", 409)
+
+	// The two approval-lifecycle codes below are emitted by approval and by
+	// templates, whose delivery edge classifies the approval kernel's published
+	// error surface for the template submit/signoff path.
+	//
+	// annex R-14 / §2.8 #164 keeps them apart deliberately: "the instance is
+	// finished" and "this stage is not the active one" have different operator
+	// remedies, and templates used to flatten both onto conflict.generic.
+	CodeStateApprovalInstanceCompleted = Register("shared", "state.approval_instance_completed", 409)
+	CodeStateApprovalStageNotActive    = Register("shared", "state.approval_stage_not_active", 409)
 )
 
 // ---------------------------------------------------------------------------
@@ -162,6 +203,24 @@ var (
 
 	CodeConflictStaleBase        = Register("platform", "conflict.stale_base", 409)
 	CodeConflictMembershipExists = Register("platform", "conflict.membership_exists", 409)
+
+	// Shared by approval and templates (annex C-10, R-4): a second submit while an
+	// approval instance is already open. templates used to answer conflict.generic.
+	CodeConflictDuplicateSubmission = Register("shared", "conflict.duplicate_submission", 409)
+)
+
+// ---------------------------------------------------------------------------
+// precondition. — a precondition the CALLER SUPPLIED (If-Match, expected content
+// hash, lock version) no longer holds. Default 412.
+// ---------------------------------------------------------------------------
+
+var (
+	// CodePreconditionContentHashMismatch is the single content-hash-mismatch code
+	// (annex C-17 / R-2, ratified in ADR 0089 decision 3): the caller DECLARED a
+	// precondition and it failed (RFC 9110 §15.5.13). It was 412 in approval, 422
+	// in documents and 409 in templates; 412 wins everywhere. Approval and
+	// templates both emit it, so it lives here rather than in either module.
+	CodePreconditionContentHashMismatch = Register("shared", "precondition.content_hash_mismatch", 412)
 )
 
 // ---------------------------------------------------------------------------
@@ -173,6 +232,28 @@ var (
 	// CodeValidationRoleUnknown is 422, not the pre-0089 400 (annex R-12): the
 	// body parses and the supplied value names a role that does not exist.
 	CodeValidationRoleUnknown = Register("platform", "validation.role_unknown", 422)
+
+	// CodeValidationFailed is the canonical GENERIC 422 (annex row #121, R-6). It
+	// was declared by the documents fill-in surface; taxonomy and tokens need the
+	// same string for their R-6 residual sites, which were answering 422 while
+	// carrying request.invalid (registered @400) — a code/status contradiction the
+	// registry's status binding forbids.
+	CodeValidationFailed = Register("shared", "validation.failed", 422)
+
+	// CodeValidationTemplateProfileMismatch is the single "this template version
+	// does not belong to that document profile" code (annex C-14 / R-22, rows #139
+	// + #150). It was `template_invalid` @422 in controlleddocuments and
+	// TEMPLATE_PROFILE_MISMATCH @409 in taxonomy; 422 wins — the caller supplied an
+	// invalid template/profile pair and nothing is racing.
+	CodeValidationTemplateProfileMismatch = Register("shared", "validation.template_profile_mismatch", 422)
+
+	// The three submit-time business-rule rejections below are emitted by approval
+	// and by templates (annex C-18 / R-4). Statuses already agreed at 422; only the
+	// codes diverged, because templates flattened all three onto conflict.generic
+	// and thereby made the FE message map useless for template submit.
+	CodeValidationEmptyEligiblePool             = Register("shared", "validation.empty_eligible_pool", 422)
+	CodeValidationSubmitChoiceRequired          = Register("shared", "validation.submit_choice_required", 422)
+	CodeValidationSubmitChoiceConstraintViolated = Register("shared", "validation.submit_choice_constraint_violated", 422)
 )
 
 // ---------------------------------------------------------------------------

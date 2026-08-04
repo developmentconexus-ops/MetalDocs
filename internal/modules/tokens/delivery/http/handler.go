@@ -215,12 +215,16 @@ func (h *Handler) writeTokenError(w http.ResponseWriter, err error) {
 		_ = problem.Write(w, problem.
 			New(http.StatusUnprocessableEntity, CodeTokenReservedName, "name is reserved by a native token").
 			WithFieldError("name", CodeTokenReservedName, "name collides with a built-in token; choose another"))
+	// annex R-6: both 422 sites below carried request.invalid, whose registered
+	// default is 400 — a code/status contradiction. The generic 422 is
+	// validation.failed (annex row #121), and the status now comes from the
+	// registration via NewFor instead of being restated at the call site.
 	case errors.As(err, &valErr):
-		httpresponse.WriteError(w, http.StatusUnprocessableEntity, problem.CodeRequestInvalid, valErr.Error())
+		_ = problem.Write(w, problem.NewFor(problem.CodeValidationFailed, valErr.Error()))
 	case errors.As(err, &pgErr) && pgErr.Code == "23505":
 		httpresponse.WriteError(w, http.StatusConflict, CodeTokenAlreadyExists, "token name already exists for this tenant")
 	case errors.As(err, &pgErr) && pgErr.Code == "23514":
-		httpresponse.WriteError(w, http.StatusUnprocessableEntity, problem.CodeRequestInvalid, "request violates data constraints")
+		_ = problem.Write(w, problem.NewFor(problem.CodeValidationFailed, "request violates data constraints"))
 	default:
 		slog.Error("tokens: handler error", "err", err)
 		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")

@@ -165,8 +165,10 @@ func TestCommitAutosave_HashMismatch(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusConflict {
-		t.Fatalf("expected 409, got %d body=%s", rr.Code, rr.Body.String())
+	// R-2 / ADR 0089 decision 3: the caller sent expected_content_hash and the
+	// object no longer matches it — a failed precondition, not a conflict.
+	if rr.Code != http.StatusPreconditionFailed {
+		t.Fatalf("expected 412, got %d body=%s", rr.Code, rr.Body.String())
 	}
 
 	var out struct {
@@ -175,7 +177,7 @@ func TestCommitAutosave_HashMismatch(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Code != "conflict.generic" {
-		t.Fatalf("expected error.code=CONFLICT_ERROR, got %q", out.Code)
+	if out.Code != "precondition.content_hash_mismatch" {
+		t.Fatalf("expected error.code=precondition.content_hash_mismatch, got %q", out.Code)
 	}
 }

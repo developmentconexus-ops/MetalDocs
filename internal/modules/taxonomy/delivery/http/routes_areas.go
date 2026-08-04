@@ -186,7 +186,11 @@ func (h *Handler) writeAreaError(w http.ResponseWriter, err error) {
 		// R-25: 400 -> 422, bound to validation.area_code_immutable.
 		writeError(w, http.StatusUnprocessableEntity, codeTaxAreaCodeImmutable, "area code is immutable")
 	case errors.Is(err, domain.ErrInvalidDefaultApproverRole):
-		writeError(w, http.StatusUnprocessableEntity, problem.CodeRequestInvalid, defaultApproverRoleMessage())
+		// annex R-6: this site answered 422 while carrying request.invalid, whose
+		// registered default is 400 — a code/status contradiction. The generic 422
+		// is validation.failed (annex row #121); the status now comes from the
+		// registration via NewFor instead of being restated here.
+		_ = problem.Write(w, problem.NewFor(problem.CodeValidationFailed, defaultApproverRoleMessage()))
 	case errors.As(err, &pgErr) && pgErr.Code == "23514":
 		writeError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "request violates data constraints")
 	case errors.As(err, &pgErr) && pgErr.Code == "23505":

@@ -138,27 +138,27 @@ var ErrBadContentType = errors.New("content-type must be application/json")
 // parses and the addressed placeholder is simply the wrong kind — a supplied
 // value failing a business rule, which is `validation.` @422.
 //
-// The codes bound to a problem.Code* platform var are wire strings the approval
-// module also emits; the registry's duplicate guard forbids declaring them
-// twice and documents may not import approval's delivery package, so their
-// single registration lives in the platform catalog's shared block.
+// The codes bound to a problem.Code* platform var are wire strings another
+// bounded context also emits — approval for the request.* family, and taxonomy +
+// tokens for validation.failed, the canonical generic 422 (annex row #121, R-6).
+// The registry's duplicate guard forbids declaring them twice and no module may
+// import another module's delivery package, so their single registration lives
+// in the platform catalog's shared block.
 var (
 	codeFillCapabilityDenied     = problem.CodePermissionCapabilityDenied
 	codeFillNotChoicePlaceholder = problem.Register("documents", "validation.placeholder_not_choice", 422)
 	codeFillNotFoundRevision     = problem.Register("documents", "notfound.revision", 404)
 	codeFillNotAuthorEditable    = problem.Register("documents", "state.placeholder_not_author_editable", 409)
 	codeFillRevisionNotDraft     = problem.Register("documents", "state.revision_not_draft", 409)
-	codeFillValidationFailed     = problem.Register("documents", "validation.failed", 422)
+	codeFillValidationFailed     = problem.CodeValidationFailed
 	codeFillEmptyBody            = problem.CodeRequestEmptyBody
 
-	// STOP (annex §2.4 row #123 / C-16). The target name
-	// `request.content_type_unsupported` is already registered by approval
-	// (annex row #86, `approval/http/errors.go`). One wire string may have only
-	// one registration and documents may not import approval's delivery package,
-	// so the collapse needs a shared home in the platform catalog — a move annex
-	// §2.10 did not record for this string and this sweep is not authorised to
-	// make. Left legacy deliberately; see the sweep report.
-	codeFillBadContentType = problem.RegisterLegacy("documents", "validation.bad_content_type", 415)
+	// annex §2.4 row #123 / C-16: `validation.bad_content_type` renames onto
+	// `request.content_type_unsupported`, the same string approval renames onto
+	// (row #86) at the same 415. One wire string may have only one registration
+	// and documents may not import approval's delivery package, so the collapsed
+	// code is declared once in the platform catalog's shared block.
+	codeFillBadContentType = problem.CodeRequestContentTypeUnsupported
 
 	codeFillJSONDecode      = problem.CodeRequestJSONDecode
 	codeFillInternalUnknown = problem.CodeInternalUnknown

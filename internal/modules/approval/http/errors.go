@@ -51,24 +51,24 @@ var (
 	// even though both return the same 404 status to the client (the client
 	// response body must not leak which case it is).
 	approvalCodeNotFoundInstanceNotVisible = problem.Register("approval", "notfound.approval_instance_not_visible", 404)
-	approvalCodeConflictDuplicate          = problem.Register("approval", "conflict.duplicate_submission", 409)
+	approvalCodeConflictDuplicate          = problem.CodeConflictDuplicateSubmission
 	approvalCodeSignoffDuplicate           = problem.Register("approval", "conflict.signoff_duplicate", 409)
 
 	// annex R-13: the caller supplied a supersede target id that fails a business
 	// rule. No race is asserted, so 409 was wrong — 422 (RFC 9110 §15.5.21).
 	approvalCodeValidationSupersedeTargetInvalid = problem.Register("approval", "validation.supersede_target_invalid", 422)
 
-	approvalCodeStateInstanceCompleted = problem.Register("approval", "state.approval_instance_completed", 409)
+	approvalCodeStateInstanceCompleted = problem.CodeStateApprovalInstanceCompleted
 
 	// annex R-14 / §2.8 #164: "no active stage" and "instance completed" are
 	// different conditions with different operator remedies, so domain.ErrNoActiveStage
 	// no longer folds onto state.approval_instance_completed.
-	approvalCodeStateApprovalStageNotActive = problem.Register("approval", "state.approval_stage_not_active", 409)
+	approvalCodeStateApprovalStageNotActive = problem.CodeStateApprovalStageNotActive
 
 	approvalCodeRouteInUse             = problem.Register("approval", "state.approval_route_in_use", 409)
 	approvalCodeRouteDuplicateProfile  = problem.Register("approval", "conflict.approval_route_duplicate_profile", 409)
-	approvalCodeSignoffNotEligible     = problem.Register("approval", "permission.signoff_actor_not_eligible", 403)
-	approvalCodeSodSubmitterCannotSign = problem.Register("approval", "permission.sod_submitter_cannot_sign", 403)
+	approvalCodeSignoffNotEligible     = problem.CodePermissionSignoffActorNotEligible
+	approvalCodeSodSubmitterCannotSign = problem.CodePermissionSodSubmitterCannotSign
 	approvalCodeSodCrossStageDuplicate = problem.Register("approval", "permission.sod_cross_stage_duplicate", 403)
 	approvalCodeFreezeEffDateMissing   = problem.Register("approval", "validation.effective_date_required", 422)
 
@@ -84,7 +84,7 @@ var (
 	approvalCodeIdempotencyRequired    = problem.CodeRequestIdempotencyKeyRequired
 	approvalCodeIdempotencyKeyConflict = problem.CodeConflictIdempotencyKeyReused
 
-	approvalCodePreconditionHashMismatch = problem.Register("approval", "precondition.content_hash_mismatch", 412)
+	approvalCodePreconditionHashMismatch = problem.CodePreconditionContentHashMismatch
 	approvalCodeAuthnSignatureInvalid    = problem.Register("approval", "auth.signature_invalid", 401)
 
 	// C-6: a throttle is a throttle. The signature re-auth limiter emits the one
@@ -123,8 +123,7 @@ var (
 	approvalCodeValidationJSONTypeError = problem.Register("approval", "request.json_type_error", 400)
 	approvalCodeValidationEmptyBody     = problem.CodeRequestEmptyBody
 
-	approvalCodeValidationContentType = problem.RegisterWithStatus("approval", "request.content_type_unsupported", 415,
-		"415 Unsupported Media Type is the dedicated status for a rejected Content-Type (RFC 9110 §15.5.16)")
+	approvalCodeValidationContentType = problem.CodeRequestContentTypeUnsupported
 
 	// C-5 / C-1: both collapse onto platform codes.
 	approvalCodeValidationBodyTooLarge  = problem.CodeRequestBodyTooLarge
@@ -148,9 +147,9 @@ var (
 	approvalCodeConflictMarkReviewedStaleRevision  = problem.Register("approval", "conflict.mark_reviewed_stale_revision", 409)
 	approvalCodeValidationReviewDueBeforeEffective = problem.Register("approval", "validation.review_due_before_effective", 422)
 	approvalCodeValidationEffectiveToNotAfterFrom  = problem.Register("approval", "validation.effective_to_not_after_effective_from", 422)
-	approvalCodeValidationEmptyEligiblePool        = problem.Register("approval", "validation.empty_eligible_pool", 422)
-	approvalCodeValidationSubmitChoiceRequired     = problem.Register("approval", "validation.submit_choice_required", 422)
-	approvalCodeValidationSubmitChoiceConstraint   = problem.Register("approval", "validation.submit_choice_constraint_violated", 422)
+	approvalCodeValidationEmptyEligiblePool        = problem.CodeValidationEmptyEligiblePool
+	approvalCodeValidationSubmitChoiceRequired     = problem.CodeValidationSubmitChoiceRequired
+	approvalCodeValidationSubmitChoiceConstraint   = problem.CodeValidationSubmitChoiceConstraintViolated
 
 	// Route-shape policy rejections (per-profile governance policy, G1/ADR 0081,
 	// livre arm superseded by ADR 0087). All 422: the request is well-formed,
@@ -331,8 +330,12 @@ func MapErrorToResponse(err error) *problem.Problem {
 		statusCode = http.StatusInternalServerError
 		code = approvalCodeInternalDBUnknown
 	case errors.Is(err, domain.ErrNoActiveStage):
+		// annex R-14: "no active stage" and "the instance is completed" are
+		// different conditions with different operator remedies, so this sentinel
+		// no longer folds onto state.approval_instance_completed — which now
+		// carries only infrastructure.ErrInstanceCompleted. Status is unchanged.
 		statusCode = http.StatusConflict
-		code = approvalCodeStateInstanceCompleted
+		code = approvalCodeStateApprovalStageNotActive
 	case errors.Is(err, domain.ErrVerdictReadyOnApprovalStage):
 		// R3/G2: a `ready` verdict targeting an approval-kind stage is a
 		// business-rule rejection of a semantically-valid request — 422,

@@ -68,7 +68,7 @@ func TestMapErrorToResponse(t *testing.T) {
 			name:       "domain no active stage",
 			err:        domain.ErrNoActiveStage,
 			wantStatus: http.StatusConflict,
-			wantCode:   "state.approval_instance_completed",
+			wantCode:   "state.approval_stage_not_active",
 			wantTitle:  domain.ErrNoActiveStage.Error(),
 		},
 		{
@@ -365,8 +365,12 @@ func TestMapErrorToResponse_ErrNoActiveStage(t *testing.T) {
 	if prob.Status != http.StatusConflict {
 		t.Fatalf("status = %d, want %d", prob.Status, http.StatusConflict)
 	}
-	if prob.Code.String() != "state.approval_instance_completed" {
-		t.Fatalf("code = %q, want %q", prob.Code, "state.approval_instance_completed")
+	// R-14 (annex row #164): ErrNoActiveStage and ErrStageNotActive used to fold
+	// into "instance completed", which is a different condition — an instance can
+	// be very much open while the stage it is on is not active. They now carry
+	// their own code, in both this module and templates.
+	if prob.Code.String() != "state.approval_stage_not_active" {
+		t.Fatalf("code = %q, want %q", prob.Code, "state.approval_stage_not_active")
 	}
 }
 

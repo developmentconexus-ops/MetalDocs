@@ -41,8 +41,10 @@ var (
 	// annex #150 / R-22 / C-14: "this template version does not belong to that
 	// document profile" was 409 here and 422 (`template_invalid`) in
 	// controlleddocuments. The caller supplied an invalid template/profile pair;
-	// nothing is racing, so 422 wins and the two codes collapse onto this one.
-	codeTaxTemplateProfileMismatch = problem.Register("taxonomy", "validation.template_profile_mismatch", 422)
+	// nothing is racing, so 422 wins and the two codes collapse onto this one —
+	// declared in the platform catalog's shared block because both modules emit it
+	// and neither may import the other's delivery package.
+	codeTaxTemplateProfileMismatch = problem.CodeValidationTemplateProfileMismatch
 
 	// annex #151 / R-20: the body parses and a supplied value fails a business
 	// rule (the code may not change after creation) — 422, not the pre-0089 400.
@@ -396,7 +398,11 @@ func (h *Handler) writeProfileError(w http.ResponseWriter, err error) {
 	case errors.Is(err, domain.ErrInvalidGovernanceClass):
 		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "governance_class must be one of: controlado, simples, livre")
 	case errors.Is(err, domain.ErrInvalidEditableByRole):
-		httpresponse.WriteError(w, http.StatusUnprocessableEntity, problem.CodeRequestInvalid, editableByRoleMessage())
+		// annex R-6: this site answered 422 while carrying request.invalid, whose
+		// registered default is 400 — a code/status contradiction. The generic 422
+		// is validation.failed (annex row #121); the status now comes from the
+		// registration via NewFor instead of being restated here.
+		_ = problem.Write(w, problem.NewFor(problem.CodeValidationFailed, editableByRoleMessage()))
 	case errors.Is(err, domain.ErrClassChangeRouteConflict):
 		httpresponse.WriteError(w, http.StatusConflict, codeTaxProfileClassRouteConflict, "reclassification conflicts with an active approval route")
 	case errors.As(err, &pgErr) && pgErr.Code == "23514":

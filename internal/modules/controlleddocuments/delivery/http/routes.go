@@ -517,11 +517,12 @@ func optionalUUID(value *string) (*openapi_types.UUID, error) {
 // value, which is `validation.` @422, not a request-shape defect.
 //
 // state.approval_route_missing, notfound.document_profile,
-// state.document_profile_archived, notfound.process_area and
-// state.process_area_archived are not declared here: they are wire strings the
-// approval and taxonomy modules also emit, so their single registration lives in
-// the platform catalog's shared block (annex §2.10 S-5..S-9, collisions C-9,
-// C-15, C-19) and the emit sites reference it directly.
+// state.document_profile_archived, notfound.process_area,
+// state.process_area_archived and validation.template_profile_mismatch are not
+// declared here: they are wire strings the approval and taxonomy modules also
+// emit, so their single registration lives in the platform catalog's shared
+// block (annex §2.10 S-5..S-9 plus C-14) and the emit sites reference it
+// directly.
 var (
 	codeCDNotFoundActiveInstance       = problem.Register("controlleddocuments", "notfound.active_document_instance", 404)
 	codeCDNotFoundControlledDocument   = problem.Register("controlleddocuments", "notfound.controlled_document", 404)
@@ -536,15 +537,14 @@ var (
 	codeCDStateOverrideTplNotPublished = problem.Register("controlleddocuments", "state.override_template_not_published", 409)
 	codeCDValidationDictionaryToken    = problem.Register("controlleddocuments", "validation.dictionary_token_missing", 422)
 
-	// STOP (annex §2.5 row #139 / C-14). The target name
-	// `validation.template_profile_mismatch` is ALSO the target of taxonomy row
-	// #150 (`TEMPLATE_PROFILE_MISMATCH`). Two modules cannot both register one
-	// wire string (record()'s duplicate guard panics at init) and a module may
-	// not import another module's delivery package, so the collapse needs a
-	// single home in the platform catalog — a decision annex §2.10 did not
-	// record for this string and this sweep is not authorised to make.
-	// Left legacy deliberately; see the sweep report.
-	codeCDTemplateInvalid = problem.RegisterLegacy("controlleddocuments", "template_invalid", 422)
+	// annex §2.5 row #139 / C-14 / R-22: `template_invalid` renames onto
+	// `validation.template_profile_mismatch`, which is ALSO the target of taxonomy
+	// row #150 (`TEMPLATE_PROFILE_MISMATCH`). Two modules cannot both register one
+	// wire string (record()'s duplicate guard panics at init) and a module may not
+	// import another module's delivery package, so the collapsed code is declared
+	// once in the platform catalog's shared block. Status is unchanged here (422);
+	// taxonomy's site moves 409 -> 422.
+	codeCDTemplateInvalid = problem.CodeValidationTemplateProfileMismatch
 
 	codeCDStateTemplateArtifactMissing         = problem.Register("controlleddocuments", "state.template_artifact_missing", 409)
 	codeCDInternalTemplateArtifactUnconfigured = problem.Register("controlleddocuments", "internal.template_artifact_invariant_unconfigured", 500)
@@ -601,7 +601,7 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 	case errors.Is(err, controlleddocumentsdomain.ErrDictionaryTokenMissing):
 		httpresponse.WriteError(w, http.StatusUnprocessableEntity, codeCDValidationDictionaryToken, "a referenced dictionary token does not exist")
 	case errors.Is(err, controlleddocumentsdomain.ErrTemplateProfileMismatch):
-		_ = problem.Write(w, problem.New(http.StatusUnprocessableEntity, codeCDTemplateInvalid, "template version does not match the document profile"))
+		_ = problem.Write(w, problem.NewFor(codeCDTemplateInvalid, "template version does not match the document profile"))
 	case errors.Is(err, application.ErrTemplateArtifactMissing):
 		httpresponse.WriteError(w, http.StatusConflict, codeCDStateTemplateArtifactMissing, "template artifact missing")
 	case errors.Is(err, application.ErrTemplateArtifactInvariantUnconfigured):

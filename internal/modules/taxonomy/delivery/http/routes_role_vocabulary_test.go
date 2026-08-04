@@ -59,8 +59,8 @@ func TestProfilesHandler_InvalidEditableByRoleReturns422(t *testing.T) {
 		t.Fatalf("status = %d, want %d (body=%s)", rec.Code, http.StatusUnprocessableEntity, rec.Body.String())
 	}
 	p := decodeProblem(t, rec)
-	if p.Code != problem.CodeRequestInvalid {
-		t.Fatalf("problem code = %q, want %q", p.Code, problem.CodeRequestInvalid)
+	if p.Code.String() != "validation.failed" {
+		t.Fatalf("problem code = %q, want %q", p.Code, "validation.failed")
 	}
 	// The message is rendered from the registry, so it must name every canonical
 	// role — including system_admin, which IS valid for editable_by_role.
@@ -86,8 +86,8 @@ func TestAreasHandler_InvalidDefaultApproverRoleReturns422(t *testing.T) {
 		t.Fatalf("status = %d, want %d (body=%s)", rec.Code, http.StatusUnprocessableEntity, rec.Body.String())
 	}
 	p := decodeProblem(t, rec)
-	if p.Code != problem.CodeRequestInvalid {
-		t.Fatalf("problem code = %q, want %q", p.Code, problem.CodeRequestInvalid)
+	if p.Code.String() != "validation.failed" {
+		t.Fatalf("problem code = %q, want %q", p.Code, "validation.failed")
 	}
 	// system_admin is the whole point of the AreaRole subset: it must NOT be
 	// offered as an accepted value.
@@ -122,8 +122,8 @@ func TestProfilesHandler_InvalidEditableByRoleOnUpdateReturns422(t *testing.T) {
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, want %d (body=%s)", rec.Code, http.StatusUnprocessableEntity, rec.Body.String())
 	}
-	if p := decodeProblem(t, rec); p.Code != problem.CodeRequestInvalid {
-		t.Fatalf("problem code = %q, want %q", p.Code, problem.CodeRequestInvalid)
+	if p := decodeProblem(t, rec); p.Code.String() != "validation.failed" {
+		t.Fatalf("problem code = %q, want %q", p.Code, "validation.failed")
 	}
 }
 
@@ -141,8 +141,8 @@ func TestAreasHandler_SystemAdminDefaultApproverRoleOnUpdateReturns422(t *testin
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, want %d (body=%s)", rec.Code, http.StatusUnprocessableEntity, rec.Body.String())
 	}
-	if p := decodeProblem(t, rec); p.Code != problem.CodeRequestInvalid {
-		t.Fatalf("problem code = %q, want %q", p.Code, problem.CodeRequestInvalid)
+	if p := decodeProblem(t, rec); p.Code.String() != "validation.failed" {
+		t.Fatalf("problem code = %q, want %q", p.Code, "validation.failed")
 	}
 }
 
@@ -212,8 +212,8 @@ func TestProfilesHandler_RealServiceRejectsNonCanonicalRoleWith422(t *testing.T)
 		t.Fatalf("status = %d, want %d (body=%s)", rec.Code, http.StatusUnprocessableEntity, rec.Body.String())
 	}
 	p := decodeProblem(t, rec)
-	if p.Code != problem.CodeRequestInvalid {
-		t.Fatalf("problem code = %q, want %q", p.Code, problem.CodeRequestInvalid)
+	if p.Code.String() != "validation.failed" {
+		t.Fatalf("problem code = %q, want %q", p.Code, "validation.failed")
 	}
 	if !strings.Contains(p.Title, string(iamtypes.RoleEditor)) {
 		t.Fatalf("message %q does not name the accepted roles", p.Title)

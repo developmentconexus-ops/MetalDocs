@@ -30,13 +30,19 @@ var (
 	// name now matches the status class instead of contradicting it.
 	codeTplStaleLockVersion = problem.Register("templates", "precondition.lock_version_stale", 412)
 
-	codeTplContentHashMismatch = problem.CodeConflictGeneric
-	codeTplUploadMissing       = problem.CodeStateUploadMissing
-	codeTplUploadTooLarge      = problem.CodeRequestBodyTooLarge
-	codeTplISOSegregation      = problem.CodePermissionISOSegregationViolation
-	codeTplForbidden           = problem.CodePermissionDenied
-	codeTplSystemImmutable     = problem.CodeStateSystemTemplateImmutable
-	codeTplArchived            = problem.CodeStateTransitionInvalid
+	// annex R-2 / C-17, ratified in ADR 0089 decision 3: the caller SUPPLIES the
+	// expected hash and the server refuses because the world moved — textbook RFC
+	// 9110 §15.5.13. This site answered 409 conflict.generic; it is now 412
+	// precondition.content_hash_mismatch, the same code and status approval and
+	// documents answer. BEHAVIOUR-VISIBLE: 409 -> 412.
+	codeTplContentHashMismatch = problem.CodePreconditionContentHashMismatch
+
+	codeTplUploadMissing   = problem.CodeStateUploadMissing
+	codeTplUploadTooLarge  = problem.CodeRequestBodyTooLarge
+	codeTplISOSegregation  = problem.CodePermissionISOSegregationViolation
+	codeTplForbidden       = problem.CodePermissionDenied
+	codeTplSystemImmutable = problem.CodeStateSystemTemplateImmutable
+	codeTplArchived        = problem.CodeStateTransitionInvalid
 
 	// annex #161 / R-6: these three sites answer 422 while carrying
 	// VALIDATION_ERROR, whose registered default is 400 (request.invalid). One
@@ -67,8 +73,29 @@ var (
 	// (application-layer) error surface here — never approval/infrastructure,
 	// per the module-boundary allow-model.
 	codeTplApprovalRouteMissing = problem.CodeStateApprovalRouteMissing
-	codeTplApprovalConflict     = problem.CodeConflictGeneric
 	codeTplApprovalNotFound     = problem.CodeNotFoundResource
+
+	// codeTplApprovalConflict was a single generic 409/422 bucket for eight
+	// distinct approval-kernel conditions, which is exactly what made the FE
+	// message map useless for template submit (annex R-10). Annex R-4 / R-14 /
+	// C-10 / C-18 split it: templates adopts approval's codes verbatim, so the same
+	// condition answers the same code and status from either surface. Only
+	// approvalapp.ErrTemplateVersionNotDraft — a templates-lifecycle state, not an
+	// approval one — keeps the generic 409.
+	codeTplApprovalConflict = problem.CodeConflictGeneric
+
+	// The eight adopted codes below are declared in the platform catalog's shared
+	// block: approval owns the conditions, but templates may not import approval's
+	// delivery package (module-boundary invariant, ADR 0082) and one wire string
+	// may have only one registration.
+	codeTplDuplicateSubmission       = problem.CodeConflictDuplicateSubmission
+	codeTplApprovalInstanceCompleted = problem.CodeStateApprovalInstanceCompleted
+	codeTplApprovalStageNotActive    = problem.CodeStateApprovalStageNotActive
+	codeTplEmptyEligiblePool         = problem.CodeValidationEmptyEligiblePool
+	codeTplSubmitChoiceRequired      = problem.CodeValidationSubmitChoiceRequired
+	codeTplSubmitChoiceConstraint    = problem.CodeValidationSubmitChoiceConstraintViolated
+	codeTplSignoffActorNotEligible   = problem.CodePermissionSignoffActorNotEligible
+	codeTplSodSubmitterCannotSign    = problem.CodePermissionSodSubmitterCannotSign
 )
 
 // MapErr translates a domain/application error from the templates module into
@@ -92,7 +119,7 @@ func MapErr(err error) (httpStatus int, code problem.Code) {
 	case errors.Is(err, domain.ErrStaleLockVersion):
 		return http.StatusPreconditionFailed, codeTplStaleLockVersion
 	case errors.Is(err, domain.ErrContentHashMismatch):
-		return http.StatusConflict, codeTplContentHashMismatch
+		return http.StatusPreconditionFailed, codeTplContentHashMismatch
 	case errors.Is(err, domain.ErrUploadMissing):
 		return http.StatusConflict, codeTplUploadMissing
 	case errors.Is(err, domain.ErrUploadTooLarge):
@@ -148,7 +175,7 @@ func MapErr(err error) (httpStatus int, code problem.Code) {
 	case errors.Is(err, approvalapp.ErrStageNotActive):
 		return http.StatusConflict, codeTplApprovalConflict
 	case errors.Is(err, approvalapp.ErrContentHashMismatch):
-		return http.StatusConflict, codeTplContentHashMismatch
+		return http.StatusPreconditionFailed, codeTplContentHashMismatch
 	case errors.Is(err, approvalapp.ErrIdempotencyKeyRequired):
 		return http.StatusBadRequest, problem.CodeRequestIdempotencyKeyRequired
 	case errors.Is(err, approvaldomain.ErrEmptyEligiblePool):

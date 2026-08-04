@@ -29,10 +29,12 @@ func TestMapErr(t *testing.T) {
 		// annex #159 / R-7.
 		{name: "stale lock version", err: domain.ErrStaleLockVersion, wantStatus: http.StatusPreconditionFailed, wantCode: "precondition.lock_version_stale"},
 		{name: "concurrent transition", err: domain.ErrConcurrentTransition, wantStatus: http.StatusConflict, wantCode: "state.transition_invalid"},
-		// R-2 (precondition.content_hash_mismatch @412) is NOT applied here: that
-		// code's single registration lives in approval/http, which templates may
-		// not import. See the sweep report.
-		{name: "content hash mismatch", err: domain.ErrContentHashMismatch, wantStatus: http.StatusConflict, wantCode: "conflict.generic"},
+		// R-2, ADR 0089 decision 3: a content-hash mismatch is 412 everywhere. The
+		// caller DECLARED a precondition and it failed (RFC 9110 §15.5.13); 409
+		// claimed a resource-state conflict and 422 would have claimed the payload
+		// was malformed, which it is not — the payload is fine, the world moved.
+		// The code lives in the platform catalog because approval emits it too.
+		{name: "content hash mismatch", err: domain.ErrContentHashMismatch, wantStatus: http.StatusPreconditionFailed, wantCode: "precondition.content_hash_mismatch"},
 		{name: "upload missing", err: domain.ErrUploadMissing, wantStatus: http.StatusConflict, wantCode: "state.upload_missing"},
 		{name: "upload too large", err: domain.ErrUploadTooLarge, wantStatus: http.StatusRequestEntityTooLarge, wantCode: "request.body_too_large"},
 		{name: "iso segregation violation", err: domain.ErrISOSegregationViolation, wantStatus: http.StatusForbidden, wantCode: "permission.iso_segregation_violation"},

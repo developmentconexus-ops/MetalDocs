@@ -374,8 +374,8 @@ func TestWriteDomainError_TemplateMismatchIs422(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("unmarshal: %v; body=%s", err, rec.Body.String())
 	}
-	if body.Code != "template_invalid" {
-		t.Fatalf("code = %q, want %q", body.Code, "template_invalid")
+	if body.Code != "validation.template_profile_mismatch" {
+		t.Fatalf("code = %q, want %q", body.Code, "validation.template_profile_mismatch")
 	}
 }
 
