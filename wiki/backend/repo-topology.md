@@ -1,6 +1,6 @@
 # Repository Topology
 
-> **Last verified:** 2026-07-02 (outbox-worker goroutine rows updated for StagingOutboxWorker consolidation) | **Prior:** 2026-07-01 (TST-13 — deleted `start-api-no-build.ps1`, `start-api-planc.ps1`, `start-api.sh`, `check-governance.sh`, `run_metaldocs.ps1`, `dev-api-web.ps1`; prior: 2026-06-15 M4c F4c.5)
+> **Last verified:** 2026-08-03 (DB baseline fold f1910ac1/557a6af4: `db/` table updated — 4-stage bootstrap + `db/grants/`, `db/migrations/` noted as the currently-empty post-fold forward tail) | **Prior:** 2026-07-02 (outbox-worker goroutine rows updated for StagingOutboxWorker consolidation) | **Prior:** 2026-07-01 (TST-13 — deleted `start-api-no-build.ps1`, `start-api-planc.ps1`, `start-api.sh`, `check-governance.sh`, `run_metaldocs.ps1`, `dev-api-web.ps1`; prior: 2026-06-15 M4c F4c.5)
 > **Scope:** Top-level directory layout, all binaries built and run, Go module configuration, CI pipeline shape, script entry points, and orphan/legacy classification for every top-level directory. Does not descend into `frontend/`, `node_modules/`, `vendor/`, `.worktrees/`, `.clone/`, or `non_git/` beyond identification.
 > **Key files:**
 > - `apps/api/cmd/metaldocs-api/main.go` — composition root (binary 1)
@@ -252,11 +252,12 @@ The entire `internal/api/v2/` package (`types_gen.go` + `contract_test.go`) was 
 
 | Path | Role |
 |---|---|
-| `db/migrations/` | 31 forward-only SQL migration files (0203–0233); `platform/migrate` applies these at API startup. Migrations 0001–0202 are in `archive/migrations/` and are not applied by the runner. |
-| `db/baseline/0001_current_schema.sql` | Curated schema snapshot representing the baseline state |
-| `db/prerequisites/0001_extensions.sql` | PG extension setup (run once before migrations) |
-| `db/dev-seeds/0001_local_dev_seed.sql` | Local dev seed data |
-| `db/reference-data/0001_product_reference_data.sql` | Product reference data applied via bootstrap |
+| `db/migrations/` | Post-baseline forward-only SQL migration tail; `platform/migrate.Apply` applies these at API startup. **Currently empty except `README.md`** — migrations `0257`–`0315` were folded into the baseline 2026-07-29 and archived to `archive/migrations/post-baseline-2026-07-fold/`; pre-baseline `0001`–`0211` live in `archive/migrations/` (root) and are not applied by the runner. See `wiki/database/migration-policy.md`. |
+| `db/baseline/0001_current_schema.sql` | Curated schema snapshot representing the baseline state (bootstrap stage 2) |
+| `db/prerequisites/0001_extensions.sql` | PG extension setup, bootstrap stage 1 (run once before schema objects) |
+| `db/reference-data/0001_product_reference_data.sql` | Product reference data + folded ledger rows, bootstrap stage 3 |
+| `db/grants/0001_role_grants.sql` | Privilege/role effects a schema-only `pg_dump` can't carry, bootstrap stage 4; also applied unconditionally at every API startup via `migrate.ApplyGrants` |
+| `db/dev-seeds/0001_local_dev_seed.sql` | Local dev seed data (optional) |
 
 ### sql/ — supplementary SQL artifacts
 

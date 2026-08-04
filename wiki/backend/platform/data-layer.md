@@ -1,6 +1,6 @@
 # Platform Data Layer
 
-> **Last verified:** 2026-06-11 (Wave 1: `platform/cache` deleted F-08; River migration single-owner F-19)
+> **Last verified:** 2026-08-03 (DB baseline fold f1910ac1/557a6af4: `migrate.go` gained `ApplyGrants` for the new `db/grants/` bootstrap stage; `db/migrations/` forward tail is now empty post-fold) | **Prior:** 2026-06-11 (Wave 1: `platform/cache` deleted F-08; River migration single-owner F-19)
 > **Scope:** Packages `internal/platform/db`, `internal/platform/migrate`, `internal/platform/bootstrap`, `internal/platform/objectstore`, `internal/platform/storage`. Covers Postgres connectivity, schema migration, DI bootstrap factories, MinIO presigning, and raw blob storage. `platform/cache` was deleted in Wave 1 (F-08/REQ-TOP-3 — was a `.gitkeep`-only empty scaffold).
 > **Key files:**
 > - `internal/platform/db/postgres/connect.go` — sole Postgres connection factory
@@ -301,7 +301,7 @@ Reads from and writes to `public.schema_migrations`. The `SELECT version FROM pu
 
 Advisory lock key: `0x4D444D4947528000` (named constant at `migrate.go:24`).
 
-Migration files are in `db/migrations/` (versions 0203 through 0233 as of 2026-06-10). The runner applies only these tail files; the prerequisite (`db/prerequisites/0001_extensions.sql`), curated baseline (`db/baseline/0001_current_schema.sql`), reference data (`db/reference-data/0001_product_reference_data.sql`), and dev seeds (`db/dev-seeds/0001_local_dev_seed.sql`) are applied separately by `scripts/dev-bootstrap-baseline.ps1`.
+Migration files are in `db/migrations/` — **currently empty except `README.md`**; migrations `0257`–`0315` were folded into the baseline 2026-07-29 (see `wiki/database/migration-policy.md`). `migrate.Apply` (`migrate.go:32`) applies only forward-tail files in this directory and tolerates it being empty. Separately, `migrate.ApplyGrants` (`migrate.go:115`) applies `db/grants/0001_role_grants.sql` unconditionally on every API startup, under the same advisory lock, before `Apply` — unlike `Apply` it writes no `schema_migrations` ledger rows. The prerequisite (`db/prerequisites/0001_extensions.sql`), curated baseline (`db/baseline/0001_current_schema.sql`), reference data (`db/reference-data/0001_product_reference_data.sql`), grants (`db/grants/0001_role_grants.sql`), and dev seeds (`db/dev-seeds/0001_local_dev_seed.sql`) are applied separately by `scripts/dev-bootstrap-baseline.ps1`.
 
 ### `internal/platform/bootstrap`
 

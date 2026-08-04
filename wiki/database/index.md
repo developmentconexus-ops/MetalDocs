@@ -1,6 +1,6 @@
 # Database
 
-> **Last verified:** 2026-05-27
+> **Last verified:** 2026-08-03
 > **Scope:** Durable schema truth, migration policy, and reference-data governance.
 
 - [overview.md](overview.md) - database ownership overview
