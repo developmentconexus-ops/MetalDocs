@@ -1,8 +1,8 @@
 # ADR 0087 — Livre governance class: configured no-approval route
 
-> **Status:** Proposed 2026-08-03 (operator ruling 2026-07-29: "livre seria uma
+> **Status:** Accepted 2026-08-03 (operator ruling 2026-07-29: "livre seria uma
 > rota de aprovação que não precisa de aprovação — ele estaria configurado
-> como livre, não desconfigurado"; awaiting operator ratification + review)
+> como livre, não desconfigurado"; ratified by operator 2026-08-03)
 > **Supersedes:** the livre arm of [ADR 0081](0081-per-profile-signature-policy.md)
 > (`RoutePolicyNoRoutePermitted` / migration 0295's "no active route may exist
 > for a livre profile" — now folded into the baseline).
