@@ -7173,7 +7173,12 @@ components:
       required: [field, code, message]
       properties:
         field: { type: string, description: 'JSON pointer or dot path' }
-        code: { type: string }
+        # No `pattern` here, unlike Problem.code. Field codes have their own
+        # registry namespace (problem.RegisterField) which does NOT require a
+        # family prefix, so a pattern would be asserting something the backend
+        # does not enforce. Today's emitters happen to reuse family-shaped codes
+        # (e.g. validation.field_immutable); clients must not rely on that.
+        code: { type: string, description: 'Machine-readable per-field reason (ADR 0089 field namespace)' }
         message: { type: string }
     Problem:
       type: object
@@ -7187,7 +7192,25 @@ components:
         status: { type: integer, minimum: 400, maximum: 599 }
         detail: { type: string }
         instance: { type: string }
-        code: { type: string, description: 'Machine-readable code from canonical taxonomy' }
+        # ADR 0089. The `pattern` describes the SHAPE of the vocabulary, not its
+        # membership: `<family>.<lower_snake_name>`, family drawn from the ten
+        # closed semantic families. It is deliberately not an `enum` of all 141
+        # codes — an enum would make adding an error code a breaking change for
+        # strict clients and force a full spec regen per code, while buying
+        # nothing the generated frontend snapshot does not already enforce.
+        # A client can safely branch on the family prefix alone.
+        # The alternation is kept honest by TestSpecPatternMatchesRegistry
+        # (cmd/problem-codes-dump), which fails if a family is added or removed
+        # without updating it.
+        code:
+          type: string
+          pattern: '^(auth|conflict|internal|notfound|permission|precondition|ratelimit|request|state|validation)\.[a-z][a-z0-9]*(_[a-z0-9]+)*$'
+          description: >-
+            Machine-readable code, `<family>.<name>` (RFC 9457 extension). Families are
+            semantic, never module-named: auth 401 · conflict 409 · internal 500 ·
+            notfound 404 · permission 403 · precondition 412 · ratelimit 429 ·
+            request 400 · state 409 · validation 422. Full catalog:
+            wiki/references/problem-codes.md
         errors:
           type: array
           items: { $ref: '#/components/schemas/FieldError' }

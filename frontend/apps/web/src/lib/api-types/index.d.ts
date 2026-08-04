@@ -3717,6 +3717,7 @@ export interface components {
         FieldError: {
             /** @description JSON pointer or dot path */
             field: string;
+            /** @description Machine-readable per-field reason (ADR 0089 field namespace) */
             code: string;
             message: string;
         };
@@ -3727,7 +3728,7 @@ export interface components {
             status: number;
             detail?: string;
             instance?: string;
-            /** @description Machine-readable code from canonical taxonomy */
+            /** @description Machine-readable code, `<family>.<name>` (RFC 9457 extension). Families are semantic, never module-named: auth 401 · conflict 409 · internal 500 · notfound 404 · permission 403 · precondition 412 · ratelimit 429 · request 400 · state 409 · validation 422. Full catalog: wiki/references/problem-codes.md */
             code: string;
             errors?: components["schemas"]["FieldError"][];
         };
