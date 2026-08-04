@@ -108,6 +108,7 @@ func mapStagesToResponse(stages []domain.Stage) []contracts.StageResponse {
 			QuorumM:            stage.QuorumM,
 			DriftPolicy:        contracts.DriftPolicyKind(stage.OnEligibilityDrift),
 			StageKind:          mapStageKind(string(stage.Kind)),
+			DueInDays:          stage.DueInDays,
 			Selectors:          mapSelectorsToWire(stage.Selectors),
 		})
 	}
@@ -288,6 +289,7 @@ func mapListRoute(route infrastructure.Route) contracts.ListRouteItem {
 			QuorumM:            stage.QuorumM,
 			DriftPolicy:        contracts.DriftPolicyKind(stage.DriftPolicy),
 			StageKind:          mapStageKind(stage.Kind),
+			DueInDays:          stage.DueInDays,
 			Selectors:          mapSelectorsToWire(stage.Selectors),
 		})
 	}
@@ -342,6 +344,7 @@ func mapStageRequests(stages []contracts.StageRequest) []domain.Stage {
 			// migration 0286 DEFAULT 'approval'); a supplied review makes a
 			// review-kind stage. Validated as review|approval|"" in contracts.
 			Kind:      domain.StageKind(s.StageKind),
+			DueInDays: s.DueInDays,
 			Selectors: mapSelectorsFromWire(s.Selectors),
 		})
 	}

@@ -7260,6 +7260,14 @@ components:
             (signoff) stage. Optional; omitted defaults to approval at
             persistence. A review-kind route is only creatable by supplying
             this field.
+        due_in_days:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: >-
+            Prazo da etapa em dias corridos, contado a partir da ativação da
+            etapa. Ausente ou null significa SEM prazo — a etapa nunca vence e
+            não gera lembrete. Não existe padrão implícito.
         selectors:
           type: array
           minItems: 1
@@ -7272,7 +7280,7 @@ components:
     StageSummary:
       type: object
       additionalProperties: true
-      required: [order, name, required_capability, quorum, drift_policy, quorum_m, selectors]
+      required: [order, name, required_capability, quorum, drift_policy, quorum_m, due_in_days, selectors]
       properties:
         order: { type: integer, minimum: 1 }
         name: { type: string }
@@ -7287,6 +7295,14 @@ components:
           type: string
           enum: [review, approval]
           description: F0 (spec.md §4/W2) — review vs approval stage; defaults to approval.
+        due_in_days:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: >-
+            Prazo da etapa em dias corridos, contado a partir da ativação da
+            etapa. Ausente ou null significa SEM prazo — a etapa nunca vence e
+            não gera lembrete. Não existe padrão implícito.
         selectors:
           type: array
           minItems: 1

@@ -1135,3 +1135,38 @@ func TestListRoutes_ProfileCodeForTemplateRoutes(t *testing.T) {
 		t.Fatalf("template route profile_code raw = %s, want %q (profile-keyed since ADR 0086)", tmplCode, `"sop"`)
 	}
 }
+
+// due_in_days survives the wire round-trip. Nil means NO deadline — never zero,
+// never a default (the no-fallback principle): the SLA engine leaves due_at NULL
+// and the surfacer skips the stage entirely.
+func TestMapStageRequests_CarriesDueInDays(t *testing.T) {
+	days := 30
+	in := []contracts.StageRequest{
+		{Order: 1, Name: "Qualidade", RequiredCapability: "document.signoff", Quorum: "all", DriftPolicy: "recompute", DueInDays: &days},
+		{Order: 2, Name: "Direção", RequiredCapability: "document.signoff", Quorum: "all", DriftPolicy: "recompute"},
+	}
+
+	got := mapStageRequests(in)
+
+	if got[0].DueInDays == nil || *got[0].DueInDays != 30 {
+		t.Fatalf("stage 1 DueInDays = %v, want 30", got[0].DueInDays)
+	}
+	if got[1].DueInDays != nil {
+		t.Fatalf("stage 2 DueInDays = %v, want nil (absent means no deadline)", got[1].DueInDays)
+	}
+}
+
+func TestMapStagesToResponse_CarriesDueInDays(t *testing.T) {
+	days := 30
+	out := mapStagesToResponse([]domain.Stage{
+		{Order: 1, Name: "Qualidade", RequiredCapability: "document.signoff", DueInDays: &days},
+		{Order: 2, Name: "Direção", RequiredCapability: "document.signoff"},
+	})
+
+	if out[0].DueInDays == nil || *out[0].DueInDays != 30 {
+		t.Fatalf("stage 1 DueInDays = %v, want 30", out[0].DueInDays)
+	}
+	if out[1].DueInDays != nil {
+		t.Fatalf("stage 2 DueInDays = %v, want nil", out[1].DueInDays)
+	}
+}
