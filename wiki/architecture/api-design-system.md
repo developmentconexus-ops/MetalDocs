@@ -1,7 +1,7 @@
 ﻿# API Design System
 
 > **Status:** accepted 2026-05-10
-> **Last verified:** 2026-06-08 (Phase E2 spec hygiene: root-level `security: [sessionCookie]` makes every op secure-by-default in-doc with explicit `security: []` on public ops; top-level `tags` + every op tagged/`operationId`'d/`summary`'d; one pagination convention — cursor canonical, bounded/offset lists `x-pagination-exempt` with reason, `limit` max clamped 100 in spec+runtime; 64 zero-error ops now document their actual error modes via the shared `#/components/responses/*` set; two non-standard methods fixed (`DELETE /iam/area-memberships` → path-param `…/{user_id}/{area_code}`, `DELETE /approval/routes/{id}` → `POST …/{id}/deactivate`); `bearerAuth` myth corrected to the real `sessionCookie` scheme; `AUTHZ-DRIFT` + `PAGINATION-DRIFT` both driven to 0 and flipped BLOCKING. Prior: Phase E1 payload-casing big-bang — every declared JSON property is `snake_case` end-to-end, blocking `CASING-DRIFT` (one exemption `MDDM_NATIVE_EXPORT_ROLLOUT_PCT`); Phase D error-envelope unification — RFC 9457 `Problem` only, `ENVELOPE-DRIFT` BLOCKING; Phase C dead-path prune; 2026-05-21)
+> **Last verified:** 2026-08-04 (ADR 0089 pass: §3 error codes rewritten — the hand-copied 15-row table is replaced by the generated catalog at `wiki/references/problem-codes.md` plus the ten semantic families and the gate ladder; the example body now carries a real code; two live references to the deleted `dump-error-codes.go` and to the deleted `UNKNOWN_FILTER` constant corrected). **Prior:** 2026-06-08 (Phase E2 spec hygiene: root-level `security: [sessionCookie]` makes every op secure-by-default in-doc with explicit `security: []` on public ops; top-level `tags` + every op tagged/`operationId`'d/`summary`'d; one pagination convention — cursor canonical, bounded/offset lists `x-pagination-exempt` with reason, `limit` max clamped 100 in spec+runtime; 64 zero-error ops now document their actual error modes via the shared `#/components/responses/*` set; two non-standard methods fixed (`DELETE /iam/area-memberships` → path-param `…/{user_id}/{area_code}`, `DELETE /approval/routes/{id}` → `POST …/{id}/deactivate`); `bearerAuth` myth corrected to the real `sessionCookie` scheme; `AUTHZ-DRIFT` + `PAGINATION-DRIFT` both driven to 0 and flipped BLOCKING. Prior: Phase E1 payload-casing big-bang — every declared JSON property is `snake_case` end-to-end, blocking `CASING-DRIFT` (one exemption `MDDM_NATIVE_EXPORT_ROLLOUT_PCT`); Phase D error-envelope unification — RFC 9457 `Problem` only, `ENVELOPE-DRIFT` BLOCKING; Phase C dead-path prune; 2026-05-21)
 > **Scope:** API design conventions for v1     error envelope, pagination, idempotency, two-tier authz, list filtering, naming.
 > **Out of scope:** Adoption     Plan 2 migrates handlers, paths, and module names. Frontend wiring is in Plan 1 only for the shared parser; per-page adoption is Plan 2.
 > **Key files:**
@@ -34,7 +34,7 @@ MetalDocs exposes a growing HTTP surface across 7 modules. Without a shared cont
 | 3 | Idempotency | Stripe-model `Idempotency-Key`, shared store, 24h TTL | `middleware.go` + `postgres_store.go`; migration `0147_idempotency_keys.sql` |
 | 4 | Body validation | oapi-codegen per-op generated validation (not reflection middleware) | `cfg.yaml` `validate-against-spec: true`; strict-decode `DisallowUnknownFields` |
 | 5 | Two-tier authz | `security` + honest `x-authz-area`/`x-authz-area-none` markers in spec; enforced by Postgres tripwire | `authz.Require`; tripwire trigger; `AUTHZ-DRIFT` + `tripwire-pairing` CI rules |
-| 6 | List filtering | Stripe-flat params + per-resource allowlist + typed parser | oapi-codegen `parameters` per op; `UNKNOWN_FILTER` code |
+| 6 | List filtering | Stripe-flat params + per-resource allowlist + typed parser | oapi-codegen `parameters` per op; rejected keys answer 400 `request.invalid` (§7) |
 | 7 | Mini-conventions | UUIDv4, ISO 8601 UTC, snake_case, plural kebab paths, positive booleans, null-vs-absent, UUID-only path IDs, session-cookie auth | Codified in spec; payload casing enforced by the blocking `CASING-DRIFT` rule (Phase E1); codegen type alignment |
 
 ---
@@ -49,49 +49,72 @@ All 4xx/5xx responses MUST use `Content-Type: application/problem+json` with thi
 {
   "type": "https://errors.metaldocs.io/<category>",
   "title": "<short human-readable title>",
-  "status": 400,
+  "status": 422,
   "detail": "<longer explanation>",
   "instance": "/api/v1/templates",
-  "code": "VALIDATION_ERROR",
+  "code": "validation.failed",
   "errors": [
-    { "field": "key", "code": "REQUIRED", "message": "key is required" },
-    { "field": "name", "code": "OUT_OF_RANGE", "message": "name must be     200 chars" }
+    { "field": "name", "code": "validation.field_immutable", "message": "name is immutable after creation" }
   ]
 }
 ```
 
 - `type`, `title`, `status`, `detail`, `instance`     RFC 9457 standard fields.
-- `code`     required extension; machine-readable; drawn from the catalog in `internal/platform/problem/codes.go`.
-- `errors[]`     optional extension; field-level errors for `VALIDATION_ERROR`. Each entry carries `field` (JSON pointer or dot path), `code`, and `message`.
+- `code`     required extension; machine-readable; drawn from the closed registry (see below).
+- `errors[]`     optional extension; field-level errors. Each entry carries `field` (JSON pointer or dot path), `code`, and `message`.
 
 **Go helper:** `internal/platform/problem/problem.go`     `problem.New(status, code, title)`, chainable `.WithDetail()`, `.WithFieldError()`, `.Write(w)`.
 
 **Frontend helper:** `frontend/apps/web/src/lib/api/problem.ts`     `parseProblem(res)` + `ApiError` class (holds `.code`, `.errors[]`, `.status`). `resolveErrorMessage` dispatches on `code`.
 
-**Error-code coverage (FE):** every backend code must have a PT-BR mapping in `frontend/apps/web/src/lib/api/errorMessages.ts`. Enforced by `src/lib/api/__tests__/errorMessages.coverage.test.ts` against the snapshot `frontend/apps/web/src/lib/api/error-codes.generated.json`. After adding/renaming/removing a backend code, regenerate the snapshot: `go run ./scripts/dump-error-codes.go`. Unmapped codes fall back to an actionable PT-BR template (`Não foi possível concluir a ação. Código: <X>`) and emit a `console.warn` breadcrumb tagged `[api] unmapped error code` for observability.
+### Error codes — a closed vocabulary (ADR 0089)
 
-**Error codes** (full catalog in `internal/platform/problem/codes.go`):
+**The full catalog is generated: [`wiki/references/problem-codes.md`](../references/problem-codes.md).**
+It is not reproduced here, because a hand-copied code table is the hand-synced-enumeration
+defect class this section used to demonstrate — it listed 15 codes when the catalog held
+over a hundred, and every one of the 15 had since been renamed.
 
-| Code | HTTP | Meaning |
+Codes are `dotted.snake_case` in one of **ten closed semantic families**:
+
+| Family | Default status | Means |
 |---|---|---|
-| `VALIDATION_ERROR` | 400 | Body/params failed validation; `errors[]` populated |
-| `UNKNOWN_FIELD` | 400 | Strict-decode rejected unknown JSON field |
-| `UNKNOWN_FILTER` | 400 | Filter key not in operation allowlist |
-| `INVALID_SORT_FIELD` | 400 | Sort field not allowed for endpoint |
-| `INVALID_CURSOR` | 400 | Cursor decode failed or filter/sort mismatch |
-| `INCLUDE_NOT_SUPPORTED` | 400 | `?include=<x>` not supported by endpoint |
-| `UNAUTHENTICATED` | 401 | No or invalid JWT |
-| `FORBIDDEN_CAPABILITY` | 403 | User lacks capability (tier-1) |
-| `FORBIDDEN_AREA` | 403 | User lacks area-scoped permission (tier-2) |
-| `NOT_FOUND` | 404 | Resource does not exist or caller cannot see it |
-| `ALREADY_EXISTS` | 409 | Unique-constraint violation |
-| `STATE_TRANSITION_INVALID` | 409 | Workflow state transition not allowed |
-| `CONCURRENT_MODIFICATION` | 409 | Optimistic-lock failure |
-| `IDEMPOTENCY_KEY_CONFLICT` | 422 | Same key, different body |
-| `INTERNAL_ERROR` | 500 | Unhandled server error |
+| `request.` | 400 | The request itself is malformed — unparseable, unknown field, bad cursor |
+| `validation.` | 422 | Well-formed, but a value is unacceptable |
+| `auth.` | 401 | Caller is not authenticated (or a credential/signature failed) |
+| `permission.` | 403 | Authenticated, but not allowed |
+| `notfound.` | 404 | Does not exist, or is invisible to this caller |
+| `state.` | 409 | The resource's current state forbids the operation |
+| `precondition.` | 412 | A caller-supplied precondition (ETag, content hash) no longer holds |
+| `conflict.` | 409 | Two concurrent writers, or a uniqueness violation |
+| `ratelimit.` | 429 | Throttled |
+| `internal.` | 500 | Server fault |
 
-Field-level codes (`errors[].code`): `REQUIRED`, `INVALID_FORMAT`, `OUT_OF_RANGE`, `INVALID_ENUM`.
-Exception note: `template_invalid` is intentionally lowercase for legacy contract compatibility on controlled-documents 422 responses.
+Families are **semantic, never module-named**. A module name on a public wire contract leaks
+internal topology to clients and outlives the module that coined it — proved when ADR 0082
+extracted `approval` and stranded the `signoff.`/`sod.` prefixes it had introduced.
+
+**Adding a code** is a `problem.Register("<module>", "<family>.<name>", <status>)` call in the
+module's `errors.go`, then `go run ./cmd/problem-codes-dump` and a PT-BR message. There is no
+route by which a wrong code can reach the wire:
+
+| Mistake | Caught by | When |
+|---|---|---|
+| Bare string literal as a code | `problem.Code` has an unexported field | compile |
+| Code outside the ten families | `Register` panics at init | process start |
+| Same code registered twice | `Register` panics at init | process start |
+| Status that departs from the family default | `RegisterWithStatus` demands a reason | compile |
+| New module's codes missing from the artifacts | `PROBLEM-DUMP-IMPORT` (api-lint) | CI |
+| Artifacts not regenerated | `problem-codes-freshness` (`-check`) | CI |
+| Backend code with no PT-BR message, or a message for a dead code | `errorMessages.coverage.test.ts` | CI |
+| A frontend `if (error.code === 'X')` branch left dead by a rename | `problemCodeVocabulary.test.ts` | CI |
+
+The last row is the subtle one: a renamed code does not *break* a frontend comparison, it makes
+the branch stop firing — silently, permanently. Ten such branches were dead when the guard was
+introduced, including session-expiry detection in `lib/api/client.ts`.
+
+Unmapped codes still fall back to an actionable PT-BR template (`Não foi possível concluir a
+ação. Código: <X>`) and emit a `console.warn` breadcrumb tagged `[api] unmapped error code` — a
+backstop for a running build, not a substitute for the gates above.
 
 ---
 
@@ -222,7 +245,7 @@ Stripe-style flat query params with per-resource allowlist.
 - Equality: `<field>=value`; multi-value: repeat key.
 - Range: `<field>_after` / `<field>_before` (ISO 8601 for timestamps).
 - Free-text: `q=<term>`.
-- Unknown key     400 `UNKNOWN_FILTER`.
+- Unknown key     400 `request.invalid`. (A dedicated `UNKNOWN_FILTER` constant existed until ADR 0089 and was deleted as dead: no handler ever emitted it. Unknown and mistyped params are rejected by the generated per-operation parameter validation, which answers the generic request-shape code.)
 - Reserved keys (`cursor`, `limit`, `sort`, `include`) MUST NOT be used as filter names.
 
 Each list operation in the spec declares allowed filter keys via `parameters`. oapi-codegen-generated validation enforces typed parsing per param schema.

@@ -1,13 +1,13 @@
 # Platform — HTTP Toolkit
 
-> **Last verified:** 2026-07-06 (F9.4 doc-truth pass: fixed 1 anchor — `modules/documents/repository`→`modules/documents/infrastructure` in the pagination-consumers table, F9.5 rename) | **Prior:** 2026-06-11
+> **Last verified:** 2026-08-04 (ADR 0089 pass: §2.1 rewritten for the closed `Code` type + registry; `codes_catalog_guard_test.go` references removed — file deleted; Flags 1 and 3 marked RESOLVED; `problem.go` panic anchor re-pinned) | **Prior:** 2026-07-06 (F9.4 doc-truth pass)
 > **Scope:** The eight shared packages under `internal/platform/` that constitute the API design system's runtime enforcement surface: `httpresponse`, `problem`, `pagination`, `idempotency`, `requesttrace`, `useragent`, `httpclient`, and `formval`. Covers what each package provides, its public surface, the logic flows it implements, which domain modules consume it, and all flags identified in Stage-1 audit.
 > **Out of scope:** The higher-level observability and security platform packages (`platform/observability`, `platform/ratelimit`, `platform/security`). Those are adjacent to this layer but warrant their own docs.
 > **Key files:**
 > - `internal/platform/httpresponse/response.go`
 > - `internal/platform/problem/problem.go`
+> - `internal/platform/problem/code.go`
 > - `internal/platform/problem/codes.go`
-> - `internal/platform/problem/codes_catalog_guard_test.go`
 > - `internal/platform/pagination/cursor.go`
 > - `internal/platform/idempotency/middleware.go`
 > - `internal/platform/idempotency/postgres_store.go`
@@ -22,7 +22,7 @@
 
 The HTTP toolkit packages are domain-free libraries (`internal/platform/`, per REQ-TOP-2 — platform packages must not import modules). Together they enforce three cross-cutting concerns end-to-end:
 
-- **Error shape.** `problem` + `httpresponse` ensure every handler returns RFC 9457 `application/problem+json` with a code from a closed vocabulary; the catalog guard test prevents drift at compile time.
+- **Error shape.** `problem` + `httpresponse` ensure every handler returns RFC 9457 `application/problem+json` with a code from a genuinely closed vocabulary — closed by the type system, so an unregistered code does not compile (ADR 0089).
 - **List safety.** `pagination` provides the sole keyset-cursor codec, enforcing that unbounded list endpoints never paginate by offset (REQ-API-4).
 - **Mutation safety.** `idempotency` provides a Postgres-backed two-phase middleware that serialises concurrent replays, satisfying REQ-API-5 for all retry-prone mutations.
 
@@ -42,18 +42,32 @@ For strategic placement see [../../architecture/backend-blueprint.md](../../arch
 
 **What it provides.** The `Problem` struct (`problem.go`) implements RFC 9457 Problem Details: `type`, `title`, `status`, `detail`, `instance`, and an `errors` extension for field-level validation failures (`FieldError`). A fluent builder chain (`WithDetail`, `WithInstance`, `WithFieldError`, `WithType`) constructs problems without argument bloat. `Write(w, p)` marshals to `application/problem+json` and writes the HTTP status in one call.
 
-`codes.go` defines the `Code` type (`string`) and 38 exported constants (`CodeNotFound`, `CodeForbiddenCapability`, `CodeIdempotencyKeyRequired`, etc.) covering HTTP-level, auth, domain, and field-level error categories: 20 HTTP-status-level codes (lines 11–30), 8 auth codes (lines 32–39), 6 documents/templates codes (lines 44–49), and 4 field-level codes (lines 54–57). Using a raw string literal in the `code` position inside guarded packages causes `TestNoAdHocStringCodes` to fail at `go test` time (`codes_catalog_guard_test.go:142–178`). `TestCanonicalCodeSelectorsExist` asserts that every catalog entry is actually reachable from the guarded packages.
+`code.go` defines the vocabulary itself (ADR 0089). `Code` is **`struct{ s string }` with an unexported field** — not a string alias. That single choice is what makes the vocabulary closed: no package outside `problem` can construct a `Code` value, so writing a bare string literal in a code position is a **compile error**, not a lint finding. The predecessor was `type Code string` plus an AST guard test (`codes_catalog_guard_test.go`) that scanned an allowlist of `guardedPackages` for raw literals; both are deleted, because the type system now enforces at compile time what the allowlist only approximated in the packages someone remembered to enroll.
 
-**Key behaviour.** `problem.New` panics if `status ∉ [100, 599]` (`problem.go:31–34`) — this is a hard invariant, not a recoverable error; it converts a misuse into a loud build-time / test-time failure rather than a silent wrong HTTP response.
+Codes are created by registration, never declared:
+
+| Constructor | Use |
+|---|---|
+| `Register(module, code, defaultStatus)` | the normal case; status is the family default |
+| `RegisterWithStatus(module, code, status, reason)` | a status that departs from the family default — the `reason` argument is **mandatory** and is printed in the generated catalog |
+| `RegisterLegacy(module, code, defaultStatus)` | escape hatch for a code that cannot yet fit a family. **Zero uses outside the platform package** |
+| `RegisterField(module, code)` | field-level codes for `FieldError.code`, in a separate namespace |
+
+Every name must be `<family>.<snake_case>` in one of the ten closed semantic families (`request` 400 · `validation` 422 · `auth` 401 · `permission` 403 · `notfound` 404 · `state` 409 · `precondition` 412 · `conflict` 409 · `ratelimit` 429 · `internal` 500). A name outside a family, or a duplicate registration, **panics at package init** — the process refuses to start rather than serving an ambiguous vocabulary.
+
+`codes.go` holds the platform + shared block (53 registrations); the remaining codes are registered by their owning module's `errors.go`, which is where they belong — the module that emits a code owns its name and status. `Registrations()` returns the whole runtime catalog, which is what `cmd/problem-codes-dump` reads to generate the FE snapshot and [`wiki/references/problem-codes.md`](../../references/problem-codes.md).
+
+**Key behaviour.** `NewFor(code, title)` is the **default constructor**: the status comes from the code's registration, so the same condition cannot answer 409 on one route and 412 on another (ADR 0089 decision 3). It panics on an unregistered or zero `Code` — a Problem with no status binding has no defensible status to emit (`problem.go:35–45`). `New(status, code, title)` keeps status as an explicit argument precisely so an override is *visible at the call site* for reviewers and the api-lint drift rule; it panics if `status ∉ [100, 599]` (`problem.go:57–60`).
 
 **File inventory:**
 
 | File | Role |
 |---|---|
-| `problem.go` | `Problem` struct, fluent builder, `FromValidation`, `Write`, `Error` interface |
-| `codes.go` | `Code` type + 38 exported constants |
+| `problem.go` | `Problem` struct, `NewFor`/`New`, fluent builder, `FromValidation`, `Write`, `Error` interface |
+| `code.go` | The closed `Code` type, the ten families, the four `Register*` constructors, `Registrations`/`Lookup`/`StatusFor` |
+| `codes.go` | The platform + shared registrations (53) |
 | `problem_test.go` | Marshal/unmarshal, fluent chain, `FromValidation`, `Write`, `Error`, panic-on-invalid-status |
-| `codes_catalog_guard_test.go` | AST-level regression guard: `TestNoAdHocStringCodes`, `TestCanonicalCodeSelectorsExist` |
+| `code_test.go` | Family validation, duplicate-registration panic, separate field namespace, `testdata/` compile-fail fixtures |
 
 ---
 
@@ -197,14 +211,14 @@ sequenceDiagram
     H->>HR: WriteError(w, 404, CodeNotFound, "not found")
     Note over HR: response.go:16-18
     HR->>P: New(404, CodeNotFound, "not found")
-    Note over P: panics if status ∉ [100,599]<br/>problem.go:31-34
+    Note over P: panics if status ∉ [100,599]<br/>problem.go:57-60
     P-->>HR: *Problem
     HR->>P: Write(w, p)
     Note over P: sets Content-Type: application/problem+json<br/>writes status + JSON body<br/>problem.go:77-87
     P-->>W: HTTP 404 application/problem+json
 ```
 
-At `go test` time, `codes_catalog_guard_test.go:142–178` scans the AST of guarded packages and fails if any raw string literal appears in the `code` argument position, enforcing that only `problem.Code*` constants reach the wire.
+The `CodeNotFound` argument cannot be a string literal: `problem.Code` has an unexported field, so only a registered code type-checks in that position. This used to be a `go test`-time AST scan over an allowlist of packages; since ADR 0089 it is a compile error everywhere, with no allowlist to be absent from.
 
 ---
 
@@ -359,20 +373,22 @@ Janitor: `idempotency_janitor` sweeps expired rows; registered in `main.go:537�
 
 > These flags feed into [../legacy-register.md](../legacy-register.md). RF IDs reference the refactoring register in [../../architecture/backend-target-architecture.md](../../architecture/backend-target-architecture.md).
 
-### Flag 1 — Ad-hoc string codes in `idempotency.Require` (RF-10 adjacent)
-`middleware.go:93,97,108,111,117,123`
+### Flag 1 — Ad-hoc string codes in `idempotency.Require` — **RESOLVED (ADR 0089)**
 
-`writeErrJSON` is called with raw string literals (`"IDEMPOTENCY_KEY_REQUIRED"`, `"IDEMPOTENCY_KEY_INVALID"`, `"REQUEST_BODY_TOO_LARGE"`, `"BAD_REQUEST"`, `"IDEMPOTENCY_KEY_CONFLICT"`, `"INTERNAL"`) that are cast directly to `problem.Code`. The catalog guard does not cover `internal/platform/idempotency/`, so these strings bypass the discipline enforced everywhere else. `"IDEMPOTENCY_KEY_INVALID"`, `"BAD_REQUEST"`, and `"INTERNAL"` have no catalog entry; `"INTERNAL"` diverges from `CodeInternalError = "INTERNAL_ERROR"`. An inline comment (`middleware.go:212–215`) acknowledges this as a Phase D sweep miss. Breaks REQ-H-2 at the platform layer.
+Was: `writeErrJSON` took raw string literals cast to `problem.Code` (`"IDEMPOTENCY_KEY_INVALID"`, `"BAD_REQUEST"`, `"INTERNAL"` — three with no catalog entry, and `"INTERNAL"` diverging from `INTERNAL_ERROR`), because the guard test's `guardedPackages` allowlist did not cover `internal/platform/idempotency/`.
+
+Now: the cast is impossible. All six sites take registered codes (`middleware.go:123,126,137,140,148,154`). This flag is the clearest example of why the fix had to be a type rather than a wider allowlist — the codes were wrong precisely in the one package nobody remembered to enroll.
 
 ### Flag 2 — Manual inline idempotency on the documents finalize route
 `internal/modules/documents/delivery/http/handler.go:440–495`
 
 The documents finalize path calls `store.BeginReplay` / `CompleteReplay` / `FailReplay` inline without using the `Require` middleware, unlike every other idempotency consumer. This creates a second idempotency implementation that must be maintained in parallel and makes it easy to omit the `FailReplay` defer on new code paths. RF-10 (idempotency coverage audit) is the owning program.
 
-### Flag 3 — Catalog guard scope excludes the approval HTTP package
-`internal/platform/problem/codes_catalog_guard_test.go:31–35`
+### Flag 3 — Two coexisting code vocabularies — **RESOLVED (ADR 0089)**
 
-The guard scans `documents/delivery/http` and `templates/delivery/http` but explicitly excludes `documents/approval/http`. The approval package uses a dot-notation code taxonomy (`"idempotency.key_required"`, `"internal.unknown"`, etc.) rather than the `SNAKE_UPPER` catalog constants. The comment calls this intentional, but no ADR records the decision or documents which routes are allowed to deviate. The gap means guard coverage is not uniform across the public API surface.
+Was: the guard scanned `documents/delivery/http` and `templates/delivery/http` and explicitly excluded the approval package, which used a `dot.notation` taxonomy while the catalog used `SNAKE_UPPER`. The exclusion comment called it intentional; no ADR recorded it.
+
+Now: `dot.notation` won and is the only vocabulary — ADR 0089 swept all 155 codes into ten semantic families, and the type makes a non-conforming name unconstructible. Note which side won and why: the approval package's convention was better, and the "deviation" was the correct design being kept out of the catalog by an allowlist. An exclusion comment is a poor place to record a contract decision, which is the reason ADR 0089 exists.
 
 ### Flag 4 — `pagination` not adopted by the templates list endpoint (RF-10 adjacent)
 `internal/modules/templates/delivery/http/routes_query.go:222`
