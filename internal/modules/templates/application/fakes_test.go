@@ -65,6 +65,10 @@ type fakeRepo struct {
 	lockVersions              map[string]int
 	getTemplateByKeyErr       error
 
+	// ADR 0088 blank-materialization source overrides.
+	systemBlankVersion *domain.TemplateVersion
+	systemBlankErr     error
+
 	// UpdateTemplateTxCalls records the LatestVersion on each UpdateTemplateTx
 	// call.  Tests that assert F-T5 (single template write per tx) inspect this.
 	UpdateTemplateTxCalls []int
@@ -171,6 +175,33 @@ func (r *fakeRepo) GetVersion(_ context.Context, tenantID, templateID string, n 
 		}
 	}
 	return nil, domain.ErrNotFound
+}
+
+// fakeSystemBlankHash stands in for the reference-data-pinned sha256 of
+// deploy/assets/system-blank.docx (64 hex chars, the only shape the ADR 0088
+// materialization path accepts).
+const fakeSystemBlankHash = "5cdae1bb25103bbc121cdc696ed11eb09aa22041940f199164ebc302f6923d2e"
+
+// GetSystemBlankVersion mirrors the reference-data row by default so every
+// pre-existing CreateTemplate test keeps working unchanged. Tests that exercise
+// the fail-closed arms set systemBlankErr or systemBlankVersion explicitly.
+func (r *fakeRepo) GetSystemBlankVersion(_ context.Context) (*domain.TemplateVersion, error) {
+	if r.systemBlankErr != nil {
+		return nil, r.systemBlankErr
+	}
+	if r.systemBlankVersion != nil {
+		clone := *r.systemBlankVersion
+		return &clone, nil
+	}
+	return &domain.TemplateVersion{
+		ID:             "00000000-0000-0000-0000-000000000102",
+		TenantID:       "ffffffff-ffff-ffff-ffff-ffffffffffff",
+		TemplateID:     "00000000-0000-0000-0000-000000000101",
+		VersionNumber:  1,
+		Status:         domain.VersionStatusPublished,
+		DocxStorageKey: "system/templates/blank.docx",
+		ContentHash:    fakeSystemBlankHash,
+	}, nil
 }
 
 func (r *fakeRepo) GetVersionByID(_ context.Context, tenantID, id string) (*domain.TemplateVersion, error) {

@@ -335,6 +335,44 @@ RETURNING revision_number`
 	return nil
 }
 
+// GetSystemBlankVersion loads the PUBLISHED version row of the system blank
+// template (ADR 0088 §3) — the reference-data row that carries both the
+// storage key of the deterministic blank asset and its pinned content hash.
+//
+// The predicate is explicit and status-scoped (status = 'published' at the
+// fixed system template/tenant ids) rather than "latest version" or a
+// COALESCE-style widening: this row must be exactly the artifact
+// db/reference-data pinned, and if it is not there the caller must fail closed,
+// not settle for a neighbour (no-fallback principle).
+//
+// It runs on the pool, OUTSIDE any transaction — that is what keeps it legal
+// under RLS: templates_template_version's tenant_isolation policy passes when
+// the metaldocs.tenant_id GUC is unset, so this system-tenant read never has to
+// bypass or re-seed a tenant context. Callers invoke it PRE-TX, which is where
+// the materialization it feeds belongs anyway.
+func (r *Repository) GetSystemBlankVersion(ctx context.Context) (*domain.TemplateVersion, error) {
+	const q = `
+SELECT
+	v.id::text, v.template_id::text, v.version_number, v.revision_number, v.status, v.docx_storage_key, v.content_hash,
+	v.metadata_schema, v.placeholder_schema, v.author_id,
+	v.reviewer_id, v.approver_id,
+	v.submitted_at, v.reviewed_at, v.approved_at, v.published_at, v.obsoleted_at, v.lock_version, v.created_at
+FROM templates_template_version v
+JOIN templates_template t ON t.id = v.template_id
+WHERE v.template_id = $1::uuid
+  AND t.tenant_id = $2::uuid
+  AND v.status = 'published'`
+
+	v, err := scanTemplateVersion(r.db.QueryRowContext(ctx, q, application.SystemBlankTemplateID, application.SystemBlankTemplateTenantID))
+	if errors.Is(err, sql.ErrNoRows) || isInvalidUUID(err) {
+		return nil, domain.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return v, nil
+}
+
 // GetVersion loads a template version by its (templateID, version_number)
 // pair, scoped to the tenant via a join on templates_template. It returns
 // domain.ErrNotFound when the row is missing or an id is not a valid UUID.

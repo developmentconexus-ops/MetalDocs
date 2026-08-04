@@ -8,10 +8,12 @@ type DraftState = {
   version: VersionDTO | null;
   docxBytes: ArrayBuffer | null;
   // Non-fatal: the version loaded but its .docx blob could not be fetched
-  // (storage unreachable, presign expired, 5xx, or 404 on a non-draft version).
-  // The editor still opens — this surfaces a retry banner. A 404 on a DRAFT is
-  // NOT an error: a blank template has no object until its first autosave, so it
-  // opens empty silently. For under_review/approved/published, 404 IS an error.
+  // (storage unreachable, presign expired, 5xx, or 404). The editor still
+  // opens — this surfaces a retry banner. Under ADR 0088 every template
+  // version is materialized with content at creation time (blank creation
+  // copies the system blank asset, PRE-TX), so a 404 here is never "blank
+  // canvas" — it means something is genuinely wrong (missing object) and
+  // must surface like any other blob failure, regardless of version status.
   docxError: string | null;
 };
 
@@ -50,13 +52,10 @@ export function useTemplateDraft(templateId: string, versionNum: number): Templa
             const res = await fetch(url);
             if (res.ok) {
               docxBytes = await res.arrayBuffer();
-            } else if (res.status === 404 && version.status === 'draft') {
-              // 404 on a draft = blank template, no object until first autosave:
-              // open empty silently. For under_review/approved/published a missing
-              // blob is a real failure — surface the retry banner so eigenpal does
-              // not loop on an empty canvas.
-              // (no-op: docxBytes stays null, docxError stays null)
             } else {
+              // ADR 0088: every version is materialized with content at creation
+              // time, so a missing blob (404 included) is a real failure for any
+              // version status — surface the retry banner.
               docxError = `Não foi possível carregar o conteúdo do template (HTTP ${res.status}).`;
             }
           } catch (e) {

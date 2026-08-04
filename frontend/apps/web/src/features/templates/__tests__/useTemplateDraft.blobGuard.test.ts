@@ -1,14 +1,18 @@
 /**
  * Tests for F-FE3: useTemplateDraft blob-404 guard by version status.
  *
- * draft        + blob 404  → docxError=null, docxBytes=null  (blank canvas, silent)
- * under_review + blob 404 → docxError set                    (retry banner, not blank)
+ * Under ADR 0088 every template version is materialized with content (and a
+ * content_hash) at creation time — there is no "blank canvas, no object yet"
+ * state. A missing blob is therefore a real failure for every version status:
+ *
+ * draft        + blob 404 → docxError set (retry banner)
+ * under_review + blob 404 → docxError set (retry banner)
  * approved     + blob 404 → docxError set
  * published    + blob 404 → docxError set
  * any status   + blob 5xx → docxError set
  *
  * Mirrors DocumentEditorPage.tsx:122-129 (every blob failure incl. 404 becomes
- * editorLoadError for non-draft statuses).
+ * editorLoadError, no per-status carve-out).
  */
 import { renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -52,21 +56,7 @@ function stubFetch(status: number, body = '') {
 }
 
 describe('useTemplateDraft — blob 404 guard (F-FE3)', () => {
-  it('draft + 404 → docxError=null, docxBytes=null (blank canvas, silent)', async () => {
-    getTemplateMock.mockResolvedValue(TEMPLATE);
-    getVersionMock.mockResolvedValue(makeVersion('draft'));
-    getDocxURLMock.mockResolvedValue(BLOB_URL);
-    stubFetch(404);
-
-    const { result } = renderHook(() => useTemplateDraft('tpl-1', 1));
-    await waitFor(() => expect(result.current.loading).toBe(false));
-
-    expect(result.current.docxError).toBeNull();
-    expect(result.current.docxBytes).toBeNull();
-    expect(result.current.error).toBeNull();
-  });
-
-  it.each(['under_review', 'approved', 'published'] as const)(
+  it.each(['draft', 'under_review', 'approved', 'published'] as const)(
     '%s + 404 → docxError set (retry banner)',
     async (status) => {
       getTemplateMock.mockResolvedValue(TEMPLATE);

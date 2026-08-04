@@ -68,6 +68,16 @@ func (s *Service) requireActiveTemplateRoute(ctx context.Context, tx *sql.Tx, te
 // otherwise the create is rejected with ErrDocTypeCodeRequired (422) or
 // ErrApprovalRouteMissing (409). ADR 0082 phase (a) part 1: this no longer
 // seeds approval configuration or role bindings.
+//
+// ADR 0088: version 1 is MATERIALIZED before the transaction — its docx object
+// is copied from the system blank asset at the version's own canonical key and
+// confirmed, so the row is born carrying the verified hash of the object it
+// points at. A template version without content is no longer a reachable
+// state, which is why nothing downstream needs a "must edit before submit"
+// gate. If the materialization fails for any reason — unusable system blank
+// source, failed copy, failed read-back — the create fails closed with
+// ErrContentMaterializationFailed (a 500) rather than writing a content-less
+// version.
 func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*CreateTemplateResult, error) {
 	if strings.TrimSpace(cmd.DocTypeCode) == "" {
 		return nil, domain.ErrDocTypeCodeRequired
@@ -92,12 +102,31 @@ func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*C
 		CreatedAt:          s.clock.Now(),
 	}
 
+	// ADR 0088 — materialize BEFORE the transaction, then construct the version
+	// WITH the resulting hash. Version 1 of a template is always born from the
+	// system blank asset; the DOCX-import path (a separate call) later
+	// overwrites this object and its hash through the normal presign/confirm
+	// autosave route, so both wizard starting points share one creation shape.
+	//
+	// PRE-TX is load-bearing, not incidental: a network call must never run
+	// inside the tx, and materializing after commit (outbox) would re-open the
+	// very "version exists without content" window this closes. A failure here
+	// aborts creation with no row written; a crash between the copy and the
+	// commit leaves only an orphan object, which the templates orphan-object
+	// sweeper already owns.
+	docxKey := templateDocxKey(cmd.TenantID, template.ID, 1)
+	contentHash, err := s.materializeFromSystemBlank(ctx, cmd.TenantID, docxKey)
+	if err != nil {
+		return nil, err
+	}
+
 	version := domain.NewTemplateVersionDraft(
 		s.uuid.New(),
 		cmd.TenantID,
 		template.ID,
 		cmd.ActorUserID,
-		templateDocxKey(cmd.TenantID, template.ID, 1),
+		docxKey,
+		contentHash,
 		1,
 		domain.MetadataSchema{},
 		[]domain.Placeholder{},

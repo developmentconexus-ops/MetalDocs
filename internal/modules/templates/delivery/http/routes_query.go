@@ -12,9 +12,14 @@ import (
 	"metaldocs/internal/modules/templates/application"
 )
 
+// The system blank template's identity is declared ONCE, in the owning
+// module's application layer (ADR 0088 made creation depend on the same row,
+// and two hand-synced copies of a well-known UUID is the repo's named
+// meta-defect). These aliases keep the handler's call sites readable without
+// re-declaring the values. Resolves [SMELL-13].
 const (
-	systemBlankTemplateTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
-	systemBlankTemplateID       = "00000000-0000-0000-0000-000000000101"
+	systemBlankTemplateTenantID = application.SystemBlankTemplateTenantID
+	systemBlankTemplateID       = application.SystemBlankTemplateID
 )
 
 func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request, params templatesapi.ListTemplatesParams) {

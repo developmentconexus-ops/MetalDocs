@@ -248,6 +248,24 @@ func (r *fakeRepo) GetVersionByID(_ context.Context, tenantID, id string) (*doma
 	return v, nil
 }
 
+// fakeSystemBlankHash stands in for the reference-data-pinned sha256 of
+// deploy/assets/system-blank.docx (ADR 0088 materialization source).
+const fakeSystemBlankHash = "5cdae1bb25103bbc121cdc696ed11eb09aa22041940f199164ebc302f6923d2e"
+
+// GetSystemBlankVersion mirrors the reference-data row so template creation
+// (which now materializes version 1 from it, ADR 0088) works in handler tests.
+func (r *fakeRepo) GetSystemBlankVersion(_ context.Context) (*domain.TemplateVersion, error) {
+	return &domain.TemplateVersion{
+		ID:             "00000000-0000-0000-0000-000000000102",
+		TenantID:       "ffffffff-ffff-ffff-ffff-ffffffffffff",
+		TemplateID:     "00000000-0000-0000-0000-000000000101",
+		VersionNumber:  1,
+		Status:         domain.VersionStatusPublished,
+		DocxStorageKey: "system/templates/blank.docx",
+		ContentHash:    fakeSystemBlankHash,
+	}, nil
+}
+
 func (r *fakeRepo) CreateTemplateTx(_ context.Context, _ db.Tx, t *domain.Template) error {
 	return r.CreateTemplate(context.Background(), t)
 }

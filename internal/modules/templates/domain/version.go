@@ -54,9 +54,18 @@ type TemplateVersion struct {
 	CreatedAt         time.Time
 }
 
-// NewTemplateVersionDraft constructs a new version in draft status with an
-// empty content hash; the hash is set once the DOCX content is persisted.
-func NewTemplateVersionDraft(id, tenantID, templateID, authorID, docxStorageKey string, versionNumber int, metadata MetadataSchema, placeholders []Placeholder, createdAt time.Time) *TemplateVersion {
+// NewTemplateVersionDraft constructs a new version in draft status.
+//
+// ADR 0088: contentHash is a REQUIRED parameter, not a field the caller may
+// forget. content_hash carries exactly one meaning — the verified hash of the
+// object this version points at — and it is present from the moment the row
+// exists. Every creation path therefore materializes its object PRE-TX and
+// passes the hash Presigner.Confirm returned; the constructor no longer
+// hardcodes "" (which is what made "version without content" a reachable state
+// by construction). The parameter position, immediately after docxStorageKey,
+// makes the key/hash pair read as the single pointer it is, and the compiler
+// is the enforcement: a new caller cannot omit it.
+func NewTemplateVersionDraft(id, tenantID, templateID, authorID, docxStorageKey, contentHash string, versionNumber int, metadata MetadataSchema, placeholders []Placeholder, createdAt time.Time) *TemplateVersion {
 	return &TemplateVersion{
 		ID:                id,
 		TenantID:          tenantID,
@@ -64,7 +73,7 @@ func NewTemplateVersionDraft(id, tenantID, templateID, authorID, docxStorageKey 
 		VersionNumber:     versionNumber,
 		Status:            VersionStatusDraft,
 		DocxStorageKey:    docxStorageKey,
-		ContentHash:       "",
+		ContentHash:       contentHash,
 		MetadataSchema:    metadata,
 		PlaceholderSchema: placeholders,
 		AuthorID:          authorID,

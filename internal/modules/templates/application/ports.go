@@ -28,6 +28,15 @@ type Repository interface {
 	CreateVersionTx(ctx context.Context, tx db.Tx, v *domain.TemplateVersion) error
 	GetVersion(ctx context.Context, tenantID, templateID string, n int) (*domain.TemplateVersion, error)
 	GetVersionByID(ctx context.Context, tenantID, id string) (*domain.TemplateVersion, error)
+	// GetSystemBlankVersion loads the published version row of the system
+	// blank template — the reference-data row that owns BOTH the storage key
+	// of the deterministic blank asset AND its pinned content hash (ADR 0088
+	// §3). Creation reads the pair from here instead of hardcoding either in
+	// Go, so db/reference-data stays the single source of truth for "what an
+	// empty template is". It is the templates module's OWN table, so this is
+	// not a cross-module edge. Returns domain.ErrNotFound when the row is
+	// absent (a misconfigured deployment, which creation must fail closed on).
+	GetSystemBlankVersion(ctx context.Context) (*domain.TemplateVersion, error)
 	UpdateVersion(ctx context.Context, tenantID string, v *domain.TemplateVersion) error
 	UpdateVersionTx(ctx context.Context, tx db.Tx, tenantID string, v *domain.TemplateVersion) error
 	UpdateVersionSchemaCAS(ctx context.Context, tenantID string, v *domain.TemplateVersion, expectedLockVersion int) error

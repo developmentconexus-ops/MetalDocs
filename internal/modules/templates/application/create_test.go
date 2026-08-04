@@ -12,6 +12,7 @@ import (
 
 	"metaldocs/internal/modules/templates/application"
 	"metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/platform/objectstore"
 )
 
 func TestCreateTemplate_Happy(t *testing.T) {
@@ -65,6 +66,80 @@ func TestCreateTemplate_Happy(t *testing.T) {
 	}
 	if audit.VersionID == nil || *audit.VersionID != got.Version.ID {
 		t.Fatalf("expected audit version id %q, got %v", got.Version.ID, audit.VersionID)
+	}
+}
+
+// TestCreateTemplate_MaterializationFailure_IsServerError pins the
+// classification of every failure inside the server-side store-then-reference
+// copy (ADR 0088 §2).
+//
+// This guard exists because the original ADR 0088 implementation mapped these
+// to the user-facing upload sentinels — so an object-store outage surfaced as
+// "DOCX file not yet uploaded. Please upload the template file", telling the
+// user to fix an upload they never made and cannot make, and hiding a server
+// failure behind a 4xx. The whole suite stayed green through that defect,
+// because nothing asserted the classification. It does now.
+//
+// Blank creation copies bytes the SERVER owns (the system blank asset), so no
+// user input reaches this path and no failure on it is a user error.
+func TestCreateTemplate_MaterializationFailure_IsServerError(t *testing.T) {
+	cases := []struct {
+		name    string
+		presign func() *fakePresigner
+		notUser []error
+	}{
+		{
+			name:    "copy fails",
+			presign: func() *fakePresigner { return &fakePresigner{copyErr: errors.New("s3: connection reset")} },
+			notUser: []error{domain.ErrUploadMissing, domain.ErrUploadTooLarge, domain.ErrContentHashMismatch},
+		},
+		{
+			name:    "copied object missing on read-back",
+			presign: func() *fakePresigner { return &fakePresigner{confirmErr: objectstore.ErrObjectMissing} },
+			notUser: []error{domain.ErrUploadMissing},
+		},
+		{
+			name:    "copied object hash mismatch",
+			presign: func() *fakePresigner { return &fakePresigner{confirmErr: objectstore.ErrHashMismatch} },
+			notUser: []error{domain.ErrContentHashMismatch},
+		},
+		{
+			name:    "copied object too large",
+			presign: func() *fakePresigner { return &fakePresigner{confirmErr: objectstore.ErrObjectTooLarge} },
+			notUser: []error{domain.ErrUploadTooLarge},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := newFakeRepo()
+			svc := application.New(repo, tc.presign(), fakeClock{}, &fakeUUID{}).
+				WithRunner(newTxRunner(newPermissiveMockDB(t))).
+				WithRouteReadinessReader(&fakeTemplateRouteReadinessReader{ready: true})
+
+			_, err := svc.CreateTemplate(context.Background(), application.CreateTemplateCmd{
+				TenantID:    "tenant-a",
+				ActorUserID: "user-a",
+				DocTypeCode: "CONTRACT",
+				Key:         "contract-default",
+				Name:        "Contract Template",
+			})
+			if err == nil {
+				t.Fatal("expected create to fail closed, got nil error")
+			}
+			if !errors.Is(err, domain.ErrContentMaterializationFailed) {
+				t.Fatalf("expected ErrContentMaterializationFailed, got %v", err)
+			}
+			for _, userErr := range tc.notUser {
+				if errors.Is(err, userErr) {
+					t.Fatalf("server-side materialization failure must not classify as the user-facing %v: %v", userErr, err)
+				}
+			}
+			// Fail closed: no content-less version may survive the failure.
+			if len(repo.audit) != 0 {
+				t.Fatalf("expected no audit event on failed create, got %d", len(repo.audit))
+			}
+		})
 	}
 }
 
@@ -147,10 +222,13 @@ func TestCreateNextVersion_FromPublished(t *testing.T) {
 		PublishedVersionID: &publishedID,
 	}
 	v1 := &domain.TemplateVersion{
-		ID:                publishedID,
-		TemplateID:        template.ID,
-		VersionNumber:     1,
-		Status:            domain.VersionStatusPublished,
+		ID:            publishedID,
+		TemplateID:    template.ID,
+		VersionNumber: 1,
+		Status:        domain.VersionStatusPublished,
+		// ADR 0088: every version carries the verified hash of its object, so a
+		// spawn source without one is now a corrupt row, not a normal fixture.
+		ContentHash:       fakeSystemBlankHash,
 		MetadataSchema:    domain.MetadataSchema{DocCodePattern: "ABC-###", RequiredMetadata: []string{"department"}},
 		PlaceholderSchema: []domain.Placeholder{{ID: "ph-1", Label: "Signer", Type: domain.PHUser, Required: true}},
 	}
@@ -193,6 +271,7 @@ func TestCreateNextVersion_NoPublished_ClonesLatest(t *testing.T) {
 		TemplateID:        template.ID,
 		VersionNumber:     1,
 		Status:            domain.VersionStatusDraft,
+		ContentHash:       fakeSystemBlankHash,
 		MetadataSchema:    domain.MetadataSchema{DocCodePattern: "XYZ-###", RequiredMetadata: []string{"site"}},
 		PlaceholderSchema: []domain.Placeholder{{ID: "ph-1", Label: "Department", Type: domain.PHText}},
 	}
@@ -250,7 +329,7 @@ func TestCreateNextVersion_WithDB_UsesTransaction(t *testing.T) {
 
 	repo := newFakeRepo()
 	template := &domain.Template{ID: "tpl-1", TenantID: "tenant-a", LatestVersion: 1}
-	v1 := &domain.TemplateVersion{ID: "v1", TemplateID: template.ID, VersionNumber: 1, Status: domain.VersionStatusDraft}
+	v1 := &domain.TemplateVersion{ID: "v1", TemplateID: template.ID, VersionNumber: 1, Status: domain.VersionStatusDraft, ContentHash: fakeSystemBlankHash}
 	repo.templates[template.ID] = template
 	repo.versions[v1.ID] = v1
 	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(db))
@@ -286,6 +365,7 @@ func TestCreateNextVersion_CopiesSourceDocxToDistinctKey(t *testing.T) {
 		VersionNumber:  1,
 		Status:         domain.VersionStatusPublished,
 		DocxStorageKey: "tenants/tenant-a/templates/tpl-1/versions/1.docx",
+		ContentHash:    fakeSystemBlankHash,
 	}
 	repo.templates[template.ID] = template
 	repo.versions[v1.ID] = v1

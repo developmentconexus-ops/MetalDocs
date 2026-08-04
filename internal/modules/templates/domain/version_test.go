@@ -139,13 +139,17 @@ func TestNewTemplateVersionDraft(t *testing.T) {
 	createdAt := time.Date(2026, 4, 20, 12, 0, 0, 0, time.UTC)
 	metadata := domain.MetadataSchema{DocCodePattern: "ABC-###"}
 	placeholders := []domain.Placeholder{{ID: "p1", Label: "Name", Type: domain.PHText}}
-	v := domain.NewTemplateVersionDraft("ver-1", "tenant-1", "tpl-1", "user-1", "templates/tpl-1/versions/1.docx", 1, metadata, placeholders, createdAt)
+	const hash = "5cdae1bb25103bbc121cdc696ed11eb09aa22041940f199164ebc302f6923d2e"
+	v := domain.NewTemplateVersionDraft("ver-1", "tenant-1", "tpl-1", "user-1", "templates/tpl-1/versions/1.docx", hash, 1, metadata, placeholders, createdAt)
 
 	if v.Status != domain.VersionStatusDraft {
 		t.Fatalf("expected draft status, got %q", v.Status)
 	}
-	if v.ContentHash != "" {
-		t.Fatalf("expected empty content hash, got %q", v.ContentHash)
+	// ADR 0088 (inverted assertion): a draft is born WITH the verified hash of
+	// the object it points at. The constructor no longer hardcodes "" — the old
+	// expectation encoded the very overload the ADR removed.
+	if v.ContentHash != hash {
+		t.Fatalf("expected content hash %q, got %q", hash, v.ContentHash)
 	}
 	if v.AuthorID != "user-1" || v.TemplateID != "tpl-1" || v.ID != "ver-1" || v.TenantID != "tenant-1" {
 		t.Fatalf("unexpected identity fields: %+v", v)

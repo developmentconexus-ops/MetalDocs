@@ -77,7 +77,9 @@ func TestCreateNextVersion_TypedResponseShape(t *testing.T) {
 		VersionNumber:  1,
 		Status:         domain.VersionStatusPublished,
 		DocxStorageKey: "templates/" + tplID + "/versions/1.docx",
-		ContentHash:    "hash_v1",
+		// ADR 0088: spawnNextDraft confirms the copy against the source's hash,
+		// so the source fixture must carry a real 64-hex sha256, not a label.
+		ContentHash: fakeSystemBlankHash,
 	}
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 

@@ -20,6 +20,27 @@ const defaultMaxObjectBytes = 25 * 1024 * 1024
 // templates). Copy allows a system-tenant srcKey to be copied into any tenant.
 const SystemTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 
+// SystemAssetPrefix is the object-store namespace for tenant-agnostic assets
+// seeded by the DEPLOYMENT rather than written by any tenant's request path —
+// today exactly `system/templates/blank.docx` (compose `minio-init` copies
+// deploy/assets/system-blank.docx there, and db/reference-data pins its
+// content_hash on the system blank template's published version row).
+//
+// It is deliberately NOT of the form `tenants/{id}/…`: these objects belong to
+// no tenant, so squeezing them into a tenant namespace would be a lie the
+// isolation rule then has to carry. KeyIsSystemAsset is READ-SIDE ONLY — it
+// widens what may be a Copy SOURCE, never what may be a write DESTINATION
+// (assertTenant still governs every dst key), so no tenant can write into this
+// namespace or reach another tenant's bytes through it.
+const SystemAssetPrefix = "system/"
+
+// KeyIsSystemAsset reports whether key names a deployment-seeded system asset
+// (see SystemAssetPrefix). Single source of truth for that rule, mirroring
+// KeyHasTenantPrefix.
+func KeyIsSystemAsset(key string) bool {
+	return strings.HasPrefix(key, SystemAssetPrefix)
+}
+
 // VerifiedPointer is the verified result of a confirmed upload.
 type VerifiedPointer struct {
 	StorageKey  string
@@ -130,9 +151,12 @@ func (s *VerifiedStore) Copy(ctx context.Context, tenantID, srcKey, dstKey strin
 	if err := s.assertTenant(tenantID, dstKey); err != nil {
 		return err
 	}
-	// Assert srcKey belongs to the same tenant OR to the system tenant — explicit
-	// exception, not an omission of the check.
-	if !KeyHasTenantPrefix(tenantID, srcKey) && !KeyHasTenantPrefix(SystemTenantID, srcKey) {
+	// Assert srcKey belongs to the same tenant OR to the system tenant OR to the
+	// deployment-seeded system asset namespace — three explicit exceptions, not
+	// an omission of the check. The third (ADR 0088) is what lets a from-scratch
+	// template materialize from system/templates/blank.docx; it widens only the
+	// SOURCE side, the dst assertTenant above is untouched.
+	if !KeyHasTenantPrefix(tenantID, srcKey) && !KeyHasTenantPrefix(SystemTenantID, srcKey) && !KeyIsSystemAsset(srcKey) {
 		return ErrKeyOutsideTenant
 	}
 	_, err := s.client.CopyObject(ctx,

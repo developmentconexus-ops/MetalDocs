@@ -54,10 +54,18 @@ type GetDocxURLCmd struct {
 }
 
 // GetDocxURL returns a time-limited presigned GET URL for a template
-// version's docx object. Returns ErrUploadMissing if the version has no
-// docx object recorded yet, or if a storage key is recorded but the object
-// itself has not been uploaded yet (blank templates assign a storage key at
-// create time and lazily provision the object on first autosave confirm).
+// version's docx object.
+//
+// ADR 0088: the old rationale here — "blank templates assign a storage key at
+// create time and lazily provision the object on first autosave confirm" — is
+// FALSE as of this ADR. Every version materializes its object PRE-TX at
+// creation, so the editor never opens onto a missing object and a fresh blank
+// template resolves a URL immediately.
+//
+// The Exists gate is KEPT and still returns ErrUploadMissing: it now guards
+// only genuine store-side loss (an object deleted or never restored out of
+// band, or a pre-0317 legacy row) — the sentinel's honest residual meaning. It
+// is a read-path integrity check that fails closed, not a lifecycle gate.
 func (s *Service) GetDocxURL(ctx context.Context, cmd GetDocxURLCmd) (string, error) {
 	if _, err := s.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID); err != nil {
 		return "", err
@@ -66,9 +74,13 @@ func (s *Service) GetDocxURL(ctx context.Context, cmd GetDocxURLCmd) (string, er
 	if err != nil {
 		return "", err
 	}
-	if v.DocxStorageKey == "" {
-		return "", domain.ErrUploadMissing
-	}
+	// The `DocxStorageKey == ""` branch that used to sit here is DELETED
+	// (legacy-extermination): docx_storage_key is NOT NULL in the schema and
+	// every writer sets it from templateDocxKey, so the branch was dead even
+	// before this ADR — and an empty key now cannot survive creation at all,
+	// since materialization copies to that very key. Exists() below is the
+	// real, reachable guard; an empty key would fail it anyway rather than
+	// silently presigning garbage.
 	exists, err := s.presign.Exists(ctx, v.DocxStorageKey)
 	if err != nil {
 		return "", err

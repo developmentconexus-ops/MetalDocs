@@ -181,25 +181,12 @@ func TestListAudit_Happy(t *testing.T) {
 	}
 }
 
-func TestGetDocxURL_EmptyStorageKey_ErrUploadMissing(t *testing.T) {
-	repo := newFakeRepo()
-	tpl := &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
-	ver := &domain.TemplateVersion{ID: "ver-1", TemplateID: tpl.ID, VersionNumber: 1, DocxStorageKey: ""}
-	repo.templates[tpl.ID] = tpl
-	repo.versions[ver.ID] = ver
-
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
-
-	url, err := svc.GetDocxURL(context.Background(), application.GetDocxURLCmd{
-		TenantID: "tenant-a", TemplateID: tpl.ID, VersionNumber: 1,
-	})
-	if !errors.Is(err, domain.ErrUploadMissing) {
-		t.Fatalf("expected ErrUploadMissing, got %v", err)
-	}
-	if url != "" {
-		t.Fatalf("expected empty URL, got %q", url)
-	}
-}
+// TestGetDocxURL_EmptyStorageKey_ErrUploadMissing is DELETED (ADR 0088): it
+// pinned the `DocxStorageKey == ""` branch, which was dead code
+// (docx_storage_key is NOT NULL and every writer sets it from templateDocxKey)
+// and is now doubly unreachable, since creation materializes the object at
+// that very key. TestGetDocxURL_ObjectMissing_ErrUploadMissing below covers the
+// sentinel's real, remaining meaning: the object itself is gone.
 
 func TestGetDocxURL_ObjectMissing_ErrUploadMissing(t *testing.T) {
 	repo := newFakeRepo()

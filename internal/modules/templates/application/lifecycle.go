@@ -35,8 +35,9 @@ type PublishTemplateVersionResult struct {
 // PublishTemplateVersion publishes a version that is either a draft
 // (bypassing the review/approve workflow entirely) or already approved
 // (completing the kernel signoff flow, which ends at approved — ADR 0082).
-// The version must carry a committed content hash (ErrContentHashMismatch
-// otherwise) and the actor must pass segregation-of-duties (publisher must
+// ADR 0088 removed the "must carry a committed content hash" precondition:
+// every version is materialized at creation, so a never-edited draft publishes
+// like any other. The actor must pass segregation-of-duties (publisher must
 // not be the author or reviewer) — identity-based, not role-based (ADR 0022:
 // authz is capabilities, never roles). Any other source status is rejected
 // with ErrInvalidStateTransition. On success, the version is published, the
@@ -69,10 +70,14 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 		return nil, domain.ErrInvalidStateTransition
 	}
 
-	// T-004: content_hash gate — presigned docx must have been committed.
-	if version.ContentHash == "" {
-		return nil, domain.ErrContentHashMismatch
-	}
+	// ADR 0088 §4: the emptiness gate that used to sit here ("content_hash == ''
+	// => ErrContentHashMismatch") is DELETED, not reworded. Under ADR 0088 §1
+	// every version row carries the verified hash of its object from the moment
+	// it exists (DB CHECK chk_template_version_content_hash_non_draft is now
+	// unconditional, migration 0317), so the branch was unreachable. Its real
+	// job had drifted to "force a real edit before publishing", which is a
+	// judgment for the reviewer, not a shape fabricated out of a null column.
+	// A blank or unchanged version publishing is intended behaviour.
 
 	// T-004: SoD — publisher must not be the author or the reviewer. This is
 	// identity-based (actor user ID vs. author/reviewer user IDs), not
@@ -167,13 +172,31 @@ func nextVersionNumber(latestVersion, sourceVersionNumber int) int {
 // the draft's OWN canonical key (never the source's key — that shared-key bug
 // overwrites the immutable source object). The copy runs PRE-TX (store-then-
 // reference: the object exists before the referencing row commits; the only
-// crash outcome is a safe orphan). ContentHash is left empty (the draft
-// constructor's default) so the publish gate still forces a real edit before the
-// new revision can publish.
+// crash outcome is a safe orphan).
+//
+// ADR 0088: the copy is followed by a Confirm against the source's hash, and
+// the draft is constructed WITH the verified hash it returns — the same single
+// meaning content_hash carries everywhere else (the hash of the object THIS
+// version points at). The superseded stance ("leave ContentHash empty so the
+// publish gate still forces a real edit") is gone with the gate it served:
+// whether an unchanged revision deserves approval is the reviewer's judgment,
+// not a shape expressed by a null column.
 func (s *Service) spawnNextDraft(ctx context.Context, tenantID, templateID, actorID string, nextNum int, source *domain.TemplateVersion) (*domain.TemplateVersion, error) {
+	if len(source.ContentHash) != 64 {
+		// Fail closed: under ADR 0088 every version carries a real hash, so a
+		// source without one is a corrupt row (or a pre-0317 leftover), never a
+		// licence to spawn another content-less draft from it. That is a server
+		// -side data defect, not a missing user upload — it maps to 500, not to
+		// a 4xx telling the user to upload something they cannot upload.
+		return nil, fmt.Errorf(
+			"templates: source version %s has no verified content hash (length=%d): %w",
+			source.ID, len(source.ContentHash), domain.ErrContentMaterializationFailed,
+		)
+	}
 	dstKey := templateDocxKey(tenantID, templateID, nextNum)
-	if err := s.presign.Copy(ctx, tenantID, source.DocxStorageKey, dstKey); err != nil {
-		return nil, fmt.Errorf("templates: copy docx to %s: %w", dstKey, err)
+	contentHash, err := s.copyAndConfirm(ctx, tenantID, source.DocxStorageKey, dstKey, source.ContentHash)
+	if err != nil {
+		return nil, err
 	}
 	return domain.NewTemplateVersionDraft(
 		s.uuid.New(),
@@ -181,6 +204,7 @@ func (s *Service) spawnNextDraft(ctx context.Context, tenantID, templateID, acto
 		templateID,
 		actorID,
 		dstKey,
+		contentHash,
 		nextNum,
 		cloneMetadataSchema(source.MetadataSchema),
 		clonePlaceholders(source.PlaceholderSchema),

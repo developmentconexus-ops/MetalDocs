@@ -69,6 +69,35 @@ var ErrDocTypeCodeRequired = errors.New("templates: doc_type_code_required")
 // to 409 APPROVAL_ROUTE_MISSING.
 var ErrApprovalRouteMissing = errors.New("templates: approval_route_missing")
 
+// ErrContentMaterializationFailed is returned when the server cannot produce
+// the object a new template version must point at (ADR 0088 §2 — every version
+// is born with the verified hash of its own object).
+//
+// It covers EVERY failure inside the server-side store-then-reference copy,
+// because every caller of that primitive copies bytes the SERVER already owns:
+// blank creation copies the system blank asset, and spawning the next revision
+// copies the previous version's object. Concretely: the source row is absent or
+// carries no storage key / no 64-hex hash; the copy itself fails; the copied
+// object is missing, hash-mismatched, or oversized on read-back.
+//
+// None of those are user errors, and the distinction between them is an
+// OPERATIONS distinction, not a client one — no caller can act on it, so it is
+// carried in the wrapped error chain for logs rather than in the classification.
+// Mapping any of them to the user-facing upload sentinels (as the pre-ADR-0088
+// code did) tells the user to fix an upload they never made and cannot make,
+// while hiding an object-store failure behind a 4xx.
+//
+// The HTTP layer therefore leaves this on the default 500 arm, deliberately: a
+// 4xx would blame the request when the deployment is what is broken. It is also
+// never a licence to fall back to a content-less version (no-fallback
+// principle) — the state ADR 0088 exists to make unreachable must not be
+// re-opened by a degraded path.
+//
+// Operator fix, when the source is the system blank: re-run the reference-data
+// bundle and the object seeding (deploy/assets/system-blank.docx ->
+// system/templates/blank.docx).
+var ErrContentMaterializationFailed = errors.New("templates: content_materialization_failed")
+
 // ErrTransactionRequired is returned when an operation that must run inside a
 // transaction is invoked without one.
 var ErrTransactionRequired = errors.New("templates: transaction_required")
