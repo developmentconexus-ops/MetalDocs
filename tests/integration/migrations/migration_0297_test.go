@@ -21,6 +21,16 @@
 //     approval_instances submissions for BOTH subjects, since the pre-existing
 //     (document_id, idempotency_key) constraint cannot dedup two NULL
 //     document_id rows.
+//
+// SUPERSESSION (migration 0315, ADR 0086 — "template routes config-first,
+// profile-keyed"): the approval_ROUTES half of the third bullet is reversed.
+// A template route must now carry profile_code IS NOT NULL AND
+// profile_code = subject_key (constraint
+// approval_routes_template_subject_key_check); template routes are keyed by
+// profile, not by template id. The column stays NULL-able (0297's DDL is
+// intact) and the approval_INSTANCES half (template rows keep document_id
+// NULL) is unchanged. The route-side tests below are named Migration0315 to
+// mark which migration owns the invariant they assert.
 package migrations_test
 
 import (
@@ -73,34 +83,73 @@ func TestMigration0297_ApprovalInstances_TemplateSubject_NullDocumentID_Insertab
 	}
 }
 
-// TestMigration0297_ApprovalRoutes_TemplateSubject_NullProfileCode_Insertable
-// is the RED->GREEN proof for approval_routes: before 0297, profile_code NOT
-// NULL made this INSERT impossible. After 0297, a template-subject route row
-// with profile_code NULL inserts cleanly.
-func TestMigration0297_ApprovalRoutes_TemplateSubject_NullProfileCode_Insertable(t *testing.T) {
+// TestMigration0315_ApprovalRoutes_TemplateSubject_NullProfileCode_Rejected is
+// the INVERTED successor of 0297's
+// *_TemplateSubject_NullProfileCode_Insertable. 0297 relaxed profile_code's
+// NOT NULL so a template-subject route could carry NULL; migration 0315
+// (ADR 0086, "template routes config-first, profile-keyed") deliberately
+// REVERSED that invariant with
+//
+//	CHECK (subject_kind <> 'template'
+//	       OR (profile_code IS NOT NULL AND profile_code = subject_key))
+//
+// so template routes are now profile-keyed: a template route's subject_key IS
+// its profile code. The column stays NULL-able (0297's DDL is intact) — the
+// CHECK, not a NOT NULL, is what rejects the row.
+func TestMigration0315_ApprovalRoutes_TemplateSubject_NullProfileCode_Rejected(t *testing.T) {
 	db, _ := testdb.Open(t)
 
 	tenant := testdb.NewTenant(t, db)
 	owner := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID))
 
-	subjectKey := uuid.NewString() // stands in for a template_id
+	subjectKey := uuid.NewString() // a non-profile key: doubly illegal post-0315
 	err := insertRouteWithSubjectAndProfile(t, db, tenant.ID, nil, owner.ID, false, 1, "template", subjectKey)
-	if err != nil {
-		t.Fatalf("insert template-subject route with NULL profile_code: %v", err)
+	assertCheckViolation(t, err)
+
+	// The column itself is still NULL-able — proving the rejection above came
+	// from approval_routes_template_subject_key_check and not from a restored
+	// NOT NULL (which would also break the document path's own projection).
+	var isNullable string
+	if qErr := db.QueryRowContext(context.Background(),
+		`SELECT is_nullable FROM information_schema.columns
+		  WHERE table_schema = 'public' AND table_name = 'approval_routes'
+		    AND column_name = 'profile_code'`,
+	).Scan(&isNullable); qErr != nil {
+		t.Fatalf("query profile_code nullability: %v", qErr)
+	}
+	if isNullable != "YES" {
+		t.Fatalf("approval_routes.profile_code is_nullable = %q, want YES (0297 DDL intact)", isNullable)
+	}
+}
+
+// TestMigration0315_ApprovalRoutes_TemplateSubject_ProfileKeyed_Insertable is
+// the positive half: the post-0315 legal template row shape is
+// profile_code == subject_key, both pointing at a real document_profiles code
+// (FK approval_routes_document_profile_fk).
+func TestMigration0315_ApprovalRoutes_TemplateSubject_ProfileKeyed_Insertable(t *testing.T) {
+	db, _ := testdb.Open(t)
+
+	tenant := testdb.NewTenant(t, db)
+	owner := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID))
+	tax := testdb.NewTaxonomy(t, db, testdb.WithTenant(tenant.ID))
+
+	subjectKey := tax.ProfileCode
+	if err := insertRouteWithSubjectAndProfile(t, db, tenant.ID, &subjectKey, owner.ID, false, 1, "template", subjectKey); err != nil {
+		t.Fatalf("insert profile-keyed template route: %v", err)
 	}
 
 	var profileCode sql.NullString
 	var kind, key string
 	qErr := db.QueryRowContext(context.Background(),
 		`SELECT profile_code, subject_kind, subject_key FROM public.approval_routes
-		  WHERE tenant_id = $1::uuid AND subject_key = $2`,
+		  WHERE tenant_id = $1::uuid AND subject_kind = 'template' AND subject_key = $2`,
 		tenant.ID, subjectKey,
 	).Scan(&profileCode, &kind, &key)
 	if qErr != nil {
 		t.Fatalf("query inserted template route: %v", qErr)
 	}
-	if profileCode.Valid {
-		t.Fatalf("profile_code = %q, want NULL for a template-subject row", profileCode.String)
+	if !profileCode.Valid || profileCode.String != subjectKey {
+		t.Fatalf("profile_code = %v, want %q (profile-keyed template row)", profileCode, subjectKey)
 	}
 	if kind != "template" {
 		t.Fatalf("subject_kind = %q, want template", kind)
@@ -148,9 +197,14 @@ func TestMigration0297_ApprovalRoutes_DocumentRow_StillRequiresProfileCode(t *te
 	assertCheckViolation(t, err)
 }
 
-// TestMigration0297_ApprovalRoutes_TemplateRow_RejectsNonNullProfileCode is
-// the approval_routes sibling of the template-row projection-CHECK assertion.
-func TestMigration0297_ApprovalRoutes_TemplateRow_RejectsNonNullProfileCode(t *testing.T) {
+// TestMigration0315_ApprovalRoutes_TemplateRow_RejectsProfileKeyMismatch is
+// the approval_routes sibling of the template-row projection CHECK, restated
+// for 0315: a template row's profile_code must not merely be present, it must
+// EQUAL subject_key. A row carrying a valid profile_code with a different
+// subject_key is rejected. (Pre-0315 this test asserted the opposite — that a
+// template row must leave profile_code NULL; see
+// TestMigration0315_ApprovalRoutes_TemplateSubject_NullProfileCode_Rejected.)
+func TestMigration0315_ApprovalRoutes_TemplateRow_RejectsProfileKeyMismatch(t *testing.T) {
 	db, _ := testdb.Open(t)
 
 	tenant := testdb.NewTenant(t, db)

@@ -173,22 +173,35 @@ func TestMigration0296_NewSubjectIndexesExist(t *testing.T) {
 // duplicate must be exercised with active=true rows — two inactive rows
 // sharing a subject_key is legitimate (superseded route history) and must NOT
 // collide.
+//
+// NOTE (0315, ADR 0086 "template routes config-first, profile-keyed"): template
+// routes are no longer profile-less. approval_routes_template_subject_key_check
+// now requires profile_code IS NOT NULL AND profile_code = subject_key, so a
+// template route's subject_key IS a real document_profiles code (FK
+// approval_routes_document_profile_fk). Consequence for this test: the two
+// active-partial unique indexes — ux_approval_routes_tenant_subject
+// (tenant_id, subject_kind, subject_key) and approval_routes_active_profile_uq
+// (tenant_id, subject_kind, profile_code) — are now congruent for BOTH subject
+// kinds (documents already had the subject_key = profile_code alias CHECK), so
+// the duplicate can no longer be steered at one index in isolation. Either
+// index firing is the same invariant; the assertion stays on the SQLSTATE.
 func TestMigration0296_ApprovalRoutes_UniqueSubjectIndexRejectsDuplicate(t *testing.T) {
 	db, _ := testdb.Open(t)
 
 	tenant := testdb.NewTenant(t, db)
 	owner := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID))
+	tax := testdb.NewTaxonomy(t, db, testdb.WithTenant(tenant.ID))
 
-	// Template routes carry NULL profile_code (0297 projection CHECK), so the
-	// only unique index that can fire on two active same-subject rows is
-	// ux_approval_routes_tenant_subject — profile-keyed indexes never collide on
-	// NULL. (insertRouteWithSubjectAndProfile is defined in migration_0297_test.go,
+	// profile_code == subject_key is the post-0315 template row shape. The
+	// fixture profile is governance_class 'simples', so the deferred
+	// trg_route_profile_policy shape check admits a stage-less active route.
+	// (insertRouteWithSubjectAndProfile is defined in migration_0297_test.go,
 	// same package.)
-	sharedKey := "tpl:" + uuid.NewString()
-	if err := insertRouteWithSubjectAndProfile(t, db, tenant.ID, nil, owner.ID, true, 1, "template", sharedKey); err != nil {
+	sharedKey := tax.ProfileCode
+	if err := insertRouteWithSubjectAndProfile(t, db, tenant.ID, &sharedKey, owner.ID, true, 1, "template", sharedKey); err != nil {
 		t.Fatalf("insert first template route: %v", err)
 	}
-	err := insertRouteWithSubjectAndProfile(t, db, tenant.ID, nil, owner.ID, true, 2, "template", sharedKey)
+	err := insertRouteWithSubjectAndProfile(t, db, tenant.ID, &sharedKey, owner.ID, true, 2, "template", sharedKey)
 	assertUniqueViolation(t, err)
 }
 
@@ -203,13 +216,18 @@ func TestMigration0296_ApprovalRoutes_InactiveDuplicateSubjectAllowed(t *testing
 
 	tenant := testdb.NewTenant(t, db)
 	owner := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID))
+	tax := testdb.NewTaxonomy(t, db, testdb.WithTenant(tenant.ID))
 
-	// NULL profile_code (template rows) — see UniqueSubjectIndexRejectsDuplicate.
-	sharedKey := "tpl:" + uuid.NewString()
-	if err := insertRouteWithSubjectAndProfile(t, db, tenant.ID, nil, owner.ID, false, 1, "template", sharedKey); err != nil {
+	// profile_code == subject_key (post-0315 template row shape) — see
+	// UniqueSubjectIndexRejectsDuplicate. Distinct versions keep the full-unique
+	// approval_routes_profile_version_uq (tenant, subject_kind, profile_code,
+	// version) out of play, so an admitted pair proves the partial index really
+	// is scoped WHERE active.
+	sharedKey := tax.ProfileCode
+	if err := insertRouteWithSubjectAndProfile(t, db, tenant.ID, &sharedKey, owner.ID, false, 1, "template", sharedKey); err != nil {
 		t.Fatalf("insert first inactive route: %v", err)
 	}
-	if err := insertRouteWithSubjectAndProfile(t, db, tenant.ID, nil, owner.ID, false, 2, "template", sharedKey); err != nil {
+	if err := insertRouteWithSubjectAndProfile(t, db, tenant.ID, &sharedKey, owner.ID, false, 2, "template", sharedKey); err != nil {
 		t.Fatalf("insert second inactive route with same subject_key must be allowed (partial index WHERE active), got: %v", err)
 	}
 }
