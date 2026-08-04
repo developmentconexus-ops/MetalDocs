@@ -142,7 +142,7 @@ default into it. Recording it here is what keeps the verdict at Yellow rather th
 | Contract-first (OpenAPI + oapi-codegen) | Yes | Response fields for the eligible-actor list, `waiting_since`, `due_at` are added to `api/openapi/v1/openapi.yaml` first, then regenerated. Note the standing rule: any spec edit churns every module's embedded `swaggerSpec` — **full regen only**, partial regen is forbidden drift. | `oapi-codegen`, generated DTOs |
 | Multi-tenant pooled | Yes | Every new read and every reminder query is `tenant_id`-predicated and runs under the tx-local GUC. The background reminder is the dangerous case: it must per-tenant seed (`BypassSystem` + `SeedTxTenant`) and carry an **explicit `tenant_id` predicate** — the M6 surfacer bug (§F6.4) was exactly this, and `metaldocs_app` is superuser+BYPASSRLS in dev so RLS will not catch a miss. | `tenant.FromContext`, `SeedTxTenant` |
 | Async = transactional outbox | Yes | The submit-time fanout enqueues **inside the business transaction** via the existing `EnqueueLifecycleEventTx`. No network call in the tx; the fanout consumer stays idempotent. Inlining any send would be AS-1. | `LifecycleEventEnqueuer`, outbox repo |
-| DB enforces invariants | Partly | The stage deadline is derived, not free-typed: if a `due_at` column lands it gets a NOT NULL-or-NULL-consistent CHECK against the stage clock. No new trigger anticipated. | migration CHECK constraints |
+| DB enforces invariants | Already satisfied — **see §2a** | No new constraint is needed. `approval_route_stages.due_in_days` and `approval_stage_instances.due_in_days_snapshot` already exist with `CHECK (… > 0)` (`db/baseline/0001_current_schema.sql:2112`, `:2197`), and `due_at` is already derived at stage activation. The gap is contractual, not schematic. | the existing CHECK constraints |
 | Cross-module via published interface only | Yes | `approval → notifications` on the existing port; `approval → iam` via an `iam` application service for names. No repo/SQL/domain reach-through in either direction. | module `ports.go` |
 
 **AS-1 not raised.**
@@ -180,11 +180,11 @@ exist and are wired at the composition root.
   `waiting_since`, `due_at`, overdue flag). Full spec regen; no partial. Four stale pre-0089 code
   names remain in openapi.yaml *prose* (lines 1273, 1289, 1290, 5710) — out of scope here, noted so
   the next spec edit does not treat them as truth.
-- **Migration:** next free number is **0318** (0316 and 0317 are landed; `db/migrations/` was emptied
-  by the 2026-07-29 baseline fold). Expected content: the per-stage deadline column(s) and their
-  CHECK, plus whatever backfill the reminder needs. Any new tenant table carries `tenant_id`.
-  **Migration lesson from 0317 (Class 22):** `to_regclass` every table up front and schema-qualify
-  explicitly — `document_profiles` lives in `metaldocs`, not `public`.
+- **Migration: none — superseded by §2a.** This row originally planned migration 0318 for the stage
+  deadline. The sweep found the columns already exist (`approval_route_stages.due_in_days` and
+  `approval_stage_instances.due_in_days_snapshot`, both with `CHECK (… > 0)`), the event is a River
+  job with no schema, and `metaldocs.notifications` already exists. `db/migrations/` stays untouched,
+  which also means the Class 22 lesson from 0317 has no branch here to get wrong.
 - **Destructive change?** No. Purely additive fields; the 404 fix is a JOIN correction with no schema
   change. The one behavioural break is intentional and desirable: submits start producing
   notifications where they previously produced silence.
