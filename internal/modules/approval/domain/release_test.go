@@ -261,21 +261,27 @@ func TestReleaseSourceStatus_ParityWithDocumentsDomain(t *testing.T) {
 }
 
 // TestReleaseHoldReasons_ParityWithMigrationCheck parses the
-// ck_release_generations_hold_reason CHECK out of migration 0310 and asserts it
-// carries exactly the Go vocabulary. A reason added on one side only would let
-// the coordinator write a value the DB rejects (or leave a DB value no code can
-// produce) — a class of drift the "hand-synced enumerations" meta-defect has
-// bitten this repo with before.
+// ck_release_generations_hold_reason CHECK out of the baseline schema and
+// asserts it carries exactly the Go vocabulary. A reason added on one side only
+// would let the coordinator write a value the DB rejects (or leave a DB value no
+// code can produce) — a class of drift the "hand-synced enumerations"
+// meta-defect has bitten this repo with before.
+//
+// Source is db/baseline/0001_current_schema.sql, not the originating migration
+// 0310: the 2026-07-29 baseline fold froze 0310 under archive/migrations/ and
+// the baseline is the living schema truth. A future vocabulary change ships as
+// a new forward migration AND lands in the baseline, so this stays the honest
+// parity source.
 func TestReleaseHoldReasons_ParityWithMigrationCheck(t *testing.T) {
-	path := filepath.Join("..", "..", "..", "..", "db", "migrations", "0310_release_coordinator.sql")
+	path := filepath.Join("..", "..", "..", "..", "db", "baseline", "0001_current_schema.sql")
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("read migration: %v", err)
+		t.Fatalf("read baseline schema: %v", err)
 	}
-	block := regexp.MustCompile(`(?s)ck_release_generations_hold_reason\s+CHECK \(hold_reason IS NULL OR hold_reason IN \((.*?)\)\)`).
+	block := regexp.MustCompile(`(?s)ck_release_generations_hold_reason\s+CHECK \(\(\(hold_reason IS NULL\) OR \(hold_reason = ANY \(ARRAY\[(.*?)\]\)\)\)\)`).
 		FindStringSubmatch(string(raw))
 	if block == nil {
-		t.Fatal("ck_release_generations_hold_reason CHECK not found in migration 0310")
+		t.Fatal("ck_release_generations_hold_reason CHECK not found in db/baseline/0001_current_schema.sql")
 	}
 	var fromSQL []string
 	for _, lit := range regexp.MustCompile(`'([a-z_]+)'`).FindAllStringSubmatch(block[1], -1) {
