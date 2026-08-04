@@ -36,6 +36,12 @@ func InsertDraftDocument(t *testing.T, db *sql.DB, schema, tenantID string) (doc
 	userID := DeterministicID(t, "user")
 	templateKey := "test-template-" + randomSuffix(t)
 
+	// ADR 0086: templates_template.doc_type_code must be a real profile code
+	// (templates_template_doc_type_code_required_check forbids '' for
+	// non-system-owned templates). Seed the governed taxonomy chain through the
+	// canonical factory and key the template off its profile code.
+	tax := NewTaxonomy(t, db, WithTenant(tenantID))
+
 	// Insert minimal published template + version into the canonical family.
 	// content_hash must be 64-hex for any non-draft status
 	// (chk_template_version_content_hash_non_draft); docx_storage_key is
@@ -49,9 +55,9 @@ func InsertDraftDocument(t *testing.T, db *sql.DB, schema, tenantID string) (doc
 		if err := tx.QueryRowContext(ctx,
 			`INSERT INTO `+Qualified(schema, "templates_template")+
 				` (id, tenant_id, doc_type_code, key, name, description, latest_version, published_version_id, created_by, created_at)
-			 VALUES (gen_random_uuid(), $1::uuid, '', $2, 'Test Template', '', 1, NULL, $3::text, now())
+			 VALUES (gen_random_uuid(), $1::uuid, $2, $3, 'Test Template', '', 1, NULL, $4::text, now())
 			 RETURNING id::text`,
-			tenantID, templateKey, userID,
+			tenantID, tax.ProfileCode, templateKey, userID,
 		).Scan(&tplID); err != nil {
 			return fmt.Errorf("insert templates_template: %w", err)
 		}
