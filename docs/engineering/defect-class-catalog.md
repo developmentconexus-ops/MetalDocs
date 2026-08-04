@@ -1,0 +1,643 @@
+# Defect-Class Catalog
+
+> **Purpose.** Not a bug list — a list of **defect *classes*** observed in a large,
+> multi-module Go + TypeScript codebase, each paired with the mechanism that makes
+> the class *unreachable by construction* in a future project.
+> **Audience.** The software factory: whoever sets up repo scaffolding, CI, and
+> review doctrine on day 0 of the next system.
+> **Rule of the document.** Every class carries real evidence from this repo
+> (`file:line`, ADR, commit). No hypothetical defects. If a class has no evidence
+> here, it does not belong in this file yet.
+> **Last verified:** 2026-08-04
+
+---
+
+## 0. The Prevention Ladder
+
+The single most important idea in this document. When you decide how to prevent a
+defect class, you are choosing a rung. **Always climb as high as the problem allows.**
+
+| Rung | Mechanism | Fails when | Cost |
+|---|---|---|---|
+| 1 | **Impossible to express** — the type system rejects it | never | design effort up front |
+| 2 | **Generated** — one source of truth, everything else emitted from it | generator not run → rung 3 catches it | build wiring |
+| 3 | **CI gate** — blocking lint/check on every push | someone disables it | pipeline time |
+| 4 | **Test** — a failing assertion | test written at wrong altitude (→ §8) | maintenance |
+| 5 | **Doc / convention** — written down | always, eventually | ~0 |
+| 6 | **Review vigilance** — a human notices | reviewer tired, new, or absent | reviewer time |
+
+**The central finding of this repo's audit:** most of its real defects are conventions
+sitting on rungs 5–6 that everyone *believed* were on rungs 1–3. A convention without
+enforcement is not a standard. It is a wish with good intentions.
+
+**Factory rule:** a convention that matters enough to write down is a convention that
+must be enforced at rung ≤3. If you cannot enforce it, either it does not matter, or
+your design is wrong.
+
+---
+
+## Class 1 — The Fake Type Guard
+
+**Symptom.** A type exists to constrain values, its doc comment claims it does, and it
+does not.
+
+**Evidence.** `internal/platform/problem/codes.go:7`:
+```go
+// Using a distinct type prevents arbitrary strings from being used as codes.
+type Code string
+```
+False. `Code` is a *defined string type*, so any untyped string constant converts
+implicitly. `problem.New(409, "whatever_i_want", …)` compiles. Result: 147 distinct
+error codes in 3 competing conventions, 26 of them raw literals in a single function
+(`internal/modules/controlleddocuments/delivery/http/routes.go:501-577`).
+
+**Root cause.** Go's untyped-constant conversion. `type X string` constrains *variables*
+of other named string types, never literals. The author reasoned by analogy to a real
+newtype and never tested the negative case.
+
+**Prevention (rung 1).** If a type must reject literals, it needs an unexported field:
+```go
+type Code struct{ s string }        // literal cannot construct it
+func Register(module, code string, status int) Code { … }
+```
+Keeps comparability, map-key usability, and `MarshalJSON` to the same wire string.
+
+**Detection in an existing repo.** For every "this type prevents X" comment, write the
+test that *asserts X is prevented*. If you cannot write a compile-failure test, the
+guarantee is not real. `go vet` will not tell you.
+
+**Generalization.** Any comment asserting a guarantee is a test that was never written.
+Grep for `prevents`, `ensures`, `guarantees`, `cannot` in comments and treat each as a
+missing test.
+
+---
+
+## Class 2 — Hand-Synced Enumerations
+
+*This repo's own named meta-defect (final architecture review, 2026-07-03).*
+
+**Symptom.** Two or more lists in different languages/files must agree. Nothing enforces
+that they do. They diverge silently.
+
+**Evidence.**
+- Backend error codes ↔ `frontend/apps/web/src/lib/api/errorMessages.ts`. Bridged by
+  `scripts/dump-error-codes.go`, which is **wired to nothing** — zero references in
+  `.github/workflows/`, `Makefile`, `scripts/*.ps1`. Currently 3 codes stale, added by
+  commit `1d3f8db5` (2026-08-04), snapshot last touched `f3b5dc60` (2026-07-29). Users
+  hitting those conditions see a raw code instead of a message.
+- OpenAPI `Problem.code` is `type: string` with description *"Machine-readable code from
+  canonical taxonomy"* (`api/openapi/v1/openapi.yaml:7190`) — the spec names a taxonomy
+  it does not encode. No enum.
+- `wiki/architecture/api-design-system.md:88` documents `IDEMPOTENCY_KEY_CONFLICT`, which
+  exists nowhere. Real constant is `IDEMPOTENCY_KEY_REUSED` (`codes.go:26`).
+- Historic instances: capability registry size, authz tripwire arms (closed in GMR M2 by
+  generating the arms from the Go registry + 2 blocking drift/parity lints — the correct
+  fix, and proof the pattern generalizes).
+
+**Root cause.** Duplication across a language boundary, where no compiler spans both sides.
+
+**Prevention (rung 2 + 3).** One source of truth; every other representation *generated*
+from it; a CI job that regenerates and fails on diff. The OpenAPI enum, the FE message
+keys, and the wiki table are all **outputs**, never inputs.
+
+**Detection.** Ask of every list: "what happens if someone adds an entry to only one
+side?" If the answer is not "CI fails", it is this class.
+
+**Factory rule.** Never let two enumerations that must agree be maintained by humans.
+Generation is not an optimization here; it is the only correct implementation.
+
+---
+
+## Class 3 — The Allowlist Guard That Ratifies Drift
+
+**Symptom.** A guard exists, looks reassuring, and is *opt-in* — so the worst offenders
+are simply not on the list. Worse: the exclusion is documented as intentional, which
+converts an unpaid debt into apparent policy.
+
+**Evidence.** `internal/platform/problem/codes_catalog_guard_test.go`. `guardedPackages`
+covers 7 packages. Not guarded: **all of `approval/http`** (67 codes), the
+`controlleddocuments` 501-line switch with 26 raw literals, `taxonomy`, `tokens`,
+`documents/.../fillin_handler.go`. The exclusion comment reads:
+
+> the dotted-taxonomy packages are intentionally excluded: they own a separate,
+> documented code taxonomy
+
+The guard does not merely miss the drift. It **legitimizes** it. Every later reader sees
+a sanctioned second standard.
+
+**Root cause.** Introducing a guard into a non-conforming codebase, and choosing
+allowlist (cheap, ships today) over blocklist-with-expiry (honest).
+
+**Prevention (rung 3).** Guards are **deny-by-default**. Migration exceptions live in an
+explicit exception file where each entry carries an owner and an expiry date, and CI
+fails on an expired entry. An exception is a debt with a due date, never a second
+standard.
+
+**Detection.** Every guard with an inclusion list is suspect. Invert it and count the
+failures — that number is the true debt, and it will be much larger than expected.
+
+---
+
+## Class 4 — Semantic Overload of One Field
+
+**Symptom.** One column/field carries two meanings. Reasoning about it requires knowing
+which one is active. Bad states become reachable *by construction*.
+
+**Evidence.** ADR 0088. `template_versions.content_hash` meant simultaneously:
+1. the verified hash of the object this version points at
+   (`autosave.go:151-165`, CHECK `chk_template_version_content_hash_non_draft`);
+2. "the user has actually edited this"
+   (`lifecycle.go:72-74`, `spawnNextDraft` — *"ContentHash is left empty … so the publish
+   gate still forces a real edit"*).
+
+Meaning (2) was expressed as *absence of meaning (1)*. So "a template version that points
+at no content" was not a bug — it was the encoding. A user who created a blank template
+and submitted it got `409 UPLOAD_MISSING` for a file they never intended to upload.
+
+**Root cause.** A second requirement arrived and reused an existing field instead of
+adding one. Cheap at the time; the cost is that every future reader must disambiguate,
+and the invalid state is *required to exist* for the encoding to work.
+
+**Prevention (rung 1).** One field, one meaning, stated in the schema comment. A new
+meaning gets a new field or a new table. Then the DB constraint can be unconditional
+(`length(content_hash) = 64` always), which makes the bad state unrepresentable.
+
+**Detection.** For each nullable column, ask what NULL *means*. If the answer has the word
+"or" in it, this class is present.
+
+---
+
+## Class 5 — Absence as Configuration
+
+*Sibling of Class 4, distinct enough to name separately.*
+
+**Symptom.** A valid, intended system state is encoded as the **absence** of a record.
+Absence is then indistinguishable from misconfiguration, from a failed migration, and
+from a bug.
+
+**Evidence.**
+- ADR 0087. `governance_class='livre'` meant "no approval route may exist". Consequence:
+  a livre profile could own *nothing* — documents and templates both hard-block creation
+  without an active route. "Ungoverned material" degenerated into "profile that can own
+  nothing". Fixed by making livre an explicitly configured **zero-stage route**: absence
+  of a route is now *always* misconfiguration, for every class.
+- Same ADR, review round 2: `GetApprovers` inferred auto-approval from "zero signoff
+  rows". But simples review-only routes also approve with zero signoffs — so those PDFs
+  would have falsely rendered *"Aprovação automática — rota livre"*. Fixed by gating on
+  the instance's pinned stage-instance count == 0, a positive fact.
+
+**Root cause.** Absence is free to write and needs no migration. It is also unfalsifiable:
+you cannot distinguish "deliberately empty" from "never populated".
+
+**Prevention (rung 1).** Configuration is explicit and present. Model the "nothing
+required" case as a first-class configured object (a zero-stage route), not as a missing
+row. Then absence has exactly one meaning: misconfiguration — and can be alerted on.
+
+**Detection.** Every `IF NOT EXISTS` / `len(x) == 0` branch that produces *success*.
+Ask: could this emptiness also arise from a bug or an incomplete migration? If yes,
+the code cannot tell, and neither can the on-call engineer.
+
+---
+
+## Class 6 — Fallback That Fabricates Truth
+
+**Symptom.** Integrity-critical read cannot find a value and substitutes a plausible one.
+The caller cannot distinguish real from fabricated.
+
+**Evidence.** `GetFinalApprovalDate` used `coalesce(…, now())` — a document whose approval
+date was unknown rendered on a **regulated eQMS PDF** with today's date, indistinguishable
+from a real approval date. Fixed (ADR 0087 work) to source
+`COALESCE(MAX(signoff.signed_at), MAX(ai.completed_at))` and return `ErrNoApprovalDate`
+when neither exists.
+
+**Root cause.** `COALESCE`/`??`/`|| default` are ergonomic and make the null-pointer go
+away. The failure moves from a crash (loud, immediate, cheap) to a wrong document (silent,
+downstream, expensive, and in a regulated context, a compliance defect).
+
+**Prevention (rung 1 + doctrine).** Integrity-critical reads **fail closed**. Standing rule
+in this repo: *no-fallback principle* — explicit status-scoped queries over polymorphic
+`COALESCE`. At the type level, return `(T, error)` or an option type, never a zero value
+that reads as valid.
+
+**Detection.** Grep `COALESCE`, `?? `, `|| default`, `.unwrap_or`. For each, ask: if this
+default is wrong, does anything break loudly? If not, it is this class.
+
+**Boundary.** Fallbacks are fine for cosmetics (a default avatar). They are never fine for
+anything that lands in a record, a document, an audit trail, or a decision.
+
+---
+
+## Class 7 — Validation Duplicated Across Layers
+
+**Symptom.** The same rule is enforced at several layers. Relaxing it in one leaves the
+others enforcing the old rule — the feature is unshipped while appearing complete.
+
+**Evidence.** ADR 0087 review round 1, P0-1. Domain validation was relaxed to permit
+zero-stage routes; migration and service layer both correct; **but** the HTTP contract
+still carried `minItems: 1` on `CreateRouteRequest.stages` plus a `validateStages` check.
+Net effect: the entire ADR was unimplemented — livre profiles still could not own
+anything — while service-level and SQL-level tests passed green.
+
+**Root cause.** Defense-in-depth applied to *validation* rather than to *invariants*.
+Copies drift because nothing ties them together.
+
+**Prevention.** Distinguish the two:
+- **Invariants** (DB constraints, triggers) — deliberately duplicated with app checks.
+  The app check is the friendly error; the DB is the truth. Both must be updated
+  together, and a test asserts the DB rejects what the app rejects.
+- **Validation** (shape, ranges, cardinality) — single source. Generate the contract
+  layer from the schema, or the schema from the contract. Never hand-write both.
+
+**Detection.** For each rule, grep its concept across layers. More than one hand-written
+site = drift waiting.
+
+---
+
+## Class 8 — Tests at the Wrong Altitude (False Green)
+
+**Symptom.** Good coverage numbers, passing suite, broken feature. The tests cannot fail
+when the thing users touch is broken.
+
+**Evidence.**
+- Class 7's P0-1: tests existed at the service and SQL layers, **none through the HTTP
+  contract**. The feature was 100% broken end-to-end and 100% green.
+- FE error-message coverage test compares `errorMessages.ts` ↔ the generated snapshot —
+  **never against backend source**. A stale snapshot passes green forever. This is
+  exactly how Class 2's 3-code drift stayed invisible.
+- `//go:build integration` files are **not compiled** by an untagged `go test ./...`.
+  After any seam signature change, integration tests can be uncompilable while the
+  default suite is green. Repo rule: run `go vet -tags integration` before commit.
+
+**Root cause.** Tests written where it is *convenient to write them* (nearest the code
+just changed) rather than where the feature is *observable*. Guard tests written against
+a cached copy instead of the source, because the copy is easier to read.
+
+**Prevention.**
+- At least one test per feature at the **outermost layer the user actually touches**
+  (HTTP contract, or the UI).
+- **Guard tests compare against the source of truth, never a snapshot of it.** A snapshot
+  test detects unintended change; it can never detect staleness.
+- CI compiles *every* build tag.
+
+**Detection.** For each test, ask: "if I broke this feature completely at the boundary,
+would this test fail?" If no, it measures implementation, not behavior.
+
+---
+
+## Class 9 — The Second Copy of a Critical Path
+
+**Symptom.** An invariant-bearing sequence is copy-pasted. Later fixes land in one copy.
+
+**Evidence.** Terminal approval (instance CAS → authz check → release recorder →
+OCC update → lifecycle enqueue) was inlined in **both** `decision_service.go` and
+`review_verdict_service.go`. ADR 0087 needed a third caller (auto-approve) — extracted to
+`document_terminal_approval.go` / `template_terminal_approval.go` with an explicit
+standing note: *never write a third copy*.
+
+**Root cause.** The first duplication is always locally cheaper. Cost appears at the
+*third* site, or at the first divergent bugfix.
+
+**Prevention (doctrine + review).** Duplication of a path carrying an invariant is a
+defect at **n = 2**, not n = 3. Pure-logic duplication can wait; invariant duplication
+cannot, because the failure mode is a security or correctness hole in the copy nobody
+updated.
+
+**Detection.** Grep for authz calls, state-machine transitions, and audit-record calls.
+Each set of near-identical sequences is a candidate.
+
+---
+
+## Class 10 — Cross-Module Redeclaration of a Shared Concept
+
+**Symptom.** Modules independently declare the same concept. Values duplicate, then drift.
+
+**Evidence.**
+- `internal/modules/tokens/delivery/http/handler.go:33-36` declares
+  `CodeTokenAlreadyExists = "ALREADY_EXISTS"` and `CodeTokenNotFound = "NOT_FOUND"` —
+  **verbatim duplicates** of `problem.CodeAlreadyExists` / `problem.CodeNotFound`
+  (`codes.go:21,23`), redeclared rather than imported.
+- `PROFILE_NOT_FOUND` / `PROFILE_ARCHIVED` are typed constants in
+  `taxonomy/delivery/http/routes_profiles.go:26,27` **and** raw literals in
+  `controlleddocuments/delivery/http/routes.go:563,567`.
+- `taxonomy` declares 8 catalog-style UPPER codes outside the catalog, shadowing its
+  namespace.
+
+**Root cause.** Importing across module boundaries feels like coupling, so authors
+redeclare. But a **shared wire contract is not coupling** — it is the contract. The
+coupling already exists; redeclaring only removes the compiler's ability to see it.
+
+**Prevention (rung 1 + 3).** Shared concepts live in `platform/`, declared once. A lint
+forbids redeclaring a platform value. The registry from Class 1 makes it structural:
+you cannot register the same code twice.
+
+**Detection.** Collect all constant *values* (not names) repo-wide and group by value.
+Any value declared in two packages is this class.
+
+---
+
+## Class 11 — The Module-Private Platform Primitive
+
+**Symptom.** A genuinely general utility lives inside one module. The second module that
+needs it copies it. Often there is a comment admitting it should be promoted.
+
+**Evidence.** `strictjson.go` — module-private, carrying a standing note to promote it to
+`internal/platform`. The note has outlived several releases.
+
+**Root cause.** Promotion is a refactor with no visible feature value, so it is always
+deferred to a quieter week that does not arrive.
+
+**Prevention (rung 3 + doctrine).** **Promotion is triggered by the second consumer, not
+scheduled.** Make it a merge-blocking rule: if module B needs a utility from module A, the
+PR that introduces the need is the PR that promotes it. A `TODO: promote` comment is
+itself the defect — a rung-5 note standing in for a rung-3 rule.
+
+**Detection.** Grep `TODO: promote`, `should live in platform`, `move this to`. Each is an
+unpaid debt with a known solution.
+
+---
+
+## Class 12 — The Document as False Authority
+
+**Symptom.** Documentation states something that is no longer (or was never) true.
+It is worse than absent docs: absent docs prompt a code read; wrong docs stop the search.
+
+**Evidence.**
+- `wiki/architecture/api-design-system.md:88` documents `IDEMPOTENCY_KEY_CONFLICT`,
+  which exists nowhere in the codebase.
+- The same doc presents a 15-row code table and one acknowledged exception, while
+  **79 non-catalog codes** exist unmentioned. A reader is left believing the taxonomy is
+  small and enforced.
+- `internal/platform/problem/codes.go:7` — the fake guarantee of Class 1.
+
+**Root cause.** Docs are written once, at peak understanding, and never re-derived.
+Nothing fails when they rot.
+
+**Prevention (rung 2 + 3).**
+- Generate every doc that enumerates code facts (code tables, capability lists, route
+  tables) from source.
+- Every hand-written doc carries a `Last verified: <date>` stamp, and CI warns past a
+  threshold. *(This repo already does this — the practice is sound and worth carrying
+  forward.)*
+- `file:line` anchors in docs are checked by CI for existence.
+
+**Factory rule.** Runtime truth beats docs. When code and doc disagree, the doc is a
+defect ticket, not a decision.
+
+---
+
+## Class 13 — The Spec That Names a Constraint It Does Not Encode
+
+**Symptom.** A machine-readable contract describes a constraint in prose while leaving
+the machine-readable field unconstrained.
+
+**Evidence.** `api/openapi/v1/openapi.yaml:7190`:
+```yaml
+code: { type: string, description: 'Machine-readable code from canonical taxonomy' }
+```
+No enum. Clients cannot generate an exhaustive switch; codegen produces `string`; a typo
+is valid forever. Five code strings appear elsewhere in the spec (in descriptions and
+examples) — and **two of those five are the same condition in two different styles**,
+so the spec documents its own inconsistency.
+
+**Root cause.** Prose is free; enums require maintenance. Without Class 2's generation,
+an enum would go stale, so the author correctly avoided a worse defect and left the
+underlying one open.
+
+**Prevention (rung 2).** If the spec names a constraint, the spec **encodes** it — and
+the encoding is generated, so maintenance cost is zero. Enum + generation solve each
+other; either one alone is a trap.
+
+**Detection.** Grep spec descriptions for "one of", "must be", "from the", "canonical",
+"valid values". Each is a constraint that should be a schema keyword.
+
+---
+
+## Class 14 — Optimizing Inside a Local Maximum
+
+*The class that produces the other classes.*
+
+**Symptom.** Effort is spent improving something whose *shape* is the actual problem. The
+result works, ships, and locks the bad shape in deeper, because now there is more code
+depending on it.
+
+**Evidence.**
+- ADR 0088 explicitly rejected *"disable the submit button while `content_hash` is null"*
+  — it would have removed the user-visible symptom and preserved the
+  reachable-invalid-state-by-construction defect (Class 4) permanently.
+- ADR 0088 also rejected outbox materialization: it would fix the copy while leaving a
+  window where a version exists without content — the exact state being eliminated.
+- The error-code work: choosing a style and running a repo-wide rename **without** first
+  closing the type hole (Class 1) and building the registry would relocate an unenforced
+  convention, not enforce one, and would touch every call site twice.
+
+**Root cause.** The patch is always visible, bounded, and estimable. The redesign is
+none of those. Incentives point down the ladder.
+
+**Prevention (process, rung 3).** A **foundation-judgment gate before improvement work**:
+before optimizing/extending anything, state in writing whether the base is sound or is
+itself a patch. If it is a patch, name the global-maximum structure and its trade-off,
+and let the operator choose. This repo operationalizes it as the `developing-new-work`
+skill, which emits a written system-impact analysis with a Green/Yellow/Red verdict where
+Red hard-blocks design.
+
+**Detection.** In any improvement proposal, ask: "if we had a free hand, is this the shape
+we would build?" If no, you are on a local maximum, and every hour spent raises the exit
+cost.
+
+---
+
+## Class 15 — Two Runtimes, One Primitive
+
+**Symptom.** A primitive built for one execution context is reused in another where its
+implicit assumptions do not hold. It compiles, and fails at runtime or fails silently.
+
+**Evidence.**
+- Repositories that resolve tenant from request context are **HTTP-shaped**. Background
+  jobs have no request; they need explicit `SeedTxTenant(param)` + a system-bypass path +
+  an explicit COMMIT. Reusing the HTTP-shaped repo in a job silently reads the wrong
+  (or no) tenant.
+- `authz.Require` needs a **writable** transaction because it records the authz decision —
+  so it is structurally incompatible with a read-only transaction. Resolved by collapsing
+  `DoReadOnly` into `Do` plus an api-lint guard.
+- Calling an authz-recording read **inside a lock-holding atomic transaction** deadlocks.
+  Standing constraint: keep those reads off-transaction.
+
+**Root cause.** The assumption (a request exists / the tx is writable / no lock is held)
+is implicit in the primitive's design and invisible at the call site.
+
+**Prevention (rung 1, else 3).** Make the context a **parameter of the type**, so a
+background caller cannot construct the HTTP-shaped variant. Where the type system cannot
+express it, encode the rule as a blocking lint — which is what this repo did, correctly,
+in `scripts/api-lint`.
+
+**Detection.** For each platform primitive, list its implicit environmental assumptions.
+Every unlisted assumption is a future incident.
+
+---
+
+## Class 16 — Compiles ≠ Works
+
+**Symptom.** Wiring is present, types check, tests pass, and the feature does nothing
+at runtime — a listener not registered, a consumer not subscribed, a handler not routed.
+
+**Evidence.** GMR M2: live QA caught **non-functional drives** that compiled and passed
+tests. The lesson was recorded verbatim as *compile ≠ work*. Related: the metrics
+listener remediation (F-R1) in the same program.
+
+**Root cause.** Static wiring in Go is mostly invisible — a registration that is never
+called looks identical to one that is, at compile time.
+
+**Prevention (rung 3 + 4).** A **live QA gate** per milestone: exercise the feature
+against a running stack, not a test harness. Plus registration-parity tests (the registry
+in Class 1 supports this directly: assert every declared handler/consumer/code is
+actually reachable).
+
+**Detection.** For each registration point, ask what test would fail if the registration
+line were deleted. If none, only live QA can catch it.
+
+---
+
+## Class 17 — Shared Infrastructure Without Isolation Contracts
+
+**Symptom.** Parallel work shares mutable infrastructure. Failures are intermittent,
+environment-dependent, and blamed on flakiness rather than on the missing contract.
+
+**Evidence.**
+- Two parallel tracks with divergent schema fingerprints on the same test Postgres port
+  mutually deleted each other's templates → `3D000` errors and timeouts.
+- A test asserted goroutine lifecycle via `runtime.NumGoroutine` inside a **parallel**
+  suite — inherently racy. Recorded rule: never do this.
+- Test-DB garbage collection could not be run mid-suite without destroying peers; gated
+  behind an explicit env flag.
+
+**Root cause.** Shared infrastructure defaults to "works when one thing uses it".
+Concurrency is added later, and the isolation contract is never written down.
+
+**Prevention (rung 1 + 3).** Lease-based isolation: each track/worker gets a namespaced
+resource it exclusively owns. Destructive operations gate behind an explicit flag and
+refuse to run when peers are active. Never assert global process state in a parallel test.
+
+**Detection.** For each shared resource, ask what two concurrent consumers do to each
+other. "We do not run them concurrently" is a convention (rung 5), not an answer.
+
+---
+
+## Class 18 — Symptom-Patching at a Boundary
+
+**Symptom.** A failure surfaces at layer N and is fixed at layer N, though it originates
+at layer N−k. The boundary's guarantee is weakened to accommodate the bug.
+
+**Evidence.** Standing repo rule, learned the hard way: **authz is never symptom-patched.**
+ADR 0022 (capabilities, never roles) is the boundary; a permission failure is fixed by
+correcting the capability model, never by adding a bypass, widening a check, or
+special-casing a route.
+
+**Root cause.** The symptom is where the pain is and where the reporter is looking. The
+patch is smaller and ships today. Its cost is that the boundary's guarantee is now
+conditional, and nobody who reads the boundary later will know.
+
+**Prevention (doctrine).** Name your **inviolable boundaries** explicitly on day 0
+(authz model, tenancy, the async/outbox rule, the contract-first rule). A fix that
+weakens one of them is not a fix — it is an architecture change requiring an ADR. Say
+this out loud in the contributor doc, because the pressure to patch is strongest exactly
+when the boundary matters most.
+
+**Detection.** Any special case, bypass flag, or `if isSpecialRoute` near a security or
+tenancy check.
+
+---
+
+## Class 19 — Vocabulary Fragmentation Across Modules
+
+*The class that this whole audit began from — the aggregate of Classes 1, 2, 3, 10, 13.*
+
+**Symptom.** Each module invents its own dialect for a **shared wire contract**. The
+envelope is standardized; the payload is not. Clients cannot reason uniformly.
+
+**Evidence.** The error-code audit. Envelope: standardized and CI-enforced (RFC 9457,
+`ENVELOPE-DRIFT` rule in `scripts/api-lint`, 15/15 modules). Codes: 3 conventions,
+147 values, and the same condition emitted differently by different modules:
+
+| Condition | Module A | Module B |
+|---|---|---|
+| no active approval route | `state.approval_route_missing` (409) | `APPROVAL_ROUTE_MISSING` (409) |
+| upload missing | documents: **410** | templates: **409** |
+| content-hash mismatch | documents 422, templates 409 | approval **412** |
+| `ErrActorNotEligible` | approval: `signoff.not_eligible` | templates: `FORBIDDEN_CAPABILITY` |
+
+A comment in `controlleddocuments/.../routes.go:519-523` claims it mirrors *"the SAME wire
+contract the submit path already emits … so both surfaces are one contract for the
+client"*. True for one module, false for the other. **The comment was accurate when
+written and rotted silently** — Class 12 compounding Class 19.
+
+**Root cause.** Standardizing the *container* is easy to specify and easy to lint.
+Standardizing the *vocabulary* requires a registry, and nobody built one, so each module
+solved it locally — correctly, in isolation, and incompatibly.
+
+**Prevention (rung 1 + 2 + 3).** Registry-first, always, for any cross-module vocabulary
+(error codes, event names, capability names, metric names, feature flags):
+1. closed type — literals cannot compile;
+2. `Register(module, value, metadata)` — one declaration site per value;
+3. all downstream representations generated (spec enum, FE map, docs);
+4. CI freshness gate on the generated artifacts.
+
+**Factory rule — the strongest one in this document.** Any string that crosses a process
+boundary and that *both sides must agree on* needs a registry from day 0. Retrofitting
+one costs a repo-wide hard break; building one costs an afternoon.
+
+---
+
+## Appendix A — Day-0 Factory Checklist
+
+Derived directly from the classes above. Each line prevents a class already observed.
+
+**Type-level (rung 1)**
+- [ ] Every cross-boundary vocabulary is a closed type with an unexported field (§1, §19)
+- [ ] No nullable field carries two meanings; NULL has one documented meaning (§4)
+- [ ] "Nothing required" is a configured object, never a missing row (§5)
+- [ ] Integrity-critical reads return `(T, error)`; no defaulting (§6)
+- [ ] Execution context (request vs background) is a type parameter, not an assumption (§15)
+
+**Generation (rung 2)**
+- [ ] One registry per shared vocabulary: codes, events, capabilities, metrics, flags (§19)
+- [ ] Spec enums, FE maps, and doc tables are **generated outputs** (§2, §13)
+- [ ] Zero hand-maintained lists that must agree with another list (§2)
+
+**CI (rung 3)**
+- [ ] Generated artifacts have a freshness gate — regenerate, fail on diff (§2)
+- [ ] Guards are **deny-by-default**; exceptions carry owner + expiry, CI fails on expiry (§3)
+- [ ] All build tags compile in CI (§8)
+- [ ] Doc `file:line` anchors verified; `Last verified` stamps warn past threshold (§12)
+- [ ] Lint: no redeclaration of a platform value in a module (§10)
+- [ ] Lint: encode known runtime-context hazards (§15)
+
+**Test doctrine (rung 4)**
+- [ ] Every feature has ≥1 test at the outermost user-touchable layer (§8)
+- [ ] Guard tests compare against **source**, never a snapshot of source (§8)
+- [ ] Shared test infrastructure is leased/namespaced; destructive ops gated (§17)
+- [ ] Never assert global process state in a parallel test (§17)
+
+**Process**
+- [ ] Foundation-judgment gate before any improvement work; Red blocks design (§14)
+- [ ] Inviolable boundaries named on day 0; weakening one requires an ADR (§18)
+- [ ] Promotion to platform triggered by the **second** consumer, in that PR (§11)
+- [ ] Invariant-bearing path duplicated at n=2 is a defect (§9)
+- [ ] Live QA gate per milestone — compile ≠ work (§16)
+
+---
+
+## Appendix B — Recurring Root Causes
+
+The 19 classes reduce to five underlying causes. Useful when classifying a *new* defect
+that does not obviously match a class above.
+
+1. **A guarantee was asserted, not enforced.** Comments, docs, and conventions standing in
+   for compilers, generators, and gates. → §1, §3, §12, §13
+2. **Two things that must agree, maintained separately.** No compiler spans the boundary.
+   → §2, §7, §10, §11, §19
+3. **Absence used to carry meaning.** Unfalsifiable, indistinguishable from failure.
+   → §4, §5, §6
+4. **The local fix was cheaper than the right fix,** and the incentive gradient always
+   points there. → §9, §14, §18
+5. **An implicit assumption escaped its context.** Runtime, concurrency, or wiring
+   conditions invisible at the call site. → §8, §15, §16, §17
