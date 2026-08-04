@@ -35,7 +35,7 @@ func TestDocumentProfileRoutePolicy(t *testing.T) {
 	}{
 		{"controlado requires approval", GovernanceControlado, RoutePolicyRequireApprovalStage},
 		{"simples optional", GovernanceSimples, RoutePolicyApprovalOptional},
-		{"livre no route", GovernanceLivre, RoutePolicyNoRoutePermitted},
+		{"livre requires a zero-stage route", GovernanceLivre, RoutePolicyNoApprovalStages},
 		// Fail-closed: an unset/unknown class never silently drops the signature
 		// requirement — it derives the strictest policy.
 		{"empty fail-closes to require", GovernanceClass(""), RoutePolicyRequireApprovalStage},

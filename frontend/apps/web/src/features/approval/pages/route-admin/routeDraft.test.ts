@@ -142,6 +142,37 @@ describe('validateDraft profile requirement (ADR 0086)', () => {
   });
 });
 
+describe('validateDraft stage-count floor (ADR 0087)', () => {
+  it('rejects zero stages for a non-livre governance class', () => {
+    const draft = makeDraft({ stages: [] });
+    expect(validateDraft(draft, false, 'controlado')).toBe('A rota deve possuir ao menos uma etapa.');
+  });
+
+  it('rejects zero stages when governance class is unknown (archived profile)', () => {
+    const draft = makeDraft({ stages: [] });
+    expect(validateDraft(draft, true, null)).toBe('A rota deve possuir ao menos uma etapa.');
+  });
+
+  it('accepts zero stages for livre — auto-approval, nothing to route', () => {
+    const draft = makeDraft({ stages: [] });
+    expect(validateDraft(draft, false, 'livre')).toBeNull();
+  });
+
+  it('rejects a livre draft that still carries a stage', () => {
+    const draft = makeDraft({
+      stages: [
+        makeStage({
+          label: 'Revisão',
+          selectors: [makeSelector({ kind: 'role_in_document_area', role: 'approver' })],
+        }),
+      ],
+    });
+    expect(validateDraft(draft, false, 'livre')).toBe(
+      'Perfil livre não admite etapas — a rota livre é aprovada automaticamente.',
+    );
+  });
+});
+
 describe('routeDraft selectors', () => {
   it('validateDraft rejects a stage with an empty-role role_in_fixed_area selector', () => {
     const draft = makeDraft({

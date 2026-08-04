@@ -55,17 +55,25 @@ import (
 // ResolveEligibleActors only needs SOME eligible user to exist.
 func seedSubmitRouteWithStage(t *testing.T, dbc *sql.DB, tenantID, profileCode string) string {
 	t.Helper()
-	route := testdb.NewApprovalRoute(t, dbc, testdb.WithTenant(tenantID), testdb.WithProfile(profileCode))
+	// This fixture seeds a STAGED route, so the document's profile must be a
+	// governed class: since ADR 0087 / migration 0316 a livre route may carry
+	// no stages at all (and a governed route may never commit stageless).
+	// Reclassify before the route exists, then seed route + stage in one tx.
+	testdb.SetGovernanceClass(t, dbc, tenantID, profileCode, "controlado")
 	var stageID string
-	if err := dbc.QueryRowContext(context.Background(),
-		`INSERT INTO public.approval_route_stages
-		   (route_id, stage_order, name, required_capability, quorum, on_eligibility_drift)
-		 VALUES ($1::uuid, 1, 'Stage 1', 'document.signoff', 'any_1_of', 'keep_snapshot')
-		 RETURNING id`,
-		route.ID,
-	).Scan(&stageID); err != nil {
-		t.Fatalf("seed approval_route_stages: %v", err)
-	}
+	route := testdb.NewApprovalRoute(t, dbc,
+		testdb.WithTenant(tenantID),
+		testdb.WithProfile(profileCode),
+		testdb.WithStageSeeder(func(tx *sql.Tx, routeID string) error {
+			return tx.QueryRowContext(context.Background(),
+				`INSERT INTO public.approval_route_stages
+				   (route_id, stage_order, name, required_capability, quorum, on_eligibility_drift)
+				 VALUES ($1::uuid, 1, 'Stage 1', 'document.signoff', 'any_1_of', 'keep_snapshot')
+				 RETURNING id`,
+				routeID,
+			).Scan(&stageID)
+		}),
+	)
 	// Selectors is the sole source of truth for a stage's actor pool
 	// (unit 3.2 slice 6b); seed the equivalent role_in_fixed_area selector row
 	// so ResolveEligibleActorsForSelectors resolves the same eligible pool the

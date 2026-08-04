@@ -33,7 +33,7 @@ func TestRouteAdminSelectors_LoadRouteAndListRoutes_AgreeOnExplicitSelectors_Rea
 	ctx := context.Background()
 
 	tenantID := testdb.NewTenant(t, database).ID
-	taxonomy := testdb.NewTaxonomy(t, database, testdb.WithTenant(tenantID))
+	taxonomy := testdb.NewTaxonomy(t, database, testdb.WithTenant(tenantID), testdb.WithGovernanceClass("controlado"))
 	actor := testdb.NewUser(t, database, testdb.WithTenant(tenantID), testdb.WithRole("system_admin"))
 	namedUser := testdb.NewUser(t, database, testdb.WithTenant(tenantID), testdb.WithRole("approver"))
 

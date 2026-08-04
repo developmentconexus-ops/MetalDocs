@@ -12,6 +12,11 @@ var (
 	ErrRevisionRegression = errors.New("revision_version cannot decrease")
 	// ErrInstanceTerminal is returned by Cancel when the instance Status is already approved, rejected, or cancelled.
 	ErrInstanceTerminal = errors.New("instance is already in a terminal state")
+	// ErrAutoApproveHasStages is returned by AutoApprove when the instance
+	// carries stages. Auto-approval is the consequence of a ZERO-stage route
+	// (ADR 0087); an instance with stages must be approved through its stages,
+	// never short-circuited.
+	ErrAutoApproveHasStages = errors.New("auto-approve requires a stageless instance")
 )
 
 // InstanceStatus represents the top-level lifecycle of an approval instance.
@@ -146,6 +151,29 @@ func (inst *Instance) AdvanceStage() error {
 	}
 
 	// No more pending — instance approved.
+	inst.Status = InstanceApproved
+	inst.CompletedAt = &now
+	return nil
+}
+
+// AutoApprove completes a STAGELESS instance at creation time (ADR 0087): a
+// route bound to a livre profile carries zero stages, so there is nothing to
+// satisfy and the instance is approved in the very transaction that created it.
+//
+// It is deliberately NOT a special case inside AdvanceStage — AdvanceStage's
+// contract is "the active stage completed", and a stageless instance never has
+// one. Keeping the two apart is what stops "no stages" from being silently
+// readable as "all stages done" on an instance that merely lost its stages.
+//
+// Fails closed on a staged instance (ErrAutoApproveHasStages) and on an
+// instance that already left in_progress (ErrInstanceTerminal).
+func (inst *Instance) AutoApprove(now time.Time) error {
+	if len(inst.Stages) > 0 {
+		return ErrAutoApproveHasStages
+	}
+	if inst.Status != InstanceInProgress {
+		return ErrInstanceTerminal
+	}
 	inst.Status = InstanceApproved
 	inst.CompletedAt = &now
 	return nil

@@ -24,10 +24,13 @@ const ROUTE_POLICIES: Record<GovernanceClass, RoutePolicy> = {
     badgeTone: 'optional',
   },
   livre: {
-    routeAllowed: false,
+    // ADR 0087: livre now REQUIRES an active route — the "no approval route"
+    // reading is retired. What makes it "livre" is that the route carries
+    // zero stages: submission auto-approves instead of routing to anyone.
+    routeAllowed: true,
     signatureRequired: false,
-    badgeLabel: 'Perfil livre — sem rota de aprovação',
-    badgeTone: 'blocked',
+    badgeLabel: 'Rota livre — aprovação automática, sem etapas',
+    badgeTone: 'optional',
   },
 };
 
@@ -63,18 +66,20 @@ export function stageActorSlotDefaultHeading(): string {
   return 'Quem atua nesta etapa';
 }
 
-export function livreBlockedMessage(): string {
-  return 'Perfil livre não permite rota de aprovação — reservado a rascunhos e material não governado.';
+/** ADR 0087: livre's route must be configured with zero stages — any stage
+ * added to a livre route is a validation error, not a blocked route. */
+export function livreNoStagesMessage(): string {
+  return 'Perfil livre não admite etapas — a rota livre é aprovada automaticamente.';
 }
 
 export function validateSignaturePolicy(
   gc: GovernanceClass,
   stageKinds: StageKind[],
 ): string | null {
-  const policy = routePolicyFor(gc);
-  if (!policy.routeAllowed) {
-    return livreBlockedMessage();
+  if (gc === 'livre') {
+    return stageKinds.length > 0 ? livreNoStagesMessage() : null;
   }
+  const policy = routePolicyFor(gc);
   if (policy.signatureRequired && !stageKinds.includes('approval')) {
     return 'Perfil controlado exige ao menos uma etapa de assinatura (aprovação).';
   }

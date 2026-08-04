@@ -92,6 +92,12 @@ func (s *Services) WithLifecycleEnqueuer(e docsdomain.LifecycleEventEnqueuer) *S
 	if s.ReviewVerdict != nil {
 		s.ReviewVerdict = s.ReviewVerdict.WithLifecycleEnqueuer(e)
 	}
+	// ADR 0087: Submit is a fourth emit site — a zero-stage (livre) route
+	// reaches terminal approval inside the submit tx, so it must enqueue the
+	// same document.approved lifecycle event the other routes do.
+	if s.Submit != nil {
+		s.Submit = s.Submit.WithLifecycleEnqueuer(e)
+	}
 	return s
 }
 
@@ -110,6 +116,12 @@ func (s *Services) WithReleaseRecorder(recorder TerminalApprovalReleaseRecorder)
 	}
 	if s.ReviewVerdict != nil {
 		s.ReviewVerdict = s.ReviewVerdict.WithReleaseRecorder(recorder)
+	}
+	// ADR 0087 adds a THIRD route to terminal approval: submit against a
+	// zero-stage (livre) route. Same one-call-site rule — wiring it here is
+	// what keeps the auto-approve leg from being the next F-QA4-14.
+	if s.Submit != nil {
+		s.Submit = s.Submit.WithReleaseRecorder(recorder)
 	}
 	return s
 }
@@ -182,6 +194,10 @@ func (s *Services) WithTemplateCompletionWriter(writer TemplateCompletionWriter)
 		if sw, ok := writer.(TemplateVersionSubmitWriter); ok {
 			s.TemplateSubmit.versionWriter = sw
 		}
+		// ADR 0087: a livre profile's template route carries zero stages, so
+		// template submit itself reaches terminal approval and needs the SAME
+		// completion port DecisionService uses — one adapter, one lifecycle.
+		s.TemplateSubmit.templateCompletion = writer
 	}
 	return s
 }

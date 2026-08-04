@@ -3816,12 +3816,14 @@ export interface components {
             subject_kind?: "document" | "template";
             /** @description M3 kernel extraction (ADR 0082, P2.S3). Optional; omitted defaults to `profile_code` for both subject kinds. When present it must equal `profile_code` (ADR 0086); a divergent key is rejected 422. */
             subject_key?: string;
+            /** @description Ordered approval stages. An EMPTY list is valid and meaningful (ADR 0087): it is the required shape for a route whose profile is `governance_class='livre'` — submitting against it auto-approves instantly. The stage count is a per-profile governance policy question, not a schema one, so it is enforced at the service layer (422 `validation.route_stages_not_permitted` / `validation.approval_stage_required` / `validation.route_stage_required`) with the DB route-shape trigger as the authoritative last line. */
             stages: components["schemas"]["StageRequest"][];
         } & {
             [key: string]: unknown;
         };
         UpdateRouteRequest: {
             name: string;
+            /** @description Ordered approval stages. An EMPTY list is valid and meaningful (ADR 0087) — see CreateRouteRequest.stages. */
             stages: components["schemas"]["StageRequest"][];
         } & {
             [key: string]: unknown;

@@ -595,18 +595,52 @@ func TestRouteAdminCreate_InvalidRoute(t *testing.T) {
 		clock:   fixedClock{t: time.Now()},
 	}
 
+	// A structurally malformed route: the stage order is not dense-from-1.
+	// Stage COUNT is no longer a structural question (ADR 0087 — a livre
+	// profile's route is a configured zero-stage route), so this test exercises
+	// a genuinely structural defect; the count is policy-checked instead
+	// (see TestRouteAdminCreate_StagelessRouteIsStructurallyValid).
+	stages := validRouteStages()
+	stages[0].Order = 2
+
 	_, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
 		TenantID:    "tenant-1",
 		ProfileCode: "po",
 		Name:        "PO Route",
 		ActorUserID: "user-1",
-		Stages:      nil,
+		Stages:      stages,
 	})
-	if err == nil || !strings.Contains(err.Error(), "route must have at least one stage") {
+	if err == nil || !strings.Contains(err.Error(), "stage order must be dense starting at 1") {
 		t.Fatalf("expected validation error; got %v", err)
 	}
 	if len(emitter.Events) != 0 {
 		t.Fatalf("expected no events on validation failure; got %d", len(emitter.Events))
+	}
+}
+
+// TestRouteAdminCreate_StagelessRouteIsStructurallyValid pins the ADR 0087
+// inversion: a route with zero stages is no longer rejected out of hand. It is
+// the REQUIRED shape for a livre profile, so the stage count is decided by the
+// resolved profile policy (nil policyReader here ⇒ structural-only validation,
+// with the DB trigger as the authoritative last line).
+func TestRouteAdminCreate_StagelessRouteIsStructurallyValid(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: true}
+	db := newRouteAdminTestDB(t, conn)
+
+	emitter := &MemoryEmitter{}
+	svc := &RouteAdminService{
+		emitter: emitter,
+		clock:   fixedClock{t: time.Date(2026, 8, 3, 12, 0, 0, 0, time.UTC)},
+	}
+
+	if _, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
+		TenantID:    "tenant-1",
+		ProfileCode: "po",
+		Name:        "Livre Route",
+		ActorUserID: "user-1",
+		Stages:      nil,
+	}); err != nil {
+		t.Fatalf("Create(zero stages) must not fail structural validation: %v", err)
 	}
 }
 

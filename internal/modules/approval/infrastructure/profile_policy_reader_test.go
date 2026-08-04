@@ -33,7 +33,7 @@ func TestProfilePolicyReader_RoutePolicy_DerivesFromGovernanceClass(t *testing.T
 	}{
 		{"controlado requires approval stage", taxonomydomain.GovernanceControlado, taxonomydomain.RoutePolicyRequireApprovalStage},
 		{"simples optional", taxonomydomain.GovernanceSimples, taxonomydomain.RoutePolicyApprovalOptional},
-		{"livre no route", taxonomydomain.GovernanceLivre, taxonomydomain.RoutePolicyNoRoutePermitted},
+		{"livre requires a zero-stage route", taxonomydomain.GovernanceLivre, taxonomydomain.RoutePolicyNoApprovalStages},
 		{"unknown fail-closes to require", taxonomydomain.GovernanceClass("mystery"), taxonomydomain.RoutePolicyRequireApprovalStage},
 	}
 	for _, tc := range cases {

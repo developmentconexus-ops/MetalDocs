@@ -92,6 +92,13 @@ const (
 	approvalCodeValidationSubmitChoiceRequired       problem.Code = "validation.submit_choice_required"
 	approvalCodeValidationSubmitChoiceConstraint     problem.Code = "validation.submit_choice_constraint_violated"
 
+	// Route-shape policy rejections (per-profile governance policy, G1/ADR 0081,
+	// livre arm superseded by ADR 0087). All 422: the request is well-formed,
+	// the resulting route shape is not permitted for the profile's class.
+	approvalCodeValidationRouteStagesNotPermitted problem.Code = "validation.route_stages_not_permitted"
+	approvalCodeValidationApprovalStageRequired   problem.Code = "validation.approval_stage_required"
+	approvalCodeValidationRouteStageRequired      problem.Code = "validation.route_stage_required"
+
 	// F9/ADR 0077 — approval delegation.
 	approvalCodeValidationSelfDelegation   problem.Code = "validation.self_delegation"
 	approvalCodeValidationDelegationWindow problem.Code = "validation.delegation_window_invalid"
@@ -279,6 +286,23 @@ func MapErrorToResponse(err error) *problem.Problem {
 		// business-rule class used for ready-on-approval).
 		statusCode = http.StatusInternalServerError
 		code = approvalCodeInternalVerdictWrongStageKind
+	case errors.Is(err, domain.ErrRouteStagesNotPermittedForProfile):
+		// ADR 0087: the profile is livre — its route is configured to require no
+		// approval, so it must carry ZERO stages. Adding one is a business-rule
+		// rejection of a structurally-valid request (422), and it gets a
+		// dedicated code so the route builder can say precisely why. The DB
+		// trigger (assert_route_shape, migration 0316) rejects the same shape at
+		// COMMIT; this is the friendly first line.
+		statusCode = http.StatusUnprocessableEntity
+		code = approvalCodeValidationRouteStagesNotPermitted
+	case errors.Is(err, domain.ErrApprovalStageRequired):
+		// controlado: the route must contain >=1 approval-kind stage.
+		statusCode = http.StatusUnprocessableEntity
+		code = approvalCodeValidationApprovalStageRequired
+	case errors.Is(err, domain.ErrRouteStageRequired):
+		// simples: review-only is fine, stageless is not (that shape is livre's).
+		statusCode = http.StatusUnprocessableEntity
+		code = approvalCodeValidationRouteStageRequired
 	case errors.Is(err, application.ErrDocumentNotFound):
 		statusCode = http.StatusNotFound
 		code = approvalCodeNotFoundDocument

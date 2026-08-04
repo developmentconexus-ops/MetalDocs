@@ -28,35 +28,23 @@ import (
 func TestStageKindSchemaExpand_Default(t *testing.T) {
 	db, _ := testdb.Open(t)
 
-	route := testdb.NewApprovalRoute(t, db)
+	route := testdb.NewApprovalRoute(t, db,
+			testdb.WithGovernanceClass("controlado"),
+			// Governed class => the route may not commit stageless (ADR 0087 /
+			// migration 0316), so its stage is seeded in the route's own tx.
+			testdb.WithStageSeeder(func(tx *sql.Tx, routeID string) error {
+				return insertRouteStageTx(tx, routeID, "Stage 1")
+			}),
+		)
 
 	var stageKind string
 	if err := db.QueryRowContext(context.Background(),
 		`SELECT stage_kind FROM public.approval_route_stages WHERE route_id = $1::uuid LIMIT 1`,
 		route.ID,
 	).Scan(&stageKind); err != nil {
-		// NewApprovalRoute does not itself seed a stage row; seed one directly
-		// to exercise the column DEFAULT the same way a real route-admin write
-		// would (no stage_kind supplied).
-		if !errors.Is(err, sql.ErrNoRows) {
-			t.Fatalf("query approval_route_stages: %v", err)
-		}
-		if _, insErr := db.ExecContext(context.Background(), `
-			INSERT INTO public.approval_route_stages
-			  (route_id, stage_order, name, required_capability,
-			   quorum, on_eligibility_drift)
-			VALUES ($1::uuid, 1, 'Stage 1', 'document.review',
-			        'any_1_of', 'reduce_quorum')`,
-			route.ID,
-		); insErr != nil {
-			t.Fatalf("seed approval_route_stages row: %v", insErr)
-		}
-		if err := db.QueryRowContext(context.Background(),
-			`SELECT stage_kind FROM public.approval_route_stages WHERE route_id = $1::uuid LIMIT 1`,
-			route.ID,
-		).Scan(&stageKind); err != nil {
-			t.Fatalf("query approval_route_stages after seed: %v", err)
-		}
+		// The stage seeder above always commits a stage row with the route, and
+		// it supplies no stage_kind — so this read exercises the column DEFAULT.
+		t.Fatalf("query approval_route_stages: %v", err)
 	}
 
 	if stageKind != "approval" {
@@ -95,13 +83,20 @@ func TestStageKindSchemaExpand_RejectsUnknownValue(t *testing.T) {
 	db, _ := testdb.Open(t)
 
 	t.Run("approval_route_stages", func(t *testing.T) {
-		route := testdb.NewApprovalRoute(t, db)
+		route := testdb.NewApprovalRoute(t, db,
+			testdb.WithGovernanceClass("controlado"),
+			// Governed class => the route may not commit stageless (ADR 0087 /
+			// migration 0316), so its stage is seeded in the route's own tx.
+			testdb.WithStageSeeder(func(tx *sql.Tx, routeID string) error {
+				return insertRouteStageTx(tx, routeID, "Stage 1")
+			}),
+		)
 
 		_, err := db.ExecContext(context.Background(), `
 			INSERT INTO public.approval_route_stages
 			  (route_id, stage_order, name, required_capability,
 			   quorum, on_eligibility_drift, stage_kind)
-			VALUES ($1::uuid, 1, 'Stage 1', 'document.review',
+			VALUES ($1::uuid, 2, 'Stage 2', 'document.review',
 			        'any_1_of', 'reduce_quorum', 'signature')`,
 			route.ID,
 		)
@@ -109,7 +104,14 @@ func TestStageKindSchemaExpand_RejectsUnknownValue(t *testing.T) {
 	})
 
 	t.Run("approval_stage_instances", func(t *testing.T) {
-		route := testdb.NewApprovalRoute(t, db)
+		route := testdb.NewApprovalRoute(t, db,
+			testdb.WithGovernanceClass("controlado"),
+			// Governed class => the route may not commit stageless (ADR 0087 /
+			// migration 0316), so its stage is seeded in the route's own tx.
+			testdb.WithStageSeeder(func(tx *sql.Tx, routeID string) error {
+				return insertRouteStageTx(tx, routeID, "Stage 1")
+			}),
+		)
 		instance := testdb.NewApprovalInstance(t, db, testdb.WithRoute(route))
 
 		_, err := db.ExecContext(context.Background(), `
@@ -125,13 +127,20 @@ func TestStageKindSchemaExpand_RejectsUnknownValue(t *testing.T) {
 	})
 
 	t.Run("update_existing_row_to_invalid_value", func(t *testing.T) {
-		route := testdb.NewApprovalRoute(t, db)
+		route := testdb.NewApprovalRoute(t, db,
+			testdb.WithGovernanceClass("controlado"),
+			// Governed class => the route may not commit stageless (ADR 0087 /
+			// migration 0316), so its stage is seeded in the route's own tx.
+			testdb.WithStageSeeder(func(tx *sql.Tx, routeID string) error {
+				return insertRouteStageTx(tx, routeID, "Stage 1")
+			}),
+		)
 		var stageID string
 		if err := db.QueryRowContext(context.Background(), `
 			INSERT INTO public.approval_route_stages
 			  (route_id, stage_order, name, required_capability,
 			   quorum, on_eligibility_drift)
-			VALUES ($1::uuid, 1, 'Stage 1', 'document.review',
+			VALUES ($1::uuid, 2, 'Stage 2', 'document.review',
 			        'any_1_of', 'reduce_quorum')
 			RETURNING id::text`,
 			route.ID,

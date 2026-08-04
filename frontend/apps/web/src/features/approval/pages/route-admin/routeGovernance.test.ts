@@ -5,7 +5,7 @@ import {
   describeStageKind,
   flowPreviewEmptyLabel,
   labelForStageKind,
-  livreBlockedMessage,
+  livreNoStagesMessage,
   routePolicyFor,
   STAGE_KIND_OPTIONS,
   stageActorSlotDefaultHeading,
@@ -35,12 +35,12 @@ describe('routePolicyFor', () => {
     });
   });
 
-  it('livre blocks the route entirely', () => {
+  it('livre allows the route with auto-approval, no signature', () => {
     expect(routePolicyFor('livre')).toEqual({
-      routeAllowed: false,
+      routeAllowed: true,
       signatureRequired: false,
-      badgeLabel: 'Perfil livre — sem rota de aprovação',
-      badgeTone: 'blocked',
+      badgeLabel: 'Rota livre — aprovação automática, sem etapas',
+      badgeTone: 'optional',
     });
   });
 });
@@ -87,9 +87,9 @@ describe('stageActorSlotDefaultHeading', () => {
   });
 });
 
-describe('livreBlockedMessage', () => {
+describe('livreNoStagesMessage', () => {
   it('returns a non-empty PT-BR message', () => {
-    const message = livreBlockedMessage();
+    const message = livreNoStagesMessage();
     expect(typeof message).toBe('string');
     expect(message.length).toBeGreaterThan(0);
   });
@@ -121,10 +121,16 @@ describe('validateSignaturePolicy', () => {
       expected: null,
     },
     {
-      name: 'livre is always blocked regardless of stage kinds',
+      name: 'livre with zero stages is valid (auto-approval)',
+      gc: 'livre',
+      stageKinds: [],
+      expected: null,
+    },
+    {
+      name: 'livre with any stage errors — no stages admitted',
       gc: 'livre',
       stageKinds: ['review', 'approval'],
-      expected: livreBlockedMessage(),
+      expected: livreNoStagesMessage(),
     },
   ];
 

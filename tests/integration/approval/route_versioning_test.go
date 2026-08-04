@@ -29,6 +29,9 @@ import (
 func TestRouteVersioning_NotInUse_InPlaceUpdateSucceeds(t *testing.T) {
 	db, _ := testdb.Open(t)
 
+	// No stages seeded here, so the fixture's default livre profile is the
+	// only legal class for this shape (ADR 0087 / migration 0316: a stageless
+	// ACTIVE route is DB-exclusive to livre).
 	route := testdb.NewApprovalRoute(t, db)
 
 	var newVersion int
@@ -71,8 +74,15 @@ func TestRouteVersioning_NotInUse_InPlaceUpdateSucceeds(t *testing.T) {
 func TestRouteVersioning_InUse_DefinitionUpdateBlocked_ThenSupersede(t *testing.T) {
 	db, _ := testdb.Open(t)
 
-	route := testdb.NewApprovalRoute(t, db)
-	seedRouteStage(t, db, route.ID, "Stage 1")
+	// controlado + its stage seeded in the SAME tx as the route row: since
+	// migration 0316 a governed profile's active route may never commit
+	// stageless, not even transiently between two autocommitted statements.
+	route := testdb.NewApprovalRoute(t, db,
+		testdb.WithGovernanceClass("controlado"),
+		testdb.WithStageSeeder(func(tx *sql.Tx, routeID string) error {
+			return insertRouteStageTx(tx, routeID, "Stage 1")
+		}),
+	)
 
 	// Referencing approval_instances row makes the route "in use".
 	testdb.NewApprovalInstance(t, db, testdb.WithRoute(route))
@@ -101,16 +111,30 @@ func TestRouteVersioning_InUse_DefinitionUpdateBlocked_ThenSupersede(t *testing.
 	// 3. Insert the superseding row (new id, version+1, active=true, same
 	// tenant/profile) — the shape route_admin_service.go's supersede branch
 	// produces.
-	if _, err := db.ExecContext(context.Background(), `
+	supersedeTx, txErr := db.BeginTx(context.Background(), nil)
+	if txErr != nil {
+		t.Fatalf("begin supersede tx: %v", txErr)
+	}
+	if _, err := supersedeTx.ExecContext(context.Background(), `
 		INSERT INTO public.approval_routes (id, tenant_id, profile_code, name, version, active, created_by)
 		SELECT $1::uuid, tenant_id, profile_code, 'Renamed Route', version + 1, TRUE, created_by
 		  FROM public.approval_routes
 		 WHERE id = $2::uuid`,
 		newRouteID, route.ID,
 	); err != nil {
+		_ = supersedeTx.Rollback()
 		t.Fatalf("insert superseding route row: %v", err)
 	}
-	seedRouteStage(t, db, newRouteID, "Stage 1 v2")
+	if err := insertRouteStageTx(supersedeTx, newRouteID, "Stage 1 v2"); err != nil {
+		_ = supersedeTx.Rollback()
+		t.Fatalf("seed superseding route stage: %v", err)
+	}
+	// One commit for route row + stage: the DEFERRABLE INITIALLY DEFERRED
+	// shape trigger validates the final committed shape only (controlado
+	// requires >= 1 stage since migration 0316).
+	if err := supersedeTx.Commit(); err != nil {
+		t.Fatalf("commit supersede tx: %v", err)
+	}
 
 	// Old row: now inactive, superseded_at set, definition columns untouched.
 	var oldActive bool
@@ -203,18 +227,18 @@ func TestRouteVersioning_InactiveRoute_DefinitionUpdateBlocked(t *testing.T) {
 	assertRouteInUseException(t, err)
 }
 
-func seedRouteStage(t *testing.T, database *sql.DB, routeID, name string) {
-	t.Helper()
-	if _, err := database.ExecContext(context.Background(), `
+// insertRouteStageTx inserts one stage row for routeID inside tx. Callers must
+// share the route row's transaction whenever the profile is governed.
+func insertRouteStageTx(tx *sql.Tx, routeID, name string) error {
+	_, err := tx.ExecContext(context.Background(), `
 		INSERT INTO public.approval_route_stages
 		  (route_id, stage_order, name, required_capability,
 		   quorum, on_eligibility_drift)
 		VALUES ($1::uuid, 1, $2, 'document.review',
 		        'any_1_of', 'reduce_quorum')`,
 		routeID, name,
-	); err != nil {
-		t.Fatalf("seed approval_route_stages row: %v", err)
-	}
+	)
+	return err
 }
 
 // assertRouteInUseException fails the test unless err is the P0001

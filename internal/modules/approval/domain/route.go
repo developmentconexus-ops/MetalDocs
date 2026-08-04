@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"errors"
 	"fmt"
 
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
@@ -102,13 +101,15 @@ func hasApprovalStage(stages []Stage) bool {
 // Validate enforces route structural invariants and the per-profile governance
 // route-signature policy (G1). policy is the published-language consequence of
 // the owning profile's governance class, resolved off-tx and passed in by the
-// caller (Validate stays pure — it never reads taxonomy). An empty policy (unset,
-// e.g. in structural-only unit tests) imposes no signature constraint.
+// caller (Validate stays pure — it never reads taxonomy).
+//
+// Stage-count is a POLICY question, not a structural one (ADR 0087): a livre
+// profile's route is a configured ZERO-stage route, so "at least one stage"
+// cannot be a blanket precondition any more. An empty policy (structural-only,
+// e.g. submit's re-validation of an already-bound active route and unit tests)
+// therefore imposes no stage-count and no signature constraint — it checks only
+// that whatever stages exist are internally well-formed.
 func (r Route) Validate(policy taxonomydomain.RoutePolicy) error {
-	if len(r.Stages) == 0 {
-		return errors.New("route must have at least one stage")
-	}
-
 	names := make(map[string]bool, len(r.Stages))
 	for i, s := range r.Stages {
 		// Dense order starting at 1.
@@ -153,21 +154,32 @@ func (r Route) Validate(policy taxonomydomain.RoutePolicy) error {
 		}
 	}
 
-	// Per-profile governance route-signature policy (G1). Belt-and-suspenders to
-	// the DB deferrable trigger; the switch is total over the published policy
-	// values, with unknown/empty fail-closing to "no extra constraint" (the DB
-	// trigger remains authoritative, so nothing weakens the signature guarantee).
+	// Per-profile governance route-shape policy (G1, reworked by ADR 0087).
+	// Belt-and-suspenders to the DB deferrable trigger; the switch is total over
+	// the published policy values, with unknown/empty fail-closing to "no extra
+	// constraint" (the DB trigger remains authoritative, so nothing weakens the
+	// signature guarantee).
 	switch policy {
-	case taxonomydomain.RoutePolicyNoRoutePermitted:
-		// livre: no approval route may exist for the profile.
-		return ErrRouteNotPermittedForProfile
+	case taxonomydomain.RoutePolicyNoApprovalStages:
+		// livre: the route is required but must carry ZERO stages — its whole
+		// point is that submitting against it completes instantly.
+		if len(r.Stages) > 0 {
+			return ErrRouteStagesNotPermittedForProfile
+		}
 	case taxonomydomain.RoutePolicyRequireApprovalStage:
 		// controlado: the route must bind at least one signature stage.
 		if !hasApprovalStage(r.Stages) {
 			return ErrApprovalStageRequired
 		}
-	case taxonomydomain.RoutePolicyApprovalOptional, "":
-		// simples (and unset in structural-only tests): review-only route allowed.
+	case taxonomydomain.RoutePolicyApprovalOptional:
+		// simples: review-only route allowed, but a stageless route is not — a
+		// simples profile is reviewed, just not signed (pre-ADR-0087 semantics,
+		// preserved exactly: the old blanket structural check enforced this).
+		if len(r.Stages) == 0 {
+			return ErrRouteStageRequired
+		}
+	case "":
+		// Structural-only: no stage-count and no signature constraint.
 	}
 	return nil
 }

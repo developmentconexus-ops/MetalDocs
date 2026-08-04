@@ -183,10 +183,14 @@ func (r UpdateRouteRequest) Validate() error {
 	return wrapValidation(validateStages(r.Stages))
 }
 
+// validateStages checks that whatever stages the body carries are internally
+// well-formed. It deliberately does NOT impose a minimum count (ADR 0087): an
+// empty list is the required shape for a livre profile's route, and the stage
+// count is a per-profile governance POLICY question answered by the service
+// layer (domain.Route.Validate(policy) → 422 problem codes) with the DB
+// route-shape trigger as the authoritative last line. A schema-level
+// `minItems: 1` here would make a livre route un-creatable through the API.
 func validateStages(stages []StageRequest) error {
-	if len(stages) == 0 {
-		return fmt.Errorf("stages must contain at least one stage")
-	}
 	seenNames := make(map[string]struct{}, len(stages))
 	for i, stage := range stages {
 		expectedOrder := i + 1

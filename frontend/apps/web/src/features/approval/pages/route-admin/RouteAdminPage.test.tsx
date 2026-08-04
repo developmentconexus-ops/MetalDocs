@@ -8,7 +8,7 @@ import * as routeAdminApi from '../../api/routeAdminApi';
 import type { ListRoutesResponse, RouteSummary } from '../../api/routeAdminApi';
 import * as taxonomyApi from '../../../taxonomy/api/taxonomy';
 import type { DocumentProfile } from '../../../taxonomy/types';
-import { livreBlockedMessage, stageOrderViolationMessage } from './routeGovernance';
+import { stageOrderViolationMessage } from './routeGovernance';
 import { RouteAdminPage } from './RouteAdminPage';
 
 vi.mock('../../api/routeAdminApi');
@@ -396,7 +396,7 @@ describe('RouteAdminPage', () => {
     expect(body.stages[0].stage_kind).toBe('review');
   });
 
-  it('selecting a livre profile blocks the builder with a friendly message and disables save', async () => {
+  it('selecting a livre profile shows the auto-approval badge, disables "Adicionar etapa", auto-drops the untouched seed stage, and saves with zero stages (ADR 0087)', async () => {
     vi.mocked(routeAdminApi.listRoutes).mockResolvedValue(listResponse([]));
     vi.mocked(taxonomyApi.fetchProfiles).mockResolvedValueOnce([
       makeProfile({ code: 'LIV', name: 'Livre', governanceClass: 'livre' }),
@@ -410,17 +410,71 @@ describe('RouteAdminPage', () => {
       target: { value: 'Rota Livre' },
     });
     await within(dialog).findByRole('option', { name: 'Livre (LIV)' });
+    // The dialog opens with a pristine default stage (Etapa 1) that the user
+    // has not touched yet — selecting a livre profile auto-drops it instead
+    // of forcing a manual "Remover" click.
+    expect(within(dialog).getByLabelText('Nome da etapa 1')).toBeTruthy();
     fireEvent.change(within(dialog).getByLabelText('Código do perfil'), {
       target: { value: 'LIV' },
     });
 
-    expect(await within(dialog).findByText(livreBlockedMessage())).toBeTruthy();
-    const saveButton = within(dialog).getByRole('button', { name: /Salvar rota/i });
-    expect((saveButton as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      await within(dialog).findByText('Rota livre — aprovação automática, sem etapas'),
+    ).toBeTruthy();
+    expect(within(dialog).queryByLabelText('Nome da etapa 1')).toBeNull();
+    expect(
+      within(dialog).getByText('Rota livre: aprovação automática, sem etapas.'),
+    ).toBeTruthy();
     expect(
       (within(dialog).getByRole('button', { name: 'Adicionar etapa' }) as HTMLButtonElement)
         .disabled,
     ).toBe(true);
+
+    const saveButton = within(dialog).getByRole('button', { name: /Salvar rota/i });
+    expect((saveButton as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(saveButton);
+
+    await waitFor(() => expect(vi.mocked(routeAdminApi.createRoute)).toHaveBeenCalled());
+    const body = vi.mocked(routeAdminApi.createRoute).mock.calls[0][0];
+    expect(body.stages).toEqual([]);
+  });
+
+  it('keeps a user-edited seed stage when switching to a livre profile, and flags it on save instead of silently discarding the edit', async () => {
+    vi.mocked(routeAdminApi.listRoutes).mockResolvedValue(listResponse([]));
+    vi.mocked(taxonomyApi.fetchProfiles).mockResolvedValueOnce([
+      makeProfile({ code: 'LIV', name: 'Livre', governanceClass: 'livre' }),
+    ]);
+
+    renderWithProviders(<RouteAdminPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Nova rota' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Criar rota' });
+
+    fireEvent.change(within(dialog).getByLabelText('Nome da rota'), {
+      target: { value: 'Rota Livre Editada' },
+    });
+    // Touch the seed stage before switching profile — it is no longer
+    // "pristine", so the auto-drop must NOT fire. Fill it out fully so the
+    // save attempt below reaches the livre-specific stage-count error
+    // instead of tripping an earlier per-field validation first.
+    await fillStage1Basics(dialog, 'Etapa preenchida');
+
+    await within(dialog).findByRole('option', { name: 'Livre (LIV)' });
+    fireEvent.change(within(dialog).getByLabelText('Código do perfil'), {
+      target: { value: 'LIV' },
+    });
+
+    // The edited stage survives the profile switch.
+    expect(within(dialog).getByLabelText('Nome da etapa 1')).toHaveValue('Etapa preenchida');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /Salvar rota/i }));
+    await waitFor(() =>
+      expect(
+        within(dialog).getByText(
+          'Perfil livre não admite etapas — a rota livre é aprovada automaticamente.',
+        ),
+      ).toBeTruthy(),
+    );
+    expect(vi.mocked(routeAdminApi.createRoute)).not.toHaveBeenCalled();
   });
 
   it('renders stage-kind and quorum pills and updates the draft on click', async () => {
@@ -592,7 +646,9 @@ describe('RouteAdminPage', () => {
     // (a) no policy badge for any known governance class renders.
     expect(within(dialog).queryByText('Obrigatório ≥1 assinatura')).toBeNull();
     expect(within(dialog).queryByText('Assinatura opcional')).toBeNull();
-    expect(within(dialog).queryByText('Perfil livre — sem rota de aprovação')).toBeNull();
+    expect(
+      within(dialog).queryByText('Rota livre — aprovação automática, sem etapas'),
+    ).toBeNull();
 
     // (b) the neutral "unclassified profile" note shows instead.
     expect(within(dialog).getByText('Perfil não classificado.')).toBeTruthy();

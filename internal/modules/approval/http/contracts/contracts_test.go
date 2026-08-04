@@ -233,9 +233,19 @@ func TestCreateRouteRequestValidate(t *testing.T) {
 		t.Fatalf("expected valid request, got error: %v", err)
 	}
 
-	missingStages := CreateRouteRequest{ProfileCode: strp("ops"), Name: "x"}
-	if err := missingStages.Validate(); err == nil {
-		t.Fatalf("expected error for empty stages")
+	// ADR 0087: a livre profile's route is REQUIRED and must carry ZERO
+	// stages, so an empty stage list is a legal WIRE shape — whether it is
+	// legal for THIS profile is a policy question answered by
+	// domain.Route.Validate(policy) and, authoritatively, by the DB's
+	// route-shape trigger. A contract-level rejection here would make a livre
+	// route un-creatable through the API at all.
+	zeroStages := CreateRouteRequest{ProfileCode: strp("ops"), Name: "x", Stages: []StageRequest{}}
+	if err := zeroStages.Validate(); err != nil {
+		t.Fatalf("zero-stage route must pass contract validation (ADR 0087 livre shape), got: %v", err)
+	}
+	nilStages := CreateRouteRequest{ProfileCode: strp("ops"), Name: "x"}
+	if err := nilStages.Validate(); err != nil {
+		t.Fatalf("omitted stages must pass contract validation (ADR 0087 livre shape), got: %v", err)
 	}
 
 	badQuorum := valid

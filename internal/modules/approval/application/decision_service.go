@@ -569,77 +569,59 @@ func (s *DecisionService) recordSignoffInTx(ctx context.Context, tx *sql.Tx, req
 			// (ErrFreezeBlockedByUnresolvedComments) is now the sole gate for
 			// this concern; decision_service.go never needs its own copy.
 
-			// All stages done — complete instance.
-			if err := s.repo.UpdateInstanceStatus(ctx, tx, req.TenantID, req.InstanceID,
-				domain.InstanceApproved, domain.InstanceInProgress, &now); err != nil {
-				return SignoffResult{}, nil, fmt.Errorf("recordSignoff: complete instance: %w", err)
-			}
+			// All stages done — complete instance. The DOCUMENT arm defers the
+			// status write to the shared terminal-approval path below (it owns
+			// the CAS); the TEMPLATE arm still writes it here.
 			if instance.Subject.Kind == domain.SubjectKindTemplate {
-				// M3 P3.S2b-3b-iii-b: no document-table transition, no
-				// async-freeze Pin (templates never freeze) — the completion
-				// port drives templates_template_version under_review ->
-				// approved atomically in this same tx.
-				if s.templateCompletion == nil {
-					return SignoffResult{}, nil, fmt.Errorf("recordSignoff: template completion writer not configured")
-				}
-				// F-E4-4: req.ActorUserID is the deciding approver (the same
-				// identity the signoff ledger row and the document arm's
-				// FinalApproverID carry); it is stamped onto the version's
-				// approver_id so approved_at never lands without attribution.
-				if err := s.templateCompletion.MarkTemplateVersionApproved(ctx, tx, req.TenantID, instance.Subject.Key, req.ActorUserID); err != nil {
-					return SignoffResult{}, nil, fmt.Errorf("recordSignoff: mark template version approved: %w", err)
-				}
-				result.InstanceApproved = true
-			} else {
-				if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
-					return SignoffResult{}, nil, err
-				}
-				// ADR 0085: approval fact + pin + coordinator evaluation, all
-				// in THIS transaction and all fail-closed. Shared verbatim
-				// with the review-verdict route (F-QA4-14) so the two ways to
-				// reach terminal approval cannot drift apart.
-				if s.releaseRecorder == nil {
-					return SignoffResult{}, nil, fmt.Errorf("decision service missing required ports: releaseRecorder")
-				}
-				if _, err := s.releaseRecorder.RecordTerminalApproval(ctx, tx, TerminalApprovalInput{
+				// Shared template terminal-approval path: instance CAS +
+				// templates_template_version under_review -> approved in this
+				// same tx (M3 P3.S2b-3b-iii-b). No document-table transition and
+				// no async-freeze Pin — templates never freeze. F-E4-4:
+				// req.ActorUserID is the deciding approver (the same identity the
+				// signoff ledger row and the document arm's FinalApproverID
+				// carry), stamped onto the version's approver_id so approved_at
+				// never lands without attribution. The ADR 0087 template
+				// auto-approve route reaches terminal approval through this very
+				// helper.
+				if err := completeTemplateTerminalApproval(ctx, tx, templateTerminalApprovalPorts{
+					repo:               s.repo,
+					templateCompletion: s.templateCompletion,
+					serviceName:        "decision service",
+				}, templateTerminalApprovalInput{
 					TenantID:          req.TenantID,
-					DocumentID:        instance.DocumentID,
 					InstanceID:        req.InstanceID,
-					RevisionVersion:   instance.RevisionVersion,
-					FrozenContentHash: derefString(instance.FrozenContentHash),
-					FinalApproverID:   req.ActorUserID,
-					SubmittedBy:       instance.SubmittedBy,
-					Approver: docapp.ApproverContext{
-						UserID:       req.ActorUserID,
-						Capabilities: req.Capabilities,
-					},
+					TemplateVersionID: instance.Subject.Key,
+					ApproverID:        req.ActorUserID,
+					FromStatus:        domain.InstanceInProgress,
+					Now:               now,
 				}); err != nil {
 					return SignoffResult{}, nil, err
 				}
-				// Transition document under_review → approved. Friendly first-line
-				// legality check (M4/F4.1) mirrors the DB trigger; the OCC WHERE
-				// below remains the atomic CAS + optimistic-lock enforcement.
-				if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusUnderReview, docsdomain.DocStatusApproved); err != nil {
+				result.InstanceApproved = true
+			} else {
+				// Shared terminal-approval path (F-QA4-14 / ADR 0085): identical
+				// instance CAS, document.edit assertion, approval fact + pin +
+				// coordinator evaluation, documents transition and lifecycle
+				// event as the review-verdict and ADR 0087 auto-approve routes.
+				if err := completeDocumentTerminalApproval(ctx, tx, documentTerminalApprovalPorts{
+					repo:              s.repo,
+					releaseRecorder:   s.releaseRecorder,
+					lifecycleEnqueuer: s.lifecycleEnqueuer,
+					serviceName:       "decision service",
+				}, documentTerminalApprovalInput{
+					TenantID:             req.TenantID,
+					InstanceID:           req.InstanceID,
+					DocumentID:           instance.DocumentID,
+					AreaCode:             areaCode,
+					RevisionVersion:      instance.RevisionVersion,
+					FrozenContentHash:    derefString(instance.FrozenContentHash),
+					FinalApproverID:      req.ActorUserID,
+					SubmittedBy:          instance.SubmittedBy,
+					ApproverCapabilities: req.Capabilities,
+					FromStatus:           domain.InstanceInProgress,
+					Now:                  now,
+				}); err != nil {
 					return SignoffResult{}, nil, err
-				}
-				res, err := tx.ExecContext(ctx, `
-					UPDATE documents
-					   SET status           = 'approved',
-					       revision_version = revision_version + 1
-					 WHERE id        = $1
-					   AND tenant_id = $2
-					   AND status    = 'under_review'`,
-					instance.DocumentID, req.TenantID,
-				)
-				if err != nil {
-					return SignoffResult{}, nil, fmt.Errorf("recordSignoff: approve document: %w", err)
-				}
-				rows, err := res.RowsAffected()
-				if err != nil {
-					return SignoffResult{}, nil, fmt.Errorf("recordSignoff: approve document rows affected: %w", err)
-				}
-				if rows == 0 {
-					return SignoffResult{}, nil, infrastructure.ErrStaleRevision
 				}
 				result.InstanceApproved = true
 			}
@@ -749,26 +731,22 @@ func (s *DecisionService) recordSignoffInTx(ctx context.Context, tx *sql.Tx, req
 	// transitions only. DOCUMENT-ONLY (M3 P3.S2b-3b-iii-b): the event types below
 	// are documents-domain events; a template-subject instance has no document to
 	// notify about, so this block is skipped entirely for it.
-	if s.lifecycleEnqueuer != nil && instance.Subject.Kind != domain.SubjectKindTemplate {
-		var lifecycleEventType string
-		if result.InstanceApproved {
-			lifecycleEventType = docsdomain.EventTypeDocumentApproved
-		} else if result.InstanceRejected {
-			lifecycleEventType = docsdomain.EventTypeDocumentRejected
+	//
+	// The APPROVED leg lives in completeDocumentTerminalApproval (the shared
+	// terminal-approval path) so all three routes to terminal approval emit it
+	// identically; only the REJECTED leg is emitted here.
+	if s.lifecycleEnqueuer != nil && instance.Subject.Kind != domain.SubjectKindTemplate && result.InstanceRejected {
+		largs := docsdomain.LifecycleEventArgs{
+			EventID:      uuid.NewString(),
+			TenantID:     req.TenantID,
+			EventType:    docsdomain.EventTypeDocumentRejected,
+			ResourceType: "approval_instance",
+			ResourceID:   req.InstanceID,
+			SubmittedBy:  instance.SubmittedBy,
+			OccurredAt:   now,
 		}
-		if lifecycleEventType != "" {
-			largs := docsdomain.LifecycleEventArgs{
-				EventID:      uuid.NewString(),
-				TenantID:     req.TenantID,
-				EventType:    lifecycleEventType,
-				ResourceType: "approval_instance",
-				ResourceID:   req.InstanceID,
-				SubmittedBy:  instance.SubmittedBy,
-				OccurredAt:   now,
-			}
-			if err := s.lifecycleEnqueuer.EnqueueLifecycleEventTx(ctx, tx, largs); err != nil {
-				return SignoffResult{}, nil, fmt.Errorf("recordSignoff: enqueue lifecycle event: %w", err)
-			}
+		if err := s.lifecycleEnqueuer.EnqueueLifecycleEventTx(ctx, tx, largs); err != nil {
+			return SignoffResult{}, nil, fmt.Errorf("recordSignoff: enqueue lifecycle event: %w", err)
 		}
 	}
 

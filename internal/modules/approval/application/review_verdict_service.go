@@ -315,71 +315,30 @@ func (s *ReviewVerdictService) recordVerdictInTx(ctx context.Context, tx *sql.Tx
 			}
 
 			if instance.Status == domain.InstanceApproved {
-				if err := s.repo.UpdateInstanceStatus(ctx, tx, req.TenantID, req.InstanceID,
-					domain.InstanceApproved, domain.InstanceInProgress, &now); err != nil {
-					return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: complete instance: %w", err)
-				}
-				if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
-					return ReviewVerdictResult{}, nil, err
-				}
-				// F-QA4-14 / ADR 0085: this route is now identical to the
-				// signoff route — same Pin, same approval fact, same
-				// coordinator evaluation, same transaction.
-				if s.releaseRecorder == nil {
-					return ReviewVerdictResult{}, nil, fmt.Errorf("review verdict service missing required ports: releaseRecorder")
-				}
-				if _, err := s.releaseRecorder.RecordTerminalApproval(ctx, tx, TerminalApprovalInput{
+				// F-QA4-14 / ADR 0085: this route is identical to the signoff
+				// and ADR 0087 auto-approve routes — same instance CAS, same
+				// document.edit assertion, same Pin, same approval fact, same
+				// coordinator evaluation, same lifecycle event, same tx.
+				if err := completeDocumentTerminalApproval(ctx, tx, documentTerminalApprovalPorts{
+					repo:              s.repo,
+					releaseRecorder:   s.releaseRecorder,
+					lifecycleEnqueuer: s.lifecycleEnqueuer,
+					serviceName:       "review verdict service",
+				}, documentTerminalApprovalInput{
 					TenantID:          req.TenantID,
-					DocumentID:        instance.DocumentID,
 					InstanceID:        req.InstanceID,
+					DocumentID:        instance.DocumentID,
+					AreaCode:          areaCode,
 					RevisionVersion:   instance.RevisionVersion,
 					FrozenContentHash: derefString(instance.FrozenContentHash),
 					FinalApproverID:   req.ActorUserID,
 					SubmittedBy:       instance.SubmittedBy,
-					Approver: docapp.ApproverContext{
-						UserID: req.ActorUserID,
-					},
+					FromStatus:        domain.InstanceInProgress,
+					Now:               now,
 				}); err != nil {
 					return ReviewVerdictResult{}, nil, err
 				}
-				if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusUnderReview, docsdomain.DocStatusApproved); err != nil {
-					return ReviewVerdictResult{}, nil, err
-				}
-				res, err := tx.ExecContext(ctx, `
-					UPDATE documents
-					   SET status           = 'approved',
-					       revision_version = revision_version + 1
-					 WHERE id        = $1
-					   AND tenant_id = $2
-					   AND status    = 'under_review'`,
-					instance.DocumentID, req.TenantID,
-				)
-				if err != nil {
-					return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: approve document: %w", err)
-				}
-				rows, err := res.RowsAffected()
-				if err != nil {
-					return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: approve document rows affected: %w", err)
-				}
-				if rows == 0 {
-					return ReviewVerdictResult{}, nil, infrastructure.ErrStaleRevision
-				}
 				result.InstanceApproved = true
-
-				if s.lifecycleEnqueuer != nil {
-					largs := docsdomain.LifecycleEventArgs{
-						EventID:      uuid.NewString(),
-						TenantID:     req.TenantID,
-						EventType:    docsdomain.EventTypeDocumentApproved,
-						ResourceType: "approval_instance",
-						ResourceID:   req.InstanceID,
-						SubmittedBy:  instance.SubmittedBy,
-						OccurredAt:   now,
-					}
-					if err := s.lifecycleEnqueuer.EnqueueLifecycleEventTx(ctx, tx, largs); err != nil {
-						return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: enqueue lifecycle event: %w", err)
-					}
-				}
 			} else {
 				nextStage := instance.Active()
 				if nextStage != nil {

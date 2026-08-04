@@ -29,6 +29,38 @@ type SubmitService struct {
 	cdRead       controlleddocumentsdomain.CDFieldReader
 	resolver     SubmitDefaultsResolver // in-tx route/hash resolution when the client omits them (ADR 0073); nil in unit tests that always supply route_id
 	policyReader ProfilePolicyReader    // G1: resolves the profile route-signature policy off-tx; nil ⇒ friendly check skipped (DB trigger is the last line)
+	// releaseRecorder / lifecycleEnqueuer serve the ADR 0087 zero-stage
+	// auto-approve leg ONLY: a submit bound to a livre profile's zero-stage
+	// route reaches terminal approval inside the submit tx and must produce
+	// exactly the side effects a signoff-driven approval does. Both are nil on
+	// the staged path, where submit never approves anything.
+	releaseRecorder   TerminalApprovalReleaseRecorder
+	lifecycleEnqueuer docsdomain.LifecycleEventEnqueuer
+}
+
+// WithReleaseRecorder returns a copy of the service wired with the ADR 0085
+// terminal-approval seam, needed by the ADR 0087 auto-approve leg. A nil
+// recorder leaves auto-approve fail-closed (an explicit wiring error at submit
+// time on a zero-stage route) rather than silently producing an approved
+// instance whose document can never be published.
+func (s *SubmitService) WithReleaseRecorder(recorder TerminalApprovalReleaseRecorder) *SubmitService {
+	if s == nil {
+		return nil
+	}
+	cp := *s
+	cp.releaseRecorder = recorder
+	return &cp
+}
+
+// WithLifecycleEnqueuer returns a copy of the service wired with the F3.3
+// domain-event enqueuer, used by the ADR 0087 auto-approve leg.
+func (s *SubmitService) WithLifecycleEnqueuer(e docsdomain.LifecycleEventEnqueuer) *SubmitService {
+	if s == nil {
+		return nil
+	}
+	cp := *s
+	cp.lifecycleEnqueuer = e
+	return &cp
 }
 
 // WithPolicyReader returns a copy of the service wired with the G1
@@ -207,8 +239,10 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 		// profile's current governance class" is held by construction at the
 		// write boundaries: route-admin Validate(policy) off-tx + the DEFERRABLE
 		// both-directions DB trigger (route writes AND reclassification). Submit
-		// binds only active routes, so the bound route already conforms; livre
-		// profiles have no active route and fail at resolution. Re-reading the
+		// binds only active routes, so the bound route already conforms; a livre
+		// profile's active route conforms by carrying ZERO stages, which is the
+		// shape the auto-approve step below keys off (ADR 0087 — livre profiles
+		// DO have an active route now). Re-reading the
 		// policy here cannot satisfy ADR 0073 (route/profile resolved in-tx) and
 		// H-PRE-1 (no recording CapTaxonomyView read inside this lock-holding tx)
 		// simultaneously — in-tx enforcement is structurally wrong, not merely
@@ -447,6 +481,20 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 			return fmt.Errorf("submit: emit event: %w", err)
 		}
 
+		// Step 10 (ADR 0087): a route bound to a livre profile carries ZERO
+		// stages, so the instance created above has nothing left to satisfy and
+		// reaches terminal approval in THIS transaction. This is not a bypass —
+		// the instance exists, its audit trail exists, and the completion runs
+		// through the very same shared terminal-approval path a signoff-driven
+		// approval runs through (approval fact + pin + coordinator evaluation +
+		// documents transition + lifecycle event, ADR 0085/0044). What livre
+		// removes is human sign-off, not governance.
+		if len(route.Stages) == 0 {
+			if err := s.autoApprove(ctx, tx, req, &inst, route, areaCode, now); err != nil {
+				return err
+			}
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -455,6 +503,77 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 
 	// Step 5: return result.
 	return SubmitResult{InstanceID: instanceID}, nil
+}
+
+// autoApprove completes a stageless instance inside the submit transaction
+// (ADR 0087). It runs AFTER the draft→under_review transition and the
+// approval_submitted event, so the trail reads submitted-then-approved and the
+// documents row is in the under_review state the shared terminal-approval path
+// transitions out of.
+//
+// The domain decides that a stageless instance may complete
+// (domain.Instance.AutoApprove — fail-closed on a staged or non-in_progress
+// instance); the application layer performs the persistence and the side
+// effects. AdvanceStage is deliberately untouched: "has no stages" must never
+// become readable as "all stages done".
+func (s *SubmitService) autoApprove(
+	ctx context.Context,
+	tx *sql.Tx,
+	req SubmitRequest,
+	inst *domain.Instance,
+	route domain.Route,
+	areaCode string,
+	now time.Time,
+) error {
+	if err := inst.AutoApprove(now); err != nil {
+		return fmt.Errorf("submit: auto-approve: %w", err)
+	}
+
+	// Audit the auto-approval itself, naming the route + route version that
+	// authorized it (ADR 0087 §5). Emitted BEFORE the terminal-approval path so
+	// the reason is on the record ahead of its consequences.
+	payloadBytes, err := json.Marshal(map[string]any{
+		"instance_id":   inst.ID,
+		"route_id":      route.ID,
+		"route_version": route.Version,
+		"stage_count":   0,
+		"reason":        "zero_stage_route",
+	})
+	if err != nil {
+		return fmt.Errorf("submit: auto-approve: marshal event payload: %w", err)
+	}
+	if err := s.emitter.Emit(ctx, tx, GovernanceEvent{
+		TenantID:     req.TenantID,
+		EventType:    EventTypeApprovalAutoApproved,
+		ActorUserID:  req.SubmittedBy,
+		ResourceType: "approval_instance",
+		ResourceID:   inst.ID,
+		PayloadJSON:  json.RawMessage(payloadBytes),
+		OccurredAt:   now,
+	}); err != nil {
+		return fmt.Errorf("submit: auto-approve: emit event: %w", err)
+	}
+
+	// FinalApproverID is the submitter: on a zero-stage route the submission
+	// IS the approving act. Recording anything else (or "") would either
+	// invent an approver or leave the approval fact unattributed.
+	return completeDocumentTerminalApproval(ctx, tx, documentTerminalApprovalPorts{
+		repo:              s.repo,
+		releaseRecorder:   s.releaseRecorder,
+		lifecycleEnqueuer: s.lifecycleEnqueuer,
+		serviceName:       "submit service",
+	}, documentTerminalApprovalInput{
+		TenantID:          req.TenantID,
+		InstanceID:        inst.ID,
+		DocumentID:        req.DocumentID,
+		AreaCode:          areaCode,
+		RevisionVersion:   inst.RevisionVersion,
+		FrozenContentHash: derefString(inst.FrozenContentHash),
+		FinalApproverID:   req.SubmittedBy,
+		SubmittedBy:       req.SubmittedBy,
+		FromStatus:        domain.InstanceInProgress,
+		Now:               now,
+	})
 }
 
 // resolveActiveRoute resolves the single active approval route for the document's

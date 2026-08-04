@@ -16,12 +16,12 @@ import {
 import {
   approveNowOverlapNote,
   authorExcludedNote,
-  livreBlockedMessage,
   routePolicyFor,
   type GovernanceClass,
 } from './routeGovernance';
 import {
   defaultStage,
+  isUntouchedDefaultStages,
   toCreateRequest,
   toDraft,
   toStageRequests,
@@ -95,7 +95,10 @@ export function RouteEditorDialog({
   const selectedProfile = profileOptions.find((profile) => profile.code === draft.profileCode);
   const governanceClass: GovernanceClass | null = selectedProfile?.governanceClass ?? null;
   const policy = governanceClass ? routePolicyFor(governanceClass) : null;
-  const isRouteBlocked = policy !== null && !policy.routeAllowed;
+  // ADR 0087: livre is no longer a blocked route — it is a route configured
+  // with zero stages (auto-approval). The floor for "at least one stage" and
+  // the "Adicionar etapa" affordance both relax for it.
+  const isLivre = governanceClass === 'livre';
 
   const updateStage = (uid: string, patch: Partial<StageDraft>) => {
     setDraft((prev) => ({
@@ -109,10 +112,11 @@ export function RouteEditorDialog({
   };
 
   const removeStage = (uid: string) => {
-    setDraft((prev) => ({
-      ...prev,
-      stages: prev.stages.length === 1 ? prev.stages : prev.stages.filter((s) => s.uid !== uid),
-    }));
+    setDraft((prev) => {
+      const minStages = isLivre ? 0 : 1;
+      if (prev.stages.length <= minStages) return prev;
+      return { ...prev, stages: prev.stages.filter((s) => s.uid !== uid) };
+    });
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -161,7 +165,7 @@ export function RouteEditorDialog({
         type="submit"
         form="route-editor-form"
         className={styles.primaryButton}
-        disabled={isSubmitting || isRouteBlocked}
+        disabled={isSubmitting}
       >
         {isSubmitting ? 'Salvando…' : 'Salvar rota'}
       </button>
@@ -260,7 +264,26 @@ export function RouteEditorDialog({
           id="route-profile-code"
           className={styles.input}
           value={draft.profileCode}
-          onChange={(event) => setDraft((prev) => ({ ...prev, profileCode: event.target.value }))}
+          onChange={(event) => {
+            const nextCode = event.target.value;
+            const nextGovernanceClass = profileOptions.find(
+              (profile) => profile.code === nextCode,
+            )?.governanceClass;
+            setDraft((prev) => {
+              // ADR 0087 review nit: don't make the user manually delete the
+              // seed stage when switching into a livre profile — drop it for
+              // them, but ONLY while it is still the pristine default. If
+              // they already started filling it in, keep it and let
+              // validateDraft flag it instead of discarding their edits.
+              const shouldDropSeedStage =
+                nextGovernanceClass === 'livre' && isUntouchedDefaultStages(prev.stages);
+              return {
+                ...prev,
+                profileCode: nextCode,
+                stages: shouldDropSeedStage ? [] : prev.stages,
+              };
+            });
+          }}
           // Edit is immutable; an empty registry or in-flight/failed load leaves
           // nothing valid to pick. The registered options guarantee the value
           // satisfies the backend FK to `metaldocs.document_profiles`.
@@ -297,9 +320,10 @@ export function RouteEditorDialog({
           <small className={styles.helpText}>Perfil não classificado.</small>
         ) : null}
 
-        {isRouteBlocked ? (
-          <p className={styles.warningBox} role="alert">
-            {livreBlockedMessage()}
+        {isLivre ? (
+          <p className={styles.noteBox}>
+            Rota livre: aprovação automática, sem etapas.
+            {draft.stages.length > 0 ? ' Remova todas as etapas antes de salvar.' : ''}
           </p>
         ) : null}
 
@@ -313,7 +337,7 @@ export function RouteEditorDialog({
               type="button"
               className={styles.ghostButton}
               onClick={addStage}
-              disabled={isSubmitting || isRouteBlocked}
+              disabled={isSubmitting || isLivre}
             >
               Adicionar etapa
             </button>
@@ -333,8 +357,8 @@ export function RouteEditorDialog({
               key={stage.uid}
               stage={stage}
               stageNumber={index + 1}
-              isOnly={draft.stages.length === 1}
-              disabled={isSubmitting || isRouteBlocked}
+              isOnly={draft.stages.length === 1 && !isLivre}
+              disabled={isSubmitting}
               roleOptions={roleOptions}
               roleOptionsLoading={rolesQuery.isLoading}
               areaOptions={areaOptions}

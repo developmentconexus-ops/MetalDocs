@@ -26,10 +26,17 @@ func TestRouteValidateHappy(t *testing.T) {
 	}
 }
 
-func TestRouteValidateEmptyStages(t *testing.T) {
+// TestRouteValidateEmptyStagesStructuralOnly pins ADR 0087: stage-count is a
+// POLICY question. A structural-only Validate("") — what submit runs against an
+// already-bound active route — must ACCEPT a zero-stage route, because a livre
+// profile's configured route is exactly that.
+func TestRouteValidateEmptyStagesStructuralOnly(t *testing.T) {
 	r := Route{Stages: []Stage{}}
-	if err := r.Validate(""); err == nil {
-		t.Error("empty stages should fail validation")
+	if err := r.Validate(""); err != nil {
+		t.Errorf("structural-only Validate(\"\") on a zero-stage route = %v, want nil", err)
+	}
+	if err := (Route{}).Validate(""); err != nil {
+		t.Errorf("structural-only Validate(\"\") on a nil-stage route = %v, want nil", err)
 	}
 }
 
@@ -113,6 +120,12 @@ func approvalStageRoute() Route {
 	}
 }
 
+// zeroStageRoute is the ADR 0087 livre shape: a fully configured, first-class
+// route object that carries no stages at all.
+func zeroStageRoute() Route {
+	return Route{ID: "r1", TenantID: "t1", ProfileCode: "RASCUNHO", Version: 1}
+}
+
 func TestRouteValidatePolicy(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -120,12 +133,16 @@ func TestRouteValidatePolicy(t *testing.T) {
 		policy  taxonomydomain.RoutePolicy
 		wantErr error
 	}{
-		{"no-route-permitted rejects any route", happyRoute(), taxonomydomain.RoutePolicyNoRoutePermitted, ErrRouteNotPermittedForProfile},
+		{"no-approval-stages rejects a staged route", happyRoute(), taxonomydomain.RoutePolicyNoApprovalStages, ErrRouteStagesNotPermittedForProfile},
+		{"no-approval-stages rejects even a review-only stage", reviewOnlyRoute(), taxonomydomain.RoutePolicyNoApprovalStages, ErrRouteStagesNotPermittedForProfile},
+		{"no-approval-stages accepts the zero-stage route", zeroStageRoute(), taxonomydomain.RoutePolicyNoApprovalStages, nil},
 		{"require-approval rejects review-only", reviewOnlyRoute(), taxonomydomain.RoutePolicyRequireApprovalStage, ErrApprovalStageRequired},
+		{"require-approval rejects a zero-stage route", zeroStageRoute(), taxonomydomain.RoutePolicyRequireApprovalStage, ErrApprovalStageRequired},
 		{"require-approval accepts explicit approval stage", approvalStageRoute(), taxonomydomain.RoutePolicyRequireApprovalStage, nil},
 		{"require-approval accepts unset-Kind route (defaults to approval)", happyRoute(), taxonomydomain.RoutePolicyRequireApprovalStage, nil},
 		{"optional accepts review-only", reviewOnlyRoute(), taxonomydomain.RoutePolicyApprovalOptional, nil},
-		{"empty policy imposes no signature constraint", reviewOnlyRoute(), taxonomydomain.RoutePolicy(""), nil},
+		{"optional rejects a zero-stage route", zeroStageRoute(), taxonomydomain.RoutePolicyApprovalOptional, ErrRouteStageRequired},
+		{"empty policy imposes no stage-count or signature constraint", reviewOnlyRoute(), taxonomydomain.RoutePolicy(""), nil},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -143,13 +160,19 @@ func TestRouteValidatePolicy(t *testing.T) {
 	}
 }
 
-// TestRouteValidateStructuralBeatsPolicy confirms a structural failure is
-// reported even when a policy would also reject — structural checks run first.
+// TestRouteValidateStructuralBeatsPolicy confirms a per-stage structural
+// failure is reported even when the policy would also reject — the per-stage
+// loop runs before the policy switch.
 func TestRouteValidateStructuralBeatsPolicy(t *testing.T) {
-	empty := Route{Stages: []Stage{}}
-	if err := empty.Validate(taxonomydomain.RoutePolicyNoRoutePermitted); err == nil {
-		t.Fatal("empty stages should fail structurally regardless of policy")
-	} else if errors.Is(err, ErrRouteNotPermittedForProfile) {
+	malformed := Route{Stages: []Stage{
+		{Order: 2, Name: "Misordered", Quorum: QuorumAny1Of, OnEligibilityDrift: DriftReduceQuorum,
+			Selectors: []ActorSelector{{Kind: SelectorRoleInDocumentArea, Role: "reviewer"}}},
+	}}
+	err := malformed.Validate(taxonomydomain.RoutePolicyNoApprovalStages)
+	if err == nil {
+		t.Fatal("a misordered stage should fail structurally regardless of policy")
+	}
+	if errors.Is(err, ErrRouteStagesNotPermittedForProfile) {
 		t.Fatal("structural error should be reported before the policy error")
 	}
 }

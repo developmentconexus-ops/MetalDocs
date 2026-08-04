@@ -34,6 +34,36 @@ export function defaultStage(): StageDraft {
   };
 }
 
+/**
+ * True when `stages` is exactly the single pristine stage `defaultStage()`
+ * seeds a fresh create-draft with, untouched by the user. Lets the dialog
+ * auto-drop the seed stage the moment the user picks a livre profile,
+ * instead of making them delete it by hand (ADR 0087) — but only while it is
+ * still pristine; once the user has started filling it in, dropping it would
+ * silently discard their work, so it is left in place for validation to flag.
+ */
+export function isUntouchedDefaultStages(stages: StageDraft[]): boolean {
+  if (stages.length !== 1) return false;
+  const [stage] = stages;
+  if (
+    stage.label !== '' ||
+    stage.stageKind !== 'approval' ||
+    stage.quorumKind !== 'any_1_of' ||
+    stage.m !== '1' ||
+    stage.driftPolicy !== 'reduce_quorum'
+  ) {
+    return false;
+  }
+  if (stage.selectors.length !== 1) return false;
+  const [selector] = stage.selectors;
+  return (
+    selector.kind === 'role_in_fixed_area' &&
+    selector.userId === '' &&
+    selector.role === '' &&
+    selector.areaCode === ''
+  );
+}
+
 function toSelectorDraft(selector: ActorSelector): SelectorDraft {
   return {
     uid: uuidv4() as string,
@@ -150,7 +180,11 @@ export function validateDraft(
   if (!isEdit && !draft.profileCode.trim()) {
     return 'Informe o código do perfil.';
   }
-  if (draft.stages.length === 0) {
+  // ADR 0087: a livre route is valid with ZERO stages — that is what "livre"
+  // means now (auto-approval, nothing to route). Every other class, and the
+  // null case (archived profile on edit, backend is sole enforcer), keeps
+  // the ≥1-stage floor.
+  if (governanceClass !== 'livre' && draft.stages.length === 0) {
     return 'A rota deve possuir ao menos uma etapa.';
   }
 

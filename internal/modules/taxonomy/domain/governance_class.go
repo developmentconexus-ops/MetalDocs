@@ -14,7 +14,10 @@ const (
 	// GovernanceSimples — reviewed-but-not-signed documents (nota fiscal,
 	// orçamento, relatório de rotina). A review-only route is allowed.
 	GovernanceSimples GovernanceClass = "simples"
-	// GovernanceLivre — ungoverned material (rascunhos). No route is permitted.
+	// GovernanceLivre — material that circulates without approval (rascunhos).
+	// It is NOT route-less: config-first is universal (ADR 0087), so a livre
+	// profile requires an explicitly configured ACTIVE route that carries ZERO
+	// stages. Submitting against it completes instantly.
 	GovernanceLivre GovernanceClass = "livre"
 )
 
@@ -43,23 +46,27 @@ const (
 	// RoutePolicyApprovalOptional — a review-only route is permitted. Derived
 	// from GovernanceSimples.
 	RoutePolicyApprovalOptional RoutePolicy = "approval_optional"
-	// RoutePolicyNoRoutePermitted — no approval route may exist for the
-	// profile. Derived from GovernanceLivre.
-	RoutePolicyNoRoutePermitted RoutePolicy = "no_route_permitted"
+	// RoutePolicyNoApprovalStages — an ACTIVE route is required (config-first is
+	// universal) and it MUST carry zero stages: submitting against it completes
+	// instantly, with no approval burden. Derived from GovernanceLivre.
+	// Replaces the pre-ADR-0087 RoutePolicyNoRoutePermitted, under which livre
+	// profiles could own no route — and therefore no document or template — at
+	// all (ADR 0087 supersedes the livre arm of ADR 0081).
+	RoutePolicyNoApprovalStages RoutePolicy = "no_approval_stages"
 )
 
 // RoutePolicy derives the route-signature policy for this profile. It is pure
 // and total over the three valid classes. An unset or unknown class
 // fail-closes to RoutePolicyRequireApprovalStage — an integrity gate never
 // silently drops the signature requirement on ambiguous input (no-fallback
-// principle). The DB trigger (migration 0295) is the authoritative last line
-// regardless.
+// principle). The DB trigger (assert_route_shape, migration 0316) is the
+// authoritative last line regardless.
 func (p *DocumentProfile) RoutePolicy() RoutePolicy {
 	switch p.GovernanceClass {
 	case GovernanceSimples:
 		return RoutePolicyApprovalOptional
 	case GovernanceLivre:
-		return RoutePolicyNoRoutePermitted
+		return RoutePolicyNoApprovalStages
 	default:
 		return RoutePolicyRequireApprovalStage
 	}

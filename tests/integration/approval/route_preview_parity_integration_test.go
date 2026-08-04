@@ -262,7 +262,7 @@ func TestPreviewRoute_TemplateSubject_ResolutionParity_RealDB(t *testing.T) {
 	tnt := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
 
-	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithGovernanceClass("controlado"))
 	templateID, versionID := seedPreviewTemplateVersion(t, dbc, tnt.ID, actor.ID, tax.ProfileCode)
 
 	repo := approvalrepo.NewPostgresApprovalRepository(dbc, iamdomain.NoopUserDisplayNameReader{})

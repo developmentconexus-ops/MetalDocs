@@ -125,6 +125,7 @@ type Spec struct {
 	ProfileCode       string
 	GovernanceClass   string
 	SubjectKind       string
+	StageSeeder       func(tx *sql.Tx, routeID string) error
 
 	RecipientUserID string
 	EventType       string
@@ -173,6 +174,38 @@ func WithFrozenContentHash(hash string) Opt {
 func WithCode(code string) Opt            { return func(s *Spec) { s.Code = code } }
 func WithProfile(code string) Opt         { return func(s *Spec) { s.ProfileCode = code } }
 func WithGovernanceClass(class string) Opt { return func(s *Spec) { s.GovernanceClass = class } }
+
+// SetGovernanceClass reclassifies an existing document profile. Fixtures that
+// seed route STAGES need a governed class (ADR 0087 / migration 0316 make a
+// stageless active route DB-exclusive to livre, and conversely a livre route
+// may carry no stages), but they often receive a profile that some other
+// factory call already created with the default class. Call this BEFORE the
+// route exists: the reclassification trigger validates every active route of
+// the profile, and a profile with no routes reclassifies freely.
+func SetGovernanceClass(t *testing.T, db *sql.DB, tenantID, profileCode, class string) {
+	t.Helper()
+	seedWithCaps(t, db, `[{"cap":"taxonomy.manage"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(context.Background(),
+			`UPDATE metaldocs.document_profiles
+			    SET governance_class = $3
+			  WHERE tenant_id = $1::uuid AND code = $2`,
+			tenantID, profileCode, class,
+		)
+		return err
+	})
+}
+
+// WithStageSeeder runs fn inside the SAME transaction that inserts the
+// approval_routes row, with the new route's id. Since ADR 0087 / migration
+// 0316 a governed profile's ACTIVE route may never be stageless — not even
+// between two committed statements — so "insert route, then insert stages"
+// as separate autocommitted statements is no longer a legal fixture shape:
+// the route insert alone would trip trg_route_profile_policy at ITS commit.
+// Seeding both in one tx is the honest fixture: the DEFERRABLE INITIALLY
+// DEFERRED trigger validates only the final committed shape.
+func WithStageSeeder(fn func(tx *sql.Tx, routeID string) error) Opt {
+	return func(s *Spec) { s.StageSeeder = fn }
+}
 
 // WithSubjectKind selects the approval-route subject kind ("document" or
 // "template"). Both are profile-keyed since ADR 0086, so the factory always
@@ -313,14 +346,21 @@ func NewTaxonomy(t *testing.T, db *sql.DB, opts ...Opt) Taxonomy {
 	processArea := "pa-" + suffix
 	profile := "prof-" + suffix
 
-	// G1 governance_class: fixtures default to 'simples' so a bare active route
-	// (NewApprovalRoute seeds one with no stages) satisfies the migration-0295
-	// route-shape trigger. Tests exercising controlado/livre enforcement opt in
-	// explicitly via WithGovernanceClass. 'simples' imposes no route-shape
-	// constraint, so it never rejects any fixture route.
+	// governance_class: fixtures default to 'livre' because that is the class
+	// whose route shape the factory actually seeds — NewApprovalRoute creates a
+	// bare ACTIVE route with NO stages, and since ADR 0087 / migration 0316 a
+	// stageless active route is DB-exclusive to livre (every governed class now
+	// requires >=1 stage at the DB line, because a stageless route
+	// auto-approves). The pre-0087 default was 'simples', which was valid only
+	// while simples carried no route-shape constraint at all.
+	//
+	// Tests that seed route STAGES must therefore opt into a governed class
+	// explicitly (WithGovernanceClass("controlado"/"simples")). Stage
+	// INSTANCES (approval_stage_instances) are unaffected — the route-shape
+	// trigger reads approval_route_stages only.
 	class := s.GovernanceClass
 	if class == "" {
-		class = "simples"
+		class = "livre"
 	}
 
 	seedWithCapsIdentity(t, db, tenantID, "", `[{"cap":"taxonomy.manage"}]`, func(tx *sql.Tx) error {
@@ -368,7 +408,7 @@ func NewControlledDoc(t *testing.T, db *sql.DB, opts ...Opt) ControlledDoc {
 		tenantID = NewTenant(t, db).ID
 	}
 	if s.Taxonomy == nil {
-		tax = NewTaxonomy(t, db, WithTenant(tenantID))
+		tax = NewTaxonomy(t, db, WithTenant(tenantID), WithGovernanceClass(s.GovernanceClass))
 	}
 
 	owner := s.OwnerUserID
@@ -550,7 +590,7 @@ func NewApprovalRoute(t *testing.T, db *sql.DB, opts ...Opt) ApprovalRoute {
 	}
 	profile := s.ProfileCode
 	if profile == "" {
-		profile = NewTaxonomy(t, db, WithTenant(tenantID)).ProfileCode
+		profile = NewTaxonomy(t, db, WithTenant(tenantID), WithGovernanceClass(s.GovernanceClass)).ProfileCode
 	}
 	owner := s.OwnerUserID
 	if owner == "" {
@@ -575,7 +615,15 @@ func NewApprovalRoute(t *testing.T, db *sql.DB, opts ...Opt) ApprovalRoute {
 			 VALUES ($1::uuid, $2::uuid, $3, $4, $5, $4, true, $6)`,
 			id, tenantID, name, profile, subjectKind, owner,
 		)
-		return err
+		if err != nil {
+			return err
+		}
+		if s.StageSeeder != nil {
+			// Same tx as the route row (ADR 0087): a governed profile's active
+			// route must never commit stageless.
+			return s.StageSeeder(tx, id)
+		}
+		return nil
 	})
 	return ApprovalRoute{ID: id, TenantID: tenantID, ProfileCode: profile, SubjectKind: subjectKind}
 }

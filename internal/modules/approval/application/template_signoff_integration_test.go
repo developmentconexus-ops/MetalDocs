@@ -75,7 +75,7 @@ func setupTemplateApproval(t *testing.T) templateApprovalFixture {
 	tnt := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
 
-	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithGovernanceClass("controlado"))
 	templateID, versionID := seedTemplateVersion(t, dbc, tnt.ID, actor.ID, tax.ProfileCode, "draft")
 	seedTemplateRoute(t, dbc, tnt.ID, actor.ID, tax.ProfileCode)
 

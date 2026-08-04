@@ -46,7 +46,7 @@ func TestRouteStageSelectors_RoundTrip_RealDB(t *testing.T) {
 	ctx := context.Background()
 
 	tenantID := testdb.NewTenant(t, database).ID
-	taxonomy := testdb.NewTaxonomy(t, database, testdb.WithTenant(tenantID))
+	taxonomy := testdb.NewTaxonomy(t, database, testdb.WithTenant(tenantID), testdb.WithGovernanceClass("controlado"))
 	actor := testdb.NewUser(t, database, testdb.WithTenant(tenantID), testdb.WithRole("system_admin"))
 
 	repo := infrastructure.NewPostgresApprovalRepository(database, iamdomain.NoopUserDisplayNameReader{})
@@ -106,8 +106,23 @@ func TestRouteStageSelectors_CheckRejection_RealDB(t *testing.T) {
 	database, _ := testdb.Open(t)
 	ctx := context.Background()
 
-	route := testdb.NewApprovalRoute(t, database)
-	stageID := seedBareRouteStage(t, database, route.ID)
+	// Route + stage in ONE tx: a controlado route may not commit stageless
+	// (ADR 0087 / migration 0316).
+	var stageID string
+	route := testdb.NewApprovalRoute(t, database,
+		testdb.WithGovernanceClass("controlado"),
+		testdb.WithStageSeeder(func(tx *sql.Tx, routeID string) error {
+			return tx.QueryRowContext(ctx, `
+				INSERT INTO public.approval_route_stages
+				  (route_id, stage_order, name, required_capability,
+				   quorum, on_eligibility_drift)
+				VALUES ($1::uuid, 1, 'Stage 1', 'document.review',
+				        'any_1_of', 'reduce_quorum')
+				RETURNING id`,
+				routeID,
+			).Scan(&stageID)
+		}),
+	)
 
 	cases := []struct {
 		name     string
@@ -157,30 +172,6 @@ func TestRouteStageSelectors_CheckRejection_RealDB(t *testing.T) {
 			assertSelectorCheckViolation(t, err)
 		})
 	}
-}
-
-// seedBareRouteStage inserts a public.approval_route_stages row directly
-// (mirrors route_versioning_test.go's seedRouteStage — no tripwire on this
-// table), giving TestRouteStageSelectors_CheckRejection_RealDB a bare stage id
-// to hang malformed selector rows off of. It does not itself seed a selector
-// row — this slice's synthesis (flat -> role_in_fixed_area) lives at the HTTP
-// boundary, not in a DB backfill, since migration 0305 dropped the flat
-// required_role/area_code columns this used to read from.
-func seedBareRouteStage(t *testing.T, database *sql.DB, routeID string) string {
-	t.Helper()
-	var stageID string
-	if err := database.QueryRowContext(context.Background(), `
-		INSERT INTO public.approval_route_stages
-		  (route_id, stage_order, name, required_capability,
-		   quorum, on_eligibility_drift)
-		VALUES ($1::uuid, 1, 'Stage 1', 'document.review',
-		        'any_1_of', 'reduce_quorum')
-		RETURNING id`,
-		routeID,
-	).Scan(&stageID); err != nil {
-		t.Fatalf("seed approval_route_stages row: %v", err)
-	}
-	return stageID
 }
 
 // assertSelectorCheckViolation fails the test unless err is a Postgres CHECK

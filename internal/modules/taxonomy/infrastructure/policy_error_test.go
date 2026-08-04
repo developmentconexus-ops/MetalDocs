@@ -10,8 +10,9 @@ import (
 	"metaldocs/internal/modules/taxonomy/domain"
 )
 
-// TestMapProfilePolicyErr covers the translation of the migration-0295
-// governance-policy trigger exceptions (P0001 with stable message prefixes)
+// TestMapProfilePolicyErr covers the translation of the governance-policy
+// trigger exceptions (P0001 with stable message prefixes; assert_route_shape
+// as replaced by migration 0316)
 // into taxonomy domain sentinels, keeping driver error codes out of the
 // application/domain layers.
 func TestMapProfilePolicyErr(t *testing.T) {
@@ -28,7 +29,7 @@ func TestMapProfilePolicyErr(t *testing.T) {
 		},
 		{
 			"route-shape violation -> ErrRouteViolatesProfilePolicy",
-			&pgconn.PgError{Code: "P0001", Message: "ErrRouteViolatesProfilePolicy: profile is livre; no approval route is permitted"},
+			&pgconn.PgError{Code: "P0001", Message: "ErrRouteViolatesProfilePolicy: profile is livre; route 0f1e must carry zero stages (a livre route is configured to require no approval)"},
 			domain.ErrRouteViolatesProfilePolicy,
 		},
 		{

@@ -63,6 +63,10 @@ route is *always* misconfiguration, for every governance class.
    post-fold forward migration; baseline is never edited):
    - `assert_route_shape` livre arm: active route on a livre profile MUST have
      zero stages (any stage ⇒ P0001); replaces "no active route may exist".
+   - Zero-stage is **DB-exclusive to livre**: controlado AND simples active
+     routes MUST carry ≥1 stage at the DB line (previously an app-only
+     structural floor). A zero-stage route auto-approves — that shape may
+     never exist on a governed class.
    - Both directions preserved, DEFERRABLE INITIALLY DEFERRED preserved:
      route writes AND profile reclassification re-validate
      (reclassify controlado→livre with a staged active route ⇒ P0001;
@@ -74,8 +78,14 @@ route is *always* misconfiguration, for every governance class.
 5. **Submit = normal path, instantly complete.** No side door. Submitting a
    subject bound to a livre (zero-stage) route runs the standard submit
    service: instance created, and — having no stages to satisfy — transitions
-   to `approved` in the same transaction, with an `audit.RecordTx` event
-   recording the auto-approval and the route/version that authorized it.
+   to `approved` in the same transaction, with a governance event
+   (`governance_events`, the approval module's canonical in-tx event log —
+   same vocabulary and store as `approval_submitted`/`signoff_recorded`;
+   auto-approval is recorded exactly as much as a normal approval, no more,
+   no less) carrying the route/version that authorized it. This applies to
+   **both subjects** — documents and templates (ADR 0086 template routes on a
+   livre profile are zero-stage too; template submit auto-approves the
+   template version through its normal completion path).
    Existing submit idempotency semantics apply unchanged. Post-approval
    behavior (release coordinator, publication, ADR 0085) is exactly that of a
    normally-approved instance. No new capability is minted; the submit

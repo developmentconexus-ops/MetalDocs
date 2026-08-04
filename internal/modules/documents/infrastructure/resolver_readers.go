@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"metaldocs/internal/modules/render/fanout"
@@ -63,6 +64,22 @@ type WorkflowReader struct{ db *sql.DB }
 
 func NewWorkflowReader(db *sql.DB) *WorkflowReader { return &WorkflowReader{db: db} }
 
+// AutoApprovalDisplayName is what the approvers block renders for an instance
+// that reached terminal approval with NO signoffs — the normal case for a
+// livre profile, whose active route carries zero stages and therefore
+// auto-approves on submit (ADR 0087). Rendering an empty approvers block there
+// would read as "nobody approved this", which is wrong and unauditable: the
+// document IS approved, by an explicitly configured no-approval route.
+const AutoApprovalDisplayName = "Aprovação automática — rota livre"
+
+// ErrNoApprovalDate is returned when an approval date is requested for a
+// document that has neither a signoff nor a completed approval instance. It
+// fails closed on purpose (no-fallback principle): the previous
+// coalesce(..., now()) fabricated a date, and since ADR 0087 the no-signoff
+// case is the NORMAL livre path rather than a rare anomaly, so a fabricated
+// date would silently become the common one.
+var ErrNoApprovalDate = errors.New("documents: no approval date for document (no signoff and no completed approval instance)")
+
 func (r *WorkflowReader) GetApprovers(ctx context.Context, tenantID, revisionID, approvalInstanceID string) ([]resolvers.ApproverInfo, error) {
 	if approvalInstanceID == "" {
 		return nil, nil
@@ -87,19 +104,80 @@ func (r *WorkflowReader) GetApprovers(ctx context.Context, tenantID, revisionID,
 		}
 		out = append(out, a)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(out) > 0 {
+		return out, nil
+	}
+
+	// No signoffs. That alone does NOT mean "auto-approved": a review-only
+	// route (e.g. a simples profile whose stages are all review-kind) reaches
+	// terminal approval through review verdicts and legitimately produces zero
+	// signoff rows. Attributing those to an automatic livre approval would be a
+	// false record. So the auto-approval line is gated on the instance's ACTUAL
+	// pinned shape — the stage instances materialized at submit — and rendered
+	// only when that shape is stageless, which is exactly the ADR 0087 livre
+	// route. Every other no-signoff case keeps the pre-existing behavior
+	// (empty approvers block).
+	var completedAt sql.NullTime
+	var submittedBy sql.NullString
+	var stageCount int
+	err = r.db.QueryRowContext(ctx, `
+		SELECT ai.completed_at,
+		       ai.submitted_by::text,
+		       (SELECT count(*) FROM approval_stage_instances si
+		         WHERE si.approval_instance_id = ai.id)
+		  FROM approval_instances ai
+		 WHERE ai.tenant_id = $1::uuid
+		   AND ai.id = $2::uuid
+		   AND ai.status = 'approved'`,
+		tenantID, approvalInstanceID).Scan(&completedAt, &submittedBy, &stageCount)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return nil, nil
+	case err != nil:
+		return nil, err
+	case stageCount > 0:
+		// Approved through a staged route without signoffs (review verdicts).
+		// Nothing signoff-shaped to render; preserve prior behavior.
+		return nil, nil
+	case !completedAt.Valid:
+		// Approved but no completion timestamp: integrity-critical, so fail
+		// closed rather than render a half-truth.
+		return nil, ErrNoApprovalDate
+	}
+	return []resolvers.ApproverInfo{{
+		UserID:      submittedBy.String,
+		DisplayName: AutoApprovalDisplayName,
+		SignedAt:    completedAt.Time,
+	}}, nil
 }
 
+// GetFinalApprovalDate returns the document's approval date: the last approve
+// signoff when the route had stages, else the approval instance's completion
+// timestamp (ADR 0087 — a livre profile's zero-stage route auto-approves and
+// produces no signoff at all). Never fabricates a date; a document with
+// neither yields ErrNoApprovalDate.
 func (r *WorkflowReader) GetFinalApprovalDate(ctx context.Context, tenantID, revisionID string) (time.Time, error) {
-	var t time.Time
+	var at sql.NullTime
 	err := r.db.QueryRowContext(ctx, `
-		SELECT coalesce(max(s.signed_at), now())
-		  FROM approval_signoffs s
-		  JOIN approval_instances ai ON ai.id = s.approval_instance_id
-		 WHERE ai.tenant_id=$1::uuid AND ai.document_id=$2::uuid
-		   AND s.decision='approve'`,
-		tenantID, revisionID).Scan(&t)
-	return t, err
+		SELECT COALESCE(MAX(s.signed_at), MAX(ai.completed_at))
+		  FROM approval_instances ai
+		  LEFT JOIN approval_signoffs s
+		         ON s.approval_instance_id = ai.id
+		        AND s.decision = 'approve'
+		 WHERE ai.tenant_id = $1::uuid
+		   AND ai.document_id = $2::uuid
+		   AND ai.status = 'approved'`,
+		tenantID, revisionID).Scan(&at)
+	if err != nil {
+		return time.Time{}, err
+	}
+	if !at.Valid {
+		return time.Time{}, ErrNoApprovalDate
+	}
+	return at.Time, nil
 }
 
 // FanoutInputsReader reads stored fanout inputs for forensic reconstruction.

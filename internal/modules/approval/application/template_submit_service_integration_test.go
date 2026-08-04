@@ -406,7 +406,7 @@ func TestSubmitTemplateVersionForReview_Success_RealDB(t *testing.T) {
 	tnt := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
 
-	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithGovernanceClass("controlado"))
 	templateID, versionID := seedTemplateVersion(t, dbc, tnt.ID, actor.ID, tax.ProfileCode, "draft")
 	route := seedTemplateRoute(t, dbc, tnt.ID, actor.ID, tax.ProfileCode)
 
@@ -508,7 +508,7 @@ func TestSubmitTemplateVersionForReview_NonDraft_Rejected_RealDB(t *testing.T) {
 	tnt := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
 
-	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithGovernanceClass("controlado"))
 	templateID, versionID := seedTemplateVersion(t, dbc, tnt.ID, actor.ID, tax.ProfileCode, "published")
 	seedTemplateRoute(t, dbc, tnt.ID, actor.ID, tax.ProfileCode)
 
@@ -553,7 +553,7 @@ func TestSubmitTemplateVersionForReview_NoContentHash_Rejected_RealDB(t *testing
 	tnt := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
 
-	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithGovernanceClass("controlado"))
 	templateID, versionID := seedTemplateVersionNoContent(t, dbc, tnt.ID, actor.ID, tax.ProfileCode)
 	seedTemplateRoute(t, dbc, tnt.ID, actor.ID, tax.ProfileCode)
 

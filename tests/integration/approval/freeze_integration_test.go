@@ -200,21 +200,26 @@ func TestFreeze_SubmitApprovalOnlyRoute_PinsHashAtSubmit(t *testing.T) {
 		return err
 	})
 
-	route := testdb.NewApprovalRoute(t, database, testdb.WithTenant(tenant.ID))
 	// Seed a single approval-kind stage on the route (stage_kind defaults to
 	// 'approval' per migration 0286; route.Stages is loaded by LoadRoute).
+	// It shares the route row's transaction because a controlado route may
+	// never commit stageless (ADR 0087 / migration 0316).
 	var stageID string
-	if err := database.QueryRowContext(ctx, `
-		INSERT INTO public.approval_route_stages
-		  (route_id, stage_order, name, required_capability,
-		   quorum, on_eligibility_drift, stage_kind)
-		VALUES ($1::uuid, 1, 'Approval Stage', 'document.signoff',
-		        'any_1_of', 'keep_snapshot', 'approval')
-		RETURNING id`,
-		route.ID,
-	).Scan(&stageID); err != nil {
-		t.Fatalf("seed approval_route_stages: %v", err)
-	}
+	route := testdb.NewApprovalRoute(t, database,
+		testdb.WithTenant(tenant.ID),
+		testdb.WithGovernanceClass("controlado"),
+		testdb.WithStageSeeder(func(tx *sql.Tx, routeID string) error {
+			return tx.QueryRowContext(ctx, `
+				INSERT INTO public.approval_route_stages
+				  (route_id, stage_order, name, required_capability,
+				   quorum, on_eligibility_drift, stage_kind)
+				VALUES ($1::uuid, 1, 'Approval Stage', 'document.signoff',
+				        'any_1_of', 'keep_snapshot', 'approval')
+				RETURNING id`,
+				routeID,
+			).Scan(&stageID)
+		}),
+	)
 	// Selectors is the sole source of truth for a stage's actor pool (unit
 	// 3.2 slice 6b); seed the equivalent role_in_fixed_area selector so
 	// route.Validate (ErrStageNoSelector) and ResolveEligibleActors resolve

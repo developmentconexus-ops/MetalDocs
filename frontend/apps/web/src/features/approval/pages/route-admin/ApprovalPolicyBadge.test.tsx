@@ -15,8 +15,10 @@ describe('ApprovalPolicyBadge', () => {
     expect(screen.getByText('Assinatura opcional')).toBeInTheDocument();
   });
 
-  it('renders the blocked badge for livre', () => {
+  it('renders the auto-approval badge for livre', () => {
     render(<ApprovalPolicyBadge policy={routePolicyFor('livre')} />);
-    expect(screen.getByText('Perfil livre — sem rota de aprovação')).toBeInTheDocument();
+    expect(
+      screen.getByText('Rota livre — aprovação automática, sem etapas'),
+    ).toBeInTheDocument();
   });
 });

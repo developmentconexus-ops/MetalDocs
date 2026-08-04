@@ -129,6 +129,13 @@ type TemplateSubmitService struct {
 	// in the submit tx (M3 P3.S2b-3b-iii-b, hub Option (a)). nil fails closed
 	// (an explicit error) rather than leaving the concurrent-edit hole open.
 	versionWriter TemplateVersionSubmitWriter
+	// templateCompletion drives templates_template_version under_review ->
+	// approved when an ADR 0087 zero-stage (livre) route auto-approves the
+	// version in the submit tx. Wired by Services.WithTemplateCompletionWriter,
+	// the same adapter DecisionService uses; nil fails closed (an explicit
+	// error) rather than leaving the version stranded in under_review behind an
+	// already-approved instance.
+	templateCompletion TemplateCompletionWriter
 	// routeResolver reaches LoadActiveRouteIDBySubject, declared on
 	// SubmitDefaultsResolver (not the broader ApprovalRepository interface —
 	// same ISP split SubmitService.resolver uses). Populated via type
@@ -378,6 +385,17 @@ func (s *TemplateSubmitService) SubmitTemplateVersionForReview(ctx context.Conte
 			return fmt.Errorf("template submit: emit event: %w", err)
 		}
 
+		// ADR 0087 §5: a route bound to a livre profile carries ZERO stages, so
+		// the instance created above has nothing left to satisfy and reaches
+		// terminal approval in THIS transaction — for BOTH subjects. Without
+		// this, a livre template submit left an in_progress instance behind an
+		// under_review version that nothing could ever advance.
+		if len(route.Stages) == 0 {
+			if err := s.autoApprove(ctx, tx, req, &inst, route, now); err != nil {
+				return err
+			}
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -385,4 +403,72 @@ func (s *TemplateSubmitService) SubmitTemplateVersionForReview(ctx context.Conte
 	}
 
 	return TemplateSubmitResult{InstanceID: instanceID}, nil
+}
+
+// autoApprove completes a stageless template instance inside the submit
+// transaction (ADR 0087 §5), mirroring SubmitService.autoApprove for the
+// document subject. It runs AFTER the version's draft→under_review lock and the
+// approval_submitted event, so the trail reads submitted-then-approved and the
+// version is in the under_review state the shared template terminal-approval
+// path transitions out of.
+//
+// The domain decides that a stageless instance may complete
+// (domain.Instance.AutoApprove — fail-closed on a staged or non-in_progress
+// instance); the application layer performs the persistence and the side
+// effects, through the same helper the signoff route uses.
+func (s *TemplateSubmitService) autoApprove(
+	ctx context.Context,
+	tx *sql.Tx,
+	req TemplateSubmitRequest,
+	inst *domain.Instance,
+	route domain.Route,
+	now time.Time,
+) error {
+	if err := inst.AutoApprove(now); err != nil {
+		return fmt.Errorf("template submit: auto-approve: %w", err)
+	}
+
+	// Record WHY this version is approved with an empty signoff set, naming the
+	// route + route version that authorized it (ADR 0087 §5 — governance_events
+	// is the binding record, same store and vocabulary as approval_submitted).
+	// Subject info rides in the payload and in the resource fields.
+	payloadBytes, err := json.Marshal(map[string]any{
+		"instance_id":   inst.ID,
+		"subject_kind":  string(domain.SubjectKindTemplate),
+		"subject_key":   inst.Subject.Key,
+		"template_id":   req.TemplateID,
+		"route_id":      route.ID,
+		"route_version": route.Version,
+		"stage_count":   0,
+		"reason":        "zero_stage_route",
+	})
+	if err != nil {
+		return fmt.Errorf("template submit: auto-approve: marshal event payload: %w", err)
+	}
+	if err := s.emitter.Emit(ctx, tx, GovernanceEvent{
+		TenantID:     req.TenantID,
+		EventType:    EventTypeApprovalAutoApproved,
+		ActorUserID:  req.SubmittedBy,
+		ResourceType: "approval_instance",
+		ResourceID:   inst.ID,
+		PayloadJSON:  json.RawMessage(payloadBytes),
+		OccurredAt:   now,
+	}); err != nil {
+		return fmt.Errorf("template submit: auto-approve: emit event: %w", err)
+	}
+
+	// ApproverID is the submitter: on a zero-stage route the submission IS the
+	// approving act, so approver attribution stays honest rather than empty.
+	return completeTemplateTerminalApproval(ctx, tx, templateTerminalApprovalPorts{
+		repo:               s.repo,
+		templateCompletion: s.templateCompletion,
+		serviceName:        "template submit service",
+	}, templateTerminalApprovalInput{
+		TenantID:          req.TenantID,
+		InstanceID:        inst.ID,
+		TemplateVersionID: inst.Subject.Key,
+		ApproverID:        req.SubmittedBy,
+		FromStatus:        domain.InstanceInProgress,
+		Now:               now,
+	})
 }

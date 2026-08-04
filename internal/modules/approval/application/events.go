@@ -21,6 +21,13 @@ const (
 	EventTypeSignoffRecorded           EventType = "signoff_recorded"
 	EventTypeDocumentReviewed          EventType = "document_reviewed"
 
+	// EventTypeApprovalAutoApproved (ADR 0087) records the instant approval of
+	// an instance bound to a ZERO-stage route (livre profile). It is the audit
+	// record of the fact that no human satisfied any stage — the payload names
+	// the route and the route version that authorized it, so "why is this
+	// approved with an empty signoff set?" is answerable from the trail alone.
+	EventTypeApprovalAutoApproved EventType = "approval_auto_approved"
+
 	// EventTypeReviewVerdictRecorded / EventTypeReviewChangesRequested (F4):
 	// review-stage runtime verdicts. Ready mirrors EventTypeSignoffRecorded's
 	// role (a non-terminal, quorum-counted vote); ChangesRequested mirrors

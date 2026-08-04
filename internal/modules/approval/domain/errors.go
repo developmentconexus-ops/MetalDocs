@@ -13,10 +13,21 @@ var ErrEmptyEligiblePool = errors.New("approval: empty eligible pool")
 // than StageKindReview or StageKindApproval.
 var ErrInvalidStageKind = errors.New("approval: invalid stage kind")
 
-// ErrRouteNotPermittedForProfile is returned by Route.Validate when the
-// profile's governance policy forbids any approval route (livre class →
-// RoutePolicyNoRoutePermitted). Friendly first line for the DB trigger.
-var ErrRouteNotPermittedForProfile = errors.New("approval: profile governance policy permits no approval route")
+// ErrRouteStagesNotPermittedForProfile is returned by Route.Validate when the
+// profile's governance policy requires a ZERO-stage route (livre class →
+// RoutePolicyNoApprovalStages) but the route carries stages. Friendly first
+// line for the DB trigger (assert_route_shape's livre arm, migration 0316).
+//
+// It replaces the pre-ADR-0087 ErrRouteNotPermittedForProfile: under the old
+// model a livre profile could own no route at all, which made it unable to own
+// documents or templates either. Config-first is now universal.
+var ErrRouteStagesNotPermittedForProfile = errors.New("approval: profile governance policy permits no approval stages on its route")
+
+// ErrRouteStageRequired is returned by Route.Validate when the profile's
+// governance policy requires the route to carry at least one stage
+// (simples class → RoutePolicyApprovalOptional) but the route has none.
+// A zero-stage route is legal ONLY under RoutePolicyNoApprovalStages.
+var ErrRouteStageRequired = errors.New("approval: profile governance policy requires at least one route stage")
 
 // ErrApprovalStageRequired is returned by Route.Validate when the profile's
 // governance policy requires at least one approval-kind (signature) stage

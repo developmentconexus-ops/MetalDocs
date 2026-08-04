@@ -8,7 +8,9 @@
 //
 //	controlado -> the active route MUST contain >=1 approval-kind stage
 //	simples    -> a review-only route is permitted
-//	livre      -> no approval route is permitted at all
+//	livre      -> an active route is REQUIRED and MUST carry zero stages
+//	              (ADR 0087, migration 0316 — supersedes the pre-0087 rule
+//	              "no approval route is permitted at all")
 //
 // Direction A (approval_route_stages write) is validated at COMMIT against the
 // full committed stage set; direction B (document_profiles.governance_class
@@ -57,10 +59,11 @@ func TestGovernancePolicy_Controlado_ApprovalStage_Accepted(t *testing.T) {
 	}
 }
 
-// TestGovernancePolicy_Livre_AnyRoute_RejectedAtCommit asserts a livre profile
-// rejects the very existence of an active route, even one with an approval
-// stage.
-func TestGovernancePolicy_Livre_AnyRoute_RejectedAtCommit(t *testing.T) {
+// TestGovernancePolicy_Livre_StagedRoute_RejectedAtCommit asserts a livre
+// profile rejects an active route that carries ANY stage — approval-kind here.
+// The route and its stage are written in one tx, so the deferred trigger fires
+// once against the full committed stage set.
+func TestGovernancePolicy_Livre_StagedRoute_RejectedAtCommit(t *testing.T) {
 	db, _ := testdb.Open(t)
 
 	tenant := testdb.NewTenant(t, db)
@@ -70,6 +73,91 @@ func TestGovernancePolicy_Livre_AnyRoute_RejectedAtCommit(t *testing.T) {
 
 	err := commitRouteWithStages(t, db, tenant.ID, tax.ProfileCode, owner.ID, []string{"approval"})
 	assertPolicyViolation(t, err, "ErrRouteViolatesProfilePolicy")
+}
+
+// TestGovernancePolicy_Livre_ReviewOnlyStage_RejectedAtCommit asserts the livre
+// arm counts stage ROWS, not approval-kind stages: a review-only stage is just
+// as forbidden. "A livre route that reviews is not livre."
+func TestGovernancePolicy_Livre_ReviewOnlyStage_RejectedAtCommit(t *testing.T) {
+	db, _ := testdb.Open(t)
+
+	tenant := testdb.NewTenant(t, db)
+	owner := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID))
+	tax := testdb.NewTaxonomy(t, db, testdb.WithTenant(tenant.ID))
+	setGovernanceClass(t, db, tenant.ID, tax.ProfileCode, "livre")
+
+	err := commitRouteWithStages(t, db, tenant.ID, tax.ProfileCode, owner.ID, []string{"review"})
+	assertPolicyViolation(t, err, "ErrRouteViolatesProfilePolicy")
+}
+
+// TestGovernancePolicy_Livre_StageAddedToExistingRoute_RejectedAtCommit isolates
+// the STAGE-write direction: the livre zero-stage route is already committed and
+// untouched, and a later tx inserts a stage into it. That tx writes only
+// approval_route_stages, so the stage trigger is the sole guard here.
+func TestGovernancePolicy_Livre_StageAddedToExistingRoute_RejectedAtCommit(t *testing.T) {
+	db, _ := testdb.Open(t)
+
+	tenant := testdb.NewTenant(t, db)
+	owner := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID))
+	tax := testdb.NewTaxonomy(t, db, testdb.WithTenant(tenant.ID))
+	setGovernanceClass(t, db, tenant.ID, tax.ProfileCode, "livre")
+
+	if err := commitRouteWithStages(t, db, tenant.ID, tax.ProfileCode, owner.ID, nil); err != nil {
+		t.Fatalf("seed livre zero-stage route: %v", err)
+	}
+	routeID := activeRouteID(t, db, tenant.ID, tax.ProfileCode)
+
+	assertPolicyViolation(t, addStageToRoute(t, db, routeID, "approval"), "ErrRouteViolatesProfilePolicy")
+}
+
+// TestGovernancePolicy_Livre_IntraTxStageAddThenDelete_Accepted is the mirror of
+// the controlado intra-tx downgrade case: a tx that passes through an INVALID
+// intermediate (livre route WITH a stage) but commits a valid final state (stage
+// deleted) is accepted, because the DEFERRABLE INITIALLY DEFERRED trigger judges
+// only the final committed stage set.
+func TestGovernancePolicy_Livre_IntraTxStageAddThenDelete_Accepted(t *testing.T) {
+	db, _ := testdb.Open(t)
+
+	tenant := testdb.NewTenant(t, db)
+	owner := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID))
+	tax := testdb.NewTaxonomy(t, db, testdb.WithTenant(tenant.ID))
+	setGovernanceClass(t, db, tenant.ID, tax.ProfileCode, "livre")
+
+	ctx := context.Background()
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("begin tx: %v", err)
+	}
+	defer tx.Rollback()
+
+	routeID := uuid.NewString()
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO public.approval_routes (id, tenant_id, name, profile_code, active, created_by)
+		 VALUES ($1::uuid, $2::uuid, 'Route', $3, true, $4)`,
+		routeID, tenant.ID, tax.ProfileCode, owner.ID,
+	); err != nil {
+		t.Fatalf("insert route: %v", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO public.approval_route_stages
+		  (route_id, stage_order, name, required_capability,
+		   quorum, on_eligibility_drift, stage_kind)
+		VALUES ($1::uuid, 1, 'Signoff', 'document.signoff',
+		        'any_1_of', 'reduce_quorum', 'approval')`,
+		routeID,
+	); err != nil {
+		t.Fatalf("insert approval stage: %v", err)
+	}
+	if _, err := tx.ExecContext(ctx,
+		`DELETE FROM public.approval_route_stages WHERE route_id = $1::uuid`,
+		routeID,
+	); err != nil {
+		t.Fatalf("delete approval stage: %v", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("livre route whose final committed shape is stageless must commit: %v", err)
+	}
 }
 
 // TestGovernancePolicy_Simples_ReviewOnlyRoute_Accepted asserts a simples
@@ -197,10 +285,61 @@ func TestGovernancePolicy_Controlado_ZeroStageRoute_RejectedAtCommit(t *testing.
 	assertPolicyViolation(t, err, "ErrRouteViolatesProfilePolicy")
 }
 
-// TestGovernancePolicy_Livre_ZeroStageRoute_RejectedAtCommit proves a livre
-// active route with no stages (the cheapest way to smuggle a forbidden route)
-// is still rejected — only the route-row trigger sees it.
-func TestGovernancePolicy_Livre_ZeroStageRoute_RejectedAtCommit(t *testing.T) {
+// TestGovernancePolicy_Simples_ZeroStageRoute_RejectedAtCommit is the ADR 0087
+// §4 exclusivity guard, direction A' (route-row write): a stageless active
+// route AUTO-APPROVES on submit, so that shape may exist ONLY under livre.
+// simples had no stage-count floor at the DB line before migration 0316 — the
+// app-side structural check was the only thing standing between a governed
+// profile and silent auto-approval, and it is not authoritative
+// (RouteAdminService.resolvePolicy yields "" whenever the policy reader is
+// unwired, and Validate("") is structural-only by design).
+func TestGovernancePolicy_Simples_ZeroStageRoute_RejectedAtCommit(t *testing.T) {
+	db, _ := testdb.Open(t)
+
+	tenant := testdb.NewTenant(t, db)
+	owner := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID))
+	tax := testdb.NewTaxonomy(t, db, testdb.WithTenant(tenant.ID), testdb.WithGovernanceClass("simples"))
+
+	err := commitRouteWithStages(t, db, tenant.ID, tax.ProfileCode, owner.ID, nil)
+	assertPolicyViolation(t, err, "ErrRouteViolatesProfilePolicy")
+}
+
+// TestGovernancePolicy_Simples_ZeroStageRoute_ActivationRejectedAtCommit is the
+// same guard through the OTHER write direction: the route is seeded inactive
+// (unconstrained) and later activated, touching approval_routes only — the
+// stage trigger never fires, so only the route-row trigger can catch it.
+func TestGovernancePolicy_Simples_ZeroStageRoute_ActivationRejectedAtCommit(t *testing.T) {
+	db, _ := testdb.Open(t)
+
+	tenant := testdb.NewTenant(t, db)
+	owner := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID))
+	tax := testdb.NewTaxonomy(t, db, testdb.WithTenant(tenant.ID), testdb.WithGovernanceClass("simples"))
+
+	routeID := seedInactiveRouteWithStages(t, db, tenant.ID, tax.ProfileCode, owner.ID, nil)
+	assertPolicyViolation(t, activateRoute(t, db, routeID), "ErrRouteViolatesProfilePolicy")
+}
+
+// TestGovernancePolicy_ReclassifyLivreToSimples_ZeroStage_Rejected closes the
+// third direction: reclassification. A livre profile's legal zero-stage route
+// must not become a simples profile's illegal one by editing the class.
+func TestGovernancePolicy_ReclassifyLivreToSimples_ZeroStage_Rejected(t *testing.T) {
+	db, _ := testdb.Open(t)
+
+	tenant := testdb.NewTenant(t, db)
+	owner := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID))
+	tax := testdb.NewTaxonomy(t, db, testdb.WithTenant(tenant.ID))
+
+	if err := commitRouteWithStages(t, db, tenant.ID, tax.ProfileCode, owner.ID, nil); err != nil {
+		t.Fatalf("seed livre zero-stage route: %v", err)
+	}
+	assertPolicyViolation(t, reclassify(t, db, tenant.ID, tax.ProfileCode, "simples"), "ErrClassChangeRouteConflict")
+}
+
+// TestGovernancePolicy_Livre_ZeroStageRoute_Accepted is the ADR 0087 positive
+// case and the exact inversion of the pre-0087 rule: a livre profile's active
+// route with zero stages is the CONFIGURED shape, and must commit cleanly. It is
+// what makes livre documents creatable at all under universal config-first.
+func TestGovernancePolicy_Livre_ZeroStageRoute_Accepted(t *testing.T) {
 	db, _ := testdb.Open(t)
 
 	tenant := testdb.NewTenant(t, db)
@@ -208,8 +347,47 @@ func TestGovernancePolicy_Livre_ZeroStageRoute_RejectedAtCommit(t *testing.T) {
 	tax := testdb.NewTaxonomy(t, db, testdb.WithTenant(tenant.ID))
 	setGovernanceClass(t, db, tenant.ID, tax.ProfileCode, "livre")
 
-	err := commitRouteWithStages(t, db, tenant.ID, tax.ProfileCode, owner.ID, nil)
-	assertPolicyViolation(t, err, "ErrRouteViolatesProfilePolicy")
+	if err := commitRouteWithStages(t, db, tenant.ID, tax.ProfileCode, owner.ID, nil); err != nil {
+		t.Fatalf("livre zero-stage active route must commit: %v", err)
+	}
+}
+
+// TestGovernancePolicy_ReclassifyControladoToLivre_Conflict_Rejected asserts
+// direction B under the new livre rule: a controlado profile with an active
+// approval-stage route cannot be reclassified to livre, because the surviving
+// route would carry stages a livre profile forbids.
+func TestGovernancePolicy_ReclassifyControladoToLivre_Conflict_Rejected(t *testing.T) {
+	db, _ := testdb.Open(t)
+
+	tenant := testdb.NewTenant(t, db)
+	owner := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID))
+	tax := testdb.NewTaxonomy(t, db, testdb.WithTenant(tenant.ID), testdb.WithGovernanceClass("controlado"))
+
+	if err := commitRouteWithStages(t, db, tenant.ID, tax.ProfileCode, owner.ID, []string{"approval"}); err != nil {
+		t.Fatalf("seed controlado approval route: %v", err)
+	}
+
+	err := reclassify(t, db, tenant.ID, tax.ProfileCode, "livre")
+	assertPolicyViolation(t, err, "ErrClassChangeRouteConflict")
+}
+
+// TestGovernancePolicy_ReclassifyLivreToControlado_Conflict_Rejected asserts the
+// other direction: a livre profile's zero-stage active route is invalid under
+// controlado (no approval-kind stage), so the reclassification is rejected.
+func TestGovernancePolicy_ReclassifyLivreToControlado_Conflict_Rejected(t *testing.T) {
+	db, _ := testdb.Open(t)
+
+	tenant := testdb.NewTenant(t, db)
+	owner := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID))
+	tax := testdb.NewTaxonomy(t, db, testdb.WithTenant(tenant.ID))
+	setGovernanceClass(t, db, tenant.ID, tax.ProfileCode, "livre")
+
+	if err := commitRouteWithStages(t, db, tenant.ID, tax.ProfileCode, owner.ID, nil); err != nil {
+		t.Fatalf("seed livre zero-stage route: %v", err)
+	}
+
+	err := reclassify(t, db, tenant.ID, tax.ProfileCode, "controlado")
+	assertPolicyViolation(t, err, "ErrClassChangeRouteConflict")
 }
 
 // TestGovernancePolicy_ActivateReviewOnlyRoute_RejectedAtCommit proves the
@@ -273,6 +451,47 @@ func commitRouteWithStages(t *testing.T, db *sql.DB, tenantID, profileCode, owne
 		}
 	}
 
+	return tx.Commit()
+}
+
+// activeRouteID returns the id of the profile's single active route. Fixture
+// lookup, not an assertion — it fatals if the route is missing.
+func activeRouteID(t *testing.T, db *sql.DB, tenantID, profileCode string) string {
+	t.Helper()
+	var id string
+	if err := db.QueryRowContext(context.Background(),
+		`SELECT id::text FROM public.approval_routes
+		  WHERE tenant_id = $1::uuid AND profile_code = $2 AND active`,
+		tenantID, profileCode,
+	).Scan(&id); err != nil {
+		t.Fatalf("lookup active route: %v", err)
+	}
+	return id
+}
+
+// addStageToRoute inserts a single stage into an already-committed route in its
+// own tx and returns the COMMIT error. Touches ONLY approval_route_stages, so
+// the stage trigger is the sole guard.
+func addStageToRoute(t *testing.T, db *sql.DB, routeID, kind string) error {
+	t.Helper()
+	ctx := context.Background()
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("begin add-stage tx: %v", err)
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO public.approval_route_stages
+		  (route_id, stage_order, name, required_capability,
+		   quorum, on_eligibility_drift, stage_kind)
+		VALUES ($1::uuid, 1, 'Stage', 'document.review',
+		        'any_1_of', 'reduce_quorum', $2)`,
+		routeID, kind,
+	); err != nil {
+		t.Fatalf("insert stage (%s): %v", kind, err)
+	}
 	return tx.Commit()
 }
 

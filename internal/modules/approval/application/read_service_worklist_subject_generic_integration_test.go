@@ -153,7 +153,7 @@ func TestListWorklist_TemplateInstance_AppearsWithSubjectTitleAndRef_RealDB(t *t
 	ten := testdb.NewTenant(t, dbc)
 	admin := testdb.NewUser(t, dbc, testdb.WithTenant(ten.ID), testdb.WithRole("system_admin"))
 
-	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(ten.ID))
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(ten.ID), testdb.WithGovernanceClass("controlado"))
 	templateID, versionID := seedTemplateVersion(t, dbc, ten.ID, admin.ID, tax.ProfileCode, "draft")
 	seedTemplateRoute(t, dbc, ten.ID, admin.ID, tax.ProfileCode)
 
@@ -227,7 +227,7 @@ func TestListWorklist_TemplateInstance_CrossTenantVersion_NoLeak_RealDB(t *testi
 	adminB := testdb.NewUser(t, dbc, testdb.WithTenant(tenB.ID), testdb.WithRole("system_admin"))
 
 	// A real template version that exists ONLY under tenant B.
-	taxB := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tenB.ID))
+	taxB := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tenB.ID), testdb.WithGovernanceClass("controlado"))
 	_, versionB := seedTemplateVersion(t, dbc, tenB.ID, adminB.ID, taxB.ProfileCode, "draft")
 
 	// A tenant-A instance whose subject_key is (illegitimately, for this test)

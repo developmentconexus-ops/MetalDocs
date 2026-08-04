@@ -38,7 +38,7 @@ func TestRouteAdminCreate_SubjectDefault_RealDB(t *testing.T) {
 
 	tnt := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
-	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithGovernanceClass("controlado"))
 
 	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
 	svc := &RouteAdminService{repo: repo, emitter: NewSQLEmitter(), clock: RealClock{}}
@@ -85,7 +85,7 @@ func TestRouteAdminCreate_ExplicitSubject_RealDB(t *testing.T) {
 
 	tnt := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
-	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithGovernanceClass("controlado"))
 
 	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
 	svc := &RouteAdminService{repo: repo, emitter: NewSQLEmitter(), clock: RealClock{}}
@@ -130,7 +130,7 @@ func TestRouteAdminCreate_ExplicitDivergentSubjectKey_Rejected_RealDB(t *testing
 
 	tnt := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
-	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithGovernanceClass("controlado"))
 
 	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
 	svc := &RouteAdminService{repo: repo, emitter: NewSQLEmitter(), clock: RealClock{}}
@@ -177,7 +177,7 @@ func TestRouteAdminCreate_DocumentRoute_FoundByBothProfileAndSubjectLookup_RealD
 
 	tnt := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
-	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithGovernanceClass("controlado"))
 
 	baseRepo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
 	svc := &RouteAdminService{repo: baseRepo, emitter: NewSQLEmitter(), clock: RealClock{}}
@@ -234,7 +234,7 @@ func TestRouteAdminList_ExposesSubjectFields_RealDB(t *testing.T) {
 
 	tnt := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
-	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithGovernanceClass("controlado"))
 
 	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
 	svc := &RouteAdminService{repo: repo, emitter: NewSQLEmitter(), clock: RealClock{}}
@@ -277,7 +277,7 @@ func TestRouteAdminCreate_TemplateSubject_ProfileKeyed_RealDB(t *testing.T) {
 
 	tnt := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
-	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithGovernanceClass("controlado"))
 
 	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
 	svc := &RouteAdminService{repo: repo, emitter: NewSQLEmitter(), clock: RealClock{}}
@@ -328,7 +328,7 @@ func TestRouteAdminCreate_TemplateSubject_DivergentSubjectKey_Rejected_RealDB(t 
 
 	tnt := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
-	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithGovernanceClass("controlado"))
 
 	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
 	svc := &RouteAdminService{repo: repo, emitter: NewSQLEmitter(), clock: RealClock{}}
@@ -407,7 +407,7 @@ func TestRouteAdminCreate_DocumentSubject_ProfileCodePopulated_RealDB(t *testing
 
 	tnt := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
-	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithGovernanceClass("controlado"))
 
 	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
 	svc := &RouteAdminService{repo: repo, emitter: NewSQLEmitter(), clock: RealClock{}}
@@ -447,7 +447,7 @@ func TestRouteAdminList_TemplateAndDocumentRoutes_RealDB(t *testing.T) {
 
 	tnt := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
-	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithGovernanceClass("controlado"))
 
 	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
 	svc := &RouteAdminService{repo: repo, emitter: NewSQLEmitter(), clock: RealClock{}}
@@ -529,7 +529,7 @@ func TestRouteAdminUpdate_TemplateRoute_RealDB(t *testing.T) {
 
 	tnt := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
-	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithGovernanceClass("controlado"))
 
 	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
 	svc := (&RouteAdminService{repo: repo, emitter: NewSQLEmitter(), clock: RealClock{}}).
