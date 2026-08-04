@@ -157,7 +157,11 @@ One field, three places.
 1. **Contract.** `due_in_days` (`integer`, nullable, `minimum: 1`) on the route-configuration stage
    schema in `api/openapi/v1/openapi.yaml`, readable and writable. Full spec regeneration — a partial
    regen is forbidden drift, since any spec edit churns every module's embedded `swaggerSpec`.
-2. **Handler.** The route-configuration write path reads and persists it. Boundary validation is the
+2. **Handler.** Only the HTTP boundary is missing, and the gap is narrower than it looks:
+   `domain.Stage.DueInDays` already exists (`approval/domain/route.go:62`) and the service already
+   persists and re-reads it (`route_admin_service.go:992,1106`). What drops the value is the wire
+   mapping — `mapStageRequests`, `mapStagesToResponse` and `mapListRoute`
+   (`approval/http/route_admin_handler.go`) simply never carry the field. Boundary validation is the
    friendly first line; the DB `CHECK` is the authority (invariant 5, already satisfied).
 3. **Semantics.** Nullable stays nullable and means **no deadline** — never "zero days", never a
    hidden default. That is the no-fallback principle, and the engine already behaves that way:
@@ -195,10 +199,13 @@ and a **mandatory reason**. It applies to the instance's **active** stage.
 - **Audited.** Who extended, from when to when, and why — through the existing `GovernanceEvent`
   emitter. **No new history table:** the audit event *is* the history, and a table duplicating it
   would be exactly the redundancy §9 forbids.
-- **Clears `sla_surfaced_at`.** This is the trap. If the stage already lapsed, the surfacer marked
-  it; extending without clearing the mark means the new deadline passes and **the reminder never
-  fires**, because the job only looks at unmarked stages. Cleared in the same transaction as the
-  extension. One line, and the difference between the feature working and the feature lying.
+- **`sla_surfaced_at` is left alone — deliberately.** The obvious worry is that a stage which already
+  lapsed carries a "reminded" mark, so extending it would silently disarm the reminder. It does not,
+  because the marker is **per cycle, not boolean**: the surfacer's eligibility predicate is
+  `sla_surfaced_at IS NULL OR sla_surfaced_at < due_at` (`approval/domain/sla_port.go:52`). Moving
+  `due_at` forward makes that predicate true again, so the reminder re-arms by construction. Clearing
+  the marker would be strictly worse — it erases the evidence that the first reminder was sent. A
+  test pins this, because the behaviour is load-bearing and non-obvious.
 - **No `If-Match`.** The forward-only check reads and writes the same row inside one transaction, so
   concurrent extensions are already correct. An OCC precondition would be contract surface solving a
   problem the transaction already solves.
@@ -317,7 +324,7 @@ tagged `//go:build integration`, R1–R4 discipline. No bespoke harness.
 | 9 | Unknown event type returns an error, not `nil` | the silent-drop defect is not reproduced |
 | 10 | Extension without a reason is rejected | governance, not decoration |
 | 11 | Extension to an earlier date is rejected | forward-only |
-| 12 | Extension after lapse clears `sla_surfaced_at` and the reminder fires again on the new date | the trap in §6 |
+| 12 | Extension after lapse re-arms the reminder on the new date, with `sla_surfaced_at` untouched | the per-cycle marker in §6 |
 | 13 | A principal without `approval.sla_extend` gets 403 at both tiers | the capability is real, not decorative |
 | 14 | Completed template instance resolves to `""` area and the caller's widening tightens access | the §7 care |
 
