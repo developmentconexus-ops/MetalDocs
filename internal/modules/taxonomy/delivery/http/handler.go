@@ -18,6 +18,7 @@ import (
 	"metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/idempotency"
+	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -102,7 +103,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 			middleware,
 		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+			writeError(w, http.StatusBadRequest, problem.CodeValidationError, err.Error())
 		},
 	})
 }

@@ -81,7 +81,7 @@ func TestCreate_DuplicateReturns409(t *testing.T) {
 	if rr.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want 409 (body=%s)", rr.Code, rr.Body.String())
 	}
-	if c := decodeCode(t, rr.Body.Bytes()); c != string(tokenshttp.CodeTokenAlreadyExists) {
+	if c := decodeCode(t, rr.Body.Bytes()); c != tokenshttp.CodeTokenAlreadyExists.String() {
 		t.Fatalf("code = %q, want %q", c, tokenshttp.CodeTokenAlreadyExists)
 	}
 }
@@ -121,7 +121,7 @@ func TestUpdate_ImmutableNameReturns422(t *testing.T) {
 	if rr.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, want 422 (body=%s)", rr.Code, rr.Body.String())
 	}
-	if c := decodeCode(t, rr.Body.Bytes()); c != string(tokenshttp.CodeTokenImmutableField) {
+	if c := decodeCode(t, rr.Body.Bytes()); c != tokenshttp.CodeTokenImmutableField.String() {
 		t.Fatalf("code = %q, want %q", c, tokenshttp.CodeTokenImmutableField)
 	}
 }

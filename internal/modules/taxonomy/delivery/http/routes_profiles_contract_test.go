@@ -88,7 +88,7 @@ func TestProfilesHandler_ErrorEnvelopeContract(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &apiErr); err != nil {
 		t.Fatalf("unmarshal api error: %v body=%s", err, rec.Body.String())
 	}
-	if apiErr.Code == "" {
+	if apiErr.Code.String() == "" {
 		t.Fatalf("expected non-empty code in API error: %s", rec.Body.String())
 	}
 }

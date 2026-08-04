@@ -26,7 +26,33 @@ type FieldError struct {
 	Message string `json:"message"`
 }
 
-// New creates a Problem with required fields.
+// NewFor creates a Problem whose status comes from the code's registration.
+// This is the DEFAULT constructor: ADR 0089 decision 3 binds the status to the
+// code, so the same condition cannot be 409 in one module and 412 in another.
+//
+// It panics on an unregistered (including zero) Code — a Problem with no status
+// binding has no defensible status to emit.
+func NewFor(code Code, title string) *Problem {
+	status, ok := StatusFor(code)
+	if !ok {
+		panic(fmt.Sprintf("problem.NewFor: code %q is not registered", code.String()))
+	}
+	return &Problem{
+		Title:  title,
+		Status: status,
+		Code:   code,
+	}
+}
+
+// New creates a Problem with an EXPLICIT status, overriding the code's
+// registered default.
+//
+// The status stays a required argument precisely so the override is visible at
+// the call site rather than an implicit fallback: reviewers and the api-lint
+// drift rule can see, at the line that emits it, that this response deviates
+// from the registered binding. Prefer NewFor; reach for New only for a
+// documented exception, and annotate it.
+//
 // Panics if status is outside the valid HTTP range [100, 599].
 func New(status int, code Code, title string) *Problem {
 	if status < 100 || status > 599 {

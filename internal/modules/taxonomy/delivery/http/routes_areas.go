@@ -10,6 +10,7 @@ import (
 	"metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/iamtypes"
+	"metaldocs/internal/platform/problem"
 )
 
 type listAreasResponse struct {
@@ -28,18 +29,18 @@ type areaUpsertRequest struct {
 func (h *Handler) listAreas(w http.ResponseWriter, r *http.Request) {
 	includeArchived, err := parseIncludeArchived(r)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "include_archived must be true or false")
+		writeError(w, http.StatusBadRequest, problem.CodeValidationError, "include_archived must be true or false")
 		return
 	}
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		writeError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
 		return
 	}
 
 	items, err := h.areas.List(r.Context(), tenantID, includeArchived)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to list areas")
+		writeError(w, http.StatusInternalServerError, problem.CodeInternalError, "failed to list areas")
 		return
 	}
 	writeJSON(w, http.StatusOK, listAreasResponse{Items: items})
@@ -48,12 +49,12 @@ func (h *Handler) listAreas(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) createArea(w http.ResponseWriter, r *http.Request) {
 	var req areaUpsertRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid JSON payload")
+		writeError(w, http.StatusBadRequest, problem.CodeValidationError, "invalid JSON payload")
 		return
 	}
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		writeError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
 		return
 	}
 
@@ -67,7 +68,7 @@ func (h *Handler) createArea(w http.ResponseWriter, r *http.Request) {
 		DefaultApproverRole: req.DefaultApproverRole,
 	}
 	if area.Code == "" {
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "code is required")
+		writeError(w, http.StatusBadRequest, problem.CodeValidationError, "code is required")
 		return
 	}
 
@@ -81,7 +82,7 @@ func (h *Handler) createArea(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) getArea(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		writeError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
 		return
 	}
 
@@ -96,12 +97,12 @@ func (h *Handler) getArea(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) updateArea(w http.ResponseWriter, r *http.Request) {
 	var req areaUpsertRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid JSON payload")
+		writeError(w, http.StatusBadRequest, problem.CodeValidationError, "invalid JSON payload")
 		return
 	}
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		writeError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
 		return
 	}
 	if _, err := h.areas.Get(r.Context(), tenantID, domain.AreaCode(r.PathValue("code"))); err != nil {
@@ -128,13 +129,13 @@ func (h *Handler) updateArea(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) archiveArea(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		writeError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
 		return
 	}
 
 	actorUserID, ok := authn.UserIDFromContext(r.Context())
 	if !ok {
-		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		writeError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
 		return
 	}
 	if err := h.areas.Archive(
@@ -173,22 +174,22 @@ func (h *Handler) writeAreaError(w http.ResponseWriter, err error) {
 	var pgErr *pgconn.PgError
 	switch {
 	case errors.Is(err, domain.ErrAreaNotFound):
-		writeError(w, http.StatusNotFound, "AREA_NOT_FOUND", "process area not found")
+		writeError(w, http.StatusNotFound, codeTaxAreaNotFound, "process area not found")
 	case errors.Is(err, domain.ErrAreaArchived):
-		writeError(w, http.StatusConflict, "AREA_ARCHIVED", "process area is archived")
+		writeError(w, http.StatusConflict, codeTaxAreaArchived, "process area is archived")
 	case errors.Is(err, domain.ErrAreaParentCycle):
-		writeError(w, http.StatusBadRequest, "AREA_PARENT_CYCLE", "area parent assignment creates cycle")
+		writeError(w, http.StatusBadRequest, codeTaxAreaParentCycle, "area parent assignment creates cycle")
 	case errors.Is(err, domain.ErrAreaParentCodeRequired):
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "parentCode is required")
+		writeError(w, http.StatusBadRequest, problem.CodeValidationError, "parentCode is required")
 	case errors.Is(err, domain.ErrAreaCodeImmutable):
-		writeError(w, http.StatusBadRequest, "AREA_CODE_IMMUTABLE", "area code is immutable")
+		writeError(w, http.StatusBadRequest, codeTaxAreaCodeImmutable, "area code is immutable")
 	case errors.Is(err, domain.ErrInvalidDefaultApproverRole):
-		writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", defaultApproverRoleMessage())
+		writeError(w, http.StatusUnprocessableEntity, problem.CodeValidationError, defaultApproverRoleMessage())
 	case errors.As(err, &pgErr) && pgErr.Code == "23514":
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "request violates data constraints")
+		writeError(w, http.StatusBadRequest, problem.CodeValidationError, "request violates data constraints")
 	case errors.As(err, &pgErr) && pgErr.Code == "23505":
-		writeError(w, http.StatusConflict, "AREA_ALREADY_EXISTS", "area code already exists")
+		writeError(w, http.StatusConflict, codeTaxAreaAlreadyExists, "area code already exists")
 	default:
-		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		writeError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
 	}
 }

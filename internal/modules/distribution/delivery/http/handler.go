@@ -208,7 +208,7 @@ func toProblem(p *problem.Problem) distributionapi.Problem {
 	return distributionapi.Problem{
 		Status:   p.Status,
 		Title:    p.Title,
-		Code:     string(p.Code),
+		Code:     p.Code.String(),
 		Detail:   detail,
 		Instance: instance,
 	}

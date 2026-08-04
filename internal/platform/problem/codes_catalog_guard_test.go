@@ -84,7 +84,12 @@ func canonicalCodeNames(t *testing.T, root string) map[string]bool {
 	names := map[string]bool{}
 	for _, decl := range f.Decls {
 		gd, ok := decl.(*ast.GenDecl)
-		if !ok || gd.Tok != token.CONST {
+		// ADR 0089 step 1: the catalog is `var` now, not `const` — Code became a
+		// closed struct type, which cannot be a Go constant. Accept both tokens so
+		// this guard keeps working until ADR 0089's later step deletes it outright
+		// (it is superseded by the registry, which enforces the same invariant at
+		// init time instead of by AST scan).
+		if !ok || (gd.Tok != token.CONST && gd.Tok != token.VAR) {
 			continue
 		}
 		for _, spec := range gd.Specs {

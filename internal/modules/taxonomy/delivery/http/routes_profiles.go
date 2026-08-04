@@ -22,15 +22,43 @@ var (
 	writeError = httpresponse.WriteError
 )
 
-const (
-	codeTaxProfileNotFound           problem.Code = "PROFILE_NOT_FOUND"
-	codeTaxProfileArchived           problem.Code = "PROFILE_ARCHIVED"
-	codeTaxTemplateNotPublished      problem.Code = "TEMPLATE_NOT_PUBLISHED"
-	codeTaxTemplateProfileMismatch   problem.Code = "TEMPLATE_PROFILE_MISMATCH"
-	codeTaxProfileCodeImmutable      problem.Code = "PROFILE_CODE_IMMUTABLE"
-	codeTaxProfileAlreadyExists      problem.Code = "PROFILE_ALREADY_EXISTS"
-	codeTaxFamilyNotFound            problem.Code = "FAMILY_NOT_FOUND"
-	codeTaxProfileClassRouteConflict problem.Code = "PROFILE_CLASS_ROUTE_CONFLICT"
+// Taxonomy profile codes. ADR 0089 step 3: problem.Code is now a closed struct
+// type issued only by the registry, so these are `var` registrations instead of
+// `const … problem.Code = "…"`. Strings and statuses are unchanged; RegisterLegacy
+// skips the family validation these SCREAMING_SNAKE names would fail. Annex §2.6
+// renames them in execution step 9.
+//
+// PROFILE_NOT_FOUND / PROFILE_ARCHIVED are also emitted as raw literals by
+// controlleddocuments, so their single registration lives in the shared block of
+// the platform catalog (collision C-15) — the registry forbids declaring one wire
+// string twice.
+var (
+	codeTaxProfileNotFound           = problem.CodeSharedProfileNotFound
+	codeTaxProfileArchived           = problem.CodeSharedProfileArchived
+	codeTaxTemplateNotPublished      = problem.RegisterLegacy("taxonomy", "TEMPLATE_NOT_PUBLISHED", 409)
+	codeTaxTemplateProfileMismatch   = problem.RegisterLegacy("taxonomy", "TEMPLATE_PROFILE_MISMATCH", 409)
+	codeTaxProfileCodeImmutable      = problem.RegisterLegacy("taxonomy", "PROFILE_CODE_IMMUTABLE", 400)
+	codeTaxProfileAlreadyExists      = problem.RegisterLegacy("taxonomy", "PROFILE_ALREADY_EXISTS", 409)
+	codeTaxFamilyNotFound            = problem.RegisterLegacy("taxonomy", "FAMILY_NOT_FOUND", 409)
+	codeTaxProfileClassRouteConflict = problem.RegisterLegacy("taxonomy", "PROFILE_CLASS_ROUTE_CONFLICT", 409)
+)
+
+// Process-area and document-family codes. These were raw string literals in
+// routes_areas.go / routes_families.go and are NOT in annex §2.6, which counted
+// only this file's eight const declarations — see the report accompanying ADR
+// 0089 step 3. Strings and statuses are unchanged.
+//
+// AREA_NOT_FOUND / AREA_ARCHIVED are also emitted by controlleddocuments, so
+// they share the platform catalog's single registration.
+var (
+	codeTaxAreaNotFound          = problem.CodeSharedAreaNotFound
+	codeTaxAreaArchived          = problem.CodeSharedAreaArchived
+	codeTaxAreaParentCycle       = problem.RegisterLegacy("taxonomy", "AREA_PARENT_CYCLE", 400)
+	codeTaxAreaCodeImmutable     = problem.RegisterLegacy("taxonomy", "AREA_CODE_IMMUTABLE", 400)
+	codeTaxAreaAlreadyExists     = problem.RegisterLegacy("taxonomy", "AREA_ALREADY_EXISTS", 409)
+	codeTaxFamilyAlreadyInactive = problem.RegisterLegacy("taxonomy", "FAMILY_ALREADY_INACTIVE", 409)
+	codeTaxFamilyHasProfiles     = problem.RegisterLegacy("taxonomy", "FAMILY_HAS_PROFILES", 409)
+	codeTaxFamilyAlreadyExists   = problem.RegisterLegacy("taxonomy", "FAMILY_ALREADY_EXISTS", 409)
 )
 
 type profileUpsertRequest struct {

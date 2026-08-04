@@ -7,11 +7,12 @@ import (
 	"testing"
 
 	"metaldocs/internal/platform/httpresponse"
+	"metaldocs/internal/platform/problem"
 )
 
 func TestWriteError_ProblemJSON(t *testing.T) {
 	rr := httptest.NewRecorder()
-	httpresponse.WriteError(rr, http.StatusNotFound, "NOT_FOUND", "resource not found")
+	httpresponse.WriteError(rr, http.StatusNotFound, problem.CodeNotFound, "resource not found")
 
 	if got := rr.Code; got != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d", got, http.StatusNotFound)

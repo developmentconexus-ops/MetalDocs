@@ -85,7 +85,7 @@ func TestProblem_MarshalJSON_IncludesAllFields(t *testing.T) {
 				t.Fatalf("unmarshal failed: %v", err)
 			}
 
-			if m["type"] != tt.p.Type || m["title"] != tt.p.Title || m["detail"] != tt.p.Detail || m["instance"] != tt.p.Instance || m["code"] != string(tt.p.Code) {
+			if m["type"] != tt.p.Type || m["title"] != tt.p.Title || m["detail"] != tt.p.Detail || m["instance"] != tt.p.Instance || m["code"] != tt.p.Code.String() {
 				t.Fatalf("unexpected scalar values: %#v", m)
 			}
 			if m["status"] != float64(tt.p.Status) {
@@ -100,7 +100,7 @@ func TestProblem_MarshalJSON_IncludesAllFields(t *testing.T) {
 			if !ok {
 				t.Fatalf("unexpected error item type: %#v", rawErrors[0])
 			}
-			if err0["field"] != tt.p.Errors[0].Field || err0["code"] != string(tt.p.Errors[0].Code) || err0["message"] != tt.p.Errors[0].Message {
+			if err0["field"] != tt.p.Errors[0].Field || err0["code"] != tt.p.Errors[0].Code.String() || err0["message"] != tt.p.Errors[0].Message {
 				t.Fatalf("unexpected error item values: %#v", err0)
 			}
 		})

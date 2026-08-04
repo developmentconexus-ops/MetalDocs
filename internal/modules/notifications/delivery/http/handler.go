@@ -243,7 +243,7 @@ func toProblem(p *problem.Problem) notificationsapi.Problem {
 	return notificationsapi.Problem{
 		Status:   p.Status,
 		Title:    p.Title,
-		Code:     string(p.Code),
+		Code:     p.Code.String(),
 		Detail:   detail,
 		Instance: instance,
 	}

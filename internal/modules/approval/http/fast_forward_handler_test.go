@@ -113,7 +113,7 @@ func TestFastForwardHandler_MissingIdempotencyKey(t *testing.T) {
 	if err := json.NewDecoder(rr.Body).Decode(&out); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if out.Code != "idempotency.key_required" {
+	if out.Code.String() != "idempotency.key_required" {
 		t.Fatalf("error.code = %q, want %q", out.Code, "idempotency.key_required")
 	}
 }
@@ -139,7 +139,7 @@ func TestFastForwardHandler_StageNotCompleted(t *testing.T) {
 	if err := json.NewDecoder(rr.Body).Decode(&out); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if out.Code != "state.fast_forward_stage_not_completed" {
+	if out.Code.String() != "state.fast_forward_stage_not_completed" {
 		t.Fatalf("error.code = %q, want %q", out.Code, "state.fast_forward_stage_not_completed")
 	}
 }
@@ -165,7 +165,7 @@ func TestFastForwardHandler_NotEligible(t *testing.T) {
 	if err := json.NewDecoder(rr.Body).Decode(&out); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if out.Code != "state.fast_forward_not_eligible" {
+	if out.Code.String() != "state.fast_forward_not_eligible" {
 		t.Fatalf("error.code = %q, want %q", out.Code, "state.fast_forward_not_eligible")
 	}
 }
@@ -281,7 +281,7 @@ func TestFastForwardHandler_NilIdempStoreFailsClosed(t *testing.T) {
 	if err := json.NewDecoder(rr.Body).Decode(&out); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if out.Code != "internal.unknown" {
+	if out.Code.String() != "internal.unknown" {
 		t.Fatalf("error.code = %q, want %q", out.Code, "internal.unknown")
 	}
 }

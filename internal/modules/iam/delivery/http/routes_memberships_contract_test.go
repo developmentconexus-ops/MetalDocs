@@ -144,7 +144,7 @@ func TestMembershipsHandler_ErrorEnvelopeContract(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &apiErr); err != nil {
 		t.Fatalf("unmarshal api error: %v body=%s", err, rec.Body.String())
 	}
-	if apiErr.Code != "AUTH_FORBIDDEN" {
+	if apiErr.Code.String() != "AUTH_FORBIDDEN" {
 		t.Fatalf("code = %q, want AUTH_FORBIDDEN", apiErr.Code)
 	}
 }

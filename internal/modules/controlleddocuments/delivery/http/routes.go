@@ -33,7 +33,7 @@ var errTenantIDInvalid = errors.New("controlled_documents: tenant id invalid")
 func (h *Handler) ListControlledDocuments(w http.ResponseWriter, r *http.Request, params controlleddocumentsapi.ListControlledDocumentsParams) {
 	filter, err := filterFromListParams(params)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, err.Error())
 		return
 	}
 
@@ -46,7 +46,7 @@ func (h *Handler) ListControlledDocuments(w http.ResponseWriter, r *http.Request
 	items, hasMore, err := h.svc.List(r.Context(), tenantID, filter)
 	if err != nil {
 		if errors.Is(err, pagination.ErrInvalidCursor) {
-			httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid cursor")
+			httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, "invalid cursor")
 			return
 		}
 		h.writeDomainError(w, err)
@@ -54,7 +54,7 @@ func (h *Handler) ListControlledDocuments(w http.ResponseWriter, r *http.Request
 	}
 	respItems, err := controlledDocumentResponses(items)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
 		return
 	}
 
@@ -84,11 +84,11 @@ func (h *Handler) AtomicCreateControlledDocument(w http.ResponseWriter, r *http.
 	r.Body = http.MaxBytesReader(w, r.Body, maxControlledDocumentsJSONBodyBytes)
 	var req controlleddocumentsapi.CreateAtomicRequest
 	if err := decodeStrictJSON(r, &req); err != nil {
-		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, err.Error())
 		return
 	}
 	if field := missingAtomicCreateField(req); field != "" {
-		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "field "+field+" is required")
+		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, "field "+field+" is required")
 		return
 	}
 
@@ -130,12 +130,12 @@ func (h *Handler) AtomicCreateControlledDocument(w http.ResponseWriter, r *http.
 	}
 	cd, err := controlledDocumentResponse(*res.ControlledDocument)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
 		return
 	}
 	doc, err := documentRefResponse(res.DocumentRef)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusCreated, controlleddocumentsapi.AtomicCreateResponse{
@@ -193,7 +193,7 @@ func (h *Handler) PreviewControlledDocumentCode(w http.ResponseWriter, r *http.R
 	profileCode := strings.TrimSpace(params.ProfileCode)
 	areaCode := strings.TrimSpace(params.AreaCode)
 	if profileCode == "" || areaCode == "" {
-		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "profile_code and area_code query parameters are required")
+		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, "profile_code and area_code query parameters are required")
 		return
 	}
 	tenantID, err := tenantIDFromRequest(r)
@@ -267,11 +267,11 @@ func (h *Handler) CreateControlledDocumentRevision(w http.ResponseWriter, r *htt
 	r.Body = http.MaxBytesReader(w, r.Body, maxControlledDocumentsJSONBodyBytes)
 	var body controlleddocumentsapi.CreateRevisionRequest
 	if err := decodeStrictJSON(r, &body); err != nil {
-		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, err.Error())
 		return
 	}
 	if field := missingCreateRevisionField(body); field != "" {
-		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "field "+field+" is required")
+		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, "field "+field+" is required")
 		return
 	}
 	formData := map[string]any(nil)
@@ -291,7 +291,7 @@ func (h *Handler) CreateControlledDocumentRevision(w http.ResponseWriter, r *htt
 	}
 	respRef, err := documentRefResponse(ref)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusCreated, controlleddocumentsapi.RevisionResponse{Document: respRef})
@@ -321,7 +321,7 @@ func (h *Handler) GetControlledDocument(w http.ResponseWriter, r *http.Request, 
 	}
 	resp, err := controlledDocumentResponse(*doc)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, resp)
@@ -346,7 +346,7 @@ func (h *Handler) GetActiveDocument(w http.ResponseWriter, r *http.Request, id o
 		return
 	}
 	if inst == nil {
-		httpresponse.WriteError(w, http.StatusNotFound, "NO_ACTIVE_INSTANCE", "no active document instance for this controlled document")
+		httpresponse.WriteError(w, http.StatusNotFound, codeCDNoActiveInstance, "no active document instance for this controlled document")
 		return
 	}
 
@@ -354,7 +354,7 @@ func (h *Handler) GetActiveDocument(w http.ResponseWriter, r *http.Request, id o
 	if inst.DocumentID != nil {
 		parsed, err := uuid.Parse(*inst.DocumentID)
 		if err != nil {
-			httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+			httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
 			return
 		}
 		resp.DocumentId = &parsed
@@ -372,7 +372,7 @@ func (h *Handler) GetActiveDocument(w http.ResponseWriter, r *http.Request, id o
 	if inst.PublishedDocumentID != nil {
 		parsed, err := uuid.Parse(*inst.PublishedDocumentID)
 		if err != nil {
-			httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+			httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
 			return
 		}
 		resp.PublishedDocumentId = &parsed
@@ -380,7 +380,7 @@ func (h *Handler) GetActiveDocument(w http.ResponseWriter, r *http.Request, id o
 	if inst.ApprovalInstanceID != nil {
 		parsed, err := uuid.Parse(*inst.ApprovalInstanceID)
 		if err != nil {
-			httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+			httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
 			return
 		}
 		resp.ApprovalInstanceId = &parsed
@@ -498,6 +498,45 @@ func optionalUUID(value *string) (*openapi_types.UUID, error) {
 	return &id, nil
 }
 
+// Controlled-documents domain codes.
+//
+// ADR 0089 step 3: every one of these was a RAW STRING LITERAL at its emit site
+// in writeDomainError below — 26 of them, in three competing naming conventions,
+// legal only because the old `type Code string` accepted untyped string
+// constants. That is the exact hole the closed Code type closes: a code now has
+// one declaration site and comes from the registry.
+//
+// Wire strings and statuses are unchanged here; annex §2.5 renames them in
+// execution step 7. RegisterLegacy skips the semantic-family validation these
+// pre-taxonomy names would fail.
+//
+// state.approval_route_missing, PROFILE_NOT_FOUND and PROFILE_ARCHIVED are not
+// in this block: they are wire strings the approval and taxonomy modules also
+// emit, so their single registration lives in the platform catalog's shared
+// block (collisions C-9 and C-15) and the emit sites reference it directly.
+var (
+	codeCDNoActiveInstance                      = problem.RegisterLegacy("controlleddocuments", "NO_ACTIVE_INSTANCE", 404)
+	codeCDNotFound                              = problem.RegisterLegacy("controlleddocuments", "CONTROLLED_DOCUMENT_NOT_FOUND", 404)
+	codeCDNotActive                             = problem.RegisterLegacy("controlleddocuments", "CONTROLLED_DOCUMENT_NOT_ACTIVE", 409)
+	codeCDActiveRevisionExists                  = problem.RegisterLegacy("controlleddocuments", "ACTIVE_REVISION_ALREADY_EXISTS", 409)
+	codeCDCodeTaken                             = problem.RegisterLegacy("controlleddocuments", "CONTROLLED_DOCUMENT_CODE_TAKEN", 409)
+	codeCDCodeArchived                          = problem.RegisterLegacy("controlleddocuments", "CONTROLLED_DOCUMENT_CODE_ARCHIVED", 409)
+	codeCDManualCodeReasonRequired              = problem.RegisterLegacy("controlleddocuments", "MANUAL_CODE_REASON_REQUIRED", 400)
+	codeCDOverrideReasonRequired                = problem.RegisterLegacy("controlleddocuments", "OVERRIDE_REASON_REQUIRED", 400)
+	codeCDVisibilityScopeInvalid                = problem.RegisterLegacy("controlleddocuments", "VISIBILITY_SCOPE_INVALID", 400)
+	codeCDOverrideTemplateDeleted               = problem.RegisterLegacy("controlleddocuments", "OVERRIDE_TEMPLATE_DELETED", 409)
+	codeCDOverrideTemplateNotPublished          = problem.RegisterLegacy("controlleddocuments", "OVERRIDE_TEMPLATE_NOT_PUBLISHED", 409)
+	codeCDDictionaryTokenMissing                = problem.RegisterLegacy("controlleddocuments", "DICTIONARY_TOKEN_MISSING", 422)
+	codeCDTemplateInvalid                       = problem.RegisterLegacy("controlleddocuments", "template_invalid", 422)
+	codeCDTemplateArtifactMissing               = problem.RegisterLegacy("controlleddocuments", "template.artifact_missing", 409)
+	codeCDTemplateArtifactInvariantUnconfigured = problem.RegisterLegacy("controlleddocuments", "template.artifact_invariant_unconfigured", 500)
+	codeCDCreationContextUnconfigured           = problem.RegisterLegacy("controlleddocuments", "creation_context.unconfigured", 500)
+	codeCDProfileNoDefaultTemplate              = problem.RegisterLegacy("controlleddocuments", "PROFILE_NO_DEFAULT_TEMPLATE", 409)
+	codeCDDefaultTemplateObsolete               = problem.RegisterLegacy("controlleddocuments", "DEFAULT_TEMPLATE_OBSOLETE", 409)
+	codeCDAreaNotFound                          = problem.CodeSharedAreaNotFound
+	codeCDAreaArchived                          = problem.CodeSharedAreaArchived
+)
+
 func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 	var capDenied authz.ErrCapDenied
 	switch {
@@ -509,70 +548,70 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 	case errors.As(err, &capDenied):
 		httpresponse.WriteError(w, http.StatusForbidden, problem.CodeForbiddenCapability, "you do not have the required capability in this area")
 	case errors.Is(err, controlleddocumentsdomain.ErrNoActiveInstance):
-		httpresponse.WriteError(w, http.StatusNotFound, "NO_ACTIVE_INSTANCE", "no active document instance for this controlled document")
+		httpresponse.WriteError(w, http.StatusNotFound, codeCDNoActiveInstance, "no active document instance for this controlled document")
 	case errors.Is(err, controlleddocumentsdomain.ErrCDNotFound):
-		httpresponse.WriteError(w, http.StatusNotFound, "CONTROLLED_DOCUMENT_NOT_FOUND", "controlled document not found")
+		httpresponse.WriteError(w, http.StatusNotFound, codeCDNotFound, "controlled document not found")
 	case errors.Is(err, controlleddocumentsdomain.ErrCDNotActive):
-		httpresponse.WriteError(w, http.StatusConflict, "CONTROLLED_DOCUMENT_NOT_ACTIVE", "controlled document is not active")
+		httpresponse.WriteError(w, http.StatusConflict, codeCDNotActive, "controlled document is not active")
 	case errors.Is(err, controlleddocumentsdomain.ErrActiveRevisionExists):
-		httpresponse.WriteError(w, http.StatusConflict, "ACTIVE_REVISION_ALREADY_EXISTS", "controlled document already has an active revision")
+		httpresponse.WriteError(w, http.StatusConflict, codeCDActiveRevisionExists, "controlled document already has an active revision")
 	// Hard creation gate (D2): the profile has no active approval route, so the
 	// document could never be submitted. Mirrors the SAME wire contract the
 	// submit path already emits — 409 + "state.approval_route_missing"
 	// (internal/modules/approval/http/errors.go) — so both surfaces are one
 	// contract for the client.
 	case errors.Is(err, controlleddocumentsdomain.ErrApprovalRouteMissing):
-		httpresponse.WriteError(w, http.StatusConflict, "state.approval_route_missing", "profile has no active approval route")
+		httpresponse.WriteError(w, http.StatusConflict, problem.CodeSharedStateApprovalRouteMissing, "profile has no active approval route")
 	case errors.Is(err, controlleddocumentsdomain.ErrCDCodeTaken):
-		httpresponse.WriteError(w, http.StatusConflict, "CONTROLLED_DOCUMENT_CODE_TAKEN", "controlled document code already taken")
+		httpresponse.WriteError(w, http.StatusConflict, codeCDCodeTaken, "controlled document code already taken")
 	case errors.Is(err, controlleddocumentsdomain.ErrCDArchivedCodeReuse):
-		httpresponse.WriteError(w, http.StatusConflict, "CONTROLLED_DOCUMENT_CODE_ARCHIVED", "cannot reuse code from archived controlled document")
+		httpresponse.WriteError(w, http.StatusConflict, codeCDCodeArchived, "cannot reuse code from archived controlled document")
 	case errors.Is(err, controlleddocumentsdomain.ErrManualCodeReasonRequired):
-		httpresponse.WriteError(w, http.StatusBadRequest, "MANUAL_CODE_REASON_REQUIRED", "manual code reason is required")
+		httpresponse.WriteError(w, http.StatusBadRequest, codeCDManualCodeReasonRequired, "manual code reason is required")
 	case errors.Is(err, controlleddocumentsdomain.ErrOverrideReasonRequired):
-		httpresponse.WriteError(w, http.StatusBadRequest, "OVERRIDE_REASON_REQUIRED", "override reason is required")
+		httpresponse.WriteError(w, http.StatusBadRequest, codeCDOverrideReasonRequired, "override reason is required")
 	case errors.Is(err, controlleddocumentsdomain.ErrVisibilityScopeInvalid):
-		httpresponse.WriteError(w, http.StatusBadRequest, "VISIBILITY_SCOPE_INVALID", "visibility scope is invalid")
+		httpresponse.WriteError(w, http.StatusBadRequest, codeCDVisibilityScopeInvalid, "visibility scope is invalid")
 	case errors.Is(err, controlleddocumentsdomain.ErrOverrideTemplateDeleted):
-		httpresponse.WriteError(w, http.StatusConflict, "OVERRIDE_TEMPLATE_DELETED", "override template deleted")
+		httpresponse.WriteError(w, http.StatusConflict, codeCDOverrideTemplateDeleted, "override template deleted")
 	case errors.Is(err, controlleddocumentsdomain.ErrOverrideNotPublished):
-		httpresponse.WriteError(w, http.StatusConflict, "OVERRIDE_TEMPLATE_NOT_PUBLISHED", "override template is not published")
+		httpresponse.WriteError(w, http.StatusConflict, codeCDOverrideTemplateNotPublished, "override template is not published")
 	case errors.Is(err, controlleddocumentsdomain.ErrDictionaryTokenMissing):
-		httpresponse.WriteError(w, http.StatusUnprocessableEntity, "DICTIONARY_TOKEN_MISSING", "a referenced dictionary token does not exist")
+		httpresponse.WriteError(w, http.StatusUnprocessableEntity, codeCDDictionaryTokenMissing, "a referenced dictionary token does not exist")
 	case errors.Is(err, controlleddocumentsdomain.ErrTemplateProfileMismatch):
-		_ = problem.Write(w, problem.New(http.StatusUnprocessableEntity, "template_invalid", "template version does not match the document profile"))
+		_ = problem.Write(w, problem.New(http.StatusUnprocessableEntity, codeCDTemplateInvalid, "template version does not match the document profile"))
 	case errors.Is(err, application.ErrTemplateArtifactMissing):
-		httpresponse.WriteError(w, http.StatusConflict, "template.artifact_missing", "template artifact missing")
+		httpresponse.WriteError(w, http.StatusConflict, codeCDTemplateArtifactMissing, "template artifact missing")
 	case errors.Is(err, application.ErrTemplateArtifactInvariantUnconfigured):
-		httpresponse.WriteError(w, http.StatusInternalServerError, "template.artifact_invariant_unconfigured", "template artifact invariant not configured")
+		httpresponse.WriteError(w, http.StatusInternalServerError, codeCDTemplateArtifactInvariantUnconfigured, "template artifact invariant not configured")
 	case errors.Is(err, application.ErrCreationContextUnconfigured):
-		httpresponse.WriteError(w, http.StatusInternalServerError, "creation_context.unconfigured", "creation context is not configured")
+		httpresponse.WriteError(w, http.StatusInternalServerError, codeCDCreationContextUnconfigured, "creation context is not configured")
 	case errors.Is(err, application.ErrActorMissing):
-		httpresponse.WriteError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "authentication required")
+		httpresponse.WriteError(w, http.StatusUnauthorized, problem.CodeUnauthenticated, "authentication required")
 	case errors.Is(err, errTenantIDInvalid):
 		slog.Error("controlled-documents request has invalid tenant id in context",
 			"route", "controlledDocuments.writeDomainError",
 			"error", err,
 		)
-		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
 	case errors.Is(err, controlleddocumentsdomain.ErrProfileHasNoDefaultTemplate):
-		httpresponse.WriteError(w, http.StatusConflict, "PROFILE_NO_DEFAULT_TEMPLATE", "profile has no default template")
+		httpresponse.WriteError(w, http.StatusConflict, codeCDProfileNoDefaultTemplate, "profile has no default template")
 	case errors.Is(err, controlleddocumentsdomain.ErrDefaultObsolete):
-		httpresponse.WriteError(w, http.StatusConflict, "DEFAULT_TEMPLATE_OBSOLETE", "default template is obsolete")
+		httpresponse.WriteError(w, http.StatusConflict, codeCDDefaultTemplateObsolete, "default template is obsolete")
 	case errors.Is(err, taxonomydomain.ErrProfileNotFound):
-		httpresponse.WriteError(w, http.StatusNotFound, "PROFILE_NOT_FOUND", "profile not found")
+		httpresponse.WriteError(w, http.StatusNotFound, problem.CodeSharedProfileNotFound, "profile not found")
 	case errors.Is(err, taxonomydomain.ErrAreaNotFound):
-		httpresponse.WriteError(w, http.StatusNotFound, "AREA_NOT_FOUND", "process area not found")
+		httpresponse.WriteError(w, http.StatusNotFound, codeCDAreaNotFound, "process area not found")
 	case errors.Is(err, taxonomydomain.ErrProfileArchived):
-		httpresponse.WriteError(w, http.StatusConflict, "PROFILE_ARCHIVED", "profile is archived")
+		httpresponse.WriteError(w, http.StatusConflict, problem.CodeSharedProfileArchived, "profile is archived")
 	case errors.Is(err, taxonomydomain.ErrAreaArchived):
-		httpresponse.WriteError(w, http.StatusConflict, "AREA_ARCHIVED", "process area is archived")
+		httpresponse.WriteError(w, http.StatusConflict, codeCDAreaArchived, "process area is archived")
 	default:
 		slog.Error("controlled-documents request failed",
 			"route", "controlledDocuments.writeDomainError",
 			"error", err,
 		)
-		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
 	}
 }
 

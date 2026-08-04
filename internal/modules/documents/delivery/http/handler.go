@@ -1300,7 +1300,7 @@ func mapErr(err error) (int, problem.Code) {
 	var capDenied authz.ErrCapDenied
 	switch {
 	case err == nil:
-		return http.StatusOK, ""
+		return http.StatusOK, problem.Code{}
 	case errors.Is(err, domain.ErrForbidden), errors.Is(err, domain.ErrDocumentNotOwner):
 		return http.StatusForbidden, problem.CodeAuthForbidden
 	case errors.Is(err, domain.ErrPendingNotFound),
@@ -1349,13 +1349,13 @@ func mapErr(err error) (int, problem.Code) {
 }
 
 func httpErr(w http.ResponseWriter, status int, code problem.Code) {
-	_ = problem.Write(w, problem.New(status, code, string(code)))
+	_ = problem.Write(w, problem.New(status, code, code.String()))
 }
 
 // httpErrDetail writes a canonical-code problem carrying runtime context in the
 // RFC 9457 detail field (never in the code field).
 func httpErrDetail(w http.ResponseWriter, status int, code problem.Code, detail string) {
-	_ = problem.Write(w, problem.New(status, code, string(code)).WithDetail(detail))
+	_ = problem.Write(w, problem.New(status, code, code.String()).WithDetail(detail))
 }
 
 func isKnownDocumentStatus(status string) bool {

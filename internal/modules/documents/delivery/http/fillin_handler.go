@@ -126,30 +126,54 @@ func (h *FillInHandler) PutPlaceholderValue(w http.ResponseWriter, r *http.Reque
 
 var ErrBadContentType = errors.New("content-type must be application/json")
 
+// Fill-in taxonomy codes.
+//
+// ADR 0089 step 3: these were RAW STRING LITERALS at the emit sites below —
+// legal only because the old `type Code string` accepted untyped string
+// constants. problem.Code is now a closed struct type, so every code must come
+// from the registry and gets exactly one declaration site. Wire strings and
+// statuses are unchanged; annex §2.4 renames them in execution step 8.
+//
+// The four bound to problem.CodeShared* are wire strings the approval module
+// also emits; the registry's duplicate guard forbids declaring them twice, so
+// their single registration lives in the platform catalog's shared block.
+var (
+	codeFillCapabilityDenied     = problem.CodeSharedAuthzCapabilityDenied
+	codeFillNotChoicePlaceholder = problem.RegisterLegacy("documents", "not_a_choice_placeholder", 400)
+	codeFillNotFoundRevision     = problem.RegisterLegacy("documents", "not_found.revision", 404)
+	codeFillNotAuthorEditable    = problem.RegisterLegacy("documents", "state.placeholder_not_author_editable", 409)
+	codeFillRevisionNotDraft     = problem.RegisterLegacy("documents", "state.revision_not_draft", 409)
+	codeFillValidationFailed     = problem.RegisterLegacy("documents", "validation.failed", 422)
+	codeFillEmptyBody            = problem.CodeSharedValidationEmptyBody
+	codeFillBadContentType       = problem.RegisterLegacy("documents", "validation.bad_content_type", 415)
+	codeFillJSONDecode           = problem.CodeSharedValidationJSONDecode
+	codeFillInternalUnknown      = problem.CodeSharedInternalUnknown
+)
+
 // mapFillInError maps a service error to its RFC 9457 (status, code) pair. The
 // codes are the module's dot-notation taxonomy (see internal/platform/problem).
 func mapFillInError(err error) (int, problem.Code) {
 	switch {
 	case errors.As(err, &authz.ErrCapDenied{}):
-		return http.StatusForbidden, "authz.capability_denied"
+		return http.StatusForbidden, codeFillCapabilityDenied
 	case errors.As(err, &notChoicePlaceholderError{}):
-		return http.StatusBadRequest, "not_a_choice_placeholder"
+		return http.StatusBadRequest, codeFillNotChoicePlaceholder
 	case errors.Is(err, v2domain.ErrNotFound):
-		return http.StatusNotFound, "not_found.revision"
+		return http.StatusNotFound, codeFillNotFoundRevision
 	case errors.Is(err, v2domain.ErrPlaceholderNotAuthorEditable):
-		return http.StatusConflict, "state.placeholder_not_author_editable"
+		return http.StatusConflict, codeFillNotAuthorEditable
 	case errors.Is(err, v2domain.ErrInvalidStateTransition):
-		return http.StatusConflict, "state.revision_not_draft"
+		return http.StatusConflict, codeFillRevisionNotDraft
 	case errors.Is(err, v2domain.ErrValidationFailed):
-		return http.StatusUnprocessableEntity, "validation.failed"
+		return http.StatusUnprocessableEntity, codeFillValidationFailed
 	case errors.Is(err, io.EOF):
-		return http.StatusBadRequest, "validation.empty_body"
+		return http.StatusBadRequest, codeFillEmptyBody
 	case errors.Is(err, ErrBadContentType):
-		return http.StatusUnsupportedMediaType, "validation.bad_content_type"
+		return http.StatusUnsupportedMediaType, codeFillBadContentType
 	case looksLikeDecodeError(err):
-		return http.StatusBadRequest, "validation.json_decode"
+		return http.StatusBadRequest, codeFillJSONDecode
 	default:
-		return http.StatusInternalServerError, "internal.unknown"
+		return http.StatusInternalServerError, codeFillInternalUnknown
 	}
 }
 
@@ -167,7 +191,7 @@ func writeFillInError(w http.ResponseWriter, reqID string, err error) {
 func writeFillInJSON(w http.ResponseWriter, status int, payload any) {
 	data, err := json.Marshal(payload)
 	if err != nil {
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "internal.unknown", "internal error"))
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, codeFillInternalUnknown, "internal error"))
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

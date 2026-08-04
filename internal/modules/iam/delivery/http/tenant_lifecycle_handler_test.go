@@ -20,7 +20,7 @@ import (
 
 // codeStr unwraps a problem.Code to a plain string for comparison against a
 // JSON-decoded (map[string]any) response body field.
-func codeStr(c problem.Code) string { return string(c) }
+func codeStr(c problem.Code) string { return c.String() }
 
 // fakeTenantLifecycler is a test double for TenantLifecycler letting each
 // test case control the exact error RequestExport/RequestErase return.

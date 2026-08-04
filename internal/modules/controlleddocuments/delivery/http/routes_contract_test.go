@@ -354,7 +354,7 @@ func TestRegistryHandler_ErrorEnvelopeContract(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &apiErr); err != nil {
 		t.Fatalf("unmarshal api error: %v body=%s", err, rec.Body.String())
 	}
-	if apiErr.Code == "" {
+	if apiErr.Code.String() == "" {
 		t.Fatalf("expected non-empty code in API error: %s", rec.Body.String())
 	}
 }
@@ -495,7 +495,7 @@ func TestWriteDomainError_CapabilityDeniedIs403(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("unmarshal: %v; body=%s", err, rec.Body.String())
 	}
-	if body.Code != string(problem.CodeForbiddenCapability) {
+	if body.Code != problem.CodeForbiddenCapability.String() {
 		t.Fatalf("code = %q, want %q", body.Code, problem.CodeForbiddenCapability)
 	}
 }

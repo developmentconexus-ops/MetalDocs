@@ -145,7 +145,7 @@ func (h *PDFWebhookHandler) HandlePDFComplete(w http.ResponseWriter, r *http.Req
 // HMAC webhook. The route stays off the OpenAPI spec (Phase C wont-fix) but
 // its error codes draw from the shared catalog.
 func writePDFWebhookErr(w http.ResponseWriter, status int, code problem.Code, detail string) {
-	_ = problem.Write(w, problem.New(status, code, string(code)).WithDetail(detail))
+	_ = problem.Write(w, problem.New(status, code, code.String()).WithDetail(detail))
 }
 
 func validSignature(body []byte, sigHex, secret string) bool {

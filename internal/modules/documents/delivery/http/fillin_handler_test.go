@@ -96,7 +96,7 @@ func TestFillInHandler_MapErrorInternal(t *testing.T) {
 	if status != http.StatusInternalServerError {
 		t.Fatalf("status=%d", status)
 	}
-	if code != "internal.unknown" {
+	if code.String() != "internal.unknown" {
 		t.Fatalf("code=%q", code)
 	}
 }

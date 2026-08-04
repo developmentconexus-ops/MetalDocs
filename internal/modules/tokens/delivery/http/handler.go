@@ -29,11 +29,20 @@ type CreateCommand = application.CreateCommand
 type UpdateCommand = application.UpdateCommand
 
 // Domain-specific error codes emitted by this handler.
-const (
-	CodeTokenAlreadyExists  problem.Code = "ALREADY_EXISTS"
-	CodeTokenNotFound       problem.Code = "NOT_FOUND"
-	CodeTokenImmutableField problem.Code = "immutable_field"
-	CodeTokenReservedName   problem.Code = "reserved_name"
+//
+// ADR 0089 step 3: problem.Code is now a closed struct type issued only by the
+// registry, so these are `var` bindings instead of `const … problem.Code = "…"`.
+//
+// ALREADY_EXISTS and NOT_FOUND were REDECLARATIONS of catalog strings (annex
+// collision C-4): this package declared its own constants carrying the exact
+// wire strings the platform catalog already owns. The registry's duplicate guard
+// makes that a build break, so they now reference the catalog registrations —
+// same wire strings, same statuses, one declaration site.
+var (
+	CodeTokenAlreadyExists  = problem.CodeAlreadyExists
+	CodeTokenNotFound       = problem.CodeNotFound
+	CodeTokenImmutableField = problem.RegisterLegacy("tokens", "immutable_field", 422)
+	CodeTokenReservedName   = problem.RegisterLegacy("tokens", "reserved_name", 422)
 )
 
 // TokenService is the port the handler depends on. It matches the application

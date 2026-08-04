@@ -273,7 +273,7 @@ func writeMappedErr(w http.ResponseWriter, err error) {
 		msg = err.Error()
 	}
 	if msg == "" {
-		msg = string(code)
+		msg = code.String()
 	}
 	writeErr(w, status, code, msg)
 }

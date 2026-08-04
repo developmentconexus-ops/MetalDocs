@@ -86,7 +86,7 @@ func TestHTTP_CreateToken_ReservedName_Author_422(t *testing.T) {
 	if rr.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, want 422 (body=%s)", rr.Code, rr.Body.String())
 	}
-	if c := problemCode(t, rr.Body.Bytes()); c != string(tokenshttp.CodeTokenReservedName) {
+	if c := problemCode(t, rr.Body.Bytes()); c != tokenshttp.CodeTokenReservedName.String() {
 		t.Fatalf("code = %q, want %q", c, tokenshttp.CodeTokenReservedName)
 	}
 }
@@ -108,7 +108,7 @@ func TestHTTP_CreateToken_ReservedName_ApprovalDate_422(t *testing.T) {
 	if rr.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, want 422 (body=%s)", rr.Code, rr.Body.String())
 	}
-	if c := problemCode(t, rr.Body.Bytes()); c != string(tokenshttp.CodeTokenReservedName) {
+	if c := problemCode(t, rr.Body.Bytes()); c != tokenshttp.CodeTokenReservedName.String() {
 		t.Fatalf("code = %q, want %q", c, tokenshttp.CodeTokenReservedName)
 	}
 }

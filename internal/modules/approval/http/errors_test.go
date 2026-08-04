@@ -26,7 +26,7 @@ func TestMapErrorToResponse(t *testing.T) {
 		name       string
 		err        error
 		wantStatus int
-		wantCode   problem.Code
+		wantCode   string
 		wantTitle  string
 	}{
 		{
@@ -334,7 +334,7 @@ func TestMapErrorToResponse(t *testing.T) {
 			if prob.Status != tt.wantStatus {
 				t.Fatalf("status = %d, want %d", prob.Status, tt.wantStatus)
 			}
-			if prob.Code != tt.wantCode {
+			if prob.Code.String() != tt.wantCode {
 				t.Fatalf("code = %q, want %q", prob.Code, tt.wantCode)
 			}
 			if prob.Title != tt.wantTitle {
@@ -351,7 +351,7 @@ func TestMapErrorToResponse_WrappedSentinel(t *testing.T) {
 	if prob.Status != http.StatusConflict {
 		t.Fatalf("status = %d, want %d", prob.Status, http.StatusConflict)
 	}
-	if prob.Code != "conflict.stale_revision" {
+	if prob.Code.String() != "conflict.stale_revision" {
 		t.Fatalf("code = %q, want %q", prob.Code, "conflict.stale_revision")
 	}
 	if prob.Title != err.Error() {
@@ -365,7 +365,7 @@ func TestMapErrorToResponse_ErrNoActiveStage(t *testing.T) {
 	if prob.Status != http.StatusConflict {
 		t.Fatalf("status = %d, want %d", prob.Status, http.StatusConflict)
 	}
-	if prob.Code != "state.instance_completed" {
+	if prob.Code.String() != "state.instance_completed" {
 		t.Fatalf("code = %q, want %q", prob.Code, "state.instance_completed")
 	}
 }
@@ -386,7 +386,7 @@ func TestWriteError(t *testing.T) {
 	if err := json.NewDecoder(rr.Body).Decode(&body); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if body.Code != "conflict.stale_revision" {
+	if body.Code.String() != "conflict.stale_revision" {
 		t.Fatalf("code = %q, want %q", body.Code, "conflict.stale_revision")
 	}
 }

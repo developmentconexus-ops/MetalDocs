@@ -11,7 +11,11 @@ import (
 	"metaldocs/internal/platform/problem"
 )
 
-const (
+// Aliases onto the canonical catalog — this package introduces no wire strings
+// of its own. ADR 0089 step 3: problem.Code is now a closed struct type issued
+// only by the registry, so a catalog code is a `var`, and an alias to one cannot
+// be `const`. Bindings are unchanged; annex §2.3 re-points them in step 11.
+var (
 	codeTplNotFound               = problem.CodeNotFound
 	codeTplKeyConflict            = problem.CodeAlreadyExists
 	codeTplInvalidStateTransition = problem.CodeStateTransitionInvalid
@@ -49,7 +53,7 @@ const (
 func MapErr(err error) (httpStatus int, code problem.Code) {
 	switch {
 	case err == nil:
-		return http.StatusOK, ""
+		return http.StatusOK, problem.Code{}
 	case errors.Is(err, domain.ErrNotFound):
 		return http.StatusNotFound, codeTplNotFound
 	case errors.Is(err, domain.ErrKeyConflict):
