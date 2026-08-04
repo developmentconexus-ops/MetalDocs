@@ -1,8 +1,6 @@
 # ADR 0088 — Template version content is always materialized
 
-> **Status:** Accepted 2026-08-04 (operator ruling: blank template is submittable
-> without an edit, and the same rule governs every version-creation path —
-> "fechar o buraco na origem", no patch).
+> **Status:** Accepted and implemented 2026-08-04. See `## Status history`.
 > **Supersedes:** the "leave `ContentHash` empty so the publish gate still forces
 > a real edit" stance in `spawnNextDraft`
 > (`internal/modules/templates/application/lifecycle.go:166-189`) and the
@@ -13,6 +11,19 @@
 > **Scope:** the `templates` module and its object-store port. System-impact
 > gate: Yellow
 > (`docs/superpowers/analysis/2026-08-04-blank-template-materialization-system-impact.md`).
+
+## Status history
+
+- **2026-08-04 — Accepted.** Operator ruling: a blank template is submittable
+  without an edit, and the same rule governs every version-creation path —
+  "fechar o buraco na origem", no patch.
+- **2026-08-04 — Implemented.** `2afba713` (feature), `cd74e0c3` (two
+  content-hash guards re-homed, a stage seeded in `SeedRouteConfig`). Migration
+  `0317` tightens `chk_template_version_content_hash_non_draft` to an
+  unconditional `length(content_hash) = 64`, so the unreachable state is now
+  unrepresentable in the database and not merely unreached by the application.
+  Wiki reconciled the same day (`wiki/modules/templates.md` §8.9a,
+  `templates-tech-debt.md` T-016/T-004, the table doc).
 
 ## Context
 

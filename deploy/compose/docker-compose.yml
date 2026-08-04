@@ -29,8 +29,10 @@ services:
       # server accepts connections (so the api's service_healthy gate cannot race it). This
       # is the faithful compose translation of scripts/dev-bootstrap-baseline.ps1 steps
       # 1-4 (prerequisites -> schema -> reference-data -> grants); the api container
-      # applies the post-baseline forward migrations itself at startup (db/migrations/ is
-      # empty after the 2026-07-29 fold, so that is currently a no-op). See internal/platform/
+      # applies the post-baseline forward migrations itself at startup. That was a no-op
+      # right after the 2026-07-29 fold emptied db/migrations/; it is not one now — 0316
+      # (livre zero-stage route) and 0317 (template content_hash) land there, so a rebuilt
+      # api container is what applies them to an existing volume. See internal/platform/
       # migrate/migrate.go: "the curated baseline bootstrap is owned by [the bootstrap]".
       - ../../db/prerequisites/0001_extensions.sql:/docker-entrypoint-initdb.d/01_extensions.sql:ro
       - ../../db/baseline/0001_current_schema.sql:/docker-entrypoint-initdb.d/02_baseline.sql:ro
