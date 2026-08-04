@@ -587,6 +587,45 @@ one costs a repo-wide hard break; building one costs an afternoon.
 
 ---
 
+## Class 20 — Irreversible Artifact With a Reversible-Feeling Workflow
+
+**Symptom.** A workflow presents editing affordances for something that is, in
+practice, permanently distributed. People act as if a mistake can be taken back. It
+cannot, and the attempt to take it back produces false confidence.
+
+**Evidence.** A secret reached git history (F-18). Git *feels* editable — `amend`,
+`rebase`, `filter-branch`, `push --force`. Once pushed, it is on every clone, fork, CI
+cache, and mirror, none of which the repo owner controls. The resolution chosen here was
+a **clean re-baseline at v1** rather than a history purge, and that was the correct call:
+a purge would have produced a repo that *looks* clean while the secret survives in copies.
+
+Same class, other instances: a published package version (yankable, not deletable — it is
+already in lockfiles); a sent email; an API contract already consumed by a client.
+
+**Root cause.** The tool's affordances describe the *local* artifact. The artifact's real
+lifetime is *distributed*, and no local operation reaches the copies. The gap between
+those two is invisible at the moment of the mistake.
+
+**Prevention.**
+- **Rung 3 — stop it at the boundary.** Secret scanning in **both** pre-commit and CI (CI
+  is the one that matters; pre-commit hooks are bypassable and not installed on every
+  clone). `.env` and equivalents never tracked, enforced by `.gitignore` *and* a CI check
+  that fails on a tracked match.
+- **Rung 5 but load-bearing — name the write-once artifacts on day 0.** Git history,
+  published versions, sent messages, released contracts. Write them down, because the
+  affordance lies and only doctrine corrects it.
+- **The remediation rule, which is the real lesson:** for a distributed artifact, the fix
+  is to **invalidate the leaked thing** (rotate the secret, publish a fixed version,
+  send a correction), **never to erase the trace**. Erasure is unverifiable across copies
+  and buys a feeling of resolution instead of resolution. Treat "we purged it" as an
+  unproven claim.
+
+**Detection.** For each artifact your workflow produces, ask: after it leaves this
+machine, can I reach every copy? If no, it is write-once, regardless of what the tool's
+buttons say.
+
+---
+
 ## Appendix A — Day-0 Factory Checklist
 
 Derived directly from the classes above. Each line prevents a class already observed.
@@ -618,6 +657,8 @@ Derived directly from the classes above. Each line prevents a class already obse
 - [ ] Never assert global process state in a parallel test (§17)
 
 **Process**
+- [ ] Secret scanning in pre-commit **and** CI; tracked-`.env` check fails the build (§20)
+- [ ] Write-once artifacts named on day 0; remediation = invalidate, never erase (§20)
 - [ ] Foundation-judgment gate before any improvement work; Red blocks design (§14)
 - [ ] Inviolable boundaries named on day 0; weakening one requires an ADR (§18)
 - [ ] Promotion to platform triggered by the **second** consumer, in that PR (§11)
@@ -628,7 +669,7 @@ Derived directly from the classes above. Each line prevents a class already obse
 
 ## Appendix B — Recurring Root Causes
 
-The 19 classes reduce to five underlying causes. Useful when classifying a *new* defect
+The 20 classes reduce to five underlying causes. Useful when classifying a *new* defect
 that does not obviously match a class above.
 
 1. **A guarantee was asserted, not enforced.** Comments, docs, and conventions standing in
@@ -640,4 +681,5 @@ that does not obviously match a class above.
 4. **The local fix was cheaper than the right fix,** and the incentive gradient always
    points there. → §9, §14, §18
 5. **An implicit assumption escaped its context.** Runtime, concurrency, or wiring
-   conditions invisible at the call site. → §8, §15, §16, §17
+   conditions invisible at the call site — including the assumption that an artifact
+   still belongs to you after it leaves the machine. → §8, §15, §16, §17, §20
