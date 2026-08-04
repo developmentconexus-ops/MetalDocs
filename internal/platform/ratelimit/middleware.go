@@ -216,7 +216,7 @@ func writeRateLimitError(w http.ResponseWriter, quota, retryAfterSec int) {
 	// the legacy body carried is preserved via the standard Retry-After header
 	// plus the human-readable detail string.
 	w.Header().Set("Retry-After", strconv.Itoa(retryAfterSec))
-	prob := problem.New(http.StatusTooManyRequests, problem.CodeRateLimited, "Too many requests").
+	prob := problem.New(http.StatusTooManyRequests, problem.CodeRateLimitExceeded, "Too many requests").
 		WithDetail(fmt.Sprintf("Rate limit of %d requests per minute exceeded; retry after %d seconds.", quota, retryAfterSec))
 	_ = problem.Write(w, prob)
 }

@@ -31,7 +31,7 @@ func TestMetricsHandler_MethodNotAllowedIsProblemJSON(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body.Code != problem.CodeMethodNotAllowed {
-		t.Fatalf("code = %q, want %q", body.Code, problem.CodeMethodNotAllowed)
+	if body.Code != problem.CodeRequestMethodNotAllowed {
+		t.Fatalf("code = %q, want %q", body.Code, problem.CodeRequestMethodNotAllowed)
 	}
 }

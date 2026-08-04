@@ -44,7 +44,7 @@ func TestMethodNotAllowedJSON_RewritesStdlib405(t *testing.T) {
 		t.Fatalf("Allow = %q, want it to contain GET", allow)
 	}
 	m := decodeProblem(t, rec.Body.Bytes())
-	if m["code"] != "METHOD_NOT_ALLOWED" {
+	if m["code"] != "request.method_not_allowed" {
 		t.Fatalf("code = %v, want METHOD_NOT_ALLOWED", m["code"])
 	}
 }
@@ -61,7 +61,7 @@ func TestMethodNotAllowedJSON_RewritesStdlib404(t *testing.T) {
 		t.Fatalf("Content-Type = %q, want application/problem+json", ct)
 	}
 	m := decodeProblem(t, rec.Body.Bytes())
-	if m["code"] != "NOT_FOUND" {
+	if m["code"] != "notfound.resource" {
 		t.Fatalf("code = %v, want NOT_FOUND", m["code"])
 	}
 }
@@ -72,7 +72,7 @@ func TestMethodNotAllowedJSON_PassesThroughHandcodedProblem(t *testing.T) {
 		w.Header().Set("Allow", "GET")
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(http.StatusMethodNotAllowed)
-		_, _ = w.Write([]byte(`{"code":"METHOD_NOT_ALLOWED","title":"hand"}`))
+		_, _ = w.Write([]byte(`{"code":"request.method_not_allowed","title":"hand"}`))
 	})
 	h := MethodNotAllowedJSON(mux)
 	rec := httptest.NewRecorder()

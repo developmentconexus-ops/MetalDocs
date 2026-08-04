@@ -5,7 +5,7 @@
 // tests/unit/iam_people layout — exercises the actual MembershipHandler via
 // httptest against in-memory dependencies (no DB, no codegen server stubs).
 //
-//   go test ./tests/unit/iam_memberships/...
+//	go test ./tests/unit/iam_memberships/...
 //
 // Surface covered (matches OpenAPI spec at api/openapi/v1/openapi.yaml):
 //   - listAreaMemberships  — response shape contract
@@ -33,7 +33,6 @@ import (
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
-
 
 const (
 	tenantAlpha = "11111111-1111-1111-1111-111111111111"
@@ -607,7 +606,7 @@ func TestGrantMembership_DuplicateReturns409(t *testing.T) {
 	if err := json.Unmarshal(rec2.Body.Bytes(), &p); err != nil {
 		t.Fatalf("decode problem: %v body=%s", err, rec2.Body.String())
 	}
-	if p.Code != "MEMBERSHIP_EXISTS" || p.Status != http.StatusConflict {
+	if p.Code != "conflict.membership_exists" || p.Status != http.StatusConflict {
 		t.Errorf("problem code=%q status=%d want MEMBERSHIP_EXISTS/409", p.Code, p.Status)
 	}
 	// Only one audit event (the first successful grant).

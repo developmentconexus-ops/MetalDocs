@@ -191,7 +191,7 @@ func TestRegisterRoutes_WrapperReturnsValidationErrorOnMalformedPathParam(t *tes
 	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode problem body: %v", err)
 	}
-	if got, _ := body["code"].(string); got != "VALIDATION_ERROR" {
+	if got, _ := body["code"].(string); got != "request.invalid" {
 		t.Fatalf("expected code VALIDATION_ERROR, got %q", got)
 	}
 }

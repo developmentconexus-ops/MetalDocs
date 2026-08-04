@@ -152,5 +152,5 @@ func normalizeOrigin(origin string) string {
 }
 
 func writeOriginError(w http.ResponseWriter) {
-	_ = problem.Write(w, problem.New(http.StatusForbidden, problem.CodeForbiddenOrigin, "Cross-site session request blocked"))
+	_ = problem.Write(w, problem.New(http.StatusForbidden, problem.CodePermissionOriginForbidden, "Cross-site session request blocked"))
 }

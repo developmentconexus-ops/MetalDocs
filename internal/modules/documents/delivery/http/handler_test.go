@@ -558,7 +558,7 @@ func TestCommitAutosave_InvalidPageCountUsesProblemEnvelope(t *testing.T) {
 	if ct := rr.Header().Get("Content-Type"); ct != "application/problem+json" {
 		t.Fatalf("want application/problem+json, got %s", ct)
 	}
-	if !strings.Contains(rr.Body.String(), "VALIDATION_ERROR") {
+	if !strings.Contains(rr.Body.String(), "request.invalid") {
 		t.Fatalf("expected VALIDATION_ERROR problem, got %s", rr.Body.String())
 	}
 }

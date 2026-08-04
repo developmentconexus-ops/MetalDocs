@@ -66,7 +66,7 @@ func (h *TenantHandler) handleOnboardTenant(w http.ResponseWriter, r *http.Reque
 
 	var req iamapi.OnboardTenantRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "Invalid JSON payload"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON payload"))
 		return
 	}
 
@@ -78,7 +78,7 @@ func (h *TenantHandler) handleOnboardTenant(w http.ResponseWriter, r *http.Reque
 	actorID := authenticatedActor(r)
 	actorTenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "internal server error"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 
@@ -115,16 +115,16 @@ func mustParseTenantUUID(id string) openapi_types.UUID {
 func (h *TenantHandler) writeOnboardError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, iamdomain.ErrTenantOnboardValidation):
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, err.Error()))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
 	case errors.Is(err, iamdomain.ErrTenantSlugConflict):
-		h.writeProblem(w, problem.New(http.StatusConflict, problem.CodeConflict, "Tenant slug already exists"))
+		h.writeProblem(w, problem.New(http.StatusConflict, problem.CodeConflictGeneric, "Tenant slug already exists"))
 	case errors.Is(err, iamdomain.ErrTenantAdminUserConflict):
-		h.writeProblem(w, problem.New(http.StatusConflict, problem.CodeConflict, "Admin user already exists"))
+		h.writeProblem(w, problem.New(http.StatusConflict, problem.CodeConflictGeneric, "Admin user already exists"))
 	case isCapabilityDenied(err):
-		h.writeProblem(w, problem.New(http.StatusForbidden, problem.CodeForbiddenCapability, "tenant.onboard capability required"))
+		h.writeProblem(w, problem.New(http.StatusForbidden, problem.CodePermissionCapabilityDenied, "tenant.onboard capability required"))
 	default:
 		slog.Error("iam: onboard tenant failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to onboard tenant"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to onboard tenant"))
 	}
 }
 
@@ -167,7 +167,7 @@ func (h *TenantHandler) handleLifecycleRequest(w http.ResponseWriter, r *http.Re
 	actorID := authenticatedActor(r)
 	actorTenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "internal server error"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 
@@ -180,7 +180,7 @@ func (h *TenantHandler) handleLifecycleRequest(w http.ResponseWriter, r *http.Re
 	jobUUID, err := uuid.Parse(jobID)
 	if err != nil {
 		slog.Error("iam: tenant lifecycle service returned a non-UUID job id", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "internal server error"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 
@@ -192,15 +192,15 @@ func (h *TenantHandler) handleLifecycleRequest(w http.ResponseWriter, r *http.Re
 func (h *TenantHandler) writeLifecycleError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, iamdomain.ErrTenantNotFound):
-		h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFound, "Tenant not found"))
+		h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Tenant not found"))
 	case errors.Is(err, iamdomain.ErrTenantAlreadyErased):
-		h.writeProblem(w, problem.New(http.StatusConflict, problem.CodeConflict, "Tenant already erased"))
+		h.writeProblem(w, problem.New(http.StatusConflict, problem.CodeConflictGeneric, "Tenant already erased"))
 	case errors.Is(err, iamdomain.ErrTenantOnboardValidation):
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, err.Error()))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
 	case isCapabilityDenied(err):
-		h.writeProblem(w, problem.New(http.StatusForbidden, problem.CodeForbiddenCapability, "tenant.export or tenant.erase capability required"))
+		h.writeProblem(w, problem.New(http.StatusForbidden, problem.CodePermissionCapabilityDenied, "tenant.export or tenant.erase capability required"))
 	default:
 		slog.Error("iam: tenant lifecycle request failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to request tenant lifecycle action"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to request tenant lifecycle action"))
 	}
 }

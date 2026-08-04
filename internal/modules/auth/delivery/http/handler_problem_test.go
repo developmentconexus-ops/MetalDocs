@@ -36,8 +36,8 @@ func TestAuthHandler_UnauthorizedIsProblemJSON(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if body.Code.String() != "AUTH_UNAUTHORIZED" {
-		t.Fatalf("code = %q, want %q", body.Code, "AUTH_UNAUTHORIZED")
+	if body.Code.String() != "auth.unauthenticated" {
+		t.Fatalf("code = %q, want %q", body.Code, "auth.unauthenticated")
 	}
 }
 

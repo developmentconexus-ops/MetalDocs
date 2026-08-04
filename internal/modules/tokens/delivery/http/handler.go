@@ -39,8 +39,8 @@ type UpdateCommand = application.UpdateCommand
 // makes that a build break, so they now reference the catalog registrations —
 // same wire strings, same statuses, one declaration site.
 var (
-	CodeTokenAlreadyExists  = problem.CodeAlreadyExists
-	CodeTokenNotFound       = problem.CodeNotFound
+	CodeTokenAlreadyExists  = problem.CodeConflictAlreadyExists
+	CodeTokenNotFound       = problem.CodeNotFoundResource
 	CodeTokenImmutableField = problem.RegisterLegacy("tokens", "immutable_field", 422)
 	CodeTokenReservedName   = problem.RegisterLegacy("tokens", "reserved_name", 422)
 )
@@ -74,7 +74,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		BaseRouter: mux,
 		BaseURL:    "/api/v1",
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, err.Error())
+			httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, err.Error())
 		},
 	})
 }
@@ -85,14 +85,14 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 func (h *Handler) ListTokens(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
 		return
 	}
 
 	items, err := h.svc.List(r.Context(), tenantID)
 	if err != nil {
 		slog.Error("tokens: list", "err", err)
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
 		return
 	}
 
@@ -107,13 +107,13 @@ func (h *Handler) ListTokens(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) CreateToken(w http.ResponseWriter, r *http.Request) {
 	var body tokensapi.CreateTokenJSONRequestBody
 	if err := strictjson.Decode(r, &body); err != nil {
-		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, "invalid JSON payload")
+		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "invalid JSON payload")
 		return
 	}
 
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
 		return
 	}
 	actorID, _ := authn.UserIDFromContext(r.Context())
@@ -137,7 +137,7 @@ func (h *Handler) CreateToken(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetToken(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
 		return
 	}
 
@@ -153,13 +153,13 @@ func (h *Handler) GetToken(w http.ResponseWriter, r *http.Request, id openapi_ty
 func (h *Handler) UpdateToken(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	var body tokensapi.UpdateTokenJSONRequestBody
 	if err := strictjson.Decode(r, &body); err != nil {
-		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, "invalid JSON payload")
+		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "invalid JSON payload")
 		return
 	}
 
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
 		return
 	}
 	actorID, _ := authn.UserIDFromContext(r.Context())
@@ -184,7 +184,7 @@ func (h *Handler) UpdateToken(w http.ResponseWriter, r *http.Request, id openapi
 func (h *Handler) DeleteToken(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
 		return
 	}
 	actorID, _ := authn.UserIDFromContext(r.Context())
@@ -213,14 +213,14 @@ func (h *Handler) writeTokenError(w http.ResponseWriter, err error) {
 			New(http.StatusUnprocessableEntity, CodeTokenReservedName, "name is reserved by a native token").
 			WithFieldError("name", CodeTokenReservedName, "name collides with a built-in token; choose another"))
 	case errors.As(err, &valErr):
-		httpresponse.WriteError(w, http.StatusUnprocessableEntity, problem.CodeValidationError, valErr.Error())
+		httpresponse.WriteError(w, http.StatusUnprocessableEntity, problem.CodeRequestInvalid, valErr.Error())
 	case errors.As(err, &pgErr) && pgErr.Code == "23505":
 		httpresponse.WriteError(w, http.StatusConflict, CodeTokenAlreadyExists, "token name already exists for this tenant")
 	case errors.As(err, &pgErr) && pgErr.Code == "23514":
-		httpresponse.WriteError(w, http.StatusUnprocessableEntity, problem.CodeValidationError, "request violates data constraints")
+		httpresponse.WriteError(w, http.StatusUnprocessableEntity, problem.CodeRequestInvalid, "request violates data constraints")
 	default:
 		slog.Error("tokens: handler error", "err", err)
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
 	}
 }
 

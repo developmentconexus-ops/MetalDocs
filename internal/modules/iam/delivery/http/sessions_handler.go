@@ -103,12 +103,12 @@ func (h *SessionsHandler) handleSessions(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if h.sessions == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalError, "Sessions service is not configured"))
+		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "Sessions service is not configured"))
 		return
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthorized, "Authentication required"))
+		h.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
 		return
 	}
 
@@ -121,7 +121,7 @@ func (h *SessionsHandler) handleSessions(w http.ResponseWriter, r *http.Request)
 	if v := strings.TrimSpace(r.URL.Query().Get("is_active")); v != "" {
 		active, perr := strconv.ParseBool(v)
 		if perr != nil {
-			h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "is_active must be a boolean"))
+			h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "is_active must be a boolean"))
 			return
 		}
 		q.IncludeRevoked = !active
@@ -136,7 +136,7 @@ func (h *SessionsHandler) handleSessions(w http.ResponseWriter, r *http.Request)
 	if v := strings.TrimSpace(r.URL.Query().Get("limit")); v != "" {
 		limit, perr := strconv.Atoi(v)
 		if perr != nil || limit < 1 || limit > 100 {
-			h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "limit must be between 1 and 100"))
+			h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "limit must be between 1 and 100"))
 			return
 		}
 		requestedLimit = limit
@@ -146,7 +146,7 @@ func (h *SessionsHandler) handleSessions(w http.ResponseWriter, r *http.Request)
 	items, err := h.sessions.ListActiveSessions(r.Context(), q)
 	if err != nil {
 		slog.Error("iam sessions: list failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to list sessions"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to list sessions"))
 		return
 	}
 
@@ -223,18 +223,18 @@ func (h *SessionsHandler) handleSessionByID(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if h.sessions == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalError, "Sessions service is not configured"))
+		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "Sessions service is not configured"))
 		return
 	}
 	sessionID := strings.TrimPrefix(r.URL.Path, "/api/v1/auth/sessions/")
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID == "" || strings.Contains(sessionID, "/") {
-		h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFound, "Session not found"))
+		h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Session not found"))
 		return
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthorized, "Authentication required"))
+		h.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
 		return
 	}
 
@@ -244,15 +244,15 @@ func (h *SessionsHandler) handleSessionByID(w http.ResponseWriter, r *http.Reque
 	session, err := h.sessions.FindSession(r.Context(), sessionID)
 	if err != nil {
 		if errors.Is(err, authdomain.ErrSessionNotFound) {
-			h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFound, "Session not found"))
+			h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Session not found"))
 			return
 		}
 		slog.Error("iam sessions: find failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to revoke session"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to revoke session"))
 		return
 	}
 	if session.TenantID != tenantID {
-		h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFound, "Session not found"))
+		h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Session not found"))
 		return
 	}
 
@@ -286,22 +286,22 @@ func (h *SessionsHandler) handleSessionByID(w http.ResponseWriter, r *http.Reque
 		}, actor)
 		if err != nil {
 			if errors.Is(err, authdomain.ErrSessionNotFound) {
-				h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFound, "Session not found"))
+				h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Session not found"))
 				return
 			}
 			slog.Error("iam sessions: revoke failed", "err", err)
-			h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to revoke session"))
+			h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to revoke session"))
 			return
 		}
 	} else {
 		now := h.now()
 		if err := h.sessions.RevokeSession(r.Context(), sessionID, now); err != nil {
 			if errors.Is(err, authdomain.ErrSessionNotFound) {
-				h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFound, "Session not found"))
+				h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Session not found"))
 				return
 			}
 			slog.Error("iam sessions: revoke failed", "err", err)
-			h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to revoke session"))
+			h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to revoke session"))
 			return
 		}
 	}

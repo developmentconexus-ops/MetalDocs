@@ -103,7 +103,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 			middleware,
 		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			writeError(w, http.StatusBadRequest, problem.CodeValidationError, err.Error())
+			writeError(w, http.StatusBadRequest, problem.CodeRequestInvalid, err.Error())
 		},
 	})
 }

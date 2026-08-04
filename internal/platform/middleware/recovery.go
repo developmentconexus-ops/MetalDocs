@@ -43,7 +43,7 @@ func Recovery(next http.Handler) http.Handler {
 			// Best effort: if the handler already started writing the
 			// response this produces a corrupt body, which is still
 			// preferable to a silently dropped connection.
-			_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Internal server error"))
+			_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Internal server error"))
 		}()
 		next.ServeHTTP(w, r)
 	})

@@ -94,7 +94,7 @@ func FromValidation(fields []FieldError) *Problem {
 	return &Problem{
 		Title:  "Validation failed",
 		Status: http.StatusBadRequest,
-		Code:   CodeValidationError,
+		Code:   CodeRequestInvalid,
 		Errors: fields,
 	}
 }

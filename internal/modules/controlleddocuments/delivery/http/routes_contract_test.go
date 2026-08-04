@@ -414,7 +414,7 @@ func TestWriteDomainError_ActorMissingIs401(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("unmarshal: %v; body=%s", err, rec.Body.String())
 	}
-	if body.Code != "UNAUTHENTICATED" {
+	if body.Code != "auth.unauthenticated" {
 		t.Fatalf("code = %q, want UNAUTHENTICATED", body.Code)
 	}
 }
@@ -468,7 +468,7 @@ func TestWriteDomainError_TemplateArtifactInvariantUnconfiguredIs500(t *testing.
 // PeekSeq's "authz check preview code: %w") must surface as 403 FORBIDDEN_CAPABILITY
 // problem+json — never the default 500 INTERNAL_ERROR. Mirrors the documents-module
 // mapErr convention (errors.As(&authz.ErrCapDenied) → StatusForbidden /
-// CodeForbiddenCapability) so both PDP tiers map to the same client-visible code.
+// CodePermissionCapabilityDenied) so both PDP tiers map to the same client-visible code.
 func TestWriteDomainError_CapabilityDeniedIs403(t *testing.T) {
 	handler := &Handler{}
 	rec := httptest.NewRecorder()
@@ -495,8 +495,8 @@ func TestWriteDomainError_CapabilityDeniedIs403(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("unmarshal: %v; body=%s", err, rec.Body.String())
 	}
-	if body.Code != problem.CodeForbiddenCapability.String() {
-		t.Fatalf("code = %q, want %q", body.Code, problem.CodeForbiddenCapability)
+	if body.Code != problem.CodePermissionCapabilityDenied.String() {
+		t.Fatalf("code = %q, want %q", body.Code, problem.CodePermissionCapabilityDenied)
 	}
 }
 
@@ -1189,7 +1189,7 @@ func TestActiveDocument_ServiceError_Returns500(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body["code"] != "INTERNAL_ERROR" {
+	if body["code"] != "internal.unknown" {
 		t.Fatalf("code = %v, want INTERNAL_ERROR", body["code"])
 	}
 }
@@ -1216,7 +1216,7 @@ func TestPostControlledDocuments_MissingIdempotencyKey_400(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("unmarshal: %v; body=%s", err, rec.Body.String())
 	}
-	if body["code"] != "IDEMPOTENCY_KEY_REQUIRED" {
+	if body["code"] != "request.idempotency_key_required" {
 		t.Fatalf("code = %v, want IDEMPOTENCY_KEY_REQUIRED", body["code"])
 	}
 }

@@ -120,10 +120,10 @@ func Require(store *Store, actorFromCtx func(context.Context) (string, string), 
 			key := r.Header.Get("Idempotency-Key")
 			switch err := ValidateKey(key); {
 			case errors.Is(err, ErrKeyRequired):
-				writeErrJSON(w, 400, problem.CodeIdempotencyKeyRequired, "Idempotency-Key header required")
+				writeErrJSON(w, 400, problem.CodeRequestIdempotencyKeyRequired, "Idempotency-Key header required")
 				return
 			case errors.Is(err, ErrKeyInvalid):
-				writeErrJSON(w, 400, problem.CodeIdempotencyKeyInvalid, "Idempotency-Key must be a UUID")
+				writeErrJSON(w, 400, problem.CodeRequestIdempotencyKeyInvalid, "Idempotency-Key must be a UUID")
 				return
 			}
 
@@ -137,19 +137,21 @@ func Require(store *Store, actorFromCtx func(context.Context) (string, string), 
 					writeErrJSON(w, http.StatusRequestEntityTooLarge, problem.CodeRequestBodyTooLarge, "request body exceeds 1 MiB limit")
 					return
 				}
-				writeErrJSON(w, 400, problem.CodeValidationError, "cannot read body")
+				writeErrJSON(w, 400, problem.CodeRequestInvalid, "cannot read body")
 				return
 			}
 
 			handle, replay, err := store.BeginReplay(r.Context(), tenantID, actorID, key, hash)
 			if errors.Is(err, ErrConflict) {
-				writeErrJSON(w, 422, problem.CodeIdempotencyKeyReused, "key reused with different payload")
+				// 409, not the pre-ADR-0089 422: the status is bound to
+				// conflict.idempotency_key_reused at registration (annex R-8).
+				writeErrJSON(w, http.StatusConflict, problem.CodeConflictIdempotencyKeyReused, "key reused with different payload")
 				return
 			}
 			if err != nil {
 				slog.ErrorContext(r.Context(), "idempotency: begin failed",
 					"key", key, "tenant", tenantID, "err", err)
-				writeErrJSON(w, 500, problem.CodeInternalError, "idempotency check failed")
+				writeErrJSON(w, 500, problem.CodeInternalUnknown, "idempotency check failed")
 				return
 			}
 			if replay != nil {

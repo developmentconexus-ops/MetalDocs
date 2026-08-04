@@ -84,13 +84,13 @@ func (h *Handler) ServeSnapshot(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "tenant context missing"))
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "tenant context missing"))
 		return
 	}
 	items, err := h.repo.Snapshot(r.Context(), tenantID, time.Now().UTC())
 	if err != nil {
 		h.log.Warn("presence: snapshot failed", "tenant_id", tenantID, "err", err)
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "snapshot failed"))
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "snapshot failed"))
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, toPresenceSnapshotResponse(items))
@@ -120,7 +120,7 @@ func toPresenceSnapshotResponse(items []Item) iamapi.PresenceSnapshotResponse {
 func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "tenant context missing"))
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "tenant context missing"))
 		return
 	}
 

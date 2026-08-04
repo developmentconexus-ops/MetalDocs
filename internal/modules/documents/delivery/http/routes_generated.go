@@ -223,5 +223,5 @@ func (h *Handler) ViewDocument(w http.ResponseWriter, r *http.Request, id openap
 // registration that HandlerWithOptions's unconditional route mounting no
 // longer allows.
 func writeNotFound(w http.ResponseWriter, r *http.Request) {
-	_ = problem.Write(w, problem.New(http.StatusNotFound, problem.CodeNotFound, "not found"))
+	_ = problem.Write(w, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "not found"))
 }

@@ -13,8 +13,8 @@ import (
 
 	"metaldocs/internal/modules/approval/application"
 	"metaldocs/internal/modules/approval/domain"
-	approvalsignature "metaldocs/internal/modules/approval/infrastructure/signature"
 	"metaldocs/internal/modules/approval/infrastructure"
+	approvalsignature "metaldocs/internal/modules/approval/infrastructure/signature"
 	v2dom "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/problem"
@@ -182,7 +182,7 @@ func TestMapErrorToResponse(t *testing.T) {
 			name:       "authz capability denied",
 			err:        fmt.Errorf("wrap: %w", authz.ErrCapDenied{Capability: "x", AreaCode: "tenant", ActorID: "u1"}),
 			wantStatus: http.StatusForbidden,
-			wantCode:   "authz.capability_denied",
+			wantCode:   "permission.capability_denied",
 			wantTitle:  "wrap: authz: capability \"x\" denied for actor \"u1\" in area \"tenant\"",
 		},
 		{
@@ -227,7 +227,7 @@ func TestMapErrorToResponse(t *testing.T) {
 				return json.Unmarshal([]byte("{"), &v)
 			}(),
 			wantStatus: http.StatusBadRequest,
-			wantCode:   "validation.json_decode",
+			wantCode:   "request.json_decode",
 			wantTitle:  "unexpected end of JSON input",
 		},
 		{
@@ -246,7 +246,7 @@ func TestMapErrorToResponse(t *testing.T) {
 			name:       "io EOF",
 			err:        io.EOF,
 			wantStatus: http.StatusBadRequest,
-			wantCode:   "validation.empty_body",
+			wantCode:   "request.empty_body",
 			wantTitle:  io.EOF.Error(),
 		},
 		{
@@ -267,7 +267,7 @@ func TestMapErrorToResponse(t *testing.T) {
 			name:       "strictjson empty body",
 			err:        strictjson.ErrEmptyBody,
 			wantStatus: http.StatusBadRequest,
-			wantCode:   "validation.empty_body",
+			wantCode:   "request.empty_body",
 			wantTitle:  strictjson.ErrEmptyBody.Error(),
 		},
 		{

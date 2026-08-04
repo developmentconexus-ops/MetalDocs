@@ -271,8 +271,8 @@ func TestSignoffHandler_NonUUIDIdempotencyKey(t *testing.T) {
 	if err := json.NewDecoder(rr.Body).Decode(&out); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if out.Code != problem.CodeIdempotencyKeyInvalid {
-		t.Fatalf("error.code = %q, want %q", out.Code, problem.CodeIdempotencyKeyInvalid)
+	if out.Code != problem.CodeRequestIdempotencyKeyInvalid {
+		t.Fatalf("error.code = %q, want %q", out.Code, problem.CodeRequestIdempotencyKeyInvalid)
 	}
 	if fakeSvc.calls != 0 {
 		t.Fatalf("decision service ran %d times, want 0 (rejected before processing)", fakeSvc.calls)
@@ -508,8 +508,8 @@ func TestSignoffByDocumentHandler_NonUUIDIdempotencyKey(t *testing.T) {
 	if err := json.NewDecoder(rr.Body).Decode(&out); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if out.Code != problem.CodeIdempotencyKeyInvalid {
-		t.Fatalf("error.code = %q, want %q", out.Code, problem.CodeIdempotencyKeyInvalid)
+	if out.Code != problem.CodeRequestIdempotencyKeyInvalid {
+		t.Fatalf("error.code = %q, want %q", out.Code, problem.CodeRequestIdempotencyKeyInvalid)
 	}
 	if decisionSvc.calls != 0 {
 		t.Fatalf("decision service ran %d times, want 0", decisionSvc.calls)

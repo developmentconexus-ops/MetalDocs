@@ -16,34 +16,34 @@ import (
 // only by the registry, so a catalog code is a `var`, and an alias to one cannot
 // be `const`. Bindings are unchanged; annex §2.3 re-points them in step 11.
 var (
-	codeTplNotFound               = problem.CodeNotFound
-	codeTplKeyConflict            = problem.CodeAlreadyExists
+	codeTplNotFound               = problem.CodeNotFoundResource
+	codeTplKeyConflict            = problem.CodeConflictAlreadyExists
 	codeTplInvalidStateTransition = problem.CodeStateTransitionInvalid
-	codeTplStaleBase              = problem.CodeStaleBase
-	codeTplStaleLockVersion       = problem.CodeConcurrentModification
-	codeTplContentHashMismatch    = problem.CodeConflict
-	codeTplUploadMissing          = problem.CodeUploadMissing
+	codeTplStaleBase              = problem.CodeConflictStaleBase
+	codeTplStaleLockVersion       = problem.CodeConflictConcurrentModification
+	codeTplContentHashMismatch    = problem.CodeConflictGeneric
+	codeTplUploadMissing          = problem.CodeStateUploadMissing
 	codeTplUploadTooLarge         = problem.CodeRequestBodyTooLarge
-	codeTplISOSegregation         = problem.CodeISOSegregationViolation
-	codeTplForbidden              = problem.CodeAuthForbidden
-	codeTplSystemImmutable        = problem.CodeSystemTemplateImmutable
+	codeTplISOSegregation         = problem.CodePermissionISOSegregationViolation
+	codeTplForbidden              = problem.CodePermissionDenied
+	codeTplSystemImmutable        = problem.CodeStateSystemTemplateImmutable
 	codeTplArchived               = problem.CodeStateTransitionInvalid
-	codeTplPlaceholderNameInvalid = problem.CodeValidationError
-	codeTplDuplicatePlaceholder   = problem.CodeAlreadyExists
-	codeTplInternalError          = problem.CodeInternalError
-	codeTplInvalidRequest         = problem.CodeValidationError
-	codeTplInvalidBody            = problem.CodeValidationError
-	codeTplInvalidLimit           = problem.CodeValidationError
-	codeTplInvalidParam           = problem.CodeValidationError
+	codeTplPlaceholderNameInvalid = problem.CodeRequestInvalid
+	codeTplDuplicatePlaceholder   = problem.CodeConflictAlreadyExists
+	codeTplInternalError          = problem.CodeInternalUnknown
+	codeTplInvalidRequest         = problem.CodeRequestInvalid
+	codeTplInvalidBody            = problem.CodeRequestInvalid
+	codeTplInvalidLimit           = problem.CodeRequestInvalid
+	codeTplInvalidParam           = problem.CodeRequestInvalid
 
 	// Approval-kernel entry point codes (M3 P3.S2b-4, R2a): the thin
 	// submit-for-approval/signoff handlers delegate to
 	// approval/application's kernel services and classify the published
 	// (application-layer) error surface here — never approval/infrastructure,
 	// per the module-boundary allow-model.
-	codeTplApprovalRouteMissing = problem.CodeApprovalRouteMissing
-	codeTplApprovalConflict     = problem.CodeConflict
-	codeTplApprovalNotFound     = problem.CodeNotFound
+	codeTplApprovalRouteMissing = problem.CodeStateApprovalRouteMissing
+	codeTplApprovalConflict     = problem.CodeConflictGeneric
+	codeTplApprovalNotFound     = problem.CodeNotFoundResource
 )
 
 // MapErr translates a domain/application error from the templates module into
@@ -75,7 +75,7 @@ func MapErr(err error) (httpStatus int, code problem.Code) {
 	case errors.Is(err, domain.ErrISOSegregationViolation):
 		return http.StatusForbidden, codeTplISOSegregation
 	case errors.As(err, new(iamauthz.ErrCapDenied)):
-		return http.StatusForbidden, problem.CodeForbiddenCapability
+		return http.StatusForbidden, problem.CodePermissionCapabilityDenied
 	case errors.Is(err, domain.ErrForbidden):
 		return http.StatusForbidden, codeTplForbidden
 	case errors.Is(err, domain.ErrSystemTemplateImmutable):
@@ -125,7 +125,7 @@ func MapErr(err error) (httpStatus int, code problem.Code) {
 	case errors.Is(err, approvalapp.ErrContentHashMismatch):
 		return http.StatusConflict, codeTplContentHashMismatch
 	case errors.Is(err, approvalapp.ErrIdempotencyKeyRequired):
-		return http.StatusBadRequest, problem.CodeIdempotencyKeyRequired
+		return http.StatusBadRequest, problem.CodeRequestIdempotencyKeyRequired
 	case errors.Is(err, approvaldomain.ErrEmptyEligiblePool):
 		return http.StatusUnprocessableEntity, codeTplApprovalConflict
 	case errors.Is(err, approvaldomain.ErrSubmitChoiceRequired):
@@ -140,9 +140,9 @@ func MapErr(err error) (httpStatus int, code problem.Code) {
 	case errors.Is(err, approvaldomain.ErrNoActiveStage):
 		return http.StatusConflict, codeTplApprovalConflict
 	case errors.Is(err, approvaldomain.ErrActorNotEligible):
-		return http.StatusForbidden, problem.CodeForbiddenCapability
+		return http.StatusForbidden, problem.CodePermissionCapabilityDenied
 	case errors.Is(err, approvaldomain.ErrAuthorCannotSign):
-		return http.StatusForbidden, problem.CodeForbiddenCapability
+		return http.StatusForbidden, problem.CodePermissionCapabilityDenied
 	default:
 		return http.StatusInternalServerError, codeTplInternalError
 	}

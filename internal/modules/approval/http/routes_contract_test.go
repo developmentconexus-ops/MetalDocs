@@ -95,11 +95,13 @@ func TestGeneratedApprovalRoutes_IdempotencyStoreEngaged(t *testing.T) {
 
 	mux.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("expected 422 from the scripted idempotency conflict, got %d body=%s", rr.Code, rr.Body.String())
+	// 409, not 422: ADR 0089 binds the status to
+	// conflict.idempotency_key_reused at registration (annex R-8).
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("expected 409 from the scripted idempotency conflict, got %d body=%s", rr.Code, rr.Body.String())
 	}
-	if body := rr.Body.String(); !bytes.Contains([]byte(body), []byte("IDEMPOTENCY_KEY_REUSED")) {
-		t.Fatalf("expected IDEMPOTENCY_KEY_REUSED from the idempotency store path, got body=%s", body)
+	if body := rr.Body.String(); !bytes.Contains([]byte(body), []byte("conflict.idempotency_key_reused")) {
+		t.Fatalf("expected conflict.idempotency_key_reused from the idempotency store path, got body=%s", body)
 	}
 }
 
@@ -128,7 +130,7 @@ func TestGeneratedApprovalRoutes_NonIdempotentRouteSkipsStore(t *testing.T) {
 
 	mux.ServeHTTP(rr, req)
 
-	if body := rr.Body.String(); bytes.Contains([]byte(body), []byte("IDEMPOTENCY_KEY_REUSED")) {
+	if body := rr.Body.String(); bytes.Contains([]byte(body), []byte("conflict.idempotency_key_reused")) {
 		t.Fatalf("non-idempotent route unexpectedly went through the generic idempotency store: status=%d body=%s", rr.Code, body)
 	}
 }

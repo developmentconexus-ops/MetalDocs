@@ -80,8 +80,8 @@ func TestPreviewCode_NonMember_Returns403(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("unmarshal: %v; body=%s", err, rec.Body.String())
 	}
-	if body.Code != problem.CodeForbiddenCapability.String() {
-		t.Fatalf("code = %q, want %q", body.Code, problem.CodeForbiddenCapability)
+	if body.Code != problem.CodePermissionCapabilityDenied.String() {
+		t.Fatalf("code = %q, want %q", body.Code, problem.CodePermissionCapabilityDenied)
 	}
 }
 

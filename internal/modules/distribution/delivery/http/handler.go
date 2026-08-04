@@ -48,7 +48,7 @@ func (h *Handler) GetDocumentDistribution(
 	if !ok {
 		return distributionapi.GetDocumentDistribution404ApplicationProblemPlusJSONResponse{
 			NotFoundApplicationProblemPlusJSONResponse: distributionapi.NotFoundApplicationProblemPlusJSONResponse(
-				toProblem(problem.New(http.StatusNotFound, problem.CodeNotFound, "Document not found")),
+				toProblem(problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Document not found")),
 			),
 		}, nil
 	}
@@ -60,7 +60,7 @@ func (h *Handler) GetDocumentDistribution(
 		slog.Error("distribution.GetDocumentDistribution", "error", err)
 		return distributionapi.GetDocumentDistribution500ApplicationProblemPlusJSONResponse{
 			InternalServerErrorApplicationProblemPlusJSONResponse: distributionapi.InternalServerErrorApplicationProblemPlusJSONResponse(
-				toProblem(problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Internal server error")),
+				toProblem(problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Internal server error")),
 			),
 		}, nil
 	}
@@ -80,7 +80,7 @@ func (h *Handler) ListDocumentDistributionRecipients(
 	if !ok {
 		return distributionapi.ListDocumentDistributionRecipients404ApplicationProblemPlusJSONResponse{
 			NotFoundApplicationProblemPlusJSONResponse: distributionapi.NotFoundApplicationProblemPlusJSONResponse(
-				toProblem(problem.New(http.StatusNotFound, problem.CodeNotFound, "Document not found")),
+				toProblem(problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Document not found")),
 			),
 		}, nil
 	}
@@ -101,14 +101,14 @@ func (h *Handler) ListDocumentDistributionRecipients(
 		if errors.Is(err, pagination.ErrInvalidCursor) {
 			return distributionapi.ListDocumentDistributionRecipients400ApplicationProblemPlusJSONResponse{
 				BadRequestApplicationProblemPlusJSONResponse: distributionapi.BadRequestApplicationProblemPlusJSONResponse(
-					toProblem(problem.New(http.StatusBadRequest, problem.CodeInvalidCursor, "Invalid cursor")),
+					toProblem(problem.New(http.StatusBadRequest, problem.CodeRequestCursorInvalid, "Invalid cursor")),
 				),
 			}, nil
 		}
 		slog.Error("distribution.ListDocumentDistributionRecipients", "error", err)
 		return distributionapi.ListDocumentDistributionRecipients500ApplicationProblemPlusJSONResponse{
 			InternalServerErrorApplicationProblemPlusJSONResponse: distributionapi.InternalServerErrorApplicationProblemPlusJSONResponse(
-				toProblem(problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Internal server error")),
+				toProblem(problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Internal server error")),
 			),
 		}, nil
 	}
@@ -150,7 +150,7 @@ func (h *Handler) GetDocumentDistributionCoverage(
 	if !ok {
 		return distributionapi.GetDocumentDistributionCoverage404ApplicationProblemPlusJSONResponse{
 			NotFoundApplicationProblemPlusJSONResponse: distributionapi.NotFoundApplicationProblemPlusJSONResponse(
-				toProblem(problem.New(http.StatusNotFound, problem.CodeNotFound, "Document not found")),
+				toProblem(problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Document not found")),
 			),
 		}, nil
 	}
@@ -162,7 +162,7 @@ func (h *Handler) GetDocumentDistributionCoverage(
 		slog.Error("distribution.GetDocumentDistributionCoverage", "error", err)
 		return distributionapi.GetDocumentDistributionCoverage500ApplicationProblemPlusJSONResponse{
 			InternalServerErrorApplicationProblemPlusJSONResponse: distributionapi.InternalServerErrorApplicationProblemPlusJSONResponse(
-				toProblem(problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Internal server error")),
+				toProblem(problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Internal server error")),
 			),
 		}, nil
 	}

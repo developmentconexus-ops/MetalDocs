@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"metaldocs/internal/modules/templates/domain"
 	templatesapi "metaldocs/internal/modules/templates/api"
+	"metaldocs/internal/modules/templates/domain"
 )
 
 func TestGetSystemBlankTemplate_RequiresTemplateViewAuthz(t *testing.T) {
@@ -66,7 +66,7 @@ func TestListTemplates_LimitOver200Rejected(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Code != "VALIDATION_ERROR" {
+	if out.Code != "request.invalid" {
 		t.Fatalf("expected error.code=VALIDATION_ERROR, got %q", out.Code)
 	}
 }

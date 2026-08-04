@@ -64,20 +64,20 @@ func (h *PDFWebhookHandler) HandlePDFComplete(w http.ResponseWriter, r *http.Req
 	r.Body = http.MaxBytesReader(w, r.Body, pdfWebhookMaxBytes)
 	raw, err := io.ReadAll(r.Body)
 	if err != nil {
-		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeValidationError, "could not read request body")
+		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeRequestInvalid, "could not read request body")
 		return
 	}
 	defer r.Body.Close()
 
 	sig := r.Header.Get("X-Docgen-Signature")
 	if !validSignature(raw, sig, h.secret) {
-		writePDFWebhookErr(w, http.StatusUnauthorized, problem.CodeUnauthenticated, "invalid webhook signature")
+		writePDFWebhookErr(w, http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "invalid webhook signature")
 		return
 	}
 
 	var body pdfCompleteBody
 	if err := json.NewDecoder(bytes.NewReader(raw)).Decode(&body); err != nil {
-		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeValidationError, "invalid JSON body")
+		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeRequestInvalid, "invalid JSON body")
 		return
 	}
 	// Normalize once at the boundary so the validated form and the persisted form
@@ -86,25 +86,25 @@ func (h *PDFWebhookHandler) HandlePDFComplete(w http.ResponseWriter, r *http.Req
 	// the DB in a form that fails the (non-trimming) objectstore.assertTenant later.
 	body.FinalPDFS3Key = strings.TrimSpace(body.FinalPDFS3Key)
 	if !isValidFinalPDFS3Key(body.FinalPDFS3Key) {
-		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeValidationError, "invalid final_pdf_s3_key")
+		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeRequestInvalid, "invalid final_pdf_s3_key")
 		return
 	}
 	if body.PDFHash == "" || body.PDFGeneratedAt == "" {
-		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeValidationError, "pdf_hash and pdf_generated_at are required")
+		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeRequestInvalid, "pdf_hash and pdf_generated_at are required")
 		return
 	}
 	docID := r.PathValue("id")
 	canonicalTenantID, err := h.writer.ResolveTenantByDocumentID(r.Context(), docID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			writePDFWebhookErr(w, http.StatusNotFound, problem.CodeNotFound, "document not found")
+			writePDFWebhookErr(w, http.StatusNotFound, problem.CodeNotFoundResource, "document not found")
 			return
 		}
-		writePDFWebhookErr(w, http.StatusInternalServerError, problem.CodeInternalError, "failed to persist pdf completion")
+		writePDFWebhookErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "failed to persist pdf completion")
 		return
 	}
 	if strings.TrimSpace(body.TenantID) != "" && strings.TrimSpace(body.TenantID) != canonicalTenantID {
-		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeValidationError, "tenant_id does not match document")
+		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeRequestInvalid, "tenant_id does not match document")
 		return
 	}
 	// Full tenant-prefix guard: require the key to reside inside the canonical
@@ -113,25 +113,25 @@ func (h *PDFWebhookHandler) HandlePDFComplete(w http.ResponseWriter, r *http.Req
 	// and VerifiedStore.assertTenant cannot silently diverge. Must run AFTER
 	// ResolveTenantByDocumentID so canonicalTenantID is known.
 	if !objectstore.KeyHasTenantPrefix(canonicalTenantID, body.FinalPDFS3Key) {
-		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeValidationError, "final_pdf_s3_key outside tenant scope")
+		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeRequestInvalid, "final_pdf_s3_key outside tenant scope")
 		return
 	}
 
 	hashBytes, err := hex.DecodeString(body.PDFHash)
 	if err != nil {
-		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeValidationError, "invalid pdf_hash encoding")
+		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeRequestInvalid, "invalid pdf_hash encoding")
 		return
 	}
 
 	generatedAt, err := time.Parse(time.RFC3339, body.PDFGeneratedAt)
 	if err != nil {
-		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeValidationError, "invalid pdf_generated_at format")
+		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeRequestInvalid, "invalid pdf_generated_at format")
 		return
 	}
 	generatedAt = generatedAt.UTC()
 
 	if err := h.writer.WritePDF(r.Context(), canonicalTenantID, docID, body.FinalPDFS3Key, hashBytes, generatedAt); err != nil {
-		writePDFWebhookErr(w, http.StatusInternalServerError, problem.CodeInternalError, "failed to persist pdf completion")
+		writePDFWebhookErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "failed to persist pdf completion")
 		return
 	}
 

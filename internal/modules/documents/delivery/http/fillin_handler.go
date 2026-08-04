@@ -138,16 +138,16 @@ var ErrBadContentType = errors.New("content-type must be application/json")
 // also emits; the registry's duplicate guard forbids declaring them twice, so
 // their single registration lives in the platform catalog's shared block.
 var (
-	codeFillCapabilityDenied     = problem.CodeSharedAuthzCapabilityDenied
+	codeFillCapabilityDenied     = problem.CodePermissionCapabilityDenied
 	codeFillNotChoicePlaceholder = problem.RegisterLegacy("documents", "not_a_choice_placeholder", 400)
 	codeFillNotFoundRevision     = problem.RegisterLegacy("documents", "not_found.revision", 404)
 	codeFillNotAuthorEditable    = problem.RegisterLegacy("documents", "state.placeholder_not_author_editable", 409)
 	codeFillRevisionNotDraft     = problem.RegisterLegacy("documents", "state.revision_not_draft", 409)
 	codeFillValidationFailed     = problem.RegisterLegacy("documents", "validation.failed", 422)
-	codeFillEmptyBody            = problem.CodeSharedValidationEmptyBody
+	codeFillEmptyBody            = problem.CodeRequestEmptyBody
 	codeFillBadContentType       = problem.RegisterLegacy("documents", "validation.bad_content_type", 415)
-	codeFillJSONDecode           = problem.CodeSharedValidationJSONDecode
-	codeFillInternalUnknown      = problem.CodeSharedInternalUnknown
+	codeFillJSONDecode           = problem.CodeRequestJSONDecode
+	codeFillInternalUnknown      = problem.CodeInternalUnknown
 )
 
 // mapFillInError maps a service error to its RFC 9457 (status, code) pair. The

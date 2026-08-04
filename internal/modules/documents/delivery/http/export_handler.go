@@ -54,7 +54,7 @@ func (h *ExportHandler) exportPDF(w http.ResponseWriter, r *http.Request) {
 	docID := r.PathValue("id")
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown)
 		return
 	}
 	userID := userIDFromReq(r)
@@ -62,7 +62,7 @@ func (h *ExportHandler) exportPDF(w http.ResponseWriter, r *http.Request) {
 	req := exportPDFReq{PaperSize: "A4"}
 	if r.ContentLength != 0 {
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
+			httpErr(w, http.StatusBadRequest, problem.CodeRequestInvalid)
 			return
 		}
 		if req.PaperSize == "" {
@@ -70,7 +70,7 @@ func (h *ExportHandler) exportPDF(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !isAllowedPaperSize(req.PaperSize) {
-		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
+		httpErr(w, http.StatusBadRequest, problem.CodeRequestInvalid)
 		return
 	}
 
@@ -86,7 +86,7 @@ func (h *ExportHandler) exportPDF(w http.ResponseWriter, r *http.Request) {
 
 	signedURL, err := h.svc.SignExportURL(r.Context(), res.Export.StorageKey)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown)
 		return
 	}
 
@@ -104,7 +104,7 @@ func (h *ExportHandler) exportDocxURL(w http.ResponseWriter, r *http.Request) {
 	docID := r.PathValue("id")
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown)
 		return
 	}
 	userID := userIDFromReq(r)
@@ -132,15 +132,15 @@ func (h *ExportHandler) exportDocxURL(w http.ResponseWriter, r *http.Request) {
 func mapExportErr(err error) (int, problem.Code) {
 	switch {
 	case errors.Is(err, domain.ErrInvalidExport):
-		return http.StatusBadRequest, problem.CodeValidationError
+		return http.StatusBadRequest, problem.CodeRequestInvalid
 	case errors.Is(err, domain.ErrExportDocxMissing):
-		return http.StatusConflict, problem.CodeConflict
+		return http.StatusConflict, problem.CodeConflictGeneric
 	case errors.Is(err, domain.ErrExportGotenbergFailed):
-		return http.StatusBadGateway, problem.CodeInternalError
+		return http.StatusBadGateway, problem.CodeInternalUnknown
 	case errors.Is(err, domain.ErrNotFound):
-		return http.StatusNotFound, problem.CodeNotFound
+		return http.StatusNotFound, problem.CodeNotFoundResource
 	default:
-		return http.StatusInternalServerError, problem.CodeInternalError
+		return http.StatusInternalServerError, problem.CodeInternalUnknown
 	}
 }
 

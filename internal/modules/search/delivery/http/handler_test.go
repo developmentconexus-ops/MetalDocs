@@ -166,7 +166,7 @@ func TestHandleSearchDocumentsMethodNotAllowedIsProblemJSON(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("body not JSON: %v", err)
 	}
-	if body.Code != "METHOD_NOT_ALLOWED" {
+	if body.Code != "request.method_not_allowed" {
 		t.Fatalf("code = %q, want METHOD_NOT_ALLOWED", body.Code)
 	}
 }

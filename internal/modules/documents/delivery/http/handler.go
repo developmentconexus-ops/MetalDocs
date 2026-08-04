@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
+	approvalapp "metaldocs/internal/modules/approval/application"
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	documentsapi "metaldocs/internal/modules/documents/api"
 	"metaldocs/internal/modules/documents/application"
-	approvalapp "metaldocs/internal/modules/approval/application"
 	"metaldocs/internal/modules/documents/domain"
 	iamapp "metaldocs/internal/modules/iam/application"
 	"metaldocs/internal/modules/iam/authz"
@@ -174,7 +174,7 @@ func (h *Handler) registerRoutes(mux *http.ServeMux, rl *ratelimit.Middleware, u
 			middleware,
 		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			_ = problem.Write(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, err.Error()))
+			_ = problem.Write(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
 		},
 	})
 }
@@ -182,26 +182,26 @@ func (h *Handler) registerRoutes(mux *http.ServeMux, rl *ratelimit.Middleware, u
 func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request, params documentsapi.ListDocumentsParams) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown)
 		return
 	}
 	callerUserID := userIDFromReq(r)
 	isAdmin, err := h.isSystemAdmin(r.Context(), callerUserID, tenantID)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown)
 		return
 	}
 	opts, effectiveUserID, err := listOptionsFromParams(r, params, callerUserID, isAdmin)
 	if err != nil {
 		slog.Warn("documents listDocuments invalid query params", "err", err)
-		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
+		httpErr(w, http.StatusBadRequest, problem.CodeRequestInvalid)
 		return
 	}
 
 	items, total, hasMore, err := h.svc.ListDocumentsPaginated(r.Context(), tenantID, effectiveUserID, opts)
 	if err != nil {
 		if errors.Is(err, pagination.ErrInvalidCursor) {
-			httpErr(w, http.StatusBadRequest, problem.CodeInvalidCursor)
+			httpErr(w, http.StatusBadRequest, problem.CodeRequestCursorInvalid)
 			return
 		}
 		status, msg := mapErr(err)
@@ -220,7 +220,7 @@ func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request, params d
 	for _, d := range items {
 		s, err := toDocumentSummary(*d)
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
+			httpErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown)
 			return
 		}
 		summaries = append(summaries, s)
@@ -236,13 +236,13 @@ func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request, params d
 func (h *Handler) documentStats(w http.ResponseWriter, r *http.Request, _ documentsapi.DocumentStatsParams) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown)
 		return
 	}
 	callerUserID := userIDFromReq(r)
 	isAdmin, err := h.isSystemAdmin(r.Context(), callerUserID, tenantID)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown)
 		return
 	}
 	// DocumentStatsParams (operationId documentStats) is a strict subset of
@@ -255,7 +255,7 @@ func (h *Handler) documentStats(w http.ResponseWriter, r *http.Request, _ docume
 	opts, effectiveUserID, err := parseListOptions(r, callerUserID, isAdmin)
 	if err != nil {
 		slog.Warn("documents documentStats invalid query params", "err", err)
-		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
+		httpErr(w, http.StatusBadRequest, problem.CodeRequestInvalid)
 		return
 	}
 
@@ -435,7 +435,7 @@ func (h *Handler) getDocument(w http.ResponseWriter, r *http.Request) {
 	}
 	resp, err := toDocumentDetailResponse(*doc)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown)
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, resp)
@@ -582,11 +582,11 @@ func (h *Handler) renameDocument(w http.ResponseWriter, r *http.Request) {
 		Name string `json:"name"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
+		httpErr(w, http.StatusBadRequest, problem.CodeRequestInvalid)
 		return
 	}
 	if !isValidBoundedText(req.Name, 255) {
-		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
+		httpErr(w, http.StatusBadRequest, problem.CodeRequestInvalid)
 		return
 	}
 
@@ -639,7 +639,7 @@ func (h *Handler) duplicateDocument(w http.ResponseWriter, r *http.Request) {
 	docUUID, ridUUID, sidUUID, parseErr := parseCreateResultUUIDs(res.DocumentID, res.InitialRevisionID, res.SessionID)
 	if parseErr != nil {
 		slog.Error("documents duplicate produced unparseable id", "doc_id", docID, "tenant_id", tenantID, "actor_id", userID, "err", parseErr)
-		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown)
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusCreated, documentsapi.DocumentCreateResult{
@@ -694,12 +694,12 @@ func (h *Handler) acquireSession(w http.ResponseWriter, r *http.Request) {
 	}
 	sessID, err := uuid.Parse(sess.ID)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
 		return
 	}
 	lastAckID, err := uuid.Parse(sess.LastAcknowledgedRevisionID)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusCreated, documentsapi.DocumentSessionWriterResponse{
@@ -722,7 +722,7 @@ func (h *Handler) heartbeatSession(w http.ResponseWriter, r *http.Request) {
 		SessionID string `json:"session_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
+		httpErr(w, http.StatusBadRequest, problem.CodeRequestInvalid)
 		return
 	}
 
@@ -746,7 +746,7 @@ func (h *Handler) releaseSession(w http.ResponseWriter, r *http.Request) {
 		SessionID string `json:"session_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
+		httpErr(w, http.StatusBadRequest, problem.CodeRequestInvalid)
 		return
 	}
 
@@ -763,7 +763,7 @@ func (h *Handler) forceReleaseSession(w http.ResponseWriter, r *http.Request) {
 	docID := r.PathValue("id")
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown)
 		return
 	}
 	adminID := userIDFromReq(r)
@@ -772,7 +772,7 @@ func (h *Handler) forceReleaseSession(w http.ResponseWriter, r *http.Request) {
 		SessionID string `json:"session_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
+		httpErr(w, http.StatusBadRequest, problem.CodeRequestInvalid)
 		return
 	}
 
@@ -798,7 +798,7 @@ func (h *Handler) presignAutosave(w http.ResponseWriter, r *http.Request) {
 		ContentHash    string `json:"content_hash"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
+		httpErr(w, http.StatusBadRequest, problem.CodeRequestInvalid)
 		return
 	}
 
@@ -817,7 +817,7 @@ func (h *Handler) presignAutosave(w http.ResponseWriter, r *http.Request) {
 	}
 	pendingID, err := uuid.Parse(res.PendingUploadID)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, documentsapi.DocumentAutosavePresignResponse{
@@ -842,7 +842,7 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 		PageCount        *int            `json:"page_count"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
+		httpErr(w, http.StatusBadRequest, problem.CodeRequestInvalid)
 		return
 	}
 	// form_data_snapshot is optional — absent means "this autosave carries no
@@ -852,7 +852,7 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 	// fail to decode form_data_json into the contract's object type (one bad
 	// write poisoning a read path with 500s).
 	if len(req.FormDataSnapshot) > 0 && !isJSONObject(req.FormDataSnapshot) {
-		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
+		httpErr(w, http.StatusBadRequest, problem.CodeRequestInvalid)
 		return
 	}
 
@@ -873,7 +873,7 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 	}
 	commitRevID, err := uuid.Parse(res.RevisionID)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
 		return
 	}
 	idempotentReplay := res.AlreadyConsumed
@@ -910,7 +910,7 @@ func (h *Handler) listCheckpoints(w http.ResponseWriter, r *http.Request) {
 	resp, err := toAPICheckpoints(items)
 	if err != nil {
 		slog.Error("documents.list_checkpoints malformed uuid", "doc_id", docID, "tenant_id", tenantID, "err", err)
-		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown)
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, resp)
@@ -933,7 +933,7 @@ func (h *Handler) listRevisionHistory(w http.ResponseWriter, r *http.Request) {
 
 	histItems, err := toAPIRevisionHistoryItems(items)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown)
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, documentsapi.DocumentRevisionHistoryResponse{
@@ -1032,11 +1032,11 @@ func (h *Handler) createCheckpoint(w http.ResponseWriter, r *http.Request) {
 		Label string `json:"label"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
+		httpErr(w, http.StatusBadRequest, problem.CodeRequestInvalid)
 		return
 	}
 	if !isValidBoundedText(req.Label, 255) {
-		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
+		httpErr(w, http.StatusBadRequest, problem.CodeRequestInvalid)
 		return
 	}
 
@@ -1049,7 +1049,7 @@ func (h *Handler) createCheckpoint(w http.ResponseWriter, r *http.Request) {
 	resp, err := toAPICheckpoint(*cp)
 	if err != nil {
 		slog.Error("documents.create_checkpoint malformed uuid", "doc_id", docID, "tenant_id", tenantID, "err", err)
-		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown)
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusCreated, resp)
@@ -1065,7 +1065,7 @@ func (h *Handler) restoreCheckpoint(w http.ResponseWriter, r *http.Request) {
 
 	versionNum, err := strconv.Atoi(r.PathValue("version"))
 	if err != nil {
-		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
+		httpErr(w, http.StatusBadRequest, problem.CodeRequestInvalid)
 		return
 	}
 
@@ -1077,7 +1077,7 @@ func (h *Handler) restoreCheckpoint(w http.ResponseWriter, r *http.Request) {
 	}
 	newRevID, err := uuid.Parse(res.NewRevisionID)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
 		return
 	}
 	newRevNum := int(res.NewRevisionNum)
@@ -1142,7 +1142,7 @@ func (h *Handler) createComment(w http.ResponseWriter, r *http.Request) {
 		Content          json.RawMessage `json:"content"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
+		httpErr(w, http.StatusBadRequest, problem.CodeRequestInvalid)
 		return
 	}
 
@@ -1170,7 +1170,7 @@ func (h *Handler) updateComment(w http.ResponseWriter, r *http.Request) {
 
 	libraryID, err := strconv.Atoi(r.PathValue("library_id"))
 	if err != nil {
-		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
+		httpErr(w, http.StatusBadRequest, problem.CodeRequestInvalid)
 		return
 	}
 	var req struct {
@@ -1178,7 +1178,7 @@ func (h *Handler) updateComment(w http.ResponseWriter, r *http.Request) {
 		Done    *bool            `json:"done"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
+		httpErr(w, http.StatusBadRequest, problem.CodeRequestInvalid)
 		return
 	}
 
@@ -1204,7 +1204,7 @@ func (h *Handler) deleteComment(w http.ResponseWriter, r *http.Request) {
 
 	libraryID, err := strconv.Atoi(r.PathValue("library_id"))
 	if err != nil {
-		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
+		httpErr(w, http.StatusBadRequest, problem.CodeRequestInvalid)
 		return
 	}
 	if err := h.svc.DeleteDocumentComment(r.Context(), tenantID, userID, docID, libraryID); err != nil {
@@ -1253,13 +1253,13 @@ func decodeCommentContent(raw json.RawMessage) []documentsapi.DocumentCommentCon
 func (h *Handler) authorizeDocumentScope(w http.ResponseWriter, r *http.Request, docID string) (tenantID string, userID string, ok bool) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown)
 		return "", "", false
 	}
 	userID = userIDFromReq(r)
 	admin, err := h.isSystemAdmin(r.Context(), userID, tenantID)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown)
 		return "", "", false
 	}
 	if admin {
@@ -1302,49 +1302,52 @@ func mapErr(err error) (int, problem.Code) {
 	case err == nil:
 		return http.StatusOK, problem.Code{}
 	case errors.Is(err, domain.ErrForbidden), errors.Is(err, domain.ErrDocumentNotOwner):
-		return http.StatusForbidden, problem.CodeAuthForbidden
+		return http.StatusForbidden, problem.CodePermissionDenied
 	case errors.Is(err, domain.ErrPendingNotFound),
 		errors.Is(err, domain.ErrCheckpointNotFound),
 		errors.Is(err, domain.ErrCommentNotFound),
 		errors.Is(err, domain.ErrNotFound),
 		errors.Is(err, controlleddocumentsdomain.ErrCDNotFound):
-		return http.StatusNotFound, problem.CodeNotFound
+		return http.StatusNotFound, problem.CodeNotFoundResource
 	case errors.Is(err, domain.ErrInvalidName),
 		errors.Is(err, domain.ErrInvalidPageCount),
 		errors.Is(err, application.ErrControlledDocumentRequired),
 		errors.Is(err, approvalapp.ErrRevisionTitleRequired),
 		errors.Is(err, domain.ErrCommentInvalid):
-		return http.StatusBadRequest, problem.CodeValidationError
+		return http.StatusBadRequest, problem.CodeRequestInvalid
 	// Both tier-1 (iamapp.ErrCapabilityDenied) and tier-2 (authz.ErrCapDenied)
 	// denials are the same semantic — "you lack this capability" — so they must
 	// surface the same problem code to clients regardless of which PDP tier denied.
 	case errors.Is(err, iamapp.ErrCapabilityDenied):
-		return http.StatusForbidden, problem.CodeForbiddenCapability
+		return http.StatusForbidden, problem.CodePermissionCapabilityDenied
 	case errors.As(err, &capDenied):
-		return http.StatusForbidden, problem.CodeForbiddenCapability
+		return http.StatusForbidden, problem.CodePermissionCapabilityDenied
 	case errors.Is(err, domain.ErrExpiredUpload):
-		return http.StatusGone, problem.CodeUploadExpired
+		return http.StatusGone, problem.CodeStateUploadExpired
 	case errors.Is(err, domain.ErrUploadMissing):
-		return http.StatusGone, problem.CodeUploadMissing
+		// 409, not the pre-ADR-0089 410: the upload never happened, so 410 Gone
+		// (which asserts the resource existed and was removed) is false. The
+		// status is bound to state.upload_missing at registration (annex R-1).
+		return http.StatusConflict, problem.CodeStateUploadMissing
 	case errors.Is(err, domain.ErrUploadTooLarge):
 		return http.StatusRequestEntityTooLarge, problem.CodeRequestBodyTooLarge
 	case errors.Is(err, domain.ErrContentHashMismatch):
-		return http.StatusUnprocessableEntity, problem.CodeValidationError
+		return http.StatusUnprocessableEntity, problem.CodeRequestInvalid
 	case errors.Is(err, domain.ErrSessionTaken),
 		errors.Is(err, domain.ErrSessionInactive),
 		errors.Is(err, domain.ErrSessionNotHolder),
 		errors.Is(err, domain.ErrMisbound),
 		errors.Is(err, controlleddocumentsdomain.ErrProfileHasNoDefaultTemplate):
-		return http.StatusConflict, problem.CodeConflict
+		return http.StatusConflict, problem.CodeConflictGeneric
 	case errors.Is(err, domain.ErrStaleBase):
-		return http.StatusConflict, problem.CodeConcurrentModification
+		return http.StatusConflict, problem.CodeConflictConcurrentModification
 	case errors.Is(err, domain.ErrInvalidStateTransition),
 		errors.Is(err, controlleddocumentsdomain.ErrCDNotActive):
 		return http.StatusConflict, problem.CodeStateTransitionInvalid
 	case strings.HasPrefix(err.Error(), "form_data_invalid"):
-		return http.StatusUnprocessableEntity, problem.CodeValidationError
+		return http.StatusUnprocessableEntity, problem.CodeRequestInvalid
 	default:
-		return http.StatusInternalServerError, problem.CodeInternalError
+		return http.StatusInternalServerError, problem.CodeInternalUnknown
 	}
 }
 

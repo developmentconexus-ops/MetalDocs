@@ -77,18 +77,18 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 
 		cookie, err := r.Cookie(m.cfg.SessionCookieName)
 		if err != nil || strings.TrimSpace(cookie.Value) == "" {
-			_ = problem.Write(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthorized, "Authentication required"))
+			_ = problem.Write(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
 			return
 		}
 
 		currentUser, err := m.service.ResolveSession(r.Context(), cookie.Value)
 		if err != nil {
 			if errors.Is(err, authdomain.ErrSessionNotFound) || errors.Is(err, authdomain.ErrSessionExpired) || errors.Is(err, authdomain.ErrSessionRevoked) || errors.Is(err, authdomain.ErrIdentityInactive) {
-				_ = problem.Write(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthorized, "Authentication required"))
+				_ = problem.Write(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
 				return
 			}
 			slog.Error("auth resolve session failed", "err", err)
-			_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Authentication failed"))
+			_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Authentication failed"))
 			return
 		}
 		if currentUser.MustChangePassword && !isPasswordChangeAllowedPath(r.URL.Path, r.Method) {

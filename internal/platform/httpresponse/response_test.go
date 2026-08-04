@@ -12,7 +12,7 @@ import (
 
 func TestWriteError_ProblemJSON(t *testing.T) {
 	rr := httptest.NewRecorder()
-	httpresponse.WriteError(rr, http.StatusNotFound, problem.CodeNotFound, "resource not found")
+	httpresponse.WriteError(rr, http.StatusNotFound, problem.CodeNotFoundResource, "resource not found")
 
 	if got := rr.Code; got != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d", got, http.StatusNotFound)
@@ -29,7 +29,7 @@ func TestWriteError_ProblemJSON(t *testing.T) {
 	if err := json.NewDecoder(rr.Body).Decode(&body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body.Code != "NOT_FOUND" {
+	if body.Code != "notfound.resource" {
 		t.Fatalf("code = %q, want NOT_FOUND", body.Code)
 	}
 	if body.Status != http.StatusNotFound {

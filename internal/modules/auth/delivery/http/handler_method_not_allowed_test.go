@@ -25,8 +25,8 @@ func assertMethodNotAllowedProblem(t *testing.T, rec *httptest.ResponseRecorder,
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if body.Code != problem.CodeMethodNotAllowed {
-		t.Fatalf("code = %q, want %q", body.Code, problem.CodeMethodNotAllowed)
+	if body.Code != problem.CodeRequestMethodNotAllowed {
+		t.Fatalf("code = %q, want %q", body.Code, problem.CodeRequestMethodNotAllowed)
 	}
 }
 

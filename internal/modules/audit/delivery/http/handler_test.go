@@ -45,7 +45,7 @@ func TestAuditHandler_InvalidLimitIsProblemJSON(t *testing.T) {
 		t.Fatalf("decode body: %v", err)
 	}
 
-	if body.Code != "VALIDATION_ERROR" {
+	if body.Code != "request.invalid" {
 		t.Fatalf("expected code VALIDATION_ERROR, got %q", body.Code)
 	}
 }
@@ -164,7 +164,7 @@ func TestAuditHandler_InvalidStoredPayloadFailsHonestly(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if body.Code != "INTERNAL_ERROR" {
+	if body.Code != "internal.unknown" {
 		t.Fatalf("expected code INTERNAL_ERROR, got %q", body.Code)
 	}
 }

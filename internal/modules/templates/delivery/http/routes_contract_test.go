@@ -150,7 +150,7 @@ func TestUpdateTemplateSchema_StaleLockVersion_412(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &problem); err != nil {
 		t.Fatalf("decode problem: %v", err)
 	}
-	if problem.Code != "CONCURRENT_MODIFICATION" {
+	if problem.Code != "conflict.concurrent_modification" {
 		t.Fatalf("expected code CONCURRENT_MODIFICATION, got %q", problem.Code)
 	}
 }
@@ -311,11 +311,13 @@ func TestGeneratedTemplatesRoutes_IdempotencyStoreEngaged(t *testing.T) {
 			rr := httptest.NewRecorder()
 
 			mux.ServeHTTP(rr, req)
-			if rr.Code != http.StatusUnprocessableEntity {
-				t.Fatalf("expected 422 from the scripted idempotency conflict, got %d body=%s", rr.Code, rr.Body.String())
+			// 409, not 422: ADR 0089 binds the status to
+			// conflict.idempotency_key_reused at registration (annex R-8).
+			if rr.Code != http.StatusConflict {
+				t.Fatalf("expected 409 from the scripted idempotency conflict, got %d body=%s", rr.Code, rr.Body.String())
 			}
-			if body := rr.Body.String(); !bytes.Contains([]byte(body), []byte("IDEMPOTENCY_KEY_REUSED")) {
-				t.Fatalf("expected IDEMPOTENCY_KEY_REUSED from the idempotency store path, got body=%s", body)
+			if body := rr.Body.String(); !bytes.Contains([]byte(body), []byte("conflict.idempotency_key_reused")) {
+				t.Fatalf("expected conflict.idempotency_key_reused from the idempotency store path, got body=%s", body)
 			}
 		})
 	}
@@ -333,7 +335,7 @@ func TestGeneratedTemplatesRoutes_IdempotencyStoreEngaged(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		mux.ServeHTTP(rr, req)
-		if body := rr.Body.String(); bytes.Contains([]byte(body), []byte("IDEMPOTENCY_KEY_REUSED")) {
+		if body := rr.Body.String(); bytes.Contains([]byte(body), []byte("conflict.idempotency_key_reused")) {
 			t.Fatalf("non-idempotent route unexpectedly went through the idempotency store: body=%s", body)
 		}
 	})

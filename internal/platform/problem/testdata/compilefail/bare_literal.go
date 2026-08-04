@@ -30,4 +30,4 @@ var _ = problem.Problem{Status: 404, Code: "NOT_FOUND", Title: "not found"}
 
 // Conversion out of the type (the reverse direction) is also closed: nothing may
 // treat a Code as an interchangeable string without going through String().
-var _ = string(problem.CodeNotFound)
+var _ = string(problem.CodeNotFoundResource)

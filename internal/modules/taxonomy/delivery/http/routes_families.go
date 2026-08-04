@@ -25,17 +25,17 @@ type familyUpsertRequest struct {
 func (h *Handler) listFamilies(w http.ResponseWriter, r *http.Request) {
 	includeInactive, err := parseBool(r.URL.Query().Get("include_inactive"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, problem.CodeValidationError, "include_inactive must be true or false")
+		writeError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "include_inactive must be true or false")
 		return
 	}
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
+		writeError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
 		return
 	}
 	items, err := h.families.List(r.Context(), tenantID, includeInactive)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, problem.CodeInternalError, "failed to list families")
+		writeError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "failed to list families")
 		return
 	}
 	writeJSON(w, http.StatusOK, listFamiliesResponse{Items: items})
@@ -44,22 +44,22 @@ func (h *Handler) listFamilies(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) createFamily(w http.ResponseWriter, r *http.Request) {
 	var req familyUpsertRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, problem.CodeValidationError, "invalid JSON payload")
+		writeError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "invalid JSON payload")
 		return
 	}
 	req.Code = strings.TrimSpace(req.Code)
 	req.Name = strings.TrimSpace(req.Name)
 	if req.Code == "" {
-		writeError(w, http.StatusBadRequest, problem.CodeValidationError, "code is required")
+		writeError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "code is required")
 		return
 	}
 	if req.Name == "" {
-		writeError(w, http.StatusBadRequest, problem.CodeValidationError, "name is required")
+		writeError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "name is required")
 		return
 	}
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
+		writeError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
 		return
 	}
 	f := &domain.DocumentFamily{
@@ -78,7 +78,7 @@ func (h *Handler) createFamily(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) getFamily(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
+		writeError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
 		return
 	}
 	f, err := h.families.Get(r.Context(), tenantID, domain.FamilyCode(r.PathValue("code")))
@@ -92,12 +92,12 @@ func (h *Handler) getFamily(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) updateFamily(w http.ResponseWriter, r *http.Request) {
 	var req familyUpsertRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, problem.CodeValidationError, "invalid JSON payload")
+		writeError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "invalid JSON payload")
 		return
 	}
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
+		writeError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
 		return
 	}
 	f := &domain.DocumentFamily{
@@ -134,10 +134,10 @@ func (h *Handler) writeFamilyError(w http.ResponseWriter, err error) {
 	case errors.As(err, &pgErr) && pgErr.Code == "23505":
 		writeError(w, http.StatusConflict, codeTaxFamilyAlreadyExists, "family code already exists")
 	case errors.As(err, &pgErr) && pgErr.Code == "23514":
-		writeError(w, http.StatusBadRequest, problem.CodeValidationError, "request violates data constraints")
+		writeError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "request violates data constraints")
 	default:
 		slog.Error("taxonomy family error", "err", err)
-		writeError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
+		writeError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
 	}
 }
 

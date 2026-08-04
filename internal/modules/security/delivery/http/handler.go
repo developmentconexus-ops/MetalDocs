@@ -29,7 +29,7 @@ type mfaCoverageResponse struct {
 	TotalUsers    int                     `json:"total_users"`
 	MfaEnabled    int                     `json:"mfa_enabled"`
 	MfaEnabledPct float32                 `json:"mfa_enabled_pct"`
-	ByRole        []mfaCoverageByRoleItem  `json:"by_role"`
+	ByRole        []mfaCoverageByRoleItem `json:"by_role"`
 }
 
 type lockoutItem struct {
@@ -84,13 +84,13 @@ func (h *Handler) handleMfaCoverage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.service == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalError, "Security service is not configured"))
+		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "Security service is not configured"))
 		return
 	}
 	coverage, err := h.service.MfaCoverage(r.Context(), tenantID)
 	if err != nil {
 		slog.Error("security: mfa coverage failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to load MFA coverage"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to load MFA coverage"))
 		return
 	}
 	writeJSON(w, http.StatusOK, mfaCoverageToJSON(coverage))
@@ -106,13 +106,13 @@ func (h *Handler) handleLockouts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.service == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalError, "Security service is not configured"))
+		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "Security service is not configured"))
 		return
 	}
 	items, err := h.service.ListLockouts(r.Context(), tenantID)
 	if err != nil {
 		slog.Error("security: lockouts failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to list lockouts"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to list lockouts"))
 		return
 	}
 	out := make([]lockoutItem, 0, len(items))
@@ -146,13 +146,13 @@ func (h *Handler) handleSignals(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.service == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalError, "Security service is not configured"))
+		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "Security service is not configured"))
 		return
 	}
 	signals, err := h.service.ListSignals(r.Context(), tenantID)
 	if err != nil {
 		slog.Error("security: signals failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to list security signals"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to list security signals"))
 		return
 	}
 	out := make([]signalItem, 0, len(signals))
@@ -175,7 +175,7 @@ func (h *Handler) handleSignals(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) requireTenant(w http.ResponseWriter, r *http.Request) (string, bool) {
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthorized, "Authentication required"))
+		h.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
 		return "", false
 	}
 	return tenantID, true
@@ -210,4 +210,3 @@ func mfaCoverageToJSON(c securitydomain.MfaCoverage) mfaCoverageResponse {
 		ByRole:        byRole,
 	}
 }
-

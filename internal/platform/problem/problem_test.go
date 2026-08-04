@@ -7,6 +7,17 @@ import (
 	"testing"
 )
 
+// Field-level codes used only by this test. The four pre-ADR-0089 platform field
+// codes (REQUIRED / INVALID_FORMAT / OUT_OF_RANGE / INVALID_ENUM) never reached
+// the wire and are deleted by the ADR 0089 sweep (annex §2.1 rows #44-#47);
+// these test-only registrations keep the FieldError plumbing under test without
+// resurrecting a dead catalog entry.
+var (
+	testFieldCodeRequired      = RegisterField("platform_test", "test_required")
+	testFieldCodeInvalidFormat = RegisterField("platform_test", "test_invalid_format")
+	testFieldCodeOutOfRange    = RegisterField("platform_test", "test_out_of_range")
+)
+
 func TestProblem_MarshalJSON_OmitsOptionalEmptyFields(t *testing.T) {
 	tests := []struct {
 		name string
@@ -17,7 +28,7 @@ func TestProblem_MarshalJSON_OmitsOptionalEmptyFields(t *testing.T) {
 			p: Problem{
 				Title:  "Validation failed",
 				Status: 400,
-				Code:   CodeValidationError,
+				Code:   CodeRequestInvalid,
 			},
 		},
 	}
@@ -63,10 +74,10 @@ func TestProblem_MarshalJSON_IncludesAllFields(t *testing.T) {
 				Status:   400,
 				Detail:   "request body invalid",
 				Instance: "/v1/docs/1",
-				Code:     CodeValidationError,
+				Code:     CodeRequestInvalid,
 				Errors: []FieldError{{
 					Field:   "key",
-					Code:    FieldCodeRequired,
+					Code:    testFieldCodeRequired,
 					Message: "is required",
 				}},
 			},
@@ -108,13 +119,13 @@ func TestProblem_MarshalJSON_IncludesAllFields(t *testing.T) {
 }
 
 func TestProblem_FluentChain(t *testing.T) {
-	p := New(400, CodeValidationError, "Validation failed").
+	p := New(400, CodeRequestInvalid, "Validation failed").
 		WithDetail("d").
 		WithInstance("/x").
 		WithType("https://errors.metaldocs.io/validation").
-		WithFieldError("key", FieldCodeRequired, "msg")
+		WithFieldError("key", testFieldCodeRequired, "msg")
 
-	if p.Status != 400 || p.Code != CodeValidationError || p.Title != "Validation failed" {
+	if p.Status != 400 || p.Code != CodeRequestInvalid || p.Title != "Validation failed" {
 		t.Fatalf("unexpected base problem: %+v", p)
 	}
 	if p.Detail != "d" || p.Instance != "/x" || p.Type != "https://errors.metaldocs.io/validation" {
@@ -123,21 +134,21 @@ func TestProblem_FluentChain(t *testing.T) {
 	if len(p.Errors) != 1 {
 		t.Fatalf("unexpected errors length: got %d want 1", len(p.Errors))
 	}
-	if p.Errors[0] != (FieldError{Field: "key", Code: FieldCodeRequired, Message: "msg"}) {
+	if p.Errors[0] != (FieldError{Field: "key", Code: testFieldCodeRequired, Message: "msg"}) {
 		t.Fatalf("unexpected field error: %+v", p.Errors[0])
 	}
 }
 
 func TestProblem_FromValidation(t *testing.T) {
 	fields := []FieldError{
-		{Field: "a", Code: FieldCodeRequired, Message: "required"},
-		{Field: "b", Code: FieldCodeInvalidFormat, Message: "invalid"},
-		{Field: "c", Code: FieldCodeOutOfRange, Message: "range"},
+		{Field: "a", Code: testFieldCodeRequired, Message: "required"},
+		{Field: "b", Code: testFieldCodeInvalidFormat, Message: "invalid"},
+		{Field: "c", Code: testFieldCodeOutOfRange, Message: "range"},
 	}
 
 	p := FromValidation(fields)
 
-	if p.Status != 400 || p.Code != CodeValidationError || p.Title != "Validation failed" {
+	if p.Status != 400 || p.Code != CodeRequestInvalid || p.Title != "Validation failed" {
 		t.Fatalf("unexpected problem: %+v", p)
 	}
 	if len(p.Errors) != len(fields) {
@@ -151,11 +162,11 @@ func TestProblem_FromValidation(t *testing.T) {
 }
 
 func TestProblem_Write(t *testing.T) {
-	p := New(422, CodeValidationError, "Validation failed").
+	p := New(422, CodeRequestInvalid, "Validation failed").
 		WithDetail("bad payload").
 		WithInstance("/v1/docs/1").
 		WithType("https://errors.metaldocs.io/validation").
-		WithFieldError("key", FieldCodeRequired, "required")
+		WithFieldError("key", testFieldCodeRequired, "required")
 
 	rr := httptest.NewRecorder()
 	if err := Write(rr, p); err != nil {
@@ -187,10 +198,10 @@ func TestProblem_Write(t *testing.T) {
 }
 
 func TestProblem_ErrorInterface(t *testing.T) {
-	p := New(404, CodeNotFound, "Not found")
+	p := New(404, CodeNotFoundResource, "Not found")
 
 	var err error = p
-	expected := "problem: 404 Not found (NOT_FOUND)"
+	expected := "problem: 404 Not found (notfound.resource)"
 	if err.Error() != expected {
 		t.Fatalf("unexpected error string: got %q want %q", err.Error(), expected)
 	}
@@ -205,7 +216,7 @@ func TestProblem_ErrorInterface(t *testing.T) {
 }
 
 func TestProblem_Write_HeaderSetBeforeStatus(t *testing.T) {
-	p := New(400, CodeValidationError, "Validation failed")
+	p := New(400, CodeRequestInvalid, "Validation failed")
 	rr := httptest.NewRecorder()
 
 	if err := Write(rr, p); err != nil {
@@ -234,7 +245,7 @@ func TestProblem_New_PanicsOnInvalidStatus(t *testing.T) {
 					t.Fatalf("expected panic for status %d", tt.status)
 				}
 			}()
-			New(tt.status, CodeInternalError, "test")
+			New(tt.status, CodeInternalUnknown, "test")
 		})
 	}
 }

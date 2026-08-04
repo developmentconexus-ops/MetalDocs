@@ -197,7 +197,7 @@ func TestSubmitTemplateVersionForApproval_WrongState(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Code != "CONFLICT_ERROR" {
+	if out.Code != "conflict.generic" {
 		t.Fatalf("expected error.code=CONFLICT_ERROR, got %q", out.Code)
 	}
 }
@@ -222,7 +222,7 @@ func TestSubmitTemplateVersionForApproval_NoActiveRoute(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Code != "APPROVAL_ROUTE_MISSING" {
+	if out.Code != "state.approval_route_missing" {
 		t.Fatalf("expected error.code=APPROVAL_ROUTE_MISSING, got %q", out.Code)
 	}
 }
@@ -254,7 +254,7 @@ func TestSubmitTemplateVersionForApproval_NoContentHash(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Code != "UPLOAD_MISSING" {
+	if out.Code != "state.upload_missing" {
 		t.Fatalf("expected error.code=UPLOAD_MISSING, got %q", out.Code)
 	}
 	if strings.Contains(out.Title, "SQLSTATE") || strings.Contains(out.Title, "chk_template_version") {

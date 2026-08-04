@@ -55,37 +55,37 @@ func TestHandleExportTenant_ErrorMapping(t *testing.T) {
 			name:       "tenant not found maps to 404",
 			lcErr:      iamdomain.ErrTenantNotFound,
 			wantStatus: http.StatusNotFound,
-			wantCode:   codeStr(problem.CodeNotFound),
+			wantCode:   codeStr(problem.CodeNotFoundResource),
 		},
 		{
 			name:       "already erased maps to 409",
 			lcErr:      iamdomain.ErrTenantAlreadyErased,
 			wantStatus: http.StatusConflict,
-			wantCode:   codeStr(problem.CodeConflict),
+			wantCode:   codeStr(problem.CodeConflictGeneric),
 		},
 		{
 			name:       "validation error maps to 400",
 			lcErr:      iamdomain.ErrTenantOnboardValidation,
 			wantStatus: http.StatusBadRequest,
-			wantCode:   codeStr(problem.CodeValidationError),
+			wantCode:   codeStr(problem.CodeRequestInvalid),
 		},
 		{
 			name:       "capability denied maps to 403",
 			lcErr:      authz.ErrCapDenied{Capability: "tenant.export", AreaCode: "tenant", ActorID: "u1"},
 			wantStatus: http.StatusForbidden,
-			wantCode:   codeStr(problem.CodeForbiddenCapability),
+			wantCode:   codeStr(problem.CodePermissionCapabilityDenied),
 		},
 		{
 			name:       "wrapped capability denied still maps to 403",
 			lcErr:      errWrap(authz.ErrCapDenied{Capability: "tenant.export", AreaCode: "tenant", ActorID: "u1"}),
 			wantStatus: http.StatusForbidden,
-			wantCode:   codeStr(problem.CodeForbiddenCapability),
+			wantCode:   codeStr(problem.CodePermissionCapabilityDenied),
 		},
 		{
 			name:       "unknown error maps to 500",
 			lcErr:      errors.New("boom"),
 			wantStatus: http.StatusInternalServerError,
-			wantCode:   codeStr(problem.CodeInternalError),
+			wantCode:   codeStr(problem.CodeInternalUnknown),
 		},
 	}
 

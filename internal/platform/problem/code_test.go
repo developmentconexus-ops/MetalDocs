@@ -255,9 +255,9 @@ func TestCode_WireFormatUnchanged(t *testing.T) {
 		code Code
 		want string
 	}{
-		{CodeValidationError, `"VALIDATION_ERROR"`},
-		{CodeNotFound, `"NOT_FOUND"`},
-		{CodeInternalError, `"INTERNAL_ERROR"`},
+		{CodeRequestInvalid, `"request.invalid"`},
+		{CodeNotFoundResource, `"notfound.resource"`},
+		{CodeInternalUnknown, `"internal.unknown"`},
 		{Code{}, `""`},
 	}
 	for _, tc := range cases {
@@ -272,12 +272,12 @@ func TestCode_WireFormatUnchanged(t *testing.T) {
 
 	// Whole-envelope check: the code field must serialize as a bare JSON string,
 	// not as an object wrapping the unexported field.
-	p := New(404, CodeNotFound, "not found").WithDetail("gone").WithInstance("/x")
+	p := New(404, CodeNotFoundResource, "not found").WithDetail("gone").WithInstance("/x")
 	b, err := json.Marshal(p)
 	if err != nil {
 		t.Fatalf("marshal problem: %v", err)
 	}
-	if !strings.Contains(string(b), `"code":"NOT_FOUND"`) {
+	if !strings.Contains(string(b), `"code":"notfound.resource"`) {
 		t.Fatalf("envelope lost the flat code field: %s", b)
 	}
 
@@ -287,23 +287,23 @@ func TestCode_WireFormatUnchanged(t *testing.T) {
 	if err := json.Unmarshal(b, &back); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if back.Code != CodeNotFound {
-		t.Fatalf("round-trip code = %q, want %q", back.Code.String(), CodeNotFound.String())
+	if back.Code != CodeNotFoundResource {
+		t.Fatalf("round-trip code = %q, want %q", back.Code.String(), CodeNotFoundResource.String())
 	}
 }
 
 // Code must stay comparable and usable as a map key — several call sites switch
 // on codes and the generator keys maps by them.
 func TestCode_ComparableAndMapKey(t *testing.T) {
-	m := map[Code]int{CodeNotFound: 1, CodeInternalError: 2}
-	if m[CodeNotFound] != 1 || m[CodeInternalError] != 2 {
+	m := map[Code]int{CodeNotFoundResource: 1, CodeInternalUnknown: 2}
+	if m[CodeNotFoundResource] != 1 || m[CodeInternalUnknown] != 2 {
 		t.Fatal("Code is not usable as a map key")
 	}
-	a, _ := Lookup("NOT_FOUND")
-	if a != CodeNotFound {
+	a, _ := Lookup("notfound.resource")
+	if a != CodeNotFoundResource {
 		t.Fatal("equal wire strings must produce equal Code values")
 	}
-	if CodeNotFound == CodeInternalError {
+	if CodeNotFoundResource == CodeInternalUnknown {
 		t.Fatal("distinct codes compared equal")
 	}
 }

@@ -115,7 +115,7 @@ func (rt *Router) RegisterGenerated(mux *http.ServeMux) {
 		BaseRouter: mux,
 		BaseURL:    "/api/v1",
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			_ = problem.Write(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, err.Error()))
+			_ = problem.Write(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
 		},
 	})
 }
@@ -323,7 +323,7 @@ func (rt *Router) EraseTenant(w http.ResponseWriter, r *http.Request, tenantId o
 }
 
 func writeIAMNotImplemented(w http.ResponseWriter, detail string) {
-	if err := problem.Write(w, problem.New(http.StatusNotImplemented, problem.CodeNotImplemented, detail)); err != nil {
+	if err := problem.Write(w, problem.New(http.StatusNotImplemented, problem.CodeInternalNotImplemented, detail)); err != nil {
 		panic(err) // writer failure is unrecoverable here; surfaces as a panic caught by platform/middleware.Recovery
 	}
 }

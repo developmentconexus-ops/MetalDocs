@@ -554,7 +554,7 @@ func TestCreateTemplate_NoActiveTemplateRoute_Returns409(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Code != "APPROVAL_ROUTE_MISSING" {
+	if out.Code != "state.approval_route_missing" {
 		t.Fatalf("expected error.code=APPROVAL_ROUTE_MISSING, got %q", out.Code)
 	}
 	if len(repo.templates) != 0 {
@@ -584,7 +584,7 @@ func TestCreateTemplate_BlankDocTypeCode_Returns422(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Code != "VALIDATION_ERROR" {
+	if out.Code != "request.invalid" {
 		t.Fatalf("expected error.code=VALIDATION_ERROR, got %q", out.Code)
 	}
 	if len(repo.templates) != 0 {
@@ -611,7 +611,7 @@ func TestCreateTemplate_RejectUnknownField(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Code != "VALIDATION_ERROR" {
+	if out.Code != "request.invalid" {
 		t.Fatalf("expected error.code=VALIDATION_ERROR, got %q", out.Code)
 	}
 }
@@ -642,7 +642,7 @@ func TestCreateTemplate_KeyConflict(t *testing.T) {
 	if err := json.Unmarshal(secondRR.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Code != "ALREADY_EXISTS" {
+	if out.Code != "conflict.already_exists" {
 		t.Fatalf("expected error.code=ALREADY_EXISTS, got %q", out.Code)
 	}
 }
@@ -678,7 +678,7 @@ func TestCreateNextVersion_SystemOwnedTemplateImmutable(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Code != "SYSTEM_TEMPLATE_IMMUTABLE" {
+	if out.Code != "state.system_template_immutable" {
 		t.Fatalf("expected error.code=SYSTEM_TEMPLATE_IMMUTABLE, got %q", out.Code)
 	}
 }

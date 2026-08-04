@@ -59,14 +59,14 @@ func TestArchiveTemplate_SystemOwnedTemplateImmutable(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Code != "SYSTEM_TEMPLATE_IMMUTABLE" {
+	if out.Code != "state.system_template_immutable" {
 		t.Fatalf("expected error.code=SYSTEM_TEMPLATE_IMMUTABLE, got %q", out.Code)
 	}
 }
 
 // TestPublishTemplateVersion_SelfPublishForbiddenRFC9457 verifies that POST
 // /publish rejects an actor attempting to publish a version they authored,
-// returning RFC 9457 problem+json with `code: "ISO_SEGREGATION_VIOLATION"`
+// returning RFC 9457 problem+json with `code: "permission.iso_segregation_violation"`
 // and HTTP 403. This is the surviving identity-based SoD gate (CheckSegregation).
 //
 // Formerly TestPublishTemplateVersion_ForbiddenRoleRFC9457, which asserted the
@@ -107,7 +107,7 @@ func TestPublishTemplateVersion_SelfPublishForbiddenRFC9457(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Code != "ISO_SEGREGATION_VIOLATION" {
+	if out.Code != "permission.iso_segregation_violation" {
 		t.Fatalf("expected error.code=ISO_SEGREGATION_VIOLATION, got %q (body=%s)", out.Code, rr.Body.String())
 	}
 

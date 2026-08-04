@@ -168,7 +168,7 @@ func TestIdempotencyMiddleware_MissingKey(t *testing.T) {
 			rr := httptest.NewRecorder()
 			mux.ServeHTTP(rr, req)
 
-			expectProblemJSON(t, rr, http.StatusBadRequest, "IDEMPOTENCY_KEY_REQUIRED")
+			expectProblemJSON(t, rr, http.StatusBadRequest, "request.idempotency_key_required")
 		})
 	}
 }
@@ -199,7 +199,7 @@ func TestIdempotencyMiddleware_MalformedKey(t *testing.T) {
 			rr := httptest.NewRecorder()
 			mux.ServeHTTP(rr, req)
 
-			expectProblemJSON(t, rr, http.StatusBadRequest, "IDEMPOTENCY_KEY_INVALID")
+			expectProblemJSON(t, rr, http.StatusBadRequest, "request.idempotency_key_invalid")
 		})
 	}
 }

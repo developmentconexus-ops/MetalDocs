@@ -87,7 +87,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		BaseRouter: mux,
 		BaseURL:    "/api/v1",
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, err.Error()))
+			writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
 		},
 	})
 }
@@ -129,12 +129,12 @@ func (h *Handler) DownloadAuditExport(w http.ResponseWriter, r *http.Request, _ 
 
 func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(r.URL.Path, "/api/v1/audit/events/export") {
-		writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFound, "Not found"))
+		writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Not found"))
 		return
 	}
 	if r.Method != http.MethodGet {
 		w.Header().Set("Allow", "GET")
-		writeProblem(w, problem.New(http.StatusMethodNotAllowed, problem.CodeMethodNotAllowed, "Method not allowed"))
+		writeProblem(w, problem.New(http.StatusMethodNotAllowed, problem.CodeRequestMethodNotAllowed, "Method not allowed"))
 		return
 	}
 	tenantID, ok := auditTenantFromRequest(w, r)
@@ -151,18 +151,18 @@ func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 	items, hasMore, err := h.service.ListEvents(r.Context(), query)
 	if err != nil {
 		if errors.Is(err, application.ErrTenantRequired) {
-			writeProblem(w, problem.New(http.StatusForbidden, problem.CodeAuthForbidden, "Tenant claim required"))
+			writeProblem(w, problem.New(http.StatusForbidden, problem.CodePermissionDenied, "Tenant claim required"))
 			return
 		}
 		slog.Error("audit list events failed", "error", err)
-		writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to list audit events"))
+		writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to list audit events"))
 		return
 	}
 
 	responseItems, err := buildEventResponses(items)
 	if err != nil {
 		slog.Error("audit payload decode failed", "error", err)
-		writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Stored audit payload is invalid"))
+		writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Stored audit payload is invalid"))
 		return
 	}
 
@@ -189,7 +189,7 @@ func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleExport(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", "POST")
-		writeProblem(w, problem.New(http.StatusMethodNotAllowed, problem.CodeMethodNotAllowed, "Method not allowed"))
+		writeProblem(w, problem.New(http.StatusMethodNotAllowed, problem.CodeRequestMethodNotAllowed, "Method not allowed"))
 		return
 	}
 	tenantID, ok := auditTenantFromRequest(w, r)
@@ -197,7 +197,7 @@ func (h *Handler) handleExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.exporter == nil {
-		writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeNotImplemented, "Audit export not configured"))
+		writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalNotImplemented, "Audit export not configured"))
 		return
 	}
 	actorID, _ := authn.UserIDFromContext(r.Context())
@@ -215,7 +215,7 @@ func (h *Handler) handleExport(w http.ResponseWriter, r *http.Request) {
 		} `json:"filter"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64*1024)).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
-		writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "Invalid JSON body"))
+		writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON body"))
 		return
 	}
 
@@ -242,7 +242,7 @@ func (h *Handler) handleExport(w http.ResponseWriter, r *http.Request) {
 
 	format := domain.ExportFormat(strings.ToLower(strings.TrimSpace(body.Format)))
 	if !format.Valid() {
-		writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "format must be csv or jsonl"))
+		writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "format must be csv or jsonl"))
 		return
 	}
 
@@ -250,23 +250,23 @@ func (h *Handler) handleExport(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case err == nil:
 	case errors.Is(err, application.ErrExportTooLarge):
-		writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeNotImplemented, "Result set exceeds synchronous export limit; async export not yet available"))
+		writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalNotImplemented, "Result set exceeds synchronous export limit; async export not yet available"))
 		return
 	case errors.Is(err, application.ErrInvalidFormat):
-		writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "format must be csv or jsonl"))
+		writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "format must be csv or jsonl"))
 		return
 	case errors.Is(err, application.ErrTenantRequired):
-		writeProblem(w, problem.New(http.StatusForbidden, problem.CodeAuthForbidden, "Tenant claim required"))
+		writeProblem(w, problem.New(http.StatusForbidden, problem.CodePermissionDenied, "Tenant claim required"))
 		return
 	case errors.Is(err, application.ErrActorRequired):
-		writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthorized, "Authentication required"))
+		writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
 		return
 	case errors.Is(err, application.ErrExportRepoMissing), errors.Is(err, application.ErrCounterMissing):
-		writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeNotImplemented, "Audit export not configured"))
+		writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalNotImplemented, "Audit export not configured"))
 		return
 	default:
 		slog.Error("audit export failed", "error", err)
-		writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to export audit events"))
+		writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to export audit events"))
 		return
 	}
 
@@ -281,16 +281,16 @@ func (h *Handler) handleExport(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleExportSubresource(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.Header().Set("Allow", "GET")
-		writeProblem(w, problem.New(http.StatusMethodNotAllowed, problem.CodeMethodNotAllowed, "Method not allowed"))
+		writeProblem(w, problem.New(http.StatusMethodNotAllowed, problem.CodeRequestMethodNotAllowed, "Method not allowed"))
 		return
 	}
 	if h.exporter == nil {
-		writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeNotImplemented, "Audit export not configured"))
+		writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalNotImplemented, "Audit export not configured"))
 		return
 	}
 	tail := strings.TrimPrefix(r.URL.Path, "/api/v1/audit/events/export/")
 	if tail == "" {
-		writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFound, "Not found"))
+		writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Not found"))
 		return
 	}
 	parts := strings.SplitN(tail, "/", 2)
@@ -300,7 +300,7 @@ func (h *Handler) handleExportSubresource(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if len(parts) != 1 {
-		writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFound, "Not found"))
+		writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Not found"))
 		return
 	}
 
@@ -310,17 +310,17 @@ func (h *Handler) handleExportSubresource(w http.ResponseWriter, r *http.Request
 	}
 	actorID, ok := authn.UserIDFromContext(r.Context())
 	if !ok || strings.TrimSpace(actorID) == "" {
-		writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthorized, "Authentication required"))
+		writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
 		return
 	}
 	job, err := h.exporter.GetExportStatus(r.Context(), tenantID, actorID, exportID)
 	if err != nil {
 		if errors.Is(err, domain.ErrExportJobNotFound) {
-			writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFound, "Export job not found"))
+			writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Export job not found"))
 			return
 		}
 		slog.Error("audit export status failed", "error", err)
-		writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to read export status"))
+		writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to read export status"))
 		return
 	}
 	resp := auditapi.AuditExportStatusResponse{
@@ -342,17 +342,17 @@ func (h *Handler) handleExportSubresource(w http.ResponseWriter, r *http.Request
 func (h *Handler) handleExportDownload(w http.ResponseWriter, r *http.Request, exportID string) {
 	token := strings.TrimSpace(r.URL.Query().Get("token"))
 	if token == "" {
-		writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "token query parameter required"))
+		writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "token query parameter required"))
 		return
 	}
 	job, err := h.exporter.LoadExportPayload(r.Context(), exportID, token)
 	if err != nil {
 		if errors.Is(err, domain.ErrExportJobNotFound) {
-			writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFound, "Export not found or token expired"))
+			writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Export not found or token expired"))
 			return
 		}
 		slog.Error("audit export download failed", "error", err)
-		writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to load export payload"))
+		writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to load export payload"))
 		return
 	}
 	contentType := "application/octet-stream"
@@ -380,7 +380,7 @@ func parseListQuery(r *http.Request, tenantID string) (domain.ListEventsQuery, *
 	if raw := strings.TrimSpace(q.Get("limit")); raw != "" {
 		parsed, err := strconv.Atoi(raw)
 		if err != nil || parsed < 1 {
-			return domain.ListEventsQuery{}, problem.New(http.StatusBadRequest, problem.CodeValidationError, "Invalid limit value")
+			return domain.ListEventsQuery{}, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid limit value")
 		}
 		limit = parsed
 	}
@@ -424,7 +424,7 @@ func parseTime(field, raw string) (time.Time, *problem.Problem) {
 	}
 	t, err := time.Parse(time.RFC3339, raw)
 	if err != nil {
-		return time.Time{}, problem.New(http.StatusBadRequest, problem.CodeValidationError, fmt.Sprintf("%s must be an RFC3339 timestamp", field))
+		return time.Time{}, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, fmt.Sprintf("%s must be an RFC3339 timestamp", field))
 	}
 	return t.UTC(), nil
 }
@@ -446,14 +446,14 @@ func encodeCursor(c domain.Cursor) string {
 func decodeCursor(raw string) (domain.Cursor, *problem.Problem) {
 	sortValue, id, err := pagination.DecodeCursor(raw)
 	if err != nil {
-		return domain.Cursor{}, problem.New(http.StatusBadRequest, problem.CodeValidationError, "Invalid cursor")
+		return domain.Cursor{}, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid cursor")
 	}
 	if sortValue == "" {
 		return domain.Cursor{}, nil
 	}
 	ts, err := time.Parse(time.RFC3339Nano, sortValue)
 	if err != nil {
-		return domain.Cursor{}, problem.New(http.StatusBadRequest, problem.CodeValidationError, "Invalid cursor")
+		return domain.Cursor{}, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid cursor")
 	}
 	return domain.Cursor{OccurredAt: ts, ID: id}, nil
 }
@@ -488,12 +488,12 @@ func buildEventResponses(items []domain.Event) ([]auditapi.AuditEventItem, error
 
 func auditTenantFromRequest(w http.ResponseWriter, r *http.Request) (string, bool) {
 	if _, ok := authn.UserIDFromContext(r.Context()); !ok {
-		writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthorized, "Authentication required"))
+		writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
 		return "", false
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		writeProblem(w, problem.New(http.StatusForbidden, problem.CodeAuthForbidden, "Tenant claim required"))
+		writeProblem(w, problem.New(http.StatusForbidden, problem.CodePermissionDenied, "Tenant claim required"))
 		return "", false
 	}
 	return tenantID, true

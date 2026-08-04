@@ -516,7 +516,7 @@ func TestInviteUser_MissingTenantContext(t *testing.T) {
 // system_admin is refused, and it is refused with a friendly 400 UNKNOWN_ROLE —
 // the same problem code POST /iam/area-memberships returns — never a 500 from
 // the DB CHECK.
-func TestInviteUser_SystemAdminAreaRoleReturns400UnknownRole(t *testing.T) {
+func TestInviteUser_SystemAdminAreaRoleReturns422UnknownRole(t *testing.T) {
 	mux, _, _ := newHandlerForTest(t)
 
 	body := `{
@@ -529,8 +529,10 @@ func TestInviteUser_SystemAdminAreaRoleReturns400UnknownRole(t *testing.T) {
 	req := withTenant(httptest.NewRequest(http.MethodPost, "/api/v1/iam/users/invite", strings.NewReader(body)), testTenantID)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 for system_admin area role, got %d body=%s", rec.Code, rec.Body.String())
+	// 422, not 400: validation.role_unknown binds 422 at registration (ADR 0089
+	// annex R-12) — the body parses and the supplied role value is rejected.
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422 for system_admin area role, got %d body=%s", rec.Code, rec.Body.String())
 	}
 	var prob struct {
 		Code string `json:"code"`
@@ -538,14 +540,14 @@ func TestInviteUser_SystemAdminAreaRoleReturns400UnknownRole(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &prob); err != nil {
 		t.Fatalf("decode problem: %v body=%s", err, rec.Body.String())
 	}
-	if prob.Code != "UNKNOWN_ROLE" {
+	if prob.Code != "validation.role_unknown" {
 		t.Fatalf("problem code = %q, want UNKNOWN_ROLE (body=%s)", prob.Code, rec.Body.String())
 	}
 }
 
-// TestInviteUser_UnknownAreaRoleReturns400 pins that a non-canonical role
+// TestInviteUser_UnknownAreaRoleReturns422 pins that a non-canonical role
 // string fails on the same seam, so the gate is not system_admin-specific.
-func TestInviteUser_UnknownAreaRoleReturns400(t *testing.T) {
+func TestInviteUser_UnknownAreaRoleReturns422(t *testing.T) {
 	mux, _, _ := newHandlerForTest(t)
 
 	body := `{
@@ -558,8 +560,9 @@ func TestInviteUser_UnknownAreaRoleReturns400(t *testing.T) {
 	req := withTenant(httptest.NewRequest(http.MethodPost, "/api/v1/iam/users/invite", strings.NewReader(body)), testTenantID)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 for unknown area role, got %d body=%s", rec.Code, rec.Body.String())
+	// 422, not 400: see TestInviteUser_SystemAdminAreaRoleReturns422UnknownRole.
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422 for unknown area role, got %d body=%s", rec.Code, rec.Body.String())
 	}
 }
 
@@ -626,7 +629,7 @@ func TestBulkUsers_ForceLogoutReturns501NotImplemented(t *testing.T) {
 	if rec.Code != http.StatusNotImplemented {
 		t.Fatalf("expected 501 for force-logout, got %d body=%s", rec.Code, rec.Body.String())
 	}
-	if !strings.Contains(rec.Body.String(), "NOT_IMPLEMENTED") {
+	if !strings.Contains(rec.Body.String(), "internal.not_implemented") {
 		t.Fatalf("expected NOT_IMPLEMENTED code in body, got %s", rec.Body.String())
 	}
 }

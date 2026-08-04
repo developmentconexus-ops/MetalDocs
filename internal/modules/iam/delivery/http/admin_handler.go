@@ -137,7 +137,7 @@ func (h *AdminHandler) RegisterRoutes(mux *http.ServeMux) {
 func (h *AdminHandler) handleUserRoleUpsertTyped(w http.ResponseWriter, r *http.Request) {
 	userID := strings.TrimSpace(r.PathValue("user_id"))
 	if userID == "" {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "user_id required"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "user_id required"))
 		return
 	}
 	h.handleUserRoleUpsert(w, r, userID)
@@ -146,7 +146,7 @@ func (h *AdminHandler) handleUserRoleUpsertTyped(w http.ResponseWriter, r *http.
 func (h *AdminHandler) handleReplaceUserRolesTyped(w http.ResponseWriter, r *http.Request) {
 	userID := strings.TrimSpace(r.PathValue("user_id"))
 	if userID == "" {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "user_id required"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "user_id required"))
 		return
 	}
 	h.handleReplaceUserRoles(w, r, userID)
@@ -165,12 +165,12 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if h.authService == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalError, "User management service is not configured"))
+		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "User management service is not configured"))
 		return
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "internal server error"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 	now := time.Now().UTC()
@@ -231,7 +231,7 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 
 	if err := g.Wait(); err != nil {
 		slog.Error("iam admin: overview composition failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to load admin overview"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to load admin overview"))
 		return
 	}
 
@@ -318,17 +318,17 @@ func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Reque
 
 	var req UpsertUserRoleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "Invalid JSON payload"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON payload"))
 		return
 	}
 
 	role, err := iamdomain.ParseRole(req.Role)
 	if errors.Is(err, iamdomain.ErrInvalidRole) && strings.TrimSpace(req.Role) == "" {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "Role is required"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Role is required"))
 		return
 	}
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "Invalid role"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid role"))
 		return
 	}
 
@@ -343,12 +343,12 @@ func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Reque
 	}
 	upsertTenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "internal server error"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 
 	if err := h.service.UpsertUserAndAssignRole(r.Context(), userID, req.DisplayName, upsertTenantID, role, assignedBy, actorID); err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to upsert user role"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to upsert user role"))
 		return
 	}
 
@@ -368,13 +368,13 @@ func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Reque
 func (h *AdminHandler) handleReplaceUserRoles(w http.ResponseWriter, r *http.Request, userID string) {
 	var req ReplaceUserRolesRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "Invalid JSON payload"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON payload"))
 		return
 	}
 
 	role, err := parseExactlyOneRole(req.Roles)
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, err.Error()))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
 		return
 	}
 
@@ -385,12 +385,12 @@ func (h *AdminHandler) handleReplaceUserRoles(w http.ResponseWriter, r *http.Req
 	}
 	replaceTenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "internal server error"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 
 	if err := h.service.ReplaceUserRoles(r.Context(), userID, req.DisplayName, replaceTenantID, role, assignedBy, actorID); err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to replace user roles"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to replace user roles"))
 		return
 	}
 

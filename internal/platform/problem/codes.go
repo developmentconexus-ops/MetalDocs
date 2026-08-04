@@ -2,120 +2,201 @@
 // MetalDocs Problem responses (RFC 9457). See spec §5.2.
 package problem
 
-// LEGACY CATALOG — every declaration in this file is TEMPORARY.
+// PLATFORM CATALOG (ADR 0089 execution step 5, annex §2.1 + §2.10).
 //
-// These are the 47 pre-ADR-0089 catalog codes, registered verbatim: same wire
-// strings, same statuses, zero behaviour change. They go through RegisterLegacy
-// because their names are SCREAMING_SNAKE and predate the closed semantic family
-// set, so Register would (correctly) reject them.
+// Every code here is registered under the closed semantic family set: the
+// pre-0089 SCREAMING_SNAKE names are gone, the 11 dead constants are deleted,
+// and `RegisterLegacy` no longer appears in this file. Codes are grouped by
+// family, and the group order is the family order of annex §1.2.
 //
-// ADR 0089 execution step 5 rewrites this file from annex §2.1: each surviving
-// row becomes Register / RegisterWithStatus under its new dotted name, the 11
-// dead rows are deleted, and RegisterLegacy itself is removed. Do NOT add
-// entries here — a new code belongs in its owning module, registered with
-// problem.Register under a semantic family.
+// Four registrations are MERGES forced by the registry's duplicate guard: the
+// annex renames two old wire strings onto one new string, so they can no longer
+// be two declarations (C-1..C-19 in annex §2.9):
 //
-// The declarations are `var`, not `const`, because Register* runs at init.
-// Nothing depended on their const-ness.
+//	auth.unauthenticated          <- UNAUTHENTICATED + AUTH_UNAUTHORIZED   (C-2)
+//	permission.capability_denied  <- FORBIDDEN_CAPABILITY + authz.capability_denied (C-3)
+//	internal.unknown              <- INTERNAL_ERROR + internal.unknown     (C-7)
+//	state.approval_route_missing  <- APPROVAL_ROUTE_MISSING + state.approval_route_missing (C-9)
+//
+// The `shared` module tag marks a code two or more bounded contexts genuinely
+// emit; it is documentation and lint metadata only and NEVER reaches the wire
+// (see Registration.Module).
+//
+// Do NOT add module-owned codes here — a new code belongs in its owning module,
+// registered with problem.Register under a semantic family.
 
-// HTTP-status-level codes (used in Problem.code).
+// ---------------------------------------------------------------------------
+// request. — the request itself is malformed, unparseable, or protocol-
+// unacceptable. Fix the syntax/shape and retry. Family default 400.
+// ---------------------------------------------------------------------------
+
 var (
-	CodeValidationError        = RegisterLegacy("platform", "VALIDATION_ERROR", 400)
-	CodeUnknownField           = RegisterLegacy("platform", "UNKNOWN_FIELD", 400)
-	CodeUnknownFilter          = RegisterLegacy("platform", "UNKNOWN_FILTER", 400)
-	CodeInvalidSortField       = RegisterLegacy("platform", "INVALID_SORT_FIELD", 400)
-	CodeInvalidCursor          = RegisterLegacy("platform", "INVALID_CURSOR", 400)
-	CodeIncludeNotSupported    = RegisterLegacy("platform", "INCLUDE_NOT_SUPPORTED", 400)
-	CodeUnauthenticated        = RegisterLegacy("platform", "UNAUTHENTICATED", 401)
-	CodeForbiddenCapability    = RegisterLegacy("platform", "FORBIDDEN_CAPABILITY", 403)
-	CodeForbiddenArea          = RegisterLegacy("platform", "FORBIDDEN_AREA", 403)
-	CodeForbiddenOrigin        = RegisterLegacy("platform", "FORBIDDEN_ORIGIN", 403)
-	CodeNotFound               = RegisterLegacy("platform", "NOT_FOUND", 404)
-	CodeMethodNotAllowed       = RegisterLegacy("platform", "METHOD_NOT_ALLOWED", 405)
-	CodeAlreadyExists          = RegisterLegacy("platform", "ALREADY_EXISTS", 409)
-	CodeStateTransitionInvalid = RegisterLegacy("platform", "STATE_TRANSITION_INVALID", 409)
-	CodeConcurrentModification = RegisterLegacy("platform", "CONCURRENT_MODIFICATION", 409)
-	CodeIdempotencyKeyReused   = RegisterLegacy("platform", "IDEMPOTENCY_KEY_REUSED", 422) // R-8 will move this to 409
-	CodeIdempotencyKeyInvalid  = RegisterLegacy("platform", "IDEMPOTENCY_KEY_INVALID", 400)
-	CodeIdempotencyReplay      = RegisterLegacy("platform", "IDEMPOTENCY_REPLAY", 409)
-	CodeRequestBodyTooLarge    = RegisterLegacy("platform", "REQUEST_BODY_TOO_LARGE", 413)
-	CodeRateLimited            = RegisterLegacy("platform", "RATE_LIMITED", 429) // emitted by the rate-limit middlewares (platform/ratelimit + platform/security)
-	CodeInternalError          = RegisterLegacy("platform", "INTERNAL_ERROR", 500)
-	CodeNotImplemented         = RegisterLegacy("platform", "NOT_IMPLEMENTED", 501) // 501: endpoint/feature wired but not yet implemented
-	CodeCursorExpired          = RegisterLegacy("platform", "CURSOR_EXPIRED", 410)  // 410: pagination cursor refers to an item that no longer exists
-	CodeConflict               = RegisterLegacy("platform", "CONFLICT_ERROR", 409)
-	CodeIdempotencyKeyRequired = RegisterLegacy("platform", "IDEMPOTENCY_KEY_REQUIRED", 400)
+	// CodeRequestInvalid is the generic request-shape rejection (annex #1, C-1).
+	CodeRequestInvalid = Register("platform", "request.invalid", 400)
 
-	CodeAuthUnauthorized           = RegisterLegacy("platform", "AUTH_UNAUTHORIZED", 401)
-	CodeAuthInvalidCredentials     = RegisterLegacy("platform", "AUTH_INVALID_CREDENTIALS", 401)
-	CodeAuthAccountLocked          = RegisterLegacy("platform", "AUTH_ACCOUNT_LOCKED", 403)
-	CodeAuthAccountInactive        = RegisterLegacy("platform", "AUTH_ACCOUNT_INACTIVE", 403)
-	CodeAuthTenantForbidden        = RegisterLegacy("platform", "AUTH_TENANT_FORBIDDEN", 403)
-	CodeAuthTenantRequired         = RegisterLegacy("platform", "AUTH_TENANT_REQUIRED", 403)
-	CodeAuthPasswordChangeRequired = RegisterLegacy("platform", "AUTH_PASSWORD_CHANGE_REQUIRED", 403)
-	CodeAuthForbidden              = RegisterLegacy("platform", "AUTH_FORBIDDEN", 403)
+	CodeRequestCursorInvalid = Register("platform", "request.cursor_invalid", 400)
+
+	CodeRequestMethodNotAllowed = RegisterWithStatus("platform", "request.method_not_allowed", 405,
+		"405 is the dedicated status for an unsupported method on an existing target (RFC 9110 §15.5.6); "+
+			"the request is otherwise well-formed, so the request. family is right and 400 is not")
+
+	CodeRequestBodyTooLarge = RegisterWithStatus("platform", "request.body_too_large", 413,
+		"413 Content Too Large is the dedicated status for an oversized body (RFC 9110 §15.5.14)")
+
+	CodeRequestCursorExpired = RegisterWithStatus("platform", "request.cursor_expired", 410,
+		"410 Gone: the cursor addressed an item that has been permanently removed, so the caller must "+
+			"restart pagination rather than fix the request syntax")
+
+	CodeRequestIdempotencyKeyInvalid  = Register("platform", "request.idempotency_key_invalid", 400)
+	CodeRequestIdempotencyKeyRequired = Register("platform", "request.idempotency_key_required", 400)
+
+	// CodeRequestJSONDecode and CodeRequestEmptyBody are shared by approval and
+	// the documents fill-in surface (annex §2.10 S-2/S-3, C-16).
+	CodeRequestJSONDecode = Register("shared", "request.json_decode", 400)
+	CodeRequestEmptyBody  = Register("shared", "request.empty_body", 400)
 )
 
-// Documents/templates domain-specific codes (used in Problem.code).
+// ---------------------------------------------------------------------------
+// auth. — the caller's identity is missing, unproven, or blocked. Default 401.
+// ---------------------------------------------------------------------------
+
 var (
-	CodeApprovalRouteMissing = RegisterLegacy("platform", "APPROVAL_ROUTE_MISSING", 409)
-	CodeUploadExpired        = RegisterLegacy("platform", "UPLOAD_EXPIRED", 410)
-	// CodeUploadMissing is registered at the documents status (410). Templates
-	// emits the same code at 409; ADR 0089 ruling R-1 unifies both on 409. The
-	// binding is inert until call sites move to NewFor, so recording the current
-	// documents value here changes nothing on the wire.
-	CodeUploadMissing           = RegisterLegacy("platform", "UPLOAD_MISSING", 410)
-	CodeStaleBase               = RegisterLegacy("platform", "STALE_BASE", 409)
-	CodeISOSegregationViolation = RegisterLegacy("platform", "ISO_SEGREGATION_VIOLATION", 403)
-	CodeSystemTemplateImmutable = RegisterLegacy("platform", "SYSTEM_TEMPLATE_IMMUTABLE", 409)
-	// CodePreconditionRequired is the canonical-catalog counterpart of the
-	// approval/http package's local approvalCodePreconditionIfMatch
-	// ("precondition.if_match_required"). Reserved wire-contract code: the
-	// finalize handler that consumed it was removed (ADR 0073); retained for the
-	// FE error-code catalog and any future If-Match/OCC precondition surface.
-	CodePreconditionRequired = RegisterLegacy("platform", "PRECONDITION_REQUIRED", 428)
+	// CodeAuthUnauthenticated is the single no/invalid-session code (annex C-2).
+	CodeAuthUnauthenticated = Register("platform", "auth.unauthenticated", 401)
+
+	CodeAuthInvalidCredentials = Register("platform", "auth.invalid_credentials", 401)
+
+	// The five 403 registrations below deviate from the auth. default of 401 for
+	// one shared reason: identity is PROVEN and the account or tenant claim is
+	// what blocks the call (RFC 9110 §15.5.4). A 401 would wrongly invite the
+	// client to re-authenticate against a credential that is already valid.
+	CodeAuthAccountLocked = RegisterWithStatus("platform", "auth.account_locked", 403,
+		"identity is proven; the account is administratively blocked, so re-authenticating cannot help")
+	CodeAuthAccountInactive = RegisterWithStatus("platform", "auth.account_inactive", 403,
+		"identity is proven; the account is deactivated, so re-authenticating cannot help")
+	CodeAuthTenantForbidden = RegisterWithStatus("platform", "auth.tenant_forbidden", 403,
+		"identity is proven; the caller may not act on the requested tenant")
+	CodeAuthTenantRequired = RegisterWithStatus("platform", "auth.tenant_required", 403,
+		"identity is proven; the session carries no tenant claim for a tenant-scoped route")
+	CodeAuthPasswordChangeRequired = RegisterWithStatus("platform", "auth.password_change_required", 403,
+		"identity is proven; the session is refused until the mandatory password change completes")
 )
 
-// IAM area-membership domain codes (used in Problem.code by the memberships
-// handler). These have been part of the wire contract — and the frontend
-// error-code catalog — since Wave 1; they are promoted to typed constants here
-// (H-4) with their exact existing string values, so the contract is unchanged.
+// ---------------------------------------------------------------------------
+// permission. — the caller is identified but lacks the required capability in
+// the required area. Default 403.
+// ---------------------------------------------------------------------------
+
 var (
-	CodeMembershipExists   = RegisterLegacy("platform", "MEMBERSHIP_EXISTS", 409)
-	CodeMembershipNotFound = RegisterLegacy("platform", "MEMBERSHIP_NOT_FOUND", 404)
-	CodeUnknownRole        = RegisterLegacy("platform", "UNKNOWN_ROLE", 400)
+	// CodePermissionCapabilityDenied is the single capability-denial code
+	// (annex C-3): it absorbs the old FORBIDDEN_CAPABILITY catalog constant and
+	// the shared authz.capability_denied string emitted by approval and fill-in.
+	CodePermissionCapabilityDenied = Register("shared", "permission.capability_denied", 403)
+
+	// CodePermissionDenied replaces AUTH_FORBIDDEN, which was mis-prefixed: it is
+	// a capability/ownership denial, not an identity failure (annex #33).
+	CodePermissionDenied = Register("platform", "permission.denied", 403)
+
+	CodePermissionOriginForbidden         = Register("platform", "permission.origin_forbidden", 403)
+	CodePermissionISOSegregationViolation = Register("platform", "permission.iso_segregation_violation", 403)
 )
 
-// SHARED LEGACY CODES — one wire string emitted by two or more modules.
-//
-// These strings already existed twice in the tree, declared independently by two
-// modules (or by one module and a raw literal in another). The registry's
-// duplicate guard makes an independent second declaration a build break, which
-// is the whole point of ADR 0089 decision 2 — so the declaration has to move to
-// a place both emitters can reference. `platform/problem` is that place; it is
-// the only package both sides already import, and having one module import
-// another module's delivery package would violate the module boundary.
-//
-// This is a REGISTRATION collapse, not a semantic one: the wire strings and the
-// per-call-site statuses are untouched. ADR 0089 execution step 10 does the
-// semantic collapse (which sentinel maps to which arm) and re-homes these into
-// their owning module or into the renamed catalog.
+// ---------------------------------------------------------------------------
+// notfound. — the addressed subject does not exist or is invisible to this
+// caller. Default 404.
+// ---------------------------------------------------------------------------
+
 var (
-	CodeSharedInternalUnknown           = RegisterLegacy("shared", "internal.unknown", 500)             // approval + documents fill-in
-	CodeSharedValidationJSONDecode      = RegisterLegacy("shared", "validation.json_decode", 400)       // approval + documents fill-in
-	CodeSharedValidationEmptyBody       = RegisterLegacy("shared", "validation.empty_body", 400)        // approval + documents fill-in
-	CodeSharedAuthzCapabilityDenied     = RegisterLegacy("shared", "authz.capability_denied", 403)      // approval + documents fill-in
-	CodeSharedStateApprovalRouteMissing = RegisterLegacy("shared", "state.approval_route_missing", 409) // approval + controlleddocuments
-	CodeSharedProfileNotFound           = RegisterLegacy("shared", "PROFILE_NOT_FOUND", 404)            // taxonomy + controlleddocuments
-	CodeSharedProfileArchived           = RegisterLegacy("shared", "PROFILE_ARCHIVED", 409)             // taxonomy + controlleddocuments
-	CodeSharedAreaNotFound              = RegisterLegacy("shared", "AREA_NOT_FOUND", 404)               // taxonomy + controlleddocuments
-	CodeSharedAreaArchived              = RegisterLegacy("shared", "AREA_ARCHIVED", 409)                // taxonomy + controlleddocuments
+	CodeNotFoundResource   = Register("platform", "notfound.resource", 404)
+	CodeNotFoundMembership = Register("platform", "notfound.membership", 404)
+
+	// Shared with controlleddocuments and taxonomy (annex §2.10 S-6/S-8).
+	CodeNotFoundDocumentProfile = Register("shared", "notfound.document_profile", 404)
+	CodeNotFoundProcessArea     = Register("shared", "notfound.process_area", 404)
 )
 
-// Field-level codes (used in FieldError.code). Separate namespace, no status.
+// ---------------------------------------------------------------------------
+// state. — the subject exists but is in the wrong lifecycle state; retrying is
+// futile until a different operation changes the state. Default 409.
+// ---------------------------------------------------------------------------
+
 var (
-	FieldCodeRequired      = RegisterField("platform", "REQUIRED")
-	FieldCodeInvalidFormat = RegisterField("platform", "INVALID_FORMAT")
-	FieldCodeOutOfRange    = RegisterField("platform", "OUT_OF_RANGE")
-	FieldCodeInvalidEnum   = RegisterField("platform", "INVALID_ENUM")
+	CodeStateTransitionInvalid = Register("platform", "state.transition_invalid", 409)
+
+	// CodeStateApprovalRouteMissing is the single "no active approval route" code
+	// (annex C-9), shared by approval, controlleddocuments and templates.
+	CodeStateApprovalRouteMissing = Register("shared", "state.approval_route_missing", 409)
+
+	CodeStateUploadExpired = RegisterWithStatus("platform", "state.upload_expired", 410,
+		"410 Gone: unlike state.upload_missing, the upload session did exist and has permanently "+
+			"expired, which is the condition 410 asserts (RFC 9110 §15.5.11)")
+
+	// CodeStateUploadMissing is 409, not the pre-0089 documents value of 410
+	// (ADR 0089 decision 3, annex R-1): the upload never happened, so 410 Gone —
+	// which asserts the resource existed and was permanently removed — is false.
+	CodeStateUploadMissing = Register("platform", "state.upload_missing", 409)
+
+	CodeStateSystemTemplateImmutable = Register("platform", "state.system_template_immutable", 409)
+
+	// Shared with controlleddocuments and taxonomy (annex §2.10 S-7/S-9).
+	CodeStateDocumentProfileArchived = Register("shared", "state.document_profile_archived", 409)
+	CodeStateProcessAreaArchived     = Register("shared", "state.process_area_archived", 409)
+)
+
+// ---------------------------------------------------------------------------
+// conflict. — race, uniqueness collision, or idempotency-key collision; a retry
+// against refreshed state may succeed. Default 409.
+// ---------------------------------------------------------------------------
+
+var (
+	CodeConflictAlreadyExists          = Register("platform", "conflict.already_exists", 409)
+	CodeConflictConcurrentModification = Register("platform", "conflict.concurrent_modification", 409)
+
+	// CodeConflictIdempotencyKeyReused is 409, not the pre-0089 422 (ADR 0089
+	// decision 3, annex R-8): the key is well-formed and meaningful; the fault is
+	// a collision with a prior request, not unprocessable content.
+	CodeConflictIdempotencyKeyReused = Register("platform", "conflict.idempotency_key_reused", 409)
+
+	// CodeConflictGeneric is the catch-all 409 (annex #24, ex-CONFLICT_ERROR).
+	CodeConflictGeneric = Register("platform", "conflict.generic", 409)
+
+	CodeConflictStaleBase        = Register("platform", "conflict.stale_base", 409)
+	CodeConflictMembershipExists = Register("platform", "conflict.membership_exists", 409)
+)
+
+// ---------------------------------------------------------------------------
+// validation. — the request parses; a supplied value or a business rule over
+// supplied values rejects it. Default 422.
+// ---------------------------------------------------------------------------
+
+var (
+	// CodeValidationRoleUnknown is 422, not the pre-0089 400 (annex R-12): the
+	// body parses and the supplied value names a role that does not exist.
+	CodeValidationRoleUnknown = Register("platform", "validation.role_unknown", 422)
+)
+
+// ---------------------------------------------------------------------------
+// ratelimit. — the caller is being throttled. Default 429.
+// ---------------------------------------------------------------------------
+
+var (
+	// Emitted by the rate-limit middlewares (platform/ratelimit +
+	// platform/security) and, per annex C-6, by approval's signature re-auth
+	// limiter once step 6 lands.
+	CodeRateLimitExceeded = Register("platform", "ratelimit.exceeded", 429)
+)
+
+// ---------------------------------------------------------------------------
+// internal. — server fault: bug, misconfiguration, unimplemented surface, or
+// upstream failure. Default 500.
+// ---------------------------------------------------------------------------
+
+var (
+	// CodeInternalUnknown is the single unmapped-server-fault code (annex C-7):
+	// it absorbs the old INTERNAL_ERROR catalog constant and the shared
+	// internal.unknown string emitted by approval and fill-in.
+	CodeInternalUnknown = Register("shared", "internal.unknown", 500)
+
+	CodeInternalNotImplemented = RegisterWithStatus("platform", "internal.not_implemented", 501,
+		"501 Not Implemented is the dedicated status for a wired-but-unimplemented surface (RFC 9110 §15.6.2)")
 )

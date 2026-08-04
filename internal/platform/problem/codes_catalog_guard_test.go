@@ -73,7 +73,7 @@ func repoRoot(t *testing.T) string {
 }
 
 // canonicalCodeNames parses codes.go and returns the set of exported Code
-// constant names (e.g. "CodeNotFound").
+// constant names (e.g. "CodeNotFoundResource").
 func canonicalCodeNames(t *testing.T, root string) map[string]bool {
 	t.Helper()
 	fset := token.NewFileSet()

@@ -53,7 +53,7 @@ func (h *Handler) ListNotifications(
 	if !ok {
 		return notificationsapi.ListNotifications500ApplicationProblemPlusJSONResponse{
 			InternalServerErrorApplicationProblemPlusJSONResponse: notificationsapi.InternalServerErrorApplicationProblemPlusJSONResponse(
-				toProblem(problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Internal server error")),
+				toProblem(problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Internal server error")),
 			),
 		}, nil
 	}
@@ -77,14 +77,14 @@ func (h *Handler) ListNotifications(
 		if errors.Is(err, pagination.ErrInvalidCursor) {
 			return notificationsapi.ListNotifications400ApplicationProblemPlusJSONResponse{
 				BadRequestApplicationProblemPlusJSONResponse: notificationsapi.BadRequestApplicationProblemPlusJSONResponse(
-					toProblem(problem.New(http.StatusBadRequest, problem.CodeInvalidCursor, "Invalid cursor")),
+					toProblem(problem.New(http.StatusBadRequest, problem.CodeRequestCursorInvalid, "Invalid cursor")),
 				),
 			}, nil
 		}
 		slog.Error("notifications.ListNotifications", "error", err)
 		return notificationsapi.ListNotifications500ApplicationProblemPlusJSONResponse{
 			InternalServerErrorApplicationProblemPlusJSONResponse: notificationsapi.InternalServerErrorApplicationProblemPlusJSONResponse(
-				toProblem(problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Internal server error")),
+				toProblem(problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Internal server error")),
 			),
 		}, nil
 	}
@@ -118,7 +118,7 @@ func (h *Handler) GetNotificationsUnreadCount(
 	if !ok {
 		return notificationsapi.GetNotificationsUnreadCount500ApplicationProblemPlusJSONResponse{
 			InternalServerErrorApplicationProblemPlusJSONResponse: notificationsapi.InternalServerErrorApplicationProblemPlusJSONResponse(
-				toProblem(problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Internal server error")),
+				toProblem(problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Internal server error")),
 			),
 		}, nil
 	}
@@ -128,7 +128,7 @@ func (h *Handler) GetNotificationsUnreadCount(
 		slog.Error("notifications.GetNotificationsUnreadCount", "error", err)
 		return notificationsapi.GetNotificationsUnreadCount500ApplicationProblemPlusJSONResponse{
 			InternalServerErrorApplicationProblemPlusJSONResponse: notificationsapi.InternalServerErrorApplicationProblemPlusJSONResponse(
-				toProblem(problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Internal server error")),
+				toProblem(problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Internal server error")),
 			),
 		}, nil
 	}
@@ -147,7 +147,7 @@ func (h *Handler) MarkNotificationRead(
 	if !ok {
 		return notificationsapi.MarkNotificationRead404ApplicationProblemPlusJSONResponse{
 			NotFoundApplicationProblemPlusJSONResponse: notificationsapi.NotFoundApplicationProblemPlusJSONResponse(
-				toProblem(problem.New(http.StatusNotFound, problem.CodeNotFound, "Notification not found")),
+				toProblem(problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Notification not found")),
 			),
 		}, nil
 	}
@@ -156,7 +156,7 @@ func (h *Handler) MarkNotificationRead(
 		slog.Error("notifications.MarkNotificationRead", "error", err)
 		return notificationsapi.MarkNotificationRead500ApplicationProblemPlusJSONResponse{
 			InternalServerErrorApplicationProblemPlusJSONResponse: notificationsapi.InternalServerErrorApplicationProblemPlusJSONResponse(
-				toProblem(problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Internal server error")),
+				toProblem(problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Internal server error")),
 			),
 		}, nil
 	}
@@ -175,7 +175,7 @@ func (h *Handler) MarkAllNotificationsRead(
 	if !ok {
 		return notificationsapi.MarkAllNotificationsRead500ApplicationProblemPlusJSONResponse{
 			InternalServerErrorApplicationProblemPlusJSONResponse: notificationsapi.InternalServerErrorApplicationProblemPlusJSONResponse(
-				toProblem(problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Internal server error")),
+				toProblem(problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Internal server error")),
 			),
 		}, nil
 	}
@@ -185,7 +185,7 @@ func (h *Handler) MarkAllNotificationsRead(
 		slog.Error("notifications.MarkAllNotificationsRead", "error", err)
 		return notificationsapi.MarkAllNotificationsRead500ApplicationProblemPlusJSONResponse{
 			InternalServerErrorApplicationProblemPlusJSONResponse: notificationsapi.InternalServerErrorApplicationProblemPlusJSONResponse(
-				toProblem(problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Internal server error")),
+				toProblem(problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Internal server error")),
 			),
 		}, nil
 	}

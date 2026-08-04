@@ -31,7 +31,7 @@ func TestRecovery_PanicProduces500ProblemJSON(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("body not JSON: %v", err)
 	}
-	if body.Code != "INTERNAL_ERROR" || body.Status != 500 {
+	if body.Code != "internal.unknown" || body.Status != 500 {
 		t.Fatalf("body = %+v, want code INTERNAL_ERROR status 500", body)
 	}
 }

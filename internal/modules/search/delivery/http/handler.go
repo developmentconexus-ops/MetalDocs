@@ -69,12 +69,12 @@ func (h *Handler) handleSearchDocuments(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if strings.TrimSpace(iamdomain.UserIDFromContext(r.Context())) == "" {
-		httpresponse.WriteError(w, http.StatusUnauthorized, problem.CodeAuthUnauthorized, "Authentication required")
+		httpresponse.WriteError(w, http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required")
 		return
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusUnauthorized, problem.CodeAuthUnauthorized, "Authentication required")
+		httpresponse.WriteError(w, http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required")
 		return
 	}
 
@@ -82,7 +82,7 @@ func (h *Handler) handleSearchDocuments(w http.ResponseWriter, r *http.Request) 
 	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
 		n, err := strconv.Atoi(raw)
 		if err != nil {
-			httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, "Invalid limit value")
+			httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid limit value")
 			return
 		}
 		limit = n
@@ -90,12 +90,12 @@ func (h *Handler) handleSearchDocuments(w http.ResponseWriter, r *http.Request) 
 
 	expiryBefore, err := parseOptionalDateTimeQuery(r, "expiry_before")
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, "Invalid expiry_before value")
+		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid expiry_before value")
 		return
 	}
 	expiryAfter, err := parseOptionalDateTimeQuery(r, "expiry_after")
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, "Invalid expiry_after value")
+		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid expiry_after value")
 		return
 	}
 
@@ -117,7 +117,7 @@ func (h *Handler) handleSearchDocuments(w http.ResponseWriter, r *http.Request) 
 		Limit:           limit,
 	})
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "Internal server error")
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "Internal server error")
 		return
 	}
 
