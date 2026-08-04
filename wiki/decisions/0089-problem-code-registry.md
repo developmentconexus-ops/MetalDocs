@@ -15,7 +15,7 @@
 > 10, 13, 19 for one vocabulary).
 > **Annex (binding):**
 > `docs/superpowers/analysis/2026-08-04-problem-code-registry-mapping.md` —
-> §1 families, §2 the complete 147-row rename table, §3 the 24 status rulings,
+> §1 families, §2 the complete 155-row rename table, §3 the 26 status rulings,
 > §4 registry shape. The annex is the executable detail; this ADR is the policy.
 
 ## Context
@@ -27,8 +27,12 @@ build otherwise. 15/15 modules comply.
 The `code` **inside** that envelope is enforced by nothing. An audit on
 2026-08-04 found:
 
-- **147 distinct codes in 3 competing conventions** — 75 dotted, 67
-  `SCREAMING_SNAKE`, 5 bare lower_snake. `controlleddocuments/delivery/http/routes.go:501-577`
+- **155 distinct codes in 3 competing conventions** — 75 dotted, 75
+  `SCREAMING_SNAKE`, 5 bare lower_snake. (The audit first counted 147; the 8
+  `AREA_*` / `FAMILY_*` codes in `taxonomy/.../routes_areas.go` and
+  `routes_families.go` never reached `scripts/dump-error-codes.go` at all — the
+  regex scraper missed raw literals, which is itself an instance of the defect
+  decision 6 removes.) `controlleddocuments/delivery/http/routes.go:501-577`
   emits all three styles from a single switch, via 26 raw string literals.
 - **The type guard is fake.** `codes.go:7` declares `type Code string` with the
   comment *"prevents arbitrary strings from being used as codes"*. Untyped
@@ -92,7 +96,7 @@ mechanism**. Every module solved it locally, correctly, and incompatibly.
 3. **Status is bound to the code at registration.** A per-call-site status
    becomes an explicit, documented override rather than a default, so "the
    caller's precondition failed" cannot be 409 in one module and 412 in another.
-   The 24 status rulings are in annex §3; the three behaviour-visible ones are
+   The 26 status rulings are in annex §3; the five behaviour-visible ones are
    ratified here:
    - **content-hash mismatch → 412** everywhere. The caller *declared* a
      precondition and it failed (RFC 9110 §15.5.13). 422 would claim the payload
@@ -102,6 +106,22 @@ mechanism**. Every module solved it locally, correctly, and incompatibly.
      with current resource state.
    - **`IDEMPOTENCY_KEY_REUSED` → 409.** The key is well-formed and meaningful;
      the fault is conflict with a prior request, not unprocessability.
+   - **`FAMILY_NOT_FOUND` splits into two codes** (annex R-23 + R-26).
+     It is emitted at `taxonomy/.../routes_families.go:129` (404), where the
+     family **is** the request target, and at `routes_profiles.go:375` (409),
+     where a `family_code` **referenced inside a profile body** does not resolve.
+     Those are two conditions, and binding status to the code makes sharing one
+     name impossible. They become `notfound.document_family` @404 and
+     `validation.family_unknown` @422. Keeping a single code would have forced a
+     status change on one of the two sites anyway, so the split is the only
+     option that changes behaviour for a stated reason rather than by accident.
+   - **The taxonomy area cluster moves 400 → 422** (annex R-25):
+     `validation.area_parent_cycle` and `validation.area_code_immutable`. Both
+     requests parse; a supplied value fails a business rule. This is not a new
+     ruling but R-20's, which already moved the identical
+     `PROFILE_CODE_IMMUTABLE` to 422 — leaving the area twin at 400 would
+     recreate, inside one module, the same-condition-different-status defect this
+     ADR exists to remove.
 
 4. **One taxonomy: semantic dotted families, closed set.** Families are
    **semantic, never module-named**. The code is a wire contract telling the
@@ -126,7 +146,7 @@ mechanism**. Every module solved it locally, correctly, and incompatibly.
    one code each. No aliases, no dual-accept, no deprecation window — per the
    standing legacy-fallback-extermination rule. The product has not shipped;
    this break costs an afternoon now and a coordinated client migration later.
-   Post-sweep total ≈ **118** registered codes.
+   Post-sweep total ≈ **124** registered codes.
 
 6. **Every downstream representation is generated, and CI gates freshness.**
    The registry is the single source; the OpenAPI `Problem.code` enum, the FE
@@ -146,7 +166,7 @@ mechanism**. Every module solved it locally, correctly, and incompatibly.
   3 unmapped codes to users on 2026-08-04.
 - Cost is a large mechanical diff across every HTTP-facing module. It is
   mechanical *because* annex §2 decides every row in advance; executing it
-  without that table would be judgment-by-agent at 147 sites.
+  without that table would be judgment-by-agent at 155 sites.
 - One-way door acknowledged: after clients exist, this rename requires a
   versioned contract migration. That is the argument for doing it now.
 

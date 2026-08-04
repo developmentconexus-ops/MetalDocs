@@ -7,6 +7,18 @@ wiki table); CI freshness gate.
 Status: ANALYSIS — §1 families and §3 status rulings require operator ratification before any
 code moves.
 
+**Amendment log**
+
+| date | change | why |
+|---|---|---|
+| 2026-08-04 | §2.6b added (rows #166-#173); §2.6 header 8→16; C-19 added to §2.9; R-25 and R-26 added to §3 | §2.6 inventoried only `taxonomy/…/routes_profiles.go` and missed the `AREA_*` / `FAMILY_*` codes in `routes_areas.go` / `routes_families.go`. A sweep driven by §2 alone would have skipped all 8. |
+| 2026-08-04 | §2.10 added; §4.4 gains row 10-pre and corrects step 10's scope | ADR 0089 step 1's duplicate guard forced the **registration** half of 9 cross-module collapses into step 1. §4.4 had sequenced them into step 10; that was wrong — "one string, one declaration site" is a precondition of the closed type, not a consequence of the rename. |
+| 2026-08-04 | §2.5 verification note; §2.8 count correction | CD's 26 raw literals re-verified row-by-row against db24944f^ — §2.5 is complete. §0's "43 sites" and the 147 pre-sweep total are both slightly off; corrected in place. |
+| 2026-08-04 | §4.2 as-built deviation note | `RegisterField` ships returning the shared `Code` type with a separate namespace, not the distinct `FieldCode` type §4.2 proposed. Deferred, not dropped. |
+
+Everything below the amendment log that was already ratified is left **as ratified**; the amendments
+add rows and corrections only. R-26 was raised as a flag and is now **RATIFIED** into ADR 0089 decision 3; it resolves R-23 rather than overriding it (see §3).
+
 ## 0. Facts verified against the tree (HEAD 71692e0b + uncommitted ADR 0088)
 
 | Fact | Verified |
@@ -434,12 +446,40 @@ registry constant references, not just renamed:
 | `FORBIDDEN_CAPABILITY` (typed) | `routes.go:510` | #8 |
 | `IDEMPOTENCY_KEY_REQUIRED` (typed) | `handler.go:150` | #25 |
 
+> **Verification 2026-08-04 (amendment).** Every row #126-#146 and every site in the table above was
+> re-checked against `routes.go` as of db24944f^ (the last tree in which they were literals).
+> **§2.5 is complete — no CD row is missing.** The mapper switch at pre-step-1 `:510-:577` emits
+> exactly the 26 raw literals the ADR cites: `:512,514,516,518,525,527,529,531,533,535,537,539,541,`
+> `543,545,547,549,551,557,559,561,563,565,567,569,575`. All three naming conventions appear in it
+> (`SCREAMING_SNAKE` ×21, dotted ×4, bare lower_snake ×1 — `template_invalid`). Those 26 occurrences
+> are **25 distinct strings** (`INTERNAL_ERROR` appears at both `:557` and `:575`): the 21 CD-owned
+> strings of rows #126-#146, plus `INTERNAL_ERROR`, `UNAUTHENTICATED`, `PROFILE_NOT_FOUND` and
+> `PROFILE_ARCHIVED`. `VALIDATION_ERROR` is a literal elsewhere in the file, never inside this
+> switch. Two corrections to the table above: `handler.go:73` (`INTERNAL_ERROR`) and `handler.go:153`
+> (`VALIDATION_ERROR`) were **typed constant references**, not raw literals, even before step 1 —
+> the §2.1 row they map to is unchanged, only the "as raw literals" framing was wrong.
+> Post-step-1 truth: the literals are gone; the CD declarations are
+> `routes.go:517-538` and the mapper `writeDomainError` starts at `routes.go:540`, so step 7 is now a
+> **declaration-value** sweep (one line per row) rather than a per-site literal sweep. Rows #130,
+> #145, #146 are served by the shared platform registrations — see §2.10 (S-5, S-8, S-9).
+
 ---
 
-### 2.6 `internal/modules/taxonomy` — 8 own strings, all CONST
+### 2.6 `internal/modules/taxonomy` — 16 own strings, all CONST
 
 Declared `taxonomy/delivery/http/routes_profiles.go:26-33`; emitted through the mapper at
 `routes_profiles.go:325-350`.
+
+> **Amendment 2026-08-04 (post-ADR-0089 step 1, commit db24944f).** The original §2.6 inventoried
+> only the eight consts declared in `routes_profiles.go` and **missed the `AREA_*` / `FAMILY_*` raw
+> literals in `routes_areas.go` and `routes_families.go` (8 further codes)**. They are added as
+> rows #166-#173 in §2.6b below. Taxonomy therefore owns **16** wire strings, not 8.
+> Line numbers in the table below are **pre-step-1**; step 1 converted the const block to `var …
+> problem.RegisterLegacy(…)` registrations and shifted the file. Post-step-1 truth:
+> declarations at `routes_profiles.go:35-44` (profile codes) and `:53-62` (area/family codes);
+> the profile mapper is `routes_profiles.go:351-380`, with emits at `:355`, `:357`, `:359`, `:361`,
+> `:363`, `:369`, `:373`, `:375`. The sweep must resolve line numbers against the file it edits,
+> not against the pre-step-1 anchors preserved here.
 
 | # | old code | decl | emit site | status | NEW code | NEW default | note |
 |---|---|---|---|---|---|---|---|
@@ -454,6 +494,39 @@ Declared `taxonomy/delivery/http/routes_profiles.go:26-33`; emitted through the 
 
 Taxonomy also emits catalog `VALIDATION_ERROR` (`:56,92,123,173,257,261,337,343` at 400; **`:339` at
 422** → R-6) and `INTERNAL_ERROR` (14 sites).
+
+**Correction to row #153 (`FAMILY_NOT_FOUND`).** The row records a single emit site at 409. The
+string is emitted at **two** sites with **two different statuses**:
+`routes_profiles.go:375` (post-step-1; pre-step-1 `:347`) → **409**, on the `23503` foreign-key arm
+of the profile mapper — "the `family_code` you referenced does not exist"; and
+`routes_families.go:129` → **404**, on `domain.ErrFamilyNotFound` in the family mapper — the family
+*is* the request target (`/taxonomy/families/{code}`). Both sites are covered by row #153's rename
+to `notfound.document_family`; the status split is **not** resolved by R-23 and is raised as **R-26**
+below. The 404 site is new evidence for R-23, which was written believing 409 was the only status.
+
+### 2.6b `internal/modules/taxonomy` — process-area and document-family codes
+
+Added by the 2026-08-04 amendment; these are the codes §2.6 missed. Pre-step-1 they were **LITERAL**
+in `routes_areas.go` / `routes_families.go`; step 1 promoted them to `CONST`-class registrations in
+`routes_profiles.go:53-62`, so the sweep edits the **declaration** and the emit sites follow. All
+`file:line` values below are verified against the tree at HEAD db24944f. Statuses are the ones the
+mapper passes to `writeError`, unchanged by step 1.
+
+| # | old code | decl | emit site | status | NEW code | NEW default | note |
+|---|---|---|---|---|---|---|---|
+| 166 | `AREA_NOT_FOUND` | `problem.CodeSharedAreaNotFound` (`platform/problem/codes.go:111`), aliased `routes_profiles.go:54` | `routes_areas.go:177` | 404 | `notfound.process_area` | 404 | **C-19.** COLLAPSE→ CD #145 — same string, same status, two modules. Registration already collapsed into the platform `shared` block (§2.10). |
+| 167 | `AREA_ARCHIVED` | `problem.CodeSharedAreaArchived` (`platform/problem/codes.go:112`), aliased `routes_profiles.go:55` | `routes_areas.go:179` | 409 | `state.process_area_archived` | 409 | **C-19.** COLLAPSE→ CD #146. Same shared-registration note. |
+| 168 | `AREA_PARENT_CYCLE` | `routes_profiles.go:56` | `routes_areas.go:181` | 400 | `validation.area_parent_cycle` | **422** (R-25) | supplied `parent_code` fails a business rule over supplied values; nothing is malformed |
+| 169 | `AREA_CODE_IMMUTABLE` | `routes_profiles.go:57` | `routes_areas.go:185` | 400 | `validation.area_code_immutable` | **422** (R-25) | exact sibling of #151 `PROFILE_CODE_IMMUTABLE`, which R-20 already moves to 422 |
+| 170 | `AREA_ALREADY_EXISTS` | `routes_profiles.go:58` | `routes_areas.go:191` (pg `23505` arm) | 409 | `conflict.process_area_exists` | 409 | uniqueness collision on (tenant, area_code); mirrors #152 `conflict.document_profile_exists` |
+| 171 | `FAMILY_ALREADY_INACTIVE` | `routes_profiles.go:59` | `routes_families.go:131` | 409 | `state.document_family_already_inactive` | 409 | subject is already in the target lifecycle state; a retry is futile → `state.` per §1.4 tie-breaker |
+| 172 | `FAMILY_HAS_PROFILES` | `routes_profiles.go:60` | `routes_families.go:133` | 409 | `state.document_family_has_profiles` | 409 | same shape as `route.in_use` → `state.approval_route_in_use` (#56): the entity is referenced, so deactivation is blocked until a *different* operation moves the profiles |
+| 173 | `FAMILY_ALREADY_EXISTS` | `routes_profiles.go:61` | `routes_families.go:135` (pg `23505` arm) | 409 | `conflict.document_family_exists` | 409 | uniqueness collision on (tenant, family_code) |
+
+The area and family mappers also emit catalog `VALIDATION_ERROR` — `routes_areas.go:183,189` at
+**400** and `routes_areas.go:187` at **422** (an R-6 site the original §3 R-6 list did not
+enumerate); `routes_families.go:137` at 400 — and `INTERNAL_ERROR` (`routes_areas.go:193`,
+`routes_families.go:140`).
 
 ---
 
@@ -490,6 +563,14 @@ These do not exist today; they are created by §3 rulings that split a currently
 **Grand total after the sweep:** 147 old strings − 11 deleted − 24 collapsed + 6 new ≈ **118
 registered codes**. The exact figure is fixed once §3 is ratified.
 
+*Amendment 2026-08-04:* the §2.6b rows add **8** previously uninventoried taxonomy strings, two of
+which collapse onto CD rows (C-19). The pre-sweep inventory is therefore **155**, not 147, and the
+post-sweep estimate becomes ≈ **124**. The 147 figure in §0 is the `dump-error-codes.go` output,
+which never saw these codes — one more instance of the regex-scraper defect ADR 0089 decision 6
+removes. §0's other count to correct: `controlleddocuments/delivery/http/routes.go` carries **42**
+raw literals (41 `WriteError` + 1 `problem.New` at pre-step-1 `:543`), not 43; the ADR's "26 raw
+string literals" for the mapper switch alone is exact (pre-step-1 `:512`-`:575`).
+
 ### 2.9 Collision index (must collapse to ONE new code)
 
 | id | condition | competing old codes | new code |
@@ -512,6 +593,47 @@ registered codes**. The exact figure is fixed once §3 is ratified.
 | C-16 | JSON decode / empty body / content-type | approval `validation.*` vs fillin `validation.*` | `request.json_decode`, `request.empty_body`, `request.content_type_unsupported` |
 | C-17 | content-hash mismatch | approval(412), documents(422), templates(409) | `precondition.content_hash_mismatch` — see R-2 |
 | C-18 | empty eligible pool / submit choice | approval `validation.*`(422) vs templates `CONFLICT_ERROR`(422) | approval's codes win |
+| C-19 | process area not found / archived | taxonomy `AREA_NOT_FOUND`/`AREA_ARCHIVED` (#166,#167) vs CD raw literals (#145,#146) — same strings, same statuses | `notfound.process_area`, `state.process_area_archived` |
+
+*(C-19 added by the 2026-08-04 amendment. It is the area-side twin of C-15 and was missed for the
+same reason: §2.6 inventoried only `routes_profiles.go`.)*
+
+### 2.10 Shared registration home — the 9 codes step 1 was forced to collapse
+
+**This subsection records an execution fact, not a new decision.** ADR 0089 step 1 (commit
+db24944f) introduced `record()`'s duplicate guard: registering one wire string twice panics at
+package init. Nine strings were already declared independently by two modules each, so step 1 could
+not land green while leaving them where they were — the *registration* collapse (which §4.4 had
+sequenced into step 10) became a **precondition of step 1**, not a deferrable follow-up.
+
+A module cannot import another module's delivery package (module-boundary invariant; ADR 0082 is the
+proof of why), so the only legal single home was the platform catalog. All nine now live in the
+`SHARED LEGACY CODES` block of `internal/platform/problem/codes.go:103-113`, registered with
+`RegisterLegacy("shared", …)` — **wire strings and per-call-site statuses untouched**. Each emitting
+module references the shared `var` through a local alias.
+
+The **semantic** collapse (which sentinel maps to which arm, and the final renamed code) is still
+step 10 and still **[J]**. The rows below say only where the declaration lives today.
+
+| # | wire string | shared registration | current status | §2 rows it serves | emitting modules |
+|---|---|---|---|---|---|
+| S-1 | `internal.unknown` | `CodeSharedInternalUnknown` — `platform/problem/codes.go:104` | 500 | #48, #125 (and C-7 with #21) | approval, documents (fill-in) |
+| S-2 | `validation.json_decode` | `CodeSharedValidationJSONDecode` — `codes.go:105` | 400 | #83, #124 (C-16) | approval, documents (fill-in) |
+| S-3 | `validation.empty_body` | `CodeSharedValidationEmptyBody` — `codes.go:106` | 400 | #85, #122 (C-16) | approval, documents (fill-in) |
+| S-4 | `authz.capability_denied` | `CodeSharedAuthzCapabilityDenied` — `codes.go:107` | 403 | #77, #116 (C-3) | approval, documents (fill-in) |
+| S-5 | `state.approval_route_missing` | `CodeSharedStateApprovalRouteMissing` — `codes.go:108` | 409 | #97, #130 (C-9, which also absorbs #34) | approval, controlleddocuments |
+| S-6 | `PROFILE_NOT_FOUND` | `CodeSharedProfileNotFound` — `codes.go:109`; taxonomy alias `routes_profiles.go:36` | 404 | #147 + the CD literal (C-15) | taxonomy, controlleddocuments |
+| S-7 | `PROFILE_ARCHIVED` | `CodeSharedProfileArchived` — `codes.go:110`; taxonomy alias `routes_profiles.go:37` | 409 | #148 + the CD literal (C-15) | taxonomy, controlleddocuments |
+| S-8 | `AREA_NOT_FOUND` | `CodeSharedAreaNotFound` — `codes.go:111`; taxonomy alias `routes_profiles.go:54`, CD alias `routes.go:536` | 404 | #145, #166 (C-19) | taxonomy, controlleddocuments |
+| S-9 | `AREA_ARCHIVED` | `CodeSharedAreaArchived` — `codes.go:112`; taxonomy alias `routes_profiles.go:55`, CD alias `routes.go:537` | 409 | #146, #167 (C-19) | taxonomy, controlleddocuments |
+
+**Sweep instruction.** For S-1…S-9 the rename is a **single edit in `platform/problem/codes.go`**;
+the aliases follow. Do not re-create a per-module declaration for any of them — that is exactly the
+build break the duplicate guard exists to produce. When step 10 re-homes a shared code into its
+owning module (e.g. `state.approval_route_missing` into `approval`), the *other* emitter must be
+converted to reference that module's exported code **only if** the import direction is legal;
+otherwise it stays in the platform catalog permanently, which is the honest outcome for a code two
+bounded contexts genuinely share.
 
 ---
 
@@ -692,6 +814,55 @@ approval one is the signature-reauth limiter.
 use `ratelimit.exceeded` + `ratelimit.signature_reauth` as two registered codes — but do **not**
 keep `authn.*` for a throttle.
 
+**R-25 — the taxonomy area cluster at 400 (added 2026-08-04 by the §2.6b amendment).**
+`taxonomy/…/routes_areas.go:181` (`AREA_PARENT_CYCLE`, #168) and `routes_areas.go:185`
+(`AREA_CODE_IMMUTABLE`, #169) both return **400**.
+Both requests parse; in both a *supplied value* fails a business rule — `parent_code` would close a
+cycle in the area tree, `code` may not be changed after creation. Neither is a syntax, shape,
+header, or content-type defect, so §1.4 rule 1 does not fire and rule 2 does: `validation.` @422.
+`AREA_CODE_IMMUTABLE` is the exact sibling of `PROFILE_CODE_IMMUTABLE`, which **R-20 already moves
+to 422** — leaving the area twin at 400 would re-create, inside one module, precisely the
+same-condition-different-status defect ADR 0089 exists to remove.
+**RECOMMENDED: 422** for `validation.area_parent_cycle` and `validation.area_code_immutable`.
+This ruling is the R-20 cluster extended to the two rows R-20 could not see; it changes no decision
+R-20 already recorded. Blast radius: 2 sites, both in `writeAreaError`.
+The remaining six new rows (#166,#167,#170-#173) need **no** ruling: each already carries its
+family's default status (404 / 409 / 409 / 409 / 409 / 409), so `Register` accepts them without an
+override.
+
+**R-26 — `FAMILY_NOT_FOUND` is emitted at BOTH 409 and 404 (raised 2026-08-04, NOT resolved).**
+`taxonomy/…/routes_profiles.go:375` (pre-step-1 `:347`) → **409**, on the `23503` foreign-key arm:
+the caller supplied a `family_code` in the profile body that references a family that does not
+exist.
+`taxonomy/…/routes_families.go:129` → **404**, on `domain.ErrFamilyNotFound`: the family *is* the
+request target of `/taxonomy/families/{code}`.
+R-23 was written against the 409 site only and weighs 404-vs-422 on the premise that the family is
+always "a referenced value inside the body". The 404 site falsifies that premise for half the
+traffic: under §1.4 rule 5 the `routes_families.go` site is a textbook `notfound.` — the addressed
+subject does not exist — while the `routes_profiles.go` site is exactly the case R-23 argues is 422.
+**These are two conditions, not one**, and the registry binds one status per code, so they cannot
+both keep the same code.
+**RECOMMENDED (needs operator ratification alongside R-23, and explicitly does not override it):**
+split into `notfound.document_family` @404 for `routes_families.go:129` and
+`validation.family_unknown` @422 for `routes_profiles.go:375`. Under that split R-23's dilemma
+dissolves — both readings were right, about different sites. If the operator instead ratifies a
+single code, §2 row #153 must be amended to name it and one of the two sites changes status, which
+is behaviour-visible and belongs in ADR 0089's decision 3 list.
+**RATIFIED 2026-08-04** into ADR 0089 decision 3, as recommended: the split stands.
+`routes_families.go:129` → `notfound.document_family` @404; `routes_profiles.go:375` →
+`validation.family_unknown` @422. §2 row #153 is superseded by two rows, #153a and #153b below.
+The deciding argument is that a single code was not actually the conservative option — the registry
+binds one status per code, so keeping one name would have silently changed the status of one of the
+two sites. The split changes behaviour for a stated reason instead of by accident, and it is the
+same defect class (one field, two meanings) that ADR 0088 removed from `content_hash`.
+
+| # | old | decl | emit | current | NEW code | NEW status | note |
+|---|---|---|---|---|---|---|---|
+| 153a | `FAMILY_NOT_FOUND` | `routes_profiles.go:32` | `routes_families.go:129` | **404** | `notfound.document_family` | **404** | the family IS the request target (§1.4 rule 5); status unchanged |
+| 153b | `FAMILY_NOT_FOUND` | `routes_profiles.go:32` | `routes_profiles.go:375` | **409** | `validation.family_unknown` | **422** | `family_code` referenced inside a profile body does not resolve (R-23's reading); **behaviour-visible: 409 → 422** |
+
+R-23 is thereby resolved too: both of its readings were correct, about different sites.
+
 ---
 
 ## 4. Registry API sketch + execution order
@@ -775,6 +946,18 @@ func Register(module, code string, defaultStatus int) Code { … }
 // no HTTP status, no family prefix requirement.
 func RegisterField(module, code string) FieldCode { … }
 ```
+
+**As-built deviation (step 1, db24944f) — `RegisterField` returns `Code`, not a distinct
+`FieldCode` type.** The sketch above proposes a separate Go type for field-level codes. Step 1 kept
+the **shared `Code` type** with a **separate registration namespace** (`fieldRegistry`, its own
+duplicate guard, no status, no family validation — `internal/platform/problem/code.go:275-281`).
+Rationale: the wire type is identical (a plain JSON string in `FieldError.code`), and `FieldError`
+already carries `Code`, so introducing `FieldCode` is a second mechanical type migration that buys
+nothing until something can actually confuse the two — which the separate namespace already
+prevents at registration time. The type split is **deferred, not dropped**: if a future surface
+lets a field code be passed where a Problem code is expected (or vice versa), promote
+`RegisterField` to return `FieldCode` then. The namespace separation §2.1's field-code note and
+this section both require is already in force.
 
 `problem.New` keeps its signature for the override path but gains the status-free constructor:
 
@@ -861,15 +1044,16 @@ Haiku-class agent given §2 verbatim.
 |---|---|---|---|
 | 0 | ADR 0088 commits | — | No §2 row's file is modified, so this does **not** block steps 1-3. It **does** block R-1's ratification (`templates/application/create.go` newly routes through `UPLOAD_MISSING`). |
 | 1 | Operator ratifies §1 family set (incl. the `request.` split) and the §1.4 decision rule | **[J]** | hard gate — every later step depends on the family names |
-| 2 | Operator ratifies §3 R-1…R-24 | **[J]** | hard gate — fixes the NEW default status column |
-| 3 | Implement `Code` struct + `Register` + `RegisterField` + `NewFor` + registry + family validation in `internal/platform/problem`; keep `codes.go` constants temporarily as `Register(...)` calls with their CURRENT strings | **[J]** | one commit, compiles green, wire unchanged. This is the only step that touches type shape. |
+| 2 | Operator ratifies §3 R-1…R-26 | **[J]** | hard gate — fixes the NEW default status column. R-25/R-26 added by the 2026-08-04 amendment; R-26 is a *flag*, and the sweep must not act on it unruled |
+| 3 | Implement `Code` struct + `Register` + `RegisterField` + `NewFor` + registry + family validation in `internal/platform/problem`; keep `codes.go` constants temporarily as `Register(...)` calls with their CURRENT strings | **[J]** | **DONE — commit db24944f.** One commit, compiles green, wire unchanged. Shipped with `RegisterLegacy` (a temporary escape hatch this plan did not anticipate: SCREAMING_SNAKE names cannot pass family validation, so the type change and the rename had to be separable). It also forced the **registration** half of 9 collapses forward from step 10 — see the row below and §2.10. |
 | 4 | Sweep `internal/platform/*` + `apps/*` off raw `string(code)` onto `code.String()` | **[M]** | ~12 sites; `go build ./...` is the oracle |
 | 5 | Rename catalog values per §2.1; delete the 11 dead constants | **[M]** | §2.1 is literal; wire changes here |
 | 6 | Rename approval's 68 const values per §2.2 | **[M]** | single file, single-line-per-row edits |
 | 7 | Replace CD's 43 raw literals with registry references per §2.5 | **[M]** | `controlleddocuments/delivery/http/routes.go` + `handler.go` only |
 | 8 | Replace fill-in's 11 raw literals per §2.4 | **[M]** | `documents/delivery/http/fillin_handler.go` only |
-| 9 | Rename taxonomy (8) and tokens (4) per §2.6/§2.7; delete tokens' 2 redeclarations | **[M]** | |
-| 10 | Apply the collapses C-1…C-18 | **[J]** | each touches ≥2 modules' mappers and changes which sentinel maps where; not mechanical |
+| 9 | Rename taxonomy (**16**, not 8 — §2.6 + §2.6b) and tokens (4) per §2.6/§2.6b/§2.7; delete tokens' 2 redeclarations | **[M]** | the 8 area/family rows #166-#173 were added by the 2026-08-04 amendment; a sweep driven by the original §2.6 would have silently skipped them |
+| 10-pre | ~~Collapse the 9 cross-module registrations~~ — **DONE in step 1 (db24944f), not deferrable** | — | The duplicate guard in `problem.record()` panics at init on a second declaration of one wire string, so step 1 could not compile while 9 strings stayed declared in two modules each. A module may not import another module's delivery package, so the only legal shared home was the platform catalog: `internal/platform/problem/codes.go:103-113`, `RegisterLegacy("shared", …)`, wire strings and per-call-site statuses untouched. Affected: `internal.unknown`, `validation.json_decode`, `validation.empty_body`, `authz.capability_denied`, `state.approval_route_missing`, `PROFILE_NOT_FOUND`, `PROFILE_ARCHIVED`, `AREA_NOT_FOUND`, `AREA_ARCHIVED`. **Correction to this plan:** §4.4 originally sequenced all of C-1…C-18 into step 10. That was wrong for the registration half — the duplicate guard makes "one string, one declaration site" a *precondition* of the closed type, not a consequence of the rename. Only the semantic half (which sentinel reaches which arm, and the final renamed code) is step-10 work. |
+| 10 | Apply the **semantic** collapses C-1…C-19 | **[J]** | each touches ≥2 modules' mappers and changes which sentinel maps where; not mechanical. The **registration** half of 9 of these already landed — see row 10-pre and §2.10. C-19 was added by the 2026-08-04 amendment |
 | 11 | Re-point templates' 22 aliases; create new codes #159-#164; apply R-2/R-4/R-5/R-7/R-10/R-14 | **[J]** | ⚠0088 — sequence after 0088 merges |
 | 12 | Apply the status-only rulings (R-8, R-9, R-12, R-13, R-15, R-16, R-19, R-20, R-23) | **[M]** given §3 | each is "change this int at this line" |
 | 13 | Add `//problem:override` annotations wherever a call site keeps a non-default status | **[M]** | mechanical once step 12 lands |
