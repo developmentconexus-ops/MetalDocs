@@ -113,9 +113,9 @@ beforeEach(() => {
 });
 
 describe('TemplateWizardPage — create-error copy is keyed on the Problem code', () => {
-  it('surfaces the duplicate-key copy for ALREADY_EXISTS', async () => {
+  it('surfaces the duplicate-key copy for conflict.already_exists', async () => {
     vi.mocked(templatesApi.createTemplate).mockRejectedValue(
-      new ApiError('ALREADY_EXISTS', 409, 'template key conflict'),
+      new ApiError('conflict.already_exists', 409, 'template key conflict'),
     );
 
     const text = await submitAndReadAlert();
@@ -126,9 +126,9 @@ describe('TemplateWizardPage — create-error copy is keyed on the Problem code'
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it('surfaces the route-configuration copy for APPROVAL_ROUTE_MISSING (ADR 0086)', async () => {
+  it('surfaces the route-configuration copy for state.approval_route_missing (ADR 0086)', async () => {
     vi.mocked(templatesApi.createTemplate).mockRejectedValue(
-      new ApiError('APPROVAL_ROUTE_MISSING', 409, 'no active template route'),
+      new ApiError('state.approval_route_missing', 409, 'no active template route'),
     );
 
     const text = await submitAndReadAlert();

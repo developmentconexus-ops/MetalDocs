@@ -31,7 +31,7 @@ describe('useAuthSession.handleChangePassword', () => {
   it('maps AUTH_INVALID_CREDENTIALS (wrong current password) to a credential message', async () => {
     vi.mocked(authApi.changePassword).mockRejectedValue(
       Object.assign(new Error('Invalid username/email or password'), {
-        code: 'AUTH_INVALID_CREDENTIALS',
+        code: 'auth.invalid_credentials',
         status: 401,
       }),
     );

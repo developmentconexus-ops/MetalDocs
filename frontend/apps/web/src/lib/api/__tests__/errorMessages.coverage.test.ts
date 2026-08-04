@@ -13,7 +13,7 @@ describe('errorMessages coverage', () => {
   it('has a Portuguese mapping for every backend Problem code', () => {
     const missing = snapshot.codes.filter((code) => !(code in errorMessages));
 
-    expect(missing, `Missing PT-BR mapping for backend code(s). Run \`go run ./scripts/dump-error-codes.go\` if codes were just added, then add entries to frontend/apps/web/src/lib/api/errorMessages.ts. Missing: ${missing.join(', ')}`).toEqual([]);
+    expect(missing, `Missing PT-BR mapping for backend code(s). Run \`go run ./cmd/problem-codes-dump\` if codes were just added, then add entries to frontend/apps/web/src/lib/api/errorMessages.ts. Missing: ${missing.join(', ')}`).toEqual([]);
   });
 
   it('does not declare stale mappings for codes no longer emitted by the backend', () => {

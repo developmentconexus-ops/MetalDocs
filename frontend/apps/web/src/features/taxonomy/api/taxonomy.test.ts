@@ -171,7 +171,7 @@ describe('fetchProfiles', () => {
   });
 
   it('throws ApiError when the client reports an error', async () => {
-    mockGet.mockResolvedValue({ data: undefined, error: { code: 'authz.capability_denied' } });
+    mockGet.mockResolvedValue({ data: undefined, error: { code: 'permission.capability_denied' } });
     await expect(fetchProfiles()).rejects.toBeInstanceOf(ApiError);
   });
 });
@@ -271,7 +271,7 @@ describe('archiveProfile', () => {
   });
 
   it('throws ApiError when the client reports an error', async () => {
-    mockDelete.mockResolvedValue({ data: undefined, error: { code: 'conflict.profile_referenced' } });
+    mockDelete.mockResolvedValue({ data: undefined, error: { code: 'state.profile_class_route_conflict' } });
     await expect(archiveProfile('pop')).rejects.toBeInstanceOf(ApiError);
   });
 });

@@ -376,7 +376,7 @@ describe('NewDocumentWizardPage — submit guard via UI', () => {
 
   it('stays on the wizard and shows a shared error when the template artifact is missing', async () => {
     vi.mocked(cdApi.createControlledDocumentAtomic).mockRejectedValue(
-      new ApiError('template.artifact_missing', 409, 'artifact missing'),
+      new ApiError('state.template_artifact_missing', 409, 'artifact missing'),
     );
 
     renderWizardAtConfirmationStep();

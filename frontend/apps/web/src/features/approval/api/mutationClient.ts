@@ -59,12 +59,12 @@ export async function mutate<TReq, TRes>(
   // The API emits only RFC 9457 problem+json (AD-2). Parse it; a missing body
   // means a non-handler failure (infra 502/504/bodyless) → synthesize generic.
   const prob = await parseProblem(res.clone());
-  if (res.status === 401 && (!prob || prob.code === 'AUTH_UNAUTHORIZED')) {
+  if (res.status === 401 && (!prob || prob.code === 'auth.unauthenticated')) {
     dispatchAuthExpired(window.location.pathname + window.location.search);
     throw new ApprovalError('authn.expired', 401, 'Sessão expirada');
   }
   if (res.status === 429) {
-    throw new ApprovalError('authn.rate_limited', 429, 'Muitas tentativas. Aguarde 30 segundos.');
+    throw new ApprovalError('ratelimit.exceeded', 429, 'Muitas tentativas. Aguarde 30 segundos.');
   }
   if (res.status === 412) {
     if (opts.on412 && opts.resourceId) {

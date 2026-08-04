@@ -4,7 +4,7 @@ import { ApiError, parseProblem, resolveErrorMessage } from './problem';
 
 describe('problem', () => {
   it('parseProblem returns null on application/json', async () => {
-    const res = new Response(JSON.stringify({ code: 'VALIDATION_ERROR', title: 'x', status: 400 }), {
+    const res = new Response(JSON.stringify({ code: 'request.invalid', title: 'x', status: 400 }), {
       headers: { 'Content-Type': 'application/json' },
     });
 
@@ -29,7 +29,7 @@ describe('problem', () => {
 
   it('parseProblem returns Problem for valid problem body with case-insensitive content-type', async () => {
     const payload = {
-      code: 'VALIDATION_ERROR',
+      code: 'request.invalid',
       title: 'Erro de validação',
       status: 400,
       detail: 'Há erros no formulário.',
@@ -44,7 +44,7 @@ describe('problem', () => {
 
   it('ApiError.getFieldErrors returns map keyed by field', () => {
     const err = new ApiError({
-      code: 'VALIDATION_ERROR',
+      code: 'request.invalid',
       title: 'Erro de validação',
       status: 400,
       errors: [
@@ -61,7 +61,7 @@ describe('problem', () => {
 
   it('ApiError.hasFieldError returns true/false correctly', () => {
     const err = new ApiError({
-      code: 'VALIDATION_ERROR',
+      code: 'request.invalid',
       title: 'Erro de validação',
       status: 400,
       errors: [{ field: 'name', code: 'REQUIRED', message: 'name is required' }],
@@ -72,9 +72,9 @@ describe('problem', () => {
   });
 
   it('ApiError.fromLegacy creates sensible defaults', () => {
-    const err = ApiError.fromLegacy('legacy.code', 418, 'Mensagem legado');
+    const err = ApiError.fromLegacy('unmatched.code', 418, 'Mensagem legado');
 
-    expect(err.code).toBe('legacy.code');
+    expect(err.code).toBe('unmatched.code');
     expect(err.status).toBe(418);
     expect(err.title).toBe('Mensagem legado');
     expect(err.message).toBe('Mensagem legado');
@@ -83,7 +83,7 @@ describe('problem', () => {
 
   it('resolveErrorMessage returns mapped pt-BR for known code', () => {
     const err = new ApiError({
-      code: 'VALIDATION_ERROR',
+      code: 'request.invalid',
       title: 'Validation failed',
       status: 400,
       detail: 'detail',
@@ -94,13 +94,13 @@ describe('problem', () => {
 
   it('resolveErrorMessage returns actionable PT-BR fallback for unmapped ApiError code', () => {
     const err = new ApiError({
-      code: 'CUSTOM_UNKNOWN_CODE',
+      code: 'unmatched.code',
       title: 'Fallback title',
       status: 400,
       detail: 'Detalhe específico',
     });
 
-    expect(resolveErrorMessage(err)).toBe('Não foi possível concluir a ação. Código: CUSTOM_UNKNOWN_CODE');
+    expect(resolveErrorMessage(err)).toBe('Não foi possível concluir a ação. Código: unmatched.code');
   });
 
   it("resolveErrorMessage falls back to 'Erro inesperado.' for non-Error input", () => {

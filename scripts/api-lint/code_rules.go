@@ -116,6 +116,15 @@ func RunCodeRules(specPath, modulesRoot string, strict bool) ([]Violation, error
 	}
 	out = append(out, soleRLSRead...)
 
+	// ADR 0089 step 12 — PROBLEM-DUMP-IMPORT: a package that registers Problem
+	// codes but is not linked into cmd/problem-codes-dump contributes nothing to
+	// the registry, so every generated artifact silently omits its codes.
+	problemDump, err := checkProblemDumpImports(modulesRoot, fset, strict)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, problemDump...)
+
 	return out, nil
 }
 

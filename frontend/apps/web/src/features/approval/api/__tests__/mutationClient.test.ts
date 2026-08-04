@@ -11,7 +11,7 @@ describe('mutationClient problem+json handling', () => {
         JSON.stringify({
           title: 'Validation failed',
           status: 422,
-          code: 'VALIDATION_ERROR',
+          code: 'request.invalid',
           detail: 'Payload is invalid.',
         }),
         {
@@ -33,7 +33,7 @@ describe('mutationClient problem+json handling', () => {
 
     expect(caught).toBeInstanceOf(ApprovalError);
     expect(caught?.status).toBe(422);
-    expect(caught?.code).toBe('VALIDATION_ERROR');
+    expect(caught?.code).toBe('request.invalid');
     expect(caught?.message).toBe('Validation failed');
   });
 });

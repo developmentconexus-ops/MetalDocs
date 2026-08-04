@@ -262,7 +262,7 @@ function placeholderToWire(p: Placeholder): WirePlaceholder {
 }
 
 export class StaleLockVersionError extends Error {
-  readonly code = 'CONCURRENT_MODIFICATION';
+  readonly code = 'conflict.concurrent_modification';
   constructor(message?: string) {
     super(message ?? 'Concurrent modification: the template schema changed since you loaded it.');
     this.name = 'StaleLockVersionError';
@@ -329,7 +329,7 @@ export async function putTemplateSchemas(
     // The optimistic-lock conflict surfaces as RFC 9457 412/CONCURRENT_MODIFICATION
     // through the shared transport; re-raise as the typed domain error so the
     // editor can prompt a refresh.
-    if (err instanceof ApiError && (err.code === 'CONCURRENT_MODIFICATION' || err.status === 412)) {
+    if (err instanceof ApiError && (err.code === 'conflict.concurrent_modification' || err.status === 412)) {
       throw new StaleLockVersionError(err.message);
     }
     throw err;

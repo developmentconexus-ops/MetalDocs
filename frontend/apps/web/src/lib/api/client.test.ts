@@ -21,7 +21,7 @@ describe('assertApiResponse — 401 discrimination', () => {
 
   it('treats AUTH_UNAUTHORIZED as session-expired: dispatches authExpired and throws authn.expired', async () => {
     const dispatch = vi.spyOn(authBus, 'dispatchAuthExpired').mockImplementation(() => {});
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(problemResponse(401, 'AUTH_UNAUTHORIZED'));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(problemResponse(401, 'auth.unauthenticated'));
 
     await expect(apiFetch('/me')).rejects.toMatchObject({ code: 'authn.expired', status: 401 });
     expect(dispatch).toHaveBeenCalledOnce();
@@ -29,11 +29,11 @@ describe('assertApiResponse — 401 discrimination', () => {
 
   it('preserves a domain 401 code (AUTH_INVALID_CREDENTIALS) and does NOT dispatch authExpired', async () => {
     const dispatch = vi.spyOn(authBus, 'dispatchAuthExpired').mockImplementation(() => {});
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(problemResponse(401, 'AUTH_INVALID_CREDENTIALS'));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(problemResponse(401, 'auth.invalid_credentials'));
 
     const err: unknown = await apiFetch('/auth/change-password', { method: 'POST' }).catch((e) => e);
     expect(err).toBeInstanceOf(ApiError);
-    expect((err as ApiError).code).toBe('AUTH_INVALID_CREDENTIALS');
+    expect((err as ApiError).code).toBe('auth.invalid_credentials');
     expect((err as ApiError).status).toBe(401);
     expect(dispatch).not.toHaveBeenCalled();
   });

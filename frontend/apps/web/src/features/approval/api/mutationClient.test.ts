@@ -54,7 +54,7 @@ describe('mutationClient', () => {
       vi.spyOn(global, 'fetch').mockImplementation(() =>
         Promise.resolve(
           new Response(
-            JSON.stringify({ type: 'about:blank', title: 'forbidden', status: 403, code: 'sod.submitter_cannot_sign' }),
+            JSON.stringify({ type: 'about:blank', title: 'forbidden', status: 403, code: 'permission.sod_submitter_cannot_sign' }),
             { status: 403, headers: { 'Content-Type': 'application/problem+json' } },
           ),
         ),
@@ -67,7 +67,7 @@ describe('mutationClient', () => {
         caught = e as ApprovalError;
       }
       expect(caught).toBeInstanceOf(ApprovalError);
-      expect(caught?.code).toBe('sod.submitter_cannot_sign');
+      expect(caught?.code).toBe('permission.sod_submitter_cannot_sign');
       expect(caught?.status).toBe(403);
     });
 
@@ -75,7 +75,7 @@ describe('mutationClient', () => {
       vi.spyOn(global, 'fetch').mockImplementation(() =>
         Promise.resolve(
           new Response(
-            JSON.stringify({ type: 'about:blank', title: 'forbidden', status: 403, code: 'sod.cross_stage_duplicate' }),
+            JSON.stringify({ type: 'about:blank', title: 'forbidden', status: 403, code: 'permission.sod_cross_stage_duplicate' }),
             { status: 403, headers: { 'Content-Type': 'application/problem+json' } },
           ),
         ),
@@ -88,7 +88,7 @@ describe('mutationClient', () => {
         caught = e as ApprovalError;
       }
       expect(caught).toBeInstanceOf(ApprovalError);
-      expect(caught?.code).toBe('sod.cross_stage_duplicate');
+      expect(caught?.code).toBe('permission.sod_cross_stage_duplicate');
     });
   });
 
@@ -97,7 +97,7 @@ describe('mutationClient', () => {
       vi.spyOn(global, 'fetch').mockImplementation(() =>
         Promise.resolve(
           new Response(
-            JSON.stringify({ type: 'about:blank', title: 'stale', status: 412, code: 'conflict.stale' }),
+            JSON.stringify({ type: 'about:blank', title: 'stale', status: 412, code: 'conflict.stale_revision' }),
             { status: 412, headers: { 'Content-Type': 'application/problem+json' } },
           ),
         ),
@@ -111,7 +111,7 @@ describe('mutationClient', () => {
       }
       expect(caught).toBeInstanceOf(ApprovalError);
       expect(caught?.status).toBe(412);
-      expect(caught?.code).toBe('conflict.stale');
+      expect(caught?.code).toBe('conflict.stale_revision');
     });
   });
 
@@ -128,7 +128,7 @@ describe('mutationClient', () => {
         caught = e as ApprovalError;
       }
       expect(caught).toBeInstanceOf(ApprovalError);
-      expect(caught?.code).toBe('authn.rate_limited');
+      expect(caught?.code).toBe('ratelimit.exceeded');
       expect(caught?.status).toBe(429);
     });
   });

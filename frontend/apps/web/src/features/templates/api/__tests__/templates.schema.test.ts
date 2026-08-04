@@ -99,7 +99,7 @@ describe('templates.putTemplateSchemas', () => {
           type: 'about:blank',
           title: 'Conflict',
           status: 412,
-          code: 'CONCURRENT_MODIFICATION',
+          code: 'conflict.concurrent_modification',
           detail: 'lock_version mismatch',
         },
         412,

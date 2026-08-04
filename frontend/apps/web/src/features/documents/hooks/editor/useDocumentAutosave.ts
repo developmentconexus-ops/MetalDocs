@@ -10,7 +10,7 @@ export interface AutosaveArgs {
   baseRevisionID: string;
   onAdvanceBase: (newRevisionID: string) => void;
   onArtifactMetadata?: (metadata: { fileSizeBytes?: number | null; pageCount?: number | null }) => void;
-  onSessionLost: (reason: 'CONCURRENT_MODIFICATION' | 'CONFLICT_ERROR' | 'force_released') => void;
+  onSessionLost: (reason: 'conflict.concurrent_modification' | 'conflict.generic' | 'force_released') => void;
 }
 
 const SYNC_DEBOUNCE_MS = 3_000;
@@ -87,9 +87,9 @@ export function useDocumentAutosave(args: AutosaveArgs) {
         // presign/commit emit RFC 9457 Problem; ApiError.code carries the
         // canonical code. CONCURRENT_MODIFICATION = stale base; CONFLICT_ERROR =
         // session inactive / not holder.
-        if (e?.code === 'CONCURRENT_MODIFICATION') { onSessionLost('CONCURRENT_MODIFICATION'); setStatus('stale'); return false; }
-        if (e?.code === 'CONFLICT_ERROR') {
-          onSessionLost('CONFLICT_ERROR'); setStatus('session_lost'); return false;
+        if (e?.code === 'conflict.concurrent_modification') { onSessionLost('conflict.concurrent_modification'); setStatus('stale'); return false; }
+        if (e?.code === 'conflict.generic') {
+          onSessionLost('conflict.generic'); setStatus('session_lost'); return false;
         }
       }
       if (e?.status === 410) {

@@ -4,7 +4,7 @@ import { resolveQueryError } from '../resolveQueryError';
 
 describe('resolveQueryError', () => {
   it('returns resolveErrorMessage result for ApiError', () => {
-    const err = new ApiError('NOT_FOUND', 404, 'not found');
+    const err = new ApiError('notfound.resource', 404, 'not found');
     const result = resolveQueryError(err, 'fallback');
     // resolveErrorMessage maps known codes to Portuguese; unknown codes use the backendMessage.
     expect(typeof result).toBe('string');

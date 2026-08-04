@@ -36,7 +36,7 @@ describe("apiFetch", () => {
   it("throws ApiError with parsed code from an RFC 9457 problem+json body on 4xx", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       makeResponse(
-        { code: "validation.request_invalid", title: "Requisição inválida", status: 400, detail: "Requisição inválida" },
+        { code: "request.invalid", title: "Requisição inválida", status: 400, detail: "Requisição inválida" },
         400,
         "application/problem+json",
       ),
@@ -44,7 +44,7 @@ describe("apiFetch", () => {
 
     await expect(apiFetch("/api/documents")).rejects.toMatchObject({
       name: "ApiError",
-      code: "validation.request_invalid",
+      code: "request.invalid",
       status: 400,
       message: "Requisição inválida",
       details: undefined,

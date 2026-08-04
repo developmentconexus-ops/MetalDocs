@@ -49,7 +49,7 @@ describe('useSignoffMutation', () => {
   });
 
   it('classifies a 412 conflict as a non-terminal stale refresh, not a hard error', async () => {
-    vi.mocked(approvalApi.signoff).mockRejectedValue(new ApprovalError('conflict.stale', 412, 'stale'));
+    vi.mocked(approvalApi.signoff).mockRejectedValue(new ApprovalError('conflict.stale_revision', 412, 'stale'));
 
     const { result } = renderHook(() => useSignoffMutation(ARGS), { wrapper });
     await expect(result.current.signOff({ decision: 'reject', password: 'pw' })).rejects.toMatchObject({
@@ -61,7 +61,7 @@ describe('useSignoffMutation', () => {
 
   it('classifies an invalid-signature failure as a SignoffError (bad_password)', async () => {
     vi.mocked(approvalApi.signoff).mockRejectedValue(
-      new ApprovalError('authn.signature_invalid', 422, 'invalid'),
+      new ApprovalError('auth.signature_invalid', 422, 'invalid'),
     );
 
     const { result } = renderHook(() => useSignoffMutation(ARGS), { wrapper });

@@ -5,7 +5,7 @@
 // failed sign-off IDENTICALLY. No React, no state setters — a raw error in, a
 // { kind, message, stale } record out. Do NOT fork a second mapping.
 //
-// `stale` (HTTP 412 / conflict.stale) is not a terminal error in the UI sense:
+// `stale` (any HTTP 412) is not a terminal error in the UI sense:
 // the dialog surfaced it as a "refresh the page" banner and reset to idle rather
 // than a red error box. Callers render it as a banner and keep the form usable.
 
@@ -54,11 +54,11 @@ const MESSAGES: Record<Exclude<SignoffErrorKind, 'server'>, string> = {
   network: 'Erro de conexão. Verifique sua internet e tente novamente.',
   // E2: SoD codes get Portuguese messages from the shared errorMessages map.
   sod_submitter: resolveErrorMessage(
-    'sod.submitter_cannot_sign',
+    'permission.sod_submitter_cannot_sign',
     'Segregação de funções: submissão e aprovação pelo mesmo usuário não é permitida.',
   ),
   sod_duplicate: resolveErrorMessage(
-    'sod.cross_stage_duplicate',
+    'permission.sod_cross_stage_duplicate',
     'Você já assinou este documento em uma etapa anterior.',
   ),
 };
@@ -78,13 +78,18 @@ function of(kind: Exclude<SignoffErrorKind, 'server'>): SignoffError {
  */
 export function mapSignoffError(error: unknown): SignoffError {
   if (error instanceof ApprovalError) {
-    if (error.status === 412 || error.code === 'conflict.stale') return of('stale');
-    if (error.code === 'authn.signature_invalid' || error.code === 'AUTH_INVALID_CREDENTIALS') return of('bad_password');
-    if (error.code === 'signoff.not_eligible' || error.code === 'SIGNOFF_NOT_ELIGIBLE') return of('not_eligible');
+    // Stale is classified by STATUS, not by code: 412 is what every precondition
+    // failure answers, and the codes that carry it differ per surface
+    // (precondition.content_hash_mismatch, conflict.stale_revision, ...). The
+    // second arm here tested a conflict-family code no backend has ever
+    // registered — it never fired, and the status check was doing all the work.
+    if (error.status === 412) return of('stale');
+    if (error.code === 'auth.signature_invalid' || error.code === 'auth.invalid_credentials') return of('bad_password');
+    if (error.code === 'permission.signoff_actor_not_eligible') return of('not_eligible');
     if (error.status === 401) return of('session_expired');
-    if (error.status === 429 || error.code === 'authn.rate_limited') return of('rate_limited');
-    if (error.code === 'sod.submitter_cannot_sign') return of('sod_submitter');
-    if (error.code === 'sod.cross_stage_duplicate') return of('sod_duplicate');
+    if (error.status === 429 || error.code === 'ratelimit.exceeded') return of('rate_limited');
+    if (error.code === 'permission.sod_submitter_cannot_sign') return of('sod_submitter');
+    if (error.code === 'permission.sod_cross_stage_duplicate') return of('sod_duplicate');
     const resolved = resolveErrorMessage(error.code);
     return new SignoffError('server', resolved === 'Erro inesperado.' ? SERVER_FALLBACK : resolved);
   }

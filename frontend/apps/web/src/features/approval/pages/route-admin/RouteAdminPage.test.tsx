@@ -224,7 +224,7 @@ describe('RouteAdminPage', () => {
     // stays open with the mapped message inline; no synthetic optimistic row
     // is ever inserted, so there is nothing in the table to roll back.
     vi.mocked(routeAdminApi.createRoute).mockRejectedValueOnce(
-      new ApprovalError('route.duplicate_profile', 409, 'duplicate profile'),
+      new ApprovalError('conflict.approval_route_duplicate_profile', 409, 'duplicate profile'),
     );
 
     renderWithProviders(<RouteAdminPage />);

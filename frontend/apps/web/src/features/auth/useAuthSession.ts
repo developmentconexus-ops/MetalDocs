@@ -30,7 +30,7 @@ export function useAuthSession() {
       } catch (err) {
         setUser(null);
         setAuthState('idle');
-        setError(codeOf(err) === 'AUTH_INVALID_CREDENTIALS' ? 'Usuário ou senha inválidos.' : asMessage(err));
+        setError(codeOf(err) === 'auth.invalid_credentials' ? 'Usuário ou senha inválidos.' : asMessage(err));
       }
     },
     [loginForm, setAuthState, setError, setUser],
@@ -64,7 +64,7 @@ export function useAuthSession() {
         setAuthState('ready');
         setMessage('Senha alterada com sucesso.');
       } catch (err) {
-        setError(codeOf(err) === 'AUTH_INVALID_CREDENTIALS' ? 'Senha atual incorreta.' : asMessage(err));
+        setError(codeOf(err) === 'auth.invalid_credentials' ? 'Senha atual incorreta.' : asMessage(err));
       }
     },
     [passwordForm, setAuthState, setError, setMessage, setPasswordForm, setUser],

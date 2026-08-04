@@ -24,11 +24,15 @@ const EMPTY_SLUG_ERROR = 'Informe um nome com letras ou números para gerar o id
 // canonical RFC 9457 code -> PT-BR map — matching on `err.code` rather than on
 // the human-readable `message`, which never carries the code.
 const CREATE_ERROR_COPY: Record<string, string> = {
-  // templates MapErr maps domain.ErrKeyConflict -> problem.CodeAlreadyExists.
-  ALREADY_EXISTS: 'Já existe um template com este identificador técnico. Escolha outro nome.',
+  // templates MapErr maps domain.ErrKeyConflict -> problem.CodeConflictAlreadyExists.
+  // Keys are QUOTED so the problem-code vocabulary guard
+  // (lib/api/__tests__/problemCodeVocabulary.test.ts) can see them; as bare
+  // identifiers they were invisible to it and to the ADR 0089 rename sweep,
+  // which is how both survived pointing at codes the backend had stopped sending.
+  'conflict.already_exists': 'Já existe um template com este identificador técnico. Escolha outro nome.',
   // ADR 0086 config-first gate: the declared profile has no active TEMPLATE
   // approval route, so no template can be created under it until one exists.
-  APPROVAL_ROUTE_MISSING:
+  'state.approval_route_missing':
     'Este perfil não tem rota de aprovação de template ativa. Configure a rota em Rotas de Aprovação antes de criar o template.',
 };
 

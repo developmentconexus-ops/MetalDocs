@@ -81,7 +81,7 @@ describe('DocumentPdfViewerDialog', () => {
     const refetch = vi.fn();
     hookState.value = buildQuery({
       isError: true,
-      error: new ApiError('RATE_LIMITED', 429, 'rate limited'),
+      error: new ApiError('ratelimit.exceeded', 429, 'rate limited'),
       refetch,
     });
 

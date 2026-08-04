@@ -71,7 +71,7 @@ describe("useMembershipsQuery", () => {
   it("surfaces an error when the endpoint returns an RFC 9457 problem", async () => {
     mockGet.mockResolvedValue({
       data: undefined,
-      error: { status: 400, code: "VALIDATION_ERROR", title: "Bad Request" },
+      error: { status: 400, code: "request.invalid", title: "Bad Request" },
     });
 
     const { result } = renderHook(() => useMembershipsQuery(), {

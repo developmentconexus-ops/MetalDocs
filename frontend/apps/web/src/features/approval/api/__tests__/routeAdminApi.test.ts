@@ -52,7 +52,7 @@ describe('listRoutes', () => {
       type: 'about:blank',
       title: 'forbidden',
       status: 403,
-      code: 'authz.capability_denied',
+      code: 'permission.capability_denied',
     };
     global.fetch = vi.fn().mockResolvedValue(
       new Response(JSON.stringify(problem), {
@@ -62,7 +62,7 @@ describe('listRoutes', () => {
     ) as typeof fetch;
 
     await expect(listRoutes()).rejects.toMatchObject({
-      code: 'authz.capability_denied',
+      code: 'permission.capability_denied',
       status: 403,
     });
     await expect(listRoutes()).rejects.toBeInstanceOf(ApiError);
