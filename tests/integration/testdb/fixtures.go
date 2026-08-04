@@ -500,16 +500,39 @@ func SeedDocument(t *testing.T, ctx context.Context, db *sql.DB, schema, docID, 
 // taxonomy.manage) before inserting the route. profileCode must satisfy
 // document_profiles' CHECK constraint (lowercase, ^[a-z][a-z0-9_-]{1,63}$) —
 // callers passing an uppercase/mixed-case code will fail that CHECK.
+//
+// The route is seeded WITH one approval stage, deliberately. SeedGovernedTaxonomy
+// creates a 'simples' profile, and since ADR 0087 / migration 0316 a stageless
+// ACTIVE route is DB-exclusive to livre — every governed class requires >=1 stage
+// at the DB line, because a stageless route auto-approves at submit. Seeding the
+// stage keeps this helper's shape a REAL governed route, which is what its callers
+// exercise (they create stage instances and signoffs); flipping the profile to
+// livre instead would silently turn those tests into auto-approve tests.
+//
+// Route and stage go in the SAME transaction: assert_route_shape is DEFERRABLE
+// INITIALLY DEFERRED, so it validates the finished shape at commit, not the
+// intermediate stageless row.
 func SeedRouteConfig(t *testing.T, ctx context.Context, db *sql.DB, schema, routeID, tenantID, profileCode string) {
 	t.Helper()
 	SeedGovernedTaxonomy(t, db, tenantID, profileCode, profileCode)
 	seedTenantOnly(t, db, tenantID, "", func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(ctx, fmt.Sprintf(`
+		if _, err := tx.ExecContext(ctx, fmt.Sprintf(`
 			INSERT INTO %s (id, tenant_id, name, profile_code, created_by, active, created_at)
 			VALUES ($1::uuid, $2::uuid, 'Test Route', $3, 'system', true, now())
 			ON CONFLICT (id) DO NOTHING`,
 			Qualified(schema, "approval_routes")),
 			routeID, tenantID, profileCode,
+		); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, fmt.Sprintf(`
+			INSERT INTO %s (route_id, stage_order, name, required_capability,
+			                quorum, on_eligibility_drift, stage_kind)
+			VALUES ($1::uuid, 1, 'Signoff', 'document.signoff',
+			        'any_1_of', 'reduce_quorum', 'approval')
+			ON CONFLICT DO NOTHING`,
+			Qualified(schema, "approval_route_stages")),
+			routeID,
 		)
 		return err
 	})
