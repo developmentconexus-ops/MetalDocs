@@ -732,6 +732,60 @@ evaluates false.
 
 ---
 
+## Class 22 — The Guarded Branch That No Environment Executes
+
+**Symptom.** A branch exists to handle the abnormal case. Every environment the change is
+tested in is normal, so the branch is never entered. In a language that resolves names at
+**execution** rather than at parse time, the branch can contain an outright invalid
+reference — a table that does not exist, a column that was renamed, a function with the
+wrong arity — and still ship green. It fails on the first machine whose *data* differs.
+
+**Evidence.** Migration `0317` (ADR 0088) inventories content-less template versions and,
+`IF v_doomed = 0`, does nothing. The `ELSE` arm asserts that no doomed row is referenced,
+and it read `public.document_profiles` — that table is in the `metaldocs` schema. The other
+three tables in the same assert genuinely are in `public`, which is what let one wrong
+qualifier hide in plain sight. Every database it was verified against was already clean, took
+the `v_doomed = 0` branch, and applied it successfully. The dev volume had content-less
+drafts, entered the `ELSE`, and failed with `relation "public.document_profiles" does not
+exist (SQLSTATE 42P01)` — putting `metaldocs-api` into a startup restart loop, because
+migrations are applied on boot.
+
+Same class, other instances: a PL/pgSQL error handler that references a dropped column and
+only runs when the error fires; a rarely-hit `except` block calling a renamed helper; a
+reflection-based or string-built SQL path behind a feature flag nobody enabled in staging;
+a rollback path exercised only by the failure it exists to handle.
+
+**Root cause.** Two things compound. First, the language does no build-time name resolution
+for the branch (PL/pgSQL function bodies, dynamic SQL, reflection, interpreted config). The
+compiler that would have caught this in Go is simply not present. Second — and this is the
+part that generalizes past SQL — the branch's guard is **correlated with the data**, so the
+set of environments that exercise it is exactly the set the author did not have. "It applied
+cleanly everywhere I tried" is *evidence of the branch not running*, not evidence of it
+working. This is Class 8 (false green) with a sharper edge: the test was not at the wrong
+altitude, it was at the wrong **state**.
+
+**Prevention.**
+- **Rung 4 — a migration must be applied against a database in the state it exists to
+  change, not only against a clean one.** For a data-repair migration, that means a fixture
+  that plants the rows the migration targets. If the repair arm never ran, the migration was
+  not tested; it was type-checked by absence.
+- **Rung 3 — assert the reference, not the branch.** For PostgreSQL specifically, a
+  migration can validate its own names up front: resolve every table it touches through
+  `to_regclass('schema.table')` and `RAISE` on `NULL`, at the top of the block where it runs
+  unconditionally. That converts a data-dependent runtime failure into a deterministic one
+  on every database, clean or not.
+- **Rung 5 — write the schema qualifier explicitly and never rely on `search_path`.** Half
+  of this class in a multi-schema database is a name that was correct under the author's
+  session `search_path` and wrong under the deploying role's.
+
+**Detection.** For each conditional arm in a migration, dynamic query, or error handler, ask:
+**what data would have to exist for this line to execute, and did any environment have it?**
+If the answer is "no environment we tested", the branch is unverified regardless of what the
+suite reports. Coverage tooling does not help here — most of it does not instrument SQL at
+all, and where it does, the arm shows as uncovered rather than as wrong.
+
+---
+
 ## Appendix A — Day-0 Factory Checklist
 
 Derived directly from the classes above. Each line prevents a class already observed.
@@ -770,12 +824,16 @@ Derived directly from the classes above. Each line prevents a class already obse
 - [ ] Promotion to platform triggered by the **second** consumer, in that PR (§11)
 - [ ] Invariant-bearing path duplicated at n=2 is a defect (§9)
 - [ ] Live QA gate per milestone — compile ≠ work (§16)
+- [ ] A data-repair migration is applied against a database seeded into the state it
+      repairs; a clean-database run does not count as tested (§22)
+- [ ] Migrations resolve every table they touch up front (`to_regclass`) and qualify every
+      name explicitly — never rely on `search_path` (§22)
 
 ---
 
 ## Appendix B — Recurring Root Causes
 
-The 21 classes reduce to five underlying causes. Useful when classifying a *new* defect
+The 22 classes reduce to five underlying causes. Useful when classifying a *new* defect
 that does not obviously match a class above.
 
 1. **A guarantee was asserted, not enforced.** Comments, docs, and conventions standing in
@@ -788,4 +846,6 @@ that does not obviously match a class above.
    points there. → §9, §14, §18
 5. **An implicit assumption escaped its context.** Runtime, concurrency, or wiring
    conditions invisible at the call site — including the assumption that an artifact
-   still belongs to you after it leaves the machine. → §8, §15, §16, §17, §20
+   still belongs to you after it leaves the machine — including the assumption that the
+   environments you tested in covered the states the code branches on. → §8, §15, §16,
+   §17, §20, §22

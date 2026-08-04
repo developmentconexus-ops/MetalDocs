@@ -635,6 +635,38 @@ converted to reference that module's exported code **only if** the import direct
 otherwise it stays in the platform catalog permanently, which is the honest outcome for a code two
 bounded contexts genuinely share.
 
+### 2.11 Post-rename convergence — the same rule, applied to the set §2.10 could not enumerate
+
+**Amendment, 2026-08-04 (post-execution).** §2.10 enumerated the nine strings that were *already*
+byte-identical across two modules before the sweep. A second, larger set appears only **after** the
+rename, and §2.10 could not list it because it did not exist yet: two modules describe the same
+condition under two different SCREAMING_SNAKE names, the semantic taxonomy correctly gives that
+condition **one** name, and the duplicate guard turns the convergence into a build break at the
+moment the second module is swept.
+
+**Rule (binding, and not a new decision — it is §2.10's own argument on a bigger set):** when a
+rename makes two or more modules converge on one wire string, the declaration moves to
+`internal/platform/problem/codes.go` under the `shared` module tag, and every emitter references it
+through a local alias. It is never duplicated, never suffixed to dodge the panic, and never left in
+one module for the other to import — a module may not import another module's delivery package
+(module-boundary invariant; ADR 0082 is the proof of why), so the platform catalog is the only legal
+single declaration site.
+
+The `shared` tag is documentation and lint metadata only; it never reaches the wire
+(`Registration.Module`). It marks *"two bounded contexts genuinely emit this"*, which is a fact worth
+recording, not a module named on a public contract.
+
+**Final state (HEAD 2026-08-04):** `codes.go` holds **53** registrations, of which **21** carry the
+`shared` tag — the nine of §2.10 plus the post-rename convergences (C-10..C-14, C-16..C-18,
+R-2/R-4/R-6/R-14/R-22). `RegisterLegacy` has **zero** call sites outside the platform package; the
+escape hatch survives in `code.go:259` only so the guard against re-introducing it stays meaningful.
+Four of the 53 are outright MERGES the guard forced (C-1, C-2, C-3, C-7, C-9 — see `codes.go:14-19`).
+
+**Why this is written down.** Without it, the next rename sweep meets the init panic, reads it as an
+obstacle rather than as the guard doing its job, and "fixes" it by suffixing the second declaration —
+re-creating the per-module fragmentation of one wire vocabulary that this ADR exists to abolish. The
+panic is the feature; this section is what tells the next agent which way to resolve it.
+
 ---
 
 ## 3. Status unification rulings needed
