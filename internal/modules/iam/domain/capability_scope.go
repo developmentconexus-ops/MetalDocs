@@ -47,7 +47,7 @@ var capabilityScopes = map[Capability]CapabilityScope{
 	CapControlledDocumentSupersede: ScopeArea,
 	CapMembershipManage:            ScopeArea,
 	// approval.review (M2b F3) acts on a stage in a specific process area.
-	CapApprovalReview: ScopeArea,
+	CapApprovalReview:    ScopeArea,
 	CapApprovalSLAExtend: ScopeArea,
 
 	// --- Tenant-grade: tenant-wide authority ---
@@ -55,9 +55,9 @@ var capabilityScopes = map[Capability]CapabilityScope{
 	// document.review (M6 F6.2, ADR 0069) is tenant-grade: the mark-reviewed
 	// act is a tenant-wide governance action, not an area-scoped WRITE like
 	// document.edit/publish/obsolete. Tier-2 passes the "tenant" sentinel.
-	CapDocumentReview:   ScopeTenant,
+	CapDocumentReview: ScopeTenant,
 	// approval.oversee (M2b F3) is tenant-wide oversight, never area-scoped.
-	CapApprovalOversee: ScopeTenant,
+	CapApprovalOversee:  ScopeTenant,
 	CapTemplateView:     ScopeTenant,
 	CapTemplateCreate:   ScopeTenant,
 	CapTemplateEdit:     ScopeTenant,
