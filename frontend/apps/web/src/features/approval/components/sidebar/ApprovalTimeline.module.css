@@ -100,6 +100,30 @@
   border-color: var(--warning);
 }
 
+.dueRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.extendButton {
+  appearance: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.extendButton:hover {
+  background: var(--surface-2);
+}
+
 .signoffs {
   margin: 4px 0 0 0;
   padding-left: 16px;

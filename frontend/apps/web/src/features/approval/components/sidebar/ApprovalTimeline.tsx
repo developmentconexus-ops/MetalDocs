@@ -1,6 +1,18 @@
+import { useState } from 'react';
+
 import type { ApprovalInstance, Signoff, StageInstance } from '../../api/approvalTypes';
 import { formatDateTime as formatDateTimeValue } from '../../../../lib/formatDate';
+import { useHasCapability } from '../../../iam/hooks/useHasCapability';
+import { useExtendSLA } from '../../queries/useExtendSLA';
+import { ExtendSlaDialog } from '../ExtendSlaDialog';
 import styles from './ApprovalTimeline.module.css';
+
+// Mirrors the Go capability registry `internal/modules/iam/domain/model.go`
+// (CapApprovalSLAExtend). Gates the "Prorrogar prazo" action the same way
+// `useHasCapability('document.edit')` gates the cancel-instance action in
+// DocumentWorkspacePage — client-side UX gate only, tier-2 authz.Require
+// stays authoritative (ADR 0022).
+const SLA_EXTEND_CAPABILITY = 'approval.sla_extend';
 
 interface ApprovalTimelineProps {
   instance: ApprovalInstance | null;
@@ -63,6 +75,10 @@ function formatSignatureMethod(signatureMethod: Signoff['signature_method']): st
  * — the derived, server-controlled legal attestation distinct from the decision.
  */
 export function ApprovalTimeline({ instance, loading, error, onRetry }: ApprovalTimelineProps) {
+  const canExtendSla = useHasCapability(SLA_EXTEND_CAPABILITY);
+  const extendMutation = useExtendSLA();
+  const [extendingStage, setExtendingStage] = useState<StageInstance | null>(null);
+
   if (loading) {
     return <div className={styles.state}>Carregando timeline...</div>;
   }
@@ -108,6 +124,22 @@ export function ApprovalTimeline({ instance, loading, error, onRetry }: Approval
                     {STAGE_STATUS_LABEL[stage.status]}
                   </span>
                 </div>
+                {/* F8/Task 8 no-fallback: due_at is null while pending or when the
+                    stage has no SLA configured — never a synthesized default. */}
+                {stage.due_at ? (
+                  <div className={styles.dueRow}>
+                    <p className={styles.meta}>Prazo: {formatDateTime(stage.due_at)}</p>
+                    {stage.status === 'active' && canExtendSla ? (
+                      <button
+                        type="button"
+                        className={styles.extendButton}
+                        onClick={() => setExtendingStage(stage)}
+                      >
+                        Prorrogar prazo
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
                 {(stage.signoffs ?? []).length === 0 ? (
                   <p className={styles.meta}>Sem assinaturas registradas.</p>
                 ) : (
@@ -146,6 +178,20 @@ export function ApprovalTimeline({ instance, loading, error, onRetry }: Approval
           </li>
         ) : null}
       </ol>
+
+      {extendingStage ? (
+        <ExtendSlaDialog
+          open
+          stageLabel={extendingStage.label}
+          currentDueAt={extendingStage.due_at ?? ''}
+          isSubmitting={extendMutation.isPending}
+          onConfirm={async (dueAt, reason) => {
+            await extendMutation.mutateAsync({ instanceId: instance.id, dueAt, reason });
+            setExtendingStage(null);
+          }}
+          onClose={() => setExtendingStage(null)}
+        />
+      ) : null}
     </section>
   );
 }

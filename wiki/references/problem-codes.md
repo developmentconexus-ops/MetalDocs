@@ -6,7 +6,7 @@ Every `problem+json` body the API emits carries a `code` from this table. The vo
 
 Families are **semantic, never module-named**. A module name on a public wire contract leaks internal topology to clients and outlives the module that coined it. Status comes from the registration, so the same code cannot answer two different statuses on two different routes.
 
-**141 codes across 10 families.**
+**144 codes across 10 families.**
 
 ## `auth` — default 401
 
@@ -149,6 +149,7 @@ Families are **semantic, never module-named**. A module name on a public wire co
 | `state.profile_class_route_conflict` | 409 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:63` |
 | `state.profile_no_default_template` | 409 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:552` |
 | `state.revision_not_draft` | 409 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:152` |
+| `state.sla_extension_no_active_stage` | 409 | approval | `internal/modules/approval/http/errors.go:184` |
 | `state.system_template_immutable` | 409 | platform | `internal/platform/problem/codes.go:170` |
 | `state.template_artifact_missing` | 409 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:549` |
 | `state.template_not_published` | 409 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:39` |
@@ -191,6 +192,8 @@ Families are **semantic, never module-named**. A module name on a public wire co
 | `validation.route_stage_required` | 422 | approval | `internal/modules/approval/http/errors.go:159` |
 | `validation.route_stages_not_permitted` | 422 | approval | `internal/modules/approval/http/errors.go:157` |
 | `validation.self_delegation` | 422 | approval | `internal/modules/approval/http/errors.go:162` |
+| `validation.sla_extension_not_forward` | 422 | approval | `internal/modules/approval/http/errors.go:183` |
+| `validation.sla_extension_reason_required` | 422 | approval | `internal/modules/approval/http/errors.go:185` |
 | `validation.submit_choice_constraint_violated` | 422 | shared | `internal/platform/problem/codes.go:256` |
 | `validation.submit_choice_required` | 422 | shared | `internal/platform/problem/codes.go:255` |
 | `validation.supersede_target_invalid` | 422 | approval | `internal/modules/approval/http/errors.go:59` |

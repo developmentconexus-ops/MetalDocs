@@ -1846,6 +1846,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/approval/instances/{instance_id}/extend-sla": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Extend the deadline of an approval instance's active stage
+         * @description Task 9 (approval accountability loop): postpones due_at on the instance's active stage. The route's due_in_days is the standard; this is the recorded, auditable exception for ONE instance — it exists so giving one subject longer does not require a second route. Shortening a deadline is rejected (validation.sla_extension_not_forward, 422) — that is a different act with different governance consequences. A blank reason is rejected (validation.sla_extension_reason_required, 422): extending a deadline is a governance event, and a blank reason is no reason. No active stage, or an active stage with no due_at configured, is rejected (state.sla_extension_no_active_stage, 409). No If-Match: the forward-only check reads and writes the same row in one transaction, so concurrent extensions are already correct.
+         */
+        post: operations["extendApprovalSLA"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/approval/delegations": {
         parameters: {
             query?: never;
@@ -3674,6 +3694,14 @@ export interface components {
         CancelDocumentApprovalResponse: {
             /** Format: uuid */
             document_id: string;
+        };
+        ExtendApprovalSLARequest: {
+            /**
+             * Format: date-time
+             * @description New deadline for the instance's active stage. Must be strictly after the current due_at.
+             */
+            due_at: string;
+            reason: string;
         };
         CreateApprovalDelegationRequest: {
             /** @description user_id of the user receiving the delegated eligibility. */
@@ -7632,6 +7660,41 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             428: components["responses"]["PreconditionRequired"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    extendApprovalSLA: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                instance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtendApprovalSLARequest"];
+            };
+        };
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalInstanceResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["UnprocessableEntity"];
             500: components["responses"]["InternalServerError"];
         };
     };
