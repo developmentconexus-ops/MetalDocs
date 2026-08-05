@@ -3835,13 +3835,15 @@ paths:
         so concurrent extensions are already correct.
       tags: [approval]
       operationId: extendApprovalSLA
-      x-authz-skip-area: true
-      x-authz-skip-reason: >-
-        approval.sla_extend is area-grade but the area is not
-        request-supplied: the tier-2 check runs in-tx against the active
-        stage's own area_code_snapshot column, read inside the same
-        transaction as the write (sla_extension_service.go Extend). There is
-        no request field to point x-authz-area at.
+      x-authz-area:
+        source: tx
+        derived_from: 'approval_stage_instances.area_code_snapshot'
+        note: >-
+          Area-scoped cap enforced at tier-2 in the tx-layer service via
+          authz.Require with the area read from the active stage row inside
+          the same transaction as the write (sla_extension_service.go
+          Extend); never from a request field. A NULL snapshot yields "",
+          which authz.Require denies for non-system actors — fail-closed.
       parameters:
         - { name: instance_id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }

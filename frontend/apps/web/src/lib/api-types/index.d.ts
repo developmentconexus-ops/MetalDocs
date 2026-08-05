@@ -2849,7 +2849,7 @@ export interface components {
             code: string;
             /** @description True when this profile has an active approval route (approval_routes, subject_kind=document). Admin readiness badge: false means documents cannot be created under the profile — the create endpoint rejects it with 409 `state.approval_route_missing`. */
             has_active_route: boolean;
-            /** @description True when this profile has an active TEMPLATE approval route (approval_routes, subject_kind=template, subject_key=profile code — ADR 0086). Admin readiness badge: false means templates cannot be created under the profile — `POST /templates` rejects it with 409 `APPROVAL_ROUTE_MISSING`. */
+            /** @description True when this profile has an active TEMPLATE approval route (approval_routes, subject_kind=template, subject_key=profile code — ADR 0086). Admin readiness badge: false means templates cannot be created under the profile — `POST /templates` rejects it with 409 `state.approval_route_missing`. */
             has_active_template_route: boolean;
             family_code: string;
             name: string;
@@ -5210,7 +5210,7 @@ export interface operations {
                     key: string;
                     name: string;
                     description?: string;
-                    /** @description Profile code (e.g. `po`, `it`) this template belongs to. Required: generic templates no longer exist (ADR 0086). The profile must already have an active template approval route, otherwise creation is rejected 409 `APPROVAL_ROUTE_MISSING`. */
+                    /** @description Profile code (e.g. `po`, `it`) this template belongs to. Required: generic templates no longer exist (ADR 0086). The profile must already have an active template approval route, otherwise creation is rejected 409 `state.approval_route_missing`. */
                     doc_type_code: string;
                 };
             };
@@ -5228,7 +5228,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            /** @description Conflict. `ALREADY_EXISTS` when the template key already exists in the tenant; `APPROVAL_ROUTE_MISSING` when the declared `doc_type_code` has no active template approval route (ADR 0086 config-first gate). */
+            /** @description Conflict. `conflict.already_exists` when the template key already exists in the tenant; `state.approval_route_missing` when the declared `doc_type_code` has no active template approval route (ADR 0086 config-first gate). */
             409: {
                 headers: {
                     [name: string]: unknown;
