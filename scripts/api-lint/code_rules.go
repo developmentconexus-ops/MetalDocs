@@ -125,6 +125,18 @@ func RunCodeRules(specPath, modulesRoot string, strict bool) ([]Violation, error
 	}
 	out = append(out, problemDump...)
 
+	// F1.2 Part B — WIRE-NULLABLE-OMITEMPTY: closes the gap that let Part A's
+	// drift (route.go QuorumM/DueInDays, instance_read.go
+	// CompletedAt/Decision) exist in the first place. SHAPE-NULLABLE-NOT-
+	// REQUIRED (spec_rules.go) is spec-only and structurally blind to the Go
+	// side; this cross-checks hand-written wire structs under http/ against
+	// the spec's nullable-and-required response properties.
+	wire, err := checkWireNullableOmitempty(specPath, modulesRoot)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, wire...)
+
 	return out, nil
 }
 
