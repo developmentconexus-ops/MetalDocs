@@ -47,19 +47,19 @@ const (
 // InstanceResponse is the response body for a GET on a single approval instance.
 // ETag carries the OCC token clients must echo via If-Match on subsequent writes.
 type InstanceResponse struct {
-	ID          string          `json:"id"`
-	DocumentID  string          `json:"document_id"`
-	RouteID     string          `json:"route_id"`
-	TenantID    string          `json:"tenant_id"`
-	Status      InstanceStatus  `json:"status"`
-	SubmittedBy string          `json:"submitted_by"`
-	SubmittedAt string          `json:"submitted_at"`
+	ID          string         `json:"id"`
+	DocumentID  string         `json:"document_id"`
+	RouteID     string         `json:"route_id"`
+	TenantID    string         `json:"tenant_id"`
+	Status      InstanceStatus `json:"status"`
+	SubmittedBy string         `json:"submitted_by"`
+	SubmittedAt string         `json:"submitted_at"`
 	// CompletedAt is nullable-and-required on the wire (ApprovalInstanceResponse
 	// / ApprovalInstanceByDocumentResponse schemas): present as explicit null
 	// while the instance is not yet completed, never omitted
 	// (SHAPE-NULLABLE-NOT-REQUIRED — present-and-null must not drift to
 	// optional).
-	CompletedAt *string `json:"completed_at"`
+	CompletedAt *string         `json:"completed_at"`
 	Stages      []StageInstance `json:"stages"`
 	ETag        string          `json:"etag"`
 	// FrozenContentHash (F6/F8): the SHA-256 hex digest pinned at freeze time
@@ -128,9 +128,9 @@ type StageInstance struct {
 
 // StageActor is one eligible actor's status within a StageInstance.
 type StageActor struct {
-	UserID      string           `json:"user_id"`
-	DisplayName string           `json:"display_name"`
-	Status      string           `json:"status"`
+	UserID      string `json:"user_id"`
+	DisplayName string `json:"display_name"`
+	Status      string `json:"status"`
 	// Decision is nullable-and-required on the wire (ApprovalStageActorResponse
 	// schema): present as explicit null while the actor has not yet decided,
 	// never omitted (SHAPE-NULLABLE-NOT-REQUIRED — present-and-null must not

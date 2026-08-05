@@ -34,6 +34,26 @@ describe('ExtendSlaDialog', () => {
     expect(screen.getByRole('button', { name: 'Confirmar prorrogação' })).not.toBeDisabled();
   });
 
+  it('sets the min bound on the new-date input to the current due date', () => {
+    const currentDueAt = '2026-08-01T00:00:00.000Z';
+    render(
+      <ExtendSlaDialog
+        open
+        stageLabel="Revisão técnica"
+        currentDueAt={currentDueAt}
+        isSubmitting={false}
+        onConfirm={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    const d = new Date(currentDueAt);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const expectedMin = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+    expect(screen.getByLabelText('Novo prazo')).toHaveAttribute('min', expectedMin);
+  });
+
   it('calls onConfirm with an ISO due_at and the trimmed reason, then onClose is left to the caller', async () => {
     const onConfirm = vi.fn().mockResolvedValue(undefined);
     const onClose = vi.fn();

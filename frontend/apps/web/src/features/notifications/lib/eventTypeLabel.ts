@@ -10,6 +10,8 @@ const LABELS: Record<string, string> = {
   'document.obsoleted': 'Obsoleto',
   'document.approved': 'Aprovado',
   'document.rejected': 'Reprovado',
+  'approval.pending': 'Pendente',
+  'approval.overdue': 'Vencida',
 };
 
 export function eventTypeLabel(eventType: string): string {

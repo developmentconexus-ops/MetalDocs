@@ -351,10 +351,10 @@ type RouteResponse struct {
 
 // StageResponse is the wire representation of one stage within a RouteResponse.
 type StageResponse struct {
-	Order              int             `json:"order"`
-	Name               string          `json:"name"`
-	RequiredCapability string          `json:"required_capability"`
-	Quorum             QuorumKind      `json:"quorum"`
+	Order              int        `json:"order"`
+	Name               string     `json:"name"`
+	RequiredCapability string     `json:"required_capability"`
+	Quorum             QuorumKind `json:"quorum"`
 	// QuorumM is nullable-and-required on the wire (StageSummary schema):
 	// present as explicit null when quorum is not m_of_n, never omitted
 	// (SHAPE-NULLABLE-NOT-REQUIRED — present-and-null must not drift to
@@ -374,10 +374,10 @@ type StageResponse struct {
 
 // ListStageItem is the wire representation of one stage within a ListRouteItem.
 type ListStageItem struct {
-	Order              int             `json:"order"`
-	Name               string          `json:"name"`
-	RequiredCapability string          `json:"required_capability"`
-	Quorum             QuorumKind      `json:"quorum"`
+	Order              int        `json:"order"`
+	Name               string     `json:"name"`
+	RequiredCapability string     `json:"required_capability"`
+	Quorum             QuorumKind `json:"quorum"`
 	// QuorumM is nullable-and-required on the wire (StageSummary schema): see
 	// StageResponse.QuorumM.
 	QuorumM     *int            `json:"quorum_m"`

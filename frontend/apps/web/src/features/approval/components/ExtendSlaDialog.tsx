@@ -5,6 +5,18 @@ import { formatDateTime } from '../../../lib/formatDate';
 import { resolveErrorMessage } from '../../../lib/api/problem';
 import styles from './ExtendSlaDialog.module.css';
 
+// datetime-local inputs require `YYYY-MM-DDTHH:mm` in the browser's local
+// timezone (matching how `dueAtLocal` itself is later interpreted via
+// `new Date(dueAtLocal)`). Used only to seed the input's `min` bound — the
+// forward-only rule is enforced authoritatively server-side (422
+// `sla_extension_not_forward`), this is the friendly first line.
+function toDatetimeLocalMin(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 interface ExtendSlaDialogProps {
   open: boolean;
   /** Label of the stage whose deadline is being extended (e.g. "Revisão técnica"). */
@@ -116,6 +128,7 @@ export function ExtendSlaDialog({
             type="datetime-local"
             className={styles.input}
             value={dueAtLocal}
+            min={toDatetimeLocalMin(currentDueAt)}
             onChange={(event) => setDueAtLocal(event.target.value)}
             disabled={isSubmitting}
             required

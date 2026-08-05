@@ -27,8 +27,8 @@ func TestWireNullableOmitempty(t *testing.T) {
 		writeFile(t, dir, "internal/modules/widgets/http/contracts/widget.go", `package contracts
 
 type WidgetResponse struct {
-	ID                string  ` + "`json:\"id\"`" + `
-	PublishedVersion *string ` + "`json:\"published_version,omitempty\"`" + `
+	ID                string  `+"`json:\"id\"`"+`
+	PublishedVersion *string `+"`json:\"published_version,omitempty\"`"+`
 }
 `)
 
@@ -48,8 +48,8 @@ type WidgetResponse struct {
 		writeFile(t, dir, "internal/modules/widgets/http/contracts/widget.go", `package contracts
 
 type WidgetResponse struct {
-	ID                string  ` + "`json:\"id\"`" + `
-	PublishedVersion *string ` + "`json:\"published_version\"`" + `
+	ID                string  `+"`json:\"id\"`"+`
+	PublishedVersion *string `+"`json:\"published_version\"`"+`
 }
 `)
 
@@ -72,8 +72,8 @@ type WidgetResponse struct {
 		writeFile(t, dir, "internal/modules/widgets/http/contracts/widget.go", `package contracts
 
 type WidgetCreateRequest struct {
-	ID                string  ` + "`json:\"id\"`" + `
-	PublishedVersion *string ` + "`json:\"published_version,omitempty\"`" + `
+	ID                string  `+"`json:\"id\"`"+`
+	PublishedVersion *string `+"`json:\"published_version,omitempty\"`"+`
 }
 `)
 
@@ -94,8 +94,8 @@ type WidgetCreateRequest struct {
 		writeFile(t, dir, "internal/modules/widgets/domain/widget.go", `package domain
 
 type WidgetSnapshot struct {
-	ID                string  ` + "`json:\"id\"`" + `
-	PublishedVersion *string ` + "`json:\"published_version,omitempty\"`" + `
+	ID                string  `+"`json:\"id\"`"+`
+	PublishedVersion *string `+"`json:\"published_version,omitempty\"`"+`
 }
 `)
 
@@ -116,8 +116,8 @@ type WidgetSnapshot struct {
 		writeFile(t, dir, "internal/modules/widgets/http/api/api.gen.go", `package api
 
 type WidgetResponse struct {
-	ID                string  ` + "`json:\"id\"`" + `
-	PublishedVersion *string ` + "`json:\"published_version,omitempty\"`" + `
+	ID                string  `+"`json:\"id\"`"+`
+	PublishedVersion *string `+"`json:\"published_version,omitempty\"`"+`
 }
 `)
 
@@ -138,8 +138,8 @@ type WidgetResponse struct {
 		writeFile(t, dir, "internal/modules/widgets/http/contracts/widget.go", `package contracts
 
 type WidgetResponse struct {
-	ID                string ` + "`json:\"id\"`" + `
-	PublishedVersion string ` + "`json:\"published_version,omitempty\"`" + `
+	ID                string `+"`json:\"id\"`"+`
+	PublishedVersion string `+"`json:\"published_version,omitempty\"`"+`
 }
 `)
 

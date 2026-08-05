@@ -9,6 +9,8 @@ describe('eventTypeLabel', () => {
     ['document.obsoleted', 'Obsoleto'],
     ['document.approved', 'Aprovado'],
     ['document.rejected', 'Reprovado'],
+    ['approval.pending', 'Pendente'],
+    ['approval.overdue', 'Vencida'],
   ])('maps known event %s to %s', (eventType, label) => {
     expect(eventTypeLabel(eventType)).toBe(label);
   });

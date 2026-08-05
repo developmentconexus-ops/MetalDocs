@@ -86,10 +86,14 @@ func loadSpecOps(t *testing.T) []specOp {
 // a hand-curated op list, it DERIVES the obligation from the source of truth —
 // the set of capabilities classified IsAreaGrade. For every area-grade capability
 // it requires that the spec carries at least one route-matched operation
-// declaring an area posture (x-authz-area for a request-supplied area, or a
-// justified x-authz-skip-area for a DB/payload-derived area). Consequence: when a
-// capability is flipped to area-grade (or a new one is added) and its tier-2
-// enforcement gap is closed, the build fails until its HTTP surface is annotated
+// declaring an area posture: x-authz-area (for a request-supplied area, carrying
+// source: tx|body|path), x-authz-area-none (the op is area-grade at tier-1 but
+// performs no tier-2 area check), or x-authz-custom (a bespoke area-derivation
+// documented inline). The retired x-authz-skip-area + reason form (api-contract-
+// hardening Phase F) is no longer an acceptable posture — the spec must carry
+// zero occurrences of it. Consequence: when a capability is flipped to area-grade
+// (or a new one is added) and its tier-2 enforcement gap is closed, the build
+// fails until its HTTP surface is annotated with one of the positive forms above
 // — closing the gap forces the declaration.
 //
 // The obligation is cap-level, not op-level, on purpose: a capability's area
@@ -113,10 +117,10 @@ func TestAreaEnforcedOpsAnnotated(t *testing.T) {
 			continue
 		}
 		hasSurface[cap] = true
-		if o.hasSkip && o.skipReason == "" {
-			t.Errorf("op %q has x-authz-skip-area but no x-authz-skip-reason — a skip must be justified (ADR 0022).", o.opID)
+		if o.hasSkip {
+			t.Errorf("op %q uses the retired x-authz-skip-area marker — api-contract-hardening Phase F removed it; declare a positive area posture instead (x-authz-area with source: tx|body|path, x-authz-area-none, or x-authz-custom).", o.opID)
 		}
-		if o.hasArea || o.hasSkip {
+		if o.hasArea {
 			annotatedCap[cap] = true
 		}
 	}
@@ -133,7 +137,7 @@ func TestAreaEnforcedOpsAnnotated(t *testing.T) {
 		}
 		areaGradeSeen++
 		if hasSurface[cap] && !annotatedCap[cap] {
-			t.Errorf("area-grade capability %q has a documented HTTP surface but no operation declaring x-authz-area or a justified x-authz-skip-area (ADR 0022 Phase 7: closing a tier-2 area-enforcement gap forces the spec declaration).", cap)
+			t.Errorf("area-grade capability %q has a documented HTTP surface but no operation declaring an area posture (x-authz-area, x-authz-area-none, or x-authz-custom) (ADR 0022 Phase 7: closing a tier-2 area-enforcement gap forces the spec declaration).", cap)
 		}
 	}
 	if areaGradeSeen == 0 {

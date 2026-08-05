@@ -242,7 +242,7 @@ export function validateDraft(
     const dueInDays = stage.dueInDays.trim();
     if (dueInDays !== '') {
       const dueInDaysValue = Number(dueInDays);
-      if (!Number.isFinite(dueInDaysValue) || dueInDaysValue < 1) {
+      if (!Number.isInteger(dueInDaysValue) || dueInDaysValue < 1) {
         return `Na etapa "${label}", o prazo deve ser de pelo menos 1 dia.`;
       }
     }

@@ -370,6 +370,13 @@ describe('validateDraft stage deadline lower bound', () => {
     );
   });
 
+  it('rejects a non-integer stage due_in_days (server field is *int, decode 400 otherwise)', () => {
+    const draft = makeDraft({ stages: [makeValidStage({ dueInDays: '1.5' })] });
+    expect(validateDraft(draft, false, null)).toBe(
+      'Na etapa "Etapa", o prazo deve ser de pelo menos 1 dia.',
+    );
+  });
+
   it('accepts a valid positive due_in_days', () => {
     const draft = makeDraft({ stages: [makeValidStage({ dueInDays: '30' })] });
     expect(validateDraft(draft, false, null)).toBeNull();
