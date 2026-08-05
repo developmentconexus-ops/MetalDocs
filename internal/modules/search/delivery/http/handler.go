@@ -2,6 +2,7 @@ package httpdelivery
 
 import (
 	"context"
+	"metaldocs/internal/platform/httprouter"
 	"net/http"
 	"strconv"
 	"strings"
@@ -58,7 +59,7 @@ func NewHandler(service Searcher) *Handler {
 	return &Handler{service: service}
 }
 
-func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
 	mux.HandleFunc("/api/v1/search/documents", h.handleSearchDocuments)
 }
 

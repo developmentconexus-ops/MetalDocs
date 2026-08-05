@@ -7,7 +7,7 @@ package taxonomy
 
 import (
 	"database/sql"
-	"net/http"
+	"metaldocs/internal/platform/httprouter"
 
 	approvaldomain "metaldocs/internal/modules/approval/domain"
 	auditdomain "metaldocs/internal/modules/audit/domain"
@@ -66,6 +66,6 @@ func New(deps Dependencies) *Module {
 }
 
 // RegisterRoutes mounts the module's HTTP handler onto mux.
-func (m *Module) RegisterRoutes(mux *http.ServeMux) {
+func (m *Module) RegisterRoutes(mux httprouter.Muxer) {
 	m.Handler.RegisterRoutes(mux)
 }

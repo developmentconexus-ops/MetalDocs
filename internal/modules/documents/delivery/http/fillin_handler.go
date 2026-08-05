@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"metaldocs/internal/platform/httprouter"
 	"mime"
 	"net/http"
 	"strings"
@@ -35,7 +36,7 @@ func NewFillInHandler(service FillInService) *FillInHandler {
 	return &FillInHandler{service: service}
 }
 
-func (h *FillInHandler) RegisterRoutes(mux *http.ServeMux) {
+func (h *FillInHandler) RegisterRoutes(mux httprouter.Muxer) {
 	mux.HandleFunc("GET /api/v1/documents/{id}/fill-in-schema", h.GetFillInSchema)
 	mux.HandleFunc("GET /api/v1/documents/{id}/placeholders", h.ListPlaceholderValues)
 	mux.HandleFunc("PUT /api/v1/documents/{id}/placeholders/{pid}", h.PutPlaceholderValue)

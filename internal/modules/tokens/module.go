@@ -2,7 +2,7 @@ package tokens
 
 import (
 	"database/sql"
-	"net/http"
+	"metaldocs/internal/platform/httprouter"
 
 	auditdomain "metaldocs/internal/modules/audit/domain"
 	"metaldocs/internal/modules/tokens/application"
@@ -48,4 +48,4 @@ func New(deps Dependencies) *Module {
 }
 
 // RegisterRoutes mounts the tokens HTTP routes onto mux.
-func (m *Module) RegisterRoutes(mux *http.ServeMux) { m.Handler.RegisterRoutes(mux) }
+func (m *Module) RegisterRoutes(mux httprouter.Muxer) { m.Handler.RegisterRoutes(mux) }

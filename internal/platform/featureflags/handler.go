@@ -4,6 +4,7 @@ package featureflags
 
 import (
 	"encoding/json"
+	"metaldocs/internal/platform/httprouter"
 	"net/http"
 
 	"metaldocs/internal/platform/config"
@@ -21,7 +22,7 @@ func NewHandler(cfg config.FeatureFlagsConfig) *Handler {
 }
 
 // RegisterRoutes registers the feature-flags route on mux.
-func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
 	mux.HandleFunc("/api/v1/feature-flags", h.handle)
 }
 

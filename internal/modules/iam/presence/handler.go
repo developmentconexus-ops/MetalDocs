@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"metaldocs/internal/platform/httprouter"
 	"net/http"
 	"time"
 
@@ -68,7 +69,7 @@ func (h *Handler) WithAcceptOptions(opts *websocket.AcceptOptions) *Handler {
 // IAM) via ServeSnapshot below — streamPresence stays hand-mounted here
 // because it is a WebSocket upgrade, excluded from server codegen
 // (api/openapi/v1/openapi.yaml: exclude-operation-ids: streamPresence).
-func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
 	mux.HandleFunc(http.MethodGet+" /api/v1/iam/presence/stream", h.handleStream)
 }
 

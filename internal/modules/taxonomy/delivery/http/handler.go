@@ -11,6 +11,7 @@ package http
 import (
 	"context"
 	"database/sql"
+	"metaldocs/internal/platform/httprouter"
 	"net/http"
 
 	taxonomyapi "metaldocs/internal/modules/taxonomy/api"
@@ -80,7 +81,7 @@ var idempotentCreateRoutes = map[string]func(*Handler) *idempotency.Store{
 // the "/api/v1" base, translating unmarshalable request bodies to a 400
 // VALIDATION_ERROR problem+json response. The three create routes are
 // additionally gated by the platform idempotency middleware.
-func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
 	middleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// r.Pattern already carries the method prefix ("POST /api/v1/...")

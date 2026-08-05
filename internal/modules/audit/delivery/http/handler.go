@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"metaldocs/internal/platform/httprouter"
 	"net/http"
 	"strconv"
 	"strings"
@@ -82,7 +83,7 @@ func (h *Handler) WithExporter(exporter AuditExporter) *Handler {
 // and keys off method + path, which the generated router preserves
 // byte-for-byte (AD-1: BaseURL "/api/v1" + spec's relative paths), so it is
 // unaffected by this mount-mechanism swap.
-func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
 	auditapi.HandlerWithOptions(h, auditapi.StdHTTPServerOptions{
 		BaseRouter: mux,
 		BaseURL:    "/api/v1",

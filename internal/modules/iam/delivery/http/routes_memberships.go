@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"metaldocs/internal/platform/httprouter"
 	"net/http"
 	"strings"
 	"time"
@@ -98,7 +99,7 @@ func NewMembershipHandler(svc *iamapp.AreaMembershipService, verifier Membership
 }
 
 // RegisterRoutes mounts the list/grant/revoke area-membership routes on mux.
-func (h *MembershipHandler) RegisterRoutes(mux *http.ServeMux) {
+func (h *MembershipHandler) RegisterRoutes(mux httprouter.Muxer) {
 	mux.HandleFunc("GET /api/v1/iam/area-memberships", h.listMemberships)
 	mux.HandleFunc("POST /api/v1/iam/area-memberships", h.grantMembership)
 	// F-DELETE-SHAPE (api-contract-hardening Phase E2): the revoked membership is

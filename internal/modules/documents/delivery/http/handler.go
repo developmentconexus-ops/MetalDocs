@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"metaldocs/internal/platform/httprouter"
 	"net/http"
 	"strconv"
 	"strings"
@@ -140,13 +141,13 @@ var rateLimitedRoutes = map[string]ratelimit.RouteKey{
 	"POST /api/v1/documents/{id}/export/pdf":       ratelimit.RouteExportPDF,
 }
 
-func (h *Handler) RegisterRoutes(mux *http.ServeMux) { h.registerRoutes(mux, nil, nil) }
+func (h *Handler) RegisterRoutes(mux httprouter.Muxer) { h.registerRoutes(mux, nil, nil) }
 
-func (h *Handler) RegisterRoutesWithRateLimit(mux *http.ServeMux, rl *ratelimit.Middleware, userFn func(*http.Request) string) {
+func (h *Handler) RegisterRoutesWithRateLimit(mux httprouter.Muxer, rl *ratelimit.Middleware, userFn func(*http.Request) string) {
 	h.registerRoutes(mux, rl, userFn)
 }
 
-func (h *Handler) registerRoutes(mux *http.ServeMux, rl *ratelimit.Middleware, userFn func(*http.Request) string) {
+func (h *Handler) registerRoutes(mux httprouter.Muxer, rl *ratelimit.Middleware, userFn func(*http.Request) string) {
 	rateLimited := rl != nil && userFn != nil
 
 	middleware := func(next http.Handler) http.Handler {

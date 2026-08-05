@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -9,9 +10,36 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
+	approvalhttp "metaldocs/internal/modules/approval/http"
+	auditdelivery "metaldocs/internal/modules/audit/delivery/http"
+	auditdomain "metaldocs/internal/modules/audit/domain"
+	authdelivery "metaldocs/internal/modules/auth/delivery/http"
+	"metaldocs/internal/modules/controlleddocuments"
+	cddhttp "metaldocs/internal/modules/controlleddocuments/delivery/http"
+	distributionhttp "metaldocs/internal/modules/distribution/delivery/http"
+	distributiondomain "metaldocs/internal/modules/distribution/domain"
+	documents "metaldocs/internal/modules/documents"
+	dhttp "metaldocs/internal/modules/documents/delivery/http"
 	iamdelivery "metaldocs/internal/modules/iam/delivery/http"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	iampresence "metaldocs/internal/modules/iam/presence"
+	notificationshttp "metaldocs/internal/modules/notifications/delivery/http"
+	notificationsdomain "metaldocs/internal/modules/notifications/domain"
+	searchdelivery "metaldocs/internal/modules/search/delivery/http"
+	securitydelivery "metaldocs/internal/modules/security/delivery/http"
+	"metaldocs/internal/modules/taxonomy"
+	thttp "metaldocs/internal/modules/taxonomy/delivery/http"
+	templateshttp "metaldocs/internal/modules/templates/delivery/http"
+	"metaldocs/internal/modules/tokens"
+	tokensapplication "metaldocs/internal/modules/tokens/application"
+	tokenshttp "metaldocs/internal/modules/tokens/delivery/http"
+	tokensdomain "metaldocs/internal/modules/tokens/domain"
+	"metaldocs/internal/platform/config"
+	"metaldocs/internal/platform/featureflags"
+	"metaldocs/internal/platform/httprouter"
+	"metaldocs/internal/platform/observability"
 )
 
 func TestPermissionResolver(t *testing.T) {
@@ -198,136 +226,207 @@ func TestPublicPathChecker_RespectsPublicAndPrivateBoundaries(t *testing.T) {
 	}
 }
 
-// TestRouteCoverage walks every mux.Handle / RegisterRoutes family registered in
-// main.go and asserts the path is matched by some routeRule — i.e. the resolver
-// does NOT fall through to the SessionRequired default. This is the structural
-// guard for C2: forgetting to add a new route to routeRules will fail this test
-// loudly instead of silently demoting the route to "session-only" (or, pre-fix,
-// to "public").
+// recordingMux implements httprouter.Muxer over a real *http.ServeMux,
+// recording every registered pattern before delegating. Used by
+// TestRouteCoverage to observe exactly what buildRouter mounts, without
+// needing a live server.
+type recordingMux struct {
+	mux      *http.ServeMux
+	patterns []string
+}
+
+func newRecordingMux() *recordingMux {
+	return &recordingMux{mux: http.NewServeMux()}
+}
+
+func (r *recordingMux) Handle(pattern string, handler http.Handler) {
+	r.patterns = append(r.patterns, pattern)
+	r.mux.Handle(pattern, handler)
+}
+
+func (r *recordingMux) HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request)) {
+	r.patterns = append(r.patterns, pattern)
+	r.mux.HandleFunc(pattern, handler)
+}
+
+func (r *recordingMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	r.mux.ServeHTTP(w, req)
+}
+
+var _ httprouter.Muxer = (*recordingMux)(nil)
+
+// --- Nil-safe stubs for constructing every routeHandlers member for
+// registration purposes only. None of these methods are ever invoked by
+// buildRouter — route registration binds method values, it never calls
+// them — so returning zero values is safe and these stubs exist purely to
+// satisfy constructors that panic on a nil interface dependency.
+
+type stubTokenService struct{}
+
+func (stubTokenService) Create(context.Context, tokensapplication.CreateCommand) (*tokensdomain.Entry, error) {
+	return nil, nil
+}
+func (stubTokenService) Get(context.Context, string, string) (*tokensdomain.Entry, error) {
+	return nil, nil
+}
+func (stubTokenService) List(context.Context, string) ([]tokensdomain.Entry, error) { return nil, nil }
+func (stubTokenService) Update(context.Context, tokensapplication.UpdateCommand) (*tokensdomain.Entry, error) {
+	return nil, nil
+}
+func (stubTokenService) Delete(context.Context, string, string, string) error { return nil }
+
+type stubPresenceRepository struct{}
+
+func (stubPresenceRepository) BumpLastSeen(context.Context, string, time.Time) error { return nil }
+func (stubPresenceRepository) Snapshot(context.Context, string, time.Time) ([]iampresence.Item, error) {
+	return nil, nil
+}
+func (stubPresenceRepository) TenantsWithRecentPresence(context.Context, time.Time) ([]string, error) {
+	return nil, nil
+}
+
+type stubAuditQuerier struct{}
+
+func (stubAuditQuerier) ListEvents(context.Context, auditdomain.ListEventsQuery) ([]auditdomain.Event, bool, error) {
+	return nil, false, nil
+}
+
+type stubDistributionRepository struct{}
+
+func (stubDistributionRepository) Summary(context.Context, string, string) (int, error) {
+	return 0, nil
+}
+func (stubDistributionRepository) Recipients(context.Context, string, string, string, int) (distributiondomain.RecipientsPage, error) {
+	return distributiondomain.RecipientsPage{}, nil
+}
+func (stubDistributionRepository) Coverage(context.Context, string, string) ([]distributiondomain.AreaCoverageRow, error) {
+	return nil, nil
+}
+
+type stubNotificationsRepository struct{}
+
+func (stubNotificationsRepository) List(context.Context, string, string, string, string, int) (notificationsdomain.NotificationsPage, error) {
+	return notificationsdomain.NotificationsPage{}, nil
+}
+func (stubNotificationsRepository) UnreadCount(context.Context, string, string) (int, error) {
+	return 0, nil
+}
+func (stubNotificationsRepository) MarkRead(context.Context, string, string, string) error {
+	return nil
+}
+func (stubNotificationsRepository) MarkAllRead(context.Context, string, string) (int, error) {
+	return 0, nil
+}
+
+// buildTestRouteHandlers constructs one instance of every routeHandlers
+// member with nil/stub inner dependencies — safe because buildRouter's
+// RegisterRoutes/Register/RegisterGenerated calls only bind method values to
+// mux patterns, they never invoke a service. This exercises every mount
+// buildRouter performs, including ones main() sometimes skips at runtime
+// (e.g. the no-SQLDB boot path), so TestRouteCoverage gets maximal true
+// coverage of what a route table omission would actually miss.
+func buildTestRouteHandlers() routeHandlers {
+	presenceRepo := stubPresenceRepository{}
+	presenceHub := iampresence.NewHub(presenceRepo, nil)
+	presenceHandler := iampresence.NewHandler(presenceHub, presenceRepo, nil)
+
+	iamRouter := iamdelivery.NewRouter(
+		iamdelivery.NewAdminHandler(nil, nil),
+		iamdelivery.NewPeopleHandler(nil, nil, nil),
+		iamdelivery.NewMembershipHandler(nil, nil),
+		iamdelivery.NewRolesCapsHandler(nil),
+		iamdelivery.NewSessionsHandler(nil),
+		iamdelivery.NewObservabilityHandler(nil),
+		presenceHandler,
+	)
+
+	return routeHandlers{
+		auth:         authdelivery.NewHandler(nil),
+		health:       observability.NewHealthHandler(nil),
+		featureFlags: featureflags.NewHandler(config.FeatureFlagsConfig{}),
+		audit:        auditdelivery.NewHandler(stubAuditQuerier{}),
+		search:       searchdelivery.NewHandler(nil),
+		security:     securitydelivery.NewHandler(nil),
+		presence:     presenceHandler,
+		taxonomy:     &taxonomy.Module{Handler: thttp.NewHandler(nil, nil, nil, nil)},
+		tokens:       &tokens.Module{Handler: tokenshttp.NewHandler(stubTokenService{})},
+		controlledDocuments: &controlleddocuments.Module{
+			Handler: cddhttp.NewHandler(nil, nil),
+		},
+		iamRouter:          iamRouter,
+		documents:          &documents.Module{Handler: dhttp.NewHandler(nil)},
+		documentsRateLimit: nil,
+		documentsUserID:    func(*http.Request) string { return "" },
+		templates:          templateshttp.New(nil, func(*http.Request, string, string, string) error { return nil }, nil),
+		approval:           approvalhttp.NewHandler(nil, nil, nil, nil),
+		distribution:       distributionhttp.NewHandler(stubDistributionRepository{}),
+		notifications:      notificationshttp.NewHandler(stubNotificationsRepository{}),
+		metrics:            http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}),
+	}
+}
+
+// TestRouteCoverage builds a real routeHandlers instance and mounts it via
+// buildRouter — the exact function main() calls — onto a recordingMux, then
+// asserts every recorded pattern resolves to a routeRules entry. This
+// replaces a hand-maintained fixture list of representative routes (which
+// could silently drift from what main() actually mounts) with a structural
+// guard: a handler that's registered here but has no matching routeRules
+// entry is a build-passing-but-red-test event, not a live discovery.
 //
-// Fixture list, not reflection: representative path per registered family.
-// When adding a new RegisterRoutes call in main.go, add an entry here.
+// Method-qualified patterns ("GET /path", the oapi-codegen convention) are
+// checked strictly via matchedByRule(method, path). Bare legacy patterns
+// (no method prefix — auth/health/featureFlags/search/security/presence's
+// stream endpoint, still hand-registered with an internal r.Method switch)
+// only support a looser check: some routeRules entry matches the path for
+// some method. That's the strongest sound claim without inspecting the
+// handler's internal method switch — see the plan's "Known limitation" for
+// why finer-grained method coverage on those paths is guarded elsewhere
+// (TestPermissionsTable_NoMethodlessWriteShadowing and friends).
 func TestRouteCoverage(t *testing.T) {
-	t.Parallel()
+	rec := newRecordingMux()
+	buildRouter(rec, buildTestRouteHandlers())
 
-	registeredRoutes := []struct {
-		family string
-		method string
-		path   string
-	}{
-		// authHandler.RegisterRoutes (main.go:212)
-		{"auth", http.MethodPost, "/api/v1/auth/login"},
-		{"auth", http.MethodGet, "/api/v1/auth/me"},
-		{"auth", http.MethodPost, "/api/v1/auth/change-password"},
-		{"auth", http.MethodPost, "/api/v1/auth/logout"},
-
-		// healthHandler.RegisterRoutes (main.go:213)
-		{"health", http.MethodGet, "/api/v1/health/live"},
-		{"health", http.MethodGet, "/api/v1/health/ready"},
-		{"health", http.MethodGet, "/healthz"},
-
-		// featureFlagsHandler.RegisterRoutes (main.go:214)
-		{"feature-flags", http.MethodGet, "/api/v1/feature-flags"},
-
-		// auditHandler.RegisterRoutes (main.go:215)
-		{"audit", http.MethodGet, "/api/v1/audit/events"},
-
-		// searchHandler.RegisterRoutes (main.go:216)
-		{"search", http.MethodGet, "/api/v1/search/documents"},
-
-		// iamAdminHandler.RegisterRoutes (main.go:217)
-		{"iam-admin", http.MethodGet, "/api/v1/iam/users"},
-		{"iam-admin", http.MethodPost, "/api/v1/iam/users"},
-		{"iam-admin", http.MethodPatch, "/api/v1/iam/users/u-1"},
-		{"iam-admin", http.MethodPost, "/api/v1/iam/users/u-1/roles"},
-		{"iam-admin", http.MethodPut, "/api/v1/iam/users/u-1/roles"},
-		{"iam-admin", http.MethodPost, "/api/v1/iam/users/u-1/reset-password"},
-		{"iam-admin", http.MethodPost, "/api/v1/iam/users/u-1/unlock"},
-		{"iam-admin", http.MethodGet, "/api/v1/iam/admin/overview"},
-
-		// taxonomyModule.RegisterRoutes (main.go:224)
-		{"taxonomy", http.MethodGet, "/api/v1/taxonomy/families"},
-		{"taxonomy", http.MethodPost, "/api/v1/taxonomy/families"},
-		{"taxonomy", http.MethodPatch, "/api/v1/taxonomy/families/PROC"},
-		{"taxonomy", http.MethodGet, "/api/v1/taxonomy/areas"},
-		{"taxonomy", http.MethodPatch, "/api/v1/taxonomy/areas/QA"},
-		{"taxonomy", http.MethodGet, "/api/v1/taxonomy/profiles"},
-		{"taxonomy", http.MethodPost, "/api/v1/taxonomy/profiles"},
-
-		// controlledDocumentsModule.RegisterRoutes (main.go:231)
-		{"controlled-documents", http.MethodGet, "/api/v1/controlled-documents"},
-		{"controlled-documents", http.MethodPost, "/api/v1/controlled-documents"},
-		{"controlled-documents", http.MethodPost, "/api/v1/controlled-documents/cd-1/revisions"},
-		{"controlled-documents", http.MethodGet, "/api/v1/controlled-documents/preview-code"},
-		{"controlled-documents", http.MethodGet, "/api/v1/controlled-documents/creation-context"},
-		{"controlled-documents", http.MethodPut, "/api/v1/controlled-documents/cd-1/obsolete"},
-		{"controlled-documents", http.MethodPut, "/api/v1/controlled-documents/cd-1/supersede"},
-
-		// iamdelivery.NewMembershipHandler(...).RegisterRoutes (main.go:238)
-		{"area-memberships", http.MethodGet, "/api/v1/iam/area-memberships"},
-		{"area-memberships", http.MethodPost, "/api/v1/iam/area-memberships"},
-		{"area-memberships", http.MethodDelete, "/api/v1/iam/area-memberships/u-1/quality"},
-
-		// docMod.RegisterRoutes (main.go:379)
-		{"documents", http.MethodGet, "/api/v1/documents"},
-		{"documents", http.MethodPost, "/api/v1/documents/d1/submit"},
-		{"documents", http.MethodPost, "/api/v1/documents/d1/signoff"},
-		{"documents", http.MethodPost, "/api/v1/documents/d1/review"},
-		{"documents", http.MethodPost, "/api/v1/documents/d1/obsolete"},
-		{"documents", http.MethodPost, "/api/v1/documents/d1/cancel"},
-		{"documents", http.MethodPost, "/api/v1/documents/d1/reconstruct"},
-		{"documents", http.MethodPost, "/api/v1/documents/d1/archive"},
-		{"documents", http.MethodPost, "/api/v1/documents/d1/export/pdf"},
-		{"documents", http.MethodPost, "/api/v1/documents/d1/session/acquire"},
-		{"documents", http.MethodPost, "/api/v1/documents/d1/session/force-release"},
-		{"documents", http.MethodPost, "/api/v1/documents/d1/autosave/commit"},
-		{"documents", http.MethodPost, "/api/v1/documents/d1/checkpoints"},
-		{"documents", http.MethodPost, "/api/v1/documents/d1/checkpoints/c1/restore"},
-		{"documents", http.MethodPut, "/api/v1/documents/d1/placeholders/p1"},
-		{"documents", http.MethodPatch, "/api/v1/documents/d1"},
-
-		// templateshttp.New(...).Register (main.go:393)
-		{"templates", http.MethodGet, "/api/v1/templates"},
-		{"templates", http.MethodPost, "/api/v1/templates"},
-		{"templates", http.MethodPost, "/api/v1/templates/t1/versions"},
-		{"templates", http.MethodPut, "/api/v1/templates/t1/versions/1/draft"},
-		{"templates", http.MethodPut, "/api/v1/templates/t1/versions/1/schema"},
-		{"templates", http.MethodPost, "/api/v1/templates/t1/versions/1/publish"},
-		{"templates", http.MethodPost, "/api/v1/templates/t1/versions/1/docx-upload-url"},
-		{"templates", http.MethodPost, "/api/v1/templates/t1/versions/1/schema-upload-url"},
-		{"templates", http.MethodPost, "/api/v1/templates/t1/versions/1/autosave/presign"},
-		{"templates", http.MethodPost, "/api/v1/templates/t1/versions/1/submit-for-approval"},
-		{"templates", http.MethodPost, "/api/v1/templates/t1/versions/1/signoff"},
-		{"templates", http.MethodPost, "/api/v1/templates/t1/archive"},
-		{"templates", http.MethodGet, "/api/v1/signed"},
-
-		// approvalHandler.RegisterRoutes (main.go:753) — verified against the real
-		// router at internal/modules/approval/http/router.go (M2b F3): no
-		// PUT/DELETE on /instances/{id} and no /decisions path exist; the prior
-		// entries here were stale, only ever exercised via the now-deleted generic
-		// /api/v1/approval/ prefix fallback.
-		{"approval", http.MethodGet, "/api/v1/approval/instances/a-1"},
-		{"approval", http.MethodPost, "/api/v1/approval/instances/a-1/stages/s-1/signoffs"},
-		{"approval", http.MethodPost, "/api/v1/approval/instances/a-1/cancel"},
-		{"approval", http.MethodGet, "/api/v1/approval/inbox"},
-
-		// mux.Handle (main.go:447)
-		{"metrics", http.MethodGet, "/api/v1/metrics"},
+	if len(rec.patterns) == 0 {
+		t.Fatal("buildRouter registered zero patterns onto recordingMux — buildRouter or its handler construction is broken")
 	}
 
 	resolver := newPermissionResolver()
 
-	for _, rt := range registeredRoutes {
-		rt := rt
-		t.Run(rt.family+" "+rt.method+" "+rt.path, func(t *testing.T) {
-			t.Parallel()
+	for _, pattern := range rec.patterns {
+		pattern := pattern
+		t.Run(pattern, func(t *testing.T) {
+			if method, path, ok := strings.Cut(pattern, " "); ok && isHTTPMethod(method) {
+				if !matchedByRule(method, path) {
+					_, visibility := resolver(method, path)
+					t.Fatalf("registered route %s %s fell through to default visibility=%v — add an entry to routeRules",
+						method, path, visibility)
+				}
+				return
+			}
 
-			if !matchedByRule(rt.method, rt.path) {
-				_, visibility := resolver(rt.method, rt.path)
-				t.Fatalf("registered route %s %s (%s) fell through to default visibility=%v — add an entry to routeRules",
-					rt.method, rt.path, rt.family, visibility)
+			// Bare legacy pattern: assert some rule matches this path for some
+			// method (loose check — see doc comment above).
+			path := pattern
+			matched := false
+			for _, m := range []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete} {
+				if matchedByRule(m, path) {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				t.Fatalf("registered legacy route %q is matched by no routeRules entry for any method — add an entry to routeRules", path)
 			}
 		})
+	}
+}
+
+func isHTTPMethod(s string) bool {
+	switch s {
+	case http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodConnect, http.MethodOptions, http.MethodTrace:
+		return true
+	default:
+		return false
 	}
 }
 

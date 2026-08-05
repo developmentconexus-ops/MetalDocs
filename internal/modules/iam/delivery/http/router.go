@@ -49,6 +49,7 @@
 package httpdelivery
 
 import (
+	"metaldocs/internal/platform/httprouter"
 	"net/http"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -110,7 +111,7 @@ func (rt *Router) WithTenantHandler(tenants *TenantHandler) *Router {
 // mux.HandleFunc registration for codegen-generated registration changes no
 // tier-1 behavior. IAM has no per-route Idempotency-Key requirement (unlike
 // templates/controlleddocuments), so no Middlewares closure is needed here.
-func (rt *Router) RegisterGenerated(mux *http.ServeMux) {
+func (rt *Router) RegisterGenerated(mux httprouter.Muxer) {
 	iamapi.HandlerWithOptions(rt, iamapi.StdHTTPServerOptions{
 		BaseRouter: mux,
 		BaseURL:    "/api/v1",

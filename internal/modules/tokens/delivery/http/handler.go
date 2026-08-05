@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"metaldocs/internal/platform/httprouter"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -72,7 +73,7 @@ func NewHandler(svc TokenService) *Handler {
 }
 
 // RegisterRoutes mounts the handler onto mux under /api/v1.
-func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
 	tokensapi.HandlerWithOptions(h, tokensapi.StdHTTPServerOptions{
 		BaseRouter: mux,
 		BaseURL:    "/api/v1",

@@ -487,31 +487,23 @@ func main() {
 		return ""
 	}
 
+	// mux is populated by one consolidated buildRouter call (router.go) once
+	// every handler below is constructed — not by scattered RegisterRoutes
+	// call sites. main() and TestRouteCoverage (permissions_test.go) call the
+	// exact same buildRouter function, so a handler built here but never added
+	// to routeHandlers is a build-time-visible gap, not a live discovery.
+	// iamAdminHandler, sessionsHandler, observabilityHandler, securityHandler:
+	// mounted via buildRouter below, once peopleHandler/membershipHandler/
+	// rolesCapsHandler/presenceHandler are also constructed.
 	mux := http.NewServeMux()
-	authHandler.RegisterRoutes(mux)
-	healthHandler.RegisterRoutes(mux)
-	featureFlagsHandler.RegisterRoutes(mux)
-	auditHandler.RegisterRoutes(mux)
-	searchHandler.RegisterRoutes(mux)
-	// iamAdminHandler, sessionsHandler, observabilityHandler: mounted below via
-	// iamdelivery.Router.RegisterGenerated (CON-07 codegen rollout), once
-	// peopleHandler/membershipHandler/rolesCapsHandler/presenceHandler are also
-	// constructed. securityHandler is a separate module (not IAM) and keeps its
-	// own hand-written mount here.
-	if securityHandler != nil {
-		securityHandler.RegisterRoutes(mux)
-	}
 
-	presenceBump, presenceHub, presenceHandler := startPresence(ctx, deps, mux, iamAdminHandler)
+	presenceBump, presenceHub, presenceHandler := startPresence(ctx, deps, iamAdminHandler)
 
 	taxonomyModule := buildTaxonomyModule(deps)
-	taxonomyModule.RegisterRoutes(mux)
 
 	tokensModule := buildTokensModule(deps)
-	tokensModule.RegisterRoutes(mux)
 
 	controlledDocumentsModule := buildControlledDocumentsModule(deps)
-	controlledDocumentsModule.RegisterRoutes(mux)
 	controlledDocumentDuplicator := wiring.NewControlledDocumentDuplicator(controlledDocumentsModule.Service())
 
 	var membershipService *iamapp.AreaMembershipService
@@ -564,7 +556,6 @@ func main() {
 	// swap changes no auth behavior.
 	iamRouter := iamdelivery.NewRouter(iamAdminHandler, peopleHandler, membershipHandler, rolesCapsHandler, sessionsHandler, observabilityHandler, presenceHandler).
 		WithTenantHandler(tenantHandler)
-	iamRouter.RegisterGenerated(mux)
 
 	// Legacy templates module routes removed — templates owns /api/v1/templates/*
 
@@ -780,7 +771,6 @@ func main() {
 	// SP-2: pin tenant dictionary values at document creation. tokensModule was
 	// built at startup (line ~358), before docMod.
 	docMod.Service.WithDictionaryReader(dictionaryValueReaderAdapter{reader: tokensModule.Reader})
-	docMod.RegisterRoutesWithRateLimit(mux, globalLimiter, userIDExtractor)
 
 	// Wire the documents-side adapter back into the controlled-documents service so atomic
 	// CD-create can clone the initial document inside the same tx as the CD
@@ -805,24 +795,46 @@ func main() {
 		os.Exit(1)
 	}
 	templatesModule.WithApprovalKernel(approvalServices.TemplateSubmit, approvalServices.Decision, approvalServices.Read, db.NewTxRunner(deps.SQLDB))
-	templatesModule.Register(mux)
 	signoffIdempStore := approvalinfra.NewPostgresSignoffIdempStore(deps.SQLDB)
 	routeAdminIdempStore := approvalinfra.NewPostgresRouteAdminIdempStore(deps.SQLDB)
 	approvalServices = approvalServices.WithRouteAdminIdempStore(routeAdminIdempStore)
 	approvalHandler := approvalhttp.NewHandler(approvalServices, deps.SQLDB, signoffIdempStore, displayNameRepo)
-	approvalHandler.RegisterRoutes(mux)
 
 	// M2/F2.2: distribution module — read-only delivery + repository layer.
 	// Reuses displayNameRepo (constructed above at line ~418); no new DB handle.
 	distributionRepo := distributioninfra.NewCoverageRepository(deps.SQLDB, displayNameRepo)
 	distributionHandler := distributionhttp.NewHandler(distributionRepo)
-	distributionhttp.RegisterRoutes(distributionHandler, mux)
 
 	// M3/F3.2: notifications module — read surface (list / unread-count / mark-read).
 	// Self-scoped by CapNotificationRead (tier-1) + recipient_user_id SQL predicate.
 	notificationsRepo := notificationsinfra.NewNotificationsRepository(deps.SQLDB)
 	notificationsHandler := notificationshttp.NewHandler(notificationsRepo)
-	notificationshttp.RegisterRoutes(notificationsHandler, mux)
+
+	// buildRouter (router.go) mounts every route family in one call — main()
+	// and TestRouteCoverage (permissions_test.go) call the exact same
+	// function, so a handler built above but never added to routeHandlers is
+	// a build-time-visible gap, not a live discovery.
+	buildRouter(mux, routeHandlers{
+		auth:                authHandler,
+		health:              healthHandler,
+		featureFlags:        featureFlagsHandler,
+		audit:               auditHandler,
+		search:              searchHandler,
+		security:            securityHandler,
+		presence:            presenceHandler,
+		taxonomy:            taxonomyModule,
+		tokens:              tokensModule,
+		controlledDocuments: controlledDocumentsModule,
+		iamRouter:           iamRouter,
+		documents:           docMod,
+		documentsRateLimit:  globalLimiter,
+		documentsUserID:     userIDExtractor,
+		templates:           templatesModule,
+		approval:            approvalHandler,
+		distribution:        distributionHandler,
+		notifications:       notificationsHandler,
+		metrics:             httpObs.MetricsHandler(),
+	})
 
 	mountE2EHandlersIfEnabled(mux, func(m *http.ServeMux) {
 		e2etest.RegisterE2EHandlers(m, deps.SQLDB, nil)
@@ -849,15 +861,14 @@ func main() {
 	defer stopSessions()
 	defer stopOrphans()
 	defer stopTemplateOrphans()
-	mux.Handle("/api/v1/metrics", httpObs.MetricsHandler())
 	// Prometheus text-exposition scrape endpoint. Deliberately NOT mounted on
 	// mux (which the API chain below wraps with authn/iam/httpObs/rate-limit)
 	// — it is served from a top-level dispatch mux, ahead of and outside the
 	// entire API chain (see rootMux below, after handler is built). Contract
 	// §3.2: /metrics is a platform scrape surface, not a versioned product
 	// route, so it is NOT declared in api/openapi/v1/openapi.yaml. Coexists
-	// with the JSON endpoint above; they read from separate storage
-	// (prometheus vecs vs. byKey atomics).
+	// with the JSON endpoint (mounted via buildRouter above); they read from
+	// separate storage (prometheus vecs vs. byKey atomics).
 
 	// Audit retention - AUDIT_RETENTION_DAYS=0 disables (default disabled).
 	retentionCfg, err := config.LoadRetentionConfig()
@@ -1157,7 +1168,6 @@ func requireApprovalRuntimeSupport(fanoutURL string) error {
 func startPresence(
 	ctx context.Context,
 	deps bootstrap.APIDependencies,
-	mux *http.ServeMux,
 	iamAdminHandler *iamdelivery.AdminHandler,
 ) (*iampresence.BumpMiddleware, *iampresence.Hub, *iampresence.Handler) {
 	if deps.SQLDB == nil {
@@ -1167,8 +1177,9 @@ func startPresence(
 	presenceHub := iampresence.NewHub(presenceRepo, slog.Default())
 	go presenceHub.Run(ctx)
 	go presenceHub.RunHeartbeat(ctx)
+	// presenceHandler mounts via buildRouter (router.go), alongside every
+	// other route family — not here at construction time.
 	presenceHandler := iampresence.NewHandler(presenceHub, presenceRepo, slog.Default())
-	presenceHandler.RegisterRoutes(mux)
 	presenceBump := iampresence.NewBumpMiddleware(presenceRepo, slog.Default())
 	presenceBump.StartCleanup(ctx)
 	iamAdminHandler.WithPresenceReader(presenceRepo)

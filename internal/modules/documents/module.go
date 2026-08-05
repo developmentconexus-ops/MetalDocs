@@ -3,6 +3,7 @@ package documents
 import (
 	"context"
 	"database/sql"
+	"metaldocs/internal/platform/httprouter"
 	"net/http"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
@@ -153,11 +154,11 @@ func New(deps Dependencies) *Module {
 	}
 }
 
-func (m *Module) RegisterRoutes(mux *http.ServeMux) {
+func (m *Module) RegisterRoutes(mux httprouter.Muxer) {
 	m.Handler.RegisterRoutes(mux)
 }
 
-func (m *Module) RegisterRoutesWithRateLimit(mux *http.ServeMux, rl *ratelimit.Middleware, userFn func(*http.Request) string) {
+func (m *Module) RegisterRoutesWithRateLimit(mux httprouter.Muxer, rl *ratelimit.Middleware, userFn func(*http.Request) string) {
 	m.Handler.RegisterRoutesWithRateLimit(mux, rl, userFn)
 }
 

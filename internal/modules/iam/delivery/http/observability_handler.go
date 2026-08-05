@@ -2,6 +2,7 @@ package httpdelivery
 
 import (
 	"log/slog"
+	"metaldocs/internal/platform/httprouter"
 	"net/http"
 
 	iamapi "metaldocs/internal/modules/iam/api"
@@ -27,7 +28,7 @@ func NewObservabilityHandler(service *iamapp.ObservabilityService) *Observabilit
 
 // RegisterRoutes mounts GET /iam/usage and GET /iam/kpi on mux. Both routes
 // are permission-guarded by CapMetricsView at the tier-1 routing table.
-func (h *ObservabilityHandler) RegisterRoutes(mux *http.ServeMux) {
+func (h *ObservabilityHandler) RegisterRoutes(mux httprouter.Muxer) {
 	mux.HandleFunc(http.MethodGet+" /api/v1/iam/usage", h.handleUsage)
 	mux.HandleFunc(http.MethodGet+" /api/v1/iam/kpi", h.handleKpi)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"metaldocs/internal/platform/httprouter"
 	"net/http"
 
 	v2dom "metaldocs/internal/modules/documents/domain"
@@ -24,7 +25,7 @@ func NewReconstructHandler(svc ReconstructService) *ReconstructHandler {
 	return &ReconstructHandler{svc: svc}
 }
 
-func (h *ReconstructHandler) RegisterRoutes(mux *http.ServeMux) {
+func (h *ReconstructHandler) RegisterRoutes(mux httprouter.Muxer) {
 	mux.HandleFunc("POST /api/v1/documents/{id}/reconstruct", h.HandleReconstruct)
 }
 

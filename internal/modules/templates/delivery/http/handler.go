@@ -12,6 +12,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"metaldocs/internal/platform/httprouter"
 	"net/http"
 
 	approvalapp "metaldocs/internal/modules/approval/application"
@@ -180,7 +181,7 @@ var idempotentRoutes = map[string]bool{
 // Register mounts the generated templates routes onto mux via
 // templatesapi.HandlerWithOptions, applying an idempotency-key middleware to
 // the mutation routes listed in idempotentRoutes.
-func (h *Handler) Register(mux *http.ServeMux) {
+func (h *Handler) Register(mux httprouter.Muxer) {
 	middleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// r.Pattern already carries the method prefix ("POST /api/v1/...")

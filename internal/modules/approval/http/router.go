@@ -1,6 +1,7 @@
 package approvalhttp
 
 import (
+	"metaldocs/internal/platform/httprouter"
 	"net/http"
 
 	approvalapi "metaldocs/internal/modules/approval/api"
@@ -36,7 +37,7 @@ var idempotentRoutes = map[string]bool{
 // RegisterRoutes wires all approval routes onto mux via the generated
 // ServerInterface router, so a route added to the OpenAPI spec that lacks a
 // Handler method fails to compile instead of silently 404ing.
-func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
 	middleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// r.Pattern already carries the method prefix ("POST /api/v1/...")

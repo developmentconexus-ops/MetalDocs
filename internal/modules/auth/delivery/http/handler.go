@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"metaldocs/internal/platform/httprouter"
 	"net/http"
 	"strings"
 	"time"
@@ -79,7 +80,7 @@ func (h *Handler) WithAudit(w auditdomain.Writer) *Handler {
 }
 
 // RegisterRoutes mounts the auth endpoints (login, logout, me, change-password) on mux.
-func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
 	mux.HandleFunc("/api/v1/auth/login", h.handleLogin)
 	mux.HandleFunc("/api/v1/auth/logout", h.handleLogout)
 	mux.HandleFunc("/api/v1/auth/me", h.handleMe)

@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"metaldocs/internal/platform/httprouter"
 	"net/http"
 	"strings"
 	"time"
@@ -37,7 +38,7 @@ func NewPDFWebhookHandler(w PDFWriter, secret string) *PDFWebhookHandler {
 	return &PDFWebhookHandler{writer: w, secret: secret}
 }
 
-func (h *PDFWebhookHandler) RegisterRoutes(mux *http.ServeMux) {
+func (h *PDFWebhookHandler) RegisterRoutes(mux httprouter.Muxer) {
 	mux.HandleFunc("POST /api/v1/documents/{id}/pdf-complete", h.HandlePDFComplete)
 }
 

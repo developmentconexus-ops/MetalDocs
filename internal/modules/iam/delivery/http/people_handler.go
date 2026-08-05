@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"metaldocs/internal/platform/httprouter"
 	"net/http"
 	"strconv"
 	"strings"
@@ -50,7 +51,7 @@ func NewPeopleHandler(service *iamapp.PeopleService, authSvc UserAdminService, a
 
 // RegisterRoutes attaches People-tab routes with Go 1.22 typed mux patterns.
 // The path-param wildcard {user_id} is extracted via r.PathValue.
-func (h *PeopleHandler) RegisterRoutes(mux *http.ServeMux) {
+func (h *PeopleHandler) RegisterRoutes(mux httprouter.Muxer) {
 	if h == nil {
 		return
 	}

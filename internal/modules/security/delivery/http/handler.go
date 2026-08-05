@@ -6,6 +6,7 @@ package httpdelivery
 
 import (
 	"log/slog"
+	"metaldocs/internal/platform/httprouter"
 	"net/http"
 	"time"
 
@@ -68,7 +69,7 @@ func NewHandler(service *securityapp.Service) *Handler {
 	return &Handler{service: service}
 }
 
-func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
 	mux.HandleFunc("/api/v1/security/mfa-coverage", h.handleMfaCoverage)
 	mux.HandleFunc("/api/v1/security/lockouts", h.handleLockouts)
 	mux.HandleFunc("/api/v1/security/signals", h.handleSignals)

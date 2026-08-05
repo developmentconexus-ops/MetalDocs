@@ -10,6 +10,7 @@ package http
 import (
 	"context"
 	"database/sql"
+	"metaldocs/internal/platform/httprouter"
 	"net/http"
 	"strings"
 
@@ -88,7 +89,7 @@ func tenantIDFromContext(ctx context.Context) string {
 // RegisterRoutes mounts the generated controlled-documents API surface
 // onto mux under /api/v1, wrapping the two mutating POST routes with
 // Idempotency-Key enforcement.
-func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
 	actorOf := func(ctx context.Context) (string, string) {
 		// Idempotency scoping is best-effort here: a missing actor
 		// produces a broader-but-still-safe key. The mutation handler

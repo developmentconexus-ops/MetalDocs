@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"metaldocs/internal/platform/httprouter"
 	"net/http"
 	"strings"
 	"time"
@@ -128,7 +129,7 @@ func (h *AdminHandler) WithPresenceReader(r PresenceReader) *AdminHandler {
 // patterns under /api/v1/iam/users/*. The role-edit endpoints stay here
 // because PR-5 (Roles & Caps matrix) owns them and will restructure them
 // next.
-func (h *AdminHandler) RegisterRoutes(mux *http.ServeMux) {
+func (h *AdminHandler) RegisterRoutes(mux httprouter.Muxer) {
 	mux.HandleFunc(http.MethodPost+" /api/v1/iam/users/{user_id}/roles", h.handleUserRoleUpsertTyped)
 	mux.HandleFunc(http.MethodPut+" /api/v1/iam/users/{user_id}/roles", h.handleReplaceUserRolesTyped)
 	mux.HandleFunc("/api/v1/iam/admin/overview", h.handleAdminOverview)

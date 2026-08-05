@@ -13,7 +13,7 @@ package controlleddocuments
 import (
 	"database/sql"
 	"log/slog"
-	"net/http"
+	"metaldocs/internal/platform/httprouter"
 
 	approvaldomain "metaldocs/internal/modules/approval/domain"
 	"metaldocs/internal/modules/controlleddocuments/application"
@@ -155,7 +155,7 @@ func New(deps Dependencies) *Module {
 }
 
 // RegisterRoutes mounts the module's HTTP handler onto mux.
-func (m *Module) RegisterRoutes(mux *http.ServeMux) {
+func (m *Module) RegisterRoutes(mux httprouter.Muxer) {
 	m.Handler.RegisterRoutes(mux)
 }
 

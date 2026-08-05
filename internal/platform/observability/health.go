@@ -2,6 +2,7 @@ package observability
 
 import (
 	"encoding/json"
+	"metaldocs/internal/platform/httprouter"
 	"net/http"
 )
 
@@ -13,7 +14,7 @@ func NewHealthHandler(provider RuntimeStatusProvider) *HealthHandler {
 	return &HealthHandler{provider: provider}
 }
 
-func (h *HealthHandler) RegisterRoutes(mux *http.ServeMux) {
+func (h *HealthHandler) RegisterRoutes(mux httprouter.Muxer) {
 	mux.HandleFunc("/api/v1/health/live", h.handleLive)
 	mux.HandleFunc("/api/v1/health/ready", h.handleReady)
 	mux.HandleFunc("/healthz", h.handleLive)
