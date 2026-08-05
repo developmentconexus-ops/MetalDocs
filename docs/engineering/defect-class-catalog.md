@@ -158,8 +158,20 @@ explicit exception file where each entry carries an owner and an expiry date, an
 fails on an expired entry. An exception is a debt with a due date, never a second
 standard.
 
+**A third failure mode, found later: the allowlist anchored by position.** During the
+approval accountability loop (2026-08-05), an unrelated edit shifted lines in a file whose
+`api-lint` tripwire allowlist entry was keyed to a *location* rather than to a symbol. The
+entry silently stopped matching. Nothing failed, and the change passed review. An allowlist
+keyed by `file:line` is a second copy of a fact (Class 2) whose divergence is *invisible by
+construction*, because the guard's own success path is "entry not matched → nothing to
+report". **Rule: an exception must be keyed to something the compiler or the parser can
+resolve — a symbol, a fully-qualified name, an AST node — never to a line number, and never
+to a substring of a line. And every allowlist needs a staleness check: an entry that matches
+nothing is a failure, not a pass.**
+
 **Detection.** Every guard with an inclusion list is suspect. Invert it and count the
-failures — that number is the true debt, and it will be much larger than expected.
+failures — that number is the true debt, and it will be much larger than expected. Then
+check the inverse: for each allowlist entry, assert it still matches something.
 
 ---
 
@@ -927,6 +939,46 @@ not the docs") points straight at it.
 
 ---
 
+## Class 26 — The Local Gate That Is Weaker Than the CI Gate
+
+**Symptom.** The same tool runs in the developer's verification routine and in CI, under
+different flags. The local invocation passes; the strict one would not. Every defect in the
+gap between them is found late — after review, after merge, sometimes after push — and the
+person who introduced it had a green run in front of them the whole time.
+
+**Evidence.** `scripts/api-lint` defaults to non-strict (`main.go:19`,
+`flag.Bool("strict", false, …)`). CI runs it as
+`go run ./scripts/api-lint/ -strict api/openapi/v1/openapi.yaml .`
+(`.github/workflows/api-contract.yml:100`), where every rule is blocking. The harness
+verification ladder listed the lane as plain "api-lint". So the routine every task ran was a
+strictly weaker check than the one that decides the build — which is how the de-anchored
+allowlist in Class 3 above survived a review.
+
+**Root cause.** Two invocations of one tool, maintained in two places (Class 2 again), with
+the weaker one placed where feedback is fastest and the stronger one where feedback is
+slowest. That is the incentive gradient pointing exactly the wrong way: cheap-and-lenient
+early, expensive-and-strict late.
+
+**Prevention (rung 2, then 3).**
+- **One invocation, one definition.** The gate is a single script or make target
+  (`make lint-api`) that both the local ladder and CI call. Neither side spells out flags.
+  Divergence stops being possible rather than being discouraged.
+- If flags must differ, **the local default is the strict one.** Leniency is the flag you
+  opt into, never the one you inherit.
+- **CI check (rung 3):** assert that the workflow's invocation string equals the one the
+  local target uses. Cheap, and it catches the drift the day it appears.
+
+**Detection.** Diff every CI step's command against the documented local ladder line for the
+same tool. Any difference in flags, paths, or scope is this class. Ask specifically: *does
+any tool have a "strict", "ci", or "all" mode that the local routine does not enable?*
+
+**Generalization.** A gate is not what the tool can check — it is what the routine actually
+runs. A capability nobody invokes is documentation. This is the process-level twin of Class
+22 (the guarded branch no environment executes): there the code path never ran, here the
+check never ran, and in both cases the suite reported success.
+
+---
+
 ## Appendix A — Day-0 Factory Checklist
 
 Derived directly from the classes above. Each line prevents a class already observed.
@@ -950,6 +1002,10 @@ Derived directly from the classes above. Each line prevents a class already obse
 **CI (rung 3)**
 - [ ] Generated artifacts have a freshness gate — regenerate, fail on diff (§2)
 - [ ] Guards are **deny-by-default**; exceptions carry owner + expiry, CI fails on expiry (§3)
+- [ ] Allowlist entries key on symbols the parser resolves, never on `file:line`; an entry
+      matching nothing fails the build (§3)
+- [ ] Each gate has ONE invocation shared by the local ladder and CI; if flags differ, the
+      local default is the strict one (§26)
 - [ ] All build tags compile in CI (§8)
 - [ ] Doc `file:line` anchors verified; `Last verified` stamps warn past threshold (§12)
 - [ ] Every emitted artifact a human reads is regenerated on every relevant commit; an
@@ -983,7 +1039,7 @@ Derived directly from the classes above. Each line prevents a class already obse
 
 ## Appendix B — Recurring Root Causes
 
-The 25 classes reduce to five underlying causes. Useful when classifying a *new* defect
+The 26 classes reduce to five underlying causes. Useful when classifying a *new* defect
 that does not obviously match a class above.
 
 1. **A guarantee was asserted, not enforced.** Comments, docs, and conventions standing in
@@ -991,8 +1047,8 @@ that does not obviously match a class above.
    a configuration value an administrator may legally set the other way. → §1, §3, §12,
    §13, §23
 2. **Two things that must agree, maintained separately.** No compiler spans the boundary —
-   including an artifact and the delta chain that supersedes it. → §2, §7, §10, §11, §19,
-   §21, §25
+   including an artifact and the delta chain that supersedes it, and one tool invoked two
+   ways in two places. → §2, §7, §10, §11, §19, §21, §25, §26
 3. **Absence used to carry meaning.** Unfalsifiable, indistinguishable from failure.
    → §4, §5, §6
 4. **The local fix was cheaper than the right fix,** and the incentive gradient always

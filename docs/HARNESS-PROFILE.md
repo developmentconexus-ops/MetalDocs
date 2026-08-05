@@ -37,6 +37,12 @@ append-only log at the bottom.
 - **L0** — `go build ./...` · `npm run typecheck:docx-v2` (when docx touched) · FE typecheck
   (when FE touched) · governance lanes: api-lint, `module-boundaries.yml`,
   check-test-discipline, capability-coherence. Zero findings.
+  **api-lint runs `-strict`, always** (amended 2026-08-05):
+  `go run ./scripts/api-lint/ -strict api/openapi/v1/openapi.yaml .` — the exact string CI
+  uses (`.github/workflows/api-contract.yml:100`). The binary defaults to non-strict
+  (`scripts/api-lint/main.go:19`), so a bare `api-lint` is a strictly weaker check than the
+  one that decides the build. Field lesson: on the approval accountability loop a line shift
+  de-anchored a tripwire allowlist entry, and the weaker local lane let it through review.
 - **L1** — `go test ./...` (unit) · integration via `.\scripts\test-integration.ps1` — NEVER
   hand-set `DATABASE_URL` (script derives from `.env` `POSTGRES_*`, probes postgres, fails
   loud; `testdb.Open` silently SKIPS when the var is missing/DB down = false green) · FE
