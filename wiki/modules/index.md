@@ -1,6 +1,6 @@
 # Modules
 
-> **Last verified:** 2026-06-28
+> **Last verified:** 2026-08-05 (added `notifications.md` — module existed in the tree but had no doc until Task 11 of the approval accountability loop)
 > **Scope:** Durable per-module knowledge, tech-debt registers, and maturity state.
 
 ## Core product modules
@@ -26,6 +26,7 @@
 ## Supporting modules
 
 - [jobs.md](jobs.md) — background-job / async worker module (Stage-1 draft)
+- [notifications.md](notifications.md) — per-recipient notification inbox; two delivery-only River workers
 - [render-fanout.md](render-fanout.md), [render-fanout-tech-debt.md](render-fanout-tech-debt.md)
 - [search.md](search.md), [search-tech-debt.md](search-tech-debt.md)
 

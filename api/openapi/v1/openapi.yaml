@@ -1270,7 +1270,7 @@ paths:
                     Required: generic templates no longer exist (ADR 0086).
                     The profile must already have an active template approval
                     route, otherwise creation is rejected 409
-                    `APPROVAL_ROUTE_MISSING`.
+                    `state.approval_route_missing`.
       responses:
         '201':
           description: created
@@ -1286,8 +1286,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           description: >-
-            Conflict. `ALREADY_EXISTS` when the template key already
-            exists in the tenant; `APPROVAL_ROUTE_MISSING` when the declared
+            Conflict. `conflict.already_exists` when the template key already
+            exists in the tenant; `state.approval_route_missing` when the declared
             `doc_type_code` has no active template approval route (ADR 0086
             config-first gate).
           content:
@@ -3835,6 +3835,13 @@ paths:
         so concurrent extensions are already correct.
       tags: [approval]
       operationId: extendApprovalSLA
+      x-authz-skip-area: true
+      x-authz-skip-reason: >-
+        approval.sla_extend is area-grade but the area is not
+        request-supplied: the tier-2 check runs in-tx against the active
+        stage's own area_code_snapshot column, read inside the same
+        transaction as the write (sla_extension_service.go Extend). There is
+        no request field to point x-authz-area at.
       parameters:
         - { name: instance_id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
@@ -5756,7 +5763,7 @@ components:
             (approval_routes, subject_kind=template, subject_key=profile
             code — ADR 0086). Admin readiness badge: false means templates
             cannot be created under the profile — `POST /templates` rejects
-            it with 409 `APPROVAL_ROUTE_MISSING`.
+            it with 409 `state.approval_route_missing`.
         family_code:
           type: string
         name:
