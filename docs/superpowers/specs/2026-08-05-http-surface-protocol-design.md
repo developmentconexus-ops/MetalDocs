@@ -135,10 +135,18 @@ package main
 
 // httpSurface maps a mux pattern to its tier-1 rule. The key is the exact
 // string the mux registers, so a lookup is a map hit, not a second matcher.
+type surfaceRule struct {
+	visibility                  iamdelivery.Visibility
+	capability                  iamdomain.Capability
+	tag                         string // the owning publisher's tag — §5 check 4
+	allowedDuringPasswordChange bool   // from x-authz-password-change-allowed
+}
+
 var httpSurface = map[string]surfaceRule{
 	"GET /api/v1/metrics": {
 		visibility: iamdelivery.VisibilityPermissionGuarded,
 		capability: iamdomain.CapMetricsView,
+		tag:        "observability",
 	},
 	// … one entry per operationId
 }
@@ -225,16 +233,18 @@ module→iam edges are created**, because the capability binding never enters a 
 Mounting runs through a recording `Muxer` in **production**, not only in a test:
 
 ```go
-rec := httprouter.NewRecorder(mux)
+mounted := map[string][]string{}          // publisher name → patterns it registered
 for _, p := range publishers {
+	rec := httprouter.NewRecorder(mux)    // one recorder per publisher
 	p.Mount(rec)
+	mounted[p.Name()] = rec.Patterns()
 }
-if err := assertSurface(rec.Patterns(), httpSurface, specTags, publishers); err != nil {
+if err := assertSurface(mounted, httpSurface, specTags, publishers); err != nil {
 	log.Fatalf("http surface: %v", err)   // fail closed at boot
 }
 ```
 
-`assertSurface` checks three things and refuses to start on any failure:
+`assertSurface` checks four things and refuses to start on any failure:
 
 1. **Tag coverage** — every entry in `specTags` is claimed by exactly one publisher's `Tag()`.
    Catches a publisher constructed but not listed, and two publishers claiming one tag.
@@ -242,6 +252,14 @@ if err := assertSurface(rec.Patterns(), httpSurface, specTags, publishers); err 
    mounted with no policy.
 3. **Declared ⊆ mounted** — every `httpSurface` key was recorded. Catches a spec operation
    whose handler was never wired.
+4. **Ownership** — for every pattern a publisher recorded, `httpSurface[pattern].tag` equals
+   that publisher's `Tag()`.
+
+**Check 4 is not redundant with check 1.** Recording one global pattern set would let every
+publisher claim a distinct tag while mounting each other's operations, and checks 1–3 would all
+pass: the tag set is covered, the pattern set matches, and nothing is missing. Only per-publisher
+recording makes "documents mounts a templates route" a boot failure. That is why the recorder is
+per publisher and why `surfaceRule` carries `tag`.
 
 This is not a test hook welded into production (catalog Class 34). The recorder wraps the
 *real* mount, the assertion runs on the *real* boot, and the check is the invariant itself
@@ -255,20 +273,38 @@ upgrade but which is nonetheless mounted method-qualified (`iam/presence/handler
 check 3 has no false positive on day one, and no "declared but not implemented" escape is
 needed. Adding one would be the exception mechanism ruling C deleted.
 
-**E2E scaffolding gets its own listener, not an overlay.** `/internal/test/*` is env-gated
-(`METALDOCS_E2E`) and today is mounted onto the API mux *after* `buildRouter`
-(`main.go:839-848`), deliberately outside route truth (`router.go:33-38`). An earlier draft
-merged an e2e rule overlay into `httpSurface` when the flag was on. That is precisely the
-exception mechanism this protocol is not allowed to have, so it is rejected: under
-`METALDOCS_E2E` the scaffolding is mounted on a **separate `http.ServeMux` on its own listener**,
-composed with the same middleware chain. The governed surface stays total — one mux, one
-declaration, no conditional membership.
+**E2E scaffolding becomes a publisher with its own generated declaration.** `/internal/test/*`
+is env-gated (`METALDOCS_E2E`) and today is mounted onto the API mux *after* `buildRouter`
+(`main.go:839-848`), deliberately outside route truth (`router.go:33-38`). Two earlier drafts
+were wrong about it:
 
-The cost is real and stated: the panic probe (`REQ-MW-1`) and the e2e coverage gate move to
-that port, so `.github/workflows/e2e-coverage-gate.yml` and the two Playwright configs gain a
-second base URL. The probe still exercises the same `platform/middleware.Recovery` wrap, which
-is what it asserts. What is bought is that "a pattern is routed but has no rule" becomes
-unambiguously a wiring bug on every boot path, in every environment.
+- *A rule overlay merged into `httpSurface` when the flag is on* — rejected. Conditional
+  membership in the governed set is precisely the exception mechanism ruling C deleted.
+- *A separate listener* — rejected on cost, once the actual consumers were read. Five e2e
+  endpoints (`internal/test/e2e_seed.go:109-114`) are called from at least eight Playwright
+  sites as **relative** paths against the page's own `baseURL`
+  (`e2e/utils/seed.ts:27,46`, `fixtures/isolation.ts:50,72`, `flows/happy_path.spec.ts:39,146`,
+  `flows/sod_violation.spec.ts:87,279,309`, `flows/reject_flow.spec.ts:49`,
+  `flows/quorum_m_of_n.spec.ts:61`). A second port makes every one of them absolute.
+
+What ships instead: the scaffolding is an ordinary `SurfacePublisher` with tag `internal-e2e`,
+and its declaration is **generated by the same generator from a separate spec document**,
+`api/openapi/internal-e2e.yaml` — excluded from the public bundle and from frontend codegen, so
+test scaffolding never enters the customer contract or the FE types. Under `METALDOCS_E2E` the
+publisher is in the list and its tag is in `specTags`; otherwise neither is. Both sets move
+together, so all four checks stay total on both boot paths and nothing is exempted from
+checking.
+
+The distinction that matters: an exception is *mounted but not checked*. This is a second
+complete, generated, asserted surface — which honors locked constraint 1 (generated, never
+hand-written) as well.
+
+**The panic probe is deleted, not moved.** `GET /internal/test/panic` (`main.go:845-847`) has
+exactly one occurrence in the repository — its own registration. No workflow, spec, or
+Playwright flow ever requests it, so it has never verified REQ-MW-1; it is a guarded branch no
+environment executes (catalog §22). It goes, and REQ-MW-1 is verified where it can actually
+fail: a Go test that drives the composed API handler and asserts a panicking handler yields a
+500 problem+json.
 
 ---
 
@@ -322,8 +358,8 @@ by a design meant to change nothing observable. Splitting them means:
 same 500 + `slog.Warn` the `default:` arm returns today. Leaving it to fall through `default:`
 would work and would be wrong: a named, expected value silently relying on an
 unknown-value branch is a guard a future author closes by "completing" the switch, at which point
-an unwired route becomes a pass-through. The case is written, and a test asserts a
-`VisibilityUnresolved` request yields 500.
+an unwired route becomes a pass-through. The `default:` arm **stays** for genuinely unknown
+values, and §10 tests both arms.
 
 **The chain is not touched** (locked constraint 6, `…-system-impact.md:205`; `chain.go:25`). An
 earlier draft added a `route_resolve` link that resolved once and passed the rule through the
@@ -372,15 +408,24 @@ Ruling A forbids a two-regime ship, so these go in the same program.
 | `if r.Method != X { WriteMethodNotAllowed }` in every migrated legacy handler | e.g. `auth/.../handler.go:98`, `:146` | the method-qualified pattern; the mux rejects |
 | `x-rate-limit` | `openapi.yaml:3213` | — dead: no consumer; the real config is `ratelimit/config.go:35` |
 | `x-websocket-message` | `openapi.yaml` (1 op) | — dead: no consumer |
+| `GET /internal/test/panic` | `main.go:845-847` | a Go test over the composed handler (§5) |
+| `frontend/apps/web/e2e/playwright.approval.config.ts` | whole file | — dead: no workflow or package script selects it |
 
-The last three rows are the extermination ruling applied to this surface. `x-rate-limit` and
+The last five rows are the extermination ruling applied to this surface. `x-rate-limit` and
 `x-websocket-message` look like policy and are read by nothing; a declaration nobody consumes is
 indistinguishable from one that is enforced, which is worse than no declaration. `x-authz-area`
-stays — it is live, consumed by a blocking test (`permissions_authz_scope_test.go:76`).
+stays — it is live, consumed by a blocking test (`permissions_authz_scope_test.go:76`), as does
+`x-pagination-exempt`, consumed by `scripts/api-lint/spec_rules.go`.
 
-`/healthz` has five consumers, all repointed: `.github/workflows/e2e-coverage-gate.yml:161`,
-`perf.yml:34`, `perf.yml:65`, `frontend/apps/web/playwright.config.ts:61`,
-`frontend/apps/web/e2e/playwright.approval.config.ts:43`.
+The Playwright config is the sharper case, because an earlier draft listed it as a `/healthz`
+consumer **to be repointed**. It is referenced by nothing; its `START_BACKEND` knob
+(`:11`) is set by nothing and its branch shells out to `./cmd/api` (`:42`), a path that does not
+exist. Repointing a dead file would have been the pure form of the defect this program exists to
+remove: maintaining a copy of route truth inside an artifact nobody runs.
+
+So `/healthz` has **four** live consumers, all repointed to `/api/v1/health/live`:
+`.github/workflows/e2e-coverage-gate.yml:161`, `perf.yml:34`, `perf.yml:65`,
+`frontend/apps/web/playwright.config.ts:70`.
 
 ---
 
@@ -399,7 +444,9 @@ become method-qualified.
 | featureflags | 1 | `platform/featureflags/handler.go:26` |
 | observability (`/api/v1/metrics`) | 1 | `router.go:123-125` — bare `mux.Handle` in the composition root |
 
-**12 bare patterns, 15 spec operations across those six tags.** `presence` is *not* on this list:
+**12 bare patterns, 12 spec operations across those six tags** — auth 4, security 3, health 2,
+search 1, configuration 1, observability 1, matching §4's tag inventory exactly. (An earlier draft
+said 15; that was arithmetic, not measurement.) `presence` is *not* on this list:
 its one hand-mounted route is already method-qualified (`iam/presence/handler.go:73`) and is
 excluded from server codegen deliberately, because it is a WebSocket upgrade
 (`iam/api/cfg.yaml: exclude-operation-ids: [streamPresence]`). It stays hand-mounted and stays
@@ -420,6 +467,14 @@ matching the ten already-migrated tags, and the internal `if r.Method != X` guar
 (§7) rather than left as dead branches. `security` already has a generated
 `internal/modules/security/api/api.gen.go` that nothing wires up — that dead artifact becomes
 live rather than being written from scratch.
+
+**One accepted behavior change, in health.** `handleLive` and `handleReady`
+(`platform/observability/health.go:23,32`) check no method at all: today
+`POST /api/v1/health/live` reaches the handler. The tier-1 row is GET-only
+(`permissions.go:84`), so such a request is session-gated and then answered 200. After
+method-qualification the mux answers 405. This is a deliberate tightening, listed here and in
+§10's delta table rather than discovered — every other family already rejects non-matching
+methods itself, so health is the only one where mounting changes what a client sees.
 
 ---
 
@@ -455,20 +510,41 @@ Two consequences worth stating:
 |---|---|
 | Generator validation rules (§2, four failures) | table test per rule, each asserting non-zero exit and the operationId in the message |
 | Generated output is current | CI regenerate-and-diff; drift fails the build |
-| **Tier-1 parity, exhaustive** | for every recorded pattern: instantiate the template with a **sentinel** value per `{param}`, call the *old* `resolveRoutePermission(method, path)` and the *new* lookup, assert equal `(Capability, Visibility)`. Deltas are listed in the test as data with a reason each, not tolerated by a loose assertion. Locked constraint 5 / `…-system-impact.md:140`. |
+| **Tier-1 parity, exhaustive over the matcher's value-dependence** (see below) | for every recorded pattern × every path in its derived candidate set: call the *old* `resolveRoutePermission(method, path)` and the *new* lookup, assert equal `(Capability, Visibility)`. Deltas are listed in the test as data with a reason each, not tolerated by a loose assertion. Locked constraint 5 / `…-system-impact.md:140`. |
 | Generator key == emitted pattern, exhaustive | compare the generator's key for all 147 operations against the patterns oapi-codegen actually emits, rather than reasoning from three sampled paths |
+| Ownership (§5 check 4) | a publisher mounting a pattern whose declared tag is another publisher's fails `assertSurface` |
+| `VisibilityUnresolved` → 500, unknown value → 500 | two middleware tests, one per switch arm |
+| Health non-GET now 405 | table test asserting the accepted delta from §8, so it cannot regress silently |
 | Boot assertion fires on each of its three checks | three unit tests over `assertSurface` with hand-built inputs — the assertion is pure, so no boot needed |
 | HEAD inherits GET's capability | integration test: HEAD a capability-guarded route without the capability, expect 403 |
 | Public routes stay public | integration test over every `visibility: public` operation, no session, expect non-401 |
 | `%2F`, trailing slash, `//` | table test against the real mux |
 
-**The sentinel matters, and a naive `{id}` → `"x"` would make the parity gate unsound.**
-`routeRule.matches` (`permissions.go:35-55`) matches on `pathPrefix` (80 rows), `pathSuffix`,
-`contains`, and `notSuffix` (49 rows between them) — so a substituted parameter value that happens
-to equal a literal segment some rule keys on (`download`, `publish`, `versions`) would make the
-old resolver pick a different row than a real request ever would, and the gate would certify a
-disagreement as agreement. The sentinel is therefore a value that appears in no rule literal
-(`__p__`), and the test asserts that property against `routeRules` itself rather than trusting it.
+**One path per pattern is not a parity gate — it is a sample, and it would license a deletion it
+has not proven.** `routeRule.matches` (`permissions.go:35-55`) inspects the path through
+`pathExact`, `HasPrefix`, `HasSuffix`, `Contains`, and a disqualifying `notSuffix` — 80 rows carry
+a prefix and 49 carry a suffix/contains/notSuffix. So which row wins is **value-dependent**, and
+substituting one sentinel per `{param}` explores exactly one point of that space. The concrete
+miss: `PATCH /api/v1/iam/users/{user_id}` resolves to `user.manage` for almost any id, but row
+`permissions.go:120` carries `notSuffix: "/roles"`, so a real request to
+`/api/v1/iam/users/roles` is disqualified from that row, matches nothing else, and falls through
+to session-required today. The new lookup gives it `user.manage`. That is a genuine tier-1 delta
+— safe in direction, since it tightens — and a one-sample gate reports parity and never mentions
+it.
+
+**The candidate set is derived from the rule table, which makes it exhaustive rather than
+lucky.** `matches` can only distinguish two paths via a literal that some rule carries. So for
+each pattern, the parity test instantiates every `{param}` position with, in turn:
+
+1. a sentinel that appears in no rule literal (`__p__`), and
+2. every distinct literal token appearing in any rule's `pathExact` tail, `pathSuffix`,
+   `contains`, or `notSuffix`.
+
+Any two paths that agree on all of those agree on every rule in the table, so the set covers the
+matcher's entire decision space for that pattern. The test asserts (1)'s no-collision property
+against `routeRules` rather than trusting it, and it enumerates the candidate tokens from
+`routeRules` itself — hand-listing them would be a hand-synced enumeration inside the test that
+exists to kill hand-synced enumerations.
 
 Per `wiki/quality/test-discipline.md`, DB-touching cases use the `testdb` factory; the
 generator and `assertSurface` tests are pure and need neither.
@@ -485,11 +561,12 @@ Ruling A: no intermediate state ships. Commits may be incremental; the release i
    (`.github/workflows/api-contract.yml:29-53`; locked constraint 7). Nothing consumes the new
    extensions yet.
 2. `cmd/gen-http-surface` + its validation tests. Emits the file; nothing reads it.
-3. Migrate the six legacy families to codegen (§8), each with full regeneration. Independent of
-   1–2, but a **hard prerequisite of 4**: a bare pattern records as `"/api/v1/auth/login"` while
-   the generated key is `"POST /api/v1/auth/login"`, so mounting a bare family under the step-4
-   assertion fails check 2 *and* check 3 and the server does not boot. The ordering is
-   1‖3 → 2 → 4.
+3. Migrate the six legacy families to codegen (§8), each with full regeneration — **and, in the
+   same step, delete `/healthz` and repoint its four live consumers**, because migrating health
+   to its generated GET routes is what removes the extra bare mount at
+   `observability/health.go:20`. Leaving `/healthz` mounted would fail step 4's check 2; deleting
+   it later would break the four consumers in the interim. Also delete the dead
+   `playwright.approval.config.ts` here rather than repointing it (§7).
 4. **One commit:** `httprouter.SurfacePublisher` + `[]SurfacePublisher` replacing
    `routeHandlers`, *and* the recorder + `assertSurface` at boot, *and* deletion of
    `TestRouteCoverage`. These cannot be separate commits — step 4's deletion removes the types
@@ -502,12 +579,30 @@ Ruling A: no intermediate state ships. Commits may be incremental; the release i
 6. Flip `PermissionResolver` to the pattern lookup; delete §7's list. The parity test is deleted
    in this same commit — it exists to license the deletion, and once one side is gone it has
    nothing to compare.
-7. Move the e2e scaffolding to its own listener (§5); delete `/healthz` and repoint the five
-   consumers.
+7. Make the e2e scaffolding a publisher with its own generated declaration (§5); delete the dead
+   panic probe.
+
+**Dependency graph, not a topic list:**
+
+```
+1 ──┐
+    ├─→ 2 ──┐
+3 ──┘       ├─→ 4 ─→ 5 ─→ 6
+7 ──────────┘
+```
+
+- `1 → 2` — the generator reads the extensions step 1 authors.
+- `3 → 4` — a bare pattern records as `"/api/v1/auth/login"` while the generated key is
+  `"POST /api/v1/auth/login"`, so mounting an unmigrated family under step 4's assertion fails
+  checks 2 *and* 3 and the server does not boot.
+- `2 → 4` — `assertSurface` reads the `httpSurface` step 2 emits.
+- `7 → 4` — under `METALDOCS_E2E`, an e2e route mounted with no declaration fails check 2, so the
+  e2e publisher and its generated table must exist before the assertion goes live. (Step 7 is
+  last only in the writing order; in the graph it is a prerequisite of 4.)
+- `4 → 5 → 6` — parity needs both tables to exist; deletion needs parity green.
 
 Steps 4→6 are the only span where the old and new tier-1 coexist, and step 5 is the gate that
-licenses step 6. Steps 2 and 4 also cannot be swapped: `assertSurface` reads `httpSurface`, which
-step 2 emits.
+licenses step 6.
 
 ---
 
@@ -528,7 +623,8 @@ constraint 6 holds. The analysis also names a second ADR for the protocol-as-pla
 | Generator key and oapi-codegen key diverge | §5 check 2+3 makes divergence a boot failure, not a 403; §10 adds an exhaustive generator-level comparison |
 | 147 `x-authz-*` declarations transcribed by hand | mechanical from `routeRules`, which covers everything: an exhaustive first-match run of all 147 spec operations against the 120 rows reaches the fallback **zero** times. There is no set of "routes with no current rule" to discover — an earlier draft claimed ~28 and that number was fabricated. The authoring risk is transcription error, and §10's parity test is what catches it |
 | `BaseURL: "/api/v1"` is hard-coded in 10 module files (`audit/.../handler.go:89` + 9) — itself a hand-synced constant | promote to one exported constant the generator and every module read |
-| Moving e2e scaffolding to its own listener breaks CI wiring | 3 config files gain a second base URL (§5); the panic probe still exercises the same recovery wrap |
+| A second spec document (`internal-e2e.yaml`) is a new artifact that can rot | it is generated by the same generator and asserted by the same four checks whenever `METALDOCS_E2E` is on; the e2e CI job is where that boot path runs |
+| Health's non-GET responses change from 200 to 405 | accepted and listed in §8, tested in §10 — the only client-visible change in the program |
 | CORS preflight reaching the resolver | §9, verified during implementation |
 | Six legacy families are the bulk of the work | independent of steps 1–2, parallelizable |
 
