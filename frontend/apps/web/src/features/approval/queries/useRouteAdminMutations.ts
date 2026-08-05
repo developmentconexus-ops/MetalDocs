@@ -43,6 +43,7 @@ function stageRequestToSummary(
     required_capability: stage.required_capability,
     quorum: stage.quorum,
     quorum_m: stage.quorum_m ?? null,
+    due_in_days: stage.due_in_days ?? null,
     drift_policy: stage.drift_policy,
     stage_kind: stage.stage_kind,
     selectors: stage.selectors,

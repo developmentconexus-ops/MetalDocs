@@ -3766,6 +3766,8 @@ export interface components {
              * @enum {string}
              */
             stage_kind?: "review" | "approval";
+            /** @description Prazo da etapa em dias corridos, contado a partir da ativação da etapa. Ausente ou null significa SEM prazo — a etapa nunca vence e não gera lembrete. Não existe padrão implícito. */
+            due_in_days?: number | null;
             /** @description M4 ActorSelector (unit 3.2). REQUIRED — selectors are the sole source of truth for a stage's actor pool. The legacy flat required_role/area_code wire fields have been removed entirely (no fallback, no synthesis). */
             selectors: components["schemas"]["ActorSelector"][];
         } & {
@@ -3783,6 +3785,8 @@ export interface components {
              * @enum {string}
              */
             stage_kind?: "review" | "approval";
+            /** @description Prazo da etapa em dias corridos, contado a partir da ativação da etapa. Ausente ou null significa SEM prazo — a etapa nunca vence e não gera lembrete. Não existe padrão implícito. */
+            due_in_days: number | null;
             /** @description M4 ActorSelector (unit 3.2). Sole source of truth for the stage's actor pool; always returned. The legacy flat required_role/area_code wire fields have been removed entirely. */
             selectors: components["schemas"]["ActorSelector"][];
         } & {

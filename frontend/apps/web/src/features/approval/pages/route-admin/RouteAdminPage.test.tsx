@@ -62,6 +62,7 @@ function makeRoute(overrides: Partial<RouteSummary> = {}): RouteSummary {
         selectors: [{ kind: 'role_in_fixed_area', role: 'approver', area_code: 'AREA-01' }],
         quorum: 'any_1_of',
         quorum_m: null,
+        due_in_days: null,
         drift_policy: 'reduce_quorum',
       },
       {
@@ -71,6 +72,7 @@ function makeRoute(overrides: Partial<RouteSummary> = {}): RouteSummary {
         selectors: [{ kind: 'role_in_fixed_area', role: 'approver', area_code: 'AREA-01' }],
         quorum: 'all_of',
         quorum_m: null,
+        due_in_days: null,
         drift_policy: 'reduce_quorum',
       },
     ],

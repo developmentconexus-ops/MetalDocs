@@ -35,6 +35,7 @@ function stage(): RouteSummary['stages'][number] {
     selectors: [{ kind: 'role_in_fixed_area', role: 'approver', area_code: 'ops' }],
     quorum: 'any_1_of',
     quorum_m: null,
+    due_in_days: null,
     drift_policy: 'reduce_quorum',
   };
 }

@@ -109,6 +109,7 @@ describe('useRouteAdminMutations toast behaviour', () => {
               selectors: [{ kind: 'role_in_fixed_area', role: 'approver', area_code: 'ops' }],
               quorum: 'any_1_of',
               quorum_m: null,
+              due_in_days: null,
               drift_policy: 'reduce_quorum',
               stage_kind: 'review',
             },
@@ -133,13 +134,16 @@ describe('useRouteAdminMutations toast behaviour', () => {
       routeId: 'route-a',
       body: {
         name: 'Rota A',
-        stages: [{ ...createStage(), stage_kind: 'approval' }],
+        stages: [{ ...createStage(), stage_kind: 'approval', due_in_days: 30 }],
       },
     });
 
     await waitFor(() => {
       const cached = client.getQueryData<ListRoutesResponse>(queryKey);
       expect(cached?.routes[0]?.stages[0]?.stage_kind).toBe('approval');
+      // F8 SLA: without this, the deadline flickers away between the
+      // optimistic write and the onSettled refetch (stageRequestToSummary).
+      expect(cached?.routes[0]?.stages[0]?.due_in_days).toBe(30);
     });
   });
 });

@@ -39,6 +39,11 @@ export interface StageDraft {
   selectors: SelectorDraft[];
   quorumKind: QuorumKind;
   m: string;
+  /**
+   * '' means NO deadline. Deliberately not defaulted to a number: an empty
+   * field must round-trip back to an ABSENT wire value, not to 0.
+   */
+  dueInDays: string;
   driftPolicy: DriftPolicy;
   stageKind: StageKind;
 }
@@ -360,6 +365,21 @@ export function StageCard({
           />
         </>
       ) : null}
+
+      <label className={styles.fieldLabel} htmlFor={`stage-due-${stage.uid}`}>
+        Prazo da etapa {stageNumber} (dias)
+      </label>
+      <input
+        id={`stage-due-${stage.uid}`}
+        className={styles.input}
+        type="number"
+        min={1}
+        step={1}
+        placeholder="Sem prazo"
+        value={stage.dueInDays}
+        onChange={(event) => updateStage(stage.uid, { dueInDays: event.target.value })}
+        disabled={disabled}
+      />
 
       <label className={styles.fieldLabel} htmlFor={`stage-drift-${stage.uid}`}>
         Política de drift da etapa {stageNumber}

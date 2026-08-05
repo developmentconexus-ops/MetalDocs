@@ -53,6 +53,7 @@ function makeStage(overrides: Partial<StageDraft> = {}): StageDraft {
     selectors: [makeSelector()],
     quorumKind: 'any_1_of',
     m: '1',
+    dueInDays: '',
     driftPolicy: 'reduce_quorum',
     stageKind: 'review',
     ...overrides,
@@ -269,5 +270,53 @@ describe('StageCard', () => {
     expect(screen.getByLabelText('Usuário do seletor 1 da etapa 1')).toBeInTheDocument();
     expect(screen.queryByLabelText('Role do seletor 1 da etapa 1')).toBeNull();
     expect(screen.queryByLabelText('Área do seletor 1 da etapa 1')).toBeNull();
+  });
+
+  it('renders the deadline input with the draft value and a no-deadline placeholder', () => {
+    render(
+      <StageCard
+        stage={makeStage({ dueInDays: '30' })}
+        stageNumber={1}
+        isOnly={false}
+        disabled={false}
+        roleOptions={[]}
+        roleOptionsLoading={false}
+        areaOptions={[]}
+        areaOptionsLoading={false}
+        userOptions={[]}
+        userOptionsLoading={false}
+        updateStage={vi.fn()}
+        removeStage={vi.fn()}
+      />,
+    );
+
+    const input = screen.getByLabelText('Prazo da etapa 1 (dias)') as HTMLInputElement;
+    expect(input.value).toBe('30');
+    expect(input.placeholder).toBe('Sem prazo');
+  });
+
+  it('calls updateStage with the new dueInDays on change', () => {
+    const updateStage = vi.fn();
+    render(
+      <StageCard
+        stage={makeStage()}
+        stageNumber={1}
+        isOnly={false}
+        disabled={false}
+        roleOptions={[]}
+        roleOptionsLoading={false}
+        areaOptions={[]}
+        areaOptionsLoading={false}
+        userOptions={[]}
+        userOptionsLoading={false}
+        updateStage={updateStage}
+        removeStage={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('Prazo da etapa 1 (dias)'), {
+      target: { value: '15' },
+    });
+    expect(updateStage).toHaveBeenCalledWith('stage-1', { dueInDays: '15' });
   });
 });

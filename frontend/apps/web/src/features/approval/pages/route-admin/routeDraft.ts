@@ -29,6 +29,7 @@ export function defaultStage(): StageDraft {
     selectors: [defaultSelector()],
     quorumKind: 'any_1_of',
     m: '1',
+    dueInDays: '',
     driftPolicy: 'reduce_quorum',
     stageKind: 'approval',
   };
@@ -50,6 +51,7 @@ export function isUntouchedDefaultStages(stages: StageDraft[]): boolean {
     stage.stageKind !== 'approval' ||
     stage.quorumKind !== 'any_1_of' ||
     stage.m !== '1' ||
+    stage.dueInDays !== '' ||
     stage.driftPolicy !== 'reduce_quorum'
   ) {
     return false;
@@ -107,6 +109,9 @@ export function toDraft(route: RouteSummary | null): RouteDraft {
           : [defaultSelector()],
       quorumKind: stage.quorum,
       m: String(stage.quorum_m ?? 1),
+      // '' means NO deadline. Deliberately not defaulted to a number: an empty
+      // field must round-trip back to an ABSENT wire value, not to 0.
+      dueInDays: stage.due_in_days == null ? '' : String(stage.due_in_days),
       driftPolicy: stage.drift_policy,
       stageKind: stage.stage_kind ?? 'approval',
     })),
@@ -144,6 +149,10 @@ export function toStageRequests(draft: RouteDraft): StageRequest[] {
     };
     if (stage.quorumKind === 'm_of_n') {
       payload.quorum_m = Number(stage.m);
+    }
+    const dueInDays = stage.dueInDays.trim();
+    if (dueInDays !== '') {
+      payload.due_in_days = Number(dueInDays);
     }
     return payload;
   });

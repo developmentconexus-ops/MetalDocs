@@ -293,3 +293,41 @@ describe('routeDraft selectors', () => {
     expect(stage.selectors).toEqual([{ kind: 'role_in_document_area', role: 'approver' }]);
   });
 });
+
+describe('routeDraft stage deadline (due_in_days)', () => {
+  function makeStageSummary(
+    overrides: Partial<RouteSummary['stages'][number]> = {},
+  ): RouteSummary['stages'][number] {
+    return {
+      order: 1,
+      name: 'Etapa',
+      required_capability: 'approval.signoff',
+      quorum: 'any_1_of',
+      quorum_m: null,
+      drift_policy: 'reduce_quorum',
+      stage_kind: 'approval',
+      due_in_days: null,
+      selectors: [],
+      ...overrides,
+    };
+  }
+
+  it('carries due_in_days from the wire into the draft and back', () => {
+    const draft = toDraft(
+      makeRouteSummary({
+        stages: [
+          makeStageSummary({ due_in_days: 30 }),
+          makeStageSummary({ order: 2, due_in_days: null }),
+        ],
+      }),
+    );
+
+    expect(draft.stages[0].dueInDays).toBe('30');
+    expect(draft.stages[1].dueInDays).toBe('');
+
+    const wire = toStageRequests(draft);
+    expect(wire[0].due_in_days).toBe(30);
+    // Empty means NO deadline: the field must be ABSENT, not 0 and not null.
+    expect('due_in_days' in wire[1]).toBe(false);
+  });
+});
