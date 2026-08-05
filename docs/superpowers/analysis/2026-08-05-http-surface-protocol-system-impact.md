@@ -34,21 +34,45 @@
 
 ## 2. Foundation verdict
 
+> ### ⚠️ CORRECTION — 2026-08-05, after the ruling
+>
+> **Two of the three measurements below were wrong when first committed (`c19f1e46`), and the operator's ruling A was made on that faulty basis.** Both errors were mine and both were the same mistake: I grepped the spec for runtime paths without accounting for `servers: - url: /api/v1` (spec line 7). The spec writes `/auth/login`; I searched for `/api/v1/auth/login` and read the absence as evidence. The tell was that `/api/v1/documents` also came back "NOT-in-spec" — a route that is unquestionably generated — which is what exposed the error.
+>
+> **What is actually true is stated below.** The core thesis — three unsynchronized enumerations, structure is the defect, restructure is the answer — **survives intact and is unchanged**. What changes is the *kind* and the *size* of the contract-first violation, and therefore the cost of ruling A. See §10 for how the ruling is affected.
+
 **Base you'd build on: NOT sound. Three enumerations of the same truth, none of which agree, none of which is derived from another.**
 
-Measured this run:
+Measured this run (corrected):
 
 | Enumeration | Size | Source of truth? |
 |---|---|---|
-| `api/openapi/v1/openapi.yaml` operations | **147** `operationId`s | Declared as route truth by the contract-first invariant |
+| `api/openapi/v1/openapi.yaml` | **147** `operationId`s across **125** paths and **16** tags | Declared as route truth by the contract-first invariant |
 | Go mux registrations | 17 mount operations across 5 different call shapes (`RegisterRoutes` method, `Register`, `RegisterGenerated`, two package-level `RegisterRoutes` functions, one bare `mux.Handle`) | Partly generated from the spec, partly hand-written |
 | `permissions.go` `routeRules` | **119** hand-typed rules | Hand-maintained; sole home of route→capability |
 
 **Three facts that make this a patch, not a base:**
 
-1. **The spec does not carry capability metadata at all.** Zero `x-` extensions across the whole spec (`grep -rn "x-metaldocs\|x-capability\|x-required-cap\|x-visibility" api/openapi/` → no matches). The route→capability binding exists *only* in `routeRules`. So the "generate tier-1 from the spec" idea is not a refactor of existing data — the data does not exist yet and must be authored.
+1. **The spec carries authz metadata, but not the capability.** *(Corrected — my original claim of "zero `x-` extensions" was false.)* The spec already uses vendor extensions freely: `x-pagination-exempt` + `x-pagination-exempt-reason`, `x-websocket-message`, and — directly relevant — **`x-authz-area`** and **`x-authz-area-none`** (lines 1108, 1144, 1705). So there is an established convention for authz metadata in the spec, and the design does not have to invent one.
 
-2. **Five route families are not in the spec at all.** Verified: `/api/v1/auth/login`, `/api/v1/search`, `/api/v1/security/lockouts`, `/healthz`, `/api/v1/feature-flags` — all **NOT-in-spec**. These are the same five bare-pattern families (`auth`, `health`, `featureFlags`, `search`, `security`) that the route-coverage guard can only check loosely. **The contract-first invariant is therefore already violated today, pre-existing, for a material part of the business API surface.** `/healthz` and `/api/v1/metrics` are defensible infra exceptions; `/api/v1/auth/login`, `/api/v1/search` and `/api/v1/security/*` are not — they are ordinary API surface that was hand-added in Go.
+   More importantly, **the spec already expresses two of the three visibility states natively**: a global `security: - sessionCookie: []` default (line 11-12) with per-operation `security: []` overrides marking the genuinely public endpoints. That is `VisibilitySessionRequired` and `VisibilityPublic` in standard OpenAPI, already authored, already reviewed.
+
+   What is missing is exactly one thing: **the capability name for `VisibilityPermissionGuarded` operations.** That is the only datum that lives solely in `routeRules` and must be authored into the spec. This is a substantially smaller authoring job than "the data does not exist yet".
+
+2. **Every production route is already in the spec. The violation is that the Go side ignores it for six tags.** *(Corrected — my original claim that five families were absent from the spec was false; all of them are present.)*
+
+   | Tag | In spec | `api/cfg.yaml` | Generated server wired |
+   |---|---|---|---|
+   | approval, audit, controlled-documents, distribution, documents, iam, notifications, taxonomy, templates, tokens (10) | ✅ | ✅ | ✅ |
+   | **security** | ✅ | ✅ | ❌ **dead generated code** — a 29,750-byte `internal/modules/security/api/api.gen.go` exists and `grep -rn "securityapi"` finds **zero** references outside its own package. The handler hand-registers bare patterns beside it. |
+   | **auth** | ✅ | ❌ | hand-written |
+   | **configuration** (`/feature-flags`) | ✅ | ❌ | hand-written |
+   | **health** (`/health/live`, `/health/ready`) | ✅ | ❌ | hand-written |
+   | **observability** (`/metrics`) | ✅ | ❌ | bare `mux.Handle` in the composition root |
+   | **search** (`/search/documents`) | ✅ | ❌ | hand-written |
+
+   The only runtime routes genuinely absent from the spec are `/internal/test/*` — the e2e scaffolding, deliberately gated behind `METALDOCS_E2E` and deliberately excluded.
+
+   **So the contract-first violation is real but is a different defect than I reported.** It is not "routes were hand-added in Go without a spec entry" (nothing is). It is: **the spec declares these operations, and for six tags the Go side ignores that declaration and hand-writes the routes anyway — including one tag where the generated server already exists and is simply dead code.** That is a *drift* violation, not an *omission* violation, and it is materially cheaper to close: five `cfg.yaml` files plus wiring six handlers onto their generated `ServerInterface`, rather than authoring new spec surface.
 
 3. **The guard I built in `54cc496b..e846d295` is a drift detector, not a fix.** By CLAUDE.md's own definition that is a local maximum: it optimizes inside a structure it never questioned. Two independent gate arms then found two MAJORs that are *not* bugs in the guard but consequences of the structure:
    - `conditionalRouteFamilies` (`router.go:85`) — a hand-typed fail-open exemption set that no test validates and that is currently a dead branch (`permissions_test.go:351` always populates `presence`). One added line silently disarms the completeness check.
@@ -102,9 +126,9 @@ What that dissolves rather than patches: the `routeHandlers` struct · the `rout
 
 ## 7. Contract & data
 
-- **OpenAPI-first:** this is where the real work is.
-  - **Add authorization metadata to the spec.** No `x-` extensions exist today. A vendor extension per operation (`x-metaldocs-capability`, `x-metaldocs-visibility`) is the contract-first-compatible home for the route→capability binding currently hand-typed in `routeRules`' 119 entries.
-  - **Bring the five off-spec families onto the spec** (`auth`, `search`, `security`, `featureFlags`, and the business parts of `health`) — the prerequisite named in §2. `/healthz` and `/api/v1/metrics` stay deliberate infra exceptions and must be *declared* as such somewhere machine-readable, not implied by absence.
+- **OpenAPI-first:** this is where the real work is. *(Corrected per §2 — the spec is complete; the Go side is what diverges.)*
+  - **Add the capability to the spec, and only the capability.** Visibility is already expressible and already authored: the global `security: - sessionCookie: []` default (spec lines 11-12) plus per-operation `security: []` overrides give `VisibilitySessionRequired` and `VisibilityPublic` in standard OpenAPI. One vendor extension is needed for the third state — the capability name on `VisibilityPermissionGuarded` operations. It follows the existing `x-authz-area` / `x-authz-area-none` convention (spec lines 1108, 1144, 1705) rather than inventing one. **Open design question, not settled here:** whether visibility is *derived* purely from `security` or is *also stated explicitly*. Deriving is the DRY answer; stating is the auditable answer. Pick one deliberately.
+  - **Close the six-tag Go-side drift** — give `auth`, `configuration`, `health`, `observability` and `search` an `api/cfg.yaml` + `gen.go`, and wire `security` onto the generated server that already exists as dead code. `/internal/test/*` is the only deliberate spec exclusion and is already gated behind `METALDOCS_E2E`.
   - **Regeneration is all-or-nothing.** Any spec edit churns every module's embedded `swaggerSpec`; partial regeneration is forbidden drift.
 - **Migration:** **none.** No schema change, no new table, no `tenant_id` question.
 - **Destructive change?** Yes, in the wire-adjacent sense: `routeRules` is deleted, not deprecated. Per the house rule (*tudo fallback legacy é extermínio*) it is dropped clean, not kept as a fallback beside the derived table. But it may only be dropped **after** parity is proven — the expand/contract shape here is: derive the new table → assert byte-equal resolution against the old one for every (method, path) the mux registers → then delete. A parity gate, not a compatibility layer.
@@ -141,6 +165,12 @@ The foundation is legacy (three unsynchronized enumerations, §2), and the work 
 > - **(C) Neither — the off-spec families stay off-spec permanently.** A formal, recorded MUST-deviation from contract-first via its own ADR, rather than today's silent violation. Honest, but it caps what the protocol can ever guarantee.
 
 **RULING: (A) — one program, whole surface.** Operator, 2026-08-05.
+
+> **⚠️ The ruling was made on a faulty measurement.** See the correction box in §2. The question put to the operator said the five families were "off-spec" and framed ruling A as the larger, slower path that would have to *author new spec surface*. That was wrong: every one of those families is already in the spec. Ruling A's actual cost is five `cfg.yaml` files plus wiring six handlers onto generated servers — one of which (`security`) is already generated and merely unwired.
+>
+> **The ruling stands and is unaffected in direction.** It chose "one program over the whole surface, no two-regime state" — a scope decision that remains correct and is now *cheaper* than presented. Option (C) (formalize a permanent deviation) is moot: there is nothing off-spec to formalize. Option (B)'s premise — that including the five families is what makes the program large — was the faulty part.
+>
+> **What the operator should re-confirm, and nothing more:** ruling A was chosen against a cost that was overstated. It is not being re-opened. It is recorded here that the choice would have been at least as attractive under the true numbers, so no re-ruling is required unless the operator wants one.
 
 **What ruling A binds, beyond clearing the block:**
 
