@@ -272,3 +272,168 @@ from a brief that could have found design defects, never from one that could not
 Count 9 (2B / 3M / 4N) → all nine applied. Altitude: one dimension-completion (rung 4) + eight
 mechanical (rung 1–2). Round 5 is dispatched as the **verdict round on the current revision** — the
 round the operator asked for, and the one round 3 skipped.
+
+---
+
+## Round 5 — the verdict round, and the §2 escalation it forces
+
+**Dispatch:** `gpt-5.6-sol` / `medium`, OS-process, read-only, against HEAD `a287e6de`. Artifacts:
+`agent__r5.log`, `agent__r5.last.md`, prompt `prompt-r5.md`. The prompt made two obligations
+binding: judge the revision at HEAD, and emit a **proceed map** — a per-step license, because a
+bare DO NOT PROCEED at round 5 is not an acceptable output.
+
+### Job 1 — round-4 dispositions
+
+Seven CLOSED (2, 4, 5, 6, 7, 8, 9), one PARTIAL (3), one OPEN (1). The reviewer independently
+re-verified the five method counts and confirmed them exact, and swept for a sixteenth orphan and
+found none — so finding 5 is genuinely closed, not merely acknowledged.
+
+### The proceed map — what the operator asked for
+
+| Step | Status | Reason |
+|---|---|---|
+| 1 — contract annotations + full regen | **LICENSED** | does not depend on the parity proof |
+| 2 — generator + widened drift gate | **LICENSED** | follows step 1 |
+| 3 — 6 legacy families + `/healthz` repoint | **LICENSED** | independent; repoint is atomic |
+| 4 — e2e publisher | BLOCKED BY MAJOR 2 | activation + total-mount semantics not executable as written |
+| 5 — presence fold into IAM publisher | **LICENSED** | independent |
+| 6 — SurfacePublisher + recorder + assertSurface | BLOCKED BY MAJOR 2 | assertion not total on both e2e boot paths |
+| 7 — parity gate | BLOCKED BY BLOCKER 1, MAJOR 4 | parity not exhaustive; deltas not enumerated |
+| 8 — flip resolver + all deletions | BLOCKED BY 1, 3, 4, 5 | no total parity license; test coverage loss; docs deliverables unclosed |
+
+**VERDICT (round 5): DO NOT PROCEED — steps 1–3 and 5 are licensed; escaped-separator parity must
+become total before step 7 can license deletion of `routeRules`.**
+
+Half the program is executable today. That is the first actionable verdict the loop has produced,
+and it is the direct product of demanding a per-step map instead of a single word.
+
+### Job 2 findings, verified
+
+| # | Sev | Finding | Verification |
+|---|---|---|---|
+| 1 | BLOCKER | `GET /api/v1/documents/foo%2Fapproval-preview` matches the mux's `{id}` pattern (→ `document.view`) while the old resolver, reading **decoded** `r.URL.Path`, sees the suffix `/approval-preview` (`permissions.go:163`, → `document.submit`). The cross-product basis generates slash-free tokens only and cannot reach this class. | **CONFIRMED at the Go source.** `ServeMux.findHandler` matches on `r.URL.EscapedPath()` (`$GOROOT/src/net/http/server.go:2659-2680`), where `%2F` stays inside one segment; `r.URL.Path` is decoded, where it becomes a real separator. The two sides **read different strings**. |
+| 2 | MAJOR | The e2e surface passes all four checks on neither boot path. | **CONFIRMED, independently and in more detail, by sub-agent vote 2** — see the merged §2 entry below. Same root cause. |
+| 3 | MAJOR | Moving the 15 orphans' tests "to business methods directly" loses generated-wrapper and mux coverage — `module_wrapper_test.go:176,184`, `handler.go:169` — including typed path validation, method dispatch and `r.Pattern`. | Accepted. Direct calls are sound only for business-only assertions; routing assertions must be retained through the generated `HandlerWithOptions` mount. |
+| 4 | MAJOR | The "five client-visible changes" count omits the general HEAD authorization tightening and first-match ordering collisions. | Accepted, and it **merges into BLOCKER 1's restructure** — see below. |
+| 5 | MAJOR | §11's graph has no nodes for the two ADRs, the three wiki updates, or the `BaseURL` promotion, yet §12 lists all three as deliverables. | **CONFIRMED** — grep over the §11 graph region returns no ADR / wiki / BaseURL node. |
+| 6 | MINOR | `iam/.../router.go:102-107` says it replaces "the six `RegisterRoutes` call sites" and then names **five**, omitting observability. | **CONFIRMED.** Sharper than reported: the same comment also asserts the swap "changes no tier-1 behavior" because tier-1 "keys off `r.Method`/`r.URL.Path`, not off mux dispatch mechanics" — which is precisely the premise this program deletes. The comment must be rewritten, not just recounted. |
+
+### Sub-agent vote 2 — the e2e claim is FALSIFIED (author's own round-4 fix #3)
+
+Dispatched to falsify §3's claim that the runtime `activeSurface()` keeps the four checks total on
+both boot paths. It did.
+
+- Production builds carry **no build tags** — `deploy/docker/api.Dockerfile:6` runs plain
+  `go build`, and the repo contains no `-tags production` anywhere. So `!integration && !production`
+  holds and the **stub** (`e2e_seed_stub.go:11`, a no-op) is what ships.
+- `E2EEnabled()` (`internal/test/e2e_enabled.go:14`) reads **only** the env var. No build tag.
+- Therefore `METALDOCS_E2E=1` on a production binary: `e2eHandlersEnabled()` → true → the e2e
+  publisher enters the list → `activeSurface()` returns the **merged** table declaring 5 e2e
+  patterns → but the stub mounts **zero** → check 3 (declared ⊆ mounted) fails → `log.Fatalf` →
+  **the server refuses to boot.** A leaked env var becomes an unrecoverable boot loop.
+
+**Root cause (§1 step 1):** the declared side is gated by **one** predicate (env) and the mounted
+side by **two** (env AND build tag). §3's sentence "the table the assertion reads and the mounts it
+compares against are selected by the same predicate" is false in exactly the cell production
+occupies. Round 5's MAJOR 2 is the same defect reached from the other direction.
+
+**Two more, from the same vote:** §5's code snippet literally passes bare `httpSurface`, not
+`activeSurface()` — which breaks even the matched case. And nothing at **generation** time forbids
+a key collision between the two spec documents; the only guard is a boot-time panic.
+
+**Fix (§1 step 2 — what makes it impossible), not yet applied:** one boolean governs both sides.
+
+```go
+e2e := e2ePublisher()                       // build-tag-selected pair: real publisher, or nil
+useE2E := e2e != nil && e2eHandlersEnabled()
+surface := httpSurface
+if useE2E {
+	publishers = append(publishers, e2e)
+	surface = mergedSurface(httpSurface, httpSurfaceE2E)
+}
+assertSurface(mounted, surface, specTags, publishers)
+```
+
+`e2ePublisher()` is a tag-selected pair mirroring `internal/test/e2e_seed{,_stub}.go` — a shape the
+repo already proves — but with **total** tags (`integration && !production` /
+`!integration || production`), which also closes a latent gap the existing pair has: a literal
+`-tags production` build satisfies neither of its two files and would not compile. Plus generator
+validation rule 6: a method+path collision between the two spec documents is a **build** failure,
+not a boot panic.
+
+### Sub-agent vote 1 — the cross-product is tractable, with one ambiguity
+
+Measured, not estimated: **80** distinct tokens (`pathExact` tails 38, `pathSuffix` 35, `contains`
+7, `notSuffix` 0 new), **148** mux patterns (134 generated + 14 hand-registered; cross-checked
+three ways against the spec's 147 operations, the 148th being the bare `/healthz`), and the five
+method counts **confirmed exact** (GET 42, POST 53, PUT 11, PATCH 5, DELETE 8, plus **1 methodless
+row** the design had not counted — `/healthz`, `permissions.go:85`).
+
+Wall-clock at a padded 20 μs/iteration: **~1.2 s** literal, **~1.9 s** as §10.2 reads, **~20 s** on
+the most adversarial reading. Tractable under every reading; no reduction needed. Round 5's "86
+tokens / 82,563 cases" is the same order of magnitude reached by a slightly different extraction.
+
+**One real ambiguity the vote surfaced:** §10.2 says "instantiate every `{param}` position in
+turn", and **20 of the 148 patterns have two `{param}` positions**. One-at-a-time vs a joint
+cross-product differ by ~10× in case count. The text does not say which. §10.2's own rule — "its
+totality is re-verified against the code, not inherited from this paragraph" — makes this the
+author's defect to close before the test is written.
+
+### §2 — ESCALATION. The ratchet has fired twice; this is an operator decision.
+
+**Round 5 is the fourth consecutive round to land on §10, and the third at the same altitude.**
+Round 3: the method dimension is absent. Round 4: the method dimension is sampled, not enumerated.
+Round 5: the **encoding** dimension is absent. Each finding is individually correct and each fix
+was individually correct. That pattern is §1's explicit signal: *three findings on one construct is
+a structural signal, not a quality signal.* §1's two-patch ratchet has now been exceeded, and §8's
+same-altitude-recurrence rule says stop and escalate. **I am not applying a third basis extension.**
+
+**Q1 — What is the global-maximum structure?**
+Not a bigger enumeration. The parity gate is trying to prove *behavioral equality between two
+implementations that read different inputs*: the old resolver classifies `r.URL.Path` (decoded);
+the router routes `r.URL.EscapedPath()`. On that input space, equality is neither achievable nor
+desirable — where they differ, **the old resolver is the wrong one**, because it classifies strings
+the router never routed. Adding dimensions to chase equality is chasing a bug into its corners.
+
+The global maximum is **a row-level derivation proof plus an enumerated delta list**, replacing the
+request-level differential:
+
+1. **Derivation** — each of the 120 `routeRules` rows is mapped to the generated table and compared
+   row-by-row. That comparison is finite, total, and complete **by construction** (120 rows), with
+   no input-space enumeration anywhere in it.
+2. **Delta list** — every row that does not map identically becomes a named, approved delta with a
+   regression test. Requests only the old resolver could classify (escaped separators, off-surface
+   prefix matches, the methodless `/healthz` row) land here **automatically**, because the old
+   resolver's domain is strictly larger than the router's.
+3. **Boot assertion** — §5's four checks already prove mounted ≡ declared at every boot. That is
+   the ongoing guard; the derivation proof is the one-time migration license.
+
+This also absorbs round 5's MAJOR 4 (the delta count is incomplete): under a delta-list gate,
+completeness of the delta list *is* the gate's output, not a claim made beside it.
+
+**Q2 — What does a proven system do?** This is the standard policy-table migration: prove the new
+artifact is **derived** from the source of truth and enumerate the intentional differences. It is
+what every codegen migration in this repo already does (`oapi-codegen` + the drift gate), and what
+§5 checks 2 and 3 already are. Fuzzing two implementations against each other is what you do when
+you have no source of truth — but this program's entire premise is that the OpenAPI spec **is** the
+source of truth.
+
+**Q3 — Costs.**
+*Global maximum:* rewrite §10 (one section of twelve); the deletion license then rests on row-level
+derivation + the boot assertion instead of request equality. Steps 1–3 and 5 are unaffected and
+stay licensed. *Local maximum (extend the basis a third time):* closes round 5 and buys nothing
+structural — there is no argument that encoding is the **last** dimension. Trailing slashes, `..`
+segments, `;`-parameters, unicode normalization, and duplicate slashes are all reachable and all
+outside the current basis. **An enumeration-based proof over an infinite input space cannot be
+closed by adding dimensions.** That is the sentence the last three rounds have been paying to
+learn.
+
+**Q4 — Who decides?** The operator. Recorded here, unresolved, blocking nothing that is licensed.
+
+### Convergence line
+
+Count 6 (1B / 4M / 1N), down from 9. Altitude did **not** drop on §10 — third same-altitude
+recurrence — so §8's stop condition fires and the loop is **paused**, not closed. Everything else
+did drop: findings 3, 5 and 6 are rung 1–2 mechanical, and the e2e defect is fully diagnosed with a
+fix drafted. Steps 1–3 and 5 carry a clean license from an adversarial reviewer that was explicitly
+invited to grant one. Nothing is deferred silently and no risk is declared acceptable by me.
