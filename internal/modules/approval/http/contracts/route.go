@@ -355,11 +355,17 @@ type StageResponse struct {
 	Name               string          `json:"name"`
 	RequiredCapability string          `json:"required_capability"`
 	Quorum             QuorumKind      `json:"quorum"`
-	QuorumM            *int            `json:"quorum_m,omitempty"`
-	DriftPolicy        DriftPolicyKind `json:"drift_policy"`
-	StageKind          StageKind       `json:"stage_kind"`
-	// DueInDays is the stage's SLA window in whole days. Nil means NO deadline.
-	DueInDays *int `json:"due_in_days,omitempty"`
+	// QuorumM is nullable-and-required on the wire (StageSummary schema):
+	// present as explicit null when quorum is not m_of_n, never omitted
+	// (SHAPE-NULLABLE-NOT-REQUIRED — present-and-null must not drift to
+	// optional).
+	QuorumM     *int            `json:"quorum_m"`
+	DriftPolicy DriftPolicyKind `json:"drift_policy"`
+	StageKind   StageKind       `json:"stage_kind"`
+	// DueInDays is the stage's SLA window in whole days. Nil means NO
+	// deadline. Nullable-and-required on the wire (StageSummary schema):
+	// present as explicit null, never omitted.
+	DueInDays *int `json:"due_in_days"`
 	// Selectors (M4 ActorSelector, unit 3.2) is the sole source of truth for
 	// the stage's actor pool; always populated (legacy required_role/area_code
 	// wire fields removed entirely).
@@ -372,11 +378,15 @@ type ListStageItem struct {
 	Name               string          `json:"name"`
 	RequiredCapability string          `json:"required_capability"`
 	Quorum             QuorumKind      `json:"quorum"`
-	QuorumM            *int            `json:"quorum_m,omitempty"`
-	DriftPolicy        DriftPolicyKind `json:"drift_policy"`
-	StageKind          StageKind       `json:"stage_kind"`
-	// DueInDays is the stage's SLA window in whole days. Nil means NO deadline.
-	DueInDays *int `json:"due_in_days,omitempty"`
+	// QuorumM is nullable-and-required on the wire (StageSummary schema): see
+	// StageResponse.QuorumM.
+	QuorumM     *int            `json:"quorum_m"`
+	DriftPolicy DriftPolicyKind `json:"drift_policy"`
+	StageKind   StageKind       `json:"stage_kind"`
+	// DueInDays is the stage's SLA window in whole days. Nil means NO
+	// deadline. Nullable-and-required on the wire (StageSummary schema): see
+	// StageResponse.DueInDays.
+	DueInDays *int `json:"due_in_days"`
 	// Selectors (M4 ActorSelector, unit 3.2) is the sole source of truth for
 	// the stage's actor pool; always populated (legacy required_role/area_code
 	// wire fields removed entirely).

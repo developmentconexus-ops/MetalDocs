@@ -1170,3 +1170,33 @@ func TestMapStagesToResponse_CarriesDueInDays(t *testing.T) {
 		t.Fatalf("stage 2 DueInDays = %v, want nil", out[1].DueInDays)
 	}
 }
+
+// mapListRoute is the mapper feeding ListStageItem, whose wire field
+// (StageSummary.due_in_days) is nullable-and-required — a reviewer finding on
+// Task 2 flagged that this carry-through had no direct test. Mirrors
+// TestMapStagesToResponse_CarriesDueInDays for the list-route path.
+func TestMapListRoute_CarriesDueInDays(t *testing.T) {
+	days := 30
+	route := infrastructure.Route{
+		ID:          "route-1",
+		Name:        "Qualidade",
+		TenantID:    "tenant-1",
+		ProfileCode: "ops",
+		SubjectKind: "document",
+		SubjectKey:  "ops",
+		Version:     1,
+		Stages: []infrastructure.RouteStage{
+			{Order: 1, Name: "Qualidade", RequiredCapability: "document.signoff", Quorum: "all_of", DriftPolicy: "reduce_quorum", DueInDays: &days},
+			{Order: 2, Name: "Direção", RequiredCapability: "document.signoff", Quorum: "all_of", DriftPolicy: "reduce_quorum"},
+		},
+	}
+
+	out := mapListRoute(route)
+
+	if out.Stages[0].DueInDays == nil || *out.Stages[0].DueInDays != 30 {
+		t.Fatalf("stage 1 DueInDays = %v, want 30", out.Stages[0].DueInDays)
+	}
+	if out.Stages[1].DueInDays != nil {
+		t.Fatalf("stage 2 DueInDays = %v, want nil (absent means no deadline)", out.Stages[1].DueInDays)
+	}
+}

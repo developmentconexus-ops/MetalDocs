@@ -54,7 +54,12 @@ type InstanceResponse struct {
 	Status      InstanceStatus  `json:"status"`
 	SubmittedBy string          `json:"submitted_by"`
 	SubmittedAt string          `json:"submitted_at"`
-	CompletedAt *string         `json:"completed_at,omitempty"`
+	// CompletedAt is nullable-and-required on the wire (ApprovalInstanceResponse
+	// / ApprovalInstanceByDocumentResponse schemas): present as explicit null
+	// while the instance is not yet completed, never omitted
+	// (SHAPE-NULLABLE-NOT-REQUIRED — present-and-null must not drift to
+	// optional).
+	CompletedAt *string `json:"completed_at"`
 	Stages      []StageInstance `json:"stages"`
 	ETag        string          `json:"etag"`
 	// FrozenContentHash (F6/F8): the SHA-256 hex digest pinned at freeze time
@@ -126,7 +131,11 @@ type StageActor struct {
 	UserID      string           `json:"user_id"`
 	DisplayName string           `json:"display_name"`
 	Status      string           `json:"status"`
-	Decision    *SignoffDecision `json:"decision,omitempty"`
+	// Decision is nullable-and-required on the wire (ApprovalStageActorResponse
+	// schema): present as explicit null while the actor has not yet decided,
+	// never omitted (SHAPE-NULLABLE-NOT-REQUIRED — present-and-null must not
+	// drift to optional).
+	Decision *SignoffDecision `json:"decision"`
 }
 
 // SignoffRecord is the wire representation of a recorded signoff.
