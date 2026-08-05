@@ -135,10 +135,13 @@ func TestNotificationsFanoutWorker_Work_MultipleReaders_AllInserted(t *testing.T
 	}
 }
 
-// TestNotificationsFanoutWorker_Work_UnhandledEventType_NoTxOpened proves the
-// default no-op path does not open a tx at all (no seed needed for an event
-// type the worker does not act on).
-func TestNotificationsFanoutWorker_Work_UnhandledEventType_NoTxOpened(t *testing.T) {
+// TestNotificationsFanoutWorker_Work_UnhandledEventType_NoTxOpened_DELETED:
+// this test used to assert that an unrecognised event type made Work return
+// nil with no DB interaction. That encoded the exact defect Task 5 removes —
+// a silently dropped event is a live regression risk with no error and no
+// dead-letter trail. See TestNotificationsFanoutWorker_Work_UnhandledEventType_Errors
+// below for the replacement behavior.
+func TestNotificationsFanoutWorker_Work_UnhandledEventType_Errors(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
@@ -154,8 +157,8 @@ func TestNotificationsFanoutWorker_Work_UnhandledEventType_NoTxOpened(t *testing
 		OccurredAt: time.Now(),
 	}}
 
-	if err := worker.Work(context.Background(), job); err != nil {
-		t.Fatalf("Work: %v", err)
+	if err := worker.Work(context.Background(), job); err == nil {
+		t.Fatal("Work: want error for unrecognised event type, got nil (a dropped event must never be silent)")
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("unexpected DB interaction for unhandled event type: %v", err)

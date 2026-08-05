@@ -54,7 +54,11 @@ func (w *NotificationsFanoutWorker) Work(ctx context.Context, job *river.Job[doc
 		documentsdomain.EventTypeDocumentRejected:
 		// fall through to the seeded-tx path below.
 	default:
-		return nil
+		// Never silent. An unrecognised event type means the producer and this
+		// consumer have diverged; returning nil dropped the event with no error
+		// and no dead-letter, so the divergence was invisible. River now retries
+		// and dead-letters it.
+		return fmt.Errorf("fanout_worker: unknown event type %q", args.EventType)
 	}
 
 	tx, err := w.db.BeginTx(ctx, nil)
