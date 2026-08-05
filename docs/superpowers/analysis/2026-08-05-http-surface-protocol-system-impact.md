@@ -4,7 +4,7 @@
 **Intent (one line):** Replace the hand-written delivery wiring (`routeHandlers` struct + `routeFamilies` mount table + `main.go` keyed literal) and the hand-maintained `permissions.go` `routeRules` mirror with a single per-module declaration of HTTP surface, from which both mux registration and the tier-1 PDP table are derived.
 **Work type:** feature (cross-cutting platform framework — births a platform package, not a bounded-context module)
 **Author:** developing-new-work skill
-**Verdict:** 🔴 Red — **AS-2 unresolved** (see §10)
+**Verdict:** 🟡 Yellow — AS-2 **resolved by operator ruling A**, 2026-08-05 (see §10). Two ADRs required; ten locked constraints carried into design.
 
 ---
 
@@ -128,9 +128,11 @@ What that dissolves rather than patches: the `routeHandlers` struct · the `rout
 
 ## 10. Verdict & locked constraints
 
-**Verdict: 🔴 Red.**
+**Verdict: 🟡 Yellow.** AS-2 raised and **resolved by operator ruling, 2026-08-05.**
 
-**Open hard-stop: AS-2, unresolved.** The foundation is legacy (three unsynchronized enumerations, §2), and the proposed work is blocked on a prerequisite outside its own scope. Design cannot begin until the operator rules on **one question**:
+### AS-2 — raised and resolved
+
+The foundation is legacy (three unsynchronized enumerations, §2), and the work was blocked on a prerequisite outside its own scope. The question put to the operator:
 
 > **Does this work include bringing the five off-spec route families (`auth`, `search`, `security`, `featureFlags`, `health`) onto the OpenAPI spec — or not?**
 >
@@ -138,12 +140,32 @@ What that dissolves rather than patches: the `routeHandlers` struct · the `rout
 > - **(B) No — protocol first, migration later.** Faster to first value, but it ships a **two-regime delivery layer**: spec-derived for the codegen families, hand-declared for five. That hand-declared side is a fourth enumeration. Legal **only** under CLAUDE.md §2(b): explicitly labelled transitional, naming the deleting milestone, with deletion as that milestone's definition-of-done. Without a named milestone this is an unlabelled local maximum and therefore a defect.
 > - **(C) Neither — the off-spec families stay off-spec permanently.** A formal, recorded MUST-deviation from contract-first via its own ADR, rather than today's silent violation. Honest, but it caps what the protocol can ever guarantee.
 
+**RULING: (A) — one program, whole surface.** Operator, 2026-08-05.
+
+**What ruling A binds, beyond clearing the block:**
+
+- **The five off-spec families are in scope, not adjacent to it.** `auth`, `search`, `security`, `featureFlags`, and the business surface of `health` are brought onto `api/openapi/v1/openapi.yaml` as part of this work. Their absence is the pre-existing contract-first violation recorded in §2.2; ruling A closes it rather than routing around it.
+- **No second regime may be created, at any point, including intermediate commits.** There is no "codegen families first, legacy families after" phase that ships. Intermediate states may exist inside the work; none of them is a release boundary that leaves two declaration mechanisms live.
+- **CLAUDE.md §2(b) does not apply and must not be invoked.** Ruling A is outcome **(a) restructure now**. Any proposal during design to label something transitional and defer it is a re-litigation of a settled decision and must be surfaced to the operator, not absorbed.
+- **The existing transitional label in `permissions_test.go:424-431` is discharged by this work, not carried.** Its deleting milestone — the open item from the round-4 gate — is **this program**. Its discharge criterion is corrected from five families to six (`metrics` is also mounted bare, `router.go:124`).
+- **The HEAD tier-1 defect is absorbed, not deferred.** Ruling A makes method semantics a single declaration, which dissolves it. It stops being a standing operator-decision item and becomes an acceptance criterion: HEAD must resolve to its GET row's capability, and that must be an explicitly listed delta in the parity gate (§8), not a silent behavior change.
+- **Two MAJORs from the round-4 gate are closed by dissolution, not by patch.** `conditionalRouteFamilies` (`router.go:85`) and the `main.go:817-837` keyed-literal hole both cease to be representable once construction and mounting are the same act. **Constraint: they may not be patched in the interim** — that would be the third consecutive patch on the same construct, which the adversarial-review ratchet (§1) forbids. If the program is interrupted before they dissolve, they revert to open findings requiring their own disposition.
+- **Scope cost is accepted knowingly.** Ruling A is the larger and slower path. That was stated when the question was put and is not grounds for re-scoping later without a new ruling.
+
+### Residual items after the ruling
+
+- **Three factual errors in comments authored by this work stream, unfixed and independent of the ruling.** They are cheap, they are wrong regardless of which path was chosen, and they should be corrected before or alongside the first design commit: `router.go:72` names `buildPresence`, which does not exist (the function is `startPresence`, `main.go:1168`) — Class 27, committed in the change that edits the Class 27 catalog; `permissions_test.go:415-417,431` says five bare-pattern families when `metrics` makes six; `router.go:78-80` claims a missing family fails loudly at boot, which is false for pointer-receiver handlers (method values bind without dereferencing, so the failure is a per-request 500).
+- **Catalog residue** flagged by the round-4 gate: `defect-class-catalog.md:12-15` still frames all of Part II as prevented by review-protocol mechanisms, contradicting Class 34's rung-4 structural prevention (the Part II preamble at `:1089-1092` reconciles this; the header was not updated), and the "four rounds" headline at `:1100`/`:1445` silently excludes work item 2's three rounds.
+- **R3-5 remains open and is now a design input, not a defect:** the per-family floor is `>0`, so route *deletion* is invisible (the escalation direction — a registered pattern with no rule — is strictly caught). Under ruling A a derived declaration makes deletion a spec diff, which is reviewed by construction. Confirm during design that this is genuinely dissolved rather than assumed.
+
 Two decisions already standing from the round-4 gate, unchanged and independent of the above:
 
 - **HEAD bypasses tier-1** (`permissions.go:35-38`). No `routeRules` row carries HEAD; `matches` demands exact method equality; Go's `ServeMux` routes HEAD to GET patterns. Result: HEAD reaches the handler with only `VisibilitySessionRequired`, skipping the route's capability. *(Nuance the gate added: methodless rows — `r.method == ""` — do match HEAD, so the fall-through is confined to paths covered only by method-qualified rows.)* Pre-existing, invisible to route-coverage tooling by construction. The unified protocol dissolves it (method semantics declared once); until then it needs its own fix.
 - **The transitional label in `permissions_test.go:424-431` has no deleting milestone.** CLAUDE.md §2(b) requires label + global-max structure + milestone; the first two are in-repo, the third is the operator's. The gate additionally found the label's discharge criterion is **wrong**: it names five families, but `metrics` is also mounted bare (`router.go:124`), so migrating five would not actually delete the loose branch. Six, not five.
 
-**Locked constraints handed to brainstorming (binding, once AS-2 clears):**
+**Locked constraints handed to brainstorming (binding — AS-2 cleared by ruling A):**
+
+0. **Ruling A governs scope.** One program over the whole surface; the five off-spec families are in scope; no two-regime state ships. This constraint outranks the rest — if any other constraint appears to require a transitional split, that is a contradiction to surface, not to resolve locally.
 
 1. **The declaration is generated from the spec, never hand-written.** A hand-authored descriptor is a fourth enumeration and repeats the original defect across 15 modules at once. This is the single most important constraint and the one most likely to be quietly relaxed under implementation pressure.
 2. **Tier-1 stays fail-closed.** An operation with no declared capability resolves to `VisibilitySessionRequired` — never public, never "permissive by default because the table is now derived".
@@ -156,4 +178,4 @@ Two decisions already standing from the round-4 gate, unchanged and independent 
 9. **Decide the 15 new module→iam edges deliberately** (§1). Either accept them with a stated reason, or keep the capability binding out of the modules and derive it at the composition root. Do not let this be settled by whichever is easier to type.
 10. **Two ADRs are in scope** (§9), and the work is not done when the code compiles — it is done when the spec, the ADRs, and the three affected `wiki/architecture/*` docs are all true.
 
-**Do not invoke `superpowers:brainstorming` until AS-2 is resolved.**
+**Handoff: AS-2 cleared by ruling A. `superpowers:brainstorming` is invoked with this document as its locked constraints.**
