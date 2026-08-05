@@ -118,3 +118,42 @@ gate, not the author's. That gate is the acceptance record.
 the `main.go:817-837` keyed literal (still open), and `conditionalRouteFamilies` fail-open
 (`router.go:85`) — **now dissolved** by §4's Mount-is-total rule rather than patched, which is the
 outcome §1 step 2 asks for.
+
+---
+
+## Spec self-review (brainstorming checklist step 7) — 7 defects, all fixed inline
+
+Run by an independent sub-agent over the committed revision-3 document with a scan-only brief
+(placeholders, internal contradictions, stale self-references, ambiguity, plus three factual
+anchors). It is not a design review and raised no design finding — which is the expected result
+if the adversarial loop actually converged. It did raise seven **internal-consistency** defects
+that three rounds of adversarial review had not, because none of them is a design flaw: they are
+the artifact contradicting itself.
+
+| # | Class | Defect | Fix |
+|---|---|---|---|
+| 1 | contradiction (count) | §5 said 137 generated + 9 legacy + `streamPresence` = 147, while §8 enumerates **12** legacy operations. 137 + 9 + 1 = 147 is internally consistent but incompatible with §8; the arithmetic forces 134 + 12 + 1. | §5 corrected to 134, and it now cites §8's per-family breakdown rather than restating a number. |
+| 2 | contradiction (count) | §12's risk header said "three client-visible behavior changes" and then listed four. | Corrected to four, each lettered. |
+| 3 | ordering | §5 assigned the `internal-e2e.yaml` lint/validation gates to §11 **step 2**, but the document does not exist until **step 4**. A gate authored before its subject passes vacuously. | Split: lint + generator validation → step 4; drift pathspec → step 2. The reason is stated in the doc, not just the assignment. |
+| 4 | stale reference | §4 said the presence 501 delta is "listed in §8, tested in §10". §8 is the legacy-family migration and never mentions presence; §10 had no row for it. | Pointer corrected to §12, **and the missing §10 test row was added** — boot with `presence == nil`, assert 501 + `problem+json`. The stale pointer had concealed a genuinely absent test. |
+| 5 | contradiction | §3 said "**exactly one file**" of output, while §5 requires a second generated declaration from `internal-e2e.yaml`. | §3 rewritten: one file **per input document**, both under the same drift gate. |
+| 6 | uncounted rule | §4 required the generator to reject multi-tag operations, but §2's validation list had four rules and §10's test row said "four failures" — the rejection was enforced nowhere. | Added as §2 rule 5 with its rationale (check 4 is only well-formed if the tag is single-valued); §10's caption updated to five. |
+| 7 | naming drift | §8's family table said `featureflags` (the Go package) where §4's tag inventory says `configuration` (the spec tag); the equivalence was never stated. | Both names given together, with the rule that the **tag** governs — check 4 compares tags, never package names. |
+
+**Factual anchors re-verified:** `Makefile:3` — AGREES (five targets). `muxer.go:11-14` — AGREES
+(quoted verbatim). `.github/workflows/api-contract.yml` — **DISAGREES**, and this is the program's
+**fifth** fabricated-or-wrong citation: the doc labelled `:35` as "Redocly bundling" and `:62` as
+`api-lint`. In fact `:35` is the backend codegen-drift step name, `:62` is the Redocly **lint**
+command, the repo's own `api-lint` guard is at `:100`, and the workflow has **no bundling step at
+all**. Corrected in §5. The drift-gate citation (`:37-38`) that the round-3 fix rests on was
+re-checked and is correct.
+
+**Why this pass found what three adversarial rounds did not.** The adversarial reviewer is briefed
+to attack the *design*; a count restated two sections apart, or a pointer to the wrong section, is
+invisible to that brief because neither changes what gets built. Both scans are needed and they do
+not substitute for each other. Worth noting which class turned out to matter: defect 4 looked like
+a typo and was in fact a **missing test** — the wrong pointer was the only visible symptom of it.
+
+Six of the seven were arithmetic, pointer, or naming errors — rung-1 mechanical, exactly the
+altitude §8 predicts at the end of a converged loop. This confirms the round-3 stop decision rather
+than reopening it.
