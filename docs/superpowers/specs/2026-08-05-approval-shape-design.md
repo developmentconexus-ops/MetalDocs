@@ -218,12 +218,23 @@ stage-scoped shape the retired routes already use:
 - `POST …/stages/{stage_id}/signoffs`
 - `POST …/stages/{stage_id}/fast-forward`
 
+and one route that is not stage-scoped at all:
+
+- `POST /api/v1/documents/{id}/signoff` (`openapi.yaml:4020` → `SignoffByDocumentHandler`)
+
+The fourth is the same act addressed by document id, leaving the service to find the active stage
+itself. Two addressing schemes for one act is the duplication this change exists to remove, so it
+folds with the rest. It contributes one thing the stage routes lack — a required `If-Match: "v<N>"`
+document-revision guard — and that guard moves onto the unified route rather than dying with its
+host: `DecisionRequest.ExpectedRevisionVersion` already exists and the return path already answers a
+stale revision with 412, so dropping the header would leave a guard nothing could arm.
+
 The addressed stage stays a **path parameter**, as today — it is what the request identifies, not a
 field inside it. `POST /api/v1/templates/{id}/versions/{n}/signoff` (the template kernel entry point,
 `templates/delivery/http/routes_approval_kernel.go`) keeps its own path and is re-pointed at the
 unified service; renaming it is template-module surface and out of scope here.
 
-All three are deleted from `api/openapi/v1/openapi.yaml`, from `permissions.go`, from the generated
+All four are deleted from `api/openapi/v1/openapi.yaml`, from `permissions.go`, from the generated
 Go, and from the frontend, in one change set. No optional-for-compat fields, no aliases.
 
 Regeneration is **full**: `go generate` for every module's `api` package plus `npm run gen:api`.
