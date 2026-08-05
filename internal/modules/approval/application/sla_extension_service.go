@@ -100,11 +100,15 @@ func (s *SLAExtensionService) Extend(ctx context.Context, runner db.TxRunner, re
 			return fmt.Errorf("extend sla: load active stage: %w", err)
 		}
 
-		// Area-grade tier-2 check, in-tx, on the stage's own area snapshot. No
-		// empty-area default is invented here: an instance with no area is
-		// judged at tenant grade only because areaCode.String is legitimately
-		// "" (NULL area_code_snapshot), matching every other area-grade site
-		// in this module (e.g. CancelService).
+		// Area-grade tier-2 check, in-tx, on the stage's own area snapshot.
+		// areaCode.String is "" when area_code_snapshot IS NULL — "" is
+		// intentionally fail-closed: authz.Require denies non-system actors
+		// for an area-grade cap unless areaCode is the literal "tenant" (ADR
+		// 0022 Phase 8), so an instance with no area matches no area row and
+		// is DENIED, not judged at tenant grade. Do NOT
+		// COALESCE(areaCode.String, "tenant") here — that would silently
+		// re-open the area filter, matching CancelService's identical guard
+		// (cancel_service.go).
 		if err := authz.Require(ctx, tx, string(iamdomain.CapApprovalSLAExtend), areaCode.String); err != nil {
 			return err
 		}
