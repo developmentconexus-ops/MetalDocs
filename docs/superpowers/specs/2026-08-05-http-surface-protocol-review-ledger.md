@@ -157,3 +157,118 @@ a typo and was in fact a **missing test** — the wrong pointer was the only vis
 Six of the seven were arithmetic, pointer, or naming errors — rung-1 mechanical, exactly the
 altitude §8 predicts at the end of a converged loop. This confirms the round-3 stop decision rather
 than reopening it.
+
+> **Superseded by round 4.** That last sentence is wrong. See "Correction to the round-3 record"
+> below.
+
+---
+
+## Round 4 — the verdict round that round 3 should have been
+
+**Why this round exists.** Round 3 was closed as converged. That call was wrong on both of §8's
+axes and the operator caught it: the count went **8 → 9**, not down, and — the deeper error — the
+DO NOT PROCEED verdict the loop closed on had been rendered against **revision 2**. Two revisions
+had landed since. No round had ever judged the artifact that actually existed, so "converged" was
+a statement about a document nobody had reviewed. The prompt for this round says so explicitly and
+instructs the reviewer to judge the current revision and to not withhold PROCEED merely because a
+prior round withheld it — a non-terminating loop is itself a defect.
+
+**Dispatch:** `gpt-5.6-sol` / `medium`, OS-process, read-only. Artifacts: `agent__r4.log`,
+`agent__r4.last.md`, prompt `prompt-r4.md`.
+
+### Job 1 — round-3 dispositions (reviewer's own, verbatim)
+
+| # | Disposition | Anchor |
+|---|---|---|
+| 1 | **OPEN** | `permissions.go:35` — §10.2 still samples only one wrong method although `matches` distinguishes every method-qualified rule |
+| 2 | CLOSED | design `:251` — unconditional mounting + the step-5 presence fold makes declared ⊆ mounted total |
+| 3 | CLOSED | design `:819` — E2E publication now precedes the recorder/assertion |
+| 4 | CLOSED | design `:388` — step 4 adds both lint targets, step 2 widens the real drift gate |
+| 5 | CLOSED | design `:123` — the sole HEAD authorization delta is accepted and has a regression test |
+| 6 | CLOSED | design `:561` — the unwired HMAC handler and its tests are explicitly deleted |
+| 7 | **PARTIAL** | `iam/.../observability_handler.go:31` — at least two more production-dead registration APIs remain outside the manifest |
+| 8 | CLOSED | design `:877` — the deliverable consistently requires two ADRs |
+
+Six closed, one partial, one open. Both survivors are the **same two** findings the sub-agent vote
+layer had independently flagged in round 3 — which is the useful signal: two independent reviewers
+converging on the same two gaps is evidence the gaps are real, not evidence of reviewer
+persistence.
+
+### Job 2 — findings and author disposition
+
+All nine anchors were verified against source before acceptance (§5 symmetric author duty). **All
+nine hold.** None was disproved.
+
+| # | Sev | Finding | Disposition |
+|---|---|---|---|
+| 1 | BLOCKER | §10.2's method domain is not total: `openapi.yaml:3361` defines GET-only `/documents/{id}/view`; `PATCH` reaches the broad row `permissions.go:175` → `document.edit`, `POST` reaches the fallback `permissions.go:336` → session-required. Sampling *one* wrong method hides the other. | **applied** — §10.2 now enumerates every distinct `routeRules` method (GET 42 / POST 53 / PUT 11 / PATCH 5 / DELETE 8) plus one no-collision method, and mandates the **full cross-product** of tokens × recorded patterns |
+| 2 | BLOCKER | The boot assertion rejects the design's own topology: §4 `:285` permitted two publishers for `iam`, §5 `:325` check 1 rejects exactly that. | **applied** — the `:285` clause is **deleted**, not the check. §11 step 5's presence fold is what makes one-publisher-per-tag true before step 6 asserts it |
+| 3 | MAJOR | The generated e2e descriptor was assigned a nonexistent `METALDOCS_E2E` **build tag**. Mounting is a runtime env branch (`main.go:155-166`); the only e2e tags are `integration && !production` (`internal/test/e2e_seed.go:1`) with a stub (`e2e_seed_stub.go:1`) — a different axis. | **applied** — both descriptors are untagged files in `package main`; `activeSurface()` selects at runtime with the **same predicate** the mounts use, which is what keeps check 2 total on both boot paths |
+| 4 | MAJOR | `/healthz` is a second omitted **authentication** delta. Public today (`permissions.go:85`, `health.go:20`); after deletion the empty pattern is session-required and authn rejects at `auth/.../middleware.go:78`. §10.3 claimed "no delta to have". | **applied** — the row now states unauthenticated **200 → 401** and explains the error: authn runs **before** the mux, so deleting the route does not make the request unobservable. §12's count corrected **four → five** |
+| 5 | MAJOR | Two more production-dead registration APIs: `iam/.../observability_handler.go:31` (superseded by `router.go:205-223`) and `documents/.../handler.go:144` (reachable only via the already-dead `module.go:157`). | **applied** — §7.1 is **13 → 15**, with both added and their callers enumerated |
+| 6 | MINOR | The 501 accounting says eight and names nine. | **applied** — nine `writeIAMNotImplemented` sites: **eight** nil-dependency guards, **one** unconditional deprecated (`router.go:248`), counted separately as a different mechanism |
+| 7 | MINOR | The deletion manifest double-counts the PDF webhook (separate row + row 13 of the table). | **applied** — one row: "15 orphaned methods, including `pdf_webhook_handler.go:41`, whose whole file and test go too" |
+| 8 | MINOR | `:690` says `assertSurface` has "three checks" after four are defined. | **applied** — four, one negative test named per check |
+| 9 | MINOR | The dependency graph omits `2 → 4`. | **applied** — edge added; 3/4/5 are parallelizable with each other, 4 is **not** parallelizable with 2 |
+
+**VERDICT (round 4): DO NOT PROCEED** — the non-total parity gate cannot license deletion of
+`routeRules`. Nine of nine applied; nothing deferred, nothing disproved.
+
+### §2 judgement — is finding 1 a third patch, or a completion?
+
+Findings 1 and 2 both landed on §10's parity gate, the third consecutive round to do so. §1's
+two-patch ratchet therefore **fires**, and §8's same-altitude-recurrence rule points at an operator
+decision. A sub-agent vote was dispatched to answer the question the ratchet asks — *is the
+enumerated domain total, or is the structure wrong?* — with a per-dimension proof.
+
+**Answer: TOTAL, with the method dimension as the only hole.**
+
+| Dimension | Totality argument |
+|---|---|
+| `pathPrefix` | **Provably** unflippable. All 47 prefix rules end at a `/` **before** the first `{param}`, and `{param}` segments cannot contain `/`. So `HasPrefix` reads only the static head, which no token substitution can alter |
+| `pathExact` | Finite; every literal is a token in the enumeration |
+| `pathSuffix` / `contains` / `notSuffix` | Structure-determined except for **whole-token collisions**, which the cross-product generates by construction |
+| `method` | A **closed finite set** — five values in the table, plus HEAD, plus one no-collision method |
+
+Altitude therefore **did** drop between rounds 3 and 4: the method dimension went from *absent* to
+*sampled at 1 of 6*. That is not same-altitude recurrence; it is an incomplete restructure being
+completed. Outcome **(a) restructure now**, and it is the same restructure round 3 began — not a
+third patch on top of it. No operator escalation is required, and none is claimed.
+
+**One implementation caveat the vote surfaced, and it is load-bearing.** The totality proof holds
+**only** for the full cross-product. The narrower construction — substitute each token only into
+the pattern its own rule targets — reads identically in English and is **unsound**. The
+counterexamples are real: a document id whose literal value is `approval-preview` makes
+`GET /api/v1/documents/approval-preview` satisfy `permissions.go:163`'s
+`pathSuffix: "/approval-preview"` (→ `document.submit`) while the mux routes it to the shorter
+`/documents/{id}` pattern (→ `document.view`). This is now stated in §10.2 as a mandate, because a
+future maintainer optimizing the loop would silently reintroduce the hole.
+
+### What the sub-agent vote layer bought, across rounds 3 and 4
+
+Dispatched as an independent verification tier over the reviewer's findings, not as a second
+reviewer. It narrowed two findings, tripled one, confirmed one **including a fabrication of mine**,
+refuted one of my own claims outright, and corrected three factual classifications
+(`admin_handler.go:132`, `people_handler.go:54`, `pdf_webhook_handler.go:41` are **zero-caller**,
+not "test only").
+
+**The highest-yield lesson is about prompt shape, not about review.** My round-3 vote prompt handed
+the reviewer *a fixed list of 13 methods to verify*. A prompt of that shape can only confirm or
+deny what is already listed — it is structurally incapable of extending the list. Asked instead to
+**sweep**, the same reviewer returned two more (finding 5). The missed methods were a defect in my
+prompt, not in the reviewer. Same class as the artifact's own subject matter: an enumeration handed
+to a checker instead of derived by it.
+
+### Correction to the round-3 record
+
+The paragraph closing the self-review section — "this confirms the round-3 stop decision rather
+than reopening it" — **is wrong and is superseded here.** The self-review found only mechanical
+defects because it was briefed to scan for mechanical defects; that is not evidence the design
+search was exhausted. Round 4, briefed adversarially, returned two BLOCKERs. Altitude is judged
+from a brief that could have found design defects, never from one that could not.
+
+### Convergence line
+
+Count 9 (2B / 3M / 4N) → all nine applied. Altitude: one dimension-completion (rung 4) + eight
+mechanical (rung 1–2). Round 5 is dispatched as the **verdict round on the current revision** — the
+round the operator asked for, and the one round 3 skipped.
