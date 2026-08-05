@@ -84,8 +84,17 @@ One table, `approval_decisions`, replacing both `approval_signoffs` and `approva
 Uniqueness stays `(stage_instance_id, actor_user_id)`. `enforce_approval_sod` is re-pointed at this
 table. RLS: `tenant_isolation` policy + `FORCE ROW LEVEL SECURITY`, carried over unchanged.
 
-The instance status `rejected` is removed from the status enum — with terminal rejection gone, nothing
-can reach it, and an unreachable status in a schema is a state the system cannot explain.
+The instance status `rejected` is removed from the status enum — but only after its **second**
+producer is dealt with. Removing the human rejection is not enough: `ApplyEligibilityDrift` forces
+`QuorumRejectedStage` with zero rejection votes when a `fail_stage` stage loses an eligible actor, and
+`EvaluateQuorumResult` forces it again when the effective denominator collapses to zero
+(`domain/drift.go`, `domain/quorum.go`). Both are *system* verdicts meaning "nobody can decide this
+stage any more".
+
+Their honest outcome is the same as a human "no": **return to the author**. So the forced outcome is
+renamed `QuorumStageUnsatisfiable` and lands on the return path, carrying a system reason on the
+governance event and writing no decision row — nobody decided. Only then are `rejected`, the stage
+status `rejected_here`, and `Instance.RejectHere` genuinely unreachable, and dropped.
 
 ### 3.3 Signature meaning
 
@@ -177,10 +186,16 @@ transition check and the existing GUC gate.
 
 Derived, not configured:
 
-| Stage | Capability required for **both** outcomes |
-|---|---|
-| `requires_signature = true` | `document.signoff` |
-| `requires_signature = false` | `approval.review` |
+| Stage | Subject | Capability required for **both** outcomes |
+|---|---|---|
+| `requires_signature = true` | document | `document.signoff` |
+| `requires_signature = true` | template | `template.approve` |
+| `requires_signature = false` | either | `approval.review` |
+
+The subject arm is not a new idea — `decision_service.go:358` already switches the required capability
+on `instance.Subject.Kind`, and the DB tripwire (ADR 0083, migration 0300) discriminates the same way
+by the parent instance's `subject_kind`. Deriving the capability from `requires_signature` alone would
+silently drop that arm; the derivation is a 2×2, and the tripwire is what would have caught it.
 
 Because both outcomes on a signature stage require the same capability, **a signer can always
 return** — R3 stops being a grant an administrator can withhold and becomes a property of the code.
@@ -196,11 +211,17 @@ escalation.
 
 ## 6. Contract
 
-`POST /api/v1/approval/instances/{id}/decisions` replaces:
+`POST /api/v1/approval/instances/{instance_id}/stages/{stage_id}/decisions` replaces, at the same
+stage-scoped shape the retired routes already use:
 
-- `POST …/review-verdict`
-- `POST …/signoffs`
-- `POST …/fast-forward`
+- `POST …/stages/{stage_id}/review-verdict`
+- `POST …/stages/{stage_id}/signoffs`
+- `POST …/stages/{stage_id}/fast-forward`
+
+The addressed stage stays a **path parameter**, as today — it is what the request identifies, not a
+field inside it. `POST /api/v1/templates/{id}/versions/{n}/signoff` (the template kernel entry point,
+`templates/delivery/http/routes_approval_kernel.go`) keeps its own path and is re-pointed at the
+unified service; renaming it is template-module surface and out of scope here.
 
 All three are deleted from `api/openapi/v1/openapi.yaml`, from `permissions.go`, from the generated
 Go, and from the frontend, in one change set. No optional-for-compat fields, no aliases.
@@ -208,8 +229,15 @@ Go, and from the frontend, in one change set. No optional-for-compat fields, no 
 Regeneration is **full**: `go generate` for every module's `api` package plus `npm run gen:api`.
 Partial regen is forbidden drift — a description-only edit still churns generated doc comments.
 
-Request body carries `stage_instance_id`, `outcome`, `comment`, an optional signature block, and the
-existing optimistic-concurrency field. Idempotency stays per-handler (`signoff_idemp.go` generalized),
+Request body carries `outcome`, `comment`, an optional signature block, and the existing
+optimistic-concurrency field.
+
+The read surface changes with it: the worklist's `stage_kind` query filter and the `stage_kind` field
+on both the worklist item and the instance-detail stage become `requires_signature` (boolean), and the
+instance detail's two parallel histories — `signoffs` and the ADR 0079 verdict history — become one
+`decisions` list. The route-stage request/response schemas lose `required_capability` (today a
+**required** property, so this is a breaking edit the route builder must follow) and gain
+`requires_signature` + `signature_meaning`. Idempotency stays per-handler (`signoff_idemp.go` generalized),
 not a middleware-chain link.
 
 ## 7. Events and errors
