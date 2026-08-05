@@ -40,6 +40,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -166,7 +167,7 @@ func TestExtendSLA_MovesDueAtForward_RecordsGovernanceEvent(t *testing.T) {
 	oldDue := now.Add(2 * 24 * time.Hour)
 	newDue := now.Add(5 * 24 * time.Hour)
 
-	_, instanceID := seedActiveStageWithDueAt(t, dbc, tnt.ID, tax.ProcessAreaCode, &oldDue, nil, actor.ID)
+	stageID, instanceID := seedActiveStageWithDueAt(t, dbc, tnt.ID, tax.ProcessAreaCode, &oldDue, nil, actor.ID)
 
 	svc := newSLAExtensionTestService()
 	runner := db.NewTxRunner(dbc)
@@ -181,6 +182,13 @@ func TestExtendSLA_MovesDueAtForward_RecordsGovernanceEvent(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("Extend: unexpected error: %v", err)
+	}
+
+	// due_at must actually have moved to newDue — the missing assertion this
+	// test's name implied but never checked.
+	gotDue := readStageDueAt(t, dbc, stageID)
+	if gotDue == nil || !gotDue.Equal(newDue) {
+		t.Fatalf("due_at after Extend = %v, want %v", gotDue, newDue)
 	}
 
 	rows, err := dbc.QueryContext(context.Background(),
@@ -217,12 +225,35 @@ func TestExtendSLA_MovesDueAtForward_RecordsGovernanceEvent(t *testing.T) {
 	if reasons[0] != "vendor shipment delayed one week" {
 		t.Fatalf("reason = %q, want %q", reasons[0], "vendor shipment delayed one week")
 	}
-	if payloads[0]["new_due_at"] == nil {
-		t.Fatal("payload.new_due_at missing")
+
+	// Assert the actual timestamps, not just presence — a payload with
+	// previous/new swapped would pass a nil-check but is exactly the kind of
+	// bug a governance audit trail must never record.
+	gotNew, err := parsePayloadTime(payloads[0]["new_due_at"])
+	if err != nil {
+		t.Fatalf("payload.new_due_at: %v", err)
 	}
-	if payloads[0]["previous_due_at"] == nil {
-		t.Fatal("payload.previous_due_at missing")
+	if !gotNew.Equal(newDue) {
+		t.Fatalf("payload.new_due_at = %v, want %v", gotNew, newDue)
 	}
+	gotPrevious, err := parsePayloadTime(payloads[0]["previous_due_at"])
+	if err != nil {
+		t.Fatalf("payload.previous_due_at: %v", err)
+	}
+	if !gotPrevious.Equal(oldDue) {
+		t.Fatalf("payload.previous_due_at = %v, want %v", gotPrevious, oldDue)
+	}
+}
+
+// parsePayloadTime decodes an RFC3339 timestamp from a governance event's
+// json.RawMessage-decoded payload (json.Unmarshal into map[string]any yields
+// a string for a time.Time field).
+func parsePayloadTime(v any) (time.Time, error) {
+	s, ok := v.(string)
+	if !ok {
+		return time.Time{}, fmt.Errorf("payload value = %#v, want a string timestamp", v)
+	}
+	return time.Parse(time.RFC3339, s)
 }
 
 // TestExtendSLA_BackwardsDueAt_Rejected proves a non-forward due_at is
@@ -351,6 +382,142 @@ func TestExtendSLA_ActorWithoutCapability_Forbidden(t *testing.T) {
 	}
 	if got := readStageDueAt(t, dbc, stageID); got == nil || !got.Equal(newDue) {
 		t.Fatalf("due_at after granted extension = %v, want %v", got, newDue)
+	}
+}
+
+// TestExtendSLA_NoActiveStage_Rejected proves the first ErrSLAExtensionNoActiveStage
+// branch: an instance with NO active stage at all (sql.ErrNoRows on the
+// SELECT) is rejected the same way a missing instance would be.
+func TestExtendSLA_NoActiveStage_Rejected(t *testing.T) {
+	dbc, _ := testdb.Open(t)
+	dbc.SetMaxOpenConns(1)
+
+	tnt := testdb.NewTenant(t, dbc)
+	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID))
+
+	author := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID))
+	doc := testdb.NewDocument(t, dbc,
+		testdb.WithTenant(tnt.ID),
+		testdb.WithOwner(author.ID),
+		testdb.WithStatus("under_review"),
+		testdb.WithSubmitReadySnapshots(),
+	)
+	route := testdb.NewApprovalRoute(t, dbc, testdb.WithTenant(tnt.ID))
+	instance := testdb.NewApprovalInstance(t, dbc,
+		testdb.WithDocument(doc),
+		testdb.WithRoute(route),
+		testdb.WithOwner(author.ID),
+		testdb.WithStatus("in_progress"),
+	)
+	// Deliberately no approval_stage_instances row at all: no active stage.
+
+	svc := newSLAExtensionTestService()
+	runner := db.NewTxRunner(dbc)
+	callCtx := extendSLACtxWithIdentity(tnt.ID, actor.ID)
+
+	err := svc.Extend(callCtx, runner, ExtendRequest{
+		TenantID:   tnt.ID,
+		InstanceID: instance.ID,
+		ActorID:    actor.ID,
+		NewDueAt:   time.Now().UTC().Add(24 * time.Hour),
+		Reason:     "should be rejected, no active stage",
+	})
+	if !errors.Is(err, ErrSLAExtensionNoActiveStage) {
+		t.Fatalf("Extend with no active stage = %v, want ErrSLAExtensionNoActiveStage", err)
+	}
+}
+
+// TestExtendSLA_ActiveStageNullDueAt_Rejected proves the SECOND
+// ErrSLAExtensionNoActiveStage branch — currentDue.Valid == false — which is
+// this diff's actual no-fallback integrity guard: a stage with no deadline
+// configured cannot have one "extended" (that would invent a deadline the
+// route never configured), and until this test the branch was unexercised.
+func TestExtendSLA_ActiveStageNullDueAt_Rejected(t *testing.T) {
+	dbc, _ := testdb.Open(t)
+	dbc.SetMaxOpenConns(1)
+
+	tnt := testdb.NewTenant(t, dbc)
+	tax := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tnt.ID))
+	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID))
+	grantSLAExtendCapability(t, dbc, tnt.ID, actor.ID, tax.ProcessAreaCode)
+
+	stageID, instanceID := seedActiveStageWithDueAt(t, dbc, tnt.ID, tax.ProcessAreaCode, nil, nil, actor.ID)
+
+	svc := newSLAExtensionTestService()
+	runner := db.NewTxRunner(dbc)
+	callCtx := extendSLACtxWithIdentity(tnt.ID, actor.ID)
+
+	err := svc.Extend(callCtx, runner, ExtendRequest{
+		TenantID:   tnt.ID,
+		InstanceID: instanceID,
+		ActorID:    actor.ID,
+		NewDueAt:   time.Now().UTC().Add(24 * time.Hour),
+		Reason:     "should be rejected, no deadline to extend",
+	})
+	if !errors.Is(err, ErrSLAExtensionNoActiveStage) {
+		t.Fatalf("Extend on an active stage with NULL due_at = %v, want ErrSLAExtensionNoActiveStage", err)
+	}
+
+	got := readStageDueAt(t, dbc, stageID)
+	if got != nil {
+		t.Fatalf("due_at after rejected extension = %v, want still NULL (no deadline invented)", got)
+	}
+}
+
+// TestExtendSLA_CrossTenant_NoActiveStageError proves the tenancy fix: the
+// implementer removed two tenant_id predicates from queries against
+// approval_stage_instances (that table carries no tenant_id column of its
+// own — tenancy is inherited through its parent approval_instances row), and
+// nothing previously asserted the remaining scoping actually holds.
+//
+// The Extend call itself runs through the non-owner metaldocs_ci role
+// (testdb.OpenAsCIRole), NOT the metaldocs_app owner handle every other
+// helper in this file writes through. metaldocs_app is superuser +
+// BYPASSRLS in dev, so a cross-tenant assertion made through it would prove
+// nothing — worse than no test, since it would look like coverage. Running
+// through metaldocs_ci (NOSUPERUSER NOBYPASSRLS, db/grants/0001_role_grants.sql)
+// makes the tenant_isolation RLS policy genuinely active in addition to the
+// service's own explicit `ai.tenant_id = $2` predicate, matching how the
+// module's other tenancy-proof tests avoid a false-green (e.g.
+// notifications/infrastructure/approval_notify_worker_integration_test.go's
+// countNotificationsAsCI).
+func TestExtendSLA_CrossTenant_NoActiveStageError(t *testing.T) {
+	dbc, dbName := testdb.Open(t)
+	dbc.SetMaxOpenConns(1)
+	ci := testdb.OpenAsCIRole(t, dbName)
+
+	tenantA := testdb.NewTenant(t, dbc)
+	tenantB := testdb.NewTenant(t, dbc)
+	taxB := testdb.NewTaxonomy(t, dbc, testdb.WithTenant(tenantB.ID))
+	actorA := testdb.NewUser(t, dbc, testdb.WithTenant(tenantA.ID))
+	actorB := testdb.NewUser(t, dbc, testdb.WithTenant(tenantB.ID))
+
+	now := time.Now().UTC().Truncate(time.Second)
+	oldDue := now.Add(2 * 24 * time.Hour)
+	newDue := now.Add(5 * 24 * time.Hour)
+
+	// The stage instance (and its parent approval instance) belong to tenant B.
+	stageID, instanceID := seedActiveStageWithDueAt(t, dbc, tenantB.ID, taxB.ProcessAreaCode, &oldDue, nil, actorB.ID)
+
+	svc := newSLAExtensionTestService()
+	runner := db.NewTxRunner(ci)
+	// Tenant A's identity attempts to extend tenant B's instance by ID.
+	callCtx := extendSLACtxWithIdentity(tenantA.ID, actorA.ID)
+
+	err := svc.Extend(callCtx, runner, ExtendRequest{
+		TenantID:   tenantA.ID,
+		InstanceID: instanceID,
+		ActorID:    actorA.ID,
+		NewDueAt:   newDue,
+		Reason:     "cross-tenant attempt must fail",
+	})
+	if !errors.Is(err, ErrSLAExtensionNoActiveStage) {
+		t.Fatalf("Extend across tenants = %v, want ErrSLAExtensionNoActiveStage (the tenant_id predicate on approval_instances must exclude tenant B's row from tenant A's request)", err)
+	}
+
+	got := readStageDueAt(t, dbc, stageID)
+	if got == nil || !got.Equal(oldDue) {
+		t.Fatalf("due_at after cross-tenant attempt = %v, want unchanged %v — no silent success across tenants", got, oldDue)
 	}
 }
 
