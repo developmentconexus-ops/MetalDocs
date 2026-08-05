@@ -43,6 +43,7 @@ type Services struct {
 	ReviewVerdict  *ReviewVerdictService
 	Delegation     *DelegationService
 	FastForward    *FastForwardService
+	SLAExtension   *SLAExtensionService
 	clock          Clock
 }
 
@@ -74,6 +75,7 @@ func NewServices(repo infrastructure.ApprovalRepository, emitter EventEmitter, c
 		ReviewVerdict:  reviewVerdict,
 		Delegation:     newDelegationService(repo, emitter, clock),
 		FastForward:    newFastForwardService(reviewVerdict, decision),
+		SLAExtension:   NewSLAExtensionService(emitter, clock),
 		clock:          clock,
 	}
 }

@@ -31,6 +31,13 @@ func (h *Handler) CancelApprovalInstance(w http.ResponseWriter, r *http.Request,
 	h.CancelHandler(w, r)
 }
 
+// ExtendApprovalSLA is the spec-generated adapter for the Task 9 (approval
+// accountability loop) SLA-extension operation: postpones due_at on the
+// instance's active stage.
+func (h *Handler) ExtendApprovalSLA(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID, params approvalapi.ExtendApprovalSLAParams) {
+	h.ExtendSLAHandler(w, r)
+}
+
 // RecordApprovalReviewVerdict is the spec-generated adapter for the F4
 // review-stage runtime-verdict operation (M2b): records a ready/request_changes
 // verdict against a review-kind stage.

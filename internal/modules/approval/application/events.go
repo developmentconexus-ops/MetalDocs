@@ -48,6 +48,12 @@ const (
 	// rather than inventing a new event type).
 	EventTypeDelegationGranted EventType = "delegation.granted"
 	EventTypeDelegationRevoked EventType = "delegation.revoked"
+
+	// EventTypeApprovalSLAExtended (approval accountability loop, Task 9) is
+	// the audit record of a governed exception: one instance's active-stage
+	// deadline was postponed. It IS the extension history — no parallel
+	// history table exists, so a lost event is a lost record.
+	EventTypeApprovalSLAExtended EventType = "approval_sla_extended"
 )
 
 // GovernanceEvent mirrors the governance_events table columns.

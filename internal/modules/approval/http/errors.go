@@ -172,6 +172,17 @@ var (
 	// R5/unit 2.3 G3 — fast-forward ("Aprovar já") composition guards.
 	approvalCodeStateFastForwardStageNotCompleted = problem.Register("approval", "state.fast_forward_stage_not_completed", 409)
 	approvalCodeStateFastForwardNotEligible       = problem.Register("approval", "state.fast_forward_not_eligible", 409)
+
+	// Task 9 — SLA extension ("extend one instance's deadline without a
+	// second route"). Three distinct conditions get three distinct codes: a
+	// backwards/non-forward request is a business-rule rejection of an
+	// otherwise well-formed request (422); a missing active stage/deadline is
+	// an illegal state for the write (409); a blank reason is a friendly
+	// first-line validation failure (422), mirroring the module's other
+	// reason-required cases.
+	approvalCodeSLANotForward     = problem.Register("approval", "validation.sla_extension_not_forward", 422)
+	approvalCodeSLANoActiveStage  = problem.Register("approval", "state.sla_extension_no_active_stage", 409)
+	approvalCodeSLAReasonRequired = problem.Register("approval", "validation.sla_extension_reason_required", 422)
 )
 
 // ValidationError is a generic request-validation failure mapped to HTTP 400
@@ -398,6 +409,21 @@ func MapErrorToResponse(err error) *problem.Problem {
 	case errors.Is(err, application.ErrDelegationNotFoundOrNotOwned):
 		statusCode = http.StatusNotFound
 		code = approvalCodeNotFoundDelegation
+	case errors.Is(err, application.ErrSLAExtensionNotForward):
+		// Shortening a deadline is a different act with different governance
+		// consequences and is out of scope for this route — 422, a
+		// business-rule rejection of a semantically valid request.
+		statusCode = http.StatusUnprocessableEntity
+		code = approvalCodeSLANotForward
+	case errors.Is(err, application.ErrSLAExtensionNoActiveStage):
+		// No active stage, or the active stage carries no deadline — nothing
+		// to extend. Illegal state for the write, mirroring the module's
+		// other "no active stage" / "instance completed" 409s.
+		statusCode = http.StatusConflict
+		code = approvalCodeSLANoActiveStage
+	case errors.Is(err, application.ErrSLAExtensionReasonRequired):
+		statusCode = http.StatusUnprocessableEntity
+		code = approvalCodeSLAReasonRequired
 	case errors.Is(err, domain.ErrFastForwardStageNotCompleted):
 		// R5: the actor's `ready` verdict was recorded but did not satisfy the
 		// active stage's quorum (e.g. all_of with a co-reviewer still pending) —

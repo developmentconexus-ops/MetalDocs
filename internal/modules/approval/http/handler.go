@@ -59,6 +59,10 @@ type cancelService interface {
 	CancelInstance(ctx context.Context, runner db.TxRunner, req application.CancelInput) (application.CancelResult, error)
 }
 
+type slaExtensionService interface {
+	Extend(ctx context.Context, runner db.TxRunner, req application.ExtendRequest) error
+}
+
 type reviewVerdictService interface {
 	RecordVerdict(ctx context.Context, runner db.TxRunner, req application.ReviewVerdictRequest) (application.ReviewVerdictResult, error)
 }
@@ -119,6 +123,7 @@ type Handler struct {
 	decisionSvc           decisionService
 	readSvc               readService
 	cancelSvc             cancelService
+	slaExtensionSvc       slaExtensionService
 	reviewVerdictSvc      reviewVerdictService
 	fastForwardSvc        fastForwardService
 	obsoleteSvc           obsoleteService
@@ -149,6 +154,7 @@ func NewHandler(services *application.Services, database *sql.DB, idempStore sig
 		h.decisionSvc = services.Decision
 		h.readSvc = services.Read
 		h.cancelSvc = services.Cancel
+		h.slaExtensionSvc = services.SLAExtension
 		h.reviewVerdictSvc = services.ReviewVerdict
 		h.fastForwardSvc = services.FastForward
 		h.obsoleteSvc = services.Obsolete
