@@ -366,13 +366,47 @@ func buildTestRouteHandlers() routeHandlers {
 	}
 }
 
-// TestRouteCoverage builds a real routeHandlers instance and mounts it via
-// buildRouter — the exact function main() calls — onto a recordingMux, then
-// asserts every recorded pattern resolves to a routeRules entry. This
-// replaces a hand-maintained fixture list of representative routes (which
-// could silently drift from what main() actually mounts) with a structural
-// guard: a handler that's registered here but has no matching routeRules
-// entry is a build-passing-but-red-test event, not a live discovery.
+// routeHandlerFields returns every routeHandlers field that names a route
+// family, derived from the struct's own field names via reflection — NOT a
+// hand-typed list. routeFamily.name is a string literal in router.go's mount
+// table; without this cross-check it could be misspelled or a whole entry
+// omitted, silently reintroducing the hand-sync-drift class this test exists
+// to eliminate. Anchoring the expected set to reflect.Type field names means
+// it cannot drift: it comes from routeHandlers' actual fields at compile
+// time, not from a second, independently-typed enumeration.
+//
+// Deliberately TYPE-driven, never value-driven: it takes no routeHandlers
+// instance and inspects no field's value. An earlier version skipped fields
+// that were nil, which let a newly added family launder itself out of the
+// expected set simply by being forgotten in buildTestRouteHandlers too — the
+// exact omission this guard exists to catch. Boot-path-optional families are
+// declared once in router.go's conditionalRouteFamilies and subtracted by the
+// caller; a nil field NOT in that set is a wiring bug and must surface.
+//
+// documentsRateLimit and documentsUserID are excluded: they're config params
+// consumed by the documents family's RegisterRoutesWithRateLimit call, not
+// families of their own.
+func routeHandlerFields() map[string]bool {
+	notAFamily := map[string]bool{"documentsRateLimit": true, "documentsUserID": true}
+	fields := map[string]bool{}
+	t := reflect.TypeOf(routeHandlers{})
+	for i := 0; i < t.NumField(); i++ {
+		if name := t.Field(i).Name; !notAFamily[name] {
+			fields[name] = true
+		}
+	}
+	return fields
+}
+
+// TestRouteCoverage builds a real routeHandlers instance and mounts every
+// family in router.go's routeFamilies table onto a recordingMux, then asserts
+// every recorded pattern resolves to a routeRules entry — and separately that
+// buildRouter (the exact function main() calls) registers that same pattern
+// set. This replaces a hand-maintained fixture list of representative routes
+// (which could silently drift from what main() actually mounts) with a
+// structural guard: a handler that's registered here but has no matching
+// routeRules entry is a build-passing-but-red-test event, not a live
+// discovery.
 //
 // Method-qualified patterns ("GET /path", the oapi-codegen convention) are
 // checked strictly via matchedByRule(method, path). Bare legacy patterns
@@ -384,7 +418,8 @@ func buildTestRouteHandlers() routeHandlers {
 // — TestPermissionsTable_NoMethodlessWriteShadowing and friends guard
 // routeRules' own shape, not this gap; they don't observe a registered
 // pattern at all. (presence is NOT in this set: its stream endpoint
-// registers method-qualified, handler.go:73, so it is strict-checked.)
+// registers method-qualified, presence/handler.go:73, so it is
+// strict-checked.)
 //
 // TRANSITIONAL LOCAL MAXIMUM (CLAUDE.md "Global Maximum, Not Local
 // Maximum"): the global-maximum structure is finishing the CON-07/ARC-02
@@ -394,39 +429,6 @@ func buildTestRouteHandlers() routeHandlers {
 // NOT YET SCHEDULED to a milestone — flagging that gap to the operator is
 // itself part of shipping this local maximum honestly, rather than picking
 // a milestone unilaterally.
-// expectedRouteFamilies derives the set of families routeFamilies() must
-// return, from routeHandlers' own field names via reflection — NOT a
-// hand-typed list. routeFamily.name is a string literal in router.go's mount
-// table; without this cross-check it could be misspelled or a whole entry
-// omitted, silently reintroducing the hand-sync-drift class this test exists
-// to eliminate. Anchoring the expected set to reflect.Type field names means
-// it cannot drift: it comes from routeHandlers' actual fields at compile
-// time, not from a second, independently-typed enumeration.
-//
-// documentsRateLimit and documentsUserID are excluded: they're config params
-// consumed by the documents family's RegisterRoutesWithRateLimit call, not
-// families of their own. A nil pointer-typed field is excluded too — it
-// mirrors routeFamilies' own `if h.x != nil` guards (security, presence,
-// metrics), which omit the table entry entirely when the boot path leaves
-// the handler unconstructed.
-func expectedRouteFamilies(h routeHandlers) map[string]bool {
-	notAFamily := map[string]bool{"documentsRateLimit": true, "documentsUserID": true}
-	want := map[string]bool{}
-	v := reflect.ValueOf(h)
-	t := v.Type()
-	for i := 0; i < t.NumField(); i++ {
-		name := t.Field(i).Name
-		if notAFamily[name] {
-			continue
-		}
-		if fv := v.Field(i); fv.Kind() == reflect.Pointer && fv.IsNil() {
-			continue
-		}
-		want[name] = true
-	}
-	return want
-}
-
 func TestRouteCoverage(t *testing.T) {
 	rec := newRecordingMux()
 	h := buildTestRouteHandlers()
@@ -440,10 +442,10 @@ func TestRouteCoverage(t *testing.T) {
 	//   - a family registering zero patterns (e.g. a miswired stub here),
 	//     which would otherwise hide behind every other family registering
 	//     fine.
-	want := expectedRouteFamilies(h)
+	fields := routeHandlerFields()
 	seen := map[string]bool{}
 	for _, f := range routeFamilies(h) {
-		if !want[f.name] {
+		if !fields[f.name] {
 			t.Errorf("routeFamilies returned %q, which is not a routeHandlers field — typo in router.go's mount table?", f.name)
 		}
 		if seen[f.name] {
@@ -457,14 +459,25 @@ func TestRouteCoverage(t *testing.T) {
 			t.Errorf("route family %q registered zero patterns — its handler construction in buildTestRouteHandlers (or its RegisterRoutes) is broken", f.name)
 		}
 	}
-	for family := range want {
-		if !seen[family] {
+	for family := range fields {
+		if !seen[family] && !conditionalRouteFamilies[family] {
 			t.Errorf("routeHandlers field %q has no entry in router.go's routeFamilies mount table — it is constructed but never mounted", family)
 		}
 	}
 
 	if len(rec.patterns) == 0 {
 		t.Fatal("routeFamilies registered zero patterns onto recordingMux — the mount table or its handler construction is broken")
+	}
+
+	// Fidelity: buildRouter is production's sole mount path (main.go), and its
+	// body is supposed to be nothing but a loop over routeFamilies. Assert
+	// that rather than trusting it — otherwise a statement added to
+	// buildRouter outside the loop, or a loop that stopped registering, would
+	// be invisible to this test even though the walk above stayed green.
+	viaBuildRouter := newRecordingMux()
+	buildRouter(viaBuildRouter, buildTestRouteHandlers())
+	if !reflect.DeepEqual(viaBuildRouter.patterns, rec.patterns) {
+		t.Errorf("buildRouter's registered patterns diverge from a direct walk of routeFamilies — buildRouter must be exactly a loop over the mount table\nbuildRouter:   %v\nrouteFamilies: %v", viaBuildRouter.patterns, rec.patterns)
 	}
 
 	resolver := newPermissionResolver()

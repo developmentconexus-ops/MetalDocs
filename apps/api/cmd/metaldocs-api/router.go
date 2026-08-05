@@ -67,11 +67,26 @@ type routeFamily struct {
 	register func(httprouter.Muxer)
 }
 
+// conditionalRouteFamilies names every routeHandlers field that legitimately
+// has no entry in the mount table on some boot path. It is exactly one:
+// presence, which buildPresence returns nil for when deps.SQLDB is nil
+// (main.go:1173-1175).
+//
+// Every other field is constructed on every path — including security, which
+// takes a nil service but is itself always non-nil (main.go:404 and :406 both
+// assign), and metrics, which is an unconditional http.HandlerFunc
+// (observability/http.go:211). Guarding those would be a branch no
+// environment executes; a zero-value field there is a wiring bug and must
+// fail loudly, not be skipped silently.
+//
+// TestRouteCoverage consumes this set to decide which fields may be absent
+// from the table — so "conditional" is declared once, here, rather than
+// inferred from a zero value at two sites that could disagree.
+var conditionalRouteFamilies = map[string]bool{"presence": true}
+
 // routeFamilies is the mount table: the ordered set of route families
-// buildRouter installs. security and presence are conditional because both
-// are nil on boot paths without a SQLDB (see their construction sites in
-// main.go); metrics is conditional for the same reason. Every other handler
-// is unconditionally constructed.
+// buildRouter installs. See conditionalRouteFamilies for the one entry that
+// is boot-path dependent.
 //
 // This is a plain production function with no test-only affordance.
 // TestRouteCoverage (permissions_test.go) walks this same table to assert
@@ -84,14 +99,12 @@ func routeFamilies(h routeHandlers) []routeFamily {
 		{"featureFlags", h.featureFlags.RegisterRoutes},
 		{"audit", h.audit.RegisterRoutes},
 		{"search", h.search.RegisterRoutes},
-	}
-	if h.security != nil {
-		families = append(families, routeFamily{"security", h.security.RegisterRoutes})
+		{"security", h.security.RegisterRoutes},
 	}
 	if h.presence != nil {
 		families = append(families, routeFamily{"presence", h.presence.RegisterRoutes})
 	}
-	families = append(families,
+	return append(families,
 		routeFamily{"taxonomy", h.taxonomy.RegisterRoutes},
 		routeFamily{"tokens", h.tokens.RegisterRoutes},
 		routeFamily{"controlledDocuments", h.controlledDocuments.RegisterRoutes},
@@ -107,13 +120,10 @@ func routeFamilies(h routeHandlers) []routeFamily {
 		routeFamily{"notifications", func(mux httprouter.Muxer) {
 			notificationshttp.RegisterRoutes(h.notifications, mux)
 		}},
-	)
-	if h.metrics != nil {
-		families = append(families, routeFamily{"metrics", func(mux httprouter.Muxer) {
+		routeFamily{"metrics", func(mux httprouter.Muxer) {
 			mux.Handle("/api/v1/metrics", h.metrics)
-		}})
-	}
-	return families
+		}},
+	)
 }
 
 // buildRouter mounts every route family in routeHandlers onto mux. main()

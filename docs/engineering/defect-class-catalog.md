@@ -1077,20 +1077,25 @@ Appendix C.
 # Part II — AI-Authored Defect Classes
 
 > **Why this part exists.** Classes 1–26 are defects found *in the codebase*, most of
-> them authored by humans over time. Classes 27–33 are defects authored by an **AI agent
-> writing a design and an implementation plan**, caught by adversarial review before a
-> line of code was written.
+> them authored by humans over time. Classes 27–34 are defects authored by an **AI agent**
+> — classes 27–33 while writing a design and an implementation plan, caught by adversarial
+> review before a line of code was written; class 34 while writing code, caught by
+> adversarial review plus a direct operator objection before merge.
 >
 > They are separated because their **prevention mechanism is different**. A human defect
 > is usually prevented by a rung 1–3 mechanism in the repo. An AI-authored defect is
 > usually prevented by a mechanism in the **review protocol** — because the failure is
 > not "the agent could not express the right thing", it is "the agent produced something
-> that *reads* correct and was never checked against source".
+> that *reads* correct and was never checked against source". Class 34 is the partial
+> exception that proves the boundary is about *authorship*, not artifact type: it is code,
+> and its prevention is a rung-4 structural mechanism, but what surfaced it was still the
+> review protocol.
 >
-> **Evidence base.** All seven were observed in one work item: the unified approval
+> **Evidence base.** Classes 27–33 were observed in one work item: the unified approval
 > decision surface (`docs/superpowers/plans/2026-08-05-approval-shape-unified-decision.md`),
-> across four adversarial review rounds with an independent reviewer model. Each carries
-> the real repository line that falsifies the agent's claim.
+> across four adversarial review rounds with an independent reviewer model. Class 34 came
+> from a second work item, the metaldocs-api route-coverage refactor, across three dual-gate
+> rounds. Each carries the real repository line that falsifies the agent's claim.
 >
 > **The one number that matters:** across those four rounds, **every single finding was
 > verifiable against source** — meaning every one of these was a statement that read as
@@ -1377,8 +1382,10 @@ is that it is simple enough to audit by reading.
 
 **Evidence.** `apps/api/cmd/metaldocs-api/router.go`'s `buildRouter` is the API's sole route
 composition root. To let `TestRouteCoverage` assert a per-family route floor, it was given
-`onMount ...func(family string)` — a variadic test callback, fired after each of 17
-`RegisterRoutes` calls via 17 hand-typed `mount("name")` lines. `main()` passed zero hooks.
+`onMount ...func(family string)` — a variadic test callback, fired after each of the 17 mount
+operations (module `RegisterRoutes`/`Register`/`RegisterGenerated` methods, two package-level
+`RegisterRoutes` functions, and one bare `mux.Handle`) via 17 hand-typed `mount("name")`
+lines. `main()` passed zero hooks.
 Two independent gate arms flagged the same root cause: the 17 `mount()` strings were
 themselves a hand-synced enumeration (Class 2) that nothing asserted was complete — the fix
 for a hand-sync defect had reintroduced one, *inside* the production composition root. The
@@ -1408,6 +1415,17 @@ behavior, so nothing downstream ever forces the question.
 - **When a fix for a hand-sync defect introduces new hand-typed strings, it is not a fix.**
   Cross-check the new enumeration against a compiler-anchored source (struct fields via
   reflection, a generated registry) or restructure so the second enumeration doesn't exist.
+- **Derive that cross-check from the TYPE, never from a VALUE.** The first version of this
+  one skipped fields that were nil, to model the genuinely-optional ones. That let a newly
+  added family launder itself out of the expected set by being forgotten in the fixture too
+  — a zero value is indistinguishable from "deliberately absent", so the omission the guard
+  existed to catch became the thing that disarmed it. Optionality must be *declared* once
+  (`conditionalRouteFamilies`) and subtracted, not inferred from a zero value at two sites
+  that can disagree.
+- **A guard extracted for testability must still be exercised through the production entry
+  point.** Extracting the table made `buildRouter` a three-line loop the test stopped
+  calling — so anything added to `buildRouter` outside that loop became invisible. The test
+  now asserts `buildRouter`'s pattern set equals the direct table walk.
 
 **Generalization.** Sibling of Class 8 (tests at the wrong altitude): there the test observes
 too little to be true, here the test deforms the subject in order to observe it. Both are
