@@ -3,6 +3,7 @@ package infrastructure
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -47,13 +48,19 @@ var _ approvaldomain.SLASurfaceWriter = (*SLASurfaceWriterPG)(nil)
 // calling this method — this adapter issues no authz calls itself.
 func (w *SLASurfaceWriterPG) MarkStagesOverdueSurfaced(ctx context.Context, tx *sql.Tx, tenantID string, now time.Time) ([]approvaldomain.SurfacedStage, error) {
 	rows, err := tx.QueryContext(ctx, `
-UPDATE public.approval_stage_instances asi
-   SET sla_surfaced_at = $1
-  FROM public.approval_instances ai
- WHERE asi.approval_instance_id = ai.id
-   AND ai.tenant_id = $2::uuid
-   AND `+slaOverdueCorePredicate+`
-RETURNING asi.id::text, asi.due_at`,
+WITH marked AS (
+  UPDATE public.approval_stage_instances asi
+     SET sla_surfaced_at = $1
+    FROM public.approval_instances ai
+   WHERE asi.approval_instance_id = ai.id
+     AND ai.tenant_id = $2::uuid
+     AND `+slaOverdueCorePredicate+`
+  RETURNING asi.id, asi.approval_instance_id, asi.due_at, asi.eligible_actor_ids
+)
+SELECT m.id::text, ai.tenant_id::text, ai.subject_kind, ai.subject_key,
+       m.eligible_actor_ids, m.due_at
+  FROM marked m
+  JOIN public.approval_instances ai ON ai.id = m.approval_instance_id`,
 		now, tenantID,
 	)
 	if err != nil {
@@ -65,8 +72,14 @@ RETURNING asi.id::text, asi.due_at`,
 	for rows.Next() {
 		var s approvaldomain.SurfacedStage
 		var dueAt time.Time
-		if err := rows.Scan(&s.StageInstanceID, &dueAt); err != nil {
+		var eligibleJSON []byte
+		if err := rows.Scan(&s.StageInstanceID, &s.TenantID, &s.SubjectKind, &s.SubjectID, &eligibleJSON, &dueAt); err != nil {
 			return nil, fmt.Errorf("mark stages overdue surfaced: scan: %w", err)
+		}
+		if len(eligibleJSON) > 0 {
+			if err := json.Unmarshal(eligibleJSON, &s.EligibleActorIDs); err != nil {
+				return nil, fmt.Errorf("mark stages overdue surfaced: unmarshal eligible_actor_ids for stage %s: %w", s.StageInstanceID, err)
+			}
 		}
 		s.DueAt = &dueAt
 		out = append(out, s)

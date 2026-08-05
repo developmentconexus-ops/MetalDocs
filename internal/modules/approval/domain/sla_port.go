@@ -26,11 +26,24 @@ type OverdueStageView struct {
 }
 
 // SurfacedStage is the approval-owned projection of a stage instance newly
-// marked surfaced by one MarkStagesOverdueSurfaced run (F8). Mirrors
-// documents.SurfacedDoc.
+// marked surfaced by one MarkStagesOverdueSurfaced run (F8).
+//
+// It carries the subject and the eligible actors so the `jobs` surfacer can
+// enqueue an overdue notification WITHOUT reading approval's tables: resolving
+// who is eligible stays inside the module that owns eligibility (invariant 6).
 type SurfacedStage struct {
 	// StageInstanceID is the approval_stage_instances.id.
 	StageInstanceID string
+	// TenantID is the owning tenant, carried so the caller can build a
+	// single-tenant event without a second lookup.
+	TenantID string
+	// SubjectKind is "document" or "template" (the M3 kernel discrimination).
+	SubjectKind string
+	// SubjectID is the subject's key.
+	SubjectID string
+	// EligibleActorIDs are the people this stage is waiting on — the snapshot
+	// taken at submit, not a live recomputation.
+	EligibleActorIDs []string
 	// DueAt is the due_at value that made this stage eligible (never nil for
 	// rows this port returns).
 	DueAt *time.Time
@@ -88,7 +101,11 @@ type SLASurfaceWriter interface {
 	// surfaced for its current cycle (sla_surfaced_at >= due_at) is left
 	// untouched — running this twice for the same cycle surfaces nothing the
 	// second time. Alert-only (ADR 0068): this NEVER mutates status or
-	// due_at, only the sla_surfaced_at marker.
+	// due_at, only the sla_surfaced_at marker. The returned rows carry the
+	// subject (SubjectKind/SubjectID) and the eligible actors
+	// (EligibleActorIDs) of each newly surfaced stage, so the caller can
+	// enqueue an overdue notification without a second read against
+	// approval's tables.
 	//
 	// Runs in the caller-provided tx. Tenant scoping mirrors
 	// ListOverdueStages: an EXPLICIT tenant_id predicate in the UPDATE's

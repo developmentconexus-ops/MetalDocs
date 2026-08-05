@@ -109,6 +109,10 @@ func run(ctx context.Context) error {
 	// enqueuer) are bound to it below, before the client starts working jobs.
 	releaseEnqueuer := approvaljobs.NewDeferredReleaseEvaluationEnqueuer()
 	var releaseCoordinator *approvalapp.ReleaseCoordinator
+	// F8/Task 7: the SLA surfacer's overdue notification enqueuer has the same
+	// chicken-and-egg wiring problem as releaseEnqueuer above — bound after
+	// the River client exists, below.
+	slaNotifier := approvaljobs.NewDeferredApprovalNotificationEnqueuer()
 
 	deps, err := bootstrap.BuildJobsDependencies(ctx, jobsCfg, func(db *sql.DB) (*river.Workers, []*river.PeriodicJob, error) {
 		// No worker in this binary calls LoadActorDisplayName today, but we pass
@@ -138,7 +142,8 @@ func run(ctx context.Context) error {
 		// review_due_at cadence; see approval_sla_surfacer package docs).
 		river.AddWorker(workers, approval_sla_surfacer.NewWorker(db,
 			approvalrepo.NewSLAOverdueReaderPG(db),
-			approvalrepo.NewSLASurfaceWriterPG(db)))
+			approvalrepo.NewSLASurfaceWriterPG(db),
+			slaNotifier))
 		// ADR 0085 Stage C W2: reconciliation sweep over release generations
 		// stuck in readiness hold (lost fact, dead-lettered consumer, dead
 		// timer). Alert-only (ADR 0068) — it reads through the approval
@@ -191,6 +196,7 @@ func run(ctx context.Context) error {
 	defer deps.Cleanup()
 	releaseEnqueuer.Bind(deps.River.Client)
 	releaseCoordinator.WithLifecycleEnqueuer(approvaljobs.NewLifecycleEventEnqueuer(deps.River.Client))
+	slaNotifier.Bind(deps.River.Client)
 
 	slog.Info("MetalDocs Jobs running", "queues", "temporal")
 	if err := deps.River.Client.Start(ctx); err != nil {

@@ -24,10 +24,59 @@ import (
 	"testing"
 	"time"
 
+	approvaldomain "metaldocs/internal/modules/approval/domain"
 	approvalrepo "metaldocs/internal/modules/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
+	"metaldocs/internal/platform/db"
 	"metaldocs/tests/integration/testdb"
 )
+
+// recordingNotifier is a test-local double for
+// approvaldomain.ApprovalNotificationEnqueuer that records every call instead
+// of enqueuing a River job, so these tests assert on what the surfacer
+// PROMISED to notify without needing a live River worker/queue. Mirrors
+// application/submit_notification_integration_test.go's recordingNotifier in
+// the approval application package — that copy is unexported and lives in a
+// different package, so this is a second, correct-Go copy, not duplication to
+// avoid (per the task brief).
+type recordingNotifier struct {
+	sent []approvaldomain.ApprovalNotificationArgs
+}
+
+func (r *recordingNotifier) EnqueueApprovalNotificationTx(_ context.Context, _ db.Tx, args approvaldomain.ApprovalNotificationArgs) error {
+	r.sent = append(r.sent, args)
+	return nil
+}
+
+// assertSameUsers fails the test unless got and want contain exactly the same
+// user ids, order-insensitive. Not exported/shared: mirrors
+// submit_notification_integration_test.go's copy in a different package —
+// no importable test-only helper package exists for this, so each package
+// defines its own (per the task brief's resolved ambiguity).
+func assertSameUsers(t *testing.T, got []string, want ...string) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("recipients = %v, want %v", got, want)
+	}
+	gotSet := make(map[string]int, len(got))
+	for _, id := range got {
+		gotSet[id]++
+	}
+	wantSet := make(map[string]int, len(want))
+	for _, id := range want {
+		wantSet[id]++
+	}
+	for id, n := range wantSet {
+		if gotSet[id] != n {
+			t.Fatalf("recipients = %v, want %v", got, want)
+		}
+	}
+	for id, n := range gotSet {
+		if wantSet[id] != n {
+			t.Fatalf("recipients = %v, want %v", got, want)
+		}
+	}
+}
 
 // seedOverdueStageFixture seeds tenant/user/document/route/instance plus one
 // active stage instance with the given due_at (nil = no SLA configured, i.e.
@@ -55,6 +104,48 @@ func seedOverdueStageFixture(t *testing.T, db *sql.DB, tenantID string, dueAt *t
 	)
 
 	eligible := `["` + author.ID + `"]`
+	var id string
+	if err := db.QueryRowContext(ctx, `
+		INSERT INTO public.approval_stage_instances
+		  (approval_instance_id, stage_order, name_snapshot, required_role_snapshot,
+		   area_code_snapshot, quorum_snapshot, on_eligibility_drift_snapshot,
+		   eligible_actor_ids, status, stage_kind, due_at, required_capability_snapshot)
+		VALUES ($1::uuid, 1, 'Stage 1', 'reviewer', 'QA', 'any_1_of', 'keep_snapshot',
+		        $2::jsonb, 'active', 'review', $3, 'document.review')
+		RETURNING id::text`,
+		instance.ID, eligible, nullableTime(dueAt),
+	).Scan(&id); err != nil {
+		t.Fatalf("seed approval_stage_instances: %v", err)
+	}
+	return id, instance.ID
+}
+
+// seedOverdueStageFixtureForActor is seedOverdueStageFixture's twin, except
+// the stage's eligible_actor_ids snapshot is exactly {eligibleActorID} —
+// a caller-supplied user, not the fixture's own auto-created author — so the
+// Task 7 notification tests can assert the surfacer's recipient list against
+// a user they hold a reference to. No factory builder exists for this
+// (testdb.WithEligibleActors was checked and does not exist in this repo).
+func seedOverdueStageFixtureForActor(t *testing.T, db *sql.DB, tenantID string, dueAt *time.Time, eligibleActorID string) (stageID, instanceID string) {
+	t.Helper()
+	ctx := context.Background()
+
+	author := testdb.NewUser(t, db, testdb.WithTenant(tenantID))
+	doc := testdb.NewDocument(t, db,
+		testdb.WithTenant(tenantID),
+		testdb.WithOwner(author.ID),
+		testdb.WithStatus("under_review"),
+		testdb.WithSubmitReadySnapshots(),
+	)
+	route := testdb.NewApprovalRoute(t, db, testdb.WithTenant(tenantID))
+	instance := testdb.NewApprovalInstance(t, db,
+		testdb.WithDocument(doc),
+		testdb.WithRoute(route),
+		testdb.WithOwner(author.ID),
+		testdb.WithStatus("in_progress"),
+	)
+
+	eligible := `["` + eligibleActorID + `"]`
 	var id string
 	if err := db.QueryRowContext(ctx, `
 		INSERT INTO public.approval_stage_instances
@@ -127,7 +218,7 @@ func TestIntegration_SLASurfacer_FullTick_IteratesAllTenants(t *testing.T) {
 	writer := approvalrepo.NewSLASurfaceWriterPG(db)
 	ctx := authz.WithBackgroundBypass(context.Background())
 
-	if err := run(ctx, db, reader, writer, now); err != nil {
+	if err := run(ctx, db, reader, writer, approvaldomain.NoopApprovalNotificationEnqueuer{}, now); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 
@@ -209,7 +300,7 @@ func TestIntegration_SLASurfacer_Idempotent_SecondRunNoOp(t *testing.T) {
 	writer := approvalrepo.NewSLASurfaceWriterPG(db)
 	ctx := authz.WithBackgroundBypass(context.Background())
 
-	if err := run(ctx, db, reader, writer, now); err != nil {
+	if err := run(ctx, db, reader, writer, approvaldomain.NoopApprovalNotificationEnqueuer{}, now); err != nil {
 		t.Fatalf("first run: %v", err)
 	}
 	firstSurfacedAt := readSLASurfacedAt(t, db, stageID)
@@ -218,7 +309,7 @@ func TestIntegration_SLASurfacer_Idempotent_SecondRunNoOp(t *testing.T) {
 	}
 
 	secondNow := now.Add(10 * time.Minute)
-	if err := run(ctx, db, reader, writer, secondNow); err != nil {
+	if err := run(ctx, db, reader, writer, approvaldomain.NoopApprovalNotificationEnqueuer{}, secondNow); err != nil {
 		t.Fatalf("second run: %v", err)
 	}
 	secondSurfacedAt := readSLASurfacedAt(t, db, stageID)
@@ -246,7 +337,7 @@ func TestIntegration_SLASurfacer_AlertOnly_DoesNotMutateStatusOrDueAt(t *testing
 	writer := approvalrepo.NewSLASurfaceWriterPG(db)
 	ctx := authz.WithBackgroundBypass(context.Background())
 
-	if err := run(ctx, db, reader, writer, now); err != nil {
+	if err := run(ctx, db, reader, writer, approvaldomain.NoopApprovalNotificationEnqueuer{}, now); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 
@@ -256,5 +347,73 @@ func TestIntegration_SLASurfacer_AlertOnly_DoesNotMutateStatusOrDueAt(t *testing
 	}
 	if dueBefore == nil || dueAfter == nil || !dueBefore.Equal(*dueAfter) {
 		t.Fatalf("due_at changed by surfacer run: before=%v after=%v; want unchanged (alert-only, ADR 0068)", dueBefore, dueAfter)
+	}
+}
+
+// TestSurfacer_OverdueStage_EnqueuesApprovalOverdue proves Task 7's whole
+// point: surfacing an overdue stage must also tell the people holding it.
+// Alert-only (ADR 0068) still means alert — it constrains what the job
+// MUTATES (only sla_surfaced_at), not whether it communicates.
+func TestSurfacer_OverdueStage_EnqueuesApprovalOverdue(t *testing.T) {
+	db, _ := testdb.Open(t)
+	db.SetMaxOpenConns(1)
+
+	tnt := testdb.NewTenant(t, db)
+	approver := testdb.NewUser(t, db, testdb.WithTenant(tnt.ID))
+	now := time.Now().UTC().Truncate(time.Second)
+	overdue := now.Add(-1 * time.Hour)
+
+	seedOverdueStageFixtureForActor(t, db, tnt.ID, &overdue, approver.ID)
+
+	reader := approvalrepo.NewSLAOverdueReaderPG(db)
+	writer := approvalrepo.NewSLASurfaceWriterPG(db)
+	notifier := &recordingNotifier{}
+	ctx := authz.WithBackgroundBypass(context.Background())
+
+	if err := run(ctx, db, reader, writer, notifier, now); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+
+	if len(notifier.sent) != 1 {
+		t.Fatalf("enqueued %d events, want 1", len(notifier.sent))
+	}
+	got := notifier.sent[0]
+	if got.EventType != approvaldomain.EventTypeApprovalOverdue {
+		t.Fatalf("event type = %q, want %q", got.EventType, approvaldomain.EventTypeApprovalOverdue)
+	}
+	if got.ActorUserID != "" {
+		t.Fatalf("actor = %q, want empty — an SLA tick has no human cause", got.ActorUserID)
+	}
+	assertSameUsers(t, got.RecipientUserIDs, approver.ID)
+}
+
+// TestSurfacer_TwoTicksSameDeadline_EnqueuesOnce proves two ticks against the
+// same deadline surface once. sla_surfaced_at IS the guard — no second
+// "already reminded" flag is invented, because two flags that must agree are
+// a bug with a date on it.
+func TestSurfacer_TwoTicksSameDeadline_EnqueuesOnce(t *testing.T) {
+	db, _ := testdb.Open(t)
+	db.SetMaxOpenConns(1)
+
+	tnt := testdb.NewTenant(t, db)
+	approver := testdb.NewUser(t, db, testdb.WithTenant(tnt.ID))
+	now := time.Now().UTC().Truncate(time.Second)
+	overdue := now.Add(-1 * time.Hour)
+
+	seedOverdueStageFixtureForActor(t, db, tnt.ID, &overdue, approver.ID)
+
+	reader := approvalrepo.NewSLAOverdueReaderPG(db)
+	writer := approvalrepo.NewSLASurfaceWriterPG(db)
+	notifier := &recordingNotifier{}
+	ctx := authz.WithBackgroundBypass(context.Background())
+
+	for i := 0; i < 2; i++ {
+		if err := run(ctx, db, reader, writer, notifier, now); err != nil {
+			t.Fatalf("run %d: %v", i, err)
+		}
+	}
+
+	if len(notifier.sent) != 1 {
+		t.Fatalf("enqueued %d events, want 1 — the second tick has nothing new to surface", len(notifier.sent))
 	}
 }
