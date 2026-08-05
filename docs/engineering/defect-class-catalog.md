@@ -10,9 +10,9 @@
 > here, it does not belong in this file yet.
 >
 > **Two parts.** **Part I (classes 1–26)** — defects found in the codebase, prevented by
-> repository mechanisms. **Part II (classes 27–33)** — defects authored by an AI agent
-> writing design and plan artifacts, prevented by review-protocol mechanisms. They are kept
-> apart because the rung that stops them is in a different place.
+> repository mechanisms. **Part II (classes 27–34)** — defects authored by an AI agent
+> writing design, plan, and code artifacts, prevented by review-protocol mechanisms. They are
+> kept apart because the rung that stops them is in a different place.
 >
 > **Last verified:** 2026-08-05
 
@@ -1050,7 +1050,7 @@ Derived directly from the classes above. Each line prevents a class already obse
 ## Appendix B — Recurring Root Causes
 
 Part I's 26 classes reduce to five underlying causes. Useful when classifying a *new*
-defect that does not obviously match a class above. Part II's seven classes reduce to a
+defect that does not obviously match a class above. Part II's eight classes reduce to a
 single, different cause — uniform confidence over non-uniform correctness — treated in
 Appendix C.
 
@@ -1366,11 +1366,63 @@ producing patches, because a patch is what closes a finding.
 
 ---
 
+## Class 34 — The Test Hook Welded Into Production Code
+
+**Symptom.** A test needs visibility into a production function's internals, so the function
+grows a parameter, callback, flag, or exported field that exists *only* for the test.
+Production passes nothing, or zero, or `false`. The code compiles, the test passes, and the
+production call path now carries an affordance no production caller uses. Worst case the
+affordance is in a composition root, a guard, or a security boundary — code whose whole value
+is that it is simple enough to audit by reading.
+
+**Evidence.** `apps/api/cmd/metaldocs-api/router.go`'s `buildRouter` is the API's sole route
+composition root. To let `TestRouteCoverage` assert a per-family route floor, it was given
+`onMount ...func(family string)` — a variadic test callback, fired after each of 17
+`RegisterRoutes` calls via 17 hand-typed `mount("name")` lines. `main()` passed zero hooks.
+Two independent gate arms flagged the same root cause: the 17 `mount()` strings were
+themselves a hand-synced enumeration (Class 2) that nothing asserted was complete — the fix
+for a hand-sync defect had reintroduced one, *inside* the production composition root. The
+operator's objection — "you're putting test functions in protection code, that scares me" —
+named the smell before the third round found it. The global maximum was to invert the
+relationship: make the mount table a plain production value (`routeFamilies(h) []routeFamily`,
+each entry pairing the family name and its registration in one struct literal) and let
+`buildRouter` be a three-line loop over it. The test walks the same table with no hook, and
+the pairing is structural — a family cannot exist without a name, a name cannot exist
+without a registration.
+
+**Root cause.** "The test needs to see X" is treated as a requirement on the production
+function, when it is a requirement on the *shape of the data* the production function
+consumes. A hook is the fastest way to satisfy the former; extracting the data is the only
+way to satisfy the latter. The hook is also self-concealing: it is invisible in production
+behavior, so nothing downstream ever forces the question.
+
+**Prevention (rung 4 — structural; rung 6 for the review rule).**
+- **A test-only parameter in production code is a design smell, not a testing technique.**
+  Before adding one, ask what *value* the production function is implicitly computing that
+  the test wants to inspect, and extract that value into its own function. Test the value.
+- **The extraction is almost always better production code too** — a table, a list, or a
+  descriptor is more auditable than an imperative sequence, independent of testing.
+- **Composition roots, guards, and security boundaries get a hard "no".** Their value is
+  auditability by reading; a hook that fires only under test is exactly the construct a reader
+  cannot evaluate.
+- **When a fix for a hand-sync defect introduces new hand-typed strings, it is not a fix.**
+  Cross-check the new enumeration against a compiler-anchored source (struct fields via
+  reflection, a generated registry) or restructure so the second enumeration doesn't exist.
+
+**Generalization.** Sibling of Class 8 (tests at the wrong altitude): there the test observes
+too little to be true, here the test deforms the subject in order to observe it. Both are
+resolved the same way — move the seam, don't widen the subject.
+
+---
+
 ## Appendix C — Reviewing AI-Authored Design Work
 
-The seven classes above reduce to one asymmetry: **an AI agent's output is uniformly
+The eight classes above reduce to one asymmetry: **an AI agent's output is uniformly
 confident, and its correctness is not uniform.** The register carries no signal. Everything
-therefore has to come from mechanism.
+therefore has to come from mechanism. Class 34 adds the corollary that the mechanism must
+also constrain *where* the agent is allowed to satisfy a requirement: given a stated need,
+an agent takes the shortest path to satisfying it, and the shortest path routinely runs
+through code that should not have been touched at all.
 
 **What the four rounds actually showed**
 
