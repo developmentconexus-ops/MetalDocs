@@ -92,23 +92,31 @@ func TestExtendSLAHandler_MalformedIdempotencyKeyRejectedBeforeService(t *testin
 // TestExtendSLAHandler_ProblemCodes pins each of the three registered
 // problem codes (openapi.yaml) to its declared HTTP status on the wire.
 func TestExtendSLAHandler_ProblemCodes(t *testing.T) {
+	// The code assertion is not redundant with the status one: two of these
+	// three codes are BOTH 422, so status alone cannot tell them apart, and
+	// the blank-reason case would still pass while returning not_forward —
+	// which is the exact defect (a code the contract advertises but the wire
+	// never returns) that these cases exist to pin down.
 	tests := []struct {
 		name       string
 		body       string
 		svcErr     error
 		wantStatus int
+		wantCode   string
 	}{
 		{
 			name:       "not forward -> 422 validation.sla_extension_not_forward",
 			body:       `{"due_at":"2026-09-01T12:00:00Z","reason":"deadline pushed"}`,
 			svcErr:     application.ErrSLAExtensionNotForward,
 			wantStatus: http.StatusUnprocessableEntity,
+			wantCode:   "validation.sla_extension_not_forward",
 		},
 		{
 			name:       "no active stage -> 409 state.sla_extension_no_active_stage",
 			body:       `{"due_at":"2026-09-01T12:00:00Z","reason":"deadline pushed"}`,
 			svcErr:     application.ErrSLAExtensionNoActiveStage,
 			wantStatus: http.StatusConflict,
+			wantCode:   "state.sla_extension_no_active_stage",
 		},
 		{
 			// Blank reason never reaches the service — the handler
@@ -118,6 +126,7 @@ func TestExtendSLAHandler_ProblemCodes(t *testing.T) {
 			name:       "blank reason -> 422 validation.sla_extension_reason_required",
 			body:       `{"due_at":"2026-09-01T12:00:00Z","reason":"   "}`,
 			wantStatus: http.StatusUnprocessableEntity,
+			wantCode:   "validation.sla_extension_reason_required",
 		},
 	}
 
@@ -132,6 +141,15 @@ func TestExtendSLAHandler_ProblemCodes(t *testing.T) {
 
 			if rr.Code != tt.wantStatus {
 				t.Fatalf("status = %d, want %d (body %s)", rr.Code, tt.wantStatus, rr.Body.String())
+			}
+			var prob struct {
+				Code string `json:"code"`
+			}
+			if err := json.Unmarshal(rr.Body.Bytes(), &prob); err != nil {
+				t.Fatalf("decode problem body: %v (body %s)", err, rr.Body.String())
+			}
+			if prob.Code != tt.wantCode {
+				t.Fatalf("code = %q, want %q — the status alone does not distinguish the two 422s, so a wrong code here means the contract advertises one thing and the wire returns another", prob.Code, tt.wantCode)
 			}
 		})
 	}
