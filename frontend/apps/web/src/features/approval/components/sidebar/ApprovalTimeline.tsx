@@ -14,6 +14,14 @@ import styles from './ApprovalTimeline.module.css';
 // stays authoritative (ADR 0022).
 const SLA_EXTEND_CAPABILITY = 'approval.sla_extend';
 
+// The extend-SLA dialog needs a real due_at to display/anchor the extension
+// against (no-fallback: a nullable deadline means *no deadline*, never a
+// synthesized default — see the `?? ''` finding this type exists to close).
+// Narrowing `extendingStage`'s `due_at` to `string` here makes that guarantee
+// structural: the only place this state is set (below) is required to supply
+// a non-null value, so `ExtendSlaDialog` can never receive a stand-in.
+type ExtendableStage = StageInstance & { due_at: string };
+
 interface ApprovalTimelineProps {
   instance: ApprovalInstance | null;
   loading: boolean;
@@ -77,7 +85,7 @@ function formatSignatureMethod(signatureMethod: Signoff['signature_method']): st
 export function ApprovalTimeline({ instance, loading, error, onRetry }: ApprovalTimelineProps) {
   const canExtendSla = useHasCapability(SLA_EXTEND_CAPABILITY);
   const extendMutation = useExtendSLA();
-  const [extendingStage, setExtendingStage] = useState<StageInstance | null>(null);
+  const [extendingStage, setExtendingStage] = useState<ExtendableStage | null>(null);
 
   if (loading) {
     return <div className={styles.state}>Carregando timeline...</div>;
@@ -125,21 +133,27 @@ export function ApprovalTimeline({ instance, loading, error, onRetry }: Approval
                   </span>
                 </div>
                 {/* F8/Task 8 no-fallback: due_at is null while pending or when the
-                    stage has no SLA configured — never a synthesized default. */}
-                {stage.due_at ? (
-                  <div className={styles.dueRow}>
-                    <p className={styles.meta}>Prazo: {formatDateTime(stage.due_at)}</p>
-                    {stage.status === 'active' && canExtendSla ? (
-                      <button
-                        type="button"
-                        className={styles.extendButton}
-                        onClick={() => setExtendingStage(stage)}
-                      >
-                        Prorrogar prazo
-                      </button>
-                    ) : null}
-                  </div>
-                ) : null}
+                    stage has no SLA configured — never a synthesized default.
+                    `dueAt` is captured as a local const so the ternary's
+                    narrowing to `string` survives into the button's closure
+                    (see ExtendableStage above). */}
+                {(() => {
+                  const dueAt = stage.due_at;
+                  return dueAt ? (
+                    <div className={styles.dueRow}>
+                      <p className={styles.meta}>Prazo: {formatDateTime(dueAt)}</p>
+                      {stage.status === 'active' && canExtendSla ? (
+                        <button
+                          type="button"
+                          className={styles.extendButton}
+                          onClick={() => setExtendingStage({ ...stage, due_at: dueAt })}
+                        >
+                          Prorrogar prazo
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null;
+                })()}
                 {(stage.signoffs ?? []).length === 0 ? (
                   <p className={styles.meta}>Sem assinaturas registradas.</p>
                 ) : (
@@ -183,7 +197,7 @@ export function ApprovalTimeline({ instance, loading, error, onRetry }: Approval
         <ExtendSlaDialog
           open
           stageLabel={extendingStage.label}
-          currentDueAt={extendingStage.due_at ?? ''}
+          currentDueAt={extendingStage.due_at}
           isSubmitting={extendMutation.isPending}
           onConfirm={async (dueAt, reason) => {
             await extendMutation.mutateAsync({ instanceId: instance.id, dueAt, reason });
