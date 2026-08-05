@@ -11,6 +11,7 @@ import (
 	"errors"
 	"time"
 
+	approvaldomain "metaldocs/internal/modules/approval/domain"
 	"metaldocs/internal/modules/approval/infrastructure"
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	docsdomain "metaldocs/internal/modules/documents/domain"
@@ -63,7 +64,7 @@ func NewServices(repo infrastructure.ApprovalRepository, emitter EventEmitter, c
 	reviewVerdict := &ReviewVerdictService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead}
 	return &Services{
 		Submit:         &SubmitService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead, resolver: resolver},
-		TemplateSubmit: NewTemplateSubmitService(repo, emitter, clock, nil),
+		TemplateSubmit: NewTemplateSubmitService(repo, emitter, clock, nil, nil),
 		Decision:       decision,
 		Obsolete:       &ObsoleteService{repo: repo, emitter: emitter, clock: clock},
 		Cancel:         newCancelService(repo, emitter, clock),
@@ -198,6 +199,30 @@ func (s *Services) WithTemplateCompletionWriter(writer TemplateCompletionWriter)
 		// template submit itself reaches terminal approval and needs the SAME
 		// completion port DecisionService uses — one adapter, one lifecycle.
 		s.TemplateSubmit.templateCompletion = writer
+	}
+	return s
+}
+
+// WithApprovalNotificationEnqueuer wires the Task 6 approval.pending
+// notification port into BOTH submit routes — Submit (document) and
+// TemplateSubmit (template). Call after NewServices. A nil enqueuer (or an
+// unset field) leaves each service fail-closed to
+// domain.NoopApprovalNotificationEnqueuer: it enqueues nothing and reports
+// success, so a composition root that forgets to call this degrades to
+// silent-no-notification rather than a panic — the same fail-closed shape
+// every other optional port on Services uses.
+func (s *Services) WithApprovalNotificationEnqueuer(notifier approvaldomain.ApprovalNotificationEnqueuer) *Services {
+	if s == nil {
+		return s
+	}
+	if s.Submit != nil {
+		s.Submit = s.Submit.WithApprovalNotificationEnqueuer(notifier)
+	}
+	if s.TemplateSubmit != nil {
+		s.TemplateSubmit.notifier = notifier
+		if s.TemplateSubmit.notifier == nil {
+			s.TemplateSubmit.notifier = approvaldomain.NoopApprovalNotificationEnqueuer{}
+		}
 	}
 	return s
 }

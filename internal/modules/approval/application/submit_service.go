@@ -36,6 +36,38 @@ type SubmitService struct {
 	// the staged path, where submit never approves anything.
 	releaseRecorder   TerminalApprovalReleaseRecorder
 	lifecycleEnqueuer docsdomain.LifecycleEventEnqueuer
+	// notifier enqueues the approval.pending notification (Task 6) inside the
+	// same submit transaction as the audit GovernanceEvent below — the
+	// transactional-outbox discipline: state write and the promise to notify
+	// commit together. nil is treated as domain.NoopApprovalNotificationEnqueuer
+	// (see notifierOrNoop) so a struct-literal construction (as NewServices
+	// uses for this service) fails closed rather than nil-panicking.
+	notifier domain.ApprovalNotificationEnqueuer
+}
+
+// WithApprovalNotificationEnqueuer returns a copy of the service wired with
+// the Task 6 notification port. A nil enqueuer leaves the service fail-closed
+// to domain.NoopApprovalNotificationEnqueuer (notifierOrNoop) — enqueues
+// nothing, reports success — rather than a composition-root wiring gap
+// silently producing a submit that tells nobody.
+func (s *SubmitService) WithApprovalNotificationEnqueuer(notifier domain.ApprovalNotificationEnqueuer) *SubmitService {
+	if s == nil {
+		return nil
+	}
+	cp := *s
+	cp.notifier = notifier
+	return &cp
+}
+
+// notifierOrNoop returns s.notifier, defaulting to the fail-closed Noop
+// implementation. SubmitService is constructed via a bare struct literal in
+// NewServices (unlike TemplateSubmitService's constructor function), so the
+// nil default is resolved lazily here rather than at construction time.
+func (s *SubmitService) notifierOrNoop() domain.ApprovalNotificationEnqueuer {
+	if s.notifier == nil {
+		return domain.NoopApprovalNotificationEnqueuer{}
+	}
+	return s.notifier
 }
 
 // WithReleaseRecorder returns a copy of the service wired with the ADR 0085
@@ -479,6 +511,33 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 		}
 		if err := s.emitter.Emit(ctx, tx, event); err != nil {
 			return fmt.Errorf("submit: emit event: %w", err)
+		}
+
+		// The audit event above is a governance record; this is the
+		// notification. They are deliberately separate paths with separate
+		// consumers — conflating them is what left submit silent.
+		//
+		// Recipients are the ACTIVE stage's eligible actors, resolved above and
+		// already snapshotted onto the stage instance. A livre route has no
+		// active stage, so recipients come out empty and nothing is enqueued —
+		// the degenerate case needs no branch of its own.
+		if recipients := activeStageEligibleIDs(stageInstances); len(recipients) > 0 {
+			if err := s.notifierOrNoop().EnqueueApprovalNotificationTx(ctx, tx, domain.ApprovalNotificationArgs{
+				EventID:          uuid.New().String(),
+				TenantID:         req.TenantID,
+				EventType:        domain.EventTypeApprovalPending,
+				SubjectKind:      "document",
+				SubjectID:        req.DocumentID,
+				RecipientUserIDs: recipients,
+				ActorUserID:      req.SubmittedBy,
+				OccurredAt:       now,
+			}); err != nil {
+				// NOT swallowed. If the notification cannot be promised, the
+				// submission is not confirmed: a half-transaction that reports
+				// success and tells nobody is the defect this feature exists to
+				// remove.
+				return fmt.Errorf("submit: enqueue approval notification: %w", err)
+			}
 		}
 
 		// Step 10 (ADR 0087): a route bound to a livre profile carries ZERO

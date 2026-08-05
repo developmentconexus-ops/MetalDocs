@@ -125,6 +125,13 @@ type TemplateSubmitService struct {
 	emitter       EventEmitter
 	clock         Clock
 	versionReader TemplateVersionReader
+	// notifier enqueues the approval.pending notification (Task 6) inside the
+	// same submit transaction as the audit GovernanceEvent above — the
+	// transactional-outbox discipline: state write and the promise to notify
+	// commit together. Defaults to domain.NoopApprovalNotificationEnqueuer
+	// (fail-closed: enqueues nothing, reports success) when nil is passed to
+	// NewTemplateSubmitService.
+	notifier domain.ApprovalNotificationEnqueuer
 	// versionWriter locks the version's own status column draft->under_review
 	// in the submit tx (M3 P3.S2b-3b-iii-b, hub Option (a)). nil fails closed
 	// (an explicit error) rather than leaving the concurrent-edit hole open.
@@ -147,10 +154,27 @@ type TemplateSubmitService struct {
 
 // NewTemplateSubmitService constructs a TemplateSubmitService. versionReader
 // may be nil in unit tests that do not exercise the draft-status guard; a nil
-// reader fails closed (ErrTemplateVersionNotFound) in production use.
-func NewTemplateSubmitService(repo infrastructure.ApprovalRepository, emitter EventEmitter, clock Clock, versionReader TemplateVersionReader) *TemplateSubmitService {
+// reader fails closed (ErrTemplateVersionNotFound) in production use. notifier
+// may be nil, in which case it defaults to domain.NoopApprovalNotificationEnqueuer
+// (Task 6) — production composition roots must wire a real enqueuer or submit
+// silently tells nobody.
+func NewTemplateSubmitService(repo infrastructure.ApprovalRepository, emitter EventEmitter, clock Clock, versionReader TemplateVersionReader, notifier domain.ApprovalNotificationEnqueuer) *TemplateSubmitService {
 	resolver, _ := repo.(SubmitDefaultsResolver)
-	return &TemplateSubmitService{repo: repo, emitter: emitter, clock: clock, versionReader: versionReader, routeResolver: resolver}
+	if notifier == nil {
+		notifier = domain.NoopApprovalNotificationEnqueuer{}
+	}
+	return &TemplateSubmitService{repo: repo, emitter: emitter, clock: clock, versionReader: versionReader, routeResolver: resolver, notifier: notifier}
+}
+
+// notifierOrNoop returns s.notifier, defaulting to the fail-closed Noop
+// implementation. Guards against a raw struct literal (e.g. a test fixture
+// built without NewTemplateSubmitService, or Services.WithApprovalNotificationEnqueuer
+// passed an explicit nil) leaving the field unset.
+func (s *TemplateSubmitService) notifierOrNoop() domain.ApprovalNotificationEnqueuer {
+	if s.notifier == nil {
+		return domain.NoopApprovalNotificationEnqueuer{}
+	}
+	return s.notifier
 }
 
 // TemplateSubmitRequest carries all inputs for SubmitTemplateVersionForReview.
@@ -383,6 +407,33 @@ func (s *TemplateSubmitService) SubmitTemplateVersionForReview(ctx context.Conte
 		}
 		if err := s.emitter.Emit(ctx, tx, event); err != nil {
 			return fmt.Errorf("template submit: emit event: %w", err)
+		}
+
+		// The audit event above is a governance record; this is the
+		// notification. They are deliberately separate paths with separate
+		// consumers — conflating them is what left submit silent.
+		//
+		// Recipients are the ACTIVE stage's eligible actors, resolved above and
+		// already snapshotted onto the stage instance. A livre route has no
+		// active stage, so recipients come out empty and nothing is enqueued —
+		// the degenerate case needs no branch of its own.
+		if recipients := activeStageEligibleIDs(stageInstances); len(recipients) > 0 {
+			if err := s.notifierOrNoop().EnqueueApprovalNotificationTx(ctx, tx, domain.ApprovalNotificationArgs{
+				EventID:          uuid.New().String(),
+				TenantID:         req.TenantID,
+				EventType:        domain.EventTypeApprovalPending,
+				SubjectKind:      "template",
+				SubjectID:        req.TemplateVersionID,
+				RecipientUserIDs: recipients,
+				ActorUserID:      req.SubmittedBy,
+				OccurredAt:       now,
+			}); err != nil {
+				// NOT swallowed. If the notification cannot be promised, the
+				// submission is not confirmed: a half-transaction that reports
+				// success and tells nobody is the defect this feature exists to
+				// remove.
+				return fmt.Errorf("template submit: enqueue approval notification: %w", err)
+			}
 		}
 
 		// ADR 0087 §5: a route bound to a livre profile carries ZERO stages, so

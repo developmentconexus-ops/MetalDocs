@@ -695,6 +695,12 @@ func main() {
 			os.Exit(1)
 		}
 		approvalServices.WithLifecycleEnqueuer(approvaljobs.NewLifecycleEventEnqueuer(riverBundle.Client))
+		// Task 6: wire the approval-owned notification port into BOTH submit
+		// routes (Submit, TemplateSubmit) so a real submission tells its
+		// eligible approvers, not just the audit trail. Without this call the
+		// services stay fail-closed to domain.NoopApprovalNotificationEnqueuer —
+		// same silent-no-notification defect this feature exists to remove.
+		approvalServices.WithApprovalNotificationEnqueuer(approvaljobs.NewApprovalNotificationEnqueuer(riverBundle.Client))
 
 		// M7 F7.3 Task E: tenant export/erase orchestrator. Constructed here
 		// (not alongside tenantHandler/onboardTenantService above) because it

@@ -163,7 +163,7 @@ func TestListWorklist_TemplateInstance_AppearsWithSubjectTitleAndRef_RealDB(t *t
 	grantAreaBlindRole(t, dbc, ten.ID, manager.ID, "author")
 
 	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
-	submitSvc := NewTemplateSubmitService(repo, NewSQLEmitter(), RealClock{}, fakeTemplateVersionReader{})
+	submitSvc := NewTemplateSubmitService(repo, NewSQLEmitter(), RealClock{}, fakeTemplateVersionReader{}, nil)
 	submitSvc.versionWriter = fakeTemplateVersionSubmitWriter{}
 	runner := db.NewTxRunner(dbc)
 

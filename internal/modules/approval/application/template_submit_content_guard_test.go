@@ -64,7 +64,7 @@ func (w *recordingSubmitWriter) MarkTemplateVersionUnderReview(context.Context, 
 
 func newContentGuardService(t *testing.T, reader TemplateVersionReader, writer TemplateVersionSubmitWriter) (*TemplateSubmitService, db.TxRunner) {
 	t.Helper()
-	svc := NewTemplateSubmitService(&fakeSubmitRepo{}, &MemoryEmitter{}, fixedClock{t: time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC)}, reader)
+	svc := NewTemplateSubmitService(&fakeSubmitRepo{}, &MemoryEmitter{}, fixedClock{t: time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC)}, reader, nil)
 	svc.versionWriter = writer
 	return svc, newTxRunner(newSubmitTestDB(t, true))
 }

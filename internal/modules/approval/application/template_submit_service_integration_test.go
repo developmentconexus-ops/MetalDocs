@@ -366,7 +366,7 @@ func TestSubmitTemplateVersionForReview_Success_RealDB(t *testing.T) {
 	grantAreaBlindRole(t, dbc, tnt.ID, manager.ID, "author")
 
 	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
-	svc := NewTemplateSubmitService(repo, NewSQLEmitter(), RealClock{}, fakeTemplateVersionReader{})
+	svc := NewTemplateSubmitService(repo, NewSQLEmitter(), RealClock{}, fakeTemplateVersionReader{}, nil)
 	svc.versionWriter = fakeTemplateVersionSubmitWriter{}
 	runner := db.NewTxRunner(dbc)
 
@@ -461,7 +461,7 @@ func TestSubmitTemplateVersionForReview_NonDraft_Rejected_RealDB(t *testing.T) {
 	seedTemplateRoute(t, dbc, tnt.ID, actor.ID, tax.ProfileCode)
 
 	repo := approvalrepo.NewPostgresApprovalRepository(dbc, nil)
-	svc := NewTemplateSubmitService(repo, NewSQLEmitter(), RealClock{}, fakeTemplateVersionReader{})
+	svc := NewTemplateSubmitService(repo, NewSQLEmitter(), RealClock{}, fakeTemplateVersionReader{}, nil)
 	svc.versionWriter = fakeTemplateVersionSubmitWriter{}
 	runner := db.NewTxRunner(dbc)
 
