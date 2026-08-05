@@ -2,13 +2,18 @@
 # §2.3). This is the checked-in, non-hardcoded data file the lint reads to
 # decide whether a worker/jobs DB write targets a tenant-scoped (FORCE RLS)
 # table. Derived from `grep -n "FORCE ROW LEVEL SECURITY" db/baseline/0001_current_schema.sql`
-# (33 tables, all carrying `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL
+# (37 tables, all carrying `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL
 # SECURITY` and the identical NULL-permissive `tenant_isolation` policy).
 # Bare table names only (schema prefix stripped), one per line, `#`-comments
 # and blank lines ignored — mirrors parseMutatingTable's bareTableName
 # normalization in tripwire_arm_rules.go so entries match write-site parsing.
 #
-# This file is the honest mirror of the 33 FORCE-RLS tenant tables, INCLUDING
+# TestAsyncTenantTables_MatchesSchemaForceRLS (async_tenant_tables_schema_drift_test.go)
+# fails CI if this list and the baseline schema's FORCE RLS set ever diverge
+# again — this is a generated-equivalent guard, not hand-sync-and-hope
+# (docs/engineering/defect-class-catalog.md hand-synced-enumeration class).
+#
+# This file is the honest mirror of the 37 FORCE-RLS tenant tables, INCLUDING
 # idempotency_keys (it carries tenant_id uuid NOT NULL + FORCE ROW LEVEL
 # SECURITY — 0001_current_schema.sql:1330,1347). A corrected reading (F3.4):
 #   - idempotency_keys IS tenant-scoped; its idempotency-janitor TTL sweep
@@ -47,8 +52,12 @@ document_exports
 document_placeholder_values
 editor_sessions
 governance_events
-template_audit_log
-templates
-templates_audit_log
 templates_template
 templates_template_version
+approval_delegations
+approval_review_verdicts
+approval_signoffs
+document_families
+release_generations
+tenant_keys
+tenant_lifecycle_jobs
