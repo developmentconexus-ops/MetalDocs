@@ -97,6 +97,12 @@ const (
 	// M2b F3/F8). Tenant-grade — oversight is a capability, never a role
 	// (ADR 0022).
 	CapApprovalOversee Capability = "approval.oversee"
+	// CapApprovalSLAExtend gates postponing the deadline of an approval
+	// instance's ACTIVE stage. Distinct from CapApprovalOversee, which is
+	// declared read-only: extending is a write with governance consequences
+	// (it changes when the system will chase someone), so it carries its own
+	// capability rather than borrowing a read one.
+	CapApprovalSLAExtend Capability = "approval.sla_extend"
 
 	CapTemplateView    Capability = "template.view"
 	CapTemplateCreate  Capability = "template.create"
@@ -168,6 +174,7 @@ var validCapabilities = map[Capability]struct{}{
 	CapDocumentReview:              {},
 	CapApprovalReview:              {},
 	CapApprovalOversee:             {},
+	CapApprovalSLAExtend:           {},
 	CapTemplateView:                {},
 	CapTemplateCreate:              {},
 	CapTemplateEdit:                {},

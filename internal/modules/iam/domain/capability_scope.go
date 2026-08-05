@@ -48,6 +48,7 @@ var capabilityScopes = map[Capability]CapabilityScope{
 	CapMembershipManage:            ScopeArea,
 	// approval.review (M2b F3) acts on a stage in a specific process area.
 	CapApprovalReview: ScopeArea,
+	CapApprovalSLAExtend: ScopeArea,
 
 	// --- Tenant-grade: tenant-wide authority ---
 	CapDocumentView: ScopeTenant,

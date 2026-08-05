@@ -115,6 +115,7 @@ var capabilityDescriptions = map[Capability]string{
 	CapDocumentReview:              "Registrar revisão periódica de documento publicado",
 	CapApprovalReview:              "Atuar em etapa de revisão de aprovação (sugestões/parecer)",
 	CapApprovalOversee:             "Supervisionar qualquer instância de aprovação no tenant",
+	CapApprovalSLAExtend:           "Prorrogar o prazo da etapa ativa de uma aprovação",
 	CapTemplateView:                "Visualizar templates",
 	CapTemplateCreate:              "Criar templates",
 	CapTemplateEdit:                "Editar templates",

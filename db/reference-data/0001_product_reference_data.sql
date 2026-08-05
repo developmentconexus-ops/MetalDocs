@@ -296,6 +296,12 @@ INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES (
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'approval.oversee', 'Oversee any approval instance in the tenant (worklist, cockpit observer mode)') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('system_admin', 'approval.oversee', 'Oversee any approval instance in the tenant (worklist, cockpit observer mode)') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 
+-- Approval SLA extension (approval accountability loop, 2026-08-04): seed to
+-- the same roles that already hold route.manage, as those who configure the
+-- standard deadline may authorize exceptions to it.
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'approval.sla_extend', 'Extend the deadline of an approval instance''s active stage') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('system_admin', 'approval.sla_extend', 'Extend the deadline of an approval instance''s active stage') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+
 -- ADR 0022 Phase 10 (F2): the four redundant phantom caps Phase 8 seeded here
 -- (doc.edit_draft / doc.reconstruct / workflow.instance.cancel / doc.view_published)
 -- were merged into the canonical document.edit / document.view caps — identical

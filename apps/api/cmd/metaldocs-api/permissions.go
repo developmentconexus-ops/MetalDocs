@@ -282,6 +282,12 @@ var routeRules = []routeRule{
 	// a distinct capability class from binding e-signature approvals.
 	{method: http.MethodPost, pathPrefix: "/api/v1/approval/instances/", pathSuffix: "/review-verdict", capability: iamdomain.CapApprovalReview, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/approval/instances/", pathSuffix: "/cancel", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	// SLA extension (approval accountability loop): tier-2 gates on
+	// CapApprovalSLAExtend in-tx; tier-1 must match. There is no generic
+	// /api/v1/approval/ fallback anymore, so omitting this row does not fall
+	// back to a stricter rule — it falls through to VisibilitySessionRequired,
+	// reachable by any authenticated session.
+	{method: http.MethodPost, pathPrefix: "/api/v1/approval/instances/", pathSuffix: "/extend-sla", capability: iamdomain.CapApprovalSLAExtend, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodGet, pathPrefix: "/api/v1/approval/instances/", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodGet, pathExact: "/api/v1/approval/inbox", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
 

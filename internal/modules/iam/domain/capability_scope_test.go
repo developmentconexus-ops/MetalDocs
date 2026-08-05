@@ -46,6 +46,10 @@ func TestAreaGradeCapabilitySet(t *testing.T) {
 		// CapDocumentEdit (already in this set) — area-grade set 14 → 11.
 		// M2b F3: approval.review acts on a stage in a specific process area — 11 → 12.
 		CapApprovalReview: {},
+		// approval.sla_extend (approval accountability loop, 2026-08-04): extending
+		// the deadline of an instance's active stage is area-scoped, matching
+		// CapApprovalReview — 12 → 13.
+		CapApprovalSLAExtend: {},
 	}
 	for cap := range validCapabilities {
 		_, want := wantArea[cap]
