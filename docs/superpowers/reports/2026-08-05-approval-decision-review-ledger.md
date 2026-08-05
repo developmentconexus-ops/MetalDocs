@@ -27,6 +27,12 @@ structure is wrong and no number of rounds fixes it.
 Reinforcing signal, §1 repeated-finding rule: **signer identity is the third consecutive round
 on one construct** (R3-C4 → R4-J2-2 → R5-1). The rule says stop bounding and go to §2.
 
+**Resolution (2026-08-05).** §2 was run on both structures and the operator chose outcome (a)
+for each — the signer-identity relation and the persisted-state discriminator are built, not
+bounded. The rising altitude is what forced that, which is the rule working rather than the
+loop failing. Round 6 resumes against the new structures; if it returns findings at the same
+altitude on *those*, the stop is real.
+
 ---
 
 ## Round 5 — Job 1 dispositions (reviewer, verbatim)
@@ -215,11 +221,91 @@ Only anchor verification does.
 
 ---
 
+## Operator rulings on the two §2 escalations (2026-08-05)
+
+Both answered by the operator, in session. Recorded here because §8 forbids closing a
+DO NOT PROCEED without naming who accepted what.
+
+### (c)-1 — Signer identity → **build the global maximum now**
+
+Operator: *"Construir agora"*. Outcome **(a) restructure now**, not (b).
+
+Applied to the plan:
+- `public.approval_decision_signers` added to migration 0318 §3b —
+  `PRIMARY KEY (approval_instance_id, identity_id)`, FK to `iam_users`, composite FK to
+  `approval_decisions(id, approval_instance_id)`, no `ON DELETE CASCADE`, FORCE RLS with the
+  same tenant policy shape as its parent. No `role` column: derivable from `decision_id`, one
+  consumer, and the control's point is that the two capacities are indistinguishable.
+- `record_decision_signers()` AFTER INSERT trigger flattens every signed approval into one row
+  per participating identity via `unnest(ARRAY[actor_user_id, on_behalf_of_user_id])`. Unsigned
+  decisions and returns write nothing, which is what preserves multi-stage commenting.
+- The partial unique index `(approval_instance_id, actor_user_id) WHERE requires_signature_snapshot
+  AND outcome='approve'` is **deleted, not supplemented** — strictly weaker on every delegated
+  path, and two constructs enforcing one rule with different answers is what produced this
+  finding three rounds running.
+- Domain predicate rewritten as a set intersection over `participants(actor, onBehalf)`, which
+  computes the same set from the same two columns as the key, so parity is structural.
+- `MapPgError`'s `23505` switch (`infrastructure/errors.go:82-89`) gains both new constraint
+  names; without the second, a lost race surfaces as `ErrUnknownDB` → 500.
+- Six mandatory tests, each asserting domain rejection **and** DB rejection with the service
+  bypassed: same actor twice · `A→B` then `B` direct · `B` direct then `A→B` · `A→B` then `C→A`
+  · `A→B` and `A→C` same stage · three distinct people accepted.
+
+### (c)-2 — documents/UPDATE discriminator → **persisted-state enforcement, GUC deleted**
+
+Operator delegated the choice: *"O que recomenda avaliando com o objetivo de nunca errar"*.
+Recommendation given and applied: option (a), the persisted-state discriminator. Outcome
+**(a) restructure now**.
+
+The deciding fact, found while answering: the return path already writes the authoritative
+instance status **before** it touches `documents` (`decision_service.go:643` precedes `:681`,
+same tx) and already sets `cancel_in_progress` at `:661`. The proposed GUC would have been a
+third marker for a fact the database already holds.
+
+Applied to the plan:
+- The `documents` UPDATE arm derives from `approval_instances.status = 'changes_requested'`
+  bound to the row, plus `ai.xmin::text::bigint = pg_catalog.pg_current_xact_id()::text::bigint`
+  — proof the instance row was written by *this* transaction, which is unforgeable and closes
+  the hole where a historical `changes_requested` instance would authorize forever. PG13+;
+  the repo runs PG16.
+- `set_config('metaldocs.approval_return_in_progress', …)` and the `authz.Require(CapDocumentEdit)`
+  that accompanied it are both **deleted** from `decision_service.go:661-670`.
+- `enforce_document_transition`'s own use of `cancel_in_progress` (`baseline:533`) is explicitly
+  out of scope and unchanged.
+- Section (2b)'s "labelled transitional local maximum with a `documents` write port as
+  successor" is withdrawn in full: a Go port does not change what PostgreSQL observes, so the
+  successor could never have discharged the GUC. The ten-site boundary violation is now recorded
+  as standalone architecture debt with no dependency on the tripwire, and scheduling it is a
+  separate operator decision argued on module-boundary grounds.
+
+---
+
+## Round-5 findings — applied dispositions
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | signer identity (BLOCKER) | **applied** — see (c)-1 above |
+| 2 | pre-authz normalization unimplementable (BLOCKER) | **applied, and the fix reversed the design.** Verification found `ErrInstanceNotVisible` is produced by the *read* path (`read_service.go:961`), asserted by `read_service_tenant_grade_view_integration_test.go:121,134,244`, and branched on by the FE cockpit — so deleting its code was Class 19 repurposing of a shared entry. The global mapper, the code and every producer are now left untouched; a typed `RecordDecisionPreflight` + `ErrDecisionSubjectUnresolvable` boundary emits the literal canonical 404 in the handler and logs the cause there. No vocabulary fanout at all. Reviewer's three sub-claims all confirmed: `WriteError` logs only ≥500 (`errors.go:555-565`), `responseTitle` derives the title from the error (`errors.go:549`) so one code ≠ one response, and `errors_test.go:43,64` test `ErrNoActiveInstance`/`ErrInstanceCompleted` — the author had cited them unread |
+| 3 | Task 1 cannot compile; wrong envelope shape (BLOCKER) | **applied** — all `NewFixture` snippets replaced with test-local helpers over the real constructors; envelopes are `[{"cap":"…"}]` per `baseline:498`; `seedStageInstance` specified; `WithTemplateSubject` and an exported `SeedWithCapsIdentity` added to the Files list. Plain `SeedWithCaps` is insufficient — it seeds no tenant GUC, so RLS filters the row instead of the CHECK rejecting it |
+| 4 | shared stale sentinel → 412 (BLOCKER) | **applied** — the distinct `ErrIfMatchPreconditionFailed` was already in place; this round adds the missing half: `updateApprovalRoute`/`deactivateApprovalRoute` require `If-Match` and declare no 412 (`openapi.yaml:4184,4198-4210,4226`), recorded as pre-existing and out of scope with its anchors |
+| 5 | neither route-coverage option is executable (BLOCKER) | **applied** — both options withdrawn with the reasons (`main.go:490` is a stdlib mux; `/api/v1/metrics` at `main.go:852-859` is a deliberate off-contract mount). The gap is stated, not papered over; spawned as its own work item |
+| 6 | the labelled successor cannot delete the GUC (MAJOR) | **applied** — see (c)-2 above |
+| 7 | delete `StageActorSlot` (MINOR) | **accepted, deferred with an owner** — the frontend lane, in the milestone that next touches route-admin; re-raise rather than re-defer if that milestone lands without it |
+
+**Found by the author while applying, not by the reviewer:** `scripts/api-lint/async-tenant-tables.txt`
+is a hand-typed mirror of the FORCE-RLS table set and has drifted ten names (seven missing —
+including `approval_signoffs` and `approval_review_verdicts` — and three phantom). Task 1 now
+adds only this change's two rows and records the drift as out of scope; the durable fix
+(generate it from the schema) is spawned as its own work item.
+
+---
+
 ## Loop state
 
-**PAUSED.** Not closed — a DO NOT PROCEED verdict may not be closed by declaring the risk
-acceptable without recording who accepted it (§8). Round 6 is not scheduled: the two §2
-questions must be answered first, because both change what the plan is.
+**RESUMABLE.** Both §2 escalations are answered and recorded above, and all seven round-5
+findings have a written disposition. Round 6 attacks the new material: the signer-identity
+relation and its trigger, the `xmin`-bound documents arm, the preflight boundary, and the
+Task 1 helper contract.
 
 Evidence artifacts: `agent__r5.log`, `agent__r5.last.md` in this session's scratchpad;
 prompt at `prompt-approval-review-r5.md`.
