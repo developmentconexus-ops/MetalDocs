@@ -375,16 +375,42 @@ func buildTestRouteHandlers() routeHandlers {
 //
 // Method-qualified patterns ("GET /path", the oapi-codegen convention) are
 // checked strictly via matchedByRule(method, path). Bare legacy patterns
-// (no method prefix — auth/health/featureFlags/search/security/presence's
-// stream endpoint, still hand-registered with an internal r.Method switch)
-// only support a looser check: some routeRules entry matches the path for
-// some method. That's the strongest sound claim without inspecting the
-// handler's internal method switch — see the plan's "Known limitation" for
-// why finer-grained method coverage on those paths is guarded elsewhere
-// (TestPermissionsTable_NoMethodlessWriteShadowing and friends).
+// (no method prefix — auth, health, featureFlags, search, security, and
+// presence's stream endpoint; each still hand-registered and internally
+// switching on r.Method, EXCEPT health, which has no method switch at all,
+// see health.go) only support a looser check: some routeRules entry matches
+// the path for some method. That's the strongest sound claim without
+// inspecting each handler's internal dispatch — TestPermissionsTable_
+// NoMethodlessWriteShadowing and friends guard routeRules' own shape, not
+// this gap; they don't observe a registered pattern at all.
+//
+// TRANSITIONAL LOCAL MAXIMUM (CLAUDE.md "Global Maximum, Not Local
+// Maximum"): the global-maximum structure is finishing the CON-07/ARC-02
+// codegen migration for these six handlers, so every one of their patterns
+// becomes method-qualified by construction and this loose check is deleted
+// in favor of the strict one used for every other family. That migration is
+// NOT YET SCHEDULED to a milestone — flagging that gap to the operator is
+// itself part of shipping this local maximum honestly, rather than picking
+// a milestone unilaterally.
 func TestRouteCoverage(t *testing.T) {
 	rec := newRecordingMux()
-	buildRouter(rec, buildTestRouteHandlers())
+
+	// Per-family floor: buildRouter's onMount hook fires right after each
+	// family's RegisterRoutes call, so we can catch a family that silently
+	// contributes zero patterns (e.g. a miswired stub in
+	// buildTestRouteHandlers) — the aggregate len(rec.patterns) == 0 check
+	// below can't see that, since every OTHER family still registers fine.
+	familyCounts := map[string]int{}
+	prev := 0
+	buildRouter(rec, buildTestRouteHandlers(), func(family string) {
+		familyCounts[family] = len(rec.patterns) - prev
+		prev = len(rec.patterns)
+	})
+	for family, count := range familyCounts {
+		if count == 0 {
+			t.Errorf("route family %q registered zero patterns — its handler construction in buildTestRouteHandlers (or its RegisterRoutes) is broken", family)
+		}
+	}
 
 	if len(rec.patterns) == 0 {
 		t.Fatal("buildRouter registered zero patterns onto recordingMux — buildRouter or its handler construction is broken")
