@@ -4,6 +4,7 @@ import type { RouteSummary } from '../../api/routeAdminApi';
 import { defaultSelector, type SelectorDraft, type StageDraft } from './StageCard';
 import {
   defaultStage,
+  isUntouchedDefaultStages,
   toCreateRequest,
   toDraft,
   toStageRequests,
@@ -329,5 +330,53 @@ describe('routeDraft stage deadline (due_in_days)', () => {
     expect(wire[0].due_in_days).toBe(30);
     // Empty means NO deadline: the field must be ABSENT, not 0 and not null.
     expect('due_in_days' in wire[1]).toBe(false);
+  });
+});
+
+describe('isUntouchedDefaultStages (ADR 0087 livre auto-drop)', () => {
+  it('treats the pristine seed stage as untouched', () => {
+    expect(isUntouchedDefaultStages([defaultStage()])).toBe(true);
+  });
+
+  it('does NOT treat a seed stage with only a deadline filled in as untouched', () => {
+    // If dueInDays weren't compared here, this stage would be misclassified as
+    // "untouched" and silently dropped the moment the user switches to a livre
+    // profile (ADR 0087) — deleting the deadline the user just typed in without
+    // any warning. That is exactly the data loss this function exists to prevent.
+    const stage = { ...defaultStage(), dueInDays: '30' };
+    expect(isUntouchedDefaultStages([stage])).toBe(false);
+  });
+});
+
+describe('validateDraft stage deadline lower bound', () => {
+  function makeValidStage(overrides: Partial<StageDraft> = {}): StageDraft {
+    return makeStage({
+      selectors: [makeSelector({ kind: 'role_in_document_area', role: 'approver', areaCode: '' })],
+      ...overrides,
+    });
+  }
+
+  it('rejects a stage due_in_days of 0 (mirrors the server floor)', () => {
+    const draft = makeDraft({ stages: [makeValidStage({ dueInDays: '0' })] });
+    expect(validateDraft(draft, false, null)).toBe(
+      'Na etapa "Etapa", o prazo deve ser de pelo menos 1 dia.',
+    );
+  });
+
+  it('rejects a negative stage due_in_days', () => {
+    const draft = makeDraft({ stages: [makeValidStage({ dueInDays: '-5' })] });
+    expect(validateDraft(draft, false, null)).toBe(
+      'Na etapa "Etapa", o prazo deve ser de pelo menos 1 dia.',
+    );
+  });
+
+  it('accepts a valid positive due_in_days', () => {
+    const draft = makeDraft({ stages: [makeValidStage({ dueInDays: '30' })] });
+    expect(validateDraft(draft, false, null)).toBeNull();
+  });
+
+  it('accepts an empty due_in_days (no deadline)', () => {
+    const draft = makeDraft({ stages: [makeValidStage({ dueInDays: '' })] });
+    expect(validateDraft(draft, false, null)).toBeNull();
   });
 });

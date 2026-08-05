@@ -235,6 +235,17 @@ export function validateDraft(
         return `Na etapa "${label}", informe um valor de M válido.`;
       }
     }
+
+    // Mirrors the server-side floor (internal/modules/approval/http/contracts/route.go:
+    // "due_in_days must be at least 1 day when present") — friendly first line only,
+    // no upper bound invented here since the backend has none.
+    const dueInDays = stage.dueInDays.trim();
+    if (dueInDays !== '') {
+      const dueInDaysValue = Number(dueInDays);
+      if (!Number.isFinite(dueInDaysValue) || dueInDaysValue < 1) {
+        return `Na etapa "${label}", o prazo deve ser de pelo menos 1 dia.`;
+      }
+    }
   }
 
   const stageKinds = draft.stages.map((stage) => stage.stageKind);
