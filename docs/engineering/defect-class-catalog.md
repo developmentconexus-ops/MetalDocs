@@ -327,6 +327,17 @@ defect at **n = 2**, not n = 3. Pure-logic duplication can wait; invariant dupli
 cannot, because the failure mode is a security or correctness hole in the copy nobody
 updated.
 
+**Second evidence — the duplication can be a *table*, not a code path.**
+`approval_review_verdicts` (`db/baseline/0001_current_schema.sql:2062`) and
+`approval_signoffs` (`:2151`) carry the same instance/stage/actor/tenant columns, the same
+comment and display-name snapshot, the same `(stage_instance_id, actor_user_id)` uniqueness
+constraint and the same `enforce_approval_sod` trigger (`:4024`). The verdict table is the
+signoff table minus five signature columns. Two tables, two services, two endpoints, two
+screens — and the SoD invariant is now enforced twice, so it can drift in one place. Extend
+the rule: **an invariant enforced in two schemas is the same defect as an invariant enforced
+in two functions.** Detection is a grep for triggers and unique constraints appearing on more
+than one table with the same predicate.
+
 **Detection.** Grep for authz calls, state-machine transitions, and audit-record calls.
 Each set of near-identical sequences is a candidate.
 
@@ -786,6 +797,136 @@ all, and where it does, the arm shows as uncovered rather than as wrong.
 
 ---
 
+## Class 23 — The Invariant Delegated to Configuration
+
+**Symptom.** A rule is ratified as a product invariant, implemented correctly in code, and
+then made *optional at runtime* because its enforcement point is a per-tenant (or per-
+install, per-environment) configuration value. Every code path is right. A valid
+configuration still violates the invariant, and nothing anywhere reports it.
+
+**Evidence.** The ratified approval model (2026-07-10) carries rule R3, *"signing includes
+conversing"*: whoever can sign a stage can also return the document for correction without
+signing. The code implements it — `review_verdict_service.go:177` explicitly permits
+`request_changes` on an `approval`-kind stage and blocks only `ready` there. But the same
+method hard-requires `authz.Require(CapApprovalReview)` (`:164`), and `approval.review`
+(`internal/modules/iam/domain/model.go:94`) is a capability *granted per profile*. A tenant
+may therefore configure a signer profile holding the signature capability without
+`approval.review`. That signer's only available "no" is the terminal rejection that kills
+the instance — precisely the outcome R3 exists to prevent. No test, constraint, or lint
+detects the configuration.
+
+**Root cause.** Capability systems are designed to make authority configurable, which is
+correct. The error is applying that machinery to a rule that is not meant to vary: an
+invariant expressed as a grant becomes an invariant the operator can switch off by
+accident, and the switch looks like ordinary administration.
+
+**Prevention (rung 1, then 3).**
+1. Separate the two questions before designing: *is this something a tenant chooses, or
+   something the product guarantees?* A guarantee must not be reachable through the
+   configuration surface at all.
+2. If the rule is an implication between two capabilities ("holding A implies B"), encode
+   it as an **implication in the capability model**, resolved at check time — not as two
+   independent grants that an administrator is trusted to keep consistent.
+3. Where an implication is impossible, add a **configuration-validity gate**: a check that
+   runs on every config write and in CI against the shipped seed data, asserting no
+   reachable configuration violates a named invariant. Rung 3, but it fails loudly.
+
+**Detection.** For every rule in a ratified model or spec, name the artifact that makes it
+false. If that artifact is a row in a configuration table, the rule is a default, not an
+invariant. A blunter version: read the seed/reference data as an adversary and try to build
+a legal configuration that breaks each stated rule.
+
+**Generalization.** This is Class 1's shape moved one layer out. Class 1 is a *type* that
+claims a guarantee it does not enforce; this is a *product rule* that claims a guarantee its
+enforcement mechanism structurally cannot provide. Both are answered the same way: write the
+test that asserts the negative case, and if you cannot express it, the guarantee is not real.
+
+---
+
+## Class 24 — Two Operations, One Precondition, Divergent Terminality
+
+**Symptom.** Two operations are available to the same actor, in the same state, under
+identical preconditions — and their consequences differ irreversibly. Nothing in the
+contract, the schema, or the UI states which one applies when. The actor picks, and the
+system honours a choice it never defined.
+
+**Evidence.** On a single active `approval`-kind stage, an eligible actor may:
+
+| Operation | Record written | Consequence | Reversible? |
+|---|---|---|---|
+| `request_changes` | `approval_review_verdicts` | instance → `changes_requested`, document → `draft`, `revision_version + 1` (`review_verdict_service.go:365-412`) | yes — author corrects and resubmits |
+| signoff `decision='reject'` | `approval_signoffs`, `signature_meaning='rejection'` | stage → `rejected_here`, instance → **`rejected`** (terminal), document rejected (`decision_service.go:638-694`) | no |
+
+Same actor, same stage, same eligibility check, same SoD rule. One returns the work; the
+other ends it. There is no rule anywhere saying which situation calls for which, so the
+distinction is carried entirely by whichever screen the actor happened to open.
+
+**Root cause.** The two operations arrived at different times, each locally sensible, and
+nobody asked whether they occupy the same semantic slot. This is Class 14 (optimizing inside
+a local maximum) observed from the user's side rather than the maintainer's: the shape was
+never decided, so it accumulated.
+
+**Prevention (rung 1).** Model the decision as **one operation with an explicit outcome
+enum**, not as N endpoints. The outcome becomes a value the contract enumerates, the DB
+constrains, and the UI renders as a genuine choice with stated consequences. If two outcomes
+genuinely differ in terminality, that difference belongs in the enum's documentation and in
+a confirmation affordance — not in which URL was called.
+
+**Detection.** For each pair of write endpoints on the same resource, diff their
+preconditions. **Identical preconditions plus divergent terminality is this class**,
+regardless of how different the handlers look. Ask of the pair: could a competent user pick
+the wrong one and be unable to undo it?
+
+**Factory rule.** Irreversibility is a property of an *outcome*, never of an *endpoint*. If
+choosing a route is how a user chooses to destroy something, the API has delegated a product
+decision to routing.
+
+---
+
+## Class 25 — The Snapshot That Reads Like Source
+
+**Symptom.** A generated point-in-time artifact — a schema dump, a lockfile, a vendored
+bundle, a baseline — sits in the repository looking exactly like hand-authored source. It is
+correct only as of its fold date; the delta chain that supersedes it lives elsewhere. Any
+single read of it is silently stale, and the staleness is invisible because the file is
+internally consistent, well-formatted, and committed.
+
+**Evidence — from this audit, made by the auditor.** Investigating approval route shape, I
+read `assert_route_shape` in `db/baseline/0001_current_schema.sql:184` and reported to the
+operator that the `simples` and unknown-class arms were unconstrained — a fail-open. That
+was the truth of the baseline text and **false at runtime**: migration
+`db/migrations/0316_livre_zero_stage_route.sql:73` had already `CREATE OR REPLACE`d the
+function so unknown classes fail *closed* onto the `controlado` rule. Runtime truth is
+baseline + migrations; a baseline read alone is a read of the past. The repo's own doctrine
+already says this. It did not stop the error, because nothing in the file says so at the
+point of reading.
+
+**Root cause.** Baseline-fold is a good practice — it keeps a growing migration chain
+readable. Its cost is that the most authoritative-looking copy of the schema becomes the
+least current one, and the correction lives in files a reader must know to go find.
+
+**Prevention (rung 2, then 3).**
+- **Generate a folded view.** If a baseline exists, generate `schema-current.sql` = baseline
+  + all migrations applied, on every migration commit, and make *that* the file people read
+  and grep. The baseline stops being a read target.
+- **Mark the snapshot in-band.** A header on every generated snapshot: what it is, its fold
+  date, what supersedes it, and how to get current truth. A reader who lands mid-file via
+  grep should still hit the warning — repeat it as a section banner, not only at line 1.
+- **CI (rung 3):** fail if any object defined in the baseline is also redefined by a
+  migration and no folded view was regenerated. That is exactly the drift that bit here.
+
+**Detection.** For every committed artifact, ask: *is this authored or emitted?* If emitted,
+where is its input, and what proves the copy is current? Any emitted file that a human is
+expected to read is either regenerated on every relevant commit or is a trap. A related
+smell: two files defining the same database object, template, or symbol, where precedence is
+established by an external application order rather than by the files themselves.
+
+**Generalization.** Class 12 is a *document* that lies. This is an *artifact* that lies while
+being syntactically valid code — harder to catch, because the usual defence ("read the code,
+not the docs") points straight at it.
+
+---
+
 ## Appendix A — Day-0 Factory Checklist
 
 Derived directly from the classes above. Each line prevents a class already observed.
@@ -794,6 +935,10 @@ Derived directly from the classes above. Each line prevents a class already obse
 - [ ] Every cross-boundary vocabulary is a closed type with an unexported field (§1, §19)
 - [ ] No nullable field carries two meanings; NULL has one documented meaning (§4)
 - [ ] "Nothing required" is a configured object, never a missing row (§5)
+- [ ] A product invariant is never expressed as a grant an administrator can withhold;
+      capability implications are resolved at check time (§23)
+- [ ] A decision is one operation with an outcome enum, never N endpoints whose
+      terminality differs (§24)
 - [ ] Integrity-critical reads return `(T, error)`; no defaulting (§6)
 - [ ] Execution context (request vs background) is a type parameter, not an assumption (§15)
 
@@ -807,6 +952,11 @@ Derived directly from the classes above. Each line prevents a class already obse
 - [ ] Guards are **deny-by-default**; exceptions carry owner + expiry, CI fails on expiry (§3)
 - [ ] All build tags compile in CI (§8)
 - [ ] Doc `file:line` anchors verified; `Last verified` stamps warn past threshold (§12)
+- [ ] Every emitted artifact a human reads is regenerated on every relevant commit; an
+      object defined in a baseline and redefined by a delta fails the build unless the
+      folded view was regenerated (§25)
+- [ ] Shipped seed/reference configuration is read adversarially in CI: no legal
+      configuration may violate a named product invariant (§23)
 - [ ] Lint: no redeclaration of a platform value in a module (§10)
 - [ ] Lint: encode known runtime-context hazards (§15)
 
@@ -833,17 +983,21 @@ Derived directly from the classes above. Each line prevents a class already obse
 
 ## Appendix B — Recurring Root Causes
 
-The 22 classes reduce to five underlying causes. Useful when classifying a *new* defect
+The 25 classes reduce to five underlying causes. Useful when classifying a *new* defect
 that does not obviously match a class above.
 
 1. **A guarantee was asserted, not enforced.** Comments, docs, and conventions standing in
-   for compilers, generators, and gates. → §1, §3, §12, §13
-2. **Two things that must agree, maintained separately.** No compiler spans the boundary.
-   → §2, §7, §10, §11, §19, §21
+   for compilers, generators, and gates — including a guarantee whose enforcement point is
+   a configuration value an administrator may legally set the other way. → §1, §3, §12,
+   §13, §23
+2. **Two things that must agree, maintained separately.** No compiler spans the boundary —
+   including an artifact and the delta chain that supersedes it. → §2, §7, §10, §11, §19,
+   §21, §25
 3. **Absence used to carry meaning.** Unfalsifiable, indistinguishable from failure.
    → §4, §5, §6
 4. **The local fix was cheaper than the right fix,** and the incentive gradient always
-   points there. → §9, §14, §18
+   points there — including leaving two operations in one semantic slot because deciding
+   between them was the expensive part. → §9, §14, §18, §24
 5. **An implicit assumption escaped its context.** Runtime, concurrency, or wiring
    conditions invisible at the call site — including the assumption that an artifact
    still belongs to you after it leaves the machine — including the assumption that the
