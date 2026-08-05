@@ -8,7 +8,13 @@
 > **Rule of the document.** Every class carries real evidence from this repo
 > (`file:line`, ADR, commit). No hypothetical defects. If a class has no evidence
 > here, it does not belong in this file yet.
-> **Last verified:** 2026-08-04
+>
+> **Two parts.** **Part I (classes 1–26)** — defects found in the codebase, prevented by
+> repository mechanisms. **Part II (classes 27–33)** — defects authored by an AI agent
+> writing design and plan artifacts, prevented by review-protocol mechanisms. They are kept
+> apart because the rung that stops them is in a different place.
+>
+> **Last verified:** 2026-08-05
 
 ---
 
@@ -33,6 +39,10 @@ enforcement is not a standard. It is a wish with good intentions.
 **Factory rule:** a convention that matters enough to write down is a convention that
 must be enforced at rung ≤3. If you cannot enforce it, either it does not matter, or
 your design is wrong.
+
+---
+
+# Part I — Codebase Defect Classes
 
 ---
 
@@ -1039,8 +1049,10 @@ Derived directly from the classes above. Each line prevents a class already obse
 
 ## Appendix B — Recurring Root Causes
 
-The 26 classes reduce to five underlying causes. Useful when classifying a *new* defect
-that does not obviously match a class above.
+Part I's 26 classes reduce to five underlying causes. Useful when classifying a *new*
+defect that does not obviously match a class above. Part II's seven classes reduce to a
+single, different cause — uniform confidence over non-uniform correctness — treated in
+Appendix C.
 
 1. **A guarantee was asserted, not enforced.** Comments, docs, and conventions standing in
    for compilers, generators, and gates — including a guarantee whose enforcement point is
@@ -1059,3 +1071,344 @@ that does not obviously match a class above.
    still belongs to you after it leaves the machine — including the assumption that the
    environments you tested in covered the states the code branches on. → §8, §15, §16,
    §17, §20, §22
+
+---
+
+# Part II — AI-Authored Defect Classes
+
+> **Why this part exists.** Classes 1–26 are defects found *in the codebase*, most of
+> them authored by humans over time. Classes 27–33 are defects authored by an **AI agent
+> writing a design and an implementation plan**, caught by adversarial review before a
+> line of code was written.
+>
+> They are separated because their **prevention mechanism is different**. A human defect
+> is usually prevented by a rung 1–3 mechanism in the repo. An AI-authored defect is
+> usually prevented by a mechanism in the **review protocol** — because the failure is
+> not "the agent could not express the right thing", it is "the agent produced something
+> that *reads* correct and was never checked against source".
+>
+> **Evidence base.** All seven were observed in one work item: the unified approval
+> decision surface (`docs/superpowers/plans/2026-08-05-approval-shape-unified-decision.md`),
+> across four adversarial review rounds with an independent reviewer model. Each carries
+> the real repository line that falsifies the agent's claim.
+>
+> **The one number that matters:** across those four rounds, **every single finding was
+> verifiable against source** — meaning every one of these was a statement that read as
+> authoritative and was false. None were caught by the authoring agent's own re-reading.
+
+---
+
+## Class 27 — The Confident False Citation
+
+**Symptom.** The agent states a fact about the codebase with the register of someone who
+just read it — "X already does Y", "Z is the existing precedent", "this maps to 412" — and
+the fact is wrong. It is not hedged, not marked uncertain, and it is load-bearing: a design
+decision rests on it.
+
+**Evidence.** Three in one plan, all falsified by one `grep` each:
+- *"`metaldocs.cancel_in_progress` is the existing tripwire precedent for a GUC-discriminated
+  arm."* False. `internal/platform/tripwire/render.go` reads `current_setting` in exactly two
+  places — `:150` (`bypass_authz`) and `:186` (`asserted_caps`) — both function-global.
+  `cancel_in_progress` lives in `enforce_document_transition`
+  (`db/baseline/0001_current_schema.sql:533`), a different trigger. The plan was asking the
+  renderer for a capability it did not have, while claiming it already had it.
+- *"Making `If-Match` optional relaxes only the document route."* False. All four folded
+  routes already require it (`api/openapi/v1/openapi.yaml:3542,3598,3657` plus the document
+  route). The relaxation was four times wider than stated.
+- *"`ErrStaleRevision` maps to 412."* False. `internal/modules/approval/http/errors.go:44,213`
+  register and map it at **409**. The plan's new OpenAPI `412` response would have been
+  unreachable.
+
+**Root cause.** Plausibility and truth are produced by the same mechanism. The agent's
+confidence is calibrated to how *typical* a claim is for a codebase of this shape, not to
+whether it read the line. A claim that is true of 90% of similar repos will be asserted with
+full confidence about the 10th.
+
+**Prevention (rung 3, in the review protocol).**
+- **Every load-bearing claim about existing code carries a `file:line`.** Not "as the
+  codebase already does" — the line. An assertion without an anchor is treated as an open
+  question, not as a premise.
+- **The reviewer's first job is anchor verification**, before any design critique. Cheap,
+  mechanical, and it catches this class outright.
+- **Rung 4 backstop:** the plan's claims about status codes, required headers, and existing
+  precedents become assertions in the implementation's tests. A false premise then fails at
+  the first test run rather than at review.
+
+**Detection.** Search the artifact for these phrases: *already*, *existing*, *precedent*,
+*same as*, *mirrors*, *consistent with*. Each is a claim about code. Verify each.
+
+**Generalization.** This is Class 12 (the document as false authority) with the loop closed
+faster: the document is false the moment it is written, not after code drifts from it.
+
+---
+
+## Class 28 — The Copied Defect
+
+**Symptom.** The agent needs a function it has seen before and copies the existing one,
+adapting names. The copy is faithful — including a latent bug the original had. The bug is
+now in two places, and the second one is *new code*, so it reads as reviewed.
+
+**Evidence.** The plan's `enforce_decision_eligibility` was a near-verbatim copy of
+`enforce_signoff_eligibility` (`db/baseline/0001_current_schema.sql:728-748`), which tests
+only `NEW.actor_user_id` against `eligible_actor_ids`. But `ResolveEligibleIdentity`
+(`internal/modules/approval/domain/eligibility.go:39-49`) returns the **delegator** as the
+eligible identity when the actor is a delegate. So the original trigger rejects every
+delegated sign-off — a latent defect the delegation feature had not yet exercised. Copying it
+into the new unified table would have promoted a latent defect to a live one.
+
+**Root cause.** Copying is the highest-confidence operation available: the source compiled,
+shipped, and has no open bug. That is exactly why it is dangerous — "in production" is
+evidence of *use*, not of *correctness under the new caller set*. And the copy is made at the
+syntactic level, where the semantic mismatch is invisible.
+
+**Prevention (rung 6 → rung 4).**
+- **A copied guard must be re-derived from its invariant, not from its source.** State the
+  invariant in one sentence ("only an identity present in `eligible_actor_ids` may decide"),
+  then check whether the copied code enforces *that*, given the new caller set.
+- **Test the new copy against the paths the original never had.** Here: delegation. The four
+  tests the fix added (direct/delegated × eligible/ineligible) are the mechanism.
+- **Rung 3 where possible:** if two triggers enforce the same invariant, they are Class 9
+  (the second copy of a critical path). One function, two triggers, is better than two
+  functions.
+
+**Detection.** For every copied block, ask: *which callers does the destination have that the
+source does not?* If the answer is "none", the copy is probably fine — and probably should
+have been a shared function.
+
+---
+
+## Class 29 — Plan Code That Calls an API That Does Not Exist
+
+**Symptom.** The plan contains complete, well-formed, idiomatic code. It cannot compile,
+because it calls constructors, options, or references that were never in the repository. The
+code looks *more* correct than real code, because it was written to read well rather than to
+resolve.
+
+**Evidence.**
+- The plan's schema test called `testdb.NewFixture(...)` with a `WithApprovalInstance(...)`
+  option. Neither exists. The real surface is `testdb.NewTenant / NewUser / NewDocument /
+  NewApprovalRoute / NewApprovalInstance` with `WithTenant` / `WithStageSeeder`
+  (`tests/integration/testdb/factory.go`), and every insert into a tripwired table must be
+  wrapped in `testdb.SeedWithCaps` (`tests/integration/testdb/fixtures.go:150`) — which the
+  plan's version omitted entirely, so even the corrected constructors would have failed at
+  the trigger.
+- The plan's OpenAPI snippet referenced `#/components/responses/Problem`. `Problem` is a
+  **schema** (`api/openapi/v1/openapi.yaml:7252`), not a response component. The real names
+  are `BadRequest`, `Forbidden`, `PreconditionFailed`, etc.
+
+**Root cause.** The agent generates the API it *would design* for this purpose, which is
+frequently better-named than the one that exists. Fluency substitutes for lookup, and there
+is no compiler in a Markdown file to object.
+
+**Prevention (rung 3).**
+- **Every identifier in plan code must be either defined in the same plan or cited with a
+  `file:line`.** No third category. This is mechanically checkable and should be a lint on
+  the plan directory, not a review convention.
+- **Prefer plan code that is copied out of the repo and edited**, over plan code that is
+  composed. The starting point should be a real call site.
+- **Rung 1 for the strongest cases:** where a plan's snippets are meant to be pasted, put
+  them in a compiled scratch package instead of a fence.
+
+**Generalization.** Plan code is untyped code. It carries all the authority of code and none
+of the verification, which makes it the highest-leverage place in the process for a
+plausible-looking error to enter.
+
+---
+
+## Class 30 — The Backstop That Trusts Its Own Input
+
+**Symptom.** A defense-in-depth layer is added — a DB trigger, a last-line check — and it
+validates a value the attacker controls, against a claim the attacker also controls. It is
+structurally in the right place and semantically vacuous. Worse than absent, because its
+presence is cited as coverage.
+
+**Evidence.** Two, in the same plan, both in the layer whose entire purpose is to distrust
+the application:
+- After fixing Class 28 above, the eligibility trigger became
+  `COALESCE(NEW.on_behalf_of_user_id, NEW.actor_user_id)`. That resolves the *right* identity
+  — and lets any writer set `on_behalf_of_user_id` to any eligible user and pass. Nothing
+  proved the delegation existed. The fix re-proves it against `approval_delegations` with the
+  same predicate the application uses
+  (`internal/modules/approval/infrastructure/postgres_approval_repository.go:2255`).
+- The optimistic-concurrency guard read `revision_version`, compared it in Go, then issued an
+  `UPDATE` without it in the predicate — a check-then-act with a window. The fix put
+  `AND revision_version = $3` inside the statement and mapped zero rows to the stale error.
+
+**Root cause.** The agent reasons about the *happy caller* even when writing the layer
+designed for the hostile one. The mental model carried over from the application code — where
+`on_behalf_of` is set correctly, where the read and the write are "obviously" adjacent —
+survives the move down a layer, where it is no longer true.
+
+**Prevention (rung 6, but a specific and answerable question).**
+- For every backstop, answer in writing: **"what does this trust, and who can set it?"** If
+  the answer includes anything in the row being inserted, the check is incomplete.
+- **A DB backstop must re-derive, never accept.** Any attribution claim carried in the row
+  (`on_behalf_of`, `actor_role`, `source`) is an assertion to be proven against another table,
+  not an input to the check.
+- **Every read-then-write across a transaction boundary is one statement or it is a race.**
+  Compare inside the predicate; zero rows is the failure signal.
+
+**Generalization.** Appendix B cause 1 (asserted, not enforced) reappearing *inside* the
+enforcement layer — which is the hardest place to see it, because the layer's presence is the
+evidence everyone accepts.
+
+---
+
+## Class 31 — Self-Contradiction Across Distance
+
+**Symptom.** Two statements in one artifact are incompatible. Both are locally reasonable.
+They are hundreds of lines apart, written at different times, and neither section is wrong
+when read alone.
+
+**Evidence.**
+- The plan's global constraints forbade booting the API during the schema-cutover window
+  (the runtime would be stale against the new schema). Task 1 Step 4 instructed the worker to
+  run `.\scripts\start-api.ps1 -Build`. Both were written by the same agent, ~900 lines apart.
+- The pre-authz normalization section required a `template.approve`-only actor to receive
+  **403 from tier-2**, and, two sentences later, a response **byte-identical to a nonexistent
+  instance** — which is a 404. Mutually exclusive; each sentence defensible.
+
+**Root cause.** The agent writes locally-coherent prose over a long artifact and has no
+mechanism that cross-checks a new sentence against every prior constraint. Human authors have
+the same weakness; the agent's higher output rate makes it more frequent, and its uniform
+confident register makes the contradiction harder to spot on re-read.
+
+**Prevention (rung 3 where the constraint is formal, rung 6 otherwise).**
+- **Hoist every project-wide rule into one Global Constraints section**, and require each
+  task to be read *against* it. This is why the plan template has that section — the failure
+  above is a failure to use it, not a missing mechanism.
+- **The reviewer is asked explicitly for contradictions**, as a separate job from finding
+  defects. They are different search strategies: defects are found by reading forward,
+  contradictions by cross-referencing.
+- Where the constraint is machine-checkable ("no task may invoke `start-api.ps1`"), make it
+  a lint over the plan text.
+
+**Detection.** Extract every imperative and every prohibition into a flat list, then sort. The
+conflicts become adjacent.
+
+---
+
+## Class 32 — Sequencing That Assumes a Later Task's Output
+
+**Symptom.** The plan's tasks are individually correct and collectively impossible. Task N
+requires a state that only Task N+2 creates. Each task reviews clean; only the ordering is
+wrong, and ordering is what nobody reads end to end.
+
+**Evidence.** Migration 0318 created `approval_decisions` and attached
+`trg_require_cap_asserted`. The generated function `enforce_capability_asserted` raises
+`'no capability mapping for table %'` for any table it does not know
+(`internal/platform/tripwire/render.go:146`) — a deliberate fail-closed default. The arms for
+the new table were scheduled in generated migration **0319**, in a later task. So between the
+two, *every* insert into `approval_decisions` raised — meaning Task 3's required passing
+decision-flow tests could not pass, by construction. The fix was structural, not cosmetic:
+0318 and 0319 became one task and one commit, on the stated ground that no intermediate state
+compiles and a shim to create one would be the compatibility layer the change exists to
+delete.
+
+**Root cause.** The agent decomposes by **topic** (schema / domain / HTTP / consumers)
+because topics are how the work is *described*. Executability is ordered by **dependency**,
+which is a different graph. When the two disagree, the topic decomposition wins, because it
+is the one that reads like a plan.
+
+**Prevention (rung 4, then rung 3).**
+- **Every task ends green.** Build, vet, and the tests it declares. If a task cannot end
+  green, it is not a task — it is half of one, and the boundary is in the wrong place.
+- **State each task's precondition explicitly**, in terms of what previous tasks produced. A
+  precondition naming a *later* task is the defect, visible without simulating the run.
+- **Fail-closed defaults create hard couplings.** Any change that arms a fail-closed guard and
+  its data in separate steps is this class. Ask, at every task boundary: *what is broken
+  between these two commits, and for how long?*
+
+**Generalization.** The topic/dependency mismatch is why "each task is independently
+reviewable" and "each task is independently *executable*" are different properties, and why a
+plan can pass task-by-task review and still not run.
+
+---
+
+## Class 33 — Fixing Exactly What the Reviewer Named
+
+**Symptom.** A reviewer reports a defect. The agent fixes precisely that defect, thoroughly
+and with tests. The fix is correct. The *cause* is untouched, and the next round finds the
+next symptom of the same cause. Patch accretes on patch, each one justified, and the design
+drifts further from the structure that would have made all of them unnecessary.
+
+**Evidence.** The reviewer reported: the GUC-discriminated tripwire arm is an unbounded
+capability switch on `documents`/UPDATE. The agent bounded it — three bounds, a new renderer
+branch, four tests. All correct, all necessary given the design. What went unasked for two
+rounds: **why does a GUC exist at all?** It exists because the `approval` module writes the
+`documents` table directly — six call sites (`cancel_service.go:131`,
+`decision_service.go:681`, `document_terminal_approval.go:129`, `mark_reviewed_service.go:150`,
+`obsolete_service.go:94`, and the return path). That is a foreign module reaching past the
+owner's application service into the owner's table, which forces the tripwire to reason about
+*who is writing and why* — a question the owner should answer. The global-maximum structure is
+a published `documents` write port, under which the GUC does not exist to be bounded. Recorded
+as an explicitly transitional local maximum with the port as the immediately-following
+milestone, rather than shipped as if it were the answer.
+
+**Root cause.** A review finding arrives already framed as a defect at a location, and the
+frame is accepted along with the content. Answering the question asked is the agent's default
+disposition, and it is the wrong one when the question presupposes the structure that caused
+the finding.
+
+**Prevention (rung 6 — this is a review-doctrine rule, not a code mechanism).**
+- **Before fixing, ask what would have to be true for this finding to be impossible.** If the
+  answer is a different structure, name it and cost it. Then decide — with the operator — to
+  patch, restructure, or patch-and-schedule.
+- **A local maximum shipped knowingly must be labelled in the artifact**, with its successor
+  named and a milestone attached. An unlabelled local maximum is indistinguishable from an
+  intended design, and becomes permanent by default.
+- **Repeated findings in one area are a structural signal, not a quality signal.** Three
+  bounds on one guard means the guard is in the wrong place.
+
+**Generalization.** Class 14 (optimizing inside a local maximum) driven by the review loop
+itself: adversarial review is very good at finding symptoms and structurally biased toward
+producing patches, because a patch is what closes a finding.
+
+---
+
+## Appendix C — Reviewing AI-Authored Design Work
+
+The seven classes above reduce to one asymmetry: **an AI agent's output is uniformly
+confident, and its correctness is not uniform.** The register carries no signal. Everything
+therefore has to come from mechanism.
+
+**What the four rounds actually showed**
+
+| Round | Findings | Character |
+|---|---|---|
+| 1–2 | design defects | wrong structure, missing authorization, lost evidence |
+| 3 | 5 closed / 4 partial / 9 new | fixes that named the problem without closing it |
+| 4 | 7 closed / 7 partial / 11 new | compile-level: non-existent APIs, wrong status codes |
+
+Severity fell monotonically and the *character* of findings shifted from design to
+mechanical. That shift is the signal the loop is converging — findings moving toward things a
+compiler or a lint would catch means the design-level search is exhausted. A loop whose
+findings stay at the same altitude round after round is not converging; it is generating
+scope, and should be stopped.
+
+**The protocol**
+
+1. **Anchor verification first.** Every `file:line` in the artifact, checked, before any
+   critique. Cheap, mechanical, catches Class 27 and 29 outright.
+2. **Root cause before patch.** For each finding: what structure makes this impossible?
+   (Class 33.)
+3. **Adversarial, never accepting.** The reviewer's null hypothesis is that the artifact is
+   wrong. "Looks reasonable" is not a disposition.
+4. **Explicit re-disposition of prior findings.** `CLOSED | PARTIAL | OPEN` with evidence,
+   every round. *Mentioning* a problem is not closing it — the majority of round-3 and
+   round-4 carry-overs were fixes that acknowledged a finding and did not resolve it.
+5. **Separate pass for contradictions.** Different search strategy from finding defects.
+   (Class 31.)
+6. **Executability pass.** Walk the tasks as a dependency graph, not a topic list. Ask what
+   is broken between each pair of commits. (Class 32.)
+7. **Independence.** The reviewer must not be the author, and should not share the author's
+   context. A model re-reading its own artifact reproduces the reasoning that created the
+   defect.
+
+**The rule that generalizes.** Do not review AI design work the way you review a colleague's
+— by reading for judgment and spot-checking the rest. Read for **falsifiability**: every
+claim either has an anchor you can check or it is an open question. The failure mode is never
+"this is obviously wrong"; it is "this is plausible, load-bearing, and nobody looked."
+
+---
+

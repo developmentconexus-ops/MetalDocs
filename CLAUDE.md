@@ -18,6 +18,7 @@ Before improving/fixing/extending anything, judge the foundation first.
 - If the current implementation is legacy, a patch, or a workaround, do NOT optimize inside it — that locks in a local maximum. Improving on a bad base is a defect, not progress.
 - Step back to the whole problem: what would a senior engineer or a proven existing system do here? Propose the global-maximum structure (name it — e.g. a kernel/framework boundary, not a one-off tweak) and state the trade-off.
 - When the better answer crosses the current task boundary, stop and surface it instead of patching around it (ties to the "stop on architecture contradictions" rule above).
+- A local maximum may be shipped only if it is **labelled as transitional**, names the global-maximum structure, and names the milestone that deletes it. An unlabelled local maximum is a defect. Operationalized by the `adversarial-review` skill §2.
 
 ## Commands
 - Start API: `.\scripts\start-api.ps1`
@@ -57,6 +58,8 @@ Governing target spec (source of truth when this list drifts): `wiki/architectur
 | QA/close-out | `wiki/quality/qa-operating-system.md` and relevant `wiki/quality/*-checklist.md` |
 | Test framework discipline | `wiki/quality/test-discipline.md`, ADR `wiki/decisions/0034-integration-test-fixture-framework.md` |
 | Starting any new module or feature | `developing-new-work` skill (pre-design system-impact gate; run before brainstorming) |
+| Reviewing a design/plan/diff with Codex | `adversarial-review` skill (root cause before patch, local-vs-global, exposure standard, architecture checklist, convergence); `harness:codex-dispatch` for the launch |
+| What AI gets wrong in design work | `docs/engineering/defect-class-catalog.md` Part II + Appendix C |
 | Program/milestone work | HARNESS-CORE (mnfs-harness plugin, method) + `docs/HARNESS-PROFILE.md` (repo bindings — binding pair since 2026-07-16) + `docs/superpowers/ROADMAP.md` (ordered queue); MNFS workflow skills (`mnfs-workflow:*`) for mission/milestone mechanics |
 | Docs governance/wiki sync | `wiki/standards/documentation-governance.md`, `.claude/agents/wiki-curator.md` |
 
