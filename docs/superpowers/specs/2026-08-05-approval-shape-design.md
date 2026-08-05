@@ -50,7 +50,7 @@ Six forks, each decided by the operator during design:
 | 2 | Where does the signature requirement live? | **On the stage**, as `requires_signature`. `stage_kind` dies. Rule R1 of the 2026-07-10 model (per-profile signature policy) is superseded — it is Class 23 by construction. |
 | 3 | What does `controlado` require of a route? | **≥1 stage with `requires_signature`.** No mandatory review stage: every stage can now return, so an approval-only route keeps its promise. No existing route breaks. |
 | 4 | How are the two tables unified? | **Clean schema.** Originally "widen in place", revised once the operator confirmed there is no production data — that option's only advantage was evidence continuity. |
-| 5 | Who decides the required capability? | **Derived from `requires_signature`.** `required_capability` and its snapshot are deleted. No configuration surface on the authz path. |
+| 5 | Who decides the required capability? | **Derived, never configured** — a 2×2 over (subject kind × `requires_signature`), see §5. `required_capability` and its snapshot are deleted. No configuration surface on the authz path. |
 | 6 | Does R5 "Aprovar já" (fast-forward) survive? | **No.** One deliberate act per stage. `fast_forward_service.go`, its endpoint and its screen are deleted. |
 
 Plus one addition accepted after a clarification: **signature meaning becomes a per-stage closed
