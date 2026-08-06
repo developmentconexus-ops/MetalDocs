@@ -58,7 +58,11 @@ func TestPermissionResolver(t *testing.T) {
 		// --- Public routes (no session required) ---
 		{name: "health live public", method: http.MethodGet, path: "/api/v1/health/live", wantCap: "", wantVisibility: iamdelivery.VisibilityPublic},
 		{name: "health ready public", method: http.MethodGet, path: "/api/v1/health/ready", wantCap: "", wantVisibility: iamdelivery.VisibilityPublic},
-		{name: "healthz public", method: http.MethodGet, path: "/healthz", wantCap: "", wantVisibility: iamdelivery.VisibilityPublic},
+		// /healthz is deleted (operator ruling C): it has no routeRules entry
+		// and falls through to the fail-closed default, so authn rejects it
+		// with 401 before the mux (which no longer mounts it at all) is ever
+		// reached — §10.3 row 3.
+		{name: "healthz falls through to session required (deleted, not public)", method: http.MethodGet, path: "/healthz", wantCap: "", wantVisibility: iamdelivery.VisibilitySessionRequired},
 		{name: "auth login public", method: http.MethodPost, path: "/api/v1/auth/login", wantCap: "", wantVisibility: iamdelivery.VisibilityPublic},
 		{name: "feature flags public", method: http.MethodGet, path: "/api/v1/feature-flags", wantCap: "", wantVisibility: iamdelivery.VisibilityPublic},
 

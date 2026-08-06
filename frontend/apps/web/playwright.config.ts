@@ -58,7 +58,7 @@ export default defineConfig({
       ...process.env,
       METALDOCS_E2E: "1",
     },
-    url: "http://localhost:8080/healthz",
+    url: "http://localhost:8080/api/v1/health/live",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

@@ -81,8 +81,20 @@ func (r routeRule) matches(method, path string) bool {
 // TestPermissionsTable_NoMethodlessWriteShadowing enforces this in CI.
 var routeRules = []routeRule{
 	// ---- Public (no session required) -----------------------------------
-	{method: http.MethodGet, pathPrefix: "/api/v1/health/", visibility: iamdelivery.VisibilityPublic},
-	{pathExact: "/healthz", visibility: iamdelivery.VisibilityPublic},
+	// /healthz has no entry: it is deleted (operator ruling C, no exception
+	// mechanism), so it falls through to the default VisibilitySessionRequired
+	// below, and authn rejects it with 401 before the mux ever sees it — the
+	// mux itself no longer has a pattern for it at all (§10.3 row 3).
+	//
+	// health/live and health/ready are the ONLY two health operations the
+	// spec declares (health tag: checkLiveness, checkReadiness) — pathExact,
+	// not pathPrefix. A prefix match would also classify an unmapped
+	// GET /api/v1/health/<unknown> as public, which would then 404 at the
+	// mux for an unauthenticated caller instead of failing closed to 401
+	// (§10.3 row 2: unauthenticated GET /api/v1/health/<unknown> is 401 —
+	// authn must reject it before the mux is ever consulted).
+	{method: http.MethodGet, pathExact: "/api/v1/health/live", visibility: iamdelivery.VisibilityPublic},
+	{method: http.MethodGet, pathExact: "/api/v1/health/ready", visibility: iamdelivery.VisibilityPublic},
 	{method: http.MethodPost, pathExact: "/api/v1/auth/login", visibility: iamdelivery.VisibilityPublic},
 	{method: http.MethodGet, pathExact: "/api/v1/feature-flags", visibility: iamdelivery.VisibilityPublic},
 
