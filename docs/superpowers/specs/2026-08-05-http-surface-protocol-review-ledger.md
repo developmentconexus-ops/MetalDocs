@@ -733,3 +733,138 @@ checklist question edge by edge instead of summarizing it — which is the findi
 **Round-7 findings 1, 2, 3, 4 and 6 — DISSOLVED.** All were defects in the classifier, the golden
 file, or the 120-row walk, none of which exist after the root-cause rewrite. Dissolved is recorded
 here rather than closed: nothing was fixed, the machinery was deleted.
+
+---
+
+## Round 8 — the round that says what can proceed
+
+`gpt-5.6-sol` / medium, OS-process. Brief written **from the authority**, not from the comparison,
+and explicitly forbidding attacks on the deleted machinery. Artifacts: `agent__r8.log`,
+`agent__r8.last.md`.
+
+Count **10** (3 BLOCKER / 6 MAJOR / 1 MINOR), up from 7. **Altitude dropped decisively**, and that
+is the finding of record: **not one of the ten attacks §10's structure.** The deletion license, the
+root-cause diagnosis, and the three replacement properties survived their first adversarial round
+untouched. Every finding is one of three cheaper kinds — staleness I failed to sweep, step-scheduling
+errors, or precision in how the conformance suite is constructed. Per §8 that is convergence: the
+design-level search is exhausted and what remains is what a careful pass catches.
+
+Every finding verified against source before acceptance (§5 symmetric duty). All ten hold; two hold
+with a **cheaper correct remedy than the reviewer proposed**, and one had already been found by the
+author independently.
+
+### Job 1 dispositions — judged, not accepted
+
+1, 2, 6 **CLOSED** — the ordering, composition-algebra and 120-row-walk defects had no existence
+independent of the deleted classifier. Confirmed dissolved.
+3 **PARTIAL** and 4 **OPEN** — both correct, both now fixed (see J2 #4 and #9).
+5 **CLOSED**, 7 **OPEN** — the edge table was right to exist and wrong in three rows.
+
+### The three BLOCKERs
+
+**#1 — the analysis still carried the deleted parity gate in four more places.** CONFIRMED, and it
+is my own defect class committed against my own correction: the root-cause commit amended **one**
+copy of a duplicated statement and left `§8`'s QA-gate bullet, `§8`'s definition-of-done bullet,
+`§8`'s evidence-shape line, locked constraint 5 at `:216`, and `:193`'s HEAD-delta clause. The
+program had **two active definitions of done** for one commit. All five now superseded in place.
+That a document about deleting duplicated enumerations was itself amended in one copy out of five
+is the sharpest evidence in this ledger for why the enumeration has to be *generated*.
+
+**#2 — the 147-case suite could false-green.** CONFIRMED, and it is worse than reported: MetalDocs
+maps **both** PDP tiers to 403 by *deliberate, test-pinned* design
+(`controlleddocuments/.../routes_contract_test.go:466-471` — *"so both PDP tiers map to the same
+client-visible code"*). A suite asserting a bare 403 would pass on a route whose tier-1 rule is
+missing or wrong whenever tier-2 denies.
+
+The reviewer's remedy was heavy: exact-capability principals, independently obtained expectations,
+assert the matched mux pattern, prove the denial preceded the handler. Verification found a much
+cheaper sound one, and it was already in the codebase: **the two tiers do not share a problem
+code.** Tier-1 writes `permission.denied` (`problem/codes.go:120` from `middleware.go:143`); tier-2
+writes `permission.capability_denied` (`codes.go:116` from `authz.ErrCapDenied`). The negative case
+asserts 403 **with `permission.denied`**, which can only have come from the middleware. Applied that
+way. A finding accepted with the reviewer's own remedy would have added machinery the code made
+unnecessary.
+
+**#3 — the e2e publisher is still not total: `db == nil`.** CONFIRMED. Step 4 counted **two**
+conditionals and missed the first (`e2e_seed.go:101-103`) — and it is the consequential one,
+because it fires on exactly the SQLDB-less boot path where §5 check 3 is evaluated. Same
+partial-sweep error as #1, on a line I had already read. Also confirmed: the key formula never
+defined a **per-document server base**, so a generator with `/api/v1` baked in would emit
+unmountable keys for every root-level `/internal/test/*` route. Both fixed; §3 now reads the base
+from the document and fails the build if it does not prefix that document's own paths.
+
+### The MAJORs
+
+**#4** — property 1 overclaimed. **Found independently by the author before round 8 returned**
+(`author-findings-r8.md` A1) and reported identically by the reviewer. It is true only as
+`property 1 ∧ property 3`: the build covers *declared → policy*, the boot assertion covers
+*mounted → declared*. Now stated as two halves with different enforcement points and different
+failure times.
+
+**#5** — step 3 makes three health changes live (`health.go:17-20` mounts all three bare) with their
+tests scheduled for step 7. CONFIRMED. **This is the same defect the author found at `5 → 6`, in the
+edge the author's own table reported as "None".** Rows 1–3 now land in step 3.
+
+**#6** — steps 4 and 5 demanded `assertSurface` tests that cannot compile until step 6. CONFIRMED,
+and it was the author's text. Moved.
+
+**#7** — the suite is not mechanizable as described: `testdb` seeds by **role**, capabilities come
+from `role_capabilities`, and there is no exact-one-capability builder
+(`tests/integration/testdb/factory.go:286-330`). CONFIRMED as a gap in the artifact — but the
+remedy is smaller than "add an isolated exact-capability fixture". The negative case needs a
+principal holding **nothing**, which `NewUser` without `WithRole` already produces, one fixture for
+all 147. The positive case needs *any* role granting the capability, resolvable by query at
+suite-build time. Both are constraints on the generator, not a new fixture framework. Applied that
+way, with "a capability granted by no seeded role is itself a finding".
+
+**#8** — step 8 is not deletion-only; six test sites still reach `routeRules` directly
+(`permissions_test.go:527`, `:567`, `:575-591`, `:713`; `permissions_authz_scope_test.go:115`).
+CONFIRMED, and the author's `7 → 8` row claiming the old table was "unreachable, not merely unused"
+was **false**. Step 8 now owns their disposition explicitly, and the disposition is **delete**: every
+one guards a property of `routeRules`' hand-written *shape* — methodless rows, prefix shadowing,
+untyped capability strings — and a generated table makes all three unrepresentable. Converting them
+would guard a state that cannot occur, which doctrine §3 deletes on sight.
+
+**#9** — steelmanning the deleted gate found a real loss, and the artifact was crediting the wrong
+thing with covering it. §10.2 said transcription errors are caught "by the row-by-row review **and
+by property 2**". Property 2 cannot: it derives its *expected* capability from the same annotation
+the implementation derives its *enforced* capability from, so an error copied consistently into both
+is invisible. The human review in step 7 is the **sole** mitigation and now says so. An overclaim of
+exactly the kind §10.1 exists to stop, three sections after §10.1.
+
+**#10** — `§2:86-90` still carried the rule-count distribution and "nothing falls through" — the
+**third** surviving copy of the zero-fallback fabrication, in the same document that refutes it at
+§10.2. Struck, with no count replacing it.
+
+### Convergence
+
+Count 10, up from 7; altitude **down two rungs**. Rounds 5–7 all attacked the proof construct at
+design level and never fell. Round 8 attacked ten things and none of them is the design. Three
+findings (#1, #3, #10) are the *same* mechanical error — a partial sweep of a duplicated statement —
+which is a rung-2 defect with a rung-1 cause, and four (#5, #6, #8, and the author's own `5 → 6`)
+are step-scheduling errors found by the per-edge table rather than by attacking the design.
+
+Per §8 the design-level search is exhausted. **This is the round the operator asked for**, and its
+answer is: the structure proceeds; the schedule and the sweep needed the work.
+
+### The step verdict, re-rendered after the fixes
+
+Round 8 returned 9 of 10 steps BLOCKED. Every blocker was a document defect, not a design defect,
+and all ten findings are now applied. Re-rendered:
+
+| Step | Round 8 | After fixes | What moved it |
+|---|---|---|---|
+| 0 | PROCEED | **PROCEED** | untouched |
+| 1 | BLOCKED | **PROCEED** | analysis §8 + constraint 5 + `:193` superseded; one definition of done |
+| 2 | BLOCKED | **PROCEED** | same, plus §3's per-document server base is now defined |
+| 3 | BLOCKED | **PROCEED** | §10.3 rows 1–3 land in step 3, where the changes go live |
+| 4 | BLOCKED | **PROCEED** | `db == nil` deleted; root-path key normalization defined |
+| 5 | BLOCKED | **PROCEED** | `assertSurface` evidence moved to step 6, where the function exists |
+| 6 | BLOCKED | **PROCEED** | follows from step 4 — the e2e surface can now be total on every boot path |
+| 7 | BLOCKED | **PROCEED** | negative case asserts `permission.denied`, not a bare 403; mechanization stated |
+| 8 | BLOCKED | **PROCEED** | six surviving test references named, with delete-not-convert dispositions |
+| 9 | BLOCKED | **PROCEED** | follows from 1 and 2 |
+
+**This re-rendering is the author's, not the reviewer's, and it is recorded as such.** It is a claim
+that each blocker's stated cause is gone — verifiable against the diff — not an independent verdict.
+The operator's gate is next, and a round 9 confirming the ten dispositions is cheap if wanted.
