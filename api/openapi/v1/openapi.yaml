@@ -123,6 +123,8 @@ paths:
       summary: Revoga a sessao atual
       tags: [auth]
       operationId: logout
+      x-authz-capability-none: 'Destroys the caller''s own session; no capability can be required of a principal being logged out.'
+      x-authz-password-change-allowed: true
       responses:
         '204':
           description: Sessao encerrada
@@ -135,6 +137,8 @@ paths:
       summary: Retorna o usuario autenticado atual
       tags: [auth]
       operationId: getCurrentUser
+      x-authz-capability-none: 'Returns only the caller''s own principal; a session is the whole authorization.'
+      x-authz-password-change-allowed: true
       responses:
         '200':
           description: Usuario atual
@@ -151,6 +155,8 @@ paths:
       summary: Troca a senha do usuario autenticado
       tags: [auth]
       operationId: changePassword
+      x-authz-capability-none: 'The remedy for a must-change-password principal; gating it on a capability would deadlock the account.'
+      x-authz-password-change-allowed: true
       requestBody:
         required: true
         content:
@@ -645,8 +651,6 @@ paths:
         hand-written upgrade handler is authoritative. HTTP fallback: /iam/presence/snapshot.
       tags: [iam]
       operationId: streamPresence
-      x-websocket-message:
-        $ref: '#/components/schemas/PresenceStreamEvent'
       responses:
         '101':
           description: Switching Protocols — WebSocket established; server streams PresenceStreamEvent frames.
@@ -3210,7 +3214,6 @@ paths:
       summary: Export document PDF
       operationId: exportDocumentPDF
       tags: [documents]
-      x-rate-limit: { requests_per_minute: 20 }
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       requestBody:
