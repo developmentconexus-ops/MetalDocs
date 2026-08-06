@@ -1208,6 +1208,7 @@ paths:
       summary: List templates for tenant (docx)
       tags: [templates]
       operationId: listTemplates
+      x-authz-capability: template.view
       parameters:
         - name: limit
           in: query
@@ -1259,6 +1260,7 @@ paths:
       summary: Create template (docx)
       tags: [templates]
       operationId: createTemplate
+      x-authz-capability: template.create
       parameters:
         - name: Idempotency-Key
           in: header
@@ -1316,6 +1318,7 @@ paths:
       summary: Get system-owned blank template
       tags: [templates]
       operationId: getSystemBlankTemplate
+      x-authz-capability: template.view
       responses:
         '200':
           description: ok
@@ -1336,6 +1339,7 @@ paths:
       summary: Get template version metadata (docx)
       tags: [templates]
       operationId: getTemplateVersion
+      x-authz-capability: template.view
       parameters:
         - { in: path, name: id, required: true, schema: { type: string } }
         - { in: path, name: n, required: true, schema: { type: integer } }
@@ -1358,6 +1362,7 @@ paths:
       summary: Presign PUT URL for draft .docx upload
       tags: [templates]
       operationId: presignTemplateDocxUploadUrl
+      x-authz-capability: template.edit
       parameters:
         - { in: path, name: id, required: true, schema: { type: string } }
         - { in: path, name: n, required: true, schema: { type: integer } }
@@ -1386,6 +1391,7 @@ paths:
       summary: Presign PUT URL for draft schema.json upload
       tags: [templates]
       operationId: presignTemplateSchemaUploadUrl
+      x-authz-capability: template.edit
       parameters:
         - { in: path, name: id, required: true, schema: { type: string } }
         - { in: path, name: n, required: true, schema: { type: integer } }
@@ -1414,6 +1420,7 @@ paths:
       summary: Publish draft (validates template tokens)
       tags: [templates]
       operationId: publishTemplateVersion
+      x-authz-capability: template.publish
       parameters:
         - { in: path, name: id, required: true, schema: { type: string } }
         - { in: path, name: n, required: true, schema: { type: integer } }
@@ -1450,6 +1457,7 @@ paths:
       summary: Create template version
       tags: [templates]
       operationId: createTemplateVersion
+      x-authz-capability: template.create
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -1475,6 +1483,7 @@ paths:
       summary: Update template schema
       tags: [templates]
       operationId: updateTemplateSchema
+      x-authz-capability: template.edit
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
@@ -1535,6 +1544,7 @@ paths:
       summary: Presign template autosave
       tags: [templates]
       operationId: presignTemplateAutosave
+      x-authz-capability: template.edit
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
@@ -1559,6 +1569,7 @@ paths:
       summary: Commit template autosave
       tags: [templates]
       operationId: commitTemplateAutosave
+      x-authz-capability: template.edit
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
@@ -1606,6 +1617,7 @@ paths:
         replace it.
       tags: [templates]
       operationId: submitTemplateVersionForApproval
+      x-authz-capability: template.submit
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
@@ -1650,6 +1662,7 @@ paths:
         is null and stages is empty when no active route resolves yet.
       tags: [templates]
       operationId: getTemplateVersionApprovalPreview
+      x-authz-capability: template.submit
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
@@ -1681,6 +1694,7 @@ paths:
         templates_template_version.content_hash, never echoed by the client.
       tags: [templates]
       operationId: signoffTemplateVersion
+      x-authz-capability: template.approve
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
@@ -1715,6 +1729,7 @@ paths:
       summary: Archive template
       tags: [templates]
       operationId: archiveTemplate
+      x-authz-capability: template.archive
       x-authz-area-none: 'Templates are tenant-global; archive is tier-1 capability-gated (template.archive, area "*" in routes_lifecycle.go). No per-area scope to assert.'
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -1742,6 +1757,7 @@ paths:
       summary: Get template
       tags: [templates]
       operationId: getTemplate
+      x-authz-capability: template.view
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -1764,6 +1780,7 @@ paths:
       summary: Get template DOCX URL
       tags: [templates]
       operationId: getTemplateDocxUrl
+      x-authz-capability: template.view
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
@@ -1791,6 +1808,7 @@ paths:
       x-pagination-exempt-reason: 'Bounded per-template audit trail returned in full.'
       tags: [templates]
       operationId: listTemplateAudit
+      x-authz-capability: template.view
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -1815,6 +1833,7 @@ paths:
       x-pagination-exempt-reason: 'Fixed reference catalog: the 7-token placeholder set is a bounded enumeration.'
       tags: [templates]
       operationId: listTemplatePlaceholderCatalog
+      x-authz-capability: template.view
       responses:
         '200':
           description: ok
@@ -1835,6 +1854,7 @@ paths:
       x-pagination-exempt-reason: 'Bounded per-tenant taxonomy profile set returned in full.'
       tags: [taxonomy]
       operationId: listTaxonomyProfiles
+      x-authz-capability: taxonomy.view
       parameters:
         - name: include_archived
           in: query
@@ -1856,6 +1876,7 @@ paths:
       summary: Create taxonomy profile
       tags: [taxonomy]
       operationId: createTaxonomyProfile
+      x-authz-capability: taxonomy.manage
       parameters:
         - name: Idempotency-Key
           in: header
@@ -1891,6 +1912,7 @@ paths:
       summary: Get taxonomy profile
       tags: [taxonomy]
       operationId: getTaxonomyProfile
+      x-authz-capability: taxonomy.view
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       responses:
@@ -1912,6 +1934,7 @@ paths:
       summary: Update taxonomy profile
       tags: [taxonomy]
       operationId: updateTaxonomyProfile
+      x-authz-capability: taxonomy.manage
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       requestBody:
@@ -1947,6 +1970,7 @@ paths:
       summary: Archive taxonomy profile
       tags: [taxonomy]
       operationId: archiveTaxonomyProfile
+      x-authz-capability: taxonomy.manage
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       responses:
@@ -1969,6 +1993,7 @@ paths:
       summary: Set taxonomy profile default template
       tags: [taxonomy]
       operationId: setTaxonomyProfileDefaultTemplate
+      x-authz-capability: taxonomy.manage
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       requestBody:
@@ -1999,6 +2024,7 @@ paths:
       x-pagination-exempt-reason: 'Bounded per-tenant taxonomy area set returned in full.'
       tags: [taxonomy]
       operationId: listTaxonomyAreas
+      x-authz-capability: taxonomy.view
       parameters:
         - name: include_archived
           in: query
@@ -2020,6 +2046,7 @@ paths:
       summary: Create taxonomy area
       tags: [taxonomy]
       operationId: createTaxonomyArea
+      x-authz-capability: taxonomy.manage
       parameters:
         - name: Idempotency-Key
           in: header
@@ -2055,6 +2082,7 @@ paths:
       summary: Get taxonomy area
       tags: [taxonomy]
       operationId: getTaxonomyArea
+      x-authz-capability: taxonomy.view
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       responses:
@@ -2076,6 +2104,7 @@ paths:
       summary: Update taxonomy area
       tags: [taxonomy]
       operationId: updateTaxonomyArea
+      x-authz-capability: taxonomy.manage
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       requestBody:
@@ -2111,6 +2140,7 @@ paths:
       summary: Archive taxonomy area
       tags: [taxonomy]
       operationId: archiveTaxonomyArea
+      x-authz-capability: taxonomy.manage
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       responses:
@@ -2135,6 +2165,7 @@ paths:
       x-pagination-exempt-reason: 'Bounded per-tenant taxonomy family set returned in full.'
       tags: [taxonomy]
       operationId: listTaxonomyFamilies
+      x-authz-capability: taxonomy.view
       parameters:
         - name: include_inactive
           in: query
@@ -2158,6 +2189,7 @@ paths:
       summary: Create taxonomy family
       tags: [taxonomy]
       operationId: createTaxonomyFamily
+      x-authz-capability: taxonomy.manage
       parameters:
         - name: Idempotency-Key
           in: header
@@ -2193,6 +2225,7 @@ paths:
       summary: Get taxonomy family
       tags: [taxonomy]
       operationId: getTaxonomyFamily
+      x-authz-capability: taxonomy.view
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       responses:
@@ -2214,6 +2247,7 @@ paths:
       summary: Update taxonomy family
       tags: [taxonomy]
       operationId: updateTaxonomyFamily
+      x-authz-capability: taxonomy.manage
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       requestBody:
@@ -2243,6 +2277,7 @@ paths:
       summary: Deactivate taxonomy family
       tags: [taxonomy]
       operationId: deactivateTaxonomyFamily
+      x-authz-capability: taxonomy.manage
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       responses:
@@ -2265,6 +2300,7 @@ paths:
       summary: List controlled documents
       tags: [controlled-documents]
       operationId: listControlledDocuments
+      x-authz-capability: document.view
       parameters:
         - name: profile_code
           in: query
@@ -2318,6 +2354,7 @@ paths:
       summary: Atomically create controlled document and initial revision
       tags: [controlled-documents]
       operationId: atomicCreateControlledDocument
+      x-authz-capability: controlled_documents.create
       x-authz-area:
         source: body
         field: process_area_code
@@ -2360,6 +2397,7 @@ paths:
       summary: Preview the next auto-generated document code without allocating it
       tags: [controlled-documents]
       operationId: previewControlledDocumentCode
+      x-authz-capability: controlled_documents.create
       parameters:
         - name: profile_code
           in: query
@@ -2399,6 +2437,7 @@ paths:
         client-side narrowing of a full area catalog.
       tags: [controlled-documents]
       operationId: getControlledDocumentCreationContext
+      x-authz-capability: controlled_documents.create
       responses:
         '200':
           description: ok
@@ -2418,6 +2457,7 @@ paths:
       summary: Get controlled document by ID
       tags: [controlled-documents]
       operationId: getControlledDocument
+      x-authz-capability: document.view
       parameters:
         - name: id
           in: path
@@ -2444,6 +2484,7 @@ paths:
       summary: Create a new revision for a controlled document
       tags: [controlled-documents]
       operationId: createControlledDocumentRevision
+      x-authz-capability: document.edit
       parameters:
         - name: id
           in: path
@@ -2484,6 +2525,7 @@ paths:
       summary: Get the active document instance for a controlled document
       tags: [controlled-documents]
       operationId: getActiveDocument
+      x-authz-capability: document.view
       parameters:
         - name: id
           in: path
@@ -2510,6 +2552,7 @@ paths:
       summary: Mark controlled document as obsolete
       tags: [controlled-documents]
       operationId: obsoleteControlledDocument
+      x-authz-capability: controlled_documents.obsolete
       x-authz-area:
         source: tx
         derived_from: 'controlled_documents.process_area_code'
@@ -2548,6 +2591,7 @@ paths:
       summary: Mark controlled document as superseded
       tags: [controlled-documents]
       operationId: supersedeControlledDocument
+      x-authz-capability: controlled_documents.supersede
       x-authz-area:
         source: tx
         derived_from: 'controlled_documents.process_area_code'
