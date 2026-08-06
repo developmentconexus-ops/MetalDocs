@@ -592,6 +592,17 @@ func chainOverSentinel(t *testing.T, db *sql.DB, pattern string, sentinel http.H
 // capability — not merely to something other than VisibilityUnresolved,
 // which a resolver stuck on the unwidened production table would also
 // produce for an unrelated reason and mask this failure as a different one.
+//
+// Covers newPermissionResolver only, deliberately. newPasswordChangeAllowedChecker
+// read the same bare table and was fixed in the same commit, but no test can
+// distinguish the two readings for it: every httpSurfaceE2E entry leaves
+// allowedDuringPasswordChange false, and a missing key yields false as well
+// (the checker fails closed), so the merged and unwidened tables return the
+// identical answer for all four patterns. A test asserting that equality would
+// pass against the defect it claims to guard. Do not add one to make the
+// coverage look symmetric — if an E2E operation is ever declared
+// allowedDuringPasswordChange: true, the divergence becomes real and the test
+// becomes worth writing at that moment.
 func TestE2ESurfaceResolvesToDeclaredPolicy(t *testing.T) {
 	merged := mergedSurface(httpSurface, httpSurfaceE2E)
 
