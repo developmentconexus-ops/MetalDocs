@@ -55,7 +55,6 @@ type routeHandlers struct {
 	approval            *approvalhttp.Handler
 	distribution        *distributionhttp.Handler
 	notifications       *notificationshttp.Handler
-	metrics             http.Handler
 }
 
 // routeFamily binds a routeHandlers field name to the call that mounts it.
@@ -74,10 +73,9 @@ type routeFamily struct {
 //
 // Every other field is constructed on every path — including security, which
 // takes a nil service but is itself always non-nil (main.go:404 and :406 both
-// assign), and metrics, which is an unconditional http.HandlerFunc
-// (observability/http.go:211). Guarding those would be a branch no
-// environment executes; a zero-value field there is a wiring bug and must
-// fail loudly, not be skipped silently.
+// assign). Guarding those would be a branch no environment executes; a
+// zero-value field there is a wiring bug and must fail loudly, not be skipped
+// silently.
 //
 // TestRouteCoverage consumes this set to decide which fields may be absent
 // from the table — so "conditional" is declared once, here, rather than
@@ -119,9 +117,6 @@ func routeFamilies(h routeHandlers) []routeFamily {
 		}},
 		routeFamily{"notifications", func(mux httprouter.Muxer) {
 			notificationshttp.RegisterRoutes(h.notifications, mux)
-		}},
-		routeFamily{"metrics", func(mux httprouter.Muxer) {
-			mux.Handle("/api/v1/metrics", h.metrics)
 		}},
 	)
 }

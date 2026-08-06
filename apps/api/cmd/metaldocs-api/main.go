@@ -322,7 +322,6 @@ func main() {
 	searchService := searchapp.NewService(searchdocs.NewReader(deps.SQLDB, familyCodeResolver))
 	searchHandler := searchdelivery.NewHandler(searchService)
 	authHandler := authdelivery.NewHandler(authService).WithAudit(deps.AuditWriter)
-	healthHandler := observability.NewHealthHandler(deps.StatusProvider)
 
 	capabilityService := iamapp.NewCapabilityService(deps.SQLDB)
 	// Wire optional capability hint into /auth/me + login responses.
@@ -426,6 +425,12 @@ func main() {
 		},
 		deps.StatusProvider,
 	)
+	// healthHandler is constructed after httpObs (not at its previous call
+	// site near authHandler) because GetMetrics now lives on this same
+	// handler and delegates to httpObs.MetricsHandler() — the last bare mount
+	// in the composition root (router.go's former "metrics" family) moves
+	// into this generated mount instead.
+	healthHandler := observability.NewHealthHandler(deps.StatusProvider, httpObs.MetricsHandler())
 	cors := security.NewCORS(corsCfg)
 
 	// Rate-limit store backend selection (M8/F8.2): memory (default,
@@ -835,7 +840,6 @@ func main() {
 		approval:            approvalHandler,
 		distribution:        distributionHandler,
 		notifications:       notificationsHandler,
-		metrics:             httpObs.MetricsHandler(),
 	})
 
 	mountE2EHandlersIfEnabled(mux, func(m *http.ServeMux) {

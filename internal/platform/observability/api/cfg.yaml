@@ -8,3 +8,4 @@ output: api.gen.go
 output-options:
   include-tags:
     - health
+    - observability

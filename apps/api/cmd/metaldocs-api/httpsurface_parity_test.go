@@ -71,15 +71,6 @@ func mountAllCodegenHandlers(t *testing.T, mux httprouter.Muxer) {
 // The boot assertion (Task 15) proves the same thing on every real boot;
 // this test proves it in CI without a database.
 func TestGeneratedKeysMatchCodegenPatterns(t *testing.T) {
-	// SKIPPED: 12 operations are declared in the spec (and therefore present
-	// in httpSurface) but are still mounted by their family's legacy bare
-	// mux.HandleFunc(path, ...) registration — no method prefix — instead of
-	// oapi-codegen's method-qualified "METHOD pattern" form. Tasks 6-11 move
-	// each of those six legacy families (auth, security, health, search,
-	// configuration/featureFlags, observability) onto generated
-	// ServerInterface/HandlerWithOptions mounting; Task 11 removes this skip.
-	t.Skip("12 bare-pattern legacy operations (auth, security, health, search, configuration, observability) are not yet method-qualified; closed by Tasks 6-11, skip removed in Task 11")
-
 	rec := newSurfaceRecordingMux()
 	mountAllCodegenHandlers(t, rec) // defined above; nil services are safe at mount time
 

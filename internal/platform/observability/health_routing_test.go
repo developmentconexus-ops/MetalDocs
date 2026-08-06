@@ -11,7 +11,7 @@ import (
 func mountHealth(t *testing.T) *http.ServeMux {
 	t.Helper()
 	mux := http.NewServeMux()
-	observability.NewHealthHandler(nil).RegisterRoutes(mux)
+	observability.NewHealthHandler(nil, nil).RegisterRoutes(mux)
 	return mux
 }
 

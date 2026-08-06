@@ -347,7 +347,7 @@ func buildTestRouteHandlers() routeHandlers {
 
 	return routeHandlers{
 		auth:         authdelivery.NewHandler(nil),
-		health:       observability.NewHealthHandler(nil),
+		health:       observability.NewHealthHandler(nil, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})),
 		featureFlags: featureflags.NewHandler(config.FeatureFlagsConfig{}),
 		audit:        auditdelivery.NewHandler(stubAuditQuerier{}),
 		search:       searchdelivery.NewHandler(nil),
@@ -366,7 +366,6 @@ func buildTestRouteHandlers() routeHandlers {
 		approval:           approvalhttp.NewHandler(nil, nil, nil, nil),
 		distribution:       distributionhttp.NewHandler(stubDistributionRepository{}),
 		notifications:      notificationshttp.NewHandler(stubNotificationsRepository{}),
-		metrics:            http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}),
 	}
 }
 
