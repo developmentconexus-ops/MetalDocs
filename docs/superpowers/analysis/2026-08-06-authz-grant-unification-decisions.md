@@ -21,6 +21,17 @@ Tier-1 and tier-2 read **disjoint grant tables**.
 Three assignment tables, three different role vocabularies, hand-synced. `iam_group_roles.role`
 carries no CHECK constraint at all (`db/baseline/0001_current_schema.sql:1245`).
 
+> **Correction, 2026-08-06 (targeted verify during the system-impact gate).** "Three role
+> vocabularies" undercounts. There are **six** declaration surfaces:
+> `iamtypes.validRoles` (8), `iamtypes.areaRoles` (7), OpenAPI `UserRole` (8), OpenAPI `AreaRole` (7),
+> the `user_process_areas` CHECK (7), and the `iam_user_roles` CHECK (5) — plus `iam_group_roles`
+> with none. Four of them agree in two consistent pairs; **the `iam_user_roles` CHECK of 5 is
+> mirrored by no Go set and no OpenAPI enum**, and the three it omits are exactly `area_admin`,
+> `qms_admin`, `signer`. That unmirrored table is what tier-1 reads. Consequence for governance:
+> REQ-AUTHZ-5's declaration-surface CI binding covers **capabilities, not roles**, which is why the
+> drift survived. Full table in
+> `2026-08-06-authz-grant-unification-system-impact.md` §3b.
+
 Consequence: a principal holding only an area membership is refused at tier-1 before tier-2 ever
 runs. The area model is unreachable through HTTP except to further narrow someone tier-1 already
 admitted.
