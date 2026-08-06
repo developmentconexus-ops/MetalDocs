@@ -315,18 +315,42 @@ func main() {
 	searchHandler := searchdelivery.NewHandler(searchService)
 	authHandler := authdelivery.NewHandler(authService).WithAudit(deps.AuditWriter)
 
+	// mux is populated by one consolidated buildPublishers call (publishers.go)
+	// once every handler below is constructed — not by scattered RegisterRoutes
+	// call sites. Each publisher is mounted through its own httprouter.Recorder,
+	// and the aggregate result is fed to assertSurface (surface.go), which
+	// refuses to boot on any mismatch with the spec-generated surface table —
+	// so a handler built here but never added to publisherDeps is a fatal at
+	// startup, not a live discovery. iamAdminHandler, sessionsHandler,
+	// observabilityHandler, securityHandler: mounted via buildPublishers below,
+	// once peopleHandler/membershipHandler/rolesCapsHandler/presenceHandler are
+	// also constructed.
+	//
+	// Declared here (rather than at its historical call site further down) so
+	// permResolver below can close over it: newPermissionResolver reads
+	// mux.Handler(r) per request, long after buildPublishers has populated it —
+	// this declaration only needs the pointer to exist yet, not the routes.
+	mux := http.NewServeMux()
+
 	capabilityService := iamapp.NewCapabilityService(deps.SQLDB)
 	// Wire optional capability hint into /auth/me + login responses.
 	// Backend remains sole authz enforcer — FE consumes for UX hints only.
 	authService.WithCapabilityProvider(capabilityService)
 	cachedProvider := iamapp.NewCachedRoleProvider(ctx, deps.RoleProvider, authn.CacheTTL())
 	// permResolver is the single authoritative source of truth for route
-	// visibility. It is shared with the auth middleware so that fully public
-	// routes (no session required) and the IAM permission layer stay in sync
-	// automatically — adding a new public route requires one change here, not two.
-	permResolver := newPermissionResolver()
+	// visibility: a mux-pattern lookup into the generated httpSurface table
+	// (produced from the OpenAPI spec by cmd/gen-http-surface). It is shared
+	// with the auth middleware so that fully public routes (no session
+	// required), the password-change-allowed exceptions, and the IAM
+	// permission layer all read the same table — adding a new public route
+	// requires a spec annotation, not a change in three places. mux is
+	// declared above (line ~501 historically; moved up here) so the resolver
+	// can consult it per-request; it is only populated later, by
+	// buildPublishers, long after this closure is constructed.
+	permResolver := newPermissionResolver(mux)
 	authMiddleware := authdelivery.NewMiddleware(authService, authCfg, authn.Enabled()).
-		WithPublicPathChecker(newPublicPathChecker(permResolver))
+		WithPublicPathChecker(newPublicPathChecker(permResolver)).
+		WithPasswordChangeAllowedChecker(newPasswordChangeAllowedChecker(mux))
 	iamMiddleware := iamdelivery.NewMiddleware(capabilityService, cachedProvider, authn.Enabled()).
 		WithPermissionResolver(permResolver)
 	originProtection := security.NewOriginProtection(security.OriginProtectionConfig{
@@ -487,18 +511,6 @@ func main() {
 		}
 		return ""
 	}
-
-	// mux is populated by one consolidated buildPublishers call (publishers.go)
-	// once every handler below is constructed — not by scattered RegisterRoutes
-	// call sites. Each publisher is mounted through its own httprouter.Recorder,
-	// and the aggregate result is fed to assertSurface (surface.go), which
-	// refuses to boot on any mismatch with the spec-generated surface table —
-	// so a handler built here but never added to publisherDeps is a fatal at
-	// startup, not a live discovery. iamAdminHandler, sessionsHandler,
-	// observabilityHandler, securityHandler: mounted via buildPublishers below,
-	// once peopleHandler/membershipHandler/rolesCapsHandler/presenceHandler are
-	// also constructed.
-	mux := http.NewServeMux()
 
 	presenceBump, presenceHub, presenceHandler := startPresence(ctx, deps, iamAdminHandler)
 

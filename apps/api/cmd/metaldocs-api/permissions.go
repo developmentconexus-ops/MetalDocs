@@ -340,17 +340,36 @@ var routeRules = []routeRule{
 	{method: http.MethodGet, pathExact: "/api/v1/iam/presence/stream", capability: iamdomain.CapUserView, visibility: iamdelivery.VisibilityPermissionGuarded},
 }
 
-func newPermissionResolver() iamdelivery.PermissionResolver {
-	return func(method, path string) (iamdomain.Capability, iamdelivery.Visibility) {
-		if capability, visibility, ok := resolveRoutePermission(method, path); ok {
-			return capability, visibility
+// newPermissionResolver looks the request's matched mux pattern up in the
+// generated httpSurface table (produced from the OpenAPI spec's
+// x-authz-capability extensions by cmd/gen-http-surface). It replaces the
+// legacy routeRules string-matching resolver as the tier-1 authority; the
+// old table and resolveRoutePermission stay in place, unused in production,
+// as the row-by-row review record for Task 17b.
+func newPermissionResolver(mux *http.ServeMux) iamdelivery.PermissionResolver {
+	return func(r *http.Request) (iamdomain.Capability, iamdelivery.Visibility) {
+		_, pattern := mux.Handler(r)
+		if pattern == "" {
+			// The mux matched nothing: a 404 or a 405, not a route with a
+			// policy. Demand a session — identical to today's fall-through —
+			// and let the mux emit the status, which method_not_allowed
+			// rewrites into problem+json.
+			return "", iamdelivery.VisibilitySessionRequired
 		}
-		// Fail-closed default. Any route not enumerated above demands at
-		// least a session — never silently public.
-		return "", iamdelivery.VisibilitySessionRequired
+		rule, ok := httpSurface[pattern]
+		if !ok {
+			// §5's boot assertion (assertSurface) makes this unreachable at
+			// boot; reaching it here is a wiring bug, not a tier to guess at.
+			return "", iamdelivery.VisibilityUnresolved
+		}
+		return rule.capability, rule.visibility
 	}
 }
 
+// resolveRoutePermission backs the legacy routeRules table. Production no
+// longer calls it (see newPermissionResolver above); it stays, byte-
+// identical, as the reference Task 17b's row-by-row annotation review reads
+// against until Task 18 deletes routeRules.
 func resolveRoutePermission(method, path string) (iamdomain.Capability, iamdelivery.Visibility, bool) {
 	for _, rule := range routeRules {
 		if rule.matches(method, path) {
@@ -361,8 +380,29 @@ func resolveRoutePermission(method, path string) (iamdomain.Capability, iamdeliv
 }
 
 func newPublicPathChecker(resolver iamdelivery.PermissionResolver) authdelivery.PublicPathChecker {
-	return func(method, path string) bool {
-		_, visibility := resolver(method, path)
+	return func(r *http.Request) bool {
+		_, visibility := resolver(r)
 		return visibility == iamdelivery.VisibilityPublic
+	}
+}
+
+// newPasswordChangeAllowedChecker derives the password-change-allowed
+// boolean from the same generated httpSurface table newPermissionResolver
+// reads, so there is one authoritative source rather than a second
+// hand-maintained list (mirrors newPublicPathChecker's derivation from the
+// resolver). A request whose pattern carries no rule is treated as NOT
+// allowed — fail closed, consistent with VisibilityUnresolved's 500 rather
+// than a silent pass.
+func newPasswordChangeAllowedChecker(mux *http.ServeMux) authdelivery.PasswordChangeAllowedChecker {
+	return func(r *http.Request) bool {
+		_, pattern := mux.Handler(r)
+		if pattern == "" {
+			return false
+		}
+		rule, ok := httpSurface[pattern]
+		if !ok {
+			return false
+		}
+		return rule.allowedDuringPasswordChange
 	}
 }

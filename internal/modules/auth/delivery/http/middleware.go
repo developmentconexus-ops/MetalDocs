@@ -20,21 +20,30 @@ import (
 // rate-limit gate from the real endpoint.
 const PathLogin = "/api/v1/auth/login"
 
-// PublicPathChecker returns true if the given method+path requires no session
-// cookie (i.e. it is fully unauthenticated). Injecting this function into the
-// middleware lets the composition root own the single authoritative list of
-// public routes, preventing the auth layer and the IAM permission layer from
-// maintaining two independent lists that can drift apart.
-type PublicPathChecker func(method, path string) bool
+// PublicPathChecker reports whether a request requires no session cookie
+// (i.e. it is fully unauthenticated). Injecting this function into the
+// middleware lets the composition root own the single authoritative
+// route→visibility table (the generated httpSurface map), preventing the
+// auth layer and the IAM permission layer from maintaining two independent
+// lists that can drift apart.
+type PublicPathChecker func(*http.Request) bool
+
+// PasswordChangeAllowedChecker reports whether a request is one of the
+// operations a principal with MustChangePassword set may still reach (e.g.
+// change-password itself, logout, whoami). Like PublicPathChecker, this is
+// derived from the single authoritative httpSurface table rather than a
+// second hand-maintained list.
+type PasswordChangeAllowedChecker func(*http.Request) bool
 
 // Middleware resolves the session cookie into a CurrentUser and injects it
 // into the request context, rejecting unauthenticated requests to non-public
 // routes. When enabled is false, Wrap is a no-op passthrough.
 type Middleware struct {
-	service       *authapp.Service
-	cfg           authapp.Config
-	enabled       bool
-	publicChecker PublicPathChecker // optional; falls back to defaultPublicPaths
+	service               *authapp.Service
+	cfg                   authapp.Config
+	enabled               bool
+	publicChecker         PublicPathChecker            // mandatory once enabled; nil fails closed (500)
+	passwordChangeChecker PasswordChangeAllowedChecker // mandatory once enabled; nil fails closed (500)
 }
 
 // NewMiddleware constructs a Middleware. enabled=false makes Wrap a no-op passthrough.
@@ -42,19 +51,22 @@ func NewMiddleware(service *authapp.Service, cfg authapp.Config, enabled bool) *
 	return &Middleware{service: service, cfg: cfg, enabled: enabled}
 }
 
-// WithPublicPathChecker replaces the built-in public-path list with the
-// provided checker. Use this in the composition root so there is one
-// authoritative source of truth for which routes bypass authentication.
+// WithPublicPathChecker wires the route→visibility table's public-path
+// lookup. Must be called before Wrap serves traffic; a nil checker at
+// request time is a misconfiguration and fails closed (500), never passes
+// the request through as if it were public.
 func (m *Middleware) WithPublicPathChecker(fn PublicPathChecker) *Middleware {
 	m.publicChecker = fn
 	return m
 }
 
-func (m *Middleware) isPublic(method, path string) bool {
-	if m.publicChecker != nil {
-		return m.publicChecker(method, path)
-	}
-	return defaultPublicPaths(method, path)
+// WithPasswordChangeAllowedChecker wires the route→visibility table's
+// password-change-allowed lookup. Must be called before Wrap serves traffic;
+// a nil checker at request time is a misconfiguration and fails closed
+// (500), never silently permits or blocks a must-change-password principal.
+func (m *Middleware) WithPasswordChangeAllowedChecker(fn PasswordChangeAllowedChecker) *Middleware {
+	m.passwordChangeChecker = fn
+	return m
 }
 
 // Wrap enforces authentication on next: public paths (per isPublic) pass
@@ -70,7 +82,13 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if m.isPublic(r.Method, r.URL.Path) {
+		// Nil checker is a misconfiguration — fail closed, never pass through
+		// as if the route were public.
+		if m.publicChecker == nil {
+			_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Public path checker not configured"))
+			return
+		}
+		if m.publicChecker(r) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -91,9 +109,17 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 			_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Authentication failed"))
 			return
 		}
-		if currentUser.MustChangePassword && !isPasswordChangeAllowedPath(r.URL.Path, r.Method) {
-			_ = problem.Write(w, problem.New(http.StatusForbidden, problem.CodeAuthPasswordChangeRequired, "Password change is required before accessing the application"))
-			return
+		if currentUser.MustChangePassword {
+			// Nil checker is a misconfiguration — fail closed, never silently
+			// admit a must-change-password principal.
+			if m.passwordChangeChecker == nil {
+				_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Password change allowed checker not configured"))
+				return
+			}
+			if !m.passwordChangeChecker(r) {
+				_ = problem.Write(w, problem.New(http.StatusForbidden, problem.CodeAuthPasswordChangeRequired, "Password change is required before accessing the application"))
+				return
+			}
 		}
 
 		// Report the principal outward to the observability middleware,
@@ -110,26 +136,4 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 		r2.Header.Del("X-Tenant-ID")
 		next.ServeHTTP(w, r2)
 	})
-}
-
-// defaultPublicPaths is the fallback used when no PublicPathChecker is
-// injected. Keep this in sync with the composition root's authoritative list
-// whenever WithPublicPathChecker is not used (e.g. tests).
-func defaultPublicPaths(method, path string) bool {
-	switch {
-	case path == "/api/v1/health/live", path == "/api/v1/health/ready":
-		return true
-	case method == http.MethodPost && path == PathLogin:
-		return true
-	case method == http.MethodPost && path == "/api/v1/auth/logout":
-		return true
-	default:
-		return false
-	}
-}
-
-func isPasswordChangeAllowedPath(path, method string) bool {
-	return (method == http.MethodGet && path == "/api/v1/auth/me") ||
-		(method == http.MethodPost && path == "/api/v1/auth/change-password") ||
-		(method == http.MethodPost && path == "/api/v1/auth/logout")
 }

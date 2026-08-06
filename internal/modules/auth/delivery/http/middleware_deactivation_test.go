@@ -92,7 +92,7 @@ func TestMiddleware_DeactivatedIdentity_Returns401(t *testing.T) {
 		t.Fatalf("repo.UpdateUser(deactivate): %v", err)
 	}
 
-	m := NewMiddleware(svc, cfg, true)
+	m := NewMiddleware(svc, cfg, true).WithPublicPathChecker(func(*http.Request) bool { return false })
 	reached := false
 	handler := m.Wrap(passthrough(&reached))
 

@@ -41,10 +41,32 @@ import (
 	"metaldocs/internal/platform/observability"
 )
 
+// legacyResolve pins routeRules' still-intact (method, path) resolution
+// behavior for Task 17b's row-by-row annotation review. Production's
+// resolver (newPermissionResolver, permissions.go) now takes *http.Request
+// and reads the generated httpSurface table instead of routeRules; routeRules
+// and resolveRoutePermission are untouched by this program so this wrapper —
+// and every test below built on it — keeps pinning the legacy table's
+// behavior, not the table the server enforces.
+func legacyResolve(method, path string) (iamdomain.Capability, iamdelivery.Visibility) {
+	if capability, visibility, ok := resolveRoutePermission(method, path); ok {
+		return capability, visibility
+	}
+	return "", iamdelivery.VisibilitySessionRequired
+}
+
+// legacyIsPublic mirrors newPublicPathChecker's derivation, but over
+// legacyResolve (routeRules) rather than the production httpSurface-backed
+// resolver.
+func legacyIsPublic(method, path string) bool {
+	_, visibility := legacyResolve(method, path)
+	return visibility == iamdelivery.VisibilityPublic
+}
+
 func TestPermissionResolver(t *testing.T) {
 	t.Parallel()
 
-	resolver := newPermissionResolver()
+	resolver := legacyResolve
 
 	testCases := []struct {
 		name           string
@@ -195,7 +217,7 @@ func TestPermissionResolver(t *testing.T) {
 func TestPublicPathChecker_RespectsPublicAndPrivateBoundaries(t *testing.T) {
 	t.Parallel()
 
-	checker := newPublicPathChecker(newPermissionResolver())
+	checker := legacyIsPublic
 
 	testCases := []struct {
 		name   string
@@ -414,7 +436,7 @@ func TestPermissionsTable_NoMethodlessWriteShadowing(t *testing.T) {
 func TestPermissionResolver_PeopleHandlerRoutes(t *testing.T) {
 	t.Parallel()
 
-	resolver := newPermissionResolver()
+	resolver := legacyResolve
 	cases := []struct {
 		method string
 		path   string
@@ -448,7 +470,7 @@ func TestPermissionResolver_PeopleHandlerRoutes(t *testing.T) {
 func TestPermissionResolver_AreaMembershipRoutes(t *testing.T) {
 	t.Parallel()
 
-	resolver := newPermissionResolver()
+	resolver := legacyResolve
 	cases := []struct {
 		method string
 		path   string
@@ -491,7 +513,7 @@ func TestPermissionResolver_AreaMembershipRoutes(t *testing.T) {
 func TestDocumentsRoutesCapabilityMapping(t *testing.T) {
 	t.Parallel()
 
-	resolver := newPermissionResolver()
+	resolver := legacyResolve
 	cases := []struct {
 		method string
 		path   string
@@ -685,7 +707,7 @@ func TestEveryCapSeededOrDeferred(t *testing.T) {
 func TestTier1Tier2CapabilityCoherence_F4Sites(t *testing.T) {
 	t.Parallel()
 
-	resolver := newPermissionResolver()
+	resolver := legacyResolve
 
 	// Tier-2 truth, pinned by direct reference to the same typed consts the
 	// tier-2 call sites use (repository.go / route_admin_service.go).

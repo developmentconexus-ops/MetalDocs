@@ -19,18 +19,19 @@ import (
 //
 // The composed handler here is buildChain(mux, apiChain(...)) with authn as
 // the one real, non-nil link — the same authdelivery.Middleware main.go
-// wires, using the real routeRules-backed newPermissionResolver() via
-// WithPublicPathChecker (permissions.go), not the middleware's built-in
-// defaultPublicPaths fallback. Every other link is nil (buildChain skips
-// nil links), so a request that reaches the mux proves authn treated it as
-// public; a 401 proves authn rejected it before the mux was ever consulted.
+// wires, using the real generated-httpSurface-backed newPermissionResolver
+// via WithPublicPathChecker (permissions.go); a nil checker is no longer an
+// option (WithPublicPathChecker is mandatory). Every other link is nil
+// (buildChain skips nil links), so a request that reaches the mux proves
+// authn treated it as public; a 401 proves authn rejected it before the mux
+// was ever consulted.
 func buildHealthDeltaChain(t *testing.T) http.Handler {
 	t.Helper()
 
 	mux := http.NewServeMux()
 	observability.NewHealthHandler(nil).Mount(mux)
 
-	permResolver := newPermissionResolver()
+	permResolver := newPermissionResolver(mux)
 	authMiddleware := authdelivery.NewMiddleware(nil, authapp.Config{SessionCookieName: "sid"}, true).
 		WithPublicPathChecker(newPublicPathChecker(permResolver))
 

@@ -40,7 +40,7 @@ const (
 // PermissionResolver maps an HTTP method+path to the required tier-1
 // capability and its Visibility tier. Implementations back the route table
 // consulted by Middleware.Wrap.
-type PermissionResolver func(method, path string) (iamdomain.Capability, Visibility)
+type PermissionResolver func(*http.Request) (iamdomain.Capability, Visibility)
 
 // Middleware is the tier-1 route→capability authorization gate (ADR 0022).
 // It strips trusted identity headers before invoking the resolver and never
@@ -91,7 +91,7 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 			m.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Permission resolver not configured"))
 			return
 		}
-		capability, visibility := m.resolver(r.Method, r.URL.Path)
+		capability, visibility := m.resolver(r)
 		switch visibility {
 		case VisibilityPublic, VisibilitySessionRequired, VisibilityPermissionGuarded:
 		case VisibilityUnresolved:

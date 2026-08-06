@@ -18,7 +18,7 @@ func TestMiddlewareStripsTrustedIdentityHeaders(t *testing.T) {
 	ctx = tenant.WithTenantID(ctx, tenant.DevTenantID)
 	req = req.WithContext(ctx)
 
-	resolver := func(method, path string) (iamdomain.Capability, Visibility) {
+	resolver := func(*http.Request) (iamdomain.Capability, Visibility) {
 		return iamdomain.Capability(""), VisibilitySessionRequired
 	}
 
@@ -50,7 +50,7 @@ func TestMiddlewareStripsTrustedIdentityHeaders(t *testing.T) {
 // switch, at which point an unwired route becomes a pass-through.
 func TestWrap_VisibilityUnresolved_Is500(t *testing.T) {
 	m := NewMiddleware(nil, nil, true).WithPermissionResolver(
-		func(string, string) (iamdomain.Capability, Visibility) { return "", VisibilityUnresolved },
+		func(*http.Request) (iamdomain.Capability, Visibility) { return "", VisibilityUnresolved },
 	)
 	rr := httptest.NewRecorder()
 	m.Wrap(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
@@ -64,7 +64,7 @@ func TestWrap_VisibilityUnresolved_Is500(t *testing.T) {
 // The default arm STAYS for genuinely unknown values.
 func TestWrap_UnknownVisibility_Is500(t *testing.T) {
 	m := NewMiddleware(nil, nil, true).WithPermissionResolver(
-		func(string, string) (iamdomain.Capability, Visibility) { return "", Visibility(99) },
+		func(*http.Request) (iamdomain.Capability, Visibility) { return "", Visibility(99) },
 	)
 	rr := httptest.NewRecorder()
 	m.Wrap(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
