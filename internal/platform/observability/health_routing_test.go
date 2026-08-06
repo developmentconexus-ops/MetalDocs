@@ -31,6 +31,37 @@ func TestHealthRejectsNonGET(t *testing.T) {
 	}
 }
 
+// §10.3 / Task 11 review finding: mounting /api/v1/metrics through
+// HandlerWithOptions registers the method-qualified pattern
+// "GET /api/v1/metrics" on the mux. Go's stdlib mux intercepts a non-GET/HEAD
+// request to a method-qualified pattern BEFORE the handler runs, so
+// MetricsHandler's own in-handler 405 (http.go:211-216) never fires for the
+// mounted route. The status code stays 405, but the body/Content-Type/Allow
+// header now come from the stdlib mux's own rejection, not from the
+// handler's httpresponse.WriteMethodNotAllowed problem+json output. Pinned
+// here so that delta cannot regress or drift silently; metrics.go's
+// NewHealthHandler(nil, nil) never invokes h.metrics because the mux never
+// reaches GetMetrics for these requests.
+func TestMetricsRejectsNonGET(t *testing.T) {
+	mux := mountHealth(t)
+	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch} {
+		rr := httptest.NewRecorder()
+		mux.ServeHTTP(rr, httptest.NewRequest(method, "/api/v1/metrics", nil))
+		if rr.Code != http.StatusMethodNotAllowed {
+			t.Errorf("%s /api/v1/metrics = %d, want 405", method, rr.Code)
+		}
+		if got := rr.Header().Get("Content-Type"); got != "text/plain; charset=utf-8" {
+			t.Errorf("%s /api/v1/metrics Content-Type = %q, want stdlib mux's text/plain; charset=utf-8 (not application/problem+json)", method, got)
+		}
+		if got := rr.Header().Get("Allow"); got != "GET, HEAD" {
+			t.Errorf("%s /api/v1/metrics Allow = %q, want %q", method, got, "GET, HEAD")
+		}
+		if got := rr.Body.String(); got != "Method Not Allowed\n" {
+			t.Errorf("%s /api/v1/metrics body = %q, want stdlib mux's plain-text %q (not the problem+json body)", method, got, "Method Not Allowed\n")
+		}
+	}
+}
+
 func TestHealthGETStillServes(t *testing.T) {
 	mux := mountHealth(t)
 	for _, path := range []string{"/api/v1/health/live", "/api/v1/health/ready"} {

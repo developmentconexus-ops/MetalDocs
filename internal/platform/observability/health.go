@@ -56,9 +56,18 @@ func (h *HealthHandler) CheckReadiness(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetMetrics adapts GET /metrics to the existing HTTPObservability handler.
-// MetricsHandler already 405s on non-GET (http.go:211-216), so
-// method-qualifying it through the generated mount changes nothing a client
-// observes.
+// Method-qualifying the mount ("GET /api/v1/metrics") does NOT make this a
+// no-op relative to MetricsHandler's own 405 (http.go:211-216): a real
+// http.ServeMux intercepts non-GET/HEAD requests to a method-qualified
+// pattern before this handler ever runs, so MetricsHandler's in-handler
+// check never fires for a mounted request. The status code is unchanged
+// (405), but the body/Content-Type/Allow header change from the handler's
+// application/problem+json RFC 9457 body to the stdlib mux's own plain-text
+// "Method Not Allowed" response with Allow: GET, HEAD. That is the intended,
+// uniform outcome — every migrated route family (auth, security, health,
+// search, configuration) now rejects wrong methods the same way through the
+// mux, and metrics joining them is correct rather than a regression to
+// patch back. See TestMetricsRejectsNonGET in health_routing_test.go.
 func (h *HealthHandler) GetMetrics(w http.ResponseWriter, r *http.Request) {
 	h.metrics.ServeHTTP(w, r)
 }
