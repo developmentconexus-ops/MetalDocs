@@ -508,3 +508,94 @@ blocked by round-5 #2 (now applied). 7, 8, 9 blocked by the BLOCKER (now applied
 **Loop is not closed.** Every finding is applied, but the reviewer has not yet seen the three-valued
 classifier — and a BLOCKER fix that no adversarial round has attacked is exactly what this ledger
 exists to refuse to wave through. Round 7 judges it.
+
+---
+
+## Round 7 — judging the three-valued classifier (HEAD 93dbb997, Sol / medium)
+
+### Job 1
+
+| # | Verdict | Note |
+|---|---|---|
+| 1 (B) skeleton not the route language | **PARTIAL** — three values express partiality, but pairwise classification still does not reproduce ordered first-match resolution |
+| 2 (M) rule 6 cross-document | CLOSED |
+| 3 (M) `activeTags` circular | CLOSED |
+| 4 (N) prefix measurement | CLOSED |
+| 5 (N) five vs six generator failures | CLOSED |
+| 6 (N) per-step evidence | CLOSED |
+| r5 #2 e2e fifth route | CLOSED |
+| r5 #4 param-sensitive ordering | **PARTIAL** — membership exists, but the proof still ignores which earlier rule wins |
+
+### Job 2
+
+| # | Sev | Claim |
+|---|---|---|
+| 1 | **BLOCKER** | The proof classifies rules independently instead of resolving the ordered decision list. `routeRules` is first-match (`permissions.go:342`); `:163` shadows `:164`, `:168` shadows `:169`. Pairwise comparison reports a false delta for every shadowed row. Fix: classify each rule's **effective language** `pattern ∩ rule ∩ ¬(all earlier rules)` and compare the resulting first-match partition; empty shadowed regions ignored |
+| 2 | **BLOCKER** | The per-field table defines no composition algebra for the AND-ed predicate, and `notSuffix` is left as an unexplained "dual". The three labels are **not** a lattice: `uniform ∧ partial = partial`, `none ∧ partial = none`, but `partial ∧ partial` cannot be decided from labels at all. Fix: operate on the regular languages (intersect positives, complement `notSuffix`, then project to a label **last**) |
+| 3 | MAJOR | Completeness assertion 2 and the zero-fallback claim are **false over request languages**: `PATCH /api/v1/iam/users/roles` routes to the `{user_id}` pattern but `notSuffix: "/roles"` (`permissions.go:120`) disqualifies its only explicit PATCH rule, reaching the fallback at `:336` |
+| 4 | MAJOR | Class 9's golden file has no independent oracle — a classifier defect and its regenerated output commit together and the diff passes |
+| 5 | MAJOR | Step 4 must create `api/openapi/internal-e2e.yaml` (absent today), and the design never assigns visibility markers, though unauthenticated seed callers need the first seed response to obtain session cookies (`frontend/apps/web/e2e/utils/seed.ts:27`) |
+| 6 | MINOR | Step 3 deletes the sole methodless `/healthz` rule before step 7 claims to walk 120 rows — it is 119; risk table still says "Eight" after class 9 |
+| 7 | MINOR | Per-commit-boundary audit covers only two spans; state the runnable/broken condition for every dependency edge |
+
+Author verification: finding 3 confirmed against source. `/iam/users/{user_id}` PATCH exists
+(`openapi.yaml:332`); there is no literal PATCH route at `/iam/users/{user_id}/roles`
+(`openapi.yaml:998` is POST/PUT). The "fallback reached zero times" claim in §12 was measured over
+the 147 **operations**, not over their request languages — the same skeleton-vs-language error as
+the BLOCKER, third instance. This is the second fabricated measurement in the artifact (after the
+47/80 prefix count).
+
+### §2 escalation — the ratchet has fired on `classify`
+
+`adversarial-review` §1 permits **two** consecutive patches to one construct before §2 runs
+explicitly. `classify` has now been patched twice (round 6: two-valued → three-valued; round 7
+would be the third: pairwise → ordered + language algebra). Rounds 5, 6 and 7 all landed on §10.2
+and the last two on the same function. **No third patch is applied. The four §2 questions are put
+to the operator.**
+
+**Q1 — What is the global-maximum structure?** Two candidates, both nameable.
+
+**(A) The ordered symbolic engine.** Represent each rule as a regular language over path segments.
+Compute `E_i = pattern ∩ rule_i ∩ ¬(⋃_{j<i} rule_j)`, label the partition, and emit a delta for
+every non-empty region where the old and new verdicts differ. This handles ordering, negation,
+conjunction, `%2F` and param-spelling **uniformly** — it is the construction round 7 finding 1 and
+2 jointly specify, and it is correct.
+
+**(B) Stop proving equivalence; `routeRules` is not an oracle.** Rounds 5, 6 and 7 each found a new
+instance of one fact: `routeRules` decides on **decoded substrings of the whole path**, so its
+verdict can be steered by user-supplied parameter content. Where it disagrees with the router, it
+is not a second opinion — it is **wrong**. The deletion license becomes: every one of the 147
+operations carries an explicit reviewed `x-authz-*` annotation (the generator fails the build on
+any missing one, so completeness is structural, not measured); one live integration test per
+operation asserting the declared capability is required and its absence yields 403; §10.3 rows 1–8
+keep their regression tests; and the param-spelling class is recorded once as a security
+improvement rather than enumerated.
+
+**Q2 — What does a proven system do here?** Neither Chi, Gin, nor `net/http` ships a policy-table
+differ. The industry practice for replacing a hand-written authorization list with a generated one
+is a positive conformance suite against the new source of truth plus a reviewed migration diff —
+which is (B). Symbolic equivalence checking of two policy engines is done (AWS Zelkova for IAM
+policies) but it is a funded product, not a throwaway test.
+
+**Q3 — Costs, both sides.**
+- (A) costs a small regular-language engine — realistically 400–700 lines of tricky code plus its
+  own test suite — written to be **deleted at step 8**. It is itself unverified software used as a
+  correctness oracle, which is exactly the objection round 7 finding 4 raises about the golden
+  file, one level up. It also does not remove the need for the live conformance tests.
+- (B) costs the equivalence proof. If a `routeRules` row encoded a capability decision that nobody
+  transcribed correctly into the spec, only the row-by-row annotation review and the live test
+  catch it. It does not prove the absence of an authoring slip; it makes one detectable by test
+  rather than by proof.
+
+**Q4 — Which is chosen, by whom?** **Operator decision. Pending.** Author recommendation: **(B)**.
+Building sophisticated machinery to prove agreement with an object all three rounds have now agreed
+is wrong-where-it-disagrees is the textbook definition of optimizing inside a local maximum, and
+CLAUDE.md forbids it.
+
+### Convergence
+
+Count 7 (2B / 3M / 2N), up from 6. Altitude did **not** drop: both BLOCKERs are design-level and
+both are on `classify`. §8's same-altitude-recurrence stop condition fires. **The loop is paused,
+not closed.** Steps 0, 1, 2, 3 and 5 carry a clean license — one more than round 6, because the
+single-invocation generator closed finding 2. Findings 5, 6 and 7 are applicable under either §2
+outcome and are held only so no work is done that a (B) ruling would delete.
