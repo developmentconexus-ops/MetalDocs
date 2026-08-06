@@ -64,12 +64,14 @@ func productionMux() *http.ServeMux {
 }
 
 // prodResolve is this file's (method, path) shorthand over the production
-// resolver: newPermissionResolver(mux) reading the generated httpSurface
-// table, the sole tier-1 authority since Task 18 deleted routeRules and
-// resolveRoutePermission. Every table-driven test below asserts against this
-// resolver, not a hand-written stand-in.
+// resolver: newPermissionResolver(mux, &surface) reading a local copy of the
+// generated httpSurface table (never E2E-widened here — this file asserts
+// only the production surface), the sole tier-1 authority since Task 18
+// deleted routeRules and resolveRoutePermission. Every table-driven test
+// below asserts against this resolver, not a hand-written stand-in.
 func prodResolve(method, path string) (iamdomain.Capability, iamdelivery.Visibility) {
-	resolver := newPermissionResolver(productionMux())
+	surface := httpSurface
+	resolver := newPermissionResolver(productionMux(), &surface)
 	return resolver(httptest.NewRequest(method, path, nil))
 }
 

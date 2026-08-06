@@ -72,7 +72,7 @@ func TestSurfaceConformance(t *testing.T) {
 				reached = true
 				w.WriteHeader(http.StatusOK)
 			})
-			srv := chainOverSentinel(t, db, pattern, sentinel)
+			srv := chainOverSentinel(t, db, pattern, sentinel, httpSurface)
 
 			switch rule.visibility {
 			case iamdelivery.VisibilityPublic:
@@ -522,7 +522,10 @@ func withSession(t *testing.T, r *http.Request, u testdb.User) *http.Request {
 }
 
 // chainOverSentinel builds the REAL middleware chain (chain.go:25) with the
-// real newPermissionResolver, over a mux carrying ONLY `pattern` -> sentinel.
+// real newPermissionResolver, over a mux carrying ONLY `pattern` -> sentinel,
+// resolved against surface (the same table shape the composition root's
+// `surface` variable holds — production httpSurface for most callers, or a
+// merged table for callers exercising the E2E-widened surface).
 // Using the real chain and the real resolver is what makes the suite evidence
 // about production rather than about a hand-built stand-in.
 //
@@ -534,19 +537,19 @@ func withSession(t *testing.T, r *http.Request, u testdb.User) *http.Request {
 // pre_auth_login_rate_limit, presence_bump, rate_limit, method_not_allowed) is
 // intentionally nil: buildChain skips nil links, and this suite's assertions
 // are about sentinel invocation, never about those links' side effects.
-func chainOverSentinel(t *testing.T, db *sql.DB, pattern string, sentinel http.Handler) http.Handler {
+func chainOverSentinel(t *testing.T, db *sql.DB, pattern string, sentinel http.Handler, surface map[string]surfaceRule) http.Handler {
 	t.Helper()
 	conformanceDB = db
 
 	mux := http.NewServeMux()
 	mux.Handle(pattern, sentinel)
 
-	permResolver := newPermissionResolver(mux)
+	permResolver := newPermissionResolver(mux, &surface)
 
 	authService := newTestAuthService(t, db)
 	authMiddleware := authdelivery.NewMiddleware(authService, testAuthConfig(), true).
 		WithPublicPathChecker(newPublicPathChecker(permResolver)).
-		WithPasswordChangeAllowedChecker(newPasswordChangeAllowedChecker(mux))
+		WithPasswordChangeAllowedChecker(newPasswordChangeAllowedChecker(mux, &surface))
 
 	capabilityService := iamapp.NewCapabilityService(db)
 	roleProvider := iampg.NewRoleProvider(db)
@@ -567,4 +570,55 @@ func chainOverSentinel(t *testing.T, db *sql.DB, pattern string, sentinel http.H
 		nil, // method_not_allowed
 	)
 	return buildChain(mux, links)
+}
+
+// TestE2ESurfaceResolvesToDeclaredPolicy is the guard for the defect this
+// program's own http-surface protocol must not reintroduce: a route can be
+// MOUNTED (satisfying §5's boot assertion, assertSurface) while its policy
+// lookup still misses, because some resolver-consuming call site reads the
+// bare production httpSurface package variable instead of the composition
+// root's widened table. Mounting alone is not evidence the route is servable
+// — under METALDOCS_E2E=1, main.go widens `surface` to
+// mergedSurface(httpSurface, httpSurfaceE2E) for exactly this reason: the
+// four /internal/test/* operations exist only in httpSurfaceE2E, never in
+// httpSurface.
+//
+// This builds that exact merged table and constructs newPermissionResolver
+// directly over it — not through chainOverSentinel's full middleware chain,
+// because the claim under test is about the resolver's lookup, not
+// middleware admission (TestSurfaceConformance owns that, and it only walks
+// httpSurface, never httpSurfaceE2E, so it cannot catch this). Every
+// httpSurfaceE2E pattern must resolve to its DECLARED visibility AND
+// capability — not merely to something other than VisibilityUnresolved,
+// which a resolver stuck on the unwidened production table would also
+// produce for an unrelated reason and mask this failure as a different one.
+func TestE2ESurfaceResolvesToDeclaredPolicy(t *testing.T) {
+	merged := mergedSurface(httpSurface, httpSurfaceE2E)
+
+	patterns := make([]string, 0, len(httpSurfaceE2E))
+	for p := range httpSurfaceE2E {
+		patterns = append(patterns, p)
+	}
+	sort.Strings(patterns)
+
+	for _, pattern := range patterns {
+		pattern := pattern
+		t.Run(pattern, func(t *testing.T) {
+			declared := httpSurfaceE2E[pattern]
+
+			mux := http.NewServeMux()
+			mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {})
+			resolver := newPermissionResolver(mux, &merged)
+
+			method, path := splitPattern(t, pattern)
+			gotCap, gotVisibility := resolver(httptest.NewRequest(method, fillPathParams(path), nil))
+
+			if gotVisibility != declared.visibility {
+				t.Fatalf("pattern %q resolved to visibility %v, want declared %v (VisibilityUnresolved here means the resolver is reading the unwidened production httpSurface, not the E2E-merged table)", pattern, gotVisibility, declared.visibility)
+			}
+			if gotCap != declared.capability {
+				t.Fatalf("pattern %q resolved to capability %q, want declared %q", pattern, gotCap, declared.capability)
+			}
+		})
+	}
 }

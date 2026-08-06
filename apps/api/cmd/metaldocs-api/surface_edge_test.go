@@ -40,7 +40,7 @@ func TestHEADInheritsGETCapability(t *testing.T) {
 		reached = true
 		w.WriteHeader(http.StatusOK)
 	})
-	srv := chainOverSentinel(t, db, pattern, sentinel)
+	srv := chainOverSentinel(t, db, pattern, sentinel, httpSurface)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodHead, fillPathParams(path), nil)
@@ -107,7 +107,7 @@ func TestParameterContentCannotSteerThePolicy(t *testing.T) {
 				reached = true
 				w.WriteHeader(http.StatusOK)
 			})
-			srv := chainOverSentinel(t, db, tc.pattern, sentinel)
+			srv := chainOverSentinel(t, db, tc.pattern, sentinel, httpSurface)
 
 			rr := httptest.NewRecorder()
 			srv.ServeHTTP(rr, withSession(t, httptest.NewRequest(tc.method, tc.target, nil), tc.fixture))

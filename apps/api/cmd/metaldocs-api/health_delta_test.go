@@ -31,7 +31,8 @@ func buildHealthDeltaChain(t *testing.T) http.Handler {
 	mux := http.NewServeMux()
 	observability.NewHealthHandler(nil).Mount(mux)
 
-	permResolver := newPermissionResolver(mux)
+	surface := httpSurface
+	permResolver := newPermissionResolver(mux, &surface)
 	authMiddleware := authdelivery.NewMiddleware(nil, authapp.Config{SessionCookieName: "sid"}, true).
 		WithPublicPathChecker(newPublicPathChecker(permResolver))
 

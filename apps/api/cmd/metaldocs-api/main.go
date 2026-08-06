@@ -332,25 +332,40 @@ func main() {
 	// this declaration only needs the pointer to exist yet, not the routes.
 	mux := http.NewServeMux()
 
+	// surface is declared here, beside mux, for the identical reason: the
+	// resolver closures below need to read it per-request through a pointer,
+	// long before the E2E decision further down (main.go:~858) knows whether
+	// to widen it. It starts as the generated httpSurface and — only if
+	// useE2E — is reassigned (never shadowed) to mergedSurface(httpSurface,
+	// httpSurfaceE2E) below, before buildPublishers ever mounts the first
+	// route and before any request is served. Passing this map by value to
+	// the resolvers would freeze it at construction time, before that
+	// widening happens — they take *map[string]surfaceRule instead so they
+	// keep reading through this same variable after it is reassigned.
+	surface := httpSurface
+
 	capabilityService := iamapp.NewCapabilityService(deps.SQLDB)
 	// Wire optional capability hint into /auth/me + login responses.
 	// Backend remains sole authz enforcer — FE consumes for UX hints only.
 	authService.WithCapabilityProvider(capabilityService)
 	cachedProvider := iamapp.NewCachedRoleProvider(ctx, deps.RoleProvider, authn.CacheTTL())
 	// permResolver is the single authoritative source of truth for route
-	// visibility: a mux-pattern lookup into the generated httpSurface table
-	// (produced from the OpenAPI spec by cmd/gen-http-surface). It is shared
-	// with the auth middleware so that fully public routes (no session
-	// required), the password-change-allowed exceptions, and the IAM
-	// permission layer all read the same table — adding a new public route
-	// requires a spec annotation, not a change in three places. mux is
-	// declared above (line ~501 historically; moved up here) so the resolver
-	// can consult it per-request; it is only populated later, by
-	// buildPublishers, long after this closure is constructed.
-	permResolver := newPermissionResolver(mux)
+	// visibility: a mux-pattern lookup into the table `surface` points to —
+	// the generated httpSurface table (produced from the OpenAPI spec by
+	// cmd/gen-http-surface), possibly widened to include httpSurfaceE2E
+	// below. It is shared with the auth middleware so that fully public
+	// routes (no session required), the password-change-allowed exceptions,
+	// and the IAM permission layer all read the same table — adding a new
+	// public route requires a spec annotation, not a change in three places.
+	// mux and surface are both declared above (mux historically at line
+	// ~501; surface next to it) so the resolver can consult them per-request;
+	// mux is only populated later by buildPublishers, and surface may still
+	// be widened by the E2E decision below — both long after this closure is
+	// constructed.
+	permResolver := newPermissionResolver(mux, &surface)
 	authMiddleware := authdelivery.NewMiddleware(authService, authCfg, authn.Enabled()).
 		WithPublicPathChecker(newPublicPathChecker(permResolver)).
-		WithPasswordChangeAllowedChecker(newPasswordChangeAllowedChecker(mux))
+		WithPasswordChangeAllowedChecker(newPasswordChangeAllowedChecker(mux, &surface))
 	iamMiddleware := iamdelivery.NewMiddleware(capabilityService, cachedProvider, authn.Enabled()).
 		WithPermissionResolver(permResolver)
 	originProtection := security.NewOriginProtection(security.OriginProtectionConfig{
@@ -855,7 +870,14 @@ func main() {
 		distribution:        distributionHandler,
 		notifications:       notificationsHandler,
 	})
-	surface, expectedTags := httpSurface, specTags
+	// surface AND expectedTags are BOTH derived from useE2E — never from the
+	// publisher list — but surface is an ASSIGNMENT into the variable
+	// declared beside mux above, not a fresh `:=`: newPermissionResolver and
+	// newPasswordChangeAllowedChecker already hold a pointer to that
+	// variable, so reassigning it here (rather than shadowing it) is what
+	// makes the widened table visible to every request the resolvers serve
+	// from this point forward.
+	expectedTags := specTags
 	if useE2E {
 		publishers = append(publishers, e2e)
 		surface = mergedSurface(httpSurface, httpSurfaceE2E)
