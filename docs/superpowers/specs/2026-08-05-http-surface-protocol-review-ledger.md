@@ -785,6 +785,10 @@ asserts 403 **with `permission.denied`**, which can only have come from the midd
 way. A finding accepted with the reviewer's own remedy would have added machinery the code made
 unnecessary.
 
+> **SUPERSEDED — see "Round 8, correction" below.** The remedy recorded in this paragraph is
+> **false**: `routes_memberships.go:312-318` maps a tier-2 denial to the tier-1 code. Neither code
+> identifies a tier. The discriminator is the sentinel terminal handler, not the response.
+
 **#3 — the e2e publisher is still not total: `db == nil`.** CONFIRMED. Step 4 counted **two**
 conditionals and missed the first (`e2e_seed.go:101-103`) — and it is the consequential one,
 because it fires on exactly the SQLDB-less boot path where §5 check 3 is evaluated. Same
@@ -861,10 +865,78 @@ and all ten findings are now applied. Re-rendered:
 | 4 | BLOCKED | **PROCEED** | `db == nil` deleted; root-path key normalization defined |
 | 5 | BLOCKED | **PROCEED** | `assertSurface` evidence moved to step 6, where the function exists |
 | 6 | BLOCKED | **PROCEED** | follows from step 4 — the e2e surface can now be total on every boot path |
-| 7 | BLOCKED | **PROCEED** | negative case asserts `permission.denied`, not a bare 403; mechanization stated |
+| 7 | BLOCKED | **PROCEED** | conformance suite discriminates tier-1 by sentinel-handler invocation (row corrected — see "Round 8, correction"); mechanization stated |
 | 8 | BLOCKED | **PROCEED** | six surviving test references named, with delete-not-convert dispositions |
 | 9 | BLOCKED | **PROCEED** | follows from 1 and 2 |
 
 **This re-rendering is the author's, not the reviewer's, and it is recorded as such.** It is a claim
 that each blocker's stated cause is gone — verifiable against the diff — not an independent verdict.
 The operator's gate is next, and a round 9 confirming the ten dispositions is cheap if wanted.
+
+---
+
+## Round 8, correction — the author's own fix to #2 was wrong
+
+No new round. This is the **§5 symmetric duty applied to the author's own remedy**: two claims
+written into the round-8 fixes were load-bearing and unverified at commit time (`191986fb`), and
+verifying them was the author's job, not a round's. One held; one did not.
+
+### Claim A — DISPROVED
+
+> *"The negative case asserts 403 with `permission.denied`, which can only have come from the
+> middleware."*
+
+False, and the code disproves it in **both** directions:
+
+- `iam/delivery/http/routes_memberships.go:312-318` maps a **tier-2** `authz.ErrCapDenied` to
+  `CodePermissionDenied` — the tier-1 code — with an ADR-0022-citing comment.
+- `documents/delivery/http/handler.go:1300-1325` emits the tier-1 code from **inside the handler**
+  for `domain.ErrForbidden`/`ErrDocumentNotOwner`, and deliberately routes *both* tiers' capability
+  errors to `capability_denied`.
+
+The collapse is already catalogued independently of this program
+(`analysis/2026-08-04-problem-code-registry-mapping.md` rows 8, 33, 77, 116; consolidation **C-3**),
+so it is neither new nor this program's to close — which is exactly why the design must not depend
+on it.
+
+**Root cause (§1 step 1), and it is more general than the defect.** The suite had chosen a
+**discriminator it does not own**. The problem code on a denied request is decided by fifteen
+modules' error mappers, each free to change it for its own reasons. A proof of *this table's*
+correctness cannot rest on it; a fix that made it rest on it would have turned every future
+error-mapper edit into a silent hole in the proof. The reviewer's original heavy remedy and my
+cheaper one were both wrong in the same way — both looked for the tier in the **response**.
+
+**What makes this finding impossible (§1 step 2).** Observe the decision instead of inferring it.
+Tier-1 denies *in the middleware*, before `next.ServeHTTP` (`middleware.go:99-143`). The suite mounts
+the real chain (`chain.go:25`) over a **sentinel** terminal handler that records invocation:
+negative = denied ∧ sentinel never invoked; positive = sentinel invoked. Unambiguous, and
+independent of every error mapper, of the `problem` code vocabulary, and of every handler.
+
+**Bonus, not a consolation.** This also **retires the weak positive case** the artifact had accepted
+as unavoidable ("non-403 is a weak assertion, and deliberately so"). With a sentinel there is no
+404/400/405/501 to reason around and no valid body to construct for 147 operations, because no real
+handler runs. The corrected remedy is strictly stronger than the one it replaces *and* stronger than
+the one round 8 proposed.
+
+### Claim B — VERIFIED
+
+> *"`NewUser` with no `WithRole` yields a principal holding no capability at all."*
+
+Holds. The `iam_user_roles` insert is guarded by `if s.Role != ""` (`testdb/factory.go:318`); a
+role-less user has no row there and therefore no `role_capabilities` grant. Anchor tightened from
+the range `286-330` to the exact line.
+
+### Disposition
+
+`§10` property 2, the `§10` checklist row, and `§11` step 7 rewritten. **The design's structure is
+unchanged** — property 2 still proves *declared capability is enforced*, positively, against the one
+authority. What changed is the instrument, from one the program does not control to one it does.
+
+### On round 9
+
+The correction argues **against** it rather than for it. Round 8's remedy was wrong and round 8 did
+not catch it; the author's own verification did, and only because the claim was written down as
+load-bearing. That is §5's symmetric duty working, not a reviewer gap a ninth round would close.
+Convergence is unchanged: the design-level search is exhausted, and the residual class is exactly
+this one — unverified claims — which is discharged by verifying them, not by dispatching another
+round to guess at them.

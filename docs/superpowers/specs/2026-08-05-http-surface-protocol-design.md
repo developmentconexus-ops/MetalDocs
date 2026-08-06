@@ -828,7 +828,7 @@ Two consequences worth stating:
 | Generator validation rules (§2, **six** failures) | table test per rule, each asserting non-zero exit and the offending operationId in the message. Rule 6 is cross-document, so its case feeds the generator both documents in one run with a deliberate method+path collision |
 | `/api/v1/iam/presence/stream` on a SQLDB-less boot answers **501**, not 404 | boot the router with `presence == nil` and assert status 501 with a `problem+json` body — the Mount-is-total rule (§4) is only real if the degraded path is exercised |
 | Generated output is current | CI regenerate-and-diff; drift fails the build |
-| **Every operation enforces its declared capability** (§10.2 property 2) | generated from the spec, one integration case per operation: with the capability → non-403; without it → 403; `security: []` → admits an unauthenticated caller. Positive conformance against the single authority, not a differential against a peer table |
+| **Every operation enforces its declared capability** (§10.2 property 2) | generated from the spec, one integration case per operation, run through the real chain over a **sentinel** terminal handler: with the capability → sentinel invoked; without it → denied **and sentinel never invoked**; `security: []` → sentinel invoked unauthenticated. Positive conformance against the single authority, not a differential against a peer table |
 | **Every operation has a policy at all** (§10.2 property 1) | not a test and not a count — §2 rule 2 fails the **build** on a missing `x-authz-*`. A property the build cannot violate needs no assertion |
 | **The seven behavior changes** (§10.3) | one regression test each; rows 1–6 derived from the design, row 7 asserts the new table cannot be steered by parameter content |
 | Generator key == emitted pattern, exhaustive | compare the generator's key for all 147 operations against the patterns oapi-codegen actually emits, rather than reasoning from three sampled paths |
@@ -921,30 +921,62 @@ asserts the declared capability is *required*. This is positive evidence against
 proves the table the server actually enforces is the table the spec declares. A differential against
 a peer table could never prove this, because a peer table is not what the server should obey.
 
-**The negative case asserts a problem *code*, never a bare 403** — this is load-bearing. MetalDocs
-runs a two-tier PDP and **both tiers deny with 403 by deliberate, test-pinned design**
-(`controlleddocuments/.../routes_contract_test.go:466-471`: *"so both PDP tiers map to the same
-client-visible code"*). A suite asserting only the status would go green on a route whose tier-1
-rule is **missing or wrong** whenever tier-2 happens to deny — a false green on the exact property
-being proven. The two tiers are separable because their codes differ: tier-1 writes
-`permission.denied` (`problem/codes.go:120`, from `iam/delivery/http/middleware.go:143`) and tier-2
-writes `permission.capability_denied` (`codes.go:116`, from `authz.ErrCapDenied`). The negative case
-asserts **403 with `permission.denied`**, which can only have come from the middleware — before the
-handler and before any tx opens. Requiring the exact code also makes any module that collapses the
-two codes a suite failure rather than a silent hole.
+**A bare 403 is not evidence of tier-1.** MetalDocs runs a two-tier PDP and **both tiers deny with
+403 by deliberate, test-pinned design** (`controlleddocuments/.../routes_contract_test.go:466-471`:
+*"so both PDP tiers map to the same client-visible code"*). A suite asserting only the status would
+go green on a route whose tier-1 rule is **missing or wrong** whenever tier-2 happens to deny — a
+false green on the exact property being proven.
 
-**Positive case: non-403 is a weak assertion, and deliberately so.** 404 (cross-tenant), 400
-(validation), 405 and 501 all legitimately precede or follow tier-1, and the suite does not
-construct valid bodies for 147 operations. What it proves is that the middleware **admitted** the
-request — which is the whole of the tier-1 claim. Anything past that is tier-2's and the handler's,
-and neither is what this table decides.
+**The problem code is not evidence of tier-1 either, and an earlier revision of this section wrongly
+said it was.** That revision separated the tiers by code — tier-1 writes `permission.denied`
+(`problem/codes.go:120`, from `iam/delivery/http/middleware.go:143`), tier-2 writes
+`permission.capability_denied` (`codes.go:116`, from `authz.ErrCapDenied`) — and asserted the
+negative case on `permission.denied` as something that *"can only have come from the middleware"*.
+**The code disproves that in both directions.** `iam/delivery/http/routes_memberships.go:312-318`
+maps a **tier-2** `authz.ErrCapDenied` to `CodePermissionDenied`, the tier-1 code, with an
+ADR-0022-citing comment. `documents/delivery/http/handler.go:1300-1325` emits the same tier-1 code
+from inside the handler for `domain.ErrForbidden`/`ErrDocumentNotOwner`, and deliberately routes
+*both* tiers' capability errors to `capability_denied`. The collapse is already catalogued
+independently of this program (`docs/superpowers/analysis/2026-08-04-problem-code-registry-mapping.md`
+rows 8, 33, 77, 116 and consolidation **C-3**), so it is neither new nor this program's to close.
+
+The root cause of that mistake is more general than the mistake and is the reason this section now
+reads differently: **the suite had chosen a discriminator it does not own.** The problem code on a
+denied request is decided by fifteen modules' error mappers, each free to change it for its own
+reasons. A proof of *this table's* correctness cannot rest on it, and a fix that made the suite
+depend on it would have made every future error-mapper edit a silent hole in the proof.
+
+**The discriminator the suite owns is the terminal handler.** Tier-1 denies *in the middleware*,
+before `next.ServeHTTP` (`iam/delivery/http/middleware.go:99-143`). So the suite mounts the real
+chain (`chain.go:25`) over a **sentinel** terminal handler that records invocation and returns 200,
+registered under the generated pattern for each of the 147 operations — the same key both `Mount`
+and the capability table derive from (§3):
+
+- *Negative* — the request is denied **and the sentinel was never invoked** ⇒ the denial happened in
+  the middleware. Unambiguous, and independent of every module's error mapper, of `problem` code
+  vocabulary, and of any handler.
+- *Positive* — **the sentinel was invoked** ⇒ the middleware admitted the request, which is the
+  whole of the tier-1 claim.
+
+This is strictly stronger than the code assertion it replaces, and it **retires the weak positive
+case** an earlier draft accepted as unavoidable. With a sentinel there is no 404 (cross-tenant), 400
+(validation), 405 or 501 to reason around and no valid body to construct for 147 operations, because
+no real handler runs. The suite proves exactly *this route, this principal, admitted or refused by
+the middleware* — and nothing about tier-2 or the handler, which is correct, because neither is what
+this table decides.
+
+The suite depends on one property it does not itself establish: that the pattern it registers is the
+pattern the real publisher mounts. That is property 3's check, at boot, and the dependency is named
+here rather than assumed.
 
 **Mechanization, stated rather than assumed** (`tests/integration/testdb/factory.go:286-330`).
 `testdb` seeds principals by **role**, and capabilities come from `role_capabilities` — there is no
 exact-one-capability builder, and curated roles carry overlapping sets. The suite therefore does not
 need one:
-- *Negative* — `NewUser` with **no** `WithRole` yields a principal holding no capability at all, so
-  one fixture serves every guarded operation. This is the common case and it is available today.
+- *Negative* — `NewUser` with **no** `WithRole` yields a principal holding no capability at all: the
+  `iam_user_roles` insert is guarded by `if s.Role != ""` (`factory.go:318`), so a role-less user has
+  no row there and therefore no `role_capabilities` grant. One fixture serves every guarded
+  operation, and it is available today with no change to `testdb`.
 - *Positive* — the generator emits, per operation, any role whose `role_capabilities` set contains
   the declared capability, resolved by query at suite-build time. A capability granted by **no**
   seeded role is itself a finding, and the suite fails rather than skipping.
@@ -1089,7 +1121,9 @@ Ruling A: no intermediate state ships. Commits may be incremental; the release i
    against a table that is not yet enforcing exercises the *old* resolver and proves nothing about
    the new one, so a step 8 that flipped afterwards would be flipping onto an unverified table.
    The suite is one generated integration case per operation, asserting the declared capability is
-   required. It is positive evidence against the spec — the single authority — and it is **not** a
+   required, driven through the real chain over a **sentinel** terminal handler so that "the
+   middleware decided" is observed directly rather than inferred from a status or a problem code
+   (§10.2). It is positive evidence against the spec — the single authority — and it is **not** a
    comparison with `routeRules`; §10.1 explains at length why the program spent seven review rounds
    discovering that a comparison could not be the license.
    The 147 `x-authz-*` annotations authored in step 1 are also **reviewed row by row against
