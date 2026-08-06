@@ -70,6 +70,16 @@ func TestRule5_TwoTags(t *testing.T) {
 	}
 }
 
+func TestRule5_BlankTag(t *testing.T) {
+	errs := Validate([]Document{docWith(Operation{
+		ID: "getThing", Method: "GET", Path: "/thing", Tag: "",
+		Capability: "document.view",
+	})}, reg())
+	if !strings.Contains(errText(errs), "getThing") {
+		t.Fatalf("want getThing named in error, got: %s", errText(errs))
+	}
+}
+
 // Rule 6 is the only cross-document rule, which is why the generator takes
 // both documents in ONE invocation: a rule comparing two documents cannot be
 // checked by a run that has only ever seen one.

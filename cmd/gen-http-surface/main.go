@@ -14,10 +14,11 @@ import (
 
 // capabilityRegistrySource is the single source of truth for wire capability
 // strings: internal/modules/iam/domain/model.go's Capability constants
-// (ADR 0022). This is a stopgap reader for Task 4's validation-only command —
-// it exists because Validate requires a registry to check rule 3 against, not
-// because Task 4 owns registry sourcing. Task 5 may replace it wholesale when
-// it wires the real emitter.
+// (ADR 0022). This constant identifies the file path that loadCapabilityRegistry
+// reads to build the wire string → Go constant name map. The registry-sourcing
+// mechanism is shared: Task 4's validator uses it to check rule 3 against the
+// registry, and Task 5's emitter will use it to emit `iamdomain.CapMetricsView`
+// from the wire strings found in the spec.
 const capabilityRegistrySource = "internal/modules/iam/domain/model.go"
 
 func main() {

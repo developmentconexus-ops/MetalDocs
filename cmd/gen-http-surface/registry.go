@@ -53,5 +53,8 @@ func loadCapabilityRegistry(path string) (map[string]string, error) {
 			}
 		}
 	}
+	if len(registry) == 0 {
+		return nil, fmt.Errorf("%s: no Cap<Name> Capability = \"<wire>\" declarations found", path)
+	}
 	return registry, nil
 }
