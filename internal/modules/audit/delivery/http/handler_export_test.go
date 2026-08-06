@@ -63,7 +63,7 @@ func TestAuditHandler_MultiAxisFilter(t *testing.T) {
 	svc, _ := newExportService(t, events)
 	handler := httpdelivery.NewHandler(svc).WithExporter(svc)
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := authedRequest(t, http.MethodGet, "/api/v1/audit/events?actor_id=alice&action=auth.*", "tenant-a", "actor-test", "")
 	rec := httptest.NewRecorder()
@@ -104,7 +104,7 @@ func TestAuditHandler_CursorPagination(t *testing.T) {
 	svc, _ := newExportService(t, events)
 	handler := httpdelivery.NewHandler(svc).WithExporter(svc)
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	rec1 := httptest.NewRecorder()
 	mux.ServeHTTP(rec1, authedRequest(t, http.MethodGet, "/api/v1/audit/events?limit=2", "tenant-a", "actor-test", ""))
@@ -159,7 +159,7 @@ func TestAuditHandler_ExportCSVThenDownloadIsTenantScoped(t *testing.T) {
 	svc, _ := newExportService(t, events)
 	handler := httpdelivery.NewHandler(svc).WithExporter(svc)
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, authedRequest(t, http.MethodPost, "/api/v1/audit/events/export", tenantA.String(), "actor-test", `{"format":"csv","filter":{}}`))
@@ -206,7 +206,7 @@ func TestAuditHandler_ExportJobActorScoped(t *testing.T) {
 	svc, exports := newExportService(t, events)
 	handler := httpdelivery.NewHandler(svc).WithExporter(svc)
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	// Use a fixed valid UUID for the tenant — "tenant-a" was a placeholder that
 	// predates the uuid.UUID type change (ExportJob.TenantID is now uuid.UUID to
@@ -233,7 +233,7 @@ func TestAuditHandler_ExportRejectsBadFormat(t *testing.T) {
 	svc, _ := newExportService(t, nil)
 	handler := httpdelivery.NewHandler(svc).WithExporter(svc)
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, authedRequest(t, http.MethodPost, "/api/v1/audit/events/export", "tenant-a", "actor-test", `{"format":"xml","filter":{}}`))

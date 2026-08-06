@@ -135,7 +135,7 @@ func withModuleAuth(req *http.Request, roles string) *http.Request {
 func TestRegisterRoutes_WrapperForwardsRepresentativeRoutes(t *testing.T) {
 	mod := newWrapperTestModule()
 	mux := http.NewServeMux()
-	mod.RegisterRoutes(mux)
+	mod.Mount(mux)
 	docID := "11111111-1111-4111-8111-111111111111"
 
 	req := withModuleAuth(httptest.NewRequest(http.MethodGet, "/api/v1/documents", nil), "editor")
@@ -160,9 +160,10 @@ func TestRegisterRoutesWithRateLimit_WrapperForwardingStillWorks(t *testing.T) {
 	t.Cleanup(rlCancel)
 	rl := ratelimit.New(rlCtx, ratelimit.DefaultConfig())
 	docID := "11111111-1111-4111-8111-111111111111"
-	mod.RegisterRoutesWithRateLimit(mux, rl, func(r *http.Request) string {
+	mod.WithRateLimit(rl, func(r *http.Request) string {
 		return iamdomain.UserIDFromContext(r.Context())
 	})
+	mod.Mount(mux)
 
 	reqBody := strings.NewReader(`{"session_id":"sess_1","base_revision_id":"rev_1","content_hash":"abc"}`)
 	req := withModuleAuth(httptest.NewRequest(http.MethodPost, "/api/v1/documents/"+docID+"/autosave/presign", reqBody), "editor")
@@ -176,7 +177,7 @@ func TestRegisterRoutesWithRateLimit_WrapperForwardingStillWorks(t *testing.T) {
 func TestRegisterRoutes_WrapperReturnsValidationErrorOnMalformedPathParam(t *testing.T) {
 	mod := newWrapperTestModule()
 	mux := http.NewServeMux()
-	mod.RegisterRoutes(mux)
+	mod.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodPatch, "/api/v1/documents/not-a-uuid/comments/not-an-int", strings.NewReader(`{}`))
 	rr := httptest.NewRecorder()

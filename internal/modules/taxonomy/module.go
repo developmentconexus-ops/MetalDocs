@@ -2,7 +2,7 @@
 // context: it owns the flat, code-keyed classification catalog
 // (DocumentFamily, DocumentProfile, ProcessArea) that controlled-documents
 // and documents bind to. New wires the repository, service, and handler
-// layers together; RegisterRoutes mounts the resulting HTTP surface.
+// layers together; Mount mounts the resulting HTTP surface.
 package taxonomy
 
 import (
@@ -65,7 +65,13 @@ func New(deps Dependencies) *Module {
 	return &Module{Handler: handler}
 }
 
-// RegisterRoutes mounts the module's HTTP handler onto mux.
-func (m *Module) RegisterRoutes(mux httprouter.Muxer) {
-	m.Handler.RegisterRoutes(mux)
+// Name identifies this publisher in boot assertion messages.
+func (m *Module) Name() string { return "taxonomy" }
+
+// Tag is the OpenAPI tag this publisher owns.
+func (m *Module) Tag() string { return "taxonomy" }
+
+// Mount mounts the module's HTTP handler onto mux.
+func (m *Module) Mount(mux httprouter.Muxer) {
+	m.Handler.Mount(mux)
 }

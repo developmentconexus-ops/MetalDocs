@@ -8,10 +8,15 @@ import (
 	"metaldocs/internal/platform/observability"
 )
 
+// mountHealth mounts both the health and metrics publishers (Task 15a,
+// Ruling 1 split them into two Go objects mounting two generated packages)
+// onto one mux, matching what buildRouter does in production -- the mounted
+// patterns are unchanged, only which Go object registers them moved.
 func mountHealth(t *testing.T) *http.ServeMux {
 	t.Helper()
 	mux := http.NewServeMux()
-	observability.NewHealthHandler(nil, nil).RegisterRoutes(mux)
+	observability.NewHealthHandler(nil).Mount(mux)
+	observability.NewMetricsHandler(nil).Mount(mux)
 	return mux
 }
 
@@ -39,8 +44,8 @@ func TestHealthRejectsNonGET(t *testing.T) {
 // mounted route. The status code stays 405, but the body/Content-Type/Allow
 // header now come from the stdlib mux's own rejection, not from the
 // handler's httpresponse.WriteMethodNotAllowed problem+json output. Pinned
-// here so that delta cannot regress or drift silently; metrics.go's
-// NewHealthHandler(nil, nil) never invokes h.metrics because the mux never
+// here so that delta cannot regress or drift silently; health.go's
+// NewMetricsHandler(nil) never invokes h.metrics because the mux never
 // reaches GetMetrics for these requests.
 func TestMetricsRejectsNonGET(t *testing.T) {
 	mux := mountHealth(t)

@@ -63,7 +63,7 @@ func (h *Handler) WithAcceptOptions(opts *websocket.AcceptOptions) *Handler {
 	return h
 }
 
-// RegisterRoutes mounts the stream endpoint on mux. The HTTP-fallback
+// MountStream mounts the stream endpoint on mux. The HTTP-fallback
 // snapshot endpoint (GET /iam/presence/snapshot) is mounted separately by
 // the generated iamapi.ServerInterface router (CON-07: codegen rollout for
 // IAM) via ServeSnapshot below — streamPresence stays hand-mounted here
@@ -74,7 +74,13 @@ func (h *Handler) WithAcceptOptions(opts *websocket.AcceptOptions) *Handler {
 // unconditionally (§4, Mount is total) even when h is nil — binding the
 // h.handleStream method value does not dereference h, and handleStream
 // itself answers 501 when h is nil (see below).
-func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
+//
+// Task 15a (Ruling 2, iam/presence): the mounting SITE moved from this
+// package's own routeFamilies entry into iamdelivery.Router.Mount, which
+// already holds the presence dependency (getPresenceSnapshot delegates into
+// ServeSnapshot below). presence.Handler itself no longer implements
+// httprouter.SurfacePublisher -- iamRouter is the single "iam" tag owner.
+func (h *Handler) MountStream(mux httprouter.Muxer) {
 	mux.HandleFunc(http.MethodGet+" /api/v1/iam/presence/stream", h.handleStream)
 }
 

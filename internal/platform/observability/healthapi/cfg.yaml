@@ -1,4 +1,4 @@
-package: observabilityapi
+package: healthapi
 generate:
   models: true
   std-http-server: true
@@ -7,4 +7,4 @@ generate:
 output: api.gen.go
 output-options:
   include-tags:
-    - observability
+    - health

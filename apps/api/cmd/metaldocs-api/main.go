@@ -425,12 +425,14 @@ func main() {
 		},
 		deps.StatusProvider,
 	)
-	// healthHandler is constructed after httpObs (not at its previous call
-	// site near authHandler) because GetMetrics now lives on this same
-	// handler and delegates to httpObs.MetricsHandler() — the last bare mount
-	// in the composition root (router.go's former "metrics" family) moves
-	// into this generated mount instead.
-	healthHandler := observability.NewHealthHandler(deps.StatusProvider, httpObs.MetricsHandler())
+	// healthHandler/observabilityHandlerMetrics are constructed after httpObs
+	// (not at healthHandler's previous call site near authHandler) because
+	// GetMetrics delegates to httpObs.MetricsHandler(). Task 15a (Ruling 1)
+	// split the former combined HealthHandler into two SurfacePublishers —
+	// one per OpenAPI tag ("health", "observability") — mounting two
+	// generated packages (healthapi, observabilityapi) instead of one.
+	healthHandler := observability.NewHealthHandler(deps.StatusProvider)
+	observabilityHandlerMetrics := observability.NewMetricsHandler(httpObs.MetricsHandler())
 	cors := security.NewCORS(corsCfg)
 
 	// Rate-limit store backend selection (M8/F8.2): memory (default,
@@ -707,7 +709,7 @@ func main() {
 		// WithLifecycle mutates the already-constructed tenantHandler in
 		// place; iamRouter (built later, but referencing the SAME
 		// tenantHandler pointer via WithTenantHandler) sees the wiring once
-		// RegisterGenerated's wrapped handlers are invoked at request time —
+		// Mount's wrapped handlers are invoked at request time —
 		// route mounting only captures the Router struct, not a snapshot of
 		// tenantHandler's fields.
 		if tenantHandler != nil {
@@ -778,6 +780,11 @@ func main() {
 	// SP-2: pin tenant dictionary values at document creation. tokensModule was
 	// built at startup (line ~358), before docMod.
 	docMod.Service.WithDictionaryReader(dictionaryValueReaderAdapter{reader: tokensModule.Reader})
+	// Task 15a: Mount(Muxer) takes exactly one argument, so the rate limiter
+	// and user-ID extractor (both constructed at line ~484, well before
+	// docMod exists) move from a routeFamilies closure onto docMod as
+	// constructor fields.
+	docMod.WithRateLimit(globalLimiter, userIDExtractor)
 
 	// Wire the documents-side adapter back into the controlled-documents service so atomic
 	// CD-create can clone the initial document inside the same tx as the CD
@@ -824,18 +831,16 @@ func main() {
 	buildRouter(mux, routeHandlers{
 		auth:                authHandler,
 		health:              healthHandler,
+		observability:       observabilityHandlerMetrics,
 		featureFlags:        featureFlagsHandler,
 		audit:               auditHandler,
 		search:              searchHandler,
 		security:            securityHandler,
-		presence:            presenceHandler,
 		taxonomy:            taxonomyModule,
 		tokens:              tokensModule,
 		controlledDocuments: controlledDocumentsModule,
 		iamRouter:           iamRouter,
 		documents:           docMod,
-		documentsRateLimit:  globalLimiter,
-		documentsUserID:     userIDExtractor,
 		templates:           templatesModule,
 		approval:            approvalHandler,
 		distribution:        distributionHandler,
@@ -1158,12 +1163,13 @@ func requireApprovalRuntimeSupport(fanoutURL string) error {
 // (Z-22, REQ-REL-2); the BumpMiddleware is wrapped into the outer request chain
 // so authenticated requests refresh last_seen_at (debounced 60s per user, PR-9).
 //
-// CON-07: the presence Handler's WebSocket /iam/presence/stream route is still
-// registered here directly (RegisterRoutes only mounts /stream — see
-// presence/handler.go), because streamPresence is excluded from server codegen
-// (cfg.yaml exclude-operation-ids). The HTTP-fallback snapshot route is NOT
-// mounted here anymore: the caller mounts it via iamdelivery.Router.
-// RegisterGenerated using the returned *iampresence.Handler (ServeSnapshot).
+// CON-07: the presence Handler's WebSocket /iam/presence/stream route mounts
+// via presence.MountStream (see presence/handler.go), because streamPresence
+// is excluded from server codegen (cfg.yaml exclude-operation-ids). Task 15a
+// (Ruling 2) folded that mount into iamdelivery.Router.Mount, which also
+// mounts the HTTP-fallback snapshot route via the returned *iampresence.
+// Handler (ServeSnapshot) — neither route is mounted here at construction
+// time; both are mounted by buildRouter (router.go) via iamRouter.
 func startPresence(
 	ctx context.Context,
 	deps bootstrap.APIDependencies,

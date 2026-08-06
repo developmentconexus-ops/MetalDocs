@@ -324,12 +324,17 @@ func (stubNotificationsRepository) MarkAllRead(context.Context, string, string) 
 }
 
 // buildTestRouteHandlers constructs one instance of every routeHandlers
-// member with nil/stub inner dependencies — safe because buildRouter's
-// RegisterRoutes/Register/RegisterGenerated calls only bind method values to
-// mux patterns, they never invoke a service. This exercises every mount
-// buildRouter performs, including ones main() sometimes skips at runtime
-// (e.g. the no-SQLDB boot path), so TestRouteCoverage gets maximal true
-// coverage of what a route table omission would actually miss.
+// member with nil/stub inner dependencies — safe because buildRouter's Mount
+// calls only bind method values to mux patterns, they never invoke a
+// service. This exercises every mount buildRouter performs, including ones
+// main() sometimes skips at runtime (e.g. the no-SQLDB boot path), so
+// TestRouteCoverage gets maximal true coverage of what a route table
+// omission would actually miss.
+//
+// presence is no longer its own routeHandlers field (Task 15a, Ruling 2):
+// presenceHandler is still constructed here and passed into
+// iamdelivery.NewRouter, which folds the hand-mounted stream route into its
+// own Mount.
 func buildTestRouteHandlers() routeHandlers {
 	presenceRepo := stubPresenceRepository{}
 	presenceHub := iampresence.NewHub(presenceRepo, nil)
@@ -345,27 +350,28 @@ func buildTestRouteHandlers() routeHandlers {
 		presenceHandler,
 	)
 
+	docMod := &documents.Module{Handler: dhttp.NewHandler(nil)}
+	docMod.WithRateLimit(nil, func(*http.Request) string { return "" })
+
 	return routeHandlers{
-		auth:         authdelivery.NewHandler(nil),
-		health:       observability.NewHealthHandler(nil, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})),
-		featureFlags: featureflags.NewHandler(config.FeatureFlagsConfig{}),
-		audit:        auditdelivery.NewHandler(stubAuditQuerier{}),
-		search:       searchdelivery.NewHandler(nil),
-		security:     securitydelivery.NewHandler(nil),
-		presence:     presenceHandler,
-		taxonomy:     &taxonomy.Module{Handler: thttp.NewHandler(nil, nil, nil, nil)},
-		tokens:       &tokens.Module{Handler: tokenshttp.NewHandler(stubTokenService{})},
+		auth:          authdelivery.NewHandler(nil),
+		health:        observability.NewHealthHandler(nil),
+		observability: observability.NewMetricsHandler(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})),
+		featureFlags:  featureflags.NewHandler(config.FeatureFlagsConfig{}),
+		audit:         auditdelivery.NewHandler(stubAuditQuerier{}),
+		search:        searchdelivery.NewHandler(nil),
+		security:      securitydelivery.NewHandler(nil),
+		taxonomy:      &taxonomy.Module{Handler: thttp.NewHandler(nil, nil, nil, nil)},
+		tokens:        &tokens.Module{Handler: tokenshttp.NewHandler(stubTokenService{})},
 		controlledDocuments: &controlleddocuments.Module{
 			Handler: cddhttp.NewHandler(nil, nil),
 		},
-		iamRouter:          iamRouter,
-		documents:          &documents.Module{Handler: dhttp.NewHandler(nil)},
-		documentsRateLimit: nil,
-		documentsUserID:    func(*http.Request) string { return "" },
-		templates:          templateshttp.New(nil, func(*http.Request, string, string, string) error { return nil }, nil),
-		approval:           approvalhttp.NewHandler(nil, nil, nil, nil),
-		distribution:       distributionhttp.NewHandler(stubDistributionRepository{}),
-		notifications:      notificationshttp.NewHandler(stubNotificationsRepository{}),
+		iamRouter:     iamRouter,
+		documents:     docMod,
+		templates:     templateshttp.New(nil, func(*http.Request, string, string, string) error { return nil }, nil),
+		approval:      approvalhttp.NewHandler(nil, nil, nil, nil),
+		distribution:  distributionhttp.NewHandler(stubDistributionRepository{}),
+		notifications: notificationshttp.NewHandler(stubNotificationsRepository{}),
 	}
 }
 
@@ -386,17 +392,16 @@ func buildTestRouteHandlers() routeHandlers {
 // returned here MUST have an entry in router.go's routeFamilies table, with
 // no exemption set to subtract against.
 //
-// documentsRateLimit and documentsUserID are excluded: they're config params
-// consumed by the documents family's RegisterRoutesWithRateLimit call, not
-// families of their own.
+// Every routeHandlers field is a route family (Task 15a): the former
+// documentsRateLimit/documentsUserID config params moved onto *documents.
+// Module as constructor fields (WithRateLimit, wired in main.go before the
+// module is placed in routeHandlers), so there is no longer a non-family
+// field to exclude.
 func routeHandlerFields() map[string]bool {
-	notAFamily := map[string]bool{"documentsRateLimit": true, "documentsUserID": true}
 	fields := map[string]bool{}
 	t := reflect.TypeOf(routeHandlers{})
 	for i := 0; i < t.NumField(); i++ {
-		if name := t.Field(i).Name; !notAFamily[name] {
-			fields[name] = true
-		}
+		fields[t.Field(i).Name] = true
 	}
 	return fields
 }
@@ -421,8 +426,8 @@ func routeHandlerFields() map[string]bool {
 // — TestPermissionsTable_NoMethodlessWriteShadowing and friends guard
 // routeRules' own shape, not this gap; they don't observe a registered
 // pattern at all. (presence is NOT in this set: its stream endpoint
-// registers method-qualified, presence/handler.go:73, so it is
-// strict-checked.)
+// registers method-qualified via presence.MountStream, called from
+// iamRouter's Mount, so it is strict-checked.)
 //
 // TRANSITIONAL LOCAL MAXIMUM (CLAUDE.md "Global Maximum, Not Local
 // Maximum"): the global-maximum structure is finishing the CON-07/ARC-02

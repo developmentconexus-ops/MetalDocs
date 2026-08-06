@@ -28,7 +28,7 @@ func buildHealthDeltaChain(t *testing.T) http.Handler {
 	t.Helper()
 
 	mux := http.NewServeMux()
-	observability.NewHealthHandler(nil, nil).RegisterRoutes(mux)
+	observability.NewHealthHandler(nil).Mount(mux)
 
 	permResolver := newPermissionResolver()
 	authMiddleware := authdelivery.NewMiddleware(nil, authapp.Config{SessionCookieName: "sid"}, true).

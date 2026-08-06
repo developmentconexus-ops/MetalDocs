@@ -3,7 +3,7 @@
 // ControlledDocument slot (metaldocs.controlled_documents) that binds a
 // (profile, area) pair to a chain of documents-module revisions. New
 // wires the repository, sequence allocator, application service, and
-// HTTP handler together; RegisterRoutes mounts the resulting HTTP
+// HTTP handler together; Mount mounts the resulting HTTP
 // surface. The module depends on taxonomy (profile/area validation),
 // documents (revision content via DocumentInitializer /
 // ActiveInstanceReader), and templates (template version state) purely
@@ -154,9 +154,15 @@ func New(deps Dependencies) *Module {
 	return &Module{Handler: h, svc: svc, repo: repo}
 }
 
-// RegisterRoutes mounts the module's HTTP handler onto mux.
-func (m *Module) RegisterRoutes(mux httprouter.Muxer) {
-	m.Handler.RegisterRoutes(mux)
+// Name identifies this publisher in boot assertion messages.
+func (m *Module) Name() string { return "controlled-documents" }
+
+// Tag is the OpenAPI tag this publisher owns.
+func (m *Module) Tag() string { return "controlled-documents" }
+
+// Mount mounts the module's HTTP handler onto mux.
+func (m *Module) Mount(mux httprouter.Muxer) {
+	m.Handler.Mount(mux)
 }
 
 // Service returns the module's application service so the composition

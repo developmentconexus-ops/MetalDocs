@@ -404,7 +404,7 @@ func newMuxWithRouteReadiness(t *testing.T, authz tmplhttp.AuthzFunc, repo *fake
 		WithRouteReadinessReader(routes)
 	h := tmplhttp.New(svc, authz, db)
 	mux := http.NewServeMux()
-	h.Register(mux)
+	h.Mount(mux)
 	return mux
 }
 

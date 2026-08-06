@@ -228,7 +228,7 @@ func newMux(t *testing.T, svc *fakeSvc) *http.ServeMux {
 	t.Helper()
 	h := httphandler.NewHandler(svc).WithCaps(fakeCaps{admin: false})
 	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
+	h.Mount(mux)
 	return mux
 }
 
@@ -418,7 +418,7 @@ func TestListDocuments_AdminSeesAllVsOwnScope(t *testing.T) {
 		svc := &fakeSvc{}
 		h := httphandler.NewHandler(svc).WithCaps(fakeCaps{admin: true})
 		mux := http.NewServeMux()
-		h.RegisterRoutes(mux)
+		h.Mount(mux)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/documents", nil)
 		withAuthHeaders(req, "system_admin")

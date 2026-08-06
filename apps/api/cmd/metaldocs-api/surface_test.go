@@ -112,3 +112,31 @@ func TestMergedSurfacePanicsOnCollision(t *testing.T) {
 		map[string]surfaceRule{"GET /x": rule("b")},
 	)
 }
+
+// Step 6 (Task 15a): every route owner satisfies the role, checked at
+// compile time. The list is wired for real in Task 15b; this pins the shape
+// now so the switch is a one-line change rather than 16 discoveries. Uses
+// the same nil-service construction buildTestRouteHandlers() already uses
+// (permissions_test.go) — registration hands method values to the mux and
+// never invokes them, so nil inner services are safe at mount time.
+var _ = func() []httprouter.SurfacePublisher {
+	h := buildTestRouteHandlers()
+	return []httprouter.SurfacePublisher{
+		h.auth,
+		h.health,
+		h.observability,
+		h.featureFlags,
+		h.audit,
+		h.search,
+		h.security,
+		h.taxonomy,
+		h.tokens,
+		h.controlledDocuments,
+		h.iamRouter,
+		h.documents,
+		h.templates,
+		h.approval,
+		h.distribution,
+		h.notifications,
+	}
+}()

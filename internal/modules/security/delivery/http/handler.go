@@ -4,7 +4,7 @@
 // auth + CapUserView, so the handler can treat the context as trusted.
 //
 // Routes are mounted through the generated securityapi.ServerInterface router
-// (HandlerWithOptions) rather than bare mux.HandleFunc — see RegisterRoutes.
+// (HandlerWithOptions) rather than bare mux.HandleFunc — see Mount.
 // Handler satisfies securityapi.ServerInterface directly (not the strict
 // variant): the three operations already write typed JSON/problem+json
 // bodies straight to http.ResponseWriter via the existing writeJSON/
@@ -82,7 +82,10 @@ func NewHandler(service *securityapp.Service) *Handler {
 	return &Handler{service: service}
 }
 
-func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
+func (h *Handler) Name() string { return "security" }
+func (h *Handler) Tag() string  { return "security" }
+
+func (h *Handler) Mount(mux httprouter.Muxer) {
 	securityapi.HandlerWithOptions(h, securityapi.StdHTTPServerOptions{
 		BaseURL:    apibase.BaseURL,
 		BaseRouter: mux,

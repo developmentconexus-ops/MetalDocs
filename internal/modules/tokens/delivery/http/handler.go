@@ -73,8 +73,14 @@ func NewHandler(svc TokenService) *Handler {
 	return &Handler{svc: svc}
 }
 
-// RegisterRoutes mounts the handler onto mux under /api/v1.
-func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
+// Name identifies this publisher in boot assertion messages.
+func (h *Handler) Name() string { return "tokens" }
+
+// Tag is the OpenAPI tag this publisher owns.
+func (h *Handler) Tag() string { return "tokens" }
+
+// Mount mounts the handler onto mux under /api/v1.
+func (h *Handler) Mount(mux httprouter.Muxer) {
 	tokensapi.HandlerWithOptions(h, tokensapi.StdHTTPServerOptions{
 		BaseRouter: mux,
 		BaseURL:    apibase.BaseURL,

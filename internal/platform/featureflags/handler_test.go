@@ -15,7 +15,7 @@ func TestHandler_Returns200WithFlags(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/feature-flags", nil)
 	rr := httptest.NewRecorder()
 	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
+	h.Mount(mux)
 	mux.ServeHTTP(rr, req)
 
 	if rr.Code != 200 {

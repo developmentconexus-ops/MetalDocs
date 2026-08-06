@@ -35,7 +35,7 @@ func (f fakeFamilyService) Deactivate(_ context.Context, code domain.FamilyCode)
 func TestFamiliesHandler_GetMissing_Returns404(t *testing.T) {
 	handler := &Handler{families: fakeFamilyService{}}
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/taxonomy/families/missing", nil)
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
@@ -58,7 +58,7 @@ func TestFamiliesHandler_GetMissing_Returns404(t *testing.T) {
 func TestFamiliesHandler_ListReturns200(t *testing.T) {
 	handler := &Handler{families: fakeFamilyService{}}
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/taxonomy/families", nil)
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
@@ -73,7 +73,7 @@ func TestFamiliesHandler_ListReturns200(t *testing.T) {
 func TestFamiliesHandler_CreateUniqueViolationReturns409(t *testing.T) {
 	handler := NewHandler(fakeProfileService{}, fakeAreaService{}, fakeFamilyService{createErr: &pgconn.PgError{Code: "23505"}}, newIdempotentMockDB(t))
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/taxonomy/families", strings.NewReader(`{"code":"F1","name":"Family"}`))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
@@ -90,7 +90,7 @@ func TestFamiliesHandler_CreateUniqueViolationReturns409(t *testing.T) {
 func TestFamiliesHandler_CreateConstraintViolationReturnsGenericValidationMessage(t *testing.T) {
 	handler := NewHandler(fakeProfileService{}, fakeAreaService{}, fakeFamilyService{createErr: &pgconn.PgError{Code: "23514", Message: "sensitive detail"}}, newIdempotentMockDB(t))
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/taxonomy/families", strings.NewReader(`{"code":"F1","name":"Family"}`))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))

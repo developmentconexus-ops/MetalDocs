@@ -179,10 +179,16 @@ var idempotentRoutes = map[string]bool{
 	"POST /api/v1/templates/{id}/versions/{n}/signoff":             true,
 }
 
-// Register mounts the generated templates routes onto mux via
+// Name identifies this publisher in boot assertion messages.
+func (h *Handler) Name() string { return "templates" }
+
+// Tag is the OpenAPI tag this publisher owns.
+func (h *Handler) Tag() string { return "templates" }
+
+// Mount mounts the generated templates routes onto mux via
 // templatesapi.HandlerWithOptions, applying an idempotency-key middleware to
 // the mutation routes listed in idempotentRoutes.
-func (h *Handler) Register(mux httprouter.Muxer) {
+func (h *Handler) Mount(mux httprouter.Muxer) {
 	middleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// r.Pattern already carries the method prefix ("POST /api/v1/...")

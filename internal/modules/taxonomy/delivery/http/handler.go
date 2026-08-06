@@ -78,11 +78,17 @@ var idempotentCreateRoutes = map[string]func(*Handler) *idempotency.Store{
 	"POST /api/v1/taxonomy/families": func(h *Handler) *idempotency.Store { return h.idempFamily },
 }
 
-// RegisterRoutes mounts the 16 generated taxonomy operations onto mux under
+// Name identifies this publisher in boot assertion messages.
+func (h *Handler) Name() string { return "taxonomy" }
+
+// Tag is the OpenAPI tag this publisher owns.
+func (h *Handler) Tag() string { return "taxonomy" }
+
+// Mount mounts the 16 generated taxonomy operations onto mux under
 // the "/api/v1" base, translating unmarshalable request bodies to a 400
 // VALIDATION_ERROR problem+json response. The three create routes are
 // additionally gated by the platform idempotency middleware.
-func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
+func (h *Handler) Mount(mux httprouter.Muxer) {
 	middleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// r.Pattern already carries the method prefix ("POST /api/v1/...")

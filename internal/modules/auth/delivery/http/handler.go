@@ -92,13 +92,19 @@ func (h *Handler) WithAudit(w auditdomain.Writer) *Handler {
 	return h
 }
 
-// RegisterRoutes mounts the auth endpoints (login, logout, me, change-password)
+// Name identifies this publisher in boot assertion messages.
+func (h *Handler) Name() string { return "auth" }
+
+// Tag is the OpenAPI tag this publisher owns (specTags in httpsurface_gen.go).
+func (h *Handler) Tag() string { return "auth" }
+
+// Mount mounts the auth endpoints (login, logout, me, change-password)
 // on mux via the generated authapi.ServerInterface router. Handler satisfies
 // authapi.ServerInterface directly (see the exported adapter methods below);
 // each one delegates straight through to the pre-existing, already-tested
 // private handler (unchanged) rather than reimplementing parsing/response
 // logic.
-func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
+func (h *Handler) Mount(mux httprouter.Muxer) {
 	authapi.HandlerWithOptions(h, authapi.StdHTTPServerOptions{
 		BaseURL:    apibase.BaseURL,
 		BaseRouter: mux,

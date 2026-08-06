@@ -45,7 +45,7 @@ func (f fakeAreaService) Archive(ctx context.Context, tenantID string, areaCode 
 func TestAreasHandler_CreateUniqueViolationReturns409(t *testing.T) {
 	handler := NewHandler(fakeProfileService{}, fakeAreaService{createErr: &pgconn.PgError{Code: "23505"}}, fakeFamilyService{}, newIdempotentMockDB(t))
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/taxonomy/areas", strings.NewReader(`{"code":"A1","name":"Area"}`))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
@@ -62,7 +62,7 @@ func TestAreasHandler_CreateUniqueViolationReturns409(t *testing.T) {
 func TestAreasHandler_UpdateReturns404WhenAreaMissing(t *testing.T) {
 	handler := &Handler{areas: fakeAreaService{getErr: domain.ErrAreaNotFound}}
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/taxonomy/areas/A1", strings.NewReader(`{"name":"Area"}`))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))

@@ -92,7 +92,7 @@ func newMuxWithApprovalKernelOnly(t *testing.T, authz tmplhttp.AuthzFunc, repo *
 	svc := application.New(repo, fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(mockDB))
 	h := tmplhttp.New(svc, authz, mockDB).WithApprovalKernel(submit, decision, read, stubTxRunner{})
 	mux := http.NewServeMux()
-	h.Register(mux)
+	h.Mount(mux)
 	return mux
 }
 

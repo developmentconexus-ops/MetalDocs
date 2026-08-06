@@ -73,7 +73,7 @@ func (h *Handler) ListControlledDocuments(w http.ResponseWriter, r *http.Request
 // AtomicCreateControlledDocument handles POST /controlled-documents:
 // creates a controlled document and its first document revision
 // atomically (ADR 0011). Requires an Idempotency-Key header (enforced by
-// the middleware wired in RegisterRoutes).
+// the middleware wired in Mount).
 func (h *Handler) AtomicCreateControlledDocument(w http.ResponseWriter, r *http.Request, params controlleddocumentsapi.AtomicCreateControlledDocumentParams) {
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
@@ -255,7 +255,7 @@ func (h *Handler) GetControlledDocumentCreationContext(w http.ResponseWriter, r 
 // /controlled-documents/{id}/revisions: creates a new document revision
 // for an existing active controlled document. Requires an
 // Idempotency-Key header (enforced by the middleware wired in
-// RegisterRoutes).
+// Mount).
 func (h *Handler) CreateControlledDocumentRevision(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params controlleddocumentsapi.CreateControlledDocumentRevisionParams) {
 	r.SetPathValue("id", id.String())
 	tenantID, err := tenantIDFromRequest(r)

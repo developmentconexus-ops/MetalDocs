@@ -37,7 +37,7 @@ func TestPasswordChangeRevokesSessionAndClearsMustChangePassword(t *testing.T) {
 
 	authHandler := httpdelivery.NewHandler(svc)
 	mux := http.NewServeMux()
-	authHandler.RegisterRoutes(mux)
+	authHandler.Mount(mux)
 	handler := httpdelivery.NewMiddleware(svc, cfg, true).Wrap(mux)
 
 	loginResp := performJSONRequest(t, handler, http.MethodPost, "/api/v1/auth/login", `{"identifier":"flow.user","password":"abc12345"}`, nil)
@@ -112,7 +112,7 @@ func TestPasswordChangeEmitsExpiredCookie(t *testing.T) {
 
 	authHandler := httpdelivery.NewHandler(svc)
 	mux := http.NewServeMux()
-	authHandler.RegisterRoutes(mux)
+	authHandler.Mount(mux)
 	handler := httpdelivery.NewMiddleware(svc, cfg, true).Wrap(mux)
 
 	loginResp := performJSONRequest(t, handler, http.MethodPost, "/api/v1/auth/login", `{"identifier":"cookie.user","password":"abc12345"}`, nil)

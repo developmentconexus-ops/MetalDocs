@@ -7,9 +7,15 @@ import (
 	notificationsapi "metaldocs/internal/modules/notifications/api"
 )
 
-// RegisterRoutes wires the notifications endpoints onto mux via the generated
+// Name identifies this publisher in boot assertion messages.
+func (h *Handler) Name() string { return "notifications" }
+
+// Tag is the OpenAPI tag this publisher owns.
+func (h *Handler) Tag() string { return "notifications" }
+
+// Mount wires the notifications endpoints onto mux via the generated
 // strict handler. All endpoints share the /api/v1 base URL prefix.
-func RegisterRoutes(h *Handler, mux httprouter.Muxer) {
+func (h *Handler) Mount(mux httprouter.Muxer) {
 	strict := notificationsapi.NewStrictHandler(h, nil)
 	notificationsapi.HandlerWithOptions(strict, notificationsapi.StdHTTPServerOptions{
 		BaseRouter: mux,

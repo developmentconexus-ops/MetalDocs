@@ -35,10 +35,16 @@ var idempotentRoutes = map[string]bool{
 	"POST /api/v1/documents/{id}/review":                   true,
 }
 
-// RegisterRoutes wires all approval routes onto mux via the generated
+// Name identifies this publisher in boot assertion messages.
+func (h *Handler) Name() string { return "approval" }
+
+// Tag is the OpenAPI tag this publisher owns.
+func (h *Handler) Tag() string { return "approval" }
+
+// Mount wires all approval routes onto mux via the generated
 // ServerInterface router, so a route added to the OpenAPI spec that lacks a
 // Handler method fails to compile instead of silently 404ing.
-func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
+func (h *Handler) Mount(mux httprouter.Muxer) {
 	middleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// r.Pattern already carries the method prefix ("POST /api/v1/...")

@@ -1,5 +1,5 @@
 // Routes are mounted through the generated searchapi.ServerInterface router
-// (HandlerWithOptions) rather than bare mux.HandleFunc — see RegisterRoutes.
+// (HandlerWithOptions) rather than bare mux.HandleFunc — see Mount.
 // Handler satisfies searchapi.ServerInterface directly (not the strict
 // variant): handleSearchDocuments already writes typed JSON/problem+json
 // bodies straight to http.ResponseWriter via the existing httpresponse
@@ -70,7 +70,10 @@ func NewHandler(service Searcher) *Handler {
 	return &Handler{service: service}
 }
 
-func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
+func (h *Handler) Name() string { return "search" }
+func (h *Handler) Tag() string  { return "search" }
+
+func (h *Handler) Mount(mux httprouter.Muxer) {
 	searchapi.HandlerWithOptions(h, searchapi.StdHTTPServerOptions{
 		BaseURL:    apibase.BaseURL,
 		BaseRouter: mux,

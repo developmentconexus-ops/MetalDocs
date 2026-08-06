@@ -18,7 +18,7 @@ func TestHandleEvents_405_Allow(t *testing.T) {
 	service := application.NewService(memory.NewWriter())
 	handler := httpdelivery.NewHandler(service)
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/audit/events", nil)
 	ctx := tenant.WithTenantID(req.Context(), "tenant-test")
@@ -43,7 +43,7 @@ func TestHandleExport_405_Allow(t *testing.T) {
 	service := application.NewService(memory.NewWriter())
 	handler := httpdelivery.NewHandler(service)
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/audit/events/export", nil)
 	ctx := tenant.WithTenantID(req.Context(), "tenant-test")
@@ -73,7 +73,7 @@ func TestHandleExportSubresource_405_Allow(t *testing.T) {
 	service := application.NewService(memory.NewWriter())
 	handler := httpdelivery.NewHandler(service)
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/audit/events/export/some-id", nil)
 	ctx := tenant.WithTenantID(req.Context(), "tenant-test")

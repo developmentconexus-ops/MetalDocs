@@ -87,10 +87,16 @@ func tenantIDFromContext(ctx context.Context) string {
 	return tenant.DevTenantID
 }
 
-// RegisterRoutes mounts the generated controlled-documents API surface
+// Name identifies this publisher in boot assertion messages.
+func (h *Handler) Name() string { return "controlled-documents" }
+
+// Tag is the OpenAPI tag this publisher owns.
+func (h *Handler) Tag() string { return "controlled-documents" }
+
+// Mount mounts the generated controlled-documents API surface
 // onto mux under /api/v1, wrapping the two mutating POST routes with
 // Idempotency-Key enforcement.
-func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
+func (h *Handler) Mount(mux httprouter.Muxer) {
 	actorOf := func(ctx context.Context) (string, string) {
 		// Idempotency scoping is best-effort here: a missing actor
 		// produces a broader-but-still-safe key. The mutation handler

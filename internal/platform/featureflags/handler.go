@@ -7,7 +7,7 @@
 // to the tag, per §5 check 4 (tags govern, not package names).
 //
 // Mounted through the generated featureflagsapi.ServerInterface router
-// (HandlerWithOptions) rather than bare mux.HandleFunc -- see RegisterRoutes.
+// (HandlerWithOptions) rather than bare mux.HandleFunc -- see Mount.
 // Handler implements the plain ServerInterface directly (not strict):
 // GetFeatureFlags's (w, r) shape already matches the existing handle
 // method's signature exactly, so strict's (ctx, RequestObject) ->
@@ -35,8 +35,17 @@ func NewHandler(cfg config.FeatureFlagsConfig) *Handler {
 	return &Handler{cfg: cfg}
 }
 
-// RegisterRoutes registers the feature-flags route on mux.
-func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
+// Name identifies this publisher in boot assertion messages. It is the Go
+// package name, deliberately distinct from Tag(): see the package doc
+// comment above.
+func (h *Handler) Name() string { return "featureflags" }
+
+// Tag is the OpenAPI tag this publisher owns -- "configuration", not
+// "featureflags". See the package doc comment above.
+func (h *Handler) Tag() string { return "configuration" }
+
+// Mount registers the feature-flags route on mux.
+func (h *Handler) Mount(mux httprouter.Muxer) {
 	featureflagsapi.HandlerWithOptions(h, featureflagsapi.StdHTTPServerOptions{
 		BaseURL:    apibase.BaseURL,
 		BaseRouter: mux,

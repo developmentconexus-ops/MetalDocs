@@ -10,10 +10,10 @@ import (
 // wrong HTTP method with a 405 and the correct Allow header. Prior to T-008
 // (task 6 of the HTTP surface protocol) these bare mux.HandleFunc patterns
 // were method-less, so the handler itself had to guard the method and emit
-// the RFC 9457 problem+json 405. Now that RegisterRoutes mounts through the
+// the RFC 9457 problem+json 405. Now that Mount mounts through the
 // generated authapi.ServerInterface router (method-qualified net/http 1.22
 // patterns), the stdlib mux rejects the wrong method itself — the assertion
-// class is routing, so it registers through the real RegisterRoutes on a
+// class is routing, so it registers through the real Mount on a
 // real *http.ServeMux and asserts the 405 the mux produces (mirrors
 // internal/modules/audit/delivery/http/handler_allow_test.go, T-008).
 func TestAuthHandler_MethodNotAllowed(t *testing.T) {
@@ -32,7 +32,7 @@ func TestAuthHandler_MethodNotAllowed(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			h := &Handler{}
 			mux := http.NewServeMux()
-			h.RegisterRoutes(mux)
+			h.Mount(mux)
 
 			req := httptest.NewRequest(tc.method, tc.target, nil)
 			rec := httptest.NewRecorder()

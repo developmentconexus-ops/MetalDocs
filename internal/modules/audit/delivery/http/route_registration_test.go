@@ -24,7 +24,7 @@ func TestRegisterRoutes_AllSpecRoutesRegistered(t *testing.T) {
 	service := application.NewService(memory.NewWriter())
 	handler := httpdelivery.NewHandler(service).WithExporter(service)
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	routes := []struct {
 		method string
@@ -63,7 +63,7 @@ func TestRegisterRoutes_NoExtraRoutesServed(t *testing.T) {
 	service := application.NewService(memory.NewWriter())
 	handler := httpdelivery.NewHandler(service).WithExporter(service)
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	notFoundRoutes := []struct {
 		method string
@@ -100,7 +100,7 @@ func TestRegisterRoutes_WrapperValidationError(t *testing.T) {
 	service := application.NewService(memory.NewWriter())
 	handler := httpdelivery.NewHandler(service)
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/audit/events?limit=not-a-number", nil)
 	w := httptest.NewRecorder()
@@ -126,7 +126,7 @@ func TestRegisterRoutes_HandlerLevelValidationStillProblemJSON(t *testing.T) {
 	service := application.NewService(memory.NewWriter())
 	handler := httpdelivery.NewHandler(service)
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := authenticatedAuditRequest(http.MethodGet, "/api/v1/audit/events?occurred_after=not-a-timestamp", "tenant-a")
 	w := httptest.NewRecorder()

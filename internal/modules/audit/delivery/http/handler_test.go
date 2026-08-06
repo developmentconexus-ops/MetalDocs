@@ -23,7 +23,7 @@ func TestAuditHandler_InvalidLimitIsProblemJSON(t *testing.T) {
 	service := application.NewService(memory.NewWriter())
 	handler := httpdelivery.NewHandler(service)
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := authenticatedAuditRequest(http.MethodGet, "/api/v1/audit/events?limit=invalid", "tenant-a")
 	rec := httptest.NewRecorder()
@@ -56,7 +56,7 @@ func TestAuditHandler_RequiresAuthenticatedContext(t *testing.T) {
 	service := application.NewService(memory.NewWriter())
 	handler := httpdelivery.NewHandler(service)
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/audit/events", nil)
 	rec := httptest.NewRecorder()
@@ -103,7 +103,7 @@ func TestAuditHandler_ListEventsIsTenantScoped(t *testing.T) {
 	service := application.NewService(writer)
 	handler := httpdelivery.NewHandler(service)
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := authenticatedAuditRequest(http.MethodGet, "/api/v1/audit/events", "tenant-a")
 	rec := httptest.NewRecorder()
@@ -147,7 +147,7 @@ func TestAuditHandler_InvalidStoredPayloadFailsHonestly(t *testing.T) {
 		}},
 	})
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := authenticatedAuditRequest(http.MethodGet, "/api/v1/audit/events", "tenant-a")
 	rec := httptest.NewRecorder()
@@ -189,7 +189,7 @@ func TestAuditHandler_ExactPageOmitsNextCursor(t *testing.T) {
 		hasMore: false,
 	})
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := authenticatedAuditRequest(http.MethodGet, "/api/v1/audit/events", "tenant-a")
 	rec := httptest.NewRecorder()
@@ -235,7 +235,7 @@ func TestAuditHandler_HasMoreEmitsNextCursor(t *testing.T) {
 		hasMore: true,
 	})
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := authenticatedAuditRequest(http.MethodGet, "/api/v1/audit/events", "tenant-a")
 	rec := httptest.NewRecorder()
@@ -272,7 +272,7 @@ func TestAuditHandler_LimitClampedToMax(t *testing.T) {
 	capture := &queryCaptureQuerier{}
 	handler := httpdelivery.NewHandler(capture)
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := authenticatedAuditRequest(http.MethodGet, "/api/v1/audit/events?limit=500", "tenant-a")
 	rec := httptest.NewRecorder()

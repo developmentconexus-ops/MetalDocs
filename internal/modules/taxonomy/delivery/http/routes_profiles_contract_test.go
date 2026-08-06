@@ -73,7 +73,7 @@ func (f fakeProfileService) Archive(ctx context.Context, tenantID string, profil
 func TestProfilesHandler_ErrorEnvelopeContract(t *testing.T) {
 	handler := &Handler{profiles: fakeProfileService{getErr: domain.ErrProfileNotFound}}
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/taxonomy/profiles/missing", nil)
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
@@ -96,7 +96,7 @@ func TestProfilesHandler_ErrorEnvelopeContract(t *testing.T) {
 func TestProfilesHandler_UpdateUsesPatch(t *testing.T) {
 	handler := &Handler{profiles: fakeProfileService{}}
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodPatch, "/api/v1/taxonomy/profiles/foo", strings.NewReader(`{}`))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
@@ -111,7 +111,7 @@ func TestProfilesHandler_UpdateUsesPatch(t *testing.T) {
 func TestProfilesHandler_UpdateReturns404WhenProfileMissing(t *testing.T) {
 	handler := &Handler{profiles: fakeProfileService{getErr: domain.ErrProfileNotFound}}
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodPatch, "/api/v1/taxonomy/profiles/foo", strings.NewReader(`{}`))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
@@ -126,7 +126,7 @@ func TestProfilesHandler_UpdateReturns404WhenProfileMissing(t *testing.T) {
 func TestProfilesHandler_CreateUniqueViolationReturns409(t *testing.T) {
 	handler := NewHandler(fakeProfileService{createErr: &pgconn.PgError{Code: "23505"}}, fakeAreaService{}, fakeFamilyService{}, newIdempotentMockDB(t))
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/taxonomy/profiles", strings.NewReader(`{"code":"P1","familyCode":"F1","name":"Profile"}`))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
