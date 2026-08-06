@@ -75,6 +75,7 @@ import (
 	"metaldocs/internal/platform/featureflags"
 	"metaldocs/internal/platform/formval"
 	"metaldocs/internal/platform/httpclient"
+	"metaldocs/internal/platform/httprouter"
 	riverjobs "metaldocs/internal/platform/jobs/river"
 	platformmw "metaldocs/internal/platform/middleware"
 	"metaldocs/internal/platform/migrate"
@@ -154,15 +155,6 @@ func (a auditPayloadCryptoAdapter) DecryptForTenant(ctx context.Context, tenantI
 // so any accidental mount is treated as fully public by newPublicPathChecker.
 func e2eHandlersEnabled() bool {
 	return e2etest.E2EEnabled()
-}
-
-func mountE2EHandlersIfEnabled(mux *http.ServeMux, register func(*http.ServeMux)) {
-	if !e2eHandlersEnabled() {
-		slog.Info("e2etest handlers not mounted", "reason", "METALDOCS_E2E != 1")
-		return
-	}
-	slog.Warn("e2etest handlers mounted — destructive endpoints reachable without auth", "env", "METALDOCS_E2E=1")
-	register(mux)
 }
 
 //go:generate go run metaldocs/cmd/gen-http-surface -public ../../../../api/openapi/v1/openapi.yaml -e2e ../../../../api/openapi/internal-e2e.yaml -out-dir . -registry ../../../../internal/modules/iam/domain/model.go
@@ -496,14 +488,16 @@ func main() {
 		return ""
 	}
 
-	// mux is populated by one consolidated buildRouter call (router.go) once
-	// every handler below is constructed — not by scattered RegisterRoutes
-	// call sites. main() and TestRouteCoverage (permissions_test.go) call the
-	// exact same buildRouter function, so a handler built here but never added
-	// to routeHandlers is a build-time-visible gap, not a live discovery.
-	// iamAdminHandler, sessionsHandler, observabilityHandler, securityHandler:
-	// mounted via buildRouter below, once peopleHandler/membershipHandler/
-	// rolesCapsHandler/presenceHandler are also constructed.
+	// mux is populated by one consolidated buildPublishers call (publishers.go)
+	// once every handler below is constructed — not by scattered RegisterRoutes
+	// call sites. Each publisher is mounted through its own httprouter.Recorder,
+	// and the aggregate result is fed to assertSurface (surface.go), which
+	// refuses to boot on any mismatch with the spec-generated surface table —
+	// so a handler built here but never added to publisherDeps is a fatal at
+	// startup, not a live discovery. iamAdminHandler, sessionsHandler,
+	// observabilityHandler, securityHandler: mounted via buildPublishers below,
+	// once peopleHandler/membershipHandler/rolesCapsHandler/presenceHandler are
+	// also constructed.
 	mux := http.NewServeMux()
 
 	presenceBump, presenceHub, presenceHandler := startPresence(ctx, deps, iamAdminHandler)
@@ -824,11 +818,14 @@ func main() {
 	notificationsRepo := notificationsinfra.NewNotificationsRepository(deps.SQLDB)
 	notificationsHandler := notificationshttp.NewHandler(notificationsRepo)
 
-	// buildRouter (router.go) mounts every route family in one call — main()
-	// and TestRouteCoverage (permissions_test.go) call the exact same
-	// function, so a handler built above but never added to routeHandlers is
-	// a build-time-visible gap, not a live discovery.
-	buildRouter(mux, routeHandlers{
+	// buildPublishers (publishers.go) is the composition root's route
+	// inventory — a LIST, not a struct: a handler built above but never added
+	// to publisherDeps is a missing list element, and assertSurface's check 1
+	// (tag coverage) fires as a boot fatal below, not a live discovery.
+	e2e := e2ePublisher(deps.SQLDB)              // nil in every build without the handlers
+	useE2E := e2e != nil && e2eHandlersEnabled() // ONE value decides both sides
+
+	publishers := buildPublishers(publisherDeps{
 		auth:                authHandler,
 		health:              healthHandler,
 		observability:       observabilityHandlerMetrics,
@@ -839,17 +836,40 @@ func main() {
 		taxonomy:            taxonomyModule,
 		tokens:              tokensModule,
 		controlledDocuments: controlledDocumentsModule,
-		iamRouter:           iamRouter,
+		iam:                 iamRouter,
 		documents:           docMod,
 		templates:           templatesModule,
 		approval:            approvalHandler,
 		distribution:        distributionHandler,
 		notifications:       notificationsHandler,
 	})
+	surface, expectedTags := httpSurface, specTags
+	if useE2E {
+		publishers = append(publishers, e2e)
+		surface = mergedSurface(httpSurface, httpSurfaceE2E)
+		expectedTags = union(specTags, specTagsE2E)
+		slog.Warn("e2etest handlers mounted — destructive endpoints reachable without auth", "env", "METALDOCS_E2E=1")
+	} else {
+		slog.Info("e2etest handlers not mounted", "reason", "METALDOCS_E2E != 1")
+	}
 
-	mountE2EHandlersIfEnabled(mux, func(m *http.ServeMux) {
-		e2etest.RegisterE2EHandlers(m, deps.SQLDB, nil)
-	})
+	mounted := map[string][]string{}
+	for _, p := range publishers {
+		rec := httprouter.NewRecorder(mux) // one recorder PER publisher — check 4
+		p.Mount(rec)
+		mounted[p.Name()] = rec.Patterns()
+	}
+
+	// surface AND expectedTags are BOTH derived from useE2E — never from the
+	// publisher list, which is the thing being audited: an expected set
+	// derived from the list under audit makes check 1 vacuously true, which
+	// is exactly how a missing publisher would pass a check written to catch
+	// it.
+	if err := assertSurface(mounted, surface, expectedTags, publishers); err != nil {
+		slog.Error("http surface", "err", err)
+		deps.Cleanup()
+		os.Exit(1)
+	}
 
 	if deps.SQLDB != nil {
 		httpObs.SetDBPool(postgres.NewPoolStatsAdapter(deps.SQLDB))

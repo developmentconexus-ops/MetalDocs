@@ -6,11 +6,16 @@ import (
 	"testing"
 )
 
-// Asserts that with METALDOCS_E2E unset the e2etest registrar is not invoked
-// and the corresponding test-only paths are absent from the mux. Regression
-// guard for the C1 finding: permissions.go does not enumerate /internal/test/*
-// routes, so any unconditional mount would be treated as fully public by
-// newPublicPathChecker, bypassing both authMiddleware and iamMiddleware.
+// Asserts that with METALDOCS_E2E unset the e2e publisher (when compiled in)
+// is never mounted and the corresponding test-only paths are absent from the
+// mux. Regression guard for the C1 finding: permissions.go does not
+// enumerate /internal/test/* routes, so any unconditional mount would be
+// treated as fully public by newPublicPathChecker, bypassing both
+// authMiddleware and iamMiddleware.
+//
+// Task 15b replaced mountE2EHandlersIfEnabled's callback indirection with
+// main.go's inline `useE2E := e2e != nil && e2eHandlersEnabled()`, mirrored
+// here directly rather than through a dedicated helper function.
 func TestE2EHandlersGate_EnvUnset_DoesNotRegister(t *testing.T) {
 	t.Setenv("METALDOCS_E2E", "")
 	if e2eHandlersEnabled() {
@@ -18,10 +23,9 @@ func TestE2EHandlersGate_EnvUnset_DoesNotRegister(t *testing.T) {
 	}
 
 	mux := http.NewServeMux()
-	called := false
-	mountE2EHandlersIfEnabled(mux, func(*http.ServeMux) { called = true })
-	if called {
-		t.Fatal("register callback invoked with METALDOCS_E2E unset")
+	e2e := e2ePublisher(nil)
+	if e2e != nil && e2eHandlersEnabled() { // mirrors main.go's useE2E
+		e2e.Mount(mux)
 	}
 
 	paths := []struct {
@@ -41,16 +45,30 @@ func TestE2EHandlersGate_EnvUnset_DoesNotRegister(t *testing.T) {
 	}
 }
 
-func TestE2EHandlersGate_EnvSet_CallsRegistrar(t *testing.T) {
+// TestE2EHandlersGate_EnvSet_Mounts proves the complement: when
+// METALDOCS_E2E=1 AND the e2e handlers are compiled into this build
+// (`-tags integration`), the publisher mounts its routes. In a build without
+// the handlers (e2ePublisher returns nil, see httpsurface_e2e_publisher_stub.go)
+// there is nothing to mount regardless of the env var, so the test skips
+// rather than asserting a false positive.
+func TestE2EHandlersGate_EnvSet_Mounts(t *testing.T) {
 	t.Setenv("METALDOCS_E2E", "1")
 	if !e2eHandlersEnabled() {
 		t.Fatal("e2eHandlersEnabled returned false for METALDOCS_E2E=1")
 	}
+
+	e2e := e2ePublisher(nil)
+	if e2e == nil {
+		t.Skip("e2e handlers not compiled into this build (no -tags integration)")
+	}
+
 	mux := http.NewServeMux()
-	called := false
-	mountE2EHandlersIfEnabled(mux, func(*http.ServeMux) { called = true })
-	if !called {
-		t.Fatal("register callback not invoked when METALDOCS_E2E=1")
+	if e2e != nil && e2eHandlersEnabled() { // mirrors main.go's useE2E
+		e2e.Mount(mux)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/internal/test/seed", nil)
+	if _, pattern := mux.Handler(req); pattern == "" {
+		t.Fatal("expected /internal/test/seed registered when e2e enabled and compiled in")
 	}
 }
 

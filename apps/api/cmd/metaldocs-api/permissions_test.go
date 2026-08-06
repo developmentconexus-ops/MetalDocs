@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"runtime"
 	"sort"
@@ -39,7 +38,6 @@ import (
 	tokensdomain "metaldocs/internal/modules/tokens/domain"
 	"metaldocs/internal/platform/config"
 	"metaldocs/internal/platform/featureflags"
-	"metaldocs/internal/platform/httprouter"
 	"metaldocs/internal/platform/observability"
 )
 
@@ -231,39 +229,10 @@ func TestPublicPathChecker_RespectsPublicAndPrivateBoundaries(t *testing.T) {
 	}
 }
 
-// recordingMux implements httprouter.Muxer over a real *http.ServeMux,
-// recording every registered pattern before delegating. Used by
-// TestRouteCoverage to observe exactly what buildRouter mounts, without
-// needing a live server.
-type recordingMux struct {
-	mux      *http.ServeMux
-	patterns []string
-}
-
-func newRecordingMux() *recordingMux {
-	return &recordingMux{mux: http.NewServeMux()}
-}
-
-func (r *recordingMux) Handle(pattern string, handler http.Handler) {
-	r.patterns = append(r.patterns, pattern)
-	r.mux.Handle(pattern, handler)
-}
-
-func (r *recordingMux) HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request)) {
-	r.patterns = append(r.patterns, pattern)
-	r.mux.HandleFunc(pattern, handler)
-}
-
-func (r *recordingMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	r.mux.ServeHTTP(w, req)
-}
-
-var _ httprouter.Muxer = (*recordingMux)(nil)
-
-// --- Nil-safe stubs for constructing every routeHandlers member for
+// --- Nil-safe stubs for constructing every publisherDeps member for
 // registration purposes only. None of these methods are ever invoked by
-// buildRouter — route registration binds method values, it never calls
-// them — so returning zero values is safe and these stubs exist purely to
+// SurfacePublisher.Mount — route registration binds method values, it never
+// calls them — so returning zero values is safe and these stubs exist purely to
 // satisfy constructors that panic on a nil interface dependency.
 
 type stubTokenService struct{}
@@ -323,19 +292,19 @@ func (stubNotificationsRepository) MarkAllRead(context.Context, string, string) 
 	return 0, nil
 }
 
-// buildTestRouteHandlers constructs one instance of every routeHandlers
-// member with nil/stub inner dependencies — safe because buildRouter's Mount
+// buildTestRouteHandlers constructs one instance of every publisherDeps
+// member with nil/stub inner dependencies — safe because SurfacePublisher.Mount
 // calls only bind method values to mux patterns, they never invoke a
-// service. This exercises every mount buildRouter performs, including ones
-// main() sometimes skips at runtime (e.g. the no-SQLDB boot path), so
-// TestRouteCoverage gets maximal true coverage of what a route table
-// omission would actually miss.
+// service. This exercises every mount buildPublishers performs, including
+// ones main() sometimes skips at runtime (e.g. the no-SQLDB boot path), so
+// TestRealPublishersSatisfyTheAssertion (surface_test.go) gets maximal true
+// coverage of what a publisher list omission would actually miss.
 //
-// presence is no longer its own routeHandlers field (Task 15a, Ruling 2):
+// presence is no longer its own publisherDeps field (Task 15a, Ruling 2):
 // presenceHandler is still constructed here and passed into
 // iamdelivery.NewRouter, which folds the hand-mounted stream route into its
 // own Mount.
-func buildTestRouteHandlers() routeHandlers {
+func buildTestRouteHandlers() publisherDeps {
 	presenceRepo := stubPresenceRepository{}
 	presenceHub := iampresence.NewHub(presenceRepo, nil)
 	presenceHandler := iampresence.NewHandler(presenceHub, presenceRepo, nil)
@@ -353,7 +322,7 @@ func buildTestRouteHandlers() routeHandlers {
 	docMod := &documents.Module{Handler: dhttp.NewHandler(nil)}
 	docMod.WithRateLimit(nil, func(*http.Request) string { return "" })
 
-	return routeHandlers{
+	return publisherDeps{
 		auth:          authdelivery.NewHandler(nil),
 		health:        observability.NewHealthHandler(nil),
 		observability: observability.NewMetricsHandler(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})),
@@ -366,178 +335,13 @@ func buildTestRouteHandlers() routeHandlers {
 		controlledDocuments: &controlleddocuments.Module{
 			Handler: cddhttp.NewHandler(nil, nil),
 		},
-		iamRouter:     iamRouter,
+		iam:           iamRouter,
 		documents:     docMod,
 		templates:     templateshttp.New(nil, func(*http.Request, string, string, string) error { return nil }, nil),
 		approval:      approvalhttp.NewHandler(nil, nil, nil, nil),
 		distribution:  distributionhttp.NewHandler(stubDistributionRepository{}),
 		notifications: notificationshttp.NewHandler(stubNotificationsRepository{}),
 	}
-}
-
-// routeHandlerFields returns every routeHandlers field that names a route
-// family, derived from the struct's own field names via reflection — NOT a
-// hand-typed list. routeFamily.name is a string literal in router.go's mount
-// table; without this cross-check it could be misspelled or a whole entry
-// omitted, silently reintroducing the hand-sync-drift class this test exists
-// to eliminate. Anchoring the expected set to reflect.Type field names means
-// it cannot drift: it comes from routeHandlers' actual fields at compile
-// time, not from a second, independently-typed enumeration.
-//
-// Deliberately TYPE-driven, never value-driven: it takes no routeHandlers
-// instance and inspects no field's value. An earlier version skipped fields
-// that were nil, which let a newly added family launder itself out of the
-// expected set simply by being forgotten in buildTestRouteHandlers too — the
-// exact omission this guard exists to catch. Mount is total (§4): every field
-// returned here MUST have an entry in router.go's routeFamilies table, with
-// no exemption set to subtract against.
-//
-// Every routeHandlers field is a route family (Task 15a): the former
-// documentsRateLimit/documentsUserID config params moved onto *documents.
-// Module as constructor fields (WithRateLimit, wired in main.go before the
-// module is placed in routeHandlers), so there is no longer a non-family
-// field to exclude.
-func routeHandlerFields() map[string]bool {
-	fields := map[string]bool{}
-	t := reflect.TypeOf(routeHandlers{})
-	for i := 0; i < t.NumField(); i++ {
-		fields[t.Field(i).Name] = true
-	}
-	return fields
-}
-
-// TestRouteCoverage builds a real routeHandlers instance and mounts every
-// family in router.go's routeFamilies table onto a recordingMux, then asserts
-// every recorded pattern resolves to a routeRules entry — and separately that
-// buildRouter (the exact function main() calls) registers that same pattern
-// set. This replaces a hand-maintained fixture list of representative routes
-// (which could silently drift from what main() actually mounts) with a
-// structural guard: a handler that's registered here but has no matching
-// routeRules entry is a build-passing-but-red-test event, not a live
-// discovery.
-//
-// Method-qualified patterns ("GET /path", the oapi-codegen convention) are
-// checked strictly via matchedByRule(method, path). Bare legacy patterns
-// (no method prefix — auth, health, featureFlags, search, security; each
-// still hand-registered and internally switching on r.Method, EXCEPT health,
-// which has no method switch at all, see health.go) only support a looser
-// check: some routeRules entry matches the path for some method. That's the
-// strongest sound claim without inspecting each handler's internal dispatch
-// — TestPermissionsTable_NoMethodlessWriteShadowing and friends guard
-// routeRules' own shape, not this gap; they don't observe a registered
-// pattern at all. (presence is NOT in this set: its stream endpoint
-// registers method-qualified via presence.MountStream, called from
-// iamRouter's Mount, so it is strict-checked.)
-//
-// TRANSITIONAL LOCAL MAXIMUM (CLAUDE.md "Global Maximum, Not Local
-// Maximum"): the global-maximum structure is finishing the CON-07/ARC-02
-// codegen migration for those five handlers, so every one of their patterns
-// becomes method-qualified by construction and this loose check is deleted
-// in favor of the strict one used for every other family. That migration is
-// NOT YET SCHEDULED to a milestone — flagging that gap to the operator is
-// itself part of shipping this local maximum honestly, rather than picking
-// a milestone unilaterally.
-func TestRouteCoverage(t *testing.T) {
-	rec := newRecordingMux()
-	h := buildTestRouteHandlers()
-
-	// Walk router.go's mount table directly — buildRouter's entire body is a
-	// loop over it, so this is the same registration production performs,
-	// with per-family visibility production doesn't need. Three assertions
-	// the aggregate pattern count below cannot make:
-	//   - a family whose name isn't a routeHandlers field (typo in the table),
-	//   - a duplicate table entry,
-	//   - a family registering zero patterns (e.g. a miswired stub here),
-	//     which would otherwise hide behind every other family registering
-	//     fine.
-	fields := routeHandlerFields()
-	seen := map[string]bool{}
-	for _, f := range routeFamilies(h) {
-		if !fields[f.name] {
-			t.Errorf("routeFamilies returned %q, which is not a routeHandlers field — typo in router.go's mount table?", f.name)
-		}
-		if seen[f.name] {
-			t.Errorf("routeFamilies returned %q twice — duplicate entry in router.go's mount table", f.name)
-		}
-		seen[f.name] = true
-
-		before := len(rec.patterns)
-		f.register(rec)
-		if len(rec.patterns) == before {
-			t.Errorf("route family %q registered zero patterns — its handler construction in buildTestRouteHandlers (or its RegisterRoutes) is broken", f.name)
-		}
-	}
-	for family := range fields {
-		if !seen[family] {
-			t.Errorf("routeHandlers field %q has no entry in router.go's routeFamilies mount table — it is constructed but never mounted", family)
-		}
-	}
-
-	if len(rec.patterns) == 0 {
-		t.Fatal("routeFamilies registered zero patterns onto recordingMux — the mount table or its handler construction is broken")
-	}
-
-	// Fidelity: buildRouter is production's sole mount path (main.go), and its
-	// body is supposed to be nothing but a loop over routeFamilies. Assert
-	// that rather than trusting it — otherwise a statement added to
-	// buildRouter outside the loop, or a loop that stopped registering, would
-	// be invisible to this test even though the walk above stayed green.
-	viaBuildRouter := newRecordingMux()
-	buildRouter(viaBuildRouter, buildTestRouteHandlers())
-	if !reflect.DeepEqual(viaBuildRouter.patterns, rec.patterns) {
-		t.Errorf("buildRouter's registered patterns diverge from a direct walk of routeFamilies — buildRouter must be exactly a loop over the mount table\nbuildRouter:   %v\nrouteFamilies: %v", viaBuildRouter.patterns, rec.patterns)
-	}
-
-	resolver := newPermissionResolver()
-
-	for _, pattern := range rec.patterns {
-		pattern := pattern
-		t.Run(pattern, func(t *testing.T) {
-			if method, path, ok := strings.Cut(pattern, " "); ok && isHTTPMethod(method) {
-				if !matchedByRule(method, path) {
-					_, visibility := resolver(method, path)
-					t.Fatalf("registered route %s %s fell through to default visibility=%v — add an entry to routeRules",
-						method, path, visibility)
-				}
-				return
-			}
-
-			// Bare legacy pattern: assert some rule matches this path for some
-			// method (loose check — see doc comment above).
-			path := pattern
-			matched := false
-			for _, m := range []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete} {
-				if matchedByRule(m, path) {
-					matched = true
-					break
-				}
-			}
-			if !matched {
-				t.Fatalf("registered legacy route %q is matched by no routeRules entry for any method — add an entry to routeRules", path)
-			}
-		})
-	}
-}
-
-func isHTTPMethod(s string) bool {
-	switch s {
-	case http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodConnect, http.MethodOptions, http.MethodTrace:
-		return true
-	default:
-		return false
-	}
-}
-
-// matchedByRule reports whether some routeRule explicitly matches (method, path).
-// Distinguishes "matched as session-required" (intentional) from "unmatched →
-// session-required default" (forgotten registration). Used by TestRouteCoverage.
-func matchedByRule(method, path string) bool {
-	for _, rule := range routeRules {
-		if rule.matches(method, path) {
-			return true
-		}
-	}
-	return false
 }
 
 // TestPermissionsTable_NoMethodlessWriteShadowing locks the F-001 authoring

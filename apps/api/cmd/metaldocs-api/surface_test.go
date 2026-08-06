@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"strings"
 	"testing"
 
@@ -113,30 +114,32 @@ func TestMergedSurfacePanicsOnCollision(t *testing.T) {
 	)
 }
 
-// Step 6 (Task 15a): every route owner satisfies the role, checked at
-// compile time. The list is wired for real in Task 15b; this pins the shape
-// now so the switch is a one-line change rather than 16 discoveries. Uses
-// the same nil-service construction buildTestRouteHandlers() already uses
-// (permissions_test.go) — registration hands method values to the mux and
-// never invokes them, so nil inner services are safe at mount time.
-var _ = func() []httprouter.SurfacePublisher {
-	h := buildTestRouteHandlers()
-	return []httprouter.SurfacePublisher{
-		h.auth,
-		h.health,
-		h.observability,
-		h.featureFlags,
-		h.audit,
-		h.search,
-		h.security,
-		h.taxonomy,
-		h.tokens,
-		h.controlledDocuments,
-		h.iamRouter,
-		h.documents,
-		h.templates,
-		h.approval,
-		h.distribution,
-		h.notifications,
+// testPublisherDeps builds a real publisherDeps instance for the boot
+// assertion test below, reusing buildTestRouteHandlers (permissions_test.go)
+// — the same nil-service construction TestGeneratedKeysMatchCodegenPatterns
+// and mountRoutesWithNilPresence already use. Registration hands method
+// *values* to the mux and never invokes them, so nil inner services are safe
+// at mount time.
+func testPublisherDeps(t *testing.T) publisherDeps {
+	t.Helper()
+	return buildTestRouteHandlers()
+}
+
+// TestRealPublishersSatisfyTheAssertion is the boot assertion run in a test,
+// against the real publisher list built from real (nil-service) handlers. It
+// is the same call main() makes: one httprouter.Recorder per publisher,
+// fed to assertSurface against the generated httpSurface/specTags tables.
+func TestRealPublishersSatisfyTheAssertion(t *testing.T) {
+	mux := http.NewServeMux()
+	pubs := buildPublishers(testPublisherDeps(t)) // nil services are safe at mount time
+
+	mounted := map[string][]string{}
+	for _, p := range pubs {
+		rec := httprouter.NewRecorder(mux)
+		p.Mount(rec)
+		mounted[p.Name()] = rec.Patterns()
 	}
-}()
+	if err := assertSurface(mounted, httpSurface, specTags, pubs); err != nil {
+		t.Fatalf("the real surface does not satisfy its own declaration:\n%v", err)
+	}
+}

@@ -30,22 +30,22 @@ func TestPresenceStreamAnswers501WhenUnavailable(t *testing.T) {
 	}
 }
 
-// mountRoutesWithNilPresence builds a real routeHandlers instance exactly the
-// way buildTestRouteHandlers does (same constructors buildRouter's family
-// registration binds against), then rebuilds iamRouter with a nil presence
-// dependency and mounts through buildRouter — the same function main() calls.
+// mountRoutesWithNilPresence builds a real publisherDeps instance exactly the
+// way buildTestRouteHandlers does (same constructors buildPublishers'
+// SurfacePublisher list binds against), then rebuilds iam with a nil presence
+// dependency and mounts every publisher — the same construction main() runs.
 // This is the production mount path with only the presence dependency forced
 // nil, mirroring the one boot condition (deps.SQLDB == nil) that used to make
 // buildPresence return nil.
 //
 // Task 15a (Ruling 2) folded presence's stream mount into iamRouter.Mount, so
-// presence is no longer a routeHandlers field of its own — the nil injection
+// presence is no longer a publisherDeps field of its own — the nil injection
 // point moved to iamRouter's own presence dependency (unexported, so it's
-// re-supplied via NewRouter rather than a field assignment on h).
+// re-supplied via NewRouter rather than a field assignment on d).
 func mountRoutesWithNilPresence(t *testing.T, mux *http.ServeMux) {
 	t.Helper()
-	h := buildTestRouteHandlers()
-	h.iamRouter = iamdelivery.NewRouter(
+	d := buildTestRouteHandlers()
+	d.iam = iamdelivery.NewRouter(
 		iamdelivery.NewAdminHandler(nil, nil),
 		iamdelivery.NewPeopleHandler(nil, nil, nil),
 		iamdelivery.NewMembershipHandler(nil, nil),
@@ -54,5 +54,7 @@ func mountRoutesWithNilPresence(t *testing.T, mux *http.ServeMux) {
 		iamdelivery.NewObservabilityHandler(nil),
 		nil, // presence: forced nil, mirroring the SQLDB-less boot path
 	)
-	buildRouter(mux, h)
+	for _, p := range buildPublishers(d) {
+		p.Mount(mux)
+	}
 }

@@ -2,7 +2,11 @@
 
 package main
 
-import "metaldocs/internal/platform/httprouter"
+import (
+	"database/sql"
+
+	"metaldocs/internal/platform/httprouter"
+)
 
 // e2ePublisher returns nil in every build without the e2e handlers.
 //
@@ -10,4 +14,4 @@ import "metaldocs/internal/platform/httprouter"
 // pair uses `!integration && !production`, which leaves a hole: a literal
 // `-tags production` build satisfies neither file and would not compile. That
 // hole is latent and pre-existing; this pair must not inherit it.
-func e2ePublisher() httprouter.SurfacePublisher { return nil }
+func e2ePublisher(_ *sql.DB) httprouter.SurfacePublisher { return nil }
