@@ -965,13 +965,51 @@ Ruling A: no intermediate state ships. Commits may be incremental; the release i
    `observability/health.go:20`. Leaving `/healthz` mounted would fail step 6's check 2; deleting
    it later would break the four consumers in the interim. Also delete the dead
    `playwright.approval.config.ts` here rather than repointing it (§7).
-4. Make the e2e scaffolding a publisher with its own generated declaration (§5); delete the dead
-   panic probe. **This lands before the assertion, not after it** — an earlier draft numbered it
+4. **Create `api/openapi/internal-e2e.yaml`** — it does not exist today; `api/openapi/` contains
+   only `v1/` — make the e2e scaffolding a publisher with its own generated declaration (§5), and
+   delete the dead panic probe. **This lands before the assertion, not after it** — an earlier draft numbered it
    last while the graph already required it earlier, and a numbered order that contradicts its own
    dependency graph is a defect, not a presentation choice. `mountE2EHandlersIfEnabled`'s direct
    mount (`main.go:839-848`) runs *after* `buildRouter` today, so a recorder installed in step 6
    would not see those routes at all: following the old numbering would have left the e2e surface
    silently outside the assertion for three commits while the assertion reported completeness.
+
+   *What the new spec contains.* Exactly the routes `RegisterE2EHandlers` mounts
+   (`internal/test/e2e_seed.go:100-116`), and nothing else. The same generator runs over it in the
+   same invocation (§2 rule 6) and emits `httpsurface_e2e_gen.go`.
+
+   *Visibility — all e2e operations are declared `security: []`, public.* This records the truth
+   rather than inventing an authorization story. `POST /internal/test/seed` is the **bootstrap**:
+   its *response* is what issues the session cookies (`e2e/utils/seed.ts:27` → `SeedResult.cookies`;
+   `e2e/fixtures/isolation.ts:50`), so a caller cannot present a session it has not yet been issued.
+   `reset` and `governance-events` are likewise driven from Playwright's unauthenticated `request`
+   fixture (`e2e/utils/seed.ts:46`, `e2e/flows/happy_path.spec.ts:146`) as well as from an
+   authenticated `page.request` (`e2e/flows/sod_violation.spec.ts:87`) — called both ways, so
+   session-required is factually wrong for them. The guard on this surface is **not** tier-1 and
+   never was: it is `E2EEnabled()`, checked at registration (`e2e_seed.go:104-106`) and re-checked
+   inside every handler (`e2e_seed.go:120-123`). Declaring these session-required would add a
+   second, weaker guard and break teardown paths that run after the session is gone. What the
+   protocol *does* add is completeness — §5 check 2 makes an undeclared e2e mount a boot failure,
+   which is more than this surface has today.
+
+   *Mount is total here too* (§4), and the publisher's two conditionals are **different kinds**.
+   `runSchedulerTick != nil` (`e2e_seed.go:113-115`) is a mount conditional and is deleted: the
+   route mounts unconditionally and answers **501** when the tick is unavailable, exactly as the
+   presence stream does. `if !E2EEnabled() { return }` (`e2e_seed.go:104-106`) is **not** a mount
+   conditional under this protocol — it is a *composition-root* condition and it moves there: the
+   publisher is either in the list or it is not, and when it is, it mounts everything it declares.
+   `E2EEnabled()` survives as the per-handler check, which is the real guard.
+
+   *Two extermination items surface here, and step 4 owns both.* They are mirror images, and
+   neither is discretionary — an enumeration this program is about to **generate** must not be
+   generated over a route nobody calls or a call nobody serves.
+   - `POST /internal/test/advance-clock` is mounted (`e2e_seed.go:112`) and has **zero** callers
+     anywhere in the Playwright suite. Delete the route and `h.advanceClock`.
+   - `POST /internal/test/seed-doc` is **called** (`e2e/flows/quorum_m_of_n.spec.ts:61`) and has
+     **no handler**, with the failure swallowed by
+     `.catch(() => { /* endpoint may not exist; author submits later */ })`. That is a mask so a
+     test passes, which is exactly what the extermination directive forbids — and the comment
+     itself states the test works without it. Delete the call; do not add the endpoint.
 5. Fold `presence` into the IAM publisher and delete `conditionalRouteFamilies` (§4). Mounting
    becomes total before anything asserts totality.
 6. **One commit:** `httprouter.SurfacePublisher` + `[]SurfacePublisher` replacing
@@ -980,17 +1018,21 @@ Ruling A: no intermediate state ships. Commits may be incremental; the release i
    `routeHandlerFields` and `TestRouteCoverage` consume (`permissions_test.go:369-481`), so
    splitting them leaves a window where neither the old completeness guard nor the new
    assertion is in force.
-7. **The conformance suite** (§10.2 property 2) and the §10.3 regression tests. One generated
-   integration case per operation, asserting the declared capability is required. This is positive
-   evidence against the spec — the single authority — and it is what licenses step 8. It is **not**
-   a comparison with `routeRules`; §10.1 explains at length why the program spent seven review
-   rounds discovering that a comparison could not be the license.
+7. **Flip `PermissionResolver` to the generated table lookup, and land the conformance suite**
+   (§10.2 property 2) plus the §10.3 regression tests — **one commit**. The flip belongs here, not
+   in step 8, and the per-edge audit below is what forced the correction: a conformance suite run
+   against a table that is not yet enforcing exercises the *old* resolver and proves nothing about
+   the new one, so a step 8 that flipped afterwards would be flipping onto an unverified table.
+   The suite is one generated integration case per operation, asserting the declared capability is
+   required. It is positive evidence against the spec — the single authority — and it is **not** a
+   comparison with `routeRules`; §10.1 explains at length why the program spent seven review rounds
+   discovering that a comparison could not be the license.
    The 147 `x-authz-*` annotations authored in step 1 are also **reviewed row by row against
-   `routeRules`** here, before it is deleted. That review is a human reading of the surviving record
-   of past decisions, and it is the accepted mitigation for the one residual risk in §12.
-8. Flip `PermissionResolver` to the generated table lookup; delete §7's list — `routeRules`
-   included, along with all 15 orphaned `RegisterRoutes` methods and the whole of
-   `pdf_webhook_handler.go` (§7.1). `routeRules` is deleted because it is a **second copy of a
+   `routeRules`** here, while it still exists. That review is a human reading of the surviving
+   record of past decisions, and it is the accepted mitigation for the one residual risk in §12.
+8. **Deletion only.** Delete §7's list — `routeRules` included, along with all 15 orphaned
+   `RegisterRoutes` methods and the whole of `pdf_webhook_handler.go` (§7.1). By this point
+   `routeRules` decides nothing; it is dead code. It is deleted because it is a **second copy of a
    decision that now has one home**, not because a proof permitted it. Everything from step 7
    **stays**: the conformance suite guards the new table permanently, and the §10.3 tests guard the
    seven approved behavior changes. Nothing built in this program is thrown away at the end — which
@@ -1008,11 +1050,14 @@ several of these steps change a seam signature and untagged `go test` does not c
 `//go:build integration` files. Per step, in addition to build + vet + the touched packages'
 tests: steps 1 and 3 add a full `oapi-codegen` regeneration with a clean `git diff`; step 2 adds
 the six generator-validation table tests and a green widened drift gate; steps 4, 5 and 6 add the
-four `assertSurface` unit tests plus a real boot on both the ordinary and the `useE2E` path; step 7
-adds the per-operation conformance suite green over all 147 operations, the §10.3 regression tests,
-and the written record of the row-by-row annotation review; step 8 re-runs both suites with
-`routeRules` deleted — identical results, since neither suite ever referenced it; step 9 adds the
-ADR-status CI gate over the two new ADRs.
+four `assertSurface` unit tests plus a real boot on both the ordinary and the `useE2E` path; step 5
+additionally lands the §10.3 regression test for the presence-stream 501, because that behavior
+change goes live in step 5 rather than in step 7 (see the edge table); step 7 adds the
+per-operation conformance suite green over all 147 operations against the **new** resolver, the
+remaining §10.3 regression tests, and the written record of the row-by-row annotation review;
+step 8 re-runs both suites with `routeRules` deleted — identical results, since neither suite ever
+referenced it, and that identity is the evidence the deletion was inert; step 9 adds the ADR-status
+CI gate over the two new ADRs.
 
 **Dependency graph, not a topic list:**
 
@@ -1045,19 +1090,34 @@ ADR-status CI gate over the two new ADRs.
   exist first.
 - `5 → 6` — check 3 (declared ⊆ mounted) is false on the SQLDB-less boot path while any mount is
   conditional. Totality of mounting is a precondition of asserting totality.
-- `6 → 7 → 8` — step 7 is the conformance suite (§10.2), which needs the generated table mounted and enforced; step 8's deletion needs it green.
+- `6 → 7 → 8` — step 7 flips the resolver and proves the result (§10.2), which needs the generated
+  table mounted and asserted complete; step 8's deletion needs step 7 green.
 
 Steps 3, 4 and 5 are mutually independent and parallelizable **with each other**; 4 additionally
-requires 2 to have landed. Step 0 is parallelizable with everything. Steps 6→8 are the only span
-where the old and new tier-1 coexist, and step 7 is the gate that licenses step 8. **The program is
-not complete until step 9**; treating step 8 as the terminus is what leaves the governance
-deliverables stranded.
+requires 2 to have landed. Step 0 is parallelizable with everything. Steps 6→7 are the only span
+where the old and new tier-1 coexist. **The program is not complete until step 9**; treating step 8
+as the terminus is what leaves the governance deliverables stranded.
 
-**What is broken between commits, and for how long.** Between 3 and 6 the six migrated families
-are guarded by the old resolver, unchanged (`permissions.go:332-338`) — the migration changes
-mounting, not policy. Between 6 and 8 both tier-1 mechanisms exist and the old one is still
-authoritative; the new one is asserted for *completeness* but decides nothing. No commit in the
-sequence leaves a live route unrouted or unguarded.
+**What is broken on each edge, and for how long.** One row per dependency edge, not a summary of
+two spans — the checklist question is *“what is broken between these two commits”*, and it has to
+be answered edge by edge or the spans nobody looked at are the ones that carry the exposure.
+
+| Edge | State while the head has landed and the tail has not | Exposure |
+|---|---|---|
+| `0 → 9` | Nothing. `BaseURL` promotion is a constant extraction; every call site compiles against the new constant in the same commit. | None — which is why it is drawn as step 0 and may sit open indefinitely. |
+| `1 → 2` | Spec extensions exist and no code reads them; the same-commit full regeneration keeps `swaggerSpec` and the generated servers consistent. | Inert. A reader sees annotations with no consumer. |
+| `2 → 4` | `httpSurface` is emitted and unread; the e2e surface is still the old direct mount. | Inert at runtime. |
+| `2 → 6` | Same span: the generated table exists and decides nothing. **This is where a generator mistake is invisible** — and it is exactly why step 2's six validation table tests are mandatory *in step 2*, not deferred to step 6. | Latent, and the mitigation is in the earlier commit by design. |
+| `3 → 6` | The six migrated families mount under method-qualified patterns while the old resolver still reads decoded `r.URL.Path` (`permissions.go:332-338`). Policy is unchanged, because the old resolver never read the mux's patterns. | None. |
+| `4 → 6` | Under `METALDOCS_E2E` only: the e2e publisher exists, `assertSurface` does not, so a declared-but-unmounted e2e route (or the reverse) fails nothing. | Zero on any non-e2e boot; bounded by whoever sets the env var. |
+| `5 → 6` | **A live client-visible behavior change lands here without the assertion that motivated it**: `/api/v1/iam/presence/stream` answers 501 instead of 404 on the SQLDB-less path, in force from step 5. | Real, and it is why its §10.3 regression test lands **in step 5** rather than with the others in step 7. This row is the reason the edge table exists. |
+| `6 → 7` | Both tier-1 mechanisms exist; the old one decides, the new one is asserted for *completeness* only. A wrong `x-authz-capability` is latent and harmless. | Latent only — nothing reads the new table for a decision. |
+| `7 → 8` | The new resolver is authoritative and proven; `routeRules` is dead code awaiting deletion. | None. The old table is unreachable, not merely unused. |
+| `8 → 9` | The deletions have landed and the wiki + the two ADRs describe a topology that no longer exists. | Documentation drift — bounded, owned, and the reason step 9 is a **step** rather than a follow-up. |
+
+No commit in the sequence leaves a live route unrouted or unguarded. Two rows changed the design
+rather than merely describing it: `7 → 8` moved the resolver flip out of step 8 and into step 7,
+and `5 → 6` moved one regression test out of step 7 and into step 5.
 
 ---
 

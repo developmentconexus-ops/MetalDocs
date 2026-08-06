@@ -687,3 +687,49 @@ are **dissolved** — they were all defects in machinery that no longer exists.
 
 Next: round 8 judges the rewritten §10 and closes out findings 5 and 7. Its brief must be written
 from the authority, not from the comparison.
+
+---
+
+## Round-7 survivors — disposition
+
+**Finding 5 (MAJOR) — APPLIED.** `api/openapi/internal-e2e.yaml` does not exist; `api/openapi/`
+contains only `v1/`. §11 step 4 now says **create** it, states exactly what it contains
+(`e2e_seed.go:100-116`, nothing else), and assigns the visibility the design never assigned: all
+e2e operations are `security: []`. Evidence, not a preference — `POST /internal/test/seed` is the
+bootstrap and its *response* issues the cookies (`e2e/utils/seed.ts:27`, `isolation.ts:50`), and
+`reset`/`governance-events` are called from both the unauthenticated `request` fixture
+(`seed.ts:46`, `happy_path.spec.ts:146`) and an authenticated `page.request`
+(`sod_violation.spec.ts:87`), so session-required is factually wrong for them. The real guard is
+`E2EEnabled()`, checked twice (`e2e_seed.go:104-106`, `:120-123`); tier-1 never guarded this
+surface and the protocol does not pretend otherwise. What it adds is completeness.
+
+Two items found while applying it, both now owned by step 4 under the extermination directive:
+- `POST /internal/test/advance-clock` — mounted (`e2e_seed.go:112`), **zero callers**. Delete.
+- `POST /internal/test/seed-doc` — **called** (`quorum_m_of_n.spec.ts:61`), **no handler**, failure
+  swallowed by `.catch(() => { /* endpoint may not exist; author submits later */ })`. A mask so a
+  test passes. Delete the call; the comment itself says the test works without it.
+
+Also settled: the publisher's two conditionals are different kinds. `runSchedulerTick != nil` is a
+mount conditional and dies under §4 (mount, answer 501). `if !E2EEnabled() { return }` is a
+*composition-root* condition and moves there — the publisher is in the list or it is not, and when
+it is, it mounts everything it declares.
+
+**Finding 7 (MINOR) — APPLIED, and it was not minor.** The two-span paragraph is replaced by a
+per-edge table, one row per dependency edge. Two rows changed the design instead of describing it:
+
+- `7 → 8` — **the resolver flip moved from step 8 into step 7.** A conformance suite run against a
+  table that is not yet enforcing exercises the *old* resolver and proves nothing about the new
+  one; step 8 would then have flipped onto an unverified table. Step 7 is now flip + prove, one
+  commit; step 8 is deletion only, and by then `routeRules` is unreachable rather than merely
+  unused.
+- `5 → 6` — **one regression test moved from step 7 into step 5.** The presence-stream
+  404→501 change goes live when step 5 folds the stream into the IAM publisher, three commits
+  before the tests that were scheduled to guard it. An unguarded live behavior change for three
+  commits is precisely the thing the per-commit-boundary question exists to surface.
+
+Neither would have been found by another round of attacking §10. They were found by answering the
+checklist question edge by edge instead of summarizing it — which is the finding's actual point.
+
+**Round-7 findings 1, 2, 3, 4 and 6 — DISSOLVED.** All were defects in the classifier, the golden
+file, or the 120-row walk, none of which exist after the root-cause rewrite. Dissolved is recorded
+here rather than closed: nothing was fixed, the machinery was deleted.
