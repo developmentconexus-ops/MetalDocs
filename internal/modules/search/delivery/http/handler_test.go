@@ -143,31 +143,31 @@ func TestHandleSearchDocumentsMapsAdvertisedFilters(t *testing.T) {
 	}
 }
 
-func TestHandleSearchDocumentsMethodNotAllowedIsProblemJSON(t *testing.T) {
+// TestHandleSearchDocumentsMethodNotAllowed asserts that POST /search/documents
+// rejects with a 405. Prior to Task 9 (HTTP surface protocol) the bare
+// mux.HandleFunc pattern was method-less, so the handler itself had to guard
+// the method and emit the RFC 9457 problem+json 405. Now that RegisterRoutes
+// mounts through the generated searchapi.ServerInterface router
+// (method-qualified net/http 1.22 patterns), the stdlib mux rejects the wrong
+// method itself — the assertion class is routing, so it registers through the
+// real RegisterRoutes on a real *http.ServeMux and asserts the 405 the mux
+// produces (mirrors internal/modules/auth/delivery/http/handler_method_not_allowed_test.go).
+func TestHandleSearchDocumentsMethodNotAllowed(t *testing.T) {
 	reader := &handlerStubReader{}
 	h := NewHandler(searchapp.NewService(reader))
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/search/documents", nil)
 	rec := httptest.NewRecorder()
 
-	h.handleSearchDocuments(rec, req)
+	mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("status = %d, want 405", rec.Code)
+		t.Fatalf("status = %d, want 405, body=%s", rec.Code, rec.Body.String())
 	}
-	if ct := rec.Header().Get("Content-Type"); ct != "application/problem+json" {
-		t.Fatalf("Content-Type = %q, want application/problem+json", ct)
-	}
-	if allow := rec.Header().Get("Allow"); allow != http.MethodGet {
-		t.Fatalf("Allow = %q, want GET", allow)
-	}
-	var body struct {
-		Code string `json:"code"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("body not JSON: %v", err)
-	}
-	if body.Code != "request.method_not_allowed" {
-		t.Fatalf("code = %q, want METHOD_NOT_ALLOWED", body.Code)
+	if allow := rec.Header().Get("Allow"); allow != "GET, HEAD" {
+		t.Fatalf("Allow = %q, want GET, HEAD", allow)
 	}
 }
 

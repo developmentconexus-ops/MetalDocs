@@ -1,3 +1,12 @@
+// Routes are mounted through the generated searchapi.ServerInterface router
+// (HandlerWithOptions) rather than bare mux.HandleFunc — see RegisterRoutes.
+// Handler satisfies searchapi.ServerInterface directly (not the strict
+// variant): handleSearchDocuments already writes typed JSON/problem+json
+// bodies straight to http.ResponseWriter via the existing httpresponse
+// helpers, which the strict (ctx, RequestObject) -> (ResponseObject, error)
+// shape would force to be re-expressed as XxxResponseObject wrappers for no
+// behavioral gain. Mirrors the security module's precedent and Task 6's auth
+// migration.
 package httpdelivery
 
 import (
@@ -9,7 +18,9 @@ import (
 	"time"
 
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	searchapi "metaldocs/internal/modules/search/api"
 	searchdomain "metaldocs/internal/modules/search/domain"
+	"metaldocs/internal/platform/apibase"
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
@@ -60,15 +71,22 @@ func NewHandler(service Searcher) *Handler {
 }
 
 func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
-	mux.HandleFunc("/api/v1/search/documents", h.handleSearchDocuments)
+	searchapi.HandlerWithOptions(h, searchapi.StdHTTPServerOptions{
+		BaseURL:    apibase.BaseURL,
+		BaseRouter: mux,
+	})
+}
+
+// SearchDocuments adapts GET /search/documents to the existing handler. The
+// generated SearchDocumentsParams struct is intentionally ignored: the
+// existing handler parses the raw query itself (including subject,
+// classification and tag, which the spec's typed params do not declare), and
+// this migration must not change parsing behavior.
+func (h *Handler) SearchDocuments(w http.ResponseWriter, r *http.Request, _ searchapi.SearchDocumentsParams) {
+	h.handleSearchDocuments(w, r)
 }
 
 func (h *Handler) handleSearchDocuments(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		httpresponse.WriteMethodNotAllowed(w, http.MethodGet)
-		return
-	}
-
 	if strings.TrimSpace(iamdomain.UserIDFromContext(r.Context())) == "" {
 		httpresponse.WriteError(w, http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required")
 		return
