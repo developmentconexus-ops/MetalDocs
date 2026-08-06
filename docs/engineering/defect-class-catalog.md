@@ -9,12 +9,15 @@
 > (`file:line`, ADR, commit). No hypothetical defects. If a class has no evidence
 > here, it does not belong in this file yet.
 >
-> **Two parts.** **Part I (classes 1–26)** — defects found in the codebase, prevented by
+> **Two parts.** **Part I (classes 1–26, plus 35)** — defects found in the codebase, prevented by
 > repository mechanisms. **Part II (classes 27–34)** — defects authored by an AI agent
 > writing design, plan, and code artifacts, prevented by review-protocol mechanisms. They are
-> kept apart because the rung that stops them is in a different place.
+> kept apart because the rung that stops them is in a different place. Class 35 is numbered out
+> of sequence with Part I's own range because it was found after Part II already existed;
+> renumbering Part II's eight classes to make room would churn every internal `§27`–`§34`
+> cross-reference for no reader benefit, so it is appended after Class 34 instead.
 >
-> **Last verified:** 2026-08-05
+> **Last verified:** 2026-08-06
 
 ---
 
@@ -104,6 +107,33 @@ that they do. They diverge silently.
 - Historic instances: capability registry size, authz tripwire arms (closed in GMR M2 by
   generating the arms from the Go registry + 2 blocking drift/parity lints — the correct
   fix, and proof the pattern generalizes).
+- **HTTP route truth, five ways (http-surface-protocol program, 2026-08-06).** Hand-typed
+  `routeRules` plus its `resolveRoutePermission` walker, per-module `RegisterRoutes` methods
+  with no common contract, the OpenAPI spec's own declared operations, generated codegen tags,
+  and an ad-hoc response-typing scope list all independently claimed to describe the same HTTP
+  surface (`wiki/decisions/0091-http-surface-protocol.md` Context; system-impact analysis
+  `docs/superpowers/analysis/2026-08-05-http-surface-protocol-system-impact.md`). Five of this
+  program's nineteen tasks existed only to collapse that count to one.
+- **The role catalog is its own hand-synced pair, and it is still open.**
+  `chk_iam_user_roles_role_code` (`db/baseline/0001_current_schema.sql:1276`) permits exactly 5
+  roles. `role_capabilities` (`db/reference-data/0001_product_reference_data.sql:163-302`) seeds
+  42 grant rows for `area_admin`, `qms_admin`, and `signer` — three roles the CHECK forbids ever
+  assigning to a user. Surfaced by `TestNoDeclaredOperationIsUnreachable`
+  (`apps/api/cmd/metaldocs-api/surface_conformance_test.go:326`), red by design, pending a
+  follow-up program (`docs/superpowers/analysis/2026-08-06-authz-grant-unification-decisions.md`).
+  Sibling of Class 35's finding, not the same one: this is two lists of *which roles exist*
+  disagreeing; Class 35 is two tables answering *who holds a capability* disagreeing.
+
+**Status: HTTP route truth CLOSED, ADR 0090 + ADR 0091 (2026-08-06).** Same shape as the error-code
+closure below: `cmd/gen-http-surface` reads the spec's `x-authz-capability`/`x-authz-visibility`
+extensions and emits one generated table, `apps/api/cmd/metaldocs-api/httpsurface_gen.go`;
+`routeRules` and its walker are deleted, and `newPermissionResolver`'s own comment records why
+(`apps/api/cmd/metaldocs-api/permissions.go:11-16`); every module implements
+`SurfacePublisher.Mount` (`internal/platform/httprouter/publisher.go:19-26`); a boot assertion
+(`apps/api/cmd/metaldocs-api/surface.go:25-30`) proves mounted == declared on every start, a
+generation-plus-runtime-check pairing one rung stronger than the CI-time regenerate-and-diff gate
+used for error codes below, because a route surface bug is a security defect, not a message
+mismatch.
 
 **Status in this repo: CLOSED for error codes (ADR 0089, 2026-08-04).** The evidence
 above is preserved as observed. `dump-error-codes.go` is deleted; `cmd/problem-codes-dump`
@@ -314,6 +344,42 @@ when the thing users touch is broken.
 - `//go:build integration` files are **not compiled** by an untagged `go test ./...`.
   After any seam signature change, integration tests can be uncompilable while the
   default suite is green. Repo rule: run `go vet -tags integration` before commit.
+- **One level worse: a file that compiled under the right tag and still never ran, in any
+  lane, ever.** `apps/api/cmd/metaldocs-api/e2e_gate_test.go` guards the `METALDOCS_E2E`
+  bypass path and only asserts under `-tags integration`. `test-smoke.yml:18` runs untagged;
+  `test-full.yml:33` and `test-nightly.yml:35` did pass `-tags integration`, but scoped to
+  `./tests/... ./internal/...`, excluding `./apps/...` outright. So the file compiled clean in
+  CI (satisfying the bullet above) and its assertions still executed nowhere — the compile
+  gap and the lane-scope gap are two different failures that must each be closed
+  (http-surface-protocol program, `.superpowers/sdd/progress.md:386-393`; fixed by widening
+  both lanes to include `./apps/...`, which is also why Class 26's third mode below exists).
+- **A vacuous negative case, hidden by a skip.** `TestSurfaceConformance`'s per-operation loop
+  proves a capability is enforced by running a principal who lacks it. For a *floor*
+  capability — one every assignable role grants, e.g. `document.view` — no such principal
+  exists; the first version logged a skip and moved on, which silently removed the loop's only
+  proof that the capability mattered, forever, with no signal that it had. Fixed by asserting
+  the vacuity itself as a checked claim: `grantingRoles == assignableRoleNames`
+  (`apps/api/cmd/metaldocs-api/surface_conformance_test.go:120-131`) — the negative fixture is
+  still unbuildable, but the test now fails the instant that stops being true, instead of
+  degrading to a permanent no-op nobody would notice.
+- **The wrong variable held fixed.** `TestHEADInheritsGETCapability` and
+  `TestParameterContentCannotSteerThePolicy` each assert a property that is true of every
+  route (HEAD inherits GET's capability; a parameter's value cannot steer the resolver), but
+  were hand-pinned to `GET /api/v1/documents/{id}` — a floor-capability route, so their
+  negative fixture was exactly the vacuous case above. Changing the fixture would not have
+  fixed it: the free variable the test needed to vary was the *route*, not the *principal*.
+  Fixed by computing the carrier programmatically — the first permission-guarded operation
+  whose granting-role set is a proper non-empty subset
+  (`pickSubsetCarrierRoute`, `apps/api/cmd/metaldocs-api/surface_edge_test.go:14-24`; resolves
+  today to `GET /api/v1/audit/events/export/{export_id}`). Same lesson as the bullet above, one
+  layer up: before declaring a case unconstructible, enumerate every axis the assertion varies
+  over, not just the one that looks like "the fixture".
+- **A test that stopped exercising its own wiring.** `apps/api/cmd/metaldocs-api/metrics_endpoint_test.go:34`
+  still mounts the metrics handler on a bare, unqualified `apiMux.Handle("/api/v1/metrics", …)`,
+  while production now mounts it method-qualified through the generated surface table. The
+  test's own comment — *"assembles the same shape of PUBLIC handler main.go builds"*
+  (`:24`) — was true when written and is a Class 12 claim now: not a production defect, a
+  fidelity defect in the harness that would let a real mounting regression pass green.
 
 **Root cause.** Tests written where it is *convenient to write them* (nearest the code
 just changed) rather than where the feature is *observable*. Guard tests written against
@@ -426,6 +492,33 @@ It is worse than absent docs: absent docs prompt a code read; wrong docs stop th
   **79 non-catalog codes** exist unmentioned. A reader is left believing the taxonomy is
   small and enforced.
 - `internal/platform/problem/codes.go:7` — the fake guarantee of Class 1.
+- **An ADR's own Decision section closing over its own Context section's admission of
+  incompleteness.** ADR 0007's Context (`wiki/decisions/0007-two-tier-authz.md:23`) records,
+  verbatim, that the 2026-05-02 IAM unification plan "unified the middleware path … but left
+  `authz.Require` reading `user_process_areas`" — a stated unfinished migration. Its Decision
+  two paragraphs later (`:27`) rules the split is "distinct tiers … not a unification gap."
+  That sentence is exactly what a later reader checks before re-deriving the two tiers'
+  relationship for themselves, and for three months it was reasonable to trust it. The
+  2026-08-06 finding (`docs/superpowers/analysis/2026-08-06-authz-grant-unification-decisions.md`,
+  filed in full as Class 35) is that the gap the Context admits is real: `CanDo`
+  (`internal/modules/iam/application/capability_service.go:48`) and `Require`
+  (`internal/modules/iam/authz/authz.go:100`) read disjoint tables with three different role
+  vocabularies, one with no CHECK constraint at all, and a principal holding only an area
+  membership is unreachable through HTTP. Filed here rather than as a new class because the
+  mechanism is unchanged from the rest of this class — a written claim substitutes for
+  re-derivation and a reader stops looking — only the container changed, from a reference
+  table to an ADR's own Decision clause. (Distinguish from Class 3's "guard that legitimizes
+  drift": there a *mechanism* — an allowlist — converts debt into apparent policy; here a
+  *sentence* does, with no mechanism involved at all, which is why this belongs to Class 12
+  and not Class 3.)
+- **Comments that outlived the symbols they described, across commit boundaries**
+  (http-surface-protocol program, self-caught, not found by review). `main.go` carried
+  comments naming `buildRouter` and `mountE2EHandlersIfEnabled` after both were deleted;
+  `TestRouteCoverage` was named in a comment after its replacement landed. Recorded and swept
+  within the same program (`.superpowers/sdd/progress.md:439-442`) — worth citing here because
+  the finding was, by its own author's note, "ironic against that commit's own stated
+  discipline about comments" — the class does not spare its own authors just because they are
+  careful.
 
 **Root cause.** Docs are written once, at peak understanding, and never re-derived.
 Nothing fails when they rot.
@@ -982,6 +1075,26 @@ early, expensive-and-strict late.
 same tool. Any difference in flags, paths, or scope is this class. Ask specifically: *does
 any tool have a "strict", "ci", or "all" mode that the local routine does not enable?*
 
+**A third mode, found later: the gate that runs, fails honestly, and is therefore
+uninformative.** Different from both halves of the Generalization below — not weaker-and-green
+(this class's main evidence), not silently unexecuted (Class 22's twin) — this gate runs on
+every push and correctly reports failure. `test-full.yml` and `test-nightly.yml`'s integration
+lanes went red on 2026-08-06 when Task 18 widened their scope to `./apps/...` (Class 8's
+evidence above), because `TestNoDeclaredOperationIsUnreachable` is red by design, pending the
+follow-up program Class 35 describes. **This is a ratified operator decision for a bounded
+window, not an oversight**
+(`docs/superpowers/analysis/2026-08-06-authz-grant-unification-decisions.md`) — recorded here
+neutrally because the mechanism is real regardless of whether any one instance of it is a
+mistake: **a lane that is already red has zero regression-detection power**, because a new
+failure alongside an old one changes nothing a reader can see. The operator was offered, and
+declined, the narrower alternative — convert the finding to a baseline assertion of the exact
+known-bad set, green today and red only on a *new* regression — on the stated ground that the
+follow-up program starts immediately and there is no team for a red lane to demoralize in the
+meantime. Factory rule for the general case, independent of this instance's correctness: a
+deliberately-accepted red window needs its own tracked expiry, the same discipline Class 3
+requires of an allowlist exception, or it decays into "the lane has always been red" with
+nobody left who remembers why.
+
 **Generalization.** A gate is not what the tool can check — it is what the routine actually
 runs. A capability nobody invokes is documentation. This is the process-level twin of Class
 22 (the guarded branch no environment executes): there the code path never ran, here the
@@ -1003,6 +1116,8 @@ Derived directly from the classes above. Each line prevents a class already obse
       terminality differs (§24)
 - [ ] Integrity-critical reads return `(T, error)`; no defaulting (§6)
 - [ ] Execution context (request vs background) is a type parameter, not an assumption (§15)
+- [ ] Two enforcement layers answering the same predicate read the same source; scope lives
+      on the binding, never in a second grant table (§35)
 
 **Generation (rung 2)**
 - [ ] One registry per shared vocabulary: codes, events, capabilities, metrics, flags (§19)
@@ -1049,8 +1164,8 @@ Derived directly from the classes above. Each line prevents a class already obse
 
 ## Appendix B — Recurring Root Causes
 
-Part I's 26 classes reduce to five underlying causes. Useful when classifying a *new*
-defect that does not obviously match a class above. Part II's eight classes reduce to a
+Part I's 27 classes (1–26, plus 35) reduce to five underlying causes. Useful when classifying
+a *new* defect that does not obviously match a class above. Part II's eight classes reduce to a
 single, different cause — uniform confidence over non-uniform correctness — treated in
 Appendix C.
 
@@ -1059,8 +1174,10 @@ Appendix C.
    a configuration value an administrator may legally set the other way. → §1, §3, §12,
    §13, §23
 2. **Two things that must agree, maintained separately.** No compiler spans the boundary —
-   including an artifact and the delta chain that supersedes it, and one tool invoked two
-   ways in two places. → §2, §7, §10, §11, §19, §21, §25, §26
+   including an artifact and the delta chain that supersedes it, one tool invoked two ways in
+   two places, and — the sharpest instance, with no shared original either side drifted from —
+   two independently designed sources answering the same predicate. → §2, §7, §10, §11, §19,
+   §21, §25, §26, §35
 3. **Absence used to carry meaning.** Unfalsifiable, indistinguishable from failure.
    → §4, §5, §6
 4. **The local fix was cheaper than the right fix,** and the incentive gradient always
@@ -1430,6 +1547,68 @@ behavior, so nothing downstream ever forces the question.
 **Generalization.** Sibling of Class 8 (tests at the wrong altitude): there the test observes
 too little to be true, here the test deforms the subject in order to observe it. Both are
 resolved the same way — move the seam, don't widen the subject.
+
+---
+
+## Class 35 — Two Independent Sources of Truth Answering One Predicate
+
+*Part I class, numbered out of sequence — see the note at the top of this document.*
+
+**Symptom.** Two subsystems each answer what should be the identical yes/no question, from
+separately populated tables with no shared foreign key, no generator, and nothing that ever
+compares them. Neither is a copy of the other — both were built, correctly, to answer the
+question, at different times, for different layers. Because nothing ties them together, the
+set of principals that satisfies the predicate can differ between the two evaluators, and does.
+
+**Evidence.** ADR 0007's two-tier PDP (`wiki/decisions/0007-two-tier-authz.md`). Tier-1
+`CapabilityService.CanDo` (`internal/modules/iam/application/capability_service.go:48`) answers
+"does actor X hold capability Y" by reading `iam_user_roles` UNION `iam_group_members` JOIN
+`iam_group_roles`, constrained to 5 roles by `chk_iam_user_roles_role_code`
+(`db/baseline/0001_current_schema.sql:1276`) — and `iam_group_roles.role` carries **no CHECK
+constraint at all**. Tier-2 `authz.Require` (`internal/modules/iam/authz/authz.go:100`) answers
+the same question by reading `user_process_areas` JOIN `role_capabilities`, over 7 roles
+including `area_admin`, `qms_admin`, `signer` — three roles tier-1's CHECK forbids ever
+assigning. Consequence, surfaced by `TestNoDeclaredOperationIsUnreachable`
+(`apps/api/cmd/metaldocs-api/surface_conformance_test.go:326`): a principal holding only an
+area membership is refused at tier-1 before tier-2 ever runs, so the area model is unreachable
+through HTTP except to further narrow someone tier-1 already admitted. Full finding and the
+ratified remediation decisions: `docs/superpowers/analysis/2026-08-06-authz-grant-unification-decisions.md`.
+
+**Root cause.** Defense-in-depth is sound when both layers verify the *same* fact from the
+*same* source, at different points in a request's life. Here the two layers verify *different*
+facts, because each was built against whichever table was convenient for its own layer — a
+cheap pre-tx edge check; a costlier in-tx area-scoped check — and nobody afterward asked
+whether the two facts were required to agree. **Class 7 does not cover this:** Class 7 is a
+*relaxation* event, one layer's rule loosened while a sibling layer's is not; here nothing was
+ever relaxed, the two layers never agreed to begin with. **Class 9 does not cover this either:**
+Class 9 is a *copy* of one structure that drifts from a single later edit to the original; here
+there is no original and no copy — three independently authored tables with three different
+role vocabularies, each correct in isolation for its own layer, never unified.
+
+**Prevention (rung 1, then 2).** Collapse to one assignment relation —
+`(subject_kind, subject_id, role_code, scope_kind, scope_ref)` — with a single role catalog
+referenced by foreign key rather than repeated as a CHECK in three places. The two tiers become
+two *predicates over one source*: tier-1, granted at any scope; tier-2, granted at tenant or the
+resource's area. That yields the missing invariant as a testable property — **tier-1 must be a
+strict relaxation of tier-2, never a narrower filter** — instead of an accident nobody can name
+until a test like this one reports it. (Ratified as decision D1 in the analysis above; the
+closest industry precedent is Kubernetes RBAC's `RoleBinding` / `ClusterRoleBinding`, where
+scope lives on the *binding*, never in a second grant table.)
+
+**Detection.** For every pair of enforcement points meant to answer the same yes/no question,
+write down the query each one runs and diff the FROM clauses. A different WHERE over the same
+table is normal layering. A different *table* means the two points can disagree on a principal
+neither author ever tested, and nothing will notice until a test asks the specific question
+"is there anyone this passes for" — which is what this class's evidence test does.
+
+**Generalization.** A sharper case of Appendix B cause 2 ("two things that must agree,
+maintained separately"). Every other instance of that cause in this catalog (Classes 2, 7, 9,
+10, 19, 25, 26) has an identifiable *original* that a copy, a second declaration, or a second
+invocation drifted from — the fix is "keep the copy in sync" or "generate the copy." Here there
+was never one original to drift from: the divergence is not decay from a shared start, it is
+two designs that were never unified. The fix cannot be "keep both updated together," because
+there is no rule shared between them to update in the first place — it has to be "delete one of
+the two designs and rebuild both tiers on the survivor."
 
 ---
 
