@@ -111,7 +111,9 @@ an oversight than an intent.
 6. An operation in `internal-e2e.yaml` whose method+path collides with one in `openapi.yaml` →
    error. The two documents produce two maps that are merged at boot when e2e is active (§3), and
    a collision must be a **build** failure rather than the `mergedSurface` panic it would otherwise
-   be. All six rules run on both input documents.
+   be. Rules 1–5 are per-document; rule 6 is the only cross-document one, and it is what forces
+   the generator to take **both** documents in a single invocation (see Input below). A rule that
+   compares two documents cannot be checked by a tool that has only ever seen one.
 
 `Capability` is already a string type (`iam/domain/model.go:73`) whose values are registry
 strings (`CapMetricsView Capability = "metrics.view"`, `model.go:129`), so the spec carries the
@@ -157,14 +159,19 @@ of §11 therefore widens the pathspec to cover the emitted surface file explicit
 generated policy table outside the drift gate would reproduce the class this program exists to
 delete.
 
-**Input:** one spec document, plus the IAM capability registry for validation. It runs twice —
-over `api/openapi/v1/openapi.yaml`, and (from §11 step 4 onward) over
-`api/openapi/internal-e2e.yaml`.
+**Input:** **both** spec documents in one invocation — `api/openapi/v1/openapi.yaml` and (from
+§11 step 4 onward) `api/openapi/internal-e2e.yaml` — plus the IAM capability registry for
+validation. An earlier draft ran the generator once per document, which made validation rule 6
+unenforceable: no single run could see a cross-document collision, so the only place it could
+surface was `mergedSurface`'s boot panic, which is the outcome rule 6 exists to prevent. Before
+step 4 the second path is simply absent and the run is single-document; rule 6 is then vacuous
+rather than skipped.
 
-**Output:** exactly one file per input document — `apps/api/cmd/metaldocs-api/httpsurface_gen.go`
-for the public spec, and `httpsurface_e2e_gen.go` for the second. Same generator, same validation
-rules, same emitted shape; only the input and the output filename differ. Both are covered by the
-widened drift pathspec (§11 step 2).
+**Output:** one file per input document — `apps/api/cmd/metaldocs-api/httpsurface_gen.go` for the
+public spec and `httpsurface_e2e_gen.go` for the internal one — emitted by that single run, with
+distinct top-level symbols (`httpSurface`/`specTags` and `httpSurfaceE2E`/`specTagsE2E`) so the
+two files coexist in one package. Same validation rules, same emitted shape. Both are covered by
+the widened drift pathspec (§11 step 2).
 
 **Neither descriptor carries a build tag, but the *publisher* does — and getting that split wrong
 is a boot-loop.** Two earlier drafts were wrong here in opposite directions, and the second one is
@@ -200,12 +207,15 @@ func e2ePublisher() httprouter.SurfacePublisher { return nil }
 ```go
 e2e := e2ePublisher()                        // nil in every build without the handlers
 useE2E := e2e != nil && e2eHandlersEnabled() // ONE value decides both sides
-surface := httpSurface
+surface, expectedTags := httpSurface, specTags
 if useE2E {
 	publishers = append(publishers, e2e)
 	surface = mergedSurface(httpSurface, httpSurfaceE2E)
+	expectedTags = union(specTags, specTagsE2E)
 }
-assertSurface(mounted, surface, activeTags(publishers), publishers)
+// Both the surface and the expected tag set come from the GENERATED tables.
+// Never derive expectedTags from `publishers` — see §5 check 1.
+assertSurface(mounted, surface, expectedTags, publishers)
 ```
 
 `useE2E` is the *only* thing either side reads, so the four cells of the (build tag × env flag)
@@ -214,8 +224,17 @@ mounted, the variable inert. The descriptors stay untagged — `httpSurfaceE2E` 
 package-level map in builds where `e2ePublisher()` returns nil, which Go permits — so the generator
 emits one shape and the drift gate covers both files.
 
-Two details that are not incidental:
+Three details that are not incidental:
 
+- **The e2e publisher's `Mount` is total too — §4's rule is not waived for it.** Today
+  `RegisterE2EHandlers` mounts conditionally twice: it returns early on `!E2EEnabled()`
+  (`internal/test/e2e_seed.go:104-106`) and it registers its fifth route only when the scheduler
+  callback is non-nil (`:113-115`). Both must go. The env check is already `useE2E`'s job and
+  re-reading it inside `Mount` re-creates the two-predicate split this fix exists to close; the
+  fifth route mounts **unconditionally** and answers `501` from the handler when
+  `runSchedulerTick == nil`, exactly as `presence` does. A publisher whose declared surface and
+  mounted surface differ by one route fails check 3 at boot — and a publisher that is allowed to
+  mount conditionally is a second exception mechanism, which locked ruling C forbids.
 - **The stub's tag is `!integration || production`, the exact complement of the real one.** The
   existing `internal/test` pair uses `!integration && !production`, which leaves a hole: a literal
   `-tags production` build satisfies neither file and would not compile. No build in the repo uses
@@ -388,17 +407,25 @@ for _, p := range publishers {
 	p.Mount(rec)
 	mounted[p.Name()] = rec.Patterns()
 }
-// surface and publishers are BOTH derived from useE2E (§3) — never httpSurface
-// bare, or the e2e boot path asserts a table its own mounts are absent from.
-if err := assertSurface(mounted, surface, activeTags(publishers), publishers); err != nil {
+// surface AND expectedTags are BOTH derived from useE2E (§3) — never from the
+// publisher list, which is the thing being audited, and never httpSurface bare.
+expectedTags := specTags
+if useE2E {
+	expectedTags = union(specTags, specTagsE2E) // generated, not observed
+}
+if err := assertSurface(mounted, surface, expectedTags, publishers); err != nil {
 	log.Fatalf("http surface: %v", err)   // fail closed at boot
 }
 ```
 
 `assertSurface` checks four things and refuses to start on any failure:
 
-1. **Tag coverage** — every entry in `specTags` is claimed by exactly one publisher's `Tag()`.
-   Catches a publisher constructed but not listed, and two publishers claiming one tag.
+1. **Tag coverage** — every entry in `expectedTags` is claimed by exactly one publisher's `Tag()`,
+   and no publisher claims a tag outside it. Catches a publisher constructed but not listed, and
+   two publishers claiming one tag. **`expectedTags` must come from the generated tables**, never
+   from `publishers` itself: an expected set derived from the list under audit makes the check
+   vacuously true, which is how a missing publisher would pass a check written to catch exactly
+   that.
 2. **Mounted ⊆ declared** — every recorded pattern has a `httpSurface` key. Catches a route
    mounted with no policy.
 3. **Declared ⊆ mounted** — every `httpSurface` key was recorded. Catches a spec operation
@@ -785,11 +812,11 @@ Two consequences worth stating:
 
 | Property | How |
 |---|---|
-| Generator validation rules (§2, five failures) | table test per rule, each asserting non-zero exit and the operationId in the message |
+| Generator validation rules (§2, **six** failures) | table test per rule, each asserting non-zero exit and the offending operationId in the message. Rule 6 is cross-document, so its case feeds the generator both documents in one run with a deliberate method+path collision |
 | `/api/v1/iam/presence/stream` on a SQLDB-less boot answers **501**, not 404 | boot the router with `presence == nil` and assert status 501 with a `problem+json` body — the Mount-is-total rule (§4) is only real if the degraded path is exercised |
 | Generated output is current | CI regenerate-and-diff; drift fails the build |
-| **Tier-1 derivation proof — total by construction over all 120 rules** (§10.1–10.3) | for each of the 120 `routeRules` rows, compute the generated-table entries it governs by reading pattern **skeletons**, and assert the verdicts agree or the pair is a listed delta. Three completeness assertions: every rule reached, every pattern covered, every governed pair agrees. No request enumeration, so no dimension to omit. Locked constraint 5 / `…-system-impact.md:140`. |
-| **The delta list is complete** (§10.3, eight rows) | each delta has its own regression test, and the derivation proof fails on any *unlisted* disagreement — completeness is the gate's output, not a claim beside it |
+| **Tier-1 derivation proof — total by construction over all 120 rules** (§10.1–10.3) | classify every (rule, pattern) pair as `none` / `uniform` / `partial` by symbolic intersection of the rule predicate with the pattern language; assert every `uniform` pair agrees and every `partial` pair is a listed delta. Three completeness assertions: every rule reached, every pattern governed by a non-fallback row, every pair resolved. No request enumeration, so no dimension to omit. Locked constraint 5 / `…-system-impact.md:140`. |
+| **The delta list is complete** (§10.3, nine classes) | rows 1–8 each have their own regression test; row 9's membership is the classifier's output, held in a regenerate-and-diff golden file. The proof fails on any *unlisted* disagreement — completeness is the gate's output, not a claim beside it |
 | Generator key == emitted pattern, exhaustive | compare the generator's key for all 147 operations against the patterns oapi-codegen actually emits, rather than reasoning from three sampled paths |
 | Ownership (§5 check 4) | a publisher mounting a pattern whose declared tag is another publisher's fails `assertSurface` |
 | `VisibilityUnresolved` → 500, unknown value → 500 | two middleware tests, one per switch arm |
@@ -811,6 +838,14 @@ enumeration did not cover:
 | 3 | **method** — HEAD aliases onto GET patterns; a method mismatch returns pattern `""`; methodless rows are only reachable by varying the method |
 | 4 | **method, again** — sampled at one wrong value rather than enumerated; different wrong methods reach different rows |
 | 5 | **encoding** — `GET /api/v1/documents/foo%2Fapproval-preview` |
+| 6 | **param values that spell routing tokens** — `GET /documents/{id}/placeholder-options/{pid}` with `pid=approval-preview`. Found against the *restructure*, not the enumeration, and it is the reason §10.2's classifier is three-valued rather than two-valued |
+
+Round 6 is listed here deliberately. The restructure did not make the design correct on the first
+attempt — it made the missing case **expressible**. Under the differential, round 6's finding would
+have been a seventh dimension to enumerate; under the derivation proof it is a missing arm of one
+classification function, which the completeness assertions then force. That is the difference the
+§2 ruling bought, and overstating it as "the restructure closed the class outright" would repeat
+the error this table records.
 
 `adversarial-review` §1's two-patch ratchet was exceeded and §8's same-altitude-recurrence rule
 fired. A third extension of the basis was **not** applied. The §2 question was put to the operator
@@ -849,46 +884,96 @@ anybody read when it went red.
 The gate is a pure table-to-table function with no request in it.
 
 ```go
-// For each of the 120 rows in routeRules, compute the set of generated-table
-// entries that row governs, and compare the verdict.
+// For each of the 120 rows in routeRules × each recorded mux pattern, classify
+// the pair. There is no request string anywhere in this test.
+type governance int
+
+const (
+	governsNone    governance = iota // no request this pattern accepts satisfies the rule
+	governsUniform                   // EVERY request this pattern accepts satisfies the rule
+	governsPartial                   // SOME do and some do not — always a delta
+)
+
 func TestRouteRulesDerivation(t *testing.T) {
 	generated := httpSurface // the generated map, keyed by mux pattern
 	for _, rule := range routeRules {
-		got := entriesGovernedBy(rule, generated) // pattern → surfaceRule
-		...
+		for pattern, entry := range generated {
+			switch classify(rule, pattern) {
+			case governsNone:
+				continue
+			case governsUniform:
+				requireSameVerdict(t, rule, entry) // or a listed §10.3 delta
+			case governsPartial:
+				requireListedPartialDelta(t, rule, pattern) // §10.3 class 9
+			}
+		}
 	}
 }
 ```
 
-`entriesGovernedBy` is the only non-trivial piece, and it is **decidable**, which is the whole
-point: for a given rule and a given mux pattern, "does this rule govern this pattern?" is answered
-by reading the pattern's **static segments**, never by generating candidate request strings.
+**`classify` is three-valued, and that is the whole design.** An earlier revision made it
+two-valued — governed or not — by reading the pattern's literal skeleton and treating a `{param}`
+position as unable to satisfy a literal predicate. That is **unsound**, and the counterexample is
+live: `GET /api/v1/documents/{id}/placeholder-options/{pid}`
+(`api/openapi/v1/openapi.yaml:3418`) with `pid=approval-preview` produces the decoded path
+`…/placeholder-options/approval-preview`, which satisfies `pathSuffix: "/approval-preview"` at
+`permissions.go:163` and therefore resolves to **`CapDocumentSubmit`** — while the skeleton reading
+sees a trailing `{pid}`, declares the pair ungoverned, and silently lets the broad
+`CapDocumentView` row at `permissions.go:164` stand. A rule that governs *part* of a pattern's
+request language is precisely a behavior change, and a classifier that can only say yes or no
+**cannot emit it**. Prose asserting "that would be a delta" does not produce a delta; the
+classifier must.
 
-- `pathExact` — string equality against the pattern's path. Decidable.
-- `pathPrefix` — `strings.HasPrefix` on the pattern's static head. Decidable, and **provably
-  unaffected by param values**: all 47 prefix rules end at a `/` that sits before the first
-  `{param}` of every pattern they cover, and Go 1.22 `{param}` segments cannot contain `/`.
-- `pathSuffix` / `contains` / `notSuffix` — evaluated against the pattern's **literal** segments.
-  A `{param}` position is treated as the wildcard it is: the rule governs the pattern iff the
-  predicate holds for the literal skeleton. A param value that *coincidentally* satisfies the
-  predicate is not a derivation question — it is a **delta**, and §10.3 is where it goes.
-- `method` — equality, or "any" for the one methodless row (`/healthz`, `permissions.go:85`).
+Partiality stays decidable, because a rule predicate and a mux pattern are both regular languages
+over path segments and their intersection is computed symbolically, never sampled:
+
+| Field | `none` | `uniform` | `partial` |
+|---|---|---|---|
+| `pathExact` | pattern ≠ the literal | pattern == the literal | impossible — an exact path either is or is not the pattern |
+| `pathPrefix` | pattern's literal head diverges from the prefix | prefix terminates at or before the end of the pattern's leading **literal** segments | prefix reaches into a `{param}` segment — the verdict then depends on the param value |
+| `pathSuffix` | pattern's trailing literals contradict the suffix | pattern ends in exactly that literal | pattern ends in `{param}` and the suffix is one segment a value could equal |
+| `contains` | no literal match and no `{param}` can produce the token | the token appears in the pattern's literals | a `{param}` can produce the token — either the token is one segment, or `%2F` lets one wildcard decode to a multi-segment value |
+| `notSuffix` | the dual of `pathSuffix`, same three cases | | |
+| `method` | pattern's method ≠ rule's | equal, or the rule is methodless | impossible — `HEAD` on a `GET` pattern is uniform, and it is delta 6 |
+
+The `contains` row is where round 5's `%2F` finding now lives. It is no longer an enumeration
+dimension anyone must remember to add — it is one arm of one classification, and forgetting it
+makes the classifier reject a pair it should mark `partial`, which the completeness assertions
+catch.
+
+**The `pathPrefix` measurement, corrected.** An earlier revision claimed 47 prefix rules all ending
+at a `/`. **Both numbers were false and neither was measured.** The table has **80** `pathPrefix`
+rows, of which **20 end in `/`**; eight distinct values do not — `/api/v1/documents`,
+`/api/v1/templates`, `/api/v1/tokens`, `/api/v1/controlled-documents`, `/api/v1/approval/routes`,
+`/api/v1/taxonomy/{profiles,areas,families}`. Sweeping all 125 spec paths shows none of the eight
+currently reaches into a `{param}` or collides with a sibling literal path, so every prefix row
+classifies `uniform` **today** — but that is a contingent property of this spec, not a structural
+one. Adding `/api/v1/documents-archive` tomorrow would make `pathPrefix: "/api/v1/documents"` match
+it, and nothing outside this test would notice. **The boundary condition is therefore asserted
+per-pair inside `classify`, never stated as a count in this document.** A hand-typed count in the
+document governing a hand-typed table is the exact defect class this program exists to delete, and
+it reappeared here.
 
 **Three completeness assertions, each finite:**
 
-1. **Every rule is reached.** All 120 rows appear in the iteration; a row governing zero patterns
-   is reported, not skipped — that is a rule for a route that no longer exists, and it must be
-   accounted for before deletion.
-2. **Every pattern is covered.** All 148 recorded patterns (134 generated + 14 hand-registered;
-   §7 deletes `/healthz`, taking it to 147) are governed by at least one rule or explicitly listed
-   as new.
-3. **Every governed pair agrees, or is a listed delta.** The verdict `(Capability, Visibility)` the
-   rule yields equals the one the generated entry carries.
+1. **Every rule is reached.** All 120 rows appear in the iteration; a row whose classification is
+   `governsNone` for every pattern is reported, not skipped — that is a rule for a route that no
+   longer exists, and it must be accounted for before deletion.
+2. **Every pattern is governed by a rule that is not the fallback.** All 148 recorded patterns
+   (134 generated + 14 hand-registered; §7 deletes `/healthz`, taking it to 147) must be matched by
+   at least one explicit row. The fallback at `permissions.go:336-338` returns
+   `VisibilitySessionRequired` for anything unmatched, so an assertion phrased as "some rule
+   governs it" would pass on every conceivable input and prove nothing. The assertion is that the
+   **explicit** table covers the pattern; a pattern reaching only the fallback is a finding.
+3. **Every `uniform` pair agrees, and every `partial` pair is a listed delta.** The verdict
+   `(Capability, Visibility)` the rule yields equals the one the generated entry carries, or the
+   pair appears in §10.3.
 
-There is no sampling anywhere in this construction, so there is no dimension to omit. The counts
-above are measured, not assumed: 120 rows (GET 42, POST 53, PUT 11, PATCH 5, DELETE 8, plus **one
-methodless**), 148 patterns cross-checked three ways against the spec's 147 operations. When the
-test is written, all three are re-derived from the code.
+There is no sampling anywhere in this construction, so there is no dimension to omit. Every count
+in this section is measured: 120 rows (GET 42, POST 53, PUT 11, PATCH 5, DELETE 8, plus **one
+methodless** — `/healthz` at `permissions.go:85`, which §7 deletes, after which **every** rule is
+method-qualified and the `method` classifier loses its "any" case entirely). When the test is
+written, all counts are re-derived from the code rather than read from here.
 
 ### 10.3 The delta list — the gate's output, not a footnote beside it
 
@@ -907,15 +992,24 @@ a loose assertion.
 | 6 | **HEAD on every capability-guarded GET route**: previously resolved by the same `(method, path)` rules; now inherits its GET pattern's capability | mux-level HEAD/GET aliasing (`$GOROOT/src/net/http/server.go:2484-2486`) — this is the *general* form of delta 5, which an earlier draft had only in its `auth/me` instance | accepted; integration test HEADs a guarded route without the capability, expects 403 |
 | 7 | **Encoded-separator requests** — e.g. `GET /api/v1/documents/foo%2Fapproval-preview`: `document.submit` → `document.view` | the old resolver classified decoded `r.URL.Path`; the router routes `EscapedPath()`. Where they disagree the old verdict was **never the one the router acted on**. Whole class, not one instance. | accepted as a **correctness fix**, not a regression; table test over `%2F`, trailing slash, `//`, `..` |
 | 8 | **Off-surface prefix matches** — a path no pattern serves for which a `pathPrefix` row still returns a verdict today | tier-1's verdict is unobservable behind the mux's 404/405, **except** where an old `Public` row admitted an unauthenticated caller — which is deltas 2 and 3, already listed | accepted; no residual class |
+| 9 | **Partial governance — every `governsPartial` pair.** A param value that satisfies a rule predicate the pattern's literals do not. Confirmed live: `GET /api/v1/documents/{id}/placeholder-options/{pid}` with `pid=approval-preview` resolves to `CapDocumentSubmit` today (`permissions.go:163`) and to the operation's declared capability afterwards; likewise `GET /api/v1/documents/{id}` with `id=approval-preview` | the old table matched a *decoded substring of the whole path*; the generated table is keyed by the *route*. Wherever a param value can spell a routing token, the two disagree by construction | accepted as a **correctness fix** — the old verdict depended on user-supplied data, which is the defect, not the behavior worth preserving. **This row is a class, and its membership is enumerated by §10.2's classifier, not by this table.** One regression test per member, emitted with the list |
 
 `newPublicPathChecker` derives public from `visibility == VisibilityPublic`
 (`permissions.go:351-356`), so deltas 2, 3 and 8 come from one source, not two, and rows 1–8 are
 the complete unauthenticated-exposure diff.
 
-**Eight deltas, not five.** The count has been wrong three times (one, then four, then five), each
-time because deltas were being *noticed* rather than *derived*. Under this gate they are derived,
-and the count is an output. Per `wiki/quality/test-discipline.md`, DB-touching cases use the
-`testdb` factory; the derivation proof and the `assertSurface` tests are pure and need neither.
+**Nine delta classes — and row 9 is why this table stops carrying a number.** The count has now
+been wrong four times (one, four, five, eight). Each earlier miss came from deltas being *noticed*
+rather than *derived*; row 9 came from something worse — a two-valued classifier that could not
+express the case, so no amount of care in reading the table would have produced it. Rows 1–8 are
+individually enumerable and stay enumerated here. Row 9's membership is **the classifier's output**,
+written to a golden file the test regenerates and diffs, exactly as `.github/workflows/api-contract.yml:37`
+does for generated code. Any hand-maintained list of row-9 members would be a hand-synced
+enumeration mirroring generated truth — the defect this entire program exists to delete, reproduced
+inside its own acceptance gate.
+
+Per `wiki/quality/test-discipline.md`, DB-touching cases use the `testdb` factory; the derivation
+proof and the `assertSurface` tests are pure and need neither.
 
 ---
 
@@ -969,6 +1063,18 @@ Ruling A: no intermediate state ships. Commits may be incremental; the release i
    architecture-wiki updates, and the `BaseURL` promotion to one exported constant. A program that
    deletes three enumerations and leaves the documents describing them stale has reproduced its own
    defect class in the wiki.
+
+**Every step ends green, and the evidence is named per step, not once at the end.** Locked
+constraint `…-system-impact.md:141-142` makes `go build ./...`, `go vet -tags integration ./...`
+and the declared test set mandatory per commit — the integration-tag vet specifically, because
+several of these steps change a seam signature and untagged `go test` does not compile
+`//go:build integration` files. Per step, in addition to build + vet + the touched packages'
+tests: steps 1 and 3 add a full `oapi-codegen` regeneration with a clean `git diff`; step 2 adds
+the six generator-validation table tests and a green widened drift gate; steps 4, 5 and 6 add the
+four `assertSurface` unit tests plus a real boot on both the ordinary and the `useE2E` path; step 7
+is the derivation proof itself plus the §10.3 regression tests; step 8 re-runs the §10.3 tests with
+`routeRules` deleted, which is the only evidence that the deletion preserved the approved behavior;
+step 9 adds the ADR-status CI gate over the two new ADRs.
 
 **Dependency graph, not a topic list:**
 

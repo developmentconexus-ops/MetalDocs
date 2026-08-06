@@ -437,3 +437,74 @@ recurrence — so §8's stop condition fires and the loop is **paused**, not clo
 did drop: findings 3, 5 and 6 are rung 1–2 mechanical, and the e2e defect is fully diagnosed with a
 fix drafted. Steps 1–3 and 5 carry a clean license from an adversarial reviewer that was explicitly
 invited to grant one. Nothing is deferred silently and no risk is declared acceptable by me.
+
+---
+
+## Round 6 — verdict round on the restructure (HEAD 53eff4a0, Sol / medium)
+
+First round judging the derivation proof rather than the differential. Prompt explicitly barred
+re-raising round 5's BLOCKER as an enumeration gap and redirected the attack to *decidability* and
+*totality* of the new construction.
+
+### Job 1 — disposition of round-5 findings
+
+| # | Reviewer verdict | Author disposition |
+|---|---|---|
+| 1 (B) parity non-total, `%2F` | **OPEN** — reframed: skeleton evaluation misses param-dependent first-match | **applied**, see BLOCKER below |
+| 2 (M) e2e cannot pass four boot checks | **PARTIAL** — tags fixed statically, but the fifth e2e route is still conditional on a non-nil scheduler callback (`e2e_seed.go:113-114`) | **applied** — §3 now states the e2e publisher's `Mount` is total; both the `E2EEnabled()` early return and the callback guard are deleted, 501 from the handler |
+| 3 (M) orphan tests lose mux coverage | CLOSED | — |
+| 4 (M) delta list omits HEAD/ordering | **PARTIAL** — param-sensitive ordering absent | **applied** — §10.3 class 9 |
+| 5 (M) graph omits ADRs/wiki/BaseURL | CLOSED | — |
+| 6 (N) IAM `router.go:102` comment | CLOSED | — |
+
+### Job 2 findings
+
+| # | Sev | Claim | Disposition |
+|---|---|---|---|
+| 1 | **BLOCKER** | A literal skeleton is not the route language: §10.2 cannot discover *partial* governance inside wildcard patterns. `GET /documents/{id}/placeholder-options/{pid}` with `pid=approval-preview` resolves to `CapDocumentSubmit` (`permissions.go:163`) while the skeleton reading picks the broad `CapDocumentView` row (`:164`) and emits no delta | **applied** — verified against source. §10.2's classifier is now three-valued (`none` / `uniform` / `partial`) with a per-field decision table; every `partial` pair is a mandatory delta (§10.3 class 9) |
+| 2 | MAJOR | Validation rule 6 is impossible under one-document-per-invocation | **applied** — the generator now takes both documents in one run and emits both files with distinct symbols; rule 6 is vacuous before step 4, never skipped |
+| 3 | MAJOR | `activeTags(publishers)` derives the expected set from the list under audit — vacuously true | **applied** — `expectedTags` comes from `specTags` (+ `specTagsE2E` when `useE2E`), fixed in both §3 and §5 |
+| 4 | MINOR | The `pathPrefix` measurement is false: 80 rows, 20 ending in `/`, not 47 all ending in `/` | **applied** — independently re-measured before accepting (80 rows, 8 distinct non-slash values). The stated criterion was also wrong: it is "terminates at or before the end of the pattern's leading literal segments", and it is now asserted per-pair inside `classify` rather than written as a count |
+| 5 | MINOR | Test table says five generator failures after §2 defines six | **applied** |
+| 6 | MINOR | No per-step verification boundary despite the locked constraint mandating one | **applied** — §11 now names build + `go vet -tags integration` + the declared evidence per step |
+
+### Author-side verification, run before accepting finding 4
+
+A sonnet vote was dispatched to do nothing but *measure* `permissions.go`. It returned 120 rows
+(confirmed), the real field names (`contains` / `notSuffix` — the artifact had invented
+`pathContains` / `pathNotSuffix`), 80 `pathPrefix` rows, and the exact method distribution
+(confirmed). I re-ran the prefix measurement myself rather than take either the reviewer's or the
+vote's number, and additionally swept all 125 spec paths for sibling-prefix collisions — there are
+none today, which is *why* the eight non-slash prefixes still classify `uniform`, and precisely why
+that fact belongs in an assertion and not in a sentence.
+
+Second-order result nobody asked for: `/healthz` is the table's **only** methodless row
+(`permissions.go:85`). §7 deletes it, so after step 3 every rule is method-qualified and the
+`method` classifier loses its "any" arm entirely.
+
+### §2 judgement — is this same-altitude recurrence?
+
+No, and the distinction matters. Round 6 is the **first** round against the chosen structure. Its
+BLOCKER is not "the structure is wrong" but "the classification function has a missing arm, here is
+the arm". Under the differential this would have been a seventh dimension to enumerate — unbounded.
+Under the derivation proof it is a bounded, decidable case that the completeness assertions force.
+The §2 ruling is not re-opened.
+
+What the restructure did **not** do is make the design correct on the first attempt. §10.1's round
+table now carries round 6 for that reason: it made the missing case *expressible*, which is a
+smaller and more honest claim than the one the previous revision was drifting toward.
+
+### Convergence
+
+Count 6 (1B / 2M / 3N), same total as round 5 but the severity mix moved (round 5: 1B / 4M / 1N).
+Altitude on §10 dropped from "the gate reads an infinite input space" to "the gate's classifier is
+missing one arm" — a design fix, but a bounded and named one, not another dimension. Findings 4, 5
+and 6 are rung 1–2 mechanical. Findings 2 and 3 are single-construct design fixes with the fix
+named inside the finding.
+
+Proceed map returned: steps 0, 1, 3 and 5 LICENSED. 2 blocked by finding 2 (now applied). 4 and 6
+blocked by round-5 #2 (now applied). 7, 8, 9 blocked by the BLOCKER (now applied).
+
+**Loop is not closed.** Every finding is applied, but the reviewer has not yet seen the three-valued
+classifier — and a BLOCKER fix that no adversarial round has attacked is exactly what this ledger
+exists to refuse to wave through. Round 7 judges it.
