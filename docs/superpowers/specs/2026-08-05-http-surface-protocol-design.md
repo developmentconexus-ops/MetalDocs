@@ -907,8 +907,10 @@ nothing about a route that is **mounted and in no document**, because the genera
 that is the *mounted → declared* half, and it is property 3's check 2, enforced at **boot**, not at
 build. Stating this as one property would have been an overclaim — the two halves have different
 enforcement points and different failure times, and "every route has a policy" is true only as
-their conjunction. Both halves are closed today: `/api/v1/metrics` (`router.go:124`) enters the
-public spec in §11 step 3, the `/internal/test/*` routes enter `internal-e2e.yaml` in step 4, and
+their conjunction. Both halves are closed today: `/api/v1/metrics` (`router.go:124`) is **already
+declared** (`openapi.yaml:80-84`, `operationId: getMetrics`, `tags: [observability]`) — as are all
+twelve legacy-family operations, so §11 step 3 adds no spec operations and is a purely Go-side
+codegen migration; the `/internal/test/*` routes enter `internal-e2e.yaml` in step 4, and
 `/internal/test/panic` (`main.go:845`) is deleted there. Every coverage count
 this document asserted was fabricated, twice: 47 `pathPrefix` rows when there are 80, and "the
 fallback is reached zero times", which is false — `PATCH /api/v1/iam/users/roles` routes to the
