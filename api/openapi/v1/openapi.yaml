@@ -82,6 +82,7 @@ paths:
       summary: HTTP RED metrics por rota
       operationId: getMetrics
       tags: [observability]
+      x-authz-capability: metrics.view
       responses:
         '200':
           description: Metricas de requests, erros e duracao
@@ -665,6 +666,7 @@ paths:
       summary: Export filtered audit events as CSV or JSONL (signed URL, async if large)
       tags: [audit]
       operationId: exportAuditEvents
+      x-authz-capability: audit.read
       requestBody:
         required: true
         content:
@@ -691,6 +693,7 @@ paths:
       summary: Read the status of an audit export job
       tags: [audit]
       operationId: getAuditExportStatus
+      x-authz-capability: audit.read
       parameters:
         - name: export_id
           in: path
@@ -716,6 +719,7 @@ paths:
       summary: Download the rendered audit export payload via a signed token
       tags: [audit]
       operationId: downloadAuditExport
+      x-authz-capability: audit.read
       parameters:
         - name: export_id
           in: path
@@ -804,6 +808,7 @@ paths:
       summary: MFA enrollment coverage by tenant + by role
       tags: [security]
       operationId: getMfaCoverage
+      x-authz-capability: user.view
       responses:
         '200':
           description: Cobertura de MFA
@@ -824,6 +829,7 @@ paths:
       summary: Current account lockouts (locked-until window)
       tags: [security]
       operationId: listLockouts
+      x-authz-capability: user.view
       responses:
         '200':
           description: Lista de lockouts
@@ -844,6 +850,7 @@ paths:
       summary: Anomaly cards (repeated-failed-login, new-device-login, lockout-spike, off-hours-admin-action)
       tags: [security]
       operationId: listSecuritySignals
+      x-authz-capability: user.view
       responses:
         '200':
           description: Sinais de seguranca
@@ -862,6 +869,7 @@ paths:
       summary: Lista eventos de auditoria append-only (multi-axis filter, cursor-paginated)
       tags: [audit]
       operationId: listAuditEvents
+      x-authz-capability: audit.read
       parameters:
         - name: actor_id
           in: query
@@ -923,6 +931,7 @@ paths:
       summary: Pesquisa documentos por filtros
       operationId: searchDocuments
       tags: [search]
+      x-authz-capability: document.view
       parameters:
         - name: q
           in: query
@@ -4259,6 +4268,7 @@ paths:
       summary: Distribution coverage summary — total obligated audience for a controlled document
       tags: [distribution]
       operationId: getDocumentDistribution
+      x-authz-capability: distribution.read
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -4281,6 +4291,7 @@ paths:
       summary: Obligated audience for a controlled document (denominator only)
       tags: [distribution]
       operationId: listDocumentDistributionRecipients
+      x-authz-capability: distribution.read
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - name: cursor
@@ -4312,6 +4323,7 @@ paths:
       summary: By-area obligated totals for a controlled document (denominator only)
       tags: [distribution]
       operationId: getDocumentDistributionCoverage
+      x-authz-capability: distribution.read
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -4336,6 +4348,7 @@ paths:
       summary: List the caller's notifications (self-scope), newest first
       tags: [notifications]
       operationId: listNotifications
+      x-authz-capability: notification.read
       parameters:
         - { name: status, in: query, schema: { type: string, enum: [PENDING, SENT, READ] } }
         - name: cursor
@@ -4365,6 +4378,7 @@ paths:
       summary: Count the caller's unread (PENDING/SENT) notifications
       tags: [notifications]
       operationId: getNotificationsUnreadCount
+      x-authz-capability: notification.read
       responses:
         '200':
           description: ok
@@ -4383,6 +4397,7 @@ paths:
       summary: Mark one of the caller's notifications read (idempotent)
       tags: [notifications]
       operationId: markNotificationRead
+      x-authz-capability: notification.read
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -4401,6 +4416,7 @@ paths:
       summary: Mark all of the caller's unread (PENDING/SENT) notifications read (idempotent, self-scope)
       tags: [notifications]
       operationId: markAllNotificationsRead
+      x-authz-capability: notification.read
       responses:
         '200':
           description: ok
@@ -4422,6 +4438,7 @@ paths:
       x-pagination-exempt-reason: 'Bounded per-tenant token dictionary returned in full.'
       tags: [tokens]
       operationId: listTokens
+      x-authz-capability: token.view
       responses:
         '200':
           description: ok
@@ -4436,6 +4453,7 @@ paths:
       summary: Create token dictionary entry
       tags: [tokens]
       operationId: createToken
+      x-authz-capability: token_dictionary.manage
       requestBody:
         required: true
         content:
@@ -4460,6 +4478,7 @@ paths:
       summary: Get token dictionary entry
       tags: [tokens]
       operationId: getToken
+      x-authz-capability: token.view
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -4477,6 +4496,7 @@ paths:
       summary: Update token dictionary entry
       tags: [tokens]
       operationId: updateToken
+      x-authz-capability: token_dictionary.manage
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       requestBody:
@@ -4502,6 +4522,7 @@ paths:
       summary: Delete token dictionary entry
       tags: [tokens]
       operationId: deleteToken
+      x-authz-capability: token_dictionary.manage
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
