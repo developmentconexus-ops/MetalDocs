@@ -19,6 +19,7 @@ import (
 	auditapi "metaldocs/internal/modules/audit/api"
 	"metaldocs/internal/modules/audit/application"
 	"metaldocs/internal/modules/audit/domain"
+	"metaldocs/internal/platform/apibase"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/pagination"
@@ -86,7 +87,7 @@ func (h *Handler) WithExporter(exporter AuditExporter) *Handler {
 func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
 	auditapi.HandlerWithOptions(h, auditapi.StdHTTPServerOptions{
 		BaseRouter: mux,
-		BaseURL:    "/api/v1",
+		BaseURL:    apibase.BaseURL,
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
 		},

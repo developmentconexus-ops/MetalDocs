@@ -17,6 +17,7 @@ import (
 	tokensapi "metaldocs/internal/modules/tokens/api"
 	"metaldocs/internal/modules/tokens/application"
 	"metaldocs/internal/modules/tokens/domain"
+	"metaldocs/internal/platform/apibase"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/problem"
@@ -76,7 +77,7 @@ func NewHandler(svc TokenService) *Handler {
 func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
 	tokensapi.HandlerWithOptions(h, tokensapi.StdHTTPServerOptions{
 		BaseRouter: mux,
-		BaseURL:    "/api/v1",
+		BaseURL:    apibase.BaseURL,
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, err.Error())
 		},

@@ -56,6 +56,7 @@ import (
 
 	iamapi "metaldocs/internal/modules/iam/api"
 	iampresence "metaldocs/internal/modules/iam/presence"
+	"metaldocs/internal/platform/apibase"
 	"metaldocs/internal/platform/problem"
 )
 
@@ -114,7 +115,7 @@ func (rt *Router) WithTenantHandler(tenants *TenantHandler) *Router {
 func (rt *Router) RegisterGenerated(mux httprouter.Muxer) {
 	iamapi.HandlerWithOptions(rt, iamapi.StdHTTPServerOptions{
 		BaseRouter: mux,
-		BaseURL:    "/api/v1",
+		BaseURL:    apibase.BaseURL,
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			_ = problem.Write(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
 		},

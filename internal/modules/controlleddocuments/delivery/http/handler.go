@@ -17,6 +17,7 @@ import (
 	controlleddocumentsapi "metaldocs/internal/modules/controlleddocuments/api"
 	"metaldocs/internal/modules/controlleddocuments/application"
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
+	"metaldocs/internal/platform/apibase"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/idempotency"
@@ -142,7 +143,7 @@ func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
 		BaseRouter: mux,
 		// AD-1: spec path keys are relative; the generated router prepends this
 		// base so served routes stay /api/v1/* and the codegen matches the spec.
-		BaseURL: "/api/v1",
+		BaseURL: apibase.BaseURL,
 		Middlewares: []controlleddocumentsapi.MiddlewareFunc{
 			middleware,
 		},

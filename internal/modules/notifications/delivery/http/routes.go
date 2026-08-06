@@ -1,6 +1,7 @@
 package notificationshttp
 
 import (
+	"metaldocs/internal/platform/apibase"
 	"metaldocs/internal/platform/httprouter"
 
 	notificationsapi "metaldocs/internal/modules/notifications/api"
@@ -12,6 +13,6 @@ func RegisterRoutes(h *Handler, mux httprouter.Muxer) {
 	strict := notificationsapi.NewStrictHandler(h, nil)
 	notificationsapi.HandlerWithOptions(strict, notificationsapi.StdHTTPServerOptions{
 		BaseRouter: mux,
-		BaseURL:    "/api/v1",
+		BaseURL:    apibase.BaseURL,
 	})
 }

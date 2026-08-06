@@ -21,6 +21,7 @@ import (
 	iamapp "metaldocs/internal/modules/iam/application"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/apibase"
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/pagination"
 	"metaldocs/internal/platform/problem"
@@ -170,7 +171,7 @@ func (h *Handler) registerRoutes(mux httprouter.Muxer, rl *ratelimit.Middleware,
 		BaseRouter: mux,
 		// AD-1: spec path keys are relative; the generated router prepends this
 		// base so served routes stay /api/v1/* and the codegen matches the spec.
-		BaseURL: "/api/v1",
+		BaseURL: apibase.BaseURL,
 		Middlewares: []documentsapi.MiddlewareFunc{
 			middleware,
 		},
