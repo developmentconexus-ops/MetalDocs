@@ -152,3 +152,20 @@ before any design work starts.
 `distribution.read` / `notification.read` onto `iam_user_roles` there would have written the
 doomed model deeper while hiding the finding. `TestNoDeclaredOperationIsUnreachable` stays red as the
 evidence that justifies this program.
+
+## The red CI lane is a ratified choice, not an oversight
+
+**Operator decision, 2026-08-06.** Task 18 added `./apps/...` to the `test-full.yml` and
+`test-nightly.yml` integration lanes, so those lanes are RED until this program lands. The operator
+was offered the alternative — convert the finding to a baseline assertion ("the unreachable set is
+exactly this recorded set"), which would be green today, red on any regression, and self-deleting —
+and **chose to leave the lane red**, on the grounds that this program follows immediately and there
+is no team for a red lane to demoralize.
+
+Recorded so a future session does not "repair" it:
+- Do NOT skip, exclude, or baseline `TestNoDeclaredOperationIsUnreachable`.
+- Do NOT remove `./apps/...` from the integration lanes to restore green.
+- The accepted cost is that while the lane is red it has **no regression-detection power** — a sixth
+  dead capability would not be noticed, because the lane is already failing. That is understood and
+  accepted for the short window before this program starts.
+- The lane goes green when this program makes the unreachable set empty. That is the fix.
