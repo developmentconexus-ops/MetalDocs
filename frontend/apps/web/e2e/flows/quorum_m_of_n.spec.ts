@@ -57,11 +57,6 @@ test.describe('m_of_n quorum (2 of 3)', () => {
     routeId = routeBody.id as string;
     expect(routeId).toMatch(UUID_RE);
 
-    // Seed second doc
-    await adminReq.post('/internal/test/seed-doc', {
-      data: { tenantId: seed.tenantId, docId: doc2Id, routeId },
-    }).catch(() => { /* endpoint may not exist; author submits later */ });
-
     await adminCtx.close();
   });
 

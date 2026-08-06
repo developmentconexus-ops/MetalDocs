@@ -5,7 +5,8 @@ package test
 import (
 	"context"
 	"database/sql"
-	"net/http"
+
+	"metaldocs/internal/platform/httprouter"
 )
 
-func RegisterE2EHandlers(_ *http.ServeMux, _ *sql.DB, _ func(context.Context) error) {}
+func RegisterE2EHandlers(_ httprouter.Muxer, _ *sql.DB, _ func(context.Context) error) {}

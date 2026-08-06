@@ -90,8 +90,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	for _, t := range targets {
-		src, err := Emit(t.doc, EmitOptions{SurfaceVar: t.surfaceVar, TagsVar: t.tagsVar, Registry: registry})
+	for i, t := range targets {
+		src, err := Emit(t.doc, EmitOptions{SurfaceVar: t.surfaceVar, TagsVar: t.tagsVar, Registry: registry, SkipTypeDecl: i > 0})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "gen-http-surface: emitting %s: %v\n", t.fileName, err)
 			os.Exit(1)

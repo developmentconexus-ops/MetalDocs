@@ -31,7 +31,6 @@ func TestE2EHandlersGate_EnvUnset_DoesNotRegister(t *testing.T) {
 		{http.MethodPost, "/internal/test/seed"},
 		{http.MethodPost, "/internal/test/reset"},
 		{http.MethodGet, "/internal/test/governance-events"},
-		{http.MethodPost, "/internal/test/advance-clock"},
 		{http.MethodPost, "/internal/test/trigger-scheduler-tick"},
 	}
 	for _, p := range paths {

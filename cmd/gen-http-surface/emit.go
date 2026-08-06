@@ -21,6 +21,11 @@ type EmitOptions struct {
 	// "metrics.view" -> "CapMetricsView"). Built by loadCapabilityRegistry;
 	// Validate already proved every declared capability resolves through it.
 	Registry map[string]string
+	// SkipTypeDecl omits the `type surfaceRule struct {...}` declaration.
+	// httpsurface_gen.go and httpsurface_e2e_gen.go (Task 12) land in the
+	// same package, so only the first target emitted declares the type;
+	// every later target sets this true to avoid a duplicate declaration.
+	SkipTypeDecl bool
 }
 
 // Emit renders the generated surfaceRule table for one Document. Output is
@@ -36,10 +41,14 @@ func Emit(d Document, opts EmitOptions) (string, error) {
 
 	entries := make([]entry, 0, len(d.Operations))
 	tagSet := map[string]bool{}
+	hasCapability := false
 	for _, op := range d.Operations {
 		entries = append(entries, entry{key: Key(d, op), op: op})
 		if op.Tag != "" {
 			tagSet[op.Tag] = true
+		}
+		if op.Capability != "" {
+			hasCapability = true
 		}
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].key < entries[j].key })
@@ -55,15 +64,22 @@ func Emit(d Document, opts EmitOptions) (string, error) {
 	b.WriteString("package main\n\n")
 	b.WriteString("import (\n")
 	b.WriteString("\tiamdelivery \"metaldocs/internal/modules/iam/delivery/http\"\n")
-	b.WriteString("\tiamdomain \"metaldocs/internal/modules/iam/domain\"\n")
+	// iamdomain is only referenced when an entry carries a capability
+	// (`capability: iamdomain.CapX`); an all-public/all-session-required
+	// document (the e2e surface, Task 12) would otherwise import it unused.
+	if hasCapability {
+		b.WriteString("\tiamdomain \"metaldocs/internal/modules/iam/domain\"\n")
+	}
 	b.WriteString(")\n\n")
 
-	b.WriteString("type surfaceRule struct {\n")
-	b.WriteString("\tvisibility iamdelivery.Visibility\n")
-	b.WriteString("\tcapability iamdomain.Capability\n")
-	b.WriteString("\ttag string\n")
-	b.WriteString("\tallowedDuringPasswordChange bool\n")
-	b.WriteString("}\n\n")
+	if !opts.SkipTypeDecl {
+		b.WriteString("type surfaceRule struct {\n")
+		b.WriteString("\tvisibility iamdelivery.Visibility\n")
+		b.WriteString("\tcapability iamdomain.Capability\n")
+		b.WriteString("\ttag string\n")
+		b.WriteString("\tallowedDuringPasswordChange bool\n")
+		b.WriteString("}\n\n")
+	}
 
 	fmt.Fprintf(&b, "var %s = map[string]surfaceRule{\n", opts.SurfaceVar)
 	for _, e := range entries {

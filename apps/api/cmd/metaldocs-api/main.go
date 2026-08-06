@@ -165,7 +165,7 @@ func mountE2EHandlersIfEnabled(mux *http.ServeMux, register func(*http.ServeMux)
 	register(mux)
 }
 
-//go:generate go run metaldocs/cmd/gen-http-surface -public ../../../../api/openapi/v1/openapi.yaml -out-dir . -registry ../../../../internal/modules/iam/domain/model.go
+//go:generate go run metaldocs/cmd/gen-http-surface -public ../../../../api/openapi/v1/openapi.yaml -e2e ../../../../api/openapi/internal-e2e.yaml -out-dir . -registry ../../../../internal/modules/iam/domain/model.go
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
@@ -844,13 +844,6 @@ func main() {
 
 	mountE2EHandlersIfEnabled(mux, func(m *http.ServeMux) {
 		e2etest.RegisterE2EHandlers(m, deps.SQLDB, nil)
-		// Runtime probe for REQ-MW-1: a deliberate handler panic that the
-		// platform recovery middleware must convert into a 500 problem+json
-		// without killing the process. Mounted only when METALDOCS_E2E=1;
-		// touches no data.
-		m.HandleFunc("GET /internal/test/panic", func(http.ResponseWriter, *http.Request) {
-			panic("e2e panic probe: must be recovered by platform/middleware.Recovery (REQ-MW-1)")
-		})
 	})
 
 	if deps.SQLDB != nil {

@@ -38,6 +38,30 @@ func TestEmitShape(t *testing.T) {
 	}
 }
 
+// TestEmitSkipTypeDeclAndUnusedImport locks in Task 12's generator fix: two
+// Emit calls for two documents landing in the same package (httpsurface_gen.go
+// + httpsurface_e2e_gen.go) must not both declare `type surfaceRule struct`,
+// and a document with no capability-guarded operation (the all-public/
+// all-session-required e2e surface) must not import iamdomain unused.
+func TestEmitSkipTypeDeclAndUnusedImport(t *testing.T) {
+	d := Document{ServerBase: "", Operations: []Operation{
+		{ID: "e2eSeed", Method: "POST", Path: "/internal/test/seed", Tag: "internal-e2e", Public: true},
+	}}
+	src, err := Emit(d, EmitOptions{SurfaceVar: "httpSurfaceE2E", TagsVar: "specTagsE2E", SkipTypeDecl: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(src, "type surfaceRule struct") {
+		t.Error("SkipTypeDecl: true must omit the surfaceRule type declaration")
+	}
+	if strings.Contains(src, "iamdomain") {
+		t.Error("a document with no capability-guarded operation must not import iamdomain")
+	}
+	if !strings.Contains(src, "var httpSurfaceE2E = map[string]surfaceRule{") {
+		t.Error("missing the surface map declaration")
+	}
+}
+
 func TestEmitIsDeterministic(t *testing.T) {
 	d := Document{ServerBase: "/api/v1", Operations: []Operation{
 		{ID: "b", Method: "GET", Path: "/b", Tag: "z", Public: true},
