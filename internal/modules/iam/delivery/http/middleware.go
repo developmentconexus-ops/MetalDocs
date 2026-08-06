@@ -30,6 +30,11 @@ const (
 	VisibilityPermissionGuarded Visibility = iota
 	VisibilitySessionRequired
 	VisibilityPublic
+	// VisibilityUnresolved means the mux matched a pattern that carries no
+	// rule. §5's boot assertion makes this unreachable; reaching it is a
+	// wiring bug, not a tier to guess at. Appended AFTER VisibilityPublic so
+	// VisibilityPermissionGuarded keeps iota = 0 as the fail-closed zero value.
+	VisibilityUnresolved
 )
 
 // PermissionResolver maps an HTTP method+path to the required tier-1
@@ -89,7 +94,12 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 		capability, visibility := m.resolver(r.Method, r.URL.Path)
 		switch visibility {
 		case VisibilityPublic, VisibilitySessionRequired, VisibilityPermissionGuarded:
+		case VisibilityUnresolved:
+			slog.Warn("iam: route matched a pattern with no rule", "method", r.Method, "path", r.URL.Path)
+			m.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Route resolved to no policy"))
+			return
 		default:
+			// STAYS: genuinely unknown values.
 			slog.Warn("iam: unknown route visibility", "method", r.Method, "path", r.URL.Path, "visibility", visibility)
 			m.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Permission resolver returned unknown visibility"))
 			return
