@@ -133,6 +133,18 @@ What that dissolves rather than patches: the `routeHandlers` struct · the `rout
 - **Migration:** **none.** No schema change, no new table, no `tenant_id` question.
 - **Destructive change?** Yes, in the wire-adjacent sense: `routeRules` is deleted, not deprecated. Per the house rule (*tudo fallback legacy é extermínio*) it is dropped clean, not kept as a fallback beside the derived table. But it may only be dropped **after** parity is proven — the expand/contract shape here is: derive the new table → assert byte-equal resolution against the old one for every (method, path) the mux registers → then delete. A parity gate, not a compatibility layer.
 
+  > **AMENDED 2026-08-05 by the design's §10.1 — this constraint was wrong.** The parity gate
+  > described above treats `routeRules` as an oracle. It is not one: it is one *attempt to express*
+  > which capability each route requires, and the spec annotations are a second attempt. Neither is
+  > the authority; the authority is a decision, and a decision has a home rather than a proof.
+  > Seven adversarial rounds landed on this gate, each finding a real defect and none reducing the
+  > count or the altitude, because comparing two non-authoritative artifacts yields differences
+  > forever and truth never. Worse, the gate was a **fourth** hand-synced enumeration of route truth
+  > compared against two of the three this program exists to delete. The deletion license is now
+  > positive conformance against the single authority ruling A establishes — see the design §10.
+  > **The four operator rulings are untouched.** This constraint was authored in this program,
+  > before any design existed, and is corrected in it.
+
 ## 8. Test & QA plan
 
 - **Canonical framework:** mostly *not* integration. This is composition-root and platform work — package tests in `apps/api/cmd/metaldocs-api` and `internal/platform/httprouter`. Any live-drive verification uses the real stack per the Docker methodology, not a bespoke harness. `//go:build integration` + `testdb` applies only if a test needs a live PDP against the DB tripwire.

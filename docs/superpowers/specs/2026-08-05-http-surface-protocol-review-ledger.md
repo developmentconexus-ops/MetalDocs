@@ -599,3 +599,91 @@ both are on `classify`. §8's same-altitude-recurrence stop condition fires. **T
 not closed.** Steps 0, 1, 2, 3 and 5 carry a clean license — one more than round 6, because the
 single-invocation generator closed finding 2. Findings 5, 6 and 7 are applicable under either §2
 outcome and are held only so no work is done that a (B) ruling would delete.
+
+---
+
+## §2 resolution — the operator refused the framing, and was right
+
+The choice put to the operator was (A) build the ordered symbolic engine or (B) stop proving
+equivalence. The operator rejected both:
+
+> *"I think you're very specific to the way of revisiting or interpretation. If we're all around
+> thinking about it's wrong, it means that we don't try to find a root cause. You're trying to find
+> it wrong. This will never happen. It's like you, instead of trying to get your head out, try to
+> cut hair off."*
+
+Both options were defined **relative to the proof** — (A) build a better one, (B) abandon it. Both
+kept the frame that generated seven rounds. The instruction was to stop revisiting and find the root
+cause.
+
+### Root cause
+
+**The gate had no oracle, and I authored the constraint that required one.**
+
+`…-system-impact.md:140` — *"it may only be dropped after parity is proven… assert byte-equal
+resolution against the old one"* — was written before any design decision existed. It is **not** one
+of the four operator rulings. Every round after it measured the design against that sentence.
+
+`routeRules` is not an authority. It is one *attempt to express* which capability each route
+requires; the spec annotations are a second attempt. Neither is the decision. **Comparing two
+non-authoritative artifacts yields differences forever and truth never** — which is exactly what
+rounds 2–7 produced: six escalating constructions for one comparison, each fix more sophisticated
+than the last and none more meaningful.
+
+Three compounding facts make it worse:
+
+1. **It is this program's own defect class.** Three hand-synced enumerations of route truth, none
+   authoritative — and the acceptance gate was a **fourth artifact comparing two of them**.
+2. **The oracle was known to be wrong.** Rounds 5, 6 and 7 each found `routeRules` deciding on
+   decoded substrings of the whole path, steerable by user-supplied parameter content
+   (`%2F…`, `pid="approval-preview"`, `user_id="roles"`). Where it disagrees with the router it is
+   not a second opinion — it is the bug. Seven rounds were spent proving agreement with it.
+3. **The circularity.** Asking `routeRules` to license the deletion of `routeRules`.
+
+The reviewers were never wrong. They answered the question they were asked. The question was wrong,
+and no round could have found that, because every round's brief presupposed it.
+
+### What replaced it
+
+§10 rewritten (design HEAD after this commit). Ruling A already put the authority in one place: the
+capability is declared in the spec. Given one home for the decision, `routeRules` is a **second copy**
+and the house rule disposes of it — *tudo fallback legacy é extermínio*. No permission needed from
+itself.
+
+What is proven instead, none of it mentioning `routeRules`:
+1. **Completeness is structural** — §2 rule 2 fails the build on a missing `x-authz-*`. Not a count.
+   Both coverage counts the artifact asserted were fabricated (47 vs 80 `pathPrefix` rows; "fallback
+   reached zero times", refuted by `PATCH /api/v1/iam/users/roles`).
+2. **Live conformance, one case per operation** — 147 generated integration cases: with the
+   capability → non-403, without → 403, `security: []` → unauthenticated admitted. Positive evidence
+   against the authority. Also replaces `TestRouteCoverage`'s hand-maintained fixture list, which is
+   the defect that started this program.
+3. **The boot assertion (§5), unchanged** — a runtime invariant that survives step 8.
+
+§10.3 went from nine open-ended delta classes to **seven rows**, and the provenance is the tell:
+rows 1–6 were all derived by reading the design against the middleware chain and the mux, never by
+the differ. The differ contributed exactly two findings and they are one finding — row 7, now stated
+as a structural property (a parameter value is never part of the new key) rather than an enumerated
+set with a golden file.
+
+Nothing built in this program is thrown away at step 8 any more. The discarded design would have
+deleted its own 400–700-line oracle at the end; that fact was available as a signal and was not read
+as one.
+
+`…-system-impact.md:140` amended in place, with the four operator rulings explicitly untouched.
+
+### Convergence — closed
+
+The loop is closed, and not by a round returning PROCEED. Seven rounds could not have closed it:
+the recurrence was structural, the brief was the structure, and only the operator was positioned to
+see it from outside. Rounds 2–7 remain in this ledger in full, because the sequence *is* the
+evidence for §10.1 — each round's finding was real, and the fact that seven real findings produced
+no convergence is the argument.
+
+Findings held from round 7 and still applicable, now against a much smaller §10: finding 5 (create
+`api/openapi/internal-e2e.yaml`, specify its `security:` markers and prove the seed bootstrap works)
+and finding 7 (state the runnable/broken condition per dependency edge). Findings 1, 2, 3, 4 and 6
+are **dissolved** — they were all defects in machinery that no longer exists.
+
+Next: round 8 judges the rewritten §10 and closes out findings 5 and 7. Its brief must be written
+from the authority, not from the comparison.

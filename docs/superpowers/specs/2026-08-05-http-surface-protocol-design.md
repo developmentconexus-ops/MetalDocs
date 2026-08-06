@@ -597,7 +597,7 @@ Ruling A forbids a two-regime ship, so these go in the same program.
 
 | Deleted | Location | Replaced by |
 |---|---|---|
-| `routeRules` (120 rows) | `permissions.go:82-330` | generated `httpSurface` |
+| `routeRules` — a second copy of a decision that now has one home (§10.1) | `permissions.go:82-330` | generated `httpSurface` |
 | `routeRule` + `matches()` | `permissions.go:23-55` | `mux.Handler(r)` |
 | `resolveRoutePermission` | `permissions.go:342` | map lookup |
 | `defaultPublicPaths` | `auth/.../middleware.go:118` | `security: []` in the spec |
@@ -815,8 +815,9 @@ Two consequences worth stating:
 | Generator validation rules (§2, **six** failures) | table test per rule, each asserting non-zero exit and the offending operationId in the message. Rule 6 is cross-document, so its case feeds the generator both documents in one run with a deliberate method+path collision |
 | `/api/v1/iam/presence/stream` on a SQLDB-less boot answers **501**, not 404 | boot the router with `presence == nil` and assert status 501 with a `problem+json` body — the Mount-is-total rule (§4) is only real if the degraded path is exercised |
 | Generated output is current | CI regenerate-and-diff; drift fails the build |
-| **Tier-1 derivation proof — total by construction over all 120 rules** (§10.1–10.3) | classify every (rule, pattern) pair as `none` / `uniform` / `partial` by symbolic intersection of the rule predicate with the pattern language; assert every `uniform` pair agrees and every `partial` pair is a listed delta. Three completeness assertions: every rule reached, every pattern governed by a non-fallback row, every pair resolved. No request enumeration, so no dimension to omit. Locked constraint 5 / `…-system-impact.md:140`. |
-| **The delta list is complete** (§10.3, nine classes) | rows 1–8 each have their own regression test; row 9's membership is the classifier's output, held in a regenerate-and-diff golden file. The proof fails on any *unlisted* disagreement — completeness is the gate's output, not a claim beside it |
+| **Every operation enforces its declared capability** (§10.2 property 2) | generated from the spec, one integration case per operation: with the capability → non-403; without it → 403; `security: []` → admits an unauthenticated caller. Positive conformance against the single authority, not a differential against a peer table |
+| **Every operation has a policy at all** (§10.2 property 1) | not a test and not a count — §2 rule 2 fails the **build** on a missing `x-authz-*`. A property the build cannot violate needs no assertion |
+| **The seven behavior changes** (§10.3) | one regression test each; rows 1–6 derived from the design, row 7 asserts the new table cannot be steered by parameter content |
 | Generator key == emitted pattern, exhaustive | compare the generator's key for all 147 operations against the patterns oapi-codegen actually emits, rather than reasoning from three sampled paths |
 | Ownership (§5 check 4) | a publisher mounting a pattern whose declared tag is another publisher's fails `assertSurface` |
 | `VisibilityUnresolved` → 500, unknown value → 500 | two middleware tests, one per switch arm |
@@ -826,192 +827,123 @@ Two consequences worth stating:
 | Public routes stay public | integration test over every `visibility: public` operation, no session, expect non-401 |
 | `%2F`, trailing slash, `//`, `..` | table test against the real mux — this is §10.3 delta 7's regression test, and it asserts the **new** behavior is correct, not that it matches the old one |
 
-### 10.1 The deletion license — why it is a derivation proof and not a differential test
+### 10.1 The deletion license — there is no differential, because there is no second authority
 
-**This section was rewritten under an operator §2 ruling.** Four consecutive review rounds landed
-on this gate, three of them at the same altitude, each naming a dimension of the input space the
-enumeration did not cover:
+**This section replaces seven rounds of work, and the reason it does is worth stating before the
+design.** Rounds 2 through 7 all landed here. Each found a real defect. Each fix was applied. The
+count never fell and the altitude never dropped, and `adversarial-review` §8 says that means the
+structure is wrong, not that the reviewers were thorough.
 
-| Round | Dimension found missing |
-|---|---|
-| 2 | **path** — `permissions.go:120`'s `notSuffix: "/roles"` disqualifies `PATCH /api/v1/iam/users/roles` from the `user.manage` row today, while a pattern lookup grants it |
-| 3 | **method** — HEAD aliases onto GET patterns; a method mismatch returns pattern `""`; methodless rows are only reachable by varying the method |
-| 4 | **method, again** — sampled at one wrong value rather than enumerated; different wrong methods reach different rows |
-| 5 | **encoding** — `GET /api/v1/documents/foo%2Fapproval-preview` |
-| 6 | **param values that spell routing tokens** — `GET /documents/{id}/placeholder-options/{pid}` with `pid=approval-preview`. Found against the *restructure*, not the enumeration, and it is the reason §10.2's classifier is three-valued rather than two-valued |
+**The root cause is not in any of the seven findings. It is in the question they were answering.**
 
-Round 6 is listed here deliberately. The restructure did not make the design correct on the first
-attempt — it made the missing case **expressible**. Under the differential, round 6's finding would
-have been a seventh dimension to enumerate; under the derivation proof it is a missing arm of one
-classification function, which the completeness assertions then force. That is the difference the
-§2 ruling bought, and overstating it as "the restructure closed the class outright" would repeat
-the error this table records.
+The pre-design analysis said, at `…-system-impact.md:140`: *"it may only be dropped after parity is
+proven — assert byte-equal resolution against the old one for every (method, path) the mux
+registers."* That sentence was authored before a single design decision existed, and it is **not**
+one of the four operator rulings. Every round after it measured the design against it. The
+reviewers were never wrong; they answered the question they were asked, and the question was wrong.
 
-`adversarial-review` §1's two-patch ratchet was exceeded and §8's same-altitude-recurrence rule
-fired. A third extension of the basis was **not** applied. The §2 question was put to the operator
-and answered: **outcome (a), restructure.**
+**`routeRules` is not an oracle.** It is one *attempt to express* which capability each route
+requires. The spec annotations are a second attempt. Neither is the authority — the authority is a
+product and security **decision**, and a decision has a home, not a proof. Comparing two
+non-authoritative artifacts yields differences forever and truth never. That is the exact shape of
+rounds 2–7, and it explains why every fix made the comparison more sophisticated without making it
+more meaningful:
 
-**Root cause — deeper than any of the four findings.** The differential tried to prove behavioral
-equality between two functions that **read different inputs**. Go's `ServeMux` matches on
-`r.URL.EscapedPath()` (`$GOROOT/src/net/http/server.go:2659-2680`), where `%2F` stays inside one
-segment; the old resolver reads `r.URL.Path`, which is **decoded**, where the same bytes are a real
-separator. So `foo%2Fapproval-preview` is one segment to the router (→ `/documents/{id}` →
-`document.view`) and two to `permissions.go:163`'s suffix rule (→ `document.submit`).
+| Round | What it found | What the fix did |
+|---|---|---|
+| 2 | `notSuffix: "/roles"` disqualifies a path a pattern lookup grants | added a path dimension |
+| 3 | HEAD aliases onto GET patterns | added a method dimension |
+| 4 | the method dimension was sampled, not enumerated | enumerated it |
+| 5 | `%2F` makes the two sides read *different strings* | replaced the differential with a derivation proof |
+| 6 | a param value can spell a routing token | made the classifier three-valued |
+| 7 | first-match ordering; the labels are not a lattice | *(not applied — the ratchet fired)* |
 
-That is not a hole in the sample. It is the discovery that **where the two disagree, the old
-resolver is the wrong one** — it classifies strings the router never routed. Chasing equality over
-that input space is chasing a bug into its corners, and the space is infinite: after encoding come
-trailing slashes, `..` segments, `;`-parameters, duplicate slashes, and unicode normalization.
-**A proof by enumeration over an infinite input space cannot be closed by adding dimensions.**
+Six escalating constructions for one comparison. The seventh would have been a regular-language
+engine with negation and ordered difference — 400–700 lines of unverified code, built to serve as a
+correctness oracle, and deleted at step 8.
 
-**§2 verdict.**
+**And it is this program's own defect class.** MetalDocs had three hand-synced enumerations of route
+truth, none authoritative; this design exists to collapse them to one. The acceptance gate I wrote
+was a **fourth artifact comparing two of them**. A gate that reproduces the defect it gates is not a
+gate.
 
-| Question | Answer |
-|---|---|
-| Global-maximum structure | **A row-level derivation proof plus an enumerated delta list.** Compare the 120 `routeRules` rows to the generated table row by row — finite, total, and complete *by construction*, with no input-space enumeration anywhere in it. Every row that does not map identically becomes a named, approved delta with a regression test. |
-| What a proven system does | The standard policy-table migration: prove the new artifact is **derived** from the source of truth and enumerate the intentional differences. It is what every codegen migration in this repo already does (`oapi-codegen` + the drift gate), and what §5 checks 2 and 3 already are. Fuzzing two implementations against each other is what you do when there is *no* source of truth — and this program's whole premise is that the spec **is** one. |
-| Cost of the global maximum | Rewriting this section. Steps 1–3 and 5 of §11 are unaffected. |
-| Cost of the local maximum later | A BLOCKER every round, on a new dimension each time, and a deletion licensed by a gate that has never once been total. |
-| Chosen by | **The operator**, 2026-08-05, on the §2 escalation recorded in the review ledger. Not the author, and not the reviewer. |
+**The correction, stated positively.** Operator ruling A already put the authority in one place: the
+capability is declared in the OpenAPI spec. Once there is exactly one home for the decision,
+`routeRules` is not a peer awaiting a parity proof — it is a **second copy of a decision that now
+has one home**, and the house rule disposes of it directly: *tudo fallback legacy é extermínio*.
+Deleting it does not require its own permission. **Asking `routeRules` to license the deletion of
+`routeRules` is the circularity that generated every round above.**
 
-The request-level differential, the cross-product, the token basis and the sentinel are all
-**deleted**. They are not kept as a supplementary check: two gates where one suffices is exactly
-the shape §3 of the review doctrine tells us to collapse, and the weaker one would be the only one
-anybody read when it went red.
+What `routeRules` retains is one honest role: it is the best surviving **record** of decisions
+people actually made. So it is the *input to authoring* the 147 annotations, read row by row by a
+human — a **review**, which is what a decision deserves, not a gate, which is what a proof is.
 
-### 10.2 The derivation proof — total by construction, 120 rows
+**Amendment to the analysis.** `…-system-impact.md:140` is amended by this section, and the
+amendment is recorded there. This changes a constraint the analysis called locked; it was authored
+in this program and corrected in this program, and the four operator rulings are untouched — indeed
+ruling A is what makes the correction available.
 
-The gate is a pure table-to-table function with no request in it.
+### 10.2 What is actually proven — positive conformance against the one authority
 
-```go
-// For each of the 120 rows in routeRules × each recorded mux pattern, classify
-// the pair. There is no request string anywhere in this test.
-type governance int
+Three properties, none of which mentions `routeRules`.
 
-const (
-	governsNone    governance = iota // no request this pattern accepts satisfies the rule
-	governsUniform                   // EVERY request this pattern accepts satisfies the rule
-	governsPartial                   // SOME do and some do not — always a delta
-)
+**1. Completeness is structural, not measured.** The generator fails the build if any operation
+lacks `x-authz-capability` or `x-authz-capability-none` (§2 rule 2). So "every route has a policy"
+is not a number anyone counts — it is a condition the build cannot violate. Every coverage count
+this document asserted was fabricated, twice: 47 `pathPrefix` rows when there are 80, and "the
+fallback is reached zero times", which is false — `PATCH /api/v1/iam/users/roles` routes to the
+`{user_id}` pattern while `notSuffix: "/roles"` at `permissions.go:120` disqualifies its only
+explicit PATCH rule, reaching `permissions.go:336`. **A property enforced by the build needs no
+count. A count in a document is the defect class this program deletes.**
 
-func TestRouteRulesDerivation(t *testing.T) {
-	generated := httpSurface // the generated map, keyed by mux pattern
-	for _, rule := range routeRules {
-		for pattern, entry := range generated {
-			switch classify(rule, pattern) {
-			case governsNone:
-				continue
-			case governsUniform:
-				requireSameVerdict(t, rule, entry) // or a listed §10.3 delta
-			case governsPartial:
-				requireListedPartialDelta(t, rule, pattern) // §10.3 class 9
-			}
-		}
-	}
-}
-```
+**2. Live conformance, one case per operation.** For each of the 147 operations, an integration test
+asserts the declared capability is *required*: a principal holding it gets a non-403, a principal
+without it gets 403, and a `security: []` operation admits an unauthenticated caller. This is
+positive evidence against the authority — it proves the table the server actually enforces is the
+table the spec declares. A differential against a peer table could never prove this, because a peer
+table is not what the server should obey.
 
-**`classify` is three-valued, and that is the whole design.** An earlier revision made it
-two-valued — governed or not — by reading the pattern's literal skeleton and treating a `{param}`
-position as unable to satisfy a literal predicate. That is **unsound**, and the counterexample is
-live: `GET /api/v1/documents/{id}/placeholder-options/{pid}`
-(`api/openapi/v1/openapi.yaml:3418`) with `pid=approval-preview` produces the decoded path
-`…/placeholder-options/approval-preview`, which satisfies `pathSuffix: "/approval-preview"` at
-`permissions.go:163` and therefore resolves to **`CapDocumentSubmit`** — while the skeleton reading
-sees a trailing `{pid}`, declares the pair ungoverned, and silently lets the broad
-`CapDocumentView` row at `permissions.go:164` stand. A rule that governs *part* of a pattern's
-request language is precisely a behavior change, and a classifier that can only say yes or no
-**cannot emit it**. Prose asserting "that would be a delta" does not produce a delta; the
-classifier must.
+The suite is generated from the spec, so it cannot drift from the operation set, and it replaces
+`TestRouteCoverage`'s hand-maintained fixture list (`permissions_test.go:369-481`) — the defect that
+motivated this whole program.
 
-Partiality stays decidable, because a rule predicate and a mux pattern are both regular languages
-over path segments and their intersection is computed symbolically, never sampled:
+**3. The boot assertion, unchanged (§5).** Declared ⊆ mounted ⊆ declared, one publisher per tag,
+mounter owns its tag. That is what makes the *mounted* surface and the *declared* surface the same
+object, and it is a runtime invariant rather than a migration artifact — it survives step 8, which
+nothing in §10.1's discarded machinery would have.
 
-| Field | `none` | `uniform` | `partial` |
+**What is deliberately not proven:** that the new table decides identically to the old one. If a
+`routeRules` row encoded a capability decision the annotation review transcribed wrongly, that is
+caught by the row-by-row review and by property 2, not by a proof. This is a real and stated cost of
+the §2 correction — it trades an equivalence proof for an authority. The trade is worth taking
+because the equivalence proof was against an artifact that decides on **decoded substrings of the
+whole path**, and can therefore be steered by user-supplied parameter content.
+
+### 10.3 Behavior changes — derived from the design, not discovered by a differ
+
+Seven rows, and their provenance matters: rows 1–6 were each derived by reading the design against
+the middleware chain and the mux. **None came from the differential.** The differential produced
+exactly two findings of its own, and they are the same finding — the old table could be steered by
+param content — which row 7 states once.
+
+| # | Change | Why | Test |
 |---|---|---|---|
-| `pathExact` | pattern ≠ the literal | pattern == the literal | impossible — an exact path either is or is not the pattern |
-| `pathPrefix` | pattern's literal head diverges from the prefix | prefix terminates at or before the end of the pattern's leading **literal** segments | prefix reaches into a `{param}` segment — the verdict then depends on the param value |
-| `pathSuffix` | pattern's trailing literals contradict the suffix | pattern ends in exactly that literal | pattern ends in `{param}` and the suffix is one segment a value could equal |
-| `contains` | no literal match and no `{param}` can produce the token | the token appears in the pattern's literals | a `{param}` can produce the token — either the token is one segment, or `%2F` lets one wildcard decode to a multi-segment value |
-| `notSuffix` | the dual of `pathSuffix`, same three cases | | |
-| `method` | pattern's method ≠ rule's | equal, or the rule is methodless | impossible — `HEAD` on a `GET` pattern is uniform, and it is delta 6 |
+| 1 | Health authenticated non-GET: 200 → **405** | the method-qualified pattern replaces in-handler `r.Method` dispatch (§8) | table test |
+| 2 | `GET /api/v1/health/<unknown>` unauthenticated: 404 → **401** | deleting the `GET` prefix row `permissions.go:84`; routes nowhere either way | asserts 401 |
+| 3 | `GET /healthz` unauthenticated: **200 → 401** | authn precedes the mux (`chain.go:25`), so deleting route *and* row still changes the answer — rejected at `auth/.../middleware.go:78` before the 404. §7 repoints all four live consumers to `/api/v1/health/live` in the same step | asserts 401, not 404 |
+| 4 | `/api/v1/iam/presence/stream` on a SQLDB-less boot: 404 → **501** | §4's Mount-is-total rule | dev-path only |
+| 5 | **HEAD on every capability-guarded GET route** inherits its GET pattern's capability | mux-level HEAD/GET aliasing (`$GOROOT/src/net/http/server.go:2484-2486`). Includes `HEAD /api/v1/auth/me` for a must-change-password principal: 403 → 200, no body | HEAD a guarded route without the capability, expect 403 |
+| 6 | Public routes are exactly the `security: []` operations | `newPublicPathChecker` derives public from `visibility == VisibilityPublic` (`permissions.go:351-356`), so rows 2, 3 and 6 have one source | integration test over every public operation, no session, expect non-401 |
+| 7 | **The old table could be steered by path-parameter content; the new one cannot.** `user_id="roles"` reached the fallback; `pid="approval-preview"` reached `CapDocumentSubmit` instead of `CapDocumentView`; `foo%2Fapproval-preview` reached a suffix rule the router never routed | the old resolver matched decoded substrings of the whole path; the new table is keyed by the **route**. Structural, not enumerable | one test per named instance, asserting the **new** behavior is correct — plus `%2F`, trailing slash, `//`, `..` against the real mux |
 
-The `contains` row is where round 5's `%2F` finding now lives. It is no longer an enumeration
-dimension anyone must remember to add — it is one arm of one classification, and forgetting it
-makes the classifier reject a pair it should mark `partial`, which the completeness assertions
-catch.
+**Row 7 is one row on purpose.** Under the differential its membership was an open set that grew
+every round, and revision 6 tried to close it with a regenerated golden file — a list produced by
+the same classifier it was meant to hold accountable. The new table **cannot** be steered by param
+content, because a parameter value is never part of its key. That is a property, and a property does
+not have a membership list.
 
-**The `pathPrefix` measurement, corrected.** An earlier revision claimed 47 prefix rules all ending
-at a `/`. **Both numbers were false and neither was measured.** The table has **80** `pathPrefix`
-rows, of which **20 end in `/`**; eight distinct values do not — `/api/v1/documents`,
-`/api/v1/templates`, `/api/v1/tokens`, `/api/v1/controlled-documents`, `/api/v1/approval/routes`,
-`/api/v1/taxonomy/{profiles,areas,families}`. Sweeping all 125 spec paths shows none of the eight
-currently reaches into a `{param}` or collides with a sibling literal path, so every prefix row
-classifies `uniform` **today** — but that is a contingent property of this spec, not a structural
-one. Adding `/api/v1/documents-archive` tomorrow would make `pathPrefix: "/api/v1/documents"` match
-it, and nothing outside this test would notice. **The boundary condition is therefore asserted
-per-pair inside `classify`, never stated as a count in this document.** A hand-typed count in the
-document governing a hand-typed table is the exact defect class this program exists to delete, and
-it reappeared here.
-
-**Three completeness assertions, each finite:**
-
-1. **Every rule is reached.** All 120 rows appear in the iteration; a row whose classification is
-   `governsNone` for every pattern is reported, not skipped — that is a rule for a route that no
-   longer exists, and it must be accounted for before deletion.
-2. **Every pattern is governed by a rule that is not the fallback.** All 148 recorded patterns
-   (134 generated + 14 hand-registered; §7 deletes `/healthz`, taking it to 147) must be matched by
-   at least one explicit row. The fallback at `permissions.go:336-338` returns
-   `VisibilitySessionRequired` for anything unmatched, so an assertion phrased as "some rule
-   governs it" would pass on every conceivable input and prove nothing. The assertion is that the
-   **explicit** table covers the pattern; a pattern reaching only the fallback is a finding.
-3. **Every `uniform` pair agrees, and every `partial` pair is a listed delta.** The verdict
-   `(Capability, Visibility)` the rule yields equals the one the generated entry carries, or the
-   pair appears in §10.3.
-
-There is no sampling anywhere in this construction, so there is no dimension to omit. Every count
-in this section is measured: 120 rows (GET 42, POST 53, PUT 11, PATCH 5, DELETE 8, plus **one
-methodless** — `/healthz` at `permissions.go:85`, which §7 deletes, after which **every** rule is
-method-qualified and the `method` classifier loses its "any" case entirely). When the test is
-written, all counts are re-derived from the code rather than read from here.
-
-### 10.3 The delta list — the gate's output, not a footnote beside it
-
-Under a derivation proof, **completeness of the delta list is what the gate produces.** Any row
-that does not map identically lands here by construction, including every class the four review
-rounds found by enumeration. Each delta carries a reason and a regression test; none is absorbed by
-a loose assertion.
-
-| # | Delta | Why it exists | Disposition |
-|---|---|---|---|
-| 1 | Health authenticated non-GET: 200 → **405** | the method-qualified pattern replaces in-handler `r.Method` dispatch (§8) | accepted, table test |
-| 2 | `GET /api/v1/health/<unknown>` unauthenticated: 404 → **401** | deleting the `GET` prefix row `permissions.go:84`; the path routes nowhere in both regimes | accepted |
-| 3 | `GET /healthz` unauthenticated: **200 → 401** | authn precedes the mux (`chain.go:25`), so deleting route **and** row still changes the answer — the request is rejected at `auth/.../middleware.go:78` before reaching the 404. §7 repoints all four live consumers to `/api/v1/health/live` in the same step. | accepted, asserts 401 not 404 |
-| 4 | `/api/v1/iam/presence/stream` on a SQLDB-less boot: 404 → **501** | §4's Mount-is-total rule | accepted, dev-path only |
-| 5 | `HEAD /api/v1/auth/me` for a must-change-password principal: 403 → **200** (no body) | HEAD inherits the GET pattern's generated `allowedDuringPasswordChange` | accepted, §2's delta table |
-| 6 | **HEAD on every capability-guarded GET route**: previously resolved by the same `(method, path)` rules; now inherits its GET pattern's capability | mux-level HEAD/GET aliasing (`$GOROOT/src/net/http/server.go:2484-2486`) — this is the *general* form of delta 5, which an earlier draft had only in its `auth/me` instance | accepted; integration test HEADs a guarded route without the capability, expects 403 |
-| 7 | **Encoded-separator requests** — e.g. `GET /api/v1/documents/foo%2Fapproval-preview`: `document.submit` → `document.view` | the old resolver classified decoded `r.URL.Path`; the router routes `EscapedPath()`. Where they disagree the old verdict was **never the one the router acted on**. Whole class, not one instance. | accepted as a **correctness fix**, not a regression; table test over `%2F`, trailing slash, `//`, `..` |
-| 8 | **Off-surface prefix matches** — a path no pattern serves for which a `pathPrefix` row still returns a verdict today | tier-1's verdict is unobservable behind the mux's 404/405, **except** where an old `Public` row admitted an unauthenticated caller — which is deltas 2 and 3, already listed | accepted; no residual class |
-| 9 | **Partial governance — every `governsPartial` pair.** A param value that satisfies a rule predicate the pattern's literals do not. Confirmed live: `GET /api/v1/documents/{id}/placeholder-options/{pid}` with `pid=approval-preview` resolves to `CapDocumentSubmit` today (`permissions.go:163`) and to the operation's declared capability afterwards; likewise `GET /api/v1/documents/{id}` with `id=approval-preview` | the old table matched a *decoded substring of the whole path*; the generated table is keyed by the *route*. Wherever a param value can spell a routing token, the two disagree by construction | accepted as a **correctness fix** — the old verdict depended on user-supplied data, which is the defect, not the behavior worth preserving. **This row is a class, and its membership is enumerated by §10.2's classifier, not by this table.** One regression test per member, emitted with the list |
-
-`newPublicPathChecker` derives public from `visibility == VisibilityPublic`
-(`permissions.go:351-356`), so deltas 2, 3 and 8 come from one source, not two, and rows 1–8 are
-the complete unauthenticated-exposure diff.
-
-**Nine delta classes — and row 9 is why this table stops carrying a number.** The count has now
-been wrong four times (one, four, five, eight). Each earlier miss came from deltas being *noticed*
-rather than *derived*; row 9 came from something worse — a two-valued classifier that could not
-express the case, so no amount of care in reading the table would have produced it. Rows 1–8 are
-individually enumerable and stay enumerated here. Row 9's membership is **the classifier's output**,
-written to a golden file the test regenerates and diffs, exactly as `.github/workflows/api-contract.yml:37`
-does for generated code. Any hand-maintained list of row-9 members would be a hand-synced
-enumeration mirroring generated truth — the defect this entire program exists to delete, reproduced
-inside its own acceptance gate.
-
-Per `wiki/quality/test-discipline.md`, DB-touching cases use the `testdb` factory; the derivation
-proof and the `assertSurface` tests are pure and need neither.
-
----
+Per `wiki/quality/test-discipline.md`, the conformance suite is `//go:build integration` + `testdb`;
+the `assertSurface` tests are pure and need neither.
 
 ## 11. Sequencing
 
@@ -1048,16 +980,21 @@ Ruling A: no intermediate state ships. Commits may be incremental; the release i
    `routeHandlerFields` and `TestRouteCoverage` consume (`permissions_test.go:369-481`), so
    splitting them leaves a window where neither the old completeness guard nor the new
    assertion is in force.
-7. The **derivation proof** (§10.2) and the delta list it emits (§10.3). Both tables now exist;
-   this is the commit that walks all 120 `routeRules` rows against the generated table, proves
-   every row is either derived by it or a listed delta, and proves no generated pattern is
-   ungoverned. Locked constraint 5 forbids deleting `routeRules` before this is green — and the
-   delta list is this step's output, not a footnote written beside it.
-8. Flip `PermissionResolver` to the generated table lookup; delete §7's list, including all 15
-   orphaned `RegisterRoutes` methods and the whole of `pdf_webhook_handler.go` (§7.1). The
-   derivation proof is deleted in this same commit — it exists to license the deletion, and once
-   `routeRules` is gone it has nothing to derive from. The §10.3 delta regression tests **stay**;
-   they guard the new behavior, not the migration.
+7. **The conformance suite** (§10.2 property 2) and the §10.3 regression tests. One generated
+   integration case per operation, asserting the declared capability is required. This is positive
+   evidence against the spec — the single authority — and it is what licenses step 8. It is **not**
+   a comparison with `routeRules`; §10.1 explains at length why the program spent seven review
+   rounds discovering that a comparison could not be the license.
+   The 147 `x-authz-*` annotations authored in step 1 are also **reviewed row by row against
+   `routeRules`** here, before it is deleted. That review is a human reading of the surviving record
+   of past decisions, and it is the accepted mitigation for the one residual risk in §12.
+8. Flip `PermissionResolver` to the generated table lookup; delete §7's list — `routeRules`
+   included, along with all 15 orphaned `RegisterRoutes` methods and the whole of
+   `pdf_webhook_handler.go` (§7.1). `routeRules` is deleted because it is a **second copy of a
+   decision that now has one home**, not because a proof permitted it. Everything from step 7
+   **stays**: the conformance suite guards the new table permanently, and the §10.3 tests guard the
+   seven approved behavior changes. Nothing built in this program is thrown away at the end — which
+   is itself a check on whether the gate was the right one.
 
 9. **Governance close-out**, and it is a step, not a follow-up: the two ADRs (§12), the three
    architecture-wiki updates, and the `BaseURL` promotion to one exported constant. A program that
@@ -1072,9 +1009,10 @@ several of these steps change a seam signature and untagged `go test` does not c
 tests: steps 1 and 3 add a full `oapi-codegen` regeneration with a clean `git diff`; step 2 adds
 the six generator-validation table tests and a green widened drift gate; steps 4, 5 and 6 add the
 four `assertSurface` unit tests plus a real boot on both the ordinary and the `useE2E` path; step 7
-is the derivation proof itself plus the §10.3 regression tests; step 8 re-runs the §10.3 tests with
-`routeRules` deleted, which is the only evidence that the deletion preserved the approved behavior;
-step 9 adds the ADR-status CI gate over the two new ADRs.
+adds the per-operation conformance suite green over all 147 operations, the §10.3 regression tests,
+and the written record of the row-by-row annotation review; step 8 re-runs both suites with
+`routeRules` deleted — identical results, since neither suite ever referenced it; step 9 adds the
+ADR-status CI gate over the two new ADRs.
 
 **Dependency graph, not a topic list:**
 
@@ -1107,7 +1045,7 @@ step 9 adds the ADR-status CI gate over the two new ADRs.
   exist first.
 - `5 → 6` — check 3 (declared ⊆ mounted) is false on the SQLDB-less boot path while any mount is
   conditional. Totality of mounting is a precondition of asserting totality.
-- `6 → 7 → 8` — the derivation proof needs both tables to exist; deletion needs it green.
+- `6 → 7 → 8` — step 7 is the conformance suite (§10.2), which needs the generated table mounted and enforced; step 8's deletion needs it green.
 
 Steps 3, 4 and 5 are mutually independent and parallelizable **with each other**; 4 additionally
 requires 2 to have landed. Step 0 is parallelizable with everything. Steps 6→8 are the only span
@@ -1142,11 +1080,11 @@ record.
 
 | Risk | Handling |
 |---|---|
-| Generator key and oapi-codegen key diverge | §5 check 2+3 makes divergence a boot failure, not a 403; §10's derivation proof compares the two tables row by row |
-| 147 `x-authz-*` declarations transcribed by hand | mechanical from `routeRules`, which covers everything: an exhaustive first-match run of all 147 spec operations against the 120 rows reaches the fallback **zero** times. There is no set of "routes with no current rule" to discover — an earlier draft claimed ~28 and that number was fabricated. The authoring risk is transcription error, and §10's derivation proof is what catches it |
+| Generator key and oapi-codegen key diverge | §5 check 2+3 makes divergence a **boot failure**, not a 403 — a runtime invariant that outlives the migration |
+| 147 `x-authz-*` declarations transcribed by hand | **This is the one real residual risk, and it is accepted deliberately.** `routeRules` is the surviving *record* of the decisions, so it is read row by row as the authoring input — a human review, which is what a decision deserves. A transcription slip is caught by that review and by §10.2 property 2's live conformance case, not by a proof. Two counts asserted here earlier were fabricated (“~28 routes with no rule”, then “the fallback is reached zero times” — both false); no count replaces them, because completeness is enforced by the build |
 | `BaseURL: "/api/v1"` is hard-coded in 10 module files (`audit/.../handler.go:89` + 9) — itself a hand-synced constant | promote to one exported constant the generator and every module read. Scheduled as **§11 step 0** — no predecessor, startable on day one |
 | A second spec document (`internal-e2e.yaml`) is a new artifact that can rot | it is generated by the same generator and asserted by the same four checks whenever `METALDOCS_E2E` is on; the e2e CI job is where that boot path runs. §11 step 2 also widens the CI drift pathspec past `'**/api.gen.go'` so the generated table is covered by the same regenerate-and-diff gate |
-| **Eight client-visible behavior changes**, not one — and the count itself was the tell | §10.3 carries the full list with a reason and a regression test each. The count has now been wrong four times (one, four, five, eight), and the reason is structural: under a *differential* gate, deltas were **noticed** one review round at a time, so the count could only ever be a lower bound. Under §10's derivation proof they are **derived**, and completeness of the list is the gate's output rather than a claim standing beside it. That is the single strongest argument for the operator's §2 ruling, and it is why this row now points at §10.3 instead of restating a number |
+| **Client-visible behavior changes** — §10.3, seven rows | The count was wrong five times (one, four, five, eight, nine) and the reason was structural: a *differential* gate can only ever **notice** deltas one review round at a time, so its count is a lower bound by construction, and each round's fix made the differ more sophisticated rather than the list more complete. §10.3's rows 1–6 are instead **derived from the design** — from the middleware chain and the mux — which is where they always came from; row 7 is a structural property of the new key, not an enumeration. This row deliberately no longer carries a number as its claim |
 | `/api/v1/iam/presence/stream` on a SQLDB-less boot: 404 → 501 | accepted. §4's Mount-is-total rule replaces a routing-level absence with a handler-level `501 Not Implemented`, which is the honest answer and the repo's existing majority convention (8 IAM operations already do this). No production boot has `SQLDB == nil`; the delta is observable only in the degraded dev path |
 | `HEAD /api/v1/auth/me` for a must-change-password principal: 403 → 200 (no body) | accepted, §2's delta table. Go's `ServeMux` matches HEAD against a `GET` pattern, so the generated per-operation `allowedDuringPasswordChange` boolean is inherited by HEAD where today's exact-`GET` clause rejects it. HEAD carries no body, so no data reaches a principal who must change their password. `logout` and `changePassword` are POST-gated and structurally immune |
 | CORS preflight reaching the resolver | §9, verified during implementation |
@@ -1156,4 +1094,4 @@ record.
 **Open** — none. Both AS-2 questions from the system-impact analysis are closed by operator
 rulings; the `/healthz` exception is deleted rather than declared; and the §2 escalation on §10's
 gate structure was put to the operator on 2026-08-05 and answered **outcome (a), restructure** —
-derivation proof plus enumerated delta list, recorded in the review ledger.
+positive conformance against the single authority ruling A establishes, recorded in the review ledger.
