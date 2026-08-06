@@ -382,9 +382,9 @@ func buildTestRouteHandlers() routeHandlers {
 // instance and inspects no field's value. An earlier version skipped fields
 // that were nil, which let a newly added family launder itself out of the
 // expected set simply by being forgotten in buildTestRouteHandlers too — the
-// exact omission this guard exists to catch. Boot-path-optional families are
-// declared once in router.go's conditionalRouteFamilies and subtracted by the
-// caller; a nil field NOT in that set is a wiring bug and must surface.
+// exact omission this guard exists to catch. Mount is total (§4): every field
+// returned here MUST have an entry in router.go's routeFamilies table, with
+// no exemption set to subtract against.
 //
 // documentsRateLimit and documentsUserID are excluded: they're config params
 // consumed by the documents family's RegisterRoutesWithRateLimit call, not
@@ -463,7 +463,7 @@ func TestRouteCoverage(t *testing.T) {
 		}
 	}
 	for family := range fields {
-		if !seen[family] && !conditionalRouteFamilies[family] {
+		if !seen[family] {
 			t.Errorf("routeHandlers field %q has no entry in router.go's routeFamilies mount table — it is constructed but never mounted", family)
 		}
 	}

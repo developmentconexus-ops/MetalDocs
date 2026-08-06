@@ -66,25 +66,14 @@ type routeFamily struct {
 	register func(httprouter.Muxer)
 }
 
-// conditionalRouteFamilies names every routeHandlers field that legitimately
-// has no entry in the mount table on some boot path. It is exactly one:
-// presence, which buildPresence returns nil for when deps.SQLDB is nil
-// (main.go:1173-1175).
-//
-// Every other field is constructed on every path — including security, which
-// takes a nil service but is itself always non-nil (main.go:404 and :406 both
-// assign). Guarding those would be a branch no environment executes; a
-// zero-value field there is a wiring bug and must fail loudly, not be skipped
-// silently.
-//
-// TestRouteCoverage consumes this set to decide which fields may be absent
-// from the table — so "conditional" is declared once, here, rather than
-// inferred from a zero value at two sites that could disagree.
-var conditionalRouteFamilies = map[string]bool{"presence": true}
-
 // routeFamilies is the mount table: the ordered set of route families
-// buildRouter installs. See conditionalRouteFamilies for the one entry that
-// is boot-path dependent.
+// buildRouter installs. Mount is total (§4) — every routeHandlers field has
+// exactly one entry here, unconditionally, including presence: on the
+// SQLDB-less boot path h.presence is nil, but h.presence.RegisterRoutes binds
+// fine on a nil *presence.Handler (it only creates a method value, it never
+// dereferences the receiver), and the stream handler itself answers 501 when
+// its receiver is nil, matching GetPresenceSnapshot's existing convention
+// (iam/delivery/http/router.go:232).
 //
 // This is a plain production function with no test-only affordance.
 // TestRouteCoverage (permissions_test.go) walks this same table to assert
@@ -98,9 +87,7 @@ func routeFamilies(h routeHandlers) []routeFamily {
 		{"audit", h.audit.RegisterRoutes},
 		{"search", h.search.RegisterRoutes},
 		{"security", h.security.RegisterRoutes},
-	}
-	if h.presence != nil {
-		families = append(families, routeFamily{"presence", h.presence.RegisterRoutes})
+		{"presence", h.presence.RegisterRoutes},
 	}
 	return append(families,
 		routeFamily{"taxonomy", h.taxonomy.RegisterRoutes},
