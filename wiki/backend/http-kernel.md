@@ -1,12 +1,16 @@
 # HTTP Kernel — Composition Root, Middleware Chain, and Startup
 
-> **Last verified:** 2026-07-16 (ROADMAP unit 4.5 — e2e-seed raw-SQL bullet removed, `ensurePODefaultTemplateBinding` deleted and `document_profile_template_defaults` dropped by migration 0308) | **Prior:** 2026-07-02 (§8 outbox relay rows updated for the StagingOutboxWorker consolidation; other §8 anchors verified 2026-06-11) | **Prior:** 2026-06-11 (Wave 1)
-> **Scope:** The `apps/api` composition root: startup sequence, dependency injection, middleware chain, routing, server lifecycle, graceful shutdown, and tier-1 authorization truth table. Does not cover per-module business logic or persistence owned by domain modules.
+> **Last verified:** 2026-08-06 (http-surface-protocol program close-out — scoped to §2 file inventory, §3 public surface, §4 step 8, §6 tier-1 resolution, §11 flags: `permissions.go`'s `routeRules` table deleted (Task 18), tier-1 now reads the generated `httpSurface` table, and per-module `RegisterRoutes` was replaced by `SurfacePublisher.Mount`; see ADR [`0090`](../decisions/0090-tier1-pdp-generated-from-spec.md) and ADR [`0091`](../decisions/0091-http-surface-protocol.md). §5, §7–§10, §12 were **not** reverified this pass — they carry the prior verification date below and may contain unrelated drift (e.g. the scheduler/River description in §8 predates this program).) | **Prior:** 2026-07-16 (ROADMAP unit 4.5 — e2e-seed raw-SQL bullet removed, `ensurePODefaultTemplateBinding` deleted and `document_profile_template_defaults` dropped by migration 0308) | **Prior:** 2026-07-02 (§8 outbox relay rows updated for the StagingOutboxWorker consolidation; other §8 anchors verified 2026-06-11) | **Prior:** 2026-06-11 (Wave 1)
+> **Scope:** The `apps/api` composition root: startup sequence, dependency injection, middleware chain, routing, server lifecycle, graceful shutdown, and tier-1 authorization data source. Does not cover per-module business logic or persistence owned by domain modules.
 > **Key files:**
-> - `apps/api/cmd/metaldocs-api/main.go` — composition root (config → DI → routes → lifecycle)
+> - `apps/api/cmd/metaldocs-api/main.go` — composition root (config → DI → publisher mount → lifecycle); 1290 lines
 > - `apps/api/cmd/metaldocs-api/chain.go` — declarative middleware chain (`apiChain`/`buildChain`/`loginRateLimit`); Wave 1
 > - `apps/api/cmd/metaldocs-api/chain_test.go` — order assertion (REQ-MW-7); Wave 1
-> - `apps/api/cmd/metaldocs-api/permissions.go` — tier-1 route → capability/visibility truth table
+> - `apps/api/cmd/metaldocs-api/permissions.go` — tier-1 pattern lookup into the generated `httpSurface` table (63 lines; `routeRules` deleted Task 18)
+> - `apps/api/cmd/metaldocs-api/httpsurface_gen.go` — generated `map[string]surfaceRule` (147 entries), produced by `cmd/gen-http-surface` from the OpenAPI spec's `x-authz-*` extensions
+> - `apps/api/cmd/metaldocs-api/surface.go` — `assertSurface`, the boot assertion (4 checks) that proves mounted routes and declared routes coincide
+> - `apps/api/cmd/metaldocs-api/publishers.go` — `publisherDeps`/`buildPublishers`, the composition root's publisher list (replaces the old `routeHandlers{...}` struct)
+> - `internal/platform/httprouter/publisher.go` — `SurfacePublisher` interface every route owner implements
 > - `apps/api/cmd/metaldocs-api/reauth.go` — sign-off e-signature re-auth wiring
 > - `apps/api/internal/wiring/documents.go` — capability-checker adapter (the only non-main package exported by this binary)
 > - `internal/platform/bootstrap/api.go` — shared dependency construction (`BuildAPIDependencies`)
@@ -20,7 +24,7 @@
 
 `apps/api` is the **composition root** of the MetalDocs HTTP backend. It contains two binaries:
 
-- **`metaldocs-api`** — the API server. It owns the full startup sequence: config load, Postgres connect, startup migrations, DI of every domain module, route mounting on a single `http.ServeMux`, middleware chain composition, background goroutine launch, and the graceful shutdown path. It also owns the **tier-1 authorization truth table** (`permissions.go`): the single ordered rule list that classifies every route as public / session-required / permission-guarded and binds it to an IAM capability.
+- **`metaldocs-api`** — the API server. It owns the full startup sequence: config load, Postgres connect, startup migrations, DI of every domain module, route mounting via each module's `SurfacePublisher.Mount` on a single `http.ServeMux`, a boot assertion that the mounted surface matches the declared one, middleware chain composition, background goroutine launch, and the graceful shutdown path. Tier-1 authorization is a **pattern lookup into the generated `httpSurface` table** (`permissions.go`, ADR [`0090`](../decisions/0090-tier1-pdp-generated-from-spec.md)) — the table itself is generated from the OpenAPI spec by `cmd/gen-http-surface`, not hand-typed in this binary.
 - **`metaldocs-e2e-seed`** — a one-shot E2E test-account seeder (separate binary, same source tree).
 
 No business logic lives in `apps/api`. Everything is wiring and boundary adapters between domain modules that must not import each other directly. The kernel sits above the module layer; it is never imported by modules.
@@ -35,12 +39,19 @@ Sibling binaries `metaldocs-jobs` (`apps/jobs`) and `metaldocs-worker` (`apps/wo
 
 | File | Role |
 |---|---|
-| `apps/api/cmd/metaldocs-api/main.go` | Composition root. 943 lines. Config → DB → migrations → DI of all modules → route mounts → middleware chain → server lifecycle → shutdown. Declares 12 in-file types: 9 cross-module boundary adapters, 2 utility types (`realClock`, `realUUIDGen`), 1 grouping struct (`fanoutComponents`). |
-| `apps/api/cmd/metaldocs-api/permissions.go` | Tier-1 route → capability/visibility truth table (`routeRules`, 286 lines); `newPermissionResolver` + `newPublicPathChecker` shared by the authn and IAM middlewares. |
+| `apps/api/cmd/metaldocs-api/main.go` | Composition root. 1290 lines. Config → DB → migrations → DI of all modules → publisher construction + `Mount` on one mux + `assertSurface` boot check → middleware chain → server lifecycle → shutdown. |
+| `apps/api/cmd/metaldocs-api/permissions.go` | Tier-1 pattern lookup into the generated `httpSurface` table (63 lines; the hand-typed `routeRules` table and its `resolveRoutePermission` walker were deleted Task 18, commit `cc35b5f8`). `newPermissionResolver` + `newPublicPathChecker` + `newPasswordChangeAllowedChecker` share the same table lookup, used by the authn and IAM middlewares. |
+| `apps/api/cmd/metaldocs-api/httpsurface_gen.go` | Generated `map[string]surfaceRule` (147 entries), keyed by mux pattern; produced by `cmd/gen-http-surface` from the OpenAPI spec's `x-authz-capability`/`x-authz-visibility` extensions. Committed, never hand-edited. |
+| `apps/api/cmd/metaldocs-api/httpsurface_e2e_gen.go` | Same generation, for the optional E2E-only spec; merged into `httpSurface` only when `METALDOCS_E2E=1`. |
+| `apps/api/cmd/metaldocs-api/surface.go` | `assertSurface` (152 lines): the boot assertion. Four checks — tag coverage, mounted ⊆ declared, declared ⊆ mounted, per-publisher tag ownership — aggregated into one fatal error. |
+| `apps/api/cmd/metaldocs-api/publishers.go` | `publisherDeps` struct + `buildPublishers` (50 lines): the composition root's route inventory as an ordered list of 16 `SurfacePublisher`s (17 with E2E), replacing the old keyed-struct pattern. |
+| `apps/api/cmd/metaldocs-api/httpsurface_e2e_publisher.go` / `httpsurface_e2e_publisher_stub.go` | Build-tag-gated E2E publisher (`e2ePublisher`), appended to the publisher list only under `METALDOCS_E2E=1`. |
 | `apps/api/cmd/metaldocs-api/reauth.go` | Sign-off e-signature re-auth wiring: adapts auth identity repo to the approval signature port; builds the password re-auth provider registry with an in-memory failure rate limiter. |
 | `apps/api/cmd/metaldocs-api/main_test.go` | Shutdown-path unit tests (server error joins scheduler, `ErrServerClosed` → exit 0, ctx-cancel drains workers) + guard tests for postgres-mode / fanout-URL / capability-service preconditions. |
-| `apps/api/cmd/metaldocs-api/permissions_test.go` | Resolver lock tests: per-route cap/visibility table, fail-closed defaults, route-coverage fixture vs `routeRules`, methodless-write-shadowing guard, registry/seed cross-checks against `db/reference-data/0001_product_reference_data.sql`. |
-| `apps/api/cmd/metaldocs-api/permissions_authz_scope_test.go` | Binds `routeRules` to the OpenAPI spec: every area-grade capability with a documented HTTP surface must declare `x-authz-area` or a justified `x-authz-skip-area` (ADR 0022 Phase 7). |
+| `apps/api/cmd/metaldocs-api/permissions_test.go` | Resolver lock tests: per-route cap/visibility lookup against `httpSurface`, fail-closed default on an unmatched-but-mounted pattern, methodless-write-shadowing guard, registry/seed cross-checks against `db/reference-data/0001_product_reference_data.sql`. |
+| `apps/api/cmd/metaldocs-api/permissions_authz_scope_test.go` | Binds the generated `httpSurface` table to the OpenAPI spec: every area-grade capability with a documented HTTP surface must declare `x-authz-area` or a justified `x-authz-skip-area` (ADR 0022 Phase 7). |
+| `apps/api/cmd/metaldocs-api/surface_conformance_test.go` | The per-operation conformance suite: walks every declared operation and asserts its capability is genuinely enforced at tier-1. Includes `TestNoDeclaredOperationIsUnreachable`, **red by design** — see §6. |
+| `apps/api/cmd/metaldocs-api/surface_test.go`, `surface_edge_test.go`, `httpsurface_parity_test.go` | Unit coverage for `assertSurface`'s four checks and edge cases. |
 | `apps/api/cmd/metaldocs-api/e2e_gate_test.go` | Locks the `METALDOCS_E2E=1` gate: only the literal `"1"` value mounts `/internal/test/*` handlers. |
 
 ### apps/api/cmd/metaldocs-e2e-seed
@@ -59,28 +70,30 @@ Sibling binaries `metaldocs-jobs` (`apps/jobs`) and `metaldocs-worker` (`apps/wo
 
 ## 3. Public surface
 
-`apps/api` exports nothing importable by other modules. Both `cmd` packages are `package main`, and `metaldocs/apps/api/internal/wiring` is imported solely by `apps/api/cmd/metaldocs-api/main.go:40` (grep-verified, no other importer in the repo).
+`apps/api` exports nothing importable by other modules. Both `cmd` packages are `package main`, and `metaldocs/apps/api/internal/wiring` is imported solely by `apps/api/cmd/metaldocs-api/main.go` (grep-verified, no other importer in the repo).
 
-Routes registered **directly by the kernel** (all other routes are mounted by module `RegisterRoutes` calls):
+Every public route is mounted by a `httprouter.SurfacePublisher.Mount` call (`internal/platform/httprouter/publisher.go:19`) — there is no route registered directly by kernel code outside a publisher, with one deliberate exception: the Prometheus scrape endpoint below, which is not part of the public API surface at all.
 
-| Method | Path | Tier-1 binding | Registered at |
+| Method | Path | Tier-1 binding | Mounted by |
 |---|---|---|---|
-| `GET` | `/api/v1/metrics` | `metrics.view`, permission-guarded (`permissions.go:96`) | `main.go:572` |
-| `POST` | `/internal/test/seed`, `/internal/test/reset` | Not in `routeRules` → fail-closed session-required default; mounted only when `METALDOCS_E2E=1` | `main.go:519-521` |
-| `GET` | `/internal/test/governance-events` | Same gate | `main.go:519-521` |
-| `POST` | `/internal/test/advance-clock` | Same gate | `main.go:519-521` |
+| `GET` | `/api/v1/metrics` (JSON, per-route RED aggregation) | `metrics.view`, permission-guarded; tag `observability` (`httpsurface_gen.go:276-280`) | the `observability` publisher, via the publisher list (`main.go:840-857`) |
+| `GET` | `/metrics` (Prometheus text exposition) | Not in the OpenAPI spec, not authn/iam-gated — served on a **dedicated listener** (`METRICS_ADDR`, default `:9090`), never the public API server, so exposure is a process-topology fact and cannot depend on ingress discipline (F-R1) | `metricsMux` on `metricsServer`, constructed directly in `main` (`main.go:990-997`) |
+| `POST` | `/internal/test/seed`, `/internal/test/reset` | Fail-closed session-required default (unmatched pattern would hit the boot-assertion-guaranteed-unreachable branch — but these patterns ARE in the E2E surface table when mounted); mounted only when `METALDOCS_E2E=1`, via the `internal-e2e` publisher | `e2ePublisher` (`httpsurface_e2e_publisher.go:37-38`), appended to the publisher list at `main.go:863-866` |
+| `GET` | `/internal/test/governance-events` | Same gate | same |
+| `POST` | `/internal/test/advance-clock` | Same gate | same |
 
-Note: `/internal/test/trigger-scheduler-tick` is registered only when a non-nil `runSchedulerTick` is passed (`internal/test/e2e_seed.go:95-97`); the API binary passes `nil` (`main.go:520`), so that route is never reachable in this binary.
+Note: `/internal/test/trigger-scheduler-tick` is registered only when a non-nil `runSchedulerTick` is passed to `internal/test.RegisterE2EHandlers`; `e2ePublisherImpl` never sets that field (`httpsurface_e2e_publisher.go:25-31`), so that route is never reachable in this binary. In builds without the e2e build tag, `e2ePublisher` returns `nil` (`httpsurface_e2e_publisher_stub.go:17`) and the whole family is absent — Mount-is-total still holds because the publisher itself is absent from the list, not silently skipped.
 
 ### Tier-1 route classification summary
 
-The kernel's real "public surface" is the **route truth table** (`permissions.go:82-248`) consumed by both middlewares:
+The kernel's real "public surface" is the **generated `httpSurface` table** (`httpsurface_gen.go`, `map[string]surfaceRule`, 147 entries) consumed by both middlewares through `permissions.go`'s pattern lookup — see ADR [`0090`](../decisions/0090-tier1-pdp-generated-from-spec.md). The table is produced by `cmd/gen-http-surface` from the OpenAPI spec's `x-authz-capability`/`x-authz-visibility` extensions; it is not hand-maintained in this binary, so classification counts by tier live in the spec annotations and the generated file, not in prose here — see `docs/superpowers/analysis/2026-08-05-annotation-review.md` for the row-by-row review of all 147 entries.
 
-- **Public (no session):** `GET /api/v1/health/*`, `/healthz`, `POST /api/v1/auth/login`, `GET /api/v1/feature-flags` (`permissions.go:84-87`).
-- **Session-required (no capability check):** `GET /auth/me`, `POST /auth/change-password`, `POST /auth/logout` (`permissions.go:90-92`), plus every unmatched route via the fail-closed fallback (`permissions.go:270-279`).
-- **Permission-guarded:** 95 rules binding documents, templates, taxonomy, controlled-documents, IAM (users, area-memberships, roles-capabilities, presence, observability usage/KPI), approval, audit, search, sessions/security, and metrics routes to typed capabilities (`permissions.go:94-248`). Total table: 102 rules (95 permission-guarded + 4 public + 3 session-required).
+- **Public (no session):** e.g. `GET /api/v1/health/*`, `POST /api/v1/auth/login`, `GET /api/v1/feature-flags` — any entry with `visibility: iamdelivery.VisibilityPublic`. `/healthz` no longer exists as a route (deleted, not exempted — see `health_delta_test.go`).
+- **Session-required (no capability check):** e.g. `GET /auth/me`, `POST /auth/change-password`, `POST /auth/logout` — `visibility: VisibilitySessionRequired` with no `capability`.
+- **Permission-guarded:** every entry carrying a non-empty `capability` — documents, templates, taxonomy, controlled-documents, IAM, approval, audit, search, security, observability, notifications, distribution, tokens.
+- **Unresolved (boot-unreachable):** a matched mux pattern with no `httpSurface` entry returns `VisibilityUnresolved`, not a guessed fallback — `assertSurface`'s four boot checks (§6, ADR 0091) make that branch structurally unreachable at a boot that succeeds.
 
-Resolution algorithm: first-match-wins ordered scan (`permissions.go:261-268`). Rule fields are AND-ed: method, pathExact, pathPrefix, pathSuffix, contains, notSuffix (`permissions.go:35-55`). No match → `resolvePermissionFallback` returns `("", VisibilitySessionRequired)` — fail-closed (`permissions.go:270-279`). A forgotten route 401s rather than going public.
+Resolution algorithm: `newPermissionResolver` (`permissions.go:17-35`) does one map lookup — `httpSurface[pattern]` — against the pattern the stdlib `http.ServeMux` already matched. There is no ordered scan, no rule-field AND-ing, and no first-match-wins semantics to reason about; those existed only under the deleted `routeRules` table.
 
 ---
 
@@ -93,7 +106,7 @@ flowchart TD
     DEPS --> MIG[migrate.Apply advisory-locked<br/>main.go:186-194]
     MIG --> AUTH[auth service + bootstrap admin<br/>main.go:196-202]
     AUTH --> AUTHZ[capability svc + cached roles +<br/>permResolver + middlewares<br/>main.go:224-246]
-    AUTHZ --> MOUNT[module DI + RegisterRoutes on one mux<br/>main.go:279-521]
+    AUTHZ --> MOUNT[buildPublishers + Mount each on one mux<br/>+ assertSurface boot check<br/>main.go:840-884]
     MOUNT --> BG[scheduler + outbox workers +<br/>sweepers + retention<br/>main.go:542-639]
     BG --> CHAIN[middleware chain composition<br/>chain.go + main.go:623-643]
     CHAIN --> SRV[http.Server :8080/APP_PORT<br/>Read/Write/Idle timeouts<br/>main.go:654-663]
@@ -109,11 +122,11 @@ Step-by-step:
 5. **Auth service** — construct + bootstrap local admin account (`main.go:196-202`).
 6. **Audit service** — construct; wire export pipeline if counters/exports exist; set the global tier-2 bypass audit sink so `system_admin` short-circuits are recorded (`main.go:204-218`; adapter at `main.go:732-771`).
 7. **AuthZ spine** — build `CapabilityService` (`main.go:224-230`, also wired as capability-hint provider into auth responses), TTL-cached role provider (`main.go:231`; TTL from `METALDOCS_AUTHZ_CACHE_TTL_SECONDS`, default 30s via `authn/config.go:25-35`), shared permission resolver (`main.go:236`), auth middleware with injected public-path checker (`main.go:237-238`), IAM middleware with injected resolver (`main.go:239-240`), origin protection (`main.go:241-246`).
-8. **Route mounting** — module `RegisterRoutes` calls on a single `http.ServeMux` (`main.go:279-521`, interleaved with DI construction for documents/approval from ~356 to ~499): auth, health, feature-flags, audit, search, IAM admin, sessions (nil-guarded), security (nil-guarded), observability handler for usage+KPI (nil-guarded, `main.go:267-273, 292-294`); presence hub + handler (`main.go:302-312`); taxonomy (`main.go:314-315`); controlled-documents (`main.go:317-318`); area-membership service with role-cache invalidator (`main.go:321-327`); people handler (`main.go:334-339`); membership handler (`main.go:345`); roles-caps matrix (`main.go:348-352`); documents (`main.go:500-501`); templates (`main.go:513`); approval (`main.go:518`); E2E gate (`main.go:519-521`).
+8. **Route mounting** — `buildPublishers` (`publishers.go`) assembles the ordered list of 16 `httprouter.SurfacePublisher`s from the already-constructed module handlers (auth, health, observability, featureFlags, audit, search, security, taxonomy, tokens, controlledDocuments, iam, documents, templates, approval, distribution, notifications — `main.go:840-857`); the `internal-e2e` publisher is appended as a 17th only when `METALDOCS_E2E=1` and the e2e build tag are both present (`main.go:837-866`). Each publisher gets its own `httprouter.Recorder` wrapping the shared `mux`, so `Mount` calls are attributed per-publisher (`main.go:868-873`) — the input `assertSurface`'s per-publisher tag-ownership check (§6, check 4) needs. `assertSurface(mounted, surface, expectedTags, publishers)` (`surface.go`) then runs its four checks against the generated `httpSurface` table; any failure is `slog.Error` + `os.Exit(1)` (`main.go:880-884`) — a boot fatal, not a degraded start. `RegisterRoutes` does not exist anywhere in this codebase; every module's HTTP delivery seam implements `SurfacePublisher` (ADR [`0091`](../decisions/0091-http-surface-protocol.md)).
 9. **Documents/fanout stack** — presigner, fanout client gated on `METALDOCS_FANOUT_URL` + `METALDOCS_DOCX_RENDERER_SERVICE_TOKEN` (missing fanout URL is fatal via `requireApprovalRuntimeSupport`, `main.go:363-365, 717-722`), freeze service, PDF dispatch adapter, documents `Dependencies` struct with capability checker from `apps/api/internal/wiring/documents.go` (`main.go:356-427`).
 10. **Approval services** — River schema migration + insert-only client bundle for scheduled publish (`main.go:438-451`); freeze-service presence is mandatory (`main.go:452-454`); PDF + materialize outbox repos/workers (`main.go:455-492`); decision service with PDF outbox, pin invoker, and sign-off re-auth registry from `reauth.go:44-52` (`main.go:494-497`).
 11. **Module cycle close** — mount documents module (`main.go:500-501`); inject documents-side initializer back into controlled-documents for atomic CD-create (`main.go:507`); mount templates (`main.go:509-513`); mount approval handler with idempotency stores (`main.go:514-518`); mount gated E2E handlers (`main.go:519-521`).
-12. **Background goroutines** — register leased scheduler jobs gated per `ENABLE_JOB_*` env (`main.go:523-559`); start scheduler goroutine (`main.go:561-566`); start documents session/orphan sweepers (`main.go:568-571`); mount `/api/v1/metrics` (`main.go:572`); start optional audit-retention purge loop (`main.go:574-593`).
+12. **Background goroutines** — register leased scheduler jobs gated per `ENABLE_JOB_*` env (`main.go:523-559`); start scheduler goroutine (`main.go:561-566`); start documents session/orphan sweepers (`main.go:568-571`); start optional audit-retention purge loop (`main.go:574-593`). `[not reverified 2026-08-06 — out of scope this pass]`. `GET /api/v1/metrics` (JSON) is no longer mounted directly here — it is the `observability` `SurfacePublisher`'s route, mounted with every other publisher in step 8 (`httpsurface_gen.go:276-280`).
 13. **HTTP server** — compose the middleware chain via `buildChain(mux, apiChain(...))` (`chain.go` + `main.go:633-643`), resolve listen address (`:8080` default, `APP_PORT` override — the canonical dev script sets `APP_PORT=8081` at `scripts/start-api.ps1:241`), build `http.Server` with `ReadHeaderTimeout: 5s`, `ReadTimeout: 30s`, `WriteTimeout: 60s`, `IdleTimeout: 90s` (`main.go:654-663`), log startup summary, serve in a goroutine feeding a `serverErr` channel, then block in `shutdownServer` (`main.go:674`). (Wave 1: F-01 chain reorder, F-16 timeouts)
 
 ---
@@ -166,23 +179,30 @@ Each layer:
 
 ## 6. Tier-1 permission resolution
 
+Tier-1's data source moved from a hand-typed rule table to a generated one — full rationale in ADR [`0090`](../decisions/0090-tier1-pdp-generated-from-spec.md). What's below is the mechanism as it stands after that change, plus the boot assertion (ADR [`0091`](../decisions/0091-http-surface-protocol.md)) that makes its unreachable branch actually unreachable.
+
 ```mermaid
 flowchart TD
-    A[newPermissionResolver<br/>permissions.go:250] --> B[scan routeRules in order<br/>permissions.go:261-268]
-    B --> C{match?}
-    C -- yes --> D[return capability + visibility]
-    C -- no --> E[resolvePermissionFallback<br/>VisibilitySessionRequired<br/>permissions.go:270-279]
+    A[newPermissionResolver<br/>permissions.go:17] --> B[mux.Handler resolves pattern<br/>permissions.go:19]
+    B --> C{pattern in httpSurface?}
+    C -- yes --> D[return rule.capability + rule.visibility<br/>permissions.go:27-30]
+    C -- no, empty pattern --> E0[VisibilitySessionRequired<br/>permissions.go:20-25]
+    C -- no, matched but absent --> E1[VisibilityUnresolved<br/>boot-assertion-guaranteed unreachable<br/>permissions.go:29-30]
     D --> F{visibility}
-    F -- Public --> G[authn skips — newPublicPathChecker<br/>permissions.go:281-286]
+    F -- Public --> G[authn skips — newPublicPathChecker<br/>permissions.go:37-42]
     F -- SessionRequired --> H[authn enforces session only]
     F -- PermissionGuarded --> I[CapabilityService.CanDo PDP]
 ```
 
-- Both middlewares share one resolver instance created at `main.go:236` — single source of truth.
-- Rule matching: fields AND-ed per rule; exact / prefix / suffix / contains / not-suffix patterns (`permissions.go:24-55`); first match wins.
-- Order is load-bearing: approval route-admin rules must precede the generic `/api/v1/approval/` block; `PeopleHandler` exact rules precede the `PATCH /iam/users/` prefix rule (`permissions.go:104-115, 221-229`).
-- `newPublicPathChecker` derives the authn bypass list from the same table: public ⇔ `VisibilityPublic` (`permissions.go:281-286`), ensuring the two middlewares cannot drift.
-- CI locks: per-route expectations, registered-route coverage, no methodless-write shadowing, every capability in the typed registry, every capability seeded against `db/reference-data/0001_product_reference_data.sql`, viewer holds no area-grade capability, and spec `x-authz-area` annotations for area-grade capabilities (`permissions_test.go`, `permissions_authz_scope_test.go`).
+- Both middlewares share one resolver instance created at `main.go:350` — single source of truth.
+- Resolution is a **map lookup**, not a scan: `httpSurface[pattern]` against the pattern `http.ServeMux` itself already matched (`permissions.go:17-30`). There is no rule ordering to reason about — the ordering hazards that used to matter under `routeRules` (approval route-admin rules preceding the generic `/api/v1/approval/` block, `PeopleHandler` exact rules preceding a `PATCH /iam/users/` prefix rule) do not exist for a keyed table.
+- `newPublicPathChecker` and `newPasswordChangeAllowedChecker` derive from the same table (`permissions.go:37-42, 51-63`) — one authoritative source for all three questions tier-1 answers, not three hand-maintained ones that could drift from each other.
+- **A matched-pattern miss is a wiring bug, not a tier to guess at.** Under the old `routeRules`, no match meant "nobody wrote a rule for this path" — a plausible, if bad, steady state, handled by a fail-closed default. Under the generated table, that branch (`VisibilityUnresolved`, `permissions.go:29-30`) means `assertSurface`'s boot checks (§4 step 8; ADR 0091's four checks — tag coverage, mounted ⊆ declared, declared ⊆ mounted, per-publisher tag ownership) either didn't run or were bypassed, because a genuinely mounted-but-undeclared route is a startup fatal (`main.go:880-884`), not a runtime possibility on a boot that succeeded.
+- CI locks: per-route expectations against `httpSurface`, no methodless-write shadowing, every capability in the typed registry, every capability seeded against `db/reference-data/0001_product_reference_data.sql`, viewer holds no area-grade capability, and spec `x-authz-area` annotations for area-grade capabilities (`permissions_test.go`, `permissions_authz_scope_test.go`).
+
+### The one deliberately red test
+
+`surface_conformance_test.go`'s `TestNoDeclaredOperationIsUnreachable` is **red by design** and stays red until a separate, later program lands. It asserts every permission-guarded operation's declared capability is grantable to at least one assignable role, and finds several that are not — because tier-1's `CapabilityService.CanDo` and tier-2's `authz.Require` read **disjoint grant tables** (`iam_user_roles`/groups vs. `user_process_areas`; full finding in `docs/superpowers/analysis/2026-08-06-authz-grant-unification-decisions.md`, commit `8cdb66ac`). This is a grant-*assignment* defect, one level below what §3–§6 above describe: those sections are about which capability a route *declares* (proved coherent by `assertSurface` and the generated table); the red test is about which principals *hold* that capability through the tier-1 grant path, which this program does not touch. It is not weakened, skipped, or excluded to make any checklist look clean.
 
 ---
 
@@ -239,7 +259,7 @@ Synchronization: `workerWG` (`main.go:542`), `schedulerWG` (`main.go:561`), buff
 - **Startup:** every config/wiring failure is `log.Fatalf` — fail-fast, no degraded boot (`main.go:154-201, 364-368, 437-453, 511, 526`). Hard invariants panic in constructors (`main.go:94-95, 737-739, 778-780`).
 - **Request errors:** all middleware rejections are RFC 9457 `application/problem+json` (`internal/platform/problem/problem.go:76-83`) with stable codes: `AUTH_UNAUTHORIZED`, `AUTH_PASSWORD_CHANGE_REQUIRED` (auth middleware), `AUTH_FORBIDDEN`, `INTERNAL_ERROR` (IAM middleware), `FORBIDDEN_ORIGIN` (CORS/origin), `RATE_LIMITED` + `Retry-After` (limiter).
 - **Tracing:** `X-Trace-Id` is normalized or generated per request and stored in context (`observability/http.go:61-65`); kernel audit adapters propagate it into audit rows via `requesttrace.Resolve` (`main.go:768, 801, 824, 831-833`).
-- **Metrics:** in-process per-route RED aggregation with p50/p95/p99, exposed at `GET /api/v1/metrics` (`main.go:572`, `observability/http.go:109-124`). No Prometheus/OTLP exporter is wired in this binary (see RF-1 in `../architecture/backend-target-architecture.md`).
+- **Metrics:** in-process per-route RED aggregation with p50/p95/p99, exposed at `GET /api/v1/metrics` (JSON; now the `observability` publisher's route, see §3/§4 step 8) and `GET /metrics` (Prometheus text exposition, on a dedicated `metricsServer` listener — `METRICS_ADDR`, default `:9090` — never the public API server, `main.go:990-997`; `[verified 2026-08-06]`, corrects the prior "no Prometheus/OTLP exporter" claim). See RF-1 in `../architecture/backend-target-architecture.md` for any remaining gap.
 - **Logging:** mixed — `log.Printf/Fatalf` during startup, `slog` for runtime events, and a dedicated JSON `slog` handler inside httpObs (`observability/http.go:53`).
 - **Health:** `/api/v1/health/live`, `/api/v1/health/ready`, `/healthz` (alias of live) via the runtime status provider (`internal/platform/observability/health.go:16-20`); readiness delegates to the Postgres-backed provider with dependency checks including Gotenberg (`internal/platform/bootstrap/api.go:118, 187-216`). `[runtime-unverified]` Actual probe payload and status codes under dependency failure were not exercised (Docker down during audit).
 - **Audit:** kernel adapters write document and authz-bypass audit events, in-transaction where available (`main.go:743-771, 784-829`); fire-and-forget `Write` logs failures and continues (`main.go:826-828`).
@@ -265,21 +285,21 @@ The flags below are factual observations from the Stage-1 audit. Each maps to a 
 
 | Flag | Severity | RF link |
 |---|---|---|
-| **God file:** `main.go` is 943 lines — composition root + 12 in-file type declarations + inline background loops | medium | (RF-COMP) |
+| **God file:** `main.go` is 1290 lines (was 943; grew with publisher construction + boot assertion wiring) — composition root + type declarations + inline background loops | medium | (RF-COMP) |
 | ~~**Middleware order deviation**~~ | ~~high~~ | **CLOSED Wave 1 (F-01, 2026-06-11):** Chain moved to `chain.go`; `httpObs`/recovery outermost; pre-auth login limit added; RF-2 closed |
 | ~~**No panic-recovery middleware outermost**~~ | ~~medium~~ | **CLOSED Wave 1 (F-01):** `platformmw.Recovery` is now the outermost chain link (REQ-MW-1) |
 | ~~**No chain-order test**~~ | ~~medium~~ | **CLOSED Wave 1 (F-01):** `chain_test.go` asserts composed execution order (REQ-MW-7) |
 | ~~**Server timeouts incomplete**~~ | ~~medium~~ | **CLOSED Wave 1 (F-16):** `ReadTimeout 30s / WriteTimeout 60s / IdleTimeout 90s` added (REQ-REL-1) |
-| **Stale security comment** at `e2e_gate_test.go:9-13` references a "C1 finding" where unmatched routes were treated as fully public by `newPublicPathChecker`; the current resolver is fail-closed (`permissions.go:270-279`) and the condition no longer applies | low | — |
-| **Stale `file:line` anchors** in `permissions_test.go:202-298` citing removed `main.go` line numbers | info | — |
-| **Vestigial `switch` with only `default`** in `resolvePermissionFallback` — leftover scaffolding from removed path-based fallbacks (`permissions.go:270-279`) | info | — |
+| ~~**Self-acknowledged temporary coupling:** `routeRules` intentionally coupled startup route registration and authz classification until route metadata is generated~~ | ~~medium~~ | **CLOSED 2026-08-06 (http-surface-protocol program, Task 18/19):** `routeRules` deleted; tier-1 now reads the generated `httpSurface` table — the exact route-metadata generation this flag anticipated. See ADR [`0090`](../decisions/0090-tier1-pdp-generated-from-spec.md). This row is the "drifted public-path list" this document's own prior audit named as the program's opening problem statement. |
+| ~~**Vestigial `switch` with only `default`** in `resolvePermissionFallback`~~ | ~~info~~ | **CLOSED 2026-08-06:** `resolvePermissionFallback` deleted with `routeRules`; the unresolved branch is now `VisibilityUnresolved`, guaranteed unreachable at boot by `assertSurface` (§6). |
+| ~~**Stale `file:line` anchors** in `permissions_test.go:202-298`~~ | ~~info~~ | **CLOSED 2026-08-06:** `permissions.go` and its test file were rewritten against the generated table; the anchors this row complained about no longer exist to be stale about. |
+| ~~**"Legacy mount" comment on live routes:** the generic `/api/v1/approval/` block annotated "Approval (legacy mount)"~~ | ~~info~~ | **CLOSED 2026-08-06:** the annotated block was part of `routeRules`, deleted with it. |
+| ~~**Public-path fallback duplication:** `defaultPublicPaths` in `auth/delivery/http/middleware.go`~~ | ~~low~~ | **CLOSED 2026-08-06:** `defaultPublicPaths` deleted repo-wide (grep-verified absent); `newPublicPathChecker` is the sole public-path authority, derived from `httpSurface` (§6). |
+| **Stale security comment** at `e2e_gate_test.go:9-13` — **re-checked 2026-08-06, NOT actually stale:** the comment's terms match current names; this row itself was the drift, now corrected | low | — |
 | **Raw SQL + module responsibility in the kernel:** audit retention `DELETE` lives in `main.go:585-587`; `AUDIT_RETENTION_DAYS` lacks the `METALDOCS_` prefix | low | — |
 | **`ENABLE_JOB_*` env naming drift:** prefix inconsistency + opt-out semantics contradict the opt-in `ENABLE_` name | low | — |
-| **Duplicate `SnapshotRepository` construction:** `docrepo.NewSnapshotRepository(deps.SQLDB)` called three times in one function (`main.go:372, 398, 420`) | info | — |
-| **Public-path fallback duplication:** `defaultPublicPaths` in `auth/delivery/http/middleware.go:94-105` is a drifted copy of the kernel's public list — misclassifies `POST /auth/logout` and omits `/healthz` | low | — |
-| **"Legacy mount" comment on live routes:** the generic `/api/v1/approval/` block is annotated "Approval (legacy mount)" (`permissions.go:225-229`) yet remains the live tier-1 classification | info | — |
-| **Self-acknowledged temporary coupling:** `routeRules` intentionally couples startup route registration and authz classification until route metadata is generated (`permissions.go:58-63`) | medium | — |
-| **e2e-seed opens two DB pools** (`main.go:52-56` + `main.go:104-114`) | info | — |
+| **Duplicate `SnapshotRepository` construction:** `docrepo.NewSnapshotRepository(deps.SQLDB)` called three times in one function (`main.go:372, 398, 420`) — **not reverified 2026-08-06, out of scope this pass** | info | — |
+| **e2e-seed opens two DB pools** (`main.go:52-56` + `main.go:104-114`) — **not reverified 2026-08-06, out of scope this pass** | info | — |
 
 See also: [./legacy-register.md](./legacy-register.md) (full cross-area legacy register).
 
@@ -300,3 +320,5 @@ See also: [./legacy-register.md](./legacy-register.md) (full cross-area legacy r
 Stage-1 artifact: `wiki/backend/_artifacts/stage1/http-kernel.md`
 
 Strategic context: `wiki/architecture/backend-blueprint.md` · `wiki/architecture/backend-target-architecture.md`
+
+ADRs: `wiki/decisions/0090-tier1-pdp-generated-from-spec.md` (tier-1's data source) · `wiki/decisions/0091-http-surface-protocol.md` (`SurfacePublisher`, the generated surface table, Mount-is-total, the boot assertion)
