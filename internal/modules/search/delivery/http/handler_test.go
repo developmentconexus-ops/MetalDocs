@@ -128,19 +128,17 @@ func TestHandleSearchDocumentsMapsAdvertisedFilters(t *testing.T) {
 	if reader.lastQuery.ExpiryAfter == nil || reader.lastQuery.ExpiryAfter.UTC().Format(time.RFC3339) != "2026-01-01T00:00:00Z" {
 		t.Fatalf("query.ExpiryAfter = %v, want 2026-01-01T00:00:00Z", reader.lastQuery.ExpiryAfter)
 	}
-	if reader.lastQuery.Subject != "deviation" {
-		t.Fatalf("query.Subject = %q, want deviation", reader.lastQuery.Subject)
-	}
-	// businessUnit (camelCase, undocumented) was removed in Wave 1.5 (F-13b).
-	if reader.lastQuery.BusinessUnit != "" {
-		t.Fatalf("query.BusinessUnit = %q, want empty (parameter removed)", reader.lastQuery.BusinessUnit)
-	}
-	if reader.lastQuery.Classification != searchdomain.ClassificationInternal {
-		t.Fatalf("query.Classification = %q, want INTERNAL", reader.lastQuery.Classification)
-	}
-	if reader.lastQuery.Tag != "tag-a" {
-		t.Fatalf("query.Tag = %q, want tag-a", reader.lastQuery.Tag)
-	}
+	// The request above still sends subject / classification / tag, none of
+	// which the spec declares. There is deliberately no assertion about them:
+	// Query used to carry all three as fields the handler populated and no
+	// reader ever consumed, so the assertions that sat here proved the handler
+	// copied three strings into a struct, never that any filtering happened —
+	// a caller passing classification=CONFIDENTIAL got unfiltered results and
+	// no error. The fields are gone, along with BusinessUnit, whose parameter
+	// was removed in Wave 1.5 (F-13b) while its field survived. Their absence
+	// is now unrepresentable rather than guarded. They stay in the URL to prove
+	// the remaining thing worth proving: an undeclared parameter is ignored,
+	// not an error.
 }
 
 // TestHandleSearchDocumentsMethodNotAllowed asserts that POST /search/documents
