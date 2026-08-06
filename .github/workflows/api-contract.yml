@@ -35,7 +35,7 @@ jobs:
       - name: API codegen drift check (backend)
         run: |
           go generate ./...
-          git diff --exit-code -- '**/api.gen.go' || (echo "::error::Run 'go generate ./...' and commit"; exit 1)
+          git diff --exit-code -- '**/api.gen.go' '**/httpsurface_gen.go' '**/httpsurface_e2e_gen.go' || (echo "::error::Run 'go generate ./...' and commit"; exit 1)
 
   frontend-codegen-drift:
     runs-on: ubuntu-latest

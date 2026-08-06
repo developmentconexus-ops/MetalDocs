@@ -165,6 +165,8 @@ func mountE2EHandlersIfEnabled(mux *http.ServeMux, register func(*http.ServeMux)
 	register(mux)
 }
 
+//go:generate go run metaldocs/cmd/gen-http-surface -public ../../../../api/openapi/v1/openapi.yaml -out-dir . -registry ../../../../internal/modules/iam/domain/model.go
+
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 
