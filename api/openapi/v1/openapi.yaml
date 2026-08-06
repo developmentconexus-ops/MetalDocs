@@ -2656,6 +2656,7 @@ paths:
       summary: List documents for tenant
       tags: [documents]
       operationId: listDocuments
+      x-authz-capability: document.view
       parameters:
         - name: cursor
           in: query
@@ -2715,6 +2716,7 @@ paths:
       summary: Get document
       tags: [documents]
       operationId: getDocument
+      x-authz-capability: document.view
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '200':
@@ -2735,6 +2737,7 @@ paths:
       summary: Rename document
       tags: [documents]
       operationId: renameDocument
+      x-authz-capability: document.edit
       x-authz-area:
         source: tx
         derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
@@ -2774,6 +2777,7 @@ paths:
       summary: Archive document
       tags: [documents]
       operationId: archiveDocument
+      x-authz-capability: document.edit
       x-authz-area:
         source: tx
         derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
@@ -2803,6 +2807,7 @@ paths:
       summary: Get document revision history
       tags: [documents]
       operationId: getDocumentRevisionHistory
+      x-authz-capability: document.view
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -2825,6 +2830,7 @@ paths:
       summary: Duplicate document
       tags: [documents]
       operationId: duplicateDocument
+      x-authz-capability: document.create
       x-authz-area:
         source: tx
         derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
@@ -2858,6 +2864,7 @@ paths:
       summary: Documents stats by status and area
       tags: [documents]
       operationId: documentStats
+      x-authz-capability: document.view
       parameters:
         - name: status
           in: query
@@ -2892,6 +2899,7 @@ paths:
       summary: Acquire document session
       tags: [documents]
       operationId: acquireDocumentSession
+      x-authz-capability: document.edit
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '201':
@@ -2923,6 +2931,7 @@ paths:
       summary: Heartbeat document session
       tags: [documents]
       operationId: heartbeatDocumentSession
+      x-authz-capability: document.edit
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '204':
@@ -2944,6 +2953,7 @@ paths:
       summary: Release document session
       tags: [documents]
       operationId: releaseDocumentSession
+      x-authz-capability: document.edit
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '204':
@@ -2965,6 +2975,7 @@ paths:
       summary: Force release document session
       tags: [documents]
       operationId: forceReleaseDocumentSession
+      x-authz-capability: membership.manage
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '204':
@@ -2985,6 +2996,7 @@ paths:
       summary: Presign document autosave
       tags: [documents]
       operationId: presignDocumentAutosave
+      x-authz-capability: document.edit
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
         required: true
@@ -3021,6 +3033,7 @@ paths:
       summary: Commit document autosave
       tags: [documents]
       operationId: commitDocumentAutosave
+      x-authz-capability: document.edit
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
         required: true
@@ -3081,6 +3094,7 @@ paths:
       x-pagination-exempt-reason: 'Bounded per-document checkpoint set returned in full.'
       tags: [documents]
       operationId: listDocumentCheckpoints
+      x-authz-capability: document.view
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '200':
@@ -3103,6 +3117,7 @@ paths:
       summary: Create document checkpoint
       tags: [documents]
       operationId: createDocumentCheckpoint
+      x-authz-capability: document.edit
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
         content:
@@ -3130,6 +3145,7 @@ paths:
     post:
       tags: [documents]
       operationId: restoreDocumentCheckpoint
+      x-authz-capability: document.edit
       summary: Forward-only restore - clones the checkpoint rev into a new head revision
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -3163,6 +3179,7 @@ paths:
       summary: Get document revision URL
       tags: [documents]
       operationId: getDocumentRevisionUrl
+      x-authz-capability: document.view
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: rid, in: path, required: true, schema: { type: string, format: uuid } }
@@ -3189,6 +3206,7 @@ paths:
       x-pagination-exempt-reason: 'Bounded per-document comment set returned in full.'
       tags: [documents]
       operationId: listDocumentComments
+      x-authz-capability: document.view
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '200':
@@ -3211,6 +3229,7 @@ paths:
       summary: Create document comment
       tags: [documents]
       operationId: createDocumentComment
+      x-authz-capability: document.edit
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
         required: true
@@ -3241,6 +3260,7 @@ paths:
       summary: Update document comment
       tags: [documents]
       operationId: updateDocumentComment
+      x-authz-capability: document.edit
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: library_id, in: path, required: true, schema: { type: integer } }
@@ -3271,6 +3291,7 @@ paths:
       summary: Delete document comment
       tags: [documents]
       operationId: deleteDocumentComment
+      x-authz-capability: document.edit
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: library_id, in: path, required: true, schema: { type: integer } }
@@ -3293,6 +3314,7 @@ paths:
       summary: Export document PDF
       operationId: exportDocumentPDF
       tags: [documents]
+      x-authz-capability: document.view
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       requestBody:
@@ -3340,6 +3362,7 @@ paths:
       summary: Get document DOCX URL
       operationId: getDocumentDocxURL
       tags: [documents]
+      x-authz-capability: document.view
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -3369,6 +3392,7 @@ paths:
       summary: Get document fill-in schema
       tags: [documents]
       operationId: getDocumentFillInSchema
+      x-authz-capability: document.view
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '200':
@@ -3393,6 +3417,7 @@ paths:
       x-pagination-exempt-reason: 'Bounded per-document placeholder set (fixed 7-token catalog).'
       tags: [documents]
       operationId: listDocumentPlaceholderValues
+      x-authz-capability: document.view
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '200':
@@ -3411,6 +3436,7 @@ paths:
       summary: Put document placeholder value
       tags: [documents]
       operationId: putDocumentPlaceholderValue
+      x-authz-capability: document.edit
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: pid, in: path, required: true, schema: { type: string } }
@@ -3445,6 +3471,7 @@ paths:
       summary: View document
       tags: [documents]
       operationId: viewDocument
+      x-authz-capability: document.view
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '200':
@@ -3467,6 +3494,7 @@ paths:
       summary: Reconstruct document
       tags: [documents]
       operationId: reconstructDocument
+      x-authz-capability: document.edit
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
         required: true
@@ -3495,6 +3523,7 @@ paths:
       summary: Get document placeholder options
       tags: [documents]
       operationId: getDocumentPlaceholderOptions
+      x-authz-capability: document.view
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: pid, in: path, required: true, schema: { type: string } }
