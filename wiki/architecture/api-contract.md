@@ -2,7 +2,7 @@
 
 > **Operational guide.** For the design system contract (error envelope, pagination, idempotency, two-tier authz, list filtering) see [`architecture/api-design-system.md`](api-design-system.md).
 
-> **Last verified:** 2026-07-06 (F9.4 doc-truth pass: F9.5 `repository/`→`infrastructure/` rename fixed for `templates/infrastructure/postgres.go`; `strictjson.go` re-pointed to its actual current location `internal/platform/strictjson/strictjson.go:25` (platform-package move, predates/unrelated to F9.5); `controlleddocuments/.../handler.go:95`→`:139` and `routes.go` `missingAtomicCreateField` line drift fixed (pre-existing, unrelated to F9.5); `migrations/0183_documents_name_not_empty.sql` flagged **verify** — `migrations/` dir gone, constraint not located in current baseline, out of scope this pass) | prior: 2026-07-03 (ADR 0065 — `TemplateDTO` version pointers are now nested value objects:
+> **Last verified:** 2026-08-06 (http-surface-protocol program close-out: §3 handler wiring pattern rewritten for `SurfacePublisher.Mount` — `RegisterRoutes` deleted repo-wide; `controlleddocuments/.../handler.go:139`→`:148` anchor drift fixed; ADR 0090/0091 cross-referenced) | prior: 2026-07-06 (F9.4 doc-truth pass: F9.5 `repository/`→`infrastructure/` rename fixed for `templates/infrastructure/postgres.go`; `strictjson.go` re-pointed to its actual current location `internal/platform/strictjson/strictjson.go:25` (platform-package move, predates/unrelated to F9.5); `controlleddocuments/.../handler.go:95`→`:139` and `routes.go` `missingAtomicCreateField` line drift fixed (pre-existing, unrelated to F9.5); `migrations/0183_documents_name_not_empty.sql` flagged **verify** — `migrations/` dir gone, constraint not located in current baseline, out of scope this pass) | prior: 2026-07-03 (ADR 0065 — `TemplateDTO` version pointers are now nested value objects:
 > `latest_version` (required) and `published_version` (required-and-nullable, present-and-null) are both
 > `TemplateVersionRef {id, number, revision_number, status}`; the four coupled flat scalars
 > `latest_revision_number`/`published_version_id`/`published_version_number`/`current_revision_number` are
@@ -44,8 +44,9 @@
 > - `internal/modules/documents/api/gen.go:1` - `//go:generate` invocation for documents
 > - `internal/modules/documents/api/api.gen.go:1` - generated; DO NOT EDIT
 > - `internal/platform/strictjson/strictjson.go:25` - `Decode` helper; `DisallowUnknownFields` pattern used at handler boundaries
-> - `internal/modules/controlleddocuments/delivery/http/handler.go:139` - `HandlerWithOptions` wiring pattern (controlled-documents) (was `:95`, drift predates F9.5)
-> - `internal/modules/templates/delivery/http/handler.go:32` - `ServerInterfaceWrapper` wiring pattern (templates)
+> - `internal/modules/controlleddocuments/delivery/http/handler.go:148` - `HandlerWithOptions` wiring pattern (controlled-documents), called from `Mount` (`:99`) (was `:139`, drift predates the http-surface-protocol program — see §3)
+> - `internal/modules/templates/delivery/http/handler.go:206` - `HandlerWithOptions` wiring pattern (templates), called from `Mount`
+> - `internal/platform/httprouter/publisher.go:19` - `SurfacePublisher` interface (`Name`/`Tag`/`Mount`) every module's delivery handler implements
 > - `migrations/0183_documents_name_not_empty.sql:27` - DB invariant floor for `documents.name` (**verify** — top-level `migrations/` dir not found in current tree, replaced by `migrations_baseline/`/`db/migrations/`; constraint text not located in `migrations_baseline/0001_baseline_2026_05.sql`; pre-existing drift unrelated to F9.5, flagged not fixed)
 > - `.github/workflows/api-contract.yml:1` - CI drift guard (3 jobs)
 > - `frontend/apps/web/package.json:13` - `gen:api` script (`openapi-typescript`)
@@ -92,18 +93,23 @@ CI runs `go generate ./...` - see `api-contract.yml:27`.
 
 ## 3. Handler wiring pattern
 
-Handlers do **not** implement `StrictServerInterface` directly. The current pattern uses `HandlerWithOptions` (previously `ServerInterfaceWrapper`):
+Handlers do **not** implement `StrictServerInterface` directly. The current pattern uses `HandlerWithOptions` (previously `ServerInterfaceWrapper`), called from inside the handler's `Mount` method rather than from the composition root directly:
 
 ```go
-// internal/modules/controlleddocuments/delivery/http/handler.go:95
-controlleddocumentsapi.HandlerWithOptions(h, controlleddocumentsapi.StdHTTPServerOptions{
-    BaseRouter: mux,
-    BaseURL: "/api/v1",
+// internal/modules/controlleddocuments/delivery/http/handler.go
+func (h *Handler) Name() string { return "controlled-documents" } // :91
+func (h *Handler) Tag() string  { return "controlled-documents" } // :94
+func (h *Handler) Mount(mux httprouter.Muxer) {                    // :99
     // ...
-})
+    controlleddocumentsapi.HandlerWithOptions(h, controlleddocumentsapi.StdHTTPServerOptions{ // :148
+        BaseRouter: mux,
+        BaseURL: "/api/v1",
+        // ...
+    })
+}
 ```
 
-The handler struct (`*Handler`) implements `ServerInterface`; the generated `HandlerWithOptions` handles route dispatch and param parsing.
+The handler struct (`*Handler`) implements `ServerInterface`; the generated `HandlerWithOptions` handles route dispatch and param parsing. `Name`/`Tag`/`Mount` together satisfy `httprouter.SurfacePublisher` (`internal/platform/httprouter/publisher.go:19-26`) — the composition root never calls a module-specific `RegisterRoutes` (deleted; see ADR [`0091`](../decisions/0091-http-surface-protocol.md)). It builds a list of publishers, calls `p.Mount(rec)` on each through a per-publisher `httprouter.Recorder`, and boot-fails (`assertSurface`) if the mounted set and the OpenAPI-spec-generated `httpSurface` table (`apps/api/cmd/metaldocs-api/httpsurface_gen.go`) ever disagree.
 
 ---
 
@@ -265,7 +271,7 @@ CI rule: `frontend-codegen-drift` runs `npm run gen:api` in the same workspace a
 
 | Job | What it checks |
 |-----|---------------|
-| `backend-codegen-drift` | Runs `go generate ./...`; fails if `**/api.gen.go` has uncommitted changes |
+| `backend-codegen-drift` | Runs `go generate ./...`; fails if `**/api.gen.go`, `**/httpsurface_gen.go`, or `**/httpsurface_e2e_gen.go` has uncommitted changes (the last two are the tier-1 HTTP surface table, ADR 0090/0091) |
 | `frontend-codegen-drift` | Runs `npm run gen:api`; fails if `src/lib/api-types/` has uncommitted changes |
 | `openapi-lint` | Runs `redocly lint` against the spec; config in `redocly.yaml` |
 
@@ -335,8 +341,8 @@ If any of these conflict, stop and resolve the prerequisite before feature imple
    //go:generate go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen --config=cfg.yaml ../../../../api/openapi/v1/openapi.yaml
    ```
 5. Run `GOFLAGS=-mod=mod go generate ./internal/modules/<x>/api/...`.
-6. Implement `ServerInterface` on the handler struct; wire via `HandlerWithOptions` (controlled-documents pattern at `handler.go:95`).
-7. Commit `api.gen.go` - CI drift check will verify it stays in sync.
+6. Implement `ServerInterface` on the handler struct; wire via `HandlerWithOptions` inside a `Mount(httprouter.Muxer)` method (controlled-documents pattern at `handler.go:148`, called from `Mount` at `:99`). Add `Name()`/`Tag()` so the handler satisfies `httprouter.SurfacePublisher`, and add it to the publisher list built in `apps/api/cmd/metaldocs-api/main.go` (`buildPublishers`/`publisherDeps`) — a handler that is built but never added to that list fails the boot assertion's tag-coverage check, not silently.
+7. Commit `api.gen.go` - CI drift check will verify it stays in sync. Regenerate the HTTP surface table too: `go generate ./...` regenerates `apps/api/cmd/metaldocs-api/httpsurface_gen.go` from the new tag's `x-authz-*` annotations.
 
 ---
 
@@ -344,6 +350,8 @@ If any of these conflict, stop and resolve the prerequisite before feature imple
 
 - `wiki/architecture/backend-api-structure.md` - canonical backend/API structure rules and migration discipline
 - `wiki/decisions/0012-contract-first-api.md` - ADR: why spec-as-source-of-truth was adopted and root cause of the `documents.name` bug
+- `wiki/decisions/0091-http-surface-protocol.md` - ADR: `SurfacePublisher`, the generated surface table, and the boot assertion that replaced `RegisterRoutes`
+- `wiki/decisions/0090-tier1-pdp-generated-from-spec.md` - ADR: tier-1 authz reads the same generated table, amending ADR 0022
 - `wiki/decisions/0065-version-references-are-nested-value-objects.md` - ADR: version pointers are nested value objects, never parallel scalars
 - `wiki/backlog/contract-first-followups.md` - deferred handler migrations + documents spec/handler gap inventory
 - `wiki/references/oapi-codegen.md` - operational how-to (regenerate, vendor mode, add module)

@@ -93,7 +93,7 @@ func TestDocumentStats_OK(t *testing.T) {
 	}}
 	h := httphandler.NewHandler(svc).WithCaps(fakeCaps{admin: true})
 	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
+	h.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents/stats", nil)
 	withAuthHeaders(req, "system_admin")

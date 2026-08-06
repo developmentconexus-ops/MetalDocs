@@ -121,7 +121,7 @@ func newMuxWithCommentsSvc(t *testing.T, svc *commentsStatefulSvc) *http.ServeMu
 	t.Helper()
 	mux := http.NewServeMux()
 	h := httphandler.NewHandler(svc).WithCaps(fakeCaps{admin: false})
-	h.RegisterRoutes(mux)
+	h.Mount(mux)
 	return mux
 }
 

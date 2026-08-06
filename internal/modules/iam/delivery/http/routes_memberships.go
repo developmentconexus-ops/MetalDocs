@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"metaldocs/internal/platform/httprouter"
 	"net/http"
 	"strings"
 	"time"
@@ -96,15 +95,6 @@ func toMembershipDTO(m iamdomain.UserProcessArea) membershipDTO {
 // guardMembershipUserInTenant).
 func NewMembershipHandler(svc *iamapp.AreaMembershipService, verifier MembershipUserTenantVerifier) *MembershipHandler {
 	return &MembershipHandler{svc: svc, verifier: verifier}
-}
-
-// RegisterRoutes mounts the list/grant/revoke area-membership routes on mux.
-func (h *MembershipHandler) RegisterRoutes(mux httprouter.Muxer) {
-	mux.HandleFunc("GET /api/v1/iam/area-memberships", h.listMemberships)
-	mux.HandleFunc("POST /api/v1/iam/area-memberships", h.grantMembership)
-	// F-DELETE-SHAPE (api-contract-hardening Phase E2): the revoked membership is
-	// identified by path parameters (resource identity) rather than query params.
-	mux.HandleFunc("DELETE /api/v1/iam/area-memberships/{user_id}/{area_code}", h.revokeMembership)
 }
 
 // listMemberships — operationId listAreaMemberships.

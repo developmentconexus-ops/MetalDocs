@@ -18,7 +18,7 @@ func TestMiddlewareStripsTrustedIdentityHeaders(t *testing.T) {
 	ctx = tenant.WithTenantID(ctx, tenant.DevTenantID)
 	req = req.WithContext(ctx)
 
-	resolver := func(method, path string) (iamdomain.Capability, Visibility) {
+	resolver := func(*http.Request) (iamdomain.Capability, Visibility) {
 		return iamdomain.Capability(""), VisibilitySessionRequired
 	}
 
@@ -40,5 +40,37 @@ func TestMiddlewareStripsTrustedIdentityHeaders(t *testing.T) {
 
 	if !called {
 		t.Fatal("next handler was not called")
+	}
+}
+
+// §6: VisibilityUnresolved gets its OWN explicit case, returning the same 500
+// the default arm returns. Leaving it to fall through default: would work and
+// would be wrong — a named, expected value silently relying on an
+// unknown-value branch is a guard a future author closes by "completing" the
+// switch, at which point an unwired route becomes a pass-through.
+func TestWrap_VisibilityUnresolved_Is500(t *testing.T) {
+	m := NewMiddleware(nil, nil, true).WithPermissionResolver(
+		func(*http.Request) (iamdomain.Capability, Visibility) { return "", VisibilityUnresolved },
+	)
+	rr := httptest.NewRecorder()
+	m.Wrap(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("handler must not be reached")
+	})).ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/anything", nil))
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", rr.Code)
+	}
+}
+
+// The default arm STAYS for genuinely unknown values.
+func TestWrap_UnknownVisibility_Is500(t *testing.T) {
+	m := NewMiddleware(nil, nil, true).WithPermissionResolver(
+		func(*http.Request) (iamdomain.Capability, Visibility) { return "", Visibility(99) },
+	)
+	rr := httptest.NewRecorder()
+	m.Wrap(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("handler must not be reached")
+	})).ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/anything", nil))
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", rr.Code)
 	}
 }

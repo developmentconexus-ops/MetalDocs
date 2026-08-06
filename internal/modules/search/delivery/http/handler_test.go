@@ -128,46 +128,44 @@ func TestHandleSearchDocumentsMapsAdvertisedFilters(t *testing.T) {
 	if reader.lastQuery.ExpiryAfter == nil || reader.lastQuery.ExpiryAfter.UTC().Format(time.RFC3339) != "2026-01-01T00:00:00Z" {
 		t.Fatalf("query.ExpiryAfter = %v, want 2026-01-01T00:00:00Z", reader.lastQuery.ExpiryAfter)
 	}
-	if reader.lastQuery.Subject != "deviation" {
-		t.Fatalf("query.Subject = %q, want deviation", reader.lastQuery.Subject)
-	}
-	// businessUnit (camelCase, undocumented) was removed in Wave 1.5 (F-13b).
-	if reader.lastQuery.BusinessUnit != "" {
-		t.Fatalf("query.BusinessUnit = %q, want empty (parameter removed)", reader.lastQuery.BusinessUnit)
-	}
-	if reader.lastQuery.Classification != searchdomain.ClassificationInternal {
-		t.Fatalf("query.Classification = %q, want INTERNAL", reader.lastQuery.Classification)
-	}
-	if reader.lastQuery.Tag != "tag-a" {
-		t.Fatalf("query.Tag = %q, want tag-a", reader.lastQuery.Tag)
-	}
+	// The request above still sends subject / classification / tag, none of
+	// which the spec declares. There is deliberately no assertion about them:
+	// Query used to carry all three as fields the handler populated and no
+	// reader ever consumed, so the assertions that sat here proved the handler
+	// copied three strings into a struct, never that any filtering happened —
+	// a caller passing classification=CONFIDENTIAL got unfiltered results and
+	// no error. The fields are gone, along with BusinessUnit, whose parameter
+	// was removed in Wave 1.5 (F-13b) while its field survived. Their absence
+	// is now unrepresentable rather than guarded. They stay in the URL to prove
+	// the remaining thing worth proving: an undeclared parameter is ignored,
+	// not an error.
 }
 
-func TestHandleSearchDocumentsMethodNotAllowedIsProblemJSON(t *testing.T) {
+// TestHandleSearchDocumentsMethodNotAllowed asserts that POST /search/documents
+// rejects with a 405. Prior to Task 9 (HTTP surface protocol) the bare
+// mux.HandleFunc pattern was method-less, so the handler itself had to guard
+// the method and emit the RFC 9457 problem+json 405. Now that Mount
+// mounts through the generated searchapi.ServerInterface router
+// (method-qualified net/http 1.22 patterns), the stdlib mux rejects the wrong
+// method itself — the assertion class is routing, so it registers through the
+// real Mount on a real *http.ServeMux and asserts the 405 the mux
+// produces (mirrors internal/modules/auth/delivery/http/handler_method_not_allowed_test.go).
+func TestHandleSearchDocumentsMethodNotAllowed(t *testing.T) {
 	reader := &handlerStubReader{}
 	h := NewHandler(searchapp.NewService(reader))
+	mux := http.NewServeMux()
+	h.Mount(mux)
+
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/search/documents", nil)
 	rec := httptest.NewRecorder()
 
-	h.handleSearchDocuments(rec, req)
+	mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("status = %d, want 405", rec.Code)
+		t.Fatalf("status = %d, want 405, body=%s", rec.Code, rec.Body.String())
 	}
-	if ct := rec.Header().Get("Content-Type"); ct != "application/problem+json" {
-		t.Fatalf("Content-Type = %q, want application/problem+json", ct)
-	}
-	if allow := rec.Header().Get("Allow"); allow != http.MethodGet {
-		t.Fatalf("Allow = %q, want GET", allow)
-	}
-	var body struct {
-		Code string `json:"code"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("body not JSON: %v", err)
-	}
-	if body.Code != "request.method_not_allowed" {
-		t.Fatalf("code = %q, want METHOD_NOT_ALLOWED", body.Code)
+	if allow := rec.Header().Get("Allow"); allow != "GET, HEAD" {
+		t.Fatalf("Allow = %q, want GET, HEAD", allow)
 	}
 }
 

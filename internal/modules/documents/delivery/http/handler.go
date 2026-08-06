@@ -21,6 +21,7 @@ import (
 	iamapp "metaldocs/internal/modules/iam/application"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/apibase"
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/pagination"
 	"metaldocs/internal/platform/problem"
@@ -95,6 +96,12 @@ type Handler struct {
 	placeholderOpts *PlaceholderOptionsHandler
 	view            *ViewHandler
 	reconstruct     *ReconstructHandler
+	// rl and userFn back the per-route rate limiting Mount applies (see
+	// registerRoutes/rateLimitedRoutes below). Both nil is a valid,
+	// non-rate-limited configuration (matches the prior RegisterRoutes'
+	// (nil, nil) behavior); set together via WithRateLimit.
+	rl     *ratelimit.Middleware
+	userFn func(*http.Request) string
 }
 
 var writeJSON = httpresponse.WriteJSON
@@ -127,6 +134,16 @@ func (h *Handler) isSystemAdmin(ctx context.Context, userID, tenantID string) (b
 
 func NewHandler(svc Service) *Handler { return &Handler{svc: svc} }
 
+// WithRateLimit wires the per-route rate limiter and user-identity extractor
+// Mount applies to rateLimitedRoutes. Both nil (the zero value) keeps Mount's
+// prior no-rate-limit behavior -- this is a constructor field, not a second
+// mounting mode: Mount always calls the same registerRoutes body.
+func (h *Handler) WithRateLimit(rl *ratelimit.Middleware, userFn func(*http.Request) string) *Handler {
+	h.rl = rl
+	h.userFn = userFn
+	return h
+}
+
 // rateLimitedRoutes maps each rate-limited route's method-qualified pattern
 // (as it appears on r.Pattern once matched by the generated router — see the
 // Middlewares closure below) to its ratelimit.RouteKey. CON-03/ARC-02: mounts
@@ -141,11 +158,15 @@ var rateLimitedRoutes = map[string]ratelimit.RouteKey{
 	"POST /api/v1/documents/{id}/export/pdf":       ratelimit.RouteExportPDF,
 }
 
-func (h *Handler) RegisterRoutes(mux httprouter.Muxer) { h.registerRoutes(mux, nil, nil) }
+// Name identifies this publisher in boot assertion messages.
+func (h *Handler) Name() string { return "documents" }
 
-func (h *Handler) RegisterRoutesWithRateLimit(mux httprouter.Muxer, rl *ratelimit.Middleware, userFn func(*http.Request) string) {
-	h.registerRoutes(mux, rl, userFn)
-}
+// Tag is the OpenAPI tag this publisher owns.
+func (h *Handler) Tag() string { return "documents" }
+
+// Mount registers documents' routes on mux, applying rate limiting when
+// WithRateLimit configured it (both fields nil is a valid unlimited mount).
+func (h *Handler) Mount(mux httprouter.Muxer) { h.registerRoutes(mux, h.rl, h.userFn) }
 
 func (h *Handler) registerRoutes(mux httprouter.Muxer, rl *ratelimit.Middleware, userFn func(*http.Request) string) {
 	rateLimited := rl != nil && userFn != nil
@@ -170,7 +191,7 @@ func (h *Handler) registerRoutes(mux httprouter.Muxer, rl *ratelimit.Middleware,
 		BaseRouter: mux,
 		// AD-1: spec path keys are relative; the generated router prepends this
 		// base so served routes stay /api/v1/* and the codegen matches the spec.
-		BaseURL: "/api/v1",
+		BaseURL: apibase.BaseURL,
 		Middlewares: []documentsapi.MiddlewareFunc{
 			middleware,
 		},

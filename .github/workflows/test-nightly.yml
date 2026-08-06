@@ -32,7 +32,7 @@ jobs:
           METALDOCS_DATABASE_URL: postgres://metaldocs:metaldocs@localhost:5432/metaldocs?sslmode=disable
           INTEGRATION_STRESS_N: "500"
         run: |
-          go test -tags integration -count=1 -race -timeout 3600s ./tests/... ./internal/...
+          go test -tags integration -count=1 -race -timeout 3600s ./tests/... ./internal/... ./apps/...
         timeout-minutes: 60
       - name: Open issue on failure
         if: failure()

@@ -123,14 +123,14 @@ func (capDeniedAreaRepo) CloseActiveTx(_ context.Context, _ iamdomain.Membership
 func TestMembershipsHandler_ErrorEnvelopeContract(t *testing.T) {
 	svc := iamapp.NewAreaMembershipService(capDeniedAreaRepo{}, noopMembershipLogger{})
 	handler := NewMembershipHandler(svc, passThroughVerifier{})
-	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/iam/area-memberships/user-1/ops", nil)
+	req.SetPathValue("user_id", "user-1")
+	req.SetPathValue("area_code", "ops")
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "session-user", []iamdomain.Role{iamdomain.RoleAreaAdmin}))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
-	mux.ServeHTTP(rec, req)
+	handler.revokeMembership(rec, req)
 
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
@@ -152,14 +152,14 @@ func TestMembershipsHandler_ErrorEnvelopeContract(t *testing.T) {
 func TestMembershipsHandler_SystemAdminCanTargetOtherUser(t *testing.T) {
 	svc := iamapp.NewAreaMembershipService(fakeUserAreaWriteRepository{}, noopMembershipLogger{})
 	handler := NewMembershipHandler(svc, passThroughVerifier{})
-	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/iam/area-memberships/user-1/ops", nil)
+	req.SetPathValue("user_id", "user-1")
+	req.SetPathValue("area_code", "ops")
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "admin-1", []iamdomain.Role{iamdomain.RoleSystemAdmin}))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
-	mux.ServeHTTP(rec, req)
+	handler.revokeMembership(rec, req)
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)

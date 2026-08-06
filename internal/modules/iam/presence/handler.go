@@ -63,13 +63,24 @@ func (h *Handler) WithAcceptOptions(opts *websocket.AcceptOptions) *Handler {
 	return h
 }
 
-// RegisterRoutes mounts the stream endpoint on mux. The HTTP-fallback
+// MountStream mounts the stream endpoint on mux. The HTTP-fallback
 // snapshot endpoint (GET /iam/presence/snapshot) is mounted separately by
 // the generated iamapi.ServerInterface router (CON-07: codegen rollout for
 // IAM) via ServeSnapshot below — streamPresence stays hand-mounted here
 // because it is a WebSocket upgrade, excluded from server codegen
 // (api/openapi/v1/openapi.yaml: exclude-operation-ids: streamPresence).
-func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
+// Excluded-from-codegen is not excluded-from-surface: streamPresence is
+// still a declared spec operation (openapi.yaml:637-647), so this mounts
+// unconditionally (§4, Mount is total) even when h is nil — binding the
+// h.handleStream method value does not dereference h, and handleStream
+// itself answers 501 when h is nil (see below).
+//
+// Task 15a (Ruling 2, iam/presence): the mounting SITE moved from this
+// package's own routeFamilies entry into iamdelivery.Router.Mount, which
+// already holds the presence dependency (getPresenceSnapshot delegates into
+// ServeSnapshot below). presence.Handler itself no longer implements
+// httprouter.SurfacePublisher -- iamRouter is the single "iam" tag owner.
+func (h *Handler) MountStream(mux httprouter.Muxer) {
 	mux.HandleFunc(http.MethodGet+" /api/v1/iam/presence/stream", h.handleStream)
 }
 
@@ -118,7 +129,17 @@ func toPresenceSnapshotResponse(items []Item) iamapi.PresenceSnapshotResponse {
 	return iamapi.PresenceSnapshotResponse{Items: out}
 }
 
+// handleStream answers 501 when h is nil (SQLDB-less boot path,
+// buildPresence returns nil), exactly as GetPresenceSnapshot already does for
+// the sibling snapshot endpoint (iam/delivery/http/router.go:232) — the
+// repo's existing majority convention (eight IAM operations already follow
+// this shape) for a declared-but-unavailable dependency.
 func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request) {
+	if h == nil {
+		writePresenceStreamNotImplemented(w)
+		return
+	}
+
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
 		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "tenant context missing"))
@@ -196,6 +217,15 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+// writePresenceStreamNotImplemented mirrors writeIAMNotImplemented
+// (iam/delivery/http/router.go:327) — same problem+json writer, same
+// StatusNotImplemented + CodeInternalNotImplemented code path — so the
+// stream endpoint's degraded response matches its snapshot sibling's shape
+// exactly rather than inventing a new idiom.
+func writePresenceStreamNotImplemented(w http.ResponseWriter) {
+	_ = problem.Write(w, problem.New(http.StatusNotImplemented, problem.CodeInternalNotImplemented, "Presence service is not configured"))
 }
 
 func writeJSON(ctx context.Context, c *websocket.Conn, ev Event) error {

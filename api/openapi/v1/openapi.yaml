@@ -82,6 +82,7 @@ paths:
       summary: HTTP RED metrics por rota
       operationId: getMetrics
       tags: [observability]
+      x-authz-capability: metrics.view
       responses:
         '200':
           description: Metricas de requests, erros e duracao
@@ -123,6 +124,8 @@ paths:
       summary: Revoga a sessao atual
       tags: [auth]
       operationId: logout
+      x-authz-capability-none: 'Destroys the caller''s own session; no capability can be required of a principal being logged out.'
+      x-authz-password-change-allowed: true
       responses:
         '204':
           description: Sessao encerrada
@@ -135,6 +138,8 @@ paths:
       summary: Retorna o usuario autenticado atual
       tags: [auth]
       operationId: getCurrentUser
+      x-authz-capability-none: 'Returns only the caller''s own principal; a session is the whole authorization.'
+      x-authz-password-change-allowed: true
       responses:
         '200':
           description: Usuario atual
@@ -151,6 +156,8 @@ paths:
       summary: Troca a senha do usuario autenticado
       tags: [auth]
       operationId: changePassword
+      x-authz-capability-none: 'The remedy for a must-change-password principal; gating it on a capability would deadlock the account.'
+      x-authz-password-change-allowed: true
       requestBody:
         required: true
         content:
@@ -175,6 +182,7 @@ paths:
       summary: List tenant users (cursor-paginated, filterable)
       tags: [iam]
       operationId: listUsers
+      x-authz-capability: user.view
       parameters:
         - name: is_active
           in: query
@@ -219,6 +227,7 @@ paths:
       summary: Cria usuario interno com credencial local inicial (legacy; prefer POST /iam/users/invite)
       tags: [iam]
       operationId: createManagedUser
+      x-authz-capability: user.manage
       deprecated: true
       requestBody:
         required: true
@@ -248,6 +257,7 @@ paths:
       summary: Provisiona novo tenant com usuario administrador inicial
       tags: [iam]
       operationId: onboardTenant
+      x-authz-capability: tenant.onboard
       requestBody:
         required: true
         content:
@@ -276,6 +286,7 @@ paths:
       summary: Solicita exportacao completa dos dados de um tenant (assincrono)
       tags: [iam]
       operationId: exportTenant
+      x-authz-capability: tenant.export
       parameters:
         - name: tenant_id
           in: path
@@ -305,6 +316,7 @@ paths:
       summary: Solicita apagamento (crypto-shred) irreversivel dos dados de um tenant (assincrono)
       tags: [iam]
       operationId: eraseTenant
+      x-authz-capability: tenant.erase
       parameters:
         - name: tenant_id
           in: path
@@ -334,6 +346,7 @@ paths:
       summary: Atomic metadata + tenant role update (single tx)
       tags: [iam]
       operationId: patchUser
+      x-authz-capability: user.manage
       parameters:
         - name: user_id
           in: path
@@ -368,6 +381,7 @@ paths:
       summary: Admin password reset (forces must-change-on-first-login)
       tags: [iam]
       operationId: resetPassword
+      x-authz-capability: user.manage
       parameters:
         - name: user_id
           in: path
@@ -400,6 +414,7 @@ paths:
       summary: Clear operational lock + failed-login counter for a user
       tags: [iam]
       operationId: unlockUser
+      x-authz-capability: user.manage
       parameters:
         - name: user_id
           in: path
@@ -426,6 +441,7 @@ paths:
       summary: Composed Admin Center overview (KPI strip + presence + recent activity)
       tags: [iam]
       operationId: getIamAdminOverview
+      x-authz-capability: user.view
       responses:
         '200':
           description: Resumo administrativo
@@ -444,6 +460,7 @@ paths:
       summary: Invite a new user (server-generated temp password, must change on first login)
       tags: [iam]
       operationId: inviteUser
+      x-authz-capability: user.manage
       requestBody:
         required: true
         content:
@@ -472,6 +489,7 @@ paths:
       summary: Bulk action over a set of users (activate, deactivate, unlock, force-logout)
       tags: [iam]
       operationId: bulkUsers
+      x-authz-capability: user.manage
       requestBody:
         required: true
         content:
@@ -500,6 +518,7 @@ paths:
       summary: List area memberships for a user
       tags: [iam]
       operationId: listMemberships
+      x-authz-capability: membership.view
       parameters:
         - name: user_id
           in: path
@@ -527,6 +546,7 @@ paths:
       summary: List canonical tenant roles (read-only)
       tags: [iam]
       operationId: listRoles
+      x-authz-capability: membership.view
       responses:
         '200':
           description: Lista de roles canonicos
@@ -547,6 +567,7 @@ paths:
       summary: List capability registry (read-only)
       tags: [iam]
       operationId: listCapabilities
+      x-authz-capability: membership.view
       responses:
         '200':
           description: Lista de capabilities
@@ -567,6 +588,7 @@ paths:
       summary: List role-capability matrix rows (read-only)
       tags: [iam]
       operationId: listRoleCapabilities
+      x-authz-capability: membership.view
       responses:
         '200':
           description: Matriz role x capability
@@ -585,6 +607,7 @@ paths:
       summary: Tenant KPI snapshot for the Overview strip
       tags: [iam]
       operationId: getKpi
+      x-authz-capability: metrics.view
       responses:
         '200':
           description: Snapshot de KPIs
@@ -603,6 +626,7 @@ paths:
       summary: Tenant consumption snapshot (seats, storage, API, active users)
       tags: [iam]
       operationId: getUsage
+      x-authz-capability: metrics.view
       responses:
         '200':
           description: Snapshot de consumo
@@ -621,6 +645,7 @@ paths:
       summary: Online presence snapshot (HTTP fallback when WebSocket unavailable)
       tags: [iam]
       operationId: getPresenceSnapshot
+      x-authz-capability: user.view
       responses:
         '200':
           description: Snapshot de presenca
@@ -645,8 +670,7 @@ paths:
         hand-written upgrade handler is authoritative. HTTP fallback: /iam/presence/snapshot.
       tags: [iam]
       operationId: streamPresence
-      x-websocket-message:
-        $ref: '#/components/schemas/PresenceStreamEvent'
+      x-authz-capability: user.view
       responses:
         '101':
           description: Switching Protocols — WebSocket established; server streams PresenceStreamEvent frames.
@@ -661,6 +685,7 @@ paths:
       summary: Export filtered audit events as CSV or JSONL (signed URL, async if large)
       tags: [audit]
       operationId: exportAuditEvents
+      x-authz-capability: audit.read
       requestBody:
         required: true
         content:
@@ -687,6 +712,7 @@ paths:
       summary: Read the status of an audit export job
       tags: [audit]
       operationId: getAuditExportStatus
+      x-authz-capability: audit.read
       parameters:
         - name: export_id
           in: path
@@ -712,6 +738,7 @@ paths:
       summary: Download the rendered audit export payload via a signed token
       tags: [audit]
       operationId: downloadAuditExport
+      x-authz-capability: audit.read
       parameters:
         - name: export_id
           in: path
@@ -744,6 +771,7 @@ paths:
       summary: List active sessions in the current tenant
       tags: [iam]
       operationId: listSessions
+      x-authz-capability: user.view
       parameters:
         - name: user_id
           in: query
@@ -779,6 +807,7 @@ paths:
       summary: Revoke (force-logout) a specific session. Gate CapSessionManage.
       tags: [iam]
       operationId: revokeSession
+      x-authz-capability: session.manage
       parameters:
         - name: session_id
           in: path
@@ -800,6 +829,7 @@ paths:
       summary: MFA enrollment coverage by tenant + by role
       tags: [security]
       operationId: getMfaCoverage
+      x-authz-capability: user.view
       responses:
         '200':
           description: Cobertura de MFA
@@ -820,6 +850,7 @@ paths:
       summary: Current account lockouts (locked-until window)
       tags: [security]
       operationId: listLockouts
+      x-authz-capability: user.view
       responses:
         '200':
           description: Lista de lockouts
@@ -840,6 +871,7 @@ paths:
       summary: Anomaly cards (repeated-failed-login, new-device-login, lockout-spike, off-hours-admin-action)
       tags: [security]
       operationId: listSecuritySignals
+      x-authz-capability: user.view
       responses:
         '200':
           description: Sinais de seguranca
@@ -858,6 +890,7 @@ paths:
       summary: Lista eventos de auditoria append-only (multi-axis filter, cursor-paginated)
       tags: [audit]
       operationId: listAuditEvents
+      x-authz-capability: audit.read
       parameters:
         - name: actor_id
           in: query
@@ -919,6 +952,7 @@ paths:
       summary: Pesquisa documentos por filtros
       operationId: searchDocuments
       tags: [search]
+      x-authz-capability: document.view
       parameters:
         - name: q
           in: query
@@ -1000,6 +1034,7 @@ paths:
       summary: Cria/atualiza usuario IAM e atribui role
       tags: [iam]
       operationId: upsertUserRole
+      x-authz-capability: user.manage
       parameters:
         - name: user_id
           in: path
@@ -1031,6 +1066,7 @@ paths:
       summary: Reconcilia o conjunto de roles de um usuario interno
       tags: [iam]
       operationId: replaceUserRoles
+      x-authz-capability: user.manage
       parameters:
         - name: user_id
           in: path
@@ -1065,6 +1101,7 @@ paths:
       summary: List active area memberships for the current tenant
       tags: [iam]
       operationId: listAreaMemberships
+      x-authz-capability: membership.view
       parameters:
         - name: user_id
           in: query
@@ -1105,6 +1142,7 @@ paths:
       summary: Grant an active area membership
       tags: [iam]
       operationId: grantAreaMembership
+      x-authz-capability: membership.manage
       x-authz-area:
         source: body
         field: area_code
@@ -1139,6 +1177,7 @@ paths:
       summary: Revoke an active area membership
       tags: [iam]
       operationId: revokeAreaMembership
+      x-authz-capability: membership.manage
       # F-DELETE-SHAPE (Phase E2): the membership is now identified by path
       # parameters (resource identity) instead of query parameters.
       x-authz-area:
@@ -1195,6 +1234,7 @@ paths:
       summary: List templates for tenant (docx)
       tags: [templates]
       operationId: listTemplates
+      x-authz-capability: template.view
       parameters:
         - name: limit
           in: query
@@ -1246,6 +1286,7 @@ paths:
       summary: Create template (docx)
       tags: [templates]
       operationId: createTemplate
+      x-authz-capability: template.create
       parameters:
         - name: Idempotency-Key
           in: header
@@ -1303,6 +1344,7 @@ paths:
       summary: Get system-owned blank template
       tags: [templates]
       operationId: getSystemBlankTemplate
+      x-authz-capability: template.view
       responses:
         '200':
           description: ok
@@ -1323,6 +1365,7 @@ paths:
       summary: Get template version metadata (docx)
       tags: [templates]
       operationId: getTemplateVersion
+      x-authz-capability: template.view
       parameters:
         - { in: path, name: id, required: true, schema: { type: string } }
         - { in: path, name: n, required: true, schema: { type: integer } }
@@ -1345,6 +1388,7 @@ paths:
       summary: Presign PUT URL for draft .docx upload
       tags: [templates]
       operationId: presignTemplateDocxUploadUrl
+      x-authz-capability: template.edit
       parameters:
         - { in: path, name: id, required: true, schema: { type: string } }
         - { in: path, name: n, required: true, schema: { type: integer } }
@@ -1373,6 +1417,7 @@ paths:
       summary: Presign PUT URL for draft schema.json upload
       tags: [templates]
       operationId: presignTemplateSchemaUploadUrl
+      x-authz-capability: template.edit
       parameters:
         - { in: path, name: id, required: true, schema: { type: string } }
         - { in: path, name: n, required: true, schema: { type: integer } }
@@ -1401,6 +1446,7 @@ paths:
       summary: Publish draft (validates template tokens)
       tags: [templates]
       operationId: publishTemplateVersion
+      x-authz-capability: template.publish
       parameters:
         - { in: path, name: id, required: true, schema: { type: string } }
         - { in: path, name: n, required: true, schema: { type: integer } }
@@ -1437,6 +1483,7 @@ paths:
       summary: Create template version
       tags: [templates]
       operationId: createTemplateVersion
+      x-authz-capability: template.create
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -1462,6 +1509,7 @@ paths:
       summary: Update template schema
       tags: [templates]
       operationId: updateTemplateSchema
+      x-authz-capability: template.edit
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
@@ -1522,6 +1570,7 @@ paths:
       summary: Presign template autosave
       tags: [templates]
       operationId: presignTemplateAutosave
+      x-authz-capability: template.edit
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
@@ -1546,6 +1595,7 @@ paths:
       summary: Commit template autosave
       tags: [templates]
       operationId: commitTemplateAutosave
+      x-authz-capability: template.edit
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
@@ -1593,6 +1643,7 @@ paths:
         replace it.
       tags: [templates]
       operationId: submitTemplateVersionForApproval
+      x-authz-capability: template.submit
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
@@ -1637,6 +1688,7 @@ paths:
         is null and stages is empty when no active route resolves yet.
       tags: [templates]
       operationId: getTemplateVersionApprovalPreview
+      x-authz-capability: template.submit
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
@@ -1668,6 +1720,7 @@ paths:
         templates_template_version.content_hash, never echoed by the client.
       tags: [templates]
       operationId: signoffTemplateVersion
+      x-authz-capability: template.approve
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
@@ -1702,6 +1755,7 @@ paths:
       summary: Archive template
       tags: [templates]
       operationId: archiveTemplate
+      x-authz-capability: template.archive
       x-authz-area-none: 'Templates are tenant-global; archive is tier-1 capability-gated (template.archive, area "*" in routes_lifecycle.go). No per-area scope to assert.'
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -1729,6 +1783,7 @@ paths:
       summary: Get template
       tags: [templates]
       operationId: getTemplate
+      x-authz-capability: template.view
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -1751,6 +1806,7 @@ paths:
       summary: Get template DOCX URL
       tags: [templates]
       operationId: getTemplateDocxUrl
+      x-authz-capability: template.view
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
@@ -1778,6 +1834,7 @@ paths:
       x-pagination-exempt-reason: 'Bounded per-template audit trail returned in full.'
       tags: [templates]
       operationId: listTemplateAudit
+      x-authz-capability: template.view
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -1802,6 +1859,7 @@ paths:
       x-pagination-exempt-reason: 'Fixed reference catalog: the 7-token placeholder set is a bounded enumeration.'
       tags: [templates]
       operationId: listTemplatePlaceholderCatalog
+      x-authz-capability: template.view
       responses:
         '200':
           description: ok
@@ -1822,6 +1880,7 @@ paths:
       x-pagination-exempt-reason: 'Bounded per-tenant taxonomy profile set returned in full.'
       tags: [taxonomy]
       operationId: listTaxonomyProfiles
+      x-authz-capability: taxonomy.view
       parameters:
         - name: include_archived
           in: query
@@ -1843,6 +1902,7 @@ paths:
       summary: Create taxonomy profile
       tags: [taxonomy]
       operationId: createTaxonomyProfile
+      x-authz-capability: taxonomy.manage
       parameters:
         - name: Idempotency-Key
           in: header
@@ -1878,6 +1938,7 @@ paths:
       summary: Get taxonomy profile
       tags: [taxonomy]
       operationId: getTaxonomyProfile
+      x-authz-capability: taxonomy.view
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       responses:
@@ -1899,6 +1960,7 @@ paths:
       summary: Update taxonomy profile
       tags: [taxonomy]
       operationId: updateTaxonomyProfile
+      x-authz-capability: taxonomy.manage
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       requestBody:
@@ -1934,6 +1996,7 @@ paths:
       summary: Archive taxonomy profile
       tags: [taxonomy]
       operationId: archiveTaxonomyProfile
+      x-authz-capability: taxonomy.manage
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       responses:
@@ -1956,6 +2019,7 @@ paths:
       summary: Set taxonomy profile default template
       tags: [taxonomy]
       operationId: setTaxonomyProfileDefaultTemplate
+      x-authz-capability: taxonomy.manage
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       requestBody:
@@ -1986,6 +2050,7 @@ paths:
       x-pagination-exempt-reason: 'Bounded per-tenant taxonomy area set returned in full.'
       tags: [taxonomy]
       operationId: listTaxonomyAreas
+      x-authz-capability: taxonomy.view
       parameters:
         - name: include_archived
           in: query
@@ -2007,6 +2072,7 @@ paths:
       summary: Create taxonomy area
       tags: [taxonomy]
       operationId: createTaxonomyArea
+      x-authz-capability: taxonomy.manage
       parameters:
         - name: Idempotency-Key
           in: header
@@ -2042,6 +2108,7 @@ paths:
       summary: Get taxonomy area
       tags: [taxonomy]
       operationId: getTaxonomyArea
+      x-authz-capability: taxonomy.view
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       responses:
@@ -2063,6 +2130,7 @@ paths:
       summary: Update taxonomy area
       tags: [taxonomy]
       operationId: updateTaxonomyArea
+      x-authz-capability: taxonomy.manage
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       requestBody:
@@ -2098,6 +2166,7 @@ paths:
       summary: Archive taxonomy area
       tags: [taxonomy]
       operationId: archiveTaxonomyArea
+      x-authz-capability: taxonomy.manage
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       responses:
@@ -2122,6 +2191,7 @@ paths:
       x-pagination-exempt-reason: 'Bounded per-tenant taxonomy family set returned in full.'
       tags: [taxonomy]
       operationId: listTaxonomyFamilies
+      x-authz-capability: taxonomy.view
       parameters:
         - name: include_inactive
           in: query
@@ -2145,6 +2215,7 @@ paths:
       summary: Create taxonomy family
       tags: [taxonomy]
       operationId: createTaxonomyFamily
+      x-authz-capability: taxonomy.manage
       parameters:
         - name: Idempotency-Key
           in: header
@@ -2180,6 +2251,7 @@ paths:
       summary: Get taxonomy family
       tags: [taxonomy]
       operationId: getTaxonomyFamily
+      x-authz-capability: taxonomy.view
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       responses:
@@ -2201,6 +2273,7 @@ paths:
       summary: Update taxonomy family
       tags: [taxonomy]
       operationId: updateTaxonomyFamily
+      x-authz-capability: taxonomy.manage
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       requestBody:
@@ -2230,6 +2303,7 @@ paths:
       summary: Deactivate taxonomy family
       tags: [taxonomy]
       operationId: deactivateTaxonomyFamily
+      x-authz-capability: taxonomy.manage
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       responses:
@@ -2252,6 +2326,7 @@ paths:
       summary: List controlled documents
       tags: [controlled-documents]
       operationId: listControlledDocuments
+      x-authz-capability: document.view
       parameters:
         - name: profile_code
           in: query
@@ -2305,6 +2380,7 @@ paths:
       summary: Atomically create controlled document and initial revision
       tags: [controlled-documents]
       operationId: atomicCreateControlledDocument
+      x-authz-capability: controlled_documents.create
       x-authz-area:
         source: body
         field: process_area_code
@@ -2347,6 +2423,7 @@ paths:
       summary: Preview the next auto-generated document code without allocating it
       tags: [controlled-documents]
       operationId: previewControlledDocumentCode
+      x-authz-capability: controlled_documents.create
       parameters:
         - name: profile_code
           in: query
@@ -2386,6 +2463,7 @@ paths:
         client-side narrowing of a full area catalog.
       tags: [controlled-documents]
       operationId: getControlledDocumentCreationContext
+      x-authz-capability: controlled_documents.create
       responses:
         '200':
           description: ok
@@ -2405,6 +2483,7 @@ paths:
       summary: Get controlled document by ID
       tags: [controlled-documents]
       operationId: getControlledDocument
+      x-authz-capability: document.view
       parameters:
         - name: id
           in: path
@@ -2431,6 +2510,7 @@ paths:
       summary: Create a new revision for a controlled document
       tags: [controlled-documents]
       operationId: createControlledDocumentRevision
+      x-authz-capability: document.edit
       parameters:
         - name: id
           in: path
@@ -2471,6 +2551,7 @@ paths:
       summary: Get the active document instance for a controlled document
       tags: [controlled-documents]
       operationId: getActiveDocument
+      x-authz-capability: document.view
       parameters:
         - name: id
           in: path
@@ -2497,6 +2578,7 @@ paths:
       summary: Mark controlled document as obsolete
       tags: [controlled-documents]
       operationId: obsoleteControlledDocument
+      x-authz-capability: controlled_documents.obsolete
       x-authz-area:
         source: tx
         derived_from: 'controlled_documents.process_area_code'
@@ -2535,6 +2617,7 @@ paths:
       summary: Mark controlled document as superseded
       tags: [controlled-documents]
       operationId: supersedeControlledDocument
+      x-authz-capability: controlled_documents.supersede
       x-authz-area:
         source: tx
         derived_from: 'controlled_documents.process_area_code'
@@ -2573,6 +2656,7 @@ paths:
       summary: List documents for tenant
       tags: [documents]
       operationId: listDocuments
+      x-authz-capability: document.view
       parameters:
         - name: cursor
           in: query
@@ -2632,6 +2716,7 @@ paths:
       summary: Get document
       tags: [documents]
       operationId: getDocument
+      x-authz-capability: document.view
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '200':
@@ -2652,6 +2737,7 @@ paths:
       summary: Rename document
       tags: [documents]
       operationId: renameDocument
+      x-authz-capability: document.edit
       x-authz-area:
         source: tx
         derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
@@ -2691,6 +2777,7 @@ paths:
       summary: Archive document
       tags: [documents]
       operationId: archiveDocument
+      x-authz-capability: document.edit
       x-authz-area:
         source: tx
         derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
@@ -2720,6 +2807,7 @@ paths:
       summary: Get document revision history
       tags: [documents]
       operationId: getDocumentRevisionHistory
+      x-authz-capability: document.view
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -2742,6 +2830,7 @@ paths:
       summary: Duplicate document
       tags: [documents]
       operationId: duplicateDocument
+      x-authz-capability: document.create
       x-authz-area:
         source: tx
         derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
@@ -2775,6 +2864,7 @@ paths:
       summary: Documents stats by status and area
       tags: [documents]
       operationId: documentStats
+      x-authz-capability: document.view
       parameters:
         - name: status
           in: query
@@ -2809,6 +2899,7 @@ paths:
       summary: Acquire document session
       tags: [documents]
       operationId: acquireDocumentSession
+      x-authz-capability: document.edit
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '201':
@@ -2840,6 +2931,7 @@ paths:
       summary: Heartbeat document session
       tags: [documents]
       operationId: heartbeatDocumentSession
+      x-authz-capability: document.edit
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '204':
@@ -2861,6 +2953,7 @@ paths:
       summary: Release document session
       tags: [documents]
       operationId: releaseDocumentSession
+      x-authz-capability: document.edit
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '204':
@@ -2882,6 +2975,7 @@ paths:
       summary: Force release document session
       tags: [documents]
       operationId: forceReleaseDocumentSession
+      x-authz-capability: membership.manage
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '204':
@@ -2902,6 +2996,7 @@ paths:
       summary: Presign document autosave
       tags: [documents]
       operationId: presignDocumentAutosave
+      x-authz-capability: document.edit
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
         required: true
@@ -2938,6 +3033,7 @@ paths:
       summary: Commit document autosave
       tags: [documents]
       operationId: commitDocumentAutosave
+      x-authz-capability: document.edit
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
         required: true
@@ -2998,6 +3094,7 @@ paths:
       x-pagination-exempt-reason: 'Bounded per-document checkpoint set returned in full.'
       tags: [documents]
       operationId: listDocumentCheckpoints
+      x-authz-capability: document.view
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '200':
@@ -3020,6 +3117,7 @@ paths:
       summary: Create document checkpoint
       tags: [documents]
       operationId: createDocumentCheckpoint
+      x-authz-capability: document.edit
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
         content:
@@ -3047,6 +3145,7 @@ paths:
     post:
       tags: [documents]
       operationId: restoreDocumentCheckpoint
+      x-authz-capability: document.edit
       summary: Forward-only restore - clones the checkpoint rev into a new head revision
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -3080,6 +3179,7 @@ paths:
       summary: Get document revision URL
       tags: [documents]
       operationId: getDocumentRevisionUrl
+      x-authz-capability: document.view
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: rid, in: path, required: true, schema: { type: string, format: uuid } }
@@ -3106,6 +3206,7 @@ paths:
       x-pagination-exempt-reason: 'Bounded per-document comment set returned in full.'
       tags: [documents]
       operationId: listDocumentComments
+      x-authz-capability: document.view
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '200':
@@ -3128,6 +3229,7 @@ paths:
       summary: Create document comment
       tags: [documents]
       operationId: createDocumentComment
+      x-authz-capability: document.edit
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
         required: true
@@ -3158,6 +3260,7 @@ paths:
       summary: Update document comment
       tags: [documents]
       operationId: updateDocumentComment
+      x-authz-capability: document.edit
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: library_id, in: path, required: true, schema: { type: integer } }
@@ -3188,6 +3291,7 @@ paths:
       summary: Delete document comment
       tags: [documents]
       operationId: deleteDocumentComment
+      x-authz-capability: document.edit
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: library_id, in: path, required: true, schema: { type: integer } }
@@ -3210,7 +3314,7 @@ paths:
       summary: Export document PDF
       operationId: exportDocumentPDF
       tags: [documents]
-      x-rate-limit: { requests_per_minute: 20 }
+      x-authz-capability: document.view
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       requestBody:
@@ -3258,6 +3362,7 @@ paths:
       summary: Get document DOCX URL
       operationId: getDocumentDocxURL
       tags: [documents]
+      x-authz-capability: document.view
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -3287,6 +3392,7 @@ paths:
       summary: Get document fill-in schema
       tags: [documents]
       operationId: getDocumentFillInSchema
+      x-authz-capability: document.view
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '200':
@@ -3311,6 +3417,7 @@ paths:
       x-pagination-exempt-reason: 'Bounded per-document placeholder set (fixed 7-token catalog).'
       tags: [documents]
       operationId: listDocumentPlaceholderValues
+      x-authz-capability: document.view
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '200':
@@ -3329,6 +3436,7 @@ paths:
       summary: Put document placeholder value
       tags: [documents]
       operationId: putDocumentPlaceholderValue
+      x-authz-capability: document.edit
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: pid, in: path, required: true, schema: { type: string } }
@@ -3363,6 +3471,7 @@ paths:
       summary: View document
       tags: [documents]
       operationId: viewDocument
+      x-authz-capability: document.view
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '200':
@@ -3385,6 +3494,7 @@ paths:
       summary: Reconstruct document
       tags: [documents]
       operationId: reconstructDocument
+      x-authz-capability: document.edit
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
         required: true
@@ -3413,6 +3523,7 @@ paths:
       summary: Get document placeholder options
       tags: [documents]
       operationId: getDocumentPlaceholderOptions
+      x-authz-capability: document.view
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: pid, in: path, required: true, schema: { type: string } }
@@ -3445,6 +3556,7 @@ paths:
         submit).
       tags: [approval]
       operationId: submitDocumentForApproval
+      x-authz-capability: document.submit
       x-authz-area:
         source: tx
         derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
@@ -3505,6 +3617,7 @@ paths:
         authority.
       tags: [approval]
       operationId: getDocumentApprovalPreview
+      x-authz-capability: document.submit
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -3527,6 +3640,7 @@ paths:
       summary: Record approval stage signoff
       tags: [approval]
       operationId: recordApprovalStageSignoff
+      x-authz-capability: document.signoff
       x-authz-area:
         source: tx
         derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
@@ -3583,6 +3697,7 @@ paths:
         document to draft (no quorum needed).
       tags: [approval]
       operationId: recordApprovalReviewVerdict
+      x-authz-capability: approval.review
       x-authz-area:
         source: tx
         derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
@@ -3641,6 +3756,7 @@ paths:
         actor eligibility on the next approval stage, is rejected.
       tags: [approval]
       operationId: recordApprovalFastForward
+      x-authz-capability: document.signoff
       x-authz-area:
         source: tx
         derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
@@ -3697,6 +3813,7 @@ paths:
         submit operation (CON-01).
       tags: [approval]
       operationId: markDocumentReviewed
+      x-authz-capability: document.review
       x-authz-area:
         source: tx
         derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
@@ -3741,6 +3858,7 @@ paths:
       summary: Obsolete document
       tags: [approval]
       operationId: obsoleteDocument
+      x-authz-capability: document.obsolete
       x-authz-area:
         source: tx
         derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
@@ -3785,6 +3903,7 @@ paths:
       summary: Cancel approval instance
       tags: [approval]
       operationId: cancelApprovalInstance
+      x-authz-capability: document.edit
       parameters:
         - { name: instance_id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
@@ -3835,6 +3954,7 @@ paths:
         so concurrent extensions are already correct.
       tags: [approval]
       operationId: extendApprovalSLA
+      x-authz-capability: approval.sla_extend
       x-authz-area:
         source: tx
         derived_from: 'approval_stage_instances.area_code_snapshot'
@@ -3886,6 +4006,7 @@ paths:
         derived from the authenticated session, never accepted from the body.
       tags: [approval]
       operationId: createApprovalDelegation
+      x-authz-capability: document.signoff
       security:
         - sessionCookie: []
       parameters:
@@ -3924,6 +4045,7 @@ paths:
         or soft-flag state to go stale.
       tags: [approval]
       operationId: revokeApprovalDelegation
+      x-authz-capability: document.signoff
       security:
         - sessionCookie: []
       parameters:
@@ -3944,6 +4066,7 @@ paths:
       summary: Get approval instance
       tags: [approval]
       operationId: getApprovalInstance
+      x-authz-capability: document.view
       parameters: [{ name: instance_id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '200':
@@ -3965,6 +4088,7 @@ paths:
       summary: Get approval instance by document
       tags: [approval]
       operationId: getApprovalInstanceByDocument
+      x-authz-capability: document.view
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '200':
@@ -3988,6 +4112,7 @@ paths:
       x-pagination-exempt-reason: 'Bounded per-actor inbox of pending sign-offs; offset/limit paging with a total count, no cursor envelope.'
       tags: [approval]
       operationId: listApprovalInbox
+      x-authz-capability: document.view
       parameters:
         - { name: area_code, in: query, required: false, schema: { type: string }, description: 'Filter to a single process area.' }
         - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }
@@ -4022,6 +4147,7 @@ paths:
       summary: Record document signoff
       tags: [approval]
       operationId: recordDocumentSignoff
+      x-authz-capability: document.signoff
       x-authz-area:
         source: tx
         derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
@@ -4068,6 +4194,7 @@ paths:
       summary: Cancel document approval
       tags: [approval]
       operationId: cancelDocumentApproval
+      x-authz-capability: document.edit
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
@@ -4104,6 +4231,7 @@ paths:
       summary: Create an approval route for the active tenant
       tags: [approval]
       operationId: createApprovalRoute
+      x-authz-capability: route.manage
       # ADR 0022 Phase 11 (F4): tier-1 + tier-2 both enforce route.manage. The
       # tier-1 row lives in apps/api/cmd/metaldocs-api/permissions.go
       # (/api/v1/approval/routes -> CapRouteManage); tier-2 is
@@ -4139,6 +4267,7 @@ paths:
       summary: List approval routes for the active tenant
       tags: [approval]
       operationId: listApprovalRoutes
+      x-authz-capability: route.manage
       security:
         - sessionCookie: []
       # ADR 0022 Phase 11 (F4): approval routes are a small, bounded per-tenant
@@ -4176,6 +4305,7 @@ paths:
         their original (now-superseded) route row, unaffected.
       tags: [approval]
       operationId: updateApprovalRoute
+      x-authz-capability: route.manage
       security:
         - sessionCookie: []
       parameters:
@@ -4218,6 +4348,7 @@ paths:
       summary: Deactivate an approval route
       tags: [approval]
       operationId: deactivateApprovalRoute
+      x-authz-capability: route.manage
       security:
         - sessionCookie: []
       parameters:
@@ -4256,6 +4387,7 @@ paths:
       summary: Distribution coverage summary — total obligated audience for a controlled document
       tags: [distribution]
       operationId: getDocumentDistribution
+      x-authz-capability: distribution.read
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -4278,6 +4410,7 @@ paths:
       summary: Obligated audience for a controlled document (denominator only)
       tags: [distribution]
       operationId: listDocumentDistributionRecipients
+      x-authz-capability: distribution.read
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - name: cursor
@@ -4309,6 +4442,7 @@ paths:
       summary: By-area obligated totals for a controlled document (denominator only)
       tags: [distribution]
       operationId: getDocumentDistributionCoverage
+      x-authz-capability: distribution.read
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -4333,6 +4467,7 @@ paths:
       summary: List the caller's notifications (self-scope), newest first
       tags: [notifications]
       operationId: listNotifications
+      x-authz-capability: notification.read
       parameters:
         - { name: status, in: query, schema: { type: string, enum: [PENDING, SENT, READ] } }
         - name: cursor
@@ -4362,6 +4497,7 @@ paths:
       summary: Count the caller's unread (PENDING/SENT) notifications
       tags: [notifications]
       operationId: getNotificationsUnreadCount
+      x-authz-capability: notification.read
       responses:
         '200':
           description: ok
@@ -4380,6 +4516,7 @@ paths:
       summary: Mark one of the caller's notifications read (idempotent)
       tags: [notifications]
       operationId: markNotificationRead
+      x-authz-capability: notification.read
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -4398,6 +4535,7 @@ paths:
       summary: Mark all of the caller's unread (PENDING/SENT) notifications read (idempotent, self-scope)
       tags: [notifications]
       operationId: markAllNotificationsRead
+      x-authz-capability: notification.read
       responses:
         '200':
           description: ok
@@ -4419,6 +4557,7 @@ paths:
       x-pagination-exempt-reason: 'Bounded per-tenant token dictionary returned in full.'
       tags: [tokens]
       operationId: listTokens
+      x-authz-capability: token.view
       responses:
         '200':
           description: ok
@@ -4433,6 +4572,7 @@ paths:
       summary: Create token dictionary entry
       tags: [tokens]
       operationId: createToken
+      x-authz-capability: token_dictionary.manage
       requestBody:
         required: true
         content:
@@ -4457,6 +4597,7 @@ paths:
       summary: Get token dictionary entry
       tags: [tokens]
       operationId: getToken
+      x-authz-capability: token.view
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -4474,6 +4615,7 @@ paths:
       summary: Update token dictionary entry
       tags: [tokens]
       operationId: updateToken
+      x-authz-capability: token_dictionary.manage
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       requestBody:
@@ -4499,6 +4641,7 @@ paths:
       summary: Delete token dictionary entry
       tags: [tokens]
       operationId: deleteToken
+      x-authz-capability: token_dictionary.manage
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:

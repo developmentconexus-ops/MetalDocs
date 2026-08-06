@@ -1,7 +1,16 @@
 // Package httpdelivery implements the auth module's HTTP surface: the login/
 // logout/me/change-password Handler and the session-resolving Middleware that
-// gates every other route. Auth is pre-codegen (no api.gen.go); per ADR 0012,
-// hand-rolled typed request/response structs are the sanctioned posture here.
+// gates every other route. Auth is now mounted through the generated
+// authapi.ServerInterface router (HandlerWithOptions) so each operation is a
+// method-qualified mux pattern that can carry its own tier-1 authz rule; per
+// ADR 0012, the request/response bodies stay hand-rolled typed structs
+// (authLoginResponse/changePasswordResponse below) rather than the generated
+// models — Handler implements authapi.ServerInterface directly (not the
+// strict variant) because Logout needs the raw session cookie off *http.Request
+// and Login/ChangePassword set cookies mid-handler via http.ResponseWriter,
+// neither of which the strict (ctx, RequestObject) shape exposes. This
+// mirrors the audit module's precedent
+// (internal/modules/audit/delivery/http/handler.go).
 package httpdelivery
 
 import (
@@ -19,8 +28,10 @@ import (
 	"github.com/google/uuid"
 
 	auditdomain "metaldocs/internal/modules/audit/domain"
+	authapi "metaldocs/internal/modules/auth/api"
 	authapp "metaldocs/internal/modules/auth/application"
 	authdomain "metaldocs/internal/modules/auth/domain"
+	"metaldocs/internal/platform/apibase"
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/requesttrace"
@@ -45,10 +56,12 @@ type changePasswordRequest struct {
 }
 
 // authLoginResponse / changePasswordResponse are hand-rolled typed response bodies
-// mirroring the OpenAPI AuthLoginResponse / ChangePasswordResponse schemas. Auth is
-// pre-codegen (no api.gen.go); per ADR 0012 hand-rolled typed structs are the
-// sanctioned posture for pre-codegen modules. They replace the prior untyped-map
-// response literals (M7 F7.2 typed-body parity) with byte-identical wire output.
+// mirroring the OpenAPI AuthLoginResponse / ChangePasswordResponse schemas. Per
+// ADR 0012, hand-rolled typed structs remain the sanctioned posture for this
+// handler's response bodies even though routes now mount via the generated
+// authapi.ServerInterface — the generated response models are unused here so
+// the cookie-setting side effects below stay byte-identical to their prior
+// shape (M7 F7.2 typed-body parity).
 type authLoginResponse struct {
 	User      authdomain.CurrentUser `json:"user"`
 	ExpiresAt string                 `json:"expires_at"`
@@ -79,19 +92,49 @@ func (h *Handler) WithAudit(w auditdomain.Writer) *Handler {
 	return h
 }
 
-// RegisterRoutes mounts the auth endpoints (login, logout, me, change-password) on mux.
-func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
-	mux.HandleFunc("/api/v1/auth/login", h.handleLogin)
-	mux.HandleFunc("/api/v1/auth/logout", h.handleLogout)
-	mux.HandleFunc("/api/v1/auth/me", h.handleMe)
-	mux.HandleFunc("/api/v1/auth/change-password", h.handleChangePassword)
+// Name identifies this publisher in boot assertion messages.
+func (h *Handler) Name() string { return "auth" }
+
+// Tag is the OpenAPI tag this publisher owns (specTags in httpsurface_gen.go).
+func (h *Handler) Tag() string { return "auth" }
+
+// Mount mounts the auth endpoints (login, logout, me, change-password)
+// on mux via the generated authapi.ServerInterface router. Handler satisfies
+// authapi.ServerInterface directly (see the exported adapter methods below);
+// each one delegates straight through to the pre-existing, already-tested
+// private handler (unchanged) rather than reimplementing parsing/response
+// logic.
+func (h *Handler) Mount(mux httprouter.Muxer) {
+	authapi.HandlerWithOptions(h, authapi.StdHTTPServerOptions{
+		BaseURL:    apibase.BaseURL,
+		BaseRouter: mux,
+	})
+}
+
+// ─── authapi.ServerInterface adapter ───────────────────────────────────────
+
+// Login adapts POST /auth/login to the existing login handler.
+func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+	h.handleLogin(w, r)
+}
+
+// Logout adapts POST /auth/logout to the existing logout handler.
+func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
+	h.handleLogout(w, r)
+}
+
+// GetCurrentUser adapts GET /auth/me to the existing "me" handler.
+func (h *Handler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
+	h.handleMe(w, r)
+}
+
+// ChangePassword adapts POST /auth/change-password to the existing
+// change-password handler.
+func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	h.handleChangePassword(w, r)
 }
 
 func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		httpresponse.WriteMethodNotAllowed(w, "POST")
-		return
-	}
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON payload"))
@@ -123,10 +166,6 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		httpresponse.WriteMethodNotAllowed(w, "POST")
-		return
-	}
 	if cookie, err := r.Cookie(h.service.SessionCookieName()); err == nil {
 		if err := h.service.Logout(r.Context(), cookie.Value); err != nil {
 			slog.Error("auth logout failed", "err", err)
@@ -143,10 +182,6 @@ func (h *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleMe(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		httpresponse.WriteMethodNotAllowed(w, "GET")
-		return
-	}
 	user, ok := authdomain.CurrentUserFromContext(r.Context())
 	if !ok {
 		h.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
@@ -156,10 +191,6 @@ func (h *Handler) handleMe(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		httpresponse.WriteMethodNotAllowed(w, "POST")
-		return
-	}
 	user, ok := authdomain.CurrentUserFromContext(r.Context())
 	if !ok {
 		h.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))

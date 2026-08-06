@@ -41,7 +41,7 @@ func TestAuditHandler_ListEventsTypedShape(t *testing.T) {
 		hasMore: true,
 	})
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, authenticatedAuditRequest(http.MethodGet, "/api/v1/audit/events", "tenant-a"))
@@ -84,7 +84,7 @@ func TestAuditHandler_ExportPOSTTypedShape(t *testing.T) {
 	}})
 	handler := httpdelivery.NewHandler(svc).WithExporter(svc)
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, authedRequest(t, http.MethodPost, "/api/v1/audit/events/export", tenantID, "actor-test", `{"format":"csv","filter":{}}`))
@@ -111,7 +111,7 @@ func TestAuditHandler_ExportStatusTypedShape(t *testing.T) {
 	}})
 	handler := httpdelivery.NewHandler(svc).WithExporter(svc)
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	postRec := httptest.NewRecorder()
 	mux.ServeHTTP(postRec, authedRequest(t, http.MethodPost, "/api/v1/audit/events/export", tenantID, "actor-test", `{"format":"csv","filter":{}}`))

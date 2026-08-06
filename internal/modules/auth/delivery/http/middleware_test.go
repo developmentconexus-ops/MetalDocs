@@ -86,37 +86,10 @@ func passthrough(reached *bool) http.Handler {
 	})
 }
 
-func TestDefaultPublicPaths(t *testing.T) {
-	cases := []struct {
-		method string
-		path   string
-		public bool
-	}{
-		{http.MethodGet, "/api/v1/health/live", true},
-		{http.MethodGet, "/api/v1/health/ready", true},
-		{http.MethodPost, "/api/v1/auth/login", true},
-		{http.MethodPost, "/api/v1/auth/logout", true},
-		// Non-public routes must NOT be exempt
-		{http.MethodGet, "/api/v1/feature-flags", false},
-		{http.MethodGet, "/api/v1/documents", false},
-		{http.MethodPost, "/api/v1/documents", false},
-		{http.MethodGet, "/api/v1/auth/me", false},
-	}
-	for _, tc := range cases {
-		got := defaultPublicPaths(tc.method, tc.path)
-		if got != tc.public {
-			t.Errorf("defaultPublicPaths(%q, %q) = %v, want %v", tc.method, tc.path, got, tc.public)
-		}
-	}
-}
-
 func TestMiddleware_PublicPathChecker_Injection(t *testing.T) {
-	// A custom checker that marks /api/v1/feature-flags as public.
-	customChecker := func(method, path string) bool {
-		if method == http.MethodGet && path == "/api/v1/feature-flags" {
-			return true
-		}
-		return defaultPublicPaths(method, path)
+	// A custom checker that marks /api/v1/feature-flags as public and nothing else.
+	customChecker := func(r *http.Request) bool {
+		return r.Method == http.MethodGet && r.URL.Path == "/api/v1/feature-flags"
 	}
 
 	m := NewMiddleware(nil, authapp.Config{}, true).
@@ -138,7 +111,8 @@ func TestMiddleware_PublicPathChecker_Injection(t *testing.T) {
 }
 
 func TestMiddleware_NoCookie_PrivateRoute_Returns401(t *testing.T) {
-	m := NewMiddleware(nil, authapp.Config{SessionCookieName: "session"}, true)
+	m := NewMiddleware(nil, authapp.Config{SessionCookieName: "session"}, true).
+		WithPublicPathChecker(func(*http.Request) bool { return false })
 
 	reached := false
 	handler := m.Wrap(passthrough(&reached))
@@ -170,28 +144,95 @@ func TestMiddleware_Disabled_PassesThrough(t *testing.T) {
 	}
 }
 
-func TestMiddleware_DefaultPublicPaths_NoChecker(t *testing.T) {
+// TestMiddleware_NoPublicPathChecker_FailsClosed pins the C3 idiom: a nil
+// PublicPathChecker is a boot-time misconfiguration, never a silent
+// "nothing is public" or "everything is public" fallback. defaultPublicPaths
+// was deleted for exactly this reason — its doc comment carried a
+// synchronization instruction ("keep this in sync with the composition
+// root's authoritative list") that had already drifted.
+func TestMiddleware_NoPublicPathChecker_FailsClosed(t *testing.T) {
 	m := NewMiddleware(nil, authapp.Config{}, true) // no WithPublicPathChecker
 
-	cases := []struct {
-		method string
-		path   string
-		want   int
-	}{
-		{http.MethodGet, "/api/v1/health/live", http.StatusOK},
-		{http.MethodPost, "/api/v1/auth/login", http.StatusOK},
-		// feature-flags is NOT in the default list — should be 401 without a checker
-		{http.MethodGet, "/api/v1/feature-flags", http.StatusUnauthorized},
+	reached := false
+	handler := m.Wrap(passthrough(&reached))
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/health/live", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("got %d, want 500 (nil checker must fail closed)", rec.Code)
 	}
-	for _, tc := range cases {
-		reached := false
-		handler := m.Wrap(passthrough(&reached))
-		req := httptest.NewRequest(tc.method, tc.path, nil)
-		rec := httptest.NewRecorder()
-		handler.ServeHTTP(rec, req)
-		if rec.Code != tc.want {
-			t.Errorf("%s %s: got %d, want %d", tc.method, tc.path, rec.Code, tc.want)
-		}
+	if reached {
+		t.Error("passthrough handler must NOT be reached when no checker is configured")
+	}
+}
+
+// TestMiddleware_NoPasswordChangeAllowedChecker_FailsClosed mirrors the same
+// idiom for the password-change-allowed checker: a MustChangePassword
+// principal hitting a nil checker must be denied (500), never silently
+// admitted.
+func TestMiddleware_NoPasswordChangeAllowedChecker_FailsClosed(t *testing.T) {
+	repo := memory.NewRepository()
+	roleProvider := &middlewareMockRoleProvider{roles: map[string][]iamtypes.Role{}}
+	roleAdmin := middlewareNoopRoleAdminRepository{}
+
+	ctx := context.Background()
+	userID := "mw-pw-change-test-user"
+	password := "TestPassword123!"
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("GenerateFromPassword: %v", err)
+	}
+	if err := repo.CreateUser(ctx, authdomain.CreateUserParams{
+		UserID:             userID,
+		Username:           userID,
+		Email:              "mw-pw-change@example.com",
+		DisplayName:        "MW Password Change Test",
+		PasswordHash:       authdomain.PasswordHash(string(hash)),
+		PasswordAlgo:       "bcrypt",
+		IsActive:           true,
+		MustChangePassword: true,
+	}); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	roleProvider.roles[userID+":"+platformtenant.DevTenantID] = []iamtypes.Role{iamtypes.RoleViewer}
+
+	svc, err := authapp.NewService(repo, roleProvider, roleAdmin, middlewareNoopLoginCtxPort{}, authapp.Config{
+		SessionCookieName:      "session",
+		SessionTTL:             24 * time.Hour,
+		SessionSecret:          "0123456789abcdef0123456789abcdef",
+		PasswordMinLength:      8,
+		LoginMaxFailedAttempts: 5,
+		LoginLockDuration:      15 * time.Minute,
+		AllowDevTenantFallback: true,
+		CookieSecure:           false,
+	})
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", nil)
+	authSession, err := svc.Authenticate(ctx, userID, password, loginReq)
+	if err != nil {
+		t.Fatalf("Authenticate: %v", err)
+	}
+
+	m := NewMiddleware(svc, authapp.Config{SessionCookieName: "session"}, true).
+		WithPublicPathChecker(func(*http.Request) bool { return false })
+		// no WithPasswordChangeAllowedChecker
+
+	reached := false
+	handler := m.Wrap(passthrough(&reached))
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents", nil)
+	req.AddCookie(&http.Cookie{Name: "session", Value: authSession.RawToken})
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("got %d, want 500 (nil password-change checker must fail closed)", rec.Code)
+	}
+	if reached {
+		t.Error("passthrough handler must NOT be reached when no password-change checker is configured")
 	}
 }
 
@@ -245,7 +286,8 @@ func TestMiddleware_AuthenticatedRequest_InjectsTenantAndActorCtx(t *testing.T) 
 		t.Fatalf("Authenticate: %v", err)
 	}
 
-	m := NewMiddleware(svc, authapp.Config{SessionCookieName: "session"}, true)
+	m := NewMiddleware(svc, authapp.Config{SessionCookieName: "session"}, true).
+		WithPublicPathChecker(func(*http.Request) bool { return false })
 
 	var gotTenant, gotActor string
 	var tenantErr, actorErr error

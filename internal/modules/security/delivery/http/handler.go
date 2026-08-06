@@ -2,6 +2,17 @@
 // (PR-7) over HTTP. Every endpoint depends on tenant.FromContext — the
 // middleware in apps/api/cmd/metaldocs-api/permissions.go already enforces
 // auth + CapUserView, so the handler can treat the context as trusted.
+//
+// Routes are mounted through the generated securityapi.ServerInterface router
+// (HandlerWithOptions) rather than bare mux.HandleFunc — see Mount.
+// Handler satisfies securityapi.ServerInterface directly (not the strict
+// variant): the three operations already write typed JSON/problem+json
+// bodies straight to http.ResponseWriter via the existing writeJSON/
+// writeProblem helpers, which the strict (ctx, RequestObject) ->
+// (ResponseObject, error) shape would force to be re-expressed as
+// XxxResponseObject wrappers for no behavioral gain. Mirrors the audit
+// module's precedent (internal/modules/audit/delivery/http/handler.go) and
+// Task 6's auth migration.
 package httpdelivery
 
 import (
@@ -10,8 +21,10 @@ import (
 	"net/http"
 	"time"
 
+	securityapi "metaldocs/internal/modules/security/api"
 	securityapp "metaldocs/internal/modules/security/application"
 	securitydomain "metaldocs/internal/modules/security/domain"
+	"metaldocs/internal/platform/apibase"
 	httpresponse "metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
@@ -69,17 +82,34 @@ func NewHandler(service *securityapp.Service) *Handler {
 	return &Handler{service: service}
 }
 
-func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
-	mux.HandleFunc("/api/v1/security/mfa-coverage", h.handleMfaCoverage)
-	mux.HandleFunc("/api/v1/security/lockouts", h.handleLockouts)
-	mux.HandleFunc("/api/v1/security/signals", h.handleSignals)
+func (h *Handler) Name() string { return "security" }
+func (h *Handler) Tag() string  { return "security" }
+
+func (h *Handler) Mount(mux httprouter.Muxer) {
+	securityapi.HandlerWithOptions(h, securityapi.StdHTTPServerOptions{
+		BaseURL:    apibase.BaseURL,
+		BaseRouter: mux,
+	})
+}
+
+// ─── securityapi.ServerInterface adapter ───────────────────────────────────
+
+// GetMfaCoverage adapts GET /security/mfa-coverage to the existing handler.
+func (h *Handler) GetMfaCoverage(w http.ResponseWriter, r *http.Request) {
+	h.handleMfaCoverage(w, r)
+}
+
+// ListLockouts adapts GET /security/lockouts to the existing handler.
+func (h *Handler) ListLockouts(w http.ResponseWriter, r *http.Request) {
+	h.handleLockouts(w, r)
+}
+
+// ListSecuritySignals adapts GET /security/signals to the existing handler.
+func (h *Handler) ListSecuritySignals(w http.ResponseWriter, r *http.Request) {
+	h.handleSignals(w, r)
 }
 
 func (h *Handler) handleMfaCoverage(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		h.methodNotAllowed(w)
-		return
-	}
 	tenantID, ok := h.requireTenant(w, r)
 	if !ok {
 		return
@@ -98,10 +128,6 @@ func (h *Handler) handleMfaCoverage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleLockouts(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		h.methodNotAllowed(w)
-		return
-	}
 	tenantID, ok := h.requireTenant(w, r)
 	if !ok {
 		return
@@ -138,10 +164,6 @@ func (h *Handler) handleLockouts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleSignals(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		h.methodNotAllowed(w)
-		return
-	}
 	tenantID, ok := h.requireTenant(w, r)
 	if !ok {
 		return
@@ -180,12 +202,6 @@ func (h *Handler) requireTenant(w http.ResponseWriter, r *http.Request) (string,
 		return "", false
 	}
 	return tenantID, true
-}
-
-// methodNotAllowed writes the RFC 9457 405 response (D-03: every error path
-// in this module emits problem+json — bare statuses were the one exception).
-func (h *Handler) methodNotAllowed(w http.ResponseWriter) {
-	httpresponse.WriteMethodNotAllowed(w, http.MethodGet)
 }
 
 func (h *Handler) writeProblem(w http.ResponseWriter, p *problem.Problem) {

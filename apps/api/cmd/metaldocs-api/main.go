@@ -75,6 +75,7 @@ import (
 	"metaldocs/internal/platform/featureflags"
 	"metaldocs/internal/platform/formval"
 	"metaldocs/internal/platform/httpclient"
+	"metaldocs/internal/platform/httprouter"
 	riverjobs "metaldocs/internal/platform/jobs/river"
 	platformmw "metaldocs/internal/platform/middleware"
 	"metaldocs/internal/platform/migrate"
@@ -156,14 +157,7 @@ func e2eHandlersEnabled() bool {
 	return e2etest.E2EEnabled()
 }
 
-func mountE2EHandlersIfEnabled(mux *http.ServeMux, register func(*http.ServeMux)) {
-	if !e2eHandlersEnabled() {
-		slog.Info("e2etest handlers not mounted", "reason", "METALDOCS_E2E != 1")
-		return
-	}
-	slog.Warn("e2etest handlers mounted — destructive endpoints reachable without auth", "env", "METALDOCS_E2E=1")
-	register(mux)
-}
+//go:generate go run metaldocs/cmd/gen-http-surface -public ../../../../api/openapi/v1/openapi.yaml -e2e ../../../../api/openapi/internal-e2e.yaml -out-dir . -registry ../../../../internal/modules/iam/domain/model.go
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
@@ -320,7 +314,35 @@ func main() {
 	searchService := searchapp.NewService(searchdocs.NewReader(deps.SQLDB, familyCodeResolver))
 	searchHandler := searchdelivery.NewHandler(searchService)
 	authHandler := authdelivery.NewHandler(authService).WithAudit(deps.AuditWriter)
-	healthHandler := observability.NewHealthHandler(deps.StatusProvider)
+
+	// mux is populated by one consolidated buildPublishers call (publishers.go)
+	// once every handler below is constructed — not by scattered RegisterRoutes
+	// call sites. Each publisher is mounted through its own httprouter.Recorder,
+	// and the aggregate result is fed to assertSurface (surface.go), which
+	// refuses to boot on any mismatch with the spec-generated surface table —
+	// so a handler built here but never added to publisherDeps is a fatal at
+	// startup, not a live discovery. iamAdminHandler, sessionsHandler,
+	// observabilityHandler, securityHandler: mounted via buildPublishers below,
+	// once peopleHandler/membershipHandler/rolesCapsHandler/presenceHandler are
+	// also constructed.
+	//
+	// Declared here (rather than at its historical call site further down) so
+	// permResolver below can close over it: newPermissionResolver reads
+	// mux.Handler(r) per request, long after buildPublishers has populated it —
+	// this declaration only needs the pointer to exist yet, not the routes.
+	mux := http.NewServeMux()
+
+	// surface is declared here, beside mux, for the identical reason: the
+	// resolver closures below need to read it per-request through a pointer,
+	// long before the E2E decision further down (main.go:~858) knows whether
+	// to widen it. It starts as the generated httpSurface and — only if
+	// useE2E — is reassigned (never shadowed) to mergedSurface(httpSurface,
+	// httpSurfaceE2E) below, before buildPublishers ever mounts the first
+	// route and before any request is served. Passing this map by value to
+	// the resolvers would freeze it at construction time, before that
+	// widening happens — they take *map[string]surfaceRule instead so they
+	// keep reading through this same variable after it is reassigned.
+	surface := httpSurface
 
 	capabilityService := iamapp.NewCapabilityService(deps.SQLDB)
 	// Wire optional capability hint into /auth/me + login responses.
@@ -328,12 +350,22 @@ func main() {
 	authService.WithCapabilityProvider(capabilityService)
 	cachedProvider := iamapp.NewCachedRoleProvider(ctx, deps.RoleProvider, authn.CacheTTL())
 	// permResolver is the single authoritative source of truth for route
-	// visibility. It is shared with the auth middleware so that fully public
-	// routes (no session required) and the IAM permission layer stay in sync
-	// automatically — adding a new public route requires one change here, not two.
-	permResolver := newPermissionResolver()
+	// visibility: a mux-pattern lookup into the table `surface` points to —
+	// the generated httpSurface table (produced from the OpenAPI spec by
+	// cmd/gen-http-surface), possibly widened to include httpSurfaceE2E
+	// below. It is shared with the auth middleware so that fully public
+	// routes (no session required), the password-change-allowed exceptions,
+	// and the IAM permission layer all read the same table — adding a new
+	// public route requires a spec annotation, not a change in three places.
+	// mux and surface are both declared above (mux historically at line
+	// ~501; surface next to it) so the resolver can consult them per-request;
+	// mux is only populated later by buildPublishers, and surface may still
+	// be widened by the E2E decision below — both long after this closure is
+	// constructed.
+	permResolver := newPermissionResolver(mux, &surface)
 	authMiddleware := authdelivery.NewMiddleware(authService, authCfg, authn.Enabled()).
-		WithPublicPathChecker(newPublicPathChecker(permResolver))
+		WithPublicPathChecker(newPublicPathChecker(permResolver)).
+		WithPasswordChangeAllowedChecker(newPasswordChangeAllowedChecker(mux, &surface))
 	iamMiddleware := iamdelivery.NewMiddleware(capabilityService, cachedProvider, authn.Enabled()).
 		WithPermissionResolver(permResolver)
 	originProtection := security.NewOriginProtection(security.OriginProtectionConfig{
@@ -424,6 +456,14 @@ func main() {
 		},
 		deps.StatusProvider,
 	)
+	// healthHandler/observabilityHandlerMetrics are constructed after httpObs
+	// (not at healthHandler's previous call site near authHandler) because
+	// GetMetrics delegates to httpObs.MetricsHandler(). Task 15a (Ruling 1)
+	// split the former combined HealthHandler into two SurfacePublishers —
+	// one per OpenAPI tag ("health", "observability") — mounting two
+	// generated packages (healthapi, observabilityapi) instead of one.
+	healthHandler := observability.NewHealthHandler(deps.StatusProvider)
+	observabilityHandlerMetrics := observability.NewMetricsHandler(httpObs.MetricsHandler())
 	cors := security.NewCORS(corsCfg)
 
 	// Rate-limit store backend selection (M8/F8.2): memory (default,
@@ -486,16 +526,6 @@ func main() {
 		}
 		return ""
 	}
-
-	// mux is populated by one consolidated buildRouter call (router.go) once
-	// every handler below is constructed — not by scattered RegisterRoutes
-	// call sites. main() and TestRouteCoverage (permissions_test.go) call the
-	// exact same buildRouter function, so a handler built here but never added
-	// to routeHandlers is a build-time-visible gap, not a live discovery.
-	// iamAdminHandler, sessionsHandler, observabilityHandler, securityHandler:
-	// mounted via buildRouter below, once peopleHandler/membershipHandler/
-	// rolesCapsHandler/presenceHandler are also constructed.
-	mux := http.NewServeMux()
 
 	presenceBump, presenceHub, presenceHandler := startPresence(ctx, deps, iamAdminHandler)
 
@@ -700,7 +730,7 @@ func main() {
 		// WithLifecycle mutates the already-constructed tenantHandler in
 		// place; iamRouter (built later, but referencing the SAME
 		// tenantHandler pointer via WithTenantHandler) sees the wiring once
-		// RegisterGenerated's wrapped handlers are invoked at request time —
+		// Mount's wrapped handlers are invoked at request time —
 		// route mounting only captures the Router struct, not a snapshot of
 		// tenantHandler's fields.
 		if tenantHandler != nil {
@@ -771,6 +801,11 @@ func main() {
 	// SP-2: pin tenant dictionary values at document creation. tokensModule was
 	// built at startup (line ~358), before docMod.
 	docMod.Service.WithDictionaryReader(dictionaryValueReaderAdapter{reader: tokensModule.Reader})
+	// Task 15a: Mount(Muxer) takes exactly one argument, so the rate limiter
+	// and user-ID extractor (both constructed at line ~484, well before
+	// docMod exists) move from a routeFamilies closure onto docMod as
+	// constructor fields.
+	docMod.WithRateLimit(globalLimiter, userIDExtractor)
 
 	// Wire the documents-side adapter back into the controlled-documents service so atomic
 	// CD-create can clone the initial document inside the same tx as the CD
@@ -810,42 +845,65 @@ func main() {
 	notificationsRepo := notificationsinfra.NewNotificationsRepository(deps.SQLDB)
 	notificationsHandler := notificationshttp.NewHandler(notificationsRepo)
 
-	// buildRouter (router.go) mounts every route family in one call — main()
-	// and TestRouteCoverage (permissions_test.go) call the exact same
-	// function, so a handler built above but never added to routeHandlers is
-	// a build-time-visible gap, not a live discovery.
-	buildRouter(mux, routeHandlers{
+	// buildPublishers (publishers.go) is the composition root's route
+	// inventory — a LIST, not a struct: a handler built above but never added
+	// to publisherDeps is a missing list element, and assertSurface's check 1
+	// (tag coverage) fires as a boot fatal below, not a live discovery.
+	e2e := e2ePublisher(deps.SQLDB)              // nil in every build without the handlers
+	useE2E := e2e != nil && e2eHandlersEnabled() // ONE value decides both sides
+
+	publishers := buildPublishers(publisherDeps{
 		auth:                authHandler,
 		health:              healthHandler,
+		observability:       observabilityHandlerMetrics,
 		featureFlags:        featureFlagsHandler,
 		audit:               auditHandler,
 		search:              searchHandler,
 		security:            securityHandler,
-		presence:            presenceHandler,
 		taxonomy:            taxonomyModule,
 		tokens:              tokensModule,
 		controlledDocuments: controlledDocumentsModule,
-		iamRouter:           iamRouter,
+		iam:                 iamRouter,
 		documents:           docMod,
-		documentsRateLimit:  globalLimiter,
-		documentsUserID:     userIDExtractor,
 		templates:           templatesModule,
 		approval:            approvalHandler,
 		distribution:        distributionHandler,
 		notifications:       notificationsHandler,
-		metrics:             httpObs.MetricsHandler(),
 	})
+	// surface AND expectedTags are BOTH derived from useE2E — never from the
+	// publisher list — but surface is an ASSIGNMENT into the variable
+	// declared beside mux above, not a fresh `:=`: newPermissionResolver and
+	// newPasswordChangeAllowedChecker already hold a pointer to that
+	// variable, so reassigning it here (rather than shadowing it) is what
+	// makes the widened table visible to every request the resolvers serve
+	// from this point forward.
+	expectedTags := specTags
+	if useE2E {
+		publishers = append(publishers, e2e)
+		surface = mergedSurface(httpSurface, httpSurfaceE2E)
+		expectedTags = union(specTags, specTagsE2E)
+		slog.Warn("e2etest handlers mounted — destructive endpoints reachable without auth", "env", "METALDOCS_E2E=1")
+	} else {
+		slog.Info("e2etest handlers not mounted", "reason", "METALDOCS_E2E != 1")
+	}
 
-	mountE2EHandlersIfEnabled(mux, func(m *http.ServeMux) {
-		e2etest.RegisterE2EHandlers(m, deps.SQLDB, nil)
-		// Runtime probe for REQ-MW-1: a deliberate handler panic that the
-		// platform recovery middleware must convert into a 500 problem+json
-		// without killing the process. Mounted only when METALDOCS_E2E=1;
-		// touches no data.
-		m.HandleFunc("GET /internal/test/panic", func(http.ResponseWriter, *http.Request) {
-			panic("e2e panic probe: must be recovered by platform/middleware.Recovery (REQ-MW-1)")
-		})
-	})
+	mounted := map[string][]string{}
+	for _, p := range publishers {
+		rec := httprouter.NewRecorder(mux) // one recorder PER publisher — check 4
+		p.Mount(rec)
+		mounted[p.Name()] = rec.Patterns()
+	}
+
+	// surface AND expectedTags are BOTH derived from useE2E — never from the
+	// publisher list, which is the thing being audited: an expected set
+	// derived from the list under audit makes check 1 vacuously true, which
+	// is exactly how a missing publisher would pass a check written to catch
+	// it.
+	if err := assertSurface(mounted, surface, expectedTags, publishers); err != nil {
+		slog.Error("http surface", "err", err)
+		deps.Cleanup()
+		os.Exit(1)
+	}
 
 	if deps.SQLDB != nil {
 		httpObs.SetDBPool(postgres.NewPoolStatsAdapter(deps.SQLDB))
@@ -867,8 +925,9 @@ func main() {
 	// entire API chain (see rootMux below, after handler is built). Contract
 	// §3.2: /metrics is a platform scrape surface, not a versioned product
 	// route, so it is NOT declared in api/openapi/v1/openapi.yaml. Coexists
-	// with the JSON endpoint (mounted via buildRouter above); they read from
-	// separate storage (prometheus vecs vs. byKey atomics).
+	// with the JSON endpoint (mounted via buildPublishers above, see
+	// publishers.go); they read from separate storage (prometheus vecs vs.
+	// byKey atomics).
 
 	// Audit retention - AUDIT_RETENTION_DAYS=0 disables (default disabled).
 	retentionCfg, err := config.LoadRetentionConfig()
@@ -1159,12 +1218,14 @@ func requireApprovalRuntimeSupport(fanoutURL string) error {
 // (Z-22, REQ-REL-2); the BumpMiddleware is wrapped into the outer request chain
 // so authenticated requests refresh last_seen_at (debounced 60s per user, PR-9).
 //
-// CON-07: the presence Handler's WebSocket /iam/presence/stream route is still
-// registered here directly (RegisterRoutes only mounts /stream — see
-// presence/handler.go), because streamPresence is excluded from server codegen
-// (cfg.yaml exclude-operation-ids). The HTTP-fallback snapshot route is NOT
-// mounted here anymore: the caller mounts it via iamdelivery.Router.
-// RegisterGenerated using the returned *iampresence.Handler (ServeSnapshot).
+// CON-07: the presence Handler's WebSocket /iam/presence/stream route mounts
+// via presence.MountStream (see presence/handler.go), because streamPresence
+// is excluded from server codegen (cfg.yaml exclude-operation-ids). Task 15a
+// (Ruling 2) folded that mount into iamdelivery.Router.Mount, which also
+// mounts the HTTP-fallback snapshot route via the returned *iampresence.
+// Handler (ServeSnapshot) — neither route is mounted here at construction
+// time; both are mounted by buildPublishers (publishers.go) via iamRouter,
+// which is itself the SurfacePublisher for the "iam" tag.
 func startPresence(
 	ctx context.Context,
 	deps bootstrap.APIDependencies,
@@ -1177,8 +1238,9 @@ func startPresence(
 	presenceHub := iampresence.NewHub(presenceRepo, slog.Default())
 	go presenceHub.Run(ctx)
 	go presenceHub.RunHeartbeat(ctx)
-	// presenceHandler mounts via buildRouter (router.go), alongside every
-	// other route family — not here at construction time.
+	// presenceHandler mounts via buildPublishers (publishers.go), inside
+	// iamRouter's Mount, alongside every other route family — not here at
+	// construction time.
 	presenceHandler := iampresence.NewHandler(presenceHub, presenceRepo, slog.Default())
 	presenceBump := iampresence.NewBumpMiddleware(presenceRepo, slog.Default())
 	presenceBump.StartCleanup(ctx)

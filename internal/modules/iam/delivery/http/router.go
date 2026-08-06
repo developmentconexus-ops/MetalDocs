@@ -28,7 +28,7 @@
 //
 // GetPresenceSnapshot delegates to presence.Handler.ServeSnapshot (a thin
 // export of the existing, already-tested handleSnapshot). Only the WebSocket
-// /iam/presence/stream upgrade stays on presence.Handler.RegisterRoutes —
+// /iam/presence/stream upgrade stays on presence.Handler.MountStream —
 // streamPresence is excluded from server codegen via cfg.yaml's
 // exclude-operation-ids (WS upgrades have no meaningful oapi-codegen typed
 // signature). Splitting snapshot (HTTP, codegen-eligible) from stream (WS,
@@ -56,13 +56,21 @@ import (
 
 	iamapi "metaldocs/internal/modules/iam/api"
 	iampresence "metaldocs/internal/modules/iam/presence"
+	"metaldocs/internal/platform/apibase"
 	"metaldocs/internal/platform/problem"
 )
 
 // Router implements iamapi.ServerInterface by delegating to the existing
 // per-tab handler structs. Construct with NewRouter once all six handlers
-// are wired, then mount via RegisterGenerated (or call
-// iamapi.HandlerWithOptions directly with Router as the ServerInterface).
+// are wired, then mount via Mount (or call iamapi.HandlerWithOptions
+// directly with Router as the ServerInterface).
+//
+// Router is the single httprouter.SurfacePublisher for the "iam" tag (Task
+// 15a, Ruling 2). It already holds the presence dependency (rt.presence,
+// used by GetPresenceSnapshot below), so Mount also registers the
+// hand-mounted streamPresence WebSocket route via presence.MountStream —
+// presence.Handler itself is no longer a routeFamilies entry or a
+// publisher.
 type Router struct {
 	admin         *AdminHandler
 	people        *PeopleHandler
@@ -99,26 +107,43 @@ func (rt *Router) WithTenantHandler(tenants *TenantHandler) *Router {
 	return rt
 }
 
-// RegisterGenerated mounts the full generated IAM ServerInterface on mux
-// under the /api/v1 base URL (AD-1: spec path keys are relative). Replaces
-// the six RegisterRoutes call sites this router supersedes:
-// AdminHandler.RegisterRoutes, PeopleHandler.RegisterRoutes,
-// MembershipHandler.RegisterRoutes, RolesCapsHandler.RegisterRoutes,
-// SessionsHandler.RegisterRoutes. Tier-1 authz, rate limiting, and
-// panic/observability middleware are unaffected — they wrap the whole mux in
-// main.go's buildChain and key off r.Method/r.URL.Path (permissions.go
-// routeRule), not off mux dispatch mechanics, so swapping hand-written
-// mux.HandleFunc registration for codegen-generated registration changes no
-// tier-1 behavior. IAM has no per-route Idempotency-Key requirement (unlike
-// templates/controlleddocuments), so no Middlewares closure is needed here.
-func (rt *Router) RegisterGenerated(mux httprouter.Muxer) {
+// Name identifies this publisher in boot assertion messages.
+func (rt *Router) Name() string { return "iam" }
+
+// Tag is the OpenAPI tag this publisher owns.
+func (rt *Router) Tag() string { return "iam" }
+
+// Mount mounts the full generated IAM ServerInterface on mux under the
+// /api/v1 base URL (AD-1: spec path keys are relative), plus the
+// hand-mounted streamPresence WebSocket route (excluded from server codegen,
+// see presence.MountStream). Task 15a (Ruling 2) retired the six
+// hand-written RegisterRoutes methods this router supersedes:
+// AdminHandler, PeopleHandler, MembershipHandler, RolesCapsHandler,
+// SessionsHandler, and ObservabilityHandler; presence.Handler's former
+// standalone mount is folded in here too via presence.MountStream. Task 18
+// deleted those six now-orphaned RegisterRoutes methods outright (they had
+// zero remaining callers once this router became the real mount) and
+// deleted permissions.go's hand-written routeRule/routeRules table itself.
+// Tier-1 authz now reads the generated httpSurface table keyed by
+// "METHOD /api/v1/path/{param}" (permissions.go), which is derived from
+// this same generated ServerInterface — so the codegen-generated mux
+// dispatch and tier-1 authz are two views of one source of truth, not
+// independent mechanisms. IAM has no per-route Idempotency-Key requirement
+// (unlike templates/controlleddocuments), so no Middlewares closure is
+// needed here.
+//
+// Mount stays TOTAL even when rt.presence is nil: presence.MountStream binds
+// the h.handleStream method value without dereferencing h, and handleStream
+// itself answers 501 when h is nil.
+func (rt *Router) Mount(mux httprouter.Muxer) {
 	iamapi.HandlerWithOptions(rt, iamapi.StdHTTPServerOptions{
 		BaseRouter: mux,
-		BaseURL:    "/api/v1",
+		BaseURL:    apibase.BaseURL,
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			_ = problem.Write(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
 		},
 	})
+	rt.presence.MountStream(mux)
 }
 
 // ─── auth/sessions ──────────────────────────────────────────────────────────
@@ -226,7 +251,8 @@ func (rt *Router) GetUsage(w http.ResponseWriter, r *http.Request) {
 
 // GetPresenceSnapshot delegates to presence.Handler.ServeSnapshot; answers
 // 501 when presence is not wired. The WebSocket stream upgrade is excluded
-// from codegen and stays on presence.Handler.RegisterRoutes (see package doc).
+// from codegen and stays hand-mounted via presence.MountStream, called from
+// Router.Mount (see package doc).
 func (rt *Router) GetPresenceSnapshot(w http.ResponseWriter, r *http.Request) {
 	if rt.presence == nil {
 		writeIAMNotImplemented(w, "Presence service is not configured")

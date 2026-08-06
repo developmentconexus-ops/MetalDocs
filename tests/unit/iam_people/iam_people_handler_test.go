@@ -366,8 +366,12 @@ func newHandlerForTest(t *testing.T) (*http.ServeMux, *peopleServiceTestBuilder,
 	svc.WithTxAudit(fakeTxRunner{}, auditWriter, &fakeUserUpdaterTx{auth: builder.auth})
 	authAdmin := &fakeAuthAdminService{inner: builder.auth}
 	handler := iamdelivery.NewPeopleHandler(svc, authAdmin, auditWriter)
+	// PeopleHandler.RegisterRoutes was deleted as orphaned dead code (Task 18
+	// step 3); the real production mount is Router.Mount via the generated
+	// iamapi.HandlerWithOptions, which delegates straight to the same
+	// handleXxx methods (see router.go). Re-pointed to that real mount.
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	iamdelivery.NewRouter(nil, handler, nil, nil, nil, nil, nil).Mount(mux)
 	return mux, builder, auditWriter
 }
 

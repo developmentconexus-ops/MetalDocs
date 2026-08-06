@@ -291,7 +291,7 @@ func TestGeneratedTemplatesRoutes_IdempotencyStoreEngaged(t *testing.T) {
 		svc := application.New(repo, fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(db))
 		h := tmplhttp.New(svc, func(_ *http.Request, _, _, _ string) error { return nil }, db)
 		mux := http.NewServeMux()
-		h.Register(mux)
+		h.Mount(mux)
 		return mux
 	}
 

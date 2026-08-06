@@ -150,6 +150,12 @@ type Spec struct {
 type Opt func(*Spec)
 
 func WithTenant(id string) Opt            { return func(s *Spec) { s.TenantID = id } }
+
+// WithTenantID is an alias for WithTenant. Task 17a's conformance suite
+// (apps/api/cmd/metaldocs-api/surface_conformance_test.go) spells it this
+// way; kept as an additive alias rather than a rename so the ~60+ existing
+// WithTenant call sites across tests/integration are untouched.
+func WithTenantID(id string) Opt { return WithTenant(id) }
 func WithUserID(id string) Opt            { return func(s *Spec) { s.UserID = id } }
 func WithDisplayName(name string) Opt     { return func(s *Spec) { s.DisplayName = name } }
 func WithRole(role string) Opt            { return func(s *Spec) { s.Role = role } }

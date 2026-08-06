@@ -48,7 +48,7 @@ func TestProfilesHandler_InvalidEditableByRoleReturns422(t *testing.T) {
 	createErr := fmt.Errorf("taxonomy: validate profile create: %w", domain.ErrInvalidEditableByRole)
 	handler := NewHandler(fakeProfileService{createErr: createErr}, fakeAreaService{}, fakeFamilyService{}, newIdempotentMockDB(t))
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := taxonomyWriteRequest(t, http.MethodPost, "/api/v1/taxonomy/profiles",
 		`{"code":"PO","family_code":"quality","name":"Proc","description":"d","review_interval_days":365,"editable_by_role":"manager"}`)
@@ -75,7 +75,7 @@ func TestAreasHandler_InvalidDefaultApproverRoleReturns422(t *testing.T) {
 	createErr := fmt.Errorf("taxonomy: validate area create: %w", domain.ErrInvalidDefaultApproverRole)
 	handler := NewHandler(fakeProfileService{}, fakeAreaService{createErr: createErr}, fakeFamilyService{}, newIdempotentMockDB(t))
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := taxonomyWriteRequest(t, http.MethodPost, "/api/v1/taxonomy/areas",
 		`{"code":"A1","name":"Area","description":"d","default_approver_role":"system_admin"}`)
@@ -112,7 +112,7 @@ func TestProfilesHandler_InvalidEditableByRoleOnUpdateReturns422(t *testing.T) {
 	updateErr := fmt.Errorf("taxonomy: validate profile update: %w", domain.ErrInvalidEditableByRole)
 	handler := NewHandler(fakeProfileService{updateErr: updateErr}, fakeAreaService{}, fakeFamilyService{}, newIdempotentMockDB(t))
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := taxonomyWriteRequest(t, http.MethodPatch, "/api/v1/taxonomy/profiles/PO",
 		`{"code":"PO","family_code":"quality","name":"Proc","description":"d","review_interval_days":365,"editable_by_role":"manager"}`)
@@ -131,7 +131,7 @@ func TestAreasHandler_SystemAdminDefaultApproverRoleOnUpdateReturns422(t *testin
 	updateErr := fmt.Errorf("taxonomy: validate area update: %w", domain.ErrInvalidDefaultApproverRole)
 	handler := NewHandler(fakeProfileService{}, fakeAreaService{updateErr: updateErr}, fakeFamilyService{}, newIdempotentMockDB(t))
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := taxonomyWriteRequest(t, http.MethodPut, "/api/v1/taxonomy/areas/A1",
 		`{"code":"A1","name":"Area","description":"d","default_approver_role":"system_admin"}`)
@@ -201,7 +201,7 @@ func TestProfilesHandler_RealServiceRejectsNonCanonicalRoleWith422(t *testing.T)
 	}
 	handler := NewHandler(svc, fakeAreaService{}, fakeFamilyService{}, newIdempotentMockDB(t))
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := taxonomyWriteRequest(t, http.MethodPatch, "/api/v1/taxonomy/profiles/PO",
 		`{"code":"PO","family_code":"quality","name":"Proc","description":"d","review_interval_days":365,"editable_by_role":"manager"}`)
@@ -224,7 +224,7 @@ func TestAreasHandler_RealServiceRejectsSystemAdminWith422(t *testing.T) {
 	svc := realUpdateAreaService{real: application.NewAreaService(nil, stubGovernanceLogger{})}
 	handler := NewHandler(fakeProfileService{}, svc, fakeFamilyService{}, newIdempotentMockDB(t))
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := taxonomyWriteRequest(t, http.MethodPut, "/api/v1/taxonomy/areas/A1",
 		`{"code":"A1","name":"Area","description":"d","default_approver_role":"system_admin"}`)

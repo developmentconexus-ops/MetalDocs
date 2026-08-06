@@ -154,12 +154,24 @@ func New(deps Dependencies) *Module {
 	}
 }
 
-func (m *Module) RegisterRoutes(mux httprouter.Muxer) {
-	m.Handler.RegisterRoutes(mux)
+// Name identifies this publisher in boot assertion messages.
+func (m *Module) Name() string { return "documents" }
+
+// Tag is the OpenAPI tag this publisher owns.
+func (m *Module) Tag() string { return "documents" }
+
+// Mount mounts the module's HTTP handler onto mux.
+func (m *Module) Mount(mux httprouter.Muxer) {
+	m.Handler.Mount(mux)
 }
 
-func (m *Module) RegisterRoutesWithRateLimit(mux httprouter.Muxer, rl *ratelimit.Middleware, userFn func(*http.Request) string) {
-	m.Handler.RegisterRoutesWithRateLimit(mux, rl, userFn)
+// WithRateLimit wires the rate limiter and user-identity extractor onto the
+// underlying Handler as constructor fields (Task 15a Step 3): Mount(Muxer)
+// takes exactly one argument, so documents' two extra composition-root
+// dependencies move here instead of a routeFamilies closure.
+func (m *Module) WithRateLimit(rl *ratelimit.Middleware, userFn func(*http.Request) string) *Module {
+	m.Handler.WithRateLimit(rl, userFn)
+	return m
 }
 
 func (m *Module) Repo() *infrastructure.Repository { return m.repo }

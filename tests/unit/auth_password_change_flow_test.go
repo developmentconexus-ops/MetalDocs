@@ -37,8 +37,11 @@ func TestPasswordChangeRevokesSessionAndClearsMustChangePassword(t *testing.T) {
 
 	authHandler := httpdelivery.NewHandler(svc)
 	mux := http.NewServeMux()
-	authHandler.RegisterRoutes(mux)
-	handler := httpdelivery.NewMiddleware(svc, cfg, true).Wrap(mux)
+	authHandler.Mount(mux)
+	handler := httpdelivery.NewMiddleware(svc, cfg, true).
+		WithPublicPathChecker(testPublicPathChecker).
+		WithPasswordChangeAllowedChecker(testPasswordChangeAllowedChecker).
+		Wrap(mux)
 
 	loginResp := performJSONRequest(t, handler, http.MethodPost, "/api/v1/auth/login", `{"identifier":"flow.user","password":"abc12345"}`, nil)
 	if loginResp.Code != http.StatusOK {
@@ -112,8 +115,11 @@ func TestPasswordChangeEmitsExpiredCookie(t *testing.T) {
 
 	authHandler := httpdelivery.NewHandler(svc)
 	mux := http.NewServeMux()
-	authHandler.RegisterRoutes(mux)
-	handler := httpdelivery.NewMiddleware(svc, cfg, true).Wrap(mux)
+	authHandler.Mount(mux)
+	handler := httpdelivery.NewMiddleware(svc, cfg, true).
+		WithPublicPathChecker(testPublicPathChecker).
+		WithPasswordChangeAllowedChecker(testPasswordChangeAllowedChecker).
+		Wrap(mux)
 
 	loginResp := performJSONRequest(t, handler, http.MethodPost, "/api/v1/auth/login", `{"identifier":"cookie.user","password":"abc12345"}`, nil)
 	if loginResp.Code != http.StatusOK {
@@ -133,6 +139,33 @@ func TestPasswordChangeEmitsExpiredCookie(t *testing.T) {
 	if expired.Value != "" {
 		t.Fatalf("expected empty cookie value, got %q", expired.Value)
 	}
+}
+
+// testPublicPathChecker and testPasswordChangeAllowedChecker replicate what
+// the now-deleted httpdelivery.defaultPublicPaths / isPasswordChangeAllowedPath
+// used to provide as an implicit fallback. WithPublicPathChecker and
+// WithPasswordChangeAllowedChecker are mandatory now (a nil checker fails
+// closed with 500, it no longer falls back silently), so this fixture wires
+// them explicitly — this file constructs the middleware directly against an
+// in-memory repo, independent of the composition root's httpSurface-backed
+// checkers in apps/api/cmd/metaldocs-api/permissions.go.
+func testPublicPathChecker(r *http.Request) bool {
+	switch {
+	case r.URL.Path == "/api/v1/health/live", r.URL.Path == "/api/v1/health/ready":
+		return true
+	case r.Method == http.MethodPost && r.URL.Path == httpdelivery.PathLogin:
+		return true
+	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/auth/logout":
+		return true
+	default:
+		return false
+	}
+}
+
+func testPasswordChangeAllowedChecker(r *http.Request) bool {
+	return (r.Method == http.MethodGet && r.URL.Path == "/api/v1/auth/me") ||
+		(r.Method == http.MethodPost && r.URL.Path == "/api/v1/auth/change-password") ||
+		(r.Method == http.MethodPost && r.URL.Path == "/api/v1/auth/logout")
 }
 
 func performJSONRequest(t *testing.T, handler http.Handler, method, path, body string, cookie *http.Cookie) *httptest.ResponseRecorder {

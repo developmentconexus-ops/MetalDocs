@@ -17,6 +17,7 @@ import (
 	controlleddocumentsapi "metaldocs/internal/modules/controlleddocuments/api"
 	"metaldocs/internal/modules/controlleddocuments/application"
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
+	"metaldocs/internal/platform/apibase"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/idempotency"
@@ -86,10 +87,16 @@ func tenantIDFromContext(ctx context.Context) string {
 	return tenant.DevTenantID
 }
 
-// RegisterRoutes mounts the generated controlled-documents API surface
+// Name identifies this publisher in boot assertion messages.
+func (h *Handler) Name() string { return "controlled-documents" }
+
+// Tag is the OpenAPI tag this publisher owns.
+func (h *Handler) Tag() string { return "controlled-documents" }
+
+// Mount mounts the generated controlled-documents API surface
 // onto mux under /api/v1, wrapping the two mutating POST routes with
 // Idempotency-Key enforcement.
-func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
+func (h *Handler) Mount(mux httprouter.Muxer) {
 	actorOf := func(ctx context.Context) (string, string) {
 		// Idempotency scoping is best-effort here: a missing actor
 		// produces a broader-but-still-safe key. The mutation handler
@@ -142,7 +149,7 @@ func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
 		BaseRouter: mux,
 		// AD-1: spec path keys are relative; the generated router prepends this
 		// base so served routes stay /api/v1/* and the codegen matches the spec.
-		BaseURL: "/api/v1",
+		BaseURL: apibase.BaseURL,
 		Middlewares: []controlleddocumentsapi.MiddlewareFunc{
 			middleware,
 		},

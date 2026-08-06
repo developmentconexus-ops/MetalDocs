@@ -35,7 +35,7 @@ jobs:
       - name: API codegen drift check (backend)
         run: |
           go generate ./...
-          git diff --exit-code -- '**/api.gen.go' || (echo "::error::Run 'go generate ./...' and commit"; exit 1)
+          git diff --exit-code -- '**/api.gen.go' '**/httpsurface_gen.go' '**/httpsurface_e2e_gen.go' || (echo "::error::Run 'go generate ./...' and commit"; exit 1)
 
   frontend-codegen-drift:
     runs-on: ubuntu-latest
@@ -60,6 +60,13 @@ jobs:
         with: { node-version: 20.11.0 }
       - name: OpenAPI lint
         run: npx --yes @redocly/cli@latest lint api/openapi/v1/openapi.yaml
+      - name: OpenAPI lint (internal-e2e)
+        # Task 12: the e2e scaffolding document did not exist until now — a
+        # gate authored before its subject would pass vacuously. Same command,
+        # second document; the file stays excluded from the public bundle and
+        # frontend codegen (checked separately below), only its own contract
+        # hygiene is gated here.
+        run: npx --yes @redocly/cli@latest lint api/openapi/internal-e2e.yaml
 
   spec-base-path-gate:
     # AD-1 (api-contract-hardening Phase A): servers.url carries the /api/v1
@@ -73,6 +80,12 @@ jobs:
         with: { go-version: 1.25.x, cache: true }
       - name: No /api prefix in OpenAPI path keys
         run: go run ./scripts/api-lint -only PATH-BASE-PREFIX api/openapi/v1/openapi.yaml
+      - name: No /api prefix in OpenAPI path keys (internal-e2e)
+        # internal-e2e.yaml declares an empty servers.url (§4, Task 12) — its
+        # paths mount at the server root, not under /api/v1 — but the rule
+        # still runs here so a future edit that reintroduces an /api/ path key
+        # into this document is caught the same way.
+        run: go run ./scripts/api-lint -only PATH-BASE-PREFIX api/openapi/internal-e2e.yaml
 
   api-design-system-lint:
     # ADR 0022 Phase 13 — Principle 5 enforced. EVERY api-lint rule is BLOCKING:

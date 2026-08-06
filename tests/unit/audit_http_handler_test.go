@@ -21,7 +21,7 @@ func TestListAuditEventsByDocument(t *testing.T) {
 	svc := auditapp.NewService(store)
 	h := auditdelivery.NewHandler(svc)
 	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
+	h.Mount(mux)
 
 	now := time.Date(2026, 3, 18, 12, 0, 0, 0, time.UTC)
 	_ = store.Record(context.Background(), auditdomain.Event{

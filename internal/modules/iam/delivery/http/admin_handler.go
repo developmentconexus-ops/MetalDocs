@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"metaldocs/internal/platform/httprouter"
 	"net/http"
 	"strings"
 	"time"
@@ -120,19 +119,6 @@ func (h *AdminHandler) WithObservabilityService(svc KpiReader) *AdminHandler {
 func (h *AdminHandler) WithPresenceReader(r PresenceReader) *AdminHandler {
 	h.presence = r
 	return h
-}
-
-// RegisterRoutes wires the legacy AdminHandler surface: roles + overview only.
-//
-// PR-4 moved the People-tab user CRUD (list/invite/patch/bulk/reset/unlock/
-// memberships) to PeopleHandler, which registers its own typed Go 1.22 mux
-// patterns under /api/v1/iam/users/*. The role-edit endpoints stay here
-// because PR-5 (Roles & Caps matrix) owns them and will restructure them
-// next.
-func (h *AdminHandler) RegisterRoutes(mux httprouter.Muxer) {
-	mux.HandleFunc(http.MethodPost+" /api/v1/iam/users/{user_id}/roles", h.handleUserRoleUpsertTyped)
-	mux.HandleFunc(http.MethodPut+" /api/v1/iam/users/{user_id}/roles", h.handleReplaceUserRolesTyped)
-	mux.HandleFunc("/api/v1/iam/admin/overview", h.handleAdminOverview)
 }
 
 func (h *AdminHandler) handleUserRoleUpsertTyped(w http.ResponseWriter, r *http.Request) {

@@ -31,7 +31,7 @@ jobs:
       - name: Start backend
         run: |
           go run ./apps/api/cmd/metaldocs-api &
-          for i in $(seq 1 30); do curl -sf $BASE_URL/healthz && break || sleep 2; done
+          for i in $(seq 1 30); do curl -sf $BASE_URL/api/v1/health/live && break || sleep 2; done
         env:
           DATABASE_URL: ${{ secrets.PERF_DATABASE_URL }}
           METALDOCS_E2E: '1'
@@ -62,7 +62,7 @@ jobs:
       - name: Start backend
         run: |
           go run ./apps/api/cmd/metaldocs-api &
-          for i in $(seq 1 30); do curl -sf $BASE_URL/healthz && break || sleep 2; done
+          for i in $(seq 1 30); do curl -sf $BASE_URL/api/v1/health/live && break || sleep 2; done
         env:
           DATABASE_URL: ${{ secrets.PERF_DATABASE_URL }}
       - name: Install k6

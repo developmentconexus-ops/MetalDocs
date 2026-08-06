@@ -92,7 +92,7 @@ func TestListProfiles_DropsDomainFields(t *testing.T) {
 	}}
 	handler := &Handler{profiles: svc}
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/taxonomy/profiles", nil)
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
@@ -143,7 +143,7 @@ func TestGetProfile_DropsDomainFields(t *testing.T) {
 	}}
 	handler := &Handler{profiles: svc}
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/taxonomy/profiles/ISO-9001", nil)
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))

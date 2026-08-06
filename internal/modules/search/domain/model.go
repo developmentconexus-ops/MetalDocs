@@ -73,13 +73,9 @@ type Query struct {
 	DocumentProfile string
 	DocumentFamily  string
 	ProcessArea     string
-	Subject         string
 	OwnerID         string
-	BusinessUnit    string
 	Department      string
-	Classification  Classification
 	Status          Status
-	Tag             string
 	ExpiryBefore    *time.Time
 	ExpiryAfter     *time.Time
 	Limit           int

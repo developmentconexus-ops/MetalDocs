@@ -2,7 +2,6 @@ package httpdelivery
 
 import (
 	"context"
-	"metaldocs/internal/platform/httprouter"
 	"net/http"
 
 	iamapi "metaldocs/internal/modules/iam/api"
@@ -45,13 +44,6 @@ func NewRolesCapsHandler(roleCaps RoleCapabilitiesReader) *RolesCapsHandler {
 		cachedRoles: buildRoleCatalog(),
 		cachedCaps:  buildCapabilityCatalog(),
 	}
-}
-
-// RegisterRoutes mounts the three read-only catalogue routes on mux.
-func (h *RolesCapsHandler) RegisterRoutes(mux httprouter.Muxer) {
-	mux.HandleFunc("GET /api/v1/iam/roles", h.listRoles)
-	mux.HandleFunc("GET /api/v1/iam/capabilities", h.listCapabilities)
-	mux.HandleFunc("GET /api/v1/iam/role-capabilities", h.listRoleCapabilities)
 }
 
 func (h *RolesCapsHandler) listRoles(w http.ResponseWriter, r *http.Request) {

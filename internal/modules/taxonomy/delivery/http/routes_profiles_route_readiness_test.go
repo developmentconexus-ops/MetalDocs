@@ -37,7 +37,7 @@ func TestListProfiles_AnnotatesHasActiveRoute(t *testing.T) {
 	}
 	handler := &Handler{profiles: svc}
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, taxonomyRequest(t, "/api/v1/taxonomy/profiles"))
@@ -94,7 +94,7 @@ func TestListProfiles_RouteReadinessFailureIsNotDefaultedToFalse(t *testing.T) {
 	}
 	handler := &Handler{profiles: svc}
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, taxonomyRequest(t, "/api/v1/taxonomy/profiles"))
@@ -114,7 +114,7 @@ func TestGetProfile_AnnotatesHasActiveRoute(t *testing.T) {
 	}
 	handler := &Handler{profiles: svc}
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, taxonomyRequest(t, "/api/v1/taxonomy/profiles/po"))
@@ -149,7 +149,7 @@ func TestGetProfile_AnnotatesHasActiveTemplateRoute(t *testing.T) {
 	}
 	handler := &Handler{profiles: svc}
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, taxonomyRequest(t, "/api/v1/taxonomy/profiles/it"))

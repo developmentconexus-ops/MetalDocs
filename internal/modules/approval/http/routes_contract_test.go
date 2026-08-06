@@ -81,7 +81,7 @@ func TestGeneratedApprovalRoutes_IdempotencyStoreEngaged(t *testing.T) {
 	db := newConflictMockDB(t, routeTemplate)
 	h := &Handler{db: db}
 	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
+	h.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-1111-1111-111111111111/obsolete", bytes.NewBufferString(`{}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -119,7 +119,7 @@ func TestGeneratedApprovalRoutes_NonIdempotentRouteSkipsStore(t *testing.T) {
 	db := newConflictMockDB(t, routeTemplate)
 	h := &Handler{db: db}
 	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
+	h.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/routes", bytes.NewBufferString(`{}`))
 	req.Header.Set("Content-Type", "application/json")

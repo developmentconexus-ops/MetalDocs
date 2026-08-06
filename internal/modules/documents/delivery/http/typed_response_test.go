@@ -176,19 +176,6 @@ func TestDocumentCommentResponse_WireContract(t *testing.T) {
 	}
 }
 
-// TestPDFCompleteResponse_WireContract locks the off-spec hand-rolled webhook body
-// to its prior {document_id, final_pdf_s3_key} literal shape.
-func TestPDFCompleteResponse_WireContract(t *testing.T) {
-	resp := pdfCompleteResponse{DocumentID: "d-1", FinalPDFS3Key: "final/r.pdf"}
-	if got, want := jsonTopKeys(t, resp), "document_id,final_pdf_s3_key"; got != want {
-		t.Fatalf("pdf-complete keys = %q, want %q", got, want)
-	}
-	raw, _ := json.Marshal(resp)
-	if string(raw) != `{"document_id":"d-1","final_pdf_s3_key":"final/r.pdf"}` {
-		t.Fatalf("pdf-complete wire = %s", raw)
-	}
-}
-
 // TestDocumentSummaryAndDetail_ReviewFieldsWireContract pins M6 F6.2 T6 +
 // F6.4 D2: the generated DocumentSummary/DocumentDetailResponse types carry
 // effective_from/effective_to/review_due_at/last_reviewed_at/

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"metaldocs/internal/platform/httprouter"
 	"net/http"
 
 	v2dom "metaldocs/internal/modules/documents/domain"
@@ -23,10 +22,6 @@ type ReconstructHandler struct {
 
 func NewReconstructHandler(svc ReconstructService) *ReconstructHandler {
 	return &ReconstructHandler{svc: svc}
-}
-
-func (h *ReconstructHandler) RegisterRoutes(mux httprouter.Muxer) {
-	mux.HandleFunc("POST /api/v1/documents/{id}/reconstruct", h.HandleReconstruct)
 }
 
 func (h *ReconstructHandler) HandleReconstruct(w http.ResponseWriter, r *http.Request) {

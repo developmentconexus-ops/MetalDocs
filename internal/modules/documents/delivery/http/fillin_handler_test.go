@@ -36,12 +36,6 @@ func (f *fakeFillInService) GetFillInSchema(_ context.Context, _, _ string) ([]t
 	return nil, nil
 }
 
-func fillInTestMux(h *FillInHandler) *http.ServeMux {
-	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
-	return mux
-}
-
 func TestFillInHandler_PutPlaceholderValue(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -61,16 +55,17 @@ func TestFillInHandler_PutPlaceholderValue(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			svc := &fakeFillInService{setPlaceholderErr: tt.svcErr}
 			h := NewFillInHandler(svc)
-			mux := fillInTestMux(h)
 
 			req := httptest.NewRequest(http.MethodPut, "/api/v1/documents/rev-1/placeholders/p1", bytes.NewBufferString(tt.body))
+			req.SetPathValue("id", "rev-1")
+			req.SetPathValue("pid", "p1")
 			req.Header.Set("Content-Type", "application/json")
 			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "user-1", []iamdomain.Role{}))
 			req.Header.Set("X-Request-ID", "req-1")
 			rr := httptest.NewRecorder()
 
-			mux.ServeHTTP(rr, req)
+			h.PutPlaceholderValue(rr, req)
 			if rr.Code != tt.wantStatus {
 				t.Fatalf("status=%d want=%d body=%s", rr.Code, tt.wantStatus, rr.Body.String())
 			}
@@ -101,15 +96,16 @@ func TestFillInHandler_MapErrorInternal(t *testing.T) {
 func TestFillInHandler_PutPlaceholderValue_RequiresApplicationJSON(t *testing.T) {
 	svc := &fakeFillInService{}
 	h := NewFillInHandler(svc)
-	mux := fillInTestMux(h)
 
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/documents/rev-1/placeholders/p1", bytes.NewBufferString(`{"value":"ABC"}`))
+	req.SetPathValue("id", "rev-1")
+	req.SetPathValue("pid", "p1")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "user-1", []iamdomain.Role{}))
 	req.Header.Set("X-Request-ID", "req-1")
 	rr := httptest.NewRecorder()
 
-	mux.ServeHTTP(rr, req)
+	h.PutPlaceholderValue(rr, req)
 	if rr.Code != http.StatusUnsupportedMediaType {
 		t.Fatalf("status=%d want=%d body=%s", rr.Code, http.StatusUnsupportedMediaType, rr.Body.String())
 	}

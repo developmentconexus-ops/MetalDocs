@@ -195,10 +195,16 @@ func TestRolesCapsHandlerWithoutTenantContext(t *testing.T) {
 }
 
 func TestPermissionResolverGatesNewRoutesOnMembershipView(t *testing.T) {
-	// Sanity check that the new routes register with the registered
-	// HTTP mux so RegisterRoutes() does not silently drop them.
+	// Routing-class assertion (Task 18 step 3): RolesCapsHandler.RegisterRoutes
+	// was deleted as orphaned dead code -- the real production mount for these
+	// three paths is Router.Mount via iamapi.HandlerWithOptions
+	// (ListRoles/ListCapabilities/ListRoleCapabilities delegate straight to
+	// h.rolesCaps.listXxx, see router.go). Re-pointed to that real mount so the
+	// mux-dispatch shape this test guards (routes register and don't 404) still
+	// exercises production wiring, not the deleted hand-written registrar.
 	mux := http.NewServeMux()
-	NewRolesCapsHandler(stubRoleCapsReader{}).RegisterRoutes(mux)
+	rt := NewRouter(nil, nil, nil, NewRolesCapsHandler(stubRoleCapsReader{}), nil, nil, nil)
+	rt.Mount(mux)
 	for _, path := range []string{
 		"/api/v1/iam/roles",
 		"/api/v1/iam/capabilities",

@@ -50,7 +50,7 @@ const testIdempotencyKey = "11111111-1111-1111-1111-111111111111"
 func TestRegisterRoutes_AllRoutesRegistered(t *testing.T) {
 	mux := http.NewServeMux()
 	h := NewHandler(fakeProfileService{}, fakeAreaService{}, fakeFamilyService{}, nil)
-	h.RegisterRoutes(mux)
+	h.Mount(mux)
 
 	routes := []struct {
 		method string

@@ -94,13 +94,10 @@ func TestSessionsHandler_RevokeReturns404WhenCrossTenant(t *testing.T) {
 		},
 	}
 	h := NewSessionsHandler(fake, nil)
-	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
-
 	// Caller is in tenant-b, session belongs to tenant-a.
 	// MUST return 404 (not 403) to avoid leaking session existence.
 	rr := httptest.NewRecorder()
-	mux.ServeHTTP(rr, newSessionsRequest(http.MethodDelete, "/api/v1/auth/sessions/sess-1", "tenant-b"))
+	h.handleSessionByID(rr, newSessionsRequest(http.MethodDelete, "/api/v1/auth/sessions/sess-1", "tenant-b"))
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("cross-tenant revoke: want 404, got %d body=%s", rr.Code, rr.Body.String())
 	}
@@ -116,11 +113,9 @@ func TestSessionsHandler_Revoke204WhenSameTenant(t *testing.T) {
 		},
 	}
 	h := NewSessionsHandler(fake, nil)
-	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
 
 	rr := httptest.NewRecorder()
-	mux.ServeHTTP(rr, newSessionsRequest(http.MethodDelete, "/api/v1/auth/sessions/sess-1", "tenant-a"))
+	h.handleSessionByID(rr, newSessionsRequest(http.MethodDelete, "/api/v1/auth/sessions/sess-1", "tenant-a"))
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("same-tenant revoke: want 204, got %d body=%s", rr.Code, rr.Body.String())
 	}
@@ -131,11 +126,9 @@ func TestSessionsHandler_Revoke204WhenSameTenant(t *testing.T) {
 
 func TestSessionsHandler_Revoke404WhenMissing(t *testing.T) {
 	h := NewSessionsHandler(&fakeSessionAdmin{sessions: map[string]authdomain.Session{}}, nil)
-	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
 
 	rr := httptest.NewRecorder()
-	mux.ServeHTTP(rr, newSessionsRequest(http.MethodDelete, "/api/v1/auth/sessions/missing", "tenant-a"))
+	h.handleSessionByID(rr, newSessionsRequest(http.MethodDelete, "/api/v1/auth/sessions/missing", "tenant-a"))
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("missing session: want 404, got %d", rr.Code)
 	}
@@ -143,11 +136,9 @@ func TestSessionsHandler_Revoke404WhenMissing(t *testing.T) {
 
 func TestSessionsHandler_List401WithoutTenant(t *testing.T) {
 	h := NewSessionsHandler(&fakeSessionAdmin{sessions: map[string]authdomain.Session{}}, nil)
-	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
 
 	rr := httptest.NewRecorder()
-	mux.ServeHTTP(rr, newSessionsRequest(http.MethodGet, "/api/v1/auth/sessions", ""))
+	h.handleSessions(rr, newSessionsRequest(http.MethodGet, "/api/v1/auth/sessions", ""))
 	if rr.Code != http.StatusUnauthorized {
 		t.Fatalf("missing tenant: want 401, got %d", rr.Code)
 	}
@@ -163,11 +154,9 @@ func TestSessionsHandler_ListEnrichesDisplayNameViaPort(t *testing.T) {
 	// Reader knows user-1's name, omits user-2 -> handler must fall back to user_id.
 	reader := &fakeDisplayNameReader{names: map[string]string{"user-1": "Alice"}}
 	h := NewSessionsHandler(fake, nil).WithDisplayNameReader(reader)
-	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
 
 	rr := httptest.NewRecorder()
-	mux.ServeHTTP(rr, newSessionsRequest(http.MethodGet, "/api/v1/auth/sessions", "tenant-a"))
+	h.handleSessions(rr, newSessionsRequest(http.MethodGet, "/api/v1/auth/sessions", "tenant-a"))
 	if rr.Code != http.StatusOK {
 		t.Fatalf("list: want 200, got %d body=%s", rr.Code, rr.Body.String())
 	}
@@ -192,11 +181,9 @@ func TestSessionsHandler_ListHasMoreTrueWhenExtraRowExists(t *testing.T) {
 	}
 	fake := &fakeSessionAdmin{sessions: sessions}
 	h := NewSessionsHandler(fake, nil)
-	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
 
 	rr := httptest.NewRecorder()
-	mux.ServeHTTP(rr, newSessionsRequest(http.MethodGet, "/api/v1/auth/sessions?limit=2", "tenant-a"))
+	h.handleSessions(rr, newSessionsRequest(http.MethodGet, "/api/v1/auth/sessions?limit=2", "tenant-a"))
 	if rr.Code != http.StatusOK {
 		t.Fatalf("list: want 200, got %d body=%s", rr.Code, rr.Body.String())
 	}
@@ -223,11 +210,9 @@ func TestSessionsHandler_ListHasMoreFalseWhenAllSessionsFit(t *testing.T) {
 		},
 	}
 	h := NewSessionsHandler(fake, nil)
-	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
 
 	rr := httptest.NewRecorder()
-	mux.ServeHTTP(rr, newSessionsRequest(http.MethodGet, "/api/v1/auth/sessions?limit=10", "tenant-a"))
+	h.handleSessions(rr, newSessionsRequest(http.MethodGet, "/api/v1/auth/sessions?limit=10", "tenant-a"))
 	if rr.Code != http.StatusOK {
 		t.Fatalf("list: want 200, got %d body=%s", rr.Code, rr.Body.String())
 	}
@@ -252,11 +237,9 @@ func TestSessionsHandler_ListDefaultLimitAppliedWhenOmitted(t *testing.T) {
 		},
 	}
 	h := NewSessionsHandler(fake, nil)
-	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
 
 	rr := httptest.NewRecorder()
-	mux.ServeHTTP(rr, newSessionsRequest(http.MethodGet, "/api/v1/auth/sessions", "tenant-a"))
+	h.handleSessions(rr, newSessionsRequest(http.MethodGet, "/api/v1/auth/sessions", "tenant-a"))
 	if rr.Code != http.StatusOK {
 		t.Fatalf("list: want 200, got %d body=%s", rr.Code, rr.Body.String())
 	}
@@ -277,11 +260,9 @@ func TestSessionsHandler_ListOnlyOwnTenant(t *testing.T) {
 		},
 	}
 	h := NewSessionsHandler(fake, nil)
-	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
 
 	rr := httptest.NewRecorder()
-	mux.ServeHTTP(rr, newSessionsRequest(http.MethodGet, "/api/v1/auth/sessions", "tenant-a"))
+	h.handleSessions(rr, newSessionsRequest(http.MethodGet, "/api/v1/auth/sessions", "tenant-a"))
 	body := rr.Body.String()
 	if !strings.Contains(body, "sess-a") || strings.Contains(body, "sess-b") {
 		t.Fatalf("tenant isolation broken; body=%s", body)

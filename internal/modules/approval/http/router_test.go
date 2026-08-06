@@ -11,7 +11,7 @@ import (
 func TestRegisterRoutes_AllRoutesRegistered(t *testing.T) {
 	mux := http.NewServeMux()
 	h := &Handler{}
-	h.RegisterRoutes(mux)
+	h.Mount(mux)
 
 	routes := []struct {
 		method string
@@ -55,7 +55,7 @@ func TestRegisterRoutes_AllRoutesRegistered(t *testing.T) {
 // RFC 9457 application/problem+json response, not plain-text http.Error.
 func TestRegisterRoutes_WrapperValidationError(t *testing.T) {
 	mux := http.NewServeMux()
-	(&Handler{}).RegisterRoutes(mux)
+	(&Handler{}).Mount(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/approval/instances/not-a-uuid", nil)
 	w := httptest.NewRecorder()

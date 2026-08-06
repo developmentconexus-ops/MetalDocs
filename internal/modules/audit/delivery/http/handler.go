@@ -19,6 +19,7 @@ import (
 	auditapi "metaldocs/internal/modules/audit/api"
 	"metaldocs/internal/modules/audit/application"
 	"metaldocs/internal/modules/audit/domain"
+	"metaldocs/internal/platform/apibase"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/pagination"
@@ -64,7 +65,7 @@ func (h *Handler) WithExporter(exporter AuditExporter) *Handler {
 	return h
 }
 
-// RegisterRoutes mounts the audit module's routes onto mux via the generated
+// Mount mounts the audit module's routes onto mux via the generated
 // auditapi.ServerInterface router (HandlerWithOptions), replacing the prior
 // hand-written mux.HandleFunc registrations (T-008, residual of CON-09).
 // Handler satisfies auditapi.ServerInterface directly (see the adapter
@@ -83,10 +84,13 @@ func (h *Handler) WithExporter(exporter AuditExporter) *Handler {
 // and keys off method + path, which the generated router preserves
 // byte-for-byte (AD-1: BaseURL "/api/v1" + spec's relative paths), so it is
 // unaffected by this mount-mechanism swap.
-func (h *Handler) RegisterRoutes(mux httprouter.Muxer) {
+func (h *Handler) Name() string { return "audit" }
+func (h *Handler) Tag() string  { return "audit" }
+
+func (h *Handler) Mount(mux httprouter.Muxer) {
 	auditapi.HandlerWithOptions(h, auditapi.StdHTTPServerOptions{
 		BaseRouter: mux,
-		BaseURL:    "/api/v1",
+		BaseURL:    apibase.BaseURL,
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
 		},

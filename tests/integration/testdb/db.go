@@ -59,6 +59,20 @@ func DeterministicID(t *testing.T, suffix string) string {
 	return uuid.NewSHA1(testNamespace, []byte(t.Name()+":"+suffix)).String()
 }
 
+// AnyUUID is a fixed, syntactically valid UUID for tests that need a
+// path-parameter VALUE that never has to exist — tier-1 authorization runs
+// before any handler looks the id up, so a real row is never required.
+const AnyUUID = "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+
+// New returns a *sql.DB connected to a leased test database, discarding the
+// database name Open also returns. A thin convenience wrapper for callers
+// (Task 17a's conformance suite) that never need Qualified()'s name.
+func New(t *testing.T) *sql.DB {
+	t.Helper()
+	db, _ := Open(t)
+	return db
+}
+
 // DSN returns the test database connection string from env, or skips.
 func DSN(t *testing.T) string {
 	t.Helper()

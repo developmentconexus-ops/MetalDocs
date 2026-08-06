@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"metaldocs/internal/platform/httprouter"
 	"net/http"
 
 	documentsapi "metaldocs/internal/modules/documents/api"
@@ -23,10 +22,6 @@ type ViewHandler struct {
 
 func NewViewHandler(svc ViewService) *ViewHandler {
 	return &ViewHandler{svc: svc}
-}
-
-func (h *ViewHandler) RegisterRoutes(mux httprouter.Muxer) {
-	mux.HandleFunc("GET /api/v1/documents/{id}/view", h.HandleView)
 }
 
 func (h *ViewHandler) HandleView(w http.ResponseWriter, r *http.Request) {

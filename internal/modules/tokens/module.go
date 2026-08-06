@@ -47,5 +47,11 @@ func New(deps Dependencies) *Module {
 	}
 }
 
-// RegisterRoutes mounts the tokens HTTP routes onto mux.
-func (m *Module) RegisterRoutes(mux httprouter.Muxer) { m.Handler.RegisterRoutes(mux) }
+// Name identifies this publisher in boot assertion messages.
+func (m *Module) Name() string { return "tokens" }
+
+// Tag is the OpenAPI tag this publisher owns.
+func (m *Module) Tag() string { return "tokens" }
+
+// Mount mounts the tokens HTTP routes onto mux.
+func (m *Module) Mount(mux httprouter.Muxer) { m.Handler.Mount(mux) }

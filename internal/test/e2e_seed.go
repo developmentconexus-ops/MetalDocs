@@ -23,6 +23,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
+
+	"metaldocs/internal/platform/httprouter"
+	"metaldocs/internal/platform/problem"
 )
 
 const (
@@ -97,27 +100,36 @@ type seedResponse struct {
 	ContentHash string `json:"content_hash"`
 }
 
-func RegisterE2EHandlers(mux *http.ServeMux, db *sql.DB, runSchedulerTick func(context.Context) error) {
-	if mux == nil || db == nil {
-		return
-	}
-	if !E2EEnabled() {
-		return
+// RegisterE2EHandlers mounts the e2e scaffolding unconditionally. Mount is
+// total (§4): db == nil and runSchedulerTick == nil are NOT mount
+// conditionals — each handler answers 501 when its dependency is absent, so
+// the route always exists and the boot-time declared/mounted assertion never
+// depends on which optional dependency happened to be wired. !E2EEnabled()
+// is likewise not checked here; it is a composition-root condition
+// (e2eHandlersEnabled + e2ePublisher, apps/api/cmd/metaldocs-api/main.go —
+// Task 15b replaced mountE2EHandlersIfEnabled's callback indirection with the
+// inline useE2E gate) and survives
+// per-handler as the real guard below. mux == nil is a wiring bug, not a
+// branch, and panics.
+func RegisterE2EHandlers(mux httprouter.Muxer, db *sql.DB, runSchedulerTick func(context.Context) error) {
+	if mux == nil {
+		panic("e2e_seed: RegisterE2EHandlers called with a nil Muxer")
 	}
 
 	h := &seedHandler{db: db, runSchedulerTick: runSchedulerTick}
 	mux.HandleFunc("POST /internal/test/seed", h.seed)
 	mux.HandleFunc("POST /internal/test/reset", h.reset)
 	mux.HandleFunc("GET /internal/test/governance-events", h.governanceEvents)
-	mux.HandleFunc("POST /internal/test/advance-clock", h.advanceClock)
-	if runSchedulerTick != nil {
-		mux.HandleFunc("POST /internal/test/trigger-scheduler-tick", h.triggerSchedulerTick)
-	}
+	mux.HandleFunc("POST /internal/test/trigger-scheduler-tick", h.triggerSchedulerTick)
 }
 
 func (h *seedHandler) seed(w http.ResponseWriter, r *http.Request) {
 	if !E2EEnabled() {
 		http.NotFound(w, r)
+		return
+	}
+	if h.db == nil {
+		_ = problem.Write(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "e2e scaffolding requires a database"))
 		return
 	}
 
@@ -241,6 +253,10 @@ func (h *seedHandler) reset(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	if h.db == nil {
+		_ = problem.Write(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "e2e scaffolding requires a database"))
+		return
+	}
 
 	var req resetRequest
 	if err := readJSON(r, &req); err != nil {
@@ -310,6 +326,10 @@ func (h *seedHandler) reset(w http.ResponseWriter, r *http.Request) {
 func (h *seedHandler) governanceEvents(w http.ResponseWriter, r *http.Request) {
 	if !E2EEnabled() {
 		http.NotFound(w, r)
+		return
+	}
+	if h.db == nil {
+		_ = problem.Write(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "e2e scaffolding requires a database"))
 		return
 	}
 
@@ -396,53 +416,30 @@ ORDER BY ge.created_at ASC, ge.id ASC
 	writeJSON(w, http.StatusOK, events)
 }
 
-func (h *seedHandler) advanceClock(w http.ResponseWriter, r *http.Request) {
-	if !E2EEnabled() {
-		http.NotFound(w, r)
-		return
-	}
-
-	secondsRaw := strings.TrimSpace(r.URL.Query().Get("seconds"))
-	if secondsRaw == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "seconds is required"})
-		return
-	}
-
-	seconds, err := strconv.ParseInt(secondsRaw, 10, 64)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "seconds must be an integer"})
-		return
-	}
-
-	SetE2EClockOffset(seconds)
-	writeJSON(w, http.StatusOK, map[string]any{
-		"offset_seconds": int64(E2EClockOffset() / time.Second),
-	})
-}
-
+// triggerSchedulerTick matches api/openapi/internal-e2e.yaml's
+// e2eTriggerSchedulerTick: 204 on a successful tick, 501 when no scheduler
+// tick is wired (runSchedulerTick == nil — true of the shipped metaldocs-api
+// binary, which always passes nil; only the periodic-jobs test harness wires
+// a real one).
 func (h *seedHandler) triggerSchedulerTick(w http.ResponseWriter, r *http.Request) {
 	if !E2EEnabled() {
 		http.NotFound(w, r)
 		return
 	}
-
-	if h.runSchedulerTick != nil {
-		if err := h.runSchedulerTick(r.Context()); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	if h.db == nil {
+		_ = problem.Write(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "e2e scaffolding requires a database"))
+		return
+	}
+	if h.runSchedulerTick == nil {
+		_ = problem.Write(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "no scheduler tick is wired"))
 		return
 	}
 
-	select {
-	case <-time.After(6 * time.Second):
-	case <-r.Context().Done():
-		writeJSON(w, http.StatusRequestTimeout, map[string]string{"error": "request cancelled"})
+	if err := h.runSchedulerTick(r.Context()); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
-
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func ensureTenant(ctx context.Context, tx *sql.Tx, tenantID string) error {

@@ -286,8 +286,10 @@ func newHarness(t *testing.T) *harness {
 	// appends to the same events slice, so the assertions below are unchanged.
 	svc := iamapp.NewAreaMembershipService(repo, iamapp.NewAuditMembershipLogger(audit))
 	h := iamdelivery.NewMembershipHandler(svc, verifier)
+	// MembershipHandler.RegisterRoutes was deleted as orphaned dead code
+	// (Task 18 step 3); re-pointed to the real production mount, Router.Mount.
 	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
+	iamdelivery.NewRouter(nil, nil, h, nil, nil, nil, nil).Mount(mux)
 	return &harness{mux: mux, repo: repo, verifier: verifier, audit: audit}
 }
 

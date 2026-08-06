@@ -1,0 +1,43 @@
+openapi: 3.0.3
+info:
+  title: MetalDocs internal e2e scaffolding
+  version: '1.0'
+  description: |
+    Test scaffolding, mounted only when METALDOCS_E2E=1 and only in builds
+    carrying the integration tag. Deliberately excluded from the public bundle
+    and from frontend codegen — this is not part of the customer contract.
+servers:
+  - url: ''
+tags:
+  - name: internal-e2e
+    description: Destructive test scaffolding.
+paths:
+  /internal/test/seed:
+    post:
+      operationId: e2eSeed
+      tags: [internal-e2e]
+      security: []
+      responses:
+        '200': { description: Seed result including session cookies }
+  /internal/test/reset:
+    post:
+      operationId: e2eReset
+      tags: [internal-e2e]
+      security: []
+      responses:
+        '204': { description: Reset complete }
+  /internal/test/governance-events:
+    get:
+      operationId: e2eGovernanceEvents
+      tags: [internal-e2e]
+      security: []
+      responses:
+        '200': { description: Governance events emitted since the last reset }
+  /internal/test/trigger-scheduler-tick:
+    post:
+      operationId: e2eTriggerSchedulerTick
+      tags: [internal-e2e]
+      security: []
+      responses:
+        '204': { description: Tick executed }
+        '501': { description: No scheduler tick is wired }

@@ -337,7 +337,7 @@ func TestRegistryHandler_ErrorEnvelopeContract(t *testing.T) {
 	)
 	handler := NewHandler(svc, nil)
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/controlled-documents/99999999-9999-9999-9999-999999999999", nil)
 	ctx := tenant.WithTenantID(req.Context(), "test-tenant")
@@ -764,7 +764,7 @@ func TestGetControlledDocument_UsesGeneratedResponse(t *testing.T) {
 func TestGetControlledDocument_InvalidPathUUID_Returns400(t *testing.T) {
 	handler := &Handler{svc: &spyControlledDocumentService{}}
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/controlled-documents/not-a-uuid", nil)
 	rec := httptest.NewRecorder()
 
@@ -924,7 +924,7 @@ func TestObsoleteControlledDocument_UsesGeneratedPathParam(t *testing.T) {
 func TestObsoleteControlledDocument_InvalidPathUUID_Returns400(t *testing.T) {
 	handler := &Handler{svc: &spyControlledDocumentService{}}
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/controlled-documents/not-a-uuid/obsolete", nil)
 	rec := httptest.NewRecorder()
 
@@ -956,7 +956,7 @@ func TestSupersedeControlledDocument_UsesGeneratedPathParam(t *testing.T) {
 func TestSupersedeControlledDocument_InvalidPathUUID_Returns400(t *testing.T) {
 	handler := &Handler{svc: &spyControlledDocumentService{}}
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/controlled-documents/not-a-uuid/supersede", nil)
 	rec := httptest.NewRecorder()
 
@@ -1202,7 +1202,7 @@ func TestActiveDocument_ServiceError_Returns500(t *testing.T) {
 func TestPostControlledDocuments_MissingIdempotencyKey_400(t *testing.T) {
 	handler := newTestHandler(nil)
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents", nil)
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
@@ -1227,7 +1227,7 @@ func TestGetPreviewCode_200(t *testing.T) {
 	mockDB := newPermissiveMockDB(t)
 	handler := newTestHandler(mockDB)
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/controlled-documents/preview-code?profile_code=DC&area_code=RH", nil)
 	ctx := tenant.WithTenantID(req.Context(), "tenant-1")
@@ -1255,7 +1255,7 @@ func TestGetPreviewCode_200(t *testing.T) {
 func TestGetPreviewCode_MissingParams_400(t *testing.T) {
 	handler := newTestHandler(nil)
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/controlled-documents/preview-code?profile_code=DC", nil)
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
@@ -1289,7 +1289,7 @@ func TestActiveDocument_NoneExist_Returns404(t *testing.T) {
 func TestActiveDocument_InvalidPathUUID_Returns400(t *testing.T) {
 	handler := &Handler{svc: &spyControlledDocumentService{}}
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	handler.Mount(mux)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/controlled-documents/not-a-uuid/active-document", nil)
 	rec := httptest.NewRecorder()
 
