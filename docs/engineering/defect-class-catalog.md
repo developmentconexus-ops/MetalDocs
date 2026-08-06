@@ -15,7 +15,8 @@
 > kept apart because the rung that stops them is in a different place. Class 35 is numbered out
 > of sequence with Part I's own range because it was found after Part II already existed;
 > renumbering Part II's eight classes to make room would churn every internal `§27`–`§34`
-> cross-reference for no reader benefit, so it is appended after Class 34 instead.
+> cross-reference for no reader benefit. It is filed where it belongs by *kind* — at the end of
+> Part I, after Class 26 — and carries only a number out of that part's range.
 >
 > **Last verified:** 2026-08-06
 
@@ -1102,6 +1103,68 @@ check never ran, and in both cases the suite reported success.
 
 ---
 
+## Class 35 — Two Independent Sources of Truth Answering One Predicate
+
+*Part I class, numbered out of sequence — see the note at the top of this document.*
+
+**Symptom.** Two subsystems each answer what should be the identical yes/no question, from
+separately populated tables with no shared foreign key, no generator, and nothing that ever
+compares them. Neither is a copy of the other — both were built, correctly, to answer the
+question, at different times, for different layers. Because nothing ties them together, the
+set of principals that satisfies the predicate can differ between the two evaluators, and does.
+
+**Evidence.** ADR 0007's two-tier PDP (`wiki/decisions/0007-two-tier-authz.md`). Tier-1
+`CapabilityService.CanDo` (`internal/modules/iam/application/capability_service.go:48`) answers
+"does actor X hold capability Y" by reading `iam_user_roles` UNION `iam_group_members` JOIN
+`iam_group_roles`, constrained to 5 roles by `chk_iam_user_roles_role_code`
+(`db/baseline/0001_current_schema.sql:1276`) — and `iam_group_roles.role` carries **no CHECK
+constraint at all**. Tier-2 `authz.Require` (`internal/modules/iam/authz/authz.go:100`) answers
+the same question by reading `user_process_areas` JOIN `role_capabilities`, over 7 roles
+including `area_admin`, `qms_admin`, `signer` — three roles tier-1's CHECK forbids ever
+assigning. Consequence, surfaced by `TestNoDeclaredOperationIsUnreachable`
+(`apps/api/cmd/metaldocs-api/surface_conformance_test.go:326`): a principal holding only an
+area membership is refused at tier-1 before tier-2 ever runs, so the area model is unreachable
+through HTTP except to further narrow someone tier-1 already admitted. Full finding and the
+ratified remediation decisions: `docs/superpowers/analysis/2026-08-06-authz-grant-unification-decisions.md`.
+
+**Root cause.** Defense-in-depth is sound when both layers verify the *same* fact from the
+*same* source, at different points in a request's life. Here the two layers verify *different*
+facts, because each was built against whichever table was convenient for its own layer — a
+cheap pre-tx edge check; a costlier in-tx area-scoped check — and nobody afterward asked
+whether the two facts were required to agree. **Class 7 does not cover this:** Class 7 is a
+*relaxation* event, one layer's rule loosened while a sibling layer's is not; here nothing was
+ever relaxed, the two layers never agreed to begin with. **Class 9 does not cover this either:**
+Class 9 is a *copy* of one structure that drifts from a single later edit to the original; here
+there is no original and no copy — three independently authored tables with three different
+role vocabularies, each correct in isolation for its own layer, never unified.
+
+**Prevention (rung 1, then 2).** Collapse to one assignment relation —
+`(subject_kind, subject_id, role_code, scope_kind, scope_ref)` — with a single role catalog
+referenced by foreign key rather than repeated as a CHECK in three places. The two tiers become
+two *predicates over one source*: tier-1, granted at any scope; tier-2, granted at tenant or the
+resource's area. That yields the missing invariant as a testable property — **tier-1 must be a
+strict relaxation of tier-2, never a narrower filter** — instead of an accident nobody can name
+until a test like this one reports it. (Ratified as decision D1 in the analysis above; the
+closest industry precedent is Kubernetes RBAC's `RoleBinding` / `ClusterRoleBinding`, where
+scope lives on the *binding*, never in a second grant table.)
+
+**Detection.** For every pair of enforcement points meant to answer the same yes/no question,
+write down the query each one runs and diff the FROM clauses. A different WHERE over the same
+table is normal layering. A different *table* means the two points can disagree on a principal
+neither author ever tested, and nothing will notice until a test asks the specific question
+"is there anyone this passes for" — which is what this class's evidence test does.
+
+**Generalization.** A sharper case of Appendix B cause 2 ("two things that must agree,
+maintained separately"). Every other instance of that cause in this catalog (Classes 2, 7, 9,
+10, 19, 25, 26) has an identifiable *original* that a copy, a second declaration, or a second
+invocation drifted from — the fix is "keep the copy in sync" or "generate the copy." Here there
+was never one original to drift from: the divergence is not decay from a shared start, it is
+two designs that were never unified. The fix cannot be "keep both updated together," because
+there is no rule shared between them to update in the first place — it has to be "delete one of
+the two designs and rebuild both tiers on the survivor."
+
+---
+
 ## Appendix A — Day-0 Factory Checklist
 
 Derived directly from the classes above. Each line prevents a class already observed.
@@ -1547,68 +1610,6 @@ behavior, so nothing downstream ever forces the question.
 **Generalization.** Sibling of Class 8 (tests at the wrong altitude): there the test observes
 too little to be true, here the test deforms the subject in order to observe it. Both are
 resolved the same way — move the seam, don't widen the subject.
-
----
-
-## Class 35 — Two Independent Sources of Truth Answering One Predicate
-
-*Part I class, numbered out of sequence — see the note at the top of this document.*
-
-**Symptom.** Two subsystems each answer what should be the identical yes/no question, from
-separately populated tables with no shared foreign key, no generator, and nothing that ever
-compares them. Neither is a copy of the other — both were built, correctly, to answer the
-question, at different times, for different layers. Because nothing ties them together, the
-set of principals that satisfies the predicate can differ between the two evaluators, and does.
-
-**Evidence.** ADR 0007's two-tier PDP (`wiki/decisions/0007-two-tier-authz.md`). Tier-1
-`CapabilityService.CanDo` (`internal/modules/iam/application/capability_service.go:48`) answers
-"does actor X hold capability Y" by reading `iam_user_roles` UNION `iam_group_members` JOIN
-`iam_group_roles`, constrained to 5 roles by `chk_iam_user_roles_role_code`
-(`db/baseline/0001_current_schema.sql:1276`) — and `iam_group_roles.role` carries **no CHECK
-constraint at all**. Tier-2 `authz.Require` (`internal/modules/iam/authz/authz.go:100`) answers
-the same question by reading `user_process_areas` JOIN `role_capabilities`, over 7 roles
-including `area_admin`, `qms_admin`, `signer` — three roles tier-1's CHECK forbids ever
-assigning. Consequence, surfaced by `TestNoDeclaredOperationIsUnreachable`
-(`apps/api/cmd/metaldocs-api/surface_conformance_test.go:326`): a principal holding only an
-area membership is refused at tier-1 before tier-2 ever runs, so the area model is unreachable
-through HTTP except to further narrow someone tier-1 already admitted. Full finding and the
-ratified remediation decisions: `docs/superpowers/analysis/2026-08-06-authz-grant-unification-decisions.md`.
-
-**Root cause.** Defense-in-depth is sound when both layers verify the *same* fact from the
-*same* source, at different points in a request's life. Here the two layers verify *different*
-facts, because each was built against whichever table was convenient for its own layer — a
-cheap pre-tx edge check; a costlier in-tx area-scoped check — and nobody afterward asked
-whether the two facts were required to agree. **Class 7 does not cover this:** Class 7 is a
-*relaxation* event, one layer's rule loosened while a sibling layer's is not; here nothing was
-ever relaxed, the two layers never agreed to begin with. **Class 9 does not cover this either:**
-Class 9 is a *copy* of one structure that drifts from a single later edit to the original; here
-there is no original and no copy — three independently authored tables with three different
-role vocabularies, each correct in isolation for its own layer, never unified.
-
-**Prevention (rung 1, then 2).** Collapse to one assignment relation —
-`(subject_kind, subject_id, role_code, scope_kind, scope_ref)` — with a single role catalog
-referenced by foreign key rather than repeated as a CHECK in three places. The two tiers become
-two *predicates over one source*: tier-1, granted at any scope; tier-2, granted at tenant or the
-resource's area. That yields the missing invariant as a testable property — **tier-1 must be a
-strict relaxation of tier-2, never a narrower filter** — instead of an accident nobody can name
-until a test like this one reports it. (Ratified as decision D1 in the analysis above; the
-closest industry precedent is Kubernetes RBAC's `RoleBinding` / `ClusterRoleBinding`, where
-scope lives on the *binding*, never in a second grant table.)
-
-**Detection.** For every pair of enforcement points meant to answer the same yes/no question,
-write down the query each one runs and diff the FROM clauses. A different WHERE over the same
-table is normal layering. A different *table* means the two points can disagree on a principal
-neither author ever tested, and nothing will notice until a test asks the specific question
-"is there anyone this passes for" — which is what this class's evidence test does.
-
-**Generalization.** A sharper case of Appendix B cause 2 ("two things that must agree,
-maintained separately"). Every other instance of that cause in this catalog (Classes 2, 7, 9,
-10, 19, 25, 26) has an identifiable *original* that a copy, a second declaration, or a second
-invocation drifted from — the fix is "keep the copy in sync" or "generate the copy." Here there
-was never one original to drift from: the divergence is not decay from a shared start, it is
-two designs that were never unified. The fix cannot be "keep both updated together," because
-there is no rule shared between them to update in the first place — it has to be "delete one of
-the two designs and rebuild both tiers on the survivor."
 
 ---
 
