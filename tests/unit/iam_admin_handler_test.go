@@ -36,10 +36,20 @@ func newAuthServiceForTest(t *testing.T, authRepo *authmemory.Repository, roleAd
 	return svc
 }
 
+// registerPeopleHandlerForTest mounts a PeopleHandler via the real production
+// router. PeopleHandler.RegisterRoutes (hand-written mux.HandleFunc calls) was
+// deleted as orphaned dead code (Task 18 step 3) -- the actual runtime mount
+// is Router.Mount via the generated iamapi.HandlerWithOptions, which
+// delegates straight to the same handleXxx methods (see router.go). This test
+// package is external to httpdelivery (package unit) and cannot call those
+// unexported methods directly, so the router -- the real mounting mechanism,
+// not a detail of the test -- is the correct re-point target (routing class).
 func registerPeopleHandlerForTest(t *testing.T, mux *http.ServeMux, authSvc *authapp.Service, roleAdmin iamdomain.RoleAdminRepository, inv iamapp.RoleCacheInvalidator) {
 	t.Helper()
 	peopleSvc := iamapp.NewPeopleService(authSvc, peopleRoleProviderShim{}, roleAdmin, nil, nil, inv)
-	iamdelivery.NewPeopleHandler(peopleSvc, authSvc, nil).RegisterRoutes(mux)
+	people := iamdelivery.NewPeopleHandler(peopleSvc, authSvc, nil)
+	rt := iamdelivery.NewRouter(nil, people, nil, nil, nil, nil, nil)
+	rt.Mount(mux)
 }
 
 // peopleRoleProviderShim satisfies the peopleRoleProvider interface that
@@ -84,8 +94,11 @@ func TestIAMAdminHandlerUpsertRole(t *testing.T) {
 	service := iamapp.NewAdminService(repo, inv, nil, nil)
 	handler := iamdelivery.NewAdminHandler(service, nil)
 
+	// AdminHandler.RegisterRoutes was deleted as orphaned (Task 18 step 3); the
+	// real mount is Router.Mount -> iamapi.HandlerWithOptions -> UpsertUserRole
+	// -> handler.handleUserRoleUpsert (router.go). Re-pointed to that mount.
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	iamdelivery.NewRouter(handler, nil, nil, nil, nil, nil, nil).Mount(mux)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/iam/users/test-user/roles", strings.NewReader(`{"displayName":"Test User","role":"viewer"}`))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
@@ -108,8 +121,11 @@ func TestIAMAdminHandlerReplaceRoles(t *testing.T) {
 	service := iamapp.NewAdminService(repo, inv, nil, nil)
 	handler := iamdelivery.NewAdminHandler(service, nil)
 
+	// AdminHandler.RegisterRoutes was deleted as orphaned (Task 18 step 3); the
+	// real mount is Router.Mount -> iamapi.HandlerWithOptions -> ReplaceUserRoles
+	// -> handler.handleReplaceUserRoles (router.go). Re-pointed to that mount.
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	iamdelivery.NewRouter(handler, nil, nil, nil, nil, nil, nil).Mount(mux)
 
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/iam/users/test-user/roles", strings.NewReader(`{"displayName":"Test User","roles":["editor"]}`))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))

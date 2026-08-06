@@ -96,8 +96,10 @@ func newCrossTenantMux(auth *tenantAwareAuth) *http.ServeMux {
 	roleAdmin := iammemory.NewRoleAdminRepository()
 	svc := iamapp.PeopleServiceFromInterfaces(auth, tenantAwareRoleProvider{auth}, roleAdmin, nil, iamapp.PermissiveAreaCatalog{}, nil)
 	h := iamdelivery.NewPeopleHandler(svc, auth, nil)
+	// PeopleHandler.RegisterRoutes was deleted as orphaned dead code (Task 18
+	// step 3); re-pointed to the real production mount, Router.Mount.
 	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
+	iamdelivery.NewRouter(nil, h, nil, nil, nil, nil, nil).Mount(mux)
 	return mux
 }
 

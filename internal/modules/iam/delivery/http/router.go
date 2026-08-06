@@ -116,17 +116,21 @@ func (rt *Router) Tag() string { return "iam" }
 // Mount mounts the full generated IAM ServerInterface on mux under the
 // /api/v1 base URL (AD-1: spec path keys are relative), plus the
 // hand-mounted streamPresence WebSocket route (excluded from server codegen,
-// see presence.MountStream). Replaces the six RegisterRoutes call sites this
-// router supersedes: AdminHandler.RegisterRoutes, PeopleHandler.RegisterRoutes,
-// MembershipHandler.RegisterRoutes, RolesCapsHandler.RegisterRoutes,
-// SessionsHandler.RegisterRoutes, plus presence.Handler's former standalone
-// mount (Task 15a, Ruling 2). Tier-1 authz, rate limiting, and
-// panic/observability middleware are unaffected — they wrap the whole mux in
-// main.go's buildChain and key off r.Method/r.URL.Path (permissions.go
-// routeRule), not off mux dispatch mechanics, so swapping hand-written
-// mux.HandleFunc registration for codegen-generated registration changes no
-// tier-1 behavior. IAM has no per-route Idempotency-Key requirement (unlike
-// templates/controlleddocuments), so no Middlewares closure is needed here.
+// see presence.MountStream). Task 15a (Ruling 2) retired the six
+// hand-written RegisterRoutes methods this router supersedes:
+// AdminHandler, PeopleHandler, MembershipHandler, RolesCapsHandler,
+// SessionsHandler, and ObservabilityHandler; presence.Handler's former
+// standalone mount is folded in here too via presence.MountStream. Task 18
+// deleted those six now-orphaned RegisterRoutes methods outright (they had
+// zero remaining callers once this router became the real mount) and
+// deleted permissions.go's hand-written routeRule/routeRules table itself.
+// Tier-1 authz now reads the generated httpSurface table keyed by
+// "METHOD /api/v1/path/{param}" (permissions.go), which is derived from
+// this same generated ServerInterface — so the codegen-generated mux
+// dispatch and tier-1 authz are two views of one source of truth, not
+// independent mechanisms. IAM has no per-route Idempotency-Key requirement
+// (unlike templates/controlleddocuments), so no Middlewares closure is
+// needed here.
 //
 // Mount stays TOTAL even when rt.presence is nil: presence.MountStream binds
 // the h.handleStream method value without dereferencing h, and handleStream

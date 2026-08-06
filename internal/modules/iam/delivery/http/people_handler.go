@@ -15,7 +15,6 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"metaldocs/internal/platform/httprouter"
 	"net/http"
 	"strconv"
 	"strings"
@@ -47,21 +46,6 @@ type PeopleHandler struct {
 // at the application layer instead.
 func NewPeopleHandler(service *iamapp.PeopleService, authSvc UserAdminService, audit auditdomain.Writer) *PeopleHandler {
 	return &PeopleHandler{service: service, authSvc: authSvc, audit: audit}
-}
-
-// RegisterRoutes attaches People-tab routes with Go 1.22 typed mux patterns.
-// The path-param wildcard {user_id} is extracted via r.PathValue.
-func (h *PeopleHandler) RegisterRoutes(mux httprouter.Muxer) {
-	if h == nil {
-		return
-	}
-	mux.HandleFunc(http.MethodGet+" /api/v1/iam/users", h.handleListUsers)
-	mux.HandleFunc(http.MethodPost+" /api/v1/iam/users/invite", h.handleInvite)
-	mux.HandleFunc(http.MethodPost+" /api/v1/iam/users/bulk", h.handleBulk)
-	mux.HandleFunc(http.MethodPatch+" /api/v1/iam/users/{user_id}", h.handlePatch)
-	mux.HandleFunc(http.MethodPost+" /api/v1/iam/users/{user_id}/reset-password", h.handleResetPassword)
-	mux.HandleFunc(http.MethodPost+" /api/v1/iam/users/{user_id}/unlock", h.handleUnlock)
-	mux.HandleFunc(http.MethodGet+" /api/v1/iam/users/{user_id}/memberships", h.handleListMemberships)
 }
 
 // ─── GET /iam/users ─────────────────────────────────────────────────────────

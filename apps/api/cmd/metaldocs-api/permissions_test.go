@@ -3,12 +3,13 @@ package main
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
-	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -41,32 +42,47 @@ import (
 	"metaldocs/internal/platform/observability"
 )
 
-// legacyResolve pins routeRules' still-intact (method, path) resolution
-// behavior for Task 17b's row-by-row annotation review. Production's
-// resolver (newPermissionResolver, permissions.go) now takes *http.Request
-// and reads the generated httpSurface table instead of routeRules; routeRules
-// and resolveRoutePermission are untouched by this program so this wrapper —
-// and every test below built on it — keeps pinning the legacy table's
-// behavior, not the table the server enforces.
-func legacyResolve(method, path string) (iamdomain.Capability, iamdelivery.Visibility) {
-	if capability, visibility, ok := resolveRoutePermission(method, path); ok {
-		return capability, visibility
-	}
-	return "", iamdelivery.VisibilitySessionRequired
+// prodMuxOnce/prodMux back prodResolve: one real mux, built once from the
+// real (nil-service) publisher list — the same construction
+// TestRealPublishersSatisfyTheAssertion (surface_test.go) boots — and reused
+// across every (method, path) lookup below. Building it once, not per-call,
+// keeps this file's many table-driven resolver tests cheap while still
+// exercising the actual production mount.
+var (
+	prodMuxOnce sync.Once
+	prodMux     *http.ServeMux
+)
+
+func productionMux() *http.ServeMux {
+	prodMuxOnce.Do(func() {
+		prodMux = http.NewServeMux()
+		for _, p := range buildPublishers(buildTestRouteHandlers()) {
+			p.Mount(prodMux)
+		}
+	})
+	return prodMux
 }
 
-// legacyIsPublic mirrors newPublicPathChecker's derivation, but over
-// legacyResolve (routeRules) rather than the production httpSurface-backed
-// resolver.
-func legacyIsPublic(method, path string) bool {
-	_, visibility := legacyResolve(method, path)
+// prodResolve is this file's (method, path) shorthand over the production
+// resolver: newPermissionResolver(mux) reading the generated httpSurface
+// table, the sole tier-1 authority since Task 18 deleted routeRules and
+// resolveRoutePermission. Every table-driven test below asserts against this
+// resolver, not a hand-written stand-in.
+func prodResolve(method, path string) (iamdomain.Capability, iamdelivery.Visibility) {
+	resolver := newPermissionResolver(productionMux())
+	return resolver(httptest.NewRequest(method, path, nil))
+}
+
+// prodIsPublic mirrors newPublicPathChecker's derivation over prodResolve.
+func prodIsPublic(method, path string) bool {
+	_, visibility := prodResolve(method, path)
 	return visibility == iamdelivery.VisibilityPublic
 }
 
 func TestPermissionResolver(t *testing.T) {
 	t.Parallel()
 
-	resolver := legacyResolve
+	resolver := prodResolve
 
 	testCases := []struct {
 		name           string
@@ -78,7 +94,7 @@ func TestPermissionResolver(t *testing.T) {
 		// --- Public routes (no session required) ---
 		{name: "health live public", method: http.MethodGet, path: "/api/v1/health/live", wantCap: "", wantVisibility: iamdelivery.VisibilityPublic},
 		{name: "health ready public", method: http.MethodGet, path: "/api/v1/health/ready", wantCap: "", wantVisibility: iamdelivery.VisibilityPublic},
-		// /healthz is deleted (operator ruling C): it has no routeRules entry
+		// /healthz is deleted (operator ruling C): it has no httpSurface entry
 		// and falls through to the fail-closed default, so authn rejects it
 		// with 401 before the mux (which no longer mounts it at all) is ever
 		// reached — §10.3 row 3.
@@ -97,6 +113,18 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "unknown templates subpath session required", method: http.MethodDelete, path: "/api/v1/templates/t1/unmapped", wantCap: "", wantVisibility: iamdelivery.VisibilitySessionRequired},
 		{name: "iam users patch roles falls through to session required", method: http.MethodPatch, path: "/api/v1/iam/users/u-1/roles", wantCap: "", wantVisibility: iamdelivery.VisibilitySessionRequired},
 		{name: "completely unknown root session required", method: http.MethodGet, path: "/random/path", wantCap: "", wantVisibility: iamdelivery.VisibilitySessionRequired},
+		// The following three paths were legacyResolve/routeRules fictions:
+		// each had a hand-written row (GET /api/v1/signed, PUT .../draft,
+		// PATCH /api/v1/taxonomy/areas/{code}) with no corresponding mounted
+		// route or spec operation anywhere in the codebase (grep-confirmed
+		// against internal/modules/templates and internal/modules/taxonomy
+		// delivery packages during Task 18). Converting legacyResolve to the
+		// production resolver surfaced this drift; these now assert the real,
+		// correct fail-closed behavior for a path the generated table has no
+		// entry for, rather than the fiction the old table asserted.
+		{name: "signed download path never mounted, falls through", method: http.MethodGet, path: "/api/v1/signed", wantCap: "", wantVisibility: iamdelivery.VisibilitySessionRequired},
+		{name: "templates draft PUT never mounted, falls through", method: http.MethodPut, path: "/api/v1/templates/t1/versions/1/draft", wantCap: "", wantVisibility: iamdelivery.VisibilitySessionRequired},
+		{name: "taxonomy areas PATCH never mounted, falls through", method: http.MethodPatch, path: "/api/v1/taxonomy/areas/QA", wantCap: "", wantVisibility: iamdelivery.VisibilitySessionRequired},
 
 		// --- Permission-guarded: documents ---
 		{name: "documents list guarded", method: http.MethodGet, path: "/api/v1/documents", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
@@ -114,7 +142,7 @@ func TestPermissionResolver(t *testing.T) {
 		// --- Permission-guarded: distribution (M2) ---
 		// These GET routes MUST resolve to CapDistributionRead, NOT be shadowed by the
 		// generic GET /api/v1/documents → CapDocumentView catch-all. Without these rows a
-		// future reorder of routeRules could silently broaden distribution to document.view
+		// future reorder of the generated httpSurface table could silently broaden distribution to document.view
 		// (a privilege broadening) with a green suite. Mirrors the CapAuditRead/CapRouteManage
 		// "more-specific cap must win over the generic block" precedent.
 		{name: "distribution summary resolves to distribution.read", method: http.MethodGet, path: "/api/v1/documents/d1/distribution", wantCap: iamdomain.CapDistributionRead, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
@@ -125,7 +153,6 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "templates list", method: http.MethodGet, path: "/api/v1/templates", wantCap: iamdomain.CapTemplateView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "templates create", method: http.MethodPost, path: "/api/v1/templates", wantCap: iamdomain.CapTemplateCreate, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "templates version create", method: http.MethodPost, path: "/api/v1/templates/t1/versions", wantCap: iamdomain.CapTemplateCreate, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "templates draft", method: http.MethodPut, path: "/api/v1/templates/t1/versions/1/draft", wantCap: iamdomain.CapTemplateEdit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "templates schema", method: http.MethodPut, path: "/api/v1/templates/t1/versions/1/schema", wantCap: iamdomain.CapTemplateEdit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "templates publish", method: http.MethodPost, path: "/api/v1/templates/t1/versions/1/publish", wantCap: iamdomain.CapTemplatePublish, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "templates docx upload url", method: http.MethodPost, path: "/api/v1/templates/t1/versions/1/docx-upload-url", wantCap: iamdomain.CapTemplateEdit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
@@ -151,7 +178,6 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "taxonomy families create", method: http.MethodPost, path: "/api/v1/taxonomy/families", wantCap: iamdomain.CapTaxonomyManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "taxonomy families patch", method: http.MethodPatch, path: "/api/v1/taxonomy/families/PROC", wantCap: iamdomain.CapTaxonomyManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "taxonomy areas list", method: http.MethodGet, path: "/api/v1/taxonomy/areas", wantCap: iamdomain.CapTaxonomyView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "taxonomy areas patch", method: http.MethodPatch, path: "/api/v1/taxonomy/areas/QA", wantCap: iamdomain.CapTaxonomyManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "taxonomy profiles list", method: http.MethodGet, path: "/api/v1/taxonomy/profiles", wantCap: iamdomain.CapTaxonomyView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 
 		// --- Permission-guarded: controlled documents ---
@@ -175,7 +201,6 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "iam area memberships list", method: http.MethodGet, path: "/api/v1/iam/area-memberships", wantCap: iamdomain.CapMembershipView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "iam area memberships create", method: http.MethodPost, path: "/api/v1/iam/area-memberships", wantCap: iamdomain.CapMembershipManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "iam area memberships delete", method: http.MethodDelete, path: "/api/v1/iam/area-memberships/u-1/quality", wantCap: iamdomain.CapMembershipManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "signed download", method: http.MethodGet, path: "/api/v1/signed", wantCap: iamdomain.CapTemplateView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "approval get instance", method: http.MethodGet, path: "/api/v1/approval/instances/a-1", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		// M2b F3 (P1): generic /api/v1/approval/ prefix fallback deleted; these are
 		// the real runtime routes (verified against internal/modules/approval/http/router.go),
@@ -217,7 +242,7 @@ func TestPermissionResolver(t *testing.T) {
 func TestPublicPathChecker_RespectsPublicAndPrivateBoundaries(t *testing.T) {
 	t.Parallel()
 
-	checker := legacyIsPublic
+	checker := prodIsPublic
 
 	testCases := []struct {
 		name   string
@@ -366,69 +391,6 @@ func buildTestRouteHandlers() publisherDeps {
 	}
 }
 
-// TestPermissionsTable_NoMethodlessWriteShadowing locks the F-001 authoring
-// invariants. Fails if any rule:
-//
-//	(a) has empty method AND a Manage/Submit/write-grade cap, OR
-//	(b) has empty method on a prefix where some OTHER rule declares a write
-//	    verb (so the methodless row would shadow per-verb intent).
-//
-// See wiki/concepts/authz-tiers.md §Tier-1 rule authoring rules.
-func TestPermissionsTable_NoMethodlessWriteShadowing(t *testing.T) {
-	t.Parallel()
-
-	writeMethods := map[string]bool{
-		http.MethodPost:   true,
-		http.MethodPut:    true,
-		http.MethodPatch:  true,
-		http.MethodDelete: true,
-	}
-	isWriteCap := func(c iamdomain.Capability) bool {
-		s := string(c)
-		return strings.Contains(s, ".manage") ||
-			strings.Contains(s, ".submit") ||
-			strings.Contains(s, ".create") ||
-			strings.Contains(s, ".edit") ||
-			strings.Contains(s, ".approve") ||
-			strings.Contains(s, ".publish") ||
-			strings.Contains(s, ".signoff") ||
-			strings.Contains(s, ".obsolete") ||
-			strings.Contains(s, ".supersede") ||
-			strings.Contains(s, ".review")
-	}
-
-	// (a) methodless row carrying a write-grade cap.
-	for i, r := range routeRules {
-		if r.method == "" && r.capability != "" && isWriteCap(r.capability) {
-			t.Errorf("routeRules[%d]: methodless rule cannot carry write-grade cap %q (prefix=%q, exact=%q). Split into per-verb rows.",
-				i, r.capability, r.pathPrefix, r.pathExact)
-		}
-	}
-
-	// (b) methodless prefix overlapping a path declared with a write verb elsewhere.
-	for i, mr := range routeRules {
-		if mr.method != "" || mr.pathPrefix == "" {
-			continue
-		}
-		for j, other := range routeRules {
-			if i == j || !writeMethods[other.method] {
-				continue
-			}
-			overlap := false
-			if other.pathPrefix != "" && strings.HasPrefix(other.pathPrefix, mr.pathPrefix) {
-				overlap = true
-			}
-			if other.pathExact != "" && strings.HasPrefix(other.pathExact, mr.pathPrefix) {
-				overlap = true
-			}
-			if overlap {
-				t.Errorf("routeRules[%d]: methodless prefix %q shadows write-verb rule routeRules[%d] (%s %s%s). Replace methodless row with per-verb rows.",
-					i, mr.pathPrefix, j, other.method, other.pathPrefix, other.pathExact)
-			}
-		}
-	}
-}
-
 // TestPermissionResolver_PeopleHandlerRoutes asserts the PR-4 People-tab
 // routes resolve to VisibilityPermissionGuarded with the documented cap.
 // Without explicit rules they would fall through to VisibilitySessionRequired
@@ -436,7 +398,7 @@ func TestPermissionsTable_NoMethodlessWriteShadowing(t *testing.T) {
 func TestPermissionResolver_PeopleHandlerRoutes(t *testing.T) {
 	t.Parallel()
 
-	resolver := legacyResolve
+	resolver := prodResolve
 	cases := []struct {
 		method string
 		path   string
@@ -470,7 +432,7 @@ func TestPermissionResolver_PeopleHandlerRoutes(t *testing.T) {
 func TestPermissionResolver_AreaMembershipRoutes(t *testing.T) {
 	t.Parallel()
 
-	resolver := legacyResolve
+	resolver := prodResolve
 	cases := []struct {
 		method string
 		path   string
@@ -513,7 +475,7 @@ func TestPermissionResolver_AreaMembershipRoutes(t *testing.T) {
 func TestDocumentsRoutesCapabilityMapping(t *testing.T) {
 	t.Parallel()
 
-	resolver := legacyResolve
+	resolver := prodResolve
 	cases := []struct {
 		method string
 		path   string
@@ -533,24 +495,6 @@ func TestDocumentsRoutesCapabilityMapping(t *testing.T) {
 		}
 		if gotCap != tc.cap {
 			t.Errorf("%s %s: cap=%q want %q", tc.method, tc.path, gotCap, tc.cap)
-		}
-	}
-}
-
-// TestEveryRouteCapInRegistry binds the Tier-1 route table to the Go capability
-// registry (single source of truth, ADR 0022 Phase 1). Every non-empty
-// routeRules[i].capability MUST be a typed const present in validCapabilities.
-// A raw iamdomain.Capability("typo") row — which compiles clean — fails here.
-func TestEveryRouteCapInRegistry(t *testing.T) {
-	t.Parallel()
-
-	for i, r := range routeRules {
-		if r.capability == "" {
-			continue // public / session-required rows carry no cap
-		}
-		if !iamdomain.IsValidCapability(r.capability) {
-			t.Errorf("routeRules[%d]: capability %q is not in the registry (validCapabilities). Promote it to a typed const in internal/modules/iam/domain/model.go (path prefix=%q exact=%q suffix=%q).",
-				i, r.capability, r.pathPrefix, r.pathExact, r.pathSuffix)
 		}
 	}
 }
@@ -707,7 +651,7 @@ func TestEveryCapSeededOrDeferred(t *testing.T) {
 func TestTier1Tier2CapabilityCoherence_F4Sites(t *testing.T) {
 	t.Parallel()
 
-	resolver := legacyResolve
+	resolver := prodResolve
 
 	// Tier-2 truth, pinned by direct reference to the same typed consts the
 	// tier-2 call sites use (repository.go / route_admin_service.go).

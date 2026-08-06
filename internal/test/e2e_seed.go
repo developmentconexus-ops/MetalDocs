@@ -106,7 +106,9 @@ type seedResponse struct {
 // the route always exists and the boot-time declared/mounted assertion never
 // depends on which optional dependency happened to be wired. !E2EEnabled()
 // is likewise not checked here; it is a composition-root condition
-// (mountE2EHandlersIfEnabled, apps/api/cmd/metaldocs-api/main.go) and survives
+// (e2eHandlersEnabled + e2ePublisher, apps/api/cmd/metaldocs-api/main.go —
+// Task 15b replaced mountE2EHandlersIfEnabled's callback indirection with the
+// inline useE2E gate) and survives
 // per-handler as the real guard below. mux == nil is a wiring bug, not a
 // branch, and panics.
 func RegisterE2EHandlers(mux httprouter.Muxer, db *sql.DB, runSchedulerTick func(context.Context) error) {

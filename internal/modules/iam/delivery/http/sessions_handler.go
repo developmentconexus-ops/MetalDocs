@@ -7,7 +7,6 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"metaldocs/internal/platform/httprouter"
 	"net/http"
 	"strconv"
 	"strings"
@@ -89,13 +88,6 @@ func (h *SessionsHandler) WithDisplayNameReader(r iamdomain.UserDisplayNameReade
 func (h *SessionsHandler) WithSessionService(svc *iamapp.SessionService) *SessionsHandler {
 	h.sessionService = svc
 	return h
-}
-
-// RegisterRoutes mounts the session list (GET) and revoke (DELETE) routes on
-// mux under /api/v1/auth/sessions.
-func (h *SessionsHandler) RegisterRoutes(mux httprouter.Muxer) {
-	mux.HandleFunc("/api/v1/auth/sessions", h.handleSessions)
-	mux.HandleFunc("/api/v1/auth/sessions/", h.handleSessionByID)
 }
 
 func (h *SessionsHandler) handleSessions(w http.ResponseWriter, r *http.Request) {

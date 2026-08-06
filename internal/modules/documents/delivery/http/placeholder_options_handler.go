@@ -2,7 +2,6 @@ package http
 
 import (
 	"context"
-	"metaldocs/internal/platform/httprouter"
 	"net/http"
 
 	documentsapi "metaldocs/internal/modules/documents/api"
@@ -31,10 +30,6 @@ type PlaceholderOptionsHandler struct {
 
 func NewPlaceholderOptionsHandler(schema placeholderOptionsSchemaReader, iam placeholderOptionsIAMReader) *PlaceholderOptionsHandler {
 	return &PlaceholderOptionsHandler{schema: schema, iam: iam}
-}
-
-func (h *PlaceholderOptionsHandler) RegisterRoutes(mux httprouter.Muxer) {
-	mux.HandleFunc("GET /api/v1/documents/{id}/placeholder-options/{pid}", h.HandleGetOptions)
 }
 
 func (h *PlaceholderOptionsHandler) HandleGetOptions(w http.ResponseWriter, r *http.Request) {

@@ -14,8 +14,8 @@ import (
 
 // routePath normalizes a spec path key to the runtime route path. The spec mixes
 // conventions: some keys carry the /api/v1 base (servers prefix) inline, others
-// are base-relative. Runtime routeRules use the full /api/v1 path, so ensure the
-// base is present exactly once.
+// are base-relative. The generated httpSurface table's keys carry the full
+// /api/v1 path, so ensure the base is present exactly once.
 func routePath(specPath string) string {
 	if strings.HasPrefix(specPath, "/api/v1") {
 		return specPath
@@ -112,10 +112,11 @@ func TestAreaEnforcedOpsAnnotated(t *testing.T) {
 	hasSurface := map[iamdomain.Capability]bool{}
 	annotatedCap := map[iamdomain.Capability]bool{}
 	for _, o := range loadSpecOps(t) {
-		cap, _, ok := resolveRoutePermission(o.method, routePath(o.path))
-		if !ok || !iamdomain.IsAreaGrade(cap) {
+		rule, ok := httpSurface[o.method+" "+routePath(o.path)]
+		if !ok || !iamdomain.IsAreaGrade(rule.capability) {
 			continue
 		}
+		cap := rule.capability
 		hasSurface[cap] = true
 		if o.hasSkip {
 			t.Errorf("op %q uses the retired x-authz-skip-area marker — api-contract-hardening Phase F removed it; declare a positive area posture instead (x-authz-area with source: tx|body|path, x-authz-area-none, or x-authz-custom).", o.opID)

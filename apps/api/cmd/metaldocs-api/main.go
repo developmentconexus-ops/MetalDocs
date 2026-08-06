@@ -903,8 +903,9 @@ func main() {
 	// entire API chain (see rootMux below, after handler is built). Contract
 	// §3.2: /metrics is a platform scrape surface, not a versioned product
 	// route, so it is NOT declared in api/openapi/v1/openapi.yaml. Coexists
-	// with the JSON endpoint (mounted via buildRouter above); they read from
-	// separate storage (prometheus vecs vs. byKey atomics).
+	// with the JSON endpoint (mounted via buildPublishers above, see
+	// publishers.go); they read from separate storage (prometheus vecs vs.
+	// byKey atomics).
 
 	// Audit retention - AUDIT_RETENTION_DAYS=0 disables (default disabled).
 	retentionCfg, err := config.LoadRetentionConfig()
@@ -1201,7 +1202,8 @@ func requireApprovalRuntimeSupport(fanoutURL string) error {
 // (Ruling 2) folded that mount into iamdelivery.Router.Mount, which also
 // mounts the HTTP-fallback snapshot route via the returned *iampresence.
 // Handler (ServeSnapshot) — neither route is mounted here at construction
-// time; both are mounted by buildRouter (router.go) via iamRouter.
+// time; both are mounted by buildPublishers (publishers.go) via iamRouter,
+// which is itself the SurfacePublisher for the "iam" tag.
 func startPresence(
 	ctx context.Context,
 	deps bootstrap.APIDependencies,
@@ -1214,8 +1216,9 @@ func startPresence(
 	presenceHub := iampresence.NewHub(presenceRepo, slog.Default())
 	go presenceHub.Run(ctx)
 	go presenceHub.RunHeartbeat(ctx)
-	// presenceHandler mounts via buildRouter (router.go), alongside every
-	// other route family — not here at construction time.
+	// presenceHandler mounts via buildPublishers (publishers.go), inside
+	// iamRouter's Mount, alongside every other route family — not here at
+	// construction time.
 	presenceHandler := iampresence.NewHandler(presenceHub, presenceRepo, slog.Default())
 	presenceBump := iampresence.NewBumpMiddleware(presenceRepo, slog.Default())
 	presenceBump.StartCleanup(ctx)
