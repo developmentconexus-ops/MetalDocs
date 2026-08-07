@@ -55,6 +55,8 @@ type ReviewSurfaceWriter interface {
 // exercise the review-due surfacer.
 type NoopReviewSurfaceWriter struct{}
 
+// MarkSurfaced surfaces nothing and returns no rows. The Noop default
+// performs no write.
 func (NoopReviewSurfaceWriter) MarkSurfaced(context.Context, db.Tx, string, time.Time) ([]SurfacedDoc, error) {
 	return nil, nil
 }

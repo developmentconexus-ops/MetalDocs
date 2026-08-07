@@ -70,10 +70,14 @@ type ReviewDueReader interface {
 // and in unit tests that do not exercise the review-due surfacer.
 type NoopReviewDueReader struct{}
 
+// ListDueForReview returns no rows. The Noop default is not backed by a
+// store; it reports nothing rather than claiming there is nothing.
 func (NoopReviewDueReader) ListDueForReview(context.Context, db.Tx, string, time.Time, int) ([]ReviewDueView, error) {
 	return nil, nil
 }
 
+// ListTenantsWithDueReviews returns no rows. The Noop default is not backed
+// by a store; it reports nothing rather than claiming there is nothing.
 func (NoopReviewDueReader) ListTenantsWithDueReviews(context.Context, db.Tx, time.Time) ([]string, error) {
 	return nil, nil
 }

@@ -84,10 +84,14 @@ type SLAOverdueReader interface {
 // stages and no tenants with overdue stages.
 type NoopSLAOverdueReader struct{}
 
+// ListOverdueStages returns no rows. The Noop default is not backed by a
+// store; it reports nothing rather than claiming there is nothing.
 func (NoopSLAOverdueReader) ListOverdueStages(context.Context, db.Tx, string, time.Time, int) ([]OverdueStageView, error) {
 	return nil, nil
 }
 
+// ListTenantsWithOverdueStages returns no rows. The Noop default is not
+// backed by a store; it reports nothing rather than claiming there is nothing.
 func (NoopSLAOverdueReader) ListTenantsWithOverdueStages(context.Context, db.Tx, time.Time) ([]string, error) {
 	return nil, nil
 }
@@ -120,6 +124,8 @@ type SLASurfaceWriter interface {
 // NoopSLASurfaceWriter is the fail-closed default: it surfaces nothing.
 type NoopSLASurfaceWriter struct{}
 
+// MarkStagesOverdueSurfaced surfaces nothing and returns no rows. The Noop
+// default performs no write.
 func (NoopSLASurfaceWriter) MarkStagesOverdueSurfaced(context.Context, db.Tx, string, time.Time) ([]SurfacedStage, error) {
 	return nil, nil
 }

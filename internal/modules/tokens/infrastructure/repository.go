@@ -39,6 +39,7 @@ func scanEntry(row interface {
 	return &e, nil
 }
 
+// Create inserts a new token dictionary entry and returns the created entry.
 func (r *PostgresRepository) Create(ctx context.Context, tx db.Tx, e *domain.Entry) (*domain.Entry, error) {
 	const q = `
 INSERT INTO metaldocs.token_dictionary_entries
@@ -54,6 +55,7 @@ RETURNING ` + selectColumns
 	return out, nil
 }
 
+// Update modifies an existing token dictionary entry and returns the updated entry.
 func (r *PostgresRepository) Update(ctx context.Context, tx db.Tx, e *domain.Entry) (*domain.Entry, error) {
 	const q = `
 UPDATE metaldocs.token_dictionary_entries
@@ -72,6 +74,7 @@ RETURNING ` + selectColumns
 	return out, nil
 }
 
+// Delete removes a token dictionary entry by ID.
 func (r *PostgresRepository) Delete(ctx context.Context, tx db.Tx, tenantID, id string) error {
 	const q = `DELETE FROM metaldocs.token_dictionary_entries WHERE tenant_id = $1 AND id = $2`
 	res, err := tx.ExecContext(ctx, q, tenantID, id)
@@ -88,6 +91,7 @@ func (r *PostgresRepository) Delete(ctx context.Context, tx db.Tx, tenantID, id 
 	return nil
 }
 
+// GetByID retrieves a token dictionary entry by ID.
 func (r *PostgresRepository) GetByID(ctx context.Context, tx db.Tx, tenantID, id string) (*domain.Entry, error) {
 	const q = `SELECT ` + selectColumns + ` FROM metaldocs.token_dictionary_entries WHERE tenant_id = $1 AND id = $2`
 	out, err := scanEntry(tx.QueryRowContext(ctx, q, tenantID, id))
@@ -100,6 +104,7 @@ func (r *PostgresRepository) GetByID(ctx context.Context, tx db.Tx, tenantID, id
 	return out, nil
 }
 
+// GetByName retrieves a token dictionary entry by name.
 func (r *PostgresRepository) GetByName(ctx context.Context, tx db.Tx, tenantID, name string) (*domain.Entry, error) {
 	const q = `SELECT ` + selectColumns + ` FROM metaldocs.token_dictionary_entries WHERE tenant_id = $1 AND name = $2`
 	out, err := scanEntry(tx.QueryRowContext(ctx, q, tenantID, name))
@@ -112,6 +117,7 @@ func (r *PostgresRepository) GetByName(ctx context.Context, tx db.Tx, tenantID, 
 	return out, nil
 }
 
+// List retrieves all token dictionary entries for a tenant, ordered by name.
 func (r *PostgresRepository) List(ctx context.Context, tx db.Tx, tenantID string) ([]domain.Entry, error) {
 	const q = `SELECT ` + selectColumns + ` FROM metaldocs.token_dictionary_entries WHERE tenant_id = $1 ORDER BY name ASC`
 	rows, err := tx.QueryContext(ctx, q, tenantID)

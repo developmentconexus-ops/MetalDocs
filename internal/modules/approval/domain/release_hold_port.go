@@ -77,10 +77,14 @@ type ReleaseHoldReader interface {
 // and no tenants with stuck holds.
 type NoopReleaseHoldReader struct{}
 
+// ListStuckHolds returns no rows. The Noop default is not backed by a
+// store; it reports nothing rather than claiming there is nothing.
 func (NoopReleaseHoldReader) ListStuckHolds(context.Context, db.Tx, string, time.Time, time.Duration, int) ([]StuckReleaseHoldView, error) {
 	return nil, nil
 }
 
+// ListTenantsWithStuckHolds returns no rows. The Noop default is not backed
+// by a store; it reports nothing rather than claiming there is nothing.
 func (NoopReleaseHoldReader) ListTenantsWithStuckHolds(context.Context, db.Tx, time.Time, time.Duration) ([]string, error) {
 	return nil, nil
 }
