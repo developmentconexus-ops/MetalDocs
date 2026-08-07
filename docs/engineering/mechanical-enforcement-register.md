@@ -50,6 +50,7 @@ defect this register exists to eliminate.
 | ME-10 tenant-defined roles retire the generated enums | [#83](https://github.com/leandrotcawork/MetalDocs/issues/83) |
 | ME-11 anti-drift guard with a hand-synced allow-list | [#84](https://github.com/leandrotcawork/MetalDocs/issues/84) |
 | ME-12 a string lint cannot see a constant-built bypass | [#85](https://github.com/leandrotcawork/MetalDocs/issues/85) |
+| ME-13 an analysis that takes its subject as its own premise | [#86](https://github.com/leandrotcawork/MetalDocs/issues/86) |
 
 ## How to read an entry
 
@@ -419,6 +420,50 @@ written into the guard and into the spec's accepted-residue section (§14 item 2
 read as full coverage.
 
 **Owner:** follow-up to the authz grant-unification program.
+
+---
+
+## ME-13 — an analysis that takes its subject as its own premise
+
+**Found** 2026-08-07 by the operator, rejecting two independent advisory answers to the question
+"is the `documents`/`controlleddocuments`/`templates` split a domain truth or an implementation
+accident?"
+
+Both arms answered with evidence about the system as built: table ownership is disjoint, no
+`POST /documents` route exists, a prior design already ratified "no merge", the current transaction
+creates the slot and the first document together. Each of those is a **consequence** of the split
+being examined. The operator's objection, verbatim:
+
+> "você está baseando num máximo local — baseando numa coisa que já está implementada em vez de
+> analisar o melhor pra ser implementado."
+
+An argument of that shape cannot return any answer but "leave it as it is", because it takes the
+artifact under examination as its own premise. It is not a weak argument for the status quo; it is
+**no argument at all**, wearing the costume of evidence — and it reads as rigorous precisely because
+it cites `file:line`.
+
+Two properties make this worse than ordinary bias. First, **it is selective**: the same analyst
+reasons correctly about everything except the thing being judged, so the surrounding rigour vouches
+for the one section that has none. Second, **the failure is invisible from inside the answer** —
+nothing in "the tables are disjoint" announces that it is circular. It took an operator who was not
+reading the evidence to catch it.
+
+CLAUDE.md's Global-Maximum rule already names this. It fired here anyway, inside two analyses
+commissioned specifically to avoid it, and it was the *rejected* answer that was later shown wrong on
+the merits: re-asked with status-quo evidence ruled inadmissible, both arms reversed and converged on
+the opposite conclusion (ADR 0093).
+
+**Firing mechanism** — level 3, and it belongs to the brief, not to the analyst. Any brief asking
+whether an existing structure is correct MUST carry an explicit inadmissible-evidence list (current
+schema, module layout, import graph, route topology, existing ADRs, transaction boundaries,
+doc-comments describing the code, migration cost) and MUST require an **inversion test**: state which
+conclusions would survive if the current implementation were the opposite in every respect. An answer
+without a passed inversion test is not a finding. `docs/superpowers/analysis/2026-08-07-controlled-information-greenfield-brief.md`
+is the working template; the `adversarial-review` and `developing-new-work` skills are where the
+requirement has to live to fire without being remembered.
+
+**Owner:** unrouted. The skills change is small and blocks nothing; the risk is that every future
+"should we restructure X" answer inherits the defect until it lands.
 
 ---
 
