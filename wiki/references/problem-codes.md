@@ -72,7 +72,7 @@ Families are **semantic, never module-named**. A module name on a public wire co
 | `notfound.membership` | 404 | platform | `internal/platform/problem/codes.go:142` |
 | `notfound.process_area` | 404 | shared | `internal/platform/problem/codes.go:146` |
 | `notfound.resource` | 404 | platform | `internal/platform/problem/codes.go:141` |
-| `notfound.revision` | 404 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:150` |
+| `notfound.revision` | 404 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:144` |
 
 ## `permission` — default 403
 
@@ -144,11 +144,11 @@ Families are **semantic, never module-named**. A module name on a public wire co
 | `state.fast_forward_stage_not_completed` | 409 | approval | `internal/modules/approval/http/errors.go:173` |
 | `state.override_template_deleted` | 409 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:536` |
 | `state.override_template_not_published` | 409 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:537` |
-| `state.placeholder_not_author_editable` | 409 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:151` |
+| `state.placeholder_not_author_editable` | 409 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:145` |
 | `state.process_area_archived` | 409 | shared | `internal/platform/problem/codes.go:174` |
 | `state.profile_class_route_conflict` | 409 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:63` |
 | `state.profile_no_default_template` | 409 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:552` |
-| `state.revision_not_draft` | 409 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:152` |
+| `state.revision_not_draft` | 409 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:146` |
 | `state.sla_extension_no_active_stage` | 409 | approval | `internal/modules/approval/http/errors.go:184` |
 | `state.system_template_immutable` | 409 | platform | `internal/platform/problem/codes.go:170` |
 | `state.template_artifact_missing` | 409 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:549` |
@@ -173,13 +173,13 @@ Families are **semantic, never module-named**. A module name on a public wire co
 | `validation.empty_eligible_pool` | 422 | shared | `internal/platform/problem/codes.go:254` |
 | `validation.failed` | 422 | shared | `internal/platform/problem/codes.go:241` |
 | `validation.family_unknown` | 422 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:61` |
-| `validation.field_immutable` | 422 | tokens | `internal/modules/tokens/delivery/http/handler.go:47` |
+| `validation.field_immutable` | 422 | tokens | `internal/modules/tokens/delivery/http/handler.go:49` |
 | `validation.manual_code_reason_required` | 422 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:533` |
-| `validation.name_reserved` | 422 | tokens | `internal/modules/tokens/delivery/http/handler.go:48` |
+| `validation.name_reserved` | 422 | tokens | `internal/modules/tokens/delivery/http/handler.go:50` |
 | `validation.override_reason_required` | 422 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:534` |
 | `validation.placeholder_name_duplicate` | 422 | templates | `internal/modules/templates/delivery/http/errors.go:55` |
 | `validation.placeholder_name_invalid` | 422 | templates | `internal/modules/templates/delivery/http/errors.go:50` |
-| `validation.placeholder_not_choice` | 422 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:149` |
+| `validation.placeholder_not_choice` | 422 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:143` |
 | `validation.profile_code_immutable` | 422 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:51` |
 | `validation.profile_not_configured` | 422 | approval | `internal/modules/approval/http/errors.go:142` |
 | `validation.profile_unknown` | 422 | approval | `internal/modules/approval/http/errors.go:132` |
