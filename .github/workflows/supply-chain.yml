@@ -32,17 +32,22 @@ jobs:
   cve-scan:
     name: CVE Scan (Grype)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - uses: actions/checkout@v4
-      - uses: anchore/scan-action@v3
+      - id: scan
+        uses: anchore/scan-action@v7
         with:
           path: '.'
           fail-build: true
           severity-cutoff: high
-      - uses: github/codeql-action/upload-sarif@v3
-        if: always()
+          cache-db: true
+      - uses: github/codeql-action/upload-sarif@v4
+        if: always() && steps.scan.outputs.sarif != ''
         with:
-          sarif_file: results.sarif
+          sarif_file: ${{ steps.scan.outputs.sarif }}
 
   dependabot-label:
     name: Label Dependabot PRs with soak requirement

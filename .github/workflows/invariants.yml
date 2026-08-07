@@ -21,7 +21,7 @@ jobs:
       - name: Run cilint
         run: go run ./tools/cilint --sarif ./... > sarif-cilint.json 2>&1 || true
       - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         # Advisory telemetry only — the real gate is the "Fail on violations"
         # step below. Never fail the job because the SARIF upload lacked the
