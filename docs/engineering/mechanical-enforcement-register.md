@@ -14,9 +14,15 @@ The meta-defect behind all of them was named in the 2026-07-03 final architectur
 Appendix B cause 2 of the defect-class catalog is the same finding from the defect side.
 
 This register is where that observation gets *durable* instead of being re-derived each program.
-Anything spotted in passing — during design, review, debugging, anything — that is currently kept
-correct by discipline rather than by a mechanism goes here, whether or not the current task touches
-it. Recording is cheap; rediscovering is not.
+Anything spotted in passing — during design, review, debugging, anything — goes here, whether or not
+the current task touches it. Recording is cheap; rediscovering is not.
+
+**Scope, widened 2026-08-06 by operator ruling.** Hand-maintained sync was the founding case, not
+the boundary. This register takes anything worth standardizing or reconsidering: code, architecture,
+logic, implementation — **and build-vs-adopt.** Where we hand-rolled something the industry already
+sells hardened and certified (authentication is the archetype — Keycloak, Ory, Zitadel, WorkOS), that
+belongs here too. Filing an entry is **not** a proposal to adopt. It is a commitment to study the
+option on evidence rather than let "we already wrote it" decide by default.
 
 **The operator's standing rule this register serves** (2026-08-06, restated from CLAUDE.md's
 Global Maximum section): *never prefer a solution because it is what is already implemented.* If the
@@ -171,6 +177,99 @@ document — is the direct road back to the defect this program removes. On that
 engine becomes the global maximum and this entry becomes a program.
 
 **Verified** as a decision, 2026-08-06. **Owner:** whoever gets that requirement first.
+
+---
+
+## Build vs. adopt
+
+A different kind of entry, so it gets its own section and its own questions. A firing mechanism is
+not the right field here — these are not drift problems. The questions that decide them:
+
+1. **Commodity or domain?** If every serious product in the category implements the same thing the
+   same way, it is commodity and owning it earns nothing. If the logic encodes *this product's*
+   rules, it is domain and must stay ours.
+2. **Does buying shift a compliance burden?** In a regulated eQMS, a vendor-validated component can
+   move part of the validation evidence off our side. That is a real, costed argument, not a vague
+   one.
+3. **What does integration cost, and does it re-create a sync problem?** An external system holding
+   a copy of data we also hold is Class 35 at a new boundary. This is what killed the policy-engine
+   option in ME-06, and it is the first thing to check for any adoption.
+4. **What is the exit?** Adopting is also a coupling. An option we cannot leave is a bigger decision
+   than an option we can.
+
+---
+
+### ME-07 — `auth` is a hand-rolled identity provider (~4,378 LOC)
+
+**What we own today** (`internal/modules/auth/application/service.go`): password hashing (bcrypt,
+cost 12), credential verification, a constant-time login path with a dummy-hash timing-oracle
+mitigation (`:127`, `:273-300`), session token minting + signing (`:1110-1142`), session cookies,
+account lockout and unlock (`:840`), password policy (`:1013`), admin password reset (`:743`),
+local-admin bootstrap (`:198`), plus `pre_auth_login_rate_limit` in the middleware chain.
+
+**This entry is not a criticism of the code.** It is careful work — the timing-oracle handling is
+better than most hand-rolled auth, bcrypt cost 12 is right, and the failure paths are deliberate.
+The question is not quality. It is **category**.
+
+**The line worth drawing:** authentication is commodity; authorization is domain. MetalDocs' capability
+model, area scoping, and separation-of-duties encode *this product's* rules and must stay ours
+(ME-06 covers why even the authZ engine stays in-house). Proving someone is who they say they are
+encodes nothing of ours.
+
+**Arguments to study, not conclusions:**
+- **21 CFR Part 11** puts identity controls (§11.10(d),(g),(h), §11.300) in audit scope. A
+  vendor-validated IdP moves part of that evidence burden off us — question 2, and the strongest
+  argument on the adopt side.
+- **SSO / SAML / SCIM is table stakes** for pharma and medical-device buyers. Today that is a
+  from-scratch build; with an IdP it is configuration. This is a *feature* argument, not only an
+  architecture one, which makes it the one most likely to arrive as a customer requirement.
+- **Against:** integration is not free, and question 3 bites — an external IdP holding users while
+  `iam_users` also holds them is a sync boundary. It is tractable (the IdP owns the credential, we
+  own the profile and the grants, joined by a stable subject id) but it must be designed, not
+  assumed.
+- **Exit** (question 4) is genuinely good here: OIDC is a standard, so the coupling is to a protocol
+  rather than to a vendor.
+
+**Related and blocking-adjacent:** ME-08. Whatever is decided, MFA is currently a hole, and an IdP
+would close it as a side effect.
+
+**Verified** 2026-08-06, first-hand. **Owner:** unassigned — study, not scheduled.
+
+---
+
+### ME-08 — MFA is a dashboard, not a control
+
+**Severity: this is the most serious entry in the register.**
+
+`security` publishes per-tenant and per-role MFA coverage
+(`internal/modules/security/delivery/http/handler.go:112`, `domain/model.go:13-23`), reading through
+`iam`'s `MfaUserReader` port (`internal/modules/iam/domain/mfa_user_reader_port.go:16-22`). That
+port has exactly two operations: `TenantMfaCounts` and `TenantMfaCountsByRole`. Both are counts.
+
+There is **no enrollment path, no factor verification, and no MFA challenge in the login flow**
+(`auth/application/service.go:265` `Authenticate` has no MFA step). No TOTP, no WebAuthn, anywhere in
+the repo. `iam_users.mfa_enabled` and `mfa_enrolled_at` are columns nothing can set to true except
+hand-written SQL.
+
+**Why this is worse than a missing feature.** An absent control is visibly absent. A control that
+reports its own coverage looks *present and measured* — the dashboard renders, the percentage is
+real arithmetic over a real column, and an auditor reading "MFA coverage: 0%" concludes rollout is
+incomplete, not that the mechanism does not exist. The reporting layer lends credibility the
+enforcement layer never earned.
+
+**Firing mechanism** — level 1 for the reporting half, and it is available immediately regardless of
+what happens to the control itself: an endpoint must not be able to report on a control with no
+enforcement path. Either MFA gains enrollment + challenge, or the coverage endpoint is deleted until
+it does. Reporting a hollow control is a defect; the honest interim state is silence, not a zero.
+
+**Candidate defect class** — this generalizes past MFA and past this repo: *observability for a
+control that was never implemented*. Nothing in the existing catalog covers it, and the mechanism is
+distinct from Class 12 (debt written up as policy) because no one ever claimed the control worked —
+the dashboard makes the claim structurally, without a sentence. Evaluate for Part I on the next
+catalog pass.
+
+**Verified** 2026-08-06, first-hand: read the port, the repository, the handler, and the login path.
+**Owner:** unassigned. **Do not let this one sit unrouted.**
 
 ---
 
