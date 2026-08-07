@@ -3,10 +3,10 @@ import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { SearchBar } from "../../../components/ui/SearchBar";
 import { resolveQueryError } from "../../../lib/api/resolveQueryError";
-import { useHasCapability } from "../hooks/useHasCapability";
+import { useHasCapability } from "../../../lib/iam/useHasCapability";
 import { useAuthStore } from "../../../store/auth.store";
 import { useMembershipsQuery } from "../queries/useMembershipsQuery";
-import { useUsersQuery } from "../queries/useUsersQuery";
+import { useUsersQuery } from "../../../lib/iam/useUsersQuery";
 import { useGrantMembershipMutation } from "../mutations/useGrantMembershipMutation";
 import { useRevokeMembershipMutation } from "../mutations/useRevokeMembershipMutation";
 import MembershipsDirectory, {

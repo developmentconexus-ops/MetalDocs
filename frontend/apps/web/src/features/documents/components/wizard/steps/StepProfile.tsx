@@ -4,7 +4,7 @@ import { Icon } from '../../../../../components/ui/Icon';
 import { InlineAlert } from '../../../../../components/ui/InlineAlert';
 import { resolveQueryError } from '../../../../../lib/api';
 import type { DocumentProfile } from '../../../../taxonomy/types';
-import { useHasCapability } from '../../../../iam/hooks/useHasCapability';
+import { useHasCapability } from '../../../../../lib/iam/useHasCapability';
 import { WizardFooter } from '../../../../shared/components/wizard/WizardFooter';
 import styles from './StepProfile.module.css';
 

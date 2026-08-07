@@ -18,7 +18,7 @@ import type { ApprovalInstance, StageInstance } from '../../../api/approvalTypes
 import { ApprovalTimeline } from '../ApprovalTimeline';
 
 const hasCapMock = vi.fn();
-vi.mock('../../../../iam/hooks/useHasCapability', () => ({
+vi.mock('../../../../../lib/iam/useHasCapability', () => ({
   useHasCapability: (cap: string) => hasCapMock(cap),
 }));
 

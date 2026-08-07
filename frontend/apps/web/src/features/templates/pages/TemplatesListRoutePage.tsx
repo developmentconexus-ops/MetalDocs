@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { TemplatesListPage } from "../TemplatesListPage";
-import { useHasCapability } from "../../iam/hooks/useHasCapability";
+import { useHasCapability } from "../../../lib/iam/useHasCapability";
 
 export function Component() {
   const navigate = useNavigate();

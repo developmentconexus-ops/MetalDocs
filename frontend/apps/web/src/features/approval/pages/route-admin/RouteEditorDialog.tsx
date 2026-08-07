@@ -3,7 +3,7 @@ import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { Dialog } from '../../../../components/ui';
 import { resolveErrorMessage } from '../../../../lib/api/problem';
 import { useAreasQuery } from '../../../documents/queries/useAreasQuery';
-import { useUsersQuery } from '../../../iam/queries/useUsersQuery';
+import { useUsersQuery } from '../../../../lib/iam/useUsersQuery';
 import { useProfilesQuery } from '../../../taxonomy/queries/useProfilesQuery';
 import { useIamRolesQuery } from '../../queries/useIamRolesQuery';
 import type { CreateRouteRequest, RouteSummary, UpdateRouteRequest } from '../../api/routeAdminApi';

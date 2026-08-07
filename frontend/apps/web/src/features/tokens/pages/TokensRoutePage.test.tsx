@@ -9,7 +9,7 @@ vi.mock('../../templates', () => ({
   usePlaceholderCatalogQuery: () => ({ data: [{ key: 'author', label: 'Autor', description: '' }] }),
 }));
 const hasCapMock = vi.fn();
-vi.mock('../../iam/hooks/useHasCapability', () => ({ useHasCapability: (c: string) => hasCapMock(c) }));
+vi.mock('../../../lib/iam/useHasCapability', () => ({ useHasCapability: (c: string) => hasCapMock(c) }));
 
 afterEach(() => vi.restoreAllMocks());
 

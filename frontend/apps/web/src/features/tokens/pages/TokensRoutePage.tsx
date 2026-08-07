@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { usePlaceholderCatalogQuery } from '../../templates';
-import { useHasCapability } from '../../iam/hooks/useHasCapability';
+import { useHasCapability } from '../../../lib/iam/useHasCapability';
 import { resolveQueryError } from '../../../lib/api';
 import { TokenList } from '../components/TokenList';
 import { TokenEditDialog } from '../components/TokenEditDialog';

@@ -1,6 +1,6 @@
-import { useUsersQuery } from '../../iam/queries/useUsersQuery';
-import type { components } from '../../../lib/api-types';
-import { isUserRole } from '../../../lib/iam/role-vocabulary';
+import { useUsersQuery } from '../../../../lib/iam/useUsersQuery';
+import type { components } from '../../../../lib/api-types';
+import { isUserRole } from '../../../../lib/iam/role-vocabulary';
 import styles from './SubmitChoicePicker.module.css';
 
 export type ApprovalRoutePreview = components['schemas']['ApprovalRoutePreview'];

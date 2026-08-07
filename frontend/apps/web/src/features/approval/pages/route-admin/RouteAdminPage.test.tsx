@@ -19,7 +19,7 @@ vi.mock('../../../taxonomy/api/taxonomy', () => ({
     { code: 'OPS', name: 'Operações' },
   ]),
 }));
-vi.mock('../../../iam/queries/useUsersQuery', () => ({
+vi.mock('../../../../lib/iam/useUsersQuery', () => ({
   useUsersQuery: vi.fn(() => ({
     data: { items: [], page: { next_cursor: null, has_more: false } },
     isLoading: false,

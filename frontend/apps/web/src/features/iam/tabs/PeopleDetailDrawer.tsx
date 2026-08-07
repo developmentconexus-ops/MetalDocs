@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { DrawerShell } from "../../../components/ui/DrawerShell";
-import { useUsersQuery } from "../queries/useUsersQuery";
+import { useUsersQuery } from "../../../lib/iam/useUsersQuery";
 import { useAuditEventsQuery } from "../queries/useAuditEventsQuery";
 import { usePatchUserMutation } from "../mutations/usePatchUserMutation";
 import { useUnlockUserMutation } from "../mutations/useUnlockUserMutation";

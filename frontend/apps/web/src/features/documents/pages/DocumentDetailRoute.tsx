@@ -10,7 +10,7 @@ import type { ReleaseNoticeTone } from '../lib/documentReleasePresentation';
 import { createRevision } from '../../controlled-documents/api/controlledDocuments';
 import { exportPDF } from '../api/exports';
 import { DocumentPdfViewerDialog } from '../components/DocumentPdfViewerDialog';
-import { useHasCapability } from '../../iam/hooks/useHasCapability';
+import { useHasCapability } from '../../../lib/iam/useHasCapability';
 import styles from './DocumentDetailRoute.module.css';
 
 /**

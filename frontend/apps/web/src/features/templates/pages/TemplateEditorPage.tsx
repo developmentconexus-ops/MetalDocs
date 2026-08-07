@@ -28,7 +28,7 @@ import {
   isSubmitChoiceSelectionComplete,
   submitChoiceStagesOf,
   type SubmitChosenActors,
-} from '../../approval/components/SubmitChoicePicker';
+} from '../../shared/components/submit-choice-picker';
 import styles from './styles/TemplateEditorPage.module.css';
 
 export type TemplateEditorPageProps = {

@@ -1,6 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { WorkspaceViewFrame } from "../../../components/WorkspaceViewFrame";
-import { useHasCapability } from "../hooks/useHasCapability";
+import { useHasCapability } from "../../../lib/iam/useHasCapability";
 import styles from "./AdminCenterPage.module.css";
 
 type TabConfig = {

@@ -10,7 +10,7 @@ import {
 } from './SubmitChoicePicker';
 
 const usersQueryMock = vi.fn();
-vi.mock('../../iam/queries/useUsersQuery', () => ({
+vi.mock('../../../../lib/iam/useUsersQuery', () => ({
   useUsersQuery: (...args: unknown[]) => usersQueryMock(...args),
 }));
 

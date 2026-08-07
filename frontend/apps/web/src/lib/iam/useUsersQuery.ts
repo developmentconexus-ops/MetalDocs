@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "../../../lib/api/client";
-import { QK } from "../../../lib/queryKeys";
-import type { operations } from "../../../lib/api-types";
+import { api } from "../api/client";
+import { QK } from "../queryKeys";
+import type { operations } from "../api-types";
 
 const STALE_30S = 30_000;
 

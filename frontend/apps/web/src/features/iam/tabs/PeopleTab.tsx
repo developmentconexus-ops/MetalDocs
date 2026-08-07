@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { SearchBar } from "../../../components/ui/SearchBar";
 import { Dialog } from "../../../components/ui/Dialog";
 import { resolveQueryError } from "../../../lib/api/resolveQueryError";
-import { useUsersQuery } from "../queries/useUsersQuery";
+import { useUsersQuery } from "../../../lib/iam/useUsersQuery";
 import { useBulkUsersMutation } from "../mutations/useBulkUsersMutation";
 import UsersDirectory, {
   type SortKey,

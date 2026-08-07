@@ -21,7 +21,7 @@ import type { DocumentDetailGating } from '../adapters/useDocumentArtifact';
 import type { ReleasePresentation } from '../lib/documentReleasePresentation';
 
 const hasCapMock = vi.fn();
-vi.mock('../../iam/hooks/useHasCapability', () => ({
+vi.mock('../../../lib/iam/useHasCapability', () => ({
   useHasCapability: (cap: string) => hasCapMock(cap),
 }));
 

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { DocumentProfile } from "../types";
 import { useArchiveProfileMutation } from "../queries/useTaxonomyMutations";
-import { useHasCapability } from "../../iam/hooks/useHasCapability";
+import { useHasCapability } from "../../../lib/iam/useHasCapability";
 import { ProfileEditDialog } from "./ProfileEditDialog";
 import { resolveErrorMessage } from "../../../lib/api/problem";
 import styles from "./TaxonomyList.module.css";

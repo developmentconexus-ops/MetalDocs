@@ -11,7 +11,7 @@ vi.mock('../../../store/auth.store', () => ({
 // FE-11: revision-initiate gating is capability-based (ADR 0022), not role-based.
 // This mock only needs to satisfy the hook call — DocumentDetailRoute.test.tsx
 // covers the gating behavior end to end.
-vi.mock('../../iam/hooks/useHasCapability', () => ({
+vi.mock('../../../lib/iam/useHasCapability', () => ({
   useHasCapability: vi.fn(() => true),
 }));
 

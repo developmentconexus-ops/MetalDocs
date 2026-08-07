@@ -11,7 +11,7 @@ import { QK } from '../../../lib/queryKeys';
 import { ApiError, resolveErrorMessage } from '../../../lib/api';
 import type { components } from '../../../lib/api-types';
 import type { ArtifactAction } from '../../shared/controlled-artifact/types';
-import { useHasCapability } from '../../iam/hooks/useHasCapability';
+import { useHasCapability } from '../../../lib/iam/useHasCapability';
 import { CancelInstanceDialog } from '../../approval/components/CancelInstanceDialog';
 import { deriveWorkspaceMode } from '../../approval/lib/workspaceMode';
 import { deriveFastForwardOffer } from '../../approval/lib/fastForwardOffer';
@@ -22,7 +22,7 @@ import {
   SubmitChoicePicker,
   isSubmitChoiceSelectionComplete,
   submitChoiceStagesOf,
-} from '../../approval/components/SubmitChoicePicker';
+} from '../../shared/components/submit-choice-picker';
 import type { DocumentDetail } from '../api/documents';
 import { AutosaveStatus, editorChromeStyles, type AutosaveState } from '../../shared/components/editor-chrome';
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';

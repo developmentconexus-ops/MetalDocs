@@ -1,5 +1,5 @@
 import { useAuthStore } from '../../../store/auth.store';
-import { useHasCapability } from '../../iam/hooks/useHasCapability';
+import { useHasCapability } from '../../../lib/iam/useHasCapability';
 import { formatRevisionCode } from '../../../lib/labels/revisionCode';
 import { formatPageCount, formatPublishedAt, resolveAreaLabel, resolveProfileLabel } from '../lib/documentDetailMeta';
 import { resolveOwnerDisplay } from '../../shared/controlled-artifact/resolveOwnerDisplay';

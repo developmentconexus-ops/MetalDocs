@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import type { ApprovalInstance, Signoff, StageInstance } from '../../api/approvalTypes';
 import { formatDateTime as formatDateTimeValue } from '../../../../lib/formatDate';
-import { useHasCapability } from '../../../iam/hooks/useHasCapability';
+import { useHasCapability } from '../../../../lib/iam/useHasCapability';
 import { useExtendSLA } from '../../queries/useExtendSLA';
 import { ExtendSlaDialog } from '../ExtendSlaDialog';
 import styles from './ApprovalTimeline.module.css';
