@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"metaldocs/internal/modules/iam/authz"
+	fanoutinfra "metaldocs/internal/modules/render/fanout/infrastructure"
 	"metaldocs/internal/platform/db"
 )
 
@@ -199,24 +199,12 @@ UPDATE %s
 
 // inSeededTx opens a tx, seeds it with tenantID via authz.SeedTxTenant BEFORE
 // running fn, then commits/rolls back. This is the shared tx-wrap for the
-// per-row processing writes (MarkDispatched/MarkFailed).
+// per-row processing writes (MarkDispatched/MarkFailed). The actual tx
+// lifecycle (BeginTx/Commit/Rollback) is owned by fanoutinfra.RunSeededTx —
+// tools/cilint's txownership rule does not permit the fanout package itself
+// to manage transactions directly (see internal/modules/render/fanout/infrastructure).
 func (r *StagingOutboxRepository) inSeededTx(ctx context.Context, tenantID string, fn func(tx *sql.Tx) error) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("%s: begin tx: %w", r.name, err)
-	}
-	if err := authz.SeedTxTenant(ctx, tx, tenantID); err != nil {
-		_ = tx.Rollback()
-		return fmt.Errorf("%s: seed tenant: %w", r.name, err)
-	}
-	if err := fn(tx); err != nil {
-		_ = tx.Rollback()
-		return err
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("%s: commit: %w", r.name, err)
-	}
-	return nil
+	return fanoutinfra.RunSeededTx(ctx, r.db, r.name, tenantID, fn)
 }
 
 // CountDeadLettered returns the number of rows that have been permanently
