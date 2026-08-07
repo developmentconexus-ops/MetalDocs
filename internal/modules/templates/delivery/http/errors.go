@@ -167,34 +167,34 @@ func MapErr(err error) (httpStatus int, code problem.Code) {
 	case errors.Is(err, approvalapp.ErrNoActiveApprovalRoute):
 		return http.StatusConflict, codeTplApprovalRouteMissing
 	case errors.Is(err, approvalapp.ErrDuplicateSubmission):
-		return http.StatusConflict, codeTplApprovalConflict
+		return http.StatusConflict, codeTplDuplicateSubmission
 	case errors.Is(err, approvalapp.ErrNoActiveInstance):
 		return http.StatusNotFound, codeTplApprovalNotFound
 	case errors.Is(err, approvalapp.ErrInstanceCompleted):
-		return http.StatusConflict, codeTplApprovalConflict
+		return http.StatusConflict, codeTplApprovalInstanceCompleted
 	case errors.Is(err, approvalapp.ErrStageNotActive):
-		return http.StatusConflict, codeTplApprovalConflict
+		return http.StatusConflict, codeTplApprovalStageNotActive
 	case errors.Is(err, approvalapp.ErrContentHashMismatch):
 		return http.StatusPreconditionFailed, codeTplContentHashMismatch
 	case errors.Is(err, approvalapp.ErrIdempotencyKeyRequired):
 		return http.StatusBadRequest, problem.CodeRequestIdempotencyKeyRequired
 	case errors.Is(err, approvaldomain.ErrEmptyEligiblePool):
-		return http.StatusUnprocessableEntity, codeTplApprovalConflict
+		return http.StatusUnprocessableEntity, codeTplEmptyEligiblePool
 	case errors.Is(err, approvaldomain.ErrSubmitChoiceRequired):
 		// M4, unit 3.2, slice 5: symmetric with the document submit mapping
 		// (approval/http/errors.go) — a submit_choice-governed stage has no
 		// matching/non-empty chosen_actors entry.
-		return http.StatusUnprocessableEntity, codeTplApprovalConflict
+		return http.StatusUnprocessableEntity, codeTplSubmitChoiceRequired
 	case errors.Is(err, approvaldomain.ErrSubmitChoiceConstraintViolated):
 		// M4, unit 3.2, slice 5: chosen user fails the role x area_code
 		// constraint, or chosen_actors targets a non-submit_choice stage.
-		return http.StatusUnprocessableEntity, codeTplApprovalConflict
+		return http.StatusUnprocessableEntity, codeTplSubmitChoiceConstraint
 	case errors.Is(err, approvaldomain.ErrNoActiveStage):
 		return http.StatusConflict, codeTplApprovalConflict
 	case errors.Is(err, approvaldomain.ErrActorNotEligible):
-		return http.StatusForbidden, problem.CodePermissionCapabilityDenied
+		return http.StatusForbidden, codeTplSignoffActorNotEligible
 	case errors.Is(err, approvaldomain.ErrAuthorCannotSign):
-		return http.StatusForbidden, problem.CodePermissionCapabilityDenied
+		return http.StatusForbidden, codeTplSodSubmitterCannotSign
 	default:
 		return http.StatusInternalServerError, codeTplInternalError
 	}
