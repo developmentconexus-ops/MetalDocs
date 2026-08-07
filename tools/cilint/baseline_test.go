@@ -189,7 +189,12 @@ func TestCompareBaseline_PathSeparatorNormalization_BothDirections(t *testing.T)
 	bl := &Baseline{
 		Doc: baselineDoc,
 		Entries: []BaselineEntry{
-			{Analyzer: "platformboundary", File: filepath.ToSlash(`internal\platform\tripwire\arms.go`), Message: "boundary violation", Count: 1},
+			// toForwardSlash, not filepath.ToSlash: this fixture is built by hand
+			// and never passes through loadBaseline, so nothing else normalizes
+			// it. On Linux filepath.ToSlash is the identity function, which left
+			// the entry backslashed while the finding below was normalized — the
+			// test could only pass on Windows.
+			{Analyzer: "platformboundary", File: toForwardSlash(`internal\platform\tripwire\arms.go`), Message: "boundary violation", Count: 1},
 		},
 	}
 	findings := normalizeFindings([]analyzers.Finding{
