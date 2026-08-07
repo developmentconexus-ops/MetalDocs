@@ -251,14 +251,14 @@ var (
 	// and by templates (annex C-18 / R-4). Statuses already agreed at 422; only the
 	// codes diverged, because templates flattened all three onto conflict.generic
 	// and thereby made the FE message map useless for template submit.
-	// CodeValidationEmptyEligiblePool: the configured stage resolves to zero
-	// eligible actors, so no one could ever act on it.
+	// CodeValidationEmptyEligiblePool is returned when the configured stage
+	// resolves to zero eligible actors, so no one could ever act on it.
 	CodeValidationEmptyEligiblePool = Register("shared", "validation.empty_eligible_pool", 422)
-	// CodeValidationSubmitChoiceRequired: the stage needs the submitter to pick
-	// an actor and the request did not carry one.
+	// CodeValidationSubmitChoiceRequired is returned when the stage needs the
+	// submitter to pick an actor and the request did not carry one.
 	CodeValidationSubmitChoiceRequired = Register("shared", "validation.submit_choice_required", 422)
-	// CodeValidationSubmitChoiceConstraintViolated: the submitter did pick, but
-	// the choice breaks a stage constraint (eligibility, SoD).
+	// CodeValidationSubmitChoiceConstraintViolated is returned when the submitter
+	// did pick, but the choice breaks a stage constraint (eligibility, SoD).
 	CodeValidationSubmitChoiceConstraintViolated = Register("shared", "validation.submit_choice_constraint_violated", 422)
 )
 

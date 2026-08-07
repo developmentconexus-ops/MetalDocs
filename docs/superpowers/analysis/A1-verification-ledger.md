@@ -132,12 +132,12 @@ the assumption that it would pass.
 | `unit` | `test-smoke.yml:unit` | absolute — `go build ./...` + `go test ./...` |
 | `smoke` | `test-smoke.yml:smoke` | absolute |
 | `gitleaks` | `secret-scan.yml` | allowlist (§3.2) |
-| `hardening` | `phase3-hardening-gate.yml` | absolute |
 
 ### Tier 2 — reports, not required
 
 | Check | Why it cannot gate | Closes when |
 |---|---|---|
+| `hardening` | red on D-17 | `tests/contract` has Go files again, or the gate stops asking for them |
 | `conformance` | red on D-13 | 13 test-discipline violations ported |
 | `gate` | red on D-1; also `paths:`-filtered | evidence landed **and** filter removed |
 | `DB schema dictionary coverage` | red on D-5 | 10 tables documented |
@@ -219,6 +219,7 @@ does not port code.
 | D-14 | The registry has no dependency edges. `docx-v2-test` reads `dist/meta.json` produced by `docx-v2-build`, and `verify` runs a single invocation's checks concurrently, so CI enforces the order by splitting into two invocations while a local `--profile=pr` can still race. | `tools/verify/registry.go` (`docx-v2-test`), `ci.yml:node` | A1, if it recurs; otherwise the verifier axis | a `Needs`-style edge exists, or no check has a producer/consumer relationship |
 | D-15 | `E2E smoke (approval flows)` cannot pass: Playwright's `webServer` exits 1 because CI provisions no application stack. The cascade is worse than the failure — the next step, `axe diff vs baseline`, then ran anyway and died on `ENOENT: axe-report.json`, so the run reports two failures with one cause. | run 31192663852 | ops axis | stack provisioned; also make the axe step depend on the suite having produced a report |
 | D-16 | `Perf suite (reduced — PR gate)` has no `services: postgres`, runs no migrations, and reads `DATABASE_URL` from `secrets.PERF_DATABASE_URL`, which this repository does not define. Supersedes D-2: the harness's exit code was never the problem. A1 fixed only the disguise — the readiness loop was `curl -sf … && break \|\| sleep 2` with no exit, so a dead backend still produced a green step and k6 printed a full percentile table over 300 failed requests and 0 bytes received. | run 31192664532; `perf.yml:31` | ops axis | postgres service + migrations + a defined DB URL, then one green run |
+| D-17 | `phase3-hardening-gate` runs `contract-baseline.ps1`, which runs `go test ./tests/contract`. That directory holds a `.gitkeep` and nothing else — the tests were deleted in `dc0572f6` and the gate that consumes them was not. It fails with `no Go files in .../tests/contract`. **Process note:** I promoted `hardening` to required on the assumption it would go green once the cilint fix landed. It never was green; the cilint failure was masking this one. Promotion must follow an observed green, never a predicted one — that is the same "a control that fires into a red baseline is absent" error, made against my own work. | run 31194517804; `scripts/contract-baseline.ps1:42` | test-discipline axis | contract coverage restored, or the gate's target corrected |
 | D-8 | **Nothing anywhere verifies that a backup can be restored.** `run-backup-restore-gate.ps1` is a manual runbook step with no execution log proving a cadence | `wiki/runbooks/backup-restore.md:260-277` | ops axis | scheduled weekly DR drill against disposable CI Postgres with CI-only credentials |
 
 D-8 is not documentation debt. It is the only entry here where the untested
