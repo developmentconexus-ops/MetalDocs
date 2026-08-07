@@ -25,9 +25,18 @@ jobs:
         with: { go-version-file: go.mod, cache: true }
       - run: pnpm install --frozen-lockfile
       # Check set for this job lives in tools/verify/registry.go
-      # (docx-v2-typecheck, docx-v2-test) — see CIJob: "ci.yml:node".
-      - run: go run ./tools/verify --only=docx-v2-typecheck,docx-v2-test
-      - run: pnpm run build:docx-v2
+      # (docx-v2-typecheck, docx-v2-build, docx-v2-test) — see CIJob:
+      # "ci.yml:node".
+      #
+      # TWO invocations, and the order matters. docx-v2-test contains
+      # bundle-guard.test.ts, which reads dist/meta.json to assert the server
+      # bundle is framework-free — so it consumes the build's output. The
+      # build used to run AFTER the tests, which meant the guard could only
+      # ever fail ("dist/meta.json missing"). verify runs the checks within a
+      # single invocation concurrently, so the dependency is expressed by
+      # splitting the invocation rather than by ordering inside one.
+      - run: go run ./tools/verify --only=docx-v2-typecheck,docx-v2-build
+      - run: go run ./tools/verify --only=docx-v2-test
   go:
     runs-on: ubuntu-latest
     steps:

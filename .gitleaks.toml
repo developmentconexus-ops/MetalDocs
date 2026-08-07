@@ -23,10 +23,33 @@ paths = [
     # Screen-QA artifacts: idempotency-key UUIDs, captured payloads.
     '''frontend/apps/web/design-source/.*/artifacts/.*''',
 ]
+# Matched against the whole LINE, not just the captured secret. The two
+# protocol-header rules below identify a finding by the header it sits on,
+# which is only visible in the line. `StrongPass123` still matches, since a
+# line containing the literal is a superset of the literal itself.
+regexTarget = "line"
 regexes = [
     # Documented throwaway sample password used in the manual-setup runbook's
     # user-creation curl example. This exempts only this exact dummy literal
     # everywhere — a DIFFERENT secret (incl. in the same runbook) still trips.
     # Per-file scoping needs the [[allowlists]] AND-form, unsupported here.
     '''StrongPass123''',
+
+    # --- Protocol values that are structurally not credentials ---------------
+    #
+    # These two are CLASS-level, not instance-level, on purpose. QA evidence
+    # docs capture raw HTTP exchanges, so both headers will keep appearing in
+    # new files; pinning them by fingerprint would mean re-triaging the same
+    # non-finding forever, and a triage queue full of known noise is how a real
+    # finding gets waved through.
+    #
+    # An Idempotency-Key is a client-generated request de-duplication token.
+    # It grants nothing: replaying it can only collapse into the original
+    # response, and it is meaningless without the caller's actual credentials.
+    '''Idempotency-Key:''',
+    #
+    # Sec-WebSocket-Key is the RFC 6455 handshake nonce — base64 of 16 random
+    # bytes that the server echoes back through a fixed public transform. RFC
+    # 6455 §1.3 states outright that it is not used for authentication.
+    '''Sec-WebSocket-Key:''',
 ]

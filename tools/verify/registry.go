@@ -251,8 +251,20 @@ var checks = []Check{
 		CIJob:    "ci.yml:node",
 	},
 	{
-		ID:       "docx-v2-test",
-		Desc:     "docx-v2 unit tests",
+		ID:       "docx-v2-build",
+		Desc:     "the docx-v2 workspace builds; produces the dist/meta.json that docx-v2-test's bundle guard reads",
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv:     []string{"pnpm", "run", "build:docx-v2"},
+		Paths:    []string{"apps/docx-renderer/", "packages/"},
+		CIJob:    "ci.yml:node",
+	},
+	{
+		ID:   "docx-v2-test",
+		Desc: "docx-v2 unit tests",
+		// Depends on docx-v2-build having already run: bundle-guard.test.ts
+		// reads dist/meta.json. The registry has no dependency edges, so CI
+		// enforces the order by using two verify invocations (see ci.yml:node)
+		// and a local `--profile=pr` can still race. Recorded as D-14.
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"pnpm", "run", "test:docx-v2"},
 		Paths:    []string{"apps/docx-renderer/", "packages/"},
