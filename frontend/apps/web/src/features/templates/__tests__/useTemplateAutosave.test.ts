@@ -33,6 +33,15 @@ function makeFailFetch(status = 503) {
 beforeEach(() => {
   presignMock.mockResolvedValue({ upload_url: UPLOAD_URL, storage_key: 'k' });
   commitMock.mockResolvedValue({});
+  // crypto.subtle stub for jsdom, matching useDocumentAutosave.test.ts and
+  // templates.create.test.ts. The ArrayBuffer these tests construct belongs to
+  // the jsdom realm, and Node 22's webcrypto digest does a strict instanceof
+  // check against its own realm's ArrayBuffer — so the real implementation
+  // throws ERR_INVALID_ARG_TYPE on Node 22 while passing on Node 26. That is a
+  // cross-realm test artifact, not a product defect: in a browser the buffer is
+  // same-realm. These tests cover upload-failure handling (F-FE1/F-FE7), not
+  // hashing, so stubbing the digest costs no coverage.
+  vi.spyOn(crypto.subtle, 'digest').mockResolvedValue(new Uint8Array(32).buffer);
 });
 
 afterEach(() => {
