@@ -110,6 +110,9 @@ does not port code.
 | D-2 | Perf harness exits 99 unconditionally | `perf.yml` run log | ops axis | harness returns a real exit code |
 | D-3 | `E2E_DATABASE_URL` secret absent | `e2e-coverage-gate.yml` skips | ops axis | secret provisioned |
 | D-4 | Medium/low CVEs unbumped | Grype SARIF | supply-chain axis | bumped or accepted with rationale |
+| D-10 | `react-router-dom` 7.18.0 (GHSA-qwww-vcr4-c8h2). Fix is 8.3.0 — a major routing-API migration touching `AppRouter` and every route module. Advisory affects the unstable RSC APIs only. | `frontend/apps/web/package.json` | frontend axis | migrated to v8, or advisory formally accepted as not-applicable |
+| D-11 | `pdfjs-dist` 5.7.284 (GHSA-hq66-cqwq-w95j). Fix is 6.2.108, a major bump changing worker loading and `GlobalWorkerOptions`; the pinned `react-pdf`@9.2.1 is not certified against it. | `frontend/apps/web/package.json` (devDependency) | frontend axis | viewer integration ported to pdfjs 6 |
+| D-12 | `js-yaml` 4.1.1, `postcss` 8.5.15, `fast-uri` 2.4.0/3.1.2 — three advisories, one root cause: all are purely transitive with no entry in any of this repo's 9 manifests, and `pnpm update` cannot target such a dependency. Verified empirically: it left each at its vulnerable version while producing broad unrelated lockfile churn. `@redocly/openapi-core` pins `js-yaml` to the exact string `4.1.1`, so even a matching range would not help. | attempted and reverted during A1 | security axis | a `pnpm.overrides` block is introduced — a first-time manifest-pattern decision this repo has never made, which is why A1 did not make it unilaterally |
 | D-5 | 10 baseline tables have no `wiki/database/tables` page: `audit_export_jobs`, `materialize_dispatch_outbox`, `tenant_keys`, `tenant_lifecycle_jobs`, `tenant_plans`, `token_dictionary_entries`, `approval_delegations`, `approval_review_verdicts`, `approval_route_stage_selectors`, `release_generations` | `governance-check / db-dictionary-coverage` job | docs axis | all 10 documented; job → tier 1 |
 | D-6 | ~~module §11 tallies disagree with registers~~ | — | — | **CLOSED** — fixed in A1, job is tier 1 |
 | D-9 | `wiki-tally-check.ps1` check 2 (missing-ADR) passes silently when the module doc omits the "Decisions without ADR link: N" line. 11 of 16 modules omit it, so the check is live for 5. A guard that a doc can opt out of by deleting a line is not a guard. | `wiki-tally-check.ps1:130` `if ($null -ne $adrStated -and ...)` | docs axis | line required in all 16 docs, then the `$null` escape deleted |
@@ -155,9 +158,12 @@ someone actually reads. All three keeps are cited above; none is an orphan.
 | axe accessibility diff terminated with `\|\| true` | removed. The workflow header called these "real automated checks, not advisory"; the swallow made that false. Artifact upload is `if: always()`, so nothing is lost. |
 | 3 orphan scripts unwired, 1 rotted | wired / deleted per §4a |
 | 2 module docs' §11 tallies disagreed with their registers | reconciled; `wiki-tally` sweep green across 16 modules |
+| kin-openapi + grpc critical/high CVEs | bumped to v0.144.0 / v1.82.1; staticcheck repo-wide 0 findings after |
 
 ## 6. Amendment log
 
 | Date | Change |
 |---|---|
 | 2026-08-07 | Created. Tiers set, cilint + gitleaks + Grype baselines recorded, D-1…D-4 deferred. |
+| 2026-08-07 | Orphan scripts triaged (§4a). D-5…D-9 added, D-6 closed same day, `wiki-tally` → tier 1. |
+| 2026-08-07 | kin-openapi + grpc bumped; D-10…D-12 recorded for the five advisories the stop rule refused to force. staticcheck now 0 findings repo-wide → tier 1. |
