@@ -22,9 +22,9 @@ var profileOrder = []string{ProfileFast, ProfileChanged, ProfilePR, ProfileFull}
 // Infra requirements. A check declaring any of these is skipped (loudly, with
 // its reason) when the requirement is absent, and is never silently dropped.
 const (
-	needsPostgres = "postgres"   // METALDOCS_DATABASE_URL pointing at a live DB
-	needsDocker   = "docker"     // a working docker daemon
-	needsNetwork  = "network"    // fetches a tool or package at run time
+	needsPostgres = "postgres"    // METALDOCS_DATABASE_URL pointing at a live DB
+	needsDocker   = "docker"      // a working docker daemon
+	needsNetwork  = "network"     // fetches a tool or package at run time
 	needsGitDepth = "git-history" // needs real history, not a shallow clone
 )
 
