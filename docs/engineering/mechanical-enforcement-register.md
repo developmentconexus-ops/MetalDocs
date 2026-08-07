@@ -29,6 +29,25 @@ Global Maximum section): *never prefer a solution because it is what is already 
 implemented thing is genuinely best, it stays and the entry says so with the reason. Otherwise the
 global-maximum structure gets named here, even when it is out of the current boundary.
 
+## Tracking
+
+Every entry is also a GitHub issue, so the register carries the reasoning and the issue tracker
+carries the state. The issue links back here; do **not** copy entry text into the issue beyond a
+summary and its `file:line` evidence — duplicating it would recreate the exact hand-synced-copies
+defect this register exists to eliminate.
+
+| Entry | Issue |
+|---|---|
+| ME-01 role vocabulary on six surfaces | [#74](https://github.com/leandrotcawork/MetalDocs/issues/74) |
+| ME-02 REQ-AUTHZ-5 covers the wrong noun | [#75](https://github.com/leandrotcawork/MetalDocs/issues/75) |
+| ME-03 document-list visibility binary | [#76](https://github.com/leandrotcawork/MetalDocs/issues/76) |
+| ME-04 params → filter fields, no completeness guard | [#77](https://github.com/leandrotcawork/MetalDocs/issues/77) |
+| ME-05 are the tripwire arms generated? | [#78](https://github.com/leandrotcawork/MetalDocs/issues/78) |
+| ME-06 per-document sharing retires RBAC-with-scope | [#79](https://github.com/leandrotcawork/MetalDocs/issues/79) |
+| ME-07 authentication build-vs-adopt | [#80](https://github.com/leandrotcawork/MetalDocs/issues/80) |
+| ME-08 MFA is a dashboard, not a control | [#81](https://github.com/leandrotcawork/MetalDocs/issues/81) |
+| ME-09 a kill list is a hand-synced enumeration | [#82](https://github.com/leandrotcawork/MetalDocs/issues/82) |
+
 ## How to read an entry
 
 Every entry must carry a **firing mechanism** — the concrete thing that makes drift a red build, a
@@ -270,6 +289,42 @@ catalog pass.
 
 **Verified** 2026-08-06, first-hand: read the port, the repository, the handler, and the login path.
 **Owner:** unassigned. **Do not let this one sit unrouted.**
+**Filed:** [#81](https://github.com/leandrotcawork/MetalDocs/issues/81).
+
+---
+
+## ME-09 — a kill list is a hand-synced enumeration
+
+**Found** 2026-08-07, by the independent advisory review of DD-1
+(`docs/superpowers/analysis/2026-08-07-authz-advisory-opinion.md`).
+
+DD-1 ruled that "all three `system_admin` bypasses die" and listed them. The advisor found **five**:
+the two unnamed ones are `UserAreaRepository.MembershipDirectoryScope`
+(`internal/modules/iam/infrastructure/postgres/user_area_repository.go:159`, which embeds
+`SystemAdminExistsSQL` as its tenant-wide branch) and `CapsByUserID`
+(`internal/modules/iam/application/capability_service.go:132-139`, which returns `AllCapabilities()`
+on the admin branch — the `/auth/me` surface, so leaving it makes the frontend render capabilities by
+a different rule than enforcement uses).
+
+**The generalizable finding is not the two misses.** It is that a **removal inventory is the same
+artifact class as the duplication it removes**: a hand-written enumeration of "every place this fact
+lives", produced by reading, believed because it is written down. Every argument in this register
+against hand-synced declaration surfaces applies verbatim to the list that claims to have found them
+all — and this one was wrong on its first outing, by 40%, while reading as complete.
+
+The failure mode is worse than ordinary drift because a kill list is consumed **once**, at the moment
+it is believed, and then discarded. A drifting declaration surface at least stays around to be caught
+later. An incomplete kill list closes the program.
+
+**Firing mechanism** — level 3, and it is the criterion of completion rather than a check on it:
+after the program, a lint asserting the literal `'system_admin'` appears in no production Go or SQL
+outside the role-catalog seed. `SOLE-RLS` is the in-house template for exactly this shape. That
+converts "we think we got them all" from a claim into a red build.
+
+**Generalized rule:** when a program's charter is *deleting* a construct, the definition of done is a
+mechanism that makes the construct unwritable — never an inventory of its known instances.
+
+**Owner:** the authz grant-unification program (in design).
 
 ---
 
