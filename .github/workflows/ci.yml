@@ -30,6 +30,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
-        with: { go-version: 1.25.x, cache: true }
+        with: { go-version-file: go.mod, cache: true }
       - run: go build ./...
       - run: go test ./internal/platform/config/... ./internal/platform/featureflags/... ./internal/platform/servicebus/... ./internal/platform/ratelimit/... ./internal/platform/objectstore/... ./internal/modules/templates/... ./tests/docx_v2/...

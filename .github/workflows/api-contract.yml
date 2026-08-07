@@ -31,7 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
-        with: { go-version: 1.25.x, cache: true }
+        with: { go-version-file: go.mod, cache: true }
       - name: API codegen drift check (backend)
         run: |
           go generate ./...
@@ -76,7 +76,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
-        with: { go-version: 1.25.x, cache: true }
+        with: { go-version-file: go.mod, cache: true }
       - name: No /api prefix in OpenAPI path keys
         run: go run ./scripts/api-lint -only PATH-BASE-PREFIX api/openapi/v1/openapi.yaml
       - name: No /api prefix in OpenAPI path keys (internal-e2e)
@@ -105,7 +105,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
-        with: { go-version: 1.25.x, cache: true }
+        with: { go-version-file: go.mod, cache: true }
       - name: api-lint unit tests (incl. e2e self-test)
         run: go test ./scripts/api-lint/... -count=1
       - name: api-lint guards (BLOCKING — any violation fails)
@@ -125,7 +125,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
-        with: { go-version: 1.25.x, cache: true }
+        with: { go-version-file: go.mod, cache: true }
       - name: Problem code artifacts are current
         run: go run ./cmd/problem-codes-dump -check
 
