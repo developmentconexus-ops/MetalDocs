@@ -48,6 +48,8 @@ defect this register exists to eliminate.
 | ME-08 MFA is a dashboard, not a control | [#81](https://github.com/leandrotcawork/MetalDocs/issues/81) |
 | ME-09 a kill list is a hand-synced enumeration | [#82](https://github.com/leandrotcawork/MetalDocs/issues/82) |
 | ME-10 tenant-defined roles retire the generated enums | [#83](https://github.com/leandrotcawork/MetalDocs/issues/83) |
+| ME-11 anti-drift guard with a hand-synced allow-list | [#84](https://github.com/leandrotcawork/MetalDocs/issues/84) |
+| ME-12 a string lint cannot see a constant-built bypass | [#85](https://github.com/leandrotcawork/MetalDocs/issues/85) |
 
 ## How to read an entry
 
@@ -355,6 +357,68 @@ a role from capabilities) becomes a required product feature.
 justified rejecting direct per-user grants partly on "a new role is an INSERT, not a migration." No
 DDL, but a release — the escape valve for a genuine one-off is narrower than the phrasing implies.
 D3's case stands on auditability and reviewability, which are untouched.
+
+---
+
+## ME-11 — an anti-drift guard carrying a hand-synced allow-list
+
+**Found** 2026-08-07 while auditing what `role_capabilities` really is.
+
+`TestEveryCapSeededOrDeferred` (`apps/api/cmd/metaldocs-api/permissions_test.go:597`) is a genuine
+level-3 mechanism: every registry capability must be seeded to ≥1 role, or sit in a `deferred`
+allow-list with a documented reason. It works. It is also carrying, at `:609`, this comment:
+
+> `// Mirrors deferredCaps in scripts/api-lint/registry_rules.go.`
+
+A hand-synced enumeration **inside the mechanism whose purpose is preventing hand-synced
+enumerations.** The two lists can disagree, and when they do, one of them silently stops guarding.
+Prose is not a sync mechanism; `// keep in sync with` is scheduled drift.
+
+**Firing mechanism** — level 1: one declaration, imported by both consumers. The allow-list is
+program data, not test data; it belongs beside the capability registry it annotates, and the test and
+the lint both read it. Deleting the second copy beats testing that the copies agree.
+
+**Worth noting for the doctrine, not just the fix:** this guard is otherwise well built and was found
+only by reading it closely for an unrelated reason. Mechanisms are not audited the way product code
+is — nobody diffs a lint against its own principles. That is a gap in review practice, not in this
+lint.
+
+**Owner:** unassigned. Small.
+
+---
+
+## ME-12 — a lint on a string cannot see a bypass built from a constant
+
+**Found** 2026-08-07 by the second-pass advisory audit of the authz design spec, testing F3 against
+ME-02's own instruction.
+
+The authz program's definition of done is an extinction lint: the literal `'system_admin'` must not
+appear in production Go or SQL outside the role-catalog seed (ME-09). But the same program generates
+Go role constants from `role_catalog`, so generated code legitimately contains that literal and the
+lint must allowlist generated files. From that moment:
+
+```go
+if role == iamtypes.RoleSystemAdmin { /* ... */ }
+```
+
+is a brand-new bypass, with zero literals, and the lint stays green.
+
+**The lint's noun is the string. The defect's noun is role-identity special-casing in enforcement
+paths.** Different nouns — ME-02 exactly, discovered inside the mechanism written *because of* ME-02.
+The lesson is that the wrong-noun failure is not a one-time mistake to learn from; it is the default
+outcome whenever a mechanism targets a syntactic proxy for a semantic property, and it recurs even
+under authors who know the rule.
+
+**Firing mechanism** — level 3, and it is the harder, correct one: enforcement packages may consume
+role identity **only through the evaluator**. Comparing a `role_code` value against any specific role
+outside the evaluator, the seed, and generated code is the lint target. This names the semantic
+property instead of a spelling of it.
+
+**Interim, already landed in the design:** F3 claims literal extinction *only*, and the residue is
+written into the guard and into the spec's accepted-residue section (§14 item 2) rather than left to
+read as full coverage.
+
+**Owner:** follow-up to the authz grant-unification program.
 
 ---
 

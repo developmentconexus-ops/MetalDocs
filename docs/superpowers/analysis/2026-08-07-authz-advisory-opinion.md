@@ -4,6 +4,13 @@
 **Standing:** advisory. Not a ratification and not a gate. Recorded verbatim in substance so the
 design spec can dispose of each point on the record rather than absorbing it silently.
 
+> **Round 2 (2026-08-07).** The spec written from round 1 was audited back against the operator's
+> standard — *does this actually delete the manual and the legacy, or does it just read well?* Verdict
+> **(b): a large real de-legacying, but not yet mechanically self-defending.** Nine residues, two
+> guards claiming more than they enforce, one module-boundary violation, four missing sections. All
+> closed in spec **v2**; findings summarized in §R2 at the end of this document. Two of them generalized
+> into register entries ME-11 (#84) and ME-12 (#85).
+
 **Scope reviewed:** `2026-08-06-authz-grant-unification-decisions.md` (D1–D4),
 `2026-08-06-authz-grant-unification-system-impact.md` (the gate artifact),
 `docs/engineering/mechanical-enforcement-register.md`, and the ratified design decisions DD-1..DD-4.
@@ -390,3 +397,61 @@ their own role vocabulary; at that point the industry shape (one type, `role_cod
 product roles merely seeded rows — Kubernetes `cluster-admin`, Keycloak realm roles, AWS managed
 policies) becomes the global maximum and the migration cost includes a role-composition admin UI and
 labels moving from code to data.
+
+---
+
+## §R2 — Second-pass audit of the design spec (2026-08-07)
+
+**Question put to the advisor, in the operator's words:** *"identificar se isso estamos realmente
+refatorando tirando tudo de manual, legacy, validando para não acontecer novamente, deixando nível
+profissional para não ter problemas novamente, arquitetura clean, sem redundância, sem hardcode,
+gambiarra e etc."*
+
+**Verdict: (b).** The spine is professional-grade and round 1's corrections were absorbed for real,
+not cosmetically. But as written, the post-program system still needed discipline in nine places, two
+of seven guards claimed more than they enforced, one section broke a module boundary, and four
+sections a professional spec must contain were absent.
+
+### Findings, and where each is closed in spec v2
+
+| # | Finding | Severity | Closed in |
+|---|---|---|---|
+| R2-1 | **F5's "unrepresentable" was false.** Areas are soft-archived (ADR 0010, `taxonomy/domain/area.go:120`), so the FK it relied on fires *never*; the whole claim rested on a rule a human must remember in the archive service. Level 5 in level 1's clothing — ME-02 inside the anti-ME-02 program. | High | §3.4 — the invariant moves into the evaluator: tier-1's existential joins live areas, so a dangling binding grants nothing at either tier by construction |
+| R2-2 | **F3 proves the string is gone, not the bypass.** F1 generates role constants, so generated code contains the literal and the lint must allowlist it; `if role == iamtypes.RoleSystemAdmin` is then a new bypass with zero literals and a green lint. v1 §9.6 — the section that exists to state non-claims — committed the error it warns about. | High | §8 F3 non-claim column + §14 item 2; generalized as ME-12 / #85 |
+| R2-3 | **§5 violated the module boundary.** Revision provenance is `documents`, signoffs are `approval` (ADR 0082). Putting the visibility union "in the evaluator" put iam's SQL across two other modules' tables. v1 conflated *not in the handler* (right) with *in iam* (wrong module). | High | §5 rewritten — visibility is `documents`' question; iam publishes scope resolution only; the signed-revision leg needs an `approval` port or is already denormalized, and determining which is implementation step 1 |
+| R2-4 | **`recordBypass` deletion was overbroad.** `BypassKindBackground` is live (`authz.go:213`); `BypassSystem` records every scheduler bypass through the same function. Wholesale deletion unaudits the path nobody watches — an F8-class regression. | High | §6.1 — delete the arm, keep the function; the rw-tx relaxation narrows to `Require` call sites only |
+| R2-5 | **Tripwire re-point absent.** Baseline arms guard `iam_user_roles` (`:355`), `user_process_areas` (`:358`), `iam_group_members` (`:414`). The migration drops two of those tables and v1 left the arms orphaned and `capability_bindings` unarmed — grant mutations *less* DB-guarded after a hardening program. | High | §6.3, incl. the scope-discriminated capability ruling (tenant ⇒ `user.manage`, area ⇒ `membership.manage`) |
+| R2-6 | **`iam_group_members` never dispositioned.** The backfill reads it, the drop list omits it, no section states its fate — while it becomes half of every group-derived decision. | High | §3.5 |
+| R2-7 | **`role_capabilities` "unchanged" was wrong.** Hundreds of hand-typed INSERTs; `.role` has no FK to the catalog; `.capability` has no parity against the Go registry — a typo'd capability is a dead row that reads as a grant. | Medium | §3.3 + F8 |
+| R2-8 | **D2 silently disarms `TestEveryCapSeededOrDeferred`.** With system_admin holding every capability, `seededCaps` contains everything and the guard goes green forever — deleting one of the few mechanisms already catching this defect class. *(Found independently by the coordinator, same session.)* | High | §3.3.1 + F9 |
+| R2-9 | **HTTP contract surface absent** in a contract-first repo, where the spec *is* route truth. Frontend re-point (18 files on the role enums, two membership screens) likewise unspecified. | High | §9 |
+| R2-10 | **`subject_id text` chose polymorphism over referential integrity** — a binding to a deleted or non-existent subject was representable and guard-invisible. The one place the *new* schema picked convenience over the register's own doctrine. | Medium | §3.2 — discriminated column pair with real FKs |
+| R2-11 | **The transaction seam was pseudocode** where it should be specified; tier-1 staying a pooled read was never stated. | Medium | §4.2 |
+| R2-12 | **Expected-escalation set was "enumerated"** — if hand-listed, a hand-sync against the backfill. Parity corpus likewise hand-maintained against the role list. | Medium | §7.1 — computed in the migration; corpus derived from `role_catalog` |
+| R2-13 | **No rollback story, and `scope_kind='tenant'` is where old sloppiness hides** — the backfill converts every legacy row to tenant scope, now honored by tier-2. Visible via the assert, but reviewed by nobody. | Medium | §7 archive schema, §7.2 one-time review, §11 item 8 |
+| R2-14 | **F1's physical upstream unnamed.** A DB table cannot be a codegen input; left unstated, F1 degrades to a generator with a hand-maintained input nobody declared. | Medium | §3.1 — `db/reference-data/role_catalog.yaml` is the artifact |
+| R2-15 | **`deferredCaps` mirrored by hand** between `permissions_test.go:609` and `scripts/api-lint/registry_rules.go`, by comment. A hand-synced enumeration inside an anti-drift mechanism. *(Found independently by the coordinator.)* | Low | Out of scope, §12; filed as ME-11 / #84 |
+
+### Verified for this audit
+
+`taxonomy/domain/area.go:24,115,120` (soft archive); `authz.go:126,197,213` (both bypass kinds);
+`0001_current_schema.sql:355,358,414` (tripwire arms), `:141,877,952` (the three `user_process_areas`
+protections needing re-homing); `permissions_test.go:504,597,609` (the seed guard and its allow-list);
+`0001_product_reference_data.sql:156+` (the hand-written matrix); `role-vocabulary.ts:34-36` (the
+subset proof).
+
+### What the audit said not to touch
+
+The hard-break single-tx migration and its three-part directional assert; the seeded Go parity test as
+acceptance evidence; F7 as definition of done; `role_catalog`'s shape including `area_assignable`
+replacing subset-by-coincidence; DD-6's grounds; keeping `role_capabilities` as a separate bundle
+table (its *shape*, not its disposition); §6.2's F8/rw-tx coupling; ME-09's framing; the junk-row
+NOTICE handling; `subject_user_id` as TEXT — the type is right per the tokens lesson, it was the
+missing FK that was not.
+
+### Standing lesson
+
+Two of the three worst findings (R2-1, R2-2) are **wrong-noun failures inside mechanisms written
+because of ME-02**, by an author who had just written ME-02 down. That is the evidence that wrong-noun
+is not a mistake one learns past — it is the default outcome whenever a mechanism targets a syntactic
+proxy for a semantic property. ME-12 records it as a class.
