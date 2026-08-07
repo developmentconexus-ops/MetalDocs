@@ -29,6 +29,9 @@ func TestNoLegacyStatusInGoSource(t *testing.T) {
 		if containsFixturePath(file) {
 			continue
 		}
+		if containsCanonicalLegacyVocabPath(file) {
+			continue
+		}
 
 		content, err := os.ReadFile(file)
 		if err != nil {
@@ -65,6 +68,10 @@ func TestNoLegacyStatusInTSSource(t *testing.T) {
 
 	var violations []string
 	for _, file := range files {
+		if containsCanonicalLegacyVocabPath(file) {
+			continue
+		}
+
 		content, err := os.ReadFile(file)
 		if err != nil {
 			t.Fatalf("read %s: %v", file, err)
@@ -152,15 +159,18 @@ func containsFixturePath(path string) bool {
 }
 
 // "archived" was reinstated as a live lifecycle status (draft -> under_review -> archived),
-// so only "finalized" remains a banned legacy literal. Lines that must mention it
-// (parse-boundary rejection, backward-compat rendering aliases) carry a
-// "cilint:allow-legacy" annotation and are exempt.
+// so only the retired pre-cutover literal (see internal/platform/legacystatus)
+// remains a banned quoted string. Lines that must reference it (parse-boundary
+// rejection, backward-compat rendering aliases) do so through the canonical
+// constant homes — internal/platform/legacystatus (Go) and
+// frontend/apps/web/src/lib/legacyStatus.ts (TS) — which
+// containsCanonicalLegacyVocabPath excludes below by path, structurally and
+// reviewably, mirroring legacyExcludeDirs in cilint's own legacyvocab analyzer
+// (tools/cilint/internal/analyzers/legacyvocab.go). There is no per-line
+// suppression directive.
 func legacyLiteralViolationInGoLine(line string) bool {
 	trimmed := strings.TrimSpace(line)
 	if trimmed == "" {
-		return false
-	}
-	if strings.Contains(line, "cilint:allow-legacy") {
 		return false
 	}
 
@@ -179,9 +189,6 @@ func legacyLiteralViolationInTSLine(line string) bool {
 	if trimmed == "" {
 		return false
 	}
-	if strings.Contains(line, "cilint:allow-legacy") {
-		return false
-	}
 
 	if strings.Contains(strings.ToLower(trimmed), "event_type") {
 		return false
@@ -198,4 +205,15 @@ func hasLegacyQuotedLiteral(s string) bool {
 	return strings.Contains(s, "'finalized'") ||
 		strings.Contains(s, "\"finalized\"") ||
 		strings.Contains(s, "`finalized`")
+}
+
+// containsCanonicalLegacyVocabPath reports whether file is one of the two
+// canonical homes for the retired document-status literal — the only places
+// permitted to spell it out as a quoted string. Mirrors legacyExcludeDirs in
+// tools/cilint/internal/analyzers/legacyvocab.go; kept as a structural,
+// reviewable path allowlist rather than an inline per-line directive.
+func containsCanonicalLegacyVocabPath(path string) bool {
+	normalized := strings.ReplaceAll(path, "\\", "/")
+	return strings.Contains(normalized, "platform/legacystatus/") ||
+		strings.HasSuffix(normalized, "lib/legacyStatus.ts")
 }

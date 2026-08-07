@@ -9,7 +9,7 @@ type DocumentStatus string
 
 const (
 	DocStatusDraft       DocumentStatus = "draft"
-	DocStatusUnderReview DocumentStatus = "under_review" // migration 0142 removed draft→finalized; submit = under_review // cilint:allow-legacy (historical note)
+	DocStatusUnderReview DocumentStatus = "under_review" // migration 0142 retired the pre-cutover literal named in internal/platform/legacystatus (legacystatus.Retired); submit now yields under_review
 	DocStatusApproved    DocumentStatus = "approved"
 	DocStatusScheduled   DocumentStatus = "scheduled"
 	DocStatusPublished   DocumentStatus = "published"

@@ -69,14 +69,48 @@ const badName = "finalized" // legacy
 	}
 }
 
-func TestLegacyVocab_Negative_AllowDirective(t *testing.T) {
+// TestLegacyVocab_Negative_NoInlineDirective proves the retired
+// //cilint:allow-legacy per-line escape hatch is gone: writing the same
+// comment that used to suppress a finding no longer does anything — the line
+// is still reported like any other. legacyvocab.go supports exactly one
+// suppression mechanism now, a structural path allowlist (legacyExcludeDirs),
+// exercised by TestLegacyVocab_Negative_ExcludedDirectory below.
+func TestLegacyVocab_Negative_NoInlineDirective(t *testing.T) {
 	src := `package foo
-const ok = "finalized" // cilint:allow-legacy historical constant
+const notOK = "finalized" // cilint:allow-legacy historical constant
 `
-	path := writeFixture(t, "legacy_allowed.go", src)
+	path := writeFixture(t, "legacy_no_directive.go", src)
+	findings := analyzers.LegacyVocab([]string{path})
+	if len(findings) == 0 {
+		t.Fatal("expected a finding: the inline cilint:allow-legacy comment must no longer suppress legacyvocab")
+	}
+}
+
+// TestLegacyVocab_Negative_ExcludedDirectory is the NEGATIVE FIXTURE for the
+// one remaining suppression mechanism: a structural, reviewable path entry in
+// legacyExcludeDirs. It proves the guard still fires for the retired literal
+// everywhere outside such a path (canonical homes:
+// internal/platform/legacystatus, frontend/apps/web/src/lib/legacyStatus.ts)
+// by planting the literal inside an excluded testdata/ directory and asserting
+// silence, while TestLegacyVocab_Positive above proves the same literal is
+// caught when planted outside any exclusion.
+func TestLegacyVocab_Negative_ExcludedDirectory(t *testing.T) {
+	dir := t.TempDir()
+	pkgDir := filepath.Join(dir, "testdata")
+	if err := os.MkdirAll(pkgDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	src := `package foo
+const legacy = "finalized"
+`
+	path := filepath.Join(pkgDir, "legacy.go")
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
 	findings := analyzers.LegacyVocab([]string{path})
 	if len(findings) != 0 {
-		t.Fatalf("expected no findings with allow directive, got %d", len(findings))
+		t.Fatalf("expected no findings inside excluded testdata/ dir, got %d: %+v", len(findings), findings)
 	}
 }
 

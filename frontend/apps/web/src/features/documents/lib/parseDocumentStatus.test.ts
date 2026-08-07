@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseDocumentStatus } from './parseDocumentStatus';
+import { LEGACY_RETIRED_STATUS } from '../../../lib/legacyStatus';
 
 describe('parseDocumentStatus', () => {
   it('passes through every canonical status unchanged', () => {
@@ -20,13 +21,15 @@ describe('parseDocumentStatus', () => {
   });
 
   it('rejects the pre-cutover legacy aliases instead of mapping them', () => {
-    // FE-05: 'review' (renamed to under_review) and 'finalized' (removed by
-    // migration 0142) are no longer emitted by any producer — see the Go
-    // DocumentStatus enum (internal/modules/documents/domain/model.go) and the
-    // generated DocumentSummaryStatus wire enum. They must not resurface as
+    // FE-05: 'review' (renamed to under_review) and the retired literal
+    // named LEGACY_RETIRED_STATUS in frontend/apps/web/src/lib/legacyStatus.ts
+    // (removed by migration 0142) are no longer emitted by any producer —
+    // see the Go DocumentStatus enum
+    // (internal/modules/documents/domain/model.go) and the generated
+    // DocumentSummaryStatus wire enum. They must not resurface as
     // silently-aliased canonical values.
     expect(parseDocumentStatus('review')).toBeNull();
-    expect(parseDocumentStatus('finalized')).toBeNull(); // cilint:allow-legacy (parse-boundary rejection)
+    expect(parseDocumentStatus(LEGACY_RETIRED_STATUS)).toBeNull(); // parse-boundary rejection
   });
 
   it('rejects the removed document-status "rejected" (M4 F4.1) — not the live approval-decision "rejected"', () => {

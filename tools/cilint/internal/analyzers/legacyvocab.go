@@ -15,18 +15,27 @@ import (
 // documents, taxonomy areas/profiles, templates, controlled documents, and
 // search. Only the document-approval Spec-2 graph treats it as legacy, and that
 // code rejects it explicitly. "finalized" remains banned as a document status
-// (use published); legitimate legacy-rejection/cutover references carry a
-// //cilint:allow-legacy directive.
+// (use published). There is no per-line suppression directive: legitimate
+// legacy-rejection/cutover code must reference the retired literal through the
+// canonical constant homes (internal/platform/legacystatus in Go,
+// frontend/apps/web/src/lib/legacyStatus.ts in TypeScript), which are
+// structural, reviewable path exclusions in legacyExcludeDirs below — never an
+// inline, self-service escape hatch.
 var legacyPattern = regexp.MustCompile(`(?i)\b(finalized|document\.finalize|document\.archive)\b`)
 
-// legacyExcludeDirs are excluded from legacy vocab checks.
+// legacyExcludeDirs are excluded from legacy vocab checks. Every entry here is
+// a structural, reviewable path — the only form of exclusion this analyzer
+// supports. There is deliberately no inline per-line directive: an exclusion
+// must show up in this diff, not scattered invisibly through the tree.
 var legacyExcludeDirs = []string{
 	"migrations/",
 	"fixtures/",
 	"testdata/",
-	"/api-types/",        // generated OpenAPI client types mirror the backend contract
-	"tools/cilint/",      // the linter's own source defines the banned-word pattern
-	"cutover_service.go", // legacy-status cutover preflight (drains finalized/archived; ADR/migration 0142)
+	"/api-types/",            // generated OpenAPI client types mirror the backend contract
+	"tools/cilint/",          // the linter's own source defines the banned-word pattern
+	"cutover_service.go",     // legacy-status cutover preflight (drains finalized/archived; ADR/migration 0142)
+	"platform/legacystatus/", // canonical Go home for the retired "finalized" literal (internal/platform/legacystatus)
+	"lib/legacyStatus.ts",    // canonical TS home for the retired "finalized" literal (frontend/apps/web/src/lib/legacyStatus.ts)
 }
 
 // LegacyVocab reports legacy vocabulary in .go, .ts, and .tsx files
@@ -64,10 +73,6 @@ func LegacyVocab(goFiles []string) []Finding {
 			lineNum++
 			line := scanner.Text()
 
-			// Skip lines with allow directive
-			if strings.Contains(line, "cilint:allow-legacy") {
-				continue
-			}
 			// Skip historical event type constant definitions (e.g., EventTypeArchived = "archived")
 			if strings.Contains(line, "EventType") && strings.Contains(line, "=") {
 				continue
