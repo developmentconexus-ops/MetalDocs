@@ -80,7 +80,9 @@ program exists to remove.
 
 ## 4. Target structure
 
-Three workflow files. `ci.yml` is the only one that blocks a PR.
+Twenty workflow files become four: `ci.yml`, `nightly.yml`, `release.yml`, and `smoke.yml` (kept
+as-is — `workflow_dispatch` only, honest header, targets a deployed environment). `ci.yml` is the
+only one that blocks a PR.
 
 ### 4.1 `ci.yml`
 
@@ -92,25 +94,31 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 ```
 
-Jobs, and the exact registry IDs each one owns:
+Jobs, and every control each one owns. **Registry IDs are not the unit of account.** Draft 2
+made that mistake: it balanced 29 registry IDs and declared the table complete, while seven
+controls that bypass the registry — five of them *required contexts today* — had no row at all.
+Phase 5 would then have deleted `invariants.yml` and dropped the migration-monotonicity gate
+without anything noticing. That is the same blindness as `printAudit` testing only
+`CIJob != ""` (D-C), reproduced inside the instrument meant to catch it. The unit of account is
+**every control that runs in CI today**, registry-backed or not.
 
-| Job | Registry IDs (`tools/verify/registry.go`) | Replaces |
+| Job | Registry IDs | Non-registry controls it also owns |
 |---|---|---|
-| `changes` | — (dorny/paths-filter) | new |
-| `lint-go` | `gofmt`, `go-vet`, `go-vet-integration`, `cilint`, `staticcheck`, `module-boundaries`, `test-discipline` | 3 check names |
-| `lint-contract` | `problem-codes-fresh`, `api-lint-base-path-v1`, `api-lint-base-path-e2e`, `api-lint-strict`, `api-lint-selftest`, `contract-sync` | 6 check names |
-| `lint-frontend` | `fe-eslint`, `css-token-discipline`, `eigenpal-selector-pin`, `docx-v2-typecheck` | 4 check names |
-| `governance` | `adr-status`, `wiki-tally`, `db-dictionary`, `req-trace-selftest`, `req-trace` | 3 check names |
-| `test-go` | `go-build`, `go-test-unit` | 2 check names |
-| `test-frontend` | `fe-typecheck`, `fe-test`, `docx-v2-build`, `docx-v2-test` | 2 check names |
-| `test-integration` | `go-test-integration` | the 19.6-min `full` |
-| `security` | none — action-native, see §5 | 3 check names |
-| **`CI v2 / gate`** | — | **the sole required context** |
+| `changes` | — | dorny/paths-filter (new) |
+| `lint-go` | `gofmt`, `go-vet`, `go-vet-integration`, `cilint`, `staticcheck`, `module-boundaries`, `test-discipline` | **`golangci-lint`** (see §4.6) |
+| `lint-contract` | `problem-codes-fresh`, `api-lint-base-path-e2e`, `api-lint-strict`, `api-lint-selftest`, `contract-sync` | **`openapi-lint`** (redocly), **`backend-codegen-drift`**, **`frontend-codegen-drift`**, **`oasdiff-breaking`** |
+| `lint-frontend` | `fe-eslint`, `css-token-discipline`, `eigenpal-selector-pin`, `docx-v2-typecheck` | — |
+| `governance` | `adr-status`, `wiki-tally`, `db-dictionary`, `req-trace-selftest`, `req-trace` | **`Migration monotonicity check`**, **`check-governance.ps1`**, the invariant→spec-ID coverage grep |
+| `test-go` | `go-test-unit` | — |
+| `test-frontend` | `fe-typecheck`, `fe-test`, `docx-v2-build`, `docx-v2-test` | — |
+| `test-integration` | `go-test-integration` | — |
+| `security` | — | gitleaks, grype |
+| **`required`** | — | **the sole required context** |
 
-7 + 6 + 4 + 5 + 2 + 4 + 1 = **29 registry IDs, all accounted for.** This table is the contract:
-if a registry ID is not in exactly one row, the design is incomplete. Draft 1 silently dropped
-five (`go-build`, `adr-status`, `db-dictionary`, `req-trace-selftest`, `req-trace`); the mapping
-exists so that failure mode is visible rather than latent.
+Registry IDs: 7 + 5 + 4 + 5 + 1 + 4 + 1 = **27 placed, 2 deleted** (`go-build`,
+`api-lint-base-path-v1` — see §4.5), totalling the 29 in `registry.go`. Non-registry controls:
+**11 placed.** Both counts are part of the contract. A control absent from this table is a
+control Phase 5 deletes.
 
 Two side effects worth naming. Putting `docx-v2-build` and `docx-v2-test` in the same job in that
 order repairs the ordering defect admitted at `registry.go:273`. Putting `module-boundaries` and
@@ -133,15 +141,19 @@ This is the whole of the fix. The complaint was never "the full suite is too slo
 final one runs when everything is already failing". A `needs:` edge answers exactly that, and
 costs no coverage.
 
-### 4.3 `CI v2 / gate`
+### 4.3 `required`
 
-The name is qualified because a job named `gate` already exists at `req-traceability.yml:33`, and
-because a required context name is effectively permanent — with no bypass actors, renaming it
-deadlocks every open PR.
+The name is `required`, matching coder/coder exactly. Draft 2 proposed `required`; that was
+rejected on two counts. A slash faking a namespace inside a job name is a homegrown convention no
+external reader has seen — every context in `main.json` today is a bare job name. And a required
+context name is effectively permanent, so baking a migration epoch ("v2") into it means the repo
+carries a 2026 rewrite in its most durable identifier forever. The collision with the job named
+`gate` at `req-traceability.yml:33` disappears in Phase 5 when that file is deleted, and during
+Phases 2–4 the two coexist harmlessly because only `required` is ever promoted.
 
 ```yaml
-gate:
-  name: CI v2 / gate
+required:
+  name: required
   if: ${{ always() }}
   needs: [changes, lint-go, lint-contract, lint-frontend, governance,
           test-go, test-frontend, test-integration, security]
@@ -179,17 +191,63 @@ Three properties, each load-bearing:
   `cancelled`, `skipped`. Anything not in the allowlist — including `null` and any value GitHub
   adds later — fails. The tempting `any(.[]; .result == "failure")` accepts `cancelled` as green.
 
-### 4.4 `nightly.yml`
+### 4.4 `nightly.yml` and `release.yml`
 
-Cron. Perf, e2e, axe, cross-platform. Advisory, never PR-blocking. Two jobs move here because
-they are advisory *today* and pretending otherwise is the lie A1 was chartered to remove:
-`Axe baseline` reads only the accepted-violations list and never an axe report (D-18), and `perf`
-produces percentiles over failed requests.
+`nightly.yml` — cron. Perf, e2e, axe, cross-platform, gosec/govulncheck. Advisory, never
+PR-blocking. Jobs move here because they are advisory *today* and pretending otherwise is the lie
+A1 was chartered to remove. `perf.yml` carries a header saying "KNOWN RED: this job cannot pass
+today" **on a `pull_request` trigger** — a check guaranteed red on every approval-touching PR
+teaches the whole team to ignore red, which is the most corrosive thing a CI surface can do.
 
-### 4.5 What is not built
+`release.yml` — the fourth file, forced into existence by §5's decision to keep tag-time SBOM
+generation workflow-native. Draft 2 said "three workflow files" and named two; an unnamed file is
+an unowned file.
+
+### 4.5 Deletions
+
+Six controls cease to exist because they cannot fail for the reason they claim, or because
+another control strictly subsumes them. Each is evidenced.
+
+| Control | Why it dies |
+|---|---|
+| `go-build` (registry) | `go test ./...` compiles every package including those with no test files, and `go vet ./...` compiles them again. Neither links binaries, so `go build ./...` verifies nothing the other two lack. |
+| `api-lint-base-path-v1` (registry) | `-only` is a *filter*, not a mode (`scripts/api-lint/main.go:21,64-67`), so PATH-BASE-PREFIX already runs inside `api-lint-strict` on the same file. `api-lint-base-path-e2e` survives — `-strict` never touches `internal-e2e.yaml`. |
+| `test-smoke.yml:smoke` | A hand-listed `go test -run "TestTriggerBypass\|TestMembership\|..."` regex that exits 0 when every named test is renamed away. Subsumed by `go-test-integration` over a superset of paths. |
+| `governance-check.yml:docx-v2-isolation` | Fires only when the PR *title* contains "docx-v2" or the branch starts with `feat/docx-v2-` (`governance-check.yml:69`). A guard that runs only when the PR self-identifies is not a gate. |
+| `e2e-coverage-gate.yml` checkbox job | Its own header says "Treat this gate as a reminder, not a coverage guarantee". A control that documents itself as not a control has settled the question. The invariant→spec-ID grep beside it is real and moves to `governance`. |
+| `supply-chain.yml:dependabot-label` | Applies a `needs-staging-soak-7d` label. No staging environment exists (`smoke.yml` says so) and nothing enforces the label. |
+
+Two whole workflows die with no successor: `phase3-hardening-gate.yml` (D-17/D-19 — two of four
+steps duplicate other checks, one targets a suite deleted in `dc0572f6`, the fourth disables its
+only vulnerability scanner by default parameter) and `release-readiness.yml` (a
+`workflow_dispatch` wrapper around a PowerShell script writing to `non_git/` — an operator
+runbook wearing a workflow costume).
+
+One control is **broken, not inert, and must be fixed rather than deleted**:
+`e2e-coverage-gate.yml:156` runs `go run ./cmd/api`. That path does not exist; the binary is
+`apps/api/cmd/metaldocs-api`, which `perf.yml:46` in the same repository uses correctly. This job
+has not booted a backend since the layout change. It moves to `nightly.yml` with the path fixed.
+
+### 4.6 The two Go lint stacks
+
+`.golangci.yml` enables `staticcheck`, `govet` and `gosec`, so the repository runs staticcheck
+twice (golangci diff-scoped via `only-new-issues: true`; the registry's `staticcheck` whole-tree)
+and `go vet` twice. Not strictly redundant — different scoping — but two overlapping stacks with
+different scope is the same "two controls, one claim" shape as §3's boundary pair, and draft 2
+left `golangci-lint` unplaced entirely.
+
+Resolution: **golangci-lint becomes the single Go lint umbrella**, whole-tree, with
+`only-new-issues` dropped, and the registry's standalone `staticcheck` ID is deleted. This is
+conditional on the whole tree being clean at whole-tree scope, which is **not verified** and must
+be measured in Phase 0 — dropping `only-new-issues` is exactly the kind of change that surfaces a
+pre-existing backlog. If the tree is not clean, the finding is real work, not a reason to keep the
+diff-scoping. Deleting golangci-lint instead is not an option: it carries unique linters
+(`errcheck`, `nilerr`, `exhaustive`) that nothing else runs.
+
+### 4.7 What is not built
 
 The consul-style `verify-ci.yml` no-op canary is **not** adopted as a required check. If `ci.yml`
-never dispatches, `CI v2 / gate` never reports, stays pending, and blocks the merge — the canary
+never dispatches, `required` never reports, stays pending, and blocks the merge — the canary
 adds no safety guarantee, only a second permanent required name and a second deadlock surface.
 It may exist as an advisory diagnostic; it will not be required.
 
@@ -212,7 +270,7 @@ Two things must then become true, and neither is true today:
 **`verify --require-infra`.** In CI, a SKIP from `missingInfra` must be fatal. Today a
 missing `METALDOCS_DATABASE_URL` yields SKIP, `report` exits 0, and the required integration job
 is green over zero integration tests (D-D). Every `ci.yml` invocation passes `--require-infra`.
-This must land *before* `CI v2 / gate` is promoted to required.
+This must land *before* `required` is promoted to required.
 
 **`verify --audit` must read YAML.** The reverse direction — a workflow job that runs checks
 outside the registry — is currently unenforced, which is how ten bypassing workflows went
@@ -222,7 +280,7 @@ exist. Until it parses YAML, the audit is a slogan.
 
 ## 6. Ruleset changes
 
-**Required contexts: 21 → 1** (`CI v2 / gate`).
+**Required contexts: 21 → 1** (`required`).
 
 **`strict_required_status_checks_policy: false` → `true`.** Currently at `main.json:39`. Without a
 merge queue, a PR can pass against a stale base and the combined merge result is never tested.
@@ -284,6 +342,70 @@ a control that fires into a red baseline is absent.
   `approval_route_stage_selectors`, `release_generations`).
 - D-1: give each of the 4 MUST REQs a live test to cite.
 - Diagnose why `full` is red. Never diagnosed; it is a precondition, not an afterthought.
+- Measure golangci-lint whole-tree with `only-new-issues` off (§4.6). The result sizes real work;
+  it does not license keeping the diff-scoping.
+
+### 8.1 The `cilint` ownership map — Phase 0's first task, and the cheapest
+
+`tools/cilint/baseline.json` suppresses 102 findings (`hgcrossmodule` 101, `platformboundary` 1).
+That number is misleading, and the misleading part is fixable in hours.
+
+`hgcrossmodule` scans SQL string literals for `FROM`/`JOIN <table>` and compares the table's owner
+against the reading module, using the hardcoded census at `hgcrossmodule.go:23`. That census
+reads:
+
+```go
+// documents (incl. the approval sub-context)
+"approval_instances":       "documents",
+"approval_routes":          "documents",
+"approval_route_stages":    "documents",
+"approval_stage_instances": "documents",
+"approval_signoffs":        "documents",
+```
+
+The comment states the model it encodes: approval as a *sub-context of documents*, which was the
+ADR 0072 world. **ADR 0082 promoted approval to a first-class top-level module — the 15th — and
+the census was never updated.** So the analyzer accuses the approval module of cross-module
+access when it reads its own tables. Those five tables account for roughly 68 of the 101 findings.
+
+Schema ownership cannot contradict this: the schema is a single baseline file
+(`db/baseline/0001_current_schema.sql`), so there are no per-module migrations to move. Ownership
+is expressed *only* in this map, and ADR 0082 is the fact it is supposed to encode.
+
+This is the same meta-defect the 2026-07-03 architecture review named: **hand-synced
+enumerations**. An ADR changes, an enumeration does not follow, and the control silently begins
+measuring a world that no longer exists. It is the identical failure class as §9 of this document,
+which is why §9 is not decoration.
+
+Correcting the census is expected to take the baseline from 35 entries to roughly 10–12. The
+residue is genuine debt in ~5 clusters:
+
+| Cluster | Findings | Shape of the fix |
+|---|---|---|
+| approval → `documents` / `document_comments` / `document_revisions` base tables | ~29 | one published read-port on `documents`, consumed by `postgres_approval_repository.go` and `read_service.go` |
+| approval → `controlled_documents` | 1 | likely reuse the already-published `v_cd_search_facts` view |
+| templates → `audit_events` | 1 | stale exemption: `hgExempt` names `templates/repository/postgres.go`, the file is now `templates/infrastructure/postgres.go` |
+| auth → `iam_users`, iam → `governance_events` | 2 | isolated, one small port each |
+| `platformboundary`: tripwire → `iam/domain` | 1 | needs an ADR; carve into that ADR's task |
+
+A secondary defect in the ledger itself: 34 of 35 entries carry the identical copy-pasted reason
+blaming "M3 approval kernel extraction", including entries in `auth`, `iam` and `templates` that
+M3 does not touch. A false reason on a suppression is worse than no reason — it defeats triage.
+
+**The deleting milestone, named as CLAUDE.md requires.** The baseline names its global-maximum end
+state (empty entries) but names no milestone that deletes it, which under the local-maximum rule
+makes it a defect today rather than a sanctioned transitional. The milestone is
+**M3-final: cross-module SQL closure**, starting when approval HTTP (#19) merges, with three
+ordered deliverables: (1) re-derive the census for the ADR 0082 world and fix the stale assertion
+at `hgcrossmodule_test.go:51`; (2) port the residue to published read-ports; (3) delete
+`baseline.json` and make `--update-baseline` refuse to write a non-empty entries array — turning
+"shrink-only" from a comment into a mechanism.
+
+The same treatment applies to the 27-file allowlist in `check-css-token-discipline.sh:21`, which
+says "MUST only shrink" with nothing enforcing shrinkage.
+
+Neither list blocks this CI restructure. Both must carry a named deleting milestone before the
+restructure ships, because shipping an unlabelled local maximum is itself the defect.
 
 **Phase 1 — `verify` fitness.** Land `--require-infra` and the YAML-parsing `--audit`. Neither the
 gate nor any promotion happens before these exist.
@@ -292,18 +414,57 @@ gate nor any promotion happens before these exist.
 every action, and adds `concurrency` groups. It deletes and renames **nothing**. It merges under
 the existing 21 required contexts.
 
-**Phase 3 — observe.** `CI v2 / gate` must be seen green on a real PR before it is named anywhere
+**Phase 3 — observe.** `required` must be seen green on a real PR before it is named anywhere
 in the ruleset.
 
-**Phase 4 — swap the ruleset, in two atomic API edits.** First: add `CI v2 / gate` while retaining
+**Phase 4 — swap the ruleset, in two atomic API edits.** First: add `required` while retaining
 all 21 old contexts. Then, once every open PR's latest SHA carries the new context: remove the 21
-while retaining `CI v2 / gate`, and flip `strict_required_status_checks_policy` to `true`.
+while retaining `required`, and flip `strict_required_status_checks_policy` to `true`.
 Enforcement is never disabled at any point. There is no window in which `main` is unprotected and
 no window in which every PR is stuck pending.
 
-**Phase 5 — delete.** PR B removes the superseded workflows and re-exports the live ruleset to
-`.github/rulesets/main.json` with a corrected README (which currently says 22 required checks
-while the JSON contains 21 — the drift this whole design exists to stop).
+**Phase 5 — delete and rename.** PR B removes the superseded workflows, applies the renames in
+§8.2, resolves §4.6, and re-exports the live ruleset to `.github/rulesets/main.json` with a
+corrected README (which currently says 22 required checks while the JSON contains 21 — the drift
+this whole design exists to stop).
+
+Renames are safe only here. Once `required` is the sole required context, check IDs and job names
+are internal and a rename cannot deadlock anything. Renaming earlier is the deadlock.
+
+### 8.2 Renames
+
+Convention: lowercase kebab-case; workflow files named by lifecycle stage; jobs named by concern;
+checks named by **the claim they verify, not the tool that verifies it** — except where the tool
+name *is* the universally understood claim (`gofmt`, `staticcheck`, `eslint`).
+
+| Old | New | Why |
+|---|---|---|
+| `cilint` | `arch-lint` | named for a homegrown binary; the claim is that the architecture analyzers hold |
+| `problem-codes-fresh` | `problem-codes-drift` | joins the drift family; "fresh" names the desired state, "drift" names what fails |
+| `api-lint-strict` | `api-lint` | once `-base-path-v1` is deleted, strict is the only mode that runs |
+| `api-lint-base-path-e2e` | `api-lint-e2e-base-path` | subject first |
+| `module-boundaries` | `module-imports` | **misleading today**: the script reads Go import paths only; the invariant it claims covers SQL, which it cannot see (§3) |
+| `test-discipline` | `test-conventions` | "discipline" is moralistic house vocabulary |
+| `wiki-tally` | `wiki-debt-tally` | "tally" alone is opaque |
+| `db-dictionary` | `db-docs-coverage` | "dictionary" is house vocabulary; the claim is documentation coverage |
+| `fe-eslint` | `eslint` | tool = claim |
+| `css-token-discipline` | `css-tokens` | as above |
+| `docx-v2-typecheck` / `-build` / `-test` | `docx-typecheck` / `docx-build` / `docx-test` | there is no v1; the repo ships a `legacyvocab` analyzer while its own CI names carry a dead epoch suffix. Cascades to the npm scripts — coordinate, do not block on it |
+
+The remaining 14 IDs keep their names.
+
+Workflow-file names to kill, beyond the merge itself:
+
+- **`ci.yml` whose `name:` is "docx-renderer CI"** — the file every external contributor opens
+  first, named by the universal convention, containing 5% of the CI. The new `ci.yml` takes the
+  name it always implied.
+- **`phase3-hardening-gate.yml`, `release-readiness.yml`** — "phase3" is a dead internal program
+  epoch baked into a public filename. Both are deleted outright anyway (§4.5).
+- **`invariants.yml` / "CI Invariants"** — describes nothing a reader can predict.
+- **`module-boundaries.yml:conformance`** — "conformance" to what? It is a required context name
+  today carrying zero information.
+- **the job display name `gofmt + go vet + staticcheck`** — a name that is a list goes stale the
+  day the list changes, and it already omits `go-vet-integration`, which the job runs.
 
 ## 9. Known decay mechanism
 
