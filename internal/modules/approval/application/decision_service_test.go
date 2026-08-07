@@ -553,11 +553,6 @@ func buildReviewThenStageInstance(instanceID, reviewStageID, nextStageID, author
 // validContentHash is a 64-char lowercase hex string used in test signoff rows.
 const validContentHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
-// validContentHashPtr is an addressable copy of validContentHash (F6): several
-// fixtures across this package need a *string for domain.Instance.FrozenContentHash,
-// and Go cannot take the address of a string constant directly.
-var validContentHashPtr = validContentHash
-
 // TestRecordSignoff_ApprovePath_QuorumMet: single approver quorum (any_1_of).
 // Expect StageCompleted=true, InstanceApproved=true (only 1 stage).
 func TestRecordSignoff_ApprovePath_QuorumMet(t *testing.T) {

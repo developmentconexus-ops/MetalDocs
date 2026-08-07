@@ -65,7 +65,7 @@ func (l *testInMemoryLimiter) Allow(_ context.Context, actorID string) (bool, er
 	if !ok {
 		return true, nil
 	}
-	if time.Now().Sub(e.oldest) >= windowDur {
+	if time.Since(e.oldest) >= windowDur {
 		delete(l.entries, actorID)
 		return true, nil
 	}

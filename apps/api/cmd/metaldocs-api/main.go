@@ -26,7 +26,6 @@ import (
 	"metaldocs/internal/modules/jobs/maintenance"
 	templatesapp "metaldocs/internal/modules/templates/application"
 	templateshttp "metaldocs/internal/modules/templates/delivery/http"
-	templatesrepo "metaldocs/internal/modules/templates/infrastructure"
 	templatejobs "metaldocs/internal/modules/templates/jobs"
 
 	"metaldocs/apps/api/internal/wiring"
@@ -768,11 +767,14 @@ func main() {
 	// both staging dispatch kinds inside the caller's business tx (M5 F5.3 T3).
 	// riverBundle.Client is enqueue-only here (never Started in this binary);
 	// the temporal-queue dispatch workers that consume these jobs run in
-	// metaldocs-jobs.
-	pdfDispatchEnqueuer := dispatchjobs.NewEnqueuer(riverBundle.Client, pdfOutboxRepo, materializeOutboxRepo, stagingOutboxWorkerCfg.MaxAttempts)
+	// metaldocs-jobs. riverBundle is nil when deps.SQLDB is nil (:690-691), so
+	// this wiring is guarded the same way the release recorder is below (:792).
+	if riverBundle != nil {
+		pdfDispatchEnqueuer := dispatchjobs.NewEnqueuer(riverBundle.Client, pdfOutboxRepo, materializeOutboxRepo, stagingOutboxWorkerCfg.MaxAttempts)
 
-	// Wire materialize outbox into the freeze service so Pin can enqueue async jobs.
-	fanoutCfg.freezeService.WithMaterializeOutbox(pdfDispatchEnqueuer)
+		// Wire materialize outbox into the freeze service so Pin can enqueue async jobs.
+		fanoutCfg.freezeService.WithMaterializeOutbox(pdfDispatchEnqueuer)
+	}
 
 	// Wire the remaining ports directly onto the existing Decision pointer
 	// (in place — With* return the same *DecisionService) rather than
@@ -1164,7 +1166,7 @@ func buildTokensModule(deps bootstrap.APIDependencies) *tokens.Module {
 // orphan-object sweeper (F-T6) against the same instances the request path uses.
 // presigner is the shared VerifiedStore constructed once at the composition root
 // (STO-02) — templates does not construct its own instance.
-func buildTemplatesModule(deps bootstrap.APIDependencies, capabilityService *iamapp.CapabilityService, presigner *objectstore.VerifiedStore, displayNameReader iamdomain.UserDisplayNameReader) (*templateshttp.Handler, *templatesrepo.Repository, *objectstore.VerifiedStore, error) {
+func buildTemplatesModule(deps bootstrap.APIDependencies, capabilityService *iamapp.CapabilityService, presigner *objectstore.VerifiedStore, displayNameReader iamdomain.UserDisplayNameReader) (*templateshttp.Handler, *templatesinfra.Repository, *objectstore.VerifiedStore, error) {
 	if capabilityService == nil {
 		return nil, nil, nil, errors.New("templates capability service is required")
 	}
@@ -1186,7 +1188,7 @@ func buildTemplatesModule(deps bootstrap.APIDependencies, capabilityService *iam
 	if templatesResolverReg == nil || len(templatesResolverReg.Known()) == 0 {
 		return nil, nil, nil, errors.New("templates resolver registry is nil or empty; resolver_key validation would be silently skipped (SEC-08 / T-008)")
 	}
-	templatesRepo := templatesrepo.New(deps.SQLDB).WithAudit(deps.AuditWriter)
+	templatesRepo := templatesinfra.New(deps.SQLDB).WithAudit(deps.AuditWriter)
 	// ADR 0086: the config-first creation gate reads template-route readiness
 	// through the approval-owned port, in the create tx. Without it CreateTemplate
 	// fails closed, so it is wired here (never left nil in production).

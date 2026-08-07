@@ -12,11 +12,9 @@ package application
 // fixture is still consumed by service_invariants_test.go.
 
 import (
-	"database/sql"
 	"database/sql/driver"
 	"fmt"
 	"io"
-	"testing"
 )
 
 type recordingConn struct {
@@ -64,19 +62,3 @@ func (s *recordingStmt) Query(args []driver.Value) (driver.Rows, error) {
 type recordingDriverInstance struct{ conn *recordingConn }
 
 func (d *recordingDriverInstance) Open(_ string) (driver.Conn, error) { return d.conn, nil }
-
-// newTestDB registers a unique driver and returns a *sql.DB backed by conn.
-// Unused by service_invariants_test.go today (it registers its own name via
-// newSQLEmitterTestDB) but kept for parity with the original fixture in case
-// a future test wants the one-liner.
-func newTestDB(t *testing.T, conn *recordingConn) *sql.DB {
-	t.Helper()
-	name := fmt.Sprintf("recording_%p", conn)
-	sql.Register(name, &recordingDriverInstance{conn: conn})
-	db, err := sql.Open(name, "")
-	if err != nil {
-		t.Fatalf("open test db: %v", err)
-	}
-	t.Cleanup(func() { db.Close() })
-	return db
-}

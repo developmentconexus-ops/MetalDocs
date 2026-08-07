@@ -2,7 +2,6 @@ package httpdelivery
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -329,11 +328,4 @@ func (h *SessionsHandler) writeProblem(w http.ResponseWriter, p *problem.Problem
 	if err := problem.Write(w, p); err != nil {
 		slog.Warn("iam sessions: write response failed", "err", err)
 	}
-}
-
-func nullTimeRFC3339(t sql.NullTime) string {
-	if !t.Valid {
-		return ""
-	}
-	return t.Time.UTC().Format(time.RFC3339)
 }

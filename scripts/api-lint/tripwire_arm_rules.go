@@ -81,21 +81,6 @@ func gatedTableSet(arms []tripwire.Arm) map[string]struct{} {
 	return out
 }
 
-// armFor returns the TripwireArms entry (if any) matching table+op, where
-// OpAny arms match any op (mirrors the trigger's CASE branches: some branches
-// test TG_OP, some test table name only).
-func armFor(arms []tripwire.Arm, table string, op tripwire.Op) (tripwire.Arm, bool) {
-	for _, a := range arms {
-		if a.Table != table {
-			continue
-		}
-		if a.Op == tripwire.OpAny || a.Op == op {
-			return a, true
-		}
-	}
-	return tripwire.Arm{}, false
-}
-
 // unionArmCapsFor returns the UNION of Caps across ALL arms matching table+op,
 // and whether any arm matched. A subject-discriminated table (ADR 0083:
 // approval_instances/INSERT splits into a document arm requiring document.submit

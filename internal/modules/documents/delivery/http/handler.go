@@ -2,7 +2,6 @@ package http
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -89,7 +88,6 @@ type Service interface {
 
 type Handler struct {
 	svc             Service
-	db              *sql.DB
 	caps            application.CapabilityChecker
 	export          *ExportHandler
 	fillIn          *FillInHandler
@@ -963,15 +961,6 @@ func (h *Handler) listRevisionHistory(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-type revisionHistoryItemResponse struct {
-	DocumentID     string    `json:"document_id"`
-	RevisionNumber int64     `json:"revision_number"`
-	RevisionTitle  string    `json:"revision_title"`
-	Status         string    `json:"status"`
-	CreatedAt      time.Time `json:"created_at"`
-	IsCurrent      bool      `json:"is_current"`
-}
-
 func toAPICheckpoint(cp domain.Checkpoint) (documentsapi.DocumentCheckpoint, error) {
 	id, err := uuid.Parse(cp.ID)
 	if err != nil {
@@ -1006,21 +995,6 @@ func toAPICheckpoints(cps []domain.Checkpoint) ([]documentsapi.DocumentCheckpoin
 		out = append(out, mapped)
 	}
 	return out, nil
-}
-
-func toRevisionHistoryResponse(items []domain.RevisionHistoryItem) []revisionHistoryItemResponse {
-	out := make([]revisionHistoryItemResponse, 0, len(items))
-	for _, item := range items {
-		out = append(out, revisionHistoryItemResponse{
-			DocumentID:     item.DocumentID,
-			RevisionNumber: item.RevisionNumber,
-			RevisionTitle:  item.RevisionTitle,
-			Status:         string(item.Status),
-			CreatedAt:      item.CreatedAt,
-			IsCurrent:      item.IsCurrent,
-		})
-	}
-	return out
 }
 
 func toAPIRevisionHistoryItems(items []domain.RevisionHistoryItem) ([]documentsapi.DocumentRevisionHistoryItem, error) {
@@ -1375,12 +1349,6 @@ func mapErr(err error) (int, problem.Code) {
 
 func httpErr(w http.ResponseWriter, status int, code problem.Code) {
 	_ = problem.Write(w, problem.New(status, code, code.String()))
-}
-
-// httpErrDetail writes a canonical-code problem carrying runtime context in the
-// RFC 9457 detail field (never in the code field).
-func httpErrDetail(w http.ResponseWriter, status int, code problem.Code, detail string) {
-	_ = problem.Write(w, problem.New(status, code, code.String()).WithDetail(detail))
 }
 
 func isKnownDocumentStatus(status string) bool {

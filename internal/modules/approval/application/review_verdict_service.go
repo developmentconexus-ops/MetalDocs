@@ -492,8 +492,3 @@ func verdictsAsApprovals(verdicts []domain.ReviewVerdict) []domain.Signoff {
 	}
 	return approvals
 }
-
-// newReviewVerdictService constructs a ReviewVerdictService.
-func newReviewVerdictService(repo infrastructure.ApprovalRepository, emitter EventEmitter, clock Clock) *ReviewVerdictService {
-	return &ReviewVerdictService{repo: repo, emitter: emitter, clock: clock}
-}

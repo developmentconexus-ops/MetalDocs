@@ -121,24 +121,6 @@ func (h *AdminHandler) WithPresenceReader(r PresenceReader) *AdminHandler {
 	return h
 }
 
-func (h *AdminHandler) handleUserRoleUpsertTyped(w http.ResponseWriter, r *http.Request) {
-	userID := strings.TrimSpace(r.PathValue("user_id"))
-	if userID == "" {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "user_id required"))
-		return
-	}
-	h.handleUserRoleUpsert(w, r, userID)
-}
-
-func (h *AdminHandler) handleReplaceUserRolesTyped(w http.ResponseWriter, r *http.Request) {
-	userID := strings.TrimSpace(r.PathValue("user_id"))
-	if userID == "" {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "user_id required"))
-		return
-	}
-	h.handleReplaceUserRoles(w, r, userID)
-}
-
 // handleAdminOverview composes the three independent snapshots that back
 // the Admin Center Overview tab: KPI, presence, and recent activities.
 // PR-8 refactor:

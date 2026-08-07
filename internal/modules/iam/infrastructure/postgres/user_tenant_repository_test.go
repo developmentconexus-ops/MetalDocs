@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -27,7 +28,7 @@ func TestUserTenantsQueryParity(t *testing.T) {
 // TestNoopUserTenantReaderReturnsEmptyNonNil pins the null-object contract: empty,
 // non-nil, no error.
 func TestNoopUserTenantReaderReturnsEmptyNonNil(t *testing.T) {
-	ids, err := iamdomain.NoopUserTenantReader{}.UserTenantIDs(nil, "anyone")
+	ids, err := iamdomain.NoopUserTenantReader{}.UserTenantIDs(context.TODO(), "anyone")
 	if err != nil {
 		t.Fatalf("Noop UserTenantIDs err = %v, want nil", err)
 	}
