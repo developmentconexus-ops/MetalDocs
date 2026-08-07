@@ -62,6 +62,36 @@ verification of what CI will do, and verify now says so before it starts.
 
 Measured: `--profile=fast` is 15 checks in ~51s wall clock.
 
+## 1b. A required check may not carry a `paths:` filter
+
+GitHub evaluates required status checks by name. A required check that never
+reports is not treated as "not applicable" — it is treated as **pending**, and
+the PR cannot merge. So a path-filtered workflow whose jobs are required
+deadlocks every PR that falls outside its filter.
+
+That is not merely a mechanical constraint; it is the same rule this axis is
+built on, seen from the other side:
+
+> **A control that sometimes does not fire is not a gate.**
+
+An unwired script never fires. A path-filtered required check fires for some
+diffs and not others, and the diffs it skips are exactly the ones nobody
+chose deliberately — they are whatever the glob happened to miss. A reviewer
+reading a green PR cannot tell the difference between "this check passed" and
+"this check was not run," which makes green unfalsifiable.
+
+Diff-scoping is still worth having; it just belongs one level down. The job
+always runs, and `tools/verify` decides what is relevant from the `Paths`
+field on each registry entry (`--profile=changed`). The saving is the same,
+and the job still reports either way.
+
+Applied on 2026-08-07: `api-contract.yml`, `lint.yml` and `fe-ci.yml` lost
+their `paths:` filters. Report-tier workflows that will never be required
+(`ci`, `perf`, `e2e-coverage-gate`, `supply-chain`, `req-traceability`,
+`openapi-breaking`) keep theirs. **Promoting any of those to tier 1 requires
+removing its filter in the same change** — otherwise the promotion silently
+converts the check from "advisory" to "blocks unrelated PRs forever."
+
 ## 2. Check tiers
 
 The `main` ruleset promotes tier-1 to `required`. Tier-2 runs on every PR and
