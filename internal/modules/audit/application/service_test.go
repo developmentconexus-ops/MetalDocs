@@ -104,11 +104,11 @@ func TestWithExportsPanicsOnNilDependency(t *testing.T) {
 	urlBuilder := func(domain.ExportJob) string { return "" }
 
 	cases := []struct {
-		name      string
-		counter   domain.Counter
-		repo      domain.ExportJobRepository
-		writer    domain.Writer
-		urlBld    application.SignedURLBuilder
+		name    string
+		counter domain.Counter
+		repo    domain.ExportJobRepository
+		writer  domain.Writer
+		urlBld  application.SignedURLBuilder
 	}{
 		{"nil counter", nil, exports, w, urlBuilder},
 		{"nil repo", w, nil, w, urlBuilder},

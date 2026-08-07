@@ -1,4 +1,4 @@
-﻿package domain_test
+package domain_test
 
 import (
 	"bytes"
@@ -34,24 +34,30 @@ func TestComputeCompositeHash_DifferentInputsProduceDifferentHashes(t *testing.T
 		h    func() []byte
 	}{
 		{"different content", func() []byte {
-			h, _ := domain.ComputeCompositeHash([]byte("xyz789"), "tpl-v1", "grammar-v1", "docgen-v2@0.4.0", opts); return h
+			h, _ := domain.ComputeCompositeHash([]byte("xyz789"), "tpl-v1", "grammar-v1", "docgen-v2@0.4.0", opts)
+			return h
 		}},
 		{"different template", func() []byte {
-			h, _ := domain.ComputeCompositeHash([]byte("abc123"), "tpl-v2", "grammar-v1", "docgen-v2@0.4.0", opts); return h
+			h, _ := domain.ComputeCompositeHash([]byte("abc123"), "tpl-v2", "grammar-v1", "docgen-v2@0.4.0", opts)
+			return h
 		}},
 		{"different grammar", func() []byte {
-			h, _ := domain.ComputeCompositeHash([]byte("abc123"), "tpl-v1", "grammar-v2", "docgen-v2@0.4.0", opts); return h
+			h, _ := domain.ComputeCompositeHash([]byte("abc123"), "tpl-v1", "grammar-v2", "docgen-v2@0.4.0", opts)
+			return h
 		}},
 		{"different docgen version", func() []byte {
-			h, _ := domain.ComputeCompositeHash([]byte("abc123"), "tpl-v1", "grammar-v1", "docgen-v2@0.5.0", opts); return h
+			h, _ := domain.ComputeCompositeHash([]byte("abc123"), "tpl-v1", "grammar-v1", "docgen-v2@0.5.0", opts)
+			return h
 		}},
 		{"landscape=true", func() []byte {
 			h, _ := domain.ComputeCompositeHash([]byte("abc123"), "tpl-v1", "grammar-v1", "docgen-v2@0.4.0",
-				domain.RenderOptions{PaperSize: "A4", LandscapeP: true}); return h
+				domain.RenderOptions{PaperSize: "A4", LandscapeP: true})
+			return h
 		}},
 		{"paper Letter", func() []byte {
 			h, _ := domain.ComputeCompositeHash([]byte("abc123"), "tpl-v1", "grammar-v1", "docgen-v2@0.4.0",
-				domain.RenderOptions{PaperSize: "Letter", LandscapeP: false}); return h
+				domain.RenderOptions{PaperSize: "Letter", LandscapeP: false})
+			return h
 		}},
 	}
 	for _, c := range cases {

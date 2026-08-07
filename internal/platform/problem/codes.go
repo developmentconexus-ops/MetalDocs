@@ -251,8 +251,8 @@ var (
 	// and by templates (annex C-18 / R-4). Statuses already agreed at 422; only the
 	// codes diverged, because templates flattened all three onto conflict.generic
 	// and thereby made the FE message map useless for template submit.
-	CodeValidationEmptyEligiblePool             = Register("shared", "validation.empty_eligible_pool", 422)
-	CodeValidationSubmitChoiceRequired          = Register("shared", "validation.submit_choice_required", 422)
+	CodeValidationEmptyEligiblePool              = Register("shared", "validation.empty_eligible_pool", 422)
+	CodeValidationSubmitChoiceRequired           = Register("shared", "validation.submit_choice_required", 422)
 	CodeValidationSubmitChoiceConstraintViolated = Register("shared", "validation.submit_choice_constraint_violated", 422)
 )
 

@@ -8,7 +8,7 @@ import (
 
 type fixedResolver struct{}
 
-func (fixedResolver) Key() string { return "doc_code" }
+func (fixedResolver) Key() string  { return "doc_code" }
 func (fixedResolver) Version() int { return 1 }
 func (fixedResolver) Resolve(ctx context.Context, in ResolveInput) (ResolvedValue, error) {
 	return ResolvedValue{

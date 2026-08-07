@@ -26,10 +26,10 @@ func TestQuery_TypedResponseShape(t *testing.T) {
 	t.Run("list_templates", func(t *testing.T) {
 		repo := newFakeRepo()
 		repo.templates[tplID] = &domain.Template{
-			ID:       tplID,
-			TenantID: tenantID,
-			Name:     "My Template",
-			Key:      "my-template",
+			ID:        tplID,
+			TenantID:  tenantID,
+			Name:      "My Template",
+			Key:       "my-template",
 			CreatedBy: "user-a",
 		}
 		mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)

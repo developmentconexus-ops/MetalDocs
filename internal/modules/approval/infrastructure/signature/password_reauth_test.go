@@ -158,7 +158,6 @@ func TestPasswordReauthRateLimitTrip(t *testing.T) {
 	}
 }
 
-
 func TestPasswordReauthFailsClosedWhenLimiterMissing(t *testing.T) {
 	em := &fakeEmitter{}
 	p := NewPasswordReauthProvider(newFakeReader(map[string]string{"u1": "secret"}), em, nil)

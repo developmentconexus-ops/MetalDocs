@@ -99,7 +99,7 @@ func buildSARIF(results []analyzers.Finding) map[string]any {
 		if !rules[r.Analyzer] {
 			rules[r.Analyzer] = true
 			sarfRules = append(sarfRules, map[string]any{
-				"id": r.Analyzer,
+				"id":               r.Analyzer,
 				"shortDescription": map[string]any{"text": r.Analyzer},
 			})
 		}

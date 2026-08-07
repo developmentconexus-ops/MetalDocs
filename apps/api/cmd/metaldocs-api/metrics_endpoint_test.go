@@ -43,10 +43,10 @@ func buildPublicHandler(httpObs *observability.HTTPObservability) http.Handler {
 		func(next http.Handler) http.Handler { return next }, // cors stub
 		func(next http.Handler) http.Handler { return next }, // origin protection stub
 		func(next http.Handler) http.Handler { return next }, // pre-auth login limiter stub
-		denyAllMiddleware,                                     // authn: fails closed, like production authMiddleware.Wrap
-		denyAllMiddleware,                                     // iam authz: fails closed, like production iamMiddleware.Wrap
-		nil,                                                    // presence bump: nil when no SQL DB, same as production
-		func(next http.Handler) http.Handler { return next },  // global rate limit stub
+		denyAllMiddleware, // authn: fails closed, like production authMiddleware.Wrap
+		denyAllMiddleware, // iam authz: fails closed, like production iamMiddleware.Wrap
+		nil,               // presence bump: nil when no SQL DB, same as production
+		func(next http.Handler) http.Handler { return next }, // global rate limit stub
 		platformmw.MethodNotAllowedJSON,
 	)
 	return buildChain(apiMux, links)

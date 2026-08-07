@@ -19,11 +19,15 @@ type fakeFamilyRepo struct {
 
 type fakeFamilyTx struct{}
 
-func (fakeFamilyTx) Commit() error                                                          { return nil }
-func (fakeFamilyTx) Rollback() error                                                        { return nil }
-func (fakeFamilyTx) ExecContext(_ context.Context, _ string, _ ...any) (sql.Result, error)  { return nil, nil }
-func (fakeFamilyTx) QueryContext(_ context.Context, _ string, _ ...any) (*sql.Rows, error)  { return nil, nil }
-func (fakeFamilyTx) QueryRowContext(_ context.Context, _ string, _ ...any) *sql.Row         { return nil }
+func (fakeFamilyTx) Commit() error   { return nil }
+func (fakeFamilyTx) Rollback() error { return nil }
+func (fakeFamilyTx) ExecContext(_ context.Context, _ string, _ ...any) (sql.Result, error) {
+	return nil, nil
+}
+func (fakeFamilyTx) QueryContext(_ context.Context, _ string, _ ...any) (*sql.Rows, error) {
+	return nil, nil
+}
+func (fakeFamilyTx) QueryRowContext(_ context.Context, _ string, _ ...any) *sql.Row { return nil }
 
 func newFakeFamilyRepo() *fakeFamilyRepo {
 	return &fakeFamilyRepo{

@@ -12,4 +12,3 @@ func marshalGovernancePayload(v any) ([]byte, error) {
 	}
 	return b, nil
 }
-

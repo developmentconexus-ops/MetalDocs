@@ -119,11 +119,11 @@ func grantApprovalOversee(t *testing.T, dbc *sql.DB, tenantID, userID string) {
 func seedSignoff(t *testing.T, fx viewerFixture, stageID, actorID string) {
 	t.Helper()
 	sig, err := domain.NewSignoff(domain.SignoffParams{
-		ID:                 uuid.NewString(),
-		ApprovalInstanceID: fx.instanceID,
-		StageInstanceID:    stageID,
-		ActorUserID:        actorID,
-		ActorTenantID:      fx.tenantID,
+		ID:                       uuid.NewString(),
+		ApprovalInstanceID:       fx.instanceID,
+		StageInstanceID:          stageID,
+		ActorUserID:              actorID,
+		ActorTenantID:            fx.tenantID,
 		Decision:                 domain.DecisionApprove,
 		SignedAt:                 time.Now().UTC(),
 		ContentHash:              "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",

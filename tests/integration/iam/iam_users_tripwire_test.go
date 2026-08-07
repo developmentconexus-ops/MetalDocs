@@ -14,9 +14,11 @@
 //     user.manage per T-004 / Plan 5) rejects an actor holding no role at all,
 //     via authz.ErrCapDenied, before any row is written — proving tier-2 is
 //     reachable and fails closed for this table's application entry point.
+//
 //   - TestIAMUsersTripwire_Tier2PassesWithGrant: the same Go call succeeds once
 //     the caller holds system_admin (tier-2 inheritance bypass, ADR 0022 R1),
 //     and the iam_users/iam_user_roles rows are actually written.
+//
 //   - TestIAMUsersTripwire_DBRejectsDirectWriteWithoutAssertion: a raw SQL
 //     INSERT against metaldocs.iam_users with no metaldocs.asserted_caps GUC
 //     set (bypassing the Go authz layer entirely, e.g. a rogue migration or a
@@ -26,7 +28,7 @@
 //     (last_seen_at, mirroring presence.BumpLastSeen) is NOT rejected, while a
 //     privileged-column UPDATE (display_name) IS.
 //
-//	go test -tags=integration ./tests/integration/iam/... -run IAMUsersTripwire
+//     go test -tags=integration ./tests/integration/iam/... -run IAMUsersTripwire
 package iam_test
 
 import (

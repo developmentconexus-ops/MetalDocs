@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"fmt"
 
-	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/approval/domain"
 	"metaldocs/internal/modules/approval/infrastructure"
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 )
 
 // resolveCurrentEligibleForDrift computes the live eligible set used by the

@@ -37,7 +37,7 @@ import (
 // joining controlled_documents (owned by another module). It is tx-aware — the
 // caller's *sql.Tx is passed straight through as the executor, so the CD read
 // runs inside the same transaction as the document read, preserving the prior
-// JOIN's snapshot consistency. The COALESCE(snapshot, cd.process_area_code, '')
+// JOIN's snapshot consistency. The COALESCE(snapshot, cd.process_area_code, ”)
 // precedence is reproduced in Go: a non-NULL snapshot wins even when "", and
 // only a NULL snapshot falls through to the CD area (a missing/NULL CD area ⇒ "").
 func LoadDocumentAreaCode(ctx context.Context, tx *sql.Tx, cdRead controlleddocumentsdomain.CDFieldReader, tenantID, documentID string) (areaCode string, found bool, err error) {

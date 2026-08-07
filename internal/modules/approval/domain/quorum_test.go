@@ -21,9 +21,9 @@ func makeSignoff(actor string, dec Decision) Signoff {
 
 func stageWithEligible(eligible []string, q QuorumPolicy, m *int) StageInstance {
 	return StageInstance{
-		Status:          StageActive,
-		QuorumSnapshot:  q,
-		QuorumMSnapshot: m,
+		Status:           StageActive,
+		QuorumSnapshot:   q,
+		QuorumMSnapshot:  m,
 		EligibleActorIDs: eligible,
 	}
 }

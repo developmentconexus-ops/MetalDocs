@@ -75,9 +75,13 @@ func (f *fakeExportPresigner) PresignGet(_ context.Context, key string, _ time.D
 	return "https://example/get/" + key, nil
 }
 
-func (f *fakeExportPresigner) Exists(_ context.Context, _ string) (bool, error) { return f.headFound, nil }
+func (f *fakeExportPresigner) Exists(_ context.Context, _ string) (bool, error) {
+	return f.headFound, nil
+}
 
-func (f *fakeExportPresigner) Size(_ context.Context, _ string) (int64, error) { return f.sizeBytes, nil }
+func (f *fakeExportPresigner) Size(_ context.Context, _ string) (int64, error) {
+	return f.sizeBytes, nil
+}
 
 type fakePDFClient struct {
 	calls int

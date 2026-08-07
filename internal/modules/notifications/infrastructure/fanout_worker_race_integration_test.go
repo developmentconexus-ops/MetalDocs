@@ -112,13 +112,13 @@ func TestNotificationsFanoutWorker_ConcurrentRaceCommutativity(t *testing.T) {
 
 		argsA := documentsdomain.LifecycleEventArgs{
 			EventID: eventA, TenantID: ten.ID,
-			EventType: documentsdomain.EventTypeDocumentPublished,
+			EventType:    documentsdomain.EventTypeDocumentPublished,
 			ResourceType: "document", ResourceID: uuid.NewString(),
 			ControlledDocumentID: cd.ID, OccurredAt: time.Now(),
 		}
 		argsB := documentsdomain.LifecycleEventArgs{
 			EventID: eventB, TenantID: ten.ID,
-			EventType: documentsdomain.EventTypeDocumentSuperseded,
+			EventType:    documentsdomain.EventTypeDocumentSuperseded,
 			ResourceType: "document", ResourceID: uuid.NewString(),
 			ControlledDocumentID: cd.ID, OccurredAt: time.Now(),
 		}

@@ -70,6 +70,17 @@ var checks = []Check{
 		CIJob:    "test-smoke.yml:unit",
 	},
 	{
+		ID:   "gofmt",
+		Desc: "every tracked Go file is gofmt-clean",
+		// Nothing enforced this before A1, and 96 files had drifted by the
+		// time anyone swept. golangci-lint's enabled set has no formatter and
+		// go vet does not look at layout, so the convention was held up
+		// entirely by habit.
+		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-gofmt.sh"},
+		CIJob:    "invariants.yml:staticcheck",
+	},
+	{
 		ID:       "go-vet",
 		Desc:     "go vet ./...",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},

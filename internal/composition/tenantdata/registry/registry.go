@@ -16,10 +16,10 @@ import (
 
 	"metaldocs/internal/platform/tenantdata"
 
+	approvalrepo "metaldocs/internal/modules/approval/infrastructure"
 	auditpg "metaldocs/internal/modules/audit/infrastructure/postgres"
 	authpg "metaldocs/internal/modules/auth/infrastructure/postgres"
 	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
-	approvalrepo "metaldocs/internal/modules/approval/infrastructure"
 	docsrepo "metaldocs/internal/modules/documents/infrastructure"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
 	jobstenantdata "metaldocs/internal/modules/jobs/tenantdata"

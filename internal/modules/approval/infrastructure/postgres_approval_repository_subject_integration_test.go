@@ -173,9 +173,9 @@ func TestInsertInstance_ZeroSubject_ReturnsError_RealDB(t *testing.T) {
 	route := testdb.NewApprovalRoute(t, dbc, testdb.WithTenant(doc.TenantID))
 
 	inst := domain.Instance{
-		ID:                   uuid.NewString(),
-		TenantID:             doc.TenantID,
-		DocumentID:           doc.ID,
+		ID:         uuid.NewString(),
+		TenantID:   doc.TenantID,
+		DocumentID: doc.ID,
 		// Subject intentionally left zero-value (Kind == "").
 		RouteID:              route.ID,
 		RouteVersionSnapshot: 1,

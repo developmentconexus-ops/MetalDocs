@@ -5,7 +5,7 @@
 // (TenantKeyRepository) round-trips through the actual metaldocs.tenant_keys
 // table + FORCE RLS tenant_isolation policy from migration 0281.
 //
-//   go test -tags=integration ./tests/integration/security/... -run TenantCrypto
+//	go test -tags=integration ./tests/integration/security/... -run TenantCrypto
 package security_test
 
 import (

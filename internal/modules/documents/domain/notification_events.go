@@ -12,9 +12,9 @@ import (
 // No `river` import here — domain stays infra-free; Kind() satisfies river.JobArgs via
 // a plain string method, not a structural River dependency.
 type LifecycleEventArgs struct {
-	EventID              string    `json:"event_id"`               // uuid, minted at emit — idempotency key
+	EventID              string    `json:"event_id"` // uuid, minted at emit — idempotency key
 	TenantID             string    `json:"tenant_id"`
-	EventType            string    `json:"event_type"`             // one of the constants below
+	EventType            string    `json:"event_type"` // one of the constants below
 	ResourceType         string    `json:"resource_type"`
 	ResourceID           string    `json:"resource_id"`
 	ControlledDocumentID string    `json:"controlled_document_id"` // set for reader events; "" for author events

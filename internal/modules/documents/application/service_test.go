@@ -40,9 +40,9 @@ func newPermissiveMockDB(t *testing.T) *sql.DB {
 }
 
 type fakeRepo struct {
-	createDocErr    error
-	createDocIDs    [3]string
-	updateStatusErr error
+	createDocErr     error
+	createDocIDs     [3]string
+	updateStatusErr  error
 	acquireSess      *domain.Session
 	acquireErr       error
 	pendingMeta      *application.PendingCommitMeta

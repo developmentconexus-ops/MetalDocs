@@ -33,7 +33,7 @@ import (
 //     child of approval_routes — erased before the routes delete)
 //  4. approval_routes (blocked by enforce_route_immutable only while a
 //     referencing approval_instances row exists — already gone by step 4)
-//  +. approval_review_verdicts (actor_tenant_id, no FK) and
+//     +. approval_review_verdicts (actor_tenant_id, no FK) and
 //     approval_delegations (tenant_id, no FK, independent) — unconstrained order
 //
 // Cross-module FK note (orchestrator concern): approval_signoffs and

@@ -64,8 +64,8 @@ type stubSeq struct{}
 func (stubSeq) NextAndIncrement(_ context.Context, _ platformdb.Tx, _, _, _ string) (int, error) {
 	return 0, nil
 }
-func (stubSeq) Peek(_ context.Context, _, _, _ string) (int, error)        { return 0, nil }
-func (stubSeq) EnsureCounter(_ context.Context, _, _, _ string) error      { return nil }
+func (stubSeq) Peek(_ context.Context, _, _, _ string) (int, error)   { return 0, nil }
+func (stubSeq) EnsureCounter(_ context.Context, _, _, _ string) error { return nil }
 
 // stubTplCheck satisfies application.TemplateVersionChecker.
 type stubTplCheck struct{}
@@ -93,7 +93,7 @@ func (stubAreaReader) GetByCode(_ context.Context, _, _ string) (*taxonomydomain
 // stubGovLogger satisfies taxonomydomain.GovernanceLogger.
 type stubGovLogger struct{}
 
-func (stubGovLogger) Log(_ context.Context, _ taxonomydomain.GovernanceEvent) error     { return nil }
+func (stubGovLogger) Log(_ context.Context, _ taxonomydomain.GovernanceEvent) error { return nil }
 func (stubGovLogger) LogTx(_ context.Context, _ platformdb.Tx, _ taxonomydomain.GovernanceEvent) error {
 	return nil
 }

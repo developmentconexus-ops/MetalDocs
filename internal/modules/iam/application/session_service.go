@@ -57,7 +57,7 @@ type RevokeSessionInfo struct {
 func (s *SessionService) RevokeSession(ctx context.Context, info RevokeSessionInfo, actorID string) error {
 	now := time.Now().UTC()
 	payload := map[string]any{
-		"session_id":    info.SessionID,
+		"session_id":   info.SessionID,
 		"targetUserId": info.UserID,
 	}
 	if info.Reason != "" {

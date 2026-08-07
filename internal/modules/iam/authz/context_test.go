@@ -39,7 +39,7 @@ func TestMustActorID_ReturnsErrWhenGUCMissing(t *testing.T) {
 
 // TestMustActorID_ReturnsErrWhenGUCNull pins the F4.2/F4.5 root-cause fix: a
 // placeholder GUC that was never set on the connection makes
-// current_setting('metaldocs.actor_id', true) return SQL NULL (not ''). Before the
+// current_setting('metaldocs.actor_id', true) return SQL NULL (not ”). Before the
 // fix, scanning that NULL into a plain string failed with a driver error
 // ("converting NULL to string is unsupported") instead of the documented sentinel.
 // AddRow(nil) reproduces the NULL; the guard must fail closed with

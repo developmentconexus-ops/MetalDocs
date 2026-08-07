@@ -322,4 +322,3 @@ func TestFreeze_Idempotent_ReentryIsNoop(t *testing.T) {
 		t.Fatalf("hash changed after re-entry: first=%q second=%q", firstHash.String, secondHash.String)
 	}
 }
-

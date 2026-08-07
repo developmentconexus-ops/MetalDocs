@@ -38,9 +38,9 @@ func TestSecurityRepository_PortParity_Live(t *testing.T) {
 		tenantA = "f4500000-0000-4000-8000-0000000000aa"
 		tenantB = "f4500000-0000-4000-8000-0000000000bb"
 
-		adminUser   = "f45-admin-user"   // tenant A, system_admin role
-		normalUser  = "f45-normal-user"  // tenant A, no admin role (editor)
-		otherTenant = "f45-other-admin"  // tenant B, system_admin role (must be excluded by tenant)
+		adminUser   = "f45-admin-user"  // tenant A, system_admin role
+		normalUser  = "f45-normal-user" // tenant A, no admin role (editor)
+		otherTenant = "f45-other-admin" // tenant B, system_admin role (must be excluded by tenant)
 	)
 
 	allUsers := []string{adminUser, normalUser, otherTenant}
@@ -124,7 +124,7 @@ func TestSecurityRepository_PortParity_Live(t *testing.T) {
 		at                time.Time
 	}{
 		{"f45-evt-admin-off", adminUser, tenantA, offHours},
-		{"f45-evt-admin-in", adminUser, tenantA, inHours},   // in-hours: should be excluded
+		{"f45-evt-admin-in", adminUser, tenantA, inHours},     // in-hours: should be excluded
 		{"f45-evt-normal-off", normalUser, tenantA, offHours}, // no admin role: excluded by port
 		{"f45-evt-other-off", otherTenant, tenantB, offHours}, // wrong tenant: excluded
 	} {

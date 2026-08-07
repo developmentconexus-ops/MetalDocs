@@ -6,16 +6,16 @@ package application_test
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
 
 	"metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/iam/authz"
-	templatesinfra "metaldocs/internal/modules/templates/infrastructure"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
+	templatesinfra "metaldocs/internal/modules/templates/infrastructure"
 	"metaldocs/tests/integration/testdb"
 )
 

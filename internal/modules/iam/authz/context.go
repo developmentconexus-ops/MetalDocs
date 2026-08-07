@@ -22,12 +22,12 @@ var ErrTenantContextMissing = errors.New("authz: metaldocs.tenant_id GUC not set
 //
 // PostgreSQL subtlety this exists to absorb: a *placeholder* custom GUC
 // (metaldocs.*) that was never introduced on the connection makes
-// current_setting(..., true) return SQL **NULL**, not ''. Scanning that NULL into
+// current_setting(..., true) return SQL **NULL**, not ”. Scanning that NULL into
 // a plain Go string fails at the driver ("converting NULL to string is
 // unsupported") — which on a cold, never-seeded pooled connection turns a clean
 // "identity missing" into an opaque driver error. Scanning into sql.NullString and
 // collapsing NULL to "" gives every caller one unambiguous unset signal (NULL and
-// '' both mean "not seeded"). This is the same idiom loadAssertedCaps already uses;
+// ” both mean "not seeded"). This is the same idiom loadAssertedCaps already uses;
 // centralizing it here removes the three-way split across the GUC readers.
 //
 // query is always a compile-time constant literal at the call site (no injection

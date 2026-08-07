@@ -109,7 +109,7 @@ jobs:
           echo "✅ No historical migration edits"
 
   staticcheck:
-    name: staticcheck + go vet
+    name: gofmt + go vet + staticcheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -117,9 +117,14 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      # Check set for this job lives in tools/verify/registry.go (go-vet,
-      # go-vet-integration, staticcheck) — see CIJob: "invariants.yml:staticcheck".
+      # Check set for this job lives in tools/verify/registry.go (gofmt,
+      # go-vet, go-vet-integration, staticcheck) — see CIJob:
+      # "invariants.yml:staticcheck".
       # The go-vet-integration and staticcheck-pin rationale that used to live
       # here as comments now lives next to those registry entries.
-      - name: verify (go-vet, go-vet-integration, staticcheck)
-        run: go run ./tools/verify --only=go-vet,go-vet-integration,staticcheck
+      #
+      # gofmt runs on the toolchain go.mod pins, because setup-go above uses
+      # go-version-file. That matters: gofmt output differs between Go minor
+      # versions, so a sweep on a newer local Go reports drift CI does not see.
+      - name: verify (gofmt, go-vet, go-vet-integration, staticcheck)
+        run: go run ./tools/verify --only=gofmt,go-vet,go-vet-integration,staticcheck
