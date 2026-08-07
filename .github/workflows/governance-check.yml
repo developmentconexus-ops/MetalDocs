@@ -27,6 +27,31 @@ jobs:
       - name: ADR status-field budget gate
         run: bash scripts/check-adr-status.sh
 
+  # A1 item 3 — two deterministic, zero-infra scripts that existed in
+  # scripts/ and were never referenced by any workflow. Both are RED today on
+  # real drift (see docs/superpowers/analysis/A1-verification-ledger.md D-5,
+  # D-6), so they are separate jobs: the `check` job above stays promotable to
+  # a required status check, and these two report until their drift closes.
+  # They are wired now rather than after the fix because an unwired script
+  # proves nothing, and the drift they found is the evidence that they work.
+  wiki-tally:
+    name: wiki module/tech-debt tally sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check §11 severity tallies against the tech-debt registers
+        shell: pwsh
+        run: ./scripts/wiki-tally-check.ps1 -All
+
+  db-dictionary-coverage:
+    name: DB schema dictionary coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Every baseline table has a wiki/database/tables page
+        shell: pwsh
+        run: ./scripts/check-db-dictionary-coverage.ps1
+
   docx-v2-isolation:
     name: docx-v2 PR must not touch CK5 paths
     runs-on: ubuntu-latest

@@ -172,11 +172,16 @@ jobs:
         if: always()
         working-directory: frontend/apps/web
         run: |
+          # A1: the `|| true` that used to terminate this command contradicted
+          # this workflow's own header ("real automated checks, not advisory").
+          # axe-diff exits 1 on a blocking regression; swallowing that made the
+          # accessibility baseline read as enforced while enforcing nothing.
+          # The artifact upload below is `if: always()`, so the HTML diff is
+          # still captured when this step fails.
           node ../../../scripts/axe-diff.mjs \
             --report test-results/axe-report.json \
             --baseline e2e/axe-baseline.json \
-            --html test-results/axe-diff.html \
-          || true  # axe-diff exits 1 on blocking — captured in upload
+            --html test-results/axe-diff.html
 
       - name: Upload E2E artifacts
         uses: actions/upload-artifact@v4

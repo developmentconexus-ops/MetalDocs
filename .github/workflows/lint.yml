@@ -14,6 +14,8 @@ on:
       - 'pnpm-lock.yaml'
       - '.github/workflows/lint.yml'
       - 'scripts/check-css-token-discipline.sh'
+      - 'scripts/check-eigenpal-selector-pin.sh'
+      - 'packages/eigenpal-adapter/package.json'
   push:
     branches: [main]
 
@@ -36,3 +38,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: bash scripts/check-css-token-discipline.sh
+
+  # ADR 0046 §Enforcement, second half. The eslint job above guards the
+  # eigenpal IMPORT boundary; this guards the SELECTOR-PIN boundary — the
+  # `:global(` and `!important` counts in EditorChrome.module.css that couple
+  # our CSS to eigenpal's internal DOM, pinned against the adapter's declared
+  # version. Drift on either side means the manual DOM smoke checklist must be
+  # re-run before merge. The script existed and was never wired; ADR 0046 has
+  # been half-enforced since it was ratified.
+  eigenpal-selector-pin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/check-eigenpal-selector-pin.sh

@@ -513,7 +513,7 @@ Evidence: commit `2afba713` (ADR 0088 implementation); `cd74e0c3` (re-homed cont
 Pointer-only. Body lives in `wiki/modules/templates-tech-debt.md`.
 
 - Critical: 4
-- Major: 6
+- Major: 8
 - Minor: 5
 
 Top 3 (by severity, then blast-radius):

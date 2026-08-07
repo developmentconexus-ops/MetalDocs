@@ -36,6 +36,17 @@
     wiki/modules/<Module>.md
     wiki/modules/<Module>-tech-debt.md
 
+.PARAMETER All
+  Sweep every module that has a tech-debt register, and fail if ANY module
+  fails. This is the mode CI runs (governance-check.yml / wiki-tally): a
+  per-module gate that CI must be told which modules to check is a gate that
+  silently stops covering a module the day someone adds one.
+
+  Modules are enumerated from `wiki/modules/*-tech-debt.md`, because the tally
+  is a doc-vs-register agreement and a register is what makes it checkable. A
+  module doc with NO register is outside this check by construction — that is
+  a different invariant and is not silently absorbed here.
+
 .PARAMETER RepoRoot
   Repo root to resolve paths from. Defaults to current directory.
 
@@ -43,16 +54,47 @@
   ./scripts/wiki-tally-check.ps1 -Module documents
 
 .EXAMPLE
+  ./scripts/wiki-tally-check.ps1 -All
+
+.EXAMPLE
   ./scripts/wiki-tally-check.ps1 -Module iam -RepoRoot C:\path\to\MetalDocs
 #>
+[CmdletBinding(DefaultParameterSetName = 'Single')]
 param(
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $true, ParameterSetName = 'Single')]
     [string]$Module,
+
+    [Parameter(Mandatory = $true, ParameterSetName = 'All')]
+    [switch]$All,
 
     [string]$RepoRoot = (Get-Location).Path
 )
 
 $ErrorActionPreference = "Stop"
+
+# --- Sweep mode --------------------------------------------------------------
+if ($All) {
+    $registers = Get-ChildItem -LiteralPath (Join-Path $RepoRoot 'wiki/modules') -Filter '*-tech-debt.md' -File |
+        Sort-Object Name
+    if ($registers.Count -eq 0) {
+        Write-Host "FAIL: -All found no wiki/modules/*-tech-debt.md registers; refusing to report success on an empty sweep"
+        exit 1
+    }
+    $failed = @()
+    foreach ($reg in $registers) {
+        $slug = $reg.BaseName -replace '-tech-debt$', ''
+        Write-Host "== $slug =="
+        & $PSCommandPath -Module $slug -RepoRoot $RepoRoot
+        if ($LASTEXITCODE -ne 0) { $failed += $slug }
+    }
+    Write-Host ""
+    if ($failed.Count -gt 0) {
+        Write-Host "[tally] SWEEP FAIL ($($failed.Count)/$($registers.Count)): $($failed -join ', ')"
+        exit 1
+    }
+    Write-Host "[tally] SWEEP PASS ($($registers.Count) modules)"
+    exit 0
+}
 
 # --- Exempt modules ----------------------------------------------------------
 # Modules whose register deliberately does NOT use the T-NNN + `- **Severity:**`

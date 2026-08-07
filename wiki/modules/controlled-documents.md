@@ -438,8 +438,8 @@ Tenant is sourced from `tenant.FromContext` via the `injectTenant` thin middlewa
 Detail in [wiki/modules/controlled-documents-tech-debt.md](modules/controlled-documents-tech-debt.md). Severity rubric: see top of that file (concrete triggers; do not invent local definitions).
 
 - Critical: 2
-- Major: 6
-- Minor: 4
+- Major: 7
+- Minor: 5
 
 Top 3 (by severity, then blast-radius):
 
