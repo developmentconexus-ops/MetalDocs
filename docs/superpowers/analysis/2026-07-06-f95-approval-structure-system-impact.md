@@ -20,7 +20,7 @@
     `documents/application` ×6. **Bidirectional, dense, same-aggregate coupling.**
   - External consumers of approval: audit (handler), jobs/stuck_instance_watchdog (incl.
     `approval/repository` — a violation-class import), render/fanout/dispatchjobs,
-    platform/tenantdata/registry, apps/api main.
+    composition/tenantdata/registry, apps/api main.
 
 ## 2. Foundation judgment (global maximum, not local)
 

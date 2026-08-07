@@ -13,6 +13,7 @@ import (
 
 	"github.com/riverqueue/river"
 
+	"metaldocs/internal/composition/tenantdata/registry"
 	approvalapp "metaldocs/internal/modules/approval/application"
 	approvalrepo "metaldocs/internal/modules/approval/infrastructure"
 	approvaljobs "metaldocs/internal/modules/approval/jobs"
@@ -43,7 +44,6 @@ import (
 	outboxpg "metaldocs/internal/platform/messaging/outbox/postgres"
 	"metaldocs/internal/platform/objectstore"
 	"metaldocs/internal/platform/observability"
-	"metaldocs/internal/platform/tenantdata/registry"
 )
 
 // auditPayloadCryptoAdapter adapts security's published TenantCrypto port to

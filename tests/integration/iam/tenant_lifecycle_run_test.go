@@ -53,7 +53,7 @@ import (
 	"metaldocs/internal/platform/db"
 	platformtenant "metaldocs/internal/platform/tenant"
 	"metaldocs/internal/platform/tenantdata"
-	"metaldocs/internal/platform/tenantdata/registry"
+	"metaldocs/internal/composition/tenantdata/registry"
 	"metaldocs/tests/integration/testdb"
 )
 

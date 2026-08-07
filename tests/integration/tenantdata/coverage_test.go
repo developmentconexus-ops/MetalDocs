@@ -22,8 +22,8 @@ import (
 	"sort"
 	"testing"
 
+	"metaldocs/internal/composition/tenantdata/registry"
 	"metaldocs/internal/platform/tenantdata"
-	"metaldocs/internal/platform/tenantdata/registry"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -110,7 +110,7 @@ func TestTenantDataPortCoverage(t *testing.T) {
 		sort.Strings(missingPort)
 		t.Fatalf("tenant-scoped table(s) with NO registered TenantDataPort: %v — "+
 			"every module owning a tenant_id/actor_tenant_id table must register a port "+
-			"in internal/platform/tenantdata/registry.go (F7.3 spec §2.2)", missingPort)
+			"in internal/composition/tenantdata/registry.go (F7.3 spec §2.2)", missingPort)
 	}
 
 	censusSet := make(map[string]struct{}, len(census))

@@ -30,6 +30,7 @@ import (
 	templatejobs "metaldocs/internal/modules/templates/jobs"
 
 	"metaldocs/apps/api/internal/wiring"
+	"metaldocs/internal/composition/tenantdata/registry"
 	auditapp "metaldocs/internal/modules/audit/application"
 	auditdelivery "metaldocs/internal/modules/audit/delivery/http"
 	auditpg "metaldocs/internal/modules/audit/infrastructure/postgres"
@@ -83,7 +84,6 @@ import (
 	"metaldocs/internal/platform/observability"
 	"metaldocs/internal/platform/ratelimit"
 	"metaldocs/internal/platform/security"
-	"metaldocs/internal/platform/tenantdata/registry"
 	e2etest "metaldocs/internal/test"
 )
 

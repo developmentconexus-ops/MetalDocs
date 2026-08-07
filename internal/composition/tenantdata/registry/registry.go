@@ -6,9 +6,9 @@
 // internal/platform/tenantdata to declare `var _ tenantdata.Port = (...)`,
 // and if the registry (which imports every implementing module) lived in
 // that same package, those modules would transitively import themselves —
-// an import cycle. Splitting the wiring into this sibling package keeps the
-// dependency direction one-way: registry -> {tenantdata, every module},
-// never the reverse.
+// an import cycle. Splitting the wiring into this separate package (under
+// internal/composition, not internal/platform) keeps the dependency direction
+// one-way: registry -> {tenantdata, every module}, never the reverse.
 package registry
 
 import (

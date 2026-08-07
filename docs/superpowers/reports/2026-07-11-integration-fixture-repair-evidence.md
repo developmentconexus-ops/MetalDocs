@@ -111,7 +111,7 @@ defect (E-PROD-1..5) — zero fixture/harness debt remaining. Honest-green-modul
 - **Fix (product, needs architecture decision):** migration to composite PK / tenant-scoped unique.
 
 ### E-PROD-3 — TenantDataPort missing for two tenant-scoped tables (CONFIRMED)
-- **Files:** `internal/platform/tenantdata/registry/registry.go` +
+- **Files:** `internal/composition/tenantdata/registry/registry.go` +
   `internal/modules/documents/approval/infrastructure/tenant_data_port.go` (covers only
   `approval_instances`/`approval_routes`/`approval_signoffs`).
 - **Defect:** `public.approval_delegations` (migration `0293_approval_delegations.sql`, has
