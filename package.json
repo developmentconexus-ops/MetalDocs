@@ -10,7 +10,7 @@
     "lint": "eslint ."
   },
   "engines": {
-    "node": ">=20.11.0"
+    "node": ">=22.13.0"
   },
   "devDependencies": {
     "eslint": "^10.5.0",
