@@ -108,7 +108,34 @@ No hand-rolled equivalent is proposed. No genuinely new cross-cutting concern ap
 
 **Migration.** Next number is **0318** (`db/migrations/` currently ends at `0317_template_version_content_hash_always.sql`). `capability_bindings` carries `tenant_id`; the role catalog gets a table; the three CHECKs are replaced by one FK.
 
-**Destructive change — expand/contract is mandatory, not optional.** These tables hold live tenant grants; a one-step cutover risks locking real users out of a regulated eQMS.
+> **Correction, 2026-08-06 (during brainstorming, operator-ratified).** The paragraph below rests on
+> a premise this analysis got wrong: that the three tables hold **live tenant grants**. They do not.
+> The release has been on HOLD since 2026-07-23 with "dev-grade prod path" as one of three blockers,
+> v1 ships as a clean repo re-baseline (F-18), and the dev database was wiped at the 2026-07-29
+> baseline fold. There is no production tenant. The three tables hold seed and dev data.
+>
+> Expand/contract exists to avoid revoking access from real people mid-migration. With no real
+> people, it buys nothing and costs the one thing this program exists to delete: a window in which
+> **two sources of truth coexist**, with tier-1 and tier-2 free to read different ones. That is the
+> defect, re-created as a migration procedure.
+>
+> **Ruling: one migration, hard break.** `0318` creates `role_catalog` + `capability_bindings`,
+> backfills from all three legacy tables, asserts equivalence, and DROPs the three — in one
+> transaction. No dual-write, no reconciliation window, no compat code to delete later. This is the
+> repo's standing doctrine ("tudo fallback legacy é extermínio"), and the premise that justified
+> deviating from it was false.
+>
+> The equivalence replay is **kept and promoted**: it moves from a separate verify phase into the
+> migration itself. For every (actor, capability, area) the old two evaluators can be replayed
+> against the new relation; if the new source does not reproduce them, the migration raises and
+> nothing commits. That replay is the program's cheapest evidence and the reason a bare re-seed was
+> rejected — a grant that existed only in `user_process_areas` would vanish unobserved.
+>
+> **Locked constraint 1 is superseded accordingly** (see §10). The semantic decision below —
+> what `iam_user_roles` → `scope_kind='tenant'` does to tier-2 visibility — is **unaffected and
+> still binding**; it is a modelling choice, not a rollout choice.
+
+**Superseded — retained for the record.** ~~Destructive change — expand/contract is mandatory, not optional. These tables hold live tenant grants; a one-step cutover risks locking real users out of a regulated eQMS.~~
 
 1. **Expand** — create `capability_bindings` + `role_catalog`; dual-write; backfill from all three legacy tables. Legacy tables still authoritative for reads.
 2. **Verify** — assert the new relation reproduces every grant the old evaluators would have returned, per tenant. The migration is provable: for every (actor, capability, area) the old two evaluators can be replayed against the new source.
@@ -135,7 +162,14 @@ The backfill has a **semantic decision the design must make explicitly, not by d
 
 ## 10. Verdict & locked constraints
 
-**Verdict: 🟡 Yellow.** Proceed to design. The work fits the architecture, restores an invariant rather than bending one, and no hard-stop fires — but it carries a mandatory ADR, a MUST-deviation, and a destructive data migration, so it is not Green.
+**Verdict: 🟡 Yellow.** Proceed to design. The work fits the architecture, restores an invariant rather than bending one, and no hard-stop fires — but it carries a mandatory ADR and a MUST-deviation from REQ-AUTHZ-4, so it is not Green.
+
+> **Amended 2026-08-06.** The verdict originally rested on three grounds; the second has been
+> withdrawn. "A destructive data migration over live tenant grants" was false — there are no live
+> tenant grants (§7 correction), and the migration is now a single-transaction hard break. Yellow
+> **stands** on the two surviving grounds, which are the load-bearing ones: the mandatory ADR and
+> the MUST-deviation. The red lane was never a Yellow ground in its own right — it is the
+> program's acceptance criterion (constraint 3), not a risk.
 
 **Open hard-stops:** none.
 - **AS-1** — does not fire. No invariant violated; invariant 1's intent is restored.
@@ -144,7 +178,7 @@ The backfill has a **semantic decision the design must make explicitly, not by d
 
 **Locked constraints handed to brainstorming:**
 
-1. **Expand → verify → contract.** Live tenant grants; no one-step cutover. The backfill must state explicitly what `iam_user_roles` → `scope_kind='tenant'` does to tier-2 visibility, because it is a privilege change.
+1. ~~**Expand → verify → contract.**~~ **SUPERSEDED 2026-08-06** — premised on live tenant grants, which do not exist (§7 correction). Replaced by: **one migration, hard break.** `0318` creates, backfills, asserts equivalence, and DROPs the three legacy tables in one transaction; the equivalence replay moves *into* the migration as a failing assertion. What survives unchanged from the original constraint: the backfill must state explicitly what `iam_user_roles` → `scope_kind='tenant'` does to tier-2 visibility, because that is a privilege change and a modelling decision, not a rollout one.
 2. **The ADR is mandatory and supersedes ADR 0007**, amends ADR 0022, and amends REQ-AUTHZ-4 in the target spec in the same change. D2 makes REQ-AUTHZ-4's current wording false.
 3. **`TestNoDeclaredOperationIsUnreachable` going green is the definition of done** — the acceptance criterion, not a test to repair. Do not skip, exclude, or baseline it; do not remove `./apps/...` from the integration lanes to restore green.
 4. **Add the tier-1 ⊆ tier-2 property as a permanent guard**, and extend the REQ-AUTHZ-5 surface-coherence CI binding to cover the **role** catalog, which it does not cover today (§3b). Without this, the same class of drift returns in a different table.
