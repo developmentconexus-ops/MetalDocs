@@ -95,8 +95,12 @@ var checks = []Check{
 		CIJob:    "invariants.yml:cilint",
 	},
 	{
-		ID:       "staticcheck",
-		Desc:     "staticcheck 2025.1.1 — pinned to the version CI uses",
+		ID:   "staticcheck",
+		Desc: "staticcheck 2025.1.1 — pinned to the version CI uses",
+		// 2024.1 fails to compile under Go 1.25 (its vendored x/tools hits
+		// "invalid array length"); 2025.1.1 is the first release with Go 1.25
+		// support and the same check set. Moved here from invariants.yml when
+		// the staticcheck-action step was replaced by this check.
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "honnef.co/go/tools/cmd/staticcheck@2025.1.1", "./..."},
 		Needs:    []string{needsNetwork},

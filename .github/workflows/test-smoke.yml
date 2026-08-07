@@ -12,10 +12,10 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Build all packages
-        run: go build ./...
-      - name: Run full unit test suite
-        run: go test -count=1 -timeout 600s ./...
+      # Check set for this job lives in tools/verify/registry.go (go-build,
+      # go-test-unit) — see CIJob: "test-smoke.yml:unit".
+      - name: verify (go-build, go-test-unit)
+        run: go run ./tools/verify --only=go-build,go-test-unit
         timeout-minutes: 12
 
   smoke:

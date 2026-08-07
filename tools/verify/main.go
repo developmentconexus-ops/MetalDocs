@@ -113,55 +113,65 @@ func main() {
 
 func selectChecks(profile, only, base string) ([]Check, error) {
 	if only != "" {
-		want := map[string]bool{}
-		for _, id := range strings.Split(only, ",") {
-			want[strings.TrimSpace(id)] = true
-		}
-		var out []Check
-		for _, c := range checks {
-			if want[c.ID] {
-				out = append(out, c)
-				delete(want, c.ID)
-			}
-		}
-		if len(want) > 0 {
-			var unknown []string
-			for id := range want {
-				unknown = append(unknown, id)
-			}
-			sort.Strings(unknown)
-			return nil, fmt.Errorf("unknown check ID(s): %s", strings.Join(unknown, ", "))
-		}
-		return out, nil
+		return selectByIDs(only)
 	}
-
 	if profile == ProfileChanged {
-		changed, err := changedFiles(base)
-		if err != nil {
-			return nil, fmt.Errorf("--profile=changed needs a diff against %s: %w", base, err)
-		}
-		var out []Check
-		for _, c := range checks {
-			if !hasProfile(c, ProfilePR) {
-				continue
-			}
-			if matchesPaths(c, changed) {
-				out = append(out, c)
-			}
-		}
-		return out, nil
+		return selectChanged(base)
 	}
-
 	if !validProfile(profile) {
 		return nil, fmt.Errorf("unknown profile %q; valid: %s", profile, strings.Join(profileOrder, ", "))
 	}
+	return selectByProfile(profile), nil
+}
+
+// selectByIDs resolves an explicit --only list. An unknown ID is an error
+// rather than a silent no-op: a workflow step that names a check that no
+// longer exists must go red, not quietly verify nothing.
+func selectByIDs(only string) ([]Check, error) {
+	want := map[string]bool{}
+	for _, id := range strings.Split(only, ",") {
+		want[strings.TrimSpace(id)] = true
+	}
+	var out []Check
+	for _, c := range checks {
+		if want[c.ID] {
+			out = append(out, c)
+			delete(want, c.ID)
+		}
+	}
+	if len(want) > 0 {
+		unknown := make([]string, 0, len(want))
+		for id := range want {
+			unknown = append(unknown, id)
+		}
+		sort.Strings(unknown)
+		return nil, fmt.Errorf("unknown check ID(s): %s", strings.Join(unknown, ", "))
+	}
+	return out, nil
+}
+
+func selectChanged(base string) ([]Check, error) {
+	changed, err := changedFiles(base)
+	if err != nil {
+		return nil, fmt.Errorf("--profile=changed needs a diff against %s: %w", base, err)
+	}
+	var out []Check
+	for _, c := range checks {
+		if hasProfile(c, ProfilePR) && matchesPaths(c, changed) {
+			out = append(out, c)
+		}
+	}
+	return out, nil
+}
+
+func selectByProfile(profile string) []Check {
 	var out []Check
 	for _, c := range checks {
 		if hasProfile(c, profile) {
 			out = append(out, c)
 		}
 	}
-	return out, nil
+	return out
 }
 
 func hasProfile(c Check, p string) bool {
@@ -202,12 +212,21 @@ func matchesPaths(c Check, changed []string) bool {
 	return false
 }
 
+// refPattern is the only shape --base is allowed to take. It is the single
+// value in this program that reaches a subprocess from outside the
+// compile-time registry, so it is validated at the boundary rather than
+// trusted. This is what lets command() below state its invariant as a fact.
+var refPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]{0,254}$`)
+
 func changedFiles(base string) ([]string, error) {
-	mb, err := exec.Command("git", "merge-base", base, "HEAD").Output()
+	if !refPattern.MatchString(base) {
+		return nil, fmt.Errorf("--base %q is not a valid git ref name", base)
+	}
+	mb, err := capture("git", "merge-base", base, "HEAD")
 	if err != nil {
 		return nil, fmt.Errorf("git merge-base %s HEAD: %w", base, err)
 	}
-	out, err := exec.Command("git", "diff", "--name-only", strings.TrimSpace(string(mb))).Output()
+	out, err := capture("git", "diff", "--name-only", strings.TrimSpace(string(mb)))
 	if err != nil {
 		return nil, fmt.Errorf("git diff: %w", err)
 	}
@@ -242,7 +261,7 @@ func preflight() []string {
 		}
 	}
 
-	if want := readTrimmed(".nvmrc"); want != "" {
+	if want := nvmrcVersion(); want != "" {
 		if got := toolVersion("node", `v?(\d+\.\d+\.\d+)`, "--version"); got != "" {
 			if !sameMinor(got, want) {
 				warns = append(warns, fmt.Sprintf(
@@ -267,7 +286,7 @@ func goDirective() string {
 }
 
 func toolVersion(bin, pattern string, args ...string) string {
-	out, err := exec.Command(bin, args...).Output()
+	out, err := capture(append([]string{bin}, args...)...)
 	if err != nil {
 		return ""
 	}
@@ -286,8 +305,8 @@ func sameMinor(a, b string) bool {
 	return as[0] == bs[0] && as[1] == bs[1]
 }
 
-func readTrimmed(path string) string {
-	b, err := os.ReadFile(path)
+func nvmrcVersion() string {
+	b, err := os.ReadFile(".nvmrc")
 	if err != nil {
 		return ""
 	}
@@ -295,6 +314,28 @@ func readTrimmed(path string) string {
 }
 
 // ---------------------------------------------------------------- execution
+
+// command is the ONLY place in this program that constructs a subprocess.
+//
+// Every argv that reaches it is one of exactly two things: a string literal at
+// the call site, or a value already validated against refPattern. There is no
+// path from unvalidated input to here — which is the whole reason this is one
+// function instead of six scattered exec sites. gosec cannot see that
+// invariant across call sites, so it is asserted once, here, next to the code
+// that makes it true, and it is checkable by reading this file top to bottom.
+//
+// Adding an exec call anywhere else in this package defeats that argument.
+// Route it through here instead.
+func command(ctx context.Context, dir string, argv []string) *exec.Cmd {
+	//nolint:gosec // G204 — argv is compile-time literals or refPattern-validated; see the invariant above.
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	cmd.Dir = dir
+	return cmd
+}
+
+func capture(argv ...string) ([]byte, error) {
+	return command(context.Background(), "", argv).Output()
+}
 
 // missingInfra returns the reason a check cannot run here, or "".
 func missingInfra(c Check) string {
@@ -324,7 +365,7 @@ func missingInfra(c Check) string {
 }
 
 func isShallow() bool {
-	out, err := exec.Command("git", "rev-parse", "--is-shallow-repository").Output()
+	out, err := capture("git", "rev-parse", "--is-shallow-repository")
 	if err != nil {
 		return false
 	}
@@ -356,9 +397,7 @@ func run(selected []Check, parallelism int, verbose bool) []result {
 			}
 
 			start := time.Now()
-			cmd := exec.CommandContext(context.Background(), c.Argv[0], c.Argv[1:]...)
-			cmd.Dir = c.Dir
-			out, err := cmd.CombinedOutput()
+			out, err := command(context.Background(), c.Dir, c.Argv).CombinedOutput()
 			d := time.Since(start)
 
 			status := statusPass
@@ -471,7 +510,7 @@ func printAudit() int {
 // ------------------------------------------------------------------- helpers
 
 func repoRoot() (string, error) {
-	out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
+	out, err := capture("git", "rev-parse", "--show-toplevel")
 	if err != nil {
 		return "", err
 	}

@@ -21,9 +21,12 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with: { node-version-file: .nvmrc, cache: pnpm }
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod, cache: true }
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run typecheck:docx-v2
-      - run: pnpm run test:docx-v2
+      # Check set for this job lives in tools/verify/registry.go
+      # (docx-v2-typecheck, docx-v2-test) — see CIJob: "ci.yml:node".
+      - run: go run ./tools/verify --only=docx-v2-typecheck,docx-v2-test
       - run: pnpm run build:docx-v2
   go:
     runs-on: ubuntu-latest

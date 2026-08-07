@@ -1,5 +1,10 @@
 name: Test Full Gate (merge to main)
+# A1 item 4 — the full integration suite runs PRE-MERGE, not only after.
+# Push-only made this a post-mortem: it told you main was broken, it never
+# stopped main from breaking. The fast tier (`verify --profile=fast`, ~1 min)
+# is what keeps the inner loop short; this is the slow tier and it gates.
 on:
+  pull_request:
   push:
     branches: [main]
 
@@ -26,9 +31,10 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Run all integration tests (N=50 race)
+      # Check set for this job lives in tools/verify/registry.go (go-test-integration)
+      # — see CIJob: "test-full.yml:full".
+      - name: verify (go-test-integration)
         env:
           METALDOCS_DATABASE_URL: postgres://metaldocs:metaldocs@localhost:5432/metaldocs?sslmode=disable
-        run: |
-          go test -tags integration -count=1 -race -timeout 900s ./tests/... ./internal/... ./apps/...
+        run: go run ./tools/verify --only=go-test-integration
         timeout-minutes: 20

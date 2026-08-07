@@ -29,8 +29,10 @@ jobs:
         continue-on-error: true
         with:
           sarif_file: sarif-cilint.json
+      # Check set for this job lives in tools/verify/registry.go (cilint) —
+      # see CIJob: "invariants.yml:cilint".
       - name: Fail on violations
-        run: go run ./tools/cilint ./...
+        run: go run ./tools/verify --only=cilint
 
   # NOTE: the former `openapi-drift` job was removed — it regenerated approval
   # frontend types from api/openapi/spec2.yaml (deleted with the rest of the
@@ -115,21 +117,9 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: go vet
-        run: go vet ./...
-
-      # An untagged `go test`/`go vet` does NOT compile files behind
-      # `//go:build integration`, so a seam signature change can break the
-      # entire integration suite while every PR check stays green. That has
-      # happened here. `verify --audit` reported this as the one registry
-      # check with no CI job; this is that job.
-      - name: go vet (integration build tag)
-        run: go vet -tags integration ./...
-      - name: staticcheck
-        uses: dominikh/staticcheck-action@v1
-        with:
-          # 2024.1 fails to compile under Go 1.25 (its vendored x/tools hits
-          # "invalid array length"); 2025.1.1 is the first release with Go 1.25
-          # support and the same check set.
-          version: "2025.1.1"
-          install-go: false
+      # Check set for this job lives in tools/verify/registry.go (go-vet,
+      # go-vet-integration, staticcheck) — see CIJob: "invariants.yml:staticcheck".
+      # The go-vet-integration and staticcheck-pin rationale that used to live
+      # here as comments now lives next to those registry entries.
+      - name: verify (go-vet, go-vet-integration, staticcheck)
+        run: go run ./tools/verify --only=go-vet,go-vet-integration,staticcheck
