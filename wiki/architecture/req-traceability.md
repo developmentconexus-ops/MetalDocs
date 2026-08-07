@@ -12,7 +12,7 @@
 | REQ-TOP-2 | MUST | commit | commit 8e0aa9eb — F-06a: platform/observability drops its auth/domain import via an injected resolver, closing the platform-imports-a-module violation; commit 8e0aa9eb (also cited: 0b41d1c1). |
 | REQ-TOP-3 | MUST | doc-annotation | `platform/cache` deleted Wave 1 (F-08); `platform/storage` still open. |
 | REQ-TOP-4 | SHOULD | none | — |
-| REQ-MW-1 | MUST | commit | commit 58d7009d — F-01: canonical middleware chain rewrite — panic recovery outermost; commit 58d7009d. Runtime probe added in 2d8728c6. |
+| REQ-MW-1 | MUST | test | apps/api/cmd/metaldocs-api/panic_recovery_test.go |
 | REQ-MW-2 | MUST | commit | commit 58d7009d — F-01 chain rewrite establishes request-ID-tagged logging outermost (same commit as REQ-MW-1); commit 58d7009d. |
 | REQ-MW-3 | MUST | commit | commit 58d7009d — F-01 chain rewrite orders authn strictly before authz/rate-limit tiers; commit 58d7009d (asserted by chain_test.go, REQ-MW-7). |
 | REQ-MW-4 | MUST | test | apps/api/cmd/metaldocs-api/metrics_endpoint_test.go |
