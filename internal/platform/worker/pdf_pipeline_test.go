@@ -71,7 +71,7 @@ func TestPDFPipeline_RealClient(t *testing.T) {
 	store := &fakePDFStore{objects: map[string][]byte{docxKey: []byte("PK fake docx")}}
 	converter := newGotenbergPDFConverter(t, srv.URL, store)
 	persister := &fakePDFPersister{}
-	runner := NewPDFJobRunner(converter, persister)
+	runner := NewPDFJobRunner(converter, persister, &fakeAuthzSeam{})
 
 	event := makePDFEvent(messaging.PDFConvertPayload{
 		TenantID:       tenantID,
@@ -113,7 +113,7 @@ func TestPDFPipeline_RealClient_GotenbergError(t *testing.T) {
 	store := &fakePDFStore{objects: map[string][]byte{docxKey: []byte("PK fake docx")}}
 	converter := newGotenbergPDFConverter(t, srv.URL, store)
 	persister := &fakePDFPersister{}
-	runner := NewPDFJobRunner(converter, persister)
+	runner := NewPDFJobRunner(converter, persister, &fakeAuthzSeam{})
 
 	err := runner.Handle(context.Background(), makePDFEvent(messaging.PDFConvertPayload{
 		TenantID:       "t1",
@@ -153,7 +153,7 @@ func TestPDFPipeline_WorkerLoop(t *testing.T) {
 	}}
 	converter := newGotenbergPDFConverter(t, srv.URL, store)
 	persister := &fakePDFPersister{}
-	runner := NewPDFJobRunner(converter, persister)
+	runner := NewPDFJobRunner(converter, persister, &fakeAuthzSeam{})
 
 	cfg := config.WorkerConfig{MaxAttempts: 3, RetryBaseSeconds: 10, RetryMaxSeconds: 300}
 	svc := NewService(consumer, cfg).WithPDFRunner(runner)

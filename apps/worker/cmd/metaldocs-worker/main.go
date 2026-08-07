@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"os"
@@ -13,6 +14,7 @@ import (
 	approvaljobs "metaldocs/internal/modules/approval/jobs"
 	docapp "metaldocs/internal/modules/documents/application"
 	docrepo "metaldocs/internal/modules/documents/infrastructure"
+	"metaldocs/internal/modules/iam/authz"
 	fanoutpkg "metaldocs/internal/modules/render/fanout"
 	"metaldocs/internal/modules/render/fanout/dispatchjobs"
 	"metaldocs/internal/modules/render/resolvers"
@@ -88,6 +90,23 @@ func (a snapshotPDFTxAdapter) WritePDF(ctx context.Context, req workerapp.PDFWri
 		req.PDFHash,
 		req.GeneratedAt,
 	)
+}
+
+// authzSeamAdapter bridges internal/modules/iam/authz to
+// workerapp.TxAuthzSeam (REQ-TOP-2: internal/platform must not import
+// internal/modules — this adapter lives at the composition root instead).
+type authzSeamAdapter struct{}
+
+func (authzSeamAdapter) WithBackgroundBypass(ctx context.Context) context.Context {
+	return authz.WithBackgroundBypass(ctx)
+}
+
+func (authzSeamAdapter) SeedTxTenant(ctx context.Context, tx *sql.Tx, tenantID string) error {
+	return authz.SeedTxTenant(ctx, tx, tenantID)
+}
+
+func (authzSeamAdapter) BypassSystem(ctx context.Context, tx *sql.Tx) error {
+	return authz.BypassSystem(ctx, tx)
 }
 
 // buildRevisionBodyReader builds the blob reader Materialize uses to fetch the
@@ -181,7 +200,7 @@ func main() {
 		snapRepo := docrepo.NewSnapshotRepository(deps.SQLDB)
 		// M3 F3.2 (validation-contract.md §2.2 site 2): wrap the PDF write in a
 		// SeedTxTenant-seeded tx so the FORCE RLS backstop engages.
-		pdfRunner := workerapp.NewPDFJobRunnerWithDB(deps.PDFConverter, snapshotPDFTxAdapter{repo: snapRepo}, deps.SQLDB).
+		pdfRunner := workerapp.NewPDFJobRunnerWithDB(deps.PDFConverter, snapshotPDFTxAdapter{repo: snapRepo}, authzSeamAdapter{}, deps.SQLDB).
 			WithArtifactFactRecorder(artifactFactRecorder)
 		workerSvc = workerSvc.WithPDFRunner(pdfRunner)
 	}
@@ -242,6 +261,7 @@ func main() {
 			materializeInvokerAdapter{svc: freezeSvc},
 			snapshotFinalDocxAdapter{repo: snapRepo},
 			pdfDispatchEnqueuer,
+			authzSeamAdapter{},
 			deps.SQLDB,
 		).WithArtifactFactRecorder(artifactFactRecorder)
 		workerSvc = workerSvc.WithMaterializeRunner(materializeRunner)

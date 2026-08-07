@@ -63,7 +63,7 @@ func TestWorkerService_RoutesPDFEventToPDFRunner(t *testing.T) {
 		ContentHash: "deadbeef",
 	}}
 	persister := &fakePDFPersister{}
-	runner := NewPDFJobRunner(converter, persister)
+	runner := NewPDFJobRunner(converter, persister, &fakeAuthzSeam{})
 
 	cfg := config.WorkerConfig{MaxAttempts: 3, RetryBaseSeconds: 10, RetryMaxSeconds: 300}
 	svc := NewService(consumer, cfg).WithPDFRunner(runner)
@@ -129,6 +129,7 @@ func TestWorkerService_RunOnceContinuesAfterPersistenceErrors(t *testing.T) {
 	svc := NewService(consumer, cfg).WithPDFRunner(&PDFJobRunner{
 		converter: failingSecondCallConverter{delegate: converter},
 		persister: persister,
+		authzSeam: &fakeAuthzSeam{},
 	})
 
 	err := svc.RunOnce(context.Background(), 10)

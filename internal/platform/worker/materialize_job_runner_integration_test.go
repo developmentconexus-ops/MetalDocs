@@ -66,6 +66,23 @@ func (noopPDFEnqueuer) EnqueuePDFTx(ctx context.Context, tx db.Tx, tenantID, rev
 	return nil
 }
 
+// testAuthzSeam mirrors apps/worker/cmd/metaldocs-worker/main.go's
+// authzSeamAdapter, bridging the real iam/authz package to
+// worker.TxAuthzSeam for this integration test's system-under-test.
+type testAuthzSeam struct{}
+
+func (testAuthzSeam) WithBackgroundBypass(ctx context.Context) context.Context {
+	return authz.WithBackgroundBypass(ctx)
+}
+
+func (testAuthzSeam) SeedTxTenant(ctx context.Context, tx *sql.Tx, tenantID string) error {
+	return authz.SeedTxTenant(ctx, tx, tenantID)
+}
+
+func (testAuthzSeam) BypassSystem(ctx context.Context, tx *sql.Tx) error {
+	return authz.BypassSystem(ctx, tx)
+}
+
 func openRunnerDB(t *testing.T) *sql.DB {
 	t.Helper()
 	database, _ := testdb.Open(t)
@@ -93,6 +110,7 @@ func TestMaterializeJobRunner_Integration_PersistsFinalDocx(t *testing.T) {
 		fakeMaterializeInvoker{result: wantResult},
 		snapshotFinalDocxAdapter{repo: repo},
 		noopPDFEnqueuer{},
+		testAuthzSeam{},
 		database,
 	)
 

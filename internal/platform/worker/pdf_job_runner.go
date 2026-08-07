@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/messaging"
 	"metaldocs/internal/platform/servicebus"
@@ -70,6 +69,7 @@ type PDFJobRunner struct {
 	converter    PDFConverter
 	persister    PDFPersister
 	artifactFact ArtifactFactRecorder
+	authzSeam    TxAuthzSeam
 	db           *sql.DB
 }
 
@@ -86,10 +86,14 @@ func (r *PDFJobRunner) WithArtifactFactRecorder(rec ArtifactFactRecorder) *PDFJo
 // RLS tenant seed). Prefer NewPDFJobRunnerWithDB for production wiring — M3
 // F3.2 requires the write to run inside a SeedTxTenant-seeded tx so the FORCE
 // RLS backstop engages (validation-contract.md §2.2 site 2).
-func NewPDFJobRunner(converter PDFConverter, persister PDFPersister) *PDFJobRunner {
+func NewPDFJobRunner(converter PDFConverter, persister PDFPersister, authzSeam TxAuthzSeam) *PDFJobRunner {
+	if authzSeam == nil {
+		panic("pdf_job_runner: authzSeam is required")
+	}
 	return &PDFJobRunner{
 		converter: converter,
 		persister: persister,
+		authzSeam: authzSeam,
 	}
 }
 
@@ -99,19 +103,26 @@ func NewPDFJobRunner(converter PDFConverter, persister PDFPersister) *PDFJobRunn
 // PDFPersisterInTx — the caller supplies an adapter bridging its repository's
 // tx-scoped write method (e.g. *documents/repository.SnapshotRepository's
 // WritePDF variadic DBTX param) to WritePDFInTx(ctx, tx, req).
-func NewPDFJobRunnerWithDB(converter PDFConverter, persister PDFPersister, database *sql.DB) *PDFJobRunner {
+func NewPDFJobRunnerWithDB(converter PDFConverter, persister PDFPersister, authzSeam TxAuthzSeam, database *sql.DB) *PDFJobRunner {
 	if database == nil {
 		panic("pdf_job_runner: db is required for NewPDFJobRunnerWithDB")
+	}
+	if authzSeam == nil {
+		panic("pdf_job_runner: authzSeam is required")
 	}
 	return &PDFJobRunner{
 		converter: converter,
 		persister: persister,
+		authzSeam: authzSeam,
 		db:        database,
 	}
 }
 
 func (r *PDFJobRunner) Handle(ctx context.Context, event messaging.Event) error {
-	ctx = authz.WithBackgroundBypass(ctx)
+	if r.authzSeam == nil {
+		return fmt.Errorf("pdf job runner: authz seam not configured")
+	}
+	ctx = r.authzSeam.WithBackgroundBypass(ctx)
 	payload, err := messaging.PDFConvertPayloadFrom(event)
 	if err != nil {
 		return fmt.Errorf("pdf job runner: %w", err)
@@ -174,11 +185,11 @@ func (r *PDFJobRunner) Handle(ctx context.Context, event messaging.Event) error 
 	}
 	// M3 F3.2 (validation-contract.md §2.2 site 2) — seed the tenant-only RLS
 	// backstop GUC before the write in this single-tenant processing tx.
-	if err := authz.SeedTxTenant(ctx, tx, payload.TenantID); err != nil {
+	if err := r.authzSeam.SeedTxTenant(ctx, tx, payload.TenantID); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("pdf job runner: seed tenant: %w", err)
 	}
-	if err := authz.BypassSystem(ctx, tx); err != nil {
+	if err := r.authzSeam.BypassSystem(ctx, tx); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("pdf job runner: bypass system: %w", err)
 	}

@@ -117,7 +117,7 @@ func TestMaterializeJobRunner_Handle_Success(t *testing.T) {
 	pdfOutbox := &fakePDFEnqueuer{}
 	db := newNopDB(t)
 
-	runner := NewMaterializeJobRunner(invoker, finalDocx, pdfOutbox, db)
+	runner := NewMaterializeJobRunner(invoker, finalDocx, pdfOutbox, &fakeAuthzSeam{}, db)
 	if err := runner.Handle(context.Background(), materializeEvent("tenant-1", "rev-1")); err != nil {
 		t.Fatalf("Handle() error = %v", err)
 	}
@@ -144,7 +144,7 @@ func TestMaterializeJobRunner_Handle_MaterializeError_NoWrites(t *testing.T) {
 	pdfOutbox := &fakePDFEnqueuer{}
 	db := newNopDB(t)
 
-	runner := NewMaterializeJobRunner(invoker, finalDocx, pdfOutbox, db)
+	runner := NewMaterializeJobRunner(invoker, finalDocx, pdfOutbox, &fakeAuthzSeam{}, db)
 	err := runner.Handle(context.Background(), materializeEvent("t", "r"))
 	if err == nil {
 		t.Fatal("expected error from Materialize, got nil")
@@ -172,7 +172,7 @@ func TestMaterializeJobRunner_Handle_SeedsTenantBeforeWrites(t *testing.T) {
 	pdfOutbox := &fakePDFEnqueuer{}
 	db := newNopDB(t)
 
-	runner := NewMaterializeJobRunner(invoker, finalDocx, pdfOutbox, db)
+	runner := NewMaterializeJobRunner(invoker, finalDocx, pdfOutbox, &fakeAuthzSeam{}, db)
 	if err := runner.Handle(context.Background(), materializeEvent("tenant-seed-1", "rev-1")); err != nil {
 		t.Fatalf("Handle() error = %v", err)
 	}
@@ -186,6 +186,7 @@ func TestMaterializeJobRunner_Handle_MissingPayload(t *testing.T) {
 		&fakeMaterializeInvoker{},
 		&fakeFinalDocxPersister{},
 		&fakePDFEnqueuer{},
+		&fakeAuthzSeam{},
 		newNopDB(t),
 	)
 	err := runner.Handle(context.Background(), messaging.Event{

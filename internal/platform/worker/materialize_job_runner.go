@@ -6,10 +6,22 @@ import (
 	"fmt"
 	"log/slog"
 
-	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/messaging"
 )
+
+// TxAuthzSeam is the consumer-owned port onto the iam/authz background-tx
+// primitives these runners need (REQ-TOP-2: internal/platform must not
+// import internal/modules). Implemented by a thin adapter over
+// iam/authz at the production construction site
+// (apps/worker/cmd/metaldocs-worker/main.go); see WithBackgroundBypass,
+// SeedTxTenant, and BypassSystem in internal/modules/iam/authz for the
+// semantics each method bridges.
+type TxAuthzSeam interface {
+	WithBackgroundBypass(ctx context.Context) context.Context
+	SeedTxTenant(ctx context.Context, tx *sql.Tx, tenantID string) error
+	BypassSystem(ctx context.Context, tx *sql.Tx) error
+}
 
 // MaterializeInvoker calls the docx-renderer fanout and returns the result.
 // Implemented by *docapp.FreezeService via the MaterializeResult adapter in main.
@@ -63,6 +75,7 @@ type MaterializeJobRunner struct {
 	finalDocx    MaterializeFinalDocxPersister
 	pdfOutbox    MaterializePDFEnqueuer
 	artifactFact ArtifactFactRecorder
+	authzSeam    TxAuthzSeam
 	db           *sql.DB
 }
 
@@ -78,18 +91,26 @@ func NewMaterializeJobRunner(
 	invoker MaterializeInvoker,
 	finalDocx MaterializeFinalDocxPersister,
 	pdfOutbox MaterializePDFEnqueuer,
+	authzSeam TxAuthzSeam,
 	db *sql.DB,
 ) *MaterializeJobRunner {
+	if authzSeam == nil {
+		panic("materialize_job_runner: authzSeam is required")
+	}
 	return &MaterializeJobRunner{
 		invoker:   invoker,
 		finalDocx: finalDocx,
 		pdfOutbox: pdfOutbox,
+		authzSeam: authzSeam,
 		db:        db,
 	}
 }
 
 func (r *MaterializeJobRunner) Handle(ctx context.Context, event messaging.Event) error {
-	ctx = authz.WithBackgroundBypass(ctx)
+	if r.authzSeam == nil {
+		return fmt.Errorf("materialize job runner: authz seam not configured")
+	}
+	ctx = r.authzSeam.WithBackgroundBypass(ctx)
 	payload, err := messaging.MaterializeFanoutPayloadFrom(event)
 	if err != nil {
 		return fmt.Errorf("materialize job runner: %w", err)
@@ -111,11 +132,11 @@ func (r *MaterializeJobRunner) Handle(ctx context.Context, event messaging.Event
 	}
 	// M3 F3.2 (validation-contract.md §2.2 site 1) — seed the tenant-only RLS
 	// backstop GUC before any write/lock in this single-tenant processing tx.
-	if err := authz.SeedTxTenant(ctx, tx, payload.TenantID); err != nil {
+	if err := r.authzSeam.SeedTxTenant(ctx, tx, payload.TenantID); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("materialize job runner: seed tenant: %w", err)
 	}
-	if err := authz.BypassSystem(ctx, tx); err != nil {
+	if err := r.authzSeam.BypassSystem(ctx, tx); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("materialize job runner: bypass system: %w", err)
 	}

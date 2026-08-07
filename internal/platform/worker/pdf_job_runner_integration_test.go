@@ -22,6 +22,7 @@ package worker
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 	"testing"
 	"time"
@@ -82,6 +83,23 @@ func (c fixedPDFConverter) ConvertPDF(_ context.Context, req servicebus.ConvertP
 	}, nil
 }
 
+// testAuthzSeam mirrors apps/worker/cmd/metaldocs-worker/main.go's
+// authzSeamAdapter, bridging the real iam/authz package to TxAuthzSeam for
+// this integration test's system-under-test.
+type testAuthzSeam struct{}
+
+func (testAuthzSeam) WithBackgroundBypass(ctx context.Context) context.Context {
+	return authz.WithBackgroundBypass(ctx)
+}
+
+func (testAuthzSeam) SeedTxTenant(ctx context.Context, tx *sql.Tx, tenantID string) error {
+	return authz.SeedTxTenant(ctx, tx, tenantID)
+}
+
+func (testAuthzSeam) BypassSystem(ctx context.Context, tx *sql.Tx) error {
+	return authz.BypassSystem(ctx, tx)
+}
+
 func TestPDFJobRunner_Integration_Handle_PersistsFinalPDFKey(t *testing.T) {
 	ctx := context.Background()
 	sqlDB, _ := testdb.Open(t)
@@ -96,7 +114,7 @@ func TestPDFJobRunner_Integration_Handle_PersistsFinalPDFKey(t *testing.T) {
 		contentHash: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
 	}
 
-	runner := NewPDFJobRunnerWithDB(converter, adapter, sqlDB)
+	runner := NewPDFJobRunnerWithDB(converter, adapter, testAuthzSeam{}, sqlDB)
 
 	event := messaging.Event{
 		EventID:   "event-1",

@@ -15,6 +15,32 @@ import (
 	"metaldocs/internal/platform/servicebus"
 )
 
+// fakeAuthzSeam is a no-op TxAuthzSeam double: WithBackgroundBypass returns
+// ctx unchanged, and the tx-scoped methods succeed without touching tx. Unit
+// tests here exercise the runner's control flow, not the real iam/authz
+// bridge (that is covered by the integration tests in
+// pdf_job_runner_integration_test.go / materialize_job_runner_integration_test.go).
+type fakeAuthzSeam struct {
+	seedErr     error
+	bypassErr   error
+	seedCalls   int
+	bypassCalls int
+}
+
+func (f *fakeAuthzSeam) WithBackgroundBypass(ctx context.Context) context.Context {
+	return ctx
+}
+
+func (f *fakeAuthzSeam) SeedTxTenant(_ context.Context, _ *sql.Tx, _ string) error {
+	f.seedCalls++
+	return f.seedErr
+}
+
+func (f *fakeAuthzSeam) BypassSystem(_ context.Context, _ *sql.Tx) error {
+	f.bypassCalls++
+	return f.bypassErr
+}
+
 type fakePDFConverter struct {
 	calls  int
 	req    servicebus.ConvertPDFRequest
@@ -72,7 +98,7 @@ func TestPDFJobRunner_Handle_Success(t *testing.T) {
 		},
 	}
 	persister := &fakePDFPersister{}
-	runner := NewPDFJobRunner(converter, persister)
+	runner := NewPDFJobRunner(converter, persister, &fakeAuthzSeam{})
 
 	err := runner.Handle(context.Background(), makePDFEvent(messaging.PDFConvertPayload{
 		TenantID:       "tenant-1",
@@ -118,7 +144,7 @@ func TestPDFJobRunner_Handle_Success(t *testing.T) {
 func TestPDFJobRunner_Handle_MissingPayloadFields(t *testing.T) {
 	converter := &fakePDFConverter{}
 	persister := &fakePDFPersister{}
-	runner := NewPDFJobRunner(converter, persister)
+	runner := NewPDFJobRunner(converter, persister, &fakeAuthzSeam{})
 
 	err := runner.Handle(context.Background(), makePDFEvent(messaging.PDFConvertPayload{
 		TenantID:       "tenant-1",
@@ -140,7 +166,7 @@ func TestPDFJobRunner_Handle_ConvertError(t *testing.T) {
 	convertErr := errors.New("convert failed")
 	converter := &fakePDFConverter{err: convertErr}
 	persister := &fakePDFPersister{}
-	runner := NewPDFJobRunner(converter, persister)
+	runner := NewPDFJobRunner(converter, persister, &fakeAuthzSeam{})
 
 	err := runner.Handle(context.Background(), makePDFEvent(messaging.PDFConvertPayload{
 		TenantID:       "tenant-1",
@@ -231,7 +257,7 @@ func TestPDFJobRunner_HandleWithDB_WrapsWriteInSeededTx(t *testing.T) {
 	persister := &fakePDFPersisterInTx{}
 	sqlDB := newPDFNopDB(t)
 
-	runner := NewPDFJobRunnerWithDB(converter, persister, sqlDB)
+	runner := NewPDFJobRunnerWithDB(converter, persister, &fakeAuthzSeam{}, sqlDB)
 	err := runner.Handle(context.Background(), makePDFEvent(messaging.PDFConvertPayload{
 		TenantID:       "tenant-1",
 		RevisionID:     "rev-1",
@@ -260,7 +286,7 @@ func TestPDFJobRunner_HandleWithDB_NonTxPersisterErrors(t *testing.T) {
 	persister := &fakePDFPersister{}
 	sqlDB := newPDFNopDB(t)
 
-	runner := NewPDFJobRunnerWithDB(converter, persister, sqlDB)
+	runner := NewPDFJobRunnerWithDB(converter, persister, &fakeAuthzSeam{}, sqlDB)
 	err := runner.Handle(context.Background(), makePDFEvent(messaging.PDFConvertPayload{
 		TenantID:       "tenant-1",
 		RevisionID:     "rev-1",
@@ -280,7 +306,7 @@ func TestPDFJobRunner_Handle_PersistError(t *testing.T) {
 		},
 	}
 	persister := &fakePDFPersister{err: persistErr}
-	runner := NewPDFJobRunner(converter, persister)
+	runner := NewPDFJobRunner(converter, persister, &fakeAuthzSeam{})
 
 	err := runner.Handle(context.Background(), makePDFEvent(messaging.PDFConvertPayload{
 		TenantID:       "tenant-1",
