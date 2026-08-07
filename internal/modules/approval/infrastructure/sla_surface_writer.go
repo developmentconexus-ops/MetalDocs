@@ -8,6 +8,7 @@ import (
 	"time"
 
 	approvaldomain "metaldocs/internal/modules/approval/domain"
+	"metaldocs/internal/platform/db"
 )
 
 // SLASurfaceWriterPG is the approval-owned Postgres adapter for the
@@ -46,7 +47,7 @@ var _ approvaldomain.SLASurfaceWriter = (*SLASurfaceWriterPG)(nil)
 // caller MUST seed exactly one tenant on the tx (authz.BypassSystem then
 // authz.SeedTxTenant(tenantID), under authz.WithBackgroundBypass) before
 // calling this method — this adapter issues no authz calls itself.
-func (w *SLASurfaceWriterPG) MarkStagesOverdueSurfaced(ctx context.Context, tx *sql.Tx, tenantID string, now time.Time) ([]approvaldomain.SurfacedStage, error) {
+func (w *SLASurfaceWriterPG) MarkStagesOverdueSurfaced(ctx context.Context, tx db.Tx, tenantID string, now time.Time) ([]approvaldomain.SurfacedStage, error) {
 	rows, err := tx.QueryContext(ctx, `
 WITH marked AS (
   UPDATE public.approval_stage_instances asi

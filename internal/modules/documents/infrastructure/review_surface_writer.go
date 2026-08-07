@@ -7,6 +7,7 @@ import (
 	"time"
 
 	documentsdomain "metaldocs/internal/modules/documents/domain"
+	"metaldocs/internal/platform/db"
 )
 
 // ReviewSurfaceWriterPG is the documents-owned Postgres adapter for the
@@ -58,7 +59,7 @@ var _ documentsdomain.ReviewSurfaceWriter = (*ReviewSurfaceWriterPG)(nil)
 // tenant seed (authz.BypassSystem + authz.SeedTxTenant under
 // authz.WithBackgroundBypass) before calling this port — this adapter issues
 // no authz calls itself.
-func (w *ReviewSurfaceWriterPG) MarkSurfaced(ctx context.Context, tx *sql.Tx, tenantID string, now time.Time) ([]documentsdomain.SurfacedDoc, error) {
+func (w *ReviewSurfaceWriterPG) MarkSurfaced(ctx context.Context, tx db.Tx, tenantID string, now time.Time) ([]documentsdomain.SurfacedDoc, error) {
 	rows, err := tx.QueryContext(ctx, `
 UPDATE public.documents
    SET review_surfaced_at = $1

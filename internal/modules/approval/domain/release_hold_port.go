@@ -2,8 +2,9 @@ package domain
 
 import (
 	"context"
-	"database/sql"
 	"time"
+
+	"metaldocs/internal/platform/db"
 )
 
 // StuckReleaseHoldView is the approval-owned projection of ONE release
@@ -62,24 +63,24 @@ type ReleaseHoldReader interface {
 	// FORCE policy on the tx-local metaldocs.tenant_id GUC is the backstop. The
 	// caller is responsible for seeding tenant identity (SeedTxTenant) before
 	// calling this port.
-	ListStuckHolds(ctx context.Context, tx *sql.Tx, tenantID string, now time.Time, stuckAfter time.Duration, limit int) ([]StuckReleaseHoldView, error)
+	ListStuckHolds(ctx context.Context, tx db.Tx, tenantID string, now time.Time, stuckAfter time.Duration, limit int) ([]StuckReleaseHoldView, error)
 
 	// ListTenantsWithStuckHolds returns the DISTINCT tenant_ids (as text) that
 	// currently have at least one stuck hold (the same eligibility as
 	// ListStuckHolds). Called by the jobs reconciler under authz.BypassSystem
 	// with NO tenant GUC seeded — mirrors
 	// SLAOverdueReader.ListTenantsWithOverdueStages.
-	ListTenantsWithStuckHolds(ctx context.Context, tx *sql.Tx, now time.Time, stuckAfter time.Duration) ([]string, error)
+	ListTenantsWithStuckHolds(ctx context.Context, tx db.Tx, now time.Time, stuckAfter time.Duration) ([]string, error)
 }
 
 // NoopReleaseHoldReader is the fail-closed default: it reports no stuck holds
 // and no tenants with stuck holds.
 type NoopReleaseHoldReader struct{}
 
-func (NoopReleaseHoldReader) ListStuckHolds(context.Context, *sql.Tx, string, time.Time, time.Duration, int) ([]StuckReleaseHoldView, error) {
+func (NoopReleaseHoldReader) ListStuckHolds(context.Context, db.Tx, string, time.Time, time.Duration, int) ([]StuckReleaseHoldView, error) {
 	return nil, nil
 }
 
-func (NoopReleaseHoldReader) ListTenantsWithStuckHolds(context.Context, *sql.Tx, time.Time, time.Duration) ([]string, error) {
+func (NoopReleaseHoldReader) ListTenantsWithStuckHolds(context.Context, db.Tx, time.Time, time.Duration) ([]string, error) {
 	return nil, nil
 }

@@ -2,8 +2,9 @@ package domain
 
 import (
 	"context"
-	"database/sql"
 	"errors"
+
+	"metaldocs/internal/platform/db"
 )
 
 // TenantCrypto is the published port for per-tenant envelope encryption (M7
@@ -23,7 +24,7 @@ type TenantCrypto interface {
 	// service's KEK, and inserts the metaldocs.tenant_keys row for tenantID
 	// inside the caller's tx. Idempotent: calling it again for a tenant that
 	// already has a key is a no-op (does not rotate or overwrite).
-	ProvisionTenantKeyTx(ctx context.Context, tx *sql.Tx, tenantID string) error
+	ProvisionTenantKeyTx(ctx context.Context, tx db.Tx, tenantID string) error
 
 	// EncryptForTenant seals plaintext under tenantID's active DEK and
 	// returns the envelope JSON string ({"enc":"aesgcm.v1","data":"..."}).
@@ -42,7 +43,7 @@ type TenantCrypto interface {
 	// falling through to plaintext storage. Falls back to the ordinary
 	// pool-backed resolution when tx is nil (byte-identical to
 	// EncryptForTenant).
-	EncryptForTenantTx(ctx context.Context, tx *sql.Tx, tenantID string, plaintext []byte) (string, error)
+	EncryptForTenantTx(ctx context.Context, tx db.Tx, tenantID string, plaintext []byte) (string, error)
 
 	// DecryptForTenant reverses EncryptForTenant. Returns ErrKeyNotFound if
 	// the tenant has no key row, ErrKeyDestroyed if the tenant's key has
@@ -54,7 +55,7 @@ type TenantCrypto interface {
 	// tx: sets destroyed_at = now() and zeroes wrapped_dek. Idempotent
 	// (destroying an already-destroyed or missing key is a no-op, not an
 	// error) so erasure retries are safe.
-	DestroyTenantKeyTx(ctx context.Context, tx *sql.Tx, tenantID string) error
+	DestroyTenantKeyTx(ctx context.Context, tx db.Tx, tenantID string) error
 }
 
 // ErrKeyNotFound is returned when a tenant has no metaldocs.tenant_keys row

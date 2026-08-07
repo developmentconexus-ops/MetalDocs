@@ -2,8 +2,9 @@ package domain
 
 import (
 	"context"
-	"database/sql"
 	"time"
+
+	"metaldocs/internal/platform/db"
 )
 
 // OverdueStageView is the approval-owned projection of a stage instance whose
@@ -69,25 +70,25 @@ type SLAOverdueReader interface {
 	// approval_stage_instances RLS FORCE policy on the tx's
 	// metaldocs.tenant_id GUC is the backstop. The caller is responsible for
 	// seeding tenant identity (SeedTxTenant) before calling this port.
-	ListOverdueStages(ctx context.Context, tx *sql.Tx, tenantID string, now time.Time, limit int) ([]OverdueStageView, error)
+	ListOverdueStages(ctx context.Context, tx db.Tx, tenantID string, now time.Time, limit int) ([]OverdueStageView, error)
 
 	// ListTenantsWithOverdueStages returns the DISTINCT tenant_ids (as text)
 	// that currently have at least one overdue, not-yet-surfaced active stage
 	// instance (the same eligibility as ListOverdueStages). Called by the
 	// jobs surfacer under authz.BypassSystem with NO tenant GUC seeded —
 	// mirrors documents.ReviewDueReader.ListTenantsWithDueReviews.
-	ListTenantsWithOverdueStages(ctx context.Context, tx *sql.Tx, now time.Time) ([]string, error)
+	ListTenantsWithOverdueStages(ctx context.Context, tx db.Tx, now time.Time) ([]string, error)
 }
 
 // NoopSLAOverdueReader is the fail-closed default: it reports no overdue
 // stages and no tenants with overdue stages.
 type NoopSLAOverdueReader struct{}
 
-func (NoopSLAOverdueReader) ListOverdueStages(context.Context, *sql.Tx, string, time.Time, int) ([]OverdueStageView, error) {
+func (NoopSLAOverdueReader) ListOverdueStages(context.Context, db.Tx, string, time.Time, int) ([]OverdueStageView, error) {
 	return nil, nil
 }
 
-func (NoopSLAOverdueReader) ListTenantsWithOverdueStages(context.Context, *sql.Tx, time.Time) ([]string, error) {
+func (NoopSLAOverdueReader) ListTenantsWithOverdueStages(context.Context, db.Tx, time.Time) ([]string, error) {
 	return nil, nil
 }
 
@@ -113,12 +114,12 @@ type SLASurfaceWriter interface {
 	// scheduler caller must set authz.BypassSystem (requires
 	// authz.WithBackgroundBypass on ctx) before calling this port — mirrors
 	// ReviewSurfaceWriter.MarkSurfaced.
-	MarkStagesOverdueSurfaced(ctx context.Context, tx *sql.Tx, tenantID string, now time.Time) ([]SurfacedStage, error)
+	MarkStagesOverdueSurfaced(ctx context.Context, tx db.Tx, tenantID string, now time.Time) ([]SurfacedStage, error)
 }
 
 // NoopSLASurfaceWriter is the fail-closed default: it surfaces nothing.
 type NoopSLASurfaceWriter struct{}
 
-func (NoopSLASurfaceWriter) MarkStagesOverdueSurfaced(context.Context, *sql.Tx, string, time.Time) ([]SurfacedStage, error) {
+func (NoopSLASurfaceWriter) MarkStagesOverdueSurfaced(context.Context, db.Tx, string, time.Time) ([]SurfacedStage, error) {
 	return nil, nil
 }

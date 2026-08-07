@@ -2,8 +2,9 @@ package domain
 
 import (
 	"context"
-	"database/sql"
 	"time"
+
+	"metaldocs/internal/platform/db"
 )
 
 // ReviewDueView is the documents-owned projection of a document due for
@@ -50,7 +51,7 @@ type ReviewDueReader interface {
 	// the backstop. The caller is still responsible for seeding tenant
 	// identity (SeedTxIdentity/SeedTxTenant, M3) before calling this port, so
 	// the RLS backstop is live.
-	ListDueForReview(ctx context.Context, tx *sql.Tx, tenantID string, now time.Time, limit int) ([]ReviewDueView, error)
+	ListDueForReview(ctx context.Context, tx db.Tx, tenantID string, now time.Time, limit int) ([]ReviewDueView, error)
 
 	// ListTenantsWithDueReviews returns the DISTINCT tenant_ids (as text) that
 	// currently have at least one review-due document (the same "due-core"
@@ -61,7 +62,7 @@ type ReviewDueReader interface {
 	// can iterate tenants and seed each one (authz.SeedTxTenant) before its
 	// tenant-scoped MarkSurfaced write, per validation-contract.md §4.2/§4.3 —
 	// reads are safe unseeded; only the write must be seeded.
-	ListTenantsWithDueReviews(ctx context.Context, tx *sql.Tx, now time.Time) ([]string, error)
+	ListTenantsWithDueReviews(ctx context.Context, tx db.Tx, now time.Time) ([]string, error)
 }
 
 // NoopReviewDueReader is the fail-closed default: it reports no due documents
@@ -69,10 +70,10 @@ type ReviewDueReader interface {
 // and in unit tests that do not exercise the review-due surfacer.
 type NoopReviewDueReader struct{}
 
-func (NoopReviewDueReader) ListDueForReview(context.Context, *sql.Tx, string, time.Time, int) ([]ReviewDueView, error) {
+func (NoopReviewDueReader) ListDueForReview(context.Context, db.Tx, string, time.Time, int) ([]ReviewDueView, error) {
 	return nil, nil
 }
 
-func (NoopReviewDueReader) ListTenantsWithDueReviews(context.Context, *sql.Tx, time.Time) ([]string, error) {
+func (NoopReviewDueReader) ListTenantsWithDueReviews(context.Context, db.Tx, time.Time) ([]string, error) {
 	return nil, nil
 }

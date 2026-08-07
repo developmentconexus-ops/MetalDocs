@@ -19,6 +19,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/lib/pq"
+
+	"metaldocs/internal/platform/db"
 )
 
 // TenantKeyRepository implements the tenantKeyRepository port the security
@@ -35,7 +37,7 @@ func NewTenantKeyRepository(db *sql.DB) *TenantKeyRepository {
 // InsertIfAbsentTx inserts the tenant_keys row for tenantID with wrappedDEK,
 // inside tx, unless a row already exists (ON CONFLICT DO NOTHING —
 // idempotent, never rotates an existing key).
-func (r *TenantKeyRepository) InsertIfAbsentTx(ctx context.Context, tx *sql.Tx, tenantID string, wrappedDEK []byte) error {
+func (r *TenantKeyRepository) InsertIfAbsentTx(ctx context.Context, tx db.Tx, tenantID string, wrappedDEK []byte) error {
 	const q = `
 INSERT INTO metaldocs.tenant_keys (tenant_id, wrapped_dek)
 VALUES ($1::uuid, $2)
@@ -84,7 +86,7 @@ WHERE tenant_id = $1::uuid
 // same tx as ProvisionTenantKeyTx) sees the just-inserted, still-uncommitted
 // row instead of racing a pool read that always misses an uncommitted
 // insert. Same query/semantics as WrappedDEK otherwise.
-func (r *TenantKeyRepository) WrappedDEKTx(ctx context.Context, tx *sql.Tx, tenantID string) ([]byte, bool, error) {
+func (r *TenantKeyRepository) WrappedDEKTx(ctx context.Context, tx db.Tx, tenantID string) ([]byte, bool, error) {
 	const q = `
 SELECT wrapped_dek, destroyed_at IS NOT NULL
 FROM metaldocs.tenant_keys
@@ -109,7 +111,7 @@ WHERE tenant_id = $1::uuid
 // zeroes wrapped_dek. Explicit tenant_id predicate; no-op (0 rows affected)
 // if the tenant has no key row or the key is already destroyed — both are
 // success, not an error (idempotent erasure retries).
-func (r *TenantKeyRepository) DestroyTx(ctx context.Context, tx *sql.Tx, tenantID string) error {
+func (r *TenantKeyRepository) DestroyTx(ctx context.Context, tx db.Tx, tenantID string) error {
 	const q = `
 UPDATE metaldocs.tenant_keys
 SET destroyed_at = now(), wrapped_dek = ''::bytea

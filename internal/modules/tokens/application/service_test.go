@@ -29,20 +29,20 @@ type fakeRepo struct {
 	getErr error
 }
 
-func (f *fakeRepo) Create(ctx context.Context, tx *sql.Tx, e *domain.Entry) (*domain.Entry, error) {
+func (f *fakeRepo) Create(ctx context.Context, tx db.Tx, e *domain.Entry) (*domain.Entry, error) {
 	return e, nil
 }
-func (f *fakeRepo) Update(ctx context.Context, tx *sql.Tx, e *domain.Entry) (*domain.Entry, error) {
+func (f *fakeRepo) Update(ctx context.Context, tx db.Tx, e *domain.Entry) (*domain.Entry, error) {
 	return e, nil
 }
-func (f *fakeRepo) Delete(ctx context.Context, tx *sql.Tx, tenantID, id string) error { return nil }
-func (f *fakeRepo) GetByID(ctx context.Context, tx *sql.Tx, tenantID, id string) (*domain.Entry, error) {
+func (f *fakeRepo) Delete(ctx context.Context, tx db.Tx, tenantID, id string) error { return nil }
+func (f *fakeRepo) GetByID(ctx context.Context, tx db.Tx, tenantID, id string) (*domain.Entry, error) {
 	return f.entry, f.getErr
 }
-func (f *fakeRepo) GetByName(ctx context.Context, tx *sql.Tx, tenantID, name string) (*domain.Entry, error) {
+func (f *fakeRepo) GetByName(ctx context.Context, tx db.Tx, tenantID, name string) (*domain.Entry, error) {
 	return f.entry, f.getErr
 }
-func (f *fakeRepo) List(ctx context.Context, tx *sql.Tx, tenantID string) ([]domain.Entry, error) {
+func (f *fakeRepo) List(ctx context.Context, tx db.Tx, tenantID string) ([]domain.Entry, error) {
 	return nil, nil
 }
 

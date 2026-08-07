@@ -10,7 +10,6 @@ package application_test
 import (
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"errors"
 	"testing"
 
@@ -19,6 +18,7 @@ import (
 	securitydomain "metaldocs/internal/modules/security/domain"
 
 	"metaldocs/internal/modules/security/application"
+	"metaldocs/internal/platform/db"
 )
 
 // fakeTenantKeyRepository is an in-memory stand-in for the Postgres adapter,
@@ -45,7 +45,7 @@ func newFakeRepo() *fakeTenantKeyRepository {
 	return &fakeTenantKeyRepository{rows: map[string]*fakeKeyRow{}}
 }
 
-func (f *fakeTenantKeyRepository) InsertIfAbsentTx(ctx context.Context, tx *sql.Tx, tenantID string, wrappedDEK []byte) error {
+func (f *fakeTenantKeyRepository) InsertIfAbsentTx(ctx context.Context, tx db.Tx, tenantID string, wrappedDEK []byte) error {
 	if f.insertErr != nil {
 		return f.insertErr
 	}
@@ -73,7 +73,7 @@ func (f *fakeTenantKeyRepository) WrappedDEK(ctx context.Context, tenantID strin
 // When txRows is nil, it mirrors WrappedDEK exactly (no tx/pool visibility
 // difference modeled) — sufficient for tests that only care that the Tx
 // variant delegates correctly.
-func (f *fakeTenantKeyRepository) WrappedDEKTx(ctx context.Context, tx *sql.Tx, tenantID string) ([]byte, bool, error) {
+func (f *fakeTenantKeyRepository) WrappedDEKTx(ctx context.Context, tx db.Tx, tenantID string) ([]byte, bool, error) {
 	if f.txRows != nil {
 		row, ok := f.txRows[tenantID]
 		if !ok {
@@ -87,7 +87,7 @@ func (f *fakeTenantKeyRepository) WrappedDEKTx(ctx context.Context, tx *sql.Tx, 
 	return f.WrappedDEK(ctx, tenantID)
 }
 
-func (f *fakeTenantKeyRepository) DestroyTx(ctx context.Context, tx *sql.Tx, tenantID string) error {
+func (f *fakeTenantKeyRepository) DestroyTx(ctx context.Context, tx db.Tx, tenantID string) error {
 	row, ok := f.rows[tenantID]
 	if !ok {
 		return nil // idempotent no-op: nothing to destroy

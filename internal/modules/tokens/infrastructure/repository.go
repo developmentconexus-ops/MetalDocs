@@ -11,6 +11,7 @@ import (
 	"fmt"
 
 	"metaldocs/internal/modules/tokens/domain"
+	"metaldocs/internal/platform/db"
 )
 
 type PostgresRepository struct{}
@@ -38,7 +39,7 @@ func scanEntry(row interface {
 	return &e, nil
 }
 
-func (r *PostgresRepository) Create(ctx context.Context, tx *sql.Tx, e *domain.Entry) (*domain.Entry, error) {
+func (r *PostgresRepository) Create(ctx context.Context, tx db.Tx, e *domain.Entry) (*domain.Entry, error) {
 	const q = `
 INSERT INTO metaldocs.token_dictionary_entries
     (tenant_id, name, value, label, description, created_by, updated_by)
@@ -53,7 +54,7 @@ RETURNING ` + selectColumns
 	return out, nil
 }
 
-func (r *PostgresRepository) Update(ctx context.Context, tx *sql.Tx, e *domain.Entry) (*domain.Entry, error) {
+func (r *PostgresRepository) Update(ctx context.Context, tx db.Tx, e *domain.Entry) (*domain.Entry, error) {
 	const q = `
 UPDATE metaldocs.token_dictionary_entries
    SET value = $1, label = $2, description = $3, updated_by = $4, updated_at = now()
@@ -71,7 +72,7 @@ RETURNING ` + selectColumns
 	return out, nil
 }
 
-func (r *PostgresRepository) Delete(ctx context.Context, tx *sql.Tx, tenantID, id string) error {
+func (r *PostgresRepository) Delete(ctx context.Context, tx db.Tx, tenantID, id string) error {
 	const q = `DELETE FROM metaldocs.token_dictionary_entries WHERE tenant_id = $1 AND id = $2`
 	res, err := tx.ExecContext(ctx, q, tenantID, id)
 	if err != nil {
@@ -87,7 +88,7 @@ func (r *PostgresRepository) Delete(ctx context.Context, tx *sql.Tx, tenantID, i
 	return nil
 }
 
-func (r *PostgresRepository) GetByID(ctx context.Context, tx *sql.Tx, tenantID, id string) (*domain.Entry, error) {
+func (r *PostgresRepository) GetByID(ctx context.Context, tx db.Tx, tenantID, id string) (*domain.Entry, error) {
 	const q = `SELECT ` + selectColumns + ` FROM metaldocs.token_dictionary_entries WHERE tenant_id = $1 AND id = $2`
 	out, err := scanEntry(tx.QueryRowContext(ctx, q, tenantID, id))
 	if errors.Is(err, sql.ErrNoRows) {
@@ -99,7 +100,7 @@ func (r *PostgresRepository) GetByID(ctx context.Context, tx *sql.Tx, tenantID, 
 	return out, nil
 }
 
-func (r *PostgresRepository) GetByName(ctx context.Context, tx *sql.Tx, tenantID, name string) (*domain.Entry, error) {
+func (r *PostgresRepository) GetByName(ctx context.Context, tx db.Tx, tenantID, name string) (*domain.Entry, error) {
 	const q = `SELECT ` + selectColumns + ` FROM metaldocs.token_dictionary_entries WHERE tenant_id = $1 AND name = $2`
 	out, err := scanEntry(tx.QueryRowContext(ctx, q, tenantID, name))
 	if errors.Is(err, sql.ErrNoRows) {
@@ -111,7 +112,7 @@ func (r *PostgresRepository) GetByName(ctx context.Context, tx *sql.Tx, tenantID
 	return out, nil
 }
 
-func (r *PostgresRepository) List(ctx context.Context, tx *sql.Tx, tenantID string) ([]domain.Entry, error) {
+func (r *PostgresRepository) List(ctx context.Context, tx db.Tx, tenantID string) ([]domain.Entry, error) {
 	const q = `SELECT ` + selectColumns + ` FROM metaldocs.token_dictionary_entries WHERE tenant_id = $1 ORDER BY name ASC`
 	rows, err := tx.QueryContext(ctx, q, tenantID)
 	if err != nil {

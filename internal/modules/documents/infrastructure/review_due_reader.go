@@ -7,6 +7,7 @@ import (
 	"time"
 
 	documentsdomain "metaldocs/internal/modules/documents/domain"
+	"metaldocs/internal/platform/db"
 )
 
 // ReviewDueReaderPG is the documents-owned Postgres adapter for the
@@ -59,7 +60,7 @@ const dueCorePredicate = `status = 'published'
 // "Currently-effective" = effective_from <= now (already effective) AND
 // (effective_to IS NULL OR effective_to > now) (not yet expired) — the F6.2
 // review/expiry model (validation-contract.md §2).
-func (r *ReviewDueReaderPG) ListDueForReview(ctx context.Context, tx *sql.Tx, tenantID string, now time.Time, limit int) ([]documentsdomain.ReviewDueView, error) {
+func (r *ReviewDueReaderPG) ListDueForReview(ctx context.Context, tx db.Tx, tenantID string, now time.Time, limit int) ([]documentsdomain.ReviewDueView, error) {
 	if limit <= 0 {
 		limit = 25
 	}
@@ -107,7 +108,7 @@ SELECT id::text, tenant_id::text, code, name, status, review_due_at
 // per-tenant-seeded write loop — validation-contract.md §4.2/§4.3. Reads are
 // safe unseeded; only the subsequent MarkSurfaced write per tenant must be
 // seeded.
-func (r *ReviewDueReaderPG) ListTenantsWithDueReviews(ctx context.Context, tx *sql.Tx, now time.Time) ([]string, error) {
+func (r *ReviewDueReaderPG) ListTenantsWithDueReviews(ctx context.Context, tx db.Tx, now time.Time) ([]string, error) {
 	rows, err := tx.QueryContext(ctx, `
 SELECT DISTINCT tenant_id::text
   FROM public.documents

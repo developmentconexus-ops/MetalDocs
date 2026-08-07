@@ -7,6 +7,7 @@ import (
 	"time"
 
 	approvaldomain "metaldocs/internal/modules/approval/domain"
+	"metaldocs/internal/platform/db"
 )
 
 // ReleaseHoldReaderPG is the approval-owned Postgres adapter for the
@@ -79,7 +80,7 @@ const releaseHoldStuckCorePredicate = `g.released_at IS NULL
 // Index note: with the tenant bound, the (tenant_id, last_evaluated_at)
 // WHERE released_at IS NULL partial index (ix_release_generations_open,
 // migration 0310 — created for exactly this sweep) is a prefix match.
-func (r *ReleaseHoldReaderPG) ListStuckHolds(ctx context.Context, tx *sql.Tx, tenantID string, now time.Time, stuckAfter time.Duration, limit int) ([]approvaldomain.StuckReleaseHoldView, error) {
+func (r *ReleaseHoldReaderPG) ListStuckHolds(ctx context.Context, tx db.Tx, tenantID string, now time.Time, stuckAfter time.Duration, limit int) ([]approvaldomain.StuckReleaseHoldView, error) {
 	if limit <= 0 {
 		limit = 25
 	}
@@ -125,7 +126,7 @@ SELECT g.id::text, g.tenant_id::text, g.document_id::text, g.approval_instance_i
 // least one generation matching releaseHoldStuckCorePredicate. System-level,
 // cross-tenant enumeration read: the caller runs it under authz.BypassSystem
 // with NO tenant GUC seeded (mirrors ListTenantsWithOverdueStages).
-func (r *ReleaseHoldReaderPG) ListTenantsWithStuckHolds(ctx context.Context, tx *sql.Tx, now time.Time, stuckAfter time.Duration) ([]string, error) {
+func (r *ReleaseHoldReaderPG) ListTenantsWithStuckHolds(ctx context.Context, tx db.Tx, now time.Time, stuckAfter time.Duration) ([]string, error) {
 	rows, err := tx.QueryContext(ctx, `
 SELECT DISTINCT g.tenant_id::text
   FROM public.release_generations g

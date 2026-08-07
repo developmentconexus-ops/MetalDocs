@@ -7,6 +7,7 @@ import (
 	"time"
 
 	approvaldomain "metaldocs/internal/modules/approval/domain"
+	"metaldocs/internal/platform/db"
 )
 
 // SLAOverdueReaderPG is the approval-owned Postgres adapter for the
@@ -58,7 +59,7 @@ const slaOverdueCorePredicate = `asi.status = 'active'
 // tx-local metaldocs.tenant_id GUC) is the BACKSTOP; the caller is
 // responsible for seeding tenant identity (SeedTxTenant) before calling this
 // port.
-func (r *SLAOverdueReaderPG) ListOverdueStages(ctx context.Context, tx *sql.Tx, tenantID string, now time.Time, limit int) ([]approvaldomain.OverdueStageView, error) {
+func (r *SLAOverdueReaderPG) ListOverdueStages(ctx context.Context, tx db.Tx, tenantID string, now time.Time, limit int) ([]approvaldomain.OverdueStageView, error) {
 	if limit <= 0 {
 		limit = 25
 	}
@@ -100,7 +101,7 @@ SELECT asi.id::text, asi.approval_instance_id::text, ai.tenant_id::text, asi.due
 // System-level, cross-tenant enumeration read: the caller runs it under
 // authz.BypassSystem with NO tenant GUC seeded (mirrors
 // documents.ReviewDueReaderPG.ListTenantsWithDueReviews).
-func (r *SLAOverdueReaderPG) ListTenantsWithOverdueStages(ctx context.Context, tx *sql.Tx, now time.Time) ([]string, error) {
+func (r *SLAOverdueReaderPG) ListTenantsWithOverdueStages(ctx context.Context, tx db.Tx, now time.Time) ([]string, error) {
 	rows, err := tx.QueryContext(ctx, `
 SELECT DISTINCT ai.tenant_id::text
   FROM public.approval_stage_instances asi

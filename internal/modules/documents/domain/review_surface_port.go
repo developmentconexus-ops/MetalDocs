@@ -2,8 +2,9 @@ package domain
 
 import (
 	"context"
-	"database/sql"
 	"time"
+
+	"metaldocs/internal/platform/db"
 )
 
 // SurfacedDoc is the documents-owned projection of a document that was newly
@@ -46,7 +47,7 @@ type ReviewSurfaceWriter interface {
 	// (authz.BypassSystem, requires authz.WithBackgroundBypass on ctx) before
 	// calling this port — MarkSurfaced does not set the bypass itself, mirroring
 	// the existing janitors' own-tx bypass calls rather than hiding it here.
-	MarkSurfaced(ctx context.Context, tx *sql.Tx, tenantID string, now time.Time) ([]SurfacedDoc, error)
+	MarkSurfaced(ctx context.Context, tx db.Tx, tenantID string, now time.Time) ([]SurfacedDoc, error)
 }
 
 // NoopReviewSurfaceWriter is the fail-closed default: it surfaces nothing.
@@ -54,6 +55,6 @@ type ReviewSurfaceWriter interface {
 // exercise the review-due surfacer.
 type NoopReviewSurfaceWriter struct{}
 
-func (NoopReviewSurfaceWriter) MarkSurfaced(context.Context, *sql.Tx, string, time.Time) ([]SurfacedDoc, error) {
+func (NoopReviewSurfaceWriter) MarkSurfaced(context.Context, db.Tx, string, time.Time) ([]SurfacedDoc, error) {
 	return nil, nil
 }

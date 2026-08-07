@@ -13,12 +13,12 @@ package application
 import (
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
 
 	platcrypto "metaldocs/internal/platform/crypto"
+	"metaldocs/internal/platform/db"
 
 	securitydomain "metaldocs/internal/modules/security/domain"
 )
@@ -34,7 +34,7 @@ type tenantKeyRepository interface {
 	// given already-wrapped DEK, inside tx, UNLESS a row already exists —
 	// in which case it is a no-op (idempotent; never rotates an existing
 	// key).
-	InsertIfAbsentTx(ctx context.Context, tx *sql.Tx, tenantID string, wrappedDEK []byte) error
+	InsertIfAbsentTx(ctx context.Context, tx db.Tx, tenantID string, wrappedDEK []byte) error
 
 	// WrappedDEK returns the tenant's wrapped DEK bytes and whether the key
 	// has been destroyed. found=false means no row exists at all.
@@ -47,12 +47,12 @@ type tenantKeyRepository interface {
 	// ProvisionTenantKeyTx) actually sees the just-inserted row instead of
 	// racing an uncommitted write via the pool (which always misses,
 	// yielding a false ErrKeyNotFound).
-	WrappedDEKTx(ctx context.Context, tx *sql.Tx, tenantID string) (wrappedDEK []byte, destroyed bool, err error)
+	WrappedDEKTx(ctx context.Context, tx db.Tx, tenantID string) (wrappedDEK []byte, destroyed bool, err error)
 
 	// DestroyTx crypto-shreds tenantID's key inside tx: sets
 	// destroyed_at = now() and zeroes wrapped_dek. No-op (not an error) if
 	// the tenant has no key row, or the key is already destroyed.
-	DestroyTx(ctx context.Context, tx *sql.Tx, tenantID string) error
+	DestroyTx(ctx context.Context, tx db.Tx, tenantID string) error
 }
 
 // TenantCryptoService implements securitydomain.TenantCrypto.
@@ -82,7 +82,7 @@ func NewTenantCryptoService(repo tenantKeyRepository, kek []byte) (*TenantCrypto
 
 // ProvisionTenantKeyTx generates a fresh 32-byte DEK, wraps it under the
 // service's KEK, and inserts the tenant_keys row inside tx. Idempotent.
-func (s *TenantCryptoService) ProvisionTenantKeyTx(ctx context.Context, tx *sql.Tx, tenantID string) error {
+func (s *TenantCryptoService) ProvisionTenantKeyTx(ctx context.Context, tx db.Tx, tenantID string) error {
 	tenantID = strings.TrimSpace(tenantID)
 	if tenantID == "" {
 		return errors.New("security: tenant id required")
@@ -128,7 +128,7 @@ func (s *TenantCryptoService) EncryptForTenant(ctx context.Context, tenantID str
 // rather than racing a pool read that always misses it. When tx is nil, this
 // falls back to the ordinary pool-backed resolution (byte-identical to
 // EncryptForTenant).
-func (s *TenantCryptoService) EncryptForTenantTx(ctx context.Context, tx *sql.Tx, tenantID string, plaintext []byte) (string, error) {
+func (s *TenantCryptoService) EncryptForTenantTx(ctx context.Context, tx db.Tx, tenantID string, plaintext []byte) (string, error) {
 	dek, err := s.resolveDEKTx(ctx, tx, tenantID)
 	if err != nil {
 		return "", err
@@ -162,7 +162,7 @@ func (s *TenantCryptoService) DecryptForTenant(ctx context.Context, tenantID str
 }
 
 // DestroyTenantKeyTx crypto-shreds tenantID's key inside tx.
-func (s *TenantCryptoService) DestroyTenantKeyTx(ctx context.Context, tx *sql.Tx, tenantID string) error {
+func (s *TenantCryptoService) DestroyTenantKeyTx(ctx context.Context, tx db.Tx, tenantID string) error {
 	tenantID = strings.TrimSpace(tenantID)
 	if tenantID == "" {
 		return errors.New("security: tenant id required")
@@ -189,7 +189,7 @@ func (s *TenantCryptoService) resolveDEK(ctx context.Context, tenantID string) (
 
 // resolveDEKTx is resolveDEK's tx-aware variant: when tx is non-nil, the
 // wrapped DEK is read via WrappedDEKTx (through tx) instead of the pool.
-func (s *TenantCryptoService) resolveDEKTx(ctx context.Context, tx *sql.Tx, tenantID string) ([]byte, error) {
+func (s *TenantCryptoService) resolveDEKTx(ctx context.Context, tx db.Tx, tenantID string) ([]byte, error) {
 	tenantID = strings.TrimSpace(tenantID)
 	if tenantID == "" {
 		return nil, errors.New("security: tenant id required")
