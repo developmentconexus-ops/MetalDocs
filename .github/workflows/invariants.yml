@@ -117,6 +117,14 @@ jobs:
           cache: true
       - name: go vet
         run: go vet ./...
+
+      # An untagged `go test`/`go vet` does NOT compile files behind
+      # `//go:build integration`, so a seam signature change can break the
+      # entire integration suite while every PR check stays green. That has
+      # happened here. `verify --audit` reported this as the one registry
+      # check with no CI job; this is that job.
+      - name: go vet (integration build tag)
+        run: go vet -tags integration ./...
       - name: staticcheck
         uses: dominikh/staticcheck-action@v1
         with:

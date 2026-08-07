@@ -28,6 +28,40 @@ Every baseline in §3 is **transitional**. Each names the global maximum (an
 empty baseline) and the milestone that deletes it. A baseline with no exit is a
 suppression wearing a ratchet's clothes.
 
+## 1a. The verify entry point
+
+`go run ./tools/verify --profile={fast|changed|pr|full}` is the single
+implementation of every deterministic check in this repo. CI jobs call it and
+nothing else, so "green locally" and "green in CI" are the same claim. Job
+names are unchanged, so the ruleset's required-check names are unaffected by
+the rewiring.
+
+- `--list` prints what each profile contains.
+- `--audit` reports registry entries with no CI job and exits non-zero. A
+  check that runs on laptops but not on PRs is advice, not a control — the
+  same failure mode as an unwired script. Its first run found one:
+  `go vet -tags integration`, now wired.
+- `--only=id,id` runs specific checks; `--profile=changed` runs the `pr` set
+  filtered by the diff.
+
+Three properties are deliberate:
+
+**Checks are argv, not shell strings.** A quoting bug cannot silently change
+what ran.
+
+**A check that cannot run is reported as SKIP with its reason, and the reasons
+are reprinted at the end of the run.** A check that vanishes when its
+precondition is missing is an inert control, and a hole that scrolled off the
+top of the output is a hole nobody sees.
+
+**Toolchain versions are preflighted against `go.mod` and `.nvmrc`.** This
+repo's dev machines run Go 1.26 and Node 26 against CI's 1.25 and 22.13; that
+split produced both a false "unformatted Go in main" alarm and a real test
+failure this axis had to diagnose. A run on the wrong toolchain is not a
+verification of what CI will do, and verify now says so before it starts.
+
+Measured: `--profile=fast` is 15 checks in ~51s wall clock.
+
 ## 2. Check tiers
 
 The `main` ruleset promotes tier-1 to `required`. Tier-2 runs on every PR and
@@ -115,6 +149,7 @@ does not port code.
 | D-12 | `js-yaml` 4.1.1, `postcss` 8.5.15, `fast-uri` 2.4.0/3.1.2 — three advisories, one root cause: all are purely transitive with no entry in any of this repo's 9 manifests, and `pnpm update` cannot target such a dependency. Verified empirically: it left each at its vulnerable version while producing broad unrelated lockfile churn. `@redocly/openapi-core` pins `js-yaml` to the exact string `4.1.1`, so even a matching range would not help. | attempted and reverted during A1 | security axis | a `pnpm.overrides` block is introduced — a first-time manifest-pattern decision this repo has never made, which is why A1 did not make it unilaterally |
 | D-5 | 10 baseline tables have no `wiki/database/tables` page: `audit_export_jobs`, `materialize_dispatch_outbox`, `tenant_keys`, `tenant_lifecycle_jobs`, `tenant_plans`, `token_dictionary_entries`, `approval_delegations`, `approval_review_verdicts`, `approval_route_stage_selectors`, `release_generations` | `governance-check / db-dictionary-coverage` job | docs axis | all 10 documented; job → tier 1 |
 | D-6 | ~~module §11 tallies disagree with registers~~ | — | — | **CLOSED** — fixed in A1, job is tier 1 |
+| D-13 | `check-test-discipline.sh` reports 13 violations, so `module-boundaries.yml:conformance` is red on every PR today. R1 (raw `set_config('metaldocs.asserted_caps', ...)` instead of the fixture seam) x8, R4 (raw `documents` SQL from approval tests) x4, R3 x1. Found by `verify --profile=fast`; it was not on the inherited scoreboard because nobody had run the job's second step locally. | `bash scripts/check-test-discipline.sh` | test-discipline axis | violations ported to the canonical fixture seam |
 | D-9 | `wiki-tally-check.ps1` check 2 (missing-ADR) passes silently when the module doc omits the "Decisions without ADR link: N" line. 11 of 16 modules omit it, so the check is live for 5. A guard that a doc can opt out of by deleting a line is not a guard. | `wiki-tally-check.ps1:130` `if ($null -ne $adrStated -and ...)` | docs axis | line required in all 16 docs, then the `$null` escape deleted |
 | D-7 | `check-db-bootstrap.ps1` asserts a real, uncovered invariant (baseline ledger marker + 6 critical tables) but is pinned to `docker exec metaldocs-postgres` | script source | ops axis | rewritten against a GH Actions `postgres:16` service, then wired |
 | D-8 | **Nothing anywhere verifies that a backup can be restored.** `run-backup-restore-gate.ps1` is a manual runbook step with no execution log proving a cadence | `wiki/runbooks/backup-restore.md:260-277` | ops axis | scheduled weekly DR drill against disposable CI Postgres with CI-only credentials |
