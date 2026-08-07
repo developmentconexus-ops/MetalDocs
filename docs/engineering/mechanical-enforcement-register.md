@@ -47,6 +47,7 @@ defect this register exists to eliminate.
 | ME-07 authentication build-vs-adopt | [#80](https://github.com/leandrotcawork/MetalDocs/issues/80) |
 | ME-08 MFA is a dashboard, not a control | [#81](https://github.com/leandrotcawork/MetalDocs/issues/81) |
 | ME-09 a kill list is a hand-synced enumeration | [#82](https://github.com/leandrotcawork/MetalDocs/issues/82) |
+| ME-10 tenant-defined roles retire the generated enums | [#83](https://github.com/leandrotcawork/MetalDocs/issues/83) |
 
 ## How to read an entry
 
@@ -328,6 +329,35 @@ mechanism that makes the construct unwritable — never an inventory of its know
 
 ---
 
+## ME-10 — watch for tenant-defined roles; they retire the generated role enums
+
+**Recorded** 2026-08-07 by operator ruling DD-6. **Not a defect** — a decision trigger, in the ME-06
+mold, so the choice is revisited on evidence instead of inertia.
+
+The role vocabulary is **product reference data**: `role_catalog` is the single upstream, the OpenAPI
+`UserRole` / `AreaRole` enums are generated from it, and adding a role is an INSERT plus a spec
+regen, an FE regen and a release. Chosen on merit — in a validated eQMS each tenant-defined role is
+un-validated configuration inside the customer's own CSV package, and the frontend's exhaustiveness
+proof (see the positive template below) only exists because the vocabulary is closed.
+
+**The trigger that flips this:** the first customer requiring their own role vocabulary. At that
+point the industry shape becomes the global maximum — one type, `role_code` a string FK to the
+catalog, product roles merely seeded rows. Kubernetes does not distinguish `cluster-admin` from a
+ClusterRole you wrote; Keycloak realm roles are all data; AWS managed and customer-managed policies
+are the same object. The enum in the contract is the piece none of them has.
+
+**The migration cost, recorded now so it is not discovered later:** `role_code` leaves the enum space,
+`role-vocabulary.ts`'s `satisfies Record<UserRole, …>` guard stops proving anything, the FE must fetch
+the catalog at runtime, PT-BR labels move from code to data, and a role-composition admin UI (compose
+a role from capabilities) becomes a required product feature.
+
+**Related correction, filed here because it is the kind of claim that ages badly:** D3 argument 5
+justified rejecting direct per-user grants partly on "a new role is an INSERT, not a migration." No
+DDL, but a release — the escape valve for a genuine one-off is narrower than the phrasing implies.
+D3's case stands on auditability and reviewability, which are untouched.
+
+---
+
 ## Positive template — what a landed firing mechanism looks like
 
 Recorded because "what good looks like" is easier to copy than to describe, and because the register
@@ -344,3 +374,22 @@ is fixable in one restart, ending in `os.Exit(1)`. Level 2. Two properties worth
 2. **Its ADR states what it does not claim** — that the surface is *exactly the declared one*, not
    that any handler is correct. A guard whose scope is written down cannot be mistaken for a
    stronger one later. ME-02 is what happens when that is left implicit.
+
+**`role-vocabulary.ts`** (`frontend/apps/web/src/lib/iam/role-vocabulary.ts`, F-QA4-2) — the frontend
+role vocabulary, single-sourced from the generated contract types, with every runtime list proved
+against them:
+
+```ts
+const ROLE_LABELS = { … } as const satisfies Record<UserRole, string>;
+```
+
+Miss a role and `tsc` reports the missing property; invent one and `tsc` rejects the excess property.
+Level 3, and 18 files depend on it. Two properties worth copying:
+
+1. **It solves the type-only problem instead of working around it.** Generated OpenAPI enums are
+   type-only, so *some* runtime array has to be written by hand — the design accepts that one literal
+   and makes it undriftable, rather than pretending the hand-written list does not exist.
+2. **It is the reason ME-10 has a cost.** A guard this good is an argument in the design record:
+   DD-6 kept the role vocabulary closed partly because opening it degrades `UserRole` to `string` and
+   this proof silently evaluates to nothing. Knowing what a mechanism buys is what makes trading it
+   away a decision rather than an accident.

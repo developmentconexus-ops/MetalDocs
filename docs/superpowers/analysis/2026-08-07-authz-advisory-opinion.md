@@ -326,8 +326,67 @@ one that works" — should graduate into the defect-class catalog alongside the 
 | DD-2 — `iam_group_roles` junk rows explicit, NOTICE + count | **accepted** |
 | DD-4 — sole-reader lint on `capability_bindings` | **accepted** |
 | DD-4 — dangling-scope FK + retire semantics | **accepted** |
-| DD-3 — send back for restructure (revision-scoped floor) | **operator decision — open** |
-| Role catalog: reference data vs tenant data | **operator decision — open** |
+| DD-3 — send back for restructure (revision-scoped floor) | **accepted 2026-08-07** — see DD-5 below |
+| Role catalog: reference data vs tenant data | **decided 2026-08-07** — see DD-6 below |
 | ME-08 immediate deletion of the coverage endpoint | **operator decision — open** (issue #81) |
 | ME-07 adopt-post-v1 recommendation + vendor split | **recorded**, no decision now (issue #80) |
 | Phantom-control instrumentation defect class | **accepted** for the next catalog pass |
+
+---
+
+## Operator rulings on the two open points (2026-08-07)
+
+### DD-5 — the authorship floor is revision-scoped, not document-scoped
+
+**Supersedes DD-3 as ratified 2026-08-06.** The floor is *read of the revisions the actor authored
+or signed*, never the living document.
+
+The advisor's prong 1 is the reason: keyed on document identity, the floor gave the author of
+revision 1 read access to revision 12 — written by others, after they left the area, at a
+classification they never saw. The eQMS traceability need is about *their own act*, and a
+revision-scoped floor is that act, frozen. A live-document floor was a larger grant wearing the
+justification of a smaller one.
+
+Two consequences, both good:
+- **The D3 contradiction dissolves.** A revision the actor authored is not a per-user ACL row; it is
+  a fact already recorded in revision provenance. "Who can read D?" stays answerable from
+  `capability_bindings` plus a join the evaluator owns — no second grant regime, so **no named ADR
+  exception to D3 is needed**. DD-3's fallback conditions (a)/(b)/(c) are moot.
+- **It composes with soft revocation** (cross-cutting risk 2). Binding history answers "could they
+  read it at the time"; the revision floor answers "can they retrieve what they wrote". Different
+  questions, different instruments, neither faked by the other.
+
+Design constraint carried forward: the floor is still expressed **inside the single evaluator** as a
+relation the policy engine unions. Never a `WHERE created_by` in a list handler — that is how ME-03
+was born.
+
+### DD-6 — the role catalog is product reference data, with two corrections
+
+Roles stay a product-controlled vocabulary. The OpenAPI `UserRole` / `AreaRole` enums remain
+generated, and `role_catalog` becomes the single upstream they are generated *from* — which is
+ME-01's fix and changes nothing about the contract's shape.
+
+**Decided on merit, not on what exists.** Two grounds:
+
+1. **Validated-configuration burden.** In a validated eQMS, every tenant-defined role is
+   un-validated configuration inside the customer's CSV package — the customer must justify their
+   own bundle in their own audit, alone. A product-controlled vocabulary is a compliance asset.
+2. **The frontend guard is real and would be destroyed.** `frontend/apps/web/src/lib/iam/role-vocabulary.ts`
+   single-sources both role types from the generated contract and proves every runtime list against
+   them with `as const satisfies Record<UserRole, …>` — miss a role or invent one and `tsc` fails.
+   18 files depend on it. Under tenant-definable roles the type degrades to `string` and that proof
+   evaluates to nothing. This is a **positive template** in the register's sense and belongs beside
+   `assertSurface`.
+
+**Correction 1 — D3 argument 5 is overstated and must be reworded.** "A new role is an INSERT, not a
+migration" is half true: no DDL, but a spec regen, an FE regen and a **release**. D3's case against
+direct per-user grants stands on auditability and reviewability, which are untouched — but it may not
+lean on a cheapness it does not deliver. The escape valve for a genuine one-off is narrower than
+ratified, and the record must say so.
+
+**Correction 2 — the inversion trigger is recorded** in the register as ME-10, in the ME-06 mold, so
+this is revisited on evidence rather than by inertia. The trigger is the first customer requiring
+their own role vocabulary; at that point the industry shape (one type, `role_code` as a string FK,
+product roles merely seeded rows — Kubernetes `cluster-admin`, Keycloak realm roles, AWS managed
+policies) becomes the global maximum and the migration cost includes a role-composition admin UI and
+labels moving from code to data.
