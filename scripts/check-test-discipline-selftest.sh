@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Self-test for check-test-discipline.sh. Proves the checker reads code and
-# ignores Go line comments. Registered in tools/verify as `test-discipline-selftest`
-# is NOT part of this task — this runs standalone and from Task 1's commit only.
+# ignores Go line comments. Registered in tools/verify as
+# `test-discipline-selftest` (tools/verify/registry.go), in profiles fast/pr/full.
 set -uo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

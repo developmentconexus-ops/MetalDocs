@@ -185,6 +185,14 @@ var checks = []Check{
 		Paths:    []string{"internal/", "tests/", "apps/"},
 		CIJob:    "module-boundaries.yml:conformance",
 	},
+	{
+		ID:       "test-discipline-selftest",
+		Desc:     "check-test-discipline.sh reads code and ignores Go line comments",
+		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-test-discipline-selftest.sh"},
+		Paths:    []string{"scripts/check-test-discipline.sh", "scripts/check-test-discipline-selftest.sh", "scripts/testdata/test-discipline/"},
+		CIJob:    "module-boundaries.yml:conformance",
+	},
 
 	// ---- Governance -------------------------------------------------------
 	{
