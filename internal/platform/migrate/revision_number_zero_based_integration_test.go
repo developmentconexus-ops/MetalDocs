@@ -4,28 +4,24 @@ package migrate
 
 import (
 	"context"
-	"database/sql"
-	"os"
-	"strings"
 	"testing"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+
+	"metaldocs/tests/integration/testdb"
 )
 
+// TestDocumentsRevisionNumberZeroBasedShiftAvoidsUniqueCollisions runs against
+// a reset-safe leased clone from the canonical testdb factory (ADR 0034), NOT
+// a raw sql.Open against the shared dev database. The prior body read
+// DATABASE_URL/METALDOCS_DATABASE_URL directly and skipped-as-green when
+// unset — the cluster-4 framework bypass. testdb.Open owns t.Helper, the
+// leased-DB reset, cleanup, and a fail-loud ping. The test itself only ever
+// touched a session-local TEMP TABLE, so this migration changes nothing about
+// what schema state the assertions depend on — it only fixes how the
+// connection is obtained.
 func TestDocumentsRevisionNumberZeroBasedShiftAvoidsUniqueCollisions(t *testing.T) {
-	dsn := strings.TrimSpace(os.Getenv("DATABASE_URL"))
-	if dsn == "" {
-		dsn = strings.TrimSpace(os.Getenv("METALDOCS_DATABASE_URL"))
-	}
-	if dsn == "" {
-		t.Skip("DATABASE_URL or METALDOCS_DATABASE_URL is not set")
-	}
-
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	defer db.Close()
+	db, _ := testdb.Open(t)
 
 	ctx := context.Background()
 	tx, err := db.BeginTx(ctx, nil)

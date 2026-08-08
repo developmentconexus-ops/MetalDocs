@@ -7,40 +7,37 @@ package signature
 // Verifies that RecordFailure uses only timestamptz parameters — no time.Duration
 // binding — so the UPSERT succeeds against a real Postgres instance.
 //
-// Run:
-//   DATABASE_URL=postgres://... go test -tags integration -run TestPostgresLimiter_Live ./internal/modules/approval/infrastructure/signature/
-//   METALDOCS_DATABASE_URL=postgres://... go test -tags integration -run TestPostgresLimiter_Live ./internal/modules/approval/infrastructure/signature/
+// Run (any go test invocation with the integration tag — the database comes from
+// the canonical testdb factory, ADR 0034; METALDOCS_DATABASE_URL points at the
+// Postgres server it leases clones from, not at a pre-built database):
 //
-// The test creates a throwaway actor UUID and deletes it in cleanup.
+//	METALDOCS_DATABASE_URL=postgres://... go test -tags integration -run TestPostgresLimiter_Live ./internal/modules/approval/infrastructure/signature/
+//
+// The test creates a throwaway actor UUID and deletes it in cleanup. That
+// uniqueness/cleanup is kept even though it runs on a private leased clone (no
+// other writer shares it): it costs nothing and keeps the test correct if it is
+// ever run twice against the same lease within one process.
 
 import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
-	"strings"
 	"testing"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+
+	"metaldocs/tests/integration/testdb"
 )
 
+// testLiveDB returns a reset-safe leased clone from the canonical testdb
+// factory (ADR 0034), NOT a raw sql.Open against the shared dev database. The
+// prior body read DATABASE_URL/METALDOCS_DATABASE_URL directly and
+// skipped-as-green when unset — the cluster-4 framework bypass. testdb.Open
+// owns t.Helper, the leased-DB reset, cleanup, and a fail-loud ping.
 func testLiveDB(t *testing.T) *sql.DB {
 	t.Helper()
-	dsn := strings.TrimSpace(os.Getenv("DATABASE_URL"))
-	if dsn == "" {
-		dsn = strings.TrimSpace(os.Getenv("METALDOCS_DATABASE_URL"))
-	}
-	if dsn == "" {
-		t.Skip("no DATABASE_URL or METALDOCS_DATABASE_URL set — skipping live DB probe")
-	}
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatalf("sql.Open(pgx): %v", err)
-	}
-	if err := db.PingContext(context.Background()); err != nil {
-		t.Fatalf("db.Ping: %v", err)
-	}
+	db, _ := testdb.Open(t)
 	return db
 }
 
