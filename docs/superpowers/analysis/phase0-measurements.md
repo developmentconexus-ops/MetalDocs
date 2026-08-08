@@ -16,7 +16,7 @@ before trusting any golangci-lint count in this repo again.
 
 ## 1. golangci-lint whole-tree
 
-`.github/workflows/golangci-lint.yml:24` sets `only-new-issues: true`, so CI has
+`.github/workflows/golangci-lint.yml:26` sets `only-new-issues: true`, so CI has
 never reported the tree's absolute lint state. Measured with the CI-pinned
 version at both the CI's scoped path list and the true whole tree, so the
 restructure can see what exists outside the workflow's current scope too.
@@ -57,7 +57,7 @@ go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.0 run \
   --output.text.path=stdout \
   ./apps/api/... ./internal/... ./tools/...
 ```
-(Matches `golangci-lint.yml:28` path list, plus the two cap-disabling flags
+(Matches `golangci-lint.yml:27` path list, plus the two cap-disabling flags
 and `--timeout` — see Timeout note below.)
 
 **Total findings:** **1078** (previously reported: 214 — a 5.0x undercount)
@@ -386,6 +386,31 @@ registry-defined command at all).
 
 ### Methodology: the aggregate run itself is not trustworthy on this box
 
+**Correction (final whole-branch review, 2026-08-08):** the two claims below
+— that the aggregate run died without completing, and that `gofmt`,
+`adr-status`, `test-discipline`, `css-token-discipline`, and
+`eigenpal-selector-pin` are parallelism-flaky — do not reproduce. An
+independent `--profile=full` run completed **all 29 checks** with a correct
+exit code (`26 passed, 2 failed, 1 skipped`, exit 1); the runner did not die,
+and no `EXITCODE` line was missing. All five allegedly flaky checks **passed**
+in that parallel run — slower under contention (as expected at
+`parallelism=6`), never failing. The most economical explanation for the
+original symptom (no process, no exit code, *and* five sub-second bogus
+failures, all at once) is one cause, not two: the background task harness
+that ran the original measurement killed the process group mid-run, which
+both truncated the output stream and left those five checks' subprocesses
+reaped before they could report their real result. It is not a `tools/verify`
+defect and it is not a Windows/git-bash concurrency defect in those five
+checks. The five checks are exonerated; the runner is not implicated. The
+real parallelism defect this branch has is the `docx-v2-test`/`fe-test`
+suite overlap (see the final review's Critical 2, fixed on this branch by
+scoping `build:docx-v2`/`test:docx-v2`/`typecheck:docx-v2` to the docx
+workspaces only) — that one *was* reproduced with a same-commit pass/fail
+split, not inferred from a symptom that could have two explanations.
+
+The paragraphs below are preserved as the original (now-corrected) account
+for the record.
+
 `go run ./tools/verify --profile=full` was started in the background and
 produced 16 of 29 check lines, then stopped producing output entirely — no
 further checks completed, no `EXITCODE` line was ever written, and no `go`,
@@ -426,7 +451,7 @@ re-run alone.
 
 | Check | Failure | Owner module |
 |---|---|---|
-| `go-test-unit` | `TestHGCrossModule_Negative_SubpackageSameModule` (tools/cilint/internal/analyzers) fails: the test asserts that an intra-module `documents/approval ⊂ documents` read must NOT be flagged, but the analyzer now flags it (1 finding). This is very likely a fallout of ADR 0082 (approval promoted from a nested exception under `documents` to its own top-level module, landed on this branch): the negative-test fixture still encodes the pre-ADR-0082 subpackage relationship, so it is asserting a containment that is no longer architecturally true. Whole run also failed with this as the only Go-side failure. | tools/cilint (test fixture), approval (ADR 0082 fallout) |
+| `go-test-unit` | **CLOSED by `f19b38ac`.** `TestHGCrossModule_Negative_SubpackageSameModule` (tools/cilint/internal/analyzers) failed: the test asserted that an intra-module `documents/approval ⊂ documents` read must NOT be flagged, but the analyzer now flags it (1 finding) — fallout of ADR 0082 (approval promoted from a nested exception under `documents` to its own top-level module, landed on this branch). `f19b38ac` re-expressed the same subpackage guard against the corrected ownership (a file in `approval/application` reading approval's own `approval_instances`), same assertion, same scenario, keyed to the module that actually owns the table now. `go test ./...` is green. | tools/cilint (test fixture), approval (ADR 0082 fallout) |
 | `go-test-integration` | See its own row below — could not execute its registry-defined command at all (missing cgo), so no real-failure verdict is available from the exact check. The diagnostic no-race substitute (not the registry command — see that row) surfaced 14 failing packages; of those, `internal/platform/idempotency`'s `TestMiddleware_Conflict_Returns422` / `TestMiddleware_SameKeyDifferentResourcePath_Returns422` (idempotency conflict returns HTTP 409, test wants 422) and `apps/api/cmd/metaldocs-api`'s `TestNoDeclaredOperationIsUnreachable` (a self-reporting test that intentionally fails while `metaldocs.role_capabilities` seeds `area_admin`/`qms_admin`/`signer` on capabilities no assignable role can hold — its own message calls this "pre-existing") read as real code-level findings, not environment noise. The remaining ~11 diagnostic failures cluster at suspiciously uniform ~60s durations (60.05s–61.49s) across otherwise-unrelated packages (`tests/integration/{audit,controlleddocuments,documents,iam,scenarios,templates,tenantdata}`, `internal/modules/{approval/infrastructure,iam/authz,templates/infrastructure}`) — consistent with resource/connection-pool contention from running many DB-heavy packages at Go's default test parallelism against one shared local Postgres container, not 11 independent code defects. **Not confirmed either way** — isolating each would require re-running it alone against the DB, which this task's time budget did not cover. Flagged, not asserted. | approval, iam, templates, tenantdata, platform/idempotency, platform/bootstrap (mixed; see next section for the bootstrap ones, which are environment not code) |
 
 ### Infrastructure skips — the false-green class
@@ -485,11 +510,10 @@ exercise the suite. Before this can block a PR:
    discovering this a second time, in CI, the way it was discovered here, is
    the same failure mode the task brief opened with — just for a different
    missing dependency.
-2. **The one real, confirmed code-level failure this measurement surfaced**
-   (`go-test-unit`'s `TestHGCrossModule_Negative_SubpackageSameModule`) must
-   be fixed or the fixture updated for ADR 0082's approval-module promotion
-   before Phase 2 adds `ci.yml`, or every PR touching anything under
-   `internal/` inherits a red `go-test-unit` from day one.
+2. **CLOSED.** The one real, confirmed code-level failure this measurement
+   surfaced (`go-test-unit`'s `TestHGCrossModule_Negative_SubpackageSameModule`)
+   was fixed by `f19b38ac` (fixture updated for ADR 0082's approval-module
+   promotion) before this branch's last commit. `go-test-unit` is green.
 3. **The idempotency status-code mismatch and the pre-existing
    unreachable-capability finding** (both surfaced only via the no-race
    diagnostic substitute, not the registry's own `-race` command) need a
