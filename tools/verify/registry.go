@@ -267,7 +267,7 @@ var checks = []Check{
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"pnpm", "run", "typecheck:docx-v2"},
 		Paths:    []string{"apps/docx-renderer/", "packages/"},
-		CIJob:    "ci.yml:node",
+		CIJob:    "docx-renderer.yml:node",
 	},
 	{
 		ID:       "docx-v2-build",
@@ -275,14 +275,14 @@ var checks = []Check{
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"pnpm", "run", "build:docx-v2"},
 		Paths:    []string{"apps/docx-renderer/", "packages/"},
-		CIJob:    "ci.yml:node",
+		CIJob:    "docx-renderer.yml:node",
 	},
 	{
 		ID:   "docx-v2-test",
 		Desc: "docx-v2 unit tests",
 		// Depends on docx-v2-build having already run: bundle-guard.test.ts
 		// reads dist/meta.json. The registry has no dependency edges, so CI
-		// enforces the order by using two verify invocations (see ci.yml:node)
+		// enforces the order by using two verify invocations (see docx-renderer.yml:node)
 		// and a local `--profile=pr` can still race. Recorded as D-14.
 		//
 		// D-14 UPDATE (final review, Critical 2): the npm scripts this argv
@@ -301,7 +301,7 @@ var checks = []Check{
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"pnpm", "run", "test:docx-v2"},
 		Paths:    []string{"apps/docx-renderer/", "packages/"},
-		CIJob:    "ci.yml:node",
+		CIJob:    "docx-renderer.yml:node",
 	},
 
 	// ---- Tests ------------------------------------------------------------

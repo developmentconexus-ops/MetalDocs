@@ -1,51 +1,52 @@
-name: docx-renderer CI
-
-# No `paths:` filter, deliberately. A required status check is matched by NAME,
-# and a job that never runs never reports — GitHub then counts it as pending
-# forever and the PR can never merge. So a path-filtered workflow is structurally
-# ineligible to be required, which means its checks gate nothing. Diff-scoping
-# belongs one level down, in `verify --profile=changed`, where the job still
-# always reports. Full rationale in api-contract.yml and A1 ledger §1b.
-#
-# This one matters more than most: node runs bundle-guard.test.ts, which asserts
-# the docx-renderer server bundle stays framework-free. That invariant is broken
-# by adding a dependency, and the old filter did not match package.json or the
-# lockfile — so the exact change most likely to break it was the one change that
-# did not run the guard.
+name: CI
 on:
   pull_request:
-  push:
     branches: [main]
 
-jobs:
-  node:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with: { node-version-file: .nvmrc, cache: pnpm }
-      - uses: actions/setup-go@v5
-        with: { go-version-file: go.mod, cache: true }
-      - run: pnpm install --frozen-lockfile
-      # Check set for this job lives in tools/verify/registry.go
-      # (docx-v2-typecheck, docx-v2-build, docx-v2-test) — see CIJob:
-      # "ci.yml:node".
-      #
-      # TWO invocations, and the order matters. docx-v2-test contains
-      # bundle-guard.test.ts, which reads dist/meta.json to assert the server
-      # bundle is framework-free — so it consumes the build's output. The
-      # build used to run AFTER the tests, which meant the guard could only
-      # ever fail ("dist/meta.json missing"). verify runs the checks within a
-      # single invocation concurrently, so the dependency is expressed by
-      # splitting the invocation rather than by ordering inside one.
-      - run: go run ./tools/verify --only=docx-v2-typecheck,docx-v2-build
-      - run: go run ./tools/verify --only=docx-v2-test
+# No trigger-level paths:. A path filter at the trigger makes the workflow not
+# run at all, which leaves a required context permanently pending and blocks
+# the merge. Filtering happens per job, via the changes job below, so every
+# job still reports a result.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# The `go` job that used to live here ran `go build ./...` plus `go test` over
-# seven hand-listed packages. Every one of them is already covered by
-# test-smoke.yml's `unit` job, which runs verify --only=go-build,go-test-unit —
-# and go-test-unit is `go test ./...`, a strict superset of any package list.
-# Removed as duplicated compute on every PR, not to reach green: coverage is
-# unchanged, and dropping the filter above means `node` now runs on every PR,
-# which is a net increase in what this workflow gates.
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.filter.outputs.go }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      docx: ${{ steps.filter.outputs.docx }}
+      contract: ${{ steps.filter.outputs.contract }}
+      db: ${{ steps.filter.outputs.db }}
+      workflows: ${{ steps.filter.outputs.workflows }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: filter
+        with:
+          filters: |
+            go:
+              - '**/*.go'
+              - 'go.mod'
+              - 'go.sum'
+              - 'tools/**'
+              - 'scripts/**'
+            frontend:
+              - 'frontend/**'
+            docx:
+              - 'apps/docx-renderer/**'
+              - 'packages/docx-editor/**'
+            contract:
+              - 'api/openapi/**'
+              - 'internal/modules/*/delivery/http/**'
+            db:
+              - 'db/**'
+            workflows:
+              - '.github/workflows/**'
+              - '.github/rulesets/**'
