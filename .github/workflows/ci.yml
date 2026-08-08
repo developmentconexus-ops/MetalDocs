@@ -59,7 +59,10 @@ jobs:
       # css-token-discipline, eigenpal-selector-pin, fe-typecheck, fe-test,
       # docx-v2-build/test, go-test-unit, adr-status, wiki-tally,
       # db-dictionary, migration-gapless, governance-diff-rules,
-      # invariant-coverage-map, req-trace(-selftest), required-gate-selftest.
+      # invariant-coverage-map, req-trace(-selftest), required-gate-selftest,
+      # verify-audit (registry.go's "Anti-drift" section — runs `verify
+      # --audit` itself, so this job's own drift against the registry is
+      # gated on every PR, not just when a human types it).
       # A check with no declared Paths (matchesPaths' fail-closed default)
       # always runs. golangci-lint is not a registry check — it stays a
       # GitHub Action step in the lint-go job below, because it needs the

@@ -521,4 +521,23 @@ var checks = []Check{
 		Paths:    []string{".github/workflows/ci.yml", "scripts/check-required-gate.sh", "scripts/testdata/required-gate/"},
 		CIJob:    "ci.yml:verify",
 	},
+
+	// ---- Anti-drift ---------------------------------------------------------
+	{
+		ID:   "verify-audit",
+		Desc: "registry vs CI workflow YAML cross-check (--audit) reports 0 findings",
+		// R4: --audit was this branch's central anti-drift claim and was wired
+		// into no workflow — a detector nothing runs detects nothing. This
+		// entry is what runs it. It has to be registered like any other check
+		// (Argv shells back out to `verify --audit` as a subprocess) rather
+		// than special-cased, or it would repeat the exact defect it exists to
+		// close: a control that only fires when a human remembers to type it.
+		//
+		// No Paths: the audit's correctness depends on the whole registry and
+		// every workflow file, not a scoped subset — same reasoning as
+		// governance-diff-rules above.
+		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
+		Argv:     []string{"go", "run", "./tools/verify", "--audit"},
+		CIJob:    "ci.yml:verify",
+	},
 }
