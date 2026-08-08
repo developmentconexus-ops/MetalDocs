@@ -1,5 +1,5 @@
 {
-  "_doc": "This file is TRANSITIONAL. It is a record of known lint debt as of the last --update-baseline run, not a permission slip to add more of it — new violations still fail CI. The global-maximum end state is an empty entries array (all analyzers clean with no baseline needed at all). The baseline may only ever shrink: every entry must eventually be remediated and removed, never grown to accommodate new debt. If you are here to add an entry for a NEW finding, stop — fix the finding instead. Deleting milestone: NOT YET SCHEDULED — this file is a labelled local maximum pending one.",
+  "_doc": "This file is TRANSITIONAL. It is a record of known lint debt as of the last --update-baseline run, not a permission slip to add more of it — new violations still fail CI. The global-maximum end state is an empty entries array (all analyzers clean with no baseline needed at all). The baseline may only ever shrink: every entry must eventually be remediated and removed, never grown to accommodate new debt. If you are here to add an entry for a NEW finding, stop — fix the finding instead.",
   "entries": [
     {
       "analyzer": "hgcrossmodule",
@@ -139,6 +139,14 @@
     },
     {
       "analyzer": "hgcrossmodule",
+      "file": "internal/modules/documents/infrastructure/repository.go",
+      "message": "module \"documents\" reads \"approval\"'s base table \"release_generations\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
+      "count": 1,
+      "reason": "GetDocument (repository.go:302-336) LEFT JOIN LATERAL over public.release_generations to fold the ADR 0085 Stage C readiness-hold projection (hold_reason/hold_detail/released_at/last_evaluated_at) into the single document-detail read model, avoiding a second handler-side round-trip. release_generations was absent from the census entirely (unrecorded, not mis-owned) until this fix revealed it — genuine cross-module debt now that the map covers the table. Not exempted — recorded as debt per this task's binding resolution (do not launder a newly revealed violation into hgExempt).",
+      "owner": "unclassified — no owner identified as of 2026-08-08"
+    },
+    {
+      "analyzer": "hgcrossmodule",
       "file": "internal/modules/documents/infrastructure/resolver_readers.go",
       "message": "module \"documents\" reads \"approval\"'s base table \"approval_instances\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
       "count": 2,
@@ -166,7 +174,7 @@
       "file": "internal/modules/iam/application/tenant_lifecycle_service.go",
       "message": "module \"iam\" reads \"approval\"'s base table \"governance_events\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
       "count": 1,
-      "reason": "NEWLY REVEALED by this task's census fix (ADR 0082 flip; governance_events also moved documents->approval per this task, since its live INSERT site is approval/application/events.go), not new debt: tenant_lifecycle_service.go:535 DELETE FROM public.governance_events WHERE tenant_id=$1 as the final sweep step of tenant crypto-shred erasure. Was invisible while governance_events was mis-owned to documents; genuine cross-module write now that approval is the real owner. Not exempted — recorded as debt per this task's binding resolution.",
+      "reason": "NEWLY REVEALED by this task's census fix (ADR 0082 flip; governance_events also moved documents-\u003eapproval per this task, since its live INSERT site is approval/application/events.go), not new debt: tenant_lifecycle_service.go:535 DELETE FROM public.governance_events WHERE tenant_id=$1 as the final sweep step of tenant crypto-shred erasure. Was invisible while governance_events was mis-owned to documents; genuine cross-module write now that approval is the real owner. Not exempted — recorded as debt per this task's binding resolution.",
       "owner": "unclassified — no owner identified as of 2026-08-07"
     },
     {

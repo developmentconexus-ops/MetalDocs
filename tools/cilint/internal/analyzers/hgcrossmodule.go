@@ -21,6 +21,17 @@ const hgCrossModuleAllow = "//cilint:allow-hgcrossmodule"
 // This is the data ADR-0039 D1 (base table = violation) classifies against.
 // Kept in sync with the ADR that defines the module list — when an ADR
 // promotes or merges a module, this map is part of that ADR's diff.
+//
+// TRANSITIONAL — hand-synced enumeration, the repo's known meta-defect (see
+// design §9, docs/superpowers/specs/2026-08-07-ci-restructure-design.md). This
+// map is a local maximum: ownership is asserted here by hand instead of
+// derived from a single source of truth. The global maximum is ownership
+// derived from a single source — a module manifest, schema comments, or a
+// drift test that fails when a table appears in SQL under a module that
+// neither owns it nor is exempted. The milestone that deletes this map is
+// M3-final: cross-module SQL closure (design §8.1), whose deliverable (1) is
+// exactly re-deriving this census and turning it into a mechanism rather than
+// a hand-maintained list.
 var hgOwnerByTable = map[string]string{
 	// controlleddocuments
 	"controlled_documents":            "controlleddocuments",
@@ -46,12 +57,27 @@ var hgOwnerByTable = map[string]string{
 	"approval_stage_instances": "approval",
 	"approval_signoffs":        "approval",
 	"auth_failure_counters":    "approval", // approval's signature reauth limiter
-	// governance_events is written exclusively by approval's SQLEmitter
+	// governance_events is written by approval's SQLEmitter
 	// (internal/modules/approval/application/events.go:84 — INSERT INTO
 	// governance_events); it was mis-census'd to documents pre-0082 alongside
-	// the other approval tables. Verified via grep for the live INSERT site,
-	// not by the ADR 0082 module-promotion text alone.
+	// the other approval tables. Verified via grep for the live INSERT sites,
+	// not by the ADR 0082 module-promotion text alone — internal/platform/
+	// tripwire/render.go:154 also inserts into it, so approval is the primary
+	// owner but not the sole writer.
 	"governance_events": "approval",
+	// release_generations, approval_delegations, approval_review_verdicts, and
+	// approval_route_stage_selectors were absent from this census entirely
+	// (not mis-owned, unrecorded) until this fix. All four are approval-owned:
+	// release_generations backs the ADR 0085 release-hold state machine
+	// (wiki/database/tables/release_generations.md), and the other three are
+	// approval's own delegation/verdict/selector tables (release_facts.go,
+	// review_verdict_service.go, tenant_data_port.go). Their absence let
+	// documents/infrastructure/repository.go:330's raw
+	// `FROM release_generations rg` read go undetected as cross-module.
+	"release_generations":            "approval",
+	"approval_delegations":           "approval",
+	"approval_review_verdicts":       "approval",
+	"approval_route_stage_selectors": "approval",
 	// taxonomy
 	"document_process_areas": "taxonomy",
 	"document_profiles":      "taxonomy",
