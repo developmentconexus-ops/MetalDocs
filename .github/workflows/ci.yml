@@ -42,16 +42,31 @@ jobs:
       # PR's base SHA stays a workflow prerequisite rather than becoming part
       # of the check itself. Copied verbatim from this file's prior
       # lint-contract job.
+      # Pinned, not @latest: an unpinned tool version can change what this
+      # gate accepts without a diff anywhere in this repo to review — the
+      # exact drift R5 existed to close for the Action tags in
+      # docx-renderer.yml. v1.28.0 is the latest release as of this pin
+      # (2026-08-08); bump deliberately, not implicitly.
       - name: Install oasdiff
-        run: go install github.com/oasdiff/oasdiff@latest
+        run: go install github.com/oasdiff/oasdiff@v1.28.0
       # check-governance.ps1 (governance-diff-rules) diffs against
       # origin/main, and --changed's default --base=origin/main needs the
-      # same local ref. Copied verbatim from this file's prior governance job.
+      # same local ref. Copied verbatim from this file's prior governance job,
+      # minus `--depth=1`: fetch-depth: 0 above already made this a complete
+      # clone (git rev-parse --is-shallow-repository is false right after
+      # checkout), and a *shallow* fetch against a complete repo still writes
+      # .git/shallow — reproduced locally: full clone -> false ->
+      # `git fetch origin main --depth=1` -> true. That flips every
+      # needsGitDepth check (governance-diff-rules has no Paths, so it is
+      # selected on every PR; req-trace and migration-gapless too) to SKIP,
+      # and --require-infra turns SKIP into FAIL, so `verify` failed on every
+      # PR before this fix. Dropping `--depth=1` keeps the fetch (still needed
+      # to populate the ref/SHA locally) without re-introducing a depth limit.
       - name: Fetch base ref
-        run: git fetch origin ${{ github.base_ref }} --depth=1
+        run: git fetch origin ${{ github.base_ref }}
       - name: Materialize base-branch spec
         run: |
-          git fetch origin "${{ github.event.pull_request.base.sha }}" --depth=1
+          git fetch origin "${{ github.event.pull_request.base.sha }}"
           git show "${{ github.event.pull_request.base.sha }}:api/openapi/v1/openapi.yaml" > /tmp/openapi.base.yaml
       # Every registry check whose declared Paths the diff touches — gofmt,
       # go vet, cilint, staticcheck, module-boundaries, test-discipline,
@@ -107,8 +122,14 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      # Same fix as the `verify` job's "Fetch base ref" step above, same
+      # reason: `--depth=1` against an already-complete (fetch-depth: 0)
+      # clone writes .git/shallow, which trips go-test-integration's own
+      # needsGitDepth-adjacent consumers indirectly (a shallow tree here is
+      # still a lie about what was checked out) even though this job's own
+      # check doesn't declare needsGitDepth itself.
       - name: Fetch base ref
-        run: git fetch origin ${{ github.base_ref }} --depth=1
+        run: git fetch origin ${{ github.base_ref }}
       # --require-infra is what makes this job's green mean anything: without
       # it, an unset METALDOCS_DATABASE_URL yields SKIP and the job exits 0
       # over zero executed integration tests. --changed diff-scopes the
@@ -146,8 +167,19 @@ jobs:
           fail-build: true
           severity-cutoff: high
           cache-db: true
+      # A fork PR's GITHUB_TOKEN is forced read-only by GitHub regardless of
+      # what `permissions:` above requests — `security-events: write` is
+      # silently downgraded, and upload-sarif 403s. Left unconditional, that
+      # 403 fails this step (and therefore the job) for every outside
+      # contributor on this public repo, for a reason that has nothing to do
+      # with whether the scan actually found anything: `scan`'s own
+      # `fail-build: true` already fails the job on real findings, on its
+      # own step, independent of this one. So the extra clause below only
+      # skips the *upload* on a fork PR — the scan itself still runs and
+      # still gates on findings for forks exactly as it does for same-repo
+      # PRs; only the Security-tab SARIF artifact is same-repo-only.
       - uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
-        if: always() && steps.scan.outputs.sarif != ''
+        if: always() && steps.scan.outputs.sarif != '' && github.event.pull_request.head.repo.full_name == github.repository
         with:
           sarif_file: ${{ steps.scan.outputs.sarif }}
 
@@ -165,6 +197,18 @@ jobs:
       # instruction is "Lint should capture it no bypass, fallback only to
       # show green I want to catch the erros" — a continue-on-error on a
       # lint step is precisely that fallback, so it is not present here.
+      #
+      # TRANSITIONAL (CLAUDE.md "Global Maximum, Not Local Maximum"):
+      # only-new-issues: true is a local maximum, not the intended shape.
+      # Whole-tree golangci-lint reports 1078 findings at this job's
+      # configured scope (1173 across the whole tree) — spec §11.1 — so
+      # dropping the diff-scope while this job blocks would red every PR on
+      # pre-existing debt, not on what the PR introduced. The global-maximum
+      # structure is spec §4.6: golangci-lint as the single Go lint umbrella,
+      # whole-tree, blocking, `only-new-issues` deleted. The milestone that
+      # deletes this comment is the golangci-lint backlog burn-down (plan
+      # docs/superpowers/plans/2026-08-08-ci-phases-1-5.md §"Phase 5 Task 12,
+      # Step 4"), unscheduled as of 2026-08-08.
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: v2.11

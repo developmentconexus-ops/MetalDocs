@@ -44,7 +44,13 @@ jobs:
       # docx-v2-build), specifically because running it anyway is how a
       # stale dist/meta.json from an earlier build used to pass the guard
       # without re-validating current source.
-      - run: go run ./tools/verify --only=docx-v2-typecheck,docx-v2-build,docx-v2-test
+      # --require-infra: without it, a missing pnpm/node (or any other
+      # missing tool on Argv[0]) reports SKIP and this job exits 0 over zero
+      # executed checks — the exact hole --require-infra exists to close, and
+      # this job's checks are why docx-renderer.yml matters (bundle-guard.test.ts
+      # is what asserts the server bundle stays framework-free; see this
+      # file's header comment).
+      - run: go run ./tools/verify --require-infra --only=docx-v2-typecheck,docx-v2-build,docx-v2-test
 
 # The `go` job that used to live here ran `go build ./...` plus `go test` over
 # seven hand-listed packages. Every one of them is already covered by
