@@ -146,19 +146,46 @@ func TestSelectChecksKeepsPathlessCheckUnderChanged(t *testing.T) {
 }
 
 // --profile=changed must keep working exactly as documented, with no
-// --changed flag needed — it already implies scoping.
-func TestProfileChangedStillWorksWithoutFlag(t *testing.T) {
-	t.Setenv("GITHUB_EVENT_NAME", "pull_request")
-	selected, scoped, err := selectChecks(ProfileChanged, "", "HEAD", false)
+// --changed flag needed: it resolves to the `pr` check set and implies
+// scoping (scoped=true) on its own.
+//
+// The prior version of this test called selectChecks(ProfileChanged, "",
+// "HEAD", false) on a `pull_request` event, which resolves to
+// `git diff --name-only HEAD` — a diff against the WORKING TREE, not a
+// commit — then asserted no selected check had declared Paths (i.e. the
+// diff was empty). That asserts the developer's tree is clean: it fails for
+// any uncommitted change to a Paths-scoped file, which is exactly the state
+// a developer is in while running `go run ./tools/verify`. It was asserting
+// mutable external state, not the behaviour --profile=changed actually
+// promises.
+//
+// filterByChanged (main.go:268) is the pure half of that behaviour and is
+// already covered directly, above (TestFilterByChanged*). What was missing
+// is proof that --profile=changed reaches that pure function via the same
+// composition as `pr` + --changed, with no flag needed. This test proves
+// that half deterministically, by taking the non-PR fallback branch of
+// scopeToChanged (TestScopeToChangedFallsBackOutsidePR below exercises the
+// same branch): outside a pull request the diff step is skipped entirely
+// and the input selection passes through unfiltered, so the only things
+// left to assert are exactly the two properties --profile=changed must
+// have regardless of git state — it resolves to the `pr` set, and it
+// implies scoped=true — without ever reading the working tree.
+func TestProfileChangedResolvesToPRSetAndImpliesScoping(t *testing.T) {
+	t.Setenv("GITHUB_EVENT_NAME", "push")
+	selected, scoped, err := selectChecks(ProfileChanged, "", "irrelevant-on-non-pr-fallback", false)
 	if err != nil {
 		t.Fatalf("selectChecks: %v", err)
 	}
 	if !scoped {
 		t.Fatal("profile=changed must imply scoping even without --changed")
 	}
-	for _, c := range selected {
-		if len(c.Paths) > 0 {
-			t.Errorf("check %s has declared Paths but the diff is empty; it should have been filtered out", c.ID)
+	want := selectByProfile(ProfilePR)
+	if len(selected) != len(want) {
+		t.Fatalf("profile=changed must resolve to the `pr` check set before diff-scoping is applied, got %d checks, want %d (the `pr` set)", len(selected), len(want))
+	}
+	for i, c := range selected {
+		if c.ID != want[i].ID {
+			t.Fatalf("profile=changed's resolved set diverges from `pr` at index %d: got %s, want %s", i, c.ID, want[i].ID)
 		}
 	}
 }

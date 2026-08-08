@@ -151,16 +151,26 @@ var checks = []Check{
 		Desc:     "PATH-BASE-PREFIX on the v1 spec",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "./scripts/api-lint", "-only", "PATH-BASE-PREFIX", "api/openapi/v1/openapi.yaml"},
-		Paths:    []string{"api/openapi/"},
-		CIJob:    "ci.yml:verify",
+		// scripts/api-lint/ is the check's own tool: api-lint-strict only lints
+		// api/openapi/v1/openapi.yaml, so this check is the SOLE gate on
+		// internal-e2e.yaml's base-prefix rule (see the sibling entry below) —
+		// without scripts/api-lint/ here, a PR neutering PATH-BASE-PREFIX
+		// inside the tool while touching no api/openapi/ file selects zero
+		// checks over the spec that most needs catching (whole-branch review
+		// C2 class).
+		Paths: []string{"api/openapi/", "scripts/api-lint/"},
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:       "api-lint-base-path-e2e",
 		Desc:     "PATH-BASE-PREFIX on the internal-e2e spec",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "./scripts/api-lint", "-only", "PATH-BASE-PREFIX", "api/openapi/internal-e2e.yaml"},
-		Paths:    []string{"api/openapi/"},
-		CIJob:    "ci.yml:verify",
+		// scripts/api-lint/ is the check's own tool — see the comment on
+		// api-lint-base-path-v1 above; this is the sole gate on
+		// internal-e2e.yaml's base-prefix rule, so the gap was worse here.
+		Paths: []string{"api/openapi/", "scripts/api-lint/"},
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:       "api-lint-strict",
@@ -280,8 +290,10 @@ var checks = []Check{
 		Desc:     "new tests use the canonical framework for their class",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-test-discipline.sh"},
-		Paths:    []string{"internal/", "tests/", "apps/"},
-		CIJob:    "ci.yml:verify",
+		// scripts/check-test-discipline.sh is the check's own definition
+		// (whole-branch review C2 class).
+		Paths: []string{"internal/", "tests/", "apps/", "scripts/check-test-discipline.sh"},
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:       "test-discipline-selftest",
@@ -419,8 +431,13 @@ var checks = []Check{
 		Desc:     "eslint across the workspace, including the eigenpal import boundary",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"pnpm", "run", "lint"},
-		Paths:    []string{"frontend/", "packages/", "apps/", "eslint.config.mjs", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc"},
-		CIJob:    "ci.yml:verify",
+		// package.json (root) is where the "lint" script this check invokes
+		// is defined — without it here, a PR rewriting "lint" to a no-op
+		// while touching no frontend/, packages/, apps/, or config file
+		// disarms eslint and selects nothing that would notice (whole-branch
+		// review C2 class).
+		Paths: []string{"frontend/", "packages/", "apps/", "eslint.config.mjs", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc"},
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:       "css-token-discipline",
@@ -573,8 +590,16 @@ var checks = []Check{
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "./scripts/req-trace"},
 		Needs:    []string{needsGitDepth},
-		Paths:    []string{"wiki/architecture/", "internal/", "apps/"},
-		CIJob:    "ci.yml:verify",
+		// scripts/req-trace/ is the check's own tool (whole-branch review C2
+		// class): without it here, a PR that only weakens the tool (e.g. what
+		// counts as "live test evidence") while touching no
+		// wiki/architecture/, internal/, or apps/ file selects zero checks
+		// over the change that most needs catching. req-trace-selftest also
+		// covers this directory, but that is unit-test coverage of the tool's
+		// internals, not a substitute for this check itself running against
+		// a diff that touches the tool.
+		Paths: []string{"wiki/architecture/", "internal/", "apps/", "scripts/req-trace/"},
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:       "required-gate-selftest",
