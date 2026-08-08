@@ -333,17 +333,44 @@ rather than wildcarded, so that stays true.
 **Phase 0 — make the baseline honestly green.** A gate cannot be promoted over red controls, and
 a control that fires into a red baseline is absent.
 
-- D-13: port 13 `check-test-discipline.sh` violations to the canonical fixture seam
-  (R1 raw `set_config('metaldocs.asserted_caps', ...)` ×8, R4 raw `documents` SQL from approval
-  tests ×4, R3 ×1).
-- D-5: write the 10 missing `wiki/database/tables` pages (`audit_export_jobs`,
-  `materialize_dispatch_outbox`, `tenant_keys`, `tenant_lifecycle_jobs`, `tenant_plans`,
+The three bullets below were re-measured on 2026-08-07 while writing the Phase 0 plan, and each
+one moved. They are restated here as measured, not as first estimated. A spec whose enumeration
+drifts from the tree is the same meta-defect §9 names.
+
+- **D-13 — 10 real violations, not 13.** `bash scripts/check-test-discipline.sh` reports 13, but
+  three are the checker itself: R1/R3/R4 grep raw lines, so a Go comment *describing* SQL
+  (`// … the INNER JOIN documents in the pre-check dropped`) is reported as a violation. Those
+  three are at `read_service_template_area_integration_test.go:9,83` and
+  `read_service_worklist_subject_generic_integration_test.go:99`. The fix is to make the checker
+  skip comments — rewording prose to satisfy a grep would be bending the file to fit the rule
+  instead of fixing the rule. The 10 real ones are R1 ×8, R4 ×1, R3 ×1 (not R4 ×4).
+- **D-5 — 9 missing pages plus 1 wrong heading.** `tenant_plans.md` exists; its heading does not
+  carry the qualified name the coverage checker demands. The 9 genuinely missing:
+  `audit_export_jobs`, `materialize_dispatch_outbox`, `tenant_keys`, `tenant_lifecycle_jobs`,
   `token_dictionary_entries`, `approval_delegations`, `approval_review_verdicts`,
-  `approval_route_stage_selectors`, `release_generations`).
-- D-1: give each of the 4 MUST REQs a live test to cite.
-- Diagnose why `full` is red. Never diagnosed; it is a precondition, not an afterthought.
+  `approval_route_stage_selectors`, `release_generations`.
+- **D-1 — not a traceability gap.** "Give each of the 4 MUST REQs a live test to cite" was the
+  wrong instruction. Three of the four describe a system MetalDocs did not build:
+  REQ-AUTHN-1 demands Argon2id and the code uses bcrypt
+  (`internal/modules/auth/infrastructure/postgres/repository.go:544` writes
+  `password_algo = 'bcrypt'`); REQ-AUTHN-3 demands RFC 8725 token handling in a tree with zero
+  JWTs; REQ-SEARCH-1 demands a derived rebuildable index where search is live-table escaped
+  `ILIKE`. The fourth, REQ-SEC-3, is a process requirement ("OWASP ASVS is the review checklist")
+  that `req-trace`'s test/commit evidence model structurally cannot express.
+  `wiki/architecture/req-trace-map.yaml`'s own header declares the anti-gaming boundary; adding
+  entries to make these go green would game the gate the map exists to protect. Phase 0 therefore
+  produces a **written disposition, and `req-trace` stays red** pending operator rulings.
+  REQ-AUTHN-1 in particular must be closed by implementing Argon2id, never by amending the REQ to
+  accept bcrypt — that is relaxing a security requirement to match the code.
+- Diagnose why `full` is red. Never diagnosed; it is a precondition, not an afterthought. The
+  diagnosis must separate real failures from `missingInfra` skips (§5), because a skip exits 0.
 - Measure golangci-lint whole-tree with `only-new-issues` off (§4.6). The result sizes real work;
   it does not license keeping the diff-scoping.
+
+Phase 0's exit criteria are `test-discipline`, `db-dictionary`, and `cilint` green; `req-trace`
+red **with a written disposition**; and both measurements recorded. `req-trace` staying red is not
+a Phase 0 failure — it was already required and already red, and Phase 0 replaces an undiagnosed
+red with a diagnosed one.
 
 ### 8.1 The `cilint` ownership map — Phase 0's first task, and the cheapest
 
@@ -375,7 +402,18 @@ is expressed *only* in this map, and ADR 0082 is the fact it is supposed to enco
 This is the same meta-defect the 2026-07-03 architecture review named: **hand-synced
 enumerations**. An ADR changes, an enumeration does not follow, and the control silently begins
 measuring a world that no longer exists. It is the identical failure class as §9 of this document,
-which is why §9 is not decoration.
+which is why §9 is not decoration. The stale `hgExempt` path in the table below is a second
+instance in the same file — and `scripts/check-test-discipline.sh:59` reconciled that exact rename
+on 2026-07-06, so one enumeration followed the rename and the other did not.
+
+A third finding, measured while writing the Phase 0 plan: **34 of `baseline.json`'s 35 entries
+carry the same copy-pasted reason**, attributing the debt to "M3 approval kernel extraction" —
+including entries in `auth`, `iam`, and `templates` that M3 does not touch. A reason that is
+pasted rather than written is not a reason, and it is what let ~68 fabricated findings sit in the
+file looking like real debt. The regenerated baseline must carry per-entry reasons that are true
+of that entry, or the honest string `unclassified`. Its `_doc` must also name the milestone that
+deletes it; today it declares the file transitional and shrink-only while naming no such
+milestone, which is an unlabelled local maximum.
 
 Correcting the census is expected to take the baseline from 35 entries to roughly 10–12. The
 residue is genuine debt in ~5 clusters:
@@ -384,7 +422,7 @@ residue is genuine debt in ~5 clusters:
 |---|---|---|
 | approval → `documents` / `document_comments` / `document_revisions` base tables | ~29 | one published read-port on `documents`, consumed by `postgres_approval_repository.go` and `read_service.go` |
 | approval → `controlled_documents` | 1 | likely reuse the already-published `v_cd_search_facts` view |
-| templates → `audit_events` | 1 | stale exemption: `hgExempt` names `templates/repository/postgres.go`, the file is now `templates/infrastructure/postgres.go` |
+| templates → `audit_events` | 1 | stale exemption: `hgExempt` names `templates/repository/postgres.go`; `internal/modules/templates/repository/` no longer exists (the F9.5 rename moved it to `templates/infrastructure/`). Locate the live read by grep before rewriting the entry — if no `audit_events` read remains in `templates/`, delete the entry rather than repoint it. A permanent allowlist matching nothing is the same class of lie. |
 | auth → `iam_users`, iam → `governance_events` | 2 | isolated, one small port each |
 | `platformboundary`: tripwire → `iam/domain` | 1 | needs an ADR; carve into that ADR's task |
 
