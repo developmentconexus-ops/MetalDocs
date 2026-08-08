@@ -59,6 +59,36 @@ type rawWorkflow struct {
 // only one form would otherwise be invisible to the audit.
 var onlyPattern = regexp.MustCompile(`--?only=([A-Za-z0-9_,-]+)`)
 
+// profilePattern reads a --profile=X / -profile=X flag out of a run: block.
+// A job that selects its checks by profile instead of by explicit --only
+// list (ci.yml:verify runs `--profile=changed`) still names a full,
+// enumerable set of registry IDs — just indirectly, through profile
+// membership rather than a literal list. Without resolving this, every check
+// whose CIJob points at that job would read as A3 ("claimed job exists but
+// does not run the check"), which is false: the job does run it, by profile.
+var profilePattern = regexp.MustCompile(`--?profile=([a-z]+)`)
+
+// idsForProfile resolves a --profile=X value to the check IDs it selects, by
+// the same rule selectChecks (main.go) uses at run time: "changed" means the
+// `pr` set (the profile it filters), everything else means checks that
+// declare that literal profile. This mirrors run-time selection for the
+// purpose of the audit only — it does not attempt to reproduce --changed's
+// diff-scoping, which is a per-run runtime decision, not a fact about which
+// checks a job is wired to.
+func idsForProfile(profile string) []string {
+	resolved := profile
+	if resolved == ProfileChanged {
+		resolved = ProfilePR
+	}
+	var ids []string
+	for _, c := range checks {
+		if hasProfile(c, resolved) {
+			ids = append(ids, c.ID)
+		}
+	}
+	return ids
+}
+
 func parseWorkflows(dir string) ([]workflowJob, error) {
 	paths, err := filepath.Glob(filepath.Join(dir, "*.yml"))
 	if err != nil {
@@ -90,12 +120,18 @@ func parseWorkflows(dir string) ([]workflowJob, error) {
 			j := wf.Jobs[name]
 			var ids []string
 			for _, s := range j.Steps {
-				for _, m := range onlyPattern.FindAllStringSubmatch(s.Run, -1) {
-					for _, id := range strings.Split(m[1], ",") {
-						if id = strings.TrimSpace(id); id != "" {
-							ids = append(ids, id)
+				if onlyPattern.MatchString(s.Run) {
+					for _, m := range onlyPattern.FindAllStringSubmatch(s.Run, -1) {
+						for _, id := range strings.Split(m[1], ",") {
+							if id = strings.TrimSpace(id); id != "" {
+								ids = append(ids, id)
+							}
 						}
 					}
+					continue
+				}
+				for _, m := range profilePattern.FindAllStringSubmatch(s.Run, -1) {
+					ids = append(ids, idsForProfile(m[1])...)
 				}
 			}
 			out = append(out, workflowJob{

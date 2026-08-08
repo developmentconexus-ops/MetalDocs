@@ -173,7 +173,7 @@ var checks = []Check{
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-codegen-drift-backend.sh"},
 		Paths:    []string{"api/openapi/", "internal/", "apps/", "cmd/"},
-		CIJob:    "ci.yml:lint-contract",
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:       "codegen-drift-frontend",
@@ -181,7 +181,7 @@ var checks = []Check{
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-codegen-drift-frontend.sh"},
 		Paths:    []string{"api/openapi/", "frontend/"},
-		CIJob:    "ci.yml:lint-contract",
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:       "openapi-lint-v1",
@@ -190,7 +190,7 @@ var checks = []Check{
 		Argv:     []string{"npx", "--yes", "@redocly/cli@latest", "lint", "api/openapi/v1/openapi.yaml"},
 		Needs:    []string{needsNetwork},
 		Paths:    []string{"api/openapi/"},
-		CIJob:    "ci.yml:lint-contract",
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:   "openapi-lint-e2e",
@@ -204,7 +204,7 @@ var checks = []Check{
 		Argv:     []string{"npx", "--yes", "@redocly/cli@latest", "lint", "api/openapi/internal-e2e.yaml"},
 		Needs:    []string{needsNetwork},
 		Paths:    []string{"api/openapi/"},
-		CIJob:    "ci.yml:lint-contract",
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:   "oasdiff-breaking",
@@ -221,7 +221,7 @@ var checks = []Check{
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"oasdiff", "breaking", "/tmp/openapi.base.yaml", "api/openapi/v1/openapi.yaml", "--fail-on", "ERR"},
 		Paths:    []string{"api/openapi/v1/"},
-		CIJob:    "ci.yml:lint-contract",
+		CIJob:    "ci.yml:verify",
 	},
 
 	// ---- Architecture invariants -----------------------------------------
@@ -282,7 +282,7 @@ var checks = []Check{
 		Argv:     []string{"bash", "scripts/check-migration-gapless.sh"},
 		Needs:    []string{needsGitDepth},
 		Paths:    []string{"db/migrations/"},
-		CIJob:    "ci.yml:governance",
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:   "governance-diff-rules",
@@ -295,7 +295,7 @@ var checks = []Check{
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"pwsh", "-NoProfile", "-File", "./scripts/check-governance.ps1"},
 		Needs:    []string{needsGitDepth},
-		CIJob:    "ci.yml:governance",
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:       "invariant-coverage-map",
@@ -303,7 +303,7 @@ var checks = []Check{
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-invariant-coverage-map.sh"},
 		Paths:    []string{"frontend/apps/web/e2e/COVERAGE.md"},
-		CIJob:    "ci.yml:governance",
+		CIJob:    "ci.yml:verify",
 	},
 
 	// ---- Security -----------------------------------------------------------
@@ -460,7 +460,23 @@ var checks = []Check{
 		Profiles: []string{ProfileFull},
 		Argv:     []string{"go", "test", "-tags", "integration", "-count=1", "-race", "-timeout", "900s", "./tests/...", "./internal/...", "./apps/..."},
 		Needs:    []string{needsPostgres},
-		CIJob:    "test-full.yml:full",
+		// Declared honestly wide (R3, ci.yml:test-integration --changed). The
+		// Argv above only names tests/, internal/, apps/, but anything that can
+		// change what those packages build against or run against can break
+		// the suite without touching a line inside them:
+		//   - go.mod, go.sum: a dependency bump changes every package's build,
+		//     which is everything ./tests/... ./internal/... ./apps/... compile.
+		//   - db/: migrations, baseline schema, grants, prerequisites, dev
+		//     seeds and reference data are what the suite's real Postgres is
+		//     bootstrapped from (internal/platform/migrate,
+		//     internal/platform/config read db/... at runtime) — a schema-only
+		//     edit here can break the suite with zero Go diff.
+		//   - internal/, apps/, tests/: the three roots the Argv actually runs.
+		// When in doubt this unit's brief says include the path, so this list
+		// is deliberately roots, not the narrower subset that happened to be
+		// touched by any one past incident.
+		Paths: []string{"go.mod", "go.sum", "db/", "internal/", "apps/", "tests/"},
+		CIJob: "test-full.yml:full",
 	},
 
 	// ---- Traceability -----------------------------------------------------
@@ -487,6 +503,6 @@ var checks = []Check{
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-required-gate.sh"},
 		Paths:    []string{".github/workflows/ci.yml", "scripts/check-required-gate.sh", "scripts/testdata/required-gate/"},
-		CIJob:    "ci.yml:governance",
+		CIJob:    "ci.yml:verify",
 	},
 }

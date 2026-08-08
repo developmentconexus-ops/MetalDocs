@@ -5,8 +5,13 @@ on:
 
 # No trigger-level paths:. A path filter at the trigger makes the workflow not
 # run at all, which leaves a required context permanently pending and blocks
-# the merge. Filtering happens per job, via the changes job below, so every
-# job still reports a result.
+# the merge. There is no path filter anywhere else in this file either
+# (R3, ci.yml restructure): every job below always runs; only the *work
+# inside* the `verify` and `test-integration` jobs is diff-scoped, by
+# tools/verify's own registry (Check.Paths + matchesPaths), via
+# `--changed` / `--profile=changed`. A docs-only PR still runs every job —
+# `--changed` simply selects zero checks for that job and it exits 0 saying
+# so. Nothing is skipped at the YAML level, so nothing can be skipped over.
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -15,225 +20,69 @@ permissions:
   contents: read
 
 jobs:
-  changes:
-    name: changes
+  verify:
+    name: verify
     runs-on: ubuntu-latest
-    outputs:
-      go: ${{ steps.filter.outputs.go }}
-      frontend: ${{ steps.filter.outputs.frontend }}
-      docx: ${{ steps.filter.outputs.docx }}
-      contract: ${{ steps.filter.outputs.contract }}
-      db: ${{ steps.filter.outputs.db }}
-      workflows: ${{ steps.filter.outputs.workflows }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
-        id: filter
         with:
-          filters: |
-            go:
-              - '**/*.go'
-              - 'go.mod'
-              - 'go.sum'
-              - 'tools/**'
-              - 'scripts/**'
-            frontend:
-              - 'frontend/**'
-            docx:
-              - 'apps/docx-renderer/**'
-              - 'packages/docx-editor/**'
-            contract:
-              - 'api/openapi/**'
-              - 'internal/modules/*/delivery/http/**'
-            db:
-              - 'db/**'
-            workflows:
-              - '.github/workflows/**'
-              - '.github/rulesets/**'
-
-  lint-go:
-    name: lint-go
-    needs: [changes]
-    if: needs.changes.outputs.go == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+          fetch-depth: 0   # --changed diffs against origin/main; oasdiff compares against the base ref
       - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
         with:
           go-version-file: go.mod
           cache: true
-      - name: registry checks
-        run: >
-          go run ./tools/verify --require-infra
-          --only=gofmt,go-vet,go-vet-integration,cilint,staticcheck,module-boundaries,test-discipline
-      # golangci-lint stays report-tier for this restructure: 1078 findings at
-      # the configured scope, and apps/worker and apps/jobs have no lint
-      # coverage at all today. Spec §11.1. Promoting it is a later milestone's
-      # work, not this one's. Copied verbatim from golangci-lint.yml, SHA-pinned.
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        with:
-          version: v2.11
-          # Report only issues introduced by this PR (diffed against its base
-          # branch), not the whole branch's divergence from main — otherwise a
-          # long-lived integration branch floods every PR with pre-existing
-          # findings in files the PR never touched.
-          only-new-issues: true
-          args: --timeout=5m ./apps/api/... ./internal/... ./tools/...
-        continue-on-error: true
-
-  lint-contract:
-    name: lint-contract
-    needs: [changes]
-    if: needs.changes.outputs.contract == 'true' || needs.changes.outputs.go == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          fetch-depth: 0   # oasdiff compares against the base ref
-      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: registry checks
-        run: >
-          go run ./tools/verify --require-infra
-          --only=problem-codes-fresh,api-lint-base-path-e2e,api-lint-strict,api-lint-selftest,contract-sync,codegen-drift-backend
-      # frontend-codegen-drift, openapi-lint, openapi-lint (internal-e2e) —
-      # need pnpm/node on PATH, set up below. Check set lives in
-      # tools/verify/registry.go (codegen-drift-frontend, openapi-lint-v1,
-      # openapi-lint-e2e) — see CIJob: "ci.yml:lint-contract".
       - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
       - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6 # v4.0.4
         with: { node-version-file: .nvmrc, cache: pnpm, cache-dependency-path: pnpm-lock.yaml }
       - run: pnpm install --frozen-lockfile
-      - name: registry checks (frontend codegen + OpenAPI lint)
-        run: >
-          go run ./tools/verify --require-infra
-          --only=codegen-drift-frontend,openapi-lint-v1,openapi-lint-e2e
-      # oasdiff-breaking — Install oasdiff and Materialize base-branch spec
-      # stay workflow prerequisite steps (job setup, not registry checks):
-      # they need the PR's base SHA, which a Check's Argv cannot express
-      # (compile-time literals only, no shell/YAML interpolation). Check set
-      # lives in tools/verify/registry.go (oasdiff-breaking) — see CIJob:
-      # "ci.yml:lint-contract". fetch-depth: 0 above (checkout step) covers
-      # this step's need for base-ref history.
+      # oasdiff-breaking (registry.go) needs the oasdiff binary and a
+      # base-branch spec on disk; a Check's Argv cannot carry a templated
+      # `${{ }}` value (no shell interpolation, by design — see
+      # tools/verify/main.go's `command` invariant), so materializing the
+      # PR's base SHA stays a workflow prerequisite rather than becoming part
+      # of the check itself. Copied verbatim from this file's prior
+      # lint-contract job.
       - name: Install oasdiff
         run: go install github.com/oasdiff/oasdiff@latest
+      # check-governance.ps1 (governance-diff-rules) diffs against
+      # origin/main, and --changed's default --base=origin/main needs the
+      # same local ref. Copied verbatim from this file's prior governance job.
+      - name: Fetch base ref
+        run: git fetch origin ${{ github.base_ref }} --depth=1
       - name: Materialize base-branch spec
         run: |
           git fetch origin "${{ github.event.pull_request.base.sha }}" --depth=1
           git show "${{ github.event.pull_request.base.sha }}:api/openapi/v1/openapi.yaml" > /tmp/openapi.base.yaml
-      - name: registry checks (oasdiff-breaking)
-        run: go run ./tools/verify --require-infra --only=oasdiff-breaking
+      # Every registry check whose declared Paths the diff touches — gofmt,
+      # go vet, cilint, staticcheck, module-boundaries, test-discipline,
+      # contract sync/codegen/oasdiff/openapi lint, fe-eslint,
+      # css-token-discipline, eigenpal-selector-pin, fe-typecheck, fe-test,
+      # docx-v2-build/test, go-test-unit, adr-status, wiki-tally,
+      # db-dictionary, migration-gapless, governance-diff-rules,
+      # invariant-coverage-map, req-trace(-selftest), required-gate-selftest.
+      # A check with no declared Paths (matchesPaths' fail-closed default)
+      # always runs. golangci-lint is not a registry check — it stays a
+      # GitHub Action step in the lint-go job below, because it needs the
+      # Action, not because it needs a different job to be scoped correctly.
+      - name: verify --profile=changed
+        run: go run ./tools/verify --require-infra --profile=changed
 
-  lint-frontend:
-    name: lint-frontend
-    needs: [changes]
-    if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.docx == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
-        with:
-          go-version-file: go.mod
-          cache: true
-      - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
-      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6 # v4.0.4
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: registry checks
-        run: >
-          go run ./tools/verify --require-infra
-          --only=fe-eslint,css-token-discipline,eigenpal-selector-pin,docx-v2-typecheck
-
-  test-go:
-    name: test-go
-    needs: [changes]
-    if: needs.changes.outputs.go == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
-        with:
-          go-version-file: go.mod
-          cache: true
-      - run: go run ./tools/verify --require-infra --only=go-test-unit
-
-  test-frontend:
-    name: test-frontend
-    needs: [changes]
-    if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.docx == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
-        with:
-          go-version-file: go.mod
-          cache: true
-      - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
-      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6 # v4.0.4
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      # docx-v2-build before docx-v2-test, in one job, in this order. The
-      # registry admits at registry.go:273 that these two are order-dependent
-      # and that nothing enforced the order; putting them in one sequential
-      # job is what makes the ordering true rather than hoped for.
-      - run: go run ./tools/verify --require-infra --only=fe-typecheck,fe-test,docx-v2-build,docx-v2-test
-
-  governance:
-    name: governance
-    needs: [changes]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          fetch-depth: 0   # check-governance.ps1 diffs against origin/main; also needed for the migration-history check below
-      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
-        with:
-          go-version-file: go.mod
-          cache: true
-      - run: go run ./tools/verify --require-infra --only=adr-status,wiki-tally,db-dictionary,req-trace-selftest,req-trace,required-gate-selftest,migration-gapless
-      # check-governance.ps1 — copied verbatim from governance-check.yml:check.
-      - name: Fetch base ref
-        run: git fetch origin ${{ github.base_ref }} --depth=1
-      # governance-diff-rules, invariant-coverage-map — check set lives in
-      # tools/verify/registry.go — see CIJob: "ci.yml:governance". No
-      # -BaseRef arg: check-governance.ps1 now reads GITHUB_BASE_REF itself
-      # (GitHub Actions sets it automatically on pull_request events), since
-      # a registry Check's Argv cannot carry a templated `${{ }}` value.
-      - name: registry checks (governance-diff-rules, invariant-coverage-map)
-        run: go run ./tools/verify --require-infra --only=governance-diff-rules,invariant-coverage-map
-
+  # test-integration needs the Postgres service container and runs
+  # ~20 minutes, so it stages behind `verify` in its own job. `needs: [verify]`
+  # carries no `if:` — the implicit success() means this job is SKIPPED
+  # (not run) when verify fails, which is the staging: don't start the
+  # 20-minute suite when the cheap checks already failed. That is safe here
+  # specifically because the new required-gate.jq requires literal "success"
+  # from every upstream job, with no "skipped is green" allowance — a skip
+  # here fails the gate exactly like a failure would, so skip propagation
+  # cannot silently pass a PR.
   test-integration:
     name: test-integration
-    # The whole fix for the original complaint. The 20-minute suite does not
-    # start until the cheap jobs pass. It stays pre-merge and blocking:
-    # A1 item 4 and test-full.yml:2 both require the full suite before merge.
-    needs: [changes, lint-go, lint-contract, lint-frontend, test-go]
-    # !cancelled() is a status-check function; it suppresses the implicit
-    # success() so a skipped upstream job does not skip this one (a plain
-    # AND-of-success `if:` propagates skip through `needs:`). The per-job
-    # `!= 'failure'` guards keep the edge's real purpose: don't start the
-    # 20-minute suite when a cheap check already failed. Bracket syntax is
-    # required because hyphenated job ids can't be dot-dereferenced
-    # (needs.lint-go parses as subtraction).
-    if: >-
-      !cancelled()
-      && needs.changes.result == 'success'
-      && (needs.changes.outputs.go == 'true' || needs.changes.outputs.db == 'true')
-      && needs['lint-go'].result != 'failure'
-      && needs['lint-contract'].result != 'failure'
-      && needs['lint-frontend'].result != 'failure'
-      && needs['test-go'].result != 'failure'
+    needs: [verify]
     runs-on: ubuntu-latest
     # services:, the postgres user/db names and timeout-minutes: 20 below are
-    # copied verbatim from test-full.yml:full — not from the sketch in the
-    # task brief, which used different (invented) credentials.
+    # copied verbatim from this file's prior test-integration job (itself
+    # copied from test-full.yml:full).
     services:
       postgres:
         image: postgres:16
@@ -249,23 +98,29 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0   # --changed diffs against origin/main
       - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
         with:
           go-version-file: go.mod
           cache: true
-      # --require-infra is what makes this job's green mean anything. Without
+      - name: Fetch base ref
+        run: git fetch origin ${{ github.base_ref }} --depth=1
+      # --require-infra is what makes this job's green mean anything: without
       # it, an unset METALDOCS_DATABASE_URL yields SKIP and the job exits 0
-      # over zero executed integration tests. test-full.yml did not carry
-      # --require-infra; adding it here is this task's deliberate fix.
+      # over zero executed integration tests. --changed diff-scopes the
+      # 20-minute suite to PRs that actually touch go-test-integration's
+      # declared Paths (go.mod, go.sum, db/, internal/, apps/, tests/) — a
+      # docs-only PR still runs this job, it just selects zero checks and
+      # exits 0 saying so.
       - name: verify (go-test-integration)
         env:
           METALDOCS_DATABASE_URL: postgres://metaldocs:metaldocs@localhost:5432/metaldocs?sslmode=disable
-        run: go run ./tools/verify --require-infra --only=go-test-integration
+        run: go run ./tools/verify --require-infra --only=go-test-integration --changed
         timeout-minutes: 20
 
   security:
     name: security
-    needs: [changes]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -274,13 +129,13 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0   # gitleaks scans full history
-      # gitleaks — copied verbatim from secret-scan.yml:gitleaks.
+      # gitleaks — copied verbatim from this file's prior security job.
       - name: Run gitleaks over full git history
         run: >
           docker run --rm -v "$PWD:/repo"
           ghcr.io/gitleaks/gitleaks:v8.24.3
           detect --source /repo --config /repo/.gitleaks.toml --redact -v --exit-code 1
-      # grype (CVE scan) — copied verbatim from supply-chain.yml:cve-scan, SHA-pinned.
+      # grype (CVE scan) — copied verbatim from this file's prior security job.
       - id: scan
         uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7
         with:
@@ -293,11 +148,30 @@ jobs:
         with:
           sarif_file: ${{ steps.scan.outputs.sarif }}
 
+  lint-go:
+    name: lint-go
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      # golangci-lint is not a tools/verify registry check (it needs its own
+      # setup-go via the Action below), so this job is exactly this one step.
+      # only-new-issues: true already scopes its report to what the PR
+      # introduces, not the repo's pre-existing findings — that is the
+      # diff-scoping for this job, done by the Action itself rather than by
+      # tools/verify. Blocking, not report-only: the operator's standing
+      # instruction is "Lint should capture it no bypass, fallback only to
+      # show green I want to catch the erros" — a continue-on-error on a
+      # lint step is precisely that fallback, so it is not present here.
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.11
+          only-new-issues: true
+          args: --timeout=5m ./apps/api/... ./internal/... ./tools/...
+
   required:
     name: required
     if: ${{ always() }}
-    needs: [changes, lint-go, lint-contract, lint-frontend, governance,
-            test-go, test-frontend, test-integration, security]
+    needs: [verify, test-integration, security, lint-go]
     runs-on: ubuntu-latest
     env:
       NEEDS_JSON: ${{ toJSON(needs) }}
