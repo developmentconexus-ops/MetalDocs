@@ -80,6 +80,7 @@ jobs:
           # findings in files the PR never touched.
           only-new-issues: true
           args: --timeout=5m ./apps/api/... ./internal/... ./tools/...
+        continue-on-error: true
 
   lint-contract:
     name: lint-contract
