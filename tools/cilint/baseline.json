@@ -1,277 +1,173 @@
 {
-  "_doc": "This file is TRANSITIONAL. It is a record of known lint debt as of the last --update-baseline run, not a permission slip to add more of it — new violations still fail CI. The global-maximum end state is an empty entries array (all analyzers clean with no baseline needed at all). The baseline may only ever shrink: every entry must eventually be remediated and removed, never grown to accommodate new debt. If you are here to add an entry for a NEW finding, stop — fix the finding instead.",
+  "_doc": "This file is TRANSITIONAL. It is a record of known lint debt as of the last --update-baseline run, not a permission slip to add more of it — new violations still fail CI. The global-maximum end state is an empty entries array (all analyzers clean with no baseline needed at all). The baseline may only ever shrink: every entry must eventually be remediated and removed, never grown to accommodate new debt. If you are here to add an entry for a NEW finding, stop — fix the finding instead. Deleting milestone: NOT YET SCHEDULED — this file is a labelled local maximum pending one.",
   "entries": [
-    {
-      "analyzer": "hgcrossmodule",
-      "file": "internal/modules/approval/application/cancel_service.go",
-      "message": "module \"approval\" reads \"documents\"'s base table \"approval_instances\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
-      "count": 1,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
-    },
     {
       "analyzer": "hgcrossmodule",
       "file": "internal/modules/approval/application/cancel_service.go",
       "message": "module \"approval\" reads \"documents\"'s base table \"documents\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
       "count": 1,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
+      "reason": "cancel_service.go:74 SELECT process_area_code_snapshot FROM documents ... FOR UPDATE to lock the subject document row before mutating approval state; not ported to a documents-owned read-port.",
+      "owner": "unclassified — no owner identified as of 2026-08-07"
     },
     {
       "analyzer": "hgcrossmodule",
       "file": "internal/modules/approval/application/mark_reviewed_service.go",
       "message": "module \"approval\" reads \"documents\"'s base table \"documents\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
       "count": 1,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
+      "reason": "mark_reviewed_service.go:112 SELECT status, effective_from, revision_version FROM documents to validate the subject document's lifecycle state before recording a review; not ported to a documents-owned read-port.",
+      "owner": "unclassified — no owner identified as of 2026-08-07"
     },
     {
       "analyzer": "hgcrossmodule",
       "file": "internal/modules/approval/application/obsolete_service.go",
       "message": "module \"approval\" reads \"documents\"'s base table \"documents\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
       "count": 1,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
+      "reason": "obsolete_service.go:67 SELECT status, revision_version, process_area_code_snapshot FROM documents to validate the subject document before marking its approval obsolete; not ported to a documents-owned read-port.",
+      "owner": "unclassified — no owner identified as of 2026-08-07"
     },
     {
       "analyzer": "hgcrossmodule",
       "file": "internal/modules/approval/application/read_service.go",
       "message": "module \"approval\" reads \"controlleddocuments\"'s base table \"controlled_documents\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
       "count": 1,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
-    },
-    {
-      "analyzer": "hgcrossmodule",
-      "file": "internal/modules/approval/application/read_service.go",
-      "message": "module \"approval\" reads \"documents\"'s base table \"approval_instances\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
-      "count": 6,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
-    },
-    {
-      "analyzer": "hgcrossmodule",
-      "file": "internal/modules/approval/application/read_service.go",
-      "message": "module \"approval\" reads \"documents\"'s base table \"approval_signoffs\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
-      "count": 2,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
-    },
-    {
-      "analyzer": "hgcrossmodule",
-      "file": "internal/modules/approval/application/read_service.go",
-      "message": "module \"approval\" reads \"documents\"'s base table \"approval_stage_instances\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
-      "count": 6,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
+      "reason": "read_service.go:678 LEFT JOIN controlled_documents cd, commented as deliberate: the inbox needs controlled_documents.code (the canonical NOT-NULL human code) rather than the documents.code snapshot; joined directly instead of through controlleddocuments' CDFieldReader port.",
+      "owner": "unclassified — no owner identified as of 2026-08-07"
     },
     {
       "analyzer": "hgcrossmodule",
       "file": "internal/modules/approval/application/read_service.go",
       "message": "module \"approval\" reads \"documents\"'s base table \"documents\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
       "count": 3,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
+      "reason": "read_service.go:672-990 LEFT/JOIN documents d in the inbox/count queries that decorate approval instances with the subject document's snapshot fields (process_area_code_snapshot, controlled_document_id); direct join instead of a documents-owned read-port.",
+      "owner": "unclassified — no owner identified as of 2026-08-07"
     },
     {
       "analyzer": "hgcrossmodule",
       "file": "internal/modules/approval/application/release_coordinator.go",
       "message": "module \"approval\" reads \"documents\"'s base table \"documents\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
       "count": 3,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
+      "reason": "release_coordinator.go:713-734 SELECT ...documentReleaseColumns... FROM documents to read/re-read the document's release state (planned_effective_from, hold flags) while coordinating a release; not ported to a documents-owned read-port.",
+      "owner": "unclassified — no owner identified as of 2026-08-07"
     },
     {
       "analyzer": "hgcrossmodule",
       "file": "internal/modules/approval/application/release_facts.go",
       "message": "module \"approval\" reads \"documents\"'s base table \"documents\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
       "count": 1,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
+      "reason": "release_facts.go:143 SELECT current_revision_id FROM documents to resolve the document's current revision id when assembling release facts; not ported to a documents-owned read-port.",
+      "owner": "unclassified — no owner identified as of 2026-08-07"
     },
     {
       "analyzer": "hgcrossmodule",
       "file": "internal/modules/approval/application/release_terminal_approval.go",
       "message": "module \"approval\" reads \"documents\"'s base table \"documents\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
       "count": 1,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
-    },
-    {
-      "analyzer": "hgcrossmodule",
-      "file": "internal/modules/approval/application/route_admin_service.go",
-      "message": "module \"approval\" reads \"documents\"'s base table \"approval_instances\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
-      "count": 1,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
-    },
-    {
-      "analyzer": "hgcrossmodule",
-      "file": "internal/modules/approval/application/route_admin_service.go",
-      "message": "module \"approval\" reads \"documents\"'s base table \"approval_route_stages\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
-      "count": 3,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
-    },
-    {
-      "analyzer": "hgcrossmodule",
-      "file": "internal/modules/approval/application/route_admin_service.go",
-      "message": "module \"approval\" reads \"documents\"'s base table \"approval_routes\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
-      "count": 4,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
-    },
-    {
-      "analyzer": "hgcrossmodule",
-      "file": "internal/modules/approval/application/sla_extension_service.go",
-      "message": "module \"approval\" reads \"documents\"'s base table \"approval_instances\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
-      "count": 1,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
-    },
-    {
-      "analyzer": "hgcrossmodule",
-      "file": "internal/modules/approval/application/sla_extension_service.go",
-      "message": "module \"approval\" reads \"documents\"'s base table \"approval_stage_instances\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
-      "count": 1,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
-    },
-    {
-      "analyzer": "hgcrossmodule",
-      "file": "internal/modules/approval/infrastructure/postgres_approval_repository.go",
-      "message": "module \"approval\" reads \"documents\"'s base table \"approval_instances\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
-      "count": 17,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
-    },
-    {
-      "analyzer": "hgcrossmodule",
-      "file": "internal/modules/approval/infrastructure/postgres_approval_repository.go",
-      "message": "module \"approval\" reads \"documents\"'s base table \"approval_route_stages\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
-      "count": 2,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
-    },
-    {
-      "analyzer": "hgcrossmodule",
-      "file": "internal/modules/approval/infrastructure/postgres_approval_repository.go",
-      "message": "module \"approval\" reads \"documents\"'s base table \"approval_routes\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
-      "count": 5,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
-    },
-    {
-      "analyzer": "hgcrossmodule",
-      "file": "internal/modules/approval/infrastructure/postgres_approval_repository.go",
-      "message": "module \"approval\" reads \"documents\"'s base table \"approval_signoffs\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
-      "count": 6,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
-    },
-    {
-      "analyzer": "hgcrossmodule",
-      "file": "internal/modules/approval/infrastructure/postgres_approval_repository.go",
-      "message": "module \"approval\" reads \"documents\"'s base table \"approval_stage_instances\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
-      "count": 3,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
+      "reason": "release_terminal_approval.go:185 SELECT final_docx_s3_key, final_pdf_s3_key FROM documents to fetch the rendered document's storage keys as part of terminal-approval processing; not ported to a documents-owned read-port.",
+      "owner": "unclassified — no owner identified as of 2026-08-07"
     },
     {
       "analyzer": "hgcrossmodule",
       "file": "internal/modules/approval/infrastructure/postgres_approval_repository.go",
       "message": "module \"approval\" reads \"documents\"'s base table \"document_comments\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
       "count": 2,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
+      "reason": "postgres_approval_repository.go direct reads/writes of document_comments as part of persisting approval-flow comment state alongside instance rows; not ported to a documents-owned read-port.",
+      "owner": "unclassified — no owner identified as of 2026-08-07"
     },
     {
       "analyzer": "hgcrossmodule",
       "file": "internal/modules/approval/infrastructure/postgres_approval_repository.go",
       "message": "module \"approval\" reads \"documents\"'s base table \"document_revisions\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
       "count": 1,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
+      "reason": "postgres_approval_repository.go direct read of document_revisions when resolving the subject revision an approval instance was frozen against; not ported to a documents-owned read-port.",
+      "owner": "unclassified — no owner identified as of 2026-08-07"
     },
     {
       "analyzer": "hgcrossmodule",
       "file": "internal/modules/approval/infrastructure/postgres_approval_repository.go",
       "message": "module \"approval\" reads \"documents\"'s base table \"documents\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
       "count": 13,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
+      "reason": "postgres_approval_repository.go's approval-instance query family (lines ~363-648) JOIN/LEFT JOIN documents d repeatedly to decorate approval instance rows with the subject document's fields (status, code, area) across list/get/exists queries; not ported to a documents-owned read-port.",
+      "owner": "unclassified — no owner identified as of 2026-08-07"
     },
     {
       "analyzer": "hgcrossmodule",
       "file": "internal/modules/approval/infrastructure/release_hold_reader.go",
       "message": "module \"approval\" reads \"documents\"'s base table \"documents\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
       "count": 2,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
-    },
-    {
-      "analyzer": "hgcrossmodule",
-      "file": "internal/modules/approval/infrastructure/route_readiness_reader.go",
-      "message": "module \"approval\" reads \"documents\"'s base table \"approval_routes\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
-      "count": 2,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
-    },
-    {
-      "analyzer": "hgcrossmodule",
-      "file": "internal/modules/approval/infrastructure/signature/postgres_auth_failure_rate_limiter.go",
-      "message": "module \"approval\" reads \"documents\"'s base table \"auth_failure_counters\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
-      "count": 2,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
-    },
-    {
-      "analyzer": "hgcrossmodule",
-      "file": "internal/modules/approval/infrastructure/sla_overdue_reader.go",
-      "message": "module \"approval\" reads \"documents\"'s base table \"approval_instances\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
-      "count": 2,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
-    },
-    {
-      "analyzer": "hgcrossmodule",
-      "file": "internal/modules/approval/infrastructure/sla_overdue_reader.go",
-      "message": "module \"approval\" reads \"documents\"'s base table \"approval_stage_instances\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
-      "count": 2,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
-    },
-    {
-      "analyzer": "hgcrossmodule",
-      "file": "internal/modules/approval/infrastructure/sla_surface_writer.go",
-      "message": "module \"approval\" reads \"documents\"'s base table \"approval_instances\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
-      "count": 2,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
+      "reason": "release_hold_reader.go:93,133 JOIN public.documents d ON d.id = g.document_id to attach the subject document's tenant/id to release-hold rows owned by approval (release_generations); not ported to a documents-owned read-port.",
+      "owner": "unclassified — no owner identified as of 2026-08-07"
     },
     {
       "analyzer": "hgcrossmodule",
       "file": "internal/modules/auth/infrastructure/postgres/tenant_data_port.go",
       "message": "module \"auth\" reads \"iam\"'s base table \"iam_users\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
       "count": 1,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
+      "reason": "tenant_data_port.go:70 DELETE FROM auth_identities WHERE user_id IN (SELECT user_id FROM iam_users WHERE tenant_id=$1) — a subquery against iam_users used to scope the tenant-erasure DELETE during GDPR crypto-shred; not ported to an iam-owned read-port.",
+      "owner": "unclassified — no owner identified as of 2026-08-07"
+    },
+    {
+      "analyzer": "hgcrossmodule",
+      "file": "internal/modules/documents/application/context_builder.go",
+      "message": "module \"documents\" reads \"approval\"'s base table \"approval_instances\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
+      "count": 1,
+      "reason": "NEWLY REVEALED by this task's census fix (ADR 0082 flip), not new debt: context_builder.go:49 SELECT id FROM approval_instances WHERE tenant_id=$1 AND document_id=$2 to find the document's active approval instance while building rendering context. Was invisible while approval_instances was mis-owned to documents; genuine ADR-0039 D1 cross-module read now that approval is the real owner. Not exempted — recorded as debt per this task's binding resolution.",
+      "owner": "unclassified — no owner identified as of 2026-08-07"
+    },
+    {
+      "analyzer": "hgcrossmodule",
+      "file": "internal/modules/documents/infrastructure/active_instance_reader.go",
+      "message": "module \"documents\" reads \"approval\"'s base table \"approval_instances\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
+      "count": 1,
+      "reason": "NEWLY REVEALED by this task's census fix (ADR 0082 flip), not new debt: active_instance_reader.go:119 SELECT id, frozen_content_hash FROM approval_instances WHERE document_id=$1, part of the documents-owned ActiveInstanceReader that composes the active/published document view with the in-progress approval instance. Was invisible while approval_instances was mis-owned to documents; genuine cross-module read now that approval is the real owner. Not exempted — recorded as debt per this task's binding resolution.",
+      "owner": "unclassified — no owner identified as of 2026-08-07"
+    },
+    {
+      "analyzer": "hgcrossmodule",
+      "file": "internal/modules/documents/infrastructure/repository.go",
+      "message": "module \"documents\" reads \"approval\"'s base table \"approval_instances\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
+      "count": 1,
+      "reason": "NEWLY REVEALED by this task's census fix (ADR 0082 flip), not new debt: repository.go IsEligibleApprover (lines 1858-1868) JOINs approval_stage_instances/approval_instances to check whether an actor is an eligible approver for the document's active stage. Was invisible while these tables were mis-owned to documents; genuine cross-module read now that approval is the real owner. Not exempted — recorded as debt per this task's binding resolution.",
+      "owner": "unclassified — no owner identified as of 2026-08-07"
+    },
+    {
+      "analyzer": "hgcrossmodule",
+      "file": "internal/modules/documents/infrastructure/repository.go",
+      "message": "module \"documents\" reads \"approval\"'s base table \"approval_stage_instances\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
+      "count": 1,
+      "reason": "NEWLY REVEALED by this task's census fix (ADR 0082 flip), not new debt: repository.go IsEligibleApprover (lines 1858-1868), same query as the approval_instances entry above — JOINs approval_stage_instances/approval_instances to check whether an actor is an eligible approver for the document's active stage. Was invisible while these tables were mis-owned to documents; genuine cross-module read now that approval is the real owner. Not exempted — recorded as debt per this task's binding resolution.",
+      "owner": "unclassified — no owner identified as of 2026-08-07"
+    },
+    {
+      "analyzer": "hgcrossmodule",
+      "file": "internal/modules/documents/infrastructure/resolver_readers.go",
+      "message": "module \"documents\" reads \"approval\"'s base table \"approval_instances\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
+      "count": 2,
+      "reason": "NEWLY REVEALED by this task's census fix (ADR 0082 flip), not new debt: resolver_readers.go GetApprovers (line 131, fallback path) and GetFinalApprovalDate (line 166) both read approval_instances directly to resolve document-facing approval facts (auto-approval fallback, completion timestamp) for the GraphQL-style document resolvers. Was invisible while approval_instances was mis-owned to documents; genuine cross-module read now that approval is the real owner. Not exempted — recorded as debt per this task's binding resolution.",
+      "owner": "unclassified — no owner identified as of 2026-08-07"
+    },
+    {
+      "analyzer": "hgcrossmodule",
+      "file": "internal/modules/documents/infrastructure/resolver_readers.go",
+      "message": "module \"documents\" reads \"approval\"'s base table \"approval_signoffs\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
+      "count": 2,
+      "reason": "NEWLY REVEALED by this task's census fix (ADR 0082 flip), not new debt: resolver_readers.go GetApprovers (line 89) and GetFinalApprovalDate (line 167) both read approval_signoffs directly to list/date the approve-decision signoffs for a document's approval instance, for the document resolvers. Was invisible while approval_signoffs was mis-owned to documents; genuine cross-module read now that approval is the real owner. Not exempted — recorded as debt per this task's binding resolution.",
+      "owner": "unclassified — no owner identified as of 2026-08-07"
+    },
+    {
+      "analyzer": "hgcrossmodule",
+      "file": "internal/modules/documents/infrastructure/resolver_readers.go",
+      "message": "module \"documents\" reads \"approval\"'s base table \"approval_stage_instances\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
+      "count": 1,
+      "reason": "NEWLY REVEALED by this task's census fix (ADR 0082 flip), not new debt: resolver_readers.go GetApprovers (line 129) reads a COUNT(*) subquery over approval_stage_instances to detect the ADR 0087 stageless (livre) shape before rendering an auto-approval line. Was invisible while approval_stage_instances was mis-owned to documents; genuine cross-module read now that approval is the real owner. Not exempted — recorded as debt per this task's binding resolution.",
+      "owner": "unclassified — no owner identified as of 2026-08-07"
     },
     {
       "analyzer": "hgcrossmodule",
       "file": "internal/modules/iam/application/tenant_lifecycle_service.go",
-      "message": "module \"iam\" reads \"documents\"'s base table \"governance_events\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
+      "message": "module \"iam\" reads \"approval\"'s base table \"governance_events\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
       "count": 1,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
-    },
-    {
-      "analyzer": "hgcrossmodule",
-      "file": "internal/modules/templates/infrastructure/postgres.go",
-      "message": "module \"templates\" reads \"audit\"'s base table \"audit_events\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
-      "count": 1,
-      "reason": "Pre-existing cross-module raw-SQL read (H-G, ADR-0039 D1). Not fixed now because the M3 approval kernel extraction is actively rewriting most of these files; remediating H-G here would collide with that in-flight work.",
-      "owner": "M3 approval kernel extraction"
+      "reason": "NEWLY REVEALED by this task's census fix (ADR 0082 flip; governance_events also moved documents->approval per this task, since its live INSERT site is approval/application/events.go), not new debt: tenant_lifecycle_service.go:535 DELETE FROM public.governance_events WHERE tenant_id=$1 as the final sweep step of tenant crypto-shred erasure. Was invisible while governance_events was mis-owned to documents; genuine cross-module write now that approval is the real owner. Not exempted — recorded as debt per this task's binding resolution.",
+      "owner": "unclassified — no owner identified as of 2026-08-07"
     },
     {
       "analyzer": "platformboundary",

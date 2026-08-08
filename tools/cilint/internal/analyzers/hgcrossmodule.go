@@ -16,17 +16,18 @@ const hgCrossModuleAllow = "//cilint:allow-hgcrossmodule"
 // hgOwnerByTable maps every owned base table to the TOP-LEVEL module that owns
 // it (holds its writes), per the F0.2 binding census
 // (docs/superpowers/milestones/backend-module-boundary-hardening/milestone-0-adr-and-census/f0.2-binding-census/census.md).
-// "Top-level" means the first segment under internal/modules/: documents/approval
-// ⊂ documents, iam/presence ⊂ iam — so an intra-context read across sub-packages
-// is NOT cross-module. This is the data ADR-0039 D1 (base table = violation)
-// classifies against.
+// "Top-level" means the first segment under internal/modules/: iam/presence ⊂
+// iam — so an intra-context read across sub-packages is NOT cross-module.
+// This is the data ADR-0039 D1 (base table = violation) classifies against.
+// Kept in sync with the ADR that defines the module list — when an ADR
+// promotes or merges a module, this map is part of that ADR's diff.
 var hgOwnerByTable = map[string]string{
 	// controlleddocuments
 	"controlled_documents":            "controlleddocuments",
 	"controlled_document_area_grants": "controlleddocuments",
 	"controlled_document_user_grants": "controlleddocuments",
 	"cd_sequence_counters":            "controlleddocuments",
-	// documents (incl. the approval sub-context)
+	// documents
 	"documents":                   "documents",
 	"document_revisions":          "documents",
 	"document_comments":           "documents",
@@ -35,13 +36,22 @@ var hgOwnerByTable = map[string]string{
 	"document_placeholder_values": "documents",
 	"editor_sessions":             "documents",
 	"autosave_pending_uploads":    "documents",
-	"auth_failure_counters":       "documents", // owned by documents/approval signature limiter (census false-positive note)
-	"approval_instances":          "documents",
-	"approval_routes":             "documents",
-	"approval_route_stages":       "documents",
-	"approval_stage_instances":    "documents",
-	"approval_signoffs":           "documents",
-	"governance_events":           "documents",
+	// approval — promoted to a top-level module by ADR 0082, superseding
+	// ADR 0072's nested `documents/approval` ruling. The F0.2 binding census
+	// predates 0082 and assigned these tables to `documents`; that made the
+	// approval module's reads of its OWN tables report as cross-module.
+	"approval_instances":       "approval",
+	"approval_routes":          "approval",
+	"approval_route_stages":    "approval",
+	"approval_stage_instances": "approval",
+	"approval_signoffs":        "approval",
+	"auth_failure_counters":    "approval", // approval's signature reauth limiter
+	// governance_events is written exclusively by approval's SQLEmitter
+	// (internal/modules/approval/application/events.go:84 — INSERT INTO
+	// governance_events); it was mis-census'd to documents pre-0082 alongside
+	// the other approval tables. Verified via grep for the live INSERT site,
+	// not by the ADR 0082 module-promotion text alone.
+	"governance_events": "approval",
 	// taxonomy
 	"document_process_areas": "taxonomy",
 	"document_profiles":      "taxonomy",
@@ -125,7 +135,11 @@ var hgExempt = []hgSite{
 	// module writes via AppendAudit[Tx]; read projections are a distinct class.
 	{"security/infrastructure/postgres/repository.go", "audit_events"},          // X3
 	{"iam/infrastructure/postgres/observability_repository.go", "audit_events"}, // X4
-	{"templates/repository/postgres.go", "audit_events"},                        // X7
+	// X7 path reconciled 2026-08-07: F9.5 renamed templates/repository/ →
+	// templates/infrastructure/. scripts/check-test-discipline.sh:59 reconciled
+	// the same rename on 2026-07-06; this list did not, so the exemption had
+	// silently stopped matching and the read fell into the baseline instead.
+	{"templates/infrastructure/postgres.go", "audit_events"}, // X7
 	// D3(e) — parent grade-a-completion M4 dispositioned auth reads (ADR 0029/0031):
 	// auth_identities has no tenant_id, scoped via = ANY(ids); re-porting re-litigates 0031.
 	{"security/infrastructure/postgres/repository.go", "auth_identities"},          // X1
