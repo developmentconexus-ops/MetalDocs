@@ -515,6 +515,17 @@ func validateOrdering(all []Check) error {
 		known[c.ID] = true
 		byID[c.ID] = c
 	}
+	if err := checkKnownAfterEdges(all, known); err != nil {
+		return err
+	}
+	return detectOrderingCycle(all, byID)
+}
+
+// checkKnownAfterEdges rejects an After edge naming an unregistered check
+// ID. Split out of validateOrdering so the "is every edge valid" question is
+// separate from "is the edge set acyclic" — cycle detection assumes it is
+// already walking known IDs, and this is what makes that assumption true.
+func checkKnownAfterEdges(all []Check, known map[string]bool) error {
 	for _, c := range all {
 		for _, dep := range c.After {
 			if !known[dep] {
@@ -522,7 +533,30 @@ func validateOrdering(all []Check) error {
 			}
 		}
 	}
+	return nil
+}
 
+// formatOrderingCycle renders the cycle found by detectOrderingCycle's DFS:
+// the portion of the walk stack from the repeated node's first occurrence
+// through the edge that closed the loop.
+func formatOrderingCycle(stack []string, dep string) error {
+	start := 0
+	for i, s := range stack {
+		if s == dep {
+			start = i
+			break
+		}
+	}
+	return fmt.Errorf("ordering cycle in After edges: %s -> %s",
+		strings.Join(stack[start:], " -> "), dep)
+}
+
+// detectOrderingCycle runs a colored DFS over the After graph and rejects a
+// cycle. Checked against the WHOLE registry, not just a selection, because a
+// cycle that only shows up under some future --only combination is still a
+// defect in the registry today. Iteration order over the ID set is sorted
+// first so a registry with more than one cycle always reports the same one.
+func detectOrderingCycle(all []Check, byID map[string]Check) error {
 	const (
 		white = iota
 		gray
@@ -537,15 +571,7 @@ func validateOrdering(all []Check) error {
 		for _, dep := range byID[id].After {
 			switch color[dep] {
 			case gray:
-				start := 0
-				for i, s := range stack {
-					if s == dep {
-						start = i
-						break
-					}
-				}
-				return fmt.Errorf("ordering cycle in After edges: %s -> %s",
-					strings.Join(stack[start:], " -> "), dep)
+				return formatOrderingCycle(stack, dep)
 			case white:
 				if err := visit(dep); err != nil {
 					return err
@@ -572,11 +598,24 @@ func validateOrdering(all []Check) error {
 	return nil
 }
 
-func run(selected []Check, parallelism int, verbose bool, requireInfra bool) []result {
-	if parallelism < 1 {
-		parallelism = 1
-	}
-	results := make([]result, len(selected))
+// runState holds everything the per-check goroutines share: the shared
+// results/done slices, the concurrency semaphore, and the run-wide flags.
+// Splitting run() into this struct plus methods separates the three things
+// it used to do in one function body — waiting on ordering, scheduling
+// under the parallelism limit, and reporting each outcome as it lands —
+// into one method per concern, each independently readable and testable in
+// isolation from the goroutine plumbing.
+type runState struct {
+	indexByID    map[string]int
+	results      []result
+	done         []chan struct{}
+	sem          chan struct{}
+	printMu      sync.Mutex
+	verbose      bool
+	requireInfra bool
+}
+
+func newRunState(selected []Check, parallelism int, verbose, requireInfra bool) *runState {
 	indexByID := make(map[string]int, len(selected))
 	for i, c := range selected {
 		indexByID[c.ID] = i
@@ -591,86 +630,131 @@ func run(selected []Check, parallelism int, verbose bool, requireInfra bool) []r
 	for i := range done {
 		done[i] = make(chan struct{})
 	}
+	return &runState{
+		indexByID:    indexByID,
+		results:      make([]result, len(selected)),
+		done:         done,
+		sem:          make(chan struct{}, parallelism),
+		verbose:      verbose,
+		requireInfra: requireInfra,
+	}
+}
 
-	sem := make(chan struct{}, parallelism)
+func (st *runState) printLine(format string, args ...any) {
+	st.printMu.Lock()
+	fmt.Printf(format, args...)
+	st.printMu.Unlock()
+}
+
+// awaitPredecessors blocks until every check c.After depends on has a final
+// result, recording c's own result and returning false the moment one of
+// them makes running c impossible. It returns true only when every
+// predecessor passed and c is clear to run.
+func (st *runState) awaitPredecessors(i int, c Check) bool {
+	for _, dep := range c.After {
+		di, ok := st.indexByID[dep]
+		if !ok {
+			// Excluded from this selection. main() refuses this case
+			// before run() is ever called (validateSelectionOrdering,
+			// called from selectChecks) — this branch is the same rule
+			// enforced a second time, in the execution kernel itself, so
+			// a future caller that assembles `selected` some other way
+			// than selectChecks still cannot slip an incomplete
+			// selection past run(). FAIL, not SKIP: report() only turns
+			// FAILs into a non-zero exit, and a SKIP here would be
+			// exactly the "green over nothing" shape this whole unit
+			// exists to close.
+			reason := fmt.Sprintf("refusing: predecessor %s is not part of this selection", dep)
+			st.results[i] = result{check: c, status: statusFail, reason: reason}
+			st.printLine("  %s  %-24s %s\n", statusFail, c.ID, reason)
+			return false
+		}
+		<-st.done[di]
+		if st.results[di].status != statusPass {
+			pred := st.results[di]
+			reason := fmt.Sprintf("not run: predecessor %s did not pass (%s)", pred.check.ID, pred.status)
+			st.results[i] = result{check: c, status: statusSkip, reason: reason}
+			st.printLine("  %s  %-24s %s\n", "SKIP", c.ID, reason)
+			return false
+		}
+	}
+	return true
+}
+
+// skipForMissingInfra records and reports a SKIP (or, under --require-infra,
+// a FAIL) when c cannot run in this environment. Returns true when it did so
+// — the caller must not proceed to execute c.
+func (st *runState) skipForMissingInfra(i int, c Check) bool {
+	reason := missingInfra(c)
+	if reason == "" {
+		return false
+	}
+	// One decision site, two verdicts. Deriving this in report() instead
+	// would mean two places agree on what a skip means.
+	status, label := statusSkip, "SKIP"
+	if st.requireInfra {
+		status, label = statusFail, "FAIL"
+	}
+	st.results[i] = result{check: c, status: status, reason: reason}
+	st.printLine("  %s  %-24s %s\n", label, c.ID, reason)
+	return true
+}
+
+// execute runs c's Argv and records the PASS/FAIL result.
+func (st *runState) execute(i int, c Check) {
+	start := time.Now()
+	out, err := command(context.Background(), c.Dir, c.Argv).CombinedOutput()
+	d := time.Since(start)
+
+	status := statusPass
+	if err != nil {
+		status = statusFail
+	}
+	st.results[i] = result{check: c, status: status, output: string(out), duration: d}
+
+	st.printMu.Lock()
+	fmt.Printf("  %-5s %-24s %6.1fs\n", status, c.ID, d.Seconds())
+	if st.verbose && status == statusPass && len(out) > 0 {
+		fmt.Println(indent(string(out)))
+	}
+	st.printMu.Unlock()
+}
+
+// runOne is the full lifecycle of one check's goroutine: wait for
+// predecessors, acquire a scheduling slot, skip if infra is missing,
+// otherwise execute.
+func (st *runState) runOne(i int, c Check) {
+	if !st.awaitPredecessors(i, c) {
+		return
+	}
+
+	st.sem <- struct{}{}
+	defer func() { <-st.sem }()
+
+	if st.skipForMissingInfra(i, c) {
+		return
+	}
+
+	st.execute(i, c)
+}
+
+func run(selected []Check, parallelism int, verbose bool, requireInfra bool) []result {
+	if parallelism < 1 {
+		parallelism = 1
+	}
+	st := newRunState(selected, parallelism, verbose, requireInfra)
+
 	var wg sync.WaitGroup
-	var printMu sync.Mutex
-
 	for i, c := range selected {
 		wg.Add(1)
 		go func(i int, c Check) {
 			defer wg.Done()
-			defer close(done[i])
-
-			for _, dep := range c.After {
-				di, ok := indexByID[dep]
-				if !ok {
-					// Excluded from this selection. main() refuses this
-					// case before run() is ever called (validateSelectionOrdering,
-					// called from selectChecks) — this branch is the same
-					// rule enforced a second time, in the execution kernel
-					// itself, so a future caller that assembles `selected`
-					// some other way than selectChecks still cannot slip
-					// an incomplete selection past run(). FAIL, not SKIP:
-					// report() only turns FAILs into a non-zero exit, and a
-					// SKIP here would be exactly the "green over nothing"
-					// shape this whole unit exists to close.
-					reason := fmt.Sprintf("refusing: predecessor %s is not part of this selection", dep)
-					results[i] = result{check: c, status: statusFail, reason: reason}
-					printMu.Lock()
-					fmt.Printf("  %s  %-24s %s\n", statusFail, c.ID, reason)
-					printMu.Unlock()
-					return
-				}
-				<-done[di]
-				if results[di].status != statusPass {
-					pred := results[di]
-					reason := fmt.Sprintf("not run: predecessor %s did not pass (%s)", pred.check.ID, pred.status)
-					results[i] = result{check: c, status: statusSkip, reason: reason}
-					printMu.Lock()
-					fmt.Printf("  %s  %-24s %s\n", "SKIP", c.ID, reason)
-					printMu.Unlock()
-					return
-				}
-			}
-
-			sem <- struct{}{}
-			defer func() { <-sem }()
-
-			if reason := missingInfra(c); reason != "" {
-				// One decision site, two verdicts. Deriving this in report()
-				// instead would mean two places agree on what a skip means.
-				status, label := statusSkip, "SKIP"
-				if requireInfra {
-					status, label = statusFail, "FAIL"
-				}
-				results[i] = result{check: c, status: status, reason: reason}
-				printMu.Lock()
-				fmt.Printf("  %s  %-24s %s\n", label, c.ID, reason)
-				printMu.Unlock()
-				return
-			}
-
-			start := time.Now()
-			out, err := command(context.Background(), c.Dir, c.Argv).CombinedOutput()
-			d := time.Since(start)
-
-			status := statusPass
-			if err != nil {
-				status = statusFail
-			}
-			results[i] = result{check: c, status: status, output: string(out), duration: d}
-
-			printMu.Lock()
-			fmt.Printf("  %-5s %-24s %6.1fs\n", status, c.ID, d.Seconds())
-			if verbose && status == statusPass && len(out) > 0 {
-				fmt.Println(indent(string(out)))
-			}
-			printMu.Unlock()
+			defer close(st.done[i])
+			st.runOne(i, c)
 		}(i, c)
 	}
 	wg.Wait()
-	return results
+	return st.results
 }
 
 // ---------------------------------------------------------------- reporting

@@ -89,7 +89,9 @@ func idsForProfile(profile string) []string {
 	return ids
 }
 
-func parseWorkflows(dir string) ([]workflowJob, error) {
+// workflowFiles globs *.yml and *.yaml under dir, sorted for a deterministic
+// scan order.
+func workflowFiles(dir string) ([]string, error) {
 	paths, err := filepath.Glob(filepath.Join(dir, "*.yml"))
 	if err != nil {
 		return nil, err
@@ -100,6 +102,66 @@ func parseWorkflows(dir string) ([]workflowJob, error) {
 	}
 	paths = append(paths, more...)
 	sort.Strings(paths)
+	return paths, nil
+}
+
+// onlyIDsForStep extracts the registry IDs a single step's `run:` block
+// selects, whether it names them directly (--only=a,b) or indirectly
+// (--profile=x). Split out of parseWorkflows so the two id-sources
+// (explicit list vs. profile resolution) are each one small branch instead
+// of one loop doing both.
+func onlyIDsForStep(run string) []string {
+	if onlyPattern.MatchString(run) {
+		var ids []string
+		for _, m := range onlyPattern.FindAllStringSubmatch(run, -1) {
+			for _, id := range strings.Split(m[1], ",") {
+				if id = strings.TrimSpace(id); id != "" {
+					ids = append(ids, id)
+				}
+			}
+		}
+		return ids
+	}
+	var ids []string
+	for _, m := range profilePattern.FindAllStringSubmatch(run, -1) {
+		ids = append(ids, idsForProfile(m[1])...)
+	}
+	return ids
+}
+
+// jobsInWorkflow turns one parsed workflow file's Jobs map into the sorted
+// []workflowJob the audit works with. Split out of parseWorkflows so the
+// YAML-walking loop (this function) is separate from the per-file I/O
+// (parseWorkflows itself).
+func jobsInWorkflow(fileBase string, wf rawWorkflow) []workflowJob {
+	names := make([]string, 0, len(wf.Jobs))
+	for name := range wf.Jobs {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	out := make([]workflowJob, 0, len(names))
+	for _, name := range names {
+		j := wf.Jobs[name]
+		var ids []string
+		for _, s := range j.Steps {
+			ids = append(ids, onlyIDsForStep(s.Run)...)
+		}
+		out = append(out, workflowJob{
+			Workflow: fileBase,
+			Job:      name,
+			OnlyIDs:  ids,
+			Needs:    []string(j.Needs),
+		})
+	}
+	return out
+}
+
+func parseWorkflows(dir string) ([]workflowJob, error) {
+	paths, err := workflowFiles(dir)
+	if err != nil {
+		return nil, err
+	}
 
 	var out []workflowJob
 	for _, p := range paths {
@@ -111,51 +173,16 @@ func parseWorkflows(dir string) ([]workflowJob, error) {
 		if err := yaml.Unmarshal(b, &wf); err != nil {
 			return nil, fmt.Errorf("%s: %w", filepath.Base(p), err)
 		}
-		names := make([]string, 0, len(wf.Jobs))
-		for name := range wf.Jobs {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-		for _, name := range names {
-			j := wf.Jobs[name]
-			var ids []string
-			for _, s := range j.Steps {
-				if onlyPattern.MatchString(s.Run) {
-					for _, m := range onlyPattern.FindAllStringSubmatch(s.Run, -1) {
-						for _, id := range strings.Split(m[1], ",") {
-							if id = strings.TrimSpace(id); id != "" {
-								ids = append(ids, id)
-							}
-						}
-					}
-					continue
-				}
-				for _, m := range profilePattern.FindAllStringSubmatch(s.Run, -1) {
-					ids = append(ids, idsForProfile(m[1])...)
-				}
-			}
-			out = append(out, workflowJob{
-				Workflow: filepath.Base(p),
-				Job:      name,
-				OnlyIDs:  ids,
-				Needs:    []string(j.Needs),
-			})
-		}
+		out = append(out, jobsInWorkflow(filepath.Base(p), wf)...)
 	}
 	return out, nil
 }
 
-// auditFindings applies the five rules. Pure, so the rules are testable
-// without a repository on disk — requiredGateKeys is read from
-// scripts/required-gate.jq by the caller (parseRequiredGateKeys) and handed
-// in already parsed, same reason parseWorkflows' I/O stays out of this
-// function.
-func auditFindings(regs []Check, jobs []workflowJob, requiredGateKeys []string) []string {
-	known := map[string]bool{}
-	for _, c := range regs {
-		known[c.ID] = true
-	}
-	runsIn := map[string]map[string]bool{} // "file.yml:job" -> set of IDs
+// runsInByJob indexes jobs by "file.yml:job" -> the set of registry IDs that
+// job's --only=/--profile= flags resolve to. Shared by the A2/A3/A4 and A6
+// rules below.
+func runsInByJob(jobs []workflowJob) map[string]map[string]bool {
+	runsIn := map[string]map[string]bool{}
 	for _, j := range jobs {
 		key := j.Workflow + ":" + j.Job
 		if runsIn[key] == nil {
@@ -165,10 +192,12 @@ func auditFindings(regs []Check, jobs []workflowJob, requiredGateKeys []string) 
 			runsIn[key][id] = true
 		}
 	}
+	return runsIn
+}
 
+// auditUnknownIDs is A1 — a workflow runs an ID the registry does not have.
+func auditUnknownIDs(jobs []workflowJob, known map[string]bool) []string {
 	var findings []string
-
-	// A1 — a workflow runs an ID the registry does not have.
 	for _, j := range jobs {
 		for _, id := range j.OnlyIDs {
 			if !known[id] {
@@ -177,37 +206,46 @@ func auditFindings(regs []Check, jobs []workflowJob, requiredGateKeys []string) 
 			}
 		}
 	}
+	return findings
+}
 
+// auditCIJobClaims is A2 (claimed job does not exist), A3 (claimed job
+// exists but does not run the check), and A4 (no CIJob claimed at all) — one
+// pass over the registry, since each check falls into exactly one of the
+// three.
+func auditCIJobClaims(regs []Check, runsIn map[string]map[string]bool) []string {
+	var findings []string
 	for _, c := range regs {
-		// A4 — no CI job claimed at all.
 		if c.CIJob == "" {
 			findings = append(findings, fmt.Sprintf(
 				"A4 %s has no CIJob: it runs locally and nothing enforces it on a PR", c.ID))
 			continue
 		}
 		set, ok := runsIn[c.CIJob]
-		// A2 — the claimed job does not exist.
 		if !ok {
 			findings = append(findings, fmt.Sprintf(
 				"A2 %s claims CIJob %q, which no workflow defines", c.ID, c.CIJob))
 			continue
 		}
-		// A3 — the claimed job exists but does not run the check.
 		if !set[c.ID] {
 			findings = append(findings, fmt.Sprintf(
 				"A3 %s claims CIJob %q, but that job's --only= set does not include it", c.ID, c.CIJob))
 		}
 	}
+	return findings
+}
 
-	// A5 — ci.yml's `required` job's needs: list and scripts/required-gate.jq's
-	// hard-coded key set must name exactly the same jobs. Nothing else ties
-	// them together: `required-gate-selftest` proves the .jq expression
-	// itself accepts/rejects the right result sets, but it does that against
-	// fixtures, not against ci.yml's live needs: list — so a job added to one
-	// and not the other passed every existing check while the gate silently
-	// stopped requiring it. This is what scripts/required-gate.jq's dead
-	// workflowJob.Needs field (parsed since audit.go's first version, never
-	// read until now) was always for.
+// auditRequiredGateParity is A5 — ci.yml's `required` job's needs: list and
+// scripts/required-gate.jq's hard-coded key set must name exactly the same
+// jobs. Nothing else ties them together: `required-gate-selftest` proves the
+// .jq expression itself accepts/rejects the right result sets, but it does
+// that against fixtures, not against ci.yml's live needs: list — so a job
+// added to one and not the other passed every existing check while the gate
+// silently stopped requiring it. This is what scripts/required-gate.jq's
+// dead workflowJob.Needs field (parsed since audit.go's first version, never
+// read until now) was always for.
+func auditRequiredGateParity(jobs []workflowJob, requiredGateKeys []string) []string {
+	var findings []string
 	for _, j := range jobs {
 		if j.Workflow != "ci.yml" || j.Job != "required" {
 			continue
@@ -222,24 +260,28 @@ func auditFindings(regs []Check, jobs []workflowJob, requiredGateKeys []string) 
 				got, want))
 		}
 	}
+	return findings
+}
 
-	// A6 — every ProfilePR check's CIJob must be a job inside ci.yml:required's
-	// needs: transitive closure. I8: 22 of 42 CIJob values used to name
-	// legacy, since-collapsed workflows (module-boundaries.yml, lint.yml,
-	// governance-check.yml, fe-ci.yml, req-traceability.yml, test-smoke.yml,
-	// test-full.yml, invariants.yml) — a check pointed at one of those still
-	// passed A2/A3 (the workflow file and its --only=/--profile= still exist
-	// on disk today) while proving nothing about whether the NEW topology
-	// (ci.yml's four required jobs) actually gates a merge on it. A6 closes
-	// that: it does not care whether the claimed job runs and reports
-	// (A2/A3's job) — it asks whether reporting it can ever change whether a
-	// PR merges. needs: is same-workflow-file only (a job in another file
-	// cannot appear in ci.yml:required's needs: list even indirectly), so the
-	// closure is computed only over ci.yml's own jobs; a CIJob pointing at any
-	// other workflow file — however real that job and however faithfully it
-	// runs the check — fails A6, because that workflow's result cannot reach
-	// `required` and therefore cannot block a merge.
+// auditRequiredClosure is A6 — every ProfilePR check's CIJob must be a job
+// inside ci.yml:required's needs: transitive closure. I8: 22 of 42 CIJob
+// values used to name legacy, since-collapsed workflows
+// (module-boundaries.yml, lint.yml, governance-check.yml, fe-ci.yml,
+// req-traceability.yml, test-smoke.yml, test-full.yml, invariants.yml) — a
+// check pointed at one of those still passed A2/A3 (the workflow file and
+// its --only=/--profile= still exist on disk today) while proving nothing
+// about whether the NEW topology (ci.yml's four required jobs) actually
+// gates a merge on it. A6 closes that: it does not care whether the claimed
+// job runs and reports (A2/A3's job) — it asks whether reporting it can ever
+// change whether a PR merges. needs: is same-workflow-file only (a job in
+// another file cannot appear in ci.yml:required's needs: list even
+// indirectly), so the closure is computed only over ci.yml's own jobs; a
+// CIJob pointing at any other workflow file — however real that job and
+// however faithfully it runs the check — fails A6, because that workflow's
+// result cannot reach `required` and therefore cannot block a merge.
+func auditRequiredClosure(regs []Check, jobs []workflowJob) []string {
 	closure := requiredClosure(jobs)
+	var findings []string
 	for _, c := range regs {
 		if !hasProfile(c, ProfilePR) {
 			continue
@@ -252,6 +294,26 @@ func auditFindings(regs []Check, jobs []workflowJob, requiredGateKeys []string) 
 				"A6 %s claims CIJob %q, which is not inside ci.yml:required's needs: transitive closure — it cannot gate a merge", c.ID, c.CIJob))
 		}
 	}
+	return findings
+}
+
+// auditFindings applies the six rules. Pure, so the rules are testable
+// without a repository on disk — requiredGateKeys is read from
+// scripts/required-gate.jq by the caller (parseRequiredGateKeys) and handed
+// in already parsed, same reason parseWorkflows' I/O stays out of this
+// function.
+func auditFindings(regs []Check, jobs []workflowJob, requiredGateKeys []string) []string {
+	known := map[string]bool{}
+	for _, c := range regs {
+		known[c.ID] = true
+	}
+	runsIn := runsInByJob(jobs)
+
+	var findings []string
+	findings = append(findings, auditUnknownIDs(jobs, known)...)
+	findings = append(findings, auditCIJobClaims(regs, runsIn)...)
+	findings = append(findings, auditRequiredGateParity(jobs, requiredGateKeys)...)
+	findings = append(findings, auditRequiredClosure(regs, jobs)...)
 
 	sort.Strings(findings)
 	return findings

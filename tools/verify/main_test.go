@@ -57,8 +57,15 @@ func appendLine(file, id string) {
 	if err != nil {
 		os.Exit(1)
 	}
-	defer f.Close()
+	// No defer here: this function's every exit path is os.Exit, which
+	// terminates the process before a deferred call would ever run — so the
+	// close (and its error) has to be handled explicitly on each path
+	// instead.
 	if _, err := f.WriteString(id + "\n"); err != nil {
+		_ = f.Close()
+		os.Exit(1)
+	}
+	if err := f.Close(); err != nil {
 		os.Exit(1)
 	}
 }
