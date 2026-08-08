@@ -341,4 +341,12 @@ var checks = []Check{
 		Paths:    []string{"wiki/architecture/", "internal/", "apps/"},
 		CIJob:    "req-traceability.yml:gate",
 	},
+	{
+		ID:       "required-gate-selftest",
+		Desc:     "the ci.yml `required` aggregator accepts and rejects the right needs-result sets",
+		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-required-gate.sh"},
+		Paths:    []string{".github/workflows/ci.yml", "scripts/check-required-gate.sh", "scripts/testdata/required-gate/"},
+		CIJob:    "ci.yml:governance",
+	},
 }

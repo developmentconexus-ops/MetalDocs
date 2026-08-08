@@ -1,0 +1,10 @@
+{
+  "changes": { "result": "success" },
+  "lint-go": { "result": "success" },
+  "lint-contract": { "result": "success" },
+  "lint-frontend": { "result": "success" },
+  "governance": { "result": "success" },
+  "test-go": { "result": "success" },
+  "test-frontend": { "result": "success" },
+  "test-integration": { "result": "success" }
+}

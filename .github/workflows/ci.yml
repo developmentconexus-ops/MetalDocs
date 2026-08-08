@@ -206,7 +206,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - run: go run ./tools/verify --require-infra --only=adr-status,wiki-tally,db-dictionary,req-trace-selftest,req-trace
+      - run: go run ./tools/verify --require-infra --only=adr-status,wiki-tally,db-dictionary,req-trace-selftest,req-trace,required-gate-selftest
       # Migration monotonicity check — copied verbatim from
       # invariants.yml:migration-gapless.
       - name: Check gapless sequence + no historical edits
@@ -371,3 +371,30 @@ jobs:
         if: always() && steps.scan.outputs.sarif != ''
         with:
           sarif_file: ${{ steps.scan.outputs.sarif }}
+
+  required:
+    name: required
+    if: ${{ always() }}
+    needs: [changes, lint-go, lint-contract, lint-frontend, governance,
+            test-go, test-frontend, test-integration, security]
+    runs-on: ubuntu-latest
+    env:
+      NEEDS_JSON: ${{ toJSON(needs) }}
+    steps:
+      - name: Validate all CI results
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! jq -e '
+            (keys | sort) == ([
+              "changes","lint-go","lint-contract","lint-frontend","governance",
+              "test-go","test-frontend","test-integration","security"
+            ] | sort)
+            and .changes.result == "success"
+            and all(to_entries[];
+                    if .key == "changes" then .value.result == "success"
+                    else (.value.result == "success" or .value.result == "skipped") end)
+          ' <<<"$NEEDS_JSON" >/dev/null; then
+            jq -r 'to_entries[] | "\(.key)=\(.value.result // "null")"' <<<"$NEEDS_JSON"
+            exit 1
+          fi
