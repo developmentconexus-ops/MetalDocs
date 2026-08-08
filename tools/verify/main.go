@@ -64,7 +64,8 @@ func main() {
 		list    = flag.Bool("list", false, "print the registry grouped by profile and exit")
 		audit   = flag.Bool("audit", false, "report checks with no CI job, and exit non-zero if any exist")
 		only    = flag.String("only", "", "comma-separated check IDs to run, ignoring the profile")
-		base    = flag.String("base", "origin/main", "base ref for --profile=changed")
+		changed = flag.Bool("changed", false, "narrow whatever selection --only/--profile made to checks whose declared Paths the diff against --base touches; --profile=changed implies this")
+		base    = flag.String("base", "origin/main", "base ref for --changed / --profile=changed")
 		jobs    = flag.Int("j", defaultParallelism(), "how many checks to run concurrently")
 		verbose = flag.Bool("v", false, "stream output of passing checks too")
 		// In CI a SKIP is indistinguishable from a PASS at the exit code, so a
@@ -90,12 +91,12 @@ func main() {
 		os.Exit(printAudit(filepath.Join(".github", "workflows")))
 	}
 
-	selected, err := selectChecks(*profile, *only, *base)
+	selected, scoped, err := selectChecks(*profile, *only, *base, *changed)
 	if err != nil {
 		fatalf("%v", err)
 	}
 	if len(selected) == 0 {
-		fmt.Println("verify: nothing to run")
+		fmt.Println(emptySelectionMessage(scoped, *base))
 		return
 	}
 
@@ -115,17 +116,55 @@ func main() {
 
 // ---------------------------------------------------------------- selection
 
-func selectChecks(profile, only, base string) ([]Check, error) {
-	if only != "" {
-		return selectByIDs(only)
+// selectChecks resolves --only/--profile to a set of checks, then applies
+// --changed diff-scoping on top if either --changed was passed explicitly or
+// the profile is `changed` (which has always meant "scoped", since before
+// this flag existed). This is what lets a workflow job say "my set of
+// checks, further narrowed to what the diff touches" —
+// `--only=go-test-integration --changed` — instead of --changed being a
+// whole selection mode of its own that can't be intersected with anything.
+//
+// The returned bool tells the caller whether scoping was actually applied,
+// so an empty result can be explained: "0 checks, diff-scoped" is a fact
+// worth printing, "0 checks" alone is not (see emptySelectionMessage).
+func selectChecks(profile, only, base string, changedFlag bool) (selected []Check, scoped bool, err error) {
+	scoped = changedFlag
+	switch {
+	case only != "":
+		selected, err = selectByIDs(only)
+	case profile == ProfileChanged:
+		selected = selectByProfile(ProfilePR)
+		scoped = true
+	default:
+		if !validProfile(profile) {
+			return nil, false, fmt.Errorf("unknown profile %q; valid: %s", profile, strings.Join(profileOrder, ", "))
+		}
+		selected = selectByProfile(profile)
 	}
-	if profile == ProfileChanged {
-		return selectChanged(base)
+	if err != nil {
+		return nil, false, err
 	}
-	if !validProfile(profile) {
-		return nil, fmt.Errorf("unknown profile %q; valid: %s", profile, strings.Join(profileOrder, ", "))
+	if !scoped {
+		return selected, false, nil
 	}
-	return selectByProfile(profile), nil
+	out, err := scopeToChanged(selected, base)
+	if err != nil {
+		return nil, false, err
+	}
+	return out, true, nil
+}
+
+// emptySelectionMessage explains a zero-check run. A silent "0 checks, exit
+// 0" is indistinguishable from a broken selector — the exact shape of the
+// bug this unit exists to close (a PR touching only files no check declares
+// used to skip every job and let `required` report green over nothing). A
+// diff-scoped zero and an ordinary zero are different facts and read
+// differently on purpose.
+func emptySelectionMessage(scoped bool, base string) string {
+	if scoped {
+		return fmt.Sprintf("verify: 0 checks selected — --changed found no diff against %s that touches any declared Paths. A check with no declared Paths always matches, so this means the diff is entirely outside every path-scoped check and there is no repo-scoped check in the selection either. Confirm this is expected.", base)
+	}
+	return "verify: nothing to run"
 }
 
 // selectByIDs resolves an explicit --only list. An unknown ID is an error
@@ -154,18 +193,60 @@ func selectByIDs(only string) ([]Check, error) {
 	return out, nil
 }
 
-func selectChanged(base string) ([]Check, error) {
+// scopeToChanged narrows `selected` to the checks whose declared Paths
+// intersect the diff against base — except outside a pull request, where it
+// returns `selected` unchanged.
+//
+// That exception exists because the diff itself lies outside a PR: on a
+// push to main, --base defaults to origin/main and HEAD already IS
+// origin/main, so the diff is empty. Scoping to an empty diff means
+// selecting zero checks and exiting 0 — green over nothing, which is the
+// defect this whole unit exists to eliminate (the YAML path map had the same
+// hole, just via `if:` conditions and `skipped` counting as green for
+// `required`). Falling back to the full set is the only fail-closed answer:
+// there is no diff outside a PR that could safely narrow anything.
+func scopeToChanged(selected []Check, base string) ([]Check, error) {
+	if runningAsNonPRCI() {
+		return selected, nil
+	}
 	changed, err := changedFiles(base)
 	if err != nil {
-		return nil, fmt.Errorf("--profile=changed needs a diff against %s: %w", base, err)
+		return nil, fmt.Errorf("--changed needs a diff against %s: %w", base, err)
 	}
+	return filterByChanged(selected, changed), nil
+}
+
+// filterByChanged is the pure intersection: which of `selected` does the
+// diff actually touch. Split out from scopeToChanged so the composition
+// logic is testable without a git repository — matchesPaths already
+// guarantees a pathless check always matches, so this filter never has to
+// special-case one.
+func filterByChanged(selected []Check, changed []string) []Check {
 	var out []Check
-	for _, c := range checks {
-		if hasProfile(c, ProfilePR) && matchesPaths(c, changed) {
+	for _, c := range selected {
+		if matchesPaths(c, changed) {
 			out = append(out, c)
 		}
 	}
-	return out, nil
+	return out
+}
+
+// runningAsNonPRCI reports whether this is a GitHub Actions run triggered by
+// something other than a pull request — a push to main, a schedule, a
+// manual dispatch. GITHUB_EVENT_NAME is GitHub's documented signal for the
+// triggering event
+// (https://docs.github.com/actions/learn-github-actions/variables#default-environment-variables)
+// and is unset outside Actions, so an empty value means "not GitHub Actions
+// at all" (a laptop) rather than "not a pull request" — the fallback must
+// not fire there, or `--profile=changed` on a developer's machine would stop
+// being diff-scoped and start being the full set, silently changing
+// behaviour this flag has always had.
+func runningAsNonPRCI() bool {
+	ev := os.Getenv("GITHUB_EVENT_NAME")
+	if ev == "" {
+		return false
+	}
+	return ev != "pull_request" && ev != "pull_request_target"
 }
 
 func selectByProfile(profile string) []Check {
