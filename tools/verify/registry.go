@@ -220,6 +220,60 @@ var checks = []Check{
 		CIJob:    "governance-check.yml:db-dictionary-coverage",
 	},
 
+	// ---- Security -----------------------------------------------------------
+	// Both entries below are TRANSITIONAL local maxima under this repository's
+	// "labelled or it's a defect" rule (CLAUDE.md, "Global Maximum, Not Local
+	// Maximum"). Measured in docs/superpowers/reports/2026-08-08-gosec-govulncheck-measurement.md
+	// (Task 4 of the CI restructure); Task 9 consumes that measurement rather
+	// than re-measuring.
+	{
+		ID:   "gosec",
+		Desc: "no gosec rule fires on the Go tree",
+		// 64 findings across 11 rules (top: G304=23, G201=10, G104=8), a mix of
+		// real issues and false positives on the sample triaged — not a clean
+		// tree, so `full`-only/advisory, not blocking.
+		//
+		// Global-maximum structure: gosec blocking in `pr` + `full`, every
+		// finding fixed or carrying a gosec-native `#nosec Gxxx -- reason`
+		// suppression (`//nolint:gosec` is golangci-lint syntax; standalone
+		// gosec does not read it — the two existing comments on this pattern,
+		// tools/verify/main.go:335 and tools/verify/audit.go:76, show up as
+		// live findings under a naive registration for exactly this reason).
+		// Promoting milestone: "gosec backlog triage" — unscheduled on
+		// docs/superpowers/ROADMAP.md as of 2026-08-08.
+		//
+		// -exclude-dir=.claude is load-bearing, not cosmetic: an unexcluded
+		// scan walks into .claude/worktrees/<sibling>/, a sibling git worktree
+		// with its own go.mod, inflating the true 176 import directories to
+		// 333 (157, 47%, from the sibling worktree alone) — measured on this
+		// machine both before and after the flag. `-no-fail` from the
+		// measurement's own invocation is deliberately NOT carried over: this
+		// registration must fail the check like any other, not just record it.
+		Profiles: []string{ProfileFull},
+		Argv:     []string{"go", "run", "github.com/securego/gosec/v2/cmd/gosec@latest", "-quiet", "-exclude-dir=.claude", "./..."},
+		Needs:    []string{needsNetwork},
+		CIJob:    "nightly.yml:security-scan",
+	},
+	{
+		ID:   "govulncheck",
+		Desc: "no known-vulnerable symbol is reachable from any binary",
+		// 19 total findings, but only 2 are called/reachable (GO-2026-5970 in
+		// golang.org/x/text, GO-2026-5856 in stdlib crypto/tls) — both
+		// call-graph-verified, not a naive dependency match. Those 2 are NOT
+		// yet remediated as of this registration, so this stays `full`-only
+		// (advisory), never `pr`-blocking, until they are.
+		//
+		// Global-maximum structure: govulncheck blocking in `pr` + `full` with
+		// zero called vulnerabilities outstanding. Promoting milestone:
+		// "called-CVE remediation" — unscheduled on docs/superpowers/ROADMAP.md
+		// as of 2026-08-08; its two entry criteria are already measured: bump
+		// golang.org/x/text to v0.39.0, bump the Go toolchain to go1.26.5.
+		Profiles: []string{ProfileFull},
+		Argv:     []string{"go", "run", "golang.org/x/vuln/cmd/govulncheck@latest", "./..."},
+		Needs:    []string{needsNetwork},
+		CIJob:    "nightly.yml:security-scan",
+	},
+
 	// ---- Frontend ---------------------------------------------------------
 	{
 		ID:       "fe-eslint",

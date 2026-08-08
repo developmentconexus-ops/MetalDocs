@@ -1,0 +1,21 @@
+reviews:
+  profile: chill
+  commit_status: true
+  auto_review: { enabled: true, drafts: false, base_branches: ["main"] }
+  path_filters:
+    - "!vendor/**"
+    - "!third_party/**"
+    - "!**/*.gen.go"
+    - "!**/generated/**"
+    - "!frontend/apps/web/node_modules/**"
+  path_instructions:
+    - path: "internal/modules/**"
+      instructions: "Enforce ADR 0022 capability-based authz. Flag any reasoning of the form
+        'admin/author/editor can X' — authorization is expressed in capabilities, never roles."
+    - path: "api/openapi/**"
+      instructions: "Routes change only by editing the spec and regenerating. Flag hand-edited
+        generated client or server code."
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns: ["CLAUDE.md", "wiki/architecture/backend-target-architecture.md"]

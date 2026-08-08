@@ -1,0 +1,228 @@
+name: nightly
+on:
+  schedule:
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Nothing here blocks a PR. These jobs are advisory today; pretending
+# otherwise is the lie this restructure was chartered to remove.
+jobs:
+  perf:
+    name: perf
+    runs-on: ubuntu-latest
+    env:
+      BASE_URL: http://localhost:8080
+    steps:
+      # perf.yml's perf-full job, moved verbatim (its pull_request-gated
+      # perf-reduced sibling has no successor here: nightly has no
+      # pull_request trigger to reduce for). KNOWN RED still applies —
+      # moving off `pull_request` removes the corrosive "red on every PR"
+      # signal, but does not fix the underlying gap: no `services: postgres`,
+      # no migrations, and secrets.PERF_DATABASE_URL is still undefined in
+      # this repository. This job will keep failing nightly until that
+      # infra lands; see the named risk in the Task 9 report.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Start backend
+        run: |
+          # A1: this loop used to end with `|| sleep 2` and no exit, so when the
+          # API never came up the step still succeeded and k6 ran against a dead
+          # port. That produced a full percentile table computed over 300 failed
+          # requests and 0 bytes received — numbers that look like a measurement
+          # and are not one. A benchmark that cannot detect an absent target is
+          # not a benchmark. Fail at the cause instead.
+          #
+          # KNOWN RED: this job cannot pass today. It has no `services: postgres`,
+          # runs no migrations, and reads DATABASE_URL from secrets.PERF_DATABASE_URL,
+          # which this repository does not define. Standing up that stack is the
+          # perf axis's work; A1's job is to stop the failure from masquerading as
+          # a passing measurement. Tracked in the A1 ledger as a recorded defer.
+          set -euo pipefail
+          go run ./apps/api/cmd/metaldocs-api &
+          for i in $(seq 1 30); do
+            if curl -sf "$BASE_URL/api/v1/health/live"; then
+              echo "API is live after $i attempt(s)"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "FAIL: API did not answer $BASE_URL/api/v1/health/live within 60s; refusing to benchmark a dead target"
+          exit 1
+        env:
+          DATABASE_URL: ${{ secrets.PERF_DATABASE_URL }}
+      - name: Install k6
+        run: |
+          curl -fsSL https://dl.k6.io/key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/k6-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update && sudo apt-get install -y k6
+      - name: Run full perf suite
+        run: |
+          k6 run tools/perfbench/submit.js
+          k6 run tools/perfbench/signoff.js
+          k6 run tools/perfbench/publish.js
+          k6 run tools/perfbench/scheduler_tick.js
+      - name: Upload results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: perf-results
+          path: k6-results/
+          retention-days: 30
+
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    env:
+      METALDOCS_E2E: '1'
+      DATABASE_URL: ${{ secrets.E2E_DATABASE_URL }}
+    steps:
+      # e2e-coverage-gate.yml's e2e-smoke job, moved here with the coverage-map-check
+      # dependency dropped (that job's real half — the invariant→spec-ID grep — already
+      # moved to ci.yml:governance; its checkbox half was deleted per spec §4.5). The
+      # broken `go run ./cmd/api` path is fixed to the real binary
+      # (apps/api/cmd/metaldocs-api), matching perf.yml:46 in this same repository.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
+
+      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6 # v4.0.4
+        with:
+          node-version-file: .nvmrc
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install workspace deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        working-directory: frontend/apps/web
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: Set up Go backend
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Start backend
+        run: |
+          go run ./apps/api/cmd/metaldocs-api &
+          # Wait for health
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/api/v1/health/live; then break; fi
+            sleep 2
+          done
+
+      - name: Run E2E approval flows
+        working-directory: frontend/apps/web
+        run: |
+          pnpm exec playwright test e2e/flows/ \
+            --project=parallel-flows \
+            --reporter=html,list \
+            2>&1
+
+      - name: Run axe diff vs baseline
+        if: always()
+        working-directory: frontend/apps/web
+        run: |
+          # A1: the `|| true` that used to terminate this command contradicted
+          # this workflow's own header ("real automated checks, not advisory").
+          # axe-diff exits 1 on a blocking regression; swallowing that made the
+          # accessibility baseline read as enforced while enforcing nothing.
+          # The artifact upload below is `if: always()`, so the HTML diff is
+          # still captured when this step fails.
+          node ../../../scripts/axe-diff.mjs \
+            --report test-results/axe-report.json \
+            --baseline e2e/axe-baseline.json \
+            --html test-results/axe-diff.html
+
+      - name: Upload E2E artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: e2e-approval-report
+          path: |
+            frontend/apps/web/playwright-report/
+            frontend/apps/web/test-results/
+          retention-days: 14
+
+  axe:
+    name: axe
+    runs-on: ubuntu-latest
+    steps:
+      # e2e-coverage-gate.yml's axe-baseline-check job, moved verbatim (only its
+      # `needs: coverage-map-check` dependency is dropped — that job does not
+      # exist in this workflow).
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Check baseline update has reviewer field
+        run: |
+          BASELINE=frontend/apps/web/e2e/axe-baseline.json
+          if [ ! -f "$BASELINE" ]; then
+            echo "No baseline file found — skipping."
+            exit 0
+          fi
+
+          # Every entry must have approved_by and reason
+          node -e "
+            const fs = require('fs');
+            const b = JSON.parse(fs.readFileSync('$BASELINE', 'utf8'));
+            const invalid = b.filter(e => !e.approved_by || !e.reason);
+            if (invalid.length > 0) {
+              console.error('Baseline entries missing approved_by/reason:', invalid.map(e => e.id));
+              process.exit(1);
+            }
+            console.log('All baseline entries have required fields.');
+          "
+
+      - name: Detect critical violations in baseline
+        run: |
+          BASELINE=frontend/apps/web/e2e/axe-baseline.json
+          if [ ! -f "$BASELINE" ]; then
+            exit 0
+          fi
+
+          node -e "
+            const b = JSON.parse(require('fs').readFileSync('$BASELINE', 'utf8'));
+            const crits = b.filter(e => e.impact === 'critical');
+            if (crits.length > 0) {
+              console.error('CRITICAL violations must never be baselined:', crits.map(e => e.id));
+              process.exit(1);
+            }
+            console.log('No critical violations in baseline.');
+          "
+
+  security-scan:
+    name: security-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version-file: go.mod
+          cache: true
+      # gosec: full-only, transitional under this repository's local-maximum
+      # rule. Promoting milestone: "gosec backlog triage" (unscheduled on
+      # docs/superpowers/ROADMAP.md as of 2026-08-08). Global-maximum
+      # structure: gosec blocking in both `pr` and `full`, every finding
+      # fixed or carrying a gosec-native `#nosec Gxxx -- reason` suppression
+      # (`//nolint:gosec` is golangci-lint syntax; standalone gosec does not
+      # read it), and this -exclude-dir=.claude carried forward so a sibling
+      # git worktree's own go.mod never re-contaminates the scan (measured:
+      # 333 → 176 import directories, 157 → 0 from .claude/worktrees, with
+      # this flag).
+      #
+      # govulncheck: full-only, transitional. Promoting milestone:
+      # "called-CVE remediation" (unscheduled as of 2026-08-08) — bump
+      # golang.org/x/text to v0.39.0 (GO-2026-5970) and the Go toolchain to
+      # go1.26.5 (GO-2026-5856), the two called-and-reachable CVEs out of the
+      # 19 total findings. Only once both land does this promote to blocking
+      # in `pr` + `full`.
+      - name: registry checks (gosec, govulncheck)
+        run: go run ./tools/verify --require-infra --only=gosec,govulncheck
