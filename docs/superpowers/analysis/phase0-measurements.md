@@ -365,3 +365,163 @@ backlog is being worked down — that is a separate, related decision from
 disabling the output caps, and this document takes no position on it beyond
 flagging that the caps themselves should go regardless of what
 `only-new-issues` does.
+
+## 2. Why `full` is red
+
+Measured 2026-08-08 after Tasks 1–5 (`test-discipline`, `db-dictionary`, and
+`cilint` already green, so they do not appear below as findings — but they
+are still in the table for completeness).
+
+**Command:** `go run ./tools/verify --profile=full`
+**Wall clock:** the aggregate command itself did not complete — see
+"Methodology" below. Summed solo runtimes for the 29 checks: **≈471s**
+serial (excludes `go-test-integration`, which could not execute its
+registry-defined command at all — see its row). CI's own historical `full`
+wall clock is **1176s** (~19.6 min, cited in this plan's spec); that number
+is credible given `go-test-integration`'s no-race diagnostic alone took
+439s (7m19s) locally, and `-race` plus CI's own resource profile would push
+that further.
+**Result:** exit 1 (real failures + a check that could not execute its
+registry-defined command at all).
+
+### Methodology: the aggregate run itself is not trustworthy on this box
+
+`go run ./tools/verify --profile=full` was started in the background and
+produced 16 of 29 check lines, then stopped producing output entirely — no
+further checks completed, no `EXITCODE` line was ever written, and no `go`,
+`gcc`, `node`, or `pnpm` process was left running under it. The process had
+died without printing a final report. Per this task's own escalation rule,
+the aggregate run was abandoned after confirming (via `TaskStop`, which
+reported "no task found" for both the run and its poller) that the process
+was gone, and the remaining 13 checks — plus the 6 that had already reported
+FAIL in the aggregate's partial output — were re-run individually instead.
+
+That per-check rerun surfaced a second, independent finding: **5 of the 6
+checks the aggregate run reported as FAIL are clean when run alone**
+(`gofmt`, `adr-status`, `test-discipline`, `css-token-discipline`,
+`eigenpal-selector-pin` — all exit 0 standalone, with real output proving a
+real pass, e.g. `test-discipline: clean (176 integration test files
+checked)`, `OK: 1148 Go files are gofmt-clean`). All five reported FAIL in
+the aggregate run in 0.1–0.3s, far faster than their real standalone runtime
+(0.3s–56s) — too fast to have actually executed their check logic. The
+registry runs checks at `parallelism=6` by default
+(`tools/verify/main.go`'s `run()`), and something about 6 concurrent `bash`/
+`git`/subprocess invocations on this Windows/git-bash box produces spurious
+near-instant failures for several of them. This was not investigated
+further (out of scope: this task inventories, it does not fix `tools/
+verify`), but it means **`--profile=full`'s own aggregate/parallel mode
+cannot be trusted at face value on this machine** — every FAIL it reports
+must be confirmed by a solo rerun before being counted as real. Only
+`req-trace` (0.5s aggregate, 0.37s solo, exit 1 both times, identical
+output) was consistent between the two run modes. This is a distinct
+finding from the SKIP/false-green problem the task brief names, but it is
+the same shape: an aggregate "FAIL" that never actually observed the code
+under test is a false negative the way a "SKIP reported as pass" is a false
+positive. CI runs on Linux, not this Windows box, so this specific
+parallelism artifact may not reproduce there — but it is a reason to treat
+any *local* `--profile=full` red as unverified until each failing line is
+re-run alone.
+
+### Real failures — code is wrong
+
+| Check | Failure | Owner module |
+|---|---|---|
+| `go-test-unit` | `TestHGCrossModule_Negative_SubpackageSameModule` (tools/cilint/internal/analyzers) fails: the test asserts that an intra-module `documents/approval ⊂ documents` read must NOT be flagged, but the analyzer now flags it (1 finding). This is very likely a fallout of ADR 0082 (approval promoted from a nested exception under `documents` to its own top-level module, landed on this branch): the negative-test fixture still encodes the pre-ADR-0082 subpackage relationship, so it is asserting a containment that is no longer architecturally true. Whole run also failed with this as the only Go-side failure. | tools/cilint (test fixture), approval (ADR 0082 fallout) |
+| `go-test-integration` | See its own row below — could not execute its registry-defined command at all (missing cgo), so no real-failure verdict is available from the exact check. The diagnostic no-race substitute (not the registry command — see that row) surfaced 14 failing packages; of those, `internal/platform/idempotency`'s `TestMiddleware_Conflict_Returns422` / `TestMiddleware_SameKeyDifferentResourcePath_Returns422` (idempotency conflict returns HTTP 409, test wants 422) and `apps/api/cmd/metaldocs-api`'s `TestNoDeclaredOperationIsUnreachable` (a self-reporting test that intentionally fails while `metaldocs.role_capabilities` seeds `area_admin`/`qms_admin`/`signer` on capabilities no assignable role can hold — its own message calls this "pre-existing") read as real code-level findings, not environment noise. The remaining ~11 diagnostic failures cluster at suspiciously uniform ~60s durations (60.05s–61.49s) across otherwise-unrelated packages (`tests/integration/{audit,controlleddocuments,documents,iam,scenarios,templates,tenantdata}`, `internal/modules/{approval/infrastructure,iam/authz,templates/infrastructure}`) — consistent with resource/connection-pool contention from running many DB-heavy packages at Go's default test parallelism against one shared local Postgres container, not 11 independent code defects. **Not confirmed either way** — isolating each would require re-running it alone against the DB, which this task's time budget did not cover. Flagged, not asserted. | approval, iam, templates, tenantdata, platform/idempotency, platform/bootstrap (mixed; see next section for the bootstrap ones, which are environment not code) |
+
+### Infrastructure skips — the false-green class
+
+`tools/verify/main.go:341`'s `missingInfra` returns SKIP when a `Needs:`
+precondition is unmet, and `report` exits 0 on a skip. **None fired in this
+measurement** — `METALDOCS_DATABASE_URL` was set and the container
+(`metaldocs-postgres`) was healthy and accepting connections before every
+run, this repo is not a shallow clone (`needsGitDepth` satisfied), `docker`
+is on PATH (`needsDocker` satisfied, though no check in `full` currently
+declares it), and network access was available for `staticcheck`'s
+`needsNetwork`. So the zero-skip result here is not "the control was never
+exercised" — it is "the control's trigger condition (missing infra) did not
+occur this run," which is exactly why this section is empty and Step 4
+below is the sharper finding instead.
+
+| Check | Unmet `Needs:` | What it would have measured |
+|---|---|---|
+| *(none — all `Needs:` preconditions were satisfied this run)* | — | — |
+
+**This is not the same as "the false-green risk is closed."** It only means
+this particular run had the infrastructure present. The mechanism
+(`missingInfra` → SKIP → exit 0) is unconditional: any future run — a CI
+runner without `METALDOCS_DATABASE_URL` wired, a laptop with Postgres
+stopped, a shallow-clone CI checkout for `req-trace` — reproduces exactly
+the false-green the task brief describes, with zero code change. See
+"Bearing on Plan B" below for the sharper version of this risk that this
+run *did* surface: a check whose `Needs:` are satisfied can still fail to
+exercise the suite, for a reason the registry does not declare at all.
+
+### Environment failures — local only
+
+| Check | Cause |
+|---|---|
+| `go-test-integration` | `go: -race requires cgo; enable cgo by setting CGO_ENABLED=1` — exit 2, 0.14s, before compiling a single package. This machine has `CGO_ENABLED=0` (Go's own default when no C toolchain is detected) and no `gcc`/`cc` binary anywhere on `PATH` (`where gcc.exe` / `where cc.exe` both report nothing found; `/mingw64/bin` carries only `libgcc_s_seh-1.dll`, a runtime DLL, not a compiler). **This is not the `missingInfra`/SKIP path** — the registry's only declared `Needs:` for this check is `postgres`, which was satisfied, so `missingInfra` returned `""` and the check was attempted for real. It failed anyway, immediately, on a dependency the registry does not know to check for. This is the sharpest version of the task brief's "the required job can be green over zero tests" concern turned inside out: here it is *neither* green *nor* a declared skip — it is a silent-if-you're-not-reading-closely exit 2 that a CI log would show as "FAIL go-test-integration" with a one-line cause easy to skim past as "some flaky test," when the real story is "the suite never got past `go build`." A CI Linux runner with `build-essential`/`gcc` installed would not hit this; this box does not have that installed. Recorded as an environment gap, not a code defect — but also as evidence that `Needs:` in the registry is incomplete for this check (cgo/gcc is a real, undeclared precondition). |
+| `gofmt`, `adr-status`, `test-discipline`, `css-token-discipline`, `eigenpal-selector-pin` | Reported FAIL only inside the aggregate `--profile=full` run, in 0.1–0.3s each — far below their real standalone runtime (0.3s–56s). Solo reruns of the identical registry command (same argv, same working directory) all exit 0 with real, substantive pass output. Classified as an artifact of this Windows/git-bash box's behavior under the registry's default `parallelism=6`, not a code defect — see "Methodology" above. |
+
+### Bearing on Plan B
+
+**Can `test-integration` (`go-test-integration`) be a blocking job? Not yet,
+and not for the reason the plan expected.** The concern going in was the
+`missingInfra`/SKIP false-green path — that a required integration job could
+report green over zero tests because `METALDOCS_DATABASE_URL` was unset.
+This run had that variable set and Postgres healthy, so that specific path
+did not fire. But the check still could not produce a real result: it died
+on a missing C toolchain, a dependency the registry's `Needs:` list does not
+mention at all. That means **the skip mechanism is not the only way this
+check can go dark** — an operator who wires up Postgres and calls it done
+has fixed exactly one of at least two ways `go-test-integration` can fail to
+exercise the suite. Before this can block a PR:
+
+1. **The registry's `Needs:` for `go-test-integration` must be corrected**
+   to also declare (or the CI job's environment must guarantee) a working
+   cgo toolchain, or the check must drop `-race` and accept weaker coverage,
+   or `missingInfra` must grow a new precondition class for it. Silently
+   discovering this a second time, in CI, the way it was discovered here, is
+   the same failure mode the task brief opened with — just for a different
+   missing dependency.
+2. **The one real, confirmed code-level failure this measurement surfaced**
+   (`go-test-unit`'s `TestHGCrossModule_Negative_SubpackageSameModule`) must
+   be fixed or the fixture updated for ADR 0082's approval-module promotion
+   before Phase 2 adds `ci.yml`, or every PR touching anything under
+   `internal/` inherits a red `go-test-unit` from day one.
+3. **The idempotency status-code mismatch and the pre-existing
+   unreachable-capability finding** (both surfaced only via the no-race
+   diagnostic substitute, not the registry's own `-race` command) need a
+   disposition — fix or explicit acceptance — before they can sit behind a
+   blocking gate; right now they are undispositioned reds with no `req-
+   trace`-style writeup.
+4. **The ~11 uniform-duration diagnostic failures need isolation, not
+   dismissal.** They read like test-parallelism/DB-connection contention,
+   not 11 independent bugs, but that is a hypothesis, not a confirmed
+   classification — Phase 2 should not blindly retry-until-green a job that
+   might be surfacing a real, intermittent concurrency defect.
+
+**If the skip list is non-empty, that is the direct justification for
+`--require-infra`:** in this run, the skip list is empty because the
+infrastructure happened to be present — but the mechanism that would have
+produced a false green (missing `METALDOCS_DATABASE_URL`) is still live in
+`tools/verify/main.go:341` for every check tagged `Needs: postgres`
+(currently `go-test-integration` alone) and every check tagged `Needs:
+git-history` (`req-trace`) or `Needs: network` (`staticcheck`). A
+`--require-infra` flag that turns "SKIP" into "FAIL: infra required and
+absent" would convert exactly **1 check** (`go-test-integration`) from a
+silent pass-over-nothing into an honest failure in the one scenario this
+task exists to prevent (CI without `METALDOCS_DATABASE_URL` wired), plus
+harden `req-trace` and `staticcheck` against the same failure mode under a
+shallow clone or offline runner respectively — 3 checks total that currently
+have a "green without running" escape hatch.
+
+**Net verdict:** `full` cannot move behind the `required` gate as-is.
+Staging it there today would stage one confirmed real failure
+(`go-test-unit`), one check that cannot currently produce a verdict at all
+on an undeclared missing dependency (`go-test-integration`), and an
+unknown number (0–11+) of unconfirmed real failures under the same red —
+exactly the "staging a red job just moves the redness later" problem the
+plan opened with. Phase 2 needs items 1–4 above closed (or explicitly
+deferred with a written disposition, `req-trace`-style) first.
