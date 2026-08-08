@@ -381,20 +381,12 @@ jobs:
     env:
       NEEDS_JSON: ${{ toJSON(needs) }}
     steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Validate all CI results
         shell: bash
         run: |
           set -euo pipefail
-          if ! jq -e '
-            (keys | sort) == ([
-              "changes","lint-go","lint-contract","lint-frontend","governance",
-              "test-go","test-frontend","test-integration","security"
-            ] | sort)
-            and .changes.result == "success"
-            and all(to_entries[];
-                    if .key == "changes" then .value.result == "success"
-                    else (.value.result == "success" or .value.result == "skipped") end)
-          ' <<<"$NEEDS_JSON" >/dev/null; then
+          if ! jq -e -f scripts/required-gate.jq <<<"$NEEDS_JSON" >/dev/null; then
             jq -r 'to_entries[] | "\(.key)=\(.value.result // "null")"' <<<"$NEEDS_JSON"
             exit 1
           fi
