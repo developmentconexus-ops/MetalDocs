@@ -102,6 +102,16 @@ for f in "${FILES[@]}"; do
   # the file to fit the rule instead of fixing the rule. Blank out everything
   # from an unquoted `//` to end of line, preserving the line count so reported
   # line numbers still point at the real file.
+  #
+  # TRANSITIONAL: this is a regex heuristic, not a tokenizer; the global-maximum
+  # replacement is go/scanner-based comment stripping. Two known blind spots:
+  #   1. A trailing `//` comment whose own text contains a `"`, `'`, or a
+  #      backtick is left unstripped (fail-safe: extra noise, never a
+  #      silenced finding).
+  #   2. A multi-line raw-string literal whose continuation line starts with
+  #      `//` gets blanked anyway by branch 1, since sed has no cross-line
+  #      state — this direction CAN lose a real finding; not hit by the
+  #      current corpus.
   scan="$(mktemp)"
   sed -E 's@^[[:space:]]*//.*$@@; s@([^:"'"'"'`])//[^"'"'"'`]*$@\1@' "$f" > "$scan"
 

@@ -1,0 +1,7 @@
+//go:build integration
+
+package selftest
+
+func Nothing() {} // R4 shape in a trailing comment: the INNER JOIN documents in the pre-check dropped rows.
+
+var Real = 1 // benign trailing comment, no rule pattern here
