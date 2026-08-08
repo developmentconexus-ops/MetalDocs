@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "packageManager": "pnpm@11.8.0",
   "scripts": {
-    "build:docx-v2": "pnpm -r run build",
-    "test:docx-v2": "pnpm -r run test",
-    "typecheck:docx-v2": "pnpm -r run typecheck",
+    "build:docx-v2": "pnpm --filter \"./packages/**\" --filter \"./apps/**\" run build",
+    "test:docx-v2": "pnpm --filter \"./packages/**\" --filter \"./apps/**\" run test",
+    "typecheck:docx-v2": "pnpm --filter \"./packages/**\" --filter \"./apps/**\" run typecheck",
     "lint": "eslint ."
   },
   "engines": {

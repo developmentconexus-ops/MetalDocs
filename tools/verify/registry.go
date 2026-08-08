@@ -276,6 +276,20 @@ var checks = []Check{
 		// reads dist/meta.json. The registry has no dependency edges, so CI
 		// enforces the order by using two verify invocations (see ci.yml:node)
 		// and a local `--profile=pr` can still race. Recorded as D-14.
+		//
+		// D-14 UPDATE (final review, Critical 2): the npm scripts this argv
+		// calls used to be `pnpm -r run <script>`, which is recursive over
+		// EVERY workspace including frontend/apps/web — so this check and
+		// fe-test ran the same 154-file vitest suite concurrently in the same
+		// tree, with docx-v2-build's `pnpm -r run build` writing
+		// frontend/apps/web/dist underneath both. That race, not the
+		// build-before-test ordering below, was the reproducible source of
+		// flaky/contradictory results between this check and fe-test. The npm
+		// scripts now filter to `./packages/**` + `./apps/**` only, which does
+		// not include frontend/apps/web — so docx-v2-test and fe-test no
+		// longer touch the same files at all, and D-14 is left covering only
+		// the narrower build-before-test ordering within the docx workspaces
+		// themselves.
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"pnpm", "run", "test:docx-v2"},
 		Paths:    []string{"apps/docx-renderer/", "packages/"},
