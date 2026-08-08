@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"metaldocs/internal/platform/tenant"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -64,7 +65,7 @@ func TestMigration0317_RejectsContentLessInsert(t *testing.T) {
 		{name: "short hash", hash: "deadbeef"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			err := insertContentLessDraft(ctx, db, tc.hash)
+			err := insertContentLessDraft(t, ctx, db, tc.hash)
 			if err == nil {
 				t.Fatalf("insert of a draft version with content_hash %q succeeded — ADR 0088's invariant is not enforced at the DB line", tc.hash)
 			}
@@ -133,19 +134,17 @@ func constraintDef(t *testing.T, ctx context.Context, db *sql.DB, table, name st
 // insertContentLessDraft attempts the forbidden write with the capability and
 // tenant context the application itself would hold, so a failure is attributable
 // to the CHECK rather than to trg_require_cap_asserted or RLS.
-func insertContentLessDraft(ctx context.Context, db *sql.DB, hash string) error {
+func insertContentLessDraft(t *testing.T, ctx context.Context, db *sql.DB, hash string) error {
+	t.Helper()
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if _, err := tx.ExecContext(ctx, `SELECT set_config('metaldocs.asserted_caps', $1, true)`,
-		`[{"cap":"template.create"}]`); err != nil {
-		return err
-	}
+	testdb.SetCapsOnTx(t, tx, `[{"cap":"template.create"}]`)
 	if _, err := tx.ExecContext(ctx, `SELECT set_config('metaldocs.tenant_id', $1, true)`,
-		"ffffffff-ffff-ffff-ffff-ffffffffffff"); err != nil {
+		tenant.DevTenantID); err != nil {
 		return err
 	}
 	_, err = tx.ExecContext(ctx, `

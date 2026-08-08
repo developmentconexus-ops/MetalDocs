@@ -377,7 +377,8 @@ func TestDocumentSubmit_EnqueueFailure_RollsBackSubmission(t *testing.T) {
 	var docStatus string
 	var revisionVersion int
 	if err := dbc.QueryRowContext(ctx,
-		`SELECT status, revision_version FROM documents WHERE id = $1 AND tenant_id = $2`,
+		`SELECT status, revision_version FROM `+testdb.Qualified("", "documents")+
+			` WHERE id = $1 AND tenant_id = $2`,
 		doc.ID, tnt.ID,
 	).Scan(&docStatus, &revisionVersion); err != nil {
 		t.Fatalf("query documents: %v", err)
