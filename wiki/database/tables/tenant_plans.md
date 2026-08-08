@@ -1,4 +1,4 @@
-# tenant_plans
+# metaldocs.tenant_plans
 
 **Schema:** `metaldocs.tenant_plans`
 **Owner:** IAM Admin Center observability (PR-8)
