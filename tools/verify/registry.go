@@ -81,7 +81,7 @@ var checks = []Check{
 		Desc:     "go build ./... — the whole module compiles",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"go", "build", "./..."},
-		CIJob:    "test-smoke.yml:unit",
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:   "gofmt",
@@ -92,14 +92,14 @@ var checks = []Check{
 		// entirely by habit.
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-gofmt.sh"},
-		CIJob:    "invariants.yml:staticcheck",
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:       "go-vet",
 		Desc:     "go vet ./...",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"go", "vet", "./..."},
-		CIJob:    "invariants.yml:staticcheck",
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:   "go-vet-integration",
@@ -108,7 +108,7 @@ var checks = []Check{
 		// has bitten this repo before (bit QR-C).
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"go", "vet", "-tags", "integration", "./..."},
-		CIJob:    "invariants.yml:staticcheck",
+		CIJob:    "ci.yml:verify",
 	},
 
 	// ---- Go: lint ---------------------------------------------------------
@@ -117,7 +117,7 @@ var checks = []Check{
 		Desc:     "custom Go analyzers (hgcrossmodule, nosqltxindomain, platformboundary, txownership, legacyvocab) against the recorded baseline",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "./tools/cilint", "./..."},
-		CIJob:    "invariants.yml:cilint",
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:   "staticcheck",
@@ -129,7 +129,7 @@ var checks = []Check{
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "honnef.co/go/tools/cmd/staticcheck@2025.1.1", "./..."},
 		Needs:    []string{needsNetwork},
-		CIJob:    "invariants.yml:staticcheck",
+		CIJob:    "ci.yml:verify",
 	},
 
 	// ---- Contract ---------------------------------------------------------
@@ -138,8 +138,13 @@ var checks = []Check{
 		Desc:     "generated problem-code artifacts match the registry",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "./cmd/problem-codes-dump", "-check"},
-		Paths:    []string{"internal/", "api/openapi/", "wiki/references/problem-codes.md"},
-		CIJob:    "api-contract.yml:problem-codes-freshness",
+		// cmd/problem-codes-dump/ is the check's own tool: without it here, a
+		// PR that only weakens the tool (and touches no internal/ or spec
+		// file) would select zero checks over the change that most needs
+		// catching. Same class of gap as required-gate-selftest's missing
+		// scripts/required-gate.jq (whole-branch review C2).
+		Paths: []string{"internal/", "api/openapi/", "wiki/references/problem-codes.md", "cmd/problem-codes-dump/"},
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:       "api-lint-base-path-v1",
@@ -147,7 +152,7 @@ var checks = []Check{
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "./scripts/api-lint", "-only", "PATH-BASE-PREFIX", "api/openapi/v1/openapi.yaml"},
 		Paths:    []string{"api/openapi/"},
-		CIJob:    "api-contract.yml:spec-base-path-gate",
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:       "api-lint-base-path-e2e",
@@ -155,7 +160,7 @@ var checks = []Check{
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "./scripts/api-lint", "-only", "PATH-BASE-PREFIX", "api/openapi/internal-e2e.yaml"},
 		Paths:    []string{"api/openapi/"},
-		CIJob:    "api-contract.yml:spec-base-path-gate",
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:       "api-lint-strict",
@@ -163,7 +168,7 @@ var checks = []Check{
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "./scripts/api-lint/", "-strict", "api/openapi/v1/openapi.yaml", "."},
 		Paths:    []string{"api/openapi/", "scripts/api-lint/"},
-		CIJob:    "api-contract.yml:api-design-system-lint",
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:       "api-lint-selftest",
@@ -171,40 +176,55 @@ var checks = []Check{
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"go", "test", "./scripts/api-lint/...", "-count=1"},
 		Paths:    []string{"scripts/api-lint/"},
-		CIJob:    "api-contract.yml:api-design-system-lint",
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:       "contract-sync",
 		Desc:     "spec/generated/runtime contract sync across modules",
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"pwsh", "-NoProfile", "-File", "./scripts/check-contract-sync-all.ps1"},
-		Paths:    []string{"api/openapi/", "internal/"},
-		CIJob:    "api-contract.yml:contract-sync",
+		// scripts/check-contract-sync-all.ps1 is the check's own definition;
+		// without it a PR editing only the script (weakening what it checks)
+		// selects zero checks (whole-branch review C2).
+		Paths: []string{"api/openapi/", "internal/", "scripts/check-contract-sync-all.ps1"},
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:       "codegen-drift-backend",
 		Desc:     "go generate ./... produces no diff in generated Go artifacts (api.gen.go, httpsurface_gen.go, httpsurface_e2e_gen.go)",
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-codegen-drift-backend.sh"},
-		Paths:    []string{"api/openapi/", "internal/", "apps/", "cmd/"},
-		CIJob:    "ci.yml:verify",
+		// scripts/check-codegen-drift-backend.sh is the check's own
+		// definition (whole-branch review C2 class).
+		Paths: []string{"api/openapi/", "internal/", "apps/", "cmd/", "scripts/check-codegen-drift-backend.sh"},
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:       "codegen-drift-frontend",
 		Desc:     "pnpm run gen:api produces no diff in frontend/apps/web/src/lib/api-types/",
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-codegen-drift-frontend.sh"},
-		Paths:    []string{"api/openapi/", "frontend/"},
-		CIJob:    "ci.yml:verify",
+		// scripts/check-codegen-drift-frontend.sh is the check's own
+		// definition (whole-branch review C2 class).
+		Paths: []string{"api/openapi/", "frontend/", "scripts/check-codegen-drift-frontend.sh"},
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:       "openapi-lint-v1",
 		Desc:     "redocly lint on the v1 spec",
 		Profiles: []string{ProfilePR, ProfileFull},
-		Argv:     []string{"npx", "--yes", "@redocly/cli@latest", "lint", "api/openapi/v1/openapi.yaml"},
-		Needs:    []string{needsNetwork},
-		Paths:    []string{"api/openapi/"},
-		CIJob:    "ci.yml:verify",
+		// Pinned to 2.46.0, latest at pin time (2026-08-08) — same reasoning
+		// as ci.yml's oasdiff pin: an unpinned lint tool can change what it
+		// accepts with no diff in this repo to review.
+		Argv:  []string{"npx", "--yes", "@redocly/cli@2.46.0", "lint", "api/openapi/v1/openapi.yaml"},
+		Needs: []string{needsNetwork},
+		// redocly.yaml at repo root configures this lint's rule set (rules:
+		// struct: error, etc.) — without it here, a PR that only loosens
+		// redocly.yaml (e.g. turning a rule off) selects zero checks
+		// (whole-branch review C3 class: a repo-root config file absent from
+		// every check's Paths).
+		Paths: []string{"api/openapi/", "redocly.yaml"},
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:   "openapi-lint-e2e",
@@ -215,10 +235,16 @@ var checks = []Check{
 		// the public bundle and frontend codegen (codegen-drift-frontend),
 		// only its own contract hygiene is gated here.
 		Profiles: []string{ProfilePR, ProfileFull},
-		Argv:     []string{"npx", "--yes", "@redocly/cli@latest", "lint", "api/openapi/internal-e2e.yaml"},
-		Needs:    []string{needsNetwork},
-		Paths:    []string{"api/openapi/"},
-		CIJob:    "ci.yml:verify",
+		// Pinned to 2.46.0 — same reasoning as openapi-lint-v1 above.
+		Argv:  []string{"npx", "--yes", "@redocly/cli@2.46.0", "lint", "api/openapi/internal-e2e.yaml"},
+		Needs: []string{needsNetwork},
+		// redocly.yaml at repo root configures this lint's rule set (rules:
+		// struct: error, etc.) — without it here, a PR that only loosens
+		// redocly.yaml (e.g. turning a rule off) selects zero checks
+		// (whole-branch review C3 class: a repo-root config file absent from
+		// every check's Paths).
+		Paths: []string{"api/openapi/", "redocly.yaml"},
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:   "oasdiff-breaking",
@@ -244,8 +270,10 @@ var checks = []Check{
 		Desc:     "cross-module access goes through published interfaces",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"pwsh", "-NoProfile", "-File", "./scripts/check-module-boundaries.ps1"},
-		Paths:    []string{"internal/"},
-		CIJob:    "module-boundaries.yml:conformance",
+		// scripts/check-module-boundaries.ps1 is the check's own definition
+		// (whole-branch review C2 class).
+		Paths: []string{"internal/", "scripts/check-module-boundaries.ps1"},
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:       "test-discipline",
@@ -253,7 +281,7 @@ var checks = []Check{
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-test-discipline.sh"},
 		Paths:    []string{"internal/", "tests/", "apps/"},
-		CIJob:    "module-boundaries.yml:conformance",
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:       "test-discipline-selftest",
@@ -261,7 +289,7 @@ var checks = []Check{
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-test-discipline-selftest.sh"},
 		Paths:    []string{"scripts/check-test-discipline.sh", "scripts/check-test-discipline-selftest.sh", "scripts/testdata/test-discipline/"},
-		CIJob:    "module-boundaries.yml:conformance",
+		CIJob:    "ci.yml:verify",
 	},
 
 	// ---- Governance -------------------------------------------------------
@@ -270,24 +298,30 @@ var checks = []Check{
 		Desc:     "no ADR status block exceeds its line/char budget",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-adr-status.sh"},
-		Paths:    []string{"wiki/decisions/"},
-		CIJob:    "governance-check.yml:check",
+		// scripts/check-adr-status.sh is the check's own definition
+		// (whole-branch review C2 class).
+		Paths: []string{"wiki/decisions/", "scripts/check-adr-status.sh"},
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:       "wiki-tally",
 		Desc:     "every module doc's severity tally matches its tech-debt register",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"pwsh", "-NoProfile", "-File", "./scripts/wiki-tally-check.ps1", "-All"},
-		Paths:    []string{"wiki/modules/"},
-		CIJob:    "governance-check.yml:wiki-tally",
+		// scripts/wiki-tally-check.ps1 is the check's own definition
+		// (whole-branch review C2 class).
+		Paths: []string{"wiki/modules/", "scripts/wiki-tally-check.ps1"},
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:       "db-dictionary",
 		Desc:     "every baseline table has a wiki dictionary page",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"pwsh", "-NoProfile", "-File", "./scripts/check-db-dictionary-coverage.ps1"},
-		Paths:    []string{"db/baseline/", "wiki/database/tables/"},
-		CIJob:    "governance-check.yml:db-dictionary-coverage",
+		// scripts/check-db-dictionary-coverage.ps1 is the check's own
+		// definition (whole-branch review C2 class).
+		Paths: []string{"db/baseline/", "wiki/database/tables/", "scripts/check-db-dictionary-coverage.ps1"},
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:       "migration-gapless",
@@ -295,8 +329,10 @@ var checks = []Check{
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-migration-gapless.sh"},
 		Needs:    []string{needsGitDepth},
-		Paths:    []string{"db/migrations/"},
-		CIJob:    "ci.yml:verify",
+		// scripts/check-migration-gapless.sh is the check's own definition —
+		// named explicitly in the whole-branch review's C2 finding.
+		Paths: []string{"db/migrations/", "scripts/check-migration-gapless.sh"},
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:   "governance-diff-rules",
@@ -316,8 +352,11 @@ var checks = []Check{
 		Desc:     "every invariant row in e2e/COVERAGE.md has ≥1 mapped spec ID",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-invariant-coverage-map.sh"},
-		Paths:    []string{"frontend/apps/web/e2e/COVERAGE.md"},
-		CIJob:    "ci.yml:verify",
+		// scripts/check-invariant-coverage-map.sh is the check's own
+		// definition — named explicitly in the whole-branch review's C2
+		// finding.
+		Paths: []string{"frontend/apps/web/e2e/COVERAGE.md", "scripts/check-invariant-coverage-map.sh"},
+		CIJob: "ci.yml:verify",
 	},
 
 	// ---- Security -----------------------------------------------------------
@@ -380,56 +419,77 @@ var checks = []Check{
 		Desc:     "eslint across the workspace, including the eigenpal import boundary",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"pnpm", "run", "lint"},
-		Paths:    []string{"frontend/", "packages/", "apps/", "eslint.config.mjs"},
-		CIJob:    "lint.yml:eslint",
+		Paths:    []string{"frontend/", "packages/", "apps/", "eslint.config.mjs", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc"},
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:       "css-token-discipline",
 		Desc:     "no new raw hex colors in module.css",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-css-token-discipline.sh"},
-		Paths:    []string{"frontend/"},
-		CIJob:    "lint.yml:css-token-discipline",
+		// scripts/check-css-token-discipline.sh is the check's own
+		// definition — named explicitly in the whole-branch review's C2
+		// finding.
+		Paths: []string{"frontend/", "scripts/check-css-token-discipline.sh"},
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:       "eigenpal-selector-pin",
 		Desc:     "eigenpal version and selector counts are pinned together (ADR 0046, second half)",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-eigenpal-selector-pin.sh"},
-		Paths:    []string{"frontend/", "packages/eigenpal-adapter/"},
-		CIJob:    "lint.yml:eigenpal-selector-pin",
+		// scripts/check-eigenpal-selector-pin.sh is the check's own
+		// definition — named explicitly in the whole-branch review's C2
+		// finding.
+		Paths: []string{"frontend/", "packages/eigenpal-adapter/", "scripts/check-eigenpal-selector-pin.sh"},
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:       "fe-typecheck",
 		Desc:     "tsc over @metaldocs/web",
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"pnpm", "--filter", "@metaldocs/web", "run", "typecheck"},
-		Paths:    []string{"frontend/", "packages/"},
-		CIJob:    "fe-ci.yml:web-typecheck-test",
+		// Root toolchain/dependency files, not just frontend/ and packages/:
+		// a lockfile-only or Node-version-only PR (Dependabot's normal shape)
+		// otherwise selects zero frontend checks while the pathless Go
+		// checks still run, so `required` reports success over an unrun
+		// frontend suite (whole-branch review C3).
+		Paths: []string{"frontend/", "packages/", "pnpm-lock.yaml", "package.json", "pnpm-workspace.yaml", ".nvmrc"},
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:       "fe-test",
 		Desc:     "vitest over @metaldocs/web",
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"pnpm", "--filter", "@metaldocs/web", "run", "test"},
-		Paths:    []string{"frontend/", "packages/"},
-		CIJob:    "fe-ci.yml:web-typecheck-test",
+		// Same C3 fix as fe-typecheck above, same reason.
+		Paths: []string{"frontend/", "packages/", "pnpm-lock.yaml", "package.json", "pnpm-workspace.yaml", ".nvmrc"},
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:       "docx-v2-typecheck",
 		Desc:     "tsc over the docx-v2 workspace",
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"pnpm", "run", "typecheck:docx-v2"},
-		Paths:    []string{"apps/docx-renderer/", "packages/"},
-		CIJob:    "docx-renderer.yml:node",
+		// Same C3 fix as fe-typecheck above, same reason.
+		Paths: []string{"apps/docx-renderer/", "packages/", "pnpm-lock.yaml", "package.json", "pnpm-workspace.yaml", ".nvmrc"},
+		// I8: docx-renderer.yml:node is where this check actually runs today,
+		// but it is a new-topology workflow that is NOT inside ci.yml:required's
+		// needs: closure and will not gate a merge after the Phase 4 ruleset
+		// swap (required_status_checks becomes exactly [{"context": "required"}]).
+		// ci.yml:verify's own --profile=changed selection also runs this check
+		// (Paths above match), so that is the honest CIJob for audit purposes.
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:       "docx-v2-build",
 		Desc:     "the docx-v2 workspace builds; produces the dist/meta.json that docx-v2-test's bundle guard reads",
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"pnpm", "run", "build:docx-v2"},
-		Paths:    []string{"apps/docx-renderer/", "packages/"},
-		CIJob:    "docx-renderer.yml:node",
+		// Same C3 fix as fe-typecheck above, same reason.
+		Paths: []string{"apps/docx-renderer/", "packages/", "pnpm-lock.yaml", "package.json", "pnpm-workspace.yaml", ".nvmrc"},
+		// I8: same CIJob reasoning as docx-v2-typecheck above.
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:   "docx-v2-test",
@@ -457,8 +517,10 @@ var checks = []Check{
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"pnpm", "run", "test:docx-v2"},
 		After:    []string{"docx-v2-build"},
-		Paths:    []string{"apps/docx-renderer/", "packages/"},
-		CIJob:    "docx-renderer.yml:node",
+		// Same C3 fix as fe-typecheck above, same reason.
+		Paths: []string{"apps/docx-renderer/", "packages/", "pnpm-lock.yaml", "package.json", "pnpm-workspace.yaml", ".nvmrc"},
+		// I8: same CIJob reasoning as docx-v2-typecheck above.
+		CIJob: "ci.yml:verify",
 	},
 
 	// ---- Tests ------------------------------------------------------------
@@ -467,7 +529,7 @@ var checks = []Check{
 		Desc:     "go test ./... (no integration tag)",
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"go", "test", "-count=1", "-timeout", "600s", "./..."},
-		CIJob:    "test-smoke.yml:unit",
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:   "go-test-integration",
@@ -493,7 +555,7 @@ var checks = []Check{
 		// is deliberately roots, not the narrower subset that happened to be
 		// touched by any one past incident.
 		Paths: []string{"go.mod", "go.sum", "db/", "internal/", "apps/", "tests/"},
-		CIJob: "test-full.yml:full",
+		CIJob: "ci.yml:test-integration",
 	},
 
 	// ---- Traceability -----------------------------------------------------
@@ -503,7 +565,7 @@ var checks = []Check{
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"go", "test", "./scripts/req-trace/...", "-count=1"},
 		Paths:    []string{"scripts/req-trace/"},
-		CIJob:    "req-traceability.yml:gate",
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:       "req-trace",
@@ -512,15 +574,22 @@ var checks = []Check{
 		Argv:     []string{"go", "run", "./scripts/req-trace"},
 		Needs:    []string{needsGitDepth},
 		Paths:    []string{"wiki/architecture/", "internal/", "apps/"},
-		CIJob:    "req-traceability.yml:gate",
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:       "required-gate-selftest",
 		Desc:     "the ci.yml `required` aggregator accepts and rejects the right needs-result sets",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-required-gate.sh"},
-		Paths:    []string{".github/workflows/ci.yml", "scripts/check-required-gate.sh", "scripts/testdata/required-gate/"},
-		CIJob:    "ci.yml:verify",
+		// scripts/required-gate.jq is the expression this check exists to
+		// pin down (audit rule A5 binds it to ci.yml:required's needs: list,
+		// but A5 only compares the key array, not the predicate) — a PR
+		// editing only the .jq (e.g. loosening `== "success"` to
+		// `!= "failure"`) must select this check too, or it is the one PR
+		// that can weaken the gate expression while selecting zero gate
+		// checks (whole-branch review C2).
+		Paths: []string{".github/workflows/ci.yml", "scripts/check-required-gate.sh", "scripts/required-gate.jq", "scripts/testdata/required-gate/"},
+		CIJob: "ci.yml:verify",
 	},
 
 	// ---- Anti-drift ---------------------------------------------------------

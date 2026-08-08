@@ -193,6 +193,58 @@ jobs:
 	}
 }
 
+// ---- A6: ProfilePR check's CIJob must be inside ci.yml:required's needs: closure ----
+
+func TestAuditA6FiresOnCIJobOutsideRequiredClosure(t *testing.T) {
+	regs := []Check{
+		{ID: "orphan-pr-check", Profiles: []string{ProfilePR}, CIJob: "side.yml:node"},
+	}
+	jobs := []workflowJob{
+		{Workflow: "side.yml", Job: "node", OnlyIDs: []string{"orphan-pr-check"}},
+		{Workflow: "ci.yml", Job: "verify", OnlyIDs: nil, Needs: nil},
+		{Workflow: "ci.yml", Job: "required", Needs: []string{"verify"}},
+	}
+	got := strings.Join(auditFindings(regs, jobs, nil), "\n")
+	if !strings.Contains(got, "A6") || !strings.Contains(got, "orphan-pr-check") {
+		t.Fatalf("want an A6 finding naming orphan-pr-check (its CIJob side.yml:node is outside ci.yml:required's closure), got:\n%s", got)
+	}
+}
+
+func TestAuditA6CleanWhenCIJobInsideClosure(t *testing.T) {
+	regs := []Check{
+		{ID: "in-closure-check", Profiles: []string{ProfilePR}, CIJob: "ci.yml:verify"},
+	}
+	jobs := []workflowJob{
+		{Workflow: "ci.yml", Job: "verify", OnlyIDs: []string{"in-closure-check"}},
+		{Workflow: "ci.yml", Job: "required", Needs: []string{"verify"}},
+	}
+	got := auditFindings(regs, jobs, nil)
+	for _, f := range got {
+		if strings.Contains(f, "A6") {
+			t.Errorf("want no A6 finding when CIJob is inside the closure, got %v", got)
+		}
+	}
+}
+
+// A6 must not fire for a check that is not in ProfilePR at all (e.g. a
+// full-only integration suite) — its CIJob is allowed to be a job that never
+// reports to `required`, because it was never claimed to gate a merge.
+func TestAuditA6IgnoresNonPRProfileChecks(t *testing.T) {
+	regs := []Check{
+		{ID: "full-only-check", Profiles: []string{ProfileFull}, CIJob: "side.yml:node"},
+	}
+	jobs := []workflowJob{
+		{Workflow: "side.yml", Job: "node", OnlyIDs: []string{"full-only-check"}},
+		{Workflow: "ci.yml", Job: "required", Needs: nil},
+	}
+	got := auditFindings(regs, jobs, nil)
+	for _, f := range got {
+		if strings.Contains(f, "A6") {
+			t.Errorf("A6 must not fire for a non-ProfilePR check, got %v", got)
+		}
+	}
+}
+
 func TestAuditProfileInvocationSatisfiesCIJob(t *testing.T) {
 	// idsForProfile(changed) is computed against the real global registry
 	// (it has to be — it is not injectable), so this test points a copy of
@@ -201,15 +253,21 @@ func TestAuditProfileInvocationSatisfiesCIJob(t *testing.T) {
 	// Using the real registry (rather than a two-entry fake one) avoids a
 	// storm of spurious A1 "unknown ID" findings for every other real
 	// pr-scoped check idsForProfile also returns.
+	// Workflow/job named "ci.yml:verify" (not a "sample.yml" stand-in): A6
+	// requires every ProfilePR check's CIJob to be inside ci.yml:required's
+	// needs: closure, so the fake job here has to actually live in that
+	// closure for this test to isolate what it means to test (A1/A2/A3
+	// satisfaction via --profile=), rather than tripping A6 as a side effect.
 	regs := make([]Check, len(checks))
 	copy(regs, checks)
 	for i, c := range regs {
 		if c.ID == "go-build" {
-			regs[i].CIJob = "sample.yml:verify"
+			regs[i].CIJob = "ci.yml:verify"
 		}
 	}
 	jobs := []workflowJob{
-		{Workflow: "sample.yml", Job: "verify", OnlyIDs: idsForProfile(ProfileChanged)},
+		{Workflow: "ci.yml", Job: "verify", OnlyIDs: idsForProfile(ProfileChanged)},
+		{Workflow: "ci.yml", Job: "required", Needs: []string{"verify"}},
 	}
 	found := false
 	for _, id := range jobs[0].OnlyIDs {
@@ -221,8 +279,8 @@ func TestAuditProfileInvocationSatisfiesCIJob(t *testing.T) {
 		t.Fatalf("idsForProfile(changed) does not include go-build; got %v", jobs[0].OnlyIDs)
 	}
 	for _, f := range auditFindings(regs, jobs, nil) {
-		if strings.Contains(f, "sample.yml:verify") {
-			t.Errorf("want no finding referencing the profile-satisfied CIJob, got %q", f)
+		if strings.Contains(f, " go-build ") {
+			t.Errorf("want no finding for go-build (profile-satisfied CIJob, inside the closure), got %q", f)
 		}
 	}
 }

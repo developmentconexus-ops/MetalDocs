@@ -223,8 +223,71 @@ func auditFindings(regs []Check, jobs []workflowJob, requiredGateKeys []string) 
 		}
 	}
 
+	// A6 — every ProfilePR check's CIJob must be a job inside ci.yml:required's
+	// needs: transitive closure. I8: 22 of 42 CIJob values used to name
+	// legacy, since-collapsed workflows (module-boundaries.yml, lint.yml,
+	// governance-check.yml, fe-ci.yml, req-traceability.yml, test-smoke.yml,
+	// test-full.yml, invariants.yml) — a check pointed at one of those still
+	// passed A2/A3 (the workflow file and its --only=/--profile= still exist
+	// on disk today) while proving nothing about whether the NEW topology
+	// (ci.yml's four required jobs) actually gates a merge on it. A6 closes
+	// that: it does not care whether the claimed job runs and reports
+	// (A2/A3's job) — it asks whether reporting it can ever change whether a
+	// PR merges. needs: is same-workflow-file only (a job in another file
+	// cannot appear in ci.yml:required's needs: list even indirectly), so the
+	// closure is computed only over ci.yml's own jobs; a CIJob pointing at any
+	// other workflow file — however real that job and however faithfully it
+	// runs the check — fails A6, because that workflow's result cannot reach
+	// `required` and therefore cannot block a merge.
+	closure := requiredClosure(jobs)
+	for _, c := range regs {
+		if !hasProfile(c, ProfilePR) {
+			continue
+		}
+		if c.CIJob == "" { // already reported by A4
+			continue
+		}
+		if !closure[c.CIJob] {
+			findings = append(findings, fmt.Sprintf(
+				"A6 %s claims CIJob %q, which is not inside ci.yml:required's needs: transitive closure — it cannot gate a merge", c.ID, c.CIJob))
+		}
+	}
+
 	sort.Strings(findings)
 	return findings
+}
+
+// requiredClosure returns the set of "ci.yml:job" keys reachable from
+// ci.yml's `required` job by following needs: edges, plus "ci.yml:required"
+// itself. needs: only ever names a job in the same workflow file (GitHub
+// Actions has no cross-file needs:), so the closure never leaves ci.yml —
+// which is exactly why a CIJob naming any other workflow file can never be in
+// it, no matter how real that job is.
+func requiredClosure(jobs []workflowJob) map[string]bool {
+	needsByJob := map[string][]string{}
+	for _, j := range jobs {
+		if j.Workflow != "ci.yml" {
+			continue
+		}
+		needsByJob[j.Job] = j.Needs
+	}
+
+	closure := map[string]bool{}
+	var visit func(job string)
+	visit = func(job string) {
+		key := "ci.yml:" + job
+		if closure[key] {
+			return
+		}
+		closure[key] = true
+		for _, dep := range needsByJob[job] {
+			visit(dep)
+		}
+	}
+	if _, ok := needsByJob["required"]; ok {
+		visit("required")
+	}
+	return closure
 }
 
 func sameStrings(a, b []string) bool {
