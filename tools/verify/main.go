@@ -87,7 +87,7 @@ func main() {
 		printList()
 		return
 	case *audit:
-		os.Exit(printAudit())
+		os.Exit(printAudit(filepath.Join(".github", "workflows")))
 	}
 
 	selected, err := selectChecks(*profile, *only, *base)
@@ -497,27 +497,6 @@ func printList() {
 		}
 	}
 	fmt.Println()
-}
-
-// printAudit reports registry entries with no corresponding CI job. Such a
-// check runs on developer machines and not in CI, which makes it advice
-// rather than a control — the same failure mode as an unwired script.
-func printAudit() int {
-	var gaps []Check
-	for _, c := range checks {
-		if c.CIJob == "" {
-			gaps = append(gaps, c)
-		}
-	}
-	fmt.Printf("verify --audit: %d checks, %d with no CI job\n", len(checks), len(gaps))
-	if len(gaps) == 0 {
-		return 0
-	}
-	fmt.Println("\nThese run locally but nothing enforces them on a PR:")
-	for _, c := range gaps {
-		fmt.Printf("  - %-24s %s\n", c.ID, c.Desc)
-	}
-	return 1
 }
 
 // ------------------------------------------------------------------- helpers

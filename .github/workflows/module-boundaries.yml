@@ -15,6 +15,7 @@ jobs:
         with: { go-version-file: go.mod, cache: true }
 
       # Check set for this job lives in tools/verify/registry.go
-      # (module-boundaries, test-discipline) — see CIJob: "module-boundaries.yml:conformance".
-      - name: verify (module-boundaries, test-discipline)
-        run: go run ./tools/verify --only=module-boundaries,test-discipline
+      # (module-boundaries, test-discipline, test-discipline-selftest) — see
+      # CIJob: "module-boundaries.yml:conformance".
+      - name: verify (module-boundaries, test-discipline, test-discipline-selftest)
+        run: go run ./tools/verify --only=module-boundaries,test-discipline,test-discipline-selftest
