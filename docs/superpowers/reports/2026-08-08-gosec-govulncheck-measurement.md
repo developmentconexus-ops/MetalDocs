@@ -108,6 +108,20 @@ symbol-level analysis is what makes "2, both real, both fixable" a
 defensible gate — a naive dependency scanner would have reported 19 and
 buried the 2 that matter under the 17 that don't apply.
 
+The `pr`+`full` blocking tier below is conditional on those two bumps
+landing first, so the prerequisite is itself a named, transitional
+deliverable rather than an unnamed future action:
+
+- **Transitional:** the blocking tier is gated, not yet in force.
+- **Global-maximum structure:** govulncheck registered as a blocking check
+  in `pr` and `full` with zero called vulnerabilities outstanding.
+- **Promoting milestone: "called-CVE remediation."** A follow-on milestone,
+  **unscheduled on `docs/superpowers/ROADMAP.md` as of 2026-08-08** — the
+  operator schedules it. Its completion is the event that flips the tier
+  from conditional to unconditionally blocking. Its two entry criteria are
+  already measured in this report: bump `golang.org/x/text` to v0.39.0
+  (GO-2026-5970) and the Go toolchain to go1.26.5 (GO-2026-5856).
+
 ---
 
 ## 2. gosec — whole tree, caps off
@@ -140,6 +154,37 @@ walker does **not** respect that boundary: the contaminated run logged 333
 worktree — nearly doubling the true count. Re-running with
 `-exclude-dir=.claude` drops this to 176 unique import directories and 0
 worktree lines in the log.
+
+**The 176-vs-157 gap, measured, not assumed:** 176 (gosec import directories,
+post-fix) is 19 more than the 157 `go list ./...` reports. This was checked
+directly rather than left as an unexplained 12%: `find . -name '*.go'
+-not -path './vendor/*' -not -path '*/.claude/*' | xargs -n1 dirname | sort -u
+| wc -l` also returns 176, confirming gosec's directory walker and this
+independent directory count agree — the gap is entirely between "has a
+`.go` file" (176) and "is a buildable Go package under default build
+constraints" (157). Diffing the two directory sets accounts for all 19:
+
+- 12 are `tests/integration/*` subpackages gated `//go:build integration` —
+  `go list ./...` without `-tags integration` sees no buildable file there.
+- 3 are `testdata` directories (`internal/platform/problem/testdata/compilefail`,
+  `scripts/api-lint/testdata/repo_good`, `scripts/api-lint/testdata/repo_missing`)
+  — the `testdata` name is a directory the Go toolchain always skips.
+- 1 is `scripts/tmp` (`qa_hashgen.go`, tagged `//go:build ignore`).
+- 1 is `internal/modules/iam` — its only `.go` file is
+  `integration_test.go`, tagged `//go:build integration`, so under default
+  constraints the directory has zero buildable files.
+- 1 is the repo root — its only `.go` file is `tools.go`, tagged
+  `//go:build tools`.
+- 1 is a vendored Go source file inside `node_modules/.pnpm/flatted@.../golang/pkg/flatted`
+  (the `flatted` npm package ships a Go port); `go list` confirms it explicitly:
+  `directory ... outside main module or its selected dependencies`.
+
+12+3+1+1+1+1 = 19, closing the gap exactly. gosec's plain directory walk
+sees all of these because it does not evaluate build constraints or module
+boundaries; `go list ./...` correctly excludes them. Both counts are
+therefore right for what they measure — the post-fix 176 remains the
+correct scope for gosec specifically (it is what gosec actually walked),
+and 157 is the correct scope for `go build`/`go vet`.
 
 This is the same class of mistake the brief warns about with golangci-lint's
 214-vs-1078: an uncorrected number here would have been ~2x inflated by code
@@ -221,9 +266,20 @@ local-maximum rule.**
   work for this purpose), zero untriaged findings remaining, and
   `-exclude-dir=.claude` (or equivalent worktree exclusion) built into the
   registered invocation so the census stays honest run to run.
-- **Promoting milestone:** the follow-up gosec-triage task that Task 9's
-  report should schedule (not named here — this report does not create new
-  program structure, only states the condition).
+- **Global-maximum structure:** gosec running as a *blocking* check in both
+  the `pr` and `full` profiles, with no advisory carve-out — every finding
+  either fixed or carrying a gosec-native suppression (`#nosec Gxxx --
+  reason` or an equivalent `-nosec-tag` marker; see §3) with a live
+  justification, and `//nolint:gosec` no longer relied on for a tool that
+  does not read it.
+- **Promoting milestone: "gosec backlog triage."** A follow-on milestone,
+  **unscheduled on `docs/superpowers/ROADMAP.md` as of 2026-08-08** — the
+  operator schedules it. Its completion is the event that deletes this
+  advisory `full`-only placement. Its two entry criteria are already
+  measured in this report and require no further discovery to start: (1)
+  triage all 64 findings from §2 to fixed/suppressed, zero untriaged; (2)
+  resolve the `//nolint:gosec`-vs-gosec-native suppression mismatch
+  documented in §3.
 
 ---
 
@@ -249,7 +305,19 @@ for a check we would register.
 |---|---|---|---|
 | `tools/verify/main.go:334` | G204 | argv is compile-time literals or `refPattern`-validated | **Still holds.** `command()` (main.go:333-338) is documented as the single exec chokepoint; every call site is a literal or regex-validated string — confirmed by reading the function and its doc comment. Already the brief's known-good example. |
 | `tools/verify/audit.go:76` | G304 | path comes from a glob of a fixed directory | **Still holds.** Traced `parseWorkflows(dir)` → `printAudit(dir)` → sole caller `main.go:90: printAudit(filepath.Join(".github", "workflows"))` — `dir` is a compile-time literal, `filepath.Glob` only returns paths under it. |
-| `internal/modules/render/fanout/staging_outbox.go:89,153,181,215,229,255` (6 sites) | none stated per-line, but file comment: table name is allowlist-validated at construction | **Still holds, all 6.** `stagingOutboxAllowlist` (line 38-41) is a fixed 2-entry map; `NewStagingOutboxRepository` (line 55-60) panics if the constructor's `table` argument isn't in it. Every one of the 6 `fmt.Sprintf(..., r.table, ...)` sites uses that already-validated field, not user input — read each site directly, same pattern throughout. |
+| `internal/modules/render/fanout/staging_outbox.go:89` (Enqueue, `INSERT INTO %s`) | G201 | `//nolint:gosec // table name is allowlist-validated at construction` | **Still holds.** `fmt.Sprintf` substitutes `r.table` only; `r.table` was validated against `stagingOutboxAllowlist` in `NewStagingOutboxRepository` (line 55-60) before this struct could exist. |
+| `internal/modules/render/fanout/staging_outbox.go:153` (MarkDispatched, `UPDATE %s`) | G201 | `//nolint:gosec // table name is allowlist-validated at construction` | **Still holds.** Same `r.table`, same construction-time validation; no other interpolated value in the format string. |
+| `internal/modules/render/fanout/staging_outbox.go:181` (dead-letter UPDATE, `UPDATE %s`) | G201 | `//nolint:gosec // table name is allowlist-validated at construction` | **Still holds.** Same `r.table`; comment above the call cross-references `internal/platform/messaging/outbox/postgres/consumer.go:152-177` as the pattern this mirrors — read, and it is the same allowlisted-identifier shape. |
+| `internal/modules/render/fanout/staging_outbox.go:215` (CountDeadLettered, `SELECT COUNT(*) FROM %s ...`) | G201 | `//nolint:gosec // table name is allowlist-validated at construction` | **Still holds.** Same `r.table`; the `WHERE` clause uses a placeholder-free static predicate, no additional interpolation. |
+| `internal/modules/render/fanout/staging_outbox.go:229` (ReadState, `SELECT status FROM %s ...`) | G201 | `//nolint:gosec // table name is allowlist-validated at construction` | **Still holds.** Same `r.table`; the rest of the query binds `tenantID`/`revisionID` as parameterized args, not string-interpolated. |
+| `internal/modules/render/fanout/staging_outbox.go:255` (purge loop, `DELETE FROM %s ...`) | G201 | `//nolint:gosec // table name is allowlist-validated at construction` | **Still holds.** Same `r.table`, inside a bounded `maxIterations` loop; the delete predicate is otherwise parameterized. |
+
+All 6 sites genuinely share one justification — they are the same
+`fmt.Sprintf(..., r.table, ...)` pattern against the same
+construction-time-validated field, confirmed by reading each site
+individually rather than assumed from the file-level comment. No site was
+found to deviate from that pattern; six identical verdicts is the accurate
+record, not a shortcut.
 
 **Critical gap found while verifying — not a "still holds" issue, a
 mechanism issue:** `//nolint:gosec` is a **golangci-lint** convention.
@@ -284,7 +352,7 @@ make, now made with the real number instead of an assumption.
 
 | Scanner | Called/real findings | Total findings | Branch | Tier |
 |---|---|---|---|---|
-| govulncheck | 2 called (19 total: 2 called + 2 imported + 15 required) | 19 | Few, all real → fix then register blocking | `pr` + `full`, blocking, **after** a follow-up task closes GO-2026-5970 and GO-2026-5856 |
-| gosec | mix of real/noise across 11 rules | 64 (after excluding the contaminated `.claude/worktrees` sibling-worktree scope; the contaminated run's finding count was not captured before the file was overwritten by the corrected run — see note below) | Many / mixed → register `full` only | `full` only, routed to `nightly.yml`, **transitional** — promotable once every finding is triaged and the `//nolint:gosec` vs gosec-native-suppression mismatch is resolved |
+| govulncheck | 2 called (19 total: 2 called + 2 imported + 15 required) | 19 | Few, all real → fix then register blocking | `pr` + `full`, blocking, **after** a follow-up task closes GO-2026-5970 and GO-2026-5856 — promoting milestone **"called-CVE remediation," unscheduled as of 2026-08-08** |
+| gosec | mix of real/noise across 11 rules | 64 (after excluding the contaminated `.claude/worktrees` sibling-worktree scope; the contaminated run's finding count was not captured before the file was overwritten by the corrected run — see note below) | Many / mixed → register `full` only | `full` only, routed to `nightly.yml`, **transitional** — promotable once every finding is triaged and the `//nolint:gosec` vs gosec-native-suppression mismatch is resolved — promoting milestone **"gosec backlog triage," unscheduled as of 2026-08-08** |
 
 **Note on the contaminated run's count:** the first (contaminated) gosec run's `/tmp/gosec.json` was overwritten by the corrected `-exclude-dir=.claude` run before its `Stats`/`Issues` were parsed, so no contaminated-run finding count is reported here — only the import-directory evidence (333 total, 157 from the sibling worktree, confirmed via the gosec stderr log) is available. The 64-finding count above comes exclusively from the corrected, uncontaminated run and is not compared against a number that was never actually measured.
