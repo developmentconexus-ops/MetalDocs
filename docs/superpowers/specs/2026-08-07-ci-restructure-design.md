@@ -524,3 +524,133 @@ generated CI manifest, and the milestone that must build it is the follow-on to 
 - Any paid tier of any tool. Zero spend stands.
 - Sharding the integration suite. Go already runs packages concurrently; naive sharding is not
   verified to help, and the `needs:` edge in §4.2 removes the pain without touching the suite.
+
+---
+
+## 11. Amendment — 2026-08-08, after Phase 0
+
+Phase 0 executed (branch `ci/a1-verify-single-entry-point`, 31 commits). It did what it was for:
+it replaced estimates with measurements. Two of this spec's premises did not survive that, and
+the first real CI run against the branch produced evidence about the report tier that changes
+Phase 1's contents. Recorded here rather than silently absorbed, because a spec that quietly
+absorbs a falsified premise is the §9 decay mechanism operating on this document.
+
+### 11.1 golangci-lint cannot be a blocking gate in this restructure
+
+§8's Phase 0 bullet said to measure whole-tree golangci-lint because "the result sizes real work".
+It was measured. The result is larger than the sentence anticipated:
+
+| Scope | Findings |
+|---|---|
+| Configured scope | **1078** |
+| Whole tree | **1173** |
+
+`revive` (582) and `errcheck` (267) are 79% of it; `documents` is the top package at 291.
+
+Two corrections follow. First, the number previously carried in the Phase 0 planning notes — 214 —
+was not a count. It was golangci-lint v2's **default output cap** (`max-issues-per-linter: 50`,
+`max-same-issues: 3`), which truncates with no `+N more` indicator. Any future measurement of this
+tool must pass `--max-issues-per-linter=0 --max-same-issues=0` or it is reading a ceiling and
+reporting it as a total.
+
+Second, and worse for the plan: **`apps/worker` and `apps/jobs` have zero lint coverage in CI
+today** — two of the four binaries. Turning golangci-lint into a required blocking gate is
+therefore not "tightening an existing gate", it is discovering two unlinted binaries at the moment
+the gate goes live.
+
+**Amended:** golangci-lint stays in the report tier for the duration of this restructure and is
+**not** promoted in Phase 4. Reducing 1078 to a gateable number is real work with its own
+sequencing, and it is not this design's work. §4.6's resolution of the dual Go lint stack is
+unaffected — that is about which linter owns which rule, not about promotion.
+
+### 11.2 `--require-infra` is confirmed in code, not proposed
+
+§5 argued for `--require-infra` from the shape of the runner. The mechanism is now located
+exactly: `tools/verify/main.go:341` returns SKIP when infra is missing, and `report()` at
+`:423-466` returns non-zero only when `len(failed) > 0`. A SKIP therefore exits 0.
+
+**A job promoted to `required` can report green over zero executed tests, with no code change and
+nothing in its output that looks wrong.** `test-integration` is the only check in the `full`
+profile and not in `pr`, which is precisely the check this would silently hollow out.
+
+Phase 1 keeps `--require-infra` unchanged in substance; the justification is upgraded from
+inference to `file:line`.
+
+### 11.3 Three inherited report-tier reds, named
+
+PR #96's first full run against the Phase 0 branch: 24 pass, 5 fail. One failure was Phase 0's own
+(`check`/governance — a false positive fixed at the rule, see §11.5). One is red by design
+(`gate`/req-traceability — the four dispositioned MUSTs). The remaining three are inherited, and
+none of them is a required context, so none has ever blocked a merge. They are named here because
+Phase 0 existed to end accepted red without an owner, and inheriting three unnamed would reproduce
+exactly that.
+
+**R-1 — `hardening` runs tests that were deleted.** `scripts/contract-baseline.ps1:42` invokes
+`go test ./tests/contract`; the directory contains only `.gitkeep`, the contract tests having been
+removed in `dc0572f6`. It fails with `no Go files in .../tests/contract` and has failed loudly for
+long enough that the failure is ambient. This is §9's decay mechanism already realised in another
+control: a check measuring a world that no longer exists. Phase 1 resolves it in one direction or
+the other — restore the contract tests, or delete the step and the directory. Leaving a third
+option open ("someone will look at it") is what produced the current state.
+
+**R-2 — `E2E smoke` has no stack.** `webServer` exits 1 with `DATABASE_URL` empty.
+
+**R-3 — `Perf suite (reduced — PR gate)` has no stack.** The API refuses to boot:
+`METALDOCS_ATTACHMENTS_SIGNING_SECRET is required for provider local`. The workflow's own comment
+concedes the position — *"Standing up that stack is the perf axis's work; A1's job is to stop the
+failure from masquerading as a passing measurement."*
+
+R-2 and R-3 share a cause with §11.2: this repository's CI has no runnable application stack, and
+every control that needs one is either red or skipping. That is one problem with three faces, not
+three problems.
+
+### 11.4 Tier placement for E2E and perf, decided on industry practice
+
+The operator asked directly whether running E2E and perf in GitHub CI is what large engineering
+organisations do. The answer differs for the two, and the difference is a design decision this
+spec had not made explicitly.
+
+**E2E — yes, staged; never full-breadth blocking on every PR.** The standard shape is a small
+smoke subset presubmit, the full suite on merge queue or post-merge, and the remainder nightly.
+Google's small/medium/large/enormous size taxonomy encodes the same rule: large and enormous tests
+do not run presubmit by default. The reason is behavioural rather than technical. E2E is the
+flakiest tier by construction, and a blocking gate that fails on flake teaches the team to press
+re-run — after which they re-run *every* gate. A flaky required check does not merely fail to
+guard its own subject; it degrades the signal of every other required check beside it. This is the
+same failure this design's own §4.3 exists to prevent from the other direction.
+
+**Perf — never a PR gate on shared runners, stack or no stack.** The check is currently named
+`Perf suite (reduced — PR gate)`. Fixing R-3's stack would make it *run*, and it would still be
+wrong: GitHub-hosted runners are shared, unpinned and noisy-neighbour prone, so run-to-run variance
+on an identical commit exceeds the regression such a gate is meant to catch. It measures which
+machine it landed on. Industry practice puts perf on dedicated pinned hardware, or on statistical
+microbenchmark comparison (`benchstat` in Go — significance, not raw numbers), or on a nightly
+trend that alerts rather than blocks.
+
+**Amended:** perf leaves the pre-merge tier permanently and belongs in `nightly.yml` (§4.4) as an
+alerting trend. It is not a candidate for `required` in Phase 4 or afterwards. E2E keeps a
+presubmit smoke and moves its breadth to nightly. R-2 and R-3 are therefore not "restore these two
+checks to the gate" — they are "put each one in the tier where its result means something."
+
+### 11.5 One Phase 0 defect worth carrying forward
+
+`scripts/check-governance.ps1` failed the branch by flagging three static fixture files under
+`scripts/testdata/` as an infra/ops change requiring a runbook edit. The rule excludes what is
+*not* ops (`check-`, `api-lint/`, `req-trace/`), so every new non-ops path under `scripts/` must be
+remembered into that list — the hand-synced-enumeration class again, inside a governance control.
+Fixed by adding `testdata/` as a **category** (Go's reserved, toolchain-ignored directory: a path
+under it is test input by definition) rather than as a fourth remembered name, and proved in both
+directions. The inverted enumeration remains and will drift again; it is filed in
+`docs/engineering/mechanical-enforcement-register.md`.
+
+### 11.6 Out of this design's scope, stated so it is not lost
+
+ME-14: `approval_route_stage_selectors` declares `tenant_id uuid NOT NULL` and enables no RLS —
+38 tenant-scoped tables in the baseline, 37 with RLS. None of the repository's four RLS controls
+could have caught it; all four take "the table has RLS" as their premise, and `tools/verify`'s 29
+checks contain no RLS check at all. The firing mechanism is a set-equality drift test between
+`{tables with tenant_id}` and `{tables with ENABLE ROW LEVEL SECURITY}`.
+
+It is deliberately **not** queued behind this restructure. It is security work that would merely
+*use* CI as its trigger, it is cheap, and the table is wired into the tenant export and erasure
+paths. Placing it in the CI queue would make it wait five phases for no reason.
