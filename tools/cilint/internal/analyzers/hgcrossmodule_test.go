@@ -48,16 +48,22 @@ func TestHGCrossModule_Negative_OwnTable(t *testing.T) {
 }
 
 func TestHGCrossModule_Negative_SubpackageSameModule(t *testing.T) {
-	// documents/approval reading the documents-context approval_instances is INTRA-module
-	// (approval ⊂ documents top-level module), not cross-module. Must not flag.
+	// ADR 0082 promoted approval to its own top-level module (superseding ADR 0072's
+	// nested documents/approval ruling), so approval_instances is now owned by
+	// "approval", not "documents" (tools/cilint/internal/analyzers/hgcrossmodule.go
+	// hgOwnerByTable). The scenario this test guards — a file in one SUBPACKAGE of a
+	// module reading a base table owned by that same top-level module — is now
+	// expressed inside approval itself: approval/application (a different subpackage
+	// from wherever the table is canonically written) reading approval's own
+	// approval_instances is INTRA-module, not cross-module. Must not flag.
 	src := "package application\n" +
 		"func q() string {\n" +
 		"\treturn `SELECT id FROM approval_instances WHERE tenant_id = $1`\n" +
 		"}\n"
-	path := hgFixture(t, "internal/modules/documents/application/context_builder.go", src)
+	path := hgFixture(t, "internal/modules/approval/application/context_builder.go", src)
 	findings := analyzers.HGCrossModule([]string{path})
 	if len(findings) != 0 {
-		t.Fatalf("intra-module (documents/approval ⊂ documents) read must not be flagged, got %d: %+v", len(findings), findings)
+		t.Fatalf("intra-module (approval/application reading approval's own approval_instances) read must not be flagged, got %d: %+v", len(findings), findings)
 	}
 }
 
