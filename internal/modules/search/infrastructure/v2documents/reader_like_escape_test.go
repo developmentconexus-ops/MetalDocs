@@ -26,19 +26,19 @@ func TestListDocuments_EscapesLikeWildcards(t *testing.T) {
 	// We match a minimal substring that proves the ESCAPE clause is present.
 	mock.ExpectQuery(`LIKE '%' \|\| \$2 \|\| '%' ESCAPE`).
 		WithArgs(
-			"tenant-1",  // $1 tenant_id
-			"a\\%b\\_c", // $2 escaped+lowercased: LikeEscape("a%b_c") = "a\%b\_c"
-			"",          // $3 status
-			"",          // $4 profile_code
-			"",          // $5 family
-			"",          // $6 process_area
-			"",          // $7 department
-			"",          // $8 owner
-			nil,         // $9 expiry_before
-			nil,         // $10 expiry_after
-			20,          // $11 limit
-			0,           // $12 offset
-			"user-1",    // $13 actor
+			"tenant-1",       // $1 tenant_id
+			"a\\%b\\_c",      // $2 escaped+lowercased: LikeEscape("a%b_c") = "a\%b\_c"
+			"",               // $3 status
+			"",               // $4 profile_code
+			"",               // $5 family
+			"",               // $6 process_area
+			"",               // $7 department
+			"",               // $8 owner
+			nil,              // $9 expiry_before
+			nil,              // $10 expiry_after
+			20,               // $11 limit
+			0,                // $12 offset
+			"user-1",         // $13 actor
 			sqlmock.AnyArg(), // $14 family-filter codes (pq.Array, empty here)
 		).
 		WillReturnRows(rows)

@@ -9,9 +9,9 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
-	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
-	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/documents/infrastructure"
+	iamdomain "metaldocs/internal/modules/iam/domain"
+	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 )
 
 // TestListDocumentsPaginated_ScansSnapshotAndRevisionColumns guards the F12 fix:

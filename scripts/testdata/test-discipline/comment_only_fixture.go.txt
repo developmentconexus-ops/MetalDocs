@@ -1,0 +1,9 @@
+//go:build integration
+
+package selftest
+
+// R4 shape in prose: the INNER JOIN documents in the pre-check dropped rows.
+// R1 shape in prose: we used to call set_config('metaldocs.asserted_caps', $1, true) inline here.
+// R3 shape in prose: the dev tenant is "ffffffff-ffff-ffff-ffff-ffffffffffff".
+
+func Nothing() {}

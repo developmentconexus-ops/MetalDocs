@@ -21,7 +21,7 @@ type fakeTenantDataPort struct {
 	tables []string
 }
 
-func (p fakeTenantDataPort) Module() string  { return p.module }
+func (p fakeTenantDataPort) Module() string   { return p.module }
 func (p fakeTenantDataPort) Tables() []string { return p.tables }
 func (p fakeTenantDataPort) ExportTenantData(ctx context.Context, db *sql.DB, tenantID string) ([]tenantdata.TableExport, error) {
 	return nil, nil

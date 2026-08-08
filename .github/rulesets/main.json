@@ -1,0 +1,110 @@
+{
+  "name": "main",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "exclude": [],
+      "include": [
+        "~DEFAULT_BRANCH"
+      ]
+    }
+  },
+  "rules": [
+    {
+      "type": "deletion"
+    },
+    {
+      "type": "non_fast_forward"
+    },
+    {
+      "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 0,
+        "dismiss_stale_reviews_on_push": true,
+        "required_reviewers": [],
+        "require_code_owner_review": false,
+        "require_last_push_approval": false,
+        "required_review_thread_resolution": true,
+        "allowed_merge_methods": [
+          "squash",
+          "merge",
+          "rebase"
+        ]
+      }
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": false,
+        "do_not_enforce_on_create": false,
+        "required_status_checks": [
+          {
+            "context": "golangci-lint"
+          },
+          {
+            "context": "cilint — custom Go linters"
+          },
+          {
+            "context": "Migration monotonicity check"
+          },
+          {
+            "context": "gofmt + go vet + staticcheck"
+          },
+          {
+            "context": "api-design-system-lint"
+          },
+          {
+            "context": "backend-codegen-drift"
+          },
+          {
+            "context": "contract-sync"
+          },
+          {
+            "context": "frontend-codegen-drift"
+          },
+          {
+            "context": "openapi-lint"
+          },
+          {
+            "context": "problem-codes-freshness"
+          },
+          {
+            "context": "spec-base-path-gate"
+          },
+          {
+            "context": "eslint"
+          },
+          {
+            "context": "css-token-discipline"
+          },
+          {
+            "context": "eigenpal-selector-pin"
+          },
+          {
+            "context": "web-typecheck-test"
+          },
+          {
+            "context": "node"
+          },
+          {
+            "context": "check"
+          },
+          {
+            "context": "wiki module/tech-debt tally sync"
+          },
+          {
+            "context": "unit"
+          },
+          {
+            "context": "smoke"
+          },
+          {
+            "context": "gitleaks"
+          }
+        ]
+      }
+    }
+  ],
+  "bypass_actors": []
+}

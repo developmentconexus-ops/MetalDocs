@@ -11,10 +11,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Run module boundaries conformance
-        shell: pwsh
-        run: ./scripts/check-module-boundaries.ps1
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod, cache: true }
 
-      - name: Run test-discipline guard
-        shell: bash
-        run: bash scripts/check-test-discipline.sh
+      # Check set for this job lives in tools/verify/registry.go
+      # (module-boundaries, test-discipline) — see CIJob: "module-boundaries.yml:conformance".
+      - name: verify (module-boundaries, test-discipline)
+        run: go run ./tools/verify --only=module-boundaries,test-discipline

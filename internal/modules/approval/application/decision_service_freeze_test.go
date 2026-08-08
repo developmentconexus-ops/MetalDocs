@@ -420,7 +420,6 @@ func TestRecordSignoff_PinInvoker_CallsPin(t *testing.T) {
 	}
 }
 
-
 func TestRecordSignoff_RejectPath_AssertsDocumentEditBeforeDocumentWrite(t *testing.T) {
 	const (
 		instanceID = "inst-freeze-reject"

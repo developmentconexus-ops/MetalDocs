@@ -56,10 +56,10 @@ func TestSecurityRepository_NoIamUsersJoin_Live(t *testing.T) {
 		tenantA = "f4600000-0000-4000-8000-0000000000aa"
 		tenantB = "f4600000-0000-4000-8000-0000000000bb"
 
-		userActive = "sec-active-f46"   // tenant A member, locked, recent failures
-		userDeact  = "sec-deact-f46"    // tenant A member (deactivated), locked
-		userOther  = "sec-other-f46"    // tenant B member, locked
-		userGhost  = "sec-ghost-f46"    // NO iam_users row; auth_identity + tenant-A session
+		userActive = "sec-active-f46" // tenant A member, locked, recent failures
+		userDeact  = "sec-deact-f46"  // tenant A member (deactivated), locked
+		userOther  = "sec-other-f46"  // tenant B member, locked
+		userGhost  = "sec-ghost-f46"  // NO iam_users row; auth_identity + tenant-A session
 	)
 	now := time.Now().UTC()
 
@@ -120,11 +120,11 @@ func TestSecurityRepository_NoIamUsersJoin_Live(t *testing.T) {
 
 	// auth_identities — all four; locked; userActive over the failed-login threshold.
 	type identity struct {
-		id            string
-		failedLogins  int
-		lockedUntil   time.Time
-		lastFailedAt  sql.NullTime
-		lastFailedIP  string
+		id           string
+		failedLogins int
+		lockedUntil  time.Time
+		lastFailedAt sql.NullTime
+		lastFailedIP string
 	}
 	idents := []identity{
 		{userActive, 6, now.Add(time.Hour), sql.NullTime{Time: now.Add(-time.Minute), Valid: true}, "10.0.0.1"},

@@ -86,19 +86,19 @@ func (c *Code) UnmarshalJSON(b []byte) error {
 //
 // Picking the family for a NEW code (annex §1.4, first match wins):
 //
-//	1. Could the caller have avoided it by sending a syntactically/structurally
-//	   different request?                                        -> request.
-//	2. Does it parse, but a supplied value or a business rule over supplied
-//	   values rejects it, with no reference to stored state?     -> validation.
-//	3. Is the problem WHO the caller is?                         -> auth.
-//	4. Is the caller identified but lacks a capability?          -> permission.
-//	5. Does the addressed subject not exist / is it invisible?   -> notfound.
-//	6. Did a caller-SUPPLIED precondition stop holding?          -> precondition.
-//	7. Race or uniqueness/idempotency collision, where retrying
-//	   against refreshed state could succeed?                    -> conflict.
-//	8. Subject in the wrong lifecycle state, retry is futile?    -> state.
-//	9. Is the caller being throttled?                            -> ratelimit.
-//	10. Otherwise it is a server fault.                          -> internal.
+//  1. Could the caller have avoided it by sending a syntactically/structurally
+//     different request?                                        -> request.
+//  2. Does it parse, but a supplied value or a business rule over supplied
+//     values rejects it, with no reference to stored state?     -> validation.
+//  3. Is the problem WHO the caller is?                         -> auth.
+//  4. Is the caller identified but lacks a capability?          -> permission.
+//  5. Does the addressed subject not exist / is it invisible?   -> notfound.
+//  6. Did a caller-SUPPLIED precondition stop holding?          -> precondition.
+//  7. Race or uniqueness/idempotency collision, where retrying
+//     against refreshed state could succeed?                    -> conflict.
+//  8. Subject in the wrong lifecycle state, retry is futile?    -> state.
+//  9. Is the caller being throttled?                            -> ratelimit.
+//  10. Otherwise it is a server fault.                          -> internal.
 //
 // Tie-breaker between 7 and 8 (both 409): if a retry of the SAME request would
 // succeed once a concurrent writer finishes, it is conflict.; if a DIFFERENT

@@ -284,11 +284,7 @@ func insertInstanceWithSubject(t *testing.T, db *sql.DB, doc testdb.Document, ro
 		t.Fatalf("set tenant_id GUC: %v", err)
 	}
 	assertedCap := capForSubject(subjectKind)
-	if _, err := tx.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', $1, true)`, `[{"cap":"`+assertedCap+`"}]`,
-	); err != nil {
-		t.Fatalf("assert %s cap: %v", assertedCap, err)
-	}
+	testdb.SetCapsOnTx(t, tx, `[{"cap":"`+assertedCap+`"}]`)
 
 	id := uuid.NewString()
 	idemKey := "idem-" + uuid.NewString()

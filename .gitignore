@@ -94,3 +94,6 @@ scratch_qa/
 # --- Local env overrides ---
 .env.local
 **/.env.local
+
+# gitleaks JSON report — local triage artifact, never committed.
+.gitleaks-report.json

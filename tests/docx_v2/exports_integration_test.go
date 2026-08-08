@@ -28,11 +28,11 @@ func TestExportsV2_HappyPath(t *testing.T) {
 // TestExportsV2_RBACDenialMatrix enforces permission checks on all export routes.
 //
 // Matrix:
-// - POST /export/pdf without PermDocumentRead → 403
-// - GET /export/docx-url without PermDocumentRead → 403
-// - POST /export/pdf for document owned by user_A, requested by user_B with only
-//   viewer role on a different document → 403
-// - Unauthenticated POST /export/pdf → 401
+//   - POST /export/pdf without PermDocumentRead → 403
+//   - GET /export/docx-url without PermDocumentRead → 403
+//   - POST /export/pdf for document owned by user_A, requested by user_B with only
+//     viewer role on a different document → 403
+//   - Unauthenticated POST /export/pdf → 401
 //
 // Each sub-test asserts HTTP denial and no row inserted into document_exports.
 func TestExportsV2_RBACDenialMatrix(t *testing.T) {

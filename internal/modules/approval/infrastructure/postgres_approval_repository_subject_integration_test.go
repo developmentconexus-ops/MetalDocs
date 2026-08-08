@@ -56,12 +56,7 @@ func insertInstanceTx(t *testing.T, db *sql.DB, tenantID, actorID string) *sql.T
 	// helper seeds instances of either subject kind, so it asserts both; the
 	// trigger's per-row CASE picks the one it needs. (Asserting an unused cap is
 	// harmless — the trigger checks membership, not exclusivity.)
-	if _, err := tx.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', $1, true)`,
-		`[{"cap":"document.submit"},{"cap":"template.submit"}]`,
-	); err != nil {
-		t.Fatalf("assert submit caps: %v", err)
-	}
+	testdb.SetCapsOnTx(t, tx, `[{"cap":"document.submit"},{"cap":"template.submit"}]`)
 	return tx
 }
 
@@ -173,9 +168,9 @@ func TestInsertInstance_ZeroSubject_ReturnsError_RealDB(t *testing.T) {
 	route := testdb.NewApprovalRoute(t, dbc, testdb.WithTenant(doc.TenantID))
 
 	inst := domain.Instance{
-		ID:                   uuid.NewString(),
-		TenantID:             doc.TenantID,
-		DocumentID:           doc.ID,
+		ID:         uuid.NewString(),
+		TenantID:   doc.TenantID,
+		DocumentID: doc.ID,
 		// Subject intentionally left zero-value (Kind == "").
 		RouteID:              route.ID,
 		RouteVersionSnapshot: 1,

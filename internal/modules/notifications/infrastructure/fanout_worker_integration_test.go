@@ -61,7 +61,7 @@ func TestNotificationsFanoutWorker(t *testing.T) {
 		eventID := uuid.NewString()
 		args := documentsdomain.LifecycleEventArgs{
 			EventID: eventID, TenantID: ten.ID,
-			EventType: documentsdomain.EventTypeDocumentPublished,
+			EventType:    documentsdomain.EventTypeDocumentPublished,
 			ResourceType: "document", ResourceID: uuid.NewString(),
 			ControlledDocumentID: cd.ID, OccurredAt: time.Now(),
 		}
@@ -82,7 +82,7 @@ func TestNotificationsFanoutWorker(t *testing.T) {
 		eventID := uuid.NewString()
 		args := documentsdomain.LifecycleEventArgs{
 			EventID: eventID, TenantID: ten.ID,
-			EventType: documentsdomain.EventTypeDocumentSuperseded,
+			EventType:    documentsdomain.EventTypeDocumentSuperseded,
 			ResourceType: "document", ResourceID: uuid.NewString(),
 			ControlledDocumentID: cd.ID, OccurredAt: time.Now(),
 		}
@@ -103,7 +103,7 @@ func TestNotificationsFanoutWorker(t *testing.T) {
 		eventID := uuid.NewString()
 		args := documentsdomain.LifecycleEventArgs{
 			EventID: eventID, TenantID: ten.ID,
-			EventType: documentsdomain.EventTypeDocumentObsoleted,
+			EventType:    documentsdomain.EventTypeDocumentObsoleted,
 			ResourceType: "document", ResourceID: uuid.NewString(),
 			ControlledDocumentID: cd.ID, OccurredAt: time.Now(),
 		}
@@ -122,7 +122,7 @@ func TestNotificationsFanoutWorker(t *testing.T) {
 		eventID := uuid.NewString()
 		args := documentsdomain.LifecycleEventArgs{
 			EventID: eventID, TenantID: ten.ID,
-			EventType: documentsdomain.EventTypeDocumentApproved,
+			EventType:    documentsdomain.EventTypeDocumentApproved,
 			ResourceType: "approval_instance", ResourceID: uuid.NewString(),
 			SubmittedBy: submitter.ID, OccurredAt: time.Now(),
 		}
@@ -141,7 +141,7 @@ func TestNotificationsFanoutWorker(t *testing.T) {
 		eventID := uuid.NewString()
 		args := documentsdomain.LifecycleEventArgs{
 			EventID: eventID, TenantID: ten.ID,
-			EventType: documentsdomain.EventTypeDocumentRejected,
+			EventType:    documentsdomain.EventTypeDocumentRejected,
 			ResourceType: "approval_instance", ResourceID: uuid.NewString(),
 			SubmittedBy: submitter.ID, OccurredAt: time.Now(),
 		}
@@ -162,7 +162,7 @@ func TestNotificationsFanoutWorker(t *testing.T) {
 		eventID := uuid.NewString()
 		args := documentsdomain.LifecycleEventArgs{
 			EventID: eventID, TenantID: ten.ID,
-			EventType: documentsdomain.EventTypeDocumentPublished,
+			EventType:    documentsdomain.EventTypeDocumentPublished,
 			ResourceType: "document", ResourceID: uuid.NewString(),
 			ControlledDocumentID: cd.ID, OccurredAt: time.Now(),
 		}

@@ -28,17 +28,17 @@ func TestCanTransitionDocumentStatus(t *testing.T) {
 	}
 
 	legal := map[[2]domain.DocumentStatus]bool{
-		{domain.DocStatusDraft, domain.DocStatusUnderReview}:       true,
-		{domain.DocStatusUnderReview, domain.DocStatusApproved}:    true,
-		{domain.DocStatusUnderReview, domain.DocStatusDraft}:       true,
-		{domain.DocStatusApproved, domain.DocStatusPublished}:      true,
-		{domain.DocStatusApproved, domain.DocStatusScheduled}:      true,
-		{domain.DocStatusApproved, domain.DocStatusDraft}:          true,
-		{domain.DocStatusScheduled, domain.DocStatusPublished}:     true,
-		{domain.DocStatusScheduled, domain.DocStatusDraft}:         true,
-		{domain.DocStatusPublished, domain.DocStatusSuperseded}:    true,
-		{domain.DocStatusPublished, domain.DocStatusObsolete}:      true,
-		{domain.DocStatusSuperseded, domain.DocStatusObsolete}:     true,
+		{domain.DocStatusDraft, domain.DocStatusUnderReview}:    true,
+		{domain.DocStatusUnderReview, domain.DocStatusApproved}: true,
+		{domain.DocStatusUnderReview, domain.DocStatusDraft}:    true,
+		{domain.DocStatusApproved, domain.DocStatusPublished}:   true,
+		{domain.DocStatusApproved, domain.DocStatusScheduled}:   true,
+		{domain.DocStatusApproved, domain.DocStatusDraft}:       true,
+		{domain.DocStatusScheduled, domain.DocStatusPublished}:  true,
+		{domain.DocStatusScheduled, domain.DocStatusDraft}:      true,
+		{domain.DocStatusPublished, domain.DocStatusSuperseded}: true,
+		{domain.DocStatusPublished, domain.DocStatusObsolete}:   true,
+		{domain.DocStatusSuperseded, domain.DocStatusObsolete}:  true,
 	}
 	if len(legal) != 11 {
 		t.Fatalf("test setup error: expected 11 legal arcs, got %d", len(legal))

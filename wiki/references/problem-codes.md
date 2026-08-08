@@ -49,10 +49,10 @@ Families are **semantic, never module-named**. A module name on a public wire co
 | `internal.creation_context_unconfigured` | 500 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:551` |
 | `internal.db_privilege_missing` | 500 | approval | `internal/modules/approval/http/errors.go:94` |
 | `internal.db_unknown` | 500 | approval | `internal/modules/approval/http/errors.go:95` |
-| `internal.not_implemented` | **501** — 501 Not Implemented is the dedicated status for a wired-but-unimplemented surface (RFC 9110 §15.6.2) | platform | `internal/platform/problem/codes.go:281` |
+| `internal.not_implemented` | **501** — 501 Not Implemented is the dedicated status for a wired-but-unimplemented surface (RFC 9110 §15.6.2) | platform | `internal/platform/problem/codes.go:287` |
 | `internal.signature_misconfigured` | 500 | approval | `internal/modules/approval/http/errors.go:96` |
 | `internal.template_artifact_invariant_unconfigured` | 500 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:550` |
-| `internal.unknown` | 500 | shared | `internal/platform/problem/codes.go:279` |
+| `internal.unknown` | 500 | shared | `internal/platform/problem/codes.go:285` |
 | `internal.upstream_timeout` | **504** — 504 Gateway Timeout: the deadline was exceeded waiting on a dependency, which is a narrower server fault than the internal. family default of 500 | approval | `internal/modules/approval/http/errors.go:118` |
 | `internal.verdict_wrong_stage_kind` | 500 | approval | `internal/modules/approval/http/errors.go:170` |
 
@@ -98,7 +98,7 @@ Families are **semantic, never module-named**. A module name on a public wire co
 
 | Code | Status | Module | Declared at |
 |---|---|---|---|
-| `ratelimit.exceeded` | 429 | platform | `internal/platform/problem/codes.go:267` |
+| `ratelimit.exceeded` | 429 | platform | `internal/platform/problem/codes.go:273` |
 
 ## `request` — default 400
 
@@ -170,7 +170,7 @@ Families are **semantic, never module-named**. A module name on a public wire co
 | `validation.document_subject_key_mismatch` | 422 | approval | `internal/modules/approval/http/errors.go:136` |
 | `validation.effective_date_required` | 422 | approval | `internal/modules/approval/http/errors.go:73` |
 | `validation.effective_to_not_after_effective_from` | 422 | approval | `internal/modules/approval/http/errors.go:149` |
-| `validation.empty_eligible_pool` | 422 | shared | `internal/platform/problem/codes.go:254` |
+| `validation.empty_eligible_pool` | 422 | shared | `internal/platform/problem/codes.go:256` |
 | `validation.failed` | 422 | shared | `internal/platform/problem/codes.go:241` |
 | `validation.family_unknown` | 422 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:61` |
 | `validation.field_immutable` | 422 | tokens | `internal/modules/tokens/delivery/http/handler.go:49` |
@@ -194,8 +194,8 @@ Families are **semantic, never module-named**. A module name on a public wire co
 | `validation.self_delegation` | 422 | approval | `internal/modules/approval/http/errors.go:162` |
 | `validation.sla_extension_not_forward` | 422 | approval | `internal/modules/approval/http/errors.go:183` |
 | `validation.sla_extension_reason_required` | 422 | approval | `internal/modules/approval/http/errors.go:185` |
-| `validation.submit_choice_constraint_violated` | 422 | shared | `internal/platform/problem/codes.go:256` |
-| `validation.submit_choice_required` | 422 | shared | `internal/platform/problem/codes.go:255` |
+| `validation.submit_choice_constraint_violated` | 422 | shared | `internal/platform/problem/codes.go:262` |
+| `validation.submit_choice_required` | 422 | shared | `internal/platform/problem/codes.go:259` |
 | `validation.supersede_target_invalid` | 422 | approval | `internal/modules/approval/http/errors.go:59` |
 | `validation.template_profile_mismatch` | 422 | shared | `internal/platform/problem/codes.go:248` |
 | `validation.template_subject_key_mismatch` | 422 | approval | `internal/modules/approval/http/errors.go:137` |

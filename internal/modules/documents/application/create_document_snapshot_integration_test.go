@@ -10,11 +10,11 @@ import (
 	"testing"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
-	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/modules/documents/application"
 	docrepo "metaldocs/internal/modules/documents/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
+	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/docgenv2"
 	"metaldocs/tests/integration/testdb"
 )

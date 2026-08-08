@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"fmt"
 
+	"metaldocs/internal/modules/approval/domain"
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	docapp "metaldocs/internal/modules/documents/application"
-	"metaldocs/internal/modules/approval/domain"
 )
 
 // resolveSubjectAreaCode returns the process-area string to pass to

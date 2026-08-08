@@ -112,7 +112,7 @@ var (
 	// field class was incoherent.
 	approvalCodeValidationReasonRequired = problem.Register("approval", "validation.reason_required", 422)
 
-	approvalCodeNotFoundRoute     = problem.Register("approval", "notfound.approval_route", 404)
+	approvalCodeNotFoundRoute      = problem.Register("approval", "notfound.approval_route", 404)
 	approvalCodeStateRouteInactive = problem.Register("approval", "state.approval_route_inactive", 409)
 
 	approvalCodeTimeout = problem.RegisterWithStatus("approval", "internal.upstream_timeout", 504,
@@ -126,7 +126,7 @@ var (
 	approvalCodeValidationContentType = problem.CodeRequestContentTypeUnsupported
 
 	// C-5 / C-1: both collapse onto platform codes.
-	approvalCodeValidationBodyTooLarge  = problem.CodeRequestBodyTooLarge
+	approvalCodeValidationBodyTooLarge   = problem.CodeRequestBodyTooLarge
 	approvalCodeValidationRequestInvalid = problem.CodeRequestInvalid
 
 	approvalCodeValidationProfileUnknown             = problem.Register("approval", "validation.profile_unknown", 422)

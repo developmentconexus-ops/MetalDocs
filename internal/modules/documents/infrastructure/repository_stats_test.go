@@ -7,8 +7,8 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
-	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 )
 
 func TestStatsByStatus_GroupsCorrectly(t *testing.T) {

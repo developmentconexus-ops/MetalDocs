@@ -72,7 +72,7 @@ func TestTouchSession_UsesGraceWindowComparison(t *testing.T) {
 
 	seenAt := time.Date(2026, time.May, 27, 17, 0, 0, 0, time.UTC)
 
-mock.ExpectExec(regexp.QuoteMeta(`
+	mock.ExpectExec(regexp.QuoteMeta(`
 UPDATE metaldocs.auth_sessions
 SET last_seen_at = $2
 WHERE session_id = $1

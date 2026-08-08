@@ -38,8 +38,7 @@ jobs:
       - uses: actions/setup-go@v5
         with: { go-version-file: go.mod, cache: true }
 
-      - name: req-trace unit tests
-        run: go test ./scripts/req-trace/... -count=1
-
-      - name: REQ traceability gate (BLOCKING on any uncovered MUST or a stale report)
-        run: go run ./scripts/req-trace
+      # Check set for this job lives in tools/verify/registry.go
+      # (req-trace-selftest, req-trace) — see CIJob: "req-traceability.yml:gate".
+      - name: verify (req-trace-selftest, req-trace)
+        run: go run ./tools/verify --only=req-trace-selftest,req-trace

@@ -9,9 +9,9 @@ import (
 	"testing"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
-	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
-	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/documents/infrastructure"
+	iamdomain "metaldocs/internal/modules/iam/domain"
+	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/tests/integration/testdb"
 )
 

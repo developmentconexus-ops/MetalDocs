@@ -114,15 +114,33 @@ func TestSignoffGetters(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSignoff: %v", err)
 	}
-	if s.ID() != "sig-1" { t.Error("ID") }
-	if s.ApprovalInstanceID() != "inst-1" { t.Error("ApprovalInstanceID") }
-	if s.StageInstanceID() != "stage-1" { t.Error("StageInstanceID") }
-	if s.ActorTenantID() != "tenant-1" { t.Error("ActorTenantID") }
-	if s.Decision() != DecisionApprove { t.Error("Decision") }
-	if s.SignatureMethod() != "password" { t.Error("SignatureMethod") }
-	if s.SignaturePayload() == nil { t.Error("SignaturePayload") }
-	if s.Comment() != "" { t.Error("Comment should be empty") }
-	if s.SignedAt().IsZero() { t.Error("SignedAt") }
+	if s.ID() != "sig-1" {
+		t.Error("ID")
+	}
+	if s.ApprovalInstanceID() != "inst-1" {
+		t.Error("ApprovalInstanceID")
+	}
+	if s.StageInstanceID() != "stage-1" {
+		t.Error("StageInstanceID")
+	}
+	if s.ActorTenantID() != "tenant-1" {
+		t.Error("ActorTenantID")
+	}
+	if s.Decision() != DecisionApprove {
+		t.Error("Decision")
+	}
+	if s.SignatureMethod() != "password" {
+		t.Error("SignatureMethod")
+	}
+	if s.SignaturePayload() == nil {
+		t.Error("SignaturePayload")
+	}
+	if s.Comment() != "" {
+		t.Error("Comment should be empty")
+	}
+	if s.SignedAt().IsZero() {
+		t.Error("SignedAt")
+	}
 }
 
 func TestSignoffMarshalJSON(t *testing.T) {

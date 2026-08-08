@@ -178,7 +178,7 @@ func (fakeTemplateVersionSubmitWriter) MarkTemplateVersionUnderReview(ctx contex
 // chk_template_version_content_hash_non_draft only requires it for non-draft
 // rows, but a fixed 64-hex value is harmless for draft too.
 // docTypeCode must be a real profile code: post-ADR-0086
-// templates_template_doc_type_code_required_check rejects '' outright, and it
+// templates_template_doc_type_code_required_check rejects ” outright, and it
 // is what the template route is keyed by.
 func seedTemplateVersion(t *testing.T, dbc *sql.DB, tenantID, actorID, docTypeCode, status string) (templateID, versionID string) {
 	t.Helper()
@@ -196,11 +196,7 @@ func seedTemplateVersion(t *testing.T, dbc *sql.DB, tenantID, actorID, docTypeCo
 	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 		t.Fatalf("seedTemplateVersion: seed identity: %v", err)
 	}
-	if _, err := tx.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', $1, true)`, `[{"cap":"template.create"}]`,
-	); err != nil {
-		t.Fatalf("seedTemplateVersion: assert caps: %v", err)
-	}
+	testdb.SetCapsOnTx(t, tx, `[{"cap":"template.create"}]`)
 
 	if err := tx.QueryRowContext(ctx,
 		`INSERT INTO public.templates_template

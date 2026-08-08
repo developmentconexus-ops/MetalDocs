@@ -996,11 +996,7 @@ func TestRelease_SecondPublishedHeadRefusedByDB(t *testing.T) {
 	if err := authz.SeedTxIdentity(ctx, tx, tenant.ID, admin.ID); err != nil {
 		t.Fatalf("seed identity: %v", err)
 	}
-	if _, err := tx.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', $1, true)`, `[{"cap":"document.edit"}]`,
-	); err != nil {
-		t.Fatalf("assert caps: %v", err)
-	}
+	testdb.SetCapsOnTx(t, tx, `[{"cap":"document.edit"}]`)
 
 	_, err = tx.ExecContext(ctx, `
 		UPDATE public.documents

@@ -39,8 +39,9 @@ import (
 //
 // Tier-1 denies IN THE MIDDLEWARE, before next.ServeHTTP. So the suite mounts
 // the real chain over a sentinel terminal handler and observes invocation:
-//   negative = denied AND sentinel never invoked  => the middleware decided
-//   positive = sentinel invoked                   => the middleware admitted
+//
+//	negative = denied AND sentinel never invoked  => the middleware decided
+//	positive = sentinel invoked                   => the middleware admitted
 //
 // This depends on one property it does not establish: that the pattern it
 // registers is the pattern the real publisher mounts. That is §5 check 3, at

@@ -12,4 +12,3 @@ func trimOptionalString(v *string) *string {
 	}
 	return &trimmed
 }
-

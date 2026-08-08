@@ -13,7 +13,6 @@ import (
 	"metaldocs/tests/integration/testdb"
 )
 
-
 // SEC-05 / migration 0259: iam_users and iam_user_roles carry
 // trg_require_cap_asserted (user.manage) — seed via the scheduler bypass GUC
 // (withBypass/withBypassErr, shared with membership_area_scope_test.go in this

@@ -1,17 +1,21 @@
 name: docx-renderer CI
 
+# No `paths:` filter, deliberately. A required status check is matched by NAME,
+# and a job that never runs never reports — GitHub then counts it as pending
+# forever and the PR can never merge. So a path-filtered workflow is structurally
+# ineligible to be required, which means its checks gate nothing. Diff-scoping
+# belongs one level down, in `verify --profile=changed`, where the job still
+# always reports. Full rationale in api-contract.yml and A1 ledger §1b.
+#
+# This one matters more than most: node runs bundle-guard.test.ts, which asserts
+# the docx-renderer server bundle stays framework-free. That invariant is broken
+# by adding a dependency, and the old filter did not match package.json or the
+# lockfile — so the exact change most likely to break it was the one change that
+# did not run the guard.
 on:
   pull_request:
-    paths:
-      - 'apps/docx-renderer/**'
-      - 'packages/**'
-      - 'internal/platform/config/feature_flags*.go'
-      - 'internal/platform/featureflags/**'
-      - 'internal/modules/templates/**'
-      - 'frontend/apps/web/src/features/featureFlags.ts'
-      - 'tests/docx_v2/**'
-      - 'scripts/docx-v2-*'
-      - '.github/workflows/ci.yml'
+  push:
+    branches: [main]
 
 jobs:
   node:
@@ -21,15 +25,27 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with: { node-version-file: .nvmrc, cache: pnpm }
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run typecheck:docx-v2
-      - run: pnpm run test:docx-v2
-      - run: pnpm run build:docx-v2
-  go:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with: { go-version-file: go.mod, cache: true }
-      - run: go build ./...
-      - run: go test ./internal/platform/config/... ./internal/platform/featureflags/... ./internal/platform/servicebus/... ./internal/platform/ratelimit/... ./internal/platform/objectstore/... ./internal/modules/templates/... ./tests/docx_v2/...
+      - run: pnpm install --frozen-lockfile
+      # Check set for this job lives in tools/verify/registry.go
+      # (docx-v2-typecheck, docx-v2-build, docx-v2-test) — see CIJob:
+      # "ci.yml:node".
+      #
+      # TWO invocations, and the order matters. docx-v2-test contains
+      # bundle-guard.test.ts, which reads dist/meta.json to assert the server
+      # bundle is framework-free — so it consumes the build's output. The
+      # build used to run AFTER the tests, which meant the guard could only
+      # ever fail ("dist/meta.json missing"). verify runs the checks within a
+      # single invocation concurrently, so the dependency is expressed by
+      # splitting the invocation rather than by ordering inside one.
+      - run: go run ./tools/verify --only=docx-v2-typecheck,docx-v2-build
+      - run: go run ./tools/verify --only=docx-v2-test
+
+# The `go` job that used to live here ran `go build ./...` plus `go test` over
+# seven hand-listed packages. Every one of them is already covered by
+# test-smoke.yml's `unit` job, which runs verify --only=go-build,go-test-unit —
+# and go-test-unit is `go test ./...`, a strict superset of any package list.
+# Removed as duplicated compute on every PR, not to reach green: coverage is
+# unchanged, and dropping the filter above means `node` now runs on every PR,
+# which is a net increase in what this workflow gates.

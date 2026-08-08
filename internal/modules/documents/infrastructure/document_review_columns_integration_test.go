@@ -32,8 +32,8 @@ import (
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/domain"
-	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/documents/infrastructure"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/tests/integration/testdb"
 )

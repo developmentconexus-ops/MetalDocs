@@ -314,9 +314,9 @@ func checkPagination(file, opID string, op, schemas *yaml.Node) []Violation {
 //     area-scoped op now carries a positive marker that says where the enforced
 //     area comes from:
 //     - `x-authz-area: {source: tx, derived_from: "<table>.<column>"}` — area
-//       loaded from the DB row inside the tx (un-spoofable).
+//     loaded from the DB row inside the tx (un-spoofable).
 //     - `x-authz-area: {source: body|path, field: <name>}` — area is the
-//       request-supplied action target (e.g. grant membership in area X).
+//     request-supplied action target (e.g. grant membership in area X).
 //     - `x-authz-area-none: "<reason>"` — genuinely area-less (tenant-global).
 //     - `x-authz-custom: true` — bespoke handler-level check.
 //     Every state-transition POST must carry exactly one of those.

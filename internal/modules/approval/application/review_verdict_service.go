@@ -9,10 +9,10 @@ import (
 
 	"github.com/google/uuid"
 
-	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
-	docapp "metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/approval/domain"
 	"metaldocs/internal/modules/approval/infrastructure"
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
+	docapp "metaldocs/internal/modules/documents/application"
 	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"

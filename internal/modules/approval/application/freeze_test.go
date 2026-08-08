@@ -42,11 +42,11 @@ func TestExecuteFreeze_IdempotentReentry_NoOps(t *testing.T) {
 	hash := "already-frozen-hash"
 	inst := &domain.Instance{
 		ID:                  "inst-1",
-		TenantID:             "tenant-1",
-		DocumentID:           "doc-1",
-		SubmittedAt:          time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
-		ContentHashAtSubmit:  "abc123",
-		FrozenContentHash:    &hash,
+		TenantID:            "tenant-1",
+		DocumentID:          "doc-1",
+		SubmittedAt:         time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+		ContentHashAtSubmit: "abc123",
+		FrozenContentHash:   &hash,
 	}
 	repo := &fakeFreezeRepo{}
 

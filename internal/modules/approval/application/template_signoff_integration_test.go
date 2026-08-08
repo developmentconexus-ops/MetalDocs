@@ -342,11 +342,7 @@ func TestTemplateSignoff_DocumentSignoffCap_TripwireRejects_RealDB(t *testing.T)
 		t.Fatalf("seed identity: %v", err)
 	}
 	// Assert the WRONG capability for a template subject.
-	if _, err := tx.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', $1, true)`, `[{"cap":"document.signoff"}]`,
-	); err != nil {
-		t.Fatalf("assert caps: %v", err)
-	}
+	testdb.SetCapsOnTx(t, tx, `[{"cap":"document.signoff"}]`)
 
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO public.approval_signoffs

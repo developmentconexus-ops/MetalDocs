@@ -16,17 +16,29 @@ const hgCrossModuleAllow = "//cilint:allow-hgcrossmodule"
 // hgOwnerByTable maps every owned base table to the TOP-LEVEL module that owns
 // it (holds its writes), per the F0.2 binding census
 // (docs/superpowers/milestones/backend-module-boundary-hardening/milestone-0-adr-and-census/f0.2-binding-census/census.md).
-// "Top-level" means the first segment under internal/modules/: documents/approval
-// ⊂ documents, iam/presence ⊂ iam — so an intra-context read across sub-packages
-// is NOT cross-module. This is the data ADR-0039 D1 (base table = violation)
-// classifies against.
+// "Top-level" means the first segment under internal/modules/: iam/presence ⊂
+// iam — so an intra-context read across sub-packages is NOT cross-module.
+// This is the data ADR-0039 D1 (base table = violation) classifies against.
+// Kept in sync with the ADR that defines the module list — when an ADR
+// promotes or merges a module, this map is part of that ADR's diff.
+//
+// TRANSITIONAL — hand-synced enumeration, the repo's known meta-defect (see
+// design §9, docs/superpowers/specs/2026-08-07-ci-restructure-design.md). This
+// map is a local maximum: ownership is asserted here by hand instead of
+// derived from a single source of truth. The global maximum is ownership
+// derived from a single source — a module manifest, schema comments, or a
+// drift test that fails when a table appears in SQL under a module that
+// neither owns it nor is exempted. The milestone that deletes this map is
+// M3-final: cross-module SQL closure (design §8.1), whose deliverable (1) is
+// exactly re-deriving this census and turning it into a mechanism rather than
+// a hand-maintained list.
 var hgOwnerByTable = map[string]string{
 	// controlleddocuments
 	"controlled_documents":            "controlleddocuments",
 	"controlled_document_area_grants": "controlleddocuments",
 	"controlled_document_user_grants": "controlleddocuments",
 	"cd_sequence_counters":            "controlleddocuments",
-	// documents (incl. the approval sub-context)
+	// documents
 	"documents":                   "documents",
 	"document_revisions":          "documents",
 	"document_comments":           "documents",
@@ -35,13 +47,37 @@ var hgOwnerByTable = map[string]string{
 	"document_placeholder_values": "documents",
 	"editor_sessions":             "documents",
 	"autosave_pending_uploads":    "documents",
-	"auth_failure_counters":       "documents", // owned by documents/approval signature limiter (census false-positive note)
-	"approval_instances":          "documents",
-	"approval_routes":             "documents",
-	"approval_route_stages":       "documents",
-	"approval_stage_instances":    "documents",
-	"approval_signoffs":           "documents",
-	"governance_events":           "documents",
+	// approval — promoted to a top-level module by ADR 0082, superseding
+	// ADR 0072's nested `documents/approval` ruling. The F0.2 binding census
+	// predates 0082 and assigned these tables to `documents`; that made the
+	// approval module's reads of its OWN tables report as cross-module.
+	"approval_instances":       "approval",
+	"approval_routes":          "approval",
+	"approval_route_stages":    "approval",
+	"approval_stage_instances": "approval",
+	"approval_signoffs":        "approval",
+	"auth_failure_counters":    "approval", // approval's signature reauth limiter
+	// governance_events is written by approval's SQLEmitter
+	// (internal/modules/approval/application/events.go:84 — INSERT INTO
+	// governance_events); it was mis-census'd to documents pre-0082 alongside
+	// the other approval tables. Verified via grep for the live INSERT sites,
+	// not by the ADR 0082 module-promotion text alone — internal/platform/
+	// tripwire/render.go:154 also inserts into it, so approval is the primary
+	// owner but not the sole writer.
+	"governance_events": "approval",
+	// release_generations, approval_delegations, approval_review_verdicts, and
+	// approval_route_stage_selectors were absent from this census entirely
+	// (not mis-owned, unrecorded) until this fix. All four are approval-owned:
+	// release_generations backs the ADR 0085 release-hold state machine
+	// (wiki/database/tables/release_generations.md), and the other three are
+	// approval's own delegation/verdict/selector tables (release_facts.go,
+	// review_verdict_service.go, tenant_data_port.go). Their absence let
+	// documents/infrastructure/repository.go:330's raw
+	// `FROM release_generations rg` read go undetected as cross-module.
+	"release_generations":            "approval",
+	"approval_delegations":           "approval",
+	"approval_review_verdicts":       "approval",
+	"approval_route_stage_selectors": "approval",
 	// taxonomy
 	"document_process_areas": "taxonomy",
 	"document_profiles":      "taxonomy",
@@ -125,7 +161,11 @@ var hgExempt = []hgSite{
 	// module writes via AppendAudit[Tx]; read projections are a distinct class.
 	{"security/infrastructure/postgres/repository.go", "audit_events"},          // X3
 	{"iam/infrastructure/postgres/observability_repository.go", "audit_events"}, // X4
-	{"templates/repository/postgres.go", "audit_events"},                        // X7
+	// X7 path reconciled 2026-08-07: F9.5 renamed templates/repository/ →
+	// templates/infrastructure/. scripts/check-test-discipline.sh:59 reconciled
+	// the same rename on 2026-07-06; this list did not, so the exemption had
+	// silently stopped matching and the read fell into the baseline instead.
+	{"templates/infrastructure/postgres.go", "audit_events"}, // X7
 	// D3(e) — parent grade-a-completion M4 dispositioned auth reads (ADR 0029/0031):
 	// auth_identities has no tenant_id, scoped via = ANY(ids); re-porting re-litigates 0031.
 	{"security/infrastructure/postgres/repository.go", "auth_identities"},          // X1

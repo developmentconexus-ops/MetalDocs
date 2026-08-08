@@ -12,9 +12,9 @@ import (
 
 	"github.com/google/uuid"
 
-	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/approval/domain"
 	"metaldocs/internal/modules/approval/infrastructure"
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"

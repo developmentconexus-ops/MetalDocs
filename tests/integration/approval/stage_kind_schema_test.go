@@ -29,13 +29,13 @@ func TestStageKindSchemaExpand_Default(t *testing.T) {
 	db, _ := testdb.Open(t)
 
 	route := testdb.NewApprovalRoute(t, db,
-			testdb.WithGovernanceClass("controlado"),
-			// Governed class => the route may not commit stageless (ADR 0087 /
-			// migration 0316), so its stage is seeded in the route's own tx.
-			testdb.WithStageSeeder(func(tx *sql.Tx, routeID string) error {
-				return insertRouteStageTx(tx, routeID, "Stage 1")
-			}),
-		)
+		testdb.WithGovernanceClass("controlado"),
+		// Governed class => the route may not commit stageless (ADR 0087 /
+		// migration 0316), so its stage is seeded in the route's own tx.
+		testdb.WithStageSeeder(func(tx *sql.Tx, routeID string) error {
+			return insertRouteStageTx(tx, routeID, "Stage 1")
+		}),
+	)
 
 	var stageKind string
 	if err := db.QueryRowContext(context.Background(),

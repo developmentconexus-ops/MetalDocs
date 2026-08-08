@@ -8,12 +8,14 @@
 // in-memory unit tests cannot reach (they have no authz layer):
 //
 //   - area_admin CAN grant/revoke within a managed area
+//
 //   - area_admin CANNOT grant/revoke outside a managed area  → ErrCapDenied (403)
+//
 //   - R1 (ADR amendment): system_admin with NO per-area membership row is NOT
 //     blocked by the missing sub-scope grant — the tier-2 bypass short-circuits
 //     before the area-filtered capability query.
 //
-//   go test -tags=integration ./tests/integration/iam/... -run Membership
+//     go test -tags=integration ./tests/integration/iam/... -run Membership
 package iam_test
 
 import (

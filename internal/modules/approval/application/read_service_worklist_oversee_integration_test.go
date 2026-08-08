@@ -8,7 +8,7 @@
 // which only pins the SQL shape):
 //
 //  1. an actor with NO CapApprovalOversee grant is denied (authz.ErrCapDenied,
-//     403) when Oversee=true, even if they hold no other relevant grant.
+//  403. when Oversee=true, even if they hold no other relevant grant.
 //  2. an actor with a real qms_admin role grant (-> approval.oversee per
 //     db/reference-data/0001_product_reference_data.sql) succeeds and sees an
 //     instance NOT in their own eligible_actor_ids pool — proving the

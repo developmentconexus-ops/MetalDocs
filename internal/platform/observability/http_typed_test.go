@@ -12,8 +12,8 @@ import (
 
 type stubRuntime struct{ m map[string]any }
 
-func (s stubRuntime) Live(context.Context) (int, map[string]any)  { return http.StatusOK, nil }
-func (s stubRuntime) Ready(context.Context) (int, map[string]any) { return http.StatusOK, nil }
+func (s stubRuntime) Live(context.Context) (int, map[string]any)    { return http.StatusOK, nil }
+func (s stubRuntime) Ready(context.Context) (int, map[string]any)   { return http.StatusOK, nil }
 func (s stubRuntime) RuntimeMetrics(context.Context) map[string]any { return s.m }
 
 // TestMetricsHandler_TypedEnvelope_KeySet is the F8.2 parity-lock for the typed

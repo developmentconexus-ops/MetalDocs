@@ -17,8 +17,10 @@ type docAreaRows struct {
 	done     bool
 }
 
-func (r *docAreaRows) Columns() []string { return []string{"process_area_code_snapshot", "controlled_document_id"} }
-func (r *docAreaRows) Close() error      { return nil }
+func (r *docAreaRows) Columns() []string {
+	return []string{"process_area_code_snapshot", "controlled_document_id"}
+}
+func (r *docAreaRows) Close() error { return nil }
 func (r *docAreaRows) Next(dest []driver.Value) error {
 	if r.done {
 		return io.EOF

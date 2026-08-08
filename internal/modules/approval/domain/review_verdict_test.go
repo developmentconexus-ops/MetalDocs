@@ -160,8 +160,8 @@ func TestNewVerdict_RequiredFields(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		mutate  func(p *VerdictParams)
+		name   string
+		mutate func(p *VerdictParams)
 	}{
 		{"missing ID", func(p *VerdictParams) { p.ID = "" }},
 		{"missing ApprovalInstanceID", func(p *VerdictParams) { p.ApprovalInstanceID = "" }},

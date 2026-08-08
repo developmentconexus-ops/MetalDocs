@@ -19,12 +19,13 @@ import (
 // flow with a mocked docx-renderer fanout endpoint.
 //
 // Prerequisites (set via env):
-//   METALDOCS_E2E_URL             - running metaldocs-api base URL
-//   METALDOCS_E2E_TENANT_ID       - tenant UUID (default: 00000000-0000-0000-0000-000000000001)
-//   METALDOCS_E2E_USER_ID         - actor user ID (default: e2e-fanout-user)
-//   METALDOCS_E2E_TEMPLATE_VERSION_ID - template version with placeholders
-//   METALDOCS_E2E_ROUTE_ID        - approval route ID
-//   METALDOCS_E2E_APPROVER_ID     - approver user ID (default: e2e-approver)
+//
+//	METALDOCS_E2E_URL             - running metaldocs-api base URL
+//	METALDOCS_E2E_TENANT_ID       - tenant UUID (default: 00000000-0000-0000-0000-000000000001)
+//	METALDOCS_E2E_USER_ID         - actor user ID (default: e2e-fanout-user)
+//	METALDOCS_E2E_TEMPLATE_VERSION_ID - template version with placeholders
+//	METALDOCS_E2E_ROUTE_ID        - approval route ID
+//	METALDOCS_E2E_APPROVER_ID     - approver user ID (default: e2e-approver)
 //
 // The test starts a local stub server that captures the fanout POST request so the
 // pipeline can complete without a real docx-renderer instance.

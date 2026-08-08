@@ -70,6 +70,17 @@ var checks = []Check{
 		CIJob:    "test-smoke.yml:unit",
 	},
 	{
+		ID:   "gofmt",
+		Desc: "every tracked Go file is gofmt-clean",
+		// Nothing enforced this before A1, and 96 files had drifted by the
+		// time anyone swept. golangci-lint's enabled set has no formatter and
+		// go vet does not look at layout, so the convention was held up
+		// entirely by habit.
+		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-gofmt.sh"},
+		CIJob:    "invariants.yml:staticcheck",
+	},
+	{
 		ID:       "go-vet",
 		Desc:     "go vet ./...",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
@@ -95,8 +106,12 @@ var checks = []Check{
 		CIJob:    "invariants.yml:cilint",
 	},
 	{
-		ID:       "staticcheck",
-		Desc:     "staticcheck 2025.1.1 — pinned to the version CI uses",
+		ID:   "staticcheck",
+		Desc: "staticcheck 2025.1.1 — pinned to the version CI uses",
+		// 2024.1 fails to compile under Go 1.25 (its vendored x/tools hits
+		// "invalid array length"); 2025.1.1 is the first release with Go 1.25
+		// support and the same check set. Moved here from invariants.yml when
+		// the staticcheck-action step was replaced by this check.
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "honnef.co/go/tools/cmd/staticcheck@2025.1.1", "./..."},
 		Needs:    []string{needsNetwork},
@@ -168,6 +183,14 @@ var checks = []Check{
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-test-discipline.sh"},
 		Paths:    []string{"internal/", "tests/", "apps/"},
+		CIJob:    "module-boundaries.yml:conformance",
+	},
+	{
+		ID:       "test-discipline-selftest",
+		Desc:     "check-test-discipline.sh reads code and ignores Go line comments",
+		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-test-discipline-selftest.sh"},
+		Paths:    []string{"scripts/check-test-discipline.sh", "scripts/check-test-discipline-selftest.sh", "scripts/testdata/test-discipline/"},
 		CIJob:    "module-boundaries.yml:conformance",
 	},
 
@@ -247,8 +270,34 @@ var checks = []Check{
 		CIJob:    "ci.yml:node",
 	},
 	{
-		ID:       "docx-v2-test",
-		Desc:     "docx-v2 unit tests",
+		ID:       "docx-v2-build",
+		Desc:     "the docx-v2 workspace builds; produces the dist/meta.json that docx-v2-test's bundle guard reads",
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv:     []string{"pnpm", "run", "build:docx-v2"},
+		Paths:    []string{"apps/docx-renderer/", "packages/"},
+		CIJob:    "ci.yml:node",
+	},
+	{
+		ID:   "docx-v2-test",
+		Desc: "docx-v2 unit tests",
+		// Depends on docx-v2-build having already run: bundle-guard.test.ts
+		// reads dist/meta.json. The registry has no dependency edges, so CI
+		// enforces the order by using two verify invocations (see ci.yml:node)
+		// and a local `--profile=pr` can still race. Recorded as D-14.
+		//
+		// D-14 UPDATE (final review, Critical 2): the npm scripts this argv
+		// calls used to be `pnpm -r run <script>`, which is recursive over
+		// EVERY workspace including frontend/apps/web — so this check and
+		// fe-test ran the same 154-file vitest suite concurrently in the same
+		// tree, with docx-v2-build's `pnpm -r run build` writing
+		// frontend/apps/web/dist underneath both. That race, not the
+		// build-before-test ordering below, was the reproducible source of
+		// flaky/contradictory results between this check and fe-test. The npm
+		// scripts now filter to `./packages/**` + `./apps/**` only, which does
+		// not include frontend/apps/web — so docx-v2-test and fe-test no
+		// longer touch the same files at all, and D-14 is left covering only
+		// the narrower build-before-test ordering within the docx workspaces
+		// themselves.
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"pnpm", "run", "test:docx-v2"},
 		Paths:    []string{"apps/docx-renderer/", "packages/"},

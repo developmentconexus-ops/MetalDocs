@@ -177,7 +177,7 @@ func (previewTemplateVersionWriter) MarkTemplateVersionRejected(context.Context,
 // seedPreviewTemplateVersion inserts a templates_template + draft
 // templates_template_version pair for the tenant/actor, returning both ids.
 // docTypeCode must be a real profile code (ADR 0086:
-// templates_template_doc_type_code_required_check forbids '') and is the key
+// templates_template_doc_type_code_required_check forbids ”) and is the key
 // the template route is looked up by.
 func seedPreviewTemplateVersion(t *testing.T, dbc *sql.DB, tenantID, actorID, docTypeCode string) (templateID, versionID string) {
 	t.Helper()
@@ -195,11 +195,7 @@ func seedPreviewTemplateVersion(t *testing.T, dbc *sql.DB, tenantID, actorID, do
 	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 		t.Fatalf("seed template version: identity: %v", err)
 	}
-	if _, err := tx.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', $1, true)`, `[{"cap":"template.create"}]`,
-	); err != nil {
-		t.Fatalf("seed template version: assert caps: %v", err)
-	}
+	testdb.SetCapsOnTx(t, tx, `[{"cap":"template.create"}]`)
 	if err := tx.QueryRowContext(ctx,
 		`INSERT INTO public.templates_template
 		   (id, tenant_id, doc_type_code, key, name, description, latest_version, created_by, created_at)

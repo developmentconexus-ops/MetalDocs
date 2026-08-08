@@ -42,6 +42,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"metaldocs/internal/composition/tenantdata/registry"
 	auditdomain "metaldocs/internal/modules/audit/domain"
 	auditpg "metaldocs/internal/modules/audit/infrastructure/postgres"
 	iamapp "metaldocs/internal/modules/iam/application"
@@ -53,7 +54,6 @@ import (
 	"metaldocs/internal/platform/db"
 	platformtenant "metaldocs/internal/platform/tenant"
 	"metaldocs/internal/platform/tenantdata"
-	"metaldocs/internal/composition/tenantdata/registry"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -86,7 +86,7 @@ func newRunSideTenantLifecycleService(t *testing.T, sqlDB *sql.DB) (*iamapp.Tena
 		nil, // tenantLookupTx: enqueue-side only
 		nil, // lifecycleJobInserter: enqueue-side only
 		lifecycleRepo,
-		nil, // iamdomain.TenantLifecycleEnqueuer: enqueue-side only
+		nil,                   // iamdomain.TenantLifecycleEnqueuer: enqueue-side only
 		db.NewTxRunner(sqlDB), // runErase phase-1/phase-3 txs run through it
 		auditpg.NewWriter(sqlDB),
 		sqlDB,

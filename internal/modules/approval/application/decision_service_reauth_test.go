@@ -10,8 +10,8 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"metaldocs/internal/modules/approval/infrastructure/signature"
 	"metaldocs/internal/modules/approval/infrastructure"
+	"metaldocs/internal/modules/approval/infrastructure/signature"
 )
 
 // reauthFakeUserReader satisfies signature.IamUserReader for the reauth tests.
@@ -43,9 +43,9 @@ func (r reauthFakeUserReader) GetPasswordHash(_ context.Context, userID string) 
 // testNoopRateLimiter is a test-only rate limiter that always allows.
 type testNoopRateLimiter struct{}
 
-func (testNoopRateLimiter) Allow(_ context.Context, _ string) (bool, error)         { return true, nil }
-func (testNoopRateLimiter) RecordFailure(_ context.Context, _ string) error          { return nil }
-func (testNoopRateLimiter) Reset(_ context.Context, _ string) error                  { return nil }
+func (testNoopRateLimiter) Allow(_ context.Context, _ string) (bool, error) { return true, nil }
+func (testNoopRateLimiter) RecordFailure(_ context.Context, _ string) error { return nil }
+func (testNoopRateLimiter) Reset(_ context.Context, _ string) error         { return nil }
 
 // testCountingRateLimiter is a test-only in-process rate limiter that counts
 // failures and enforces maxFailures=5 per actor (mirrors signature.testInMemoryLimiter).
@@ -99,9 +99,9 @@ func newReauthRegistryWithLimiter(reader signature.IamUserReader, limiter signat
 
 func newReauthDecisionService(reg *signature.Registry, repo infrastructure.ApprovalRepository, emitter EventEmitter) *DecisionService {
 	return (&DecisionService{
-		repo:          repo,
-		emitter:       emitter,
-		clock:         fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
+		repo:            repo,
+		emitter:         emitter,
+		clock:           fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
 		releaseRecorder: &fakeReleaseRecorder{},
 	}).WithSignatureRegistry(reg)
 }

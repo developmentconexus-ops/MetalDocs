@@ -15,8 +15,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
+	"strings"
 
 	"metaldocs/tools/cilint/internal/analyzers"
 )
@@ -67,10 +67,26 @@ func baselineKey(analyzer, file, message string) string {
 func normalizeFindings(findings []analyzers.Finding) []analyzers.Finding {
 	out := make([]analyzers.Finding, len(findings))
 	for i, f := range findings {
-		f.File = filepath.ToSlash(f.File)
+		f.File = toForwardSlash(f.File)
 		out[i] = f
 	}
 	return out
+}
+
+// toForwardSlash rewrites backslashes to forward slashes on EVERY host, which
+// filepath.ToSlash does not: on Linux the separator is already '/', so
+// ToSlash is the identity function and a Windows-produced path in the
+// baseline stays backslashed. That made the normalization work only on the
+// platform that did not need it, and it is why the two baseline tests passed
+// on a developer's Windows machine and failed in CI — the exact
+// "green locally, red in CI" split this axis exists to remove.
+//
+// A backslash is a legal character in a Linux filename, so this is not a
+// general-purpose path helper. It is correct here because these are Go source
+// paths emitted by the analyzers, and Go import/source paths never contain
+// one.
+func toForwardSlash(p string) string {
+	return strings.ReplaceAll(p, `\`, "/")
 }
 
 // countByKey aggregates findings into per-key counts, keeping one sample
@@ -105,7 +121,7 @@ func loadBaseline(path string) (*Baseline, error) {
 		return nil, fmt.Errorf("parse %s: %w", path, err)
 	}
 	for i := range bl.Entries {
-		bl.Entries[i].File = filepath.ToSlash(bl.Entries[i].File)
+		bl.Entries[i].File = toForwardSlash(bl.Entries[i].File)
 	}
 	return &bl, nil
 }

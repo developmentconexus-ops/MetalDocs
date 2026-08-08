@@ -16,7 +16,7 @@
 //     than the River worker this same tx enqueues), and a paired River job via
 //     InsertTx sharing the same *sql.Tx (mirrors
 //     render/fanout/dispatchjobs.Enqueuer.EnqueuePDFTx: business-tx dedup row
-//     + River InsertTx, both inside tx — NOT the generic
+//   - River InsertTx, both inside tx — NOT the generic
 //     platform/messaging/outbox/postgres pipeline, which feeds the separate
 //     metaldocs-worker binary's poll loop and has no consumer registered for
 //     a tenant-lifecycle event type).
@@ -320,8 +320,8 @@ func (s *TenantLifecycleService) RunJob(ctx context.Context, jobID string) error
 // exportArtifact is the full JSON document written to
 // tenants/{tenantID}/exports/tenant-export-{jobID}.json.
 type exportArtifact struct {
-	Header       exportHeader        `json:"header"`
-	Tables       []exportTableRows   `json:"tables"`
+	Header       exportHeader         `json:"header"`
+	Tables       []exportTableRows    `json:"tables"`
 	BlobManifest []exportBlobManifest `json:"blob_manifest"`
 }
 

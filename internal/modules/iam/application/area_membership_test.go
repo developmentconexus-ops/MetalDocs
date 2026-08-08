@@ -134,7 +134,7 @@ func (s *userAreaWriteRepoStub) GrantAtomicTx(_ context.Context, _ domain.Member
 }
 
 type membershipLoggerStub struct {
-	actions []string
+	actions  []string
 	logTxErr error
 }
 

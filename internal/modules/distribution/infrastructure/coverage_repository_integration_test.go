@@ -12,8 +12,8 @@ import (
 
 	"github.com/google/uuid"
 
-	distributioninfra "metaldocs/internal/modules/distribution/infrastructure"
 	distributiondomain "metaldocs/internal/modules/distribution/domain"
+	distributioninfra "metaldocs/internal/modules/distribution/infrastructure"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/pagination"
 	"metaldocs/tests/integration/testdb"

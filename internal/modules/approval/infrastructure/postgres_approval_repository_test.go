@@ -269,7 +269,6 @@ func TestInsertSignoffReplayDetection(t *testing.T) {
 	})
 }
 
-
 // ---------------------------------------------------------------------------
 // TestSignoffInsertResultFields — basic struct field test
 // ---------------------------------------------------------------------------

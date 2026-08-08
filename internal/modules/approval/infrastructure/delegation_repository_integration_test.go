@@ -297,4 +297,3 @@ func TestApprovalDelegations_TenantIsolation(t *testing.T) {
 		t.Fatalf("LoadActiveDelegationsFor scoped to tenant A = %d rows, want 1", len(gotA))
 	}
 }
-

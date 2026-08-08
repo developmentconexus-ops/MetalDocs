@@ -20,4 +20,3 @@ func TestAutoCode_ThreeSegmentThreeDigit(t *testing.T) {
 		t.Fatalf("got %q want DC-RH-003", got)
 	}
 }
-

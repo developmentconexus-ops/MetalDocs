@@ -23,8 +23,8 @@ import (
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/application"
-	docrepo "metaldocs/internal/modules/documents/infrastructure"
 	"metaldocs/internal/modules/documents/domain"
+	docrepo "metaldocs/internal/modules/documents/infrastructure"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/objectstore"

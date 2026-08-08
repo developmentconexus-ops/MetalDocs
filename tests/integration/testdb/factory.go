@@ -13,9 +13,9 @@ import (
 
 	"github.com/google/uuid"
 
+	domain "metaldocs/internal/modules/approval/domain"
 	cddomain "metaldocs/internal/modules/controlleddocuments/domain"
 	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
-	domain "metaldocs/internal/modules/approval/domain"
 )
 
 // factory.go — unified integration-test fixture builders, built ON the testdb
@@ -149,24 +149,24 @@ type Spec struct {
 
 type Opt func(*Spec)
 
-func WithTenant(id string) Opt            { return func(s *Spec) { s.TenantID = id } }
+func WithTenant(id string) Opt { return func(s *Spec) { s.TenantID = id } }
 
 // WithTenantID is an alias for WithTenant. Task 17a's conformance suite
 // (apps/api/cmd/metaldocs-api/surface_conformance_test.go) spells it this
 // way; kept as an additive alias rather than a rename so the ~60+ existing
 // WithTenant call sites across tests/integration are untouched.
-func WithTenantID(id string) Opt { return WithTenant(id) }
-func WithUserID(id string) Opt            { return func(s *Spec) { s.UserID = id } }
-func WithDisplayName(name string) Opt     { return func(s *Spec) { s.DisplayName = name } }
-func WithRole(role string) Opt            { return func(s *Spec) { s.Role = role } }
-func WithTaxonomy(tax Taxonomy) Opt       { return func(s *Spec) { s.Taxonomy = &tax } }
+func WithTenantID(id string) Opt             { return WithTenant(id) }
+func WithUserID(id string) Opt               { return func(s *Spec) { s.UserID = id } }
+func WithDisplayName(name string) Opt        { return func(s *Spec) { s.DisplayName = name } }
+func WithRole(role string) Opt               { return func(s *Spec) { s.Role = role } }
+func WithTaxonomy(tax Taxonomy) Opt          { return func(s *Spec) { s.Taxonomy = &tax } }
 func WithControlledDoc(cd ControlledDoc) Opt { return func(s *Spec) { s.ControlledDoc = &cd } }
-func WithDocument(d Document) Opt         { return func(s *Spec) { s.Document = &d } }
-func WithRoute(r ApprovalRoute) Opt       { return func(s *Spec) { s.Route = &r } }
-func WithOwner(userID string) Opt         { return func(s *Spec) { s.OwnerUserID = userID } }
-func WithTemplateVersionID(id string) Opt { return func(s *Spec) { s.TemplateVersionID = id } }
-func WithName(name string) Opt            { return func(s *Spec) { s.Name = name } }
-func WithStatus(status string) Opt        { return func(s *Spec) { s.Status = status } }
+func WithDocument(d Document) Opt            { return func(s *Spec) { s.Document = &d } }
+func WithRoute(r ApprovalRoute) Opt          { return func(s *Spec) { s.Route = &r } }
+func WithOwner(userID string) Opt            { return func(s *Spec) { s.OwnerUserID = userID } }
+func WithTemplateVersionID(id string) Opt    { return func(s *Spec) { s.TemplateVersionID = id } }
+func WithName(name string) Opt               { return func(s *Spec) { s.Name = name } }
+func WithStatus(status string) Opt           { return func(s *Spec) { s.Status = status } }
 
 // WithFrozenContentHash sets approval_instances.frozen_content_hash explicitly
 // (F6 no-fallback hash chain: signoff/publish read ONLY this pin, never a
@@ -177,8 +177,8 @@ func WithStatus(status string) Opt        { return func(s *Spec) { s.Status = st
 func WithFrozenContentHash(hash string) Opt {
 	return func(s *Spec) { s.FrozenContentHash = &hash }
 }
-func WithCode(code string) Opt            { return func(s *Spec) { s.Code = code } }
-func WithProfile(code string) Opt         { return func(s *Spec) { s.ProfileCode = code } }
+func WithCode(code string) Opt             { return func(s *Spec) { s.Code = code } }
+func WithProfile(code string) Opt          { return func(s *Spec) { s.ProfileCode = code } }
 func WithGovernanceClass(class string) Opt { return func(s *Spec) { s.GovernanceClass = class } }
 
 // SetGovernanceClass reclassifies an existing document profile. Fixtures that
@@ -217,11 +217,11 @@ func WithStageSeeder(fn func(tx *sql.Tx, routeID string) error) Opt {
 // "template"). Both are profile-keyed since ADR 0086, so the factory always
 // binds subject_key := profile_code.
 func WithSubjectKind(kind string) Opt { return func(s *Spec) { s.SubjectKind = kind } }
-func WithRevisionNumber(n int) Opt        { return func(s *Spec) { s.RevisionNumber = n } }
-func WithRecipient(userID string) Opt     { return func(s *Spec) { s.RecipientUserID = userID } }
-func WithEventType(t string) Opt          { return func(s *Spec) { s.EventType = t } }
-func WithResourceType(t string) Opt       { return func(s *Spec) { s.ResourceType = t } }
-func WithResourceID(id string) Opt        { return func(s *Spec) { s.ResourceID = id } }
+func WithRevisionNumber(n int) Opt    { return func(s *Spec) { s.RevisionNumber = n } }
+func WithRecipient(userID string) Opt { return func(s *Spec) { s.RecipientUserID = userID } }
+func WithEventType(t string) Opt      { return func(s *Spec) { s.EventType = t } }
+func WithResourceType(t string) Opt   { return func(s *Spec) { s.ResourceType = t } }
+func WithResourceID(id string) Opt    { return func(s *Spec) { s.ResourceID = id } }
 
 func WithRevisionVersion(n int) Opt {
 	return func(s *Spec) { s.RevisionVersion = n; s.hasRevisionVersion = true }

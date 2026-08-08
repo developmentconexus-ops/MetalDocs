@@ -219,11 +219,11 @@ type fakeProfileRepository struct {
 
 type fakeTx struct{}
 
-func (fakeTx) Commit() error                                                                { return nil }
-func (fakeTx) Rollback() error                                                              { return nil }
-func (fakeTx) ExecContext(_ context.Context, _ string, _ ...any) (sql.Result, error)       { return nil, nil }
-func (fakeTx) QueryContext(_ context.Context, _ string, _ ...any) (*sql.Rows, error)       { return nil, nil }
-func (fakeTx) QueryRowContext(_ context.Context, _ string, _ ...any) *sql.Row              { return nil }
+func (fakeTx) Commit() error                                                         { return nil }
+func (fakeTx) Rollback() error                                                       { return nil }
+func (fakeTx) ExecContext(_ context.Context, _ string, _ ...any) (sql.Result, error) { return nil, nil }
+func (fakeTx) QueryContext(_ context.Context, _ string, _ ...any) (*sql.Rows, error) { return nil, nil }
+func (fakeTx) QueryRowContext(_ context.Context, _ string, _ ...any) *sql.Row        { return nil }
 
 func newFakeProfileRepository() *fakeProfileRepository {
 	return &fakeProfileRepository{byKey: map[string]*domain.DocumentProfile{}}

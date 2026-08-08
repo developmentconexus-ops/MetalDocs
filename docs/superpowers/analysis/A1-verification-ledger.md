@@ -62,38 +62,102 @@ verification of what CI will do, and verify now says so before it starts.
 
 Measured: `--profile=fast` is 15 checks in ~51s wall clock.
 
+## 1b. A required check may not carry a `paths:` filter
+
+GitHub evaluates required status checks by name. A required check that never
+reports is not treated as "not applicable" — it is treated as **pending**, and
+the PR cannot merge. So a path-filtered workflow whose jobs are required
+deadlocks every PR that falls outside its filter.
+
+That is not merely a mechanical constraint; it is the same rule this axis is
+built on, seen from the other side:
+
+> **A control that sometimes does not fire is not a gate.**
+
+An unwired script never fires. A path-filtered required check fires for some
+diffs and not others, and the diffs it skips are exactly the ones nobody
+chose deliberately — they are whatever the glob happened to miss. A reviewer
+reading a green PR cannot tell the difference between "this check passed" and
+"this check was not run," which makes green unfalsifiable.
+
+Diff-scoping is still worth having; it just belongs one level down. The job
+always runs, and `tools/verify` decides what is relevant from the `Paths`
+field on each registry entry (`--profile=changed`). The saving is the same,
+and the job still reports either way.
+
+Applied on 2026-08-07: `api-contract.yml`, `lint.yml` and `fe-ci.yml` lost
+their `paths:` filters. Report-tier workflows that will never be required
+(`ci`, `perf`, `e2e-coverage-gate`, `supply-chain`, `req-traceability`,
+`openapi-breaking`) keep theirs. **Promoting any of those to tier 1 requires
+removing its filter in the same change** — otherwise the promotion silently
+converts the check from "advisory" to "blocks unrelated PRs forever."
+
 ## 2. Check tiers
 
 The `main` ruleset promotes tier-1 to `required`. Tier-2 runs on every PR and
 reports, but cannot block, because its failure does not depend on the diff.
 
+The earlier version of this section listed *workflow* names — `Go Lint`,
+`api-contract`, `lint`, `Supply Chain`. A required status check is matched by
+**job** name, and not one of those strings exists as a check context, so that
+table could not have been applied as written. The names below are copied from
+PR #96's actual check list.
+
 ### Tier 1 — required on `main`
 
-| Check | Workflow | Enforcement |
+Live as ruleset `main` (id `20560142`), exported to `.github/rulesets/main.json`.
+Every entry was observed green on PR #96 before promotion; none was promoted on
+the assumption that it would pass.
+
+| Check (context) | Workflow:job | Enforcement |
 |---|---|---|
-| `Go Lint` | `golangci-lint.yml` | absolute — zero findings |
-| `api-contract` | `api-contract.yml` | absolute — spec/codegen/problem-code parity |
-| `CI Invariants — cilint` | `invariants.yml` | baseline ratchet (§3.1) |
-| `CI Invariants — staticcheck` | `invariants.yml` | absolute — zero findings |
-| `CI Invariants — migrations` | `invariants.yml` | absolute — monotonic |
-| `lint` (eslint + css tokens + eigenpal pin) | `lint.yml` | absolute — zero findings |
-| `governance-check / wiki-tally` | `governance-check.yml` | absolute — 16-module sweep, green |
-| `fe-ci` | `fe-ci.yml` | absolute — typecheck + unit tests |
-| `secret-scan` | `secret-scan.yml` | allowlist (§3.2) |
-| `Supply Chain` | `supply-chain.yml` | severity gate (§3.3) |
-| `test-full` | `test-full.yml` | absolute — must move pre-merge (A1 item 4) |
+| `golangci-lint` | `golangci-lint.yml:golangci-lint` | new findings only (`--new-from-patch`) |
+| `cilint — custom Go linters` | `invariants.yml:cilint` | baseline ratchet (§3.1) |
+| `gofmt + go vet + staticcheck` | `invariants.yml:staticcheck` | absolute — zero findings |
+| `Migration monotonicity check` | `invariants.yml:migration-gapless` | absolute — monotonic |
+| `api-design-system-lint` | `api-contract.yml` | absolute |
+| `backend-codegen-drift` | `api-contract.yml` | absolute |
+| `contract-sync` | `api-contract.yml` | absolute |
+| `frontend-codegen-drift` | `api-contract.yml` | absolute |
+| `openapi-lint` | `api-contract.yml` | absolute |
+| `problem-codes-freshness` | `api-contract.yml` | absolute |
+| `spec-base-path-gate` | `api-contract.yml` | absolute |
+| `eslint` | `lint.yml:eslint` | absolute |
+| `css-token-discipline` | `lint.yml` | absolute |
+| `eigenpal-selector-pin` | `lint.yml` | absolute |
+| `web-typecheck-test` | `fe-ci.yml` | absolute — typecheck + unit tests |
+| `node` | `ci.yml:node` | absolute — docx-v2 typecheck/build/bundle guard |
+| `check` | `governance-check.yml:check` | absolute — three proxy rules (§5) |
+| `wiki module/tech-debt tally sync` | `governance-check.yml:wiki-tally` | absolute |
+| `unit` | `test-smoke.yml:unit` | absolute — `go build ./...` + `go test ./...` |
+| `smoke` | `test-smoke.yml:smoke` | absolute |
+| `gitleaks` | `secret-scan.yml` | allowlist (§3.2) |
 
 ### Tier 2 — reports, not required
 
 | Check | Why it cannot gate | Closes when |
 |---|---|---|
-| `E2E Coverage Gate` | needs `E2E_DATABASE_URL`; the secret does not exist | secret provisioned |
-| `Perf Benchmarks` | harness exits 99 unconditionally | exit code fixed |
-| `req-traceability` | 4 MUST REQs have no test evidence (§4) | evidence landed |
-| `governance-check / db-dictionary-coverage` | red on D-5 | 10 tables documented |
+| `hardening` | red on D-17 | `tests/contract` has Go files again, or the gate stops asking for them |
+| `conformance` | red on D-13 | 13 test-discipline violations ported |
+| `gate` | red on D-1; also `paths:`-filtered | evidence landed **and** filter removed |
+| `DB schema dictionary coverage` | red on D-5 | 10 tables documented |
+| `E2E smoke (approval flows)` | `webServer` exits 1 — no application stack in CI | stack provisioned (D-15) |
+| `Perf suite (reduced — PR gate)` | no postgres service, no migrations, `PERF_DATABASE_URL` undefined | stack provisioned (D-16) |
+| `full` | `test-full.yml` now runs on PRs but has not yet produced one complete result | first green run observed |
+| `Axe baseline`, `Coverage map` | green, but `e2e-coverage-gate.yml` is `paths:`-filtered (§1b) | filter removed |
+| `openapi-breaking`, `Supply Chain` | `paths:`-filtered (§1b) | filter removed |
+| `docx-v2 PR must not touch CK5 paths` | job-level `if:` makes it report `skipped`, which satisfies a required check without running | condition reworked so it always evaluates |
 
 A tier-2 entry is a promise, not a parking space. Each has a closing condition;
 when it is met the check moves to tier 1 and its row is deleted from this table.
+
+### Bypass
+
+The ruleset has **zero** bypass actors. That is deliberate and it has a cost:
+renaming a required job without updating the ruleset in the same commit will
+deadlock every open PR, because the old context never reports and a
+never-reporting check is pending forever. Recovery procedure is in
+`.github/rulesets/README.md`.
 
 ## 3. Recorded baselines
 
@@ -152,6 +216,12 @@ does not port code.
 | D-13 | `check-test-discipline.sh` reports 13 violations, so `module-boundaries.yml:conformance` is red on every PR today. R1 (raw `set_config('metaldocs.asserted_caps', ...)` instead of the fixture seam) x8, R4 (raw `documents` SQL from approval tests) x4, R3 x1. Found by `verify --profile=fast`; it was not on the inherited scoreboard because nobody had run the job's second step locally. | `bash scripts/check-test-discipline.sh` | test-discipline axis | violations ported to the canonical fixture seam |
 | D-9 | `wiki-tally-check.ps1` check 2 (missing-ADR) passes silently when the module doc omits the "Decisions without ADR link: N" line. 11 of 16 modules omit it, so the check is live for 5. A guard that a doc can opt out of by deleting a line is not a guard. | `wiki-tally-check.ps1:130` `if ($null -ne $adrStated -and ...)` | docs axis | line required in all 16 docs, then the `$null` escape deleted |
 | D-7 | `check-db-bootstrap.ps1` asserts a real, uncovered invariant (baseline ledger marker + 6 critical tables) but is pinned to `docker exec metaldocs-postgres` | script source | ops axis | rewritten against a GH Actions `postgres:16` service, then wired |
+| D-14 | The registry has no dependency edges. `docx-v2-test` reads `dist/meta.json` produced by `docx-v2-build`, and `verify` runs a single invocation's checks concurrently, so CI enforces the order by splitting into two invocations while a local `--profile=pr` can still race. | `tools/verify/registry.go` (`docx-v2-test`), `ci.yml:node` | A1, if it recurs; otherwise the verifier axis | a `Needs`-style edge exists, or no check has a producer/consumer relationship |
+| D-15 | `E2E smoke (approval flows)` cannot pass: Playwright's `webServer` exits 1 because CI provisions no application stack. The cascade is worse than the failure — the next step, `axe diff vs baseline`, then ran anyway and died on `ENOENT: axe-report.json`, so the run reports two failures with one cause. | run 31192663852 | ops axis | stack provisioned; also make the axe step depend on the suite having produced a report |
+| D-16 | `Perf suite (reduced — PR gate)` has no `services: postgres`, runs no migrations, and reads `DATABASE_URL` from `secrets.PERF_DATABASE_URL`, which this repository does not define. Supersedes D-2: the harness's exit code was never the problem. A1 fixed only the disguise — the readiness loop was `curl -sf … && break \|\| sleep 2` with no exit, so a dead backend still produced a green step and k6 printed a full percentile table over 300 failed requests and 0 bytes received. | run 31192664532; `perf.yml:31` | ops axis | postgres service + migrations + a defined DB URL, then one green run |
+| D-17 | `phase3-hardening-gate` runs `contract-baseline.ps1`, which runs `go test ./tests/contract`. That directory holds a `.gitkeep` and nothing else — the tests were deleted in `dc0572f6` and the gate that consumes them was not. It fails with `no Go files in .../tests/contract`. **Process note:** I promoted `hardening` to required on the assumption it would go green once the cilint fix landed. It never was green; the cilint failure was masking this one. Promotion must follow an observed green, never a predicted one — that is the same "a control that fires into a red baseline is absent" error, made against my own work. | run 31194517804; `scripts/contract-baseline.ps1:42` | test-discipline axis | contract coverage restored, or the gate's target corrected |
+| D-18 | `Axe baseline — no critical violations` is **inert**, and its own workflow header asserts the opposite ("the axe-baseline-check job below it are real automated checks, not advisory", `e2e-coverage-gate.yml:18`). Both of its steps read only `frontend/apps/web/e2e/axe-baseline.json` — the list of *accepted* violations — and that file is `[]`, 3 bytes. It never reads an axe report. It can therefore only fail if someone deliberately writes a critical violation into the accept-list; a real critical violation in the app passes it. Actual axe enforcement lives in the `axe diff vs baseline` step of the e2e suite, which is dead per D-15. Net: accessibility is unguarded while two green checks say otherwise. | `e2e-coverage-gate.yml:88-120`; `axe-baseline.json` = `[]` | frontend/a11y axis | the job consumes a produced axe report, not just the accept-list |
+| D-19 | `phase3-hardening-gate` is a spent milestone gate: of its four steps, two duplicate existing checks, one targets a deleted suite (D-17), and the fourth disables the only vulnerability scanner it has. `go test ./...` = `test-smoke:unit`'s `go-test-unit`; `check-module-boundaries.ps1` = `module-boundaries:conformance`'s `module-boundaries` check; `contract-baseline.ps1` → empty `tests/contract`; `security-baseline.ps1` is invoked with `-SkipGovulncheck` because `phase3-hardening-gate.ps1:3` defaults `$SkipGovulncheck = $true`. The name refers to a "phase 3" that ended. | `scripts/phase3-hardening-gate.ps1:3,56,63,69,90` | A1 | resolved per §7 |
 | D-8 | **Nothing anywhere verifies that a backup can be restored.** `run-backup-restore-gate.ps1` is a manual runbook step with no execution log proving a cadence | `wiki/runbooks/backup-restore.md:260-277` | ops axis | scheduled weekly DR drill against disposable CI Postgres with CI-only credentials |
 
 D-8 is not documentation debt. It is the only entry here where the untested
@@ -194,6 +264,16 @@ someone actually reads. All three keeps are cited above; none is an orphan.
 | 3 orphan scripts unwired, 1 rotted | wired / deleted per §4a |
 | 2 module docs' §11 tallies disagreed with their registers | reconciled; `wiki-tally` sweep green across 16 modules |
 | kin-openapi + grpc critical/high CVEs | bumped to v0.144.0 / v1.82.1; staticcheck repo-wide 0 findings after |
+| `tools/verify` introduced 6 golangci-lint findings | fixed in the code, not excluded from the linter. `selectChecks` decomposed; `readTrimmed(path)` → `nvmrcVersion()` reading a literal (G304 gone outright); `--base` validated against `refPattern`; all subprocess construction collapsed to one `command()` chokepoint. The repo went from zero lint suppressions to exactly one, at a chokepoint, with the invariant it relies on enforced in code rather than asserted in a comment. |
+| `tools/cilint` path normalization was a no-op on Linux | `filepath.ToSlash` IS the identity function where the separator is already `/`, so a Windows-written baseline path stayed backslashed in CI and two tests passed only on the platform that did not need them. Replaced with an explicit `toForwardSlash`. This was "green locally, red in CI" living inside the verifier itself. |
+| `build:docx-v2` ran AFTER the tests consuming its output | `bundle-guard.test.ts` reads `dist/meta.json`, so with the build last the guard could only ever fail with "missing" — it had never guarded anything. Build is now its own check, run in a prior verify invocation. Ordering hole recorded as D-14. |
+| 5 gitleaks findings untriaged | all 5 classified, none a credential. Two protocol values exempted as a **class** (`Idempotency-Key`, `Sec-WebSocket-Key` — the latter explicitly not an authenticator, RFC 6455 §1.3) because QA evidence docs capture raw HTTP and will keep producing them. Two blob-storage object keys exempted per-**instance** in `.gitleaksignore`, because `"key":"…"` in JSON is also exactly what a real leaked API key looks like. The CI step gained `-v`; it previously reported `leaks found: 5` and named none. |
+| duplicate `gitleaks` check name on every PR | `secret-scan.yml` fired on unscoped `push` **and** `pull_request`, producing two runs sharing one check name — a required check matched by name would have had no defined referent. Push scoped to `main`. Found by reading PR #96's own check list. |
+| 96 Go files not gofmt-clean; nothing enforced gofmt | swept with the toolchain `go.mod` pins (1.25.0 via `GOTOOLCHAIN`), which produced the same list as local 1.26 — real drift, not a version artifact. `git diff -w` is import re-ordering, blank-line collapse and wrapping only; build + vet pass. Gated by a new `gofmt` check. The script fails closed on an empty file list (the first sweep blew the argv limit and reported a green that meant gofmt never ran) and includes untracked files (without that, a new file passes locally and fails in CI on commit — found because the negative fixture did not fire on its first attempt). |
+| revive finding on an exported var with no doc comment | `CodeValidationSubmitChoiceRequired` had none, and neither did its two siblings. Pre-existing, but invisible: `golangci-lint` runs `--new-from-patch`, so a finding only surfaces once its line enters a diff — and the gofmt realignment put it there. Fixed by writing the three comments, not by excluding the file. A linter scoped to new lines will keep surfacing old debt this way; that is the ratchet working, not a regression. |
+| `ci.yml` gated the docx-v2 bundle guard behind a `paths:` filter that did not match `package.json` or the lockfile | so the change most likely to break "the server bundle stays framework-free" — adding a dependency — was the one change that did not run the guard. Filter removed; `node` is now required on every PR. The redundant `go` job (`go build ./...` + 7 hand-listed packages, all covered by `test-smoke:unit`'s `go test ./...`) was deleted as duplicate compute. |
+| perf readiness loop could not fail | `curl -sf … && break \|\| sleep 2` with no exit, so a backend that never started still produced a green step and k6 benchmarked a dead port — emitting a full percentile table over 300 failed requests and 0 bytes received. Output shaped like a measurement that measured nothing. Now fails at the cause. The job stays red for D-16; A1 removed the disguise, not the defect. |
+| `main` had no ruleset and no branch protection of any kind | direct push, force-push and deletion all permitted; **every green check in this repo was advisory**. Ruleset `main` (id `20560142`) now requires a PR, blocks force-push and deletion, requires thread resolution, and requires 22 status checks — each one observed green on PR #96 before promotion. Verified live: PR #96 reports `mergeable: MERGEABLE, state: BLOCKED`. Exported to `.github/rulesets/main.json`, with the README stating plainly that GitHub does not read that file. |
 
 ## 6. Amendment log
 
@@ -202,3 +282,5 @@ someone actually reads. All three keeps are cited above; none is an orphan.
 | 2026-08-07 | Created. Tiers set, cilint + gitleaks + Grype baselines recorded, D-1…D-4 deferred. |
 | 2026-08-07 | Orphan scripts triaged (§4a). D-5…D-9 added, D-6 closed same day, `wiki-tally` → tier 1. |
 | 2026-08-07 | kin-openapi + grpc bumped; D-10…D-12 recorded for the five advisories the stop rule refused to force. staticcheck now 0 findings repo-wide → tier 1. |
+| 2026-08-07 | All 17 deterministic CI jobs rewired to `go run ./tools/verify --only=…` (item 5 complete). §1b added: a required check may not carry a `paths:` filter. `api-contract`/`lint`/`fe-ci` filters removed; `test-full` moved to `pull_request` (item 4). PR #96 opened as the evidence run — the first PR to exercise the whole check surface, and it immediately exposed the duplicate `gitleaks` name, the Linux-only cilint failure and the docx-v2 build ordering. gofmt gated; D-14 recorded. |
+| 2026-08-07 | **Item 6 complete.** `main` ruleset created (id `20560142`) with 22 required checks and zero bypass actors; blocking verified live against PR #96. §2 rewritten from real evidence — the previous tier-1 table listed *workflow* names (`Go Lint`, `api-contract`, `lint`, `Supply Chain`), none of which exists as a check context, so it could not have been applied as written. `ci.yml` filter removed and its `node` job promoted. D-15/D-16 recorded; D-16 supersedes D-2. |

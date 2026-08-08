@@ -15,9 +15,9 @@ import (
 	"github.com/google/uuid"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
+	"metaldocs/internal/modules/documents/infrastructure"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
-	"metaldocs/internal/modules/documents/infrastructure"
 	"metaldocs/tests/integration/testdb"
 )
 

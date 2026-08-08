@@ -16,9 +16,9 @@ import (
 	docrepo "metaldocs/internal/modules/documents/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
-	"metaldocs/internal/platform/docgenv2"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/platform/docgenv2"
 	"metaldocs/tests/integration/testdb"
 )
 

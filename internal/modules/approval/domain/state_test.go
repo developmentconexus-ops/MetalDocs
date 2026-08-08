@@ -10,18 +10,18 @@ func TestStateLegalTransitions(t *testing.T) {
 
 	// Build truth table from spec.
 	legal := map[[2]DocState]bool{
-		{StateDraft, StateUnderReview}:     true,
-		{StateUnderReview, StateApproved}:  true,
-		{StateUnderReview, StateRejected}:  true,
-		{StateRejected, StateDraft}:        true,
-		{StateApproved, StatePublished}:    true,
-		{StateApproved, StateScheduled}:    true,
-		{StateApproved, StateDraft}:        true,
-		{StateScheduled, StatePublished}:   true,
-		{StateScheduled, StateDraft}:       true,
-		{StatePublished, StateSuperseded}:  true,
-		{StatePublished, StateObsolete}:    true,
-		{StateSuperseded, StateObsolete}:   true,
+		{StateDraft, StateUnderReview}:    true,
+		{StateUnderReview, StateApproved}: true,
+		{StateUnderReview, StateRejected}: true,
+		{StateRejected, StateDraft}:       true,
+		{StateApproved, StatePublished}:   true,
+		{StateApproved, StateScheduled}:   true,
+		{StateApproved, StateDraft}:       true,
+		{StateScheduled, StatePublished}:  true,
+		{StateScheduled, StateDraft}:      true,
+		{StatePublished, StateSuperseded}: true,
+		{StatePublished, StateObsolete}:   true,
+		{StateSuperseded, StateObsolete}:  true,
 	}
 
 	for _, from := range states {

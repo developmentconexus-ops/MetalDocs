@@ -46,7 +46,7 @@ func NewRepository(db *sql.DB, displayNames iamdomain.UserDisplayNameReader, mem
 }
 
 // resolveNames fetches display names for the given user ids via the iam port and
-// applies the COALESCE(NULLIF(display_name,''), user_id) fallback consumer-side:
+// applies the COALESCE(NULLIF(display_name,”), user_id) fallback consumer-side:
 // any id the port omits (absent in tenant or empty display_name) maps to itself.
 func (r *Repository) resolveNames(ctx context.Context, tenantID string, ids []string) (map[string]string, error) {
 	out := make(map[string]string, len(ids))

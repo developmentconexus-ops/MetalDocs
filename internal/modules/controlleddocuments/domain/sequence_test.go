@@ -180,4 +180,3 @@ func TestSequenceAllocatorNextAndIncrement_Concurrent(t *testing.T) {
 		}
 	}
 }
-

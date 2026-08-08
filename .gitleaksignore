@@ -1,0 +1,24 @@
+# gitleaks fingerprint allowlist — INSTANCE-scoped, one line per triaged
+# finding. Format: <commit>:<path>:<rule>:<line>
+#
+# Why this file exists alongside .gitleaks.toml: the toml allowlist is
+# class-scoped (a path or regex exempts everything matching it, forever).
+# Some findings are false positives as INSTANCES but their shape is exactly
+# what a real secret looks like, so exempting the class would blind the
+# scanner to the thing it exists to catch. Those go here, individually, with
+# the reason written down.
+#
+# Rule for adding a line: name what the value actually is and why it grants
+# nothing. "It's in a doc" is not a reason — the repo is public.
+
+# Blob-storage object key (a path inside the tenant-namespaced bucket) captured
+# in QA evidence for the docx render pipeline. Reading it requires the storage
+# credentials, which are not here; the key alone is not authorization.
+# gitleaks' generic-api-key rule fires on the identifier name "…S3Key", not on
+# the value's meaning.
+21f52f29479fbf56421667e62c5ec821a69f3ec0:docs/superpowers/reports/2026-07-22-qa3-browser-qa-evidence.md:generic-api-key:40
+
+# Same class: the `"key"` field of a blob descriptor in a captured JSON
+# response body. Object key, not credential. NOT exempted as a class, because
+# `"key":"…"` in JSON is also the exact shape of a genuine leaked API key.
+665b2bae29faa9681dc762df4add6702e5b8b51b:docs/superpowers/reports/2026-07-16-unit-blank-docx-b-evidence.md:generic-api-key:96

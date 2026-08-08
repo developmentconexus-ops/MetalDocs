@@ -43,8 +43,8 @@ import (
 	"errors"
 	"testing"
 
-	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
 	approvalrepo "metaldocs/internal/modules/approval/infrastructure"
+	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
 	"metaldocs/tests/integration/testdb"
@@ -252,9 +252,9 @@ func TestSubmitBindsHeadContentHash_RealDB(t *testing.T) {
 	runner := db.NewTxRunner(dbc)
 
 	req := SubmitRequest{
-		TenantID:   tnt.ID,
-		DocumentID: doc.ID,
-		RouteID:    routeID,
+		TenantID:    tnt.ID,
+		DocumentID:  doc.ID,
+		RouteID:     routeID,
 		SubmittedBy: actor.ID,
 		// Present-but-empty → resolveContentFormData substitutes the head hash.
 		ContentFormData: map[string]any{"_content_hash": ""},
