@@ -167,6 +167,62 @@ var checks = []Check{
 		Paths:    []string{"api/openapi/", "internal/"},
 		CIJob:    "api-contract.yml:contract-sync",
 	},
+	{
+		ID:       "codegen-drift-backend",
+		Desc:     "go generate ./... produces no diff in generated Go artifacts (api.gen.go, httpsurface_gen.go, httpsurface_e2e_gen.go)",
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-codegen-drift-backend.sh"},
+		Paths:    []string{"api/openapi/", "internal/", "apps/", "cmd/"},
+		CIJob:    "ci.yml:lint-contract",
+	},
+	{
+		ID:       "codegen-drift-frontend",
+		Desc:     "pnpm run gen:api produces no diff in frontend/apps/web/src/lib/api-types/",
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-codegen-drift-frontend.sh"},
+		Paths:    []string{"api/openapi/", "frontend/"},
+		CIJob:    "ci.yml:lint-contract",
+	},
+	{
+		ID:       "openapi-lint-v1",
+		Desc:     "redocly lint on the v1 spec",
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv:     []string{"npx", "--yes", "@redocly/cli@latest", "lint", "api/openapi/v1/openapi.yaml"},
+		Needs:    []string{needsNetwork},
+		Paths:    []string{"api/openapi/"},
+		CIJob:    "ci.yml:lint-contract",
+	},
+	{
+		ID:   "openapi-lint-e2e",
+		Desc: "redocly lint on the internal-e2e spec",
+		// Task 12: the e2e scaffolding document did not exist until now — a
+		// gate authored before its subject would pass vacuously. Same command
+		// as openapi-lint-v1, second document; the file stays excluded from
+		// the public bundle and frontend codegen (codegen-drift-frontend),
+		// only its own contract hygiene is gated here.
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv:     []string{"npx", "--yes", "@redocly/cli@latest", "lint", "api/openapi/internal-e2e.yaml"},
+		Needs:    []string{needsNetwork},
+		Paths:    []string{"api/openapi/"},
+		CIJob:    "ci.yml:lint-contract",
+	},
+	{
+		ID:   "oasdiff-breaking",
+		Desc: "oasdiff breaking-change gate: PR head spec vs base-branch spec, --fail-on ERR",
+		// The base-branch spec this diffs against is materialized to
+		// /tmp/openapi.base.yaml by a workflow prerequisite step
+		// (ci.yml:lint-contract "Materialize base-branch spec"), which needs
+		// the PR's base SHA — a fact this registry cannot express as an argv
+		// (no shell interpolation, see Check.Argv), so that materialization
+		// stays a workflow step rather than becoming part of this check.
+		// Running `--only=oasdiff-breaking` on a laptop without first
+		// producing that file fails because the file does not exist, not
+		// because of a real breaking change — expected, not a defect.
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv:     []string{"oasdiff", "breaking", "/tmp/openapi.base.yaml", "api/openapi/v1/openapi.yaml", "--fail-on", "ERR"},
+		Paths:    []string{"api/openapi/v1/"},
+		CIJob:    "ci.yml:lint-contract",
+	},
 
 	// ---- Architecture invariants -----------------------------------------
 	{

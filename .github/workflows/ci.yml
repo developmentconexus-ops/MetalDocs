@@ -98,43 +98,34 @@ jobs:
       - name: registry checks
         run: >
           go run ./tools/verify --require-infra
-          --only=problem-codes-fresh,api-lint-base-path-e2e,api-lint-strict,api-lint-selftest,contract-sync
-      # backend-codegen-drift — copied verbatim from api-contract.yml, SHA-pinned.
-      - name: API codegen drift check (backend)
-        run: |
-          go generate ./...
-          git diff --exit-code -- '**/api.gen.go' '**/httpsurface_gen.go' '**/httpsurface_e2e_gen.go' || (echo "::error::Run 'go generate ./...' and commit"; exit 1)
-      # frontend-codegen-drift — copied verbatim from api-contract.yml, SHA-pinned.
+          --only=problem-codes-fresh,api-lint-base-path-e2e,api-lint-strict,api-lint-selftest,contract-sync,codegen-drift-backend
+      # frontend-codegen-drift, openapi-lint, openapi-lint (internal-e2e) —
+      # need pnpm/node on PATH, set up below. Check set lives in
+      # tools/verify/registry.go (codegen-drift-frontend, openapi-lint-v1,
+      # openapi-lint-e2e) — see CIJob: "ci.yml:lint-contract".
       - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
       - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6 # v4.0.4
         with: { node-version-file: .nvmrc, cache: pnpm, cache-dependency-path: pnpm-lock.yaml }
       - run: pnpm install --frozen-lockfile
-      - name: API codegen drift check (frontend)
-        run: |
-          cd frontend/apps/web
-          pnpm run gen:api
-          git diff --exit-code -- src/lib/api-types/ || (echo "::error::Run 'pnpm run gen:api' in frontend/apps/web and commit"; exit 1)
-      # openapi-lint — copied verbatim from api-contract.yml, SHA-pinned.
-      - name: OpenAPI lint
-        run: npx --yes @redocly/cli@latest lint api/openapi/v1/openapi.yaml
-      - name: OpenAPI lint (internal-e2e)
-        # Task 12: the e2e scaffolding document did not exist until now — a
-        # gate authored before its subject would pass vacuously. Same command,
-        # second document; the file stays excluded from the public bundle and
-        # frontend codegen (checked separately below), only its own contract
-        # hygiene is gated here.
-        run: npx --yes @redocly/cli@latest lint api/openapi/internal-e2e.yaml
-      # oasdiff-breaking — copied verbatim from openapi-breaking.yml, SHA-pinned.
-      # fetch-depth: 0 above (checkout step) covers this step's need for base-ref history.
+      - name: registry checks (frontend codegen + OpenAPI lint)
+        run: >
+          go run ./tools/verify --require-infra
+          --only=codegen-drift-frontend,openapi-lint-v1,openapi-lint-e2e
+      # oasdiff-breaking — Install oasdiff and Materialize base-branch spec
+      # stay workflow prerequisite steps (job setup, not registry checks):
+      # they need the PR's base SHA, which a Check's Argv cannot express
+      # (compile-time literals only, no shell/YAML interpolation). Check set
+      # lives in tools/verify/registry.go (oasdiff-breaking) — see CIJob:
+      # "ci.yml:lint-contract". fetch-depth: 0 above (checkout step) covers
+      # this step's need for base-ref history.
       - name: Install oasdiff
         run: go install github.com/oasdiff/oasdiff@latest
       - name: Materialize base-branch spec
         run: |
           git fetch origin "${{ github.event.pull_request.base.sha }}" --depth=1
           git show "${{ github.event.pull_request.base.sha }}:api/openapi/v1/openapi.yaml" > /tmp/openapi.base.yaml
-      - name: oasdiff breaking-change gate (BLOCKING — any breaking change fails)
-        run: |
-          oasdiff breaking /tmp/openapi.base.yaml api/openapi/v1/openapi.yaml --fail-on ERR
+      - name: registry checks (oasdiff-breaking)
+        run: go run ./tools/verify --require-infra --only=oasdiff-breaking
 
   lint-frontend:
     name: lint-frontend
@@ -206,87 +197,17 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - run: go run ./tools/verify --require-infra --only=adr-status,wiki-tally,db-dictionary,req-trace-selftest,req-trace,required-gate-selftest
-      # Migration monotonicity check — copied verbatim from
-      # invariants.yml:migration-gapless.
-      - name: Check gapless sequence + no historical edits
-        run: |
-          set -euo pipefail
-          MIGRATION_DIR="db/migrations"
-
-          # After the 2026-07-29 fold (migrations 0257-0315 squashed into
-          # db/baseline, files moved to
-          # archive/migrations/post-baseline-2026-07-fold/) the directory holds
-          # only its README. Under `set -euo pipefail` an unmatched `ls` glob
-          # would abort the step, so the empty case is guarded explicitly: skip
-          # the gapless sequence check (there is no sequence), but still run the
-          # historical-edit check below — that one is a git-history question,
-          # not a filesystem one, and stays meaningful with an empty directory.
-          shopt -s nullglob
-          files=("$MIGRATION_DIR"/*.sql)
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "✅ No forward migrations (post-fold baseline) — gapless check skipped"
-          else
-            # Discover min and max from filesystem (never hardcoded). Match only
-            # the leading 4-digit prefix of each basename — `grep -oE '[0-9]+'` on
-            # the full path also captured digits inside descriptions (e.g. phase8),
-            # making MIN collapse to 2.
-            nums=$(printf '%s\n' "${files[@]}" \
-              | xargs -r -n1 basename | grep -oE '^[0-9]{4}' | sort -n)
-            MIN=$(echo "$nums" | head -1)
-            MAX=$(echo "$nums" | tail -1)
-
-            echo "Checking migrations $MIN..$MAX for gapless sequence..."
-            for n in $(seq "$MIN" "$MAX"); do
-              padded=$(printf "%04d" "$n")
-              hits=("$MIGRATION_DIR"/${padded}_*.sql)
-              if [ ${#hits[@]} -eq 0 ]; then
-                echo "❌ Gap: migration $padded missing"
-                exit 1
-              fi
-            done
-
-            echo "✅ Gapless $MIN..$MAX"
-          fi
-
-          # Check no historical migrations were modified after merge
-          # (only check files that exist in main already). The pathspec is fully
-          # quoted so GIT expands it — with nullglob an unquoted `*.sql` would
-          # vanish from the argv and turn this into a repo-wide query.
-          BASE=${GITHUB_BASE_REF:-main}
-          MODIFIED=$(git log --diff-filter=M --follow --name-only \
-            "origin/$BASE...HEAD" -- "$MIGRATION_DIR/*.sql" 2>/dev/null | grep '\.sql$' || true)
-
-          if [ -n "$MODIFIED" ]; then
-            echo "❌ Historical migrations modified: $MODIFIED"
-            exit 1
-          fi
-          echo "✅ No historical migration edits"
+      - run: go run ./tools/verify --require-infra --only=adr-status,wiki-tally,db-dictionary,req-trace-selftest,req-trace,required-gate-selftest,migration-gapless
       # check-governance.ps1 — copied verbatim from governance-check.yml:check.
       - name: Fetch base ref
         run: git fetch origin ${{ github.base_ref }} --depth=1
-      - name: Run governance checks (PowerShell)
-        shell: pwsh
-        run: ./scripts/check-governance.ps1 -BaseRef "origin/${{ github.base_ref }}"
-      # Invariant→spec-ID coverage grep — copied verbatim from
-      # e2e-coverage-gate.yml:coverage-map-check.
-      - name: Check all invariants have ≥1 spec ID
-        run: |
-          COVERAGE=frontend/apps/web/e2e/COVERAGE.md
-          echo "Scanning $COVERAGE for unmapped invariants..."
-
-          # Find all invariant rows (lines with | Pn-Ixx | or | Fn | pattern)
-          UNMAPPED=$(grep -E '^\|[[:space:]]*(P[0-9]+-I[0-9]+|F[0-9]+)[[:space:]]*\|' "$COVERAGE" \
-            | grep '❌' \
-            | awk -F'|' '{print $2}' | xargs)
-
-          if [ -n "$UNMAPPED" ]; then
-            echo "❌ Unmapped invariants found: $UNMAPPED"
-            echo "Add ≥1 spec ID for each before merging."
-            exit 1
-          fi
-
-          echo "✅ All invariants are mapped."
+      # governance-diff-rules, invariant-coverage-map — check set lives in
+      # tools/verify/registry.go — see CIJob: "ci.yml:governance". No
+      # -BaseRef arg: check-governance.ps1 now reads GITHUB_BASE_REF itself
+      # (GitHub Actions sets it automatically on pull_request events), since
+      # a registry Check's Argv cannot carry a templated `${{ }}` value.
+      - name: registry checks (governance-diff-rules, invariant-coverage-map)
+        run: go run ./tools/verify --require-infra --only=governance-diff-rules,invariant-coverage-map
 
   test-integration:
     name: test-integration
