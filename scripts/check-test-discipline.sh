@@ -97,6 +97,14 @@ violations=0
 report() { echo "$1:$2: $3: $4"; violations=$((violations+1)); }
 
 for f in "${FILES[@]}"; do
+  # Rules R1/R3/R4 describe CODE. A Go line comment that merely *describes* SQL
+  # is not a violation, and rewording prose to satisfy a grep would be bending
+  # the file to fit the rule instead of fixing the rule. Blank out everything
+  # from an unquoted `//` to end of line, preserving the line count so reported
+  # line numbers still point at the real file.
+  scan="$(mktemp)"
+  sed -E 's@^[[:space:]]*//.*$@@; s@([^:"'"'"'`])//[^"'"'"'`]*$@\1@' "$f" > "$scan"
+
   # R1 — no inline metaldocs.asserted_caps set_config literal in test files.
   # Sanctioned path: testdb.SetCapsOnDB / testdb.SeedWithCaps / testdb.SetCapsOnTx.
   while IFS= read -r hit; do
@@ -104,7 +112,7 @@ for f in "${FILES[@]}"; do
     line=$(echo "$hit" | cut -d: -f1)
     text=$(echo "$hit" | cut -d: -f2-)
     report "$f" "$line" "R1" "$text"
-  done < <(grep -nE "set_config\('metaldocs\.asserted_caps'" "$f" 2>/dev/null || true)
+  done < <(grep -nE "set_config\('metaldocs\.asserted_caps'" "$scan" 2>/dev/null || true)
 
   # R2 — no is_local=false in a set_config call.
   # F4c.1 invariant: tripwire writes must be tx-local (is_local=true) to avoid
@@ -127,7 +135,7 @@ for f in "${FILES[@]}"; do
       line=$(echo "$hit" | cut -d: -f1)
       text=$(echo "$hit" | cut -d: -f2-)
       report "$f" "$line" "R3" "$text"
-    done < <(grep -nF "\"${DEV_TENANT_UUID}\"" "$f" 2>/dev/null || true)
+    done < <(grep -nF "\"${DEV_TENANT_UUID}\"" "$scan" 2>/dev/null || true)
   fi
 
   # R4 — no bare unqualified `documents` table reference in SQL.
@@ -139,8 +147,10 @@ for f in "${FILES[@]}"; do
       line=$(echo "$hit" | cut -d: -f1)
       text=$(echo "$hit" | cut -d: -f2-)
       report "$f" "$line" "R4" "$text"
-    done < <(grep -nE "(FROM|JOIN|INTO|UPDATE)[[:space:]]+documents([^_a-zA-Z]|$)" "$f" 2>/dev/null || true)
+    done < <(grep -nE "(FROM|JOIN|INTO|UPDATE)[[:space:]]+documents([^_a-zA-Z]|$)" "$scan" 2>/dev/null || true)
   fi
+
+  rm -f "$scan"
 done
 
 if (( violations > 0 )); then

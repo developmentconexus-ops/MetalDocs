@@ -1,0 +1,7 @@
+//go:build integration
+
+package selftest
+
+const capsSQL = `SELECT set_config('metaldocs.asserted_caps', $1, true)`
+const devTenant = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+const docQuery = `SELECT id FROM documents WHERE tenant_id = $1`
