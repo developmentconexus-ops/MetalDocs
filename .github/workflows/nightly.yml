@@ -13,6 +13,9 @@ jobs:
   perf:
     name: perf
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     env:
       BASE_URL: http://localhost:8080
     steps:
@@ -74,10 +77,36 @@ jobs:
           name: perf-results
           path: k6-results/
           retention-days: 30
+      - name: Open or update issue on failure
+        if: failure()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const title = 'nightly: perf job failing';
+            const { data: existing } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'nightly-failure,perf',
+            });
+            if (existing.some(issue => issue.title === title)) {
+              console.log('Open nightly-failure issue for perf already exists; skipping creation.');
+              return;
+            }
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              labels: ['nightly-failure', 'perf'],
+              body: `The \`perf\` job in \`nightly.yml\` failed. See run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
 
   e2e:
     name: e2e
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     env:
       METALDOCS_E2E: '1'
       DATABASE_URL: ${{ secrets.E2E_DATABASE_URL }}
@@ -151,10 +180,36 @@ jobs:
             frontend/apps/web/playwright-report/
             frontend/apps/web/test-results/
           retention-days: 14
+      - name: Open or update issue on failure
+        if: failure()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const title = 'nightly: e2e job failing';
+            const { data: existing } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'nightly-failure,e2e',
+            });
+            if (existing.some(issue => issue.title === title)) {
+              console.log('Open nightly-failure issue for e2e already exists; skipping creation.');
+              return;
+            }
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              labels: ['nightly-failure', 'e2e'],
+              body: `The \`e2e\` job in \`nightly.yml\` failed. See run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
 
   axe:
     name: axe
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     steps:
       # e2e-coverage-gate.yml's axe-baseline-check job, moved verbatim (only its
       # `needs: coverage-map-check` dependency is dropped — that job does not
@@ -198,9 +253,36 @@ jobs:
             console.log('No critical violations in baseline.');
           "
 
+      - name: Open or update issue on failure
+        if: failure()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const title = 'nightly: axe job failing';
+            const { data: existing } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'nightly-failure,axe',
+            });
+            if (existing.some(issue => issue.title === title)) {
+              console.log('Open nightly-failure issue for axe already exists; skipping creation.');
+              return;
+            }
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              labels: ['nightly-failure', 'axe'],
+              body: `The \`axe\` job in \`nightly.yml\` failed. See run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
+
   security-scan:
     name: security-scan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
@@ -226,3 +308,26 @@ jobs:
       # in `pr` + `full`.
       - name: registry checks (gosec, govulncheck)
         run: go run ./tools/verify --require-infra --only=gosec,govulncheck
+      - name: Open or update issue on failure
+        if: failure()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const title = 'nightly: security-scan job failing';
+            const { data: existing } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'nightly-failure,security-scan',
+            });
+            if (existing.some(issue => issue.title === title)) {
+              console.log('Open nightly-failure issue for security-scan already exists; skipping creation.');
+              return;
+            }
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              labels: ['nightly-failure', 'security-scan'],
+              body: `The \`security-scan\` job in \`nightly.yml\` failed. See run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
