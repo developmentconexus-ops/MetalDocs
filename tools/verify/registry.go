@@ -275,6 +275,36 @@ var checks = []Check{
 		Paths:    []string{"db/baseline/", "wiki/database/tables/"},
 		CIJob:    "governance-check.yml:db-dictionary-coverage",
 	},
+	{
+		ID:       "migration-gapless",
+		Desc:     "db/migrations is a gapless sequence and no historical migration was edited after merge",
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-migration-gapless.sh"},
+		Needs:    []string{needsGitDepth},
+		Paths:    []string{"db/migrations/"},
+		CIJob:    "ci.yml:governance",
+	},
+	{
+		ID:   "governance-diff-rules",
+		Desc: "cross-cutting diff rules: contract changes ship with an OpenAPI update, domain changes ship with tests, ops changes ship with a runbook update",
+		// No Paths: check-governance.ps1 reads git diff itself and its rules
+		// span internal/modules/, api/openapi/, tests/, scripts/, deploy/ and
+		// docs/runbooks/ — a path list narrow enough to be honest here would
+		// just be "the whole repo except docs prose and frontend", which is
+		// not a claim worth making.
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv:     []string{"pwsh", "-NoProfile", "-File", "./scripts/check-governance.ps1"},
+		Needs:    []string{needsGitDepth},
+		CIJob:    "ci.yml:governance",
+	},
+	{
+		ID:       "invariant-coverage-map",
+		Desc:     "every invariant row in e2e/COVERAGE.md has ≥1 mapped spec ID",
+		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-invariant-coverage-map.sh"},
+		Paths:    []string{"frontend/apps/web/e2e/COVERAGE.md"},
+		CIJob:    "ci.yml:governance",
+	},
 
 	// ---- Security -----------------------------------------------------------
 	// Both entries below are TRANSITIONAL local maxima under this repository's

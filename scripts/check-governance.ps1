@@ -1,5 +1,13 @@
 param(
-  [string]$BaseRef = "origin/main"
+  # Default reads GITHUB_BASE_REF (GitHub Actions sets this automatically on
+  # pull_request events to the PR's base branch name) rather than the
+  # workflow passing a templated `${{ github.base_ref }}` argument — a
+  # registry Check's Argv is compile-time literals only, no shell/YAML
+  # interpolation (tools/verify/registry.go doc comment on Check.Argv), so
+  # anything the check needs at runtime has to come from an env var. Outside
+  # Actions (a laptop, or `push`) GITHUB_BASE_REF is unset, so this falls
+  # back to "origin/main" — the same default this param always had.
+  [string]$BaseRef = $(if ($env:GITHUB_BASE_REF) { "origin/$env:GITHUB_BASE_REF" } else { "origin/main" })
 )
 
 $ErrorActionPreference = "Stop"
