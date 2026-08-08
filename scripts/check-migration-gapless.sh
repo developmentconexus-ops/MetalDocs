@@ -46,9 +46,25 @@ fi
 # (only check files that exist in main already). The pathspec is fully
 # quoted so GIT expands it — with nullglob an unquoted `*.sql` would
 # vanish from the argv and turn this into a repo-wide query.
+#
+# `git log` and the `grep` that filters its output are split into two
+# steps on purpose. `git log` finding no matching commits is a real,
+# legitimate outcome (exit 0, empty output) — but `git log` itself can
+# also fail (bad ref, shallow clone missing `origin/$BASE`, detached
+# HEAD with no such ref), which is exit != 0 with output on stderr. The
+# previous form piped both through `2>/dev/null | grep ... || true`,
+# which swallowed a `git log` failure and a `grep` "no match" into the
+# same "no historical edits" pass — so a broken git command reported the
+# same ✅ as a clean history. Checking `git log`'s own exit status here
+# means only *that* command's failure fails the check; the downstream
+# `grep` finding nothing is still allowed to be empty.
 BASE=${GITHUB_BASE_REF:-main}
-MODIFIED=$(git log --diff-filter=M --follow --name-only \
-  "origin/$BASE...HEAD" -- "$MIGRATION_DIR/*.sql" 2>/dev/null | grep '\.sql$' || true)
+if ! GIT_LOG_OUTPUT=$(git log --diff-filter=M --follow --name-only \
+  "origin/$BASE...HEAD" -- "$MIGRATION_DIR/*.sql"); then
+  echo "❌ git log failed while checking for historical migration edits (bad ref origin/$BASE?, shallow clone?)"
+  exit 1
+fi
+MODIFIED=$(printf '%s\n' "$GIT_LOG_OUTPUT" | grep '\.sql$' || true)
 
 if [ -n "$MODIFIED" ]; then
   echo "❌ Historical migrations modified: $MODIFIED"
