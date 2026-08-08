@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -63,7 +64,7 @@ func TestAuditRules(t *testing.T) {
 		{Workflow: "sample.yml", Job: "lint-go", OnlyIDs: []string{"gofmt", "typo-id"}},
 	}
 
-	got := strings.Join(auditFindings(regs, jobs), "\n")
+	got := strings.Join(auditFindings(regs, jobs, nil), "\n")
 
 	for _, want := range []string{
 		"typo-id",   // A1: workflow runs an ID the registry does not have
@@ -80,8 +81,65 @@ func TestAuditRules(t *testing.T) {
 func TestAuditCleanRegistryHasNoFindings(t *testing.T) {
 	regs := []Check{{ID: "gofmt", CIJob: "sample.yml:lint-go"}}
 	jobs := []workflowJob{{Workflow: "sample.yml", Job: "lint-go", OnlyIDs: []string{"gofmt"}}}
-	if f := auditFindings(regs, jobs); len(f) != 0 {
+	if f := auditFindings(regs, jobs, nil); len(f) != 0 {
 		t.Errorf("want no findings, got %v", f)
+	}
+}
+
+// ---- A5: ci.yml `required`'s needs: vs scripts/required-gate.jq's keys ----
+
+func TestAuditA5FiresOnDesyncedRequiredNeeds(t *testing.T) {
+	jobs := []workflowJob{
+		{Workflow: "ci.yml", Job: "required", Needs: []string{"verify", "test-integration", "security", "lint-go", "extra-job"}},
+	}
+	got := strings.Join(auditFindings(nil, jobs, []string{"verify", "test-integration", "security", "lint-go"}), "\n")
+	if !strings.Contains(got, "A5") {
+		t.Fatalf("want an A5 finding when needs: and required-gate.jq disagree, got:\n%s", got)
+	}
+	if !strings.Contains(got, "extra-job") {
+		t.Errorf("finding should name the job causing the mismatch, got:\n%s", got)
+	}
+}
+
+func TestAuditA5CleanWhenSynced(t *testing.T) {
+	jobs := []workflowJob{
+		{Workflow: "ci.yml", Job: "required", Needs: []string{"verify", "test-integration", "security", "lint-go"}},
+	}
+	got := auditFindings(nil, jobs, []string{"lint-go", "security", "test-integration", "verify"})
+	for _, f := range got {
+		if strings.Contains(f, "A5") {
+			t.Errorf("want no A5 finding when needs: and required-gate.jq agree (order-independent), got %v", got)
+		}
+	}
+}
+
+// A5 must only look at ci.yml's `required` job — a job that happens to be
+// named `required` in some other workflow, or a `required` job during a
+// synthetic test that has nothing to do with the real gate, must not fire.
+func TestAuditA5IgnoresUnrelatedRequiredJobs(t *testing.T) {
+	jobs := []workflowJob{
+		{Workflow: "sample.yml", Job: "required", Needs: []string{"anything"}},
+	}
+	got := auditFindings(nil, jobs, []string{"verify"})
+	for _, f := range got {
+		if strings.Contains(f, "A5") {
+			t.Errorf("A5 must be scoped to ci.yml:required, got %v", got)
+		}
+	}
+}
+
+func TestParseRequiredGateKeysReadsTheRealGateFile(t *testing.T) {
+	// scripts/required-gate.jq relative to the repo root; go test runs with
+	// the package directory as cwd, so walk up.
+	keys, err := parseRequiredGateKeys(filepath.Join("..", "..", "scripts", "required-gate.jq"))
+	if err != nil {
+		t.Fatalf("parseRequiredGateKeys: %v", err)
+	}
+	want := []string{"lint-go", "security", "test-integration", "verify"}
+	got := append([]string(nil), keys...)
+	sort.Strings(got)
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("got %v, want %v", got, want)
 	}
 }
 
@@ -93,7 +151,7 @@ func TestAuditAllowsDuplicateInvocation(t *testing.T) {
 		{Workflow: "old.yml", Job: "legacy", OnlyIDs: []string{"gofmt"}},
 		{Workflow: "ci.yml", Job: "lint-go", OnlyIDs: []string{"gofmt"}},
 	}
-	if f := auditFindings(regs, jobs); len(f) != 0 {
+	if f := auditFindings(regs, jobs, nil); len(f) != 0 {
 		t.Errorf("duplicate invocation must be allowed during Phase 2, got %v", f)
 	}
 }
@@ -162,7 +220,7 @@ func TestAuditProfileInvocationSatisfiesCIJob(t *testing.T) {
 	if !found {
 		t.Fatalf("idsForProfile(changed) does not include go-build; got %v", jobs[0].OnlyIDs)
 	}
-	for _, f := range auditFindings(regs, jobs) {
+	for _, f := range auditFindings(regs, jobs, nil) {
 		if strings.Contains(f, "sample.yml:verify") {
 			t.Errorf("want no finding referencing the profile-satisfied CIJob, got %q", f)
 		}

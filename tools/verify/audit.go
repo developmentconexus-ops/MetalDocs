@@ -145,9 +145,12 @@ func parseWorkflows(dir string) ([]workflowJob, error) {
 	return out, nil
 }
 
-// auditFindings applies the four rules. Pure, so the rules are testable
-// without a repository on disk.
-func auditFindings(regs []Check, jobs []workflowJob) []string {
+// auditFindings applies the five rules. Pure, so the rules are testable
+// without a repository on disk — requiredGateKeys is read from
+// scripts/required-gate.jq by the caller (parseRequiredGateKeys) and handed
+// in already parsed, same reason parseWorkflows' I/O stays out of this
+// function.
+func auditFindings(regs []Check, jobs []workflowJob, requiredGateKeys []string) []string {
 	known := map[string]bool{}
 	for _, c := range regs {
 		known[c.ID] = true
@@ -196,8 +199,68 @@ func auditFindings(regs []Check, jobs []workflowJob) []string {
 		}
 	}
 
+	// A5 — ci.yml's `required` job's needs: list and scripts/required-gate.jq's
+	// hard-coded key set must name exactly the same jobs. Nothing else ties
+	// them together: `required-gate-selftest` proves the .jq expression
+	// itself accepts/rejects the right result sets, but it does that against
+	// fixtures, not against ci.yml's live needs: list — so a job added to one
+	// and not the other passed every existing check while the gate silently
+	// stopped requiring it. This is what scripts/required-gate.jq's dead
+	// workflowJob.Needs field (parsed since audit.go's first version, never
+	// read until now) was always for.
+	for _, j := range jobs {
+		if j.Workflow != "ci.yml" || j.Job != "required" {
+			continue
+		}
+		got := append([]string(nil), j.Needs...)
+		sort.Strings(got)
+		want := append([]string(nil), requiredGateKeys...)
+		sort.Strings(want)
+		if !sameStrings(got, want) {
+			findings = append(findings, fmt.Sprintf(
+				"A5 ci.yml:required needs=%v but scripts/required-gate.jq requires=%v — a job in one and not the other can fail while `required` still reports success",
+				got, want))
+		}
+	}
+
 	sort.Strings(findings)
 	return findings
+}
+
+func sameStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// requiredGateKeyPattern extracts the jq array literal
+// `["a", "b", "c"]` that scripts/required-gate.jq compares `keys | sort`
+// against. The audit reads this instead of hard-coding the job list a third
+// time (ci.yml's needs:, the .jq file, and this audit would otherwise all
+// have to agree by hand).
+var requiredGateKeyArrayPattern = regexp.MustCompile(`\[\s*((?:"[^"]*"\s*,?\s*)+)\]`)
+var requiredGateKeyPattern = regexp.MustCompile(`"([^"]*)"`)
+
+func parseRequiredGateKeys(path string) ([]string, error) {
+	b, err := os.ReadFile(path) //nolint:gosec // G304 — path is the fixed scripts/required-gate.jq literal, not user input.
+	if err != nil {
+		return nil, err
+	}
+	m := requiredGateKeyArrayPattern.FindSubmatch(b)
+	if m == nil {
+		return nil, fmt.Errorf("%s: no jq array literal found (expected [\"job\", ...])", path)
+	}
+	var keys []string
+	for _, km := range requiredGateKeyPattern.FindAllSubmatch(m[1], -1) {
+		keys = append(keys, string(km[1]))
+	}
+	return keys, nil
 }
 
 func printAudit(dir string) int {
@@ -206,7 +269,12 @@ func printAudit(dir string) int {
 		fmt.Fprintf(os.Stderr, "verify --audit: cannot read workflows: %v\n", err)
 		return 1
 	}
-	findings := auditFindings(checks, jobs)
+	gateKeys, err := parseRequiredGateKeys(filepath.Join("scripts", "required-gate.jq"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "verify --audit: cannot read scripts/required-gate.jq: %v\n", err)
+		return 1
+	}
+	findings := auditFindings(checks, jobs, gateKeys)
 	fmt.Printf("verify --audit: %d checks, %d workflow jobs, %d findings\n",
 		len(checks), len(jobs), len(findings))
 	if len(findings) == 0 {
