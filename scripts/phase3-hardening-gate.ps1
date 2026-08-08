@@ -37,10 +37,6 @@ $result = [ordered]@{
     module_boundaries = [ordered]@{
       passed = $false
     }
-    contract_baseline = [ordered]@{
-      evidence_file = $null
-      status = "not_run"
-    }
     security_baseline = [ordered]@{
       skip_govulncheck = $SkipGovulncheck
       evidence_file = $null
@@ -66,25 +62,12 @@ try {
   }
   $result.steps.module_boundaries.passed = $true
 
-  & "$PSScriptRoot/contract-baseline.ps1"
-  if ($LASTEXITCODE -ne 0) {
-    throw "contract-baseline falhou com exit code $LASTEXITCODE"
-  }
-
-  $contractEvidence = Get-ChildItem "non_git/contract/contract_baseline_*.json" `
-    -File `
-    | Sort-Object LastWriteTime -Descending `
-    | Select-Object -First 1
-  if (-not $contractEvidence) {
-    throw "Nao foi encontrado arquivo de evidencia de contract baseline."
-  }
-
-  $contractResult = Get-Content $contractEvidence.FullName | ConvertFrom-Json
-  $result.steps.contract_baseline.evidence_file = $contractEvidence.FullName
-  $result.steps.contract_baseline.status = $contractResult.status
-  if ($contractResult.status -ne "approved") {
-    throw "Contract baseline nao aprovado."
-  }
+  # The contract-baseline step was removed 2026-08-08. It ran `go test ./tests/contract`,
+  # a suite deleted in dc0572f6 against a module layout that no longer exists (it imported
+  # a `workflow` module; the repo has 15 modules and none is named that). Its strongest
+  # claim — that the OpenAPI spec contains the runtime endpoints — is now proved at boot by
+  # assertSurface (apps/api/cmd/metaldocs-api/surface.go), which is boot-fatal and records
+  # per publisher. See spec 2026-08-07-ci-restructure-design.md §11.3 R-1.
 
   if ($SkipGovulncheck) {
     & "$PSScriptRoot/security-baseline.ps1" -SkipGovulncheck
