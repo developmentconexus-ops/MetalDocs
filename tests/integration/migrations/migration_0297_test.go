@@ -355,11 +355,7 @@ func insertInstanceFull(t *testing.T, db *sql.DB, tenantID, routeID, submittedBy
 	// — never unioned, so the wrong constant here fail-closes P0001 before
 	// the row-shape assertion this test is actually about.
 	assertedCap := capForSubject(subjectKind)
-	if _, err := tx.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', $1, true)`, `[{"cap":"`+assertedCap+`"}]`,
-	); err != nil {
-		t.Fatalf("assert %s cap: %v", assertedCap, err)
-	}
+	testdb.SetCapsOnTx(t, tx, `[{"cap":"`+assertedCap+`"}]`)
 
 	id := uuid.NewString()
 	var docIDArg any
