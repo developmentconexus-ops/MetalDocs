@@ -294,7 +294,21 @@ jobs:
     # start until the cheap jobs pass. It stays pre-merge and blocking:
     # A1 item 4 and test-full.yml:2 both require the full suite before merge.
     needs: [changes, lint-go, lint-contract, lint-frontend, test-go]
-    if: needs.changes.outputs.go == 'true' || needs.changes.outputs.db == 'true'
+    # !cancelled() is a status-check function; it suppresses the implicit
+    # success() so a skipped upstream job does not skip this one (a plain
+    # AND-of-success `if:` propagates skip through `needs:`). The per-job
+    # `!= 'failure'` guards keep the edge's real purpose: don't start the
+    # 20-minute suite when a cheap check already failed. Bracket syntax is
+    # required because hyphenated job ids can't be dot-dereferenced
+    # (needs.lint-go parses as subtraction).
+    if: >-
+      !cancelled()
+      && needs.changes.result == 'success'
+      && (needs.changes.outputs.go == 'true' || needs.changes.outputs.db == 'true')
+      && needs['lint-go'].result != 'failure'
+      && needs['lint-contract'].result != 'failure'
+      && needs['lint-frontend'].result != 'failure'
+      && needs['test-go'].result != 'failure'
     runs-on: ubuntu-latest
     # services:, the postgres user/db names and timeout-minutes: 20 below are
     # copied verbatim from test-full.yml:full — not from the sketch in the
