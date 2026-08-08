@@ -51,6 +51,7 @@ defect this register exists to eliminate.
 | ME-11 anti-drift guard with a hand-synced allow-list | [#84](https://github.com/leandrotcawork/MetalDocs/issues/84) |
 | ME-12 a string lint cannot see a constant-built bypass | [#85](https://github.com/leandrotcawork/MetalDocs/issues/85) |
 | ME-13 an analysis that takes its subject as its own premise | [#86](https://github.com/leandrotcawork/MetalDocs/issues/86) |
+| ME-14 a tenant table with no RLS, and no control that could see it | _issue pending_ |
 
 ## How to read an entry
 
@@ -464,6 +465,68 @@ requirement has to live to fire without being remembered.
 
 **Owner:** unrouted. The skills change is small and blocks nothing; the risk is that every future
 "should we restructure X" answer inherits the defect until it lands.
+
+---
+
+## ME-14 — a tenant table with no RLS, and no control that could have seen it
+
+**Found** 2026-08-08 during the CI Phase-0 baseline work, by hand, while a *documentation* task
+(the `db-dictionary` gap closure) read `db/baseline/0001_current_schema.sql` and refused to assume a
+table matched its siblings.
+
+**Surfaces**
+| Surface | Claim |
+|---|---|
+| `db/baseline/0001_current_schema.sql:2084` `approval_route_stage_selectors` | `tenant_id uuid NOT NULL`, **no `ENABLE`, no `FORCE ROW LEVEL SECURITY`** |
+| same file, sibling approval tables `:2025, 2055, 2077, 2144, 2171` | `FORCE ROW LEVEL SECURITY` |
+| same file `:4807-4831` | the `ENABLE ROW LEVEL SECURITY` block — 37 tables |
+| `internal/modules/iam/tenancy/tenant_data_port.go` | the table is wired into export **and** erase — the GDPR surface |
+
+Measured first-hand against the baseline on 2026-08-08: **38 tables declare `tenant_id`; 37 enable
+RLS.** The set difference is exactly one table, and the 37 are a strict subset of the 38. That
+singleton status is what makes it credible as an oversight rather than a design choice — every other
+RLS-less table in the schema inherits isolation through its FK chain and carries no `tenant_id` of
+its own.
+
+**Kept correct by** nothing. This is the part worth recording. The repo has a real, well-built RLS
+control stack, and **not one piece of it could have caught this**:
+
+- `scripts/api-lint/async_tenant_tables_schema_drift_test.go:48` compares
+  `async-tenant-tables.txt` against the baseline's FORCE-RLS set. Both sides are derived from tables
+  that *already have* RLS, so a table with none is absent from both and the test is green — a
+  consistent, complete-looking agreement about an incomplete world.
+- `tests/integration/security/rls_truth_test.go` proves enforcement is genuine for a table that has
+  a policy (it killed the `metaldocs_app` false green, M7 F7.4). It says nothing about which tables
+  should have one.
+- `scripts/api-lint/sole_rls_read_rule.go` governs reads that rely on RLS as the sole isolation
+  mechanism — again, downstream of RLS existing.
+- `tools/verify/registry.go` — all 29 checks — contains **no RLS check of any kind** (`grep -i rls`
+  returns nothing).
+
+The M7 RLS-truth sweep missed it for the same structural reason: it reasoned about FORCE-vs-ENABLE
+on tables already known to be RLS-enabled, not about tenant-scoped tables with no RLS at all. Every
+control in the stack takes "the table has RLS" as its starting point. **The question none of them
+asks is the one that fails.**
+
+**Firing mechanism** — level 3, and the cheapest one in this register. A generator-diff test
+asserting *set equality* between `{tables with a tenant_id column}` and `{tables with ENABLE ROW
+LEVEL SECURITY}` in the baseline, registered in `tools/verify/registry.go` so it runs in `pr` and
+`full`. Both sides come from the schema; neither is hand-maintained; new tenant tables are covered
+the day they land. Deliberate exceptions go in a checked-in allow-list **with a reason per line**,
+the same shape as `async-tenant-tables.txt`. Today that list would hold zero entries.
+
+Level 1 is reachable and better if the schema ever moves to generated DDL: emit the `ENABLE`/`FORCE`
+lines and the `tenant_isolation` policy *from* the `tenant_id` column declaration, so an RLS-less
+tenant table is unrepresentable. Out of the current boundary; named here so the level-3 test is
+understood as a step, not a destination.
+
+**Verified** 2026-08-08, first-hand against `db/baseline/0001_current_schema.sql` and against the
+four controls named above.
+
+**Owner:** unrouted. Two pieces of work, and they are separable — the missing RLS on
+`approval_route_stage_selectors` (a migration, plus a decision on whether its FK chain already makes
+the exposure theoretical), and the drift test that makes the *class* impossible. The second is worth
+more than the first: the table is one instance, and the absent control is why there could be others.
 
 ---
 
