@@ -67,6 +67,10 @@ func main() {
 		base    = flag.String("base", "origin/main", "base ref for --profile=changed")
 		jobs    = flag.Int("j", defaultParallelism(), "how many checks to run concurrently")
 		verbose = flag.Bool("v", false, "stream output of passing checks too")
+		// In CI a SKIP is indistinguishable from a PASS at the exit code, so a
+		// job can report green over zero executed tests. This flag makes
+		// "cannot run here" fatal, and CI always passes it.
+		requireInfra = flag.Bool("require-infra", false, "treat missing infra as a failure instead of a skip; CI always sets this")
 	)
 	flag.Parse()
 
@@ -105,7 +109,7 @@ func main() {
 	}
 
 	fmt.Printf("verify: profile=%s checks=%d parallelism=%d\n\n", *profile, len(selected), *jobs)
-	results := run(selected, *jobs, *verbose)
+	results := run(selected, *jobs, *verbose, *requireInfra)
 	os.Exit(report(results, *profile))
 }
 
@@ -372,7 +376,7 @@ func isShallow() bool {
 	return strings.TrimSpace(string(out)) == "true"
 }
 
-func run(selected []Check, parallelism int, verbose bool) []result {
+func run(selected []Check, parallelism int, verbose bool, requireInfra bool) []result {
 	if parallelism < 1 {
 		parallelism = 1
 	}
@@ -389,9 +393,15 @@ func run(selected []Check, parallelism int, verbose bool) []result {
 			defer func() { <-sem }()
 
 			if reason := missingInfra(c); reason != "" {
-				results[i] = result{check: c, status: statusSkip, reason: reason}
+				// One decision site, two verdicts. Deriving this in report()
+				// instead would mean two places agree on what a skip means.
+				status, label := statusSkip, "SKIP"
+				if requireInfra {
+					status, label = statusFail, "FAIL"
+				}
+				results[i] = result{check: c, status: status, reason: reason}
 				printMu.Lock()
-				fmt.Printf("  SKIP  %-24s %s\n", c.ID, reason)
+				fmt.Printf("  %s  %-24s %s\n", label, c.ID, reason)
 				printMu.Unlock()
 				return
 			}
@@ -441,6 +451,9 @@ func report(results []result, profile string) int {
 			fmt.Printf("  $ %s\n", strings.Join(r.check.Argv, " "))
 			if r.check.CIJob != "" {
 				fmt.Printf("  CI job: %s\n", r.check.CIJob)
+			}
+			if r.reason != "" {
+				fmt.Printf("  not runnable here: %s\n", r.reason)
 			}
 			fmt.Println(indent(r.output))
 		}
