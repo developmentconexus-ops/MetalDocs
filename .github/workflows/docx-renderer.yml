@@ -32,15 +32,19 @@ jobs:
       # (docx-v2-typecheck, docx-v2-build, docx-v2-test) — see CIJob:
       # "docx-renderer.yml:node".
       #
-      # TWO invocations, and the order matters. docx-v2-test contains
-      # bundle-guard.test.ts, which reads dist/meta.json to assert the server
-      # bundle is framework-free — so it consumes the build's output. The
-      # build used to run AFTER the tests, which meant the guard could only
-      # ever fail ("dist/meta.json missing"). verify runs the checks within a
-      # single invocation concurrently, so the dependency is expressed by
-      # splitting the invocation rather than by ordering inside one.
-      - run: go run ./tools/verify --only=docx-v2-typecheck,docx-v2-build
-      - run: go run ./tools/verify --only=docx-v2-test
+      # ONE invocation. docx-v2-test contains bundle-guard.test.ts, which
+      # reads dist/meta.json to assert the server bundle is framework-free —
+      # so it consumes docx-v2-build's output. That ordering used to be
+      # enforced only by splitting this job into two `verify` invocations
+      # (build, then test); the registry's Check.After edge
+      # (docx-v2-test After docx-v2-build) now enforces it inside a single
+      # invocation instead, so the split is no longer needed. It would also
+      # now be refused: `verify` rejects a selection that contains a check
+      # without its After predecessor (--only=docx-v2-test alone excludes
+      # docx-v2-build), specifically because running it anyway is how a
+      # stale dist/meta.json from an earlier build used to pass the guard
+      # without re-validating current source.
+      - run: go run ./tools/verify --only=docx-v2-typecheck,docx-v2-build,docx-v2-test
 
 # The `go` job that used to live here ran `go build ./...` plus `go test` over
 # seven hand-listed packages. Every one of them is already covered by

@@ -104,10 +104,6 @@ func main() {
 		return
 	}
 
-	for _, w := range excludedPredecessorWarnings(selected) {
-		fmt.Fprintf(os.Stderr, "verify: ORDERING %s\n", w)
-	}
-
 	warns := preflight()
 	for _, w := range warns {
 		fmt.Fprintf(os.Stderr, "verify: PREFLIGHT %s\n", w)
@@ -152,14 +148,54 @@ func selectChecks(profile, only, base string, changedFlag bool) (selected []Chec
 	if err != nil {
 		return nil, false, err
 	}
-	if !scoped {
-		return selected, false, nil
+	if scoped {
+		selected, err = scopeToChanged(selected, base)
+		if err != nil {
+			return nil, false, err
+		}
 	}
-	out, err := scopeToChanged(selected, base)
-	if err != nil {
+	if err := validateSelectionOrdering(selected); err != nil {
 		return nil, false, err
 	}
-	return out, true, nil
+	return selected, scoped, nil
+}
+
+// validateSelectionOrdering refuses a selection that contains a check
+// without its After predecessor. This is the selection-boundary half of the
+// excluded-predecessor fix (run()'s wait loop is the other half — see its
+// doc comment).
+//
+// The prior ruling — run the dependent anyway, warn on stderr, do not
+// refuse — was proven fail-open by reproduction: `apps/docx-renderer/dist/meta.json`
+// already existed on disk from an earlier, unrelated build, and
+// `--only=docx-v2-test` alone ran bundle-guard.test.ts anyway, which read
+// that stale file and reported PASS without ever re-validating current
+// source. verify has no state that survives past its own process, so it
+// cannot tell "the predecessor already ran and passed elsewhere" apart from
+// "the predecessor never ran" — refusing is the only answer that isn't a
+// guess. A caller that wants both checks must include both in the same
+// selection, e.g. `--only=docx-v2-build,docx-v2-test`, which is what
+// docx-renderer.yml now does (see that file).
+func validateSelectionOrdering(selected []Check) error {
+	inSelection := make(map[string]bool, len(selected))
+	for _, c := range selected {
+		inSelection[c.ID] = true
+	}
+	var missing []string
+	for _, c := range selected {
+		for _, dep := range c.After {
+			if !inSelection[dep] {
+				missing = append(missing, fmt.Sprintf(
+					"%s declares After %s, but %s is not in this selection", c.ID, dep, dep))
+			}
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	sort.Strings(missing)
+	return fmt.Errorf("selection drops an ordering predecessor:\n  %s\ninclude the missing check(s) in --only (or pick a profile/--changed selection that keeps both sides of the edge)",
+		strings.Join(missing, "\n  "))
 }
 
 // emptySelectionMessage explains a zero-check run. A silent "0 checks, exit
@@ -536,39 +572,6 @@ func validateOrdering(all []Check) error {
 	return nil
 }
 
-// excludedPredecessorWarnings reports the checks in `selected` whose After
-// predecessor was left out of the same selection — entirely possible under
-// --only or a --changed diff that touches one side of an edge but not the
-// other (docx-v2-build and docx-v2-test happen to share Paths today, so
-// --changed can't split them, but --only always can).
-//
-// The ruling: run the dependent anyway, rather than refuse. verify has no
-// state that survives past its own process, so it cannot know whether the
-// excluded predecessor already ran and passed in some earlier invocation —
-// and refusing would break the one caller that does exactly that today,
-// docx-renderer.yml:node, which runs docx-v2-build and docx-v2-test as two
-// separate `verify` invocations on purpose (see that file). Silence is what
-// this ruling forbids, not the run itself: this function's output is always
-// printed, so "ran without waiting" is a fact on the record, not a fact
-// nobody sees.
-func excludedPredecessorWarnings(selected []Check) []string {
-	inSelection := map[string]bool{}
-	for _, c := range selected {
-		inSelection[c.ID] = true
-	}
-	var warns []string
-	for _, c := range selected {
-		for _, dep := range c.After {
-			if !inSelection[dep] {
-				warns = append(warns, fmt.Sprintf(
-					"%s declares After %s, but %s is not in this selection — running %s without waiting for it; order across separate invocations is not enforced",
-					c.ID, dep, dep, c.ID))
-			}
-		}
-	}
-	return warns
-}
-
 func run(selected []Check, parallelism int, verbose bool, requireInfra bool) []result {
 	if parallelism < 1 {
 		parallelism = 1
@@ -602,9 +605,22 @@ func run(selected []Check, parallelism int, verbose bool, requireInfra bool) []r
 			for _, dep := range c.After {
 				di, ok := indexByID[dep]
 				if !ok {
-					// Excluded from this selection — already warned about by
-					// excludedPredecessorWarnings; nothing to wait on here.
-					continue
+					// Excluded from this selection. main() refuses this
+					// case before run() is ever called (validateSelectionOrdering,
+					// called from selectChecks) — this branch is the same
+					// rule enforced a second time, in the execution kernel
+					// itself, so a future caller that assembles `selected`
+					// some other way than selectChecks still cannot slip
+					// an incomplete selection past run(). FAIL, not SKIP:
+					// report() only turns FAILs into a non-zero exit, and a
+					// SKIP here would be exactly the "green over nothing"
+					// shape this whole unit exists to close.
+					reason := fmt.Sprintf("refusing: predecessor %s is not part of this selection", dep)
+					results[i] = result{check: c, status: statusFail, reason: reason}
+					printMu.Lock()
+					fmt.Printf("  %s  %-24s %s\n", statusFail, c.ID, reason)
+					printMu.Unlock()
+					return
 				}
 				<-done[di]
 				if results[di].status != statusPass {

@@ -206,42 +206,97 @@ func TestValidateOrderingAcceptsDAG(t *testing.T) {
 	}
 }
 
-// ---- excluded-predecessor ruling: run anyway, but never silently ---------
+// ---- excluded-predecessor ruling: refuse rather than run over stale state -
+//
+// The prior ruling here was "run the dependent anyway, warn loudly, do not
+// refuse." A reproduction proved that fail-open: `dist/meta.json` already
+// existed on disk from an earlier, unrelated build, and
+// `--only=docx-v2-test` ran the bundle-guard test anyway — it read the
+// stale file and reported PASS without ever re-validating current source.
+// The ruling is now: a selection that includes a check without its After
+// predecessor is refused, not run. See validateSelectionOrdering (selection
+// boundary, tools/verify/main.go) and run()'s excluded-predecessor branch
+// (execution kernel, same file) — both enforce it, independently, so a
+// future caller that assembles a selection some other way than
+// selectChecks still cannot slip an incomplete one past run().
 
-func TestExcludedPredecessorWarnsAndDoesNotBlock(t *testing.T) {
+func TestValidateSelectionOrderingRejectsExcludedPredecessor(t *testing.T) {
 	selected := []Check{
 		{ID: "fixture-test-only", After: []string{"fixture-build-excluded"}},
 	}
-	warns := excludedPredecessorWarnings(selected)
-	if len(warns) != 1 {
-		t.Fatalf("want one warning about the excluded predecessor, got %v", warns)
+	err := validateSelectionOrdering(selected)
+	if err == nil {
+		t.Fatal("want an error: fixture-test-only's After predecessor is not in the selection")
 	}
-	if !strings.Contains(warns[0], "fixture-build-excluded") || !strings.Contains(warns[0], "fixture-test-only") {
-		t.Errorf("warning should name both checks, got %q", warns[0])
+	if !strings.Contains(err.Error(), "fixture-build-excluded") || !strings.Contains(err.Error(), "fixture-test-only") {
+		t.Errorf("error should name both checks, got %q", err.Error())
 	}
 }
 
-func TestExcludedPredecessorNoWarningWhenBothSelected(t *testing.T) {
+func TestValidateSelectionOrderingAcceptsCompleteSelection(t *testing.T) {
 	selected := []Check{
 		{ID: "fixture-build"},
 		{ID: "fixture-test", After: []string{"fixture-build"}},
 	}
-	if warns := excludedPredecessorWarnings(selected); len(warns) != 0 {
-		t.Errorf("want no warning when the predecessor is in the same selection, got %v", warns)
+	if err := validateSelectionOrdering(selected); err != nil {
+		t.Errorf("want no error when the predecessor is in the same selection, got %v", err)
+	}
+}
+
+// This is the reviewer's exact reproduction, at the unit level: selecting
+// docx-v2-test alone, via the real registry, through the same selectChecks
+// path `--only=docx-v2-test` goes through. Before the fix this returned the
+// check with no error, and main() ran it anyway over whatever
+// dist/meta.json happened to be on disk.
+func TestSelectChecksRefusesOnlyDocxV2TestAlone(t *testing.T) {
+	_, _, err := selectChecks(ProfileFast, "docx-v2-test", "origin/main", false)
+	if err == nil {
+		t.Fatal("want an error: --only=docx-v2-test excludes its After predecessor docx-v2-build")
+	}
+	if !strings.Contains(err.Error(), "docx-v2-build") {
+		t.Errorf("error should name the missing predecessor docx-v2-build, got %v", err)
+	}
+}
+
+// selectChecks must still resolve a complete pair without error — the fix
+// must not make an ordinary, order-complete selection refuse.
+func TestSelectChecksAcceptsDocxV2BuildAndTestTogether(t *testing.T) {
+	selected, _, err := selectChecks(ProfileFast, "docx-v2-build,docx-v2-test", "origin/main", false)
+	if err != nil {
+		t.Fatalf("want no error when both sides of the edge are selected, got %v", err)
+	}
+	if len(selected) != 2 {
+		t.Fatalf("want both checks selected, got %d", len(selected))
 	}
 }
 
 // The excluded-predecessor case must not deadlock run(): a dependent whose
-// predecessor is missing from the selection has no done-channel to wait on
-// and must run immediately.
-func TestRunExcludedPredecessorRunsAnyway(t *testing.T) {
+// predecessor is missing from the selection has no done-channel to wait on,
+// and must be refused (FAIL, with a reason) rather than block forever or
+// run unguarded.
+func TestRunRefusesWhenPredecessorExcluded(t *testing.T) {
 	t.Setenv("GO_WANT_HELPER_PROCESS", "1")
-	file := t.TempDir() + "/ran-anyway.log"
+	file := t.TempDir() + "/never-written.log"
 	test := Check{ID: "fixture-test-solo", Argv: helperArgv("append", file, "fixture-test-solo"), After: []string{"fixture-build-not-selected"}}
 
 	got := run([]Check{test}, 1, false, false)
-	if len(got) != 1 || got[0].status != statusPass {
-		t.Fatalf("want the dependent to run when its predecessor is excluded, got %+v", got)
+	if len(got) != 1 {
+		t.Fatalf("want one result, got %+v", got)
+	}
+	if got[0].status == statusPass {
+		t.Fatalf("must never report PASS when the After predecessor is excluded from the selection; got %+v", got[0])
+	}
+	if got[0].status != statusFail {
+		t.Fatalf("want FAIL (a SKIP would exit 0 and hide the refusal), got %s", got[0].status)
+	}
+	if got[0].reason == "" {
+		t.Error("the FAIL must carry a reason naming the missing predecessor")
+	}
+	if !strings.Contains(got[0].reason, "fixture-build-not-selected") {
+		t.Errorf("reason should name the missing predecessor, got %q", got[0].reason)
+	}
+	if lines := readLines(t, file); len(lines) != 0 {
+		t.Fatalf("the check's Argv must never have executed; file has %v", lines)
 	}
 }
 

@@ -54,10 +54,11 @@ type Check struct {
 	// After asks "did check X already succeed". Only declare an edge when a
 	// later check consumes an earlier one's output (docx-v2-test reads the
 	// dist/meta.json docx-v2-build produces) — most checks are independent
-	// and must stay that way so -j keeps meaning what it means. run() honours
-	// After only among checks present in the same selection; a predecessor
-	// excluded by --only/--changed does not block its dependent (see run()'s
-	// doc comment for why that is the correct default, not a workaround).
+	// and must stay that way so -j keeps meaning what it means. A selection
+	// that includes a check without its After predecessor is refused, not
+	// run — see validateSelectionOrdering in main.go. A predecessor and its
+	// dependent must always be selected together (--only=a,b, or a profile
+	// that carries both).
 	After []string
 
 	// Paths are prefix/glob patterns; the `changed` profile runs this check
