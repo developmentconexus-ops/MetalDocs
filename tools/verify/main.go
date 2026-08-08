@@ -75,6 +75,10 @@ func main() {
 	)
 	flag.Parse()
 
+	if err := validateOrdering(checks); err != nil {
+		fatalf("invalid check registry: %v", err)
+	}
+
 	root, err := repoRoot()
 	if err != nil {
 		fatalf("cannot locate repo root: %v", err)
@@ -98,6 +102,10 @@ func main() {
 	if len(selected) == 0 {
 		fmt.Println(emptySelectionMessage(scoped, *base))
 		return
+	}
+
+	for _, w := range excludedPredecessorWarnings(selected) {
+		fmt.Fprintf(os.Stderr, "verify: ORDERING %s\n", w)
 	}
 
 	warns := preflight()
@@ -457,11 +465,130 @@ func isShallow() bool {
 	return strings.TrimSpace(string(out)) == "true"
 }
 
+// validateOrdering rejects a registry whose After edges cannot be honoured:
+// an edge naming an unknown ID, or a cycle. Both are startup failures rather
+// than a runtime deadlock or a silent serialization — run() below assumes
+// the graph it is handed is already a DAG over known IDs, and this is the
+// one place that assumption is made true. Checked against the WHOLE
+// registry, not just a selection, because a cycle that only shows up under
+// some future --only combination is still a defect in the registry today.
+func validateOrdering(all []Check) error {
+	known := map[string]bool{}
+	byID := map[string]Check{}
+	for _, c := range all {
+		known[c.ID] = true
+		byID[c.ID] = c
+	}
+	for _, c := range all {
+		for _, dep := range c.After {
+			if !known[dep] {
+				return fmt.Errorf("check %q declares After %q, which is not a registered check ID", c.ID, dep)
+			}
+		}
+	}
+
+	const (
+		white = iota
+		gray
+		black
+	)
+	color := map[string]int{}
+	var stack []string
+	var visit func(id string) error
+	visit = func(id string) error {
+		color[id] = gray
+		stack = append(stack, id)
+		for _, dep := range byID[id].After {
+			switch color[dep] {
+			case gray:
+				start := 0
+				for i, s := range stack {
+					if s == dep {
+						start = i
+						break
+					}
+				}
+				return fmt.Errorf("ordering cycle in After edges: %s -> %s",
+					strings.Join(stack[start:], " -> "), dep)
+			case white:
+				if err := visit(dep); err != nil {
+					return err
+				}
+			}
+		}
+		stack = stack[:len(stack)-1]
+		color[id] = black
+		return nil
+	}
+
+	ids := make([]string, 0, len(all))
+	for _, c := range all {
+		ids = append(ids, c.ID)
+	}
+	sort.Strings(ids) // deterministic error on a multi-cycle registry
+	for _, id := range ids {
+		if color[id] == white {
+			if err := visit(id); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// excludedPredecessorWarnings reports the checks in `selected` whose After
+// predecessor was left out of the same selection — entirely possible under
+// --only or a --changed diff that touches one side of an edge but not the
+// other (docx-v2-build and docx-v2-test happen to share Paths today, so
+// --changed can't split them, but --only always can).
+//
+// The ruling: run the dependent anyway, rather than refuse. verify has no
+// state that survives past its own process, so it cannot know whether the
+// excluded predecessor already ran and passed in some earlier invocation —
+// and refusing would break the one caller that does exactly that today,
+// docx-renderer.yml:node, which runs docx-v2-build and docx-v2-test as two
+// separate `verify` invocations on purpose (see that file). Silence is what
+// this ruling forbids, not the run itself: this function's output is always
+// printed, so "ran without waiting" is a fact on the record, not a fact
+// nobody sees.
+func excludedPredecessorWarnings(selected []Check) []string {
+	inSelection := map[string]bool{}
+	for _, c := range selected {
+		inSelection[c.ID] = true
+	}
+	var warns []string
+	for _, c := range selected {
+		for _, dep := range c.After {
+			if !inSelection[dep] {
+				warns = append(warns, fmt.Sprintf(
+					"%s declares After %s, but %s is not in this selection — running %s without waiting for it; order across separate invocations is not enforced",
+					c.ID, dep, dep, c.ID))
+			}
+		}
+	}
+	return warns
+}
+
 func run(selected []Check, parallelism int, verbose bool, requireInfra bool) []result {
 	if parallelism < 1 {
 		parallelism = 1
 	}
 	results := make([]result, len(selected))
+	indexByID := make(map[string]int, len(selected))
+	for i, c := range selected {
+		indexByID[c.ID] = i
+	}
+	// done[i] closes once results[i] is final. A dependent waits on its
+	// predecessor's done channel, not on a semaphore slot, so waiting costs
+	// nothing but a blocked goroutine — the concurrency limit only governs
+	// checks that are actually running, which is what keeps independent
+	// checks concurrent while ordered ones still serialize relative to each
+	// other.
+	done := make([]chan struct{}, len(selected))
+	for i := range done {
+		done[i] = make(chan struct{})
+	}
+
 	sem := make(chan struct{}, parallelism)
 	var wg sync.WaitGroup
 	var printMu sync.Mutex
@@ -470,6 +597,27 @@ func run(selected []Check, parallelism int, verbose bool, requireInfra bool) []r
 		wg.Add(1)
 		go func(i int, c Check) {
 			defer wg.Done()
+			defer close(done[i])
+
+			for _, dep := range c.After {
+				di, ok := indexByID[dep]
+				if !ok {
+					// Excluded from this selection — already warned about by
+					// excludedPredecessorWarnings; nothing to wait on here.
+					continue
+				}
+				<-done[di]
+				if results[di].status != statusPass {
+					pred := results[di]
+					reason := fmt.Sprintf("not run: predecessor %s did not pass (%s)", pred.check.ID, pred.status)
+					results[i] = result{check: c, status: statusSkip, reason: reason}
+					printMu.Lock()
+					fmt.Printf("  %s  %-24s %s\n", "SKIP", c.ID, reason)
+					printMu.Unlock()
+					return
+				}
+			}
+
 			sem <- struct{}{}
 			defer func() { <-sem }()
 

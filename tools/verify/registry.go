@@ -47,6 +47,19 @@ type Check struct {
 	// with Go, Node, pnpm and git.
 	Needs []string
 
+	// After lists check IDs that must run, and pass, before this one starts.
+	// This is an ORDERING edge, not an infra requirement — deliberately a
+	// different field from Needs so the two classes of dependency can never
+	// be confused by a reader or a future PR: Needs asks "is Postgres up",
+	// After asks "did check X already succeed". Only declare an edge when a
+	// later check consumes an earlier one's output (docx-v2-test reads the
+	// dist/meta.json docx-v2-build produces) — most checks are independent
+	// and must stay that way so -j keeps meaning what it means. run() honours
+	// After only among checks present in the same selection; a predecessor
+	// excluded by --only/--changed does not block its dependent (see run()'s
+	// doc comment for why that is the correct default, not a workaround).
+	After []string
+
 	// Paths are prefix/glob patterns; the `changed` profile runs this check
 	// only when a changed file matches. Empty means always run under
 	// `changed` — use that for checks whose scope is the whole repo.
@@ -420,10 +433,14 @@ var checks = []Check{
 	{
 		ID:   "docx-v2-test",
 		Desc: "docx-v2 unit tests",
-		// Depends on docx-v2-build having already run: bundle-guard.test.ts
-		// reads dist/meta.json. The registry has no dependency edges, so CI
-		// enforces the order by using two verify invocations (see docx-renderer.yml:node)
-		// and a local `--profile=pr` can still race. Recorded as D-14.
+		// D-14 (closed by R4): depends on docx-v2-build having already run —
+		// bundle-guard.test.ts reads dist/meta.json. This used to be enforced
+		// only by docx-renderer.yml:node splitting into two `verify`
+		// invocations, so the now-required ci.yml:verify job — which runs
+		// both checks in one `--profile=changed` invocation — raced them.
+		// The After edge below is the real fix: an ordering primitive in the
+		// registry itself, honoured by run() regardless of how many
+		// invocations a workflow happens to split across.
 		//
 		// D-14 UPDATE (final review, Critical 2): the npm scripts this argv
 		// calls used to be `pnpm -r run <script>`, which is recursive over
@@ -431,15 +448,14 @@ var checks = []Check{
 		// fe-test ran the same 154-file vitest suite concurrently in the same
 		// tree, with docx-v2-build's `pnpm -r run build` writing
 		// frontend/apps/web/dist underneath both. That race, not the
-		// build-before-test ordering below, was the reproducible source of
+		// build-before-test ordering, was the reproducible source of
 		// flaky/contradictory results between this check and fe-test. The npm
 		// scripts now filter to `./packages/**` + `./apps/**` only, which does
 		// not include frontend/apps/web — so docx-v2-test and fe-test no
-		// longer touch the same files at all, and D-14 is left covering only
-		// the narrower build-before-test ordering within the docx workspaces
-		// themselves.
+		// longer touch the same files at all.
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"pnpm", "run", "test:docx-v2"},
+		After:    []string{"docx-v2-build"},
 		Paths:    []string{"apps/docx-renderer/", "packages/"},
 		CIJob:    "docx-renderer.yml:node",
 	},
