@@ -51,9 +51,28 @@ if ($changedText -match '(?m)^internal/modules/') {
 # procedure still matches. If a future scripts/ file does affect operations,
 # it belongs under one of the ops-shaped names below or the rule is wrong
 # again — say so rather than adding an exception.
+#
+# Saying so, 2026-08-08. The rule was wrong again, and the shape of the
+# mistake matters more than the fix. `check-|api-lint/|req-trace/` is a
+# hand-maintained list of things that are NOT ops, so every new non-ops thing
+# under scripts/ has to be *remembered* into it. CI Phase 0 added
+# scripts/testdata/test-discipline/*.go.txt — fixtures for check-test-discipline
+# — and the rule demanded a runbook edit for three static text files.
+#
+# `testdata/` is added as a category, not as a fourth name. It is Go's
+# reserved directory name, ignored by the toolchain by definition: a path
+# under testdata/ is input to a test, never code that runs in production and
+# never something an operator can do at 3am. That is a property of the path,
+# not a fact someone has to keep in sync.
+#
+# The enumeration is still inverted and still drifts — a new non-ops script
+# that is neither check-, api-lint/, req-trace/ nor testdata/ will trip this
+# again. Filed as an instance of the hand-synced-enumeration class in
+# docs/engineering/mechanical-enforcement-register.md; the global maximum is
+# deriving ops-ness from something declared, not pattern-matching paths.
 $opsChanged = $changed | Where-Object {
   $_ -match '^deploy/' -or
-  ($_ -match '^scripts/' -and $_ -notmatch '^scripts/(check-|api-lint/|req-trace/)')
+  ($_ -match '^scripts/' -and $_ -notmatch '^scripts/(check-|api-lint/|req-trace/|testdata/)')
 }
 if ($opsChanged) {
   if ($changedText -notmatch '(?m)^docs/runbooks/') {
