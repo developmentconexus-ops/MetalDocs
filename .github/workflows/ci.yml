@@ -157,3 +157,203 @@ jobs:
         run: >
           go run ./tools/verify --require-infra
           --only=fe-eslint,css-token-discipline,eigenpal-selector-pin,docx-v2-typecheck
+
+  test-go:
+    name: test-go
+    needs: [changes]
+    if: needs.changes.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go run ./tools/verify --require-infra --only=go-test-unit
+
+  test-frontend:
+    name: test-frontend
+    needs: [changes]
+    if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.docx == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
+      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6 # v4.0.4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # docx-v2-build before docx-v2-test, in one job, in this order. The
+      # registry admits at registry.go:273 that these two are order-dependent
+      # and that nothing enforced the order; putting them in one sequential
+      # job is what makes the ordering true rather than hoped for.
+      - run: go run ./tools/verify --require-infra --only=fe-typecheck,fe-test,docx-v2-build,docx-v2-test
+
+  governance:
+    name: governance
+    needs: [changes]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0   # check-governance.ps1 diffs against origin/main; also needed for the migration-history check below
+      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go run ./tools/verify --require-infra --only=adr-status,wiki-tally,db-dictionary,req-trace-selftest,req-trace
+      # Migration monotonicity check — copied verbatim from
+      # invariants.yml:migration-gapless.
+      - name: Check gapless sequence + no historical edits
+        run: |
+          set -euo pipefail
+          MIGRATION_DIR="db/migrations"
+
+          # After the 2026-07-29 fold (migrations 0257-0315 squashed into
+          # db/baseline, files moved to
+          # archive/migrations/post-baseline-2026-07-fold/) the directory holds
+          # only its README. Under `set -euo pipefail` an unmatched `ls` glob
+          # would abort the step, so the empty case is guarded explicitly: skip
+          # the gapless sequence check (there is no sequence), but still run the
+          # historical-edit check below — that one is a git-history question,
+          # not a filesystem one, and stays meaningful with an empty directory.
+          shopt -s nullglob
+          files=("$MIGRATION_DIR"/*.sql)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "✅ No forward migrations (post-fold baseline) — gapless check skipped"
+          else
+            # Discover min and max from filesystem (never hardcoded). Match only
+            # the leading 4-digit prefix of each basename — `grep -oE '[0-9]+'` on
+            # the full path also captured digits inside descriptions (e.g. phase8),
+            # making MIN collapse to 2.
+            nums=$(printf '%s\n' "${files[@]}" \
+              | xargs -r -n1 basename | grep -oE '^[0-9]{4}' | sort -n)
+            MIN=$(echo "$nums" | head -1)
+            MAX=$(echo "$nums" | tail -1)
+
+            echo "Checking migrations $MIN..$MAX for gapless sequence..."
+            for n in $(seq "$MIN" "$MAX"); do
+              padded=$(printf "%04d" "$n")
+              hits=("$MIGRATION_DIR"/${padded}_*.sql)
+              if [ ${#hits[@]} -eq 0 ]; then
+                echo "❌ Gap: migration $padded missing"
+                exit 1
+              fi
+            done
+
+            echo "✅ Gapless $MIN..$MAX"
+          fi
+
+          # Check no historical migrations were modified after merge
+          # (only check files that exist in main already). The pathspec is fully
+          # quoted so GIT expands it — with nullglob an unquoted `*.sql` would
+          # vanish from the argv and turn this into a repo-wide query.
+          BASE=${GITHUB_BASE_REF:-main}
+          MODIFIED=$(git log --diff-filter=M --follow --name-only \
+            "origin/$BASE...HEAD" -- "$MIGRATION_DIR/*.sql" 2>/dev/null | grep '\.sql$' || true)
+
+          if [ -n "$MODIFIED" ]; then
+            echo "❌ Historical migrations modified: $MODIFIED"
+            exit 1
+          fi
+          echo "✅ No historical migration edits"
+      # check-governance.ps1 — copied verbatim from governance-check.yml:check.
+      - name: Fetch base ref
+        run: git fetch origin ${{ github.base_ref }} --depth=1
+      - name: Run governance checks (PowerShell)
+        shell: pwsh
+        run: ./scripts/check-governance.ps1 -BaseRef "origin/${{ github.base_ref }}"
+      # Invariant→spec-ID coverage grep — copied verbatim from
+      # e2e-coverage-gate.yml:coverage-map-check.
+      - name: Check all invariants have ≥1 spec ID
+        run: |
+          COVERAGE=frontend/apps/web/e2e/COVERAGE.md
+          echo "Scanning $COVERAGE for unmapped invariants..."
+
+          # Find all invariant rows (lines with | Pn-Ixx | or | Fn | pattern)
+          UNMAPPED=$(grep -E '^\|[[:space:]]*(P[0-9]+-I[0-9]+|F[0-9]+)[[:space:]]*\|' "$COVERAGE" \
+            | grep '❌' \
+            | awk -F'|' '{print $2}' | xargs)
+
+          if [ -n "$UNMAPPED" ]; then
+            echo "❌ Unmapped invariants found: $UNMAPPED"
+            echo "Add ≥1 spec ID for each before merging."
+            exit 1
+          fi
+
+          echo "✅ All invariants are mapped."
+
+  test-integration:
+    name: test-integration
+    # The whole fix for the original complaint. The 20-minute suite does not
+    # start until the cheap jobs pass. It stays pre-merge and blocking:
+    # A1 item 4 and test-full.yml:2 both require the full suite before merge.
+    needs: [changes, lint-go, lint-contract, lint-frontend, test-go]
+    if: needs.changes.outputs.go == 'true' || needs.changes.outputs.db == 'true'
+    runs-on: ubuntu-latest
+    # services:, the postgres user/db names and timeout-minutes: 20 below are
+    # copied verbatim from test-full.yml:full — not from the sketch in the
+    # task brief, which used different (invented) credentials.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: metaldocs
+          POSTGRES_PASSWORD: metaldocs
+          POSTGRES_DB: metaldocs
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version-file: go.mod
+          cache: true
+      # --require-infra is what makes this job's green mean anything. Without
+      # it, an unset METALDOCS_DATABASE_URL yields SKIP and the job exits 0
+      # over zero executed integration tests. test-full.yml did not carry
+      # --require-infra; adding it here is this task's deliberate fix.
+      - name: verify (go-test-integration)
+        env:
+          METALDOCS_DATABASE_URL: postgres://metaldocs:metaldocs@localhost:5432/metaldocs?sslmode=disable
+        run: go run ./tools/verify --require-infra --only=go-test-integration
+        timeout-minutes: 20
+
+  security:
+    name: security
+    needs: [changes]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write   # SARIF upload; this is why these live in YAML, not in verify
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0   # gitleaks scans full history
+      # gitleaks — copied verbatim from secret-scan.yml:gitleaks.
+      - name: Run gitleaks over full git history
+        run: >
+          docker run --rm -v "$PWD:/repo"
+          ghcr.io/gitleaks/gitleaks:v8.24.3
+          detect --source /repo --config /repo/.gitleaks.toml --redact -v --exit-code 1
+      # grype (CVE scan) — copied verbatim from supply-chain.yml:cve-scan, SHA-pinned.
+      - id: scan
+        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7
+        with:
+          path: '.'
+          fail-build: true
+          severity-cutoff: high
+          cache-db: true
+      - uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
+        if: always() && steps.scan.outputs.sarif != ''
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarif }}
