@@ -32,7 +32,7 @@ flowchart TB
     end
     subgraph API["metaldocs-api (stateless)"]
         MW["middleware pipeline (§2)"]
-        MODS["15 bounded-context modules<br/>domain → application → infra → delivery"]
+        MODS["15 current module directories<br/>(target bounded contexts per accepted ADRs —<br/>ADR 0093 rules documents/controlleddocuments/templates<br/>are not three peer contexts; jobs is orchestration)<br/>domain → application → infra → delivery"]
         PDP["authz engine (two-tier PDP)"]
     end
     subgraph ASYNC["async tier"]

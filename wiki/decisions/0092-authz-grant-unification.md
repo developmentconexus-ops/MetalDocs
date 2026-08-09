@@ -50,7 +50,7 @@ Group = **who** (a subject). Area = **where** (a scope). Under D1 they are diffe
 
 ### Standing ruling — the red CI lane stays red
 
-`TestNoDeclaredOperationIsUnreachable` stays red in the `test-full.yml`/`test-nightly.yml` integration lanes until this program lands (operator ruling 2026-08-06). Do NOT skip, exclude, or baseline it; do NOT remove `./apps/...` from the lanes. The lane goes green when the unreachable set is empty — that is the fix.
+`TestNoDeclaredOperationIsUnreachable` stays red in **whichever CI lane runs the `./apps/...` integration suite** until this program lands (operator ruling 2026-08-06). The ruling is workflow-name-independent: at materialization time (post-PR-#97 consolidated CI) that lane is `.github/workflows/nightly.yml`; the ruling as originally filed named `test-full.yml`/`test-nightly.yml`, which are the historical pre-PR-#97 workflow names. Do NOT skip, exclude, or baseline the test; do NOT remove `./apps/...` from the lane. The lane goes green when the unreachable set is empty — that is the fix.
 
 ## Consequences
 

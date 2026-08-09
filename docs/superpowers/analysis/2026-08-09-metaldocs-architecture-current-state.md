@@ -104,7 +104,7 @@ Nine of fifteen domain packages import `database/sql` and/or `internal/platform/
 
 ### 4.5 Platform inversion (`P`)
 
-The target architecture requires `internal/platform` to be domain-free. The measured inventory identified module-specific imports from platform packages including `bootstrap`, `authn`, `docgenv2`, `tripwire` and `worker` *(historical list — the reproduction narrows this to **4 packages / 9 package edges: authn, bootstrap, docgenv2, tripwire**; `worker` is NOT among them, §16)*, separate from legitimate composition wiring.
+The target architecture requires `internal/platform` to be domain-free. Reproduced-current state (§16): **4 platform packages carry 9 module-specific package edges — `authn`, `bootstrap`, `docgenv2`, `tripwire`** — separate from legitimate composition wiring (`tripwire` is the documented legitimate exception; `docgenv2` is the hidden S-edge). *Superseded historical note: the original measured inventory listed 5 packages including `worker`; `worker` is NOT among the reproduced violators — do not act on the 5-package list.*
 
 ### 4.6 Composition-only wiring (`W`)
 
@@ -272,9 +272,9 @@ This is dependency guidance derived from owning issue/ADR constraints; it is not
 
 ### F-AUD-02 — Import boundaries alone cannot enforce data ownership
 
-**Evidence:** 17+ foreign-table SQL reads reproduced in the layering lane *(historical figure — full reproduction: **55 foreign reads + 12 foreign writes**, §16)*.
+**Evidence:** **55 foreign reads + 12 foreign writes** (67 statements, full reproduction §16). *Superseded historical figure: "17+ foreign-table SQL reads" — read-only and undercounted ~4×; do not act on it.*
 
-**Owner:** #93 / A4. *(Corrected 2026-08-09: an earlier revision of this row claimed A9 would absorb seams that become intra-context under ADR 0093 — the reproduction shows **0 of the 67 foreign-SQL statements become intra-context**; approval stays subject-generic permanently, so A9 absorbs none of them — §16.)*
+**Owner:** #93 / A4 — and #93/A4 only. ADR 0093 (#94/A9) absorbs **none** of these seams: **0 of the 67 foreign-SQL statements become intra-context** under the ruled consolidation; approval stays subject-generic permanently (§16). *(Corrected 2026-08-09: an earlier revision of this row claimed A9 would absorb seams that become intra-context — superseded; do not act on it.)*
 
 **Acceptance property:** a single machine-readable table-ownership catalog plus SQL identifier analysis makes foreign-table coupling visible at verification time.
 

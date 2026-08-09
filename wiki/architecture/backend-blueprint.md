@@ -169,8 +169,9 @@ flowchart LR
 
 ### C. Domain & data
 
-#### C1. Module architecture — ✅
+#### C1. Module architecture — 🟡 *(regraded 2026-08-09; previously graded ✅ — prior grade preserved as history, not current)*
 - **Definition:** Business logic partitioned by bounded context, each module layered.
+- **Current-state gaps (reproduced 2026-08-09 audit):** the module *graph* has one strongly-connected component of size 9 plus 7 reciprocal pairs, producer-shaped cross-module seams, and 67 foreign-SQL statements (55 reads + 12 writes, incl. approval issuing raw `UPDATE documents`). Intra-module layering remains healthy (zero package-level SCCs, zero layer inversions) — the 🟡 is about cross-module structure, not the layer convention. Remediation owned by #93/A4 (+ #94/A9 for the ruled ADR 0093 consolidation).
 - **Industry standard:** Hexagonal/clean layering — `domain` (pure rules) ← `application` (use cases) ← `infrastructure`/`repository` (adapters) ← `delivery/http` (transport). Dependencies point inward only.
 - **We have:** 15 modules under `internal/modules/` (approval · audit · auth · controlleddocuments · distribution · documents · iam · jobs · notifications · render · search · security · taxonomy · templates · tokens), following the layer convention with `module.go` DI wiring (`jobs` is the structural outlier — flat per-job packages, no domain/application/delivery split). Largest: documents, iam, templates, approval.
 - **Watch item:** `main.go` is a ~37KB monolithic composition root. Acceptable for a modular monolith, but module `Dependencies` structs are the seam to keep clean.
@@ -324,7 +325,7 @@ All Wave Z concerns resolved. Grade deltas from Wave F → Wave Z:
 | REQ-* | Finding(s) | State | Evidence |
 |---|---|---|---|
 | REQ-MW-1/2/4/5/7 (middleware chain) | F-01 | **MET** | Wave 1.1 reorder + `chain_test.go`; F.3 live (panic→500 problem+json, 401s in RED metrics, pre-auth 429) |
-| REQ-TOP-1 (no cross-module SQL/infra) | F-06b/c/d | **MET (4/9); residual next-touch** | Wave 2.5/2.6/2.7; F-06e + security-JOIN + standalone-CD-repo deferred |
+| REQ-TOP-1 (no cross-module SQL/infra) | F-06b/c/d | **NOT MET** *(corrected 2026-08-09; previously recorded as "MET (4/9); residual next-touch" — incompatible with reproduced-current state)* | Reproduced 2026-08-09: 55 foreign reads + 12 foreign writes (67 statements, 10 directed pairs); module SCC of size 9. Remediation owned by #93/A4 (seams/ports) + #94/A9 (ADR 0093 consolidation). Historical: Wave 2.5/2.6/2.7; F-06e + security-JOIN + standalone-CD-repo deferred |
 | REQ-TOP-2 (platform domain-free) | F-06a, F-05 | **NOT MET — allowlisted debt** *(corrected 2026-08-09; previously misrecorded as "MET + CI-locked")* | `platformboundary` analyzer exits 0 only because `platformBoundaryAllowed` exempts the live violators (`platform/bootstrap`, `platform/authn`, `platform/docgenv2`); 4 platform packages / 9 package edges import modules (`tripwire` is the documented legitimate exception). Remediation owned by #93/A4. |
 | REQ-TOP-3 (no dead platform pkgs) | F-08 | **MET** | Wave 1.9/2.13 |
 | REQ-ASYNC-1 (in-tx audit + membership governance) | F-07, D-01, T-007 | **MET + CI-locked** | Wave 2.2; `PostCommitAudit` analyzer exit 0 (F.1); F.3 live; Z-6 (c7b10f3d6 + abc9afa48): membership governance in-tx via LogTx |
