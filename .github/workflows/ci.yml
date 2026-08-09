@@ -69,7 +69,7 @@ jobs:
           git fetch origin "${{ github.event.pull_request.base.sha }}"
           git show "${{ github.event.pull_request.base.sha }}:api/openapi/v1/openapi.yaml" > /tmp/openapi.base.yaml
       # Every registry check whose declared Paths the diff touches — gofmt,
-      # go vet, cilint, staticcheck, module-boundaries, test-discipline,
+      # go vet, cilint, module-boundaries, test-discipline,
       # contract sync/codegen/oasdiff/openapi lint, fe-eslint,
       # css-token-discipline, eigenpal-selector-pin, fe-typecheck, fe-test,
       # docx-v2-build/test, go-test-unit, adr-status, wiki-tally,

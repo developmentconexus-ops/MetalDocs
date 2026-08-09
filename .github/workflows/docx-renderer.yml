@@ -54,8 +54,9 @@ jobs:
 
 # The `go` job that used to live here ran `go build ./...` plus `go test` over
 # seven hand-listed packages. Every one of them is already covered by
-# test-smoke.yml's `unit` job, which runs verify --only=go-build,go-test-unit —
-# and go-test-unit is `go test ./...`, a strict superset of any package list.
+# go-test-unit (`go test ./...`, now run in ci.yml's verify job), a strict
+# superset of any package list; the compile coverage go-build claimed is
+# implied by go test + go vet compiling every package.
 # Removed as duplicated compute on every PR, not to reach green: coverage is
 # unchanged, and dropping the filter above means `node` now runs on every PR,
 # which is a net increase in what this workflow gates.
