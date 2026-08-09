@@ -180,10 +180,10 @@ jobs:
 	for _, id := range jobs[0].OnlyIDs {
 		got[id] = true
 	}
-	// go-build declares {fast, pr, full} — a member of `pr`, so `changed`
+	// go-vet declares {fast, pr, full} — a member of `pr`, so `changed`
 	// (which resolves to `pr`) must include it.
-	if !got["go-build"] {
-		t.Errorf("expected --profile=changed to resolve to the pr set including go-build; got %v", jobs[0].OnlyIDs)
+	if !got["go-vet"] {
+		t.Errorf("expected --profile=changed to resolve to the pr set including go-vet; got %v", jobs[0].OnlyIDs)
 	}
 	// go-test-integration is `full`-only, never `pr`, so `changed` must not
 	// claim it — that would let a check with no PR-time coverage read as
@@ -248,7 +248,7 @@ func TestAuditA6IgnoresNonPRProfileChecks(t *testing.T) {
 func TestAuditProfileInvocationSatisfiesCIJob(t *testing.T) {
 	// idsForProfile(changed) is computed against the real global registry
 	// (it has to be — it is not injectable), so this test points a copy of
-	// that real registry's "go-build" entry at a fake job that runs
+	// that real registry's "go-vet" entry at a fake job that runs
 	// `--profile=changed`, and asserts no A1/A2/A3 finding mentions that job.
 	// Using the real registry (rather than a two-entry fake one) avoids a
 	// storm of spurious A1 "unknown ID" findings for every other real
@@ -261,7 +261,7 @@ func TestAuditProfileInvocationSatisfiesCIJob(t *testing.T) {
 	regs := make([]Check, len(checks))
 	copy(regs, checks)
 	for i, c := range regs {
-		if c.ID == "go-build" {
+		if c.ID == "go-vet" {
 			regs[i].CIJob = "ci.yml:verify"
 		}
 	}
@@ -271,16 +271,16 @@ func TestAuditProfileInvocationSatisfiesCIJob(t *testing.T) {
 	}
 	found := false
 	for _, id := range jobs[0].OnlyIDs {
-		if id == "go-build" {
+		if id == "go-vet" {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("idsForProfile(changed) does not include go-build; got %v", jobs[0].OnlyIDs)
+		t.Fatalf("idsForProfile(changed) does not include go-vet; got %v", jobs[0].OnlyIDs)
 	}
 	for _, f := range auditFindings(regs, jobs, nil) {
-		if strings.Contains(f, " go-build ") {
-			t.Errorf("want no finding for go-build (profile-satisfied CIJob, inside the closure), got %q", f)
+		if strings.Contains(f, " go-vet ") {
+			t.Errorf("want no finding for go-vet (profile-satisfied CIJob, inside the closure), got %q", f)
 		}
 	}
 }

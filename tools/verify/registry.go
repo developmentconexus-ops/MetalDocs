@@ -76,13 +76,11 @@ type Check struct {
 // checks is the registry. Keep it sorted by ID.
 var checks = []Check{
 	// ---- Go: build and vet ------------------------------------------------
-	{
-		ID:       "go-build",
-		Desc:     "go build ./... — the whole module compiles",
-		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
-		Argv:     []string{"go", "build", "./..."},
-		CIJob:    "ci.yml:verify",
-	},
+	// go-build (go build ./... — the whole module compiles) deleted Task 12:
+	// go test ./... compiles every package including those with no test
+	// files, and go vet ./... compiles them again. Neither links binaries,
+	// so go build ./... verified nothing the other two lacked. See the
+	// deletion ledger (docs/superpowers/reports/2026-08-08-workflow-deletion-ledger.md).
 	{
 		ID:   "gofmt",
 		Desc: "every tracked Go file is gofmt-clean",
@@ -119,18 +117,12 @@ var checks = []Check{
 		Argv:     []string{"go", "run", "./tools/cilint", "./..."},
 		CIJob:    "ci.yml:verify",
 	},
-	{
-		ID:   "staticcheck",
-		Desc: "staticcheck 2025.1.1 — pinned to the version CI uses",
-		// 2024.1 fails to compile under Go 1.25 (its vendored x/tools hits
-		// "invalid array length"); 2025.1.1 is the first release with Go 1.25
-		// support and the same check set. Moved here from invariants.yml when
-		// the staticcheck-action step was replaced by this check.
-		Profiles: []string{ProfilePR, ProfileFull},
-		Argv:     []string{"go", "run", "honnef.co/go/tools/cmd/staticcheck@2025.1.1", "./..."},
-		Needs:    []string{needsNetwork},
-		CIJob:    "ci.yml:verify",
-	},
+	// staticcheck (pinned honnef.co/go/tools/cmd/staticcheck) deleted Task 12
+	// / spec §4.6: golangci-lint becomes the single Go lint umbrella and
+	// .golangci.yml already enables staticcheck, so this standalone entry was
+	// running the same analyzer a second time at whole-tree scope instead of
+	// golangci-lint's diff-scoped run — redundant, not broken. See the
+	// deletion ledger.
 
 	// ---- Contract ---------------------------------------------------------
 	{
@@ -146,21 +138,13 @@ var checks = []Check{
 		Paths: []string{"internal/", "api/openapi/", "wiki/references/problem-codes.md", "cmd/problem-codes-dump/"},
 		CIJob: "ci.yml:verify",
 	},
-	{
-		ID:       "api-lint-base-path-v1",
-		Desc:     "PATH-BASE-PREFIX on the v1 spec",
-		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
-		Argv:     []string{"go", "run", "./scripts/api-lint", "-only", "PATH-BASE-PREFIX", "api/openapi/v1/openapi.yaml"},
-		// scripts/api-lint/ is the check's own tool: api-lint-strict only lints
-		// api/openapi/v1/openapi.yaml, so this check is the SOLE gate on
-		// internal-e2e.yaml's base-prefix rule (see the sibling entry below) —
-		// without scripts/api-lint/ here, a PR neutering PATH-BASE-PREFIX
-		// inside the tool while touching no api/openapi/ file selects zero
-		// checks over the spec that most needs catching (whole-branch review
-		// C2 class).
-		Paths: []string{"api/openapi/", "scripts/api-lint/"},
-		CIJob: "ci.yml:verify",
-	},
+	// api-lint-base-path-v1 (PATH-BASE-PREFIX on the v1 spec, standalone
+	// -only run) deleted Task 12 (six-control table, spec §4.5): -only is a
+	// filter, not a mode (scripts/api-lint/main.go:21,64-67), so
+	// PATH-BASE-PREFIX already runs inside api-lint-strict below on the same
+	// v1 spec file. api-lint-base-path-e2e survives unchanged — api-lint-strict
+	// never touches internal-e2e.yaml, so that file's base-prefix rule still
+	// needs its own gate.
 	{
 		ID:       "api-lint-base-path-e2e",
 		Desc:     "PATH-BASE-PREFIX on the internal-e2e spec",

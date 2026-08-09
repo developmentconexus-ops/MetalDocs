@@ -133,7 +133,7 @@ func TestSelectChecksComposesOnlyWithChanged(t *testing.T) {
 // diff — same fail-closed default as the unscoped case.
 func TestSelectChecksKeepsPathlessCheckUnderChanged(t *testing.T) {
 	t.Setenv("GITHUB_EVENT_NAME", "pull_request")
-	selected, scoped, err := selectChecks(ProfileFast, "go-build", "HEAD", true)
+	selected, scoped, err := selectChecks(ProfileFast, "go-vet", "HEAD", true)
 	if err != nil {
 		t.Fatalf("selectChecks: %v", err)
 	}

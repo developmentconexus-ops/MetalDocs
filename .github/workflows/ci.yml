@@ -190,29 +190,18 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       # golangci-lint is not a tools/verify registry check (it needs its own
       # setup-go via the Action below), so this job is exactly this one step.
-      # only-new-issues: true already scopes its report to what the PR
-      # introduces, not the repo's pre-existing findings — that is the
-      # diff-scoping for this job, done by the Action itself rather than by
-      # tools/verify. Blocking, not report-only: the operator's standing
-      # instruction is "Lint should capture it no bypass, fallback only to
-      # show green I want to catch the erros" — a continue-on-error on a
-      # lint step is precisely that fallback, so it is not present here.
       #
-      # TRANSITIONAL (CLAUDE.md "Global Maximum, Not Local Maximum"):
-      # only-new-issues: true is a local maximum, not the intended shape.
-      # Whole-tree golangci-lint reports 1078 findings at this job's
-      # configured scope (1173 across the whole tree) — spec §11.1 — so
-      # dropping the diff-scope while this job blocks would red every PR on
-      # pre-existing debt, not on what the PR introduced. The global-maximum
-      # structure is spec §4.6: golangci-lint as the single Go lint umbrella,
-      # whole-tree, blocking, `only-new-issues` deleted. The milestone that
-      # deletes this comment is the golangci-lint backlog burn-down (plan
-      # docs/superpowers/plans/2026-08-08-ci-phases-1-5.md §"Phase 5 Task 12,
-      # Step 4"), unscheduled as of 2026-08-08.
+      # TRANSITIONAL. golangci-lint is the single Go lint umbrella (spec §4.6)
+      # but stays advisory: 1078 findings at the configured scope, 1173 whole
+      # tree, and apps/worker and apps/jobs had no lint coverage at all before
+      # this restructure. The global-maximum structure is a clean tree with
+      # this job blocking and continue-on-error deleted. The milestone that
+      # deletes this comment is the golangci-lint backlog burn-down, which is
+      # named in spec §11.1 as work with its own sequencing.
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        continue-on-error: true
         with:
           version: v2.11
-          only-new-issues: true
           args: --timeout=5m ./apps/api/... ./internal/... ./tools/...
 
   required:

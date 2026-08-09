@@ -295,3 +295,23 @@ Do not proceed to Step 2 (`git rm`) until an operator adjudicates:
 
 Everything else in this ledger — every job, every step, in all 18 files — has a verified
 successor or a verified, evidenced reason to die with none.
+
+---
+
+## Controller adjudications (Task 12, Steps 2-6)
+
+Recorded post-hoc, before `git rm` ran, resolving the three open items above:
+
+| # | Item | Ruling | Disposition |
+|---|---|---|---|
+| 1 | `test-nightly.yml`'s stress job — no successor found | Port, don't drop. Controls die only with evidence; there is none for killing race-mode integration stress. | New `stress` job added to `nightly.yml` before `test-nightly.yml` was deleted: same postgres service block, same `go test -tags integration -count=1 -race -timeout 3600s ./tests/... ./internal/... ./apps/...` with `INTEGRATION_STRESS_N=500`, same 60-minute timeout. The failure-issue step was adapted to `nightly.yml`'s existing github-script pattern (list-open/comment-or-create, `nightly-failure,stress` labels) instead of the old workflow's bare `issues.create`. |
+| 2 | `scripts/release-readiness.ps1` vs. `scripts/phase3-release-readiness.ps1` naming mismatch | The brief's Files list names a file that does not exist (`scripts/release-readiness.ps1`). Confirmed by `ls` and by grep: the only repo reference to `phase3-release-readiness.ps1` was `.github/workflows/release-readiness.yml` itself (deleted in the same step). `scripts/release-readiness.ps1` never existed. | Deleted `scripts/phase3-release-readiness.ps1` instead — the file the (now-deleted) workflow actually invoked. |
+| 3 | `invariants.yml:cilint`'s SARIF-upload step — flagged as "no successor, silently dropped" | Documented deletion, not silent. cilint's blocking coverage is preserved (registry `cilint` → `ci.yml:verify`); the SARIF upload was advisory GitHub Security-tab annotation only, itself `continue-on-error: true`, non-blocking. No gate is lost. | Recorded here as the row this item needed — `invariants.yml:cilint`'s "Upload SARIF" step dies with `invariants.yml`, no successor, by evidenced decision (advisory-only, not a control). |
+
+Item 3 in the original Recommendation (whether spec §4.1's 27+2/11 counts should be corrected)
+is a spec-document question outside this ledger's and Task 12's file scope — not adjudicated
+here. The ledger's file-by-file map (32 registry IDs placed + 3 deleted = 35 of the 18 files'
+registry-backed controls, plus 7 non-registry controls placed, 2 whole files and 1 job dying
+by design, this SARIF step dying by design, and the stress job now ported) is the authority
+Task 12 Steps 2-6 were executed against, per controller instruction — not spec §4.1's
+uncorrected 27+2=29/11.
