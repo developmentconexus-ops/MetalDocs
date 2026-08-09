@@ -1034,12 +1034,43 @@ SELECT EXISTS (
 }
 
 // TestLogout_EmptyAndMalformedTokenReturnError also guards REQ-AUTHN-3's
-// comparison clause: a malformed/tampered cookie value is rejected via
-// tokenHashFromCookieValue's hmac.Equal signature check (service.go:1223),
-// never treated as a valid session lookup key.
+// comparison clause: a structurally well-formed but tampered-signature cookie
+// is rejected via tokenHashFromCookieValue's hmac.Equal signature check
+// (service.go:1223), never treated as a valid session lookup key. The empty
+// and malformed-shape cases below fail earlier, at the 2-part split
+// (service.go:1220); they guard that the lookup key is never derived from an
+// unparseable cookie, not the comparison itself.
 func TestLogout_EmptyAndMalformedTokenReturnError(t *testing.T) {
-	svc := mustNewService(t, memory.NewRepository(), newMockRoleProvider(), newMockRoleAdminRepository(), Config{
-		SessionSecret: testSessionSecret,
+	repo := memory.NewRepository()
+	roleProvider := newMockRoleProvider()
+	roleAdmin := newMockRoleAdminRepository()
+	ctx := context.Background()
+
+	userID := "logout-tamper-user"
+	password := "TestPassword123!"
+	hash := mustHashPassword(t, password)
+	if err := repo.CreateUser(ctx, authdomain.CreateUserParams{
+		UserID:       userID,
+		Username:     userID,
+		Email:        "logout-tamper@example.com",
+		DisplayName:  "Logout Tamper User",
+		PasswordHash: hash,
+		PasswordAlgo: "bcrypt",
+		IsActive:     true,
+	}); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	roleProvider.roles[userID+":"+tenant.DevTenantID] = []iamtypes.Role{iamtypes.RoleViewer}
+
+	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
+		SessionCookieName:      "session",
+		SessionTTL:             24 * time.Hour,
+		SessionSecret:          testSessionSecret,
+		PasswordMinLength:      8,
+		LoginMaxFailedAttempts: 5,
+		LoginLockDuration:      15 * time.Minute,
+		AllowDevTenantFallback: true,
+		CookieSecure:           false,
 	})
 
 	if err := svc.Logout(context.Background(), ""); !errors.Is(err, authdomain.ErrSessionNotFound) {
@@ -1047,6 +1078,24 @@ func TestLogout_EmptyAndMalformedTokenReturnError(t *testing.T) {
 	}
 	if err := svc.Logout(context.Background(), "not-a-valid-cookie"); !errors.Is(err, authdomain.ErrSessionNotFound) {
 		t.Fatalf("Logout(malformed) error = %v, want ErrSessionNotFound", err)
+	}
+
+	// Genuinely issued session, then tamper the signature half only: this is a
+	// structurally well-formed "<token>.<wrong-signature>" cookie (two non-empty
+	// dot-separated parts), so it passes the split and must be rejected by
+	// hmac.Equal rather than by shape.
+	req := httptest.NewRequest("POST", "/api/v1/auth/login", nil)
+	authSession, err := svc.Authenticate(ctx, userID, password, req)
+	if err != nil {
+		t.Fatalf("Authenticate: %v", err)
+	}
+	parts := strings.SplitN(authSession.RawToken, ".", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		t.Fatalf("RawToken not in <token>.<sig> form: %q", authSession.RawToken)
+	}
+	tamperedToken := parts[0] + "." + parts[1] + "x"
+	if err := svc.Logout(context.Background(), tamperedToken); !errors.Is(err, authdomain.ErrSessionNotFound) {
+		t.Fatalf("Logout(tampered signature) error = %v, want ErrSessionNotFound", err)
 	}
 }
 
