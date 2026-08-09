@@ -225,6 +225,10 @@ entries:
     kind: commit
     ref: 1df720d8
     note: "fix(fanout): aligns Go<->docgen-v2 contract and adds service-token auth for the internal call, the docx-renderer service-to-service authentication; commit 1df720d8."
+  - req: REQ-SEC-3
+    kind: commit
+    ref: 56216ed1
+    note: "REQ-SEC-3 is a process rule (\"OWASP ASVS is the review checklist for...\") with no runtime behavior a *_test.go assertion could ever prove — a human consulting a checklist during review is not a code-behavior fact. This entry is deliberately weaker evidence than every other commit-kind entry in this map: it names the enforcing ARTIFACT (wiki/quality/security-review-checklist.md, wired into .github/PULL_REQUEST_TEMPLATE.md), not an implemented/enforced behavior. The artifact itself states, in its own \"Status\" section, that it is a reviewer prompt a box can be ticked without reading — not a mechanically enforced gate. See the checklist's \"Global maximum this defers\" section: a CI check that parses the diff for the five trigger areas and requires a completed checklist block is the named target, deliberately not built here because it would perturb required-gate.jq's needs: closure before the Phase 4 ruleset swap. Commit 56216ed1 adds this file, the checklist, and the PULL_REQUEST_TEMPLATE.md wiring together."
   - req: REQ-SEC-4
     kind: commit
     ref: 6fd39eee

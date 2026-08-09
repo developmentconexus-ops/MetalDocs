@@ -10,21 +10,22 @@ import (
 )
 
 // authPasswordHashReader adapts the auth module's identity repository to the
-// approval signature port. The acting user's bcrypt password hash is resolved
-// through the auth port (auth_identities) — the approval module never reaches
-// across the boundary with raw SQL.
+// approval signature port. The acting user's password hash AND its algorithm
+// discriminator (REQ-AUTHN-1: "bcrypt" or "argon2id") are resolved through the
+// auth port (auth_identities) — the approval module never reaches across the
+// boundary with raw SQL, and never assumes a single hashing algorithm.
 type authPasswordHashReader struct {
 	repo authdomain.Repository
 }
 
-func (r authPasswordHashReader) GetPasswordHash(ctx context.Context, userID string) ([]byte, error) {
+func (r authPasswordHashReader) GetPasswordHash(ctx context.Context, userID string) ([]byte, string, error) {
 	identity, err := r.repo.FindIdentityByUserID(ctx, userID)
 	if err != nil {
 		// User missing / lookup failure → the provider maps this to the same
 		// disclosure-safe invalid-credentials error as a wrong password.
-		return nil, err
+		return nil, "", err
 	}
-	return []byte(identity.PasswordHash), nil
+	return []byte(identity.PasswordHash), identity.PasswordAlgo, nil
 }
 
 // slogReauthEmitter records failed sign-off re-authentication attempts. The

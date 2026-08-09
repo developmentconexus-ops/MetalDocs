@@ -108,7 +108,11 @@ func TestMiddleware_FirstCall_RecordsAndPasses(t *testing.T) {
 	}
 }
 
-func TestMiddleware_Conflict_Returns422(t *testing.T) {
+// ADR 0089 (commit 75c03821, annex R-8) ratified 409 Conflict for
+// conflict.idempotency_key_reused; middleware.go returns http.StatusConflict
+// deliberately. These tests previously asserted the pre-ADR-0089 422 and were
+// never updated in the rename sweep.
+func TestMiddleware_Conflict_Returns409(t *testing.T) {
 	db, _ := testdb.Open(t)
 	tenant := testdb.NewTenant(t, db)
 	store := idempotency.New(db, "POST /test")
@@ -121,12 +125,12 @@ func TestMiddleware_Conflict_Returns422(t *testing.T) {
 	req2.Header.Set("Idempotency-Key", "22222222-2222-4222-8222-222222222222")
 	rec2 := httptest.NewRecorder()
 	h.ServeHTTP(rec2, req2)
-	if rec2.Code != 422 {
-		t.Fatalf("conflict status: got %d want 422", rec2.Code)
+	if rec2.Code != 409 {
+		t.Fatalf("conflict status: got %d want 409", rec2.Code)
 	}
 }
 
-func TestMiddleware_SameKeyDifferentResourcePath_Returns422(t *testing.T) {
+func TestMiddleware_SameKeyDifferentResourcePath_Returns409(t *testing.T) {
 	db, _ := testdb.Open(t)
 	tenant := testdb.NewTenant(t, db)
 	store := idempotency.New(db, "POST /test/{id}")
@@ -140,7 +144,7 @@ func TestMiddleware_SameKeyDifferentResourcePath_Returns422(t *testing.T) {
 	req2.Header.Set("Idempotency-Key", "33333333-3333-4333-8333-333333333333")
 	rec2 := httptest.NewRecorder()
 	h.ServeHTTP(rec2, req2)
-	if rec2.Code != 422 {
-		t.Fatalf("status: got %d want 422", rec2.Code)
+	if rec2.Code != 409 {
+		t.Fatalf("status: got %d want 409", rec2.Code)
 	}
 }

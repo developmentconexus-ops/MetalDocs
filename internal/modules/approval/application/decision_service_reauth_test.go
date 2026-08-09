@@ -32,12 +32,12 @@ func newReauthReader(t *testing.T, users map[string]string) reauthFakeUserReader
 	return reauthFakeUserReader{hashes: hashes}
 }
 
-func (r reauthFakeUserReader) GetPasswordHash(_ context.Context, userID string) ([]byte, error) {
+func (r reauthFakeUserReader) GetPasswordHash(_ context.Context, userID string) ([]byte, string, error) {
 	h, ok := r.hashes[userID]
 	if !ok {
-		return nil, errors.New("not found")
+		return nil, "", errors.New("not found")
 	}
-	return h, nil
+	return h, "bcrypt", nil
 }
 
 // testNoopRateLimiter is a test-only rate limiter that always allows.

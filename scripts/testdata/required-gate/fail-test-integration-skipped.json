@@ -1,0 +1,6 @@
+{
+  "verify": { "result": "success" },
+  "test-integration": { "result": "skipped" },
+  "security": { "result": "success" },
+  "lint-go": { "result": "success" }
+}

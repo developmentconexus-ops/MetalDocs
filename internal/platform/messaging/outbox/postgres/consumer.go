@@ -135,6 +135,7 @@ func (c *Consumer) MarkPublished(ctx context.Context, eventIDs []messaging.Event
 		placeholders = append(placeholders, fmt.Sprintf("$%d", idx+1))
 		args = append(args, strings.TrimSpace(string(eventID)))
 	}
+	// #nosec G201 -- the only interpolated values are computed placeholder positions ($1,$2,...) and their comma-joined list; every actual event-id value is bound as a query arg via args, never interpolated into the SQL text.
 	q := fmt.Sprintf(`
 UPDATE metaldocs.outbox_events
 SET published_at = $%d,

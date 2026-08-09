@@ -84,7 +84,7 @@ func main() {
 			}
 			continue
 		}
-		if err := os.WriteFile(filepath.FromSlash(path), want, 0o644); err != nil {
+		if err := os.WriteFile(filepath.FromSlash(path), want, 0o644); err != nil { // #nosec G306 -- path iterates the fixed feJSONPath/wikiPath constants; both are committed generated artifacts (FE snapshot + wiki table) that must stay git/build readable at 0644, no secret material.
 			fmt.Fprintf(os.Stderr, "problem-codes-dump: write %s: %v\n", path, err)
 			os.Exit(1)
 		}

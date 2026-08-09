@@ -12,7 +12,7 @@ import (
 const (
 	EnvRatelimitStore         = "METALDOCS_RATELIMIT_STORE"
 	EnvRatelimitRedisAddr     = "METALDOCS_RATELIMIT_REDIS_ADDR"
-	EnvRatelimitRedisPassword = "METALDOCS_RATELIMIT_REDIS_PASSWORD"
+	EnvRatelimitRedisPassword = "METALDOCS_RATELIMIT_REDIS_PASSWORD" // #nosec G101 -- this is the env VAR NAME (the lookup key), not a credential value; the actual password is read from the environment at runtime and never appears as a literal here.
 	EnvMultiReplica           = "METALDOCS_MULTI_REPLICA"
 )
 

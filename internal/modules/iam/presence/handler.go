@@ -167,7 +167,7 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request) {
 	items, err := h.repo.Snapshot(ctx, tenantID, time.Now().UTC())
 	if err != nil {
 		h.log.Warn("presence: ws initial snapshot failed", "tenant_id", tenantID, "err", err)
-		c.Close(websocket.StatusInternalError, "snapshot failed")
+		_ = c.Close(websocket.StatusInternalError, "snapshot failed") // #nosec G104 -- best-effort close on a connection already being torn down for the logged snapshot error above; a Close error has no further recovery action and the deferred c.Close on the accept path handles any leak.
 		return
 	}
 	initial := Event{Type: "snapshot", Presence: items}
@@ -213,7 +213,7 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		case <-idleTimer.C:
-			c.Close(websocket.StatusPolicyViolation, "client idle")
+			_ = c.Close(websocket.StatusPolicyViolation, "client idle") // #nosec G104 -- best-effort close on idle-timeout teardown; a Close error has no further recovery action once the handler is returning.
 			return
 		}
 	}

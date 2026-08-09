@@ -109,7 +109,7 @@ func countByKey(findings []analyzers.Finding) (counts map[string]int, sample map
 // configured" — behave exactly as if the ratchet did not exist, i.e. any
 // finding fails.
 func loadBaseline(path string) (*Baseline, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- path is the -baseline CLI flag, defaulting to the fixed repo-relative tools/cilint/baseline.json; operator-controlled, not external/request input.
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
@@ -133,7 +133,7 @@ func writeBaseline(path string, bl *Baseline) error {
 		return err
 	}
 	data = append(data, '\n')
-	return os.WriteFile(path, data, 0o644)
+	return os.WriteFile(path, data, 0o644) // #nosec G306 -- baseline.json is committed to the repo and must stay git/CI readable at 0644; it carries no secret material, only analyzer/file/message/count entries.
 }
 
 // buildBaseline generates a fresh Baseline from the current findings. When

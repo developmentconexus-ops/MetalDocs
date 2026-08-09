@@ -4,9 +4,7 @@ package application
 
 import (
 	"context"
-	"database/sql"
 	"errors"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -18,24 +16,14 @@ import (
 	"metaldocs/tests/integration/testdb"
 )
 
+// TestCodeImmutability runs against a reset-safe leased clone from the
+// canonical testdb factory (ADR 0034), NOT a raw sql.Open against the shared
+// dev database. The prior body read DATABASE_URL/METALDOCS_DATABASE_URL
+// directly and skipped-as-green when unset — the cluster-4 framework bypass.
+// testdb.Open owns t.Helper, the leased-DB reset, cleanup, and a fail-loud
+// ping.
 func TestCodeImmutability(t *testing.T) {
-	dsn := strings.TrimSpace(os.Getenv("DATABASE_URL"))
-	if dsn == "" {
-		dsn = strings.TrimSpace(os.Getenv("METALDOCS_DATABASE_URL"))
-	}
-	if dsn == "" {
-		t.Skip("DATABASE_URL or METALDOCS_DATABASE_URL is not set")
-	}
-
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	defer db.Close()
-
-	if err := db.PingContext(context.Background()); err != nil {
-		t.Skipf("cannot connect to database: %v", err)
-	}
+	db, _ := testdb.Open(t)
 
 	tx, err := db.BeginTx(context.Background(), nil)
 	if err != nil {

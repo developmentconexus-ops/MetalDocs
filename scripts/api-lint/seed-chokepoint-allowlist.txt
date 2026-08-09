@@ -10,15 +10,15 @@
 
 internal/modules/documents/infrastructure/repository.go:127  # category A — d.CreatedBy (document owner) is distinct from the ctx actor creating it (CreateDocumentTx)
 internal/modules/documents/infrastructure/repository.go:405  # raw BeginTx — UpdateDocumentNameTx-adjacent path opens its own tx, not chokepoint-covered
-internal/modules/documents/infrastructure/repository.go:737  # raw BeginTx — not chokepoint-covered
-internal/modules/documents/infrastructure/repository.go:772  # raw BeginTx — not chokepoint-covered
-internal/modules/documents/infrastructure/repository.go:855  # raw BeginTx — not chokepoint-covered
-internal/modules/documents/infrastructure/repository.go:888  # raw BeginTx — not chokepoint-covered
-internal/modules/documents/infrastructure/repository.go:1124  # raw BeginTx — not chokepoint-covered
-internal/modules/documents/infrastructure/repository.go:1286  # raw BeginTx — not chokepoint-covered
-internal/modules/documents/infrastructure/repository.go:1412  # raw BeginTx — not chokepoint-covered
-internal/modules/documents/infrastructure/repository.go:1754  # raw BeginTx — not chokepoint-covered
-internal/modules/documents/infrastructure/repository.go:1792  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/infrastructure/repository.go:738  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/infrastructure/repository.go:773  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/infrastructure/repository.go:856  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/infrastructure/repository.go:889  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/infrastructure/repository.go:1125  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/infrastructure/repository.go:1287  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/infrastructure/repository.go:1413  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/infrastructure/repository.go:1755  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/infrastructure/repository.go:1793  # raw BeginTx — not chokepoint-covered
 
 internal/modules/iam/infrastructure/postgres/role_admin_repository.go:72  # category A — assignedBy (role-grantor) distinct from ctx actor (UpsertUserAndAssignRoleTx)
 internal/modules/iam/infrastructure/postgres/role_admin_repository.go:128  # category A — assignedBy distinct from ctx actor (ReplaceUserRolesTx)
@@ -32,7 +32,7 @@ internal/modules/iam/infrastructure/postgres/user_area_repository.go:543  # cate
 
 internal/modules/taxonomy/infrastructure/authz_guc.go:31  # raw BeginTx — shared setAuthzGUC() helper called from 24 taxonomy repository sites that open their own tx (module-local tx wrapper), none flow through TxRunner
 
-internal/modules/iam/application/onboard_tenant_service.go:182  # category B — platform-operator tenant onboarding: actor identity arrives as explicit args (operator-tooling API), the tx later re-seeds to the NEW tenant for provisioning writes; carrier-less-ctx callers (tests/tooling) get no chokepoint auto-seed, so this manual seed is load-bearing
+internal/modules/iam/application/onboard_tenant_service.go:187  # category B — platform-operator tenant onboarding: actor identity arrives as explicit args (operator-tooling API), the tx later re-seeds to the NEW tenant for provisioning writes; carrier-less-ctx callers (tests/tooling) get no chokepoint auto-seed, so this manual seed is load-bearing
 internal/modules/iam/application/tenant_lifecycle_service.go:188  # category B — cross-tenant operator tooling (tenant.export/tenant.erase): actor's tenant ≠ target tenant, identity arrives as explicit args, tx later re-seeds to the TARGET tenant before the job INSERT; carrier-less-ctx callers get no chokepoint auto-seed
 
 tests/integration/testdb/fixtures.go:233  # raw BeginTx — canonical testdb fixture factory, not chokepoint-covered

@@ -19,7 +19,7 @@ import (
 // query with fmt.Sprintf here carries no injection surface; the tenant VALUE
 // itself is always bound as $1.
 func ExportTable(ctx context.Context, db *sql.DB, table, tenantColumn, tenantID string) (TableExport, error) {
-	query := fmt.Sprintf(
+	query := fmt.Sprintf( // #nosec G201 -- table/tenantColumn are compile-time constant literals from each module's Port.Tables() or a fixed call-site string (never user input); the tenant VALUE is bound as $1. See the doc comment above.
 		`SELECT row_to_json(t) FROM (SELECT * FROM %s WHERE %s = $1::uuid ORDER BY 1) t`,
 		table, tenantColumn,
 	)
@@ -48,7 +48,7 @@ func ExportTable(ctx context.Context, db *sql.DB, table, tenantColumn, tenantID 
 // as a separate function rather than a cast flag so both call sites stay
 // simple compile-time literals.
 func ExportTableTextTenant(ctx context.Context, db *sql.DB, table, tenantColumn, tenantID string) (TableExport, error) {
-	query := fmt.Sprintf(
+	query := fmt.Sprintf( // #nosec G201 -- table/tenantColumn are compile-time constant literals from each module's Port.Tables() or a fixed call-site string (never user input); the tenant VALUE is bound as $1. See the doc comment above.
 		`SELECT row_to_json(t) FROM (SELECT * FROM %s WHERE %s = $1 ORDER BY 1) t`,
 		table, tenantColumn,
 	)
@@ -76,7 +76,7 @@ func ExportTableTextTenant(ctx context.Context, db *sql.DB, table, tenantColumn,
 // inside tx and returns the number of rows removed. Same constant-literal
 // safety note as ExportTable applies to table/tenantColumn.
 func EraseTable(ctx context.Context, tx *sql.Tx, table, tenantColumn, tenantID string) (int64, error) {
-	query := fmt.Sprintf(`DELETE FROM %s WHERE %s = $1::uuid`, table, tenantColumn)
+	query := fmt.Sprintf(`DELETE FROM %s WHERE %s = $1::uuid`, table, tenantColumn) // #nosec G201 -- table/tenantColumn are compile-time constant literals from each module's Port.Tables() or a fixed call-site string (never user input); the tenant VALUE is bound as $1. See the doc comment above.
 	res, err := tx.ExecContext(ctx, query, tenantID)
 	if err != nil {
 		return 0, fmt.Errorf("tenantdata: erase %s: %w", table, err)
@@ -88,7 +88,7 @@ func EraseTable(ctx context.Context, tx *sql.Tx, table, tenantColumn, tenantID s
 // (metaldocs.audit_events — though audit's own port never calls this; kept
 // for symmetry and any future text-tenant table).
 func EraseTableTextTenant(ctx context.Context, tx *sql.Tx, table, tenantColumn, tenantID string) (int64, error) {
-	query := fmt.Sprintf(`DELETE FROM %s WHERE %s = $1`, table, tenantColumn)
+	query := fmt.Sprintf(`DELETE FROM %s WHERE %s = $1`, table, tenantColumn) // #nosec G201 -- table/tenantColumn are compile-time constant literals from each module's Port.Tables() or a fixed call-site string (never user input); the tenant VALUE is bound as $1. See the doc comment above.
 	res, err := tx.ExecContext(ctx, query, tenantID)
 	if err != nil {
 		return 0, fmt.Errorf("tenantdata: erase %s: %w", table, err)

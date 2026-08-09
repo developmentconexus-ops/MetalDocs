@@ -109,7 +109,7 @@ WHERE tenant_id = $1`
 	// out of scope for this fix) so a pathological tenant catalog can't return
 	// an unbounded result set. maxTaxonomyListRows is the shared safety cap
 	// defined in repository.go (also used by ProfileRepository/AreaRepository).
-	q += " ORDER BY code ASC LIMIT " + strconv.Itoa(maxTaxonomyListRows) // TODO: add pagination instead of returning the full family catalog.
+	q += " ORDER BY code ASC LIMIT " + strconv.Itoa(maxTaxonomyListRows) // #nosec G202 -- maxTaxonomyListRows is a package-level compile-time int constant, never derived from user/tenant input. TODO: add pagination instead of returning the full family catalog.
 
 	rows, err := tx.QueryContext(ctx, q, tenantID)
 	if err != nil {

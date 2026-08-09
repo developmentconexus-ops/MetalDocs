@@ -164,7 +164,7 @@ for f in "${FILES[@]}"; do
 done
 
 if (( violations > 0 )); then
-  echo "test-discipline: $violations violation(s) found — see output above"
+  echo "test-conventions: $violations violation(s) found — see output above"
   exit 1
 fi
-echo "test-discipline: clean (${#FILES[@]} integration test files checked)"
+echo "test-conventions: clean (${#FILES[@]} integration test files checked)"

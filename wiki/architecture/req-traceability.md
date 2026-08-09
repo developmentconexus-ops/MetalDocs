@@ -4,7 +4,7 @@
 > detects drift between this file and a fresh regeneration and fails as stale.
 > Local command: `go run ./scripts/req-trace`
 
-**Totals:** 67 REQ IDs (61 MUST, 6 SHOULD, 0 MAY). Uncovered MUST: 4.
+**Totals:** 68 REQ IDs (61 MUST, 7 SHOULD, 0 MAY). Uncovered MUST: 0.
 
 | REQ ID | Class | Evidence | Pointer |
 |---|---|---|---|
@@ -22,9 +22,9 @@
 | REQ-H-1 | MUST | commit | commit ea996da2 — F-06b: extracts delivery-layer raw SQL out of handlers into repositories (handlers stop doing SQL/business rules) across controlled-documents + documents; commit ea996da2. |
 | REQ-H-2 | MUST | commit | commit 6b0bb338 — F-ENVELOPE-DOCSHTTP: migrates documents/http delivery package to RFC 9457 Problem responses; commit 6b0bb338. |
 | REQ-H-3 | MUST | commit | commit 0b88b38e — ADR 0022 Phase 3: membership area-scoping closes the area_admin 403-vs-404 boundary decision; commit 0b88b38e. |
-| REQ-AUTHN-1 | MUST | none | — |
+| REQ-AUTHN-1 | MUST | test | internal/modules/approval/infrastructure/signature/password_reauth_test.go; internal/modules/auth/application/service_argon2_test.go; internal/modules/auth/application/service_test.go; internal/platform/passwordhash/passwordhash_test.go |
 | REQ-AUTHN-2 | MUST | commit | commit b5f00d73 — feat(auth): constant-time login + sliding idle timeout + complete role-cache invalidation — sessions revocable/expiring with step-up reauth; commit b5f00d73 (also cited: 7fa91bed, 9921b323). |
-| REQ-AUTHN-3 | MUST | none | — |
+| REQ-AUTHN-3 | MUST | test | internal/modules/auth/application/service_session_opacity_test.go; internal/modules/auth/application/service_test.go; internal/modules/auth/domain/model_test.go |
 | REQ-AUTHN-4 | MUST | commit | commit 492882d3 — ADR 0022 Phase 11 F8: deny-default matrix + bypass audit establishes the audit-on-authn-decision pattern that auth login/logout/reauth flows use; commit 492882d3. |
 | REQ-AUTHZ-1 | MUST | doc-annotation | achieved for IAM in ADR 0022 Phases 3-4; CI guard `no-rolestring-in-delivery` keeps it. |
 | REQ-AUTHZ-2 | MUST | commit | commit 784ce561 — F-11: resolves template.admin unknown capability, aligns tier-1/tier-2 pairs onto the typed registry, adds tier-1 lint rule; commit 784ce561. |
@@ -53,7 +53,8 @@
 | REQ-CACHE-1 | MUST | commit | commit 79f946df — Wave Z Z-29: cache contracts + invalidation-path verification (RF-3, D-05) — the one-page-contract requirement's closure; commit 79f946df. |
 | REQ-CACHE-2 | MUST | commit | commit 79f946df — Wave Z Z-29: cache contracts + invalidation-path verification includes the fail-closed-to-DB behavior on cache outage; commit 79f946df. |
 | REQ-BLOB-1 | MUST | commit | commit b64a5fd4 — ARC-05+STO-02: single shared VerifiedStore + fail-closed CD auto-create path — presigned-URL-first blob access; commit b64a5fd4. |
-| REQ-SEARCH-1 | MUST | none | — |
+| REQ-SEARCH-1 | MUST | test | internal/modules/search/application/service_test.go; internal/modules/search/infrastructure/v2documents/reader_contract_parity_integration_test.go; internal/modules/search/infrastructure/v2documents/reader_visibility_integration_test.go |
+| REQ-SEARCH-2 | SHOULD | doc-annotation | not yet built; search is a live `ILIKE` query over live tables today, deliberately deferred pending the promotion trigger in ADR [0095](../decisions/0095-search-live-query-derived-index-deferred.md) |
 | REQ-ASYNC-1 | MUST | test | internal/modules/iam/application/area_membership_test.go |
 | REQ-ASYNC-2 | MUST | commit | commit fce3d71b — D6: PDFOutboxWorker — bounded retry, backoff, structured logging; replay-safe consumer design; commit fce3d71b. |
 | REQ-ASYNC-3 | MUST | commit | commit 708853eb — APP-02 drift-closed: pins the Retryable-aware dead-letter fast path — backoff+jitter+cap with an inspectable dead-letter state; commit 708853eb. |
@@ -72,6 +73,6 @@
 | REQ-REL-5 | SHOULD | none | — |
 | REQ-SEC-1 | MUST | commit | commit 3402a8bb — F-18: gitleaks secret-scan workflow + secrets-never-quoted doc rule — commit message cites REQ-SEC-1 directly; commit 3402a8bb (also: 58cbf994 remediation). |
 | REQ-SEC-2 | MUST | commit | commit 1df720d8 — fix(fanout): aligns Go<->docgen-v2 contract and adds service-token auth for the internal call, the docx-renderer service-to-service authentication; commit 1df720d8. |
-| REQ-SEC-3 | MUST | none | — |
+| REQ-SEC-3 | MUST | commit | commit 56216ed1 — REQ-SEC-3 is a process rule ("OWASP ASVS is the review checklist for...") with no runtime behavior a *_test.go assertion could ever prove — a human consulting a checklist during review is not a code-behavior fact. This entry is deliberately weaker evidence than every other commit-kind entry in this map: it names the enforcing ARTIFACT (wiki/quality/security-review-checklist.md, wired into .github/PULL_REQUEST_TEMPLATE.md), not an implemented/enforced behavior. The artifact itself states, in its own "Status" section, that it is a reviewer prompt a box can be ticked without reading — not a mechanically enforced gate. See the checklist's "Global maximum this defers" section: a CI check that parses the diff for the five trigger areas and requires a completed checklist block is the named target, deliberately not built here because it would perturb required-gate.jq's needs: closure before the Phase 4 ruleset swap. Commit 56216ed1 adds this file, the checklist, and the PULL_REQUEST_TEMPLATE.md wiring together. |
 | REQ-SEC-4 | MUST | commit | commit 6fd39eee — feat(documents_v2): PDF completion webhook handler — HMAC-SHA256 signature verification over the raw request body (internal/modules/documents/delivery/http/pdf_webhook_handler.go validSignature); commit 6fd39eee. Note: this route is currently unwired (RegisterRoutes not called, per an H-1e code comment) — the signature-verification mechanism exists and is real, but is not live-reachable today; surfaced honestly, not hidden. |
 | REQ-SEC-5 | SHOULD | none | — |

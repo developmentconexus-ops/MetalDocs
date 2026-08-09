@@ -80,7 +80,7 @@ func WriteReport(in GateInput) error {
 	}
 	rep := BuildReport(reqs, testCitations, mapEntries)
 	rendered := RenderReport(rep)
-	if err := os.WriteFile(in.ReportPath, []byte(rendered), 0o644); err != nil {
+	if err := os.WriteFile(in.ReportPath, []byte(rendered), 0o644); err != nil { // #nosec G306 -- report is a committed wiki doc (wiki/architecture/req-traceability.md) that must stay git/CI readable at 0644; contains only REQ-ID coverage rows, no secret material.
 		return fmt.Errorf("write report %s: %w", in.ReportPath, err)
 	}
 	return nil

@@ -107,7 +107,7 @@ func checkProblemDumpImports(root string, fset *token.FileSet, strict bool) ([]V
 // dumperImports returns the repo-relative package directories the dumper
 // imports, keyed for lookup. Only metaldocs/-prefixed imports are relevant.
 func dumperImports(path string, fset *token.FileSet) (map[string]struct{}, error) {
-	src, err := os.ReadFile(path)
+	src, err := os.ReadFile(path) // #nosec G304 -- path is root (CLI-supplied repo root) joined with the fixed literal dumperRelPath constant; not external input.
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +185,7 @@ func registeringPackages(root string, fset *token.FileSet) (map[string]struct{},
 // single-file AST scan by design (no call graph, no type checker), and the
 // qualifier is unambiguous — nothing else in this tree is named `problem`.
 func fileRegistersCode(path string, fset *token.FileSet) (bool, error) {
-	src, err := os.ReadFile(path)
+	src, err := os.ReadFile(path) // #nosec G304 -- path is produced by filepath.Walk over root/internal and root/apps (CLI-supplied repo root); not external input.
 	if err != nil {
 		return false, err
 	}

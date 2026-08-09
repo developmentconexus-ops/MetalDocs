@@ -394,17 +394,16 @@ func (s *ReadService) ListPendingForActor(ctx context.Context, runner db.TxRunne
 		if err != nil {
 			return fmt.Errorf("list pending: query: %w", err)
 		}
+		defer func() { _ = rows.Close() }() // #nosec G104 -- deferred cleanup; rows.Err() (checked below) is the authoritative signal for loop failures, and *sql.Rows.Close is a no-op once already consumed to error.
 
 		var ids []string
 		for rows.Next() {
 			var id string
 			if err := rows.Scan(&id); err != nil {
-				rows.Close()
 				return fmt.Errorf("list pending: scan id: %w", err)
 			}
 			ids = append(ids, id)
 		}
-		rows.Close()
 		if err := rows.Err(); err != nil {
 			return fmt.Errorf("list pending: rows: %w", err)
 		}
@@ -521,6 +520,7 @@ func (s *ReadService) listInboxItems(ctx context.Context, runner db.TxRunner, te
 		if err != nil {
 			return fmt.Errorf("list inbox: query: %w", err)
 		}
+		defer func() { _ = rows.Close() }() // #nosec G104 -- deferred cleanup; rows.Err() (checked below) is the authoritative signal for loop failures, and *sql.Rows.Close is a no-op once already consumed to error.
 
 		for rows.Next() {
 			var v InboxView
@@ -531,7 +531,6 @@ func (s *ReadService) listInboxItems(ctx context.Context, runner db.TxRunner, te
 				&v.AreaCode, &v.SubmittedBy, &v.SubmittedAt,
 				&v.StageLabel, &required, &signed, &rowTotal,
 			); err != nil {
-				rows.Close()
 				return fmt.Errorf("list inbox: scan: %w", err)
 			}
 			// Deprecated method (see doc comment): document-only, predates the
@@ -546,7 +545,6 @@ func (s *ReadService) listInboxItems(ctx context.Context, runner db.TxRunner, te
 			items = append(items, v)
 			total = rowTotal
 		}
-		rows.Close()
 		if err := rows.Err(); err != nil {
 			return fmt.Errorf("list inbox: rows: %w", err)
 		}
@@ -690,6 +688,7 @@ func (s *ReadService) ListWorklist(ctx context.Context, runner db.TxRunner, tena
 		if err != nil {
 			return fmt.Errorf("list worklist: query: %w", err)
 		}
+		defer func() { _ = rows.Close() }() // #nosec G104 -- deferred cleanup; rows.Err() (checked below) is the authoritative signal for loop failures, and *sql.Rows.Close is a no-op once already consumed to error.
 
 		for rows.Next() {
 			var v InboxView
@@ -706,7 +705,6 @@ func (s *ReadService) ListWorklist(ctx context.Context, runner db.TxRunner, tena
 				&v.AreaCode, &v.SubmittedBy, &v.SubmittedAt,
 				&v.StageLabel, &required, &signed, &stageKind, &dueAt, &rowTotal,
 			); err != nil {
-				rows.Close()
 				return fmt.Errorf("list worklist: scan: %w", err)
 			}
 			if v.SubjectKind == string(domain.SubjectKindDocument) {
@@ -724,7 +722,6 @@ func (s *ReadService) ListWorklist(ctx context.Context, runner db.TxRunner, tena
 			items = append(items, v)
 			total = rowTotal
 		}
-		rows.Close()
 		if err := rows.Err(); err != nil {
 			return fmt.Errorf("list worklist: rows: %w", err)
 		}

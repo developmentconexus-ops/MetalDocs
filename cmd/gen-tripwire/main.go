@@ -50,7 +50,7 @@ func main() {
 	}
 
 	content := tripwire.RenderMigration()
-	if err := os.WriteFile(out, []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(out, []byte(content), 0o644); err != nil { // #nosec G306 G703 -- out is either the fixed defaultRelPath golden file or an explicit operator-supplied CLI arg (os.Args[1]) to this local codegen command, never external/request input; the output is a committed SQL migration/golden file that must stay git readable at 0644.
 		fmt.Fprintf(os.Stderr, "gen-tripwire: write %s: %v\n", out, err)
 		os.Exit(1)
 	}

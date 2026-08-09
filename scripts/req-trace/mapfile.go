@@ -31,7 +31,7 @@ type mapFile struct {
 // a hard parse error so a gaming attempt fails loudly rather than silently
 // being dropped.
 func ParseMap(path string) ([]MapEntry, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- path is main.go's fixed repo-relative wiki/architecture/req-trace-map.yaml, derived from the -repo CLI flag; operator-controlled, not external input.
 	if os.IsNotExist(err) {
 		return nil, nil
 	}

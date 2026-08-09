@@ -17,7 +17,7 @@ func CommitExists(root, ref string) (bool, error) {
 	if !hasGitDir(gitDir) {
 		return false, nil
 	}
-	cmd := exec.Command("git", "cat-file", "-e", ref)
+	cmd := exec.Command("git", "cat-file", "-e", ref) // #nosec G204 -- argv, not a shell string, so ref cannot inject shell metacharacters; it only selects which read-only git object to probe, and the only caller in this tree is the test suite (CommitExists is not wired to any external/request input).
 	cmd.Dir = root
 	if err := cmd.Run(); err != nil {
 		if _, isExit := err.(*exec.ExitError); isExit {

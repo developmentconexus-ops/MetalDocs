@@ -13,7 +13,17 @@ type PostgresConfig struct {
 }
 
 func LoadPostgresConfig() (PostgresConfig, error) {
-	dsn := strings.TrimSpace(os.Getenv("DATABASE_URL"))
+	// Precedence: METALDOCS_DATABASE_URL wins over DATABASE_URL when both are
+	// set. METALDOCS_DATABASE_URL is this repo's project-prefixed convention
+	// (matching every other METALDOCS_* env var, and tests/integration/testdb's
+	// own DSN() precedence, which this loader must agree with rather than
+	// silently diverge from); DATABASE_URL is kept as the generic fallback for
+	// environments that only export the unprefixed name. Do not remove
+	// DATABASE_URL support — other things may depend on it.
+	dsn := strings.TrimSpace(os.Getenv("METALDOCS_DATABASE_URL"))
+	if dsn == "" {
+		dsn = strings.TrimSpace(os.Getenv("DATABASE_URL"))
+	}
 	if dsn != "" {
 		if err := validateDSN(dsn); err != nil {
 			return PostgresConfig{}, err
@@ -32,7 +42,7 @@ func LoadPostgresConfig() (PostgresConfig, error) {
 	}
 
 	if host == "" || db == "" || user == "" || pass == "" {
-		return PostgresConfig{}, fmt.Errorf("postgres config missing: set PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD or DATABASE_URL")
+		return PostgresConfig{}, fmt.Errorf("postgres config missing: set PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD or METALDOCS_DATABASE_URL/DATABASE_URL")
 	}
 	if port == "" {
 		port = "5432"

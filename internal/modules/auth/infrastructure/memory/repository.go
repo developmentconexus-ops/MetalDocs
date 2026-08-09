@@ -221,6 +221,7 @@ func (m memoryLoginTx) LoadLoginState(ctx context.Context, userID string) (authd
 	}
 	return authdomain.LoginState{
 		PasswordHash: identity.PasswordHash,
+		PasswordAlgo: identity.PasswordAlgo,
 		IsActive:     identity.IsActive,
 		LockedUntil:  identity.LockedUntil,
 	}, nil
@@ -228,6 +229,23 @@ func (m memoryLoginTx) LoadLoginState(ctx context.Context, userID string) (authd
 
 func (m memoryLoginTx) RecordFailedLogin(ctx context.Context, userID string, maxAttempts int, lockDurationSeconds int, ip string) (int, *time.Time, error) {
 	return m.r.RecordFailedLogin(ctx, userID, maxAttempts, lockDurationSeconds, ip)
+}
+
+// RehashPassword implements authdomain.LoginTx for the in-memory test
+// double: it persists newHash/newAlgo for userID, mirroring the Postgres
+// rehash-on-login write.
+func (m memoryLoginTx) RehashPassword(_ context.Context, userID string, newHash authdomain.PasswordHash, newAlgo string) error {
+	m.r.mu.Lock()
+	defer m.r.mu.Unlock()
+	identity, ok := m.r.users[userID]
+	if !ok {
+		return authdomain.ErrIdentityNotFound
+	}
+	identity.PasswordHash = newHash
+	identity.PasswordAlgo = newAlgo
+	identity.UpdatedAt = time.Now().UTC()
+	m.r.users[userID] = identity
+	return nil
 }
 
 // CreateUser implements authdomain.Repository. Returns ErrUserAlreadyExists if
@@ -364,7 +382,9 @@ func (r *Repository) UpdateUser(_ context.Context, params authdomain.UpdateUserP
 	}
 	if params.NewPasswordHash != nil {
 		identity.PasswordHash = *params.NewPasswordHash
-		identity.PasswordAlgo = "bcrypt"
+		if params.NewPasswordAlgo != nil {
+			identity.PasswordAlgo = *params.NewPasswordAlgo
+		}
 	}
 	if params.MustChangePassword != nil {
 		identity.MustChangePassword = *params.MustChangePassword

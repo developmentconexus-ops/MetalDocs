@@ -25,6 +25,10 @@ type CapabilityProvider interface {
 // decision without re-reading outside the serialized region.
 type LoginState struct {
 	PasswordHash PasswordHash
+	// PasswordAlgo is the stored password_algo discriminator ("bcrypt" or
+	// "argon2id"). Authenticate dispatches its credential comparison on this
+	// value (REQ-AUTHN-1) rather than assuming a single algorithm.
+	PasswordAlgo string
 	IsActive     bool
 	LockedUntil  *time.Time
 }
@@ -35,6 +39,12 @@ type LoginState struct {
 type LoginTx interface {
 	LoadLoginState(ctx context.Context, userID string) (LoginState, error)
 	RecordFailedLogin(ctx context.Context, userID string, maxAttempts int, lockDurationSeconds int, ip string) (attempts int, lockedUntil *time.Time, err error)
+	// RehashPassword persists newHash/newAlgo for userID inside the
+	// login-lock transaction (rehash-on-login migration, REQ-AUTHN-1).
+	// Callers MUST treat a returned error as non-fatal to the login itself:
+	// log it and continue — a migration hiccup must never lock out a user
+	// who just authenticated correctly.
+	RehashPassword(ctx context.Context, userID string, newHash PasswordHash, newAlgo string) error
 }
 
 // Repository is the persistence port for the auth module: identities,

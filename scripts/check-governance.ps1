@@ -1,5 +1,13 @@
 param(
-  [string]$BaseRef = "origin/main"
+  # Default reads GITHUB_BASE_REF (GitHub Actions sets this automatically on
+  # pull_request events to the PR's base branch name) rather than the
+  # workflow passing a templated `${{ github.base_ref }}` argument — a
+  # registry Check's Argv is compile-time literals only, no shell/YAML
+  # interpolation (tools/verify/registry.go doc comment on Check.Argv), so
+  # anything the check needs at runtime has to come from an env var. Outside
+  # Actions (a laptop, or `push`) GITHUB_BASE_REF is unset, so this falls
+  # back to "origin/main" — the same default this param always had.
+  [string]$BaseRef = $(if ($env:GITHUB_BASE_REF) { "origin/$env:GITHUB_BASE_REF" } else { "origin/main" })
 )
 
 $ErrorActionPreference = "Stop"
@@ -22,6 +30,24 @@ function Fail([string]$msg) {
   exit 1
 }
 
+# True when the file's diff contains a real code change; false when every
+# changed line differs only in "//" line comments (e.g. an appended
+# "// #nosec Gxxx -- reason" suppression). A comment cannot change an HTTP
+# contract or an operating procedure — failing on one is the same cry-wolf
+# class as the whitespace and _test.go exemptions. Go-style comments only;
+# a "//" inside a string literal is also stripped, which can only make a
+# rule MISS a change hidden in such a line — any other difference still
+# fails closed. Non-.go files always count as real changes.
+function Test-RealCodeChange([string]$file) {
+  if ($file -notmatch '\.go$') { return $true }
+  $diffLines = git diff -w "$BaseRef...HEAD" -- $file |
+    Where-Object { ($_ -match '^[+-]') -and ($_ -notmatch '^(\+\+\+|---)') }
+  $strip = { param($s) ($s.Substring(1) -replace '//.*$', '').TrimEnd() }
+  $added   = @($diffLines | Where-Object { $_ -match '^\+' } | ForEach-Object { & $strip $_ } | Where-Object { $_ -ne '' } | Sort-Object)
+  $removed = @($diffLines | Where-Object { $_ -match '^-' } | ForEach-Object { & $strip $_ } | Where-Object { $_ -ne '' } | Sort-Object)
+  return (($added -join "`n") -ne ($removed -join "`n"))
+}
+
 # API contract-impacting changes must update OpenAPI.
 # We intentionally scope to delivery/http handlers and API spec files to avoid false positives
 # for non-contract bootstrap changes in apps/api.
@@ -30,7 +56,16 @@ function Fail([string]$msg) {
 # the same cry-wolf failure as the whitespace case above.
 if ($changedText -match '(?m)^internal/modules/.+/delivery/http/.+(?<!_test)\.go$') {
   if ($changedText -notmatch '(?m)^api/openapi/v1/openapi.yaml$') {
-    Fail "API contract change detected without OpenAPI update."
+    # Comment-only exemption — see Test-RealCodeChange (found for real: the
+    # gosec triage appended "// #nosec" comments in routes_mapping.go and
+    # tripped this rule).
+    $handlerFiles = $changed | Where-Object {
+      $_ -match '^internal/modules/.+/delivery/http/' -and $_ -match '\.go$' -and $_ -notmatch '_test\.go$'
+    }
+    $realChange = @($handlerFiles | Where-Object { Test-RealCodeChange $_ })
+    if ($realChange.Count -gt 0) {
+      Fail "API contract change detected without OpenAPI update."
+    }
   }
 }
 
@@ -71,8 +106,9 @@ if ($changedText -match '(?m)^internal/modules/') {
 # docs/engineering/mechanical-enforcement-register.md; the global maximum is
 # deriving ops-ness from something declared, not pattern-matching paths.
 $opsChanged = $changed | Where-Object {
-  $_ -match '^deploy/' -or
-  ($_ -match '^scripts/' -and $_ -notmatch '^scripts/(check-|api-lint/|req-trace/|testdata/)')
+  ($_ -match '^deploy/' -or
+    ($_ -match '^scripts/' -and $_ -notmatch '^scripts/(check-|api-lint/|req-trace/|testdata/)')) -and
+  (Test-RealCodeChange $_)  # comment-only .go edits cannot change an operating procedure
 }
 if ($opsChanged) {
   if ($changedText -notmatch '(?m)^docs/runbooks/') {

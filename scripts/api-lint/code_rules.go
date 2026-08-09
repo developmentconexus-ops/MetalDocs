@@ -431,7 +431,7 @@ func tripwireAllowlistPath(modulesRoot string) string {
 // reporting their intentional violations.
 func loadTripwireAllowlist(modulesRoot string, strict bool) (map[string]struct{}, error) {
 	path := tripwireAllowlistPath(modulesRoot)
-	raw, err := os.ReadFile(path)
+	raw, err := os.ReadFile(path) // #nosec G304 -- path is modulesRoot (CLI-supplied repo root) joined with the fixed literal "scripts/api-lint/tripwire-allowlist.txt"; not external input.
 	if err != nil {
 		if os.IsNotExist(err) {
 			if strict {

@@ -63,7 +63,7 @@ func LegacyVocab(goFiles []string) []Finding {
 			continue
 		}
 
-		f, err := os.Open(path)
+		f, err := os.Open(path) // #nosec G304 -- path is drawn from allFiles, itself sourced from the caller's goFiles list (repo-tree walk) plus a filepath.WalkDir over frontend/apps/web/src; not external input.
 		if err != nil {
 			continue
 		}

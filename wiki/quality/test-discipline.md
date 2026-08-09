@@ -1,7 +1,7 @@
 # Integration Test Discipline Rules
 
 > Last verified: 2026-06-15 — F4c.4 (CI grep-guard landed, script + workflow step live).
-> Enforced by: `scripts/check-test-discipline.sh` (runs in `module-boundaries` CI workflow on PR→main).
+> Enforced by: `scripts/check-test-discipline.sh` (registry check `test-conventions`, run by `tools/verify` in `ci.yml` on PR→main since the 2026-08 CI restructure).
 
 Four rules govern integration test files (`//go:build integration` first line) in MetalDocs. They
 were established in Milestone 4c (F4c.4) after the unified `testdb` factory framework (F4c.1) made

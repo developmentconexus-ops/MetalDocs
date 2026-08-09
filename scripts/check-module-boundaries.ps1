@@ -148,7 +148,7 @@ foreach ($file in $goFiles) {
 }
 
 if ($violations.Count -gt 0) {
-  Write-Host "[module-boundaries] FAIL"
+  Write-Host "[module-imports] FAIL"
   Write-Host "Violacoes encontradas:"
   foreach ($v in $violations) {
     Write-Host (" - " + $v)
@@ -156,4 +156,4 @@ if ($violations.Count -gt 0) {
   exit 1
 }
 
-Write-Host "[module-boundaries] OK"
+Write-Host "[module-imports] OK"

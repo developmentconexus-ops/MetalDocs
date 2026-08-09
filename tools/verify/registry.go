@@ -47,6 +47,20 @@ type Check struct {
 	// with Go, Node, pnpm and git.
 	Needs []string
 
+	// After lists check IDs that must run, and pass, before this one starts.
+	// This is an ORDERING edge, not an infra requirement — deliberately a
+	// different field from Needs so the two classes of dependency can never
+	// be confused by a reader or a future PR: Needs asks "is Postgres up",
+	// After asks "did check X already succeed". Only declare an edge when a
+	// later check consumes an earlier one's output (docx-test reads the
+	// dist/meta.json docx-build produces) — most checks are independent
+	// and must stay that way so -j keeps meaning what it means. A selection
+	// that includes a check without its After predecessor is refused, not
+	// run — see validateSelectionOrdering in main.go. A predecessor and its
+	// dependent must always be selected together (--only=a,b, or a profile
+	// that carries both).
+	After []string
+
 	// Paths are prefix/glob patterns; the `changed` profile runs this check
 	// only when a changed file matches. Empty means always run under
 	// `changed` — use that for checks whose scope is the whole repo.
@@ -62,13 +76,11 @@ type Check struct {
 // checks is the registry. Keep it sorted by ID.
 var checks = []Check{
 	// ---- Go: build and vet ------------------------------------------------
-	{
-		ID:       "go-build",
-		Desc:     "go build ./... — the whole module compiles",
-		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
-		Argv:     []string{"go", "build", "./..."},
-		CIJob:    "test-smoke.yml:unit",
-	},
+	// go-build (go build ./... — the whole module compiles) deleted Task 12:
+	// go test ./... compiles every package including those with no test
+	// files, and go vet ./... compiles them again. Neither links binaries,
+	// so go build ./... verified nothing the other two lacked. See the
+	// deletion ledger (docs/superpowers/reports/2026-08-08-workflow-deletion-ledger.md).
 	{
 		ID:   "gofmt",
 		Desc: "every tracked Go file is gofmt-clean",
@@ -78,14 +90,14 @@ var checks = []Check{
 		// entirely by habit.
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-gofmt.sh"},
-		CIJob:    "invariants.yml:staticcheck",
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:       "go-vet",
 		Desc:     "go vet ./...",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"go", "vet", "./..."},
-		CIJob:    "invariants.yml:staticcheck",
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:   "go-vet-integration",
@@ -94,62 +106,63 @@ var checks = []Check{
 		// has bitten this repo before (bit QR-C).
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"go", "vet", "-tags", "integration", "./..."},
-		CIJob:    "invariants.yml:staticcheck",
+		CIJob:    "ci.yml:verify",
 	},
 
 	// ---- Go: lint ---------------------------------------------------------
 	{
-		ID:       "cilint",
+		ID:       "arch-lint",
 		Desc:     "custom Go analyzers (hgcrossmodule, nosqltxindomain, platformboundary, txownership, legacyvocab) against the recorded baseline",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "./tools/cilint", "./..."},
-		CIJob:    "invariants.yml:cilint",
+		CIJob:    "ci.yml:verify",
 	},
-	{
-		ID:   "staticcheck",
-		Desc: "staticcheck 2025.1.1 — pinned to the version CI uses",
-		// 2024.1 fails to compile under Go 1.25 (its vendored x/tools hits
-		// "invalid array length"); 2025.1.1 is the first release with Go 1.25
-		// support and the same check set. Moved here from invariants.yml when
-		// the staticcheck-action step was replaced by this check.
-		Profiles: []string{ProfilePR, ProfileFull},
-		Argv:     []string{"go", "run", "honnef.co/go/tools/cmd/staticcheck@2025.1.1", "./..."},
-		Needs:    []string{needsNetwork},
-		CIJob:    "invariants.yml:staticcheck",
-	},
+	// staticcheck (pinned honnef.co/go/tools/cmd/staticcheck) deleted Task 12
+	// / spec §4.6: golangci-lint becomes the single Go lint umbrella and
+	// .golangci.yml already enables staticcheck, so this standalone entry was
+	// running the same analyzer a second time at whole-tree scope instead of
+	// golangci-lint's diff-scoped run — redundant, not broken. See the
+	// deletion ledger.
 
 	// ---- Contract ---------------------------------------------------------
 	{
-		ID:       "problem-codes-fresh",
+		ID:       "problem-codes-drift",
 		Desc:     "generated problem-code artifacts match the registry",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "./cmd/problem-codes-dump", "-check"},
-		Paths:    []string{"internal/", "api/openapi/", "wiki/references/problem-codes.md"},
-		CIJob:    "api-contract.yml:problem-codes-freshness",
+		// cmd/problem-codes-dump/ is the check's own tool: without it here, a
+		// PR that only weakens the tool (and touches no internal/ or spec
+		// file) would select zero checks over the change that most needs
+		// catching. Same class of gap as required-gate-selftest's missing
+		// scripts/required-gate.jq (whole-branch review C2).
+		Paths: []string{"internal/", "api/openapi/", "wiki/references/problem-codes.md", "cmd/problem-codes-dump/"},
+		CIJob: "ci.yml:verify",
 	},
+	// api-lint-base-path-v1 (PATH-BASE-PREFIX on the v1 spec, standalone
+	// -only run) deleted Task 12 (six-control table, spec §4.5): -only is a
+	// filter, not a mode (scripts/api-lint/main.go:21,64-67), so
+	// PATH-BASE-PREFIX already runs inside api-lint below on the same
+	// v1 spec file. api-lint-e2e-base-path survives unchanged — api-lint
+	// never touches internal-e2e.yaml, so that file's base-prefix rule still
+	// needs its own gate.
 	{
-		ID:       "api-lint-base-path-v1",
-		Desc:     "PATH-BASE-PREFIX on the v1 spec",
-		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
-		Argv:     []string{"go", "run", "./scripts/api-lint", "-only", "PATH-BASE-PREFIX", "api/openapi/v1/openapi.yaml"},
-		Paths:    []string{"api/openapi/"},
-		CIJob:    "api-contract.yml:spec-base-path-gate",
-	},
-	{
-		ID:       "api-lint-base-path-e2e",
+		ID:       "api-lint-e2e-base-path",
 		Desc:     "PATH-BASE-PREFIX on the internal-e2e spec",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "./scripts/api-lint", "-only", "PATH-BASE-PREFIX", "api/openapi/internal-e2e.yaml"},
-		Paths:    []string{"api/openapi/"},
-		CIJob:    "api-contract.yml:spec-base-path-gate",
+		// scripts/api-lint/ is the check's own tool — see the comment on
+		// api-lint-base-path-v1 above; this is the sole gate on
+		// internal-e2e.yaml's base-prefix rule, so the gap was worse here.
+		Paths: []string{"api/openapi/", "scripts/api-lint/"},
+		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "api-lint-strict",
+		ID:       "api-lint",
 		Desc:     "full API design-system lint, strict",
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "./scripts/api-lint/", "-strict", "api/openapi/v1/openapi.yaml", "."},
 		Paths:    []string{"api/openapi/", "scripts/api-lint/"},
-		CIJob:    "api-contract.yml:api-design-system-lint",
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:       "api-lint-selftest",
@@ -157,41 +170,147 @@ var checks = []Check{
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"go", "test", "./scripts/api-lint/...", "-count=1"},
 		Paths:    []string{"scripts/api-lint/"},
-		CIJob:    "api-contract.yml:api-design-system-lint",
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:       "contract-sync",
 		Desc:     "spec/generated/runtime contract sync across modules",
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"pwsh", "-NoProfile", "-File", "./scripts/check-contract-sync-all.ps1"},
-		Paths:    []string{"api/openapi/", "internal/"},
-		CIJob:    "api-contract.yml:contract-sync",
+		// scripts/check-contract-sync-all.ps1 is the check's own definition;
+		// without it a PR editing only the script (weakening what it checks)
+		// selects zero checks (whole-branch review C2).
+		Paths: []string{"api/openapi/", "internal/", "scripts/check-contract-sync-all.ps1"},
+		CIJob: "ci.yml:verify",
+	},
+	{
+		ID:       "codegen-drift-backend",
+		Desc:     "go generate ./... produces no diff in generated Go artifacts (api.gen.go, httpsurface_gen.go, httpsurface_e2e_gen.go)",
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-codegen-drift-backend.sh"},
+		// scripts/check-codegen-drift-backend.sh is the check's own
+		// definition (whole-branch review C2 class).
+		Paths: []string{"api/openapi/", "internal/", "apps/", "cmd/", "scripts/check-codegen-drift-backend.sh"},
+		CIJob: "ci.yml:verify",
+	},
+	{
+		ID:       "codegen-drift-frontend",
+		Desc:     "pnpm run gen:api produces no diff in frontend/apps/web/src/lib/api-types/",
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-codegen-drift-frontend.sh"},
+		// scripts/check-codegen-drift-frontend.sh is the check's own
+		// definition (whole-branch review C2 class).
+		Paths: []string{"api/openapi/", "frontend/", "scripts/check-codegen-drift-frontend.sh"},
+		CIJob: "ci.yml:verify",
+	},
+	{
+		ID:       "openapi-lint-v1",
+		Desc:     "redocly lint on the v1 spec",
+		Profiles: []string{ProfilePR, ProfileFull},
+		// Pinned to 2.46.0, latest at pin time (2026-08-08) — same reasoning
+		// as ci.yml's oasdiff pin: an unpinned lint tool can change what it
+		// accepts with no diff in this repo to review.
+		Argv:  []string{"npx", "--yes", "@redocly/cli@2.46.0", "lint", "api/openapi/v1/openapi.yaml"},
+		Needs: []string{needsNetwork},
+		// redocly.yaml at repo root configures this lint's rule set (rules:
+		// struct: error, etc.) — without it here, a PR that only loosens
+		// redocly.yaml (e.g. turning a rule off) selects zero checks
+		// (whole-branch review C3 class: a repo-root config file absent from
+		// every check's Paths).
+		Paths: []string{"api/openapi/", "redocly.yaml"},
+		CIJob: "ci.yml:verify",
+	},
+	{
+		ID:   "openapi-lint-e2e",
+		Desc: "redocly lint on the internal-e2e spec",
+		// Task 12: the e2e scaffolding document did not exist until now — a
+		// gate authored before its subject would pass vacuously. Same command
+		// as openapi-lint-v1, second document; the file stays excluded from
+		// the public bundle and frontend codegen (codegen-drift-frontend),
+		// only its own contract hygiene is gated here.
+		Profiles: []string{ProfilePR, ProfileFull},
+		// Pinned to 2.46.0 — same reasoning as openapi-lint-v1 above.
+		Argv:  []string{"npx", "--yes", "@redocly/cli@2.46.0", "lint", "api/openapi/internal-e2e.yaml"},
+		Needs: []string{needsNetwork},
+		// redocly.yaml at repo root configures this lint's rule set (rules:
+		// struct: error, etc.) — without it here, a PR that only loosens
+		// redocly.yaml (e.g. turning a rule off) selects zero checks
+		// (whole-branch review C3 class: a repo-root config file absent from
+		// every check's Paths).
+		Paths: []string{"api/openapi/", "redocly.yaml"},
+		CIJob: "ci.yml:verify",
+	},
+	{
+		ID:   "oasdiff-breaking",
+		Desc: "oasdiff breaking-change gate: PR head spec vs base-branch spec, --fail-on ERR",
+		// The base-branch spec this diffs against is materialized to
+		// /tmp/openapi.base.yaml by a workflow prerequisite step
+		// (ci.yml:lint-contract "Materialize base-branch spec"), which needs
+		// the PR's base SHA — a fact this registry cannot express as an argv
+		// (no shell interpolation, see Check.Argv), so that materialization
+		// stays a workflow step rather than becoming part of this check.
+		// Running `--only=oasdiff-breaking` on a laptop without first
+		// producing that file fails because the file does not exist, not
+		// because of a real breaking change — expected, not a defect.
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv:     []string{"oasdiff", "breaking", "/tmp/openapi.base.yaml", "api/openapi/v1/openapi.yaml", "--fail-on", "ERR"},
+		Paths:    []string{"api/openapi/v1/"},
+		CIJob:    "ci.yml:verify",
 	},
 
 	// ---- Architecture invariants -----------------------------------------
 	{
-		ID:       "module-boundaries",
+		ID:       "module-imports",
 		Desc:     "cross-module access goes through published interfaces",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"pwsh", "-NoProfile", "-File", "./scripts/check-module-boundaries.ps1"},
-		Paths:    []string{"internal/"},
-		CIJob:    "module-boundaries.yml:conformance",
+		// scripts/check-module-boundaries.ps1 is the check's own definition
+		// (whole-branch review C2 class).
+		Paths: []string{"internal/", "scripts/check-module-boundaries.ps1"},
+		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "test-discipline",
+		ID:       "test-conventions",
 		Desc:     "new tests use the canonical framework for their class",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-test-discipline.sh"},
-		Paths:    []string{"internal/", "tests/", "apps/"},
-		CIJob:    "module-boundaries.yml:conformance",
+		// scripts/check-test-discipline.sh is the check's own definition
+		// (whole-branch review C2 class).
+		Paths: []string{"internal/", "tests/", "apps/", "scripts/check-test-discipline.sh"},
+		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "test-discipline-selftest",
+		ID:       "test-conventions-selftest",
 		Desc:     "check-test-discipline.sh reads code and ignores Go line comments",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-test-discipline-selftest.sh"},
 		Paths:    []string{"scripts/check-test-discipline.sh", "scripts/check-test-discipline-selftest.sh", "scripts/testdata/test-discipline/"},
-		CIJob:    "module-boundaries.yml:conformance",
+		CIJob:    "ci.yml:verify",
+	},
+	{
+		ID:   "testdb-bypass-guard",
+		Desc: "no _test.go file bypasses testdb.Open via raw DATABASE_URL/METALDOCS_DATABASE_URL + sql.Open (ADR 0034) — the class of defect fixed at least five times, most recently 1a0663f5",
+		// Same self-invocation shape as verify-audit below: the check's own
+		// logic lives in tools/verify itself (testdbbypass.go), tested by
+		// go test ./tools/verify/... like any other file in this package,
+		// and its Argv shells back into `go run ./tools/verify
+		// --testdb-bypass-guard` as a subprocess rather than a separate
+		// script or tool directory.
+		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
+		Argv:     []string{"go", "run", "./tools/verify", "--testdb-bypass-guard"},
+		// Deliberately no Paths. The check's own scan (trackedTestFiles in
+		// testdbbypass.go) is `git ls-files "*_test.go"` — repo-wide, not
+		// scoped to internal/, apps/, or tests/. A `_test.go` file under
+		// cmd/ or scripts/ (both tracked, both outside those trees) can
+		// bypass the factory exactly like one under internal/ can, so any
+		// Paths list here would have to enumerate every directory that can
+		// ever hold a `_test.go` file — a claim that silently rots as the
+		// repo grows new ones. matchesPaths' documented default (no declared
+		// Paths -> repo-scoped, always runs) is the fail-closed answer:
+		// narrowing this check to a path set is a claim that nothing outside
+		// it can break the check, and the repo-wide scan disproves that
+		// claim on its face.
+		CIJob: "ci.yml:verify",
 	},
 
 	// ---- Governance -------------------------------------------------------
@@ -200,108 +319,265 @@ var checks = []Check{
 		Desc:     "no ADR status block exceeds its line/char budget",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-adr-status.sh"},
-		Paths:    []string{"wiki/decisions/"},
-		CIJob:    "governance-check.yml:check",
+		// scripts/check-adr-status.sh is the check's own definition
+		// (whole-branch review C2 class).
+		Paths: []string{"wiki/decisions/", "scripts/check-adr-status.sh"},
+		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "wiki-tally",
+		ID:       "wiki-debt-tally",
 		Desc:     "every module doc's severity tally matches its tech-debt register",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"pwsh", "-NoProfile", "-File", "./scripts/wiki-tally-check.ps1", "-All"},
-		Paths:    []string{"wiki/modules/"},
-		CIJob:    "governance-check.yml:wiki-tally",
+		// scripts/wiki-tally-check.ps1 is the check's own definition
+		// (whole-branch review C2 class).
+		Paths: []string{"wiki/modules/", "scripts/wiki-tally-check.ps1"},
+		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "db-dictionary",
+		ID:       "db-docs-coverage",
 		Desc:     "every baseline table has a wiki dictionary page",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"pwsh", "-NoProfile", "-File", "./scripts/check-db-dictionary-coverage.ps1"},
-		Paths:    []string{"db/baseline/", "wiki/database/tables/"},
-		CIJob:    "governance-check.yml:db-dictionary-coverage",
+		// scripts/check-db-dictionary-coverage.ps1 is the check's own
+		// definition (whole-branch review C2 class).
+		Paths: []string{"db/baseline/", "wiki/database/tables/", "scripts/check-db-dictionary-coverage.ps1"},
+		CIJob: "ci.yml:verify",
+	},
+	{
+		ID:       "migration-gapless",
+		Desc:     "db/migrations is a gapless sequence and no historical migration was edited after merge",
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-migration-gapless.sh"},
+		Needs:    []string{needsGitDepth},
+		// scripts/check-migration-gapless.sh is the check's own definition —
+		// named explicitly in the whole-branch review's C2 finding.
+		Paths: []string{"db/migrations/", "scripts/check-migration-gapless.sh"},
+		CIJob: "ci.yml:verify",
+	},
+	{
+		ID:   "governance-diff-rules",
+		Desc: "cross-cutting diff rules: contract changes ship with an OpenAPI update, domain changes ship with tests, ops changes ship with a runbook update",
+		// No Paths: check-governance.ps1 reads git diff itself and its rules
+		// span internal/modules/, api/openapi/, tests/, scripts/, deploy/ and
+		// docs/runbooks/ — a path list narrow enough to be honest here would
+		// just be "the whole repo except docs prose and frontend", which is
+		// not a claim worth making.
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv:     []string{"pwsh", "-NoProfile", "-File", "./scripts/check-governance.ps1"},
+		Needs:    []string{needsGitDepth},
+		CIJob:    "ci.yml:verify",
+	},
+	{
+		ID:       "invariant-coverage-map",
+		Desc:     "every invariant row in e2e/COVERAGE.md has ≥1 mapped spec ID",
+		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-invariant-coverage-map.sh"},
+		// scripts/check-invariant-coverage-map.sh is the check's own
+		// definition — named explicitly in the whole-branch review's C2
+		// finding.
+		Paths: []string{"frontend/apps/web/e2e/COVERAGE.md", "scripts/check-invariant-coverage-map.sh"},
+		CIJob: "ci.yml:verify",
+	},
+
+	// ---- Security -----------------------------------------------------------
+	// Both entries below are TRANSITIONAL local maxima under this repository's
+	// "labelled or it's a defect" rule (CLAUDE.md, "Global Maximum, Not Local
+	// Maximum"). Measured in docs/superpowers/reports/2026-08-08-gosec-govulncheck-measurement.md
+	// (Task 4 of the CI restructure); Task 9 consumes that measurement rather
+	// than re-measuring.
+	{
+		ID:   "gosec",
+		Desc: "no gosec rule fires on the Go tree",
+		// The 64-finding backlog measured in
+		// docs/superpowers/reports/2026-08-08-gosec-govulncheck-measurement.md
+		// (Task 4) was triaged to zero in Task 9 (D9): every finding is either
+		// a genuine fix (raw-string-comment corruption bugs, defer-based
+		// sql.Rows.Close ordering, %w error wrapping) or a `// #nosec Gxxx --
+		// reason` suppression on the exact flagged line, with the reason
+		// stating the concrete fact that makes the code safe (a fixed literal
+		// path/table/argv, a bounds-checked conversion, a computed
+		// placeholder index never a value, an env var NAME not a credential).
+		// `-nosec-require-rules -nosec-require-justification` enforce this
+		// shape going forward: gosec itself now rejects a bare `#nosec` or one
+		// missing a rule ID, so the triage can't silently rot back into an
+		// unscoped blanket suppression. The two pre-existing `//nolint:gosec`
+		// comments (tools/verify/main.go, tools/verify/audit.go,
+		// tools/verify/testdbbypass.go) were converted to gosec-native
+		// `// #nosec` syntax in the same pass — `//nolint:gosec` is
+		// golangci-lint syntax; standalone gosec never read it, so those
+		// suppressions were dead and the underlying findings were live under
+		// a naive registration.
+		//
+		// Global-maximum structure: gosec blocking in `pr` + `full` with a
+		// clean, justified-suppression tree (this state). It still stays
+		// `full`-only (advisory), never `pr`-blocking, for the same A6 reason
+		// as govulncheck below: A6 requires every ProfilePR check's CIJob to
+		// sit inside ci.yml's required-gate needs: closure, and this CIJob
+		// (nightly.yml:security-scan) sits outside it. The live branch
+		// ruleset also still requires 21 legacy status contexts with
+		// bypass_actors: []. Promoting this check is safe only as part of the
+		// ruleset-swap phase, not before — the tree is clean now, but
+		// promotion is a closure-safety decision, not a re-triage decision.
+		// Promoting milestone: "ruleset swap" — unscheduled on
+		// docs/superpowers/ROADMAP.md as of 2026-08-08.
+		//
+		// -exclude-dir=.claude is load-bearing, not cosmetic: an unexcluded
+		// scan walks into .claude/worktrees/<sibling>/, a sibling git worktree
+		// with its own go.mod, inflating the true 176 import directories to
+		// 333 (157, 47%, from the sibling worktree alone) — measured on this
+		// machine both before and after the flag. `-no-fail` from the
+		// measurement's own invocation is deliberately NOT carried over: this
+		// registration must fail the check like any other, not just record it.
+		Profiles: []string{ProfileFull},
+		Argv:     []string{"go", "run", "github.com/securego/gosec/v2/cmd/gosec@latest", "-quiet", "-exclude-dir=.claude", "-nosec-require-rules", "-nosec-require-justification", "./..."},
+		Needs:    []string{needsNetwork},
+		CIJob:    "nightly.yml:security-scan",
+	},
+	{
+		ID:   "govulncheck",
+		Desc: "no known-vulnerable symbol is reachable from any binary",
+		// 19 total findings, but only 2 were called/reachable (GO-2026-5970 in
+		// golang.org/x/text, GO-2026-5856 in stdlib crypto/tls) — both
+		// call-graph-verified, not a naive dependency match. As of 2026-08-08
+		// both are remediated (golang.org/x/text bumped to v0.39.0, Go
+		// toolchain bumped to go1.26.5 — both versions confirmed as the fix
+		// from govulncheck's own "Fixed in" output, not assumed): a fresh
+		// govulncheck run reports 0 called vulnerabilities. This entry's
+		// remediation criteria are met.
+		//
+		// It still stays `full`-only (advisory), never `pr`-blocking: A6
+		// requires every ProfilePR check's CIJob to sit inside ci.yml's
+		// required-gate needs: closure, and this CIJob (nightly.yml:
+		// security-scan) sits outside it. The live branch ruleset also still
+		// requires 21 legacy status contexts with bypass_actors: []. Promoting
+		// this check is safe only as part of the ruleset-swap phase, not
+		// before.
+		//
+		// Global-maximum structure: govulncheck blocking in `pr` + `full` with
+		// zero called vulnerabilities outstanding. Promoting milestone:
+		// "ruleset swap" — unscheduled on docs/superpowers/ROADMAP.md as of
+		// 2026-08-08; its remaining entry criterion is the closure-safety /
+		// ruleset-swap work, not further CVE remediation.
+		Profiles: []string{ProfileFull},
+		Argv:     []string{"go", "run", "golang.org/x/vuln/cmd/govulncheck@latest", "./..."},
+		Needs:    []string{needsNetwork},
+		CIJob:    "nightly.yml:security-scan",
 	},
 
 	// ---- Frontend ---------------------------------------------------------
 	{
-		ID:       "fe-eslint",
+		ID:       "eslint",
 		Desc:     "eslint across the workspace, including the eigenpal import boundary",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"pnpm", "run", "lint"},
-		Paths:    []string{"frontend/", "packages/", "apps/", "eslint.config.mjs"},
-		CIJob:    "lint.yml:eslint",
+		// package.json (root) is where the "lint" script this check invokes
+		// is defined — without it here, a PR rewriting "lint" to a no-op
+		// while touching no frontend/, packages/, apps/, or config file
+		// disarms eslint and selects nothing that would notice (whole-branch
+		// review C2 class).
+		Paths: []string{"frontend/", "packages/", "apps/", "eslint.config.mjs", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc"},
+		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "css-token-discipline",
+		ID:       "css-tokens",
 		Desc:     "no new raw hex colors in module.css",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-css-token-discipline.sh"},
-		Paths:    []string{"frontend/"},
-		CIJob:    "lint.yml:css-token-discipline",
+		// scripts/check-css-token-discipline.sh is the check's own
+		// definition — named explicitly in the whole-branch review's C2
+		// finding.
+		Paths: []string{"frontend/", "scripts/check-css-token-discipline.sh"},
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:       "eigenpal-selector-pin",
 		Desc:     "eigenpal version and selector counts are pinned together (ADR 0046, second half)",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-eigenpal-selector-pin.sh"},
-		Paths:    []string{"frontend/", "packages/eigenpal-adapter/"},
-		CIJob:    "lint.yml:eigenpal-selector-pin",
+		// scripts/check-eigenpal-selector-pin.sh is the check's own
+		// definition — named explicitly in the whole-branch review's C2
+		// finding.
+		Paths: []string{"frontend/", "packages/eigenpal-adapter/", "scripts/check-eigenpal-selector-pin.sh"},
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:       "fe-typecheck",
 		Desc:     "tsc over @metaldocs/web",
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"pnpm", "--filter", "@metaldocs/web", "run", "typecheck"},
-		Paths:    []string{"frontend/", "packages/"},
-		CIJob:    "fe-ci.yml:web-typecheck-test",
+		// Root toolchain/dependency files, not just frontend/ and packages/:
+		// a lockfile-only or Node-version-only PR (Dependabot's normal shape)
+		// otherwise selects zero frontend checks while the pathless Go
+		// checks still run, so `required` reports success over an unrun
+		// frontend suite (whole-branch review C3).
+		Paths: []string{"frontend/", "packages/", "pnpm-lock.yaml", "package.json", "pnpm-workspace.yaml", ".nvmrc"},
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:       "fe-test",
 		Desc:     "vitest over @metaldocs/web",
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"pnpm", "--filter", "@metaldocs/web", "run", "test"},
-		Paths:    []string{"frontend/", "packages/"},
-		CIJob:    "fe-ci.yml:web-typecheck-test",
+		// Same C3 fix as fe-typecheck above, same reason.
+		Paths: []string{"frontend/", "packages/", "pnpm-lock.yaml", "package.json", "pnpm-workspace.yaml", ".nvmrc"},
+		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "docx-v2-typecheck",
+		ID:       "docx-typecheck",
 		Desc:     "tsc over the docx-v2 workspace",
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"pnpm", "run", "typecheck:docx-v2"},
-		Paths:    []string{"apps/docx-renderer/", "packages/"},
-		CIJob:    "ci.yml:node",
+		// Same C3 fix as fe-typecheck above, same reason.
+		Paths: []string{"apps/docx-renderer/", "packages/", "pnpm-lock.yaml", "package.json", "pnpm-workspace.yaml", ".nvmrc"},
+		// I8: docx-renderer.yml:node is where this check actually runs today,
+		// but it is a new-topology workflow that is NOT inside ci.yml:required's
+		// needs: closure and will not gate a merge after the Phase 4 ruleset
+		// swap (required_status_checks becomes exactly [{"context": "required"}]).
+		// ci.yml:verify's own --profile=changed selection also runs this check
+		// (Paths above match), so that is the honest CIJob for audit purposes.
+		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "docx-v2-build",
-		Desc:     "the docx-v2 workspace builds; produces the dist/meta.json that docx-v2-test's bundle guard reads",
+		ID:       "docx-build",
+		Desc:     "the docx-v2 workspace builds; produces the dist/meta.json that docx-test's bundle guard reads",
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"pnpm", "run", "build:docx-v2"},
-		Paths:    []string{"apps/docx-renderer/", "packages/"},
-		CIJob:    "ci.yml:node",
+		// Same C3 fix as fe-typecheck above, same reason.
+		Paths: []string{"apps/docx-renderer/", "packages/", "pnpm-lock.yaml", "package.json", "pnpm-workspace.yaml", ".nvmrc"},
+		// I8: same CIJob reasoning as docx-typecheck above.
+		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:   "docx-v2-test",
+		ID:   "docx-test",
 		Desc: "docx-v2 unit tests",
-		// Depends on docx-v2-build having already run: bundle-guard.test.ts
-		// reads dist/meta.json. The registry has no dependency edges, so CI
-		// enforces the order by using two verify invocations (see ci.yml:node)
-		// and a local `--profile=pr` can still race. Recorded as D-14.
+		// D-14 (closed by R4): depends on docx-build having already run —
+		// bundle-guard.test.ts reads dist/meta.json. This used to be enforced
+		// only by docx-renderer.yml:node splitting into two `verify`
+		// invocations, so the now-required ci.yml:verify job — which runs
+		// both checks in one `--profile=changed` invocation — raced them.
+		// The After edge below is the real fix: an ordering primitive in the
+		// registry itself, honoured by run() regardless of how many
+		// invocations a workflow happens to split across.
 		//
 		// D-14 UPDATE (final review, Critical 2): the npm scripts this argv
 		// calls used to be `pnpm -r run <script>`, which is recursive over
 		// EVERY workspace including frontend/apps/web — so this check and
 		// fe-test ran the same 154-file vitest suite concurrently in the same
-		// tree, with docx-v2-build's `pnpm -r run build` writing
+		// tree, with docx-build's `pnpm -r run build` writing
 		// frontend/apps/web/dist underneath both. That race, not the
-		// build-before-test ordering below, was the reproducible source of
+		// build-before-test ordering, was the reproducible source of
 		// flaky/contradictory results between this check and fe-test. The npm
 		// scripts now filter to `./packages/**` + `./apps/**` only, which does
-		// not include frontend/apps/web — so docx-v2-test and fe-test no
-		// longer touch the same files at all, and D-14 is left covering only
-		// the narrower build-before-test ordering within the docx workspaces
-		// themselves.
+		// not include frontend/apps/web — so docx-test and fe-test no
+		// longer touch the same files at all.
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"pnpm", "run", "test:docx-v2"},
-		Paths:    []string{"apps/docx-renderer/", "packages/"},
-		CIJob:    "ci.yml:node",
+		After:    []string{"docx-build"},
+		// Same C3 fix as fe-typecheck above, same reason.
+		Paths: []string{"apps/docx-renderer/", "packages/", "pnpm-lock.yaml", "package.json", "pnpm-workspace.yaml", ".nvmrc"},
+		// I8: same CIJob reasoning as docx-typecheck above.
+		CIJob: "ci.yml:verify",
 	},
 
 	// ---- Tests ------------------------------------------------------------
@@ -310,7 +586,7 @@ var checks = []Check{
 		Desc:     "go test ./... (no integration tag)",
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"go", "test", "-count=1", "-timeout", "600s", "./..."},
-		CIJob:    "test-smoke.yml:unit",
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:   "go-test-integration",
@@ -320,7 +596,23 @@ var checks = []Check{
 		Profiles: []string{ProfileFull},
 		Argv:     []string{"go", "test", "-tags", "integration", "-count=1", "-race", "-timeout", "900s", "./tests/...", "./internal/...", "./apps/..."},
 		Needs:    []string{needsPostgres},
-		CIJob:    "test-full.yml:full",
+		// Declared honestly wide (R3, ci.yml:test-integration --changed). The
+		// Argv above only names tests/, internal/, apps/, but anything that can
+		// change what those packages build against or run against can break
+		// the suite without touching a line inside them:
+		//   - go.mod, go.sum: a dependency bump changes every package's build,
+		//     which is everything ./tests/... ./internal/... ./apps/... compile.
+		//   - db/: migrations, baseline schema, grants, prerequisites, dev
+		//     seeds and reference data are what the suite's real Postgres is
+		//     bootstrapped from (internal/platform/migrate,
+		//     internal/platform/config read db/... at runtime) — a schema-only
+		//     edit here can break the suite with zero Go diff.
+		//   - internal/, apps/, tests/: the three roots the Argv actually runs.
+		// When in doubt this unit's brief says include the path, so this list
+		// is deliberately roots, not the narrower subset that happened to be
+		// touched by any one past incident.
+		Paths: []string{"go.mod", "go.sum", "db/", "internal/", "apps/", "tests/"},
+		CIJob: "ci.yml:test-integration",
 	},
 
 	// ---- Traceability -----------------------------------------------------
@@ -330,7 +622,7 @@ var checks = []Check{
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"go", "test", "./scripts/req-trace/...", "-count=1"},
 		Paths:    []string{"scripts/req-trace/"},
-		CIJob:    "req-traceability.yml:gate",
+		CIJob:    "ci.yml:verify",
 	},
 	{
 		ID:       "req-trace",
@@ -338,7 +630,49 @@ var checks = []Check{
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "./scripts/req-trace"},
 		Needs:    []string{needsGitDepth},
-		Paths:    []string{"wiki/architecture/", "internal/", "apps/"},
-		CIJob:    "req-traceability.yml:gate",
+		// scripts/req-trace/ is the check's own tool (whole-branch review C2
+		// class): without it here, a PR that only weakens the tool (e.g. what
+		// counts as "live test evidence") while touching no
+		// wiki/architecture/, internal/, or apps/ file selects zero checks
+		// over the change that most needs catching. req-trace-selftest also
+		// covers this directory, but that is unit-test coverage of the tool's
+		// internals, not a substitute for this check itself running against
+		// a diff that touches the tool.
+		Paths: []string{"wiki/architecture/", "internal/", "apps/", "scripts/req-trace/"},
+		CIJob: "ci.yml:verify",
+	},
+	{
+		ID:       "required-gate-selftest",
+		Desc:     "the ci.yml `required` aggregator accepts and rejects the right needs-result sets",
+		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-required-gate.sh"},
+		// scripts/required-gate.jq is the expression this check exists to
+		// pin down (audit rule A5 binds it to ci.yml:required's needs: list,
+		// but A5 only compares the key array, not the predicate) — a PR
+		// editing only the .jq (e.g. loosening `== "success"` to
+		// `!= "failure"`) must select this check too, or it is the one PR
+		// that can weaken the gate expression while selecting zero gate
+		// checks (whole-branch review C2).
+		Paths: []string{".github/workflows/ci.yml", "scripts/check-required-gate.sh", "scripts/required-gate.jq", "scripts/testdata/required-gate/"},
+		CIJob: "ci.yml:verify",
+	},
+
+	// ---- Anti-drift ---------------------------------------------------------
+	{
+		ID:   "verify-audit",
+		Desc: "registry vs CI workflow YAML cross-check (--audit) reports 0 findings",
+		// R4: --audit was this branch's central anti-drift claim and was wired
+		// into no workflow — a detector nothing runs detects nothing. This
+		// entry is what runs it. It has to be registered like any other check
+		// (Argv shells back out to `verify --audit` as a subprocess) rather
+		// than special-cased, or it would repeat the exact defect it exists to
+		// close: a control that only fires when a human remembers to type it.
+		//
+		// No Paths: the audit's correctness depends on the whole registry and
+		// every workflow file, not a scoped subset — same reasoning as
+		// governance-diff-rules above.
+		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
+		Argv:     []string{"go", "run", "./tools/verify", "--audit"},
+		CIJob:    "ci.yml:verify",
 	},
 }

@@ -52,6 +52,7 @@ defect this register exists to eliminate.
 | ME-12 a string lint cannot see a constant-built bypass | [#85](https://github.com/leandrotcawork/MetalDocs/issues/85) |
 | ME-13 an analysis that takes its subject as its own premise | [#86](https://github.com/leandrotcawork/MetalDocs/issues/86) |
 | ME-14 a tenant table with no RLS, and no control that could see it | _issue pending_ |
+| ME-15 the check registry is four hand-synced inventories, not one | _issue pending_ |
 
 ## How to read an entry
 
@@ -471,7 +472,7 @@ requirement has to live to fire without being remembered.
 ## ME-14 — a tenant table with no RLS, and no control that could have seen it
 
 **Found** 2026-08-08 during the CI Phase-0 baseline work, by hand, while a *documentation* task
-(the `db-dictionary` gap closure) read `db/baseline/0001_current_schema.sql` and refused to assume a
+(the `db-docs-coverage` gap closure) read `db/baseline/0001_current_schema.sql` and refused to assume a
 table matched its siblings.
 
 **Surfaces**
@@ -527,6 +528,54 @@ four controls named above.
 `approval_route_stage_selectors` (a migration, plus a decision on whether its FK chain already makes
 the exposure theoretical), and the drift test that makes the *class* impossible. The second is worth
 more than the first: the table is one instance, and the absent control is why there could be others.
+
+---
+
+## ME-15 — the check registry is four hand-synced inventories, not one
+
+**Found** 2026-08-09 during Task 13 of the CI restructure (§8.2 renames + ruleset re-export),
+recorded per spec §9's own instruction to name this design's most likely lie: *"the gate enforces
+every check."*
+
+**Surfaces** — four places that must agree, by hand, for a registered check to actually gate a merge:
+
+| Surface | What it claims |
+|---|---|
+| `tools/verify/registry.go` | the check exists, with an `ID`, a `Profiles` set, and a `CIJob` |
+| each workflow job's `--only=`/`--profile=` invocation (`ci.yml`, `nightly.yml`, `docx-renderer.yml`) | which registered checks actually run, and in which job |
+| `ci.yml`'s `required` job `needs:` list (`verify, test-integration, security, lint-go`), validated by `scripts/required-gate.jq` / the `required-gate-selftest` registry check | which of those jobs must succeed before `required` — the sole required ruleset context — reports success |
+| the diff surface each check's `Paths` matches against under `--profile=changed` (`matchesPaths` in `tools/verify`) | whether a given PR's diff actually selected the check at all |
+
+**Kept correct by** `--audit` (registry rules A1–A6) and `required-gate.jq`'s exact-set-equality
+assertion — both real, both load-bearing, and both proven in this task's own verification run. But
+per the ordering in "How to read an entry" above, that is level 3 (red build), not level 1
+(unrepresentable): a fifth inventory — a check registered, wired into a profile, matched by a
+job's `--only=`, inside `required`'s closure, but silently never selected because its `Paths` never
+matches the diff that actually needs it — is exactly the shape A1–A6 were built to catch, and the
+existence of a catching lint is not the same claim as the drift being impossible. `--audit` and the
+set-equality guard make drift *visible*; they do not make it *impossible* (spec §9, quoted verbatim
+in the Task 13 brief).
+
+**Firing mechanism today** — level 3: `go run ./tools/verify --audit` (registry rules A1–A6),
+red build in `ci.yml:verify`'s `--profile=changed` invocation on every PR. `required-gate-selftest`
+pins the fourth inventory's aggregator (`scripts/required-gate.jq`) down the same way.
+
+**Global-maximum structure** — one generated CI manifest that *owns* registry membership, job
+routing (which job runs which check, via which `--only=`), and `required`'s gate dependency
+(`needs:` closure), with the workflow YAML **generated from it** rather than hand-authored and
+then audited for agreement after the fact. That converts all four inventories above into one
+declaration with three projections, the same "unrepresentable beats guarded" move ME-01, ME-05,
+and ME-11 already name for their own surfaces (no-fallback-principle doctrine, cited there).
+
+**Follow-on milestone:** scheduled on `docs/superpowers/ROADMAP.md` §4, row **4.7 "generated CI
+manifest"** (added 2026-08-09), queued after this CI-restructure program merges. Working name:
+**"generated CI manifest"** — one manifest owning registry membership, job routing (`--only`
+lists), the `required`-gate `needs`/jq set, and the workflow YAML generated from it; deletes this
+entry on landing. Under this repository's Global Maximum rule (CLAUDE.md), shipping §4's rename +
+re-export without this label would itself be the defect the rule exists to catch.
+
+**Owner:** unrouted. Cheap to defer, expensive to forget — record here rather than let the next
+`--audit` false-confidence read stand unqualified.
 
 ---
 

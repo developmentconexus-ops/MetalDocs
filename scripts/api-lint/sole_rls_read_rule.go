@@ -85,7 +85,7 @@ func soleRLSReadAllowlistPath(modulesRoot string) string {
 // stripped, missing file is not an error.
 func loadSoleRLSReadAllowlist(modulesRoot string) (map[string]struct{}, error) {
 	path := soleRLSReadAllowlistPath(modulesRoot)
-	raw, err := os.ReadFile(path)
+	raw, err := os.ReadFile(path) // #nosec G304 -- path is modulesRoot (CLI-supplied repo root) joined with the fixed literal "scripts/api-lint/sole-rls-read-allowlist.txt"; not external input.
 	if err != nil {
 		if os.IsNotExist(err) {
 			return map[string]struct{}{}, nil

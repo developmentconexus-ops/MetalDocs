@@ -1,51 +1,225 @@
-name: docx-renderer CI
-
-# No `paths:` filter, deliberately. A required status check is matched by NAME,
-# and a job that never runs never reports — GitHub then counts it as pending
-# forever and the PR can never merge. So a path-filtered workflow is structurally
-# ineligible to be required, which means its checks gate nothing. Diff-scoping
-# belongs one level down, in `verify --profile=changed`, where the job still
-# always reports. Full rationale in api-contract.yml and A1 ledger §1b.
-#
-# This one matters more than most: node runs bundle-guard.test.ts, which asserts
-# the docx-renderer server bundle stays framework-free. That invariant is broken
-# by adding a dependency, and the old filter did not match package.json or the
-# lockfile — so the exact change most likely to break it was the one change that
-# did not run the guard.
+name: CI
 on:
   pull_request:
-  push:
     branches: [main]
 
+# No trigger-level paths:. A path filter at the trigger makes the workflow not
+# run at all, which leaves a required context permanently pending and blocks
+# the merge. There is no path filter anywhere else in this file either
+# (R3, ci.yml restructure): every job below always runs; only the *work
+# inside* the `verify` and `test-integration` jobs is diff-scoped, by
+# tools/verify's own registry (Check.Paths + matchesPaths), via
+# `--changed` / `--profile=changed`. A docs-only PR still runs every job —
+# `--changed` simply selects zero checks for that job and it exits 0 saying
+# so. Nothing is skipped at the YAML level, so nothing can be skipped over.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
 jobs:
-  node:
+  verify:
+    name: verify
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with: { node-version-file: .nvmrc, cache: pnpm }
-      - uses: actions/setup-go@v5
-        with: { go-version-file: go.mod, cache: true }
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0   # --changed diffs against origin/main; oasdiff compares against the base ref
+      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
+      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6 # v4.0.4
+        with: { node-version-file: .nvmrc, cache: pnpm, cache-dependency-path: pnpm-lock.yaml }
       - run: pnpm install --frozen-lockfile
-      # Check set for this job lives in tools/verify/registry.go
-      # (docx-v2-typecheck, docx-v2-build, docx-v2-test) — see CIJob:
-      # "ci.yml:node".
-      #
-      # TWO invocations, and the order matters. docx-v2-test contains
-      # bundle-guard.test.ts, which reads dist/meta.json to assert the server
-      # bundle is framework-free — so it consumes the build's output. The
-      # build used to run AFTER the tests, which meant the guard could only
-      # ever fail ("dist/meta.json missing"). verify runs the checks within a
-      # single invocation concurrently, so the dependency is expressed by
-      # splitting the invocation rather than by ordering inside one.
-      - run: go run ./tools/verify --only=docx-v2-typecheck,docx-v2-build
-      - run: go run ./tools/verify --only=docx-v2-test
+      # oasdiff-breaking (registry.go) needs the oasdiff binary and a
+      # base-branch spec on disk; a Check's Argv cannot carry a templated
+      # `${{ }}` value (no shell interpolation, by design — see
+      # tools/verify/main.go's `command` invariant), so materializing the
+      # PR's base SHA stays a workflow prerequisite rather than becoming part
+      # of the check itself. Copied verbatim from this file's prior
+      # lint-contract job.
+      # Pinned, not @latest: an unpinned tool version can change what this
+      # gate accepts without a diff anywhere in this repo to review — the
+      # exact drift R5 existed to close for the Action tags in
+      # docx-renderer.yml. v1.28.0 is the latest release as of this pin
+      # (2026-08-08); bump deliberately, not implicitly.
+      - name: Install oasdiff
+        run: go install github.com/oasdiff/oasdiff@v1.28.0
+      # check-governance.ps1 (governance-diff-rules) diffs against
+      # origin/main, and --changed's default --base=origin/main needs the
+      # same local ref. Copied verbatim from this file's prior governance job,
+      # minus `--depth=1`: fetch-depth: 0 above already made this a complete
+      # clone (git rev-parse --is-shallow-repository is false right after
+      # checkout), and a *shallow* fetch against a complete repo still writes
+      # .git/shallow — reproduced locally: full clone -> false ->
+      # `git fetch origin main --depth=1` -> true. That flips every
+      # needsGitDepth check (governance-diff-rules has no Paths, so it is
+      # selected on every PR; req-trace and migration-gapless too) to SKIP,
+      # and --require-infra turns SKIP into FAIL, so `verify` failed on every
+      # PR before this fix. Dropping `--depth=1` keeps the fetch (still needed
+      # to populate the ref/SHA locally) without re-introducing a depth limit.
+      - name: Fetch base ref
+        run: git fetch origin ${{ github.base_ref }}
+      - name: Materialize base-branch spec
+        run: |
+          git fetch origin "${{ github.event.pull_request.base.sha }}"
+          git show "${{ github.event.pull_request.base.sha }}:api/openapi/v1/openapi.yaml" > /tmp/openapi.base.yaml
+      # Every registry check whose declared Paths the diff touches — gofmt,
+      # go vet, arch-lint, module-imports, test-conventions,
+      # contract sync/codegen/oasdiff/openapi lint, eslint,
+      # css-tokens, eigenpal-selector-pin, fe-typecheck, fe-test,
+      # docx-build/test, go-test-unit, adr-status, wiki-debt-tally,
+      # db-docs-coverage, migration-gapless, governance-diff-rules,
+      # invariant-coverage-map, req-trace(-selftest), required-gate-selftest,
+      # verify-audit (registry.go's "Anti-drift" section — runs `verify
+      # --audit` itself, so this job's own drift against the registry is
+      # gated on every PR, not just when a human types it).
+      # A check with no declared Paths (matchesPaths' fail-closed default)
+      # always runs. golangci-lint is not a registry check — it stays a
+      # GitHub Action step in the lint-go job below, because it needs the
+      # Action, not because it needs a different job to be scoped correctly.
+      - name: verify --profile=changed
+        run: go run ./tools/verify --require-infra --profile=changed
 
-# The `go` job that used to live here ran `go build ./...` plus `go test` over
-# seven hand-listed packages. Every one of them is already covered by
-# test-smoke.yml's `unit` job, which runs verify --only=go-build,go-test-unit —
-# and go-test-unit is `go test ./...`, a strict superset of any package list.
-# Removed as duplicated compute on every PR, not to reach green: coverage is
-# unchanged, and dropping the filter above means `node` now runs on every PR,
-# which is a net increase in what this workflow gates.
+  # test-integration needs the Postgres service container and runs
+  # ~20 minutes, so it stages behind `verify` in its own job. `needs: [verify]`
+  # carries no `if:` — the implicit success() means this job is SKIPPED
+  # (not run) when verify fails, which is the staging: don't start the
+  # 20-minute suite when the cheap checks already failed. That is safe here
+  # specifically because the new required-gate.jq requires literal "success"
+  # from every upstream job, with no "skipped is green" allowance — a skip
+  # here fails the gate exactly like a failure would, so skip propagation
+  # cannot silently pass a PR.
+  test-integration:
+    name: test-integration
+    needs: [verify]
+    runs-on: ubuntu-latest
+    # services:, the postgres user/db names and timeout-minutes: 20 below are
+    # copied verbatim from this file's prior test-integration job (itself
+    # copied from test-full.yml:full).
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: metaldocs
+          POSTGRES_PASSWORD: metaldocs
+          POSTGRES_DB: metaldocs
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0   # --changed diffs against origin/main
+      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version-file: go.mod
+          cache: true
+      # Same fix as the `verify` job's "Fetch base ref" step above, same
+      # reason: `--depth=1` against an already-complete (fetch-depth: 0)
+      # clone writes .git/shallow, which trips go-test-integration's own
+      # needsGitDepth-adjacent consumers indirectly (a shallow tree here is
+      # still a lie about what was checked out) even though this job's own
+      # check doesn't declare needsGitDepth itself.
+      - name: Fetch base ref
+        run: git fetch origin ${{ github.base_ref }}
+      # --require-infra is what makes this job's green mean anything: without
+      # it, an unset METALDOCS_DATABASE_URL yields SKIP and the job exits 0
+      # over zero executed integration tests. --changed diff-scopes the
+      # 20-minute suite to PRs that actually touch go-test-integration's
+      # declared Paths (go.mod, go.sum, db/, internal/, apps/, tests/) — a
+      # docs-only PR still runs this job, it just selects zero checks and
+      # exits 0 saying so.
+      - name: verify (go-test-integration)
+        env:
+          METALDOCS_DATABASE_URL: postgres://metaldocs:metaldocs@localhost:5432/metaldocs?sslmode=disable
+        run: go run ./tools/verify --require-infra --only=go-test-integration --changed
+        timeout-minutes: 20
+
+  security:
+    name: security
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write   # SARIF upload; this is why these live in YAML, not in verify
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0   # gitleaks scans full history
+      # gitleaks — copied verbatim from this file's prior security job.
+      - name: Run gitleaks over full git history
+        run: >
+          docker run --rm -v "$PWD:/repo"
+          ghcr.io/gitleaks/gitleaks:v8.24.3
+          detect --source /repo --config /repo/.gitleaks.toml --redact -v --exit-code 1
+      # grype (CVE scan) — copied verbatim from this file's prior security job.
+      - id: scan
+        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7
+        with:
+          path: '.'
+          fail-build: true
+          severity-cutoff: high
+          cache-db: true
+      # A fork PR's GITHUB_TOKEN is forced read-only by GitHub regardless of
+      # what `permissions:` above requests — `security-events: write` is
+      # silently downgraded, and upload-sarif 403s. Left unconditional, that
+      # 403 fails this step (and therefore the job) for every outside
+      # contributor on this public repo, for a reason that has nothing to do
+      # with whether the scan actually found anything: `scan`'s own
+      # `fail-build: true` already fails the job on real findings, on its
+      # own step, independent of this one. So the extra clause below only
+      # skips the *upload* on a fork PR — the scan itself still runs and
+      # still gates on findings for forks exactly as it does for same-repo
+      # PRs; only the Security-tab SARIF artifact is same-repo-only.
+      - uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
+        if: always() && steps.scan.outputs.sarif != '' && github.event.pull_request.head.repo.full_name == github.repository
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarif }}
+
+  lint-go:
+    name: lint-go
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      # golangci-lint is not a tools/verify registry check (it needs its own
+      # setup-go via the Action below), so this job is exactly this one step.
+      #
+      # TRANSITIONAL. golangci-lint is the single Go lint umbrella (spec §4.6),
+      # blocking on NEW issues only (only-new-issues: true, diff-scoped
+      # against the PR's base) because the whole tree carries ~1078 findings
+      # at this configured scope — a whole-tree-blocking gate would red every
+      # PR on day one, including ones that touch none of them. The
+      # global-maximum structure is a clean tree with only-new-issues dropped
+      # and this job blocking on the whole tree, not just the diff. The
+      # milestone that deletes this comment is the golangci-lint backlog
+      # burn-down, named in spec §11.1 as work with its own sequencing.
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.11
+          args: --timeout=5m ./apps/api/... ./internal/... ./tools/...
+          only-new-issues: true
+
+  required:
+    name: required
+    if: ${{ always() }}
+    needs: [verify, test-integration, security, lint-go]
+    runs-on: ubuntu-latest
+    env:
+      NEEDS_JSON: ${{ toJSON(needs) }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Validate all CI results
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! jq -e -f scripts/required-gate.jq <<<"$NEEDS_JSON" >/dev/null; then
+            jq -r 'to_entries[] | "\(.key)=\(.value.result // "null")"' <<<"$NEEDS_JSON"
+            exit 1
+          fi

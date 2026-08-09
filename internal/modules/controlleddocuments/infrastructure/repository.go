@@ -211,8 +211,8 @@ WHERE tenant_id = $1`
 	}
 
 	limit := pagination.ClampLimit(filter.Limit)
-	q += fmt.Sprintf(" ORDER BY created_at DESC, id DESC LIMIT $%d", idx)
-	args = append(args, limit+1) // +1 probe row to detect hasMore
+	q += fmt.Sprintf(" ORDER BY created_at DESC, id DESC LIMIT $%d", idx) // #nosec G202 -- idx is a computed placeholder index (int), not a value; the actual limit value is bound via args below.
+	args = append(args, limit+1)                                          // +1 probe row to detect hasMore
 
 	rows, err := r.db.QueryContext(ctx, q, args...)
 	if err != nil {

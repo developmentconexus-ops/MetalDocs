@@ -60,15 +60,25 @@ const (
 
 func main() {
 	var (
-		profile = flag.String("profile", ProfileFast, "which profile to run: "+strings.Join(profileOrder, ", "))
-		list    = flag.Bool("list", false, "print the registry grouped by profile and exit")
-		audit   = flag.Bool("audit", false, "report checks with no CI job, and exit non-zero if any exist")
-		only    = flag.String("only", "", "comma-separated check IDs to run, ignoring the profile")
-		base    = flag.String("base", "origin/main", "base ref for --profile=changed")
-		jobs    = flag.Int("j", defaultParallelism(), "how many checks to run concurrently")
-		verbose = flag.Bool("v", false, "stream output of passing checks too")
+		profile           = flag.String("profile", ProfileFast, "which profile to run: "+strings.Join(profileOrder, ", "))
+		list              = flag.Bool("list", false, "print the registry grouped by profile and exit")
+		audit             = flag.Bool("audit", false, "report checks with no CI job, and exit non-zero if any exist")
+		testdbBypassGuard = flag.Bool("testdb-bypass-guard", false, "report _test.go files that bypass testdb.Open via raw DATABASE_URL/METALDOCS_DATABASE_URL + sql.Open, and exit non-zero if any exist")
+		only              = flag.String("only", "", "comma-separated check IDs to run, ignoring the profile")
+		changed           = flag.Bool("changed", false, "narrow whatever selection --only/--profile made to checks whose declared Paths the diff against --base touches; --profile=changed implies this")
+		base              = flag.String("base", "origin/main", "base ref for --changed / --profile=changed")
+		jobs              = flag.Int("j", defaultParallelism(), "how many checks to run concurrently")
+		verbose           = flag.Bool("v", false, "stream output of passing checks too")
+		// In CI a SKIP is indistinguishable from a PASS at the exit code, so a
+		// job can report green over zero executed tests. This flag makes
+		// "cannot run here" fatal, and CI always passes it.
+		requireInfra = flag.Bool("require-infra", false, "treat missing infra as a failure instead of a skip; CI always sets this")
 	)
 	flag.Parse()
+
+	if err := validateOrdering(checks); err != nil {
+		fatalf("invalid check registry: %v", err)
+	}
 
 	root, err := repoRoot()
 	if err != nil {
@@ -83,15 +93,17 @@ func main() {
 		printList()
 		return
 	case *audit:
-		os.Exit(printAudit())
+		os.Exit(printAudit(filepath.Join(".github", "workflows")))
+	case *testdbBypassGuard:
+		os.Exit(printTestdbBypassGuard())
 	}
 
-	selected, err := selectChecks(*profile, *only, *base)
+	selected, scoped, err := selectChecks(*profile, *only, *base, *changed)
 	if err != nil {
 		fatalf("%v", err)
 	}
 	if len(selected) == 0 {
-		fmt.Println("verify: nothing to run")
+		fmt.Println(emptySelectionMessage(scoped, *base))
 		return
 	}
 
@@ -105,23 +117,101 @@ func main() {
 	}
 
 	fmt.Printf("verify: profile=%s checks=%d parallelism=%d\n\n", *profile, len(selected), *jobs)
-	results := run(selected, *jobs, *verbose)
+	results := run(selected, *jobs, *verbose, *requireInfra)
 	os.Exit(report(results, *profile))
 }
 
 // ---------------------------------------------------------------- selection
 
-func selectChecks(profile, only, base string) ([]Check, error) {
-	if only != "" {
-		return selectByIDs(only)
+// selectChecks resolves --only/--profile to a set of checks, then applies
+// --changed diff-scoping on top if either --changed was passed explicitly or
+// the profile is `changed` (which has always meant "scoped", since before
+// this flag existed). This is what lets a workflow job say "my set of
+// checks, further narrowed to what the diff touches" —
+// `--only=go-test-integration --changed` — instead of --changed being a
+// whole selection mode of its own that can't be intersected with anything.
+//
+// The returned bool tells the caller whether scoping was actually applied,
+// so an empty result can be explained: "0 checks, diff-scoped" is a fact
+// worth printing, "0 checks" alone is not (see emptySelectionMessage).
+func selectChecks(profile, only, base string, changedFlag bool) (selected []Check, scoped bool, err error) {
+	scoped = changedFlag
+	switch {
+	case only != "":
+		selected, err = selectByIDs(only)
+	case profile == ProfileChanged:
+		selected = selectByProfile(ProfilePR)
+		scoped = true
+	default:
+		if !validProfile(profile) {
+			return nil, false, fmt.Errorf("unknown profile %q; valid: %s", profile, strings.Join(profileOrder, ", "))
+		}
+		selected = selectByProfile(profile)
 	}
-	if profile == ProfileChanged {
-		return selectChanged(base)
+	if err != nil {
+		return nil, false, err
 	}
-	if !validProfile(profile) {
-		return nil, fmt.Errorf("unknown profile %q; valid: %s", profile, strings.Join(profileOrder, ", "))
+	if scoped {
+		selected, err = scopeToChanged(selected, base)
+		if err != nil {
+			return nil, false, err
+		}
 	}
-	return selectByProfile(profile), nil
+	if err := validateSelectionOrdering(selected); err != nil {
+		return nil, false, err
+	}
+	return selected, scoped, nil
+}
+
+// validateSelectionOrdering refuses a selection that contains a check
+// without its After predecessor. This is the selection-boundary half of the
+// excluded-predecessor fix (run()'s wait loop is the other half — see its
+// doc comment).
+//
+// The prior ruling — run the dependent anyway, warn on stderr, do not
+// refuse — was proven fail-open by reproduction: `apps/docx-renderer/dist/meta.json`
+// already existed on disk from an earlier, unrelated build, and
+// `--only=docx-test` alone ran bundle-guard.test.ts anyway, which read
+// that stale file and reported PASS without ever re-validating current
+// source. verify has no state that survives past its own process, so it
+// cannot tell "the predecessor already ran and passed elsewhere" apart from
+// "the predecessor never ran" — refusing is the only answer that isn't a
+// guess. A caller that wants both checks must include both in the same
+// selection, e.g. `--only=docx-build,docx-test`, which is what
+// docx-renderer.yml now does (see that file).
+func validateSelectionOrdering(selected []Check) error {
+	inSelection := make(map[string]bool, len(selected))
+	for _, c := range selected {
+		inSelection[c.ID] = true
+	}
+	var missing []string
+	for _, c := range selected {
+		for _, dep := range c.After {
+			if !inSelection[dep] {
+				missing = append(missing, fmt.Sprintf(
+					"%s declares After %s, but %s is not in this selection", c.ID, dep, dep))
+			}
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	sort.Strings(missing)
+	return fmt.Errorf("selection drops an ordering predecessor:\n  %s\ninclude the missing check(s) in --only (or pick a profile/--changed selection that keeps both sides of the edge)",
+		strings.Join(missing, "\n  "))
+}
+
+// emptySelectionMessage explains a zero-check run. A silent "0 checks, exit
+// 0" is indistinguishable from a broken selector — the exact shape of the
+// bug this unit exists to close (a PR touching only files no check declares
+// used to skip every job and let `required` report green over nothing). A
+// diff-scoped zero and an ordinary zero are different facts and read
+// differently on purpose.
+func emptySelectionMessage(scoped bool, base string) string {
+	if scoped {
+		return fmt.Sprintf("verify: 0 checks selected — --changed found no diff against %s that touches any declared Paths. A check with no declared Paths always matches, so this means the diff is entirely outside every path-scoped check and there is no repo-scoped check in the selection either. Confirm this is expected.", base)
+	}
+	return "verify: nothing to run"
 }
 
 // selectByIDs resolves an explicit --only list. An unknown ID is an error
@@ -150,18 +240,60 @@ func selectByIDs(only string) ([]Check, error) {
 	return out, nil
 }
 
-func selectChanged(base string) ([]Check, error) {
+// scopeToChanged narrows `selected` to the checks whose declared Paths
+// intersect the diff against base — except outside a pull request, where it
+// returns `selected` unchanged.
+//
+// That exception exists because the diff itself lies outside a PR: on a
+// push to main, --base defaults to origin/main and HEAD already IS
+// origin/main, so the diff is empty. Scoping to an empty diff means
+// selecting zero checks and exiting 0 — green over nothing, which is the
+// defect this whole unit exists to eliminate (the YAML path map had the same
+// hole, just via `if:` conditions and `skipped` counting as green for
+// `required`). Falling back to the full set is the only fail-closed answer:
+// there is no diff outside a PR that could safely narrow anything.
+func scopeToChanged(selected []Check, base string) ([]Check, error) {
+	if runningAsNonPRCI() {
+		return selected, nil
+	}
 	changed, err := changedFiles(base)
 	if err != nil {
-		return nil, fmt.Errorf("--profile=changed needs a diff against %s: %w", base, err)
+		return nil, fmt.Errorf("--changed needs a diff against %s: %w", base, err)
 	}
+	return filterByChanged(selected, changed), nil
+}
+
+// filterByChanged is the pure intersection: which of `selected` does the
+// diff actually touch. Split out from scopeToChanged so the composition
+// logic is testable without a git repository — matchesPaths already
+// guarantees a pathless check always matches, so this filter never has to
+// special-case one.
+func filterByChanged(selected []Check, changed []string) []Check {
 	var out []Check
-	for _, c := range checks {
-		if hasProfile(c, ProfilePR) && matchesPaths(c, changed) {
+	for _, c := range selected {
+		if matchesPaths(c, changed) {
 			out = append(out, c)
 		}
 	}
-	return out, nil
+	return out
+}
+
+// runningAsNonPRCI reports whether this is a GitHub Actions run triggered by
+// something other than a pull request — a push to main, a schedule, a
+// manual dispatch. GITHUB_EVENT_NAME is GitHub's documented signal for the
+// triggering event
+// (https://docs.github.com/actions/learn-github-actions/variables#default-environment-variables)
+// and is unset outside Actions, so an empty value means "not GitHub Actions
+// at all" (a laptop) rather than "not a pull request" — the fallback must
+// not fire there, or `--profile=changed` on a developer's machine would stop
+// being diff-scoped and start being the full set, silently changing
+// behaviour this flag has always had.
+func runningAsNonPRCI() bool {
+	ev := os.Getenv("GITHUB_EVENT_NAME")
+	if ev == "" {
+		return false
+	}
+	return ev != "pull_request" && ev != "pull_request_target"
 }
 
 func selectByProfile(profile string) []Check {
@@ -327,8 +459,7 @@ func nvmrcVersion() string {
 // Adding an exec call anywhere else in this package defeats that argument.
 // Route it through here instead.
 func command(ctx context.Context, dir string, argv []string) *exec.Cmd {
-	//nolint:gosec // G204 — argv is compile-time literals or refPattern-validated; see the invariant above.
-	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...) // #nosec G204 -- argv is compile-time literals or refPattern-validated; see the invariant above.
 	cmd.Dir = dir
 	return cmd
 }
@@ -372,50 +503,260 @@ func isShallow() bool {
 	return strings.TrimSpace(string(out)) == "true"
 }
 
-func run(selected []Check, parallelism int, verbose bool) []result {
+// validateOrdering rejects a registry whose After edges cannot be honoured:
+// an edge naming an unknown ID, or a cycle. Both are startup failures rather
+// than a runtime deadlock or a silent serialization — run() below assumes
+// the graph it is handed is already a DAG over known IDs, and this is the
+// one place that assumption is made true. Checked against the WHOLE
+// registry, not just a selection, because a cycle that only shows up under
+// some future --only combination is still a defect in the registry today.
+func validateOrdering(all []Check) error {
+	known := map[string]bool{}
+	byID := map[string]Check{}
+	for _, c := range all {
+		known[c.ID] = true
+		byID[c.ID] = c
+	}
+	if err := checkKnownAfterEdges(all, known); err != nil {
+		return err
+	}
+	return detectOrderingCycle(all, byID)
+}
+
+// checkKnownAfterEdges rejects an After edge naming an unregistered check
+// ID. Split out of validateOrdering so the "is every edge valid" question is
+// separate from "is the edge set acyclic" — cycle detection assumes it is
+// already walking known IDs, and this is what makes that assumption true.
+func checkKnownAfterEdges(all []Check, known map[string]bool) error {
+	for _, c := range all {
+		for _, dep := range c.After {
+			if !known[dep] {
+				return fmt.Errorf("check %q declares After %q, which is not a registered check ID", c.ID, dep)
+			}
+		}
+	}
+	return nil
+}
+
+// formatOrderingCycle renders the cycle found by detectOrderingCycle's DFS:
+// the portion of the walk stack from the repeated node's first occurrence
+// through the edge that closed the loop.
+func formatOrderingCycle(stack []string, dep string) error {
+	start := 0
+	for i, s := range stack {
+		if s == dep {
+			start = i
+			break
+		}
+	}
+	return fmt.Errorf("ordering cycle in After edges: %s -> %s",
+		strings.Join(stack[start:], " -> "), dep)
+}
+
+// detectOrderingCycle runs a colored DFS over the After graph and rejects a
+// cycle. Checked against the WHOLE registry, not just a selection, because a
+// cycle that only shows up under some future --only combination is still a
+// defect in the registry today. Iteration order over the ID set is sorted
+// first so a registry with more than one cycle always reports the same one.
+func detectOrderingCycle(all []Check, byID map[string]Check) error {
+	const (
+		white = iota
+		gray
+		black
+	)
+	color := map[string]int{}
+	var stack []string
+	var visit func(id string) error
+	visit = func(id string) error {
+		color[id] = gray
+		stack = append(stack, id)
+		for _, dep := range byID[id].After {
+			switch color[dep] {
+			case gray:
+				return formatOrderingCycle(stack, dep)
+			case white:
+				if err := visit(dep); err != nil {
+					return err
+				}
+			}
+		}
+		stack = stack[:len(stack)-1]
+		color[id] = black
+		return nil
+	}
+
+	ids := make([]string, 0, len(all))
+	for _, c := range all {
+		ids = append(ids, c.ID)
+	}
+	sort.Strings(ids) // deterministic error on a multi-cycle registry
+	for _, id := range ids {
+		if color[id] == white {
+			if err := visit(id); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// runState holds everything the per-check goroutines share: the shared
+// results/done slices, the concurrency semaphore, and the run-wide flags.
+// Splitting run() into this struct plus methods separates the three things
+// it used to do in one function body — waiting on ordering, scheduling
+// under the parallelism limit, and reporting each outcome as it lands —
+// into one method per concern, each independently readable and testable in
+// isolation from the goroutine plumbing.
+type runState struct {
+	indexByID    map[string]int
+	results      []result
+	done         []chan struct{}
+	sem          chan struct{}
+	printMu      sync.Mutex
+	verbose      bool
+	requireInfra bool
+}
+
+func newRunState(selected []Check, parallelism int, verbose, requireInfra bool) *runState {
+	indexByID := make(map[string]int, len(selected))
+	for i, c := range selected {
+		indexByID[c.ID] = i
+	}
+	// done[i] closes once results[i] is final. A dependent waits on its
+	// predecessor's done channel, not on a semaphore slot, so waiting costs
+	// nothing but a blocked goroutine — the concurrency limit only governs
+	// checks that are actually running, which is what keeps independent
+	// checks concurrent while ordered ones still serialize relative to each
+	// other.
+	done := make([]chan struct{}, len(selected))
+	for i := range done {
+		done[i] = make(chan struct{})
+	}
+	return &runState{
+		indexByID:    indexByID,
+		results:      make([]result, len(selected)),
+		done:         done,
+		sem:          make(chan struct{}, parallelism),
+		verbose:      verbose,
+		requireInfra: requireInfra,
+	}
+}
+
+func (st *runState) printLine(format string, args ...any) {
+	st.printMu.Lock()
+	fmt.Printf(format, args...)
+	st.printMu.Unlock()
+}
+
+// awaitPredecessors blocks until every check c.After depends on has a final
+// result, recording c's own result and returning false the moment one of
+// them makes running c impossible. It returns true only when every
+// predecessor passed and c is clear to run.
+func (st *runState) awaitPredecessors(i int, c Check) bool {
+	for _, dep := range c.After {
+		di, ok := st.indexByID[dep]
+		if !ok {
+			// Excluded from this selection. main() refuses this case
+			// before run() is ever called (validateSelectionOrdering,
+			// called from selectChecks) — this branch is the same rule
+			// enforced a second time, in the execution kernel itself, so
+			// a future caller that assembles `selected` some other way
+			// than selectChecks still cannot slip an incomplete
+			// selection past run(). FAIL, not SKIP: report() only turns
+			// FAILs into a non-zero exit, and a SKIP here would be
+			// exactly the "green over nothing" shape this whole unit
+			// exists to close.
+			reason := fmt.Sprintf("refusing: predecessor %s is not part of this selection", dep)
+			st.results[i] = result{check: c, status: statusFail, reason: reason}
+			st.printLine("  %s  %-24s %s\n", statusFail, c.ID, reason)
+			return false
+		}
+		<-st.done[di]
+		if st.results[di].status != statusPass {
+			pred := st.results[di]
+			reason := fmt.Sprintf("not run: predecessor %s did not pass (%s)", pred.check.ID, pred.status)
+			st.results[i] = result{check: c, status: statusSkip, reason: reason}
+			st.printLine("  %s  %-24s %s\n", "SKIP", c.ID, reason)
+			return false
+		}
+	}
+	return true
+}
+
+// skipForMissingInfra records and reports a SKIP (or, under --require-infra,
+// a FAIL) when c cannot run in this environment. Returns true when it did so
+// — the caller must not proceed to execute c.
+func (st *runState) skipForMissingInfra(i int, c Check) bool {
+	reason := missingInfra(c)
+	if reason == "" {
+		return false
+	}
+	// One decision site, two verdicts. Deriving this in report() instead
+	// would mean two places agree on what a skip means.
+	status, label := statusSkip, "SKIP"
+	if st.requireInfra {
+		status, label = statusFail, "FAIL"
+	}
+	st.results[i] = result{check: c, status: status, reason: reason}
+	st.printLine("  %s  %-24s %s\n", label, c.ID, reason)
+	return true
+}
+
+// execute runs c's Argv and records the PASS/FAIL result.
+func (st *runState) execute(i int, c Check) {
+	start := time.Now()
+	out, err := command(context.Background(), c.Dir, c.Argv).CombinedOutput()
+	d := time.Since(start)
+
+	status := statusPass
+	if err != nil {
+		status = statusFail
+	}
+	st.results[i] = result{check: c, status: status, output: string(out), duration: d}
+
+	st.printMu.Lock()
+	fmt.Printf("  %-5s %-24s %6.1fs\n", status, c.ID, d.Seconds())
+	if st.verbose && status == statusPass && len(out) > 0 {
+		fmt.Println(indent(string(out)))
+	}
+	st.printMu.Unlock()
+}
+
+// runOne is the full lifecycle of one check's goroutine: wait for
+// predecessors, acquire a scheduling slot, skip if infra is missing,
+// otherwise execute.
+func (st *runState) runOne(i int, c Check) {
+	if !st.awaitPredecessors(i, c) {
+		return
+	}
+
+	st.sem <- struct{}{}
+	defer func() { <-st.sem }()
+
+	if st.skipForMissingInfra(i, c) {
+		return
+	}
+
+	st.execute(i, c)
+}
+
+func run(selected []Check, parallelism int, verbose bool, requireInfra bool) []result {
 	if parallelism < 1 {
 		parallelism = 1
 	}
-	results := make([]result, len(selected))
-	sem := make(chan struct{}, parallelism)
-	var wg sync.WaitGroup
-	var printMu sync.Mutex
+	st := newRunState(selected, parallelism, verbose, requireInfra)
 
+	var wg sync.WaitGroup
 	for i, c := range selected {
 		wg.Add(1)
 		go func(i int, c Check) {
 			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-
-			if reason := missingInfra(c); reason != "" {
-				results[i] = result{check: c, status: statusSkip, reason: reason}
-				printMu.Lock()
-				fmt.Printf("  SKIP  %-24s %s\n", c.ID, reason)
-				printMu.Unlock()
-				return
-			}
-
-			start := time.Now()
-			out, err := command(context.Background(), c.Dir, c.Argv).CombinedOutput()
-			d := time.Since(start)
-
-			status := statusPass
-			if err != nil {
-				status = statusFail
-			}
-			results[i] = result{check: c, status: status, output: string(out), duration: d}
-
-			printMu.Lock()
-			fmt.Printf("  %-5s %-24s %6.1fs\n", status, c.ID, d.Seconds())
-			if verbose && status == statusPass && len(out) > 0 {
-				fmt.Println(indent(string(out)))
-			}
-			printMu.Unlock()
+			defer close(st.done[i])
+			st.runOne(i, c)
 		}(i, c)
 	}
 	wg.Wait()
-	return results
+	return st.results
 }
 
 // ---------------------------------------------------------------- reporting
@@ -441,6 +782,9 @@ func report(results []result, profile string) int {
 			fmt.Printf("  $ %s\n", strings.Join(r.check.Argv, " "))
 			if r.check.CIJob != "" {
 				fmt.Printf("  CI job: %s\n", r.check.CIJob)
+			}
+			if r.reason != "" {
+				fmt.Printf("  not runnable here: %s\n", r.reason)
 			}
 			fmt.Println(indent(r.output))
 		}
@@ -484,27 +828,6 @@ func printList() {
 		}
 	}
 	fmt.Println()
-}
-
-// printAudit reports registry entries with no corresponding CI job. Such a
-// check runs on developer machines and not in CI, which makes it advice
-// rather than a control — the same failure mode as an unwired script.
-func printAudit() int {
-	var gaps []Check
-	for _, c := range checks {
-		if c.CIJob == "" {
-			gaps = append(gaps, c)
-		}
-	}
-	fmt.Printf("verify --audit: %d checks, %d with no CI job\n", len(checks), len(gaps))
-	if len(gaps) == 0 {
-		return 0
-	}
-	fmt.Println("\nThese run locally but nothing enforces them on a PR:")
-	for _, c := range gaps {
-		fmt.Printf("  - %-24s %s\n", c.ID, c.Desc)
-	}
-	return 1
 }
 
 // ------------------------------------------------------------------- helpers

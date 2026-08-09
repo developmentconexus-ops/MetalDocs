@@ -54,7 +54,7 @@ var classStartRe = regexp.MustCompile(`\((MUST|SHOULD|MAY)\b`)
 //     (balanced-paren scan, so a nested "(F-01)" inside the annotation does
 //     not truncate it), keeping only the first mention of each ID.
 func ExtractReqs(path string) ([]Req, error) {
-	f, err := os.Open(path)
+	f, err := os.Open(path) // #nosec G304 -- path is main.go's -doc/-repo CLI flag, defaulting to a fixed repo-relative wiki doc path; operator-controlled, not external input.
 	if err != nil {
 		return nil, fmt.Errorf("open %s: %w", path, err)
 	}

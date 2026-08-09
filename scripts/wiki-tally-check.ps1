@@ -38,7 +38,7 @@
 
 .PARAMETER All
   Sweep every module that has a tech-debt register, and fail if ANY module
-  fails. This is the mode CI runs (governance-check.yml / wiki-tally): a
+  fails. This is the mode CI runs (governance-check.yml / wiki-debt-tally): a
   per-module gate that CI must be told which modules to check is a gate that
   silently stops covering a module the day someone adds one.
 

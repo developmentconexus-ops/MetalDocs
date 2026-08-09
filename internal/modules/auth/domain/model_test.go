@@ -23,6 +23,10 @@ func TestNewIdentity_ZeroValueSafeDefaults(t *testing.T) {
 	}
 }
 
+// TestAuthenticatedSession_RedactsRawToken also guards REQ-AUTHN-3's opacity
+// clause: the raw bearer token is never serialized into logs or JSON output
+// even incidentally, reinforcing that the token carries no data meant to be
+// inspected — only a value meant to be looked up.
 func TestAuthenticatedSession_RedactsRawToken(t *testing.T) {
 	session := AuthenticatedSession{
 		RawToken:  "secret-token",

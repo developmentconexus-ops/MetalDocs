@@ -8,7 +8,7 @@ only in the repository settings UI, where a change leaves no trace.
 The live ruleset is the one that enforces. Re-export after any settings change:
 
 ```bash
-gh api repos/leandrotcawork/MetalDocs/rulesets/20560142 > .github/rulesets/main.json
+gh api repos/developmentconexus-ops/MetalDocs/rulesets/20560142 | jq -S . > .github/rulesets/main.json
 ```
 
 ## What it enforces
@@ -17,42 +17,79 @@ gh api repos/leandrotcawork/MetalDocs/rulesets/20560142 > .github/rulesets/main.
 - All changes arrive through a pull request. Review threads must be resolved;
   approvals are set to 0 because a solo author cannot approve their own PR, and
   a rule that cannot be satisfied is a rule that gets bypassed.
-- 22 status checks are required. Every one is a deterministic check that was
-  observed green on a real PR before being listed.
+- **One** status check is required: `required`. `bypass_actors` is `[]` and
+  `strict_required_status_checks_policy` is `true`.
 
-## Why some green checks are not required
+## `required` is an aggregator, not a single check
 
 A required check is matched **by name**, and a check that never reports counts
 as pending forever — so a workflow with a `paths:` filter cannot be required
-without deadlocking every PR that does not touch those paths. That rules out
-`e2e-coverage-gate`, `openapi-breaking`, `perf`, `req-traceability`, and
-`supply-chain` until their filters come off. Diff-scoping belongs one level
-down, in `verify --profile=changed`, where the job still always reports.
+without deadlocking every PR that does not touch those paths (see the A1
+verification ledger §1b). Naming individual job or check IDs directly in the
+ruleset also meant every rename of any one of them was a ruleset edit that had
+to land in lockstep with the workflow change, on pain of deadlocking every
+open PR — the exact failure mode the "If a required check name changes"
+section below used to warn about for 22 separate names.
 
-See the A1 verification ledger §1b for the full argument.
+The fix collapses the ruleset's surface to one name. `ci.yml`'s `required` job
+is the sole required context; it is `if: always()` so it reports even when an
+upstream job failed, and its own step fails the job (not GitHub's "skipped
+still counts" default) unless every upstream job succeeded. Its `needs:` list
+is the membership set:
 
-## Why some checks are not required yet
-
-These are red for reasons recorded as defers, not for reasons this ruleset
-should paper over. They are promoted when their defect closes, not before:
-
-| Check | Blocked on |
-|---|---|
-| `conformance` | D-13 test-discipline |
-| `gate` | D-1 req-traceability |
-| `DB schema dictionary coverage` | D-5 |
-| `E2E smoke (approval flows)` | needs an application stack CI does not provision |
-| `Perf suite (reduced — PR gate)` | same, plus a `PERF_DATABASE_URL` secret that does not exist |
-| `full` | required as soon as one complete result confirms it is green |
-
-## If a required check name changes
-
-There are no bypass actors, deliberately. That means renaming a job without
-updating this ruleset will deadlock every open PR: the old name never reports
-and nothing can merge. Recovery is an owner-level API call:
-
-```bash
-gh api -X PUT repos/leandrotcawork/MetalDocs/rulesets/20560142 --input .github/rulesets/main.json
+```yaml
+required:
+  needs: [verify, test-integration, security, lint-go]
 ```
 
-Keep the job `name:` and the required context in the same commit.
+`verify` is itself an aggregate: `go run ./tools/verify --profile=changed`
+(and `--profile=full` for `test-integration`, `security`) runs every check
+registered in `tools/verify/registry.go` whose declared `Paths` the diff
+touches — gofmt, go vet, arch-lint, module-imports, test-conventions, the
+contract/codegen/openapi lints, eslint, css-tokens, fe-typecheck, fe-test,
+docx-typecheck/build/test, adr-status, wiki-debt-tally, db-docs-coverage,
+migration-gapless, governance-diff-rules, invariant-coverage-map, and the
+registry's own self-tests, among others. A check with no declared `Paths`
+always runs (`matchesPaths`' fail-closed default). Renaming, adding, or
+removing one of those checks is a `tools/verify/registry.go` + `ci.yml`
+`--only=`/`Paths` change; the ruleset itself never needs to know a check's
+name and cannot deadlock on one changing.
+
+The membership set is not just eyeballed against `ci.yml`: `required`'s own
+step evaluates `scripts/required-gate.jq` against `toJSON(needs)`, which
+asserts **exact set equality** — `(keys | sort) == (["lint-go", "security",
+"test-integration", "verify"] | sort)` — and that every one of those four
+results is `"success"` (no "skipped is green" allowance). The
+`required-gate-selftest` registry check (`scripts/check-required-gate.sh`)
+pins that predicate itself down with fixtures for the accept/reject cases, so
+a PR that quietly loosens the jq expression is caught the same way a PR that
+quietly narrows the `needs:` list is.
+
+## Why some checks stay outside `required`'s membership
+
+`gosec` and `govulncheck` (`nightly.yml:security-scan`) are `full`-only,
+advisory, and gated behind `needsNetwork` — they are real, they pass clean
+today, but promoting them into the `required` job's `needs:` closure is a
+closure-safety decision (does the network dependency make `required` flaky on
+a bad day), not a re-triage decision. See their entries in
+`tools/verify/registry.go` for the promoting milestone.
+
+## If a job inside `required`'s `needs:` closure is renamed
+
+There is exactly one required context (`required`) and no bypass actors, so
+this ruleset itself never needs an edit for that rename — `required`'s own
+name never changes. What must move together, in the same commit, is:
+`tools/verify/registry.go` (the check's `ID`), every `--only=` list in
+`ci.yml`/`nightly.yml`/`docx-renderer.yml` that names it, and any doc or
+script that references the old ID. `--audit` (registry rule A1) catches an
+`--only=` still naming an ID the registry no longer has.
+
+If the **job name** inside `required`'s `needs:` list changes (`verify`,
+`test-integration`, `security`, `lint-go`), update both `ci.yml`'s `needs:`
+list and `scripts/required-gate.jq`'s literal array in the same commit —
+`required-gate-selftest` fails otherwise, and it fails locally, not just in
+CI, because it is in the `fast` profile.
+
+```bash
+gh api -X PUT repos/developmentconexus-ops/MetalDocs/rulesets/20560142 --input .github/rulesets/main.json
+```

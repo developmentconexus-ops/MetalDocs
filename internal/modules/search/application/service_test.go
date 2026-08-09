@@ -45,6 +45,10 @@ func TestSearchDocumentsRequiresTenantID(t *testing.T) {
 	}
 }
 
+// TestSearchDocumentsForwardsActorAndTenantToReader guards REQ-SEARCH-1: the
+// application layer makes no independent authz decision of its own — it
+// forwards the actor and tenant straight to the reader, which enforces
+// visibility in SQL alongside every other read path. See ADR 0095.
 func TestSearchDocumentsForwardsActorAndTenantToReader(t *testing.T) {
 	reader := &stubReader{}
 	svc := NewService(reader)

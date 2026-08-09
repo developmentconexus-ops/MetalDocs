@@ -97,7 +97,7 @@ func main() {
 			os.Exit(1)
 		}
 		outPath := filepath.Join(*outDir, t.fileName)
-		if err := os.WriteFile(outPath, []byte(src), 0o644); err != nil {
+		if err := os.WriteFile(outPath, []byte(src), 0o644); err != nil { // #nosec G306 -- outPath is a generated, committed .go source file that must stay git/build readable at 0644; contains only derived route-surface code, no secret material.
 			fmt.Fprintf(os.Stderr, "gen-http-surface: writing %s: %v\n", outPath, err)
 			os.Exit(1)
 		}

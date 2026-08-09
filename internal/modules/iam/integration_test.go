@@ -8,7 +8,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -16,39 +15,22 @@ import (
 	"metaldocs/internal/modules/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/tenant"
+	"metaldocs/tests/integration/testdb"
 
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 const probeTenantID = tenant.DevTenantID
 
+// integrationDB returns a reset-safe leased clone from the canonical testdb
+// factory (ADR 0034), NOT a raw sql.Open against the shared dev database. The
+// prior body read DATABASE_URL/METALDOCS_DATABASE_URL directly via the lib/pq
+// driver and skipped-as-green when unset — the cluster-4 framework bypass.
+// testdb.Open owns t.Helper, the leased-DB reset, cleanup, and a fail-loud
+// ping, and connects via pgx (see pqCode below, updated to match).
 func integrationDB(t *testing.T) *sql.DB {
 	t.Helper()
-
-	dsn := strings.TrimSpace(os.Getenv("DATABASE_URL"))
-	if dsn == "" {
-		dsn = strings.TrimSpace(os.Getenv("METALDOCS_DATABASE_URL"))
-	}
-	if dsn == "" {
-		t.Skip("DATABASE_URL/METALDOCS_DATABASE_URL not set")
-	}
-
-	db, err := sql.Open("postgres", dsn)
-	if err != nil {
-		t.Skipf("integration DB unavailable: %v", err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	if err := db.PingContext(ctx); err != nil {
-		_ = db.Close()
-		t.Skipf("integration DB unreachable: %v", err)
-	}
-
-	t.Cleanup(func() {
-		_ = db.Close()
-	})
+	db, _ := testdb.Open(t)
 	return db
 }
 
@@ -73,10 +55,15 @@ func setConfig(t *testing.T, ctx context.Context, tx *sql.Tx, key, value string)
 	}
 }
 
+// pqCode extracts the SQLSTATE from a driver error. testdb connects via pgx
+// (see integrationDB above), which surfaces errors as *pgconn.PgError, not the
+// *pq.Error the prior lib/pq-driven connection produced — the type assertion
+// must match the driver actually in use, or every probe here would silently
+// read SQLSTATE "" and fail regardless of what Postgres actually returned.
 func pqCode(err error) string {
-	var pgErr *pq.Error
+	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
-		return string(pgErr.Code)
+		return pgErr.Code
 	}
 	return ""
 }

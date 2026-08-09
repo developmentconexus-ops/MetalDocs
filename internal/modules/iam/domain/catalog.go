@@ -104,7 +104,7 @@ type RoleCapabilityLink struct {
 
 // capabilityDescriptions maps every Capability const to its pt-BR description.
 // CapabilityCatalog() panics if a const is added without a description here.
-var capabilityDescriptions = map[Capability]string{
+var capabilityDescriptions = map[Capability]string{ // #nosec G101 -- values are pt-BR human-readable UI descriptions of capability constants (e.g. "Visualizar documentos"), not credentials; gosec matches on entropy/keyword shape in the surrounding const names, not the string content.
 	CapDocumentView:                "Visualizar documentos",
 	CapDocumentCreate:              "Criar documentos",
 	CapDocumentEdit:                "Editar documentos",

@@ -36,8 +36,8 @@ function New-ModuleConfig {
                 WikiFile = 'wiki/modules/templates.md'
                 UsesGeneratedBoundary = $true
                 OwnedOpenApiPaths = @('/api/v1/templates')
-                # Finite, named, shrink-only allowlist (same idiom as css-token-discipline /
-                # test-discipline) for local wire-adapter types that the F1.4 contract
+                # Finite, named, shrink-only allowlist (same idiom as css-tokens /
+                # test-conventions) for local wire-adapter types that the F1.4 contract
                 # (docs/superpowers/milestones/global-maximum-remediation/milestone-1-contract-fe-gates/
                 # validation-contract.md, F1.4 Part B) explicitly adjudicated as genuine local
                 # view types, NOT overrides of a generated schema — the generated DTO types
