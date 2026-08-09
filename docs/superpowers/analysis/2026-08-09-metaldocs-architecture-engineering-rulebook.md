@@ -415,19 +415,25 @@ Do not execute #87-#95 as nine unrelated parallel refactors.
 Safe program shape from the current issue/ADR constraints:
 
 ```text
-A1 verifier spine
+Governance reconciliation gate (docs-only; final-synthesis §J) -> everything below
+
+A1 verifier spine (first registered guard: HGCrossModule write-scan; property owner A4)
   |-- A3 API/runtime contract
   |-- A8 authz unification
   |-- A6 fail-closed security
-  `-- A2 quality ratchet
+  |-- A2 quality ratchet
+  `-- A5-spine (TxRunner/BeginTx ban, DoReadOnly delete, pg-error classifier
+       — does NOT wait for A4; A3 informs conventions)
 
 A3 + A8 -> A4 module seam migration
-A4 -> A5 persistence migration where seam work touches repositories
-A8 + A4 (+ persistence spine where needed) -> A9 Controlled Information consolidation
-A3 -> A7 async trace/operability contract where propagation conventions are shared
+A4 (per-repo seams settled) + A5-spine -> A5 typed-query/sqlc adoption
+A8 + A4 -> A9 Controlled Information consolidation
+A3 + A5-spine -> A7 async trace/operability contract where propagation conventions are shared
 ```
 
 This is dependency guidance, not authorization to merge every axis into one mega-PR.
+(Amended 2026-08-09 post-review: A5 split into spine vs typed-query adoption; only the
+typed-query slice waits for the A4 seams touching its target repositories.)
 
 ## 16. Claude Code issue execution contract
 
@@ -468,3 +474,57 @@ Moving files, renaming packages, adding interfaces on the producer side, or redu
 - rewriting all errors at once without the A3/A4 contract model;
 - treating every duplicated name as a defect across bounded contexts;
 - using current topology as evidence that current topology is correct.
+
+## 19. Addendum (2026-08-09, post architecture-gate review)
+
+### R-CONTRACT-1 — Seam contract taxonomy (binding)
+
+Three legitimate contract-ownership classes at module seams; classify every
+seam into exactly one before proposing a fix:
+
+1. **Synchronous capability ports** — **consumer-owned by default** (R-MOD-4;
+   exemplar `documents/application.DictionaryValueReader` + composition
+   adapter). Producer-declared reader interfaces imported by consumers are the
+   anti-pattern.
+2. **Integration/domain-event schemas** — **producer-owned published
+   contracts are legitimate** (ADR 0044). Event args/payloads are the
+   producer's published vocabulary; consumers adapt.
+3. **Deliberately published DB views/projections** — **producer-owned read
+   contracts are legitimate** (ADR 0039 family; the `v_*` views are the
+   exemplar class).
+
+### R-LAYER-2 scope clarification — ADR 0044 is not a repo-wide `db.Tx` ratification
+
+ADR 0044 sanctions `db.Tx` **only** for the domain-event args/enqueuer
+boundary it rules on. All other `db.Tx`/`db.DB` usage in domain ports is
+**current architecture, unresolved pending an explicit ruling** — it is
+neither retroactively ratified nor scheduled for migration by the audit.
+Raw `database/sql` types in `auth/domain/session_admin.go` remain confirmed,
+ADR-uncovered debt. R-LAYER-2's text (new domain ports need a ruling;
+application-owned ports carry the transitional concession) is the operative
+rule and stands unchanged.
+
+### R-DATA ruling record — `governance_events`
+
+Owner: **audit** (ADR 0044 defines it as the actor-centric audit log). The
+current writer location (approval) is implementation evidence, not ownership
+evidence. Approval's direct INSERT and iam's erasure DELETE are foreign
+writes; target access is through audit-owned capability/tenant-data ports.
+Superseding this requires a new explicit domain ruling, not observation of
+the current writer.
+
+### Guard-ownership normalization
+
+#87/A1 owns verifier trust (registry, reachability, negative fixtures) for
+every guard. The property a guard proves belongs to its remediation issue:
+runtime validation, problem-writer uniqueness, actor extraction → #90/A3;
+module SCCs, consumer-owned synchronous ports, foreign SQL/data ownership,
+foreign sentinel seams, platform/module boundaries → #93/A4.
+
+### Pre-implementation governance reconciliation gate
+
+Binding: after the audit is accepted and before any runtime remediation, the
+docs/governance-only gate in `audit-2026-08-09/final-synthesis.md` §J must
+complete (wiki-drift fixes, #87–#95 body reconciliation, ADR 0092
+materialization from the approved ruling, historical artifacts preserved as
+historical).

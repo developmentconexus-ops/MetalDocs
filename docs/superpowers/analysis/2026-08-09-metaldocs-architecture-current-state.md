@@ -252,6 +252,14 @@ flowchart TD
 
 This is dependency guidance derived from owning issue/ADR constraints; it is not a mega-PR instruction.
 
+> **Superseded (2026-08-09 post-review):** the canonical, corrected sequencing
+> lives in `audit-2026-08-09/final-synthesis.md` §D/§I/§J. Material deltas vs
+> the preliminary graph above: a docs-only governance reconciliation gate
+> precedes everything; A5 is split (`A5-spine` after A1 does not wait for A4;
+> only typed-query/sqlc adoption waits for the affected A4 seams); A7
+> health/metrics starts after A1 while trace propagation waits for A3 +
+> A5-spine. This preliminary graph is kept as filed for history.
+
 ## 13. Findings already supported strongly enough not to rediscover
 
 ### F-AUD-01 — Module cycles are an architecture property missing from the legacy checker
@@ -326,11 +334,16 @@ wins. Material corrections to the numbers above:
 | "62 cross-module `errors.Is`" (F-AUD-03) | **19 true cross-module sites** — the 62 included same-module aliased imports; iam→auth alone is 10 of 19 | PASS 6-8 |
 | "20 platform→module edges / 6 packages" (F-AUD-04) | **9 package edges across 4 platform packages** (authn, bootstrap, docgenv2, tripwire); docgenv2 additionally raw-SQLs templates-owned tables (S-edge invisible to import graph); tripwire is a documented legitimate exception | PASS 2 / PASS 9 |
 | ADR 0093 absorption note (F-AUD-02 owner) | **0 of the 67 foreign-SQL statements become intra-context** under ADR 0093 — approval stays subject-generic forever; A9 does not absorb approval seams | PASS 5 |
-| §12 sequencing | refined in `audit-2026-08-09/final-synthesis.md` §D (adds guard-only quick win + A7 split) | synthesis |
+| §12 sequencing | refined in `audit-2026-08-09/final-synthesis.md` §D (governance reconciliation gate first, A1 first executable phase with the write-scan as its first registered guard, A5 split into spine vs typed-query adoption) | synthesis §D/§I/§J |
 
 New findings from the reproduction (all subsumed, zero new issues): `jobs` module is
 composition-shaped orchestration mis-filed under `internal/modules` (→ #93); security module
 raw-SQLs auth/audit-owned tables portlessly (→ #93); 8 periodic jobs exist, not 7 (→ #95);
 ADR 0092 is referenced by issues/wiki but has no file under `wiki/decisions/` (→ F-AUD-05);
-3 parallel tx abstractions, not 2 (→ #92). `db.Tx` in application-owned ports is
-ADR-0044-ratified convention, not debt.
+3 parallel tx abstractions, not 2 (→ #92). On `db.Tx` in domain ports: ADR 0044's sanction
+is scoped to its domain-event args/enqueuer boundary only; non-event domain-port
+`db.Tx`/`db.DB` usage is classified **current architecture, unresolved pending explicit
+ruling** (no migration triggered by the audit), and raw `database/sql` in
+`auth/domain/session_admin.go` stays confirmed debt (synthesis §B.6, PASS 6-8 §6.2).
+`governance_events` stays audit-owned per ADR 0044; approval's INSERT and iam's DELETE are
+foreign writes to be re-routed through audit-owned ports (PASS 5 §7).
