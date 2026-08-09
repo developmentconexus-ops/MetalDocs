@@ -84,7 +84,10 @@ Both package edges compile, but after collapsing packages to module identity the
 A <-> B
 ```
 
-The inventory reproduced seven such module-level reciprocal relationships. Therefore:
+Reproduced-current (workstation session, `main@418070bf`): the module graph
+contains **7 reciprocal pairs and one SCC of size 9** ({approval, auth,
+controlleddocuments, documents, iam, render, security, taxonomy, templates}) —
+the property to break is the SCC, not just the pairs. Therefore:
 
 - package acyclicity is a compiler property;
 - module acyclicity is an architecture property;
@@ -235,7 +238,7 @@ The audit already found no literal SQL executed in domain packages; preserve thi
 
 ### R-LAYER-2 — Domain should not expose persistence-driver types
 
-The inventory found 9/15 domain packages importing `database/sql` and/or `internal/platform/db` in port signatures.
+Reproduced-current: 9/15 domain packages import `database/sql` and/or `internal/platform/db` in port signatures. Classification (binding, per review ruling): `db.Tx` in domain-event args / the enqueuer boundary is **sanctioned by ADR 0044's specific scope**; the raw `database/sql` usage in `auth/domain/session_admin.go` is **confirmed debt**; all other `db.Tx`/`db.DB` in domain ports is **current architecture — unresolved pending an explicit ruling** (not sanctioned, not condemned). ADR 0044 is not a repo-wide ratification of `db.Tx` in domain ports.
 
 Target rule:
 
@@ -273,7 +276,7 @@ A platform package must be reusable technical machinery: DB, telemetry, HTTP pri
 
 It must not import `internal/modules/**`.
 
-The audit found module-specific imports from platform packages such as `bootstrap`, `authn`, `docgenv2`, `tripwire`, and `worker`. These are owned by #93/A4.
+Reproduced-current: platform→module inversions are **4 packages / 9 package edges** — `authn`, `bootstrap`, `docgenv2`, `tripwire` (PASS 2/PASS 9; earlier lists naming `worker` or "20 edges / 6 packages" are historical and superseded). `tripwire` is a documented legitimate exception; `docgenv2` additionally raw-SQLs templates-owned tables (an S-edge invisible to the import graph). These are owned by #93/A4.
 
 ### R-PLAT-2 — Composition is allowed to know implementations
 
@@ -285,7 +288,7 @@ Keep composition separate from platform so the architecture verifier can disting
 
 ## 10. Transaction/persistence spine
 
-The current platform contains `TxRunner`, explicitly intended to own begin/commit/rollback, but the persistence audit found 82 direct `BeginTx` sites across 25 files and parallel transaction abstractions.
+The current platform contains `TxRunner`, explicitly intended to own begin/commit/rollback, but the reproduced-current persistence audit found **84 direct `BeginTx` sites across 26 files** and **3 parallel transaction abstractions** (earlier "82 sites / 25 files" figures are historical and superseded).
 
 ### R-TX-1 — One transaction lifecycle mechanism
 
@@ -390,15 +393,17 @@ The same verifier manifest must run locally, for agents, and in CI.
 
 ## 14. Current-state hotspots and owners
 
+All figures below are reproduced-current (workstation session, `main@418070bf`); earlier issue-body figures (7 cycles, 17+ reads, 62 sentinels, 82 BeginTx) are historical and superseded.
+
 | Hotspot | Evidence class | Owner |
 |---|---|---|
-| 7 module-level cycles | Go/module graph | #93 / A4 |
-| 17+ cross-context table reads | SQL ownership | #93 / A4; A9 absorbs Controlled Information internal seams after ADR 0093 |
-| 62 foreign sentinel checks | error contract | #93 / A4 + #90 / A3 at HTTP translation |
+| 1 module SCC of size 9 + 7 reciprocal pairs | Go/module graph | #93 / A4 |
+| 55 foreign-table reads + 12 foreign-table writes (67 statements) | SQL ownership | #93 / A4 (0 of the 67 become intra-context under ADR 0093 — no A9 absorption) |
+| 19 true cross-module sentinel checks | error contract | #93 / A4 + #90 / A3 at HTTP translation |
 | producer-owned types/interfaces at seams | contract ownership | #93 / A4 |
-| 9/15 domain packages leak SQL/platform DB types | layering/transaction vocabulary | #93 / A4 + #92 / A5 |
-| platform imports modules | layering | #93 / A4 |
-| 82 direct BeginTx sites | transaction mechanics | #92 / A5 |
+| 9/15 domain packages carry SQL/platform DB types in ports (event-boundary use ADR-0044-sanctioned; auth raw `database/sql` confirmed debt; rest unresolved pending ruling — §8 R-LAYER-2) | layering/transaction vocabulary | #93 / A4 + #92 / A5 |
+| platform imports modules (4 packages / 9 package edges: authn, bootstrap, docgenv2, tripwire) | layering | #93 / A4 |
+| 84 direct BeginTx sites in 26 files | transaction mechanics | #92 / A5 |
 | 242 hand-maintained scan sites | persistence correctness | #92 / A5 |
 | request/error/validation dialects below OpenAPI | boundary contract | #90 / A3 |
 | dual-source authorization | domain/security semantics | #89 / A8 |

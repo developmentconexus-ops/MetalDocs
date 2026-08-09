@@ -51,7 +51,14 @@ The only hits are `internal/platform/db` (9 modules, §6.2) and one `database/sq
 for each *.go under */domain/*.go: extract metaldocs/internal/modules/<mod>/... imports,
 flag any import whose path is not exactly <mod>/domain
 ```
-Result: **zero violations**. Every cross-module import from a `domain` package is exactly `<module>/domain` — matching ADR 0044 §5's mandated contract surface ("a cross-module import is legal only when the imported path is exactly `<module>/domain`"). This is the one part of domain purity that is clean and disciplined.
+Result: **zero domain imports of foreign infrastructure or application packages**. Every cross-module import from a `domain` package targets exactly `<module>/domain`.
+
+Two distinct claims must not be conflated here:
+
+1. **Syntactic legality (measured, clean).** The `<module>/domain`-only pattern proves conformance to the published-surface rule enforced by the legacy boundary guard — nothing more. It shows no domain package reaches into another module's infrastructure, application, or repository internals.
+2. **Semantic seam health (NOT proven by this measurement).** Import legality does not establish that the imported contract is *owned* correctly. ADR 0044 is not a repo-wide mandate for producer-owned domain contracts — its producer-owned ruling covers integration/domain-event schemas specifically. Contract-ownership semantics are governed by R-CONTRACT-1 (rulebook §19): synchronous capability ports are consumer-owned by default; integration/domain-event schemas are producer-owned (ADR 0044); deliberate published DB projections/views are producer-owned (ADR 0039 family). An import such as `approval/domain -> taxonomydomain.RoutePolicy` is legally importable under the published-surface rule and still constitutes semantic seam coupling — a domain-to-domain dependency on a producer-owned type — to be evaluated by #93/A4 under R-CONTRACT-1.
+
+So: the measurement "zero domain imports of foreign infrastructure/application" stands as recorded; it certifies syntactic boundary discipline, not seam health.
 
 **Other platform imports** (`internal/platform/*` excluding `db`):
 ```

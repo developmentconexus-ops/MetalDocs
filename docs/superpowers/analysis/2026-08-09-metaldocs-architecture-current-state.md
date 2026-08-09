@@ -80,7 +80,7 @@ This diagram is intentionally not presented as the complete adjacency matrix. Th
 
 - 136 Go packages analyzed;
 - zero multi-node package-level SCCs;
-- seven reciprocal relationships after collapsing package paths to module identity;
+- seven reciprocal relationships after collapsing package paths to module identity *(reproduction adds: these sit inside **one module SCC of size 9**, §16)*;
 - zero same-module `domain -> infrastructure/delivery` and `application -> delivery` import inversions;
 - multiple cross-module producer-owned seams, foreign-table SQL reads, foreign sentinel contracts and platform→module edges.
 
@@ -92,11 +92,11 @@ The current boundary checker catches imports into forbidden implementation layer
 
 ### 4.2 SQL/data coupling (`S`)
 
-The layering inventory reproduces 17+ cross-context table reads across Approval/Documents/ControlledDocuments. These bypass Go package boundaries and are invisible to import-only guards.
+The layering inventory reproduces 17+ cross-context table reads across Approval/Documents/ControlledDocuments *(historical figure — superseded by the full reproduction: **55 foreign reads + 12 foreign writes**, §16)*. These bypass Go package boundaries and are invisible to import-only guards.
 
 ### 4.3 Error identity coupling (`E`)
 
-The layering inventory reports 62 `errors.Is` call sites depending on another module's raw domain sentinel across six modules. Sentinel identity therefore behaves as an undeclared integration contract.
+The layering inventory reports 62 `errors.Is` call sites depending on another module's raw domain sentinel across six modules *(historical figure — reproduction narrows this to **19 true cross-module sites**, §16)*. Sentinel identity therefore behaves as an undeclared integration contract.
 
 ### 4.4 Foreign type / persistence leakage (`T`)
 
@@ -196,7 +196,7 @@ That concession does **not** justify spreading driver/persistence types into bus
 - new `domain` APIs do not gain `*sql.Tx`, `sql.Null*`, `sql.Row`, `sql.Result`, or platform DB types without an explicit ruling;
 - A5 owns migration toward one transaction lifecycle mechanism and typed query machinery.
 
-The persistence inventory also records 82 direct `BeginTx` sites across 25 files and 242 hand-maintained scan sites, which remain A5 evidence at this baseline unless changed by later merges.
+The persistence inventory also records 82 direct `BeginTx` sites across 25 files *(historical figure — reproduced-current is **84 sites / 26 files**, §16)* and 242 hand-maintained scan sites; both remain A5 evidence at this baseline.
 
 ## 10. Existing root-cause programs
 
@@ -264,7 +264,7 @@ This is dependency guidance derived from owning issue/ADR constraints; it is not
 
 ### F-AUD-01 — Module cycles are an architecture property missing from the legacy checker
 
-**Evidence:** mechanically reproduced module-pair analysis reports seven reciprocal relationships while package SCC count is zero.
+**Evidence:** mechanically reproduced module-pair analysis reports seven reciprocal relationships (inside one module SCC of size 9, §16) while package SCC count is zero.
 
 **Owner:** #93 / A4.
 
@@ -280,7 +280,7 @@ This is dependency guidance derived from owning issue/ADR constraints; it is not
 
 ### F-AUD-03 — Raw foreign sentinels currently form undeclared integration APIs
 
-**Evidence:** 62 cross-module `errors.Is` sites in the measured layering inventory.
+**Evidence:** 62 `errors.Is` sites in the measured layering inventory, of which **19 are true cross-module** (§16).
 
 **Owner:** #93 / A4, coordinated with #90 / A3 for HTTP translation.
 
