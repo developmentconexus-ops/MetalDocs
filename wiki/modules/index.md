@@ -1,6 +1,6 @@
 # Modules
 
-> **Last verified:** 2026-08-05 (added `notifications.md` — module existed in the tree but had no doc until Task 11 of the approval accountability loop)
+> **Last verified:** 2026-08-09 (Phase G governance reconciliation — added `distribution.md` stub and linked the previously-unlinked `security` docs; index now covers all 15 code modules, PASS 14 finding D5)
 > **Scope:** Durable per-module knowledge, tech-debt registers, and maturity state.
 
 ## Core product modules
@@ -25,10 +25,12 @@
 
 ## Supporting modules
 
+- [distribution.md](distribution.md) — distribution/read-acknowledgement surface (Stage-1 stub, created 2026-08-09)
 - [jobs.md](jobs.md) — background-job / async worker module (Stage-1 draft)
 - [notifications.md](notifications.md) — per-recipient notification inbox; two delivery-only River workers
 - [render-fanout.md](render-fanout.md), [render-fanout-tech-debt.md](render-fanout-tech-debt.md)
 - [search.md](search.md), [search-tech-debt.md](search-tech-debt.md)
+- [security.md](security.md), [security-tech-debt.md](security-tech-debt.md), [security-signals.md](security-signals.md) — MFA coverage, security settings (docs existed but were unlinked until 2026-08-09)
 
 ## Governance
 

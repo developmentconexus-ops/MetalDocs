@@ -1,6 +1,6 @@
 # Repository Topology
 
-> **Last verified:** 2026-08-03 (DB baseline fold f1910ac1/557a6af4: `db/` table updated — 4-stage bootstrap + `db/grants/`, `db/migrations/` noted as the currently-empty post-fold forward tail) | **Prior:** 2026-07-02 (outbox-worker goroutine rows updated for StagingOutboxWorker consolidation) | **Prior:** 2026-07-01 (TST-13 — deleted `start-api-no-build.ps1`, `start-api-planc.ps1`, `start-api.sh`, `check-governance.sh`, `run_metaldocs.ps1`, `dev-api-web.ps1`; prior: 2026-06-15 M4c F4c.5)
+> **Last verified:** 2026-08-09 (Phase G governance reconciliation — module table completed to 15, platform count 37, retired lease-reaper/ticker-scheduler claim replaced with River dual-define truth, middleware chain corrected to 11 links) | **Prior:** 2026-08-03 (DB baseline fold f1910ac1/557a6af4: `db/` table updated — 4-stage bootstrap + `db/grants/`, `db/migrations/` noted as the currently-empty post-fold forward tail) | **Prior:** 2026-07-02 (outbox-worker goroutine rows updated for StagingOutboxWorker consolidation) | **Prior:** 2026-07-01 (TST-13 — deleted `start-api-no-build.ps1`, `start-api-planc.ps1`, `start-api.sh`, `check-governance.sh`, `run_metaldocs.ps1`, `dev-api-web.ps1`; prior: 2026-06-15 M4c F4c.5)
 > **Scope:** Top-level directory layout, all binaries built and run, Go module configuration, CI pipeline shape, script entry points, and orphan/legacy classification for every top-level directory. Does not descend into `frontend/`, `node_modules/`, `vendor/`, `.worktrees/`, `.clone/`, or `non_git/` beyond identification.
 > **Key files:**
 > - `apps/api/cmd/metaldocs-api/main.go` — composition root (binary 1)
@@ -53,8 +53,8 @@ graph TD
     APPS --> E2E_SEED["api/cmd/metaldocs-e2e-seed/ (tooling binary)"]
     APPS --> DOCX["docx-renderer/ (Node.js service)"]
 
-    INTERNAL --> MODULES["modules/ — 11 business modules"]
-    INTERNAL --> PLATFORM["platform/ — 28 cross-cutting packages"]
+    INTERNAL --> MODULES["modules/ — 15 business modules"]
+    INTERNAL --> PLATFORM["platform/ — 37 cross-cutting packages"]
     INTERNAL --> TESTSUPP["test/ + testsupport/ — test helpers"]
     INTERNAL --> APIV2["api/v2/ — orphan spec2 surface"]
 ```
@@ -173,23 +173,31 @@ graph TD
 
 ### internal/ — shared Go source
 
-#### internal/modules/ — 11 business modules
+#### internal/modules/ — 15 business modules
+
+*(Corrected 2026-08-09, Phase G: earlier revision listed 11 and omitted `approval`, `distribution`, `notifications`, `tokens`.)*
 
 | Module | Role |
 |---|---|
+| `approval/` | Approval workflow kernel — routes, stages, signoffs, SLA; top-level module since ADR 0082 (subject-generic per ADR 0083) |
 | `audit/` | Immutable audit event log, hash-chain integrity, export jobs |
 | `auth/` | Login, session, JWT, credential management, admin bootstrap |
 | `controlleddocuments/` | Controlled-document registry lifecycle |
-| `documents/` | Core document editing, approval pipeline, freeze/materialize |
+| `distribution/` | Distribution/read-acknowledgement surface (view-based reads) |
+| `documents/` | Core document editing, freeze/materialize |
 | `iam/` | Users, roles, capabilities, area memberships, presence, observability |
-| `jobs/` | Scheduler framework, watchdog jobs, idempotency janitor, audit integrity validator |
+| `jobs/` | Periodic River maintenance jobs (surfacers, janitor, integrity validator, watchdog, retention, reconciler) + tenantdata |
+| `notifications/` | Notification records + fanout consumers |
 | `render/` | Fanout client to docx-renderer, PDF outbox, materialize outbox, resolvers |
 | `search/` | Cross-module full-text search (PG-backed) |
 | `security/` | MFA coverage, security settings service |
 | `taxonomy/` | Document profiles, process areas, document families |
 | `templates/` | Template CRUD, versioning, DOCX import, publish state |
+| `tokens/` | Token issuance/verification (preview/download tokens) |
 
-#### internal/platform/ — 28 cross-cutting packages
+#### internal/platform/ — 37 cross-cutting packages
+
+*(Count corrected 2026-08-09, Phase G — table below is the historical 28-package enumeration and may lag; the authoritative list is `ls internal/platform/`.)*
 
 | Package | Role |
 |---|---|
@@ -451,12 +459,12 @@ sequenceDiagram
 5. All module services instantiated in order: auth → audit → search → IAM → taxonomy → controlled-documents → documents → templates → approval → jobs scheduler (`main.go:196-560`).
 6. Background goroutines started:
    - PDF + materialize staging outbox workers (`startOutboxWorkers`, `main.go:543/945`) — no restart loop; `Run` returns only on ctx cancel
-   - Scheduler goroutine (`main.go:563-566`) — `stuck-instance-watchdog`, `idempotency-janitor`, `audit-integrity-validator`, `lease-reaper` on ticker intervals
+   - River leader election joined so `metaldocs-api` **enqueues** the periodic maintenance jobs (`stuck-instance-watchdog`, `idempotency-janitor`, `audit-integrity-validator`, `document-review-surfacer`, `approval-sla-surfacer`, `release-hold-reconciler`, outbox-retention purge) per ADR 0067's dual-define pattern; only `metaldocs-jobs` subscribes the `maintenance` queue and executes them. *(Corrected 2026-08-09: the old in-process ticker scheduler and its `lease-reaper` are retired — M5/ADR 0067; earlier revision described them as live.)*
    - Session sweeper (`main.go:568`) — 60-second interval
    - Orphan pending sweeper (`main.go:569`) — hourly
    - Presence hub Run + RunHeartbeat (`main.go:306-307`) — 30-second heartbeat
    - Audit retention purge (`main.go:578-593`) — 24-hour ticker; only if `AUDIT_RETENTION_DAYS > 0`
-7. Middleware chain assembled via `buildChain(mux, apiChain(...))` (`chain.go` + `main.go:633`, outermost first): `panicRecovery → httpObs → CORS → origin protection → preAuthLoginLimit → AuthN → IAM → presenceBump → rateLimiter → mux`. Order asserted by `chain_test.go` (REQ-MW-7, Wave 1 F-01).
+7. Middleware chain assembled via `buildChain(mux, apiChain(...))` (`chain.go:25`, outermost first): `panic_recovery → otel → http_obs → cors → origin_protection → pre_auth_login_rate_limit → authn → iam_authz → presence_bump → rate_limit → method_not_allowed` (11 links; corrected 2026-08-09 — earlier revision omitted `otel` and `method_not_allowed`). Order asserted by `chain_test.go` (REQ-MW-7, Wave 1 F-01).
 8. HTTP server starts on `:8081`; `ReadTimeout 30s / WriteTimeout 60s / IdleTimeout 90s` (Wave 1 F-16); graceful shutdown on SIGTERM drains via `workerWG` and `schedulerWG` (`main.go:674`).
 
 ### Flow 3: Docker image build (CI/production)

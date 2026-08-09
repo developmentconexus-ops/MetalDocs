@@ -1,14 +1,14 @@
 # Backend Blueprint — Composition, Standards, Maturity
 
-> **Last verified:** 2026-07-02 (D6 retry-owner reference updated for StagingOutboxWorker consolidation) | **Prior:** 2026-06-13 (Wave Z all-green re-score — see §7)
+> **Last verified:** 2026-08-09 (Phase G governance reconciliation — module/platform counts corrected to 15/37; REQ-TOP-2 row corrected from false "MET + CI-locked" to NOT MET/allowlisted debt) | **Prior:** 2026-07-02 (D6 retry-owner reference) · 2026-06-13 (Wave Z all-green re-score — see §7)
 > **Scope:** The canonical answer to "what is the MetalDocs backend composed of". Defines every backend concern, maps it to our implementation, names the industry standard it must satisfy, and grades maturity. This is the reference for the industry-grade refactoring program.
 > **Out of scope:** Runtime topology ([system-overview.md](system-overview.md)), route truth ([backend-api-structure.md](backend-api-structure.md)), per-module deep dives (`wiki/modules/*`).
 > **Definition layer:** The implementation-independent canon this blueprint maps against is [../standards/backend-canon.md](../standards/backend-canon.md) — read it first if you want the universal model before our specifics.
 > **Target layer:** How the system MUST behave in the end state (normative REQ-* spec + refactoring register) is [backend-target-architecture.md](backend-target-architecture.md).
 > **Key files:**
 > - `apps/api/cmd/metaldocs-api/main.go` — composition root (all wiring)
-> - `internal/modules/` — 12 business modules
-> - `internal/platform/` — 28 cross-cutting platform packages
+> - `internal/modules/` — 15 business modules
+> - `internal/platform/` — 37 cross-cutting platform packages
 > - `api/openapi/v1/openapi.yaml` — contract source of truth
 
 ---
@@ -47,7 +47,7 @@ flowchart TB
     end
 
     subgraph DOMAIN["C. Domain & Data"]
-        MODULES["Business modules (12)<br/>documents · templates · taxonomy ·<br/>controlled-documents · approval ·<br/>render · search · audit · …"]
+        MODULES["Business modules (15)<br/>documents · templates · taxonomy ·<br/>controlled-documents · approval ·<br/>render · search · audit · …"]
         PG[("Postgres 16<br/>authoritative state +<br/>transactional outboxes")]
         S3[("MinIO / S3<br/>docx + pdf bytes")]
         REDIS[("Redis 7<br/>authz cache · rate limit")]
@@ -172,7 +172,7 @@ flowchart LR
 #### C1. Module architecture — ✅
 - **Definition:** Business logic partitioned by bounded context, each module layered.
 - **Industry standard:** Hexagonal/clean layering — `domain` (pure rules) ← `application` (use cases) ← `infrastructure`/`repository` (adapters) ← `delivery/http` (transport). Dependencies point inward only.
-- **We have:** 12 modules under `internal/modules/`, all following the layer convention with `module.go` DI wiring. Largest: documents (184 files), iam (62), templates (54).
+- **We have:** 15 modules under `internal/modules/` (approval · audit · auth · controlleddocuments · distribution · documents · iam · jobs · notifications · render · search · security · taxonomy · templates · tokens), following the layer convention with `module.go` DI wiring (`jobs` is the structural outlier — flat per-job packages, no domain/application/delivery split). Largest: documents, iam, templates, approval.
 - **Watch item:** `main.go` is a ~37KB monolithic composition root. Acceptable for a modular monolith, but module `Dependencies` structs are the seam to keep clean.
 
 #### C2. Relational persistence — ✅
@@ -325,7 +325,7 @@ All Wave Z concerns resolved. Grade deltas from Wave F → Wave Z:
 |---|---|---|---|
 | REQ-MW-1/2/4/5/7 (middleware chain) | F-01 | **MET** | Wave 1.1 reorder + `chain_test.go`; F.3 live (panic→500 problem+json, 401s in RED metrics, pre-auth 429) |
 | REQ-TOP-1 (no cross-module SQL/infra) | F-06b/c/d | **MET (4/9); residual next-touch** | Wave 2.5/2.6/2.7; F-06e + security-JOIN + standalone-CD-repo deferred |
-| REQ-TOP-2 (platform domain-free) | F-06a, F-05 | **MET + CI-locked** | Wave 0.6/2.8; `platformboundary` analyzer exit 0 (F.1) |
+| REQ-TOP-2 (platform domain-free) | F-06a, F-05 | **NOT MET — allowlisted debt** *(corrected 2026-08-09; previously misrecorded as "MET + CI-locked")* | `platformboundary` analyzer exits 0 only because `platformBoundaryAllowed` exempts the live violators (`platform/bootstrap`, `platform/authn`, `platform/docgenv2`); 4 platform packages / 9 package edges import modules (`tripwire` is the documented legitimate exception). Remediation owned by #93/A4. |
 | REQ-TOP-3 (no dead platform pkgs) | F-08 | **MET** | Wave 1.9/2.13 |
 | REQ-ASYNC-1 (in-tx audit + membership governance) | F-07, D-01, T-007 | **MET + CI-locked** | Wave 2.2; `PostCommitAudit` analyzer exit 0 (F.1); F.3 live; Z-6 (c7b10f3d6 + abc9afa48): membership governance in-tx via LogTx |
 | REQ-ASYNC-4 (jobs deployment) | F-19 | **MET** | Wave 0.5/1.6/1.7; F.3 live |

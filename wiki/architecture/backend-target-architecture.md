@@ -1,6 +1,6 @@
 # Backend Target Architecture — How MetalDocs MUST Behave
 
-> **Last verified:** 2026-06-11 (Wave 1)
+> **Last verified:** 2026-08-09 (Phase G governance reconciliation — topology/runtime claims re-verified against `main@418070bf`; full REQ re-verification pending)
 > **Scope:** Normative specification. Maps the universal model in [../standards/backend-canon.md](../standards/backend-canon.md) onto MetalDocs and states how each concern **must behave** in the end state. This is the reference for the industry-grade refactoring program: every refactor PR cites the requirement IDs it advances; every review defends them.
 > **Relation to siblings:** [backend-canon.md](../standards/backend-canon.md) defines the universal model · [backend-blueprint.md](backend-blueprint.md) grades the current state · **this doc defines the target** · ADRs record decisions · backlog programs execute.
 > **Language:** RFC 2119 — **MUST** (non-negotiable, review-blocking), **SHOULD** (deviate only with written reason), **MAY** (optional).
@@ -13,13 +13,15 @@ MetalDocs is and remains a **modular monolith** with plane separation expressed 
 
 | Binary | Plane | Behavior contract |
 |---|---|---|
-| `metaldocs-api` | data + control plane | Stateless. All synchronous business logic + authz. No precious local state. Also hosts the 4 leader-elected janitors (stuck-instance-watchdog, idempotency-janitor, audit-integrity-validator, lease-reaper) via an in-process scheduler with DB-backed lease/heartbeat single-runner semantics. |
+| `metaldocs-api` | data + control plane | Stateless. All synchronous business logic + authz. No precious local state. Joins River leader election to **enqueue** the periodic maintenance jobs (stuck-instance-watchdog, idempotency-janitor, audit-integrity-validator, document-review-surfacer, approval-sla-surfacer, release-hold-reconciler, outbox-retention purge) per ADR 0067's dual-define pattern; only `metaldocs-jobs` executes them. *(Historical note: the pre-ADR-0067 Postgres-lease in-process scheduler and its `lease-reaper` are retired — M5; earlier revisions of this row described them as live.)* |
 | `metaldocs-worker` | async data plane | Consumes outboxes/queues. Every consumer idempotent. |
-| `metaldocs-jobs` | management plane | Async schedules via River — scheduled-publish (approval) + notifications fanout. |
+| `metaldocs-jobs` | management plane | Hosts + executes the River periodic maintenance jobs, plus scheduled-publish (approval) + notifications fanout. |
 | `docx-renderer` | internal service | Reached only via authenticated internal calls; never exposed at the edge. |
 
 - **REQ-TOP-1** Modules under `internal/modules/` are bounded contexts. Cross-module access goes through a module's application service or published Go interface — never another module's repository, SQL, or domain internals. (MUST)
+  *Status note (2026-08-09):* this remains the target, not the current state. ADR 0093 (Accepted as design ruling, not implemented) rules that `documents`/`controlleddocuments`/`templates` are **not proven** to be three peer bounded contexts and will merge into one Controlled Information context; until that lands, REQ-TOP-1 is read per-module as-is. Current code violates this REQ in measured ways (55 foreign-table reads + 12 foreign writes; one module SCC of size 9 — see `docs/superpowers/analysis/audit-2026-08-09/final-synthesis.md`); remediation is owned by #93/A4 and #94/A9.
 - **REQ-TOP-2** `internal/platform/` packages are domain-free. A platform package importing a module is a layering violation. (MUST)
+  *Status note (2026-08-09):* **not yet met.** 4 platform packages (`authn`, `bootstrap`, `docgenv2`, `tripwire`) import modules across 9 package edges; the `platformboundary` analyzer passes only because these are allowlisted exemptions. Remediation owned by #93/A4; `tripwire` is a documented legitimate exception.
 - **REQ-TOP-3** Every platform package either has production consumers or does not exist. Empty scaffolds (`platform/cache`, `platform/storage`) are deleted or implemented — speculative directories are banned. (MUST — `platform/cache` deleted Wave 1 (F-08); `platform/storage` still open.)
 - **REQ-TOP-4** Module extraction to a separate service is a non-goal. Boundaries are kept extraction-clean (REQ-TOP-1) but no network split happens without an ADR. (SHOULD)
 
@@ -30,7 +32,7 @@ flowchart TB
     end
     subgraph API["metaldocs-api (stateless)"]
         MW["middleware pipeline (§2)"]
-        MODS["12 bounded-context modules<br/>domain → application → infra → delivery"]
+        MODS["15 bounded-context modules<br/>domain → application → infra → delivery"]
         PDP["authz engine (two-tier PDP)"]
     end
     subgraph ASYNC["async tier"]

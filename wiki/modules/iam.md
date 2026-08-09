@@ -393,7 +393,7 @@ Every IAM-owned table has `tenant_id` (`iam_users` since 0130, `iam_user_roles` 
 ### 8.4 Cross-deps (consumers)
 
 - `internal/modules/documents/application/fillin_authz.go:9` â€” tier-2 + `iamdomain.Capability`
-- `internal/modules/documents/approval/application/cancel_service.go:12` â€” tier-2 + `BypassSystem`
+- `internal/modules/approval/application/cancel_service.go:12` â€” tier-2 + `BypassSystem` *(path updated 2026-08-09; ADR 0082 moved approval out of `documents/`)*
 - `internal/modules/documents/delivery/http/handler.go:17` â€” `iamapp.ErrCapabilityDenied` (sentinel from `application/capability_service.go`); `authz.ErrCapDenied` (struct from `authz/authz.go`, carries capability/area â€” T-009 closed by Plan 4)
 - `internal/modules/templates/delivery/http/routes_lifecycle.go:8` â€” `iamdomain.RolesFromContext`
 - `internal/modules/auth/{application,delivery,domain,infrastructure}` â€” 4 sites import `iamdomain.Role` (circular concern; auth shouldn't depend on iam's role enum if iam can depend on auth â€” see T-010)
