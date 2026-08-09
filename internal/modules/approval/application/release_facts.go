@@ -300,11 +300,8 @@ type ArtifactFactResult struct {
 // stamped once (COALESCE) and the evaluation is only enqueued on the
 // transition to complete.
 func RecordArtifactFactTx(ctx context.Context, tx db.Tx, enqueuer ReleaseEvaluationEnqueuer, in ArtifactFactInput) (ArtifactFactResult, error) {
-	if in.TenantID == "" || in.ReleaseGenerationID == "" {
-		return ArtifactFactResult{}, fmt.Errorf("recordArtifactFact: tenant/generation required")
-	}
-	if in.S3Key == "" {
-		return ArtifactFactResult{}, fmt.Errorf("recordArtifactFact: %s s3 key must not be empty", in.Kind)
+	if err := validateArtifactFactInput(in); err != nil {
+		return ArtifactFactResult{}, err
 	}
 
 	g, err := LoadReleaseGenerationByIDTx(ctx, tx, in.TenantID, in.ReleaseGenerationID)
@@ -322,50 +319,25 @@ func RecordArtifactFactTx(ctx context.Context, tx db.Tx, enqueuer ReleaseEvaluat
 
 	alreadyComplete := g.ArtifactFactAt.Valid
 
-	var column string
-	switch in.Kind {
-	case ArtifactFinalDocx:
-		column = "final_docx_s3_key"
-	case ArtifactFinalPDF:
-		column = "final_pdf_s3_key"
-	default:
-		return ArtifactFactResult{}, fmt.Errorf("recordArtifactFact: unknown artifact kind %q", in.Kind)
+	column, err := artifactFactColumn(in.Kind)
+	if err != nil {
+		return ArtifactFactResult{}, err
 	}
 
 	// Write this half. The generation row is already locked FOR UPDATE, so the
 	// read-back below cannot race another artifact writer.
-	//
-	// column comes from the closed set matched immediately above — never from
-	// caller input — so the concatenation is not an injection surface.
-	if _, err := tx.ExecContext(ctx, `
-		UPDATE release_generations
-		   SET `+column+` = $1, updated_at = now()
-		 WHERE id = $2::uuid`,
-		in.S3Key, g.ID,
-	); err != nil {
-		return ArtifactFactResult{}, fmt.Errorf("recordArtifactFact: write %s pointer: %w", in.Kind, err)
+	if err := writeArtifactPointer(ctx, tx, g.ID, column, in); err != nil {
+		return ArtifactFactResult{}, err
 	}
 
-	// Stamp artifact_fact_at iff the FULL set now exists. COALESCE keeps the
-	// first stamp: a replay never moves the fact's timestamp.
-	var artifactFactAt sql.NullTime
-	err = tx.QueryRowContext(ctx, `
-		UPDATE release_generations
-		   SET artifact_fact_at = COALESCE(artifact_fact_at, now()),
-		       updated_at       = now()
-		 WHERE id = $1::uuid
-		   AND final_docx_s3_key IS NOT NULL
-		   AND final_pdf_s3_key  IS NOT NULL
-		RETURNING artifact_fact_at`,
-		g.ID,
-	).Scan(&artifactFactAt)
-	if errors.Is(err, sql.ErrNoRows) {
+	artifactFactAt, err := stampArtifactFactIfComplete(ctx, tx, g.ID)
+	if err != nil {
+		return ArtifactFactResult{}, err
+	}
+	if artifactFactAt == nil {
 		// Set still incomplete — the other half has not landed yet. Not an
 		// error: the coordinator holds on `materializing` until it does.
 		return ArtifactFactResult{GenerationKey: g.Key()}, nil
-	}
-	if err != nil {
-		return ArtifactFactResult{}, fmt.Errorf("recordArtifactFact: stamp artifact fact: %w", err)
 	}
 
 	result := ArtifactFactResult{
@@ -386,4 +358,70 @@ func RecordArtifactFactTx(ctx context.Context, tx db.Tx, enqueuer ReleaseEvaluat
 		}
 	}
 	return result, nil
+}
+
+// validateArtifactFactInput checks the required fields on an
+// ArtifactFactInput before any DB work runs.
+func validateArtifactFactInput(in ArtifactFactInput) error {
+	if in.TenantID == "" || in.ReleaseGenerationID == "" {
+		return fmt.Errorf("recordArtifactFact: tenant/generation required")
+	}
+	if in.S3Key == "" {
+		return fmt.Errorf("recordArtifactFact: %s s3 key must not be empty", in.Kind)
+	}
+	return nil
+}
+
+// artifactFactColumn maps an ArtifactKind to its release_generations
+// column. The result comes from this closed set — never from caller input —
+// so callers concatenating it into an UPDATE statement is not an injection
+// surface.
+func artifactFactColumn(kind ArtifactKind) (string, error) {
+	switch kind {
+	case ArtifactFinalDocx:
+		return "final_docx_s3_key", nil
+	case ArtifactFinalPDF:
+		return "final_pdf_s3_key", nil
+	default:
+		return "", fmt.Errorf("recordArtifactFact: unknown artifact kind %q", kind)
+	}
+}
+
+// writeArtifactPointer writes one artifact pointer (DOCX or PDF) onto the
+// already-locked generation row.
+func writeArtifactPointer(ctx context.Context, tx db.Tx, generationID, column string, in ArtifactFactInput) error {
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE release_generations
+		   SET `+column+` = $1, updated_at = now()
+		 WHERE id = $2::uuid`,
+		in.S3Key, generationID,
+	); err != nil {
+		return fmt.Errorf("recordArtifactFact: write %s pointer: %w", in.Kind, err)
+	}
+	return nil
+}
+
+// stampArtifactFactIfComplete stamps artifact_fact_at iff the FULL
+// DOCX+PDF set now exists. COALESCE keeps the first stamp: a replay never
+// moves the fact's timestamp. Returns a nil pointer (not an error) when the
+// set is still incomplete.
+func stampArtifactFactIfComplete(ctx context.Context, tx db.Tx, generationID string) (*sql.NullTime, error) {
+	var artifactFactAt sql.NullTime
+	err := tx.QueryRowContext(ctx, `
+		UPDATE release_generations
+		   SET artifact_fact_at = COALESCE(artifact_fact_at, now()),
+		       updated_at       = now()
+		 WHERE id = $1::uuid
+		   AND final_docx_s3_key IS NOT NULL
+		   AND final_pdf_s3_key  IS NOT NULL
+		RETURNING artifact_fact_at`,
+		generationID,
+	).Scan(&artifactFactAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("recordArtifactFact: stamp artifact fact: %w", err)
+	}
+	return &artifactFactAt, nil
 }

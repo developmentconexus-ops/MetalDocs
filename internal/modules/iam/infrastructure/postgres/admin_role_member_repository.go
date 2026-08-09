@@ -44,7 +44,7 @@ func (r *AdminRoleMemberRepository) AdminRoleMembers(ctx context.Context, tenant
 	if err != nil {
 		return nil, fmt.Errorf("iam: AdminRoleMembers(%s): %w", tenantID, err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := map[string]string{}
 	for rows.Next() {

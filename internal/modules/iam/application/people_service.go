@@ -69,6 +69,8 @@ type AreaCatalogReader interface {
 // Postgres-backed reader.
 type PermissiveAreaCatalog struct{}
 
+// AreaCodeExists always returns true: the permissive catalog accepts every
+// areaCode without checking it against process_areas.
 func (PermissiveAreaCatalog) AreaCodeExists(_ context.Context, _, _ string) (bool, error) {
 	return true, nil
 }
@@ -440,8 +442,25 @@ func (s *PeopleService) PatchAtomic(ctx context.Context, tenantID, actorID, user
 	if tenantID == "" || userID == "" {
 		return nil, fmt.Errorf("%w: tenant and userId required", ErrPeopleValidation)
 	}
-	changes := map[string]any{}
 
+	changes, err := buildPatchChanges(input)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.runner != nil && s.audit != nil && s.userUpdaterTx != nil {
+		return s.patchAtomic(ctx, tenantID, actorID, userID, input, changes)
+	}
+	return s.patchNonTx(ctx, tenantID, actorID, userID, input, changes)
+}
+
+// buildPatchChanges validates PatchInput (email format, tenant role
+// membership in the canonical 8) and builds the changes map used both for
+// the audit payload and PatchAtomic's returned response. On success it
+// mutates *input.Email in place to the trimmed value, mirroring the original
+// inline validation whose trimmed email must reach UpdateUserParams
+// downstream unchanged.
+func buildPatchChanges(input PatchInput) (map[string]any, error) {
 	if input.Email != nil {
 		if trimmed := strings.TrimSpace(*input.Email); trimmed != "" {
 			if _, err := mail.ParseAddress(trimmed); err != nil {
@@ -454,7 +473,7 @@ func (s *PeopleService) PatchAtomic(ctx context.Context, tenantID, actorID, user
 		return nil, fmt.Errorf("%w: tenantRole %q is not in canonical 8", ErrPeopleValidation, *input.TenantRole)
 	}
 
-	// Build the changes map first so it is available inside the tx closure.
+	changes := map[string]any{}
 	if hasMetadataUpdate(input) {
 		if input.DisplayName != nil {
 			changes["display_name"] = *input.DisplayName
@@ -472,68 +491,84 @@ func (s *PeopleService) PatchAtomic(ctx context.Context, tenantID, actorID, user
 	if input.TenantRole != nil {
 		changes["tenant_role"] = string(*input.TenantRole)
 	}
+	return changes, nil
+}
 
-	if s.runner != nil && s.audit != nil && s.userUpdaterTx != nil {
-		// Atomic path (H-3b): UpdateUserTx → ReplaceUserRolesTx (if role changes) → RecordTx.
-		// Order matters for the advisory lock: UpdateUserTx is plain SQL (no advisory lock);
-		// ReplaceUserRolesTx calls authz.Require which acquires the hash-chain lock on tx;
-		// RecordTx re-acquires the same lock on the same connection — re-entrant, safe.
-		auditPayloadJSON, marshalErr := json.Marshal(changes)
-		if marshalErr != nil {
-			return nil, fmt.Errorf("patch audit: marshal changes: %w", marshalErr)
-		}
-		if actorID == "" {
-			actorID = "system"
-		}
-		ev := auditdomain.Event{
-			ID:           "evt_" + uuid.NewString(),
-			OccurredAt:   time.Now().UTC(),
-			ActorID:      actorID,
-			Action:       "iam.user.updated",
-			ResourceType: "user",
-			ResourceID:   userID,
-			PayloadJSON:  string(auditPayloadJSON),
-			TraceID:      requesttrace.Resolve(ctx),
-			TenantID:     tenantID,
-		}
-		if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
-			if hasMetadataUpdate(input) {
-				params := authdomain.UpdateUserParams{
-					UserID:             userID,
-					DisplayName:        input.DisplayName,
-					Email:              input.Email,
-					IsActive:           input.IsActive,
-					MustChangePassword: input.MustChangePassword,
-				}
-				if err := s.userUpdaterTx.UpdateUserTx(ctx, tx, params); err != nil {
-					return err
-				}
-			}
-			if input.TenantRole != nil {
-				txRepo, ok := s.roleAdmin.(roleAdminTxRepository)
-				if !ok {
-					return fmt.Errorf("role admin repository does not support tx variant")
-				}
-				displayName := strings.TrimSpace(userID)
-				if input.DisplayName != nil {
-					displayName = strings.TrimSpace(*input.DisplayName)
-				}
-				if err := txRepo.ReplaceUserRolesTx(ctx, tx, userID, displayName, tenantID, *input.TenantRole, actorID); err != nil {
-					return err
-				}
-			}
-			return s.audit.RecordTx(ctx, tx, ev)
-		}); err != nil {
-			return nil, err
-		}
-		// Cache invalidation MUST happen post-commit (H-3b invariant).
-		if input.TenantRole != nil && s.invalidator != nil {
-			s.invalidator.InvalidateUserTenant(userID, tenantID)
-		}
-		return changes, nil
+// patchAtomic runs H-3b's atomic PatchAtomic path: UpdateUserTx ->
+// ReplaceUserRolesTx (if role changes) -> RecordTx, all inside one
+// transaction (applyPatchTx), followed by the post-commit cache
+// invalidation (H-3b invariant: the flush must happen after commit, never
+// inside the tx).
+func (s *PeopleService) patchAtomic(ctx context.Context, tenantID, actorID, userID string, input PatchInput, changes map[string]any) (map[string]any, error) {
+	auditPayloadJSON, marshalErr := json.Marshal(changes)
+	if marshalErr != nil {
+		return nil, fmt.Errorf("patch audit: marshal changes: %w", marshalErr)
 	}
+	if actorID == "" {
+		actorID = "system"
+	}
+	ev := auditdomain.Event{
+		ID:           "evt_" + uuid.NewString(),
+		OccurredAt:   time.Now().UTC(),
+		ActorID:      actorID,
+		Action:       "iam.user.updated",
+		ResourceType: "user",
+		ResourceID:   userID,
+		PayloadJSON:  string(auditPayloadJSON),
+		TraceID:      requesttrace.Resolve(ctx),
+		TenantID:     tenantID,
+	}
+	// Order matters for the advisory lock: UpdateUserTx is plain SQL (no advisory lock);
+	// ReplaceUserRolesTx calls authz.Require which acquires the hash-chain lock on tx;
+	// RecordTx re-acquires the same lock on the same connection — re-entrant, safe.
+	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
+		return s.applyPatchTx(ctx, tx, tenantID, actorID, userID, input, ev)
+	}); err != nil {
+		return nil, err
+	}
+	// Cache invalidation MUST happen post-commit (H-3b invariant).
+	if input.TenantRole != nil && s.invalidator != nil {
+		s.invalidator.InvalidateUserTenant(userID, tenantID)
+	}
+	return changes, nil
+}
 
-	// Non-tx fallback for test mode (runner/audit/userUpdaterTx not wired).
+// applyPatchTx is patchAtomic's in-tx body: metadata update (if any), tenant
+// role replacement (if requested), then the audit record — all inside the
+// caller's tx so they commit or roll back together.
+func (s *PeopleService) applyPatchTx(ctx context.Context, tx *sql.Tx, tenantID, actorID, userID string, input PatchInput, ev auditdomain.Event) error {
+	if hasMetadataUpdate(input) {
+		params := authdomain.UpdateUserParams{
+			UserID:             userID,
+			DisplayName:        input.DisplayName,
+			Email:              input.Email,
+			IsActive:           input.IsActive,
+			MustChangePassword: input.MustChangePassword,
+		}
+		if err := s.userUpdaterTx.UpdateUserTx(ctx, tx, params); err != nil {
+			return err
+		}
+	}
+	if input.TenantRole != nil {
+		txRepo, ok := s.roleAdmin.(roleAdminTxRepository)
+		if !ok {
+			return fmt.Errorf("role admin repository does not support tx variant")
+		}
+		displayName := strings.TrimSpace(userID)
+		if input.DisplayName != nil {
+			displayName = strings.TrimSpace(*input.DisplayName)
+		}
+		if err := txRepo.ReplaceUserRolesTx(ctx, tx, userID, displayName, tenantID, *input.TenantRole, actorID); err != nil {
+			return err
+		}
+	}
+	return s.audit.RecordTx(ctx, tx, ev)
+}
+
+// patchNonTx is the legacy two-step fallback used in test mode when
+// runner/audit/userUpdaterTx are not wired: the metadata update and role
+// replacement are two separate, non-atomic writes.
+func (s *PeopleService) patchNonTx(ctx context.Context, tenantID, actorID, userID string, input PatchInput, changes map[string]any) (map[string]any, error) {
 	if hasMetadataUpdate(input) {
 		params := authdomain.UpdateUserParams{
 			UserID:             userID,
@@ -708,18 +743,31 @@ func (s *PeopleService) ListFiltered(ctx context.Context, tenantID string, filte
 		return ListResult{}, err
 	}
 
-	// Batch-load active memberships for all users in one query (H-5.3 D2).
-	// memberships is nil in test/memory mode; the nil guard produces an empty
-	// map so the rest of the function behaves identically.
+	listed, err := s.buildListedUsers(ctx, tenantID, managed)
+	if err != nil {
+		return ListResult{}, err
+	}
+
+	filtered := applyPeopleFilters(listed, filters)
+	return paginateListedUsers(filtered, filters, limit)
+}
+
+// buildListedUsers batch-loads active memberships for every managed user in
+// one query (H-5.3 D2, eliminating the per-user N+1) and folds each managed
+// user plus its memberships into the ListedUser shape ListFiltered filters
+// and paginates over. memberships is nil in test/memory mode; the nil guard
+// produces an empty map so the rest of the function behaves identically.
+func (s *PeopleService) buildListedUsers(ctx context.Context, tenantID string, managed []authdomain.ManagedUser) ([]ListedUser, error) {
 	var membershipMap map[string][]iamdomain.UserProcessArea
 	if s.memberships != nil && len(managed) > 0 {
 		userIDs := make([]string, len(managed))
 		for i := range managed {
 			userIDs[i] = managed[i].UserID
 		}
+		var err error
 		membershipMap, err = s.memberships.ListActiveBatch(ctx, tenantID, userIDs)
 		if err != nil {
-			return ListResult{}, fmt.Errorf("batch load memberships: %w", err)
+			return nil, fmt.Errorf("batch load memberships: %w", err)
 		}
 	}
 	if membershipMap == nil {
@@ -752,7 +800,14 @@ func (s *PeopleService) ListFiltered(ctx context.Context, tenantID string, filte
 			AreaMemberships:     areas,
 		})
 	}
-	filtered := applyPeopleFilters(listed, filters)
+	return listed, nil
+}
+
+// paginateListedUsers applies cursor pagination (opaque cursor = last row's
+// encoded position) over the already-filtered slice and returns the page
+// plus pagination metadata. Returns ErrCursorExpired when a non-empty
+// cursor's anchor row is no longer present in filtered.
+func paginateListedUsers(filtered []ListedUser, filters ListFilters, limit int) (ListResult, error) {
 	cursorIdx := 0
 	if filters.Cursor != nil && strings.TrimSpace(*filters.Cursor) != "" {
 		idx, found := decodeCursorIndex(*filters.Cursor, filtered)

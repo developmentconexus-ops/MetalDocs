@@ -13,6 +13,8 @@ import (
 	"metaldocs/internal/platform/security"
 )
 
+// Middleware enforces per-route rate limits (REQ-MW-5), keyed by
+// authenticated user or trusted-proxy-resolved client IP.
 type Middleware struct {
 	cfg          Config
 	trustedCIDRs []netip.Prefix

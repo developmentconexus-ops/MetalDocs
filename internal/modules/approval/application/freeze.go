@@ -56,19 +56,13 @@ func executeFreeze(ctx context.Context, tx db.Tx, repo freezeRepo, tenantID stri
 	}
 
 	hash := instance.ContentHashAtSubmit
-	won, err := repo.PinFrozenHash(ctx, tx, tenantID, instance.ID, hash)
-	if err != nil {
+	if _, err := repo.PinFrozenHash(ctx, tx, tenantID, instance.ID, hash); err != nil {
 		return fmt.Errorf("executeFreeze: pin frozen hash: %w", err)
 	}
-	if won {
-		instance.FrozenContentHash = &hash
-	} else {
-		// Lost the CAS to a concurrent freeze that beat us to it (defensive —
-		// the row lock makes this practically unreachable, see doc comment
-		// above). Some freeze happened; treat as success, still reflect the
-		// locally-known hash in-memory since it is the same canonical value
-		// the winner would have pinned.
-		instance.FrozenContentHash = &hash
-	}
+	// Whether we won the CAS or lost it to a concurrent freeze that beat us to
+	// it (defensive — the row lock makes this practically unreachable, see
+	// doc comment above), the pinned hash is the same canonical value either
+	// way, so both outcomes reflect it in-memory identically.
+	instance.FrozenContentHash = &hash
 	return nil
 }

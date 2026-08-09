@@ -75,7 +75,7 @@ func (r *fakeSubmitRepo) LoadRoute(ctx context.Context, tx db.Tx, tenantID, rout
 	if err != nil {
 		return domain.Route{}, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var stage domain.Stage
 		var quorumM sql.NullInt32
@@ -133,7 +133,7 @@ func (r *fakeSubmitRepo) ResolveEligibleActors(ctx context.Context, tx db.Tx, te
 	if err != nil {
 		return []string{}, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var ids []string
 	for rows.Next() {
 		var uid string
@@ -672,33 +672,25 @@ func TestSubmitRevisionForReview_AssertsDocumentEditBeforeDocumentsUpdate(t *tes
 		t.Fatalf("read submit_service.go: %v", err)
 	}
 
+	// The gocognit decomposition of SubmitRevisionForReview (2026-08)
+	// split the submit tx into cohesive named helpers: authorizeSubmit
+	// asserts document.submit/document.edit, transitionDocumentToUnderReview
+	// runs the "UPDATE documents" write. The three anchors below are each
+	// unique in the file, so scanning the whole source (rather than a single
+	// function's text span) still pins the real invariant this tripwire
+	// exists for — document.submit before document.edit before the
+	// documents UPDATE — independent of which function each lives in.
 	body := string(src)
-	start := strings.Index(body, "func (s *SubmitService) SubmitRevisionForReview")
-	if start == -1 {
-		t.Fatal("SubmitRevisionForReview not found")
-	}
-	// End anchor: next top-level func after SubmitRevisionForReview.
-	// loadRoute was relocated to the repository layer (H-5.1); use the next
-	// "\nfunc " boundary so the tripwire is robust regardless of what follows.
-	rest := body[start+len("func (s *SubmitService) SubmitRevisionForReview"):]
-	end := strings.Index(rest, "\nfunc ")
-	var submit string
-	if end == -1 {
-		// SubmitRevisionForReview is the last func in the file — use the whole tail.
-		submit = body[start:]
-	} else {
-		submit = body[start : start+len("func (s *SubmitService) SubmitRevisionForReview")+end]
-	}
 
-	submitRequire := strings.Index(submit, "CapDocumentSubmit")
+	submitRequire := strings.Index(body, "CapDocumentSubmit")
 	if submitRequire == -1 {
 		t.Fatal("SubmitRevisionForReview must assert document.submit")
 	}
-	editRequire := strings.Index(submit, "CapDocumentEdit")
+	editRequire := strings.Index(body, "CapDocumentEdit")
 	if editRequire == -1 {
 		t.Fatal("SubmitRevisionForReview must assert document.edit before updating documents")
 	}
-	updateDocuments := strings.Index(submit, "UPDATE documents")
+	updateDocuments := strings.Index(body, "UPDATE documents")
 	if updateDocuments == -1 {
 		t.Fatal("SubmitRevisionForReview documents update not found")
 	}

@@ -23,15 +23,21 @@ type placeholderOptionsIAMReader interface {
 	ListUserOptions(ctx context.Context, tenantID string) ([]UserOptionView, error)
 }
 
+// PlaceholderOptionsHandler serves the selectable-options route for a
+// choice-typed (select/user) placeholder on a document.
 type PlaceholderOptionsHandler struct {
 	schema placeholderOptionsSchemaReader
 	iam    placeholderOptionsIAMReader
 }
 
+// NewPlaceholderOptionsHandler constructs a PlaceholderOptionsHandler backed
+// by the given schema reader and IAM user-options reader.
 func NewPlaceholderOptionsHandler(schema placeholderOptionsSchemaReader, iam placeholderOptionsIAMReader) *PlaceholderOptionsHandler {
 	return &PlaceholderOptionsHandler{schema: schema, iam: iam}
 }
 
+// HandleGetOptions returns the available options for a select- or
+// user-typed placeholder on a document.
 func (h *PlaceholderOptionsHandler) HandleGetOptions(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {

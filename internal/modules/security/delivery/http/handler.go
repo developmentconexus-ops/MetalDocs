@@ -74,17 +74,25 @@ type signalsResponse struct {
 
 var writeJSON = httpresponse.WriteJSON
 
+// Handler serves the Sessions & Security admin tab's read endpoints
+// (MFA coverage, lockouts, signals) over HTTP.
 type Handler struct {
 	service *securityapp.Service
 }
 
+// NewHandler builds a Handler backed by service.
 func NewHandler(service *securityapp.Service) *Handler {
 	return &Handler{service: service}
 }
 
+// Name returns the module identifier used by the route mount registry.
 func (h *Handler) Name() string { return "security" }
-func (h *Handler) Tag() string  { return "security" }
 
+// Tag returns the OpenAPI tag this handler groups its routes under.
+func (h *Handler) Tag() string { return "security" }
+
+// Mount registers the security routes on mux via the generated
+// securityapi.ServerInterface router.
 func (h *Handler) Mount(mux httprouter.Muxer) {
 	securityapi.HandlerWithOptions(h, securityapi.StdHTTPServerOptions{
 		BaseURL:    apibase.BaseURL,

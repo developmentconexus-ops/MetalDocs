@@ -11,14 +11,18 @@ import (
 	"metaldocs/internal/platform/messaging"
 )
 
+// Publisher implements messaging.Publisher by writing events into the
+// Postgres-backed transactional outbox table.
 type Publisher struct {
 	db *sql.DB
 }
 
+// NewPublisher constructs a Publisher backed by db.
 func NewPublisher(db *sql.DB) *Publisher {
 	return &Publisher{db: db}
 }
 
+// Publish inserts event into the outbox table, deduplicating on idempotency key.
 func (p *Publisher) Publish(ctx context.Context, event messaging.Event) error {
 	payloadJSON, err := json.Marshal(event.Payload)
 	if err != nil {

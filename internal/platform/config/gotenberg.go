@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+// GotenbergConfig holds Gotenberg (DOCX-to-PDF rendering) configuration read
+// from environment variables at startup.
 type GotenbergConfig struct {
 	// immutable after Load().
 	Enabled bool
@@ -14,6 +16,8 @@ type GotenbergConfig struct {
 	URL string
 }
 
+// LoadGotenbergConfig reads Gotenberg config from environment variables.
+// Returns a disabled config (no error) when METALDOCS_GOTENBERG_URL is unset.
 func LoadGotenbergConfig() (GotenbergConfig, error) {
 	rawURL := strings.TrimSpace(os.Getenv("METALDOCS_GOTENBERG_URL"))
 	if rawURL == "" {

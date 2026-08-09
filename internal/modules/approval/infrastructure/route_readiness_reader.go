@@ -50,7 +50,7 @@ func (r *RouteReadinessReaderPG) ActiveRouteSubjectKeys(ctx context.Context, ten
 	if err != nil {
 		return nil, fmt.Errorf("approval: list active route subject keys: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := make(map[string]struct{})
 	for rows.Next() {

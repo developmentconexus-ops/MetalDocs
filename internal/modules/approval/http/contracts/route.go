@@ -76,27 +76,41 @@ type ActorSelector struct {
 // An unrecognized Kind or a recognized Kind with the wrong fields
 // present/absent returns a descriptive error.
 func (s ActorSelector) Validate() error {
+	var fieldsOK bool
 	switch s.Kind {
 	case SelectorKindNamedUser:
-		if s.UserID != "" && s.Role == "" && s.AreaCode == "" {
-			return nil
-		}
+		fieldsOK = s.hasOnlyUserID()
 	case SelectorKindRoleInFixedArea:
-		if s.Role != "" && s.AreaCode != "" && s.UserID == "" {
-			return nil
-		}
+		fieldsOK = s.hasRoleAndAreaOnly()
 	case SelectorKindRoleInDocumentArea:
-		if s.Role != "" && s.AreaCode == "" && s.UserID == "" {
-			return nil
-		}
+		fieldsOK = s.hasRoleOnly()
 	case SelectorKindSubmitChoice:
-		if s.Role != "" && s.AreaCode != "" && s.UserID == "" {
-			return nil
-		}
+		fieldsOK = s.hasRoleAndAreaOnly()
 	default:
 		return fmt.Errorf("kind must be one of: named_user, role_in_fixed_area, role_in_document_area, submit_choice")
 	}
-	return fmt.Errorf("fields invalid for kind %q", s.Kind)
+	if !fieldsOK {
+		return fmt.Errorf("fields invalid for kind %q", s.Kind)
+	}
+	return nil
+}
+
+// hasOnlyUserID reports whether s carries the named_user field shape:
+// UserID set, Role and AreaCode absent.
+func (s ActorSelector) hasOnlyUserID() bool {
+	return s.UserID != "" && s.Role == "" && s.AreaCode == ""
+}
+
+// hasRoleAndAreaOnly reports whether s carries the role_in_fixed_area /
+// submit_choice field shape: Role and AreaCode set, UserID absent.
+func (s ActorSelector) hasRoleAndAreaOnly() bool {
+	return s.Role != "" && s.AreaCode != "" && s.UserID == ""
+}
+
+// hasRoleOnly reports whether s carries the role_in_document_area field
+// shape: Role set, UserID and AreaCode absent.
+func (s ActorSelector) hasRoleOnly() bool {
+	return s.Role != "" && s.AreaCode == "" && s.UserID == ""
 }
 
 // StageRequest is the wire representation of one stage in a create/update route request.
@@ -199,72 +213,96 @@ func (r UpdateRouteRequest) Validate() error {
 func validateStages(stages []StageRequest) error {
 	seenNames := make(map[string]struct{}, len(stages))
 	for i, stage := range stages {
-		expectedOrder := i + 1
-		if stage.Order != expectedOrder {
-			return fmt.Errorf("stages[%d].order must be %d", i, expectedOrder)
-		}
-		if err := validateRequired(fmt.Sprintf("stages[%d].name", i), stage.Name); err != nil {
+		if err := validateStageRequest(i, stage, seenNames); err != nil {
 			return err
 		}
-		if _, exists := seenNames[stage.Name]; exists {
-			return fmt.Errorf("stages[%d].name duplicates an earlier stage", i)
+	}
+	return nil
+}
+
+// validateStageRequest validates one stage of a create/update route request:
+// order, name (required + unique via seenNames), required_capability,
+// quorum/quorum_m consistency, drift_policy, stage_kind, due_in_days, and
+// selectors (see validateStages for the full rationale on each rule).
+func validateStageRequest(i int, stage StageRequest, seenNames map[string]struct{}) error {
+	expectedOrder := i + 1
+	if stage.Order != expectedOrder {
+		return fmt.Errorf("stages[%d].order must be %d", i, expectedOrder)
+	}
+	if err := validateRequired(fmt.Sprintf("stages[%d].name", i), stage.Name); err != nil {
+		return err
+	}
+	if _, exists := seenNames[stage.Name]; exists {
+		return fmt.Errorf("stages[%d].name duplicates an earlier stage", i)
+	}
+	seenNames[stage.Name] = struct{}{}
+	if err := validateRequired(fmt.Sprintf("stages[%d].required_capability", i), stage.RequiredCapability); err != nil {
+		return err
+	}
+	if err := validateRequiredCapability(fmt.Sprintf("stages[%d].required_capability", i), stage.RequiredCapability); err != nil {
+		return err
+	}
+	if err := validateStageQuorum(i, stage.Quorum, stage.QuorumM); err != nil {
+		return err
+	}
+	switch stage.DriftPolicy {
+	case DriftPolicyKindReduceQuorum, DriftPolicyKindFailStage, DriftPolicyKindKeepSnapshot:
+	default:
+		return fmt.Errorf("stages[%d].drift_policy must be one of: reduce_quorum, fail_stage, keep_snapshot", i)
+	}
+	// stage_kind is optional; empty defaults to approval downstream. When
+	// supplied it must be one of the two canonical kinds (no free text).
+	switch stage.StageKind {
+	case "", StageKindReview, StageKindApproval:
+	default:
+		return fmt.Errorf("stages[%d].stage_kind must be one of: review, approval", i)
+	}
+	if stage.DueInDays != nil && *stage.DueInDays < 1 {
+		return fmt.Errorf("stage %d: due_in_days must be at least 1 day when present", stage.Order)
+	}
+	return validateStageSelectors(i, stage.Selectors)
+}
+
+// validateStageQuorum enforces Quorum/QuorumM presence-and-value consistency
+// for one stage.
+func validateStageQuorum(i int, quorum QuorumKind, quorumM *int) error {
+	switch quorum {
+	case QuorumKindAny1Of, QuorumKindAllOf:
+		if quorumM != nil {
+			return fmt.Errorf("stages[%d].quorum_m must be omitted unless quorum is m_of_n", i)
 		}
-		seenNames[stage.Name] = struct{}{}
-		if err := validateRequired(fmt.Sprintf("stages[%d].required_capability", i), stage.RequiredCapability); err != nil {
-			return err
+	case QuorumKindMOfN:
+		if quorumM == nil {
+			return fmt.Errorf("stages[%d].quorum_m is required when quorum is m_of_n", i)
 		}
-		if err := validateRequiredCapability(fmt.Sprintf("stages[%d].required_capability", i), stage.RequiredCapability); err != nil {
-			return err
+		if *quorumM < 1 {
+			return fmt.Errorf("stages[%d].quorum_m must be >= 1", i)
 		}
-		switch stage.Quorum {
-		case QuorumKindAny1Of, QuorumKindAllOf:
-			if stage.QuorumM != nil {
-				return fmt.Errorf("stages[%d].quorum_m must be omitted unless quorum is m_of_n", i)
-			}
-		case QuorumKindMOfN:
-			if stage.QuorumM == nil {
-				return fmt.Errorf("stages[%d].quorum_m is required when quorum is m_of_n", i)
-			}
-			if *stage.QuorumM < 1 {
-				return fmt.Errorf("stages[%d].quorum_m must be >= 1", i)
-			}
-		default:
-			return fmt.Errorf("stages[%d].quorum must be one of: any_1_of, all_of, m_of_n", i)
+	default:
+		return fmt.Errorf("stages[%d].quorum must be one of: any_1_of, all_of, m_of_n", i)
+	}
+	return nil
+}
+
+// validateStageSelectors enforces that Selectors is the REQUIRED sole source
+// of truth for the stage's actor pool (M4, unit 3.2 slice 7a — flat
+// required_role/area_code wire fields are gone, no fallback/synthesis). Each
+// selector must be internally consistent for its kind, and any selector kind
+// that carries a role (role_in_fixed_area, role_in_document_area,
+// submit_choice — everything but named_user) re-homes the ADR 0022 registry
+// binding formerly applied to the flat required_role field: the role must be
+// a canonical AREA role.
+func validateStageSelectors(i int, selectors []ActorSelector) error {
+	if len(selectors) == 0 {
+		return fmt.Errorf("stages[%d].selectors must contain at least one selector", i)
+	}
+	for j, sel := range selectors {
+		if err := sel.Validate(); err != nil {
+			return fmt.Errorf("stages[%d].selectors[%d]: %w", i, j, err)
 		}
-		switch stage.DriftPolicy {
-		case DriftPolicyKindReduceQuorum, DriftPolicyKindFailStage, DriftPolicyKindKeepSnapshot:
-		default:
-			return fmt.Errorf("stages[%d].drift_policy must be one of: reduce_quorum, fail_stage, keep_snapshot", i)
-		}
-		// stage_kind is optional; empty defaults to approval downstream. When
-		// supplied it must be one of the two canonical kinds (no free text).
-		switch stage.StageKind {
-		case "", StageKindReview, StageKindApproval:
-		default:
-			return fmt.Errorf("stages[%d].stage_kind must be one of: review, approval", i)
-		}
-		if stage.DueInDays != nil && *stage.DueInDays < 1 {
-			return fmt.Errorf("stage %d: due_in_days must be at least 1 day when present", stage.Order)
-		}
-		// Selectors are the REQUIRED sole source of truth for the stage's
-		// actor pool (M4, unit 3.2 slice 7a — flat required_role/area_code
-		// wire fields are gone, no fallback/synthesis). Each selector must be
-		// internally consistent for its kind, and any selector kind that
-		// carries a role (role_in_fixed_area, role_in_document_area,
-		// submit_choice — everything but named_user) re-homes the ADR 0022
-		// registry binding formerly applied to the flat required_role field:
-		// the role must be a canonical AREA role.
-		if len(stage.Selectors) == 0 {
-			return fmt.Errorf("stages[%d].selectors must contain at least one selector", i)
-		}
-		for j, sel := range stage.Selectors {
-			if err := sel.Validate(); err != nil {
-				return fmt.Errorf("stages[%d].selectors[%d]: %w", i, j, err)
-			}
-			if sel.Kind == SelectorKindRoleInFixedArea || sel.Kind == SelectorKindRoleInDocumentArea || sel.Kind == SelectorKindSubmitChoice {
-				if err := validateAreaRole(fmt.Sprintf("stages[%d].selectors[%d].role", i, j), sel.Role); err != nil {
-					return err
-				}
+		if sel.Kind == SelectorKindRoleInFixedArea || sel.Kind == SelectorKindRoleInDocumentArea || sel.Kind == SelectorKindSubmitChoice {
+			if err := validateAreaRole(fmt.Sprintf("stages[%d].selectors[%d].role", i, j), sel.Role); err != nil {
+				return err
 			}
 		}
 	}

@@ -34,7 +34,7 @@ func TestRolesByUserID_ActiveUserWithRole(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock new: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Single query: LEFT JOIN returns one row with role_code = "author".
 	mock.ExpectQuery(regexp.QuoteMeta(singleRoundTripSQL)).
@@ -61,7 +61,7 @@ func TestRolesByUserID_FiltersByTenant(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock new: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectQuery(regexp.QuoteMeta(singleRoundTripSQL)).
 		WithArgs("alice", testTenant).
@@ -85,7 +85,7 @@ func TestRolesByUserID_UnknownUser_ReturnsErrUserNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock new: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// LEFT JOIN returns 0 rows → user not found.
 	mock.ExpectQuery(regexp.QuoteMeta(singleRoundTripSQL)).
@@ -107,7 +107,7 @@ func TestRolesByUserID_ActiveUserNoRoles_ReturnsErrNoRolesAssigned(t *testing.T)
 	if err != nil {
 		t.Fatalf("sqlmock new: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// LEFT JOIN returns 1 row with NULL role_code → user exists but has no roles.
 	mock.ExpectQuery(regexp.QuoteMeta(singleRoundTripSQL)).
@@ -130,7 +130,7 @@ func TestRolesByUserID_IsSingleRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock new: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectQuery(regexp.QuoteMeta(singleRoundTripSQL)).
 		WithArgs("alice", testTenant).
@@ -150,7 +150,7 @@ func TestUserActiveInTenant_ActiveUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock new: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	const existsSQL = `
 SELECT EXISTS (
@@ -183,7 +183,7 @@ func TestUserActiveInTenant_InactiveOrUnknownUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock new: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	const existsSQL = `
 SELECT EXISTS (
@@ -219,7 +219,7 @@ func TestRolesByUserID_InactiveUser_ReturnsErrUserNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock new: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Inactive user: deactivated_at IS NOT NULL → the WHERE clause filters it
 	// out → 0 rows returned → ErrUserNotFound.
@@ -247,7 +247,7 @@ func TestRolesByUserIDs_EmptyInput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock new: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	provider := postgres.NewRoleProvider(db)
 	out, err := provider.RolesByUserIDs(context.Background(), testTenant, nil)
@@ -268,7 +268,7 @@ func TestRolesByUserIDs_ActiveUsers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock new: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	const batchSQL = `
 SELECT u.user_id, r.role_code

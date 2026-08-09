@@ -16,7 +16,7 @@ func TestFamilyRepository_HasActiveProfiles_TenantScoped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := NewFamilyRepository(db)
 	ctx := iamdomain.WithAuthContext(tenant.WithTenantID(context.Background(), "tenant-a"), "actor-1", nil)
@@ -94,7 +94,7 @@ func TestFamilyRepository_List_HasSafetyLimit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := NewFamilyRepository(db)
 	ctx := iamdomain.WithAuthContext(tenant.WithTenantID(context.Background(), "tenant-a"), "actor-1", nil)

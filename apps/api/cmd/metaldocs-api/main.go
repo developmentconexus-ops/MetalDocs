@@ -159,101 +159,54 @@ func e2eHandlersEnabled() bool {
 //go:generate go run metaldocs/cmd/gen-http-surface -public ../../../../api/openapi/v1/openapi.yaml -e2e ../../../../api/openapi/internal-e2e.yaml -out-dir . -registry ../../../../internal/modules/iam/domain/model.go
 
 func main() {
+	os.Exit(run())
+}
+
+// run wires and serves the API process; it is main()'s former body,
+// extracted so main can call os.Exit exactly once, after run returns. Every
+// early-exit branch below now `return`s an exit code instead of calling
+// os.Exit directly, so every defer registered along the way (deps.Cleanup,
+// stop, otelShutdown, rlStore.Close, the background sweepers, ...) always
+// unwinds — os.Exit used to skip them on every early-exit path (gocritic
+// exitAfterDefer).
+//
+// run() is a composition root: it wires every module's dependencies in
+// sequence. Each conditionally-constructed handler/service block below has
+// been extracted into a cohesive, domain-named helper (buildXxx/loadXxx/
+// wireXxx), mirroring the existing buildTaxonomyModule/buildTokensModule/
+// buildFanoutComponents/startPresence convention — run() itself is now the
+// sequencing of those helpers, not the inline logic.
+func run() int {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// OpenTelemetry: inert unless an exporter is configured (Z-1, REQ-OBS-3).
-	// otelShutdown is a no-op when disabled; otelEnabled gates the chain link.
-	otelShutdown, otelEnabled, err := observability.SetupOTel(ctx, "metaldocs-api")
+	otelShutdownFn, otelEnabled, err := setupOTelTracing(ctx)
 	if err != nil {
-		slog.Error("setup otel", "err", err)
-		os.Exit(1)
+		return 1
 	}
-	defer func() {
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := otelShutdown(shutdownCtx); err != nil {
-			slog.Warn("otel shutdown", "err", err)
-		}
-	}()
-	if otelEnabled {
-		slog.Info("OpenTelemetry tracing enabled", "exporter", os.Getenv("OTEL_TRACES_EXPORTER"))
-	}
+	defer otelShutdownFn()
 
-	repoMode, err := config.RepositoryMode()
+	repoMode, corsCfg, attachmentsCfg, authCfg, featureFlagsCfg, err := loadBootConfig()
 	if err != nil {
-		slog.Error("invalid repository mode", "err", err)
-		os.Exit(1)
-	}
-	if err := requirePostgresRepositoryMode(repoMode); err != nil {
-		slog.Error("unsupported repository mode", "err", err)
-		os.Exit(1)
-	}
-	corsCfg, err := config.LoadCORSConfig()
-	if err != nil {
-		slog.Error("invalid cors config", "err", err)
-		os.Exit(1)
-	}
-	attachmentsCfg, err := config.LoadAttachmentsConfig()
-	if err != nil {
-		slog.Error("invalid attachments config", "err", err)
-		os.Exit(1)
-	}
-	authCfg, err := authn.LoadRuntimeConfig()
-	if err != nil {
-		slog.Error("invalid auth config", "err", err)
-		os.Exit(1)
-	}
-	featureFlagsCfg, err := config.LoadFeatureFlagsConfig()
-	if err != nil {
-		slog.Error("invalid feature flags config", "err", err)
-		os.Exit(1)
+		return 1
 	}
 
 	deps, err := bootstrap.BuildAPIDependencies(ctx, repoMode, attachmentsCfg)
 	if err != nil {
 		slog.Error("build api dependencies", "err", err)
-		os.Exit(1)
+		return 1
 	}
 	defer deps.Cleanup()
 
-	migrationCfg, err := config.LoadMigrationConfig()
-	if err != nil {
-		slog.Error("invalid migration config", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
-	}
-	if deps.SQLDB != nil && !migrationCfg.Skip {
-		// The grants stage runs BEFORE migrations and unconditionally (no
-		// ledger): db/grants carries the privilege/role posture pg_dump
-		// --no-privileges cannot put in the baseline, and it was previously
-		// applied only at fresh bootstrap — so an existing volume never saw an
-		// edit. Every file is idempotent by construction; a missing/empty dir
-		// is fatal. See internal/platform/migrate.ApplyGrants.
-		if err := migrate.ApplyGrants(ctx, deps.SQLDB, migrationCfg.GrantsDir, slog.Default()); err != nil {
-			slog.Error("apply grants stage", "err", err)
-			deps.Cleanup()
-			os.Exit(1)
-		}
-		if err := migrate.Apply(ctx, deps.SQLDB, migrationCfg.Dir, slog.Default()); err != nil {
-			slog.Error("apply startup migrations", "err", err)
-			deps.Cleanup()
-			os.Exit(1)
-		}
+	if err := applyStartupMigrations(ctx, deps); err != nil {
+		return 1
 	}
 
-	authService, err := authapp.NewService(deps.AuthRepo, deps.RoleProvider, deps.RoleAdminRepo, iampg.NewLoginContextRepository(deps.SQLDB), authCfg, deps.AuditWriter)
+	authService, err := buildAuthService(ctx, deps, authCfg)
 	if err != nil {
-		slog.Error("new auth service", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
-	}
-	if err := authService.BootstrapLocalAdmin(ctx); err != nil {
-		slog.Error("bootstrap local admin", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
+		return 1
 	}
 
 	// M7 F7.3: tenant DEK/KEK crypto-shred framework. tenantCrypto is nil when
@@ -261,23 +214,9 @@ func main() {
 	// own no-op path (F7.2's nil-safe pattern), so boot still works with
 	// crypto disabled. Constructed here (before audit wiring) so the audit
 	// writer below can be wired with the payload encryptor at boot.
-	var tenantCrypto securitydomain.TenantCrypto
-	if deps.SQLDB != nil {
-		kek, kekConfigured, kekErr := config.LoadTenantKEK()
-		if kekErr != nil {
-			slog.Error("invalid tenant crypto KEK", "err", kekErr)
-			os.Exit(1)
-		}
-		if kekConfigured {
-			svc, err := securityapp.NewTenantCryptoService(securitypg.NewTenantKeyRepository(deps.SQLDB), kek)
-			if err != nil {
-				slog.Error("construct tenant crypto service", "err", err)
-				os.Exit(1)
-			}
-			tenantCrypto = svc
-		} else {
-			slog.Info("tenant crypto disabled: METALDOCS_TENANT_KEK not set")
-		}
+	tenantCrypto, err := buildTenantCrypto(deps)
+	if err != nil {
+		return 1
 	}
 
 	// M7 F7.3 item 2: wire the audit payload envelope encryptor. deps.AuditWriter
@@ -286,21 +225,9 @@ func main() {
 	// (mutate-and-return-self) takes effect for every consumer of those three
 	// fields. Nil tenantCrypto (KEK unset) leaves the writer's crypto nil —
 	// RecordTx/ListEvents stay on the legacy plaintext path byte-for-byte.
-	if tenantCrypto != nil {
-		if auditWriter, ok := deps.AuditWriter.(*auditpg.Writer); ok {
-			auditWriter.WithPayloadCrypto(auditPayloadCryptoAdapter{crypto: tenantCrypto})
-		}
-	}
+	wireAuditPayloadCrypto(deps, tenantCrypto)
 
-	auditService := auditapp.NewService(deps.AuditReader)
-	if deps.AuditCounter != nil && deps.AuditExports != nil {
-		auditService.WithExports(deps.AuditCounter, deps.AuditExports, deps.AuditWriter, func(job auditdomain.ExportJob) string {
-			if job.ID == "" || job.DownloadToken == "" {
-				return ""
-			}
-			return fmt.Sprintf("/api/v1/audit/events/export/%s/download?token=%s", job.ID, job.DownloadToken)
-		})
-	}
+	auditService := buildAuditService(deps)
 
 	auditHandler := auditdelivery.NewHandler(auditService).WithExporter(auditService)
 	// ADR 0022 Phase 11 (F8): wire the tier-2 bypass audit sink so every
@@ -375,10 +302,7 @@ func main() {
 	})
 
 	// H-3b: TxRunner for IAM atomic audit writes (Site 2, 3, 4).
-	var iamTxRunner db.TxRunner
-	if deps.SQLDB != nil {
-		iamTxRunner = db.NewTxRunner(deps.SQLDB)
-	}
+	iamTxRunner := buildIAMTxRunner(deps)
 	iamAdminService := iamapp.NewAdminService(deps.RoleAdminRepo, cachedProvider, iamTxRunner, deps.AuditWriter)
 	iamAdminHandler := iamdelivery.NewAdminHandler(iamAdminService, authService, deps.AuditWriter).
 		WithAuditEventLister(auditService)
@@ -386,75 +310,18 @@ func main() {
 	// M7 F7.2: tenant onboarding (POST /tenants). tenantHandler is nil (Router
 	// answers 501) on the SQLDB-less boot path, matching every other
 	// conditionally-wired iam handler above/below.
-	var tenantHandler *iamdelivery.TenantHandler
-	if deps.SQLDB != nil {
-		var keyProvisioner iamapp.TenantKeyProvisioner
-		if tenantCrypto != nil {
-			// Composition-root adapter: iam depends only on its own
-			// TenantKeyProvisioner port; it never imports security's
-			// internals. This wraps security's published TenantCrypto port
-			// (F7.3 replaces F7.2's NoopTenantKeyProvisioner).
-			keyProvisioner = tenantCryptoKeyProvisioner{crypto: tenantCrypto}
-		}
-		onboardTenantService := iamapp.NewOnboardTenantService(
-			iampg.NewTenantRepository(deps.SQLDB),
-			authpg.NewRepository(deps.SQLDB, iampg.NewUserTenantRepository(deps.SQLDB)),
-			iamTxRunner,
-			deps.AuditWriter,
-			keyProvisioner, // nil -> NoopTenantKeyProvisioner when tenant crypto is disabled
-			authapp.HashPassword,
-		)
-		tenantHandler = iamdelivery.NewTenantHandler(onboardTenantService)
-	}
+	tenantHandler := buildTenantHandler(deps, iamTxRunner, tenantCrypto)
 
 	// PR-7 Sessions & Security tab.
-	var sessionsHandler *iamdelivery.SessionsHandler
-	if sqlDB := deps.SQLDB; sqlDB != nil {
-		authRepo := authpg.NewRepository(sqlDB, iampg.NewUserTenantRepository(sqlDB))
-		sessionSvc := iamapp.NewSessionService(db.NewTxRunner(sqlDB), deps.AuditWriter, authRepo)
-		// M4/F4.4: auth returns auth-owned session rows; the iam consumer enriches
-		// display names via the iam-owned port (read off-tx on the pool).
-		sessionsHandler = iamdelivery.NewSessionsHandler(authRepo, deps.AuditWriter).
-			WithSessionService(sessionSvc).
-			WithDisplayNameReader(iampg.NewUserDisplayNameRepository(sqlDB))
-	}
-	var securityService *securityapp.Service
-	var securityHandler *securitydelivery.Handler
-	if sqlDB := deps.SQLDB; sqlDB != nil {
-		// Security reports on auth_identities/auth_sessions but does not own
-		// iam_users or iam_user_roles; it resolves tenant membership, display names,
-		// and admin-role membership via iam-owned ports (M4/F4.2) instead of JOINing
-		// iam's tables.
-		securityService = securityapp.NewService(securitypg.NewRepository(
-			sqlDB,
-			iampg.NewUserDisplayNameRepository(sqlDB),
-			iampg.NewTenantUserRepository(sqlDB),
-			iampg.NewAdminRoleMemberRepository(sqlDB),
-			iampg.NewMfaUserRepository(sqlDB),
-		))
-		securityHandler = securitydelivery.NewHandler(securityService)
-	} else {
-		securityHandler = securitydelivery.NewHandler(nil)
-	}
+	sessionsHandler := buildSessionsHandler(deps)
+
+	securityService, securityHandler := buildSecurityHandler(deps)
 
 	// PR-8 Observability service.
-	var observabilityHandler *iamdelivery.ObservabilityHandler
-	if sqlDB := deps.SQLDB; sqlDB != nil {
-		observabilityRepo := iampg.NewObservabilityRepository(sqlDB)
-		observabilityService := iamapp.NewObservabilityService(observabilityRepo, wiring.NewMfaCoveragePctReader(securityService))
-		observabilityHandler = iamdelivery.NewObservabilityHandler(observabilityService)
-		iamAdminHandler = iamAdminHandler.WithObservabilityService(observabilityService)
-	}
+	observabilityHandler := buildObservabilityHandler(deps, securityService, iamAdminHandler)
+
 	featureFlagsHandler := featureflags.NewHandler(featureFlagsCfg)
-	httpObs := observability.NewHTTPObservability(
-		func(r *http.Request) string {
-			if currentUser, ok := authdomain.CurrentUserFromContext(r.Context()); ok {
-				return currentUser.UserID
-			}
-			return ""
-		},
-		deps.StatusProvider,
-	)
+	httpObs := observability.NewHTTPObservability(currentUserIDFromRequest, deps.StatusProvider)
 	// healthHandler/observabilityHandlerMetrics are constructed after httpObs
 	// (not at healthHandler's previous call site near authHandler) because
 	// GetMetrics delegates to httpObs.MetricsHandler(). Task 15a (Ruling 1)
@@ -470,37 +337,14 @@ func main() {
 	// combined budget instead of N independent ones. The startup guard
 	// refuses to boot when METALDOCS_MULTI_REPLICA=true with the in-memory
 	// store (per-process counters would silently multiply the limits ×N).
-	rlStoreCfg, err := ratelimit.LoadStoreConfig(os.Getenv)
-	if err != nil {
-		slog.Error("rate limit store config", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
-	}
 	// nil for the memory backend — each limiter then builds its own private
 	// in-memory store (unchanged behavior). Non-nil (redis) is shared by BOTH
 	// limiter mounts below so the process holds exactly one Redis client.
-	rlStore, err := ratelimit.NewStoreFromConfig(rlStoreCfg, slog.Default())
+	rlStore, rlCleanup, preAuthLimiter, err := buildRateLimiting(ctx, authCfg)
 	if err != nil {
-		slog.Error("rate limit store init", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
+		return 1
 	}
-	if rlStore != nil {
-		defer rlStore.Close()
-	}
-
-	// Pre-auth IP-keyed rate limit for the login endpoint (REQ-MW-5). Runs
-	// before authn in the chain; always keys by client IP. 10 attempts/min
-	// per IP — brute force is additionally bounded by account lockout.
-	loginRateCfg, err := ratelimit.NewConfig(map[ratelimit.RouteKey]int{ratelimit.RouteAuthLogin: 10})
-	if err != nil {
-		slog.Error("login rate limit config", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
-	}
-	loginRateCfg.TrustedProxyCIDRs = authCfg.TrustedProxyCIDRs
-	loginRateCfg.Store = rlStore
-	preAuthLimiter := ratelimit.New(ctx, loginRateCfg)
+	defer rlCleanup()
 
 	// Post-authn global envelope limiter (F-05/D-04, Wave 2.8): replaces the
 	// legacy security.RateLimiter. Same identity precedence: authenticated user
@@ -516,15 +360,7 @@ func main() {
 	// after authn + iamMiddleware in the chain, so both auth and IAM user IDs
 	// are available. Mirrors security.RateLimiter.requestIdentity without
 	// importing domain packages (dependency injected via closure).
-	userIDExtractor := func(r *http.Request) string {
-		if currentUser, ok := authdomain.CurrentUserFromContext(r.Context()); ok && strings.TrimSpace(currentUser.UserID) != "" {
-			return strings.TrimSpace(currentUser.UserID)
-		}
-		if userID := strings.TrimSpace(iamdomain.UserIDFromContext(r.Context())); userID != "" {
-			return userID
-		}
-		return ""
-	}
+	userIDExtractor := resolveRateLimitIdentity
 
 	presenceBump, presenceHub, presenceHandler := startPresence(ctx, deps, iamAdminHandler)
 
@@ -535,45 +371,7 @@ func main() {
 	controlledDocumentsModule := buildControlledDocumentsModule(deps)
 	controlledDocumentDuplicator := wiring.NewControlledDocumentDuplicator(controlledDocumentsModule.Service())
 
-	var membershipService *iamapp.AreaMembershipService
-	if deps.SQLDB != nil {
-		// WithRoleCacheInvalidator: grant/revoke must flush the cached role set so a
-		// changed area membership stops authorizing immediately, not after the TTL (A3).
-		membershipService = iamapp.NewAreaMembershipService(
-			iampg.NewUserAreaRepository(deps.SQLDB),
-			iamapp.NewAuditMembershipLogger(deps.AuditWriter),
-		).WithRoleCacheInvalidator(cachedProvider)
-	}
-
-	// PR-4: People-tab orchestrator. AreaCatalogReader validates an invite's
-	// areaCode against the process-area SSOT (metaldocs.document_process_areas)
-	// up front, so an unknown area is a clean boundary error instead of a
-	// downstream FK violation. In-memory mode (no SQLDB) leaves it nil, which
-	// NewPeopleService resolves to the permissive catalog.
-	var areaCatalog iamapp.AreaCatalogReader
-	if deps.SQLDB != nil {
-		areaCatalog = iampg.NewProcessAreaCatalog(deps.SQLDB, taxonomyinfra.NewAreaCatalogReaderPG())
-	}
-	peopleService := iamapp.NewPeopleService(authService, cachedProvider, deps.RoleAdminRepo, membershipService, areaCatalog, cachedProvider)
-	// H-3b Site 3: wire atomic PatchAtomic (UpdateUserTx + ReplaceUserRolesTx + RecordTx).
-	// authpg.Repository satisfies the userUpdaterTx port (UpdateUserTx method).
-	if deps.SQLDB != nil {
-		peopleService.WithTxAudit(db.NewTxRunner(deps.SQLDB), deps.AuditWriter, authpg.NewRepository(deps.SQLDB, iampg.NewUserTenantRepository(deps.SQLDB)))
-	}
-	peopleHandler := iamdelivery.NewPeopleHandler(peopleService, authService, deps.AuditWriter)
-
-	// PR-1 (area-memberships rebuild): MembershipHandler now takes a
-	// cross-tenant verifier (PeopleService.VerifyUserInTenant) so cross-tenant
-	// probes return 404. Grant/revoke audit rows are written in-tx by the
-	// service's AuditMembershipLogger (wired above), not by the handler (H-3a).
-	membershipHandler := iamdelivery.NewMembershipHandler(membershipService, peopleService)
-
-	// PR-5: IAM Admin Center "Roles & Capabilities" tab: read-only matrix.
-	var roleCapsReader iamdelivery.RoleCapabilitiesReader
-	if deps.SQLDB != nil {
-		roleCapsReader = iampg.NewRoleCapabilitiesRepository(deps.SQLDB)
-	}
-	rolesCapsHandler := iamdelivery.NewRolesCapsHandler(roleCapsReader)
+	peopleHandler, membershipHandler, rolesCapsHandler := buildPeopleHandlers(deps, authService, cachedProvider)
 
 	// CON-07 (ADR 0012 / target-arch N2): mount the full generated IAM
 	// ServerInterface — iamAdminHandler, sessionsHandler, observabilityHandler,
@@ -600,16 +398,9 @@ func main() {
 	profileRepo := taxonomyinfra.NewProfileRepository(deps.SQLDB)
 
 	// Fanout/eigenpal client — enabled when METALDOCS_FANOUT_URL is set.
-	fanoutClientCfg, err := config.LoadFanoutConfig()
+	fanoutClientCfg, err := loadFanoutClientConfig()
 	if err != nil {
-		slog.Error("invalid fanout config", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
-	}
-	if err := requireApprovalRuntimeSupport(fanoutClientCfg.URL); err != nil {
-		slog.Error("approval runtime unavailable", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
+		return 1
 	}
 	fanoutCfg := buildFanoutComponents(deps, fanoutClientCfg, controlledDocumentsModule)
 
@@ -652,18 +443,7 @@ func main() {
 	// PDFOutboxReader is the render/fanout-owned liveness read-port (QA-1 F13):
 	// pdf_status='failed' derives from dead-lettered materialize/pdf outbox events.
 	docDeps.PDFOutboxReader = fanout.NewPDFPipelineStateReader(deps.SQLDB)
-	if deps.PDFConverter != nil {
-		docDeps.ExportDocgen = deps.PDFConverter
-	}
-	if fanoutCfg.client != nil && deps.SQLDB != nil {
-		snapRepo := docrepo.NewSnapshotRepository(deps.SQLDB)
-		inputsReader := docrepo.NewFanoutInputsReader(deps.SQLDB)
-		docDeps.ReconstructRunner = fanout.NewReconstructService(
-			inputsReader, fanoutCfg.client, snapRepo,
-			fanout.EngineVersions{EigenpalVer: "local", DocxtemplaterVer: "local"},
-			nil,
-		)
-	}
+	finishDocumentsDependencies(&docDeps, deps, fanoutCfg)
 
 	approvalRepo := approvalrepo.NewPostgresApprovalRepository(deps.SQLDB, displayNameRepo)
 	approvalEmitter := approvalapp.NewSQLEmitter()
@@ -681,18 +461,651 @@ func main() {
 	// port to the templates-side adapter — the ONLY seam a terminal
 	// template-subject signoff decision crosses into templates_template_version.
 	approvalServices = approvalServices.WithTemplateCompletionWriter(templatesinfra.NewApprovalCompletionWriter())
+
+	// wireApprovalRuntime wires the River job runtime (which completes
+	// approvalServices.Decision's ports) and the templates handler (whose
+	// approval-kernel wiring requires Decision to be Ready()) behind one
+	// call/error-check pair — neither depends on the documents module, so
+	// both run before it without changing observable behavior.
+	templatesModule, templatesRepo, templatesStore, approvalHandler, err := wireApprovalRuntime(ctx, deps, approvalServices, tenantHandler, iamTxRunner, tenantCrypto, sharedPresigner, fanoutCfg, cdReader, capabilityService, displayNameRepo)
+	if err != nil {
+		return 1
+	}
+
+	docMod := documents.New(docDeps)
+	// SP-2: pin tenant dictionary values at document creation. tokensModule was
+	// built at startup (line ~358), before docMod.
+	docMod.Service.WithDictionaryReader(dictionaryValueReaderAdapter{reader: tokensModule.Reader})
+	// Task 15a: Mount(Muxer) takes exactly one argument, so the rate limiter
+	// and user-ID extractor (both constructed at line ~484, well before
+	// docMod exists) move from a routeFamilies closure onto docMod as
+	// constructor fields.
+	docMod.WithRateLimit(globalLimiter, userIDExtractor)
+
+	// Wire the documents-side adapter back into the controlled-documents service so atomic
+	// CD-create can clone the initial document inside the same tx as the CD
+	// insert. controlledDocumentsModule was constructed before docMod (because docMod
+	// needs ControlledDocumentDuplicator), hence the post-construction setter.
+	controlledDocumentsModule.Service().WithDocumentInitializer(docapp.NewCDDocumentInitializer(docMod.Service))
+
+	// M2/F2.2: distribution module — read-only delivery + repository layer.
+	// Reuses displayNameRepo (constructed above at line ~418); no new DB handle.
+	distributionRepo := distributioninfra.NewCoverageRepository(deps.SQLDB, displayNameRepo)
+	distributionHandler := distributionhttp.NewHandler(distributionRepo)
+
+	// M3/F3.2: notifications module — read surface (list / unread-count / mark-read).
+	// Self-scoped by CapNotificationRead (tier-1) + recipient_user_id SQL predicate.
+	notificationsRepo := notificationsinfra.NewNotificationsRepository(deps.SQLDB)
+	notificationsHandler := notificationshttp.NewHandler(notificationsRepo)
+
+	// buildPublishers (publishers.go) is the composition root's route
+	// inventory — a LIST, not a struct: a handler built above but never added
+	// to publisherDeps is a missing list element, and assertSurface's check 1
+	// (tag coverage) fires as a boot fatal below, not a live discovery.
+	e2e := e2ePublisher(deps.SQLDB) // nil in every build without the handlers
+	useE2E := decideE2E(e2e)        // ONE value decides both sides
+
+	publishers := buildPublishers(publisherDeps{
+		auth:                authHandler,
+		health:              healthHandler,
+		observability:       observabilityHandlerMetrics,
+		featureFlags:        featureFlagsHandler,
+		audit:               auditHandler,
+		search:              searchHandler,
+		security:            securityHandler,
+		taxonomy:            taxonomyModule,
+		tokens:              tokensModule,
+		controlledDocuments: controlledDocumentsModule,
+		iam:                 iamRouter,
+		documents:           docMod,
+		templates:           templatesModule,
+		approval:            approvalHandler,
+		distribution:        distributionHandler,
+		notifications:       notificationsHandler,
+	})
+	// surface AND expectedTags are BOTH derived from useE2E — never from the
+	// publisher list — but surface is an ASSIGNMENT into the variable
+	// declared beside mux above, not a fresh `:=`: newPermissionResolver and
+	// newPasswordChangeAllowedChecker already hold a pointer to that
+	// variable, so reassigning it here (rather than shadowing it) is what
+	// makes the widened table visible to every request the resolvers serve
+	// from this point forward.
+	expectedTags := specTags
+	if useE2E {
+		publishers = append(publishers, e2e)
+		surface = mergedSurface(httpSurface, httpSurfaceE2E)
+		expectedTags = union(specTags, specTagsE2E)
+		slog.Warn("e2etest handlers mounted — destructive endpoints reachable without auth", "env", "METALDOCS_E2E=1")
+	} else {
+		slog.Info("e2etest handlers not mounted", "reason", "METALDOCS_E2E != 1")
+	}
+
+	mounted := mountPublishers(mux, publishers)
+
+	// surface AND expectedTags are BOTH derived from useE2E — never from the
+	// publisher list, which is the thing being audited: an expected set
+	// derived from the list under audit makes check 1 vacuously true, which
+	// is exactly how a missing publisher would pass a check written to catch
+	// it.
+	if err := assertSurface(mounted, surface, expectedTags, publishers); err != nil {
+		slog.Error("http surface", "err", err)
+		return 1
+	}
+
+	wireHTTPObservabilityDBPool(httpObs, deps)
+
+	stopSessions := jobs.StartSessionSweeper(ctx, docMod.Repo(), 60*time.Second)
+	stopOrphans := jobs.StartOrphanPendingSweeper(ctx, docMod.Repo(), time.Hour, 24*time.Hour)
+	// F-T6(a): reconciliation janitor for template objects orphaned when
+	// spawnNextDraft's pre-tx Copy survives a rolled-back publish tx. Mirrors the
+	// documents orphan sweeper above; deletes only aged-out (>24h) objects absent
+	// from the referenced docx∪schema key set.
+	stopTemplateOrphans := templatejobs.StartTemplateOrphanSweeper(ctx, templatesRepo, templatesStore, time.Hour, 24*time.Hour)
+	defer stopSessions()
+	defer stopOrphans()
+	defer stopTemplateOrphans()
+	// Prometheus text-exposition scrape endpoint. Deliberately NOT mounted on
+	// mux (which the API chain below wraps with authn/iam/httpObs/rate-limit)
+	// — it is served from a top-level dispatch mux, ahead of and outside the
+	// entire API chain (see rootMux below, after handler is built). Contract
+	// §3.2: /metrics is a platform scrape surface, not a versioned product
+	// route, so it is NOT declared in api/openapi/v1/openapi.yaml. Coexists
+	// with the JSON endpoint (mounted via buildPublishers above, see
+	// publishers.go); they read from separate storage (prometheus vecs vs.
+	// byKey atomics).
+
+	// Audit retention - AUDIT_RETENTION_DAYS=0 disables (default disabled).
+	retentionCfg, err := config.LoadRetentionConfig()
+	if err != nil {
+		slog.Error("invalid retention config", "err", err)
+		return 1
+	}
+	startAuditRetention(ctx, deps, retentionCfg.Days)
+
+	// Canonical chain per backend-target-architecture.md §2.1 (F-01 fix,
+	// REQ-MW-1/2/4/5): panic recovery + trace context outermost, access
+	// log/metrics OUTSIDE authn so 401s and panics are observable,
+	// pre-auth IP-keyed login limit before authn. presenceBump stays
+	// after iamMiddleware (needs iamdomain.UserID in ctx, PR-9). Order is
+	// asserted by chain_test.go (REQ-MW-7).
+	// otel link is nil (skipped by buildChain) unless an exporter is configured;
+	// recovery stays outermost, otel wraps everything else (Z-1, REQ-OBS-1).
+	handler := buildChain(mux, apiChain(
+		platformmw.Recovery,
+		buildOtelWrap(otelEnabled),
+		httpObs.Wrap,
+		cors.Wrap,
+		originProtection.Wrap,
+		loginRateLimit(preAuthLimiter),
+		authMiddleware.Wrap,
+		iamMiddleware.Wrap,
+		buildPresenceWrap(presenceBump),
+		func(next http.Handler) http.Handler { return globalLimiter.GlobalEnvelopeWrap(userIDExtractor, next) },
+		// Innermost (nearest the mux): rewrite the stdlib text/plain 404/405 the
+		// method-routed ServeMux emits into problem+json, preserving Allow (D-03).
+		platformmw.MethodNotAllowedJSON,
+	))
+
+	server, metricsServer, err := buildServers(handler, httpObs)
+	if err != nil {
+		return 1
+	}
+
+	// Z-22 / REQ-REL-2: drain live WS presence connections before the
+	// HTTP server stops accepting.
+	registerPresenceShutdown(server, presenceHub)
+
+	slog.Info("MetalDocs API listening",
+		"addr", server.Addr, "metrics_addr", metricsServer.Addr,
+		"repository", repoMode, "auth_enabled", authn.Enabled(),
+		"auth_cache_ttl", authn.CacheTTL(), "cors_enabled", corsCfg.Enabled,
+		"cors_allowed_origins", len(corsCfg.AllowedOrigins))
+
+	serverErr := make(chan error, 1)
+	go func() {
+		serverErr <- server.ListenAndServe()
+	}()
+
+	metricsErr := make(chan error, 1)
+	go func() {
+		metricsErr <- metricsServer.ListenAndServe()
+	}()
+
+	// Returning (rather than os.Exit-ing here) lets every defer registered
+	// above — deps.Cleanup, stop, otelShutdown, rlStore.Close, the session/
+	// orphan/template sweepers — unwind on both the clean and the failed
+	// shutdown path; main's single os.Exit(run()) applies the exit code
+	// after that unwind completes.
+	return shutdownServer(ctx, stop, server, metricsServer, serverErr, metricsErr)
+}
+
+// setupOTelTracing wraps observability.SetupOTel with the deferred-shutdown
+// closure and the "tracing enabled" log line run() previously inlined
+// (Z-1, REQ-OBS-3). otelShutdown is a no-op when disabled; the returned
+// bool gates the otel chain link (buildOtelWrap).
+func setupOTelTracing(ctx context.Context) (func(), bool, error) {
+	otelShutdown, otelEnabled, err := observability.SetupOTel(ctx, "metaldocs-api")
+	if err != nil {
+		slog.Error("setup otel", "err", err)
+		return nil, false, err
+	}
+	if otelEnabled {
+		slog.Info("OpenTelemetry tracing enabled", "exporter", os.Getenv("OTEL_TRACES_EXPORTER")) //nolint:gosec // G706: slog default is JSONHandler (set at process start) — control chars are JSON-escaped, log-line injection not possible
+	}
+	return wrapOTelShutdown(ctx, otelShutdown), otelEnabled, nil
+}
+
+// wrapOTelShutdown wraps the OTel SetupOTel shutdown func with the 5s
+// shutdown timeout and warning log run() previously inlined into its own
+// defer closure. parentCtx is run()'s signal-context, propagated here (rather
+// than a bare context.Background()) so the shutdown deadline stays anchored
+// to the process's own context chain; it is deliberately detached from
+// cancellation via context.WithoutCancel, since the returned closure only
+// runs from run()'s own deferred cleanup, at which point parentCtx is always
+// already Done() (shutdownServer has already returned by then) — deriving
+// the timeout from it directly would cancel instantly, defeating the 5s
+// grace period below.
+func wrapOTelShutdown(parentCtx context.Context, shutdown func(context.Context) error) func() {
+	return func() {
+		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(parentCtx), 5*time.Second)
+		defer cancel()
+		if err := shutdown(shutdownCtx); err != nil {
+			slog.Warn("otel shutdown", "err", err)
+		}
+	}
+}
+
+// loadBootConfig loads the fixed set of process-lifetime config values run()
+// needs before it can build bootstrap.APIDependencies: repository mode (with
+// the metaldocs-api-requires-postgres guard), CORS, attachments, auth runtime
+// config, and feature flags. Each load keeps its own "invalid X config" log
+// line, unchanged from their previous inline call sites.
+func loadBootConfig() (repoMode string, corsCfg config.CORSConfig, attachmentsCfg config.AttachmentsConfig, authCfg authapp.Config, featureFlagsCfg config.FeatureFlagsConfig, err error) {
+	repoMode, err = config.RepositoryMode()
+	if err != nil {
+		slog.Error("invalid repository mode", "err", err)
+		return
+	}
+	if err = requirePostgresRepositoryMode(repoMode); err != nil {
+		slog.Error("unsupported repository mode", "err", err)
+		return
+	}
+	corsCfg, err = config.LoadCORSConfig()
+	if err != nil {
+		slog.Error("invalid cors config", "err", err)
+		return
+	}
+	attachmentsCfg, err = config.LoadAttachmentsConfig()
+	if err != nil {
+		slog.Error("invalid attachments config", "err", err)
+		return
+	}
+	authCfg, err = authn.LoadRuntimeConfig()
+	if err != nil {
+		slog.Error("invalid auth config", "err", err)
+		return
+	}
+	featureFlagsCfg, err = config.LoadFeatureFlagsConfig()
+	if err != nil {
+		slog.Error("invalid feature flags config", "err", err)
+		return
+	}
+	return
+}
+
+// applyStartupMigrations applies the db/grants stage followed by the
+// migration ledger, when a database connection is configured and migrations
+// are not skipped. The grants stage runs BEFORE migrations and
+// unconditionally (no ledger): db/grants carries the privilege/role posture
+// pg_dump --no-privileges cannot put in the baseline, and it was previously
+// applied only at fresh bootstrap — so an existing volume never saw an edit.
+// Every file is idempotent by construction; a missing/empty dir is fatal.
+// See internal/platform/migrate.ApplyGrants.
+func applyStartupMigrations(ctx context.Context, deps bootstrap.APIDependencies) error {
+	migrationCfg, err := config.LoadMigrationConfig()
+	if err != nil {
+		slog.Error("invalid migration config", "err", err)
+		return err
+	}
+	if deps.SQLDB == nil || migrationCfg.Skip {
+		return nil
+	}
+	if err := migrate.ApplyGrants(ctx, deps.SQLDB, migrationCfg.GrantsDir, slog.Default()); err != nil {
+		slog.Error("apply grants stage", "err", err)
+		return err
+	}
+	if err := migrate.Apply(ctx, deps.SQLDB, migrationCfg.Dir, slog.Default()); err != nil {
+		slog.Error("apply startup migrations", "err", err)
+		return err
+	}
+	return nil
+}
+
+// buildAuthService constructs the auth application service and runs its
+// local-admin bootstrap.
+func buildAuthService(ctx context.Context, deps bootstrap.APIDependencies, authCfg authapp.Config) (*authapp.Service, error) {
+	authService, err := authapp.NewService(deps.AuthRepo, deps.RoleProvider, deps.RoleAdminRepo, iampg.NewLoginContextRepository(deps.SQLDB), authCfg, deps.AuditWriter)
+	if err != nil {
+		slog.Error("new auth service", "err", err)
+		return nil, err
+	}
+	if err := authService.BootstrapLocalAdmin(ctx); err != nil {
+		slog.Error("bootstrap local admin", "err", err)
+		return nil, err
+	}
+	return authService, nil
+}
+
+// buildTenantCrypto constructs the M7 F7.3 tenant DEK/KEK crypto-shred
+// service when a database connection is available and METALDOCS_TENANT_KEK
+// is configured. Returns (nil, nil) in either the SQLDB-less boot path or
+// when the KEK is unset — every consumer falls back to its own no-op path
+// (F7.2's nil-safe pattern), so boot still works with crypto disabled.
+func buildTenantCrypto(deps bootstrap.APIDependencies) (securitydomain.TenantCrypto, error) {
+	if deps.SQLDB == nil {
+		return nil, nil
+	}
+	kek, kekConfigured, kekErr := config.LoadTenantKEK()
+	if kekErr != nil {
+		slog.Error("invalid tenant crypto KEK", "err", kekErr)
+		return nil, kekErr
+	}
+	if !kekConfigured {
+		slog.Info("tenant crypto disabled: METALDOCS_TENANT_KEK not set")
+		return nil, nil
+	}
+	svc, err := securityapp.NewTenantCryptoService(securitypg.NewTenantKeyRepository(deps.SQLDB), kek)
+	if err != nil {
+		slog.Error("construct tenant crypto service", "err", err)
+		return nil, err
+	}
+	return svc, nil
+}
+
+// wireAuditPayloadCrypto wires the M7 F7.3 item 2 payload envelope encryptor
+// into deps.AuditWriter when tenant crypto is enabled. deps.AuditWriter is
+// the same *auditpg.Writer instance backing AuditReader/AuditCounter (see
+// bootstrap.BuildAPIDependencies), so wiring it here via WithPayloadCrypto
+// (mutate-and-return-self) takes effect for every consumer of those three
+// fields. A nil tenantCrypto (KEK unset) is a no-op — RecordTx/ListEvents
+// stay on the legacy plaintext path byte-for-byte.
+func wireAuditPayloadCrypto(deps bootstrap.APIDependencies, tenantCrypto securitydomain.TenantCrypto) {
+	if tenantCrypto == nil {
+		return
+	}
+	if auditWriter, ok := deps.AuditWriter.(*auditpg.Writer); ok {
+		auditWriter.WithPayloadCrypto(auditPayloadCryptoAdapter{crypto: tenantCrypto})
+	}
+}
+
+// auditExportDownloadURL builds the export-download URL audit.Service.WithExports
+// stamps onto a completed export job, or "" for a job missing its ID/token.
+func auditExportDownloadURL(job auditdomain.ExportJob) string {
+	if job.ID == "" || job.DownloadToken == "" {
+		return ""
+	}
+	return fmt.Sprintf("/api/v1/audit/events/export/%s/download?token=%s", job.ID, job.DownloadToken)
+}
+
+// buildAuditService constructs the audit application service, wiring export
+// support when both the counter and export repositories are available.
+func buildAuditService(deps bootstrap.APIDependencies) *auditapp.Service {
+	auditService := auditapp.NewService(deps.AuditReader)
+	if deps.AuditCounter != nil && deps.AuditExports != nil {
+		auditService.WithExports(deps.AuditCounter, deps.AuditExports, deps.AuditWriter, auditExportDownloadURL)
+	}
+	return auditService
+}
+
+// buildIAMTxRunner returns a TxRunner over deps.SQLDB for IAM's atomic audit
+// writes (H-3b, Site 2/3/4), or nil in the SQLDB-less in-memory boot path.
+func buildIAMTxRunner(deps bootstrap.APIDependencies) db.TxRunner {
+	if deps.SQLDB == nil {
+		return nil
+	}
+	return db.NewTxRunner(deps.SQLDB)
+}
+
+// buildTenantHandler wires the M7 F7.2 tenant onboarding handler (POST
+// /tenants). Returns nil (Router answers 501) on the SQLDB-less boot path,
+// matching every other conditionally-wired IAM handler.
+func buildTenantHandler(deps bootstrap.APIDependencies, iamTxRunner db.TxRunner, tenantCrypto securitydomain.TenantCrypto) *iamdelivery.TenantHandler {
+	if deps.SQLDB == nil {
+		return nil
+	}
+	var keyProvisioner iamapp.TenantKeyProvisioner
+	if tenantCrypto != nil {
+		// Composition-root adapter: iam depends only on its own
+		// TenantKeyProvisioner port; it never imports security's
+		// internals. This wraps security's published TenantCrypto port
+		// (F7.3 replaces F7.2's NoopTenantKeyProvisioner).
+		keyProvisioner = tenantCryptoKeyProvisioner{crypto: tenantCrypto}
+	}
+	onboardTenantService := iamapp.NewOnboardTenantService(
+		iampg.NewTenantRepository(deps.SQLDB),
+		authpg.NewRepository(deps.SQLDB, iampg.NewUserTenantRepository(deps.SQLDB)),
+		iamTxRunner,
+		deps.AuditWriter,
+		keyProvisioner, // nil -> NoopTenantKeyProvisioner when tenant crypto is disabled
+		authapp.HashPassword,
+	)
+	return iamdelivery.NewTenantHandler(onboardTenantService)
+}
+
+// buildSessionsHandler wires the PR-7 Sessions & Security tab handler.
+// Returns nil on the SQLDB-less boot path.
+func buildSessionsHandler(deps bootstrap.APIDependencies) *iamdelivery.SessionsHandler {
+	sqlDB := deps.SQLDB
+	if sqlDB == nil {
+		return nil
+	}
+	authRepo := authpg.NewRepository(sqlDB, iampg.NewUserTenantRepository(sqlDB))
+	sessionSvc := iamapp.NewSessionService(db.NewTxRunner(sqlDB), deps.AuditWriter, authRepo)
+	// M4/F4.4: auth returns auth-owned session rows; the iam consumer enriches
+	// display names via the iam-owned port (read off-tx on the pool).
+	return iamdelivery.NewSessionsHandler(authRepo, deps.AuditWriter).
+		WithSessionService(sessionSvc).
+		WithDisplayNameReader(iampg.NewUserDisplayNameRepository(sqlDB))
+}
+
+// buildSecurityHandler wires the security-report service. Security reports on
+// auth_identities/auth_sessions but does not own iam_users or
+// iam_user_roles; it resolves tenant membership, display names, and
+// admin-role membership via iam-owned ports (M4/F4.2) instead of JOINing
+// iam's tables. The returned handler is always non-nil (nil service on the
+// SQLDB-less boot path, matching the original inline nil guard).
+func buildSecurityHandler(deps bootstrap.APIDependencies) (*securityapp.Service, *securitydelivery.Handler) {
+	sqlDB := deps.SQLDB
+	if sqlDB == nil {
+		return nil, securitydelivery.NewHandler(nil)
+	}
+	securityService := securityapp.NewService(securitypg.NewRepository(
+		sqlDB,
+		iampg.NewUserDisplayNameRepository(sqlDB),
+		iampg.NewTenantUserRepository(sqlDB),
+		iampg.NewAdminRoleMemberRepository(sqlDB),
+		iampg.NewMfaUserRepository(sqlDB),
+	))
+	return securityService, securitydelivery.NewHandler(securityService)
+}
+
+// buildObservabilityHandler wires the PR-8 Observability service and mutates
+// iamAdminHandler in place (WithObservabilityService is a mutate-and-
+// return-self pointer method, so the caller's iamAdminHandler sees the
+// wiring without needing the return value threaded back). Returns nil on the
+// SQLDB-less boot path, leaving iamAdminHandler untouched.
+func buildObservabilityHandler(deps bootstrap.APIDependencies, securityService *securityapp.Service, iamAdminHandler *iamdelivery.AdminHandler) *iamdelivery.ObservabilityHandler {
+	sqlDB := deps.SQLDB
+	if sqlDB == nil {
+		return nil
+	}
+	observabilityRepo := iampg.NewObservabilityRepository(sqlDB)
+	observabilityService := iamapp.NewObservabilityService(observabilityRepo, wiring.NewMfaCoveragePctReader(securityService))
+	observabilityHandler := iamdelivery.NewObservabilityHandler(observabilityService)
+	iamAdminHandler.WithObservabilityService(observabilityService)
+	return observabilityHandler
+}
+
+// currentUserIDFromRequest resolves the authenticated principal's user ID
+// for httpObs's per-request logging, or "" when unauthenticated.
+func currentUserIDFromRequest(r *http.Request) string {
+	if currentUser, ok := authdomain.CurrentUserFromContext(r.Context()); ok {
+		return currentUser.UserID
+	}
+	return ""
+}
+
+// resolveRateLimitIdentity resolves the global envelope limiter's identity
+// key: authenticated user → IAM user ID → "" (fail-closed to the shared
+// anonymous bucket). Runs after authn + iamMiddleware in the chain, so both
+// are available. Mirrors the retired security.RateLimiter.requestIdentity
+// without importing domain packages.
+func resolveRateLimitIdentity(r *http.Request) string {
+	if currentUser, ok := authdomain.CurrentUserFromContext(r.Context()); ok && strings.TrimSpace(currentUser.UserID) != "" {
+		return strings.TrimSpace(currentUser.UserID)
+	}
+	if userID := strings.TrimSpace(iamdomain.UserIDFromContext(r.Context())); userID != "" {
+		return userID
+	}
+	return ""
+}
+
+// buildRateLimitStore loads the rate-limit store backend config and
+// constructs the store: nil for the in-memory backend (each limiter then
+// builds its own private in-memory store), or a shared Redis-backed store so
+// N api replicas enforce ONE combined budget instead of N independent ones.
+func buildRateLimitStore() (ratelimit.Store, error) {
+	rlStoreCfg, err := ratelimit.LoadStoreConfig(os.Getenv)
+	if err != nil {
+		slog.Error("rate limit store config", "err", err)
+		return nil, err
+	}
+	rlStore, err := ratelimit.NewStoreFromConfig(rlStoreCfg, slog.Default())
+	if err != nil {
+		slog.Error("rate limit store init", "err", err)
+		return nil, err
+	}
+	return rlStore, nil
+}
+
+// buildPreAuthLimiter builds the pre-auth IP-keyed login rate limiter
+// (REQ-MW-5): 10 attempts/min per IP, sharing rlStore with the post-auth
+// global envelope limiter when a Redis backend is configured.
+func buildPreAuthLimiter(ctx context.Context, authCfg authapp.Config, rlStore ratelimit.Store) (*ratelimit.Middleware, error) {
+	loginRateCfg, err := ratelimit.NewConfig(map[ratelimit.RouteKey]int{ratelimit.RouteAuthLogin: 10})
+	if err != nil {
+		slog.Error("login rate limit config", "err", err)
+		return nil, err
+	}
+	loginRateCfg.TrustedProxyCIDRs = authCfg.TrustedProxyCIDRs
+	loginRateCfg.Store = rlStore
+	return ratelimit.New(ctx, loginRateCfg), nil
+}
+
+// buildRateLimiting wires the M8/F8.2 rate-limit store backend (memory or
+// shared Redis) together with the pre-auth IP-keyed login limiter (REQ-MW-5)
+// that shares it. The returned cleanup func closes the store for the Redis
+// backend and is a no-op for the memory backend (nil store) — the caller
+// unconditionally defers it, matching the original conditional
+// `if rlStore != nil { defer rlStore.Close() }`.
+func buildRateLimiting(ctx context.Context, authCfg authapp.Config) (ratelimit.Store, func(), *ratelimit.Middleware, error) {
+	rlStore, err := buildRateLimitStore()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	// nil for the memory backend — each limiter then builds its own private
+	// in-memory store (unchanged behavior). Non-nil (redis) is shared by BOTH
+	// limiter mounts (this one and the post-auth global envelope limiter in
+	// run()) so the process holds exactly one Redis client.
+	cleanup := func() {}
+	if rlStore != nil {
+		cleanup = rlStore.Close
+	}
+	// Pre-auth IP-keyed rate limit for the login endpoint (REQ-MW-5). Runs
+	// before authn in the chain; always keys by client IP. 10 attempts/min
+	// per IP — brute force is additionally bounded by account lockout.
+	preAuthLimiter, err := buildPreAuthLimiter(ctx, authCfg, rlStore)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return rlStore, cleanup, preAuthLimiter, nil
+}
+
+// buildPeopleHandlers wires the PR-4/PR-1/PR-5 People-tab handler trio
+// (People, Membership, Roles & Capabilities) and their shared
+// AreaMembershipService/PeopleService orchestrators. Every SQLDB-gated
+// dependency degrades to nil in the in-memory boot path, matching every
+// other conditionally-wired IAM handler.
+func buildPeopleHandlers(deps bootstrap.APIDependencies, authService *authapp.Service, cachedProvider *iamapp.CachedRoleProvider) (*iamdelivery.PeopleHandler, *iamdelivery.MembershipHandler, *iamdelivery.RolesCapsHandler) {
+	var membershipService *iamapp.AreaMembershipService
+	if deps.SQLDB != nil {
+		// WithRoleCacheInvalidator: grant/revoke must flush the cached role set so a
+		// changed area membership stops authorizing immediately, not after the TTL (A3).
+		membershipService = iamapp.NewAreaMembershipService(
+			iampg.NewUserAreaRepository(deps.SQLDB),
+			iamapp.NewAuditMembershipLogger(deps.AuditWriter),
+		).WithRoleCacheInvalidator(cachedProvider)
+	}
+
+	// PR-4: People-tab orchestrator. AreaCatalogReader validates an invite's
+	// areaCode against the process-area SSOT (metaldocs.document_process_areas)
+	// up front, so an unknown area is a clean boundary error instead of a
+	// downstream FK violation. In-memory mode (no SQLDB) leaves it nil, which
+	// NewPeopleService resolves to the permissive catalog.
+	var areaCatalog iamapp.AreaCatalogReader
+	if deps.SQLDB != nil {
+		areaCatalog = iampg.NewProcessAreaCatalog(deps.SQLDB, taxonomyinfra.NewAreaCatalogReaderPG())
+	}
+	peopleService := iamapp.NewPeopleService(authService, cachedProvider, deps.RoleAdminRepo, membershipService, areaCatalog, cachedProvider)
+	// H-3b Site 3: wire atomic PatchAtomic (UpdateUserTx + ReplaceUserRolesTx + RecordTx).
+	// authpg.Repository satisfies the userUpdaterTx port (UpdateUserTx method).
+	if deps.SQLDB != nil {
+		peopleService.WithTxAudit(db.NewTxRunner(deps.SQLDB), deps.AuditWriter, authpg.NewRepository(deps.SQLDB, iampg.NewUserTenantRepository(deps.SQLDB)))
+	}
+	peopleHandler := iamdelivery.NewPeopleHandler(peopleService, authService, deps.AuditWriter)
+
+	// PR-1 (area-memberships rebuild): MembershipHandler now takes a
+	// cross-tenant verifier (PeopleService.VerifyUserInTenant) so cross-tenant
+	// probes return 404. Grant/revoke audit rows are written in-tx by the
+	// service's AuditMembershipLogger (wired above), not by the handler (H-3a).
+	membershipHandler := iamdelivery.NewMembershipHandler(membershipService, peopleService)
+
+	// PR-5: IAM Admin Center "Roles & Capabilities" tab: read-only matrix.
+	var roleCapsReader iamdelivery.RoleCapabilitiesReader
+	if deps.SQLDB != nil {
+		roleCapsReader = iampg.NewRoleCapabilitiesRepository(deps.SQLDB)
+	}
+	rolesCapsHandler := iamdelivery.NewRolesCapsHandler(roleCapsReader)
+
+	return peopleHandler, membershipHandler, rolesCapsHandler
+}
+
+// loadFanoutClientConfig loads the fanout client config and asserts the
+// approval runtime's hard dependency on METALDOCS_FANOUT_URL (freeze support
+// is not optional).
+func loadFanoutClientConfig() (config.FanoutConfig, error) {
+	fanoutClientCfg, err := config.LoadFanoutConfig()
+	if err != nil {
+		slog.Error("invalid fanout config", "err", err)
+		return config.FanoutConfig{}, err
+	}
+	if err := requireApprovalRuntimeSupport(fanoutClientCfg.URL); err != nil {
+		slog.Error("approval runtime unavailable", "err", err)
+		return config.FanoutConfig{}, err
+	}
+	return fanoutClientCfg, nil
+}
+
+// finishDocumentsDependencies wires the two documents.Dependencies fields
+// that depend on deps/fanoutCfg being fully constructed: the direct Gotenberg
+// PDF export path (when configured) and the fanout reconstruct runner (when
+// both a fanout client and a database connection are available).
+func finishDocumentsDependencies(docDeps *documents.Dependencies, deps bootstrap.APIDependencies, fanoutCfg fanoutComponents) {
+	if deps.PDFConverter != nil {
+		docDeps.ExportDocgen = deps.PDFConverter
+	}
+	if fanoutCfg.client != nil && deps.SQLDB != nil {
+		snapRepo := docrepo.NewSnapshotRepository(deps.SQLDB)
+		inputsReader := docrepo.NewFanoutInputsReader(deps.SQLDB)
+		docDeps.ReconstructRunner = fanout.NewReconstructService(
+			inputsReader, fanoutCfg.client, snapRepo,
+			fanout.EngineVersions{EigenpalVer: "local", DocxtemplaterVer: "local"},
+			nil,
+		)
+	}
+}
+
+// wireApprovalJobRuntime wires the River job-queue runtime the approval
+// kernel depends on: the lifecycle/notification enqueuers, the tenant
+// export/erase lifecycle service, the staging-outbox dispatch enqueuer, and
+// the terminal-approval release recorder (ADR 0085 / F-QA4-14). riverBundle
+// is nil when deps.SQLDB is nil, in which case every River-dependent wiring
+// below is skipped — approvalServices stays on its NewServices defaults
+// (domain.Noop* enqueuers) exactly as it did inline. The freeze-service
+// presence check runs unconditionally (matching its original position,
+// outside the SQLDB guard): approval requires a configured freeze service
+// regardless of repository mode.
+func wireApprovalJobRuntime(
+	ctx context.Context,
+	deps bootstrap.APIDependencies,
+	approvalServices *approvalapp.Services,
+	tenantHandler *iamdelivery.TenantHandler,
+	iamTxRunner db.TxRunner,
+	tenantCrypto securitydomain.TenantCrypto,
+	sharedPresigner *objectstore.VerifiedStore,
+	fanoutCfg fanoutComponents,
+	cdReader *cdinfra.CDFieldReaderPG,
+) error {
 	jobsCfg, err := config.LoadJobsConfig()
 	if err != nil {
 		slog.Error("invalid jobs config", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
+		return err
 	}
 	var riverBundle *riverjobs.ClientBundle
 	if deps.SQLDB != nil {
 		if err := bootstrap.MigrateRiverSchema(ctx, deps.SQLDB, jobsCfg.RiverSchema); err != nil {
 			slog.Error("migrate river schema", "err", err)
-			deps.Cleanup()
-			os.Exit(1)
+			return err
 		}
 		riverBundle, err = riverjobs.NewClientBundle(deps.SQLDB, riverjobs.Config{
 			Queues: jobsCfg.Queues,
@@ -711,8 +1124,7 @@ func main() {
 		}, nil)
 		if err != nil {
 			slog.Error("build river enqueuer client", "err", err)
-			deps.Cleanup()
-			os.Exit(1)
+			return err
 		}
 		approvalServices.WithLifecycleEnqueuer(approvaljobs.NewLifecycleEventEnqueuer(riverBundle.Client))
 		// Task 6: wire the approval-owned notification port into BOTH submit
@@ -750,8 +1162,7 @@ func main() {
 	}
 	if fanoutCfg.freezeService == nil {
 		slog.Error("approval runtime requires configured freeze service")
-		deps.Cleanup()
-		os.Exit(1)
+		return errors.New("approval runtime requires configured freeze service")
 	}
 	pdfOutboxRepo := fanout.NewPDFOutboxRepository(deps.SQLDB)
 	materializeOutboxRepo := fanout.NewMaterializeOutboxRepository(deps.SQLDB)
@@ -759,16 +1170,15 @@ func main() {
 	stagingOutboxWorkerCfg, err := config.LoadStagingOutboxWorkerConfig()
 	if err != nil {
 		slog.Error("invalid staging outbox worker config", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
+		return err
 	}
 
 	// pdfDispatchEnqueuer produces the paired (outbox row, River job) write for
 	// both staging dispatch kinds inside the caller's business tx (M5 F5.3 T3).
 	// riverBundle.Client is enqueue-only here (never Started in this binary);
 	// the temporal-queue dispatch workers that consume these jobs run in
-	// metaldocs-jobs. riverBundle is nil when deps.SQLDB is nil (:690-691), so
-	// this wiring is guarded the same way the release recorder is below (:792).
+	// metaldocs-jobs. riverBundle is nil when deps.SQLDB is nil, so this wiring
+	// is guarded the same way the release recorder is below.
 	if riverBundle != nil {
 		pdfDispatchEnqueuer := dispatchjobs.NewEnqueuer(riverBundle.Client, pdfOutboxRepo, materializeOutboxRepo, stagingOutboxWorkerCfg.MaxAttempts)
 
@@ -781,7 +1191,7 @@ func main() {
 	// rebuilding it: pdfDispatchEnqueuer and fanoutCfg.freezeService only
 	// exist from this point on in the composition root, but Decision already
 	// carries the profile-policy/template ports (above) and the lifecycle
-	// enqueuer (:684), and FastForward (built in NewServices) holds this same
+	// enqueuer, and FastForward (built in NewServices) holds this same
 	// pointer. Rebuilding here would silently drop all of that wiring from
 	// Decision while leaving FastForward on the original, divergent instance.
 	approvalServices.Decision = approvalServices.Decision.
@@ -798,185 +1208,153 @@ func main() {
 			approvaljobs.NewReleaseEvaluationEnqueuer(riverBundle.Client),
 		))
 	}
+	return nil
+}
 
-	docMod := documents.New(docDeps)
-	// SP-2: pin tenant dictionary values at document creation. tokensModule was
-	// built at startup (line ~358), before docMod.
-	docMod.Service.WithDictionaryReader(dictionaryValueReaderAdapter{reader: tokensModule.Reader})
-	// Task 15a: Mount(Muxer) takes exactly one argument, so the rate limiter
-	// and user-ID extractor (both constructed at line ~484, well before
-	// docMod exists) move from a routeFamilies closure onto docMod as
-	// constructor fields.
-	docMod.WithRateLimit(globalLimiter, userIDExtractor)
-
-	// Wire the documents-side adapter back into the controlled-documents service so atomic
-	// CD-create can clone the initial document inside the same tx as the CD
-	// insert. controlledDocumentsModule was constructed before docMod (because docMod
-	// needs ControlledDocumentDuplicator), hence the post-construction setter.
-	controlledDocumentsModule.Service().WithDocumentInitializer(docapp.NewCDDocumentInitializer(docMod.Service))
-
+// wireTemplatesApprovalKernel builds the templates module, verifies the
+// approval kernel's Decision service is fully wired, and wires the kernel's
+// published services into both the templates HTTP handler (its two thin
+// kernel routes: submit-for-approval, signoff) and the approval HTTP
+// handler. approvalServices.Decision is wired in place throughout (never
+// rebuilt), so this observes the same fully-ported instance FastForward and
+// approvalHandler do.
+func wireTemplatesApprovalKernel(
+	deps bootstrap.APIDependencies,
+	capabilityService *iamapp.CapabilityService,
+	sharedPresigner *objectstore.VerifiedStore,
+	displayNameRepo iamdomain.UserDisplayNameReader,
+	approvalServices *approvalapp.Services,
+) (*templateshttp.Handler, *templatesinfra.Repository, *objectstore.VerifiedStore, *approvalhttp.Handler, error) {
 	templatesModule, templatesRepo, templatesStore, err := buildTemplatesModule(deps, capabilityService, sharedPresigner, displayNameRepo)
 	if err != nil {
 		slog.Error("build templates module", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
+		return nil, nil, nil, nil, err
 	}
-	// M3 P3.S2b-4 (R2a): wire the approval kernel's published services into
-	// the templates HTTP handler so its two thin kernel routes
-	// (submit-for-approval, signoff) can delegate. approvalServices.Decision
-	// is wired in place throughout (never rebuilt), so this observes the same
-	// fully-ported instance FastForward and approvalHandler do.
 	if err := approvalServices.Decision.Ready(); err != nil {
 		slog.Error("approval decision service not fully wired", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
+		return nil, nil, nil, nil, err
 	}
 	templatesModule.WithApprovalKernel(approvalServices.TemplateSubmit, approvalServices.Decision, approvalServices.Read, db.NewTxRunner(deps.SQLDB))
 	signoffIdempStore := approvalinfra.NewPostgresSignoffIdempStore(deps.SQLDB)
 	routeAdminIdempStore := approvalinfra.NewPostgresRouteAdminIdempStore(deps.SQLDB)
-	approvalServices = approvalServices.WithRouteAdminIdempStore(routeAdminIdempStore)
+	approvalServices.WithRouteAdminIdempStore(routeAdminIdempStore)
 	approvalHandler := approvalhttp.NewHandler(approvalServices, deps.SQLDB, signoffIdempStore, displayNameRepo)
+	return templatesModule, templatesRepo, templatesStore, approvalHandler, nil
+}
 
-	// M2/F2.2: distribution module — read-only delivery + repository layer.
-	// Reuses displayNameRepo (constructed above at line ~418); no new DB handle.
-	distributionRepo := distributioninfra.NewCoverageRepository(deps.SQLDB, displayNameRepo)
-	distributionHandler := distributionhttp.NewHandler(distributionRepo)
-
-	// M3/F3.2: notifications module — read surface (list / unread-count / mark-read).
-	// Self-scoped by CapNotificationRead (tier-1) + recipient_user_id SQL predicate.
-	notificationsRepo := notificationsinfra.NewNotificationsRepository(deps.SQLDB)
-	notificationsHandler := notificationshttp.NewHandler(notificationsRepo)
-
-	// buildPublishers (publishers.go) is the composition root's route
-	// inventory — a LIST, not a struct: a handler built above but never added
-	// to publisherDeps is a missing list element, and assertSurface's check 1
-	// (tag coverage) fires as a boot fatal below, not a live discovery.
-	e2e := e2ePublisher(deps.SQLDB)              // nil in every build without the handlers
-	useE2E := e2e != nil && e2eHandlersEnabled() // ONE value decides both sides
-
-	publishers := buildPublishers(publisherDeps{
-		auth:                authHandler,
-		health:              healthHandler,
-		observability:       observabilityHandlerMetrics,
-		featureFlags:        featureFlagsHandler,
-		audit:               auditHandler,
-		search:              searchHandler,
-		security:            securityHandler,
-		taxonomy:            taxonomyModule,
-		tokens:              tokensModule,
-		controlledDocuments: controlledDocumentsModule,
-		iam:                 iamRouter,
-		documents:           docMod,
-		templates:           templatesModule,
-		approval:            approvalHandler,
-		distribution:        distributionHandler,
-		notifications:       notificationsHandler,
-	})
-	// surface AND expectedTags are BOTH derived from useE2E — never from the
-	// publisher list — but surface is an ASSIGNMENT into the variable
-	// declared beside mux above, not a fresh `:=`: newPermissionResolver and
-	// newPasswordChangeAllowedChecker already hold a pointer to that
-	// variable, so reassigning it here (rather than shadowing it) is what
-	// makes the widened table visible to every request the resolvers serve
-	// from this point forward.
-	expectedTags := specTags
-	if useE2E {
-		publishers = append(publishers, e2e)
-		surface = mergedSurface(httpSurface, httpSurfaceE2E)
-		expectedTags = union(specTags, specTagsE2E)
-		slog.Warn("e2etest handlers mounted — destructive endpoints reachable without auth", "env", "METALDOCS_E2E=1")
-	} else {
-		slog.Info("e2etest handlers not mounted", "reason", "METALDOCS_E2E != 1")
+// wireApprovalRuntime wires the two approval-kernel dependent construction
+// steps that must run in sequence — the River job runtime (wireApprovalJobRuntime,
+// which completes approvalServices.Decision's remaining ports) and the
+// templates handler (wireTemplatesApprovalKernel, whose approval-kernel
+// wiring requires Decision to be Ready()) — behind a single call/error-check
+// pair. Neither step depends on the documents module's construction, so both
+// run before it (run() now sequences docMod after this call) without
+// changing observable behavior: no logging or other side effect occurs on
+// either step's success path, only on its own failure.
+func wireApprovalRuntime(
+	ctx context.Context,
+	deps bootstrap.APIDependencies,
+	approvalServices *approvalapp.Services,
+	tenantHandler *iamdelivery.TenantHandler,
+	iamTxRunner db.TxRunner,
+	tenantCrypto securitydomain.TenantCrypto,
+	sharedPresigner *objectstore.VerifiedStore,
+	fanoutCfg fanoutComponents,
+	cdReader *cdinfra.CDFieldReaderPG,
+	capabilityService *iamapp.CapabilityService,
+	displayNameRepo iamdomain.UserDisplayNameReader,
+) (*templateshttp.Handler, *templatesinfra.Repository, *objectstore.VerifiedStore, *approvalhttp.Handler, error) {
+	if err := wireApprovalJobRuntime(ctx, deps, approvalServices, tenantHandler, iamTxRunner, tenantCrypto, sharedPresigner, fanoutCfg, cdReader); err != nil {
+		return nil, nil, nil, nil, err
 	}
+	return wireTemplatesApprovalKernel(deps, capabilityService, sharedPresigner, displayNameRepo, approvalServices)
+}
 
+// decideE2E reports whether the E2E-only test handlers should be mounted:
+// both a non-nil publisher (built from the running binary) AND the explicit
+// env-flag gate (e2eHandlersEnabled) must hold. Extracted from run() as its
+// own boolean expression so run()'s cyclomatic complexity does not carry the
+// short-circuit && in addition to the `if useE2E` branch that consumes it.
+func decideE2E(e2e httprouter.SurfacePublisher) bool {
+	return e2e != nil && e2eHandlersEnabled()
+}
+
+// registerPresenceShutdown wires the Z-22/REQ-REL-2 WS presence drain into
+// server's shutdown hook when presence is enabled (presenceHub non-nil).
+// RegisterOnShutdown runs synchronously inside server.Shutdown after the
+// listener is closed but before Shutdown returns, so the 15s shutdown
+// context (shutdownServer) covers the drain; this closure keeps its own
+// independent 5s budget exactly as the original inline closure did.
+func registerPresenceShutdown(server *http.Server, presenceHub *iampresence.Hub) {
+	if presenceHub == nil {
+		return
+	}
+	server.RegisterOnShutdown(func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		presenceHub.CloseAll(shutdownCtx)
+	})
+}
+
+// mountPublishers mounts every publisher onto mux through its own
+// httprouter.Recorder (one recorder PER publisher — required by assertSurface
+// check 4, surface.go) and returns the per-publisher mounted-pattern map.
+func mountPublishers(mux *http.ServeMux, publishers []httprouter.SurfacePublisher) map[string][]string {
 	mounted := map[string][]string{}
 	for _, p := range publishers {
 		rec := httprouter.NewRecorder(mux) // one recorder PER publisher — check 4
 		p.Mount(rec)
 		mounted[p.Name()] = rec.Patterns()
 	}
+	return mounted
+}
 
-	// surface AND expectedTags are BOTH derived from useE2E — never from the
-	// publisher list, which is the thing being audited: an expected set
-	// derived from the list under audit makes check 1 vacuously true, which
-	// is exactly how a missing publisher would pass a check written to catch
-	// it.
-	if err := assertSurface(mounted, surface, expectedTags, publishers); err != nil {
-		slog.Error("http surface", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
-	}
-
+// wireHTTPObservabilityDBPool wires the DB pool-stats adapter into httpObs
+// when a database connection is available (SQLDB nil in in-memory mode).
+func wireHTTPObservabilityDBPool(httpObs *observability.HTTPObservability, deps bootstrap.APIDependencies) {
 	if deps.SQLDB != nil {
 		httpObs.SetDBPool(postgres.NewPoolStatsAdapter(deps.SQLDB))
 	}
+}
 
-	stopSessions := jobs.StartSessionSweeper(ctx, docMod.Repo(), 60*time.Second)
-	stopOrphans := jobs.StartOrphanPendingSweeper(ctx, docMod.Repo(), time.Hour, 24*time.Hour)
-	// F-T6(a): reconciliation janitor for template objects orphaned when
-	// spawnNextDraft's pre-tx Copy survives a rolled-back publish tx. Mirrors the
-	// documents orphan sweeper above; deletes only aged-out (>24h) objects absent
-	// from the referenced docx∪schema key set.
-	stopTemplateOrphans := templatejobs.StartTemplateOrphanSweeper(ctx, templatesRepo, templatesStore, time.Hour, 24*time.Hour)
-	defer stopSessions()
-	defer stopOrphans()
-	defer stopTemplateOrphans()
-	// Prometheus text-exposition scrape endpoint. Deliberately NOT mounted on
-	// mux (which the API chain below wraps with authn/iam/httpObs/rate-limit)
-	// — it is served from a top-level dispatch mux, ahead of and outside the
-	// entire API chain (see rootMux below, after handler is built). Contract
-	// §3.2: /metrics is a platform scrape surface, not a versioned product
-	// route, so it is NOT declared in api/openapi/v1/openapi.yaml. Coexists
-	// with the JSON endpoint (mounted via buildPublishers above, see
-	// publishers.go); they read from separate storage (prometheus vecs vs.
-	// byKey atomics).
-
-	// Audit retention - AUDIT_RETENTION_DAYS=0 disables (default disabled).
-	retentionCfg, err := config.LoadRetentionConfig()
-	if err != nil {
-		slog.Error("invalid retention config", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
-	}
-	startAuditRetention(ctx, deps, retentionCfg.Days)
-
-	// Canonical chain per backend-target-architecture.md §2.1 (F-01 fix,
-	// REQ-MW-1/2/4/5): panic recovery + trace context outermost, access
-	// log/metrics OUTSIDE authn so 401s and panics are observable,
-	// pre-auth IP-keyed login limit before authn. presenceBump stays
-	// after iamMiddleware (needs iamdomain.UserID in ctx, PR-9). Order is
-	// asserted by chain_test.go (REQ-MW-7).
-	var presenceWrap func(http.Handler) http.Handler
+// buildPresenceWrap returns presenceBump.Wrap when presence is enabled
+// (deps.SQLDB non-nil at startup), or nil otherwise — apiChain skips a nil
+// link.
+func buildPresenceWrap(presenceBump *iampresence.BumpMiddleware) func(http.Handler) http.Handler {
 	if presenceBump != nil {
-		presenceWrap = presenceBump.Wrap
+		return presenceBump.Wrap
 	}
-	// otel link is nil (skipped by buildChain) unless an exporter is configured;
-	// recovery stays outermost, otel wraps everything else (Z-1, REQ-OBS-1).
-	var otelWrap func(http.Handler) http.Handler
-	if otelEnabled {
-		otelWrap = observability.OTelMiddleware()
-	}
-	handler := buildChain(mux, apiChain(
-		platformmw.Recovery,
-		otelWrap,
-		httpObs.Wrap,
-		cors.Wrap,
-		originProtection.Wrap,
-		loginRateLimit(preAuthLimiter),
-		authMiddleware.Wrap,
-		iamMiddleware.Wrap,
-		presenceWrap,
-		func(next http.Handler) http.Handler { return globalLimiter.GlobalEnvelopeWrap(userIDExtractor, next) },
-		// Innermost (nearest the mux): rewrite the stdlib text/plain 404/405 the
-		// method-routed ServeMux emits into problem+json, preserving Allow (D-03).
-		platformmw.MethodNotAllowedJSON,
-	))
+	return nil
+}
 
+// buildOtelWrap returns the OTel middleware when tracing is enabled (an
+// exporter is configured), or nil otherwise — apiChain skips a nil link
+// (Z-1, REQ-OBS-1).
+func buildOtelWrap(otelEnabled bool) func(http.Handler) http.Handler {
+	if otelEnabled {
+		return observability.OTelMiddleware()
+	}
+	return nil
+}
+
+// buildServers constructs the public API server (wired to handler) and the
+// dedicated metrics server (wired to httpObs.PrometheusHandler, wrapped only
+// in panic recovery) from ServerConfig.
+//
+// /metrics is served on a DEDICATED listener (METRICS_ADDR, default :9090),
+// never on the public API server. This isolates the scrape surface by
+// process topology: the public port structurally cannot serve /metrics, so
+// exposure no longer depends on ops/ingress discipline (F-R1, Dim-9). The
+// scrape stays credential-less (bypasses authn/iam) and self-scrapes never
+// feed httpObs.Wrap counters or the global rate limiter, because this mux is
+// not part of the API chain. Not in openapi (contract §3.2). Compose does
+// not host-publish this port — infra-network reachable only (see
+// ops/DEPLOY.md).
+func buildServers(handler http.Handler, httpObs *observability.HTTPObservability) (*http.Server, *http.Server, error) {
 	serverCfg, err := config.LoadServerConfig()
 	if err != nil {
 		slog.Error("invalid server config", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
+		return nil, nil, err
 	}
 
 	server := &http.Server{
@@ -991,27 +1369,6 @@ func main() {
 		IdleTimeout:  90 * time.Second,
 	}
 
-	// Z-22 / REQ-REL-2: drain live WS presence connections before the
-	// HTTP server stops accepting. RegisterOnShutdown runs synchronously
-	// inside server.Shutdown after the listener is closed but before
-	// Shutdown returns, so the shutdown context (15s) covers the drain.
-	if presenceHub != nil {
-		server.RegisterOnShutdown(func() {
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			presenceHub.CloseAll(shutdownCtx)
-		})
-	}
-
-	// /metrics is served on a DEDICATED listener (METRICS_ADDR, default :9090),
-	// never on the public API server above. This isolates the scrape surface by
-	// process topology: the public port structurally cannot serve /metrics, so
-	// exposure no longer depends on ops/ingress discipline (F-R1, Dim-9). The
-	// scrape stays credential-less (bypasses authn/iam) and self-scrapes never
-	// feed httpObs.Wrap counters or the global rate limiter, because this mux is
-	// not part of the API chain. Panic recovery still wraps it. Not in openapi
-	// (contract §3.2). Compose does not host-publish this port — infra-network
-	// reachable only (see ops/DEPLOY.md).
 	metricsMux := http.NewServeMux()
 	metricsMux.Handle("GET /metrics", httpObs.PrometheusHandler())
 	metricsServer := &http.Server{
@@ -1020,31 +1377,7 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	slog.Info("MetalDocs API listening",
-		"addr", serverCfg.Addr, "metrics_addr", serverCfg.MetricsAddr,
-		"repository", repoMode, "auth_enabled", authn.Enabled(),
-		"auth_cache_ttl", authn.CacheTTL(), "cors_enabled", corsCfg.Enabled,
-		"cors_allowed_origins", len(corsCfg.AllowedOrigins))
-
-	serverErr := make(chan error, 1)
-	go func() {
-		serverErr <- server.ListenAndServe()
-	}()
-
-	metricsErr := make(chan error, 1)
-	go func() {
-		metricsErr <- metricsServer.ListenAndServe()
-	}()
-
-	exitCode := shutdownServer(ctx, stop, server, metricsServer, serverErr, metricsErr)
-	if exitCode != 0 {
-		// os.Exit skips deferred functions, including deps.Cleanup. Invoke
-		// cleanup explicitly so DB / object-store handles are released on
-		// the error path too. closeDB swallows close-on-closed, so calling
-		// twice is safe.
-		deps.Cleanup()
-		os.Exit(exitCode)
-	}
+	return server, metricsServer, nil
 }
 
 // shutdownServer waits for a listen error on EITHER server or ctx cancellation,
@@ -1077,7 +1410,15 @@ func shutdownServer(
 	case <-ctx.Done():
 	}
 
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	// shutdownCtx is intentionally detached from ctx via context.WithoutCancel
+	// rather than context.Background(): ctx is the process signal-context, and
+	// by the time we reach here it is already Done() (that is precisely why
+	// shutdownServer was called — either a listen error occurred or the signal
+	// fired). Deriving the 15s shutdown deadline from ctx directly would cancel
+	// it instantly, defeating the graceful-drain budget below. WithoutCancel
+	// keeps ctx in the propagation chain (any values it carries survive) while
+	// detaching only from its cancellation.
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
 	defer shutdownCancel()
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		slog.Error("graceful shutdown incomplete", "err", err)

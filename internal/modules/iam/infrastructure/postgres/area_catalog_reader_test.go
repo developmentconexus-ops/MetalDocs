@@ -29,7 +29,7 @@ func TestProcessAreaCatalog_AreaCodeExists(t *testing.T) {
 			if err != nil {
 				t.Fatalf("sqlmock.New: %v", err)
 			}
-			defer db.Close()
+			defer func() { _ = db.Close() }()
 
 			expect := mock.ExpectQuery("FROM metaldocs.document_process_areas").
 				WithArgs("tenant-1", "welding")

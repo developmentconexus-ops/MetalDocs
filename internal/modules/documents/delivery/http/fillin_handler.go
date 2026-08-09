@@ -21,20 +21,25 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
+// FillInService is the application boundary FillInHandler consumes for
+// reading/writing placeholder values and the fill-in schema.
 type FillInService interface {
 	SetPlaceholderValue(ctx context.Context, tenantID, actorID, revisionID, placeholderID, value string) error
 	GetPlaceholderValues(ctx context.Context, tenantID, docID string) ([]infrastructure.PlaceholderValue, error)
 	GetFillInSchema(ctx context.Context, tenantID, docID string) ([]templatesdomain.Placeholder, error)
 }
 
+// FillInHandler serves the fill-in schema and placeholder value routes for documents.
 type FillInHandler struct {
 	service FillInService
 }
 
+// NewFillInHandler constructs a FillInHandler backed by the given service.
 func NewFillInHandler(service FillInService) *FillInHandler {
 	return &FillInHandler{service: service}
 }
 
+// GetFillInSchema returns the template's placeholder schema for a document.
 func (h *FillInHandler) GetFillInSchema(w http.ResponseWriter, r *http.Request) {
 	tid, err := tenantID(r)
 	if err != nil {
@@ -59,6 +64,7 @@ func (h *FillInHandler) GetFillInSchema(w http.ResponseWriter, r *http.Request) 
 	writeFillInJSON(w, http.StatusOK, resp)
 }
 
+// ListPlaceholderValues returns the currently stored placeholder values for a document.
 func (h *FillInHandler) ListPlaceholderValues(w http.ResponseWriter, r *http.Request) {
 	docID := r.PathValue("id")
 	tid, err := tenantID(r)
@@ -84,6 +90,7 @@ func (h *FillInHandler) ListPlaceholderValues(w http.ResponseWriter, r *http.Req
 	writeFillInJSON(w, http.StatusOK, res)
 }
 
+// PutPlaceholderValue sets a single placeholder's value on a document's draft revision.
 func (h *FillInHandler) PutPlaceholderValue(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Value string `json:"value"`
@@ -118,6 +125,7 @@ func (h *FillInHandler) PutPlaceholderValue(w http.ResponseWriter, r *http.Reque
 	})
 }
 
+// ErrBadContentType indicates a request body was not sent as application/json.
 var ErrBadContentType = errors.New("content-type must be application/json")
 
 // Fill-in taxonomy codes.

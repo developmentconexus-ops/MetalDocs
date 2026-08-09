@@ -77,7 +77,7 @@ SELECT asi.id::text, asi.approval_instance_id::text, ai.tenant_id::text, asi.due
 	if err != nil {
 		return nil, fmt.Errorf("list overdue stages: query: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []approvaldomain.OverdueStageView
 	for rows.Next() {
@@ -112,7 +112,7 @@ SELECT DISTINCT ai.tenant_id::text
 	if err != nil {
 		return nil, fmt.Errorf("list tenants with overdue stages: query: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []string
 	for rows.Next() {

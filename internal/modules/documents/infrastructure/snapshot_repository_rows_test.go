@@ -47,7 +47,7 @@ func TestSnapshotRepository_WriteMethodsNoRowsReturnError(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer db.Close()
+			defer func() { _ = db.Close() }()
 
 			mock.ExpectExec(`UPDATE documents`).
 				WillReturnResult(sqlmock.NewResult(0, 0))

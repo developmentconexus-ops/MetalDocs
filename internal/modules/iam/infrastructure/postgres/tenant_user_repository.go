@@ -37,7 +37,7 @@ func (r *TenantUserRepository) TenantUserIDs(ctx context.Context, tenantID strin
 	if err != nil {
 		return nil, fmt.Errorf("iam: TenantUserIDs(%s): %w", tenantID, err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := []string{}
 	for rows.Next() {

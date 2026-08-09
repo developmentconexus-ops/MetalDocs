@@ -15,14 +15,20 @@ import (
 	riverjobs "metaldocs/internal/platform/jobs/river"
 )
 
+// JobsWorkerFactory builds the River workers and periodic jobs registered
+// against the given database handle.
 type JobsWorkerFactory func(db *sql.DB) (*river.Workers, []*river.PeriodicJob, error)
 
+// JobsDependencies holds the constructed infrastructure dependencies the
+// metaldocs-jobs binary wires into its River client at startup.
 type JobsDependencies struct {
 	River   *riverjobs.ClientBundle
 	SQLDB   *sql.DB
 	Cleanup func()
 }
 
+// BuildJobsDependencies constructs the jobs binary's infrastructure
+// dependencies, including the River client bundle built from workerFactory.
 func BuildJobsDependencies(ctx context.Context, cfg config.JobsConfig, workerFactory JobsWorkerFactory) (JobsDependencies, error) {
 	pgCfg, err := config.LoadPostgresConfig()
 	if err != nil {
@@ -80,6 +86,8 @@ func BuildJobsDependencies(ctx context.Context, cfg config.JobsConfig, workerFac
 	}, nil
 }
 
+// MigrateRiverSchema runs River's schema migrations up against the given
+// schema. Owned exclusively by the API binary at startup (F-19, REQ-ASYNC-4).
 func MigrateRiverSchema(ctx context.Context, db *sql.DB, schema string) error {
 	migrator, err := rivermigrate.New(riverdatabasesql.New(db), &rivermigrate.Config{Schema: schema})
 	if err != nil {

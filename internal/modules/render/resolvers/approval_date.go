@@ -6,12 +6,17 @@ import (
 	"time"
 )
 
+// ApprovalDateResolver resolves the "approval_date" placeholder to the
+// revision's final approval date, or a pending-approval placeholder string.
 type ApprovalDateResolver struct{}
 
+// Key returns the resolver's registry key, "approval_date".
 func (ApprovalDateResolver) Key() string { return "approval_date" }
 
+// Version returns the resolver's version.
 func (ApprovalDateResolver) Version() int { return 1 }
 
+// Resolve computes the approval_date value for in.
 func (ApprovalDateResolver) Resolve(ctx context.Context, in ResolveInput) (ResolvedValue, error) {
 	if err := requireTenantID("approval_date", in.TenantID); err != nil {
 		return ResolvedValue{}, err

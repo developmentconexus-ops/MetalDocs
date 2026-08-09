@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"errors"
 	"regexp"
 	"testing"
 	"time"
@@ -16,7 +17,7 @@ func TestUpdateVersionIncrementsLockVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := New(db)
 	version := &domain.TemplateVersion{
@@ -51,7 +52,7 @@ func TestUpdateVersionReturnsStaleLockVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := New(db)
 	version := &domain.TemplateVersion{
@@ -72,7 +73,7 @@ func TestUpdateVersionReturnsStaleLockVersion(t *testing.T) {
 		WithArgs("ver-1", "tenant-a").
 		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
 
-	if err := repo.UpdateVersion(context.Background(), "tenant-a", version); err != domain.ErrStaleLockVersion {
+	if err := repo.UpdateVersion(context.Background(), "tenant-a", version); !errors.Is(err, domain.ErrStaleLockVersion) {
 		t.Fatalf("error = %v, want ErrStaleLockVersion", err)
 	}
 	if version.LockVersion != 2 {
@@ -89,7 +90,7 @@ func TestGetVersionMatchesUUIDTenantID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := New(db)
 
@@ -138,7 +139,7 @@ func TestGetTemplateProjectsRevisionNumbers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := New(db)
 

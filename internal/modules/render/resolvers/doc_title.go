@@ -5,11 +5,17 @@ import (
 	"time"
 )
 
+// DocTitleResolver resolves the "doc_title" placeholder to the document's
+// title.
 type DocTitleResolver struct{}
 
-func (DocTitleResolver) Key() string  { return "doc_title" }
+// Key returns the resolver's registry key, "doc_title".
+func (DocTitleResolver) Key() string { return "doc_title" }
+
+// Version returns the resolver's version.
 func (DocTitleResolver) Version() int { return 1 }
 
+// Resolve computes the doc_title value for in.
 func (DocTitleResolver) Resolve(ctx context.Context, in ResolveInput) (ResolvedValue, error) {
 	if err := requireTenantID("doc_title", in.TenantID); err != nil {
 		return ResolvedValue{}, err

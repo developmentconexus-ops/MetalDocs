@@ -17,7 +17,7 @@ func TestDocumentFamily_Deactivate(t *testing.T) {
 
 func TestDocumentFamily_DeactivateAlreadyInactive(t *testing.T) {
 	f := DocumentFamily{Code: "policy", IsActive: false}
-	if err := f.Deactivate(); err != ErrFamilyAlreadyInactive {
+	if err := f.Deactivate(); !errors.Is(err, ErrFamilyAlreadyInactive) {
 		t.Fatalf("want ErrFamilyAlreadyInactive, got %v", err)
 	}
 }

@@ -113,7 +113,7 @@ func TestMapPgError(t *testing.T) {
 			got := MapPgError(tc.err, tc.hints)
 			if tc.wantTarget == nil {
 				// Expect the original error passed through unchanged.
-				if got != tc.err {
+				if !errors.Is(got, tc.err) {
 					t.Errorf("expected passthrough: got %v, want %v", got, tc.err)
 				}
 				return

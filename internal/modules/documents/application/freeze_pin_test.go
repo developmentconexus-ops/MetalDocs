@@ -172,7 +172,7 @@ func TestFreezeService_Materialize_CallsFanoutAndReturnsResult(t *testing.T) {
 	valuesRead := &fakeValuesReader{values: []infrastructure.PlaceholderValue{
 		{PlaceholderID: "p_user", ValueText: strPtr("user-value"), Source: "user"},
 	}}
-	fanoutClient := &fakeFanoutClient{resp: fanout.FanoutResponse{
+	fanoutClient := &fakeFanoutClient{resp: fanout.Response{
 		ContentHash:    "deadbeef00000000000000000000000000000000000000000000000000000000",
 		FinalDocxS3Key: "final/r.docx",
 	}}
@@ -237,7 +237,7 @@ func TestFreezeService_Materialize_ReadsPinNotCurrentRevision(t *testing.T) {
 		"documents/d/revisions/pinned.docx": pinnedBody,
 		"documents/d/revisions/head.docx":   headBody,
 	}}
-	fanoutClient := &fakeFanoutClient{resp: fanout.FanoutResponse{
+	fanoutClient := &fakeFanoutClient{resp: fanout.Response{
 		ContentHash:    "deadbeef00000000000000000000000000000000000000000000000000000000",
 		FinalDocxS3Key: "final/r.docx",
 	}}

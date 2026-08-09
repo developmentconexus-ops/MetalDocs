@@ -12,18 +12,24 @@ import (
 	"metaldocs/internal/modules/iam/authz"
 )
 
+// ViewService is the application boundary ViewHandler consumes to resolve a
+// document's viewable (rendered PDF) URL.
 type ViewService interface {
 	GetViewURL(ctx context.Context, tenantID, actorID, docID string) (application.ViewResult, error)
 }
 
+// ViewHandler serves the document view route, returning the rendered PDF's
+// status and, once ready, its signed URL.
 type ViewHandler struct {
 	svc ViewService
 }
 
+// NewViewHandler constructs a ViewHandler backed by the given service.
 func NewViewHandler(svc ViewService) *ViewHandler {
 	return &ViewHandler{svc: svc}
 }
 
+// HandleView returns the document's PDF view status and, when ready, its signed URL.
 func (h *ViewHandler) HandleView(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantID(r)
 	if err != nil {

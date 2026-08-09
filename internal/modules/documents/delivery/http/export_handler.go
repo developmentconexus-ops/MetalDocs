@@ -11,6 +11,7 @@ import (
 	"metaldocs/internal/platform/problem"
 )
 
+// ExportHandler serves PDF export and signed DOCX URL routes for documents.
 type ExportHandler struct {
 	svc *application.ExportService
 }
@@ -34,6 +35,7 @@ type exportDocxURLResp struct {
 	RevisionID string `json:"revision_id"`
 }
 
+// NewExportHandler constructs an ExportHandler backed by the given export service.
 func NewExportHandler(svc *application.ExportService) *ExportHandler { return &ExportHandler{svc: svc} }
 
 func (h *ExportHandler) exportPDF(w http.ResponseWriter, r *http.Request) {

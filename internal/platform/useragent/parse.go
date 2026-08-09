@@ -7,6 +7,8 @@ package useragent
 
 import "strings"
 
+// Unknown is the fallback device label returned by Label when the User-Agent
+// is empty or unrecognised.
 const Unknown = "Unknown device"
 
 // Label returns a short "<Browser> on <OS>" description for ua. Falls back to

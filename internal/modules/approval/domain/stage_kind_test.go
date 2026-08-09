@@ -1,6 +1,9 @@
 package domain
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 // TestStageKindValues asserts the two spec-fixed enum values exist with the
 // exact string representations the DB CHECK constraint (migration 0286) uses.
@@ -30,7 +33,7 @@ func TestStageKindValidate(t *testing.T) {
 			t.Errorf("StageKind(%q).Validate() = nil, want ErrInvalidStageKind", k)
 			continue
 		}
-		if err != ErrInvalidStageKind {
+		if !errors.Is(err, ErrInvalidStageKind) {
 			t.Errorf("StageKind(%q).Validate() = %v, want ErrInvalidStageKind", k, err)
 		}
 	}

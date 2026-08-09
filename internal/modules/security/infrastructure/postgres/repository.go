@@ -17,6 +17,9 @@ import (
 	securitydomain "metaldocs/internal/modules/security/domain"
 )
 
+// Repository implements securitydomain.Repository against Postgres, resolving
+// tenant membership, display names, admin-role membership, and MFA coverage
+// through iam-owned ports rather than cross-module tables.
 type Repository struct {
 	db *sql.DB
 	// displayNames, members, adminRoles, and mfaUsers are iam-owned ports. Security
@@ -29,6 +32,8 @@ type Repository struct {
 	mfaUsers     iamdomain.MfaUserReader
 }
 
+// NewRepository builds a Repository backed by db, defaulting any nil iam port
+// to its no-op implementation.
 func NewRepository(db *sql.DB, displayNames iamdomain.UserDisplayNameReader, members iamdomain.TenantUserReader, adminRoles iamdomain.AdminRoleMemberReader, mfaUsers iamdomain.MfaUserReader) *Repository {
 	if displayNames == nil {
 		displayNames = iamdomain.NoopUserDisplayNameReader{}
@@ -68,6 +73,7 @@ func (r *Repository) resolveNames(ctx context.Context, tenantID string, ids []st
 	return out, nil
 }
 
+// MfaCoverage summarises MFA enrollment for tenantID via the iam MFA-user port.
 func (r *Repository) MfaCoverage(ctx context.Context, tenantID string) (securitydomain.MfaCoverage, error) {
 	// Resolve MFA counts via IAM port (off-tx, H-PRE-1).
 	total, enabled, err := r.mfaUsers.TenantMfaCounts(ctx, tenantID)
@@ -100,6 +106,7 @@ func (r *Repository) MfaCoverage(ctx context.Context, tenantID string) (security
 	return cov, nil
 }
 
+// ListLockouts returns the currently-locked accounts in tenantID.
 func (r *Repository) ListLockouts(ctx context.Context, tenantID string) ([]securitydomain.Lockout, error) {
 	// auth_identities is a global-PK table (no tenant_id column); tenant scope
 	// comes from the iam-owned membership port (the user_id set with an iam_users
@@ -129,7 +136,7 @@ LIMIT 100
 	if err != nil {
 		return nil, fmt.Errorf("list lockouts: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []securitydomain.Lockout
 	var ids []string
 	for rows.Next() {
@@ -162,6 +169,8 @@ LIMIT 100
 	return out, nil
 }
 
+// CountRecentFailedLoginsByUser returns user_id → fail count for failed
+// logins inside the window, driving the repeated-failed-login signal.
 func (r *Repository) CountRecentFailedLoginsByUser(ctx context.Context, tenantID string, withinSeconds int, minThreshold int) (map[string]securitydomain.RecentFailureSummary, error) {
 	// Proxy for "N failures within window": auth_identities only stores the
 	// LAST failure timestamp + a monotonic counter that RecordSuccessfulLogin
@@ -193,7 +202,7 @@ LIMIT 100
 	if err != nil {
 		return nil, fmt.Errorf("recent failed logins: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := map[string]securitydomain.RecentFailureSummary{}
 	var ids []string
 	for rows.Next() {
@@ -222,6 +231,9 @@ LIMIT 100
 	return out, nil
 }
 
+// CountRecentLockouts returns the number of accounts in tenantID whose
+// locked_until was set within the last withinSeconds, driving the
+// lockout-spike signal.
 func (r *Repository) CountRecentLockouts(ctx context.Context, tenantID string, withinSeconds int) (int, error) {
 	// Tenant scope via the iam membership port (no iam_users JOIN). (M4/F4.6)
 	memberIDs, err := r.members.TenantUserIDs(ctx, tenantID)
@@ -245,6 +257,9 @@ WHERE i.user_id = ANY($1)
 	return count, nil
 }
 
+// ListNewDeviceLogins returns sessions created within the last windowSeconds
+// where the (user_id, user_agent) pair has never been observed in the prior
+// lookbackSeconds, driving the new-device-login signal.
 func (r *Repository) ListNewDeviceLogins(ctx context.Context, tenantID string, windowSeconds int, lookbackSeconds int) ([]securitydomain.NewDeviceLogin, error) {
 	// A "new device" = a session whose (user_id, user_agent) pair has not
 	// appeared in any earlier session in the lookback window. SQL stays
@@ -281,7 +296,7 @@ LIMIT 50
 	if err != nil {
 		return nil, fmt.Errorf("new device logins: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []securitydomain.NewDeviceLogin
 	var ids []string
 	for rows.Next() {
@@ -309,6 +324,9 @@ LIMIT 50
 	return out, nil
 }
 
+// ListOffHoursAdminActions returns audit events authored by admin-role actors
+// between offHoursStartHour and offHoursEndHour (UTC for v1) within the last
+// windowSeconds, driving the off-hours-admin-action signal.
 func (r *Repository) ListOffHoursAdminActions(ctx context.Context, tenantID string, windowSeconds int, adminRoles []string, offHoursStartHour, offHoursEndHour int) ([]securitydomain.OffHoursAction, error) {
 	if len(adminRoles) == 0 {
 		return nil, nil
@@ -352,7 +370,7 @@ LIMIT 50
 	if err != nil {
 		return nil, fmt.Errorf("off hours admin actions: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []securitydomain.OffHoursAction
 	for rows.Next() {
 		var a securitydomain.OffHoursAction

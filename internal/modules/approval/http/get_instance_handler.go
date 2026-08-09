@@ -64,9 +64,45 @@ func (h *Handler) mapInstanceResponse(ctx context.Context, tenantID string, inst
 	if err != nil {
 		return contracts.InstanceResponse{}, err
 	}
+	stages := buildStageInstanceContracts(inst.Stages, eligibleNames)
 
-	stages := make([]contracts.StageInstance, len(inst.Stages))
-	for i, s := range inst.Stages {
+	viewerContract, err := h.buildViewerContract(ctx, tenantID, viewer)
+	if err != nil {
+		return contracts.InstanceResponse{}, err
+	}
+
+	// Verdict history (F2d.2, ADR 0079): projected only on the by-document view
+	// (viewer != nil), matching the OpenAPI schema split. Always a non-nil slice
+	// there so an instance with no verdicts serializes as [] (empty ⇒ []), never
+	// omitted. actor_display_name is the immutable snapshot — no fallback.
+	var verdictsContract *[]contracts.VerdictRecord
+	if viewer != nil {
+		verdictsContract = buildVerdictRecordContracts(verdicts)
+	}
+
+	return contracts.InstanceResponse{
+		ID:                inst.ID,
+		DocumentID:        inst.DocumentID,
+		RouteID:           inst.RouteID,
+		TenantID:          inst.TenantID,
+		Status:            contracts.InstanceStatus(inst.Status),
+		SubmittedBy:       inst.SubmittedBy,
+		SubmittedAt:       inst.SubmittedAt.UTC().Format(time.RFC3339),
+		CompletedAt:       completedAt,
+		Stages:            stages,
+		ETag:              instanceETag(inst.RevisionVersion),
+		FrozenContentHash: inst.FrozenContentHash,
+		Viewer:            viewerContract,
+		Verdicts:          verdictsContract,
+	}, nil
+}
+
+// buildStageInstanceContracts maps an instance's domain stages onto their
+// wire StageInstance shape, resolving each stage's pending/signed actor list
+// via eligibleNames.
+func buildStageInstanceContracts(domainStages []domain.StageInstance, eligibleNames map[string]string) []contracts.StageInstance {
+	stages := make([]contracts.StageInstance, len(domainStages))
+	for i, s := range domainStages {
 		recs := make([]contracts.SignoffRecord, 0, len(s.Signoffs))
 		for _, sig := range s.Signoffs {
 			// Snapshot-only (D2, ADR 0079): the signed actor's name is the
@@ -98,72 +134,61 @@ func (h *Handler) mapInstanceResponse(ctx context.Context, tenantID string, inst
 			DueAt:      dueAt,
 		}
 	}
+	return stages
+}
 
-	var viewerContract *contracts.ViewerFacts
-	if viewer != nil {
-		vf := contracts.ViewerFacts{
-			IsAuthor:               viewer.IsAuthor,
-			EligibleForActiveStage: viewer.EligibleForActiveStage,
-			HasSignedActiveStage:   viewer.HasSignedActiveStage,
-		}
-		if viewer.ViaDelegationFromUserID != "" {
-			displayName := viewer.ViaDelegationFromUserID
-			names, err := h.displayNameReader.DisplayNames(ctx, tenantID, []string{viewer.ViaDelegationFromUserID})
-			if err != nil {
-				return contracts.InstanceResponse{}, fmt.Errorf("resolve viewer delegation display name: %w", err)
-			}
-			if name, ok := names[viewer.ViaDelegationFromUserID]; ok && name != "" {
-				displayName = name
-			}
-			vf.ViaDelegationFrom = &contracts.ViewerDelegationFrom{
-				UserID:      viewer.ViaDelegationFromUserID,
-				DisplayName: displayName,
-			}
-		}
-		viewerContract = &vf
+// buildViewerContract projects viewer's ViewerFacts onto the wire shape,
+// resolving the delegator's display name off-tx when the viewer signed via
+// delegation. Returns (nil, nil) when viewer is nil (the by-id read, not
+// scoped to a single viewer's workspace).
+func (h *Handler) buildViewerContract(ctx context.Context, tenantID string, viewer *domain.ViewerFacts) (*contracts.ViewerFacts, error) {
+	if viewer == nil {
+		return nil, nil
 	}
-
-	// Verdict history (F2d.2, ADR 0079): projected only on the by-document view
-	// (viewer != nil), matching the OpenAPI schema split. Always a non-nil slice
-	// there so an instance with no verdicts serializes as [] (empty ⇒ []), never
-	// omitted. actor_display_name is the immutable snapshot — no fallback.
-	var verdictsContract *[]contracts.VerdictRecord
-	if viewer != nil {
-		recs := make([]contracts.VerdictRecord, 0, len(verdicts))
-		for i := range verdicts {
-			v := &verdicts[i]
-			var reason *string
-			if c := v.Comment(); c != "" {
-				reason = &c
-			}
-			recs = append(recs, contracts.VerdictRecord{
-				ID:               v.ID(),
-				StageInstanceID:  v.StageInstanceID(),
-				ActorUserID:      v.ActorUserID(),
-				ActorDisplayName: v.ActorDisplayNameSnapshot(),
-				Verdict:          string(v.Verdict()),
-				Reason:           reason,
-				VerdictAt:        v.VerdictAt().UTC().Format(time.RFC3339),
-			})
-		}
-		verdictsContract = &recs
+	vf := contracts.ViewerFacts{
+		IsAuthor:               viewer.IsAuthor,
+		EligibleForActiveStage: viewer.EligibleForActiveStage,
+		HasSignedActiveStage:   viewer.HasSignedActiveStage,
 	}
+	if viewer.ViaDelegationFromUserID != "" {
+		displayName := viewer.ViaDelegationFromUserID
+		names, err := h.displayNameReader.DisplayNames(ctx, tenantID, []string{viewer.ViaDelegationFromUserID})
+		if err != nil {
+			return nil, fmt.Errorf("resolve viewer delegation display name: %w", err)
+		}
+		if name, ok := names[viewer.ViaDelegationFromUserID]; ok && name != "" {
+			displayName = name
+		}
+		vf.ViaDelegationFrom = &contracts.ViewerDelegationFrom{
+			UserID:      viewer.ViaDelegationFromUserID,
+			DisplayName: displayName,
+		}
+	}
+	return &vf, nil
+}
 
-	return contracts.InstanceResponse{
-		ID:                inst.ID,
-		DocumentID:        inst.DocumentID,
-		RouteID:           inst.RouteID,
-		TenantID:          inst.TenantID,
-		Status:            contracts.InstanceStatus(inst.Status),
-		SubmittedBy:       inst.SubmittedBy,
-		SubmittedAt:       inst.SubmittedAt.UTC().Format(time.RFC3339),
-		CompletedAt:       completedAt,
-		Stages:            stages,
-		ETag:              instanceETag(inst.RevisionVersion),
-		FrozenContentHash: inst.FrozenContentHash,
-		Viewer:            viewerContract,
-		Verdicts:          verdictsContract,
-	}, nil
+// buildVerdictRecordContracts maps an instance's review-verdict history onto
+// its wire shape. Always returns a non-nil slice pointer so an instance with
+// no verdicts serializes as [] (empty ⇒ []), never omitted.
+func buildVerdictRecordContracts(verdicts []domain.ReviewVerdict) *[]contracts.VerdictRecord {
+	recs := make([]contracts.VerdictRecord, 0, len(verdicts))
+	for i := range verdicts {
+		v := &verdicts[i]
+		var reason *string
+		if c := v.Comment(); c != "" {
+			reason = &c
+		}
+		recs = append(recs, contracts.VerdictRecord{
+			ID:               v.ID(),
+			StageInstanceID:  v.StageInstanceID(),
+			ActorUserID:      v.ActorUserID(),
+			ActorDisplayName: v.ActorDisplayNameSnapshot(),
+			Verdict:          string(v.Verdict()),
+			Reason:           reason,
+			VerdictAt:        v.VerdictAt().UTC().Format(time.RFC3339),
+		})
+	}
+	return &recs
 }
 
 func (h *Handler) resolveEligibleActorNames(ctx context.Context, tenantID string, inst *domain.Instance) (map[string]string, error) {
@@ -234,6 +259,9 @@ func buildStageActors(stage domain.StageInstance, eligibleNames map[string]strin
 		pendingStatus = "active"
 	case domain.StagePending:
 		pendingStatus = "waiting"
+	case domain.StageCompleted, domain.StageSkipped, domain.StageRejectedHere:
+		// Terminal stage statuses never contribute a pending-actor entry —
+		// every eligible actor is already accounted for via signoffs above.
 	}
 	if pendingStatus == "" {
 		return actors

@@ -22,12 +22,15 @@ func NewTenantDataPort(db *sql.DB) *TenantDataPort {
 
 var _ tenantdata.Port = (*TenantDataPort)(nil)
 
+// Module returns the tokens module's tenant-data port identifier.
 func (p *TenantDataPort) Module() string { return "tokens" }
 
+// Tables returns the tables this port owns for tenant data export/erasure.
 func (p *TenantDataPort) Tables() []string {
 	return []string{"metaldocs.token_dictionary_entries"}
 }
 
+// ExportTenantData exports all token_dictionary_entries rows for tenantID.
 func (p *TenantDataPort) ExportTenantData(ctx context.Context, db *sql.DB, tenantID string) ([]tenantdata.TableExport, error) {
 	exp, err := tenantdata.ExportTable(ctx, db, "metaldocs.token_dictionary_entries", "tenant_id", tenantID)
 	if err != nil {
@@ -36,6 +39,7 @@ func (p *TenantDataPort) ExportTenantData(ctx context.Context, db *sql.DB, tenan
 	return []tenantdata.TableExport{exp}, nil
 }
 
+// EraseTenantData deletes all token_dictionary_entries rows for tenantID.
 func (p *TenantDataPort) EraseTenantData(ctx context.Context, tx *sql.Tx, tenantID string) (map[string]int64, error) {
 	n, err := tenantdata.EraseTable(ctx, tx, "metaldocs.token_dictionary_entries", "tenant_id", tenantID)
 	if err != nil {

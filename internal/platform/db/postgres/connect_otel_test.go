@@ -27,7 +27,7 @@ func TestOpen_EmitsOTelSpan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenWithTracerProvider returned unexpected error: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// PingContext triggers a connection attempt. The otelsql connector emits
 	// sql.connector.connect before the underlying pgx dial — so the span is recorded

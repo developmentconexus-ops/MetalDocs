@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -111,49 +112,70 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 	// model projects revision/number/status from the version row on read.
 	template.PublishedVersionID = &version.ID
 
-	schemaKey := templateSchemaKey(cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
-	audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditPublished, map[string]any{"schema_key": schemaKey}, now)
+	audit, obsoletedAudit, err := buildPublishAuditEvents(cmd, version, obsoletedVersionID, now)
 	if err != nil {
 		return nil, err
 	}
-	var obsoletedAudit *domain.AuditEvent
-	if obsoletedVersionID != nil {
-		obsoletedAudit, err = newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, obsoletedVersionID, domain.AuditObsoleted, map[string]any{"superseded_by_version_id": version.ID}, now)
-		if err != nil {
-			return nil, err
-		}
-	}
 	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
-		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplatePublish), "tenant"); err != nil {
-			return fmt.Errorf("templates publish: authz: %w", err)
-		}
-		if err := s.repo.ObsoletePreviousPublishedTx(ctx, tx, cmd.TenantID, cmd.TemplateID, version.ID); err != nil {
-			return err
-		}
-		if obsoletedAudit != nil {
-			if err := s.repo.AppendAuditTx(ctx, tx, obsoletedAudit); err != nil {
-				return wrapAppErr("templates publish: append obsoleted audit", err)
-			}
-		}
-		if err := s.repo.UpdateTemplateTx(ctx, tx, &template.Template); err != nil {
-			return err
-		}
-		if err := s.repo.UpdateVersionTx(ctx, tx, cmd.TenantID, version); err != nil {
-			// CAS lost to a concurrent transition; reclassify so the HTTP layer
-			// returns 409 (conflict) rather than 412 (precondition failed).
-			if errors.Is(err, domain.ErrStaleLockVersion) {
-				return domain.ErrConcurrentTransition
-			}
-			return err
-		}
-		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
-			return wrapAppErr("templates publish: append audit", err)
-		}
-		return nil
+		return s.publishVersionTx(ctx, tx, cmd, template, version, audit, obsoletedAudit)
 	}); err != nil {
 		return nil, err
 	}
 	return &PublishTemplateVersionResult{PublishedVersion: version}, nil
+}
+
+// buildPublishAuditEvents constructs the AuditPublished event for the
+// version being published, plus the AuditObsoleted event for the
+// previously-published version (if any). Kept separate from
+// PublishTemplateVersion so that function's own branching stays readable.
+func buildPublishAuditEvents(cmd PublishTemplateVersionCmd, version *domain.TemplateVersion, obsoletedVersionID *string, now time.Time) (audit, obsoletedAudit *domain.AuditEvent, err error) {
+	schemaKey := templateSchemaKey(cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
+	audit, err = newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditPublished, map[string]any{"schema_key": schemaKey}, now)
+	if err != nil {
+		return nil, nil, err
+	}
+	if obsoletedVersionID == nil {
+		return audit, nil, nil
+	}
+	obsoletedAudit, err = newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, obsoletedVersionID, domain.AuditObsoleted, map[string]any{"superseded_by_version_id": version.ID}, now)
+	if err != nil {
+		return nil, nil, err
+	}
+	return audit, obsoletedAudit, nil
+}
+
+// publishVersionTx is the in-transaction body of PublishTemplateVersion:
+// authz, obsolete the previous published version, persist the template and
+// version rows, and append both audit events. Extracted to its own
+// top-level method (rather than left as a closure) so its branching does
+// not compound PublishTemplateVersion's cognitive complexity.
+func (s *Service) publishVersionTx(ctx context.Context, tx *sql.Tx, cmd PublishTemplateVersionCmd, template *domain.TemplateRead, version *domain.TemplateVersion, audit, obsoletedAudit *domain.AuditEvent) error {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapTemplatePublish), "tenant"); err != nil {
+		return fmt.Errorf("templates publish: authz: %w", err)
+	}
+	if err := s.repo.ObsoletePreviousPublishedTx(ctx, tx, cmd.TenantID, cmd.TemplateID, version.ID); err != nil {
+		return err
+	}
+	if obsoletedAudit != nil {
+		if err := s.repo.AppendAuditTx(ctx, tx, obsoletedAudit); err != nil {
+			return wrapAppErr("templates publish: append obsoleted audit", err)
+		}
+	}
+	if err := s.repo.UpdateTemplateTx(ctx, tx, &template.Template); err != nil {
+		return err
+	}
+	if err := s.repo.UpdateVersionTx(ctx, tx, cmd.TenantID, version); err != nil {
+		// CAS lost to a concurrent transition; reclassify so the HTTP layer
+		// returns 409 (conflict) rather than 412 (precondition failed).
+		if errors.Is(err, domain.ErrStaleLockVersion) {
+			return domain.ErrConcurrentTransition
+		}
+		return err
+	}
+	if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
+		return wrapAppErr("templates publish: append audit", err)
+	}
+	return nil
 }
 
 // nextVersionNumber allocates the next version slot. The new draft must be

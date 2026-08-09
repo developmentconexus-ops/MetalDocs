@@ -91,7 +91,7 @@ func (r *NotificationsRepository) List(ctx context.Context, tenantID, recipientU
 	if err != nil {
 		return notificationsdomain.NotificationsPage{}, fmt.Errorf("notifications.List query: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var items []notificationsdomain.NotificationRow
 	for rows.Next() {

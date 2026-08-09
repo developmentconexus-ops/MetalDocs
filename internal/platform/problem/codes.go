@@ -49,26 +49,39 @@ var (
 	// CodeRequestInvalid is the generic request-shape rejection (annex #1, C-1).
 	CodeRequestInvalid = Register("platform", "request.invalid", 400)
 
+	// CodeRequestCursorInvalid is returned when a pagination cursor is malformed.
 	CodeRequestCursorInvalid = Register("platform", "request.cursor_invalid", 400)
 
+	// CodeRequestMethodNotAllowed is returned when the target exists but does
+	// not support the request's HTTP method.
 	CodeRequestMethodNotAllowed = RegisterWithStatus("platform", "request.method_not_allowed", 405,
 		"405 is the dedicated status for an unsupported method on an existing target (RFC 9110 §15.5.6); "+
 			"the request is otherwise well-formed, so the request. family is right and 400 is not")
 
+	// CodeRequestBodyTooLarge is returned when the request body exceeds the
+	// configured size limit.
 	CodeRequestBodyTooLarge = RegisterWithStatus("platform", "request.body_too_large", 413,
 		"413 Content Too Large is the dedicated status for an oversized body (RFC 9110 §15.5.14)")
 
+	// CodeRequestCursorExpired is returned when the pagination cursor
+	// addressed an item that has been permanently removed.
 	CodeRequestCursorExpired = RegisterWithStatus("platform", "request.cursor_expired", 410,
 		"410 Gone: the cursor addressed an item that has been permanently removed, so the caller must "+
 			"restart pagination rather than fix the request syntax")
 
-	CodeRequestIdempotencyKeyInvalid  = Register("platform", "request.idempotency_key_invalid", 400)
+	// CodeRequestIdempotencyKeyInvalid is returned when a supplied
+	// Idempotency-Key does not meet the required shape.
+	CodeRequestIdempotencyKeyInvalid = Register("platform", "request.idempotency_key_invalid", 400)
+	// CodeRequestIdempotencyKeyRequired is returned when a route that
+	// requires an Idempotency-Key received none.
 	CodeRequestIdempotencyKeyRequired = Register("platform", "request.idempotency_key_required", 400)
 
 	// CodeRequestJSONDecode and CodeRequestEmptyBody are shared by approval and
 	// the documents fill-in surface (annex §2.10 S-2/S-3, C-16).
 	CodeRequestJSONDecode = Register("shared", "request.json_decode", 400)
-	CodeRequestEmptyBody  = Register("shared", "request.empty_body", 400)
+	// CodeRequestEmptyBody is returned when the request body is required but
+	// empty (see CodeRequestJSONDecode's doc comment for the shared context).
+	CodeRequestEmptyBody = Register("shared", "request.empty_body", 400)
 
 	// CodeRequestContentTypeUnsupported is the third leg of C-16: approval (annex
 	// row #86) and the documents fill-in surface (row #123) both rename onto this
@@ -86,20 +99,33 @@ var (
 	// CodeAuthUnauthenticated is the single no/invalid-session code (annex C-2).
 	CodeAuthUnauthenticated = Register("platform", "auth.unauthenticated", 401)
 
+	// CodeAuthInvalidCredentials is returned when the supplied credentials do
+	// not match any account.
 	CodeAuthInvalidCredentials = Register("platform", "auth.invalid_credentials", 401)
 
 	// The five 403 registrations below deviate from the auth. default of 401 for
 	// one shared reason: identity is PROVEN and the account or tenant claim is
 	// what blocks the call (RFC 9110 §15.5.4). A 401 would wrongly invite the
 	// client to re-authenticate against a credential that is already valid.
+
+	// CodeAuthAccountLocked is returned when identity is proven but the account
+	// is administratively blocked, so re-authenticating cannot help.
 	CodeAuthAccountLocked = RegisterWithStatus("platform", "auth.account_locked", 403,
 		"identity is proven; the account is administratively blocked, so re-authenticating cannot help")
+	// CodeAuthAccountInactive is returned when identity is proven but the
+	// account is deactivated, so re-authenticating cannot help.
 	CodeAuthAccountInactive = RegisterWithStatus("platform", "auth.account_inactive", 403,
 		"identity is proven; the account is deactivated, so re-authenticating cannot help")
+	// CodeAuthTenantForbidden is returned when identity is proven but the
+	// caller may not act on the requested tenant.
 	CodeAuthTenantForbidden = RegisterWithStatus("platform", "auth.tenant_forbidden", 403,
 		"identity is proven; the caller may not act on the requested tenant")
+	// CodeAuthTenantRequired is returned when identity is proven but the
+	// session carries no tenant claim for a tenant-scoped route.
 	CodeAuthTenantRequired = RegisterWithStatus("platform", "auth.tenant_required", 403,
 		"identity is proven; the session carries no tenant claim for a tenant-scoped route")
+	// CodeAuthPasswordChangeRequired is returned when identity is proven but
+	// the session is refused until the mandatory password change completes.
 	CodeAuthPasswordChangeRequired = RegisterWithStatus("platform", "auth.password_change_required", 403,
 		"identity is proven; the session is refused until the mandatory password change completes")
 )
@@ -119,7 +145,12 @@ var (
 	// a capability/ownership denial, not an identity failure (annex #33).
 	CodePermissionDenied = Register("platform", "permission.denied", 403)
 
-	CodePermissionOriginForbidden         = Register("platform", "permission.origin_forbidden", 403)
+	// CodePermissionOriginForbidden is returned when the request's Origin
+	// header fails the origin-protection check.
+	CodePermissionOriginForbidden = Register("platform", "permission.origin_forbidden", 403)
+
+	// CodePermissionISOSegregationViolation is returned when the requested
+	// action would violate an ISO segregation-of-duties rule.
 	CodePermissionISOSegregationViolation = Register("platform", "permission.iso_segregation_violation", 403)
 
 	// The two sign-off eligibility denials below are emitted by BOTH approval (its
@@ -128,8 +159,13 @@ var (
 	// flatten both onto the generic capability denial — annex C-11 / C-12, R-4.
 	// A module may not import another module's delivery package, so the shared
 	// platform catalog is the single legal declaration site.
+
+	// CodePermissionSignoffActorNotEligible is returned when the caller is not
+	// an eligible actor for the sign-off stage.
 	CodePermissionSignoffActorNotEligible = Register("shared", "permission.signoff_actor_not_eligible", 403)
-	CodePermissionSodSubmitterCannotSign  = Register("shared", "permission.sod_submitter_cannot_sign", 403)
+	// CodePermissionSodSubmitterCannotSign is returned when the submitter of a
+	// change is not permitted to also sign it off (segregation of duties).
+	CodePermissionSodSubmitterCannotSign = Register("shared", "permission.sod_submitter_cannot_sign", 403)
 )
 
 // ---------------------------------------------------------------------------
@@ -138,12 +174,19 @@ var (
 // ---------------------------------------------------------------------------
 
 var (
-	CodeNotFoundResource   = Register("platform", "notfound.resource", 404)
+	// CodeNotFoundResource is the generic "addressed subject does not exist" code.
+	CodeNotFoundResource = Register("platform", "notfound.resource", 404)
+
+	// CodeNotFoundMembership is returned when the addressed membership
+	// (user-to-tenant or user-to-group) does not exist.
 	CodeNotFoundMembership = Register("platform", "notfound.membership", 404)
 
-	// Shared with controlleddocuments and taxonomy (annex §2.10 S-6/S-8).
+	// CodeNotFoundDocumentProfile is shared with controlleddocuments and
+	// taxonomy (annex §2.10 S-6/S-8).
 	CodeNotFoundDocumentProfile = Register("shared", "notfound.document_profile", 404)
-	CodeNotFoundProcessArea     = Register("shared", "notfound.process_area", 404)
+	// CodeNotFoundProcessArea is shared with controlleddocuments and taxonomy
+	// (annex §2.10 S-6/S-8).
+	CodeNotFoundProcessArea = Register("shared", "notfound.process_area", 404)
 )
 
 // ---------------------------------------------------------------------------
@@ -152,12 +195,16 @@ var (
 // ---------------------------------------------------------------------------
 
 var (
+	// CodeStateTransitionInvalid is returned when the requested lifecycle
+	// transition is not valid from the subject's current state.
 	CodeStateTransitionInvalid = Register("platform", "state.transition_invalid", 409)
 
 	// CodeStateApprovalRouteMissing is the single "no active approval route" code
 	// (annex C-9), shared by approval, controlleddocuments and templates.
 	CodeStateApprovalRouteMissing = Register("shared", "state.approval_route_missing", 409)
 
+	// CodeStateUploadExpired is returned when the upload session existed but
+	// has permanently expired.
 	CodeStateUploadExpired = RegisterWithStatus("platform", "state.upload_expired", 410,
 		"410 Gone: unlike state.upload_missing, the upload session did exist and has permanently "+
 			"expired, which is the condition 410 asserts (RFC 9110 §15.5.11)")
@@ -167,11 +214,16 @@ var (
 	// which asserts the resource existed and was permanently removed — is false.
 	CodeStateUploadMissing = Register("platform", "state.upload_missing", 409)
 
+	// CodeStateSystemTemplateImmutable is returned when the requested mutation
+	// targets a system-owned template, which is never editable.
 	CodeStateSystemTemplateImmutable = Register("platform", "state.system_template_immutable", 409)
 
-	// Shared with controlleddocuments and taxonomy (annex §2.10 S-7/S-9).
+	// CodeStateDocumentProfileArchived is shared with controlleddocuments and
+	// taxonomy (annex §2.10 S-7/S-9).
 	CodeStateDocumentProfileArchived = Register("shared", "state.document_profile_archived", 409)
-	CodeStateProcessAreaArchived     = Register("shared", "state.process_area_archived", 409)
+	// CodeStateProcessAreaArchived is shared with controlleddocuments and
+	// taxonomy (annex §2.10 S-7/S-9).
+	CodeStateProcessAreaArchived = Register("shared", "state.process_area_archived", 409)
 
 	// The two approval-lifecycle codes below are emitted by approval and by
 	// templates, whose delivery edge classifies the approval kernel's published
@@ -180,8 +232,13 @@ var (
 	// annex R-14 / §2.8 #164 keeps them apart deliberately: "the instance is
 	// finished" and "this stage is not the active one" have different operator
 	// remedies, and templates used to flatten both onto conflict.generic.
+
+	// CodeStateApprovalInstanceCompleted is returned when the approval instance
+	// has already finished.
 	CodeStateApprovalInstanceCompleted = Register("shared", "state.approval_instance_completed", 409)
-	CodeStateApprovalStageNotActive    = Register("shared", "state.approval_stage_not_active", 409)
+	// CodeStateApprovalStageNotActive is returned when the addressed stage is
+	// not the approval instance's currently active stage.
+	CodeStateApprovalStageNotActive = Register("shared", "state.approval_stage_not_active", 409)
 )
 
 // ---------------------------------------------------------------------------
@@ -190,7 +247,12 @@ var (
 // ---------------------------------------------------------------------------
 
 var (
-	CodeConflictAlreadyExists          = Register("platform", "conflict.already_exists", 409)
+	// CodeConflictAlreadyExists is returned when the resource being created
+	// already exists.
+	CodeConflictAlreadyExists = Register("platform", "conflict.already_exists", 409)
+
+	// CodeConflictConcurrentModification is returned when a concurrent write
+	// raced the caller's operation.
 	CodeConflictConcurrentModification = Register("platform", "conflict.concurrent_modification", 409)
 
 	// CodeConflictIdempotencyKeyReused is 409, not the pre-0089 422 (ADR 0089
@@ -201,11 +263,16 @@ var (
 	// CodeConflictGeneric is the catch-all 409 (annex #24, ex-CONFLICT_ERROR).
 	CodeConflictGeneric = Register("platform", "conflict.generic", 409)
 
-	CodeConflictStaleBase        = Register("platform", "conflict.stale_base", 409)
+	// CodeConflictStaleBase is returned when the caller's base version is
+	// stale relative to the current state.
+	CodeConflictStaleBase = Register("platform", "conflict.stale_base", 409)
+	// CodeConflictMembershipExists is returned when the membership being
+	// created already exists.
 	CodeConflictMembershipExists = Register("platform", "conflict.membership_exists", 409)
 
-	// Shared by approval and templates (annex C-10, R-4): a second submit while an
-	// approval instance is already open. templates used to answer conflict.generic.
+	// CodeConflictDuplicateSubmission is shared by approval and templates (annex
+	// C-10, R-4): a second submit while an approval instance is already open.
+	// templates used to answer conflict.generic.
 	CodeConflictDuplicateSubmission = Register("shared", "conflict.duplicate_submission", 409)
 )
 
@@ -251,6 +318,7 @@ var (
 	// and by templates (annex C-18 / R-4). Statuses already agreed at 422; only the
 	// codes diverged, because templates flattened all three onto conflict.generic
 	// and thereby made the FE message map useless for template submit.
+
 	// CodeValidationEmptyEligiblePool is returned when the configured stage
 	// resolves to zero eligible actors, so no one could ever act on it.
 	CodeValidationEmptyEligiblePool = Register("shared", "validation.empty_eligible_pool", 422)
@@ -267,9 +335,9 @@ var (
 // ---------------------------------------------------------------------------
 
 var (
-	// Emitted by the rate-limit middlewares (platform/ratelimit +
-	// platform/security) and, per annex C-6, by approval's signature re-auth
-	// limiter once step 6 lands.
+	// CodeRateLimitExceeded is emitted by the rate-limit middlewares
+	// (platform/ratelimit + platform/security) and, per annex C-6, by
+	// approval's signature re-auth limiter once step 6 lands.
 	CodeRateLimitExceeded = Register("platform", "ratelimit.exceeded", 429)
 )
 
@@ -284,6 +352,7 @@ var (
 	// internal.unknown string emitted by approval and fill-in.
 	CodeInternalUnknown = Register("shared", "internal.unknown", 500)
 
+	// CodeInternalNotImplemented is returned for a wired-but-unimplemented surface.
 	CodeInternalNotImplemented = RegisterWithStatus("platform", "internal.not_implemented", 501,
 		"501 Not Implemented is the dedicated status for a wired-but-unimplemented surface (RFC 9110 §15.6.2)")
 )

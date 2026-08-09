@@ -13,7 +13,10 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 )
 
-type FanoutRequest struct {
+// Request is the payload sent to docx-renderer's /render/fanout endpoint:
+// the frozen revision's placeholder inputs plus the composition config needed
+// to re-render it.
+type Request struct {
 	TenantID          string            `json:"tenant_id"`
 	RevisionID        string            `json:"revision_id"`
 	BodyDocxS3Key     string            `json:"body_docx_s3_key"`
@@ -22,7 +25,10 @@ type FanoutRequest struct {
 	ResolvedValues    map[string]any    `json:"resolved_values"`
 }
 
-type FanoutResponse struct {
+// Response is docx-renderer's successful /render/fanout result: the
+// content hash and storage key of the rendered document plus any placeholder
+// variables that were left unreplaced.
+type Response struct {
 	ContentHash    string   `json:"content_hash"`
 	FinalDocxS3Key string   `json:"final_docx_s3_key"`
 	UnreplacedVars []string `json:"unreplaced_vars"`
@@ -47,6 +53,7 @@ func (e *RenderError) Error() string {
 // permanent; unknown/5xx failures are transient.
 func (e *RenderError) Retryable() bool { return e.Status >= 500 }
 
+// Client calls the docx-renderer service's fanout HTTP endpoint.
 type Client struct {
 	baseURL      string
 	serviceToken string
@@ -65,14 +72,16 @@ func NewClient(baseURL, serviceToken string, h *http.Client) *Client {
 	return &Client{baseURL: baseURL, serviceToken: serviceToken, http: h}
 }
 
-func (c *Client) Fanout(ctx context.Context, req FanoutRequest) (FanoutResponse, error) {
+// Fanout posts req to docx-renderer and returns the rendered document's
+// content hash and storage key, or a classified *RenderError on failure.
+func (c *Client) Fanout(ctx context.Context, req Request) (Response, error) {
 	body, err := json.Marshal(req)
 	if err != nil {
-		return FanoutResponse{}, err
+		return Response{}, err
 	}
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/render/fanout", bytes.NewReader(body))
 	if err != nil {
-		return FanoutResponse{}, err
+		return Response{}, err
 	}
 	httpReq.Header.Set("content-type", "application/json")
 	if c.serviceToken != "" {
@@ -87,9 +96,9 @@ func (c *Client) Fanout(ctx context.Context, req FanoutRequest) (FanoutResponse,
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(httpReq.Header))
 	resp, err := c.http.Do(httpReq)
 	if err != nil {
-		return FanoutResponse{}, err
+		return Response{}, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		errBody, _ := io.ReadAll(resp.Body)
 		var classified struct {
@@ -105,16 +114,16 @@ func (c *Client) Fanout(ctx context.Context, req FanoutRequest) (FanoutResponse,
 			// diagnosable rather than an empty "render failed (, status 5xx):".
 			message = strings.TrimSpace(string(errBody))
 		}
-		return FanoutResponse{}, &RenderError{
+		return Response{}, &RenderError{
 			Status:   resp.StatusCode,
 			Kind:     classified.Kind,
 			Message:  message,
 			Variable: classified.Variable,
 		}
 	}
-	var out FanoutResponse
+	var out Response
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return FanoutResponse{}, err
+		return Response{}, err
 	}
 	return out, nil
 }

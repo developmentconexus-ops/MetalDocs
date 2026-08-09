@@ -113,7 +113,7 @@ func (c Config) String() string {
 func (c Config) MarshalJSON() ([]byte, error) {
 	type configAlias Config
 	redacted := configAlias(c.redacted())
-	return json.Marshal(redacted)
+	return json.Marshal(redacted) //nolint:gosec // G117: SessionSecret/BootstrapAdminPassword are replaced with "***" by c.redacted() above before marshal
 }
 
 // Service implements the auth module's application logic: login/logout,
@@ -341,57 +341,9 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 	// lock window.
 	outcome := loginOK
 	if lockErr := s.repo.WithinLoginLock(ctx, identity.UserID, func(tx authdomain.LoginTx) error {
-		state, err := tx.LoadLoginState(ctx, identity.UserID)
-		if err != nil {
-			return err
-		}
-		// Run the credential comparison before branching so a locked or inactive
-		// account spends the same time as an active one — the fast no-KDF path
-		// would otherwise leak account state by wall-clock (OWASP Authentication
-		// Cheat Sheet — equalize work on every failure path). The distinct
-		// locked/inactive errors are kept deliberately (admin UX), only the
-		// timing is equalized. Verify dispatches on state.PasswordAlgo
-		// (REQ-AUTHN-1) and fails closed — verifyErr != nil (unrecognized
-		// algorithm or a malformed stored hash) is treated as a failed
-		// comparison, never as a match and never by falling through to a
-		// different algorithm (no-fallback principle).
-		passwordOK, verifyErr := passwordhash.Verify(state.PasswordAlgo, []byte(state.PasswordHash), []byte(password))
-		if verifyErr != nil {
-			passwordOK = false
-		}
-		if state.LockedUntil != nil && state.LockedUntil.After(s.now().UTC()) {
-			outcome = loginLocked
-			return nil
-		}
-		if !state.IsActive {
-			outcome = loginInactive
-			return nil
-		}
-		if !passwordOK {
-			if _, _, err := tx.RecordFailedLogin(ctx, identity.UserID, s.cfg.LoginMaxFailedAttempts, int(s.cfg.LoginLockDuration.Seconds()), s.remoteIP(r)); err != nil {
-				return fmt.Errorf("record failed login: %w", err)
-			}
-			outcome = loginInvalid
-			return nil
-		}
-		// Rehash-on-login migration (REQ-AUTHN-1): a successful login against a
-		// legacy bcrypt hash rehashes the verified plaintext to Argon2id and
-		// persists it in the same locked transaction. A write failure here must
-		// NOT fail the login — the user already authenticated correctly with the
-		// credential on file; a migration hiccup must not lock them out. Log and
-		// move on; the identity simply stays on bcrypt and gets another rehash
-		// attempt on its next successful login.
-		if state.PasswordAlgo == passwordAlgoBcrypt {
-			newHash, hashErr := passwordhash.HashArgon2id([]byte(password))
-			if hashErr != nil {
-				slog.ErrorContext(ctx, "auth: rehash-on-login: hash password failed; login proceeds on legacy bcrypt hash",
-					"user_id", identity.UserID, "err", hashErr)
-			} else if rehashErr := tx.RehashPassword(ctx, identity.UserID, authdomain.PasswordHash(newHash), passwordAlgoArgon2id); rehashErr != nil {
-				slog.ErrorContext(ctx, "auth: rehash-on-login: persist argon2id hash failed; login proceeds on legacy bcrypt hash",
-					"user_id", identity.UserID, "err", rehashErr)
-			}
-		}
-		return nil
+		var evalErr error
+		outcome, evalErr = s.evaluateLoginAttempt(ctx, tx, identity, password, r)
+		return evalErr
 	}); lockErr != nil {
 		return authdomain.AuthenticatedSession{}, lockErr
 	}
@@ -402,8 +354,73 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 		return authdomain.AuthenticatedSession{}, authdomain.ErrIdentityInactive
 	case loginInvalid:
 		return authdomain.AuthenticatedSession{}, authdomain.ErrInvalidCredentials
+	case loginOK:
+		// Credentials verified; fall through to session issuance below.
 	}
 
+	return s.issueSessionAfterLogin(ctx, identity, r)
+}
+
+// evaluateLoginAttempt runs the credential comparison, the lockout/active
+// checks, failed-attempt recording, and the bcrypt->argon2id rehash-on-login
+// migration, all inside the per-identity login lock held by Authenticate's
+// WithinLoginLock call. Extracted from Authenticate; behavior unchanged.
+func (s *Service) evaluateLoginAttempt(ctx context.Context, tx authdomain.LoginTx, identity authdomain.Identity, password string, r *http.Request) (loginOutcome, error) {
+	state, err := tx.LoadLoginState(ctx, identity.UserID)
+	if err != nil {
+		return loginOK, err
+	}
+	// Run the credential comparison before branching so a locked or inactive
+	// account spends the same time as an active one — the fast no-KDF path
+	// would otherwise leak account state by wall-clock (OWASP Authentication
+	// Cheat Sheet — equalize work on every failure path). The distinct
+	// locked/inactive errors are kept deliberately (admin UX), only the
+	// timing is equalized. Verify dispatches on state.PasswordAlgo
+	// (REQ-AUTHN-1) and fails closed — verifyErr != nil (unrecognized
+	// algorithm or a malformed stored hash) is treated as a failed
+	// comparison, never as a match and never by falling through to a
+	// different algorithm (no-fallback principle).
+	passwordOK, verifyErr := passwordhash.Verify(state.PasswordAlgo, []byte(state.PasswordHash), []byte(password))
+	if verifyErr != nil {
+		passwordOK = false
+	}
+	if state.LockedUntil != nil && state.LockedUntil.After(s.now().UTC()) {
+		return loginLocked, nil
+	}
+	if !state.IsActive {
+		return loginInactive, nil
+	}
+	if !passwordOK {
+		if _, _, err := tx.RecordFailedLogin(ctx, identity.UserID, s.cfg.LoginMaxFailedAttempts, int(s.cfg.LoginLockDuration.Seconds()), s.remoteIP(r)); err != nil {
+			return loginOK, fmt.Errorf("record failed login: %w", err)
+		}
+		return loginInvalid, nil
+	}
+	// Rehash-on-login migration (REQ-AUTHN-1): a successful login against a
+	// legacy bcrypt hash rehashes the verified plaintext to Argon2id and
+	// persists it in the same locked transaction. A write failure here must
+	// NOT fail the login — the user already authenticated correctly with the
+	// credential on file; a migration hiccup must not lock them out. Log and
+	// move on; the identity simply stays on bcrypt and gets another rehash
+	// attempt on its next successful login.
+	if state.PasswordAlgo == passwordAlgoBcrypt {
+		newHash, hashErr := passwordhash.HashArgon2id([]byte(password))
+		if hashErr != nil {
+			slog.ErrorContext(ctx, "auth: rehash-on-login: hash password failed; login proceeds on legacy bcrypt hash",
+				"user_id", identity.UserID, "err", hashErr)
+		} else if rehashErr := tx.RehashPassword(ctx, identity.UserID, authdomain.PasswordHash(newHash), passwordAlgoArgon2id); rehashErr != nil {
+			slog.ErrorContext(ctx, "auth: rehash-on-login: persist argon2id hash failed; login proceeds on legacy bcrypt hash",
+				"user_id", identity.UserID, "err", rehashErr)
+		}
+	}
+	return loginOK, nil
+}
+
+// issueSessionAfterLogin resolves the login tenant, records the successful
+// login (including the best-effort governance hint), and creates the new
+// session, returning the resulting AuthenticatedSession. Extracted from
+// Authenticate; behavior unchanged.
+func (s *Service) issueSessionAfterLogin(ctx context.Context, identity authdomain.Identity, r *http.Request) (authdomain.AuthenticatedSession, error) {
 	now := s.now().UTC()
 	claimedTenant := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
 	tenantID, err := s.resolveLoginTenant(ctx, identity.UserID, claimedTenant)
@@ -558,20 +575,8 @@ func (s *Service) ChangePasswordForUser(ctx context.Context, currentUser authdom
 		return err
 	}
 
-	identity, err := s.repo.FindIdentityByUserID(ctx, userID)
-	if err != nil {
+	if err := s.authorizeChangePassword(ctx, currentUser, currentPassword); err != nil {
 		return err
-	}
-	if !currentUser.MustChangePassword {
-		if currentPassword == "" {
-			return authdomain.ErrInvalidCredentials
-		}
-		if !s.currentPasswordMatches(identity, currentPassword) {
-			return authdomain.ErrInvalidCredentials
-		}
-	}
-	if currentUser.MustChangePassword && currentPassword != "" && !s.currentPasswordMatches(identity, currentPassword) {
-		return authdomain.ErrInvalidCredentials
 	}
 
 	passwordHash, err := s.hashPassword(newPassword)
@@ -592,36 +597,69 @@ func (s *Service) ChangePasswordForUser(ctx context.Context, currentUser authdom
 	repoTx, repoTxOK := s.repo.(updateUserTxRepository)
 	revokeTx, revokeTxOK := s.repo.(revokeSessionsByUserIDTxRepository)
 	beginner, beginOK := s.repo.(beginTxRepository)
-	if !(repoTxOK && revokeTxOK && beginOK) {
-		// Fallback: repo does not support tx variants (e.g. in-memory test repo).
-		// No transaction is available here, so the steps run sequentially as
-		// separate autocommits; the audit Record is best-effort. (This branch
-		// precedes the atomic path so the analyzer does not correlate this
-		// non-tx Record with the atomic path's Commit below.)
-		if err := s.repo.UpdateUser(ctx, updateParams); err != nil {
-			return err
-		}
-		if err := s.repo.RevokeSessionsByUserID(ctx, userID, now); err != nil {
-			return err
-		}
-		if s.audit != nil {
-			raw, _ := json.Marshal(map[string]any{})
-			_ = s.audit.Record(ctx, auditdomain.Event{
-				ID:           uuid.NewString(),
-				OccurredAt:   now,
-				ActorID:      userID,
-				Action:       "auth.password.changed",
-				ResourceType: "user",
-				ResourceID:   userID,
-				PayloadJSON:  string(raw),
-				TraceID:      requesttrace.Resolve(ctx),
-				TenantID:     currentUser.TenantID,
-			})
-		}
-		return nil
+	if !repoTxOK || !revokeTxOK || !beginOK {
+		return s.changePasswordFallback(ctx, updateParams, userID, now, currentUser)
 	}
+	return s.changePasswordAtomic(ctx, repoTx, revokeTx, beginner, updateParams, userID, now, currentUser)
+}
 
-	// Atomic path: mutation + session revocation + audit row in one tx.
+// authorizeChangePassword verifies currentPassword against currentUser's
+// stored credential, unless currentUser.MustChangePassword is set (in which
+// case a caller-supplied stale password is still checked, but an omitted one
+// is allowed through). Extracted from ChangePasswordForUser; behavior
+// unchanged.
+func (s *Service) authorizeChangePassword(ctx context.Context, currentUser authdomain.CurrentUser, currentPassword string) error {
+	identity, err := s.repo.FindIdentityByUserID(ctx, strings.TrimSpace(currentUser.UserID))
+	if err != nil {
+		return err
+	}
+	if !currentUser.MustChangePassword {
+		if currentPassword == "" {
+			return authdomain.ErrInvalidCredentials
+		}
+		if !s.currentPasswordMatches(identity, currentPassword) {
+			return authdomain.ErrInvalidCredentials
+		}
+	}
+	if currentUser.MustChangePassword && currentPassword != "" && !s.currentPasswordMatches(identity, currentPassword) {
+		return authdomain.ErrInvalidCredentials
+	}
+	return nil
+}
+
+// changePasswordFallback runs the mutation, session revoke, and best-effort
+// audit record as three separate autocommits — used when the repository does
+// not support transactional variants (e.g. an in-memory test repo).
+// Extracted from ChangePasswordForUser; behavior unchanged.
+func (s *Service) changePasswordFallback(ctx context.Context, updateParams authdomain.UpdateUserParams, userID string, now time.Time, currentUser authdomain.CurrentUser) error {
+	if err := s.repo.UpdateUser(ctx, updateParams); err != nil {
+		return err
+	}
+	if err := s.repo.RevokeSessionsByUserID(ctx, userID, now); err != nil {
+		return err
+	}
+	if s.audit != nil {
+		raw, _ := json.Marshal(map[string]any{})
+		_ = s.audit.Record(ctx, auditdomain.Event{
+			ID:           uuid.NewString(),
+			OccurredAt:   now,
+			ActorID:      userID,
+			Action:       "auth.password.changed",
+			ResourceType: "user",
+			ResourceID:   userID,
+			PayloadJSON:  string(raw),
+			TraceID:      requesttrace.Resolve(ctx),
+			TenantID:     currentUser.TenantID,
+		})
+	}
+	return nil
+}
+
+// changePasswordAtomic runs the mutation, session revoke (CWE-613: a stolen
+// or stale session must not survive a password change), and audit record
+// inside a single transaction. Extracted from ChangePasswordForUser;
+// behavior unchanged.
+func (s *Service) changePasswordAtomic(ctx context.Context, repoTx updateUserTxRepository, revokeTx revokeSessionsByUserIDTxRepository, beginner beginTxRepository, updateParams authdomain.UpdateUserParams, userID string, now time.Time, currentUser authdomain.CurrentUser) error {
 	tx, err := beginner.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin change password tx: %w", err)
@@ -739,32 +777,39 @@ func (s *Service) CreateUserWithInput(ctx context.Context, input authdomain.Crea
 	roleTx, roleTxOK := s.roleAdmin.(replaceUserRolesTxRepository)
 	beginner, beginOK := s.repo.(beginTxRepository)
 	if repoTxOK && roleTxOK && beginOK {
-		tx, err := beginner.BeginTx(ctx, nil)
-		if err != nil {
-			return fmt.Errorf("begin create user tx: %w", err)
-		}
-		if err := repoTx.CreateUserTx(ctx, tx, params); err != nil {
-			if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
-				return fmt.Errorf("create auth identity tx: %w (rollback failed: %v)", err, rollbackErr)
-			}
-			return err
-		}
-		if err := roleTx.ReplaceUserRolesTx(ctx, tx, fields.userID, fields.displayName, fields.tenantID, fields.role, fields.createdBy); err != nil {
-			if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
-				return fmt.Errorf("replace user roles tx: %w (rollback failed: %v)", err, rollbackErr)
-			}
-			return err
-		}
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit create user tx: %w", err)
-		}
-		return nil
+		return s.createUserAtomic(ctx, repoTx, roleTx, beginner, params, fields)
 	}
 
 	if err := s.repo.CreateUser(ctx, params); err != nil {
 		return err
 	}
 	return s.roleAdmin.ReplaceUserRoles(ctx, fields.userID, fields.displayName, fields.tenantID, fields.role, fields.createdBy)
+}
+
+// createUserAtomic creates the identity and assigns its role inside a
+// single transaction. Extracted from CreateUserWithInput; behavior
+// unchanged.
+func (s *Service) createUserAtomic(ctx context.Context, repoTx createUserTxRepository, roleTx replaceUserRolesTxRepository, beginner beginTxRepository, params authdomain.CreateUserParams, fields createUserFields) error {
+	tx, err := beginner.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin create user tx: %w", err)
+	}
+	if err := repoTx.CreateUserTx(ctx, tx, params); err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+			return fmt.Errorf("create auth identity tx: %w (rollback failed: %w)", err, rollbackErr)
+		}
+		return err
+	}
+	if err := roleTx.ReplaceUserRolesTx(ctx, tx, fields.userID, fields.displayName, fields.tenantID, fields.role, fields.createdBy); err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+			return fmt.Errorf("replace user roles tx: %w (rollback failed: %w)", err, rollbackErr)
+		}
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit create user tx: %w", err)
+	}
+	return nil
 }
 
 // UpdateUser applies params to a user, optionally setting newPassword (hashed
@@ -801,7 +846,7 @@ func (s *Service) UpdateUser(ctx context.Context, params authdomain.UpdateUserPa
 	repoTx, repoTxOK := s.repo.(updateUserTxRepository)
 	revokeTx, revokeTxOK := s.repo.(revokeSessionsByUserIDTxRepository)
 	beginner, beginOK := s.repo.(beginTxRepository)
-	if !(repoTxOK && revokeTxOK && beginOK) {
+	if !repoTxOK || !revokeTxOK || !beginOK {
 		// Fallback: in-memory / test repo — no tx available, so the mutation and the
 		// revoke run as separate autocommits.
 		if err := s.repo.UpdateUser(ctx, params); err != nil {
@@ -867,36 +912,44 @@ func (s *Service) AdminResetPassword(ctx context.Context, userID, newPassword st
 	repoTx, repoTxOK := s.repo.(updateUserTxRepository)
 	revokeTx, revokeTxOK := s.repo.(revokeSessionsByUserIDTxRepository)
 	beginner, beginOK := s.repo.(beginTxRepository)
-	if !(repoTxOK && revokeTxOK && beginOK) {
-		// Fallback: in-memory / test repo.
-		// No transaction is available here, so the steps run sequentially as
-		// separate autocommits; the audit Record is best-effort. (This branch
-		// precedes the atomic path so the analyzer does not correlate this
-		// non-tx Record with the atomic path's Commit below.)
-		if err := s.repo.UpdateUser(ctx, updateParams); err != nil {
-			return err
-		}
-		if err := s.repo.RevokeSessionsByUserID(ctx, userID, now); err != nil {
-			return err
-		}
-		if s.audit != nil {
-			raw, _ := json.Marshal(map[string]any{"must_change_password": true})
-			_ = s.audit.Record(ctx, auditdomain.Event{
-				ID:           uuid.NewString(),
-				OccurredAt:   now,
-				ActorID:      actorID,
-				Action:       "auth.user.password_reset",
-				ResourceType: "user",
-				ResourceID:   userID,
-				PayloadJSON:  string(raw),
-				TraceID:      requesttrace.Resolve(ctx),
-				TenantID:     tenantID,
-			})
-		}
-		return nil
+	if !repoTxOK || !revokeTxOK || !beginOK {
+		return s.adminResetPasswordFallback(ctx, updateParams, userID, now, actorID, tenantID)
 	}
+	return s.adminResetPasswordAtomic(ctx, repoTx, revokeTx, beginner, updateParams, userID, now, actorID, tenantID)
+}
 
-	// Atomic path: mutation + session revocation + audit row in one tx.
+// adminResetPasswordFallback runs the mutation, session revoke, and
+// best-effort audit record as three separate autocommits — used when the
+// repository does not support transactional variants (e.g. an in-memory
+// test repo). Extracted from AdminResetPassword; behavior unchanged.
+func (s *Service) adminResetPasswordFallback(ctx context.Context, updateParams authdomain.UpdateUserParams, userID string, now time.Time, actorID, tenantID string) error {
+	if err := s.repo.UpdateUser(ctx, updateParams); err != nil {
+		return err
+	}
+	if err := s.repo.RevokeSessionsByUserID(ctx, userID, now); err != nil {
+		return err
+	}
+	if s.audit != nil {
+		raw, _ := json.Marshal(map[string]any{"must_change_password": true})
+		_ = s.audit.Record(ctx, auditdomain.Event{
+			ID:           uuid.NewString(),
+			OccurredAt:   now,
+			ActorID:      actorID,
+			Action:       "auth.user.password_reset",
+			ResourceType: "user",
+			ResourceID:   userID,
+			PayloadJSON:  string(raw),
+			TraceID:      requesttrace.Resolve(ctx),
+			TenantID:     tenantID,
+		})
+	}
+	return nil
+}
+
+// adminResetPasswordAtomic runs the mutation, session revoke, and audit
+// record inside a single transaction. Extracted from AdminResetPassword;
+// behavior unchanged.
+func (s *Service) adminResetPasswordAtomic(ctx context.Context, repoTx updateUserTxRepository, revokeTx revokeSessionsByUserIDTxRepository, beginner beginTxRepository, updateParams authdomain.UpdateUserParams, userID string, now time.Time, actorID, tenantID string) error {
 	tx, err := beginner.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin admin reset password tx: %w", err)
@@ -950,7 +1003,7 @@ func (s *Service) UnlockUser(ctx context.Context, userID string) error {
 
 	repoTx, repoTxOK := s.repo.(updateUserTxRepository)
 	beginner, beginOK := s.repo.(beginTxRepository)
-	if !(repoTxOK && beginOK) {
+	if !repoTxOK || !beginOK {
 		// Fallback: in-memory / test repo.
 		// No transaction is available here, so the steps run sequentially as
 		// separate autocommits; the audit Record is best-effort. (This branch

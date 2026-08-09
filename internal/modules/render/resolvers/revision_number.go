@@ -5,12 +5,17 @@ import (
 	"time"
 )
 
+// RevisionNumberResolver resolves the "revision_number" placeholder to the
+// revision's sequential number.
 type RevisionNumberResolver struct{}
 
+// Key returns the resolver's registry key, "revision_number".
 func (RevisionNumberResolver) Key() string { return "revision_number" }
 
+// Version returns the resolver's version.
 func (RevisionNumberResolver) Version() int { return 1 }
 
+// Resolve computes the revision_number value for in.
 func (RevisionNumberResolver) Resolve(ctx context.Context, in ResolveInput) (ResolvedValue, error) {
 	if err := requireTenantID("revision_number", in.TenantID); err != nil {
 		return ResolvedValue{}, err

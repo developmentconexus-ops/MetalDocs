@@ -595,7 +595,7 @@ func TestControlledDocumentService_Create_AtomicWithDocument(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { _ = db.Close() })
 	mock.ExpectBegin()
 	expectRegistryCreateAuthz(mock, "actor-1", "tenant-a")
 	mock.ExpectCommit()
@@ -645,7 +645,7 @@ func TestControlledDocumentService_Create_InitializerError_RollsBack(t *testing.
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { _ = db.Close() })
 	mock.ExpectBegin()
 	expectRegistryCreateAuthz(mock, "actor-1", "tenant-a")
 	mock.ExpectRollback()
@@ -969,7 +969,7 @@ func TestCreateRevision_MissingActorContextReturnsErrActorMissing(t *testing.T) 
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { _ = db.Close() })
 	mock.ExpectBegin()
 	mock.ExpectRollback()
 
@@ -1029,7 +1029,7 @@ func TestCreateRevision_SetsAuthzContextBeforeClone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { _ = db.Close() })
 	mock.ExpectBegin()
 	expectRegistryCreateAuthz(mock, "actor-1", "tenant-a")
 	mock.ExpectCommit()
@@ -1075,7 +1075,7 @@ func TestCreateRevision_MapsActiveSiblingUniqueViolationToDomainConflict(t *test
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { _ = db.Close() })
 	mock.ExpectBegin()
 	expectRegistryCreateAuthz(mock, "actor-1", "tenant-a")
 

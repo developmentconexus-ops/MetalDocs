@@ -48,7 +48,7 @@ LIMIT $4
 	if err != nil {
 		return nil, fmt.Errorf("list active sessions: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := make([]authdomain.SessionListItem, 0, limit)
 	for rows.Next() {

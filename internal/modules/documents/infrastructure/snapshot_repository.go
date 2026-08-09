@@ -16,6 +16,8 @@ type SnapshotRepository struct {
 	schema string // optional schema prefix; empty = bare table name
 }
 
+// DBTX is the subset of *sql.DB / *sql.Tx these repositories need, letting
+// callers optionally run a method inside their own caller-owned transaction.
 type DBTX interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
@@ -237,6 +239,8 @@ func (r *SnapshotRepository) WritePDF(ctx context.Context, tenantID, docID, s3Ke
 	return requireRowsAffected(result, "write pdf")
 }
 
+// ResolveTenantByDocumentID looks up a document's tenant_id by its id alone,
+// for callers that must recover tenancy before they can run a tenant-scoped read.
 func (r *SnapshotRepository) ResolveTenantByDocumentID(ctx context.Context, docID string) (string, error) {
 	var tenantID string
 	if err := r.db.QueryRowContext(ctx, fmt.Sprintf(`

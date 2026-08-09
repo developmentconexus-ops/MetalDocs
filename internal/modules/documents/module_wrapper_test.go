@@ -125,8 +125,9 @@ func newWrapperTestModule() *Module {
 }
 
 func withModuleAuth(req *http.Request, roles string) *http.Request {
-	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant_1"))
-	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "user_1", []iamdomain.Role{iamdomain.Role(roles)}))
+	ctx := tenant.WithTenantID(req.Context(), "tenant_1")
+	ctx = iamdomain.WithAuthContext(ctx, "user_1", []iamdomain.Role{iamdomain.Role(roles)})
+	req = req.WithContext(ctx)
 	req.Header.Set("X-User-Roles", roles)
 	req.Header.Set("Content-Type", "application/json")
 	return req

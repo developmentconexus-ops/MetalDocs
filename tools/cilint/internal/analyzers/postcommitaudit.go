@@ -114,31 +114,40 @@ func DeliveryAuditSink(files []string) []Finding {
 			if !ok {
 				return true
 			}
-			sel, ok := call.Fun.(*ast.SelectorExpr)
-			if !ok {
-				return true
+			if finding, flagged := deliveryAuditFinding(fset, path, src, call); flagged {
+				out = append(out, finding)
 			}
-			if !postCommitAuditSinks[sel.Sel.Name] {
-				return true
-			}
-			if !isAuditReceiver(sel.X) {
-				return true
-			}
-			pos := fset.Position(call.Pos())
-			line := getLine(src, pos.Line)
-			if strings.Contains(line, postCommitAuditAllowComment) {
-				return true
-			}
-			out = append(out, Finding{
-				Analyzer: "postcommitaudit",
-				File:     path,
-				Line:     pos.Line,
-				Message:  "non-Tx audit/governance write (" + sel.Sel.Name + ") in the delivery layer; emit audit in the application/service layer inside the business tx (use the *Tx variant), or suppress with //cilint:allow-post-commit-audit for a legitimately best-effort event (H-3b, REQ-ASYNC-1, F-07)",
-			})
 			return true
 		})
 	}
 	return out
+}
+
+// deliveryAuditFinding checks a single call expression for the delivery-layer
+// non-Tx audit sink pattern (see DeliveryAuditSink doc comment), returning
+// the Finding to emit if it matches and is not explicitly allowed.
+func deliveryAuditFinding(fset *token.FileSet, path, src string, call *ast.CallExpr) (Finding, bool) {
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return Finding{}, false
+	}
+	if !postCommitAuditSinks[sel.Sel.Name] {
+		return Finding{}, false
+	}
+	if !isAuditReceiver(sel.X) {
+		return Finding{}, false
+	}
+	pos := fset.Position(call.Pos())
+	line := getLine(src, pos.Line)
+	if strings.Contains(line, postCommitAuditAllowComment) {
+		return Finding{}, false
+	}
+	return Finding{
+		Analyzer: "postcommitaudit",
+		File:     path,
+		Line:     pos.Line,
+		Message:  "non-Tx audit/governance write (" + sel.Sel.Name + ") in the delivery layer; emit audit in the application/service layer inside the business tx (use the *Tx variant), or suppress with //cilint:allow-post-commit-audit for a legitimately best-effort event (H-3b, REQ-ASYNC-1, F-07)",
+	}, true
 }
 
 // isAuditReceiver reports whether the receiver expression of a sink call resolves

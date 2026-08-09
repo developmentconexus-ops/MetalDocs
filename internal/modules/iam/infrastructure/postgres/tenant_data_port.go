@@ -61,8 +61,12 @@ func NewTenantDataPort(db *sql.DB) *TenantDataPort {
 
 var _ tenantdata.Port = (*TenantDataPort)(nil)
 
+// Module returns the owning module name, "iam".
 func (p *TenantDataPort) Module() string { return "iam" }
 
+// Tables returns the tenant-scoped tables this port owns (see the type doc
+// for the full erase-order rationale), including
+// metaldocs.tenant_lifecycle_jobs only when that table exists.
 func (p *TenantDataPort) Tables() []string {
 	tables := []string{
 		"metaldocs.iam_users",
@@ -78,6 +82,8 @@ func (p *TenantDataPort) Tables() []string {
 	return tables
 }
 
+// ExportTenantData exports every row scoped to tenantID from each table
+// returned by Tables, for inclusion in a tenant data export artifact.
 func (p *TenantDataPort) ExportTenantData(ctx context.Context, db *sql.DB, tenantID string) ([]tenantdata.TableExport, error) {
 	var out []tenantdata.TableExport
 	for _, table := range p.Tables() {
@@ -90,6 +96,9 @@ func (p *TenantDataPort) ExportTenantData(ctx context.Context, db *sql.DB, tenan
 	return out, nil
 }
 
+// EraseTenantData deletes (or, for tenant_lifecycle_jobs, scrubs) every row
+// scoped to tenantID within tx, in the child-before-parent order documented
+// on the type, and returns the per-table row counts affected.
 func (p *TenantDataPort) EraseTenantData(ctx context.Context, tx *sql.Tx, tenantID string) (map[string]int64, error) {
 	counts := make(map[string]int64)
 

@@ -10,12 +10,16 @@ import (
 	"metaldocs/internal/platform/pagination"
 )
 
+// ErrTenantRequired is returned when a search is attempted without a
+// resolved tenant id.
 var ErrTenantRequired = errors.New("search: tenant id required")
 
+// Service orchestrates tenant- and actor-scoped document search.
 type Service struct {
 	reader domain.Reader
 }
 
+// NewService builds a Service backed by reader.
 func NewService(reader domain.Reader) *Service {
 	return &Service{reader: reader}
 }

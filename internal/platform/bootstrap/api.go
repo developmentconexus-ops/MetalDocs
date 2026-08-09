@@ -27,6 +27,8 @@ import (
 	miniostore "metaldocs/internal/platform/storage/minio"
 )
 
+// APIDependencies holds the constructed infrastructure dependencies the
+// metaldocs-api binary wires into its modules at startup.
 type APIDependencies struct {
 	RoleProvider    iamdomain.RoleProvider
 	RoleAdminRepo   iamdomain.RoleAdminRepository
@@ -54,6 +56,9 @@ type APIDependencies struct {
 	Cleanup           func()
 }
 
+// BuildAPIDependencies constructs the API binary's infrastructure dependencies
+// (repository, storage, messaging, and observability clients) for the given
+// repository mode and attachments configuration.
 func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg config.AttachmentsConfig) (APIDependencies, error) {
 	gotenbergCfg, err := config.LoadGotenbergConfig()
 	if err != nil {
@@ -174,7 +179,7 @@ func gotenbergHealthCheck(cfg config.GotenbergConfig) observability.DependencyCh
 			if err != nil {
 				return observability.DependencyCheckResult{}, err
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			if resp.StatusCode != http.StatusOK {
 				return observability.DependencyCheckResult{}, fmt.Errorf("gotenberg unhealthy: status %d", resp.StatusCode)
 			}

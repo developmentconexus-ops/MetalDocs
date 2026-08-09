@@ -12,34 +12,34 @@ Families are **semantic, never module-named**. A module name on a public wire co
 
 | Code | Status | Module | Declared at |
 |---|---|---|---|
-| `auth.account_inactive` | **403** — identity is proven; the account is deactivated, so re-authenticating cannot help | platform | `internal/platform/problem/codes.go:97` |
-| `auth.account_locked` | **403** — identity is proven; the account is administratively blocked, so re-authenticating cannot help | platform | `internal/platform/problem/codes.go:95` |
-| `auth.invalid_credentials` | 401 | platform | `internal/platform/problem/codes.go:89` |
-| `auth.password_change_required` | **403** — identity is proven; the session is refused until the mandatory password change completes | platform | `internal/platform/problem/codes.go:103` |
+| `auth.account_inactive` | **403** — identity is proven; the account is deactivated, so re-authenticating cannot help | platform | `internal/platform/problem/codes.go:117` |
+| `auth.account_locked` | **403** — identity is proven; the account is administratively blocked, so re-authenticating cannot help | platform | `internal/platform/problem/codes.go:113` |
+| `auth.invalid_credentials` | 401 | platform | `internal/platform/problem/codes.go:104` |
+| `auth.password_change_required` | **403** — identity is proven; the session is refused until the mandatory password change completes | platform | `internal/platform/problem/codes.go:129` |
 | `auth.signature_invalid` | 401 | approval | `internal/modules/approval/http/errors.go:88` |
-| `auth.tenant_forbidden` | **403** — identity is proven; the caller may not act on the requested tenant | platform | `internal/platform/problem/codes.go:99` |
-| `auth.tenant_required` | **403** — identity is proven; the session carries no tenant claim for a tenant-scoped route | platform | `internal/platform/problem/codes.go:101` |
-| `auth.unauthenticated` | 401 | platform | `internal/platform/problem/codes.go:87` |
+| `auth.tenant_forbidden` | **403** — identity is proven; the caller may not act on the requested tenant | platform | `internal/platform/problem/codes.go:121` |
+| `auth.tenant_required` | **403** — identity is proven; the session carries no tenant claim for a tenant-scoped route | platform | `internal/platform/problem/codes.go:125` |
+| `auth.unauthenticated` | 401 | platform | `internal/platform/problem/codes.go:100` |
 
 ## `conflict` — default 409
 
 | Code | Status | Module | Declared at |
 |---|---|---|---|
-| `conflict.already_exists` | 409 | platform | `internal/platform/problem/codes.go:193` |
+| `conflict.already_exists` | 409 | platform | `internal/platform/problem/codes.go:252` |
 | `conflict.approval_route_duplicate_profile` | 409 | approval | `internal/modules/approval/http/errors.go:69` |
-| `conflict.concurrent_modification` | 409 | platform | `internal/platform/problem/codes.go:194` |
+| `conflict.concurrent_modification` | 409 | platform | `internal/platform/problem/codes.go:256` |
 | `conflict.controlled_document_code_archived` | 409 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:532` |
 | `conflict.controlled_document_code_taken` | 409 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:531` |
 | `conflict.document_family_exists` | 409 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:93` |
 | `conflict.document_profile_exists` | 409 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:53` |
-| `conflict.duplicate_submission` | 409 | shared | `internal/platform/problem/codes.go:209` |
-| `conflict.generic` | 409 | platform | `internal/platform/problem/codes.go:202` |
-| `conflict.idempotency_key_reused` | 409 | platform | `internal/platform/problem/codes.go:199` |
+| `conflict.duplicate_submission` | 409 | shared | `internal/platform/problem/codes.go:276` |
+| `conflict.generic` | 409 | platform | `internal/platform/problem/codes.go:264` |
+| `conflict.idempotency_key_reused` | 409 | platform | `internal/platform/problem/codes.go:261` |
 | `conflict.mark_reviewed_stale_revision` | 409 | approval | `internal/modules/approval/http/errors.go:147` |
-| `conflict.membership_exists` | 409 | platform | `internal/platform/problem/codes.go:205` |
+| `conflict.membership_exists` | 409 | platform | `internal/platform/problem/codes.go:271` |
 | `conflict.process_area_exists` | 409 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:84` |
 | `conflict.signoff_duplicate` | 409 | approval | `internal/modules/approval/http/errors.go:55` |
-| `conflict.stale_base` | 409 | platform | `internal/platform/problem/codes.go:204` |
+| `conflict.stale_base` | 409 | platform | `internal/platform/problem/codes.go:268` |
 | `conflict.stale_revision` | 409 | approval | `internal/modules/approval/http/errors.go:44` |
 
 ## `internal` — default 500
@@ -49,10 +49,10 @@ Families are **semantic, never module-named**. A module name on a public wire co
 | `internal.creation_context_unconfigured` | 500 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:551` |
 | `internal.db_privilege_missing` | 500 | approval | `internal/modules/approval/http/errors.go:94` |
 | `internal.db_unknown` | 500 | approval | `internal/modules/approval/http/errors.go:95` |
-| `internal.not_implemented` | **501** — 501 Not Implemented is the dedicated status for a wired-but-unimplemented surface (RFC 9110 §15.6.2) | platform | `internal/platform/problem/codes.go:287` |
+| `internal.not_implemented` | **501** — 501 Not Implemented is the dedicated status for a wired-but-unimplemented surface (RFC 9110 §15.6.2) | platform | `internal/platform/problem/codes.go:356` |
 | `internal.signature_misconfigured` | 500 | approval | `internal/modules/approval/http/errors.go:96` |
 | `internal.template_artifact_invariant_unconfigured` | 500 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:550` |
-| `internal.unknown` | 500 | shared | `internal/platform/problem/codes.go:285` |
+| `internal.unknown` | 500 | shared | `internal/platform/problem/codes.go:353` |
 | `internal.upstream_timeout` | **504** — 504 Gateway Timeout: the deadline was exceeded waiting on a dependency, which is a narrower server fault than the internal. family default of 500 | approval | `internal/modules/approval/http/errors.go:118` |
 | `internal.verdict_wrong_stage_kind` | 500 | approval | `internal/modules/approval/http/errors.go:170` |
 
@@ -68,29 +68,29 @@ Families are **semantic, never module-named**. A module name on a public wire co
 | `notfound.delegation` | 404 | approval | `internal/modules/approval/http/errors.go:164` |
 | `notfound.document` | 404 | approval | `internal/modules/approval/http/errors.go:145` |
 | `notfound.document_family` | 404 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:89` |
-| `notfound.document_profile` | 404 | shared | `internal/platform/problem/codes.go:145` |
-| `notfound.membership` | 404 | platform | `internal/platform/problem/codes.go:142` |
-| `notfound.process_area` | 404 | shared | `internal/platform/problem/codes.go:146` |
-| `notfound.resource` | 404 | platform | `internal/platform/problem/codes.go:141` |
-| `notfound.revision` | 404 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:144` |
+| `notfound.document_profile` | 404 | shared | `internal/platform/problem/codes.go:186` |
+| `notfound.membership` | 404 | platform | `internal/platform/problem/codes.go:182` |
+| `notfound.process_area` | 404 | shared | `internal/platform/problem/codes.go:189` |
+| `notfound.resource` | 404 | platform | `internal/platform/problem/codes.go:178` |
+| `notfound.revision` | 404 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:152` |
 
 ## `permission` — default 403
 
 | Code | Status | Module | Declared at |
 |---|---|---|---|
-| `permission.capability_denied` | 403 | shared | `internal/platform/problem/codes.go:116` |
-| `permission.denied` | 403 | platform | `internal/platform/problem/codes.go:120` |
-| `permission.iso_segregation_violation` | 403 | platform | `internal/platform/problem/codes.go:123` |
-| `permission.origin_forbidden` | 403 | platform | `internal/platform/problem/codes.go:122` |
-| `permission.signoff_actor_not_eligible` | 403 | shared | `internal/platform/problem/codes.go:131` |
+| `permission.capability_denied` | 403 | shared | `internal/platform/problem/codes.go:142` |
+| `permission.denied` | 403 | platform | `internal/platform/problem/codes.go:146` |
+| `permission.iso_segregation_violation` | 403 | platform | `internal/platform/problem/codes.go:154` |
+| `permission.origin_forbidden` | 403 | platform | `internal/platform/problem/codes.go:150` |
+| `permission.signoff_actor_not_eligible` | 403 | shared | `internal/platform/problem/codes.go:165` |
 | `permission.sod_cross_stage_duplicate` | 403 | approval | `internal/modules/approval/http/errors.go:72` |
-| `permission.sod_submitter_cannot_sign` | 403 | shared | `internal/platform/problem/codes.go:132` |
+| `permission.sod_submitter_cannot_sign` | 403 | shared | `internal/platform/problem/codes.go:168` |
 
 ## `precondition` — default 412
 
 | Code | Status | Module | Declared at |
 |---|---|---|---|
-| `precondition.content_hash_mismatch` | 412 | shared | `internal/platform/problem/codes.go:223` |
+| `precondition.content_hash_mismatch` | 412 | shared | `internal/platform/problem/codes.go:290` |
 | `precondition.if_match_required` | **428** — 428 Precondition Required (RFC 6585 §3): no precondition FAILED — the server refuses to act without one, which is the opposite of the 412 the precondition. family defaults to | approval | `internal/modules/approval/http/errors.go:75` |
 | `precondition.lock_version_stale` | 412 | templates | `internal/modules/templates/delivery/http/errors.go:31` |
 
@@ -98,25 +98,25 @@ Families are **semantic, never module-named**. A module name on a public wire co
 
 | Code | Status | Module | Declared at |
 |---|---|---|---|
-| `ratelimit.exceeded` | 429 | platform | `internal/platform/problem/codes.go:273` |
+| `ratelimit.exceeded` | 429 | platform | `internal/platform/problem/codes.go:341` |
 
 ## `request` — default 400
 
 | Code | Status | Module | Declared at |
 |---|---|---|---|
-| `request.body_too_large` | **413** — 413 Content Too Large is the dedicated status for an oversized body (RFC 9110 §15.5.14) | platform | `internal/platform/problem/codes.go:58` |
-| `request.content_type_unsupported` | **415** — 415 Unsupported Media Type is the dedicated status for a rejected Content-Type (RFC 9110 §15.5.16) | shared | `internal/platform/problem/codes.go:77` |
-| `request.cursor_expired` | **410** — 410 Gone: the cursor addressed an item that has been permanently removed, so the caller must restart pagination rather than fix the request syntax | platform | `internal/platform/problem/codes.go:61` |
-| `request.cursor_invalid` | 400 | platform | `internal/platform/problem/codes.go:52` |
-| `request.empty_body` | 400 | shared | `internal/platform/problem/codes.go:71` |
+| `request.body_too_large` | **413** — 413 Content Too Large is the dedicated status for an oversized body (RFC 9110 §15.5.14) | platform | `internal/platform/problem/codes.go:63` |
+| `request.content_type_unsupported` | **415** — 415 Unsupported Media Type is the dedicated status for a rejected Content-Type (RFC 9110 §15.5.16) | shared | `internal/platform/problem/codes.go:90` |
+| `request.cursor_expired` | **410** — 410 Gone: the cursor addressed an item that has been permanently removed, so the caller must restart pagination rather than fix the request syntax | platform | `internal/platform/problem/codes.go:68` |
+| `request.cursor_invalid` | 400 | platform | `internal/platform/problem/codes.go:53` |
+| `request.empty_body` | 400 | shared | `internal/platform/problem/codes.go:84` |
 | `request.header_required` | 400 | approval | `internal/modules/approval/http/errors.go:104` |
-| `request.idempotency_key_invalid` | 400 | platform | `internal/platform/problem/codes.go:65` |
-| `request.idempotency_key_required` | 400 | platform | `internal/platform/problem/codes.go:66` |
+| `request.idempotency_key_invalid` | 400 | platform | `internal/platform/problem/codes.go:74` |
+| `request.idempotency_key_required` | 400 | platform | `internal/platform/problem/codes.go:77` |
 | `request.if_match_malformed` | 400 | approval | `internal/modules/approval/http/errors.go:79` |
 | `request.invalid` | 400 | platform | `internal/platform/problem/codes.go:50` |
-| `request.json_decode` | 400 | shared | `internal/platform/problem/codes.go:70` |
+| `request.json_decode` | 400 | shared | `internal/platform/problem/codes.go:81` |
 | `request.json_type_error` | 400 | approval | `internal/modules/approval/http/errors.go:123` |
-| `request.method_not_allowed` | **405** — 405 is the dedicated status for an unsupported method on an existing target (RFC 9110 §15.5.6); the request is otherwise well-formed, so the request. family is right and 400 is not | platform | `internal/platform/problem/codes.go:54` |
+| `request.method_not_allowed` | **405** — 405 is the dedicated status for an unsupported method on an existing target (RFC 9110 §15.5.6); the request is otherwise well-formed, so the request. family is right and 400 is not | platform | `internal/platform/problem/codes.go:57` |
 | `request.param_format` | 400 | approval | `internal/modules/approval/http/errors.go:101` |
 | `request.param_required` | 400 | approval | `internal/modules/approval/http/errors.go:103` |
 | `request.param_too_many_values` | 400 | approval | `internal/modules/approval/http/errors.go:105` |
@@ -128,34 +128,34 @@ Families are **semantic, never module-named**. A module name on a public wire co
 |---|---|---|---|
 | `state.active_revision_exists` | 409 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:530` |
 | `state.approval_blocked_unresolved_comments` | 409 | approval | `internal/modules/approval/http/errors.go:108` |
-| `state.approval_instance_completed` | 409 | shared | `internal/platform/problem/codes.go:183` |
+| `state.approval_instance_completed` | 409 | shared | `internal/platform/problem/codes.go:238` |
 | `state.approval_route_in_use` | 409 | approval | `internal/modules/approval/http/errors.go:68` |
 | `state.approval_route_inactive` | 409 | approval | `internal/modules/approval/http/errors.go:116` |
-| `state.approval_route_missing` | 409 | shared | `internal/platform/problem/codes.go:159` |
-| `state.approval_stage_not_active` | 409 | shared | `internal/platform/problem/codes.go:184` |
+| `state.approval_route_missing` | 409 | shared | `internal/platform/problem/codes.go:204` |
+| `state.approval_stage_not_active` | 409 | shared | `internal/platform/problem/codes.go:241` |
 | `state.controlled_document_not_active` | 409 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:529` |
 | `state.default_template_obsolete` | 409 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:553` |
 | `state.document_family_already_inactive` | 409 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:91` |
 | `state.document_family_has_profiles` | 409 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:92` |
 | `state.document_not_draft` | 409 | approval | `internal/modules/approval/http/errors.go:138` |
 | `state.document_not_published` | 409 | approval | `internal/modules/approval/http/errors.go:146` |
-| `state.document_profile_archived` | 409 | shared | `internal/platform/problem/codes.go:173` |
+| `state.document_profile_archived` | 409 | shared | `internal/platform/problem/codes.go:223` |
 | `state.fast_forward_not_eligible` | 409 | approval | `internal/modules/approval/http/errors.go:174` |
 | `state.fast_forward_stage_not_completed` | 409 | approval | `internal/modules/approval/http/errors.go:173` |
 | `state.override_template_deleted` | 409 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:536` |
 | `state.override_template_not_published` | 409 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:537` |
-| `state.placeholder_not_author_editable` | 409 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:145` |
-| `state.process_area_archived` | 409 | shared | `internal/platform/problem/codes.go:174` |
+| `state.placeholder_not_author_editable` | 409 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:153` |
+| `state.process_area_archived` | 409 | shared | `internal/platform/problem/codes.go:226` |
 | `state.profile_class_route_conflict` | 409 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:63` |
 | `state.profile_no_default_template` | 409 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:552` |
-| `state.revision_not_draft` | 409 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:146` |
+| `state.revision_not_draft` | 409 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:154` |
 | `state.sla_extension_no_active_stage` | 409 | approval | `internal/modules/approval/http/errors.go:184` |
-| `state.system_template_immutable` | 409 | platform | `internal/platform/problem/codes.go:170` |
+| `state.system_template_immutable` | 409 | platform | `internal/platform/problem/codes.go:219` |
 | `state.template_artifact_missing` | 409 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:549` |
 | `state.template_not_published` | 409 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:39` |
-| `state.transition_invalid` | 409 | platform | `internal/platform/problem/codes.go:155` |
-| `state.upload_expired` | **410** — 410 Gone: unlike state.upload_missing, the upload session did exist and has permanently expired, which is the condition 410 asserts (RFC 9110 §15.5.11) | platform | `internal/platform/problem/codes.go:161` |
-| `state.upload_missing` | 409 | platform | `internal/platform/problem/codes.go:168` |
+| `state.transition_invalid` | 409 | platform | `internal/platform/problem/codes.go:200` |
+| `state.upload_expired` | **410** — 410 Gone: unlike state.upload_missing, the upload session did exist and has permanently expired, which is the condition 410 asserts (RFC 9110 §15.5.11) | platform | `internal/platform/problem/codes.go:208` |
+| `state.upload_missing` | 409 | platform | `internal/platform/problem/codes.go:215` |
 
 ## `validation` — default 422
 
@@ -170,16 +170,16 @@ Families are **semantic, never module-named**. A module name on a public wire co
 | `validation.document_subject_key_mismatch` | 422 | approval | `internal/modules/approval/http/errors.go:136` |
 | `validation.effective_date_required` | 422 | approval | `internal/modules/approval/http/errors.go:73` |
 | `validation.effective_to_not_after_effective_from` | 422 | approval | `internal/modules/approval/http/errors.go:149` |
-| `validation.empty_eligible_pool` | 422 | shared | `internal/platform/problem/codes.go:256` |
-| `validation.failed` | 422 | shared | `internal/platform/problem/codes.go:241` |
+| `validation.empty_eligible_pool` | 422 | shared | `internal/platform/problem/codes.go:324` |
+| `validation.failed` | 422 | shared | `internal/platform/problem/codes.go:308` |
 | `validation.family_unknown` | 422 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:61` |
-| `validation.field_immutable` | 422 | tokens | `internal/modules/tokens/delivery/http/handler.go:49` |
+| `validation.field_immutable` | 422 | tokens | `internal/modules/tokens/delivery/http/handler.go:54` |
 | `validation.manual_code_reason_required` | 422 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:533` |
-| `validation.name_reserved` | 422 | tokens | `internal/modules/tokens/delivery/http/handler.go:50` |
+| `validation.name_reserved` | 422 | tokens | `internal/modules/tokens/delivery/http/handler.go:55` |
 | `validation.override_reason_required` | 422 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:534` |
 | `validation.placeholder_name_duplicate` | 422 | templates | `internal/modules/templates/delivery/http/errors.go:55` |
 | `validation.placeholder_name_invalid` | 422 | templates | `internal/modules/templates/delivery/http/errors.go:50` |
-| `validation.placeholder_not_choice` | 422 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:143` |
+| `validation.placeholder_not_choice` | 422 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:151` |
 | `validation.profile_code_immutable` | 422 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:51` |
 | `validation.profile_not_configured` | 422 | approval | `internal/modules/approval/http/errors.go:142` |
 | `validation.profile_unknown` | 422 | approval | `internal/modules/approval/http/errors.go:132` |
@@ -188,16 +188,16 @@ Families are **semantic, never module-named**. A module name on a public wire co
 | `validation.reason_required` | 422 | approval | `internal/modules/approval/http/errors.go:113` |
 | `validation.review_due_before_effective` | 422 | approval | `internal/modules/approval/http/errors.go:148` |
 | `validation.revision_title_required` | 422 | approval | `internal/modules/approval/http/errors.go:135` |
-| `validation.role_unknown` | 422 | platform | `internal/platform/problem/codes.go:234` |
+| `validation.role_unknown` | 422 | platform | `internal/platform/problem/codes.go:301` |
 | `validation.route_stage_required` | 422 | approval | `internal/modules/approval/http/errors.go:159` |
 | `validation.route_stages_not_permitted` | 422 | approval | `internal/modules/approval/http/errors.go:157` |
 | `validation.self_delegation` | 422 | approval | `internal/modules/approval/http/errors.go:162` |
 | `validation.sla_extension_not_forward` | 422 | approval | `internal/modules/approval/http/errors.go:183` |
 | `validation.sla_extension_reason_required` | 422 | approval | `internal/modules/approval/http/errors.go:185` |
-| `validation.submit_choice_constraint_violated` | 422 | shared | `internal/platform/problem/codes.go:262` |
-| `validation.submit_choice_required` | 422 | shared | `internal/platform/problem/codes.go:259` |
+| `validation.submit_choice_constraint_violated` | 422 | shared | `internal/platform/problem/codes.go:330` |
+| `validation.submit_choice_required` | 422 | shared | `internal/platform/problem/codes.go:327` |
 | `validation.supersede_target_invalid` | 422 | approval | `internal/modules/approval/http/errors.go:59` |
-| `validation.template_profile_mismatch` | 422 | shared | `internal/platform/problem/codes.go:248` |
+| `validation.template_profile_mismatch` | 422 | shared | `internal/platform/problem/codes.go:315` |
 | `validation.template_subject_key_mismatch` | 422 | approval | `internal/modules/approval/http/errors.go:137` |
 | `validation.verdict_ready_on_approval_stage` | 422 | approval | `internal/modules/approval/http/errors.go:169` |
 | `validation.visibility_scope_invalid` | 422 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:535` |

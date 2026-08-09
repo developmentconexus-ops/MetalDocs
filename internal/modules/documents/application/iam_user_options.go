@@ -2,6 +2,8 @@ package application
 
 import "context"
 
+// UserOption is a selectable user (id + display name) offered when validating
+// a PHUser placeholder value.
 type UserOption struct {
 	UserID      string `json:"user_id"`
 	DisplayName string `json:"display_name"`

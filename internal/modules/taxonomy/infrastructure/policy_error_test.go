@@ -49,7 +49,7 @@ func TestMapProfilePolicyErr(t *testing.T) {
 			switch tt.want {
 			case nil:
 				// pass-through cases: the returned error must be identical to input.
-				if got != tt.in {
+				if !errors.Is(got, tt.in) {
 					t.Fatalf("mapProfilePolicyErr(%v) = %v, want identical passthrough", tt.in, got)
 				}
 			default:

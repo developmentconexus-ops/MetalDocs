@@ -18,6 +18,8 @@ import (
 	miniostore "metaldocs/internal/platform/storage/minio"
 )
 
+// WorkerDependencies holds the constructed infrastructure dependencies the
+// metaldocs-worker binary wires into its outbox consumer at startup.
 type WorkerDependencies struct {
 	Consumer     messaging.Consumer
 	PDFConverter *servicebus.GotenbergPDFClient
@@ -27,6 +29,8 @@ type WorkerDependencies struct {
 	Cleanup      func()
 }
 
+// BuildWorkerDependencies constructs the worker binary's infrastructure
+// dependencies (outbox consumer, PDF converter, and fanout client config).
 func BuildWorkerDependencies(ctx context.Context, workerCfg config.WorkerConfig) (WorkerDependencies, error) {
 	pgCfg, err := config.LoadPostgresConfig()
 	if err != nil {

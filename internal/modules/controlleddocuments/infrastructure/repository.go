@@ -112,24 +112,12 @@ func (r *PostgresControlledDocumentRepository) CodeExists(ctx context.Context, t
 	return exists, nil
 }
 
-// List returns up to filter.Limit controlled documents ordered by
-// (created_at DESC, id DESC) using an opaque keyset cursor (FD-2). hasMore
-// reports whether a further page exists; the caller builds the next cursor from
-// the last returned document's (CreatedAt, ID).
-func (r *PostgresControlledDocumentRepository) List(ctx context.Context, tenantID string, filter controlleddocumentsdomain.CDFilter) (items []controlleddocumentsdomain.ControlledDocument, hasMore bool, err error) {
-	// The area-grant EXISTS subquery reads iam's PUBLISHED active-membership view
-	// metaldocs.v_active_user_areas (M3/F3.2, ADR-0039 D3a) — the view encodes the
-	// active-now predicate `effective_to IS NULL` (ADR 0037 D1), so CD names no
-	// iam base table and re-derives no temporal predicate.
-	q := `
-SELECT id::text, tenant_id::text, profile_code, process_area_code, department_code,
-       code, sequence_num, title, owner_user_id, coalesce(override_template_version_id::text, ''),
-       visibility_scope, status, created_at, updated_at
-FROM controlled_documents
-WHERE tenant_id = $1`
-	args := []any{tenantID}
-	idx := 2
-
+// appendListFilterClauses appends List's optional WHERE clauses (profile,
+// area, department, owner, status, query, and the actor visibility gate) to
+// q in the same order and with the same $N placeholder bookkeeping as
+// before extraction, returning the extended query, args, and the next free
+// placeholder index. Extracted from List; behavior unchanged.
+func appendListFilterClauses(q string, args []any, idx int, filter controlleddocumentsdomain.CDFilter) (string, []any, int) {
 	if filter.ProfileCode != nil {
 		q += fmt.Sprintf(" AND profile_code = $%d", idx)
 		args = append(args, *filter.ProfileCode)
@@ -200,6 +188,29 @@ WHERE tenant_id = $1`
 		args = append(args, *filter.ActorUserID)
 		idx++
 	}
+	return q, args, idx
+}
+
+// List returns up to filter.Limit controlled documents ordered by
+// (created_at DESC, id DESC) using an opaque keyset cursor (FD-2). hasMore
+// reports whether a further page exists; the caller builds the next cursor from
+// the last returned document's (CreatedAt, ID).
+func (r *PostgresControlledDocumentRepository) List(ctx context.Context, tenantID string, filter controlleddocumentsdomain.CDFilter) (items []controlleddocumentsdomain.ControlledDocument, hasMore bool, err error) {
+	// The area-grant EXISTS subquery reads iam's PUBLISHED active-membership view
+	// metaldocs.v_active_user_areas (M3/F3.2, ADR-0039 D3a) — the view encodes the
+	// active-now predicate `effective_to IS NULL` (ADR 0037 D1), so CD names no
+	// iam base table and re-derives no temporal predicate.
+	q := `
+SELECT id::text, tenant_id::text, profile_code, process_area_code, department_code,
+       code, sequence_num, title, owner_user_id, coalesce(override_template_version_id::text, ''),
+       visibility_scope, status, created_at, updated_at
+FROM controlled_documents
+WHERE tenant_id = $1`
+	args := []any{tenantID}
+	idx := 2
+
+	q, args, idx = appendListFilterClauses(q, args, idx, filter)
+
 	cursorTS, cursorID, err := pagination.DecodeCursor(filter.Cursor)
 	if err != nil {
 		return nil, false, err
@@ -218,7 +229,7 @@ WHERE tenant_id = $1`
 	if err != nil {
 		return nil, false, fmt.Errorf("list controlled documents: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := make([]controlleddocumentsdomain.ControlledDocument, 0, limit+1)
 	for rows.Next() {
@@ -262,7 +273,7 @@ ORDER BY area_code`, tenantID, controlledDocumentID)
 	if err != nil {
 		return nil, fmt.Errorf("query controlled document area grants: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := []string{}
 	for rows.Next() {
@@ -287,7 +298,7 @@ ORDER BY user_id`, tenantID, controlledDocumentID)
 	if err != nil {
 		return nil, fmt.Errorf("query controlled document user grants: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := []string{}
 	for rows.Next() {
@@ -327,7 +338,7 @@ ORDER BY controlled_document_id, area_code`, tenantID, pgtype.FlatArray[string](
 	if err != nil {
 		return fmt.Errorf("query controlled document area grants: %w", err)
 	}
-	defer areaRows.Close()
+	defer func() { _ = areaRows.Close() }()
 	for areaRows.Next() {
 		var docID, areaCode string
 		if err := areaRows.Scan(&docID, &areaCode); err != nil {
@@ -349,7 +360,7 @@ ORDER BY controlled_document_id, user_id`, tenantID, pgtype.FlatArray[string](id
 	if err != nil {
 		return fmt.Errorf("query controlled document user grants: %w", err)
 	}
-	defer userRows.Close()
+	defer func() { _ = userRows.Close() }()
 	for userRows.Next() {
 		var docID, userID string
 		if err := userRows.Scan(&docID, &userID); err != nil {

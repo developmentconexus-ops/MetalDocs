@@ -2,6 +2,7 @@ package strictjson_test
 
 import (
 	"bytes"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -40,14 +41,14 @@ func TestDecode_UnknownFieldRejected(t *testing.T) {
 func TestDecode_WrongContentType(t *testing.T) {
 	var p payload
 	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader([]byte(`{"name":"x"}`)))
-	if err := strictjson.Decode(r, &p); err != strictjson.ErrContentType {
+	if err := strictjson.Decode(r, &p); !errors.Is(err, strictjson.ErrContentType) {
 		t.Fatalf("Decode = %v, want ErrContentType", err)
 	}
 }
 
 func TestDecode_EmptyBody(t *testing.T) {
 	var p payload
-	if err := strictjson.Decode(newReq(t, ``), &p); err != strictjson.ErrEmptyBody {
+	if err := strictjson.Decode(newReq(t, ``), &p); !errors.Is(err, strictjson.ErrEmptyBody) {
 		t.Fatalf("Decode = %v, want ErrEmptyBody", err)
 	}
 }
@@ -57,7 +58,7 @@ func TestDecode_BodyTooLarge(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
 	var p payload
-	if err := strictjson.Decode(r, &p); err != strictjson.ErrBodyTooLarge {
+	if err := strictjson.Decode(r, &p); !errors.Is(err, strictjson.ErrBodyTooLarge) {
 		t.Fatalf("Decode = %v, want ErrBodyTooLarge", err)
 	}
 }

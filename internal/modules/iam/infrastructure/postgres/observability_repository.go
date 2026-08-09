@@ -211,7 +211,7 @@ ORDER BY role_code
 	if err != nil {
 		return nil, fmt.Errorf("role distribution query: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := make([]iamdomain.RoleCount, 0, 4)
 	for rows.Next() {
 		var rc iamdomain.RoleCount

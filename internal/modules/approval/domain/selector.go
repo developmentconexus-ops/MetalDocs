@@ -32,27 +32,41 @@ type ActorSelector struct {
 // An unrecognized Kind returns ErrInvalidSelectorKind; a recognized Kind with
 // the wrong fields present/absent returns ErrSelectorFieldsInvalid.
 func (s ActorSelector) Validate() error {
+	var fieldsOK bool
 	switch s.Kind {
 	case SelectorNamedUser:
-		if s.UserID != "" && s.Role == "" && s.AreaCode == "" {
-			return nil
-		}
+		fieldsOK = s.hasOnlyUserID()
 	case SelectorRoleInFixedArea:
-		if s.Role != "" && s.AreaCode != "" && s.UserID == "" {
-			return nil
-		}
+		fieldsOK = s.hasRoleAndAreaOnly()
 	case SelectorRoleInDocumentArea:
-		if s.Role != "" && s.AreaCode == "" && s.UserID == "" {
-			return nil
-		}
+		fieldsOK = s.hasRoleOnly()
 	case SelectorSubmitChoice:
-		if s.Role != "" && s.AreaCode != "" && s.UserID == "" {
-			return nil
-		}
+		fieldsOK = s.hasRoleAndAreaOnly()
 	default:
 		return ErrInvalidSelectorKind
 	}
-	return ErrSelectorFieldsInvalid
+	if !fieldsOK {
+		return ErrSelectorFieldsInvalid
+	}
+	return nil
+}
+
+// hasOnlyUserID reports whether s carries the named_user field shape:
+// UserID set, Role and AreaCode absent.
+func (s ActorSelector) hasOnlyUserID() bool {
+	return s.UserID != "" && s.Role == "" && s.AreaCode == ""
+}
+
+// hasRoleAndAreaOnly reports whether s carries the role_in_fixed_area /
+// submit_choice field shape: Role and AreaCode set, UserID absent.
+func (s ActorSelector) hasRoleAndAreaOnly() bool {
+	return s.Role != "" && s.AreaCode != "" && s.UserID == ""
+}
+
+// hasRoleOnly reports whether s carries the role_in_document_area field
+// shape: Role set, UserID and AreaCode absent.
+func (s ActorSelector) hasRoleOnly() bool {
+	return s.Role != "" && s.AreaCode == "" && s.UserID == ""
 }
 
 // FlatRoleArea returns the (role, area_code) of sels' single

@@ -42,66 +42,91 @@ func OutboxPair(files []string) []Finding {
 				continue
 			}
 
-			hasMutation := false
-			hasEmit := false
-
-			ast.Inspect(fn.Body, func(n ast.Node) bool {
-				call, ok := n.(*ast.CallExpr)
-				if !ok {
-					return true
-				}
-				sel, ok := call.Fun.(*ast.SelectorExpr)
-				if !ok {
-					return true
-				}
-				name := sel.Sel.Name
-
-				// Check for repo mutation calls
-				for _, prefix := range mutatingRepos {
-					if strings.HasPrefix(name, prefix) {
-						hasMutation = true
-					}
-				}
-
-				// Check for an Emit call on the governance event emitter. Accept
-				// both the bare-identifier form (events.Emit / emitter.Emit / e.Emit)
-				// and the struct-field form the codebase actually uses everywhere
-				// (s.emitter.Emit), where sel.X is itself a selector ending in the
-				// emitter field.
-				if name == "Emit" {
-					switch base := sel.X.(type) {
-					case *ast.Ident:
-						if base.Name == "events" || base.Name == "emitter" || base.Name == "e" {
-							hasEmit = true
-						}
-					case *ast.SelectorExpr:
-						if base.Sel.Name == "events" || base.Sel.Name == "emitter" || base.Sel.Name == "e" {
-							hasEmit = true
-						}
-					}
-				}
-				return true
-			})
-
-			if hasMutation && !hasEmit {
-				pos := fset.Position(fn.Pos())
-				src := readSource(path)
-				line := getLine(src, pos.Line)
-				// Skip if explicitly allowed
-				if strings.Contains(line, "cilint:allow-no-outbox") ||
-					(fn.Doc != nil && funcDocContains(fn.Doc, "cilint:allow-no-outbox")) {
-					continue
-				}
-				out = append(out, Finding{
-					Analyzer: "outboxpair",
-					File:     path,
-					Line:     pos.Line,
-					Message:  "method " + fn.Name.Name + " mutates approval state without paired events.Emit call; add governance event or //cilint:allow-no-outbox with justification",
-				})
+			if finding, ok := outboxPairFinding(fset, path, fn); ok {
+				out = append(out, finding)
 			}
 		}
 	}
 	return out
+}
+
+// outboxPairFinding checks a single exported approval/application method for
+// a repo-mutation call unpaired with a governance events.Emit call, returning
+// the Finding to emit if the pairing is missing and not explicitly allowed.
+func outboxPairFinding(fset *token.FileSet, path string, fn *ast.FuncDecl) (Finding, bool) {
+	hasMutation, hasEmit := scanOutboxCalls(fn.Body)
+	if !hasMutation || hasEmit {
+		return Finding{}, false
+	}
+
+	pos := fset.Position(fn.Pos())
+	src := readSource(path)
+	line := getLine(src, pos.Line)
+	// Skip if explicitly allowed
+	if strings.Contains(line, "cilint:allow-no-outbox") ||
+		(fn.Doc != nil && funcDocContains(fn.Doc, "cilint:allow-no-outbox")) {
+		return Finding{}, false
+	}
+	return Finding{
+		Analyzer: "outboxpair",
+		File:     path,
+		Line:     pos.Line,
+		Message:  "method " + fn.Name.Name + " mutates approval state without paired events.Emit call; add governance event or //cilint:allow-no-outbox with justification",
+	}, true
+}
+
+// scanOutboxCalls scans a function body for repo-mutation calls (mutatingRepos
+// prefixes) and a paired governance event emitter Emit call, accepting both
+// the bare-identifier form (events.Emit / emitter.Emit / e.Emit) and the
+// struct-field form used throughout the codebase (s.emitter.Emit), where
+// sel.X is itself a selector ending in the emitter field.
+func scanOutboxCalls(body *ast.BlockStmt) (hasMutation, hasEmit bool) {
+	ast.Inspect(body, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+		if isMutatingCallName(sel.Sel.Name) {
+			hasMutation = true
+		}
+		if isEmitCall(sel) {
+			hasEmit = true
+		}
+		return true
+	})
+	return hasMutation, hasEmit
+}
+
+// isMutatingCallName reports whether name carries one of the mutatingRepos
+// prefixes (repo method names that mutate approval state).
+func isMutatingCallName(name string) bool {
+	for _, prefix := range mutatingRepos {
+		if strings.HasPrefix(name, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// isEmitCall reports whether sel is a governance events.Emit call, accepting
+// both the bare-identifier form (events.Emit / emitter.Emit / e.Emit) and the
+// struct-field form used throughout the codebase (s.emitter.Emit), where
+// sel.X is itself a selector ending in the emitter field.
+func isEmitCall(sel *ast.SelectorExpr) bool {
+	if sel.Sel.Name != "Emit" {
+		return false
+	}
+	switch base := sel.X.(type) {
+	case *ast.Ident:
+		return base.Name == "events" || base.Name == "emitter" || base.Name == "e"
+	case *ast.SelectorExpr:
+		return base.Sel.Name == "events" || base.Sel.Name == "emitter" || base.Sel.Name == "e"
+	}
+	return false
 }
 
 func funcDocContains(doc *ast.CommentGroup, substr string) bool {

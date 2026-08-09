@@ -9,11 +9,14 @@ import (
 	"metaldocs/internal/modules/iam/authz"
 )
 
+// StartOrphanPendingSweeper starts a background ticker that periodically
+// deletes pending uploads older than maxAge, and returns a stop func that
+// cancels it.
 func StartOrphanPendingSweeper(ctx context.Context, r *infrastructure.Repository, interval, maxAge time.Duration) (stop func()) {
 	// Background root: mark the context so DeleteExpiredPending's authz.BypassSystem
 	// is permitted (fail-closed off any HTTP path — ADR 0022 Phase 7, CWE-269).
 	ctx = authz.WithBackgroundBypass(ctx)
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(ctx) //nolint:gosec // G118: cancel IS the returned stop func; the composition root calls it on shutdown
 	go func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()

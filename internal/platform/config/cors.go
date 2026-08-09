@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+// CORSConfig holds CORS policy configuration read from environment variables
+// at startup.
 type CORSConfig struct {
 	Enabled          bool
 	AllowedOrigins   []string
@@ -16,6 +18,7 @@ type CORSConfig struct {
 	MaxAgeSeconds    int
 }
 
+// LoadCORSConfig reads CORS policy config from environment variables.
 func LoadCORSConfig() (CORSConfig, error) {
 	enabled := strings.EqualFold(strings.TrimSpace(os.Getenv("METALDOCS_CORS_ENABLED")), "true")
 

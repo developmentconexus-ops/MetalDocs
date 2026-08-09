@@ -96,115 +96,152 @@ func (s *MarkReviewedService) MarkReviewed(ctx context.Context, runner db.TxRunn
 
 	var result MarkReviewedResult
 	err := runner.Do(ctx, func(tx *sql.Tx) error {
-		ctx := authz.WithCapCache(ctx)
-
-		if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentReview), "tenant"); err != nil {
+		res, err := s.markReviewedTx(ctx, tx, req)
+		if err != nil {
 			return err
 		}
-
-		// Load the current row (existence + status + effective_from) under the
-		// same tx/identity as the authz check, before any write.
-		var status string
-		var effectiveFrom sql.NullTime
-		var currentRevisionVersion int
-		err := tx.QueryRowContext(ctx, `
-			SELECT status, effective_from, revision_version
-			  FROM documents
-			 WHERE id = $1 AND tenant_id = $2`,
-			req.DocumentID, req.TenantID,
-		).Scan(&status, &effectiveFrom, &currentRevisionVersion)
-		if errors.Is(err, sql.ErrNoRows) {
-			return ErrDocumentNotFound
-		}
-		if err != nil {
-			return fmt.Errorf("markReviewed: load document: %w", err)
-		}
-
-		// Friendly first-line precondition: mark-reviewed is not a status
-		// transition (no 11th state; docsdomain.CanTransitionDocumentStatus is
-		// intentionally NOT called here — it has no published->published
-		// branch). Just assert the current status is published.
-		if status != string(docsdomain.DocStatusPublished) {
-			return ErrDocumentNotPublished
-		}
-
-		// Friendly first-line mirrors of the 0274 DB CHECKs
-		// (ck_documents_review_due_sane, ck_documents_effective_window) — the
-		// DB remains the enforced last line.
-		if effectiveFrom.Valid {
-			if req.ReviewDueAt.Before(effectiveFrom.Time) {
-				return ErrReviewDueBeforeEffective
-			}
-			if req.EffectiveTo != nil && !req.EffectiveTo.After(effectiveFrom.Time) {
-				return ErrEffectiveToNotAfterEffectiveFrom
-			}
-		}
-
-		// OCC precondition is used verbatim. There is no "<=0 means skip" escape
-		// hatch: the If-Match wildcard no longer parses (see parseIfMatchMin),
-		// and substituting the just-read current version would turn the CAS into
-		// a no-op guard — the caller would be told the precondition held against
-		// a revision it never saw.
-		now := s.clock.Now()
-		res, err := tx.ExecContext(ctx, `
-			UPDATE documents
-			   SET last_reviewed_at = $1,
-			       review_due_at    = $2,
-			       effective_to     = COALESCE($3, effective_to),
-			       revision_version = revision_version + 1
-			 WHERE id               = $4
-			   AND tenant_id        = $5
-			   AND status           = 'published'
-			   AND revision_version = $6`,
-			now, req.ReviewDueAt.UTC(), nullableTime(req.EffectiveTo), req.DocumentID, req.TenantID, req.ExpectedRevisionVersion,
-		)
-		if err != nil {
-			return fmt.Errorf("markReviewed: update document: %w", err)
-		}
-		affected, err := res.RowsAffected()
-		if err != nil {
-			return fmt.Errorf("markReviewed: rows affected: %w", err)
-		}
-		if affected == 0 {
-			return ErrMarkReviewedStaleRevision
-		}
-
-		payloadMap := map[string]any{
-			"review_due_at": req.ReviewDueAt.UTC().Format(time.RFC3339),
-		}
-		if req.EffectiveTo != nil {
-			payloadMap["effective_to"] = req.EffectiveTo.UTC().Format(time.RFC3339)
-		}
-		payloadBytes, err := json.Marshal(payloadMap)
-		if err != nil {
-			return fmt.Errorf("markReviewed: marshal event payload: %w", err)
-		}
-		event := GovernanceEvent{
-			TenantID:     req.TenantID,
-			EventType:    EventTypeDocumentReviewed,
-			ActorUserID:  req.ReviewedBy,
-			ResourceType: "document",
-			ResourceID:   req.DocumentID,
-			PayloadJSON:  json.RawMessage(payloadBytes),
-			OccurredAt:   now,
-		}
-		if s.emitter != nil {
-			if err := s.emitter.Emit(ctx, tx, event); err != nil {
-				return fmt.Errorf("markReviewed: emit event: %w", err)
-			}
-		}
-
-		result = MarkReviewedResult{
-			DocumentID:      req.DocumentID,
-			NewStatus:       string(docsdomain.DocStatusPublished),
-			RevisionVersion: currentRevisionVersion + 1,
-		}
+		result = res
 		return nil
 	})
 	if err != nil {
 		return MarkReviewedResult{}, err
 	}
 	return result, nil
+}
+
+// markReviewedTx is the tx-scoped core of MarkReviewed: authz gate,
+// precondition checks against the current row, the OCC CAS update, and the
+// governance-event emission, all under the same tx/identity.
+func (s *MarkReviewedService) markReviewedTx(ctx context.Context, tx *sql.Tx, req MarkReviewedRequest) (MarkReviewedResult, error) {
+	ctx = authz.WithCapCache(ctx)
+
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentReview), "tenant"); err != nil {
+		return MarkReviewedResult{}, err
+	}
+
+	// Load the current row (existence + status + effective_from) under the
+	// same tx/identity as the authz check, before any write.
+	status, effectiveFrom, currentRevisionVersion, err := s.loadDocumentForReview(ctx, tx, req)
+	if err != nil {
+		return MarkReviewedResult{}, err
+	}
+
+	// Friendly first-line precondition: mark-reviewed is not a status
+	// transition (no 11th state; docsdomain.CanTransitionDocumentStatus is
+	// intentionally NOT called here — it has no published->published
+	// branch). Just assert the current status is published.
+	if status != string(docsdomain.DocStatusPublished) {
+		return MarkReviewedResult{}, ErrDocumentNotPublished
+	}
+
+	// Friendly first-line mirrors of the 0274 DB CHECKs
+	// (ck_documents_review_due_sane, ck_documents_effective_window) — the
+	// DB remains the enforced last line.
+	if effectiveFrom.Valid {
+		if req.ReviewDueAt.Before(effectiveFrom.Time) {
+			return MarkReviewedResult{}, ErrReviewDueBeforeEffective
+		}
+		if req.EffectiveTo != nil && !req.EffectiveTo.After(effectiveFrom.Time) {
+			return MarkReviewedResult{}, ErrEffectiveToNotAfterEffectiveFrom
+		}
+	}
+
+	// OCC precondition is used verbatim. There is no "<=0 means skip" escape
+	// hatch: the If-Match wildcard no longer parses (see parseIfMatchMin),
+	// and substituting the just-read current version would turn the CAS into
+	// a no-op guard — the caller would be told the precondition held against
+	// a revision it never saw.
+	now := s.clock.Now()
+	if err := s.applyMarkReviewedUpdate(ctx, tx, req, now); err != nil {
+		return MarkReviewedResult{}, err
+	}
+
+	if err := s.emitDocumentReviewedEvent(ctx, tx, req, now); err != nil {
+		return MarkReviewedResult{}, err
+	}
+
+	return MarkReviewedResult{
+		DocumentID:      req.DocumentID,
+		NewStatus:       string(docsdomain.DocStatusPublished),
+		RevisionVersion: currentRevisionVersion + 1,
+	}, nil
+}
+
+// loadDocumentForReview reads the document row's status/effective_from/
+// revision_version, mapping a missing row to ErrDocumentNotFound.
+func (s *MarkReviewedService) loadDocumentForReview(ctx context.Context, tx *sql.Tx, req MarkReviewedRequest) (status string, effectiveFrom sql.NullTime, revisionVersion int, err error) {
+	err = tx.QueryRowContext(ctx, `
+		SELECT status, effective_from, revision_version
+		  FROM documents
+		 WHERE id = $1 AND tenant_id = $2`,
+		req.DocumentID, req.TenantID,
+	).Scan(&status, &effectiveFrom, &revisionVersion)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", sql.NullTime{}, 0, ErrDocumentNotFound
+	}
+	if err != nil {
+		return "", sql.NullTime{}, 0, fmt.Errorf("markReviewed: load document: %w", err)
+	}
+	return status, effectiveFrom, revisionVersion, nil
+}
+
+// applyMarkReviewedUpdate runs the OCC CAS UPDATE recording the review.
+func (s *MarkReviewedService) applyMarkReviewedUpdate(ctx context.Context, tx *sql.Tx, req MarkReviewedRequest, now time.Time) error {
+	res, err := tx.ExecContext(ctx, `
+		UPDATE documents
+		   SET last_reviewed_at = $1,
+		       review_due_at    = $2,
+		       effective_to     = COALESCE($3, effective_to),
+		       revision_version = revision_version + 1
+		 WHERE id               = $4
+		   AND tenant_id        = $5
+		   AND status           = 'published'
+		   AND revision_version = $6`,
+		now, req.ReviewDueAt.UTC(), nullableTime(req.EffectiveTo), req.DocumentID, req.TenantID, req.ExpectedRevisionVersion,
+	)
+	if err != nil {
+		return fmt.Errorf("markReviewed: update document: %w", err)
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("markReviewed: rows affected: %w", err)
+	}
+	if affected == 0 {
+		return ErrMarkReviewedStaleRevision
+	}
+	return nil
+}
+
+// emitDocumentReviewedEvent emits the "document_reviewed" governance event
+// in the same tx as the update (outbox invariant). Nil emitter is a
+// test-only no-op.
+func (s *MarkReviewedService) emitDocumentReviewedEvent(ctx context.Context, tx *sql.Tx, req MarkReviewedRequest, now time.Time) error {
+	payloadMap := map[string]any{
+		"review_due_at": req.ReviewDueAt.UTC().Format(time.RFC3339),
+	}
+	if req.EffectiveTo != nil {
+		payloadMap["effective_to"] = req.EffectiveTo.UTC().Format(time.RFC3339)
+	}
+	payloadBytes, err := json.Marshal(payloadMap)
+	if err != nil {
+		return fmt.Errorf("markReviewed: marshal event payload: %w", err)
+	}
+	event := GovernanceEvent{
+		TenantID:     req.TenantID,
+		EventType:    EventTypeDocumentReviewed,
+		ActorUserID:  req.ReviewedBy,
+		ResourceType: "document",
+		ResourceID:   req.DocumentID,
+		PayloadJSON:  json.RawMessage(payloadBytes),
+		OccurredAt:   now,
+	}
+	if s.emitter == nil {
+		return nil
+	}
+	if err := s.emitter.Emit(ctx, tx, event); err != nil {
+		return fmt.Errorf("markReviewed: emit event: %w", err)
+	}
+	return nil
 }
 
 // nullableTime maps a nil *time.Time to a driver NULL bind so COALESCE($3,

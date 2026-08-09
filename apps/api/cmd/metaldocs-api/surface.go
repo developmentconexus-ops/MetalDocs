@@ -29,8 +29,24 @@ func assertSurface(
 	publishers []httprouter.SurfacePublisher,
 ) error {
 	var problems []string
+	problems = append(problems, checkTagCoverage(expectedTags, publishers)...)
 
-	// Check 1: tag coverage — exactly one publisher per expected tag.
+	allMounted := mountedPatternSet(mounted)
+	problems = append(problems, checkMountedDeclared(allMounted, surface)...)
+	problems = append(problems, checkDeclaredMounted(surface, allMounted)...)
+	problems = append(problems, checkPublisherOwnership(mounted, surface, publishers)...)
+
+	if len(problems) == 0 {
+		return nil
+	}
+	sort.Strings(problems)
+	return fmt.Errorf("http surface assertion failed:\n  - %s", strings.Join(problems, "\n  - "))
+}
+
+// checkTagCoverage is check 1: tag coverage — exactly one publisher per
+// expected tag.
+func checkTagCoverage(expectedTags []string, publishers []httprouter.SurfacePublisher) []string {
+	var problems []string
 	tagCount := make(map[string]int)
 	tagOwners := make(map[string][]string)
 	for _, p := range publishers {
@@ -52,16 +68,25 @@ func assertSurface(
 			))
 		}
 	}
+	return problems
+}
 
-	// Build the union of every pattern actually mounted, across publishers.
+// mountedPatternSet builds the union of every pattern actually mounted,
+// across publishers.
+func mountedPatternSet(mounted map[string][]string) map[string]bool {
 	allMounted := make(map[string]bool)
 	for _, patterns := range mounted {
 		for _, pattern := range patterns {
 			allMounted[pattern] = true
 		}
 	}
+	return allMounted
+}
 
-	// Check 2: mounted ⊆ declared — every mounted pattern has a surface rule.
+// checkMountedDeclared is check 2: mounted ⊆ declared — every mounted
+// pattern has a surface rule.
+func checkMountedDeclared(allMounted map[string]bool, surface map[string]surfaceRule) []string {
+	var problems []string
 	for pattern := range allMounted {
 		if _, ok := surface[pattern]; !ok {
 			problems = append(problems, fmt.Sprintf(
@@ -69,8 +94,13 @@ func assertSurface(
 			))
 		}
 	}
+	return problems
+}
 
-	// Check 3: declared ⊆ mounted — every surface rule has a mounted handler.
+// checkDeclaredMounted is check 3: declared ⊆ mounted — every surface rule
+// has a mounted handler.
+func checkDeclaredMounted(surface map[string]surfaceRule, allMounted map[string]bool) []string {
+	var problems []string
 	for pattern := range surface {
 		if !allMounted[pattern] {
 			problems = append(problems, fmt.Sprintf(
@@ -78,12 +108,16 @@ func assertSurface(
 			))
 		}
 	}
+	return problems
+}
 
-	// Check 4: ownership — a publisher may only mount patterns whose surface
-	// tag matches its own claimed tag. Evaluated per-publisher, against that
-	// publisher's own recorded patterns, so it is a genuinely distinct check
-	// from check 1 (tag claims) and cannot be satisfied by accident when
-	// checks 1-3 pass.
+// checkPublisherOwnership is check 4: ownership — a publisher may only mount
+// patterns whose surface tag matches its own claimed tag. Evaluated
+// per-publisher, against that publisher's own recorded patterns, so it is a
+// genuinely distinct check from check 1 (tag claims) and cannot be satisfied
+// by accident when checks 1-3 pass.
+func checkPublisherOwnership(mounted map[string][]string, surface map[string]surfaceRule, publishers []httprouter.SurfacePublisher) []string {
+	var problems []string
 	publisherTag := make(map[string]string)
 	for _, p := range publishers {
 		publisherTag[p.Name()] = p.Tag()
@@ -109,12 +143,7 @@ func assertSurface(
 			}
 		}
 	}
-
-	if len(problems) == 0 {
-		return nil
-	}
-	sort.Strings(problems)
-	return fmt.Errorf("http surface assertion failed:\n  - %s", strings.Join(problems, "\n  - "))
+	return problems
 }
 
 // mergedSurface merges b into a, returning a new map. It panics on a

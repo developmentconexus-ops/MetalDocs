@@ -17,10 +17,16 @@ type CDDocumentInitializer struct {
 	svc *Service
 }
 
+// NewCDDocumentInitializer builds a CDDocumentInitializer wrapping svc, so the
+// controlled-document module can seed documents through the documents Service
+// without importing its internals.
 func NewCDDocumentInitializer(svc *Service) *CDDocumentInitializer {
 	return &CDDocumentInitializer{svc: svc}
 }
 
+// ResolveTemplateStorageKey resolves the effective template's published docx
+// storage key for the given profile/override, delegating to the documents
+// Service.
 func (i *CDDocumentInitializer) ResolveTemplateStorageKey(ctx context.Context, tenantID, profileCode string, templateVersionID *string) (string, error) {
 	if i == nil || i.svc == nil {
 		return "", errors.New("documents service not configured")
@@ -28,6 +34,8 @@ func (i *CDDocumentInitializer) ResolveTemplateStorageKey(ctx context.Context, t
 	return i.svc.resolveTemplateStorageKey(ctx, tenantID, profileCode, templateVersionID)
 }
 
+// Exists reports whether an object is present at storageKey in the documents
+// module's object store, delegating to the documents Service.
 func (i *CDDocumentInitializer) Exists(ctx context.Context, storageKey string) (bool, error) {
 	if i == nil || i.svc == nil {
 		return false, errors.New("documents service not configured")

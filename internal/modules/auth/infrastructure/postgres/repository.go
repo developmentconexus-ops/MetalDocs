@@ -457,7 +457,7 @@ ORDER BY i.created_at DESC
 	if err != nil {
 		return nil, fmt.Errorf("list managed users: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	items := make([]authdomain.ManagedUser, 0)
 	for rows.Next() {
@@ -505,7 +505,7 @@ ORDER BY MAX(s.last_seen_at) DESC
 	if err != nil {
 		return nil, fmt.Errorf("list online users: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	items := make([]authdomain.OnlineUser, 0)
 	for rows.Next() {

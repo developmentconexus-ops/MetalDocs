@@ -11,6 +11,7 @@ import (
 // PaperSize selects the output page geometry for PDF rendering.
 type PaperSize string
 
+// Supported PaperSize values.
 const (
 	PaperSizeA4     PaperSize = "A4"
 	PaperSizeLetter PaperSize = "Letter"
@@ -63,10 +64,13 @@ type GotenbergPDFClient struct {
 	converter docxToPDFConverter
 }
 
+// NewGotenbergPDFClient constructs a GotenbergPDFClient backed by store and converter.
 func NewGotenbergPDFClient(store pdfObjectStore, converter docxToPDFConverter) *GotenbergPDFClient {
 	return &GotenbergPDFClient{store: store, converter: converter}
 }
 
+// ConvertPDF reads the docx at req.DocxKey from object storage, converts it
+// to PDF via Gotenberg, and writes the PDF to req.OutputKey.
 func (c *GotenbergPDFClient) ConvertPDF(ctx context.Context, req ConvertPDFRequest) (ConvertPDFResult, error) {
 	var zero ConvertPDFResult
 
@@ -74,7 +78,7 @@ func (c *GotenbergPDFClient) ConvertPDF(ctx context.Context, req ConvertPDFReque
 	if err != nil {
 		return zero, fmt.Errorf("gotenberg pdf: open docx %q: %w", req.DocxKey, err)
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	docx, err := io.ReadAll(rc)
 	if err != nil {

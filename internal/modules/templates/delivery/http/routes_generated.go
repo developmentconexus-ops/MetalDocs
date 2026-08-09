@@ -123,6 +123,8 @@ func (h *Handler) GetTemplateVersion(w http.ResponseWriter, r *http.Request, id 
 // for the given template version, delegating to h.presignTemplateUpload
 // (authorizes CapTemplateEdit and asks the application service for a
 // presigned upload URL and storage key).
+//
+//nolint:revive // name pinned by OpenAPI operationId via generated ServerInterface
 func (h *Handler) PresignTemplateDocxUploadUrl(w http.ResponseWriter, r *http.Request, id string, n int) {
 	url, key, ok := h.presignTemplateUpload(w, r, id, n)
 	if !ok {
@@ -137,6 +139,8 @@ func (h *Handler) PresignTemplateDocxUploadUrl(w http.ResponseWriter, r *http.Re
 // PresignTemplateSchemaUploadUrl handles POST for presigning a schema-file
 // upload URL for the given template version: authorizes CapTemplateEdit and
 // returns a presigned URL and storage key from the application service.
+//
+//nolint:revive // name pinned by OpenAPI operationId via generated ServerInterface
 func (h *Handler) PresignTemplateSchemaUploadUrl(w http.ResponseWriter, r *http.Request, id string, n int) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
@@ -267,6 +271,8 @@ func (h *Handler) GetTemplate(w http.ResponseWriter, r *http.Request, id openapi
 
 // GetTemplateDocxUrl handles the DOCX download-URL route for a template
 // version, delegating to the underlying get-docx-URL use case (h.getDocxURL).
+//
+//nolint:revive // name pinned by OpenAPI operationId via generated ServerInterface
 func (h *Handler) GetTemplateDocxUrl(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
 	h.getDocxURL(w, r)
 }

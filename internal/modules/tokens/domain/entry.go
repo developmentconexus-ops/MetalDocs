@@ -45,6 +45,8 @@ const (
 	maxDescription = 1024
 )
 
+// Entry is a token dictionary entry: a tenant-scoped name/value pair the
+// render resolver substitutes wherever the token is referenced.
 type Entry struct {
 	ID          string
 	TenantID    string
@@ -58,6 +60,8 @@ type Entry struct {
 	UpdatedAt   time.Time
 }
 
+// NewEntryInput carries the fields needed to construct a new Entry via
+// NewEntry; ID and timestamps are assigned later by the infrastructure layer.
 type NewEntryInput struct {
 	TenantID    string
 	ActorID     string

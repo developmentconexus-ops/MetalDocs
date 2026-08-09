@@ -9,10 +9,13 @@ import (
 )
 
 const (
-	JobName       = "idempotency_janitor"
-	BatchSize     = 5000
+	// JobName identifies this job type to River and in logs.
+	JobName = "idempotency_janitor"
+	// BatchSize caps how many rows the sweep deletes per iteration.
+	BatchSize = 5000
+	// MaxIterations bounds how many BatchSize sweeps a single tick runs.
 	MaxIterations = 10
-	// OrphanGracePeriod is how long an `in_flight` row may remain past its
+	// OrphanGraceMinutes is how long an `in_flight` row may remain past its
 	// expires_at before the janitor logs it as a crashed-handler orphan.
 	OrphanGraceMinutes = 5
 )

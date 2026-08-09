@@ -21,6 +21,7 @@ import (
 // applies regardless of TG_OP (the CASE branch tests table name only).
 type Op string
 
+// Op values recognized by Arm.
 const (
 	OpInsert Op = "INSERT"
 	OpUpdate Op = "UPDATE"

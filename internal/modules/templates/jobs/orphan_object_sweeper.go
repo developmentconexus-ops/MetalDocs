@@ -57,7 +57,7 @@ func StartTemplateOrphanSweeper(ctx context.Context, repo OrphanObjectRepo, stor
 	// Background root: mark the context as a fail-closed background bypass, off any
 	// HTTP path (ADR 0022 Phase 7, CWE-269), matching the documents sibling.
 	ctx = authz.WithBackgroundBypass(ctx)
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(ctx) //nolint:gosec // G118: cancel IS the returned stop func; the composition root calls it on shutdown
 	go func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()

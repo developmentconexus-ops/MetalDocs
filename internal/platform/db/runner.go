@@ -92,12 +92,8 @@ func (r *sqlTxRunner) do(ctx context.Context, opts *sql.TxOptions, fn func(tx *s
 // runs and before any lock fn might take (H-PRE-1) — it is not an
 // authz-recording read and no authz.Require is added here.
 func seedTxIdentityFromContext(ctx context.Context, tx *sql.Tx) error {
-	tenantID, tenantErr := platformtenant.FromContext(ctx)
-	if tenantErr != nil {
-		return nil // no-op: identity-less ctx, NULL-permissive RLS applies
-	}
-	actorID, actorErr := platformtenant.ActorFromContext(ctx)
-	if actorErr != nil {
+	tenantID, actorID, ok := ctxIdentity(ctx)
+	if !ok {
 		return nil // no-op: identity-less ctx, NULL-permissive RLS applies
 	}
 
@@ -109,6 +105,21 @@ SELECT
 		return err
 	}
 	return nil
+}
+
+// ctxIdentity extracts the tenant+actor identity pair from ctx. Absence is
+// modeled as ok=false, not as an error: an identity-less ctx (system/janitor
+// paths) legitimately gets no seed and NULL-permissive RLS applies.
+func ctxIdentity(ctx context.Context) (tenantID, actorID string, ok bool) {
+	tenantID, tenantErr := platformtenant.FromContext(ctx)
+	if tenantErr != nil {
+		return "", "", false
+	}
+	actorID, actorErr := platformtenant.ActorFromContext(ctx)
+	if actorErr != nil {
+		return "", "", false
+	}
+	return tenantID, actorID, true
 }
 
 // Do begins a transaction, runs fn, and finalizes it. A non-nil fn error rolls

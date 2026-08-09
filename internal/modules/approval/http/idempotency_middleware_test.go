@@ -116,9 +116,9 @@ func idempotentRouteCases(t *testing.T) []idempotentRouteCase {
 }
 
 func withTenantAndActor(r *http.Request) *http.Request {
-	r = r.WithContext(tenant.WithTenantID(r.Context(), "tenant-1"))
-	r = r.WithContext(iamdomain.WithAuthContext(r.Context(), "actor-1", []iamdomain.Role{}))
-	return r
+	ctx := tenant.WithTenantID(r.Context(), "tenant-1")
+	ctx = iamdomain.WithAuthContext(ctx, "actor-1", []iamdomain.Role{})
+	return r.WithContext(ctx)
 }
 
 // expectProblemJSON asserts the response is an RFC 9457 problem+json with

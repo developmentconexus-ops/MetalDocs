@@ -14,6 +14,8 @@ import (
 	"metaldocs/internal/platform/config"
 )
 
+// Enabled reports whether authentication is enabled, read from
+// METALDOCS_AUTH_ENABLED (defaults to true when unset).
 func Enabled() bool {
 	raw := strings.ToLower(strings.TrimSpace(os.Getenv("METALDOCS_AUTH_ENABLED")))
 	if raw == "" {
@@ -22,6 +24,8 @@ func Enabled() bool {
 	return raw == "1" || raw == "true" || raw == "yes" || raw == "on"
 }
 
+// CacheTTL returns the authz cache TTL, read from
+// METALDOCS_AUTHZ_CACHE_TTL_SECONDS (defaults to 30 seconds when unset or invalid).
 func CacheTTL() time.Duration {
 	raw := strings.TrimSpace(os.Getenv("METALDOCS_AUTHZ_CACHE_TTL_SECONDS"))
 	if raw == "" {
@@ -34,6 +38,9 @@ func CacheTTL() time.Duration {
 	return time.Duration(seconds) * time.Second
 }
 
+// LoadRuntimeConfig reads the authn/authz runtime configuration from
+// environment variables, enforcing that METALDOCS_AUTH_ENABLED=false is only
+// permitted when APP_ENV=local.
 func LoadRuntimeConfig() (authapp.Config, error) {
 	rawAppEnv := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
 	if !Enabled() && rawAppEnv != "local" {
@@ -50,72 +57,42 @@ func LoadRuntimeConfig() (authapp.Config, error) {
 		return authapp.Config{}, fmt.Errorf("METALDOCS_AUTH_SESSION_SECRET is required when auth is enabled")
 	}
 
-	sessionCookieName := strings.TrimSpace(os.Getenv("METALDOCS_AUTH_SESSION_COOKIE_NAME"))
-	if sessionCookieName == "" {
-		sessionCookieName = "metaldocs_session"
-	}
+	sessionCookieName := parseSessionCookieName()
 
-	sessionTTLHours := 12
-	if raw := strings.TrimSpace(os.Getenv("METALDOCS_AUTH_SESSION_TTL_HOURS")); raw != "" {
-		parsed, err := strconv.Atoi(raw)
-		if err != nil || parsed < 1 {
-			return authapp.Config{}, fmt.Errorf("invalid METALDOCS_AUTH_SESSION_TTL_HOURS")
-		}
-		sessionTTLHours = parsed
+	sessionTTLHours, err := parseIntEnv("METALDOCS_AUTH_SESSION_TTL_HOURS", 12, func(v int) bool { return v >= 1 },
+		"invalid METALDOCS_AUTH_SESSION_TTL_HOURS")
+	if err != nil {
+		return authapp.Config{}, err
 	}
 
 	// Sliding idle timeout. Defaults to 30 minutes (ISO 27001 path / backend
 	// standardization parameters); override with METALDOCS_AUTH_SESSION_IDLE_MINUTES.
 	// A value of 0 explicitly disables idle expiry (12h absolute TTL still applies).
-	sessionIdleMinutes := 30
-	if raw := strings.TrimSpace(os.Getenv("METALDOCS_AUTH_SESSION_IDLE_MINUTES")); raw != "" {
-		parsed, err := strconv.Atoi(raw)
-		if err != nil || parsed < 0 {
-			return authapp.Config{}, fmt.Errorf("METALDOCS_AUTH_SESSION_IDLE_MINUTES must be 0 or a positive integer")
-		}
-		sessionIdleMinutes = parsed
+	sessionIdleMinutes, err := parseIntEnv("METALDOCS_AUTH_SESSION_IDLE_MINUTES", 30, func(v int) bool { return v >= 0 },
+		"METALDOCS_AUTH_SESSION_IDLE_MINUTES must be 0 or a positive integer")
+	if err != nil {
+		return authapp.Config{}, err
 	}
 
-	passwordMinLength := 8
-	if raw := strings.TrimSpace(os.Getenv("METALDOCS_AUTH_PASSWORD_MIN_LENGTH")); raw != "" {
-		parsed, err := strconv.Atoi(raw)
-		if err != nil || parsed < 8 {
-			return authapp.Config{}, fmt.Errorf("invalid METALDOCS_AUTH_PASSWORD_MIN_LENGTH")
-		}
-		passwordMinLength = parsed
+	passwordMinLength, err := parseIntEnv("METALDOCS_AUTH_PASSWORD_MIN_LENGTH", 8, func(v int) bool { return v >= 8 },
+		"invalid METALDOCS_AUTH_PASSWORD_MIN_LENGTH")
+	if err != nil {
+		return authapp.Config{}, err
 	}
 
-	maxFailedAttempts := 5
-	if raw := strings.TrimSpace(os.Getenv("METALDOCS_AUTH_LOGIN_MAX_FAILED_ATTEMPTS")); raw != "" {
-		parsed, err := strconv.Atoi(raw)
-		if err != nil || parsed < 3 {
-			return authapp.Config{}, fmt.Errorf("invalid METALDOCS_AUTH_LOGIN_MAX_FAILED_ATTEMPTS")
-		}
-		maxFailedAttempts = parsed
+	maxFailedAttempts, err := parseIntEnv("METALDOCS_AUTH_LOGIN_MAX_FAILED_ATTEMPTS", 5, func(v int) bool { return v >= 3 },
+		"invalid METALDOCS_AUTH_LOGIN_MAX_FAILED_ATTEMPTS")
+	if err != nil {
+		return authapp.Config{}, err
 	}
 
-	lockMinutes := 15
-	if raw := strings.TrimSpace(os.Getenv("METALDOCS_AUTH_LOGIN_LOCK_MINUTES")); raw != "" {
-		parsed, err := strconv.Atoi(raw)
-		if err != nil || parsed < 1 {
-			return authapp.Config{}, fmt.Errorf("invalid METALDOCS_AUTH_LOGIN_LOCK_MINUTES")
-		}
-		lockMinutes = parsed
+	lockMinutes, err := parseIntEnv("METALDOCS_AUTH_LOGIN_LOCK_MINUTES", 15, func(v int) bool { return v >= 1 },
+		"invalid METALDOCS_AUTH_LOGIN_LOCK_MINUTES")
+	if err != nil {
+		return authapp.Config{}, err
 	}
 
-	bootstrapEnabled := config.ParseBoolEnv("METALDOCS_BOOTSTRAP_ADMIN_ENABLED", appEnv == "local")
-	bootstrapUserID := strings.TrimSpace(os.Getenv("METALDOCS_BOOTSTRAP_ADMIN_USER_ID"))
-	if bootstrapUserID == "" {
-		bootstrapUserID = "admin-local"
-	}
-	bootstrapUsername := strings.TrimSpace(os.Getenv("METALDOCS_BOOTSTRAP_ADMIN_USERNAME"))
-	if bootstrapUsername == "" {
-		bootstrapUsername = "admin"
-	}
-	bootstrapName := strings.TrimSpace(os.Getenv("METALDOCS_BOOTSTRAP_ADMIN_DISPLAY_NAME"))
-	if bootstrapName == "" {
-		bootstrapName = "Administrator"
-	}
+	bootstrapEnabled, bootstrapUserID, bootstrapUsername, bootstrapName := parseBootstrapAdminIdentity(appEnv)
 
 	trustedProxyCIDRs, err := config.LoadTrustedProxyCIDRs()
 	if err != nil {
@@ -147,6 +124,50 @@ func LoadRuntimeConfig() (authapp.Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// parseSessionCookieName reads METALDOCS_AUTH_SESSION_COOKIE_NAME, defaulting
+// to "metaldocs_session" when unset.
+func parseSessionCookieName() string {
+	name := strings.TrimSpace(os.Getenv("METALDOCS_AUTH_SESSION_COOKIE_NAME"))
+	if name == "" {
+		name = "metaldocs_session"
+	}
+	return name
+}
+
+// parseIntEnv reads an integer environment variable, returning defaultValue
+// when unset. A present-but-unparsable value, or one that fails isValid, is
+// reported via errMsg.
+func parseIntEnv(name string, defaultValue int, isValid func(int) bool, errMsg string) (int, error) {
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return defaultValue, nil
+	}
+	parsed, err := strconv.Atoi(raw)
+	if err != nil || !isValid(parsed) {
+		return 0, errors.New(errMsg)
+	}
+	return parsed, nil
+}
+
+// parseBootstrapAdminIdentity reads the bootstrap admin's enabled flag and
+// identity fields, applying defaults for anything unset.
+func parseBootstrapAdminIdentity(appEnv string) (enabled bool, userID, username, name string) {
+	enabled = config.ParseBoolEnv("METALDOCS_BOOTSTRAP_ADMIN_ENABLED", appEnv == "local")
+	userID = strings.TrimSpace(os.Getenv("METALDOCS_BOOTSTRAP_ADMIN_USER_ID"))
+	if userID == "" {
+		userID = "admin-local"
+	}
+	username = strings.TrimSpace(os.Getenv("METALDOCS_BOOTSTRAP_ADMIN_USERNAME"))
+	if username == "" {
+		username = "admin"
+	}
+	name = strings.TrimSpace(os.Getenv("METALDOCS_BOOTSTRAP_ADMIN_DISPLAY_NAME"))
+	if name == "" {
+		name = "Administrator"
+	}
+	return enabled, userID, username, name
 }
 
 // DevRoleMap parses METALDOCS_DEV_USER_ROLES as: user1:admin,user2:viewer|reviewer

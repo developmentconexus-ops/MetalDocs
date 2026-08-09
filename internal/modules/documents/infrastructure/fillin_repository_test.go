@@ -31,7 +31,7 @@ func TestUpsertValue_UsesTxWhenProvided(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	tx := &recordingDBTX{}
 	repo := infrastructure.NewFillInRepository(db)
@@ -62,7 +62,7 @@ func TestUpsertValue_FallsBackToDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO document_placeholder_values")).
 		WithArgs(

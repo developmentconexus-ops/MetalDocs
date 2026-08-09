@@ -14,6 +14,9 @@ import (
 	"metaldocs/internal/platform/sqlescape"
 )
 
+// Reader implements searchdomain.Reader against the v2 documents
+// cross-module read views (metaldocs.v_document_search_facts /
+// metaldocs.v_cd_search_facts / metaldocs.v_cd_grantee).
 type Reader struct {
 	db       *sql.DB
 	families taxonomydomain.FamilyCodeResolver
@@ -31,6 +34,9 @@ func NewReader(db *sql.DB, families taxonomydomain.FamilyCodeResolver) *Reader {
 	return &Reader{db: db, families: families}
 }
 
+// ListDocuments returns the tenant documents matching query that are visible
+// to query.ActorUserID, per the unified visibility model (see the query
+// comment below).
 func (r *Reader) ListDocuments(ctx context.Context, query searchdomain.Query, limit, offset int) ([]searchdomain.Document, error) {
 	// This query reads ONLY published cross-module contracts (ADR-0039 D3a), never a
 	// foreign module's base table: documents' metaldocs.v_document_search_facts
@@ -162,7 +168,7 @@ LIMIT $11 OFFSET $12
 	if err != nil {
 		return nil, fmt.Errorf("v2 list documents: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []searchdomain.Document
 	// familyKeys[i] is the profile-code join key for out[i]; resolved to a family in

@@ -74,7 +74,7 @@ func TestCommitUpload_AbsentFormDataSnapshotPreservesStoredFormData(t *testing.T
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	r := New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{}, taxonomydomain.NoopAreaCatalogReader{})
 
 	stored := []byte(`{"kept":"yes"}`)
@@ -105,7 +105,7 @@ func TestCommitUpload_PresentFormDataSnapshotIsWritten(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	r := New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{}, taxonomydomain.NoopAreaCatalogReader{})
 
 	snapshot := []byte(`{"field":"new"}`)

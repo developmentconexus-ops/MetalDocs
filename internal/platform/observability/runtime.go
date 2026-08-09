@@ -9,12 +9,15 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// RuntimeStatusProvider serves liveness, readiness, and runtime metrics data
+// for the /live, /ready, and /metrics endpoints.
 type RuntimeStatusProvider interface {
 	Live(ctx context.Context) (int, map[string]any)
 	Ready(ctx context.Context) (int, map[string]any)
 	RuntimeMetrics(ctx context.Context) map[string]any
 }
 
+// DependencyCheckResult is the outcome of one DependencyCheck invocation.
 type DependencyCheckResult struct {
 	Status string
 	Detail string
@@ -22,11 +25,15 @@ type DependencyCheckResult struct {
 	Meta map[string]any
 }
 
+// DependencyCheck is a named readiness probe run against an external dependency.
 type DependencyCheck struct {
 	Name  string
 	Check func(context.Context) (DependencyCheckResult, error)
 }
 
+// StaticRuntimeStatusProvider implements RuntimeStatusProvider from
+// statically configured repository/storage mode flags plus a set of
+// dependency checks, with no live database access of its own.
 type StaticRuntimeStatusProvider struct {
 	repositoryMode  string
 	storageProvider string
@@ -34,6 +41,7 @@ type StaticRuntimeStatusProvider struct {
 	checks          []DependencyCheck
 }
 
+// NewStaticRuntimeStatusProvider constructs a StaticRuntimeStatusProvider.
 func NewStaticRuntimeStatusProvider(repositoryMode, storageProvider string, authEnabled bool, checks ...DependencyCheck) *StaticRuntimeStatusProvider {
 	return &StaticRuntimeStatusProvider{
 		repositoryMode:  repositoryMode,
@@ -43,6 +51,7 @@ func NewStaticRuntimeStatusProvider(repositoryMode, storageProvider string, auth
 	}
 }
 
+// Live returns the liveness status; it is process-local and never fails.
 func (p *StaticRuntimeStatusProvider) Live(_ context.Context) (int, map[string]any) {
 	return 200, map[string]any{
 		"status": "live",
@@ -52,6 +61,9 @@ func (p *StaticRuntimeStatusProvider) Live(_ context.Context) (int, map[string]a
 	}
 }
 
+// Ready returns the readiness status, running the configured dependency
+// checks (this static provider always reports its own repository/storage/auth
+// checks as up).
 func (p *StaticRuntimeStatusProvider) Ready(ctx context.Context) (int, map[string]any) {
 	// Exposure: the /api/v1/metrics payload is gated by CapMetricsView in
 	// permissions.go (tier-1); health/readiness endpoints are intentionally
@@ -69,6 +81,8 @@ func (p *StaticRuntimeStatusProvider) Ready(ctx context.Context) (int, map[strin
 	}
 }
 
+// RuntimeMetrics returns static runtime metrics with zeroed counters (no
+// database access).
 func (p *StaticRuntimeStatusProvider) RuntimeMetrics(_ context.Context) map[string]any {
 	// Exposure: the /api/v1/metrics payload is gated by CapMetricsView in
 	// permissions.go (tier-1); health/readiness endpoints are intentionally
@@ -100,12 +114,17 @@ func (p *StaticRuntimeStatusProvider) RuntimeMetrics(_ context.Context) map[stri
 	}
 }
 
+// PostgresRuntimeStatusProvider implements RuntimeStatusProvider backed by a
+// live Postgres connection, overriding Ready and RuntimeMetrics to query the
+// database while falling back to StaticRuntimeStatusProvider behavior.
 type PostgresRuntimeStatusProvider struct {
 	// embedded for JSON serialization; do not add methods to the embedded type.
 	*StaticRuntimeStatusProvider
 	db *sql.DB
 }
 
+// NewPostgresRuntimeStatusProvider constructs a PostgresRuntimeStatusProvider
+// backed by db.
 func NewPostgresRuntimeStatusProvider(db *sql.DB, repositoryMode, storageProvider string, authEnabled bool, checks ...DependencyCheck) *PostgresRuntimeStatusProvider {
 	return &PostgresRuntimeStatusProvider{
 		StaticRuntimeStatusProvider: NewStaticRuntimeStatusProvider(repositoryMode, storageProvider, authEnabled, checks...),
@@ -113,6 +132,8 @@ func NewPostgresRuntimeStatusProvider(db *sql.DB, repositoryMode, storageProvide
 	}
 }
 
+// Ready returns the readiness status, pinging the database and running the
+// configured dependency checks.
 func (p *PostgresRuntimeStatusProvider) Ready(ctx context.Context) (int, map[string]any) {
 	// Exposure: the /api/v1/metrics payload is gated by CapMetricsView in
 	// permissions.go (tier-1); health/readiness endpoints are intentionally
@@ -152,6 +173,8 @@ func (p *PostgresRuntimeStatusProvider) Ready(ctx context.Context) (int, map[str
 	}
 }
 
+// RuntimeMetrics returns live auth, session, and outbox counters queried from
+// the database, omitting any section whose query failed.
 func (p *PostgresRuntimeStatusProvider) RuntimeMetrics(ctx context.Context) map[string]any {
 	// Exposure: the /api/v1/metrics payload is gated by CapMetricsView in
 	// permissions.go (tier-1); health/readiness endpoints are intentionally
@@ -281,61 +304,57 @@ func queryRuntimeMetric(ctx context.Context, timeout time.Duration, query func(c
 	return query(queryCtx)
 }
 
+// applyDependencyChecks runs every configured dependency check and appends
+// its result entry to checks. status/code are optional out-params so Ready
+// can reuse this helper without allocating a result wrapper for the common
+// static-provider fast path.
 func (p *StaticRuntimeStatusProvider) applyDependencyChecks(ctx context.Context, checks []map[string]any, status *string, code *int) []map[string]any {
 	if len(p.checks) == 0 {
 		return checks
 	}
 
-	// status/code are optional out-params so Ready can reuse this helper without
-	// allocating a result wrapper for the common static-provider fast path.
-	//
-	// All dependency checks share a single 5s budget via errgroup so the probe
-	// latency is bounded by the slowest single check, not their sum.
-	type checkEntry struct {
-		index int
-		entry map[string]any
-	}
-
-	active := make([]DependencyCheck, 0, len(p.checks))
-	for _, c := range p.checks {
-		if c.Check != nil {
-			active = append(active, c)
-		}
-	}
+	active := activeDependencyChecks(p.checks)
 	if len(active) == 0 {
 		return checks
 	}
 
+	// All dependency checks share a single 5s budget via errgroup so the probe
+	// latency is bounded by the slowest single check, not their sum.
 	budgetCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	results := make([]checkEntry, len(active))
+	for _, entry := range runDependencyChecksConcurrently(budgetCtx, active) {
+		checks = append(checks, entry)
+		degradeStatusIfUnhealthy(entry, status, code)
+	}
+	return checks
+}
+
+// activeDependencyChecks filters out entries with a nil Check func.
+func activeDependencyChecks(all []DependencyCheck) []DependencyCheck {
+	active := make([]DependencyCheck, 0, len(all))
+	for _, c := range all {
+		if c.Check != nil {
+			active = append(active, c)
+		}
+	}
+	return active
+}
+
+// runDependencyChecksConcurrently runs each check under budgetCtx via
+// errgroup and returns one result entry per check, in the same order as
+// active.
+func runDependencyChecksConcurrently(budgetCtx context.Context, active []DependencyCheck) []map[string]any {
+	results := make([]map[string]any, len(active))
 	var mu sync.Mutex
 
 	g, gCtx := errgroup.WithContext(budgetCtx)
 	for i, check := range active {
 		i, check := i, check
 		g.Go(func() error {
-			result, err := check.Check(gCtx)
-			entry := map[string]any{
-				"name":   check.Name,
-				"status": "up",
-			}
-			if result.Status != "" {
-				entry["status"] = result.Status
-			}
-			if result.Detail != "" {
-				entry["detail"] = result.Detail
-			}
-			for key, value := range result.Meta {
-				entry[key] = value
-			}
-			if err != nil {
-				entry["status"] = "down"
-				entry["detail"] = truncateReadinessError(err)
-			}
+			entry := runSingleDependencyCheck(gCtx, check)
 			mu.Lock()
-			results[i] = checkEntry{index: i, entry: entry}
+			results[i] = entry
 			mu.Unlock()
 			return nil
 		})
@@ -343,18 +362,44 @@ func (p *StaticRuntimeStatusProvider) applyDependencyChecks(ctx context.Context,
 	// errgroup.Go callbacks never return a non-nil error here; wait only for
 	// completion.
 	_ = g.Wait()
+	return results
+}
 
-	for _, r := range results {
-		checks = append(checks, r.entry)
-		state := r.entry["status"]
-		if state != "up" && state != "skipped" {
-			if status != nil {
-				*status = "degraded"
-			}
-			if code != nil {
-				*code = 503
-			}
-		}
+// runSingleDependencyCheck invokes check.Check and shapes its result/error
+// into the wire entry: {"name", "status", "detail"?, ...Meta}.
+func runSingleDependencyCheck(ctx context.Context, check DependencyCheck) map[string]any {
+	result, err := check.Check(ctx)
+	entry := map[string]any{
+		"name":   check.Name,
+		"status": "up",
 	}
-	return checks
+	if result.Status != "" {
+		entry["status"] = result.Status
+	}
+	if result.Detail != "" {
+		entry["detail"] = result.Detail
+	}
+	for key, value := range result.Meta {
+		entry[key] = value
+	}
+	if err != nil {
+		entry["status"] = "down"
+		entry["detail"] = truncateReadinessError(err)
+	}
+	return entry
+}
+
+// degradeStatusIfUnhealthy flips the optional out-params to "degraded"/503
+// when entry's status is neither "up" nor "skipped".
+func degradeStatusIfUnhealthy(entry map[string]any, status *string, code *int) {
+	state := entry["status"]
+	if state == "up" || state == "skipped" {
+		return
+	}
+	if status != nil {
+		*status = "degraded"
+	}
+	if code != nil {
+		*code = 503
+	}
 }

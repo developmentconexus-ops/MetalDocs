@@ -123,7 +123,7 @@ func listTenantsWithDueReviews(ctx context.Context, database *sql.DB, reader doc
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := authz.BypassSystem(ctx, tx); err != nil {
 		return nil, err
@@ -150,7 +150,7 @@ func surfaceTenant(ctx context.Context, database *sql.DB, reader documentsdomain
 	if err != nil {
 		return 0, 0, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := authz.BypassSystem(ctx, tx); err != nil {
 		return 0, 0, err

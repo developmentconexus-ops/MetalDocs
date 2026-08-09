@@ -104,36 +104,10 @@ func (h *SessionsHandler) handleSessions(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	q := authdomain.SessionAdminQuery{
-		TenantID: tenantID,
-		UserID:   strings.TrimSpace(r.URL.Query().Get("user_id")),
+	q, requestedLimit, ok := h.parseSessionsListQuery(w, r, tenantID)
+	if !ok {
+		return
 	}
-	// Default: active sessions only. ?is_active=false toggles to include revoked
-	// + expired rows so admins can audit recent session activity.
-	if v := strings.TrimSpace(r.URL.Query().Get("is_active")); v != "" {
-		active, perr := strconv.ParseBool(v)
-		if perr != nil {
-			h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "is_active must be a boolean"))
-			return
-		}
-		q.IncludeRevoked = !active
-	}
-	// requestedLimit is the caller-facing page size (contract: 1-100, default 50
-	// — matches authpg.ListActiveSessions's own default so behavior is unchanged
-	// when the param is omitted). We ask the port for one extra row
-	// (requestedLimit+1) purely to detect has_more without a second round trip;
-	// the extra row (if returned) is truncated below before it ever reaches the
-	// wire (security-tech-debt.md #7).
-	requestedLimit := defaultSessionsPageLimit
-	if v := strings.TrimSpace(r.URL.Query().Get("limit")); v != "" {
-		limit, perr := strconv.Atoi(v)
-		if perr != nil || limit < 1 || limit > 100 {
-			h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "limit must be between 1 and 100"))
-			return
-		}
-		requestedLimit = limit
-	}
-	q.Limit = requestedLimit + 1
 
 	items, err := h.sessions.ListActiveSessions(r.Context(), q)
 	if err != nil {
@@ -156,7 +130,58 @@ func (h *SessionsHandler) handleSessions(w http.ResponseWriter, r *http.Request)
 	// old COALESCE(NULLIF(display_name,''), user_id) value consumer-side. The
 	// read is best-effort: on error we render fallbacks rather than fail the list.
 	displayNames := h.resolveDisplayNames(r.Context(), tenantID, items)
+	out := toSessionItems(items, displayNames)
 
+	// Full cursor pagination (opaque next_cursor) is still deferred (see
+	// authpg.ListActiveSessions doc) — that would need a new contract param.
+	// has_more is now truthful within the existing limit-only response shape
+	// via the over-fetch-by-one truncation above (security-tech-debt.md #7).
+	writeJSON(w, http.StatusOK, iamapi.ListSessionsResponse{
+		Items: out,
+		Page:  iamapi.CursorPage{HasMore: hasMore},
+	})
+}
+
+// parseSessionsListQuery parses and validates the list-sessions query params
+// (user_id, is_active, limit) into an authdomain.SessionAdminQuery.
+// requestedLimit is the caller-facing page size (contract: 1-100, default 50
+// — matches authpg.ListActiveSessions's own default so behavior is unchanged
+// when the param is omitted); q.Limit asks the port for one extra row
+// (requestedLimit+1) purely to detect has_more without a second round trip
+// (security-tech-debt.md #7). On invalid input it writes the problem response
+// itself and returns ok=false.
+func (h *SessionsHandler) parseSessionsListQuery(w http.ResponseWriter, r *http.Request, tenantID string) (q authdomain.SessionAdminQuery, requestedLimit int, ok bool) {
+	q = authdomain.SessionAdminQuery{
+		TenantID: tenantID,
+		UserID:   strings.TrimSpace(r.URL.Query().Get("user_id")),
+	}
+	// Default: active sessions only. ?is_active=false toggles to include revoked
+	// + expired rows so admins can audit recent session activity.
+	if v := strings.TrimSpace(r.URL.Query().Get("is_active")); v != "" {
+		active, perr := strconv.ParseBool(v)
+		if perr != nil {
+			h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "is_active must be a boolean"))
+			return authdomain.SessionAdminQuery{}, 0, false
+		}
+		q.IncludeRevoked = !active
+	}
+	requestedLimit = defaultSessionsPageLimit
+	if v := strings.TrimSpace(r.URL.Query().Get("limit")); v != "" {
+		limit, perr := strconv.Atoi(v)
+		if perr != nil || limit < 1 || limit > 100 {
+			h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "limit must be between 1 and 100"))
+			return authdomain.SessionAdminQuery{}, 0, false
+		}
+		requestedLimit = limit
+	}
+	q.Limit = requestedLimit + 1
+	return q, requestedLimit, true
+}
+
+// toSessionItems maps auth-owned session rows onto the generated
+// iamapi.SessionItem wire shape, enriching with iam-owned display names
+// (falling back to user_id) and normalizing sql.NullTime fields to UTC.
+func toSessionItems(items []authdomain.SessionListItem, displayNames map[string]string) []iamapi.SessionItem {
 	out := make([]iamapi.SessionItem, 0, len(items))
 	for _, item := range items {
 		name := item.UserID
@@ -198,15 +223,7 @@ func (h *SessionsHandler) handleSessions(w http.ResponseWriter, r *http.Request)
 		}
 		out = append(out, si)
 	}
-
-	// Full cursor pagination (opaque next_cursor) is still deferred (see
-	// authpg.ListActiveSessions doc) — that would need a new contract param.
-	// has_more is now truthful within the existing limit-only response shape
-	// via the over-fetch-by-one truncation above (security-tech-debt.md #7).
-	writeJSON(w, http.StatusOK, iamapi.ListSessionsResponse{
-		Items: out,
-		Page:  iamapi.CursorPage{HasMore: hasMore},
-	})
+	return out
 }
 
 func (h *SessionsHandler) handleSessionByID(w http.ResponseWriter, r *http.Request) {
@@ -248,56 +265,56 @@ func (h *SessionsHandler) handleSessionByID(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Optional body: {"reason":"..."} — recorded in the audit payload only;
-	// rejecting an empty/invalid body would block the common UI path.
-	reason := ""
-	if r.Body != nil {
-		raw, _ := io.ReadAll(io.LimitReader(r.Body, 4096))
-		if len(raw) > 0 {
-			var body struct {
-				Reason string `json:"reason"`
-			}
-			_ = json.Unmarshal(raw, &body)
-			reason = strings.TrimSpace(body.Reason)
-		}
+	reason := parseRevokeSessionReason(r)
+	actor := ""
+	if userID, ok := authn.UserIDFromContext(r.Context()); ok {
+		actor = userID
 	}
 
-	// Use SessionService when wired (atomic revoke + audit in one tx, H-3b).
-	// Falls back to the bare RevokeSession path in test environments where no
-	// real DB / SessionService is available.
-	if h.sessionService != nil {
-		actor := ""
-		if userID, ok := authn.UserIDFromContext(r.Context()); ok {
-			actor = userID
+	if err := h.revokeSession(r.Context(), session, reason, actor); err != nil {
+		if errors.Is(err, authdomain.ErrSessionNotFound) {
+			h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Session not found"))
+			return
 		}
-		err := h.sessionService.RevokeSession(r.Context(), iamapp.RevokeSessionInfo{
+		slog.Error("iam sessions: revoke failed", "err", err)
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to revoke session"))
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// parseRevokeSessionReason best-effort decodes the optional {"reason":"..."}
+// request body. An absent, empty, or malformed body yields "" rather than
+// failing the revoke — rejecting the common empty-body UI path would be a
+// regression, and the reason is recorded in the audit payload only.
+func parseRevokeSessionReason(r *http.Request) string {
+	if r.Body == nil {
+		return ""
+	}
+	raw, _ := io.ReadAll(io.LimitReader(r.Body, 4096))
+	if len(raw) == 0 {
+		return ""
+	}
+	var body struct {
+		Reason string `json:"reason"`
+	}
+	_ = json.Unmarshal(raw, &body)
+	return strings.TrimSpace(body.Reason)
+}
+
+// revokeSession dispatches to SessionService (atomic revoke + audit in one
+// tx, H-3b) when wired, falling back to the bare RevokeSession port in test
+// environments where no real DB / SessionService is available.
+func (h *SessionsHandler) revokeSession(ctx context.Context, session authdomain.Session, reason, actor string) error {
+	if h.sessionService != nil {
+		return h.sessionService.RevokeSession(ctx, iamapp.RevokeSessionInfo{
 			SessionID: session.SessionID,
 			UserID:    session.UserID,
 			TenantID:  session.TenantID,
 			Reason:    reason,
 		}, actor)
-		if err != nil {
-			if errors.Is(err, authdomain.ErrSessionNotFound) {
-				h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Session not found"))
-				return
-			}
-			slog.Error("iam sessions: revoke failed", "err", err)
-			h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to revoke session"))
-			return
-		}
-	} else {
-		now := h.now()
-		if err := h.sessions.RevokeSession(r.Context(), sessionID, now); err != nil {
-			if errors.Is(err, authdomain.ErrSessionNotFound) {
-				h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Session not found"))
-				return
-			}
-			slog.Error("iam sessions: revoke failed", "err", err)
-			h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to revoke session"))
-			return
-		}
 	}
-	w.WriteHeader(http.StatusNoContent)
+	return h.sessions.RevokeSession(ctx, session.SessionID, h.now())
 }
 
 // resolveDisplayNames batches the unique user_ids of the session rows and looks

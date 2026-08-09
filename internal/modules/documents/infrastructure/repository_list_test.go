@@ -14,7 +14,7 @@ import (
 func TestListDocuments_ExcludesArchivedByDefault(t *testing.T) {
 	t.Parallel()
 	db, mock, _ := sqlmock.New()
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	r := New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{}, taxonomydomain.NoopAreaCatalogReader{})
 
 	mock.ExpectQuery(`archived_at IS NULL`).
@@ -36,7 +36,7 @@ func TestListDocuments_ExcludesArchivedByDefault(t *testing.T) {
 func TestListDocumentsForUser_ExcludesArchivedByDefault(t *testing.T) {
 	t.Parallel()
 	db, mock, _ := sqlmock.New()
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	r := New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{}, taxonomydomain.NoopAreaCatalogReader{})
 
 	mock.ExpectQuery(`archived_at IS NULL`).

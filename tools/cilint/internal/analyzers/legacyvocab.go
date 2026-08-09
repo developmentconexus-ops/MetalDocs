@@ -48,7 +48,9 @@ func LegacyVocab(goFiles []string) []Finding {
 	// Walk frontend sources too
 	_ = filepath.WalkDir("frontend/apps/web/src", func(path string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
-			return nil
+			// Best-effort walk: an unreadable entry (or an absent frontend
+			// tree) skips that entry instead of aborting the whole sweep.
+			return nil //nolint:nilerr // propagating err would kill the walk on the first unreadable path
 		}
 		if strings.HasSuffix(path, ".ts") || strings.HasSuffix(path, ".tsx") {
 			allFiles = append(allFiles, path)

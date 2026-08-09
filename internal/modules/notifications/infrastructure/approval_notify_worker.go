@@ -83,7 +83,7 @@ func (w *ApprovalNotifyWorker) Work(ctx context.Context, job *river.Job[approval
 	if err != nil {
 		return fmt.Errorf("approval_notify_worker: begin tx: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := authz.SeedTxTenant(ctx, tx, args.TenantID); err != nil {
 		return fmt.Errorf("approval_notify_worker: seed tenant: %w", err)

@@ -1,5 +1,6 @@
 package resolvers
 
+// RegisterBuiltins registers every built-in ComputedResolver into r.
 func RegisterBuiltins(r *Registry) {
 	r.Register(DocCodeResolver{})
 	r.Register(DocTitleResolver{})

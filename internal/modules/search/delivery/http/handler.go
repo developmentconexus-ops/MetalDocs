@@ -26,10 +26,12 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
+// Handler serves the document search read endpoint over HTTP.
 type Handler struct {
 	service Searcher
 }
 
+// Searcher is the application-layer port Handler depends on.
 type Searcher interface {
 	SearchDocuments(ctx context.Context, q searchdomain.Query) ([]searchdomain.Document, error)
 }
@@ -66,13 +68,19 @@ type searchDocumentsResponse struct {
 	Items []SearchDocumentResponse `json:"items"`
 }
 
+// NewHandler builds a Handler backed by service.
 func NewHandler(service Searcher) *Handler {
 	return &Handler{service: service}
 }
 
+// Name returns the module identifier used by the route mount registry.
 func (h *Handler) Name() string { return "search" }
-func (h *Handler) Tag() string  { return "search" }
 
+// Tag returns the OpenAPI tag this handler groups its routes under.
+func (h *Handler) Tag() string { return "search" }
+
+// Mount registers the search routes on mux via the generated
+// searchapi.ServerInterface router.
 func (h *Handler) Mount(mux httprouter.Muxer) {
 	searchapi.HandlerWithOptions(h, searchapi.StdHTTPServerOptions{
 		BaseURL:    apibase.BaseURL,

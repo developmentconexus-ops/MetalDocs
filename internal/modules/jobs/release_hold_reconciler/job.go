@@ -169,7 +169,7 @@ func listTenantsWithStuckHolds(ctx context.Context, database *sql.DB, reader app
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := authz.BypassSystem(ctx, tx); err != nil {
 		return nil, err
@@ -195,7 +195,7 @@ func reconcileTenant(ctx context.Context, database *sql.DB, reader approvaldomai
 	if err != nil {
 		return 0, 0, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := authz.BypassSystem(ctx, tx); err != nil {
 		return 0, 0, err

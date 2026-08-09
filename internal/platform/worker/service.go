@@ -23,6 +23,8 @@ var (
 	errMaterializeRunnerNotConfigured = errors.New("worker: materialize runner not configured")
 )
 
+// Service drains the outbox consumer, dispatching claimed events to the
+// wired PDF / materialize job runners and recording success or failure.
 type Service struct {
 	consumer          messaging.Consumer
 	pdfRunner         *PDFJobRunner
@@ -30,6 +32,8 @@ type Service struct {
 	cfg               config.WorkerConfig
 }
 
+// NewService constructs a Service backed by consumer and cfg. Attach job
+// runners via WithPDFRunner / WithMaterializeRunner before calling RunOnce.
 func NewService(consumer messaging.Consumer, cfg config.WorkerConfig) *Service {
 	return &Service{
 		consumer: consumer,
@@ -49,6 +53,9 @@ func (s *Service) WithMaterializeRunner(r *MaterializeJobRunner) *Service {
 	return s
 }
 
+// RunOnce claims up to batchSize unpublished events and dispatches each to
+// its wired job runner, marking success or scheduling retry/dead-letter on
+// failure.
 func (s *Service) RunOnce(ctx context.Context, batchSize int) error {
 	if s.consumer == nil {
 		return fmt.Errorf("worker dependencies not configured")
@@ -65,23 +72,7 @@ func (s *Service) RunOnce(ctx context.Context, batchSize int) error {
 	deadLettered := 0
 	var runErr error
 	for _, event := range events {
-		var handleErr error
-		switch event.EventType {
-		case messaging.EventTypePDFConvert:
-			if s.pdfRunner == nil {
-				handleErr = errPDFRunnerNotConfigured
-			} else {
-				handleErr = s.pdfRunner.Handle(ctx, event)
-			}
-		case messaging.EventTypeMaterializeFanout:
-			if s.materializeRunner == nil {
-				handleErr = errMaterializeRunnerNotConfigured
-			} else {
-				handleErr = s.materializeRunner.Handle(ctx, event)
-			}
-		default:
-			handleErr = fmt.Errorf("%w: %s", errUnsupportedEventType, event.EventType)
-		}
+		handleErr := s.dispatchEvent(ctx, event)
 		if handleErr != nil {
 			failed++
 			markedDLQ, markErr := s.markFailure(ctx, event, handleErr)
@@ -109,6 +100,26 @@ func (s *Service) RunOnce(ctx context.Context, batchSize int) error {
 		"result", "completed", "processed", processed, "failed", failed,
 		"dead_lettered", deadLettered, "duration_ms", time.Since(start).Milliseconds())
 	return runErr
+}
+
+// dispatchEvent routes a claimed event to its wired job runner. An event of a
+// known type whose runner was never attached fails loud with a sentinel
+// not-configured error (F-QA2-1) rather than being silently marked published.
+func (s *Service) dispatchEvent(ctx context.Context, event messaging.Event) error {
+	switch event.EventType {
+	case messaging.EventTypePDFConvert:
+		if s.pdfRunner == nil {
+			return errPDFRunnerNotConfigured
+		}
+		return s.pdfRunner.Handle(ctx, event)
+	case messaging.EventTypeMaterializeFanout:
+		if s.materializeRunner == nil {
+			return errMaterializeRunnerNotConfigured
+		}
+		return s.materializeRunner.Handle(ctx, event)
+	default:
+		return fmt.Errorf("%w: %s", errUnsupportedEventType, event.EventType)
+	}
 }
 
 func (s *Service) markFailure(ctx context.Context, event messaging.Event, handleErr error) (bool, error) {

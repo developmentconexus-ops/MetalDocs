@@ -93,6 +93,21 @@ func (h *Handler) Name() string { return "controlled-documents" }
 // Tag is the OpenAPI tag this publisher owns.
 func (h *Handler) Tag() string { return "controlled-documents" }
 
+// matchesControlledDocumentSubPath reports whether path is a
+// "/api/v1/controlled-documents/{id}/<suffix>"-shaped route: it starts with
+// the tenant-scoped controlled-documents prefix and ends with suffix. Same
+// index-based comparison the revisions/obsolete/supersede route matches in
+// Mount used inline before extraction (not strings.HasPrefix/HasSuffix, to
+// keep the match behavior byte-identical) — factored out once so Mount's own
+// body stops repeating it three times.
+func matchesControlledDocumentSubPath(path, suffix string) bool {
+	const prefix = "/api/v1/controlled-documents/"
+	return len(path) > len(prefix) &&
+		path[:len(prefix)] == prefix &&
+		len(path) >= len(suffix) &&
+		path[len(path)-len(suffix):] == suffix
+}
+
 // Mount mounts the generated controlled-documents API surface
 // onto mux under /api/v1, wrapping the two mutating POST routes with
 // Idempotency-Key enforcement.
@@ -111,11 +126,7 @@ func (h *Handler) Mount(mux httprouter.Muxer) {
 				injectTenant(idempotency.Require(h.idempCreate, actorOf)(next)).ServeHTTP(w, r)
 				return
 			}
-			if r.Method == http.MethodPost &&
-				len(r.URL.Path) > len("/api/v1/controlled-documents/") &&
-				r.URL.Path[:len("/api/v1/controlled-documents/")] == "/api/v1/controlled-documents/" &&
-				len(r.URL.Path) >= len("/revisions") &&
-				r.URL.Path[len(r.URL.Path)-len("/revisions"):] == "/revisions" {
+			if r.Method == http.MethodPost && matchesControlledDocumentSubPath(r.URL.Path, "/revisions") {
 				injectTenant(idempotency.Require(h.idempRevision, actorOf)(next)).ServeHTTP(w, r)
 				return
 			}
@@ -125,19 +136,11 @@ func (h *Handler) Mount(mux httprouter.Muxer) {
 			// row out of "active" — a genuine network-timeout retry of a
 			// succeeded request must replay the original 204, not surface that
 			// 409 as if the retry itself were invalid.
-			if r.Method == http.MethodPut &&
-				len(r.URL.Path) > len("/api/v1/controlled-documents/") &&
-				r.URL.Path[:len("/api/v1/controlled-documents/")] == "/api/v1/controlled-documents/" &&
-				len(r.URL.Path) >= len("/obsolete") &&
-				r.URL.Path[len(r.URL.Path)-len("/obsolete"):] == "/obsolete" {
+			if r.Method == http.MethodPut && matchesControlledDocumentSubPath(r.URL.Path, "/obsolete") {
 				injectTenant(idempotency.Require(h.idempObsolete, actorOf)(next)).ServeHTTP(w, r)
 				return
 			}
-			if r.Method == http.MethodPut &&
-				len(r.URL.Path) > len("/api/v1/controlled-documents/") &&
-				r.URL.Path[:len("/api/v1/controlled-documents/")] == "/api/v1/controlled-documents/" &&
-				len(r.URL.Path) >= len("/supersede") &&
-				r.URL.Path[len(r.URL.Path)-len("/supersede"):] == "/supersede" {
+			if r.Method == http.MethodPut && matchesControlledDocumentSubPath(r.URL.Path, "/supersede") {
 				injectTenant(idempotency.Require(h.idempSupersede, actorOf)(next)).ServeHTTP(w, r)
 				return
 			}

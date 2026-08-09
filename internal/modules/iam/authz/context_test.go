@@ -16,7 +16,7 @@ func TestMustActorID_ReturnsErrWhenGUCMissing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock new: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectBegin()
 	tx, err := db.Begin()
@@ -49,7 +49,7 @@ func TestMustActorID_ReturnsErrWhenGUCNull(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock new: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectBegin()
 	tx, err := db.Begin()
@@ -76,7 +76,7 @@ func TestMustTenantID_ReturnsErrWhenGUCNull(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock new: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectBegin()
 	tx, err := db.Begin()
@@ -102,7 +102,7 @@ func TestMustActorID_ReturnsValueWhenSet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock new: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectBegin()
 	tx, err := db.Begin()
@@ -131,7 +131,7 @@ func TestMustTenantID_ReturnsErrWhenGUCMissing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock new: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectBegin()
 	tx, err := db.Begin()
@@ -159,7 +159,7 @@ func TestSeedTxIdentity_UsesTransactionLocalGUCs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock new: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectBegin()
 	tx, err := db.Begin()
@@ -192,7 +192,7 @@ func TestSeedTxTenant_SetsOnlyTenantGUC(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock new: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectBegin()
 	tx, err := db.Begin()
@@ -221,7 +221,7 @@ func TestSeedTxTenant_EmptyTenantErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock new: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectBegin()
 	tx, err := db.Begin()

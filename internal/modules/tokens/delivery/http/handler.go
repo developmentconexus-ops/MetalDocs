@@ -25,9 +25,14 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
-// Re-export command types as aliases so test code can use tokenshttp.CreateCommand
-// without importing the application package directly.
+// CreateCommand is a re-exported alias of application.CreateCommand so test
+// code can use tokenshttp.CreateCommand without importing the application
+// package directly.
 type CreateCommand = application.CreateCommand
+
+// UpdateCommand is a re-exported alias of application.UpdateCommand so test
+// code can use tokenshttp.UpdateCommand without importing the application
+// package directly.
 type UpdateCommand = application.UpdateCommand
 
 // Domain-specific error codes emitted by this handler.

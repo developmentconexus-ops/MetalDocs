@@ -1092,7 +1092,7 @@ func TestCreateUser_RollbackWhenReplaceUserRolesFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectBegin()
 	mock.ExpectExec(regexp.QuoteMeta(`

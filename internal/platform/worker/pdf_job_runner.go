@@ -12,14 +12,22 @@ import (
 	"metaldocs/internal/platform/servicebus"
 )
 
+// PDFConverter is the minimal published interface for converting a docx to
+// PDF. Satisfied by *servicebus.GotenbergPDFClient.
 type PDFConverter interface {
 	ConvertPDF(ctx context.Context, req servicebus.ConvertPDFRequest) (servicebus.ConvertPDFResult, error)
 }
 
+// TenantID identifies the tenant a PDF write belongs to.
 type TenantID string
+
+// DocumentID identifies the document/revision a PDF write belongs to.
 type DocumentID string
+
+// StorageKey is the object-storage key a PDF was written to.
 type StorageKey string
 
+// PDFWriteRequest carries the fields needed to persist a generated PDF.
 type PDFWriteRequest struct {
 	TenantID    TenantID
 	DocumentID  DocumentID
@@ -28,6 +36,7 @@ type PDFWriteRequest struct {
 	GeneratedAt time.Time
 }
 
+// PDFPersister persists a generated PDF outside any transaction.
 type PDFPersister interface {
 	WritePDF(ctx context.Context, req PDFWriteRequest) error
 }
@@ -42,18 +51,24 @@ type PDFPersisterInTx interface {
 	WritePDFInTx(ctx context.Context, tx db.Tx, req PDFWriteRequest) error
 }
 
+// StringPDFPersister is a PDF persister whose WritePDF takes plain string
+// identifiers rather than the typed TenantID/DocumentID/StorageKey wrappers.
 type StringPDFPersister interface {
 	WritePDF(ctx context.Context, tenant, docID, s3Key string, pdfHash []byte, generatedAt time.Time) error
 }
 
+// SnapshotPDFPersister adapts a StringPDFPersister to the PDFPersister
+// interface by stringifying the typed PDFWriteRequest fields.
 type SnapshotPDFPersister struct {
 	persister StringPDFPersister
 }
 
+// NewSnapshotPDFPersister constructs a SnapshotPDFPersister wrapping persister.
 func NewSnapshotPDFPersister(persister StringPDFPersister) SnapshotPDFPersister {
 	return SnapshotPDFPersister{persister: persister}
 }
 
+// WritePDF stringifies req's typed fields and delegates to the wrapped StringPDFPersister.
 func (p SnapshotPDFPersister) WritePDF(ctx context.Context, req PDFWriteRequest) error {
 	return p.persister.WritePDF(
 		ctx,
@@ -65,6 +80,9 @@ func (p SnapshotPDFPersister) WritePDF(ctx context.Context, req PDFWriteRequest)
 	)
 }
 
+// PDFJobRunner handles EventTypePDFConvert events: converts the frozen docx
+// to PDF and persists the result, optionally inside a tenant-seeded
+// transaction alongside the ADR 0085 artifact fact.
 type PDFJobRunner struct {
 	converter    PDFConverter
 	persister    PDFPersister
@@ -118,6 +136,9 @@ func NewPDFJobRunnerWithDB(converter PDFConverter, persister PDFPersister, authz
 	}
 }
 
+// Handle processes an EventTypePDFConvert event: converts the frozen docx to
+// PDF and persists the result, transactionally when the runner was
+// constructed via NewPDFJobRunnerWithDB.
 func (r *PDFJobRunner) Handle(ctx context.Context, event messaging.Event) error {
 	if r.authzSeam == nil {
 		return fmt.Errorf("pdf job runner: authz seam not configured")
@@ -161,19 +182,30 @@ func (r *PDFJobRunner) Handle(ctx context.Context, event messaging.Event) error 
 	}
 
 	if r.db == nil {
-		// Legacy untransacted path (NewPDFJobRunner) — no RLS tenant seed.
-		// A release generation cannot be honoured here: its fact must commit
-		// with the artifact write, and there is no transaction to join. Fail
-		// closed rather than silently dropping the fact.
-		if payload.ReleaseGenerationID != "" {
-			return fmt.Errorf("pdf job runner: release generation %s requires the transacted path (NewPDFJobRunnerWithDB)", payload.ReleaseGenerationID)
-		}
-		if err := r.persister.WritePDF(ctx, req); err != nil {
-			return fmt.Errorf("pdf job runner: persist pdf: %w", err)
-		}
-		return nil
+		return r.persistLegacy(ctx, payload, req)
 	}
+	return r.persistInTx(ctx, payload, req)
+}
 
+// persistLegacy runs the untransacted write path (NewPDFJobRunner) — no RLS
+// tenant seed. A release generation cannot be honoured here: its fact must
+// commit with the artifact write, and there is no transaction to join. Fail
+// closed rather than silently dropping the fact.
+func (r *PDFJobRunner) persistLegacy(ctx context.Context, payload messaging.PDFConvertPayload, req PDFWriteRequest) error {
+	if payload.ReleaseGenerationID != "" {
+		return fmt.Errorf("pdf job runner: release generation %s requires the transacted path (NewPDFJobRunnerWithDB)", payload.ReleaseGenerationID)
+	}
+	if err := r.persister.WritePDF(ctx, req); err != nil {
+		return fmt.Errorf("pdf job runner: persist pdf: %w", err)
+	}
+	return nil
+}
+
+// persistInTx runs the transacted write path (NewPDFJobRunnerWithDB): the
+// PDF write and, when a release generation is present, the ADR 0085 artifact
+// fact commit together in one tenant-seeded transaction (M3 F3.2 —
+// validation-contract.md §2.2 site 2).
+func (r *PDFJobRunner) persistInTx(ctx context.Context, payload messaging.PDFConvertPayload, req PDFWriteRequest) error {
 	inTx, ok := r.persister.(PDFPersisterInTx)
 	if !ok {
 		return fmt.Errorf("pdf job runner: persister %T does not implement PDFPersisterInTx (required when constructed via NewPDFJobRunnerWithDB)", r.persister)

@@ -268,18 +268,18 @@ func TestCreateTemplate_TypedResponseShape(t *testing.T) {
 
 	// Smoke fields: data.template must carry id and tenant_id (TemplateDTO required).
 	var tpl struct {
-		Id       string `json:"id"`
-		TenantId string `json:"tenant_id"`
+		ID       string `json:"id"`
+		TenantID string `json:"tenant_id"`
 		Key      string `json:"key"`
 	}
 	if err := json.Unmarshal(dataObj.Template, &tpl); err != nil {
 		t.Fatalf("decode data.template: %v", err)
 	}
-	if tpl.Id == "" {
+	if tpl.ID == "" {
 		t.Error("data.template.id must be non-empty (TemplateDTO required field)")
 	}
-	if tpl.TenantId != tenantUUID {
-		t.Errorf("data.template.tenant_id = %q; want %q", tpl.TenantId, tenantUUID)
+	if tpl.TenantID != tenantUUID {
+		t.Errorf("data.template.tenant_id = %q; want %q", tpl.TenantID, tenantUUID)
 	}
 	if tpl.Key != "shape-f13-key" {
 		t.Errorf("data.template.key = %q; want %q", tpl.Key, "shape-f13-key")

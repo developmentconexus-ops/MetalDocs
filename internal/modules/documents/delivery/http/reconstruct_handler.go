@@ -12,18 +12,23 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
+// ReconstructService is the application boundary ReconstructHandler consumes
+// to fetch a document's render-fanout reconstruction entry.
 type ReconstructService interface {
 	GetReconstruction(ctx context.Context, tenantID, actorID, docID string) (fanout.ReconstructionEntry, error)
 }
 
+// ReconstructHandler serves the document reconstruction route.
 type ReconstructHandler struct {
 	svc ReconstructService
 }
 
+// NewReconstructHandler constructs a ReconstructHandler backed by the given service.
 func NewReconstructHandler(svc ReconstructService) *ReconstructHandler {
 	return &ReconstructHandler{svc: svc}
 }
 
+// HandleReconstruct returns the render-fanout reconstruction entry for a document.
 func (h *ReconstructHandler) HandleReconstruct(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {

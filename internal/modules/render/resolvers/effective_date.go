@@ -5,12 +5,17 @@ import (
 	"time"
 )
 
+// EffectiveDateResolver resolves the "effective_date" placeholder to the
+// revision's effective-from date, or an empty string when not yet set.
 type EffectiveDateResolver struct{}
 
+// Key returns the resolver's registry key, "effective_date".
 func (EffectiveDateResolver) Key() string { return "effective_date" }
 
+// Version returns the resolver's version.
 func (EffectiveDateResolver) Version() int { return 1 }
 
+// Resolve computes the effective_date value for in.
 func (EffectiveDateResolver) Resolve(ctx context.Context, in ResolveInput) (ResolvedValue, error) {
 	if err := requireTenantID("effective_date", in.TenantID); err != nil {
 		return ResolvedValue{}, err

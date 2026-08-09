@@ -236,7 +236,7 @@ ORDER BY audit_sequence
 	if err != nil {
 		return nil, fmt.Errorf("validate audit integrity: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	issues := make([]domain.IntegrityIssue, 0, 4)
 	for rows.Next() {
@@ -290,7 +290,7 @@ func (w *Writer) ListEvents(ctx context.Context, query domain.ListEventsQuery) (
 	if err != nil {
 		return nil, false, fmt.Errorf("list audit events: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	items := make([]domain.Event, 0, limit+1)
 	for rows.Next() {

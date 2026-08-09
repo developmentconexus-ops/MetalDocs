@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+// WorkerConfig holds the async outbox worker configuration read from
+// environment variables at startup.
 type WorkerConfig struct {
 	PollIntervalSeconds int
 	BatchSize           int
@@ -17,6 +19,8 @@ type WorkerConfig struct {
 	RetryMaxSeconds  int
 }
 
+// LoadWorkerConfig reads the worker configuration from environment
+// variables, applying defaults for anything unset.
 func LoadWorkerConfig() (WorkerConfig, error) {
 	cfg := WorkerConfig{
 		PollIntervalSeconds: 10,
@@ -26,44 +30,42 @@ func LoadWorkerConfig() (WorkerConfig, error) {
 		RetryMaxSeconds:     300,
 	}
 
-	if raw := strings.TrimSpace(os.Getenv("METALDOCS_WORKER_POLL_INTERVAL_SECONDS")); raw != "" {
-		value, err := strconv.Atoi(raw)
-		if err != nil || value < 1 {
-			return WorkerConfig{}, fmt.Errorf("invalid METALDOCS_WORKER_POLL_INTERVAL_SECONDS")
-		}
-		cfg.PollIntervalSeconds = value
+	var err error
+	if cfg.PollIntervalSeconds, err = parseWorkerIntEnv("METALDOCS_WORKER_POLL_INTERVAL_SECONDS", cfg.PollIntervalSeconds, 1); err != nil {
+		return WorkerConfig{}, err
 	}
-	if raw := strings.TrimSpace(os.Getenv("METALDOCS_WORKER_BATCH_SIZE")); raw != "" {
-		value, err := strconv.Atoi(raw)
-		if err != nil || value < 1 {
-			return WorkerConfig{}, fmt.Errorf("invalid METALDOCS_WORKER_BATCH_SIZE")
-		}
-		cfg.BatchSize = value
+	if cfg.BatchSize, err = parseWorkerIntEnv("METALDOCS_WORKER_BATCH_SIZE", cfg.BatchSize, 1); err != nil {
+		return WorkerConfig{}, err
 	}
 	if raw := strings.TrimSpace(os.Getenv("METALDOCS_WORKER_RUN_ONCE")); raw != "" {
 		cfg.RunOnce = strings.EqualFold(raw, "true") || raw == "1"
 	}
-	if raw := strings.TrimSpace(os.Getenv("METALDOCS_WORKER_MAX_ATTEMPTS")); raw != "" {
-		value, err := strconv.Atoi(raw)
-		if err != nil || value < 1 {
-			return WorkerConfig{}, fmt.Errorf("invalid METALDOCS_WORKER_MAX_ATTEMPTS")
-		}
-		cfg.MaxAttempts = value
+	if cfg.MaxAttempts, err = parseWorkerIntEnv("METALDOCS_WORKER_MAX_ATTEMPTS", cfg.MaxAttempts, 1); err != nil {
+		return WorkerConfig{}, err
 	}
-	if raw := strings.TrimSpace(os.Getenv("METALDOCS_WORKER_RETRY_BASE_SECONDS")); raw != "" {
-		value, err := strconv.Atoi(raw)
-		if err != nil || value < 1 {
-			return WorkerConfig{}, fmt.Errorf("invalid METALDOCS_WORKER_RETRY_BASE_SECONDS")
-		}
-		cfg.RetryBaseSeconds = value
+	if cfg.RetryBaseSeconds, err = parseWorkerIntEnv("METALDOCS_WORKER_RETRY_BASE_SECONDS", cfg.RetryBaseSeconds, 1); err != nil {
+		return WorkerConfig{}, err
 	}
-	if raw := strings.TrimSpace(os.Getenv("METALDOCS_WORKER_RETRY_MAX_SECONDS")); raw != "" {
-		value, err := strconv.Atoi(raw)
-		if err != nil || value < cfg.RetryBaseSeconds {
-			return WorkerConfig{}, fmt.Errorf("invalid METALDOCS_WORKER_RETRY_MAX_SECONDS")
-		}
-		cfg.RetryMaxSeconds = value
+	// RetryMaxSeconds' floor is RetryBaseSeconds (already resolved above), not a
+	// fixed constant, so backoff growth stays monotonic.
+	if cfg.RetryMaxSeconds, err = parseWorkerIntEnv("METALDOCS_WORKER_RETRY_MAX_SECONDS", cfg.RetryMaxSeconds, cfg.RetryBaseSeconds); err != nil {
+		return WorkerConfig{}, err
 	}
 
 	return cfg, nil
+}
+
+// parseWorkerIntEnv reads an integer environment variable, returning
+// defaultValue when unset. A present-but-unparsable value, or one below min,
+// yields "invalid <name>" — the single error shape for every worker int setting.
+func parseWorkerIntEnv(name string, defaultValue, min int) (int, error) {
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return defaultValue, nil
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < min {
+		return 0, fmt.Errorf("invalid %s", name)
+	}
+	return value, nil
 }

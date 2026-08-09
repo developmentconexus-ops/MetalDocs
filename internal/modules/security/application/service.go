@@ -45,11 +45,15 @@ const (
 // (qa/iam-admin-center; iamdomain.Role*).
 var AdminRoles = []string{"system_admin", "area_admin", "qms_admin"}
 
+// Service orchestrates the Sessions & Security admin tab: MFA coverage,
+// lockouts, and the rule-based signal feed, all tenant-scoped.
 type Service struct {
 	repo securitydomain.Repository
 	now  func() time.Time
 }
 
+// NewService builds a Service backed by repo, with now defaulting to the
+// real wall clock (see WithClock to override for tests).
 func NewService(repo securitydomain.Repository) *Service {
 	return &Service{
 		repo: repo,
@@ -64,8 +68,11 @@ func (s *Service) WithClock(now func() time.Time) *Service {
 	return s
 }
 
+// ErrTenantRequired is returned when a caller invokes a Service method
+// without a resolved tenant id.
 var ErrTenantRequired = errors.New("security: tenant id required")
 
+// MfaCoverage returns MFA enrollment stats for tenantID.
 func (s *Service) MfaCoverage(ctx context.Context, tenantID string) (securitydomain.MfaCoverage, error) {
 	if strings.TrimSpace(tenantID) == "" {
 		return securitydomain.MfaCoverage{}, ErrTenantRequired
@@ -73,6 +80,7 @@ func (s *Service) MfaCoverage(ctx context.Context, tenantID string) (securitydom
 	return s.repo.MfaCoverage(ctx, tenantID)
 }
 
+// ListLockouts returns the currently-locked accounts in tenantID.
 func (s *Service) ListLockouts(ctx context.Context, tenantID string) ([]securitydomain.Lockout, error) {
 	if strings.TrimSpace(tenantID) == "" {
 		return nil, ErrTenantRequired

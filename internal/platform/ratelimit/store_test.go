@@ -28,7 +28,7 @@ func redisAddrForTest(t *testing.T) string {
 		addr = "127.0.0.1:6379"
 	}
 	probe := redis.NewClient(&redis.Options{Addr: addr, DialTimeout: 500 * time.Millisecond})
-	defer probe.Close()
+	defer func() { _ = probe.Close() }()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	if err := probe.Ping(ctx).Err(); err == nil {
@@ -55,7 +55,7 @@ func TestCrossReplicaSharedBudget(t *testing.T) {
 		// Two separate clients to the same Redis — one per "replica".
 		c1 := redis.NewClient(&redis.Options{Addr: addr})
 		c2 := redis.NewClient(&redis.Options{Addr: addr})
-		t.Cleanup(func() { c1.Close(); c2.Close() })
+		t.Cleanup(func() { _ = c1.Close(); _ = c2.Close() })
 
 		ctx, cancel := context.WithCancel(context.Background())
 		t.Cleanup(cancel)

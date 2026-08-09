@@ -61,7 +61,7 @@ func TestListInboxItems_PopulatesTitleAndQuorumProgress(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	submittedAt := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
 
@@ -117,7 +117,7 @@ func TestListInboxItems_FiltersByActor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// We assert the actorID is JSON-marshalled into the eligible_actor_ids @> filter arg ($2).
 	mock.ExpectBegin()
@@ -154,7 +154,7 @@ func TestListInboxItemsWithTotal_SingleQueryCarriesTotal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	submittedAt := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
 
@@ -203,7 +203,7 @@ func TestListInboxItemsWithTotal_EmptyPageFallsBackToCount(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectBegin()
 	mock.ExpectExec(`set_config\('metaldocs\.tenant_id'`).
@@ -266,7 +266,7 @@ func TestListInboxItemsWithTotal_ClampsLimit(t *testing.T) {
 			if err != nil {
 				t.Fatalf("sqlmock.New: %v", err)
 			}
-			defer db.Close()
+			defer func() { _ = db.Close() }()
 
 			mock.ExpectBegin()
 			mock.ExpectExec(`set_config\('metaldocs\.tenant_id'`).
@@ -300,7 +300,7 @@ func TestCountPendingForActor_ReturnsTotal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectBegin()
 	mock.ExpectExec(`set_config\('metaldocs\.tenant_id'`).
@@ -332,7 +332,7 @@ func TestListWorklist_ZeroFilter_MatchesBaseInboxShape(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	submittedAt := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
 	rows := sqlmock.NewRows([]string{
@@ -381,7 +381,7 @@ func TestListWorklist_StageKindFilter_PassesArgThrough(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectBegin()
 	mock.ExpectExec(`set_config\('metaldocs\.tenant_id'`).
@@ -447,7 +447,7 @@ func TestLoadActiveInstanceByDocument_RequiresDocumentViewBeforeRepoLoad(t *test
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repoSpy := &readServiceRepoSpy{inst: &domain.Instance{ID: "inst-1"}}
 	svc := &ReadService{repo: repoSpy}
@@ -495,7 +495,7 @@ func TestLoadActiveInstanceByDocumentForMutation_DoesNotRequireDocumentView(t *t
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repoSpy := &readServiceRepoSpy{inst: &domain.Instance{ID: "inst-1"}}
 	svc := &ReadService{repo: repoSpy}

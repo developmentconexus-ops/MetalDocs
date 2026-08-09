@@ -52,11 +52,11 @@ const FailedLoginsWindowSec = 24 * 60 * 60
 // auditEventsPerMinute KPI. 60 minutes / 60 = events per minute.
 const AuditEventsRateWindowSec = 60 * 60
 
-// ApiCallActionPrefix is the audit-action prefix counted toward the
+// APICallActionPrefix is the audit-action prefix counted toward the
 // apiCalls usage panes. When no audit events use this prefix (the v1
 // surface does not emit per-request audit rows), the repository returns
 // -1 and the FE renders "—".
-const ApiCallActionPrefix = "http.request."
+const APICallActionPrefix = "http.request."
 
 // NewObservabilityService wires the observability composer. mfa may be nil,
 // in which case KpiSnapshot.MfaCoveragePct is left at its zero value.
@@ -96,15 +96,15 @@ func (s *ObservabilityService) GetUsage(ctx context.Context, tenantID string) (i
 	if err != nil {
 		return iamdomain.UsageSnapshot{}, fmt.Errorf("storage used bytes: %w", err)
 	}
-	apiCalls24h, err := s.repo.CountAuditEventsByActionPrefix(ctx, tenantID, ApiCallActionPrefix, 24*60*60)
+	apiCalls24h, err := s.repo.CountAuditEventsByActionPrefix(ctx, tenantID, APICallActionPrefix, 24*60*60)
 	if err != nil {
 		return iamdomain.UsageSnapshot{}, fmt.Errorf("count api calls 24h: %w", err)
 	}
-	apiCalls7d, err := s.repo.CountAuditEventsByActionPrefix(ctx, tenantID, ApiCallActionPrefix, 7*24*60*60)
+	apiCalls7d, err := s.repo.CountAuditEventsByActionPrefix(ctx, tenantID, APICallActionPrefix, 7*24*60*60)
 	if err != nil {
 		return iamdomain.UsageSnapshot{}, fmt.Errorf("count api calls 7d: %w", err)
 	}
-	apiCalls30d, err := s.repo.CountAuditEventsByActionPrefix(ctx, tenantID, ApiCallActionPrefix, 30*24*60*60)
+	apiCalls30d, err := s.repo.CountAuditEventsByActionPrefix(ctx, tenantID, APICallActionPrefix, 30*24*60*60)
 	if err != nil {
 		return iamdomain.UsageSnapshot{}, fmt.Errorf("count api calls 30d: %w", err)
 	}

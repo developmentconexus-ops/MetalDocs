@@ -21,11 +21,25 @@ import (
 )
 
 // Type aliases so handlers depend only on application types.
+
+// PendingCommitMeta describes a reserved-but-not-yet-committed autosave
+// upload, as returned by Repository.GetPendingForCommit.
 type PendingCommitMeta = infrastructure.PendingCommitMeta
+
+// CommitResult is the outcome of committing (or syncing metadata for) an
+// autosave upload: the resulting revision identity and whether the call was
+// an idempotent replay.
 type CommitResult = infrastructure.CommitResult
+
+// RestoreResult is the outcome of restoring a checkpoint: the new revision
+// created from it, and whether the restore was an idempotent replay.
 type RestoreResult = infrastructure.RestoreResult
+
+// RevisionHistoryItem is one entry in a document's revision history listing.
 type RevisionHistoryItem = domain.RevisionHistoryItem
 
+// Repository is the persistence port Service uses for all document,
+// revision, session, checkpoint, and comment reads/writes.
 type Repository interface {
 	CreateDocumentTx(ctx context.Context, tx db.Tx, d *domain.Document, initialContentHash, initialStorageKey string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error)
 	SeedDictionaryValuesTx(ctx context.Context, tx db.Tx, tenantID, revisionID string, values map[string]string) error
@@ -69,6 +83,9 @@ const (
 	objectDownloadTTL = 15 * time.Minute
 )
 
+// Presigner presigns and manages revision/document objects in the object
+// store: upload/download URLs, upload confirmation, existence, size, and
+// deletion.
 type Presigner interface {
 	PresignPut(ctx context.Context, tenantID, key string, ttl time.Duration) (url string, err error)
 	PresignGet(ctx context.Context, key string, ttl time.Duration) (url string, err error)
@@ -78,19 +95,27 @@ type Presigner interface {
 	Delete(ctx context.Context, key string) error
 }
 
+// TemplateReader reads a published template version's docx/schema artifacts,
+// used to seed a new document at creation time.
 type TemplateReader interface {
 	GetPublishedVersion(ctx context.Context, tenantID, templateVersionID string) (docxKey, schemaKey, schemaJSON string, err error)
 }
 
+// FormValidator validates a document's form-data JSON against a template's
+// JSON schema.
 type FormValidator interface {
 	Validate(schemaJSON string, formData json.RawMessage) (valid bool, errs []string, err error)
 }
 
+// Audit records document lifecycle events, either fire-and-forget (Write) or
+// transactionally alongside the state change it describes (WriteTx).
 type Audit interface {
 	Write(ctx context.Context, tenantID, actorID, action, docID string, meta any)
 	WriteTx(ctx context.Context, tx db.Tx, tenantID, actorID, action, docID string, meta any) error
 }
 
+// ControlledDocumentDuplicator duplicates a controlled document's identity so
+// Service.DuplicateDocument can seed a new document from an existing one.
 type ControlledDocumentDuplicator interface {
 	DuplicateControlledDocument(ctx context.Context, in DuplicateControlledDocumentInput) (*CreateDocumentResult, error)
 }
@@ -105,6 +130,9 @@ type DuplicateControlledDocumentInput struct {
 	FormData             json.RawMessage
 }
 
+// ProfileDefaultTemplateReader resolves a taxonomy profile's default template
+// version, used when a document is created without an explicit template
+// override.
 type ProfileDefaultTemplateReader interface {
 	GetDefaultTemplateVersionID(ctx context.Context, tenantID, profileCode string) (*string, *string, error)
 	// returns (*templateVersionID, *templateVersionStatus, error)
@@ -117,6 +145,10 @@ type DictionaryValueReader interface {
 	Lookup(ctx context.Context, tenantID, name string) (value string, found bool, err error)
 }
 
+// Service is the documents module's application service: document CRUD,
+// autosave/commit, sessions, checkpoints, comments, and exports all flow
+// through it, enforcing the document.edit/document.view capabilities and the
+// draft/under_review write-eligibility rules along the way.
 type Service struct {
 	repo                         Repository
 	presigner                    Presigner
@@ -131,6 +163,8 @@ type Service struct {
 	dictReader                   DictionaryValueReader
 }
 
+// WithRunner attaches the db.TxRunner Service uses for authz-enforcing
+// transactions (e.g. RequireDocumentView, ListCheckpoints).
 func (s *Service) WithRunner(runner db.TxRunner) *Service {
 	s.runner = runner
 	return s
@@ -209,6 +243,10 @@ func (s *Service) mayWriteWorkingContent(ctx context.Context, tenantID, docID, a
 	}
 }
 
+// New constructs a Service wired only with a repo, presigner, template
+// reader, form validator, and audit sink (no profile-template resolver or
+// snapshot service).
+//
 // Deprecated: use NewService.
 func New(r Repository, p Presigner, t TemplateReader, fv FormValidator, a Audit) *Service {
 	return &Service{
@@ -220,6 +258,8 @@ func New(r Repository, p Presigner, t TemplateReader, fv FormValidator, a Audit)
 	}
 }
 
+// NewService constructs a Service wired with a repo, presigner, template
+// reader, form validator, audit sink, and profile default-template reader.
 func NewService(
 	r Repository,
 	p Presigner,
@@ -260,15 +300,21 @@ func NewServiceWithSnapshot(
 	}
 }
 
+// WithControlledDocumentDuplicator attaches the ControlledDocumentDuplicator
+// used by DuplicateDocument.
 func (s *Service) WithControlledDocumentDuplicator(d ControlledDocumentDuplicator) *Service {
 	s.controlledDocumentDuplicator = d
 	return s
 }
 
+// ErrControlledDocumentRequired is returned by DuplicateDocument when the
+// source document has no controlled_document_id to duplicate from.
 var ErrControlledDocumentRequired = errors.New("controlled_document_id is required")
 var errControlledDocumentDuplicatorNotConfigured = errors.New("controlled document duplicator not configured")
 var errProfileTemplateReaderNotConfigured = errors.New("profile default template reader not configured")
 
+// CreateDocumentResult identifies the document, initial revision, and editor
+// session created by a document-creation flow.
 type CreateDocumentResult struct {
 	DocumentID        string
 	InitialRevisionID string
@@ -439,6 +485,7 @@ func (s *Service) templateArtifactExists(ctx context.Context, storageKey string)
 	return s.presigner.Exists(ctx, storageKey)
 }
 
+// GetDocument returns the document row for id.
 func (s *Service) GetDocument(ctx context.Context, tenantID, id string) (*domain.Document, error) {
 	return s.repo.GetDocument(ctx, tenantID, id)
 }
@@ -460,6 +507,10 @@ func (s *Service) RequireDocumentView(ctx context.Context, tenantID, actorID, do
 	})
 }
 
+// DuplicateDocument duplicates docID's controlled document via the wired
+// ControlledDocumentDuplicator, seeding a new document from the source's
+// name and form data. Fails with ErrControlledDocumentRequired if the source
+// document has no controlled_document_id.
 func (s *Service) DuplicateDocument(ctx context.Context, tenantID, userID, docID string) (*CreateDocumentResult, error) {
 	if s.controlledDocumentDuplicator == nil {
 		return nil, errControlledDocumentDuplicatorNotConfigured
@@ -480,11 +531,15 @@ func (s *Service) DuplicateDocument(ctx context.Context, tenantID, userID, docID
 	})
 }
 
+// DocumentStats reports document counts broken down by status and by area.
 type DocumentStats struct {
 	ByStatus map[string]int64 `json:"by_status"`
 	ByArea   map[string]int64 `json:"by_area"`
 }
 
+// ListDocumentsPaginated returns a page of documents matching opts (scoped to
+// userID when non-empty) plus the total row count and a has-more flag, taken
+// from a single consistent snapshot query.
 func (s *Service) ListDocumentsPaginated(ctx context.Context, tenantID, userID string, opts ListOptions) (items []*domain.Document, total int64, hasMore bool, err error) {
 	if userID != "" {
 		opts.CreatedBy = userID
@@ -500,6 +555,8 @@ func (s *Service) ListDocumentsPaginated(ctx context.Context, tenantID, userID s
 	return items, total, hasMore, nil
 }
 
+// DocumentStats returns document counts by status and by area for opts
+// (scoped to userID when non-empty).
 func (s *Service) DocumentStats(ctx context.Context, tenantID, userID string, opts ListOptions) (*DocumentStats, error) {
 	if userID != "" {
 		opts.CreatedBy = userID
@@ -521,6 +578,8 @@ func (s *Service) DocumentStats(ctx context.Context, tenantID, userID string, op
 	}, nil
 }
 
+// RenameDocument renames a draft document, rejecting empty/over-length names
+// and non-draft documents.
 func (s *Service) RenameDocument(ctx context.Context, tenantID, userID, docID, newName string) error {
 	name := strings.TrimSpace(newName)
 	if name == "" || len(name) > 255 {
@@ -544,14 +603,18 @@ func (s *Service) RenameDocument(ctx context.Context, tenantID, userID, docID, n
 	})
 }
 
+// IsDocumentOwner reports whether userID owns (created) docID.
 func (s *Service) IsDocumentOwner(ctx context.Context, tenantID, docID, userID string) (bool, error) {
 	return s.repo.IsDocumentOwner(ctx, tenantID, docID, userID)
 }
 
+// ListDocumentComments returns all comments on documentID.
 func (s *Service) ListDocumentComments(ctx context.Context, tenantID, documentID string) ([]domain.Comment, error) {
 	return s.repo.ListComments(ctx, tenantID, documentID)
 }
 
+// AddDocumentComment validates and creates a new comment on documentID,
+// stamping it with the trimmed authorDisplay name.
 func (s *Service) AddDocumentComment(ctx context.Context, tenantID, userID, authorDisplay, documentID string, in domain.CommentCreateInput) (*domain.Comment, error) {
 	if in.LibraryCommentID <= 0 {
 		return nil, domain.ErrCommentInvalid
@@ -567,6 +630,8 @@ func (s *Service) AddDocumentComment(ctx context.Context, tenantID, userID, auth
 	return s.repo.CreateComment(ctx, tenantID, documentID, userID, in)
 }
 
+// UpdateDocumentComment validates and applies an update to the comment
+// identified by libraryID on documentID.
 func (s *Service) UpdateDocumentComment(ctx context.Context, tenantID, userID, documentID string, libraryID int, in domain.CommentUpdateInput) (*domain.Comment, error) {
 	if libraryID <= 0 {
 		return nil, domain.ErrCommentInvalid
@@ -577,6 +642,8 @@ func (s *Service) UpdateDocumentComment(ctx context.Context, tenantID, userID, d
 	return s.repo.UpdateComment(ctx, tenantID, documentID, libraryID, userID, in)
 }
 
+// DeleteDocumentComment deletes the comment identified by libraryID on
+// documentID.
 func (s *Service) DeleteDocumentComment(ctx context.Context, tenantID, userID, documentID string, libraryID int) error {
 	if libraryID <= 0 {
 		return domain.ErrCommentInvalid
@@ -584,16 +651,22 @@ func (s *Service) DeleteDocumentComment(ctx context.Context, tenantID, userID, d
 	return s.repo.DeleteComment(ctx, tenantID, documentID, libraryID)
 }
 
+// PresignAutosaveCmd is the input to Service.PresignAutosave.
 type PresignAutosaveCmd struct {
 	TenantID, ActorUserID, DocumentID, SessionID, BaseRevisionID, ContentHash string
 }
 
+// PresignAutosaveResult carries the presigned upload URL and reservation
+// returned by Service.PresignAutosave.
 type PresignAutosaveResult struct {
 	UploadURL       string
 	PendingUploadID string
 	ExpiresAt       time.Time
 }
 
+// PresignAutosave presigns an upload URL and reserves a pending-commit slot
+// for an autosave write, after confirming cmd.ActorUserID may write the
+// document's working content.
 func (s *Service) PresignAutosave(ctx context.Context, cmd PresignAutosaveCmd) (*PresignAutosaveResult, error) {
 	doc, err := s.repo.GetDocument(ctx, cmd.TenantID, cmd.DocumentID)
 	if err != nil {
@@ -619,17 +692,22 @@ func (s *Service) PresignAutosave(ctx context.Context, cmd PresignAutosaveCmd) (
 	return &PresignAutosaveResult{UploadURL: url, PendingUploadID: pendingID, ExpiresAt: expiresAt}, nil
 }
 
+// CommitAutosaveCmd is the input to Service.CommitAutosave.
 type CommitAutosaveCmd struct {
 	TenantID, ActorUserID, DocumentID, SessionID, PendingUploadID string
 	FormDataSnapshot                                              json.RawMessage
 	PageCount                                                     *int
 }
 
+// SyncArtifactMetadataCmd is the input to Service.SyncArtifactMetadata.
 type SyncArtifactMetadataCmd struct {
 	TenantID, ActorUserID, DocumentID, SessionID string
 	PageCount                                    *int
 }
 
+// CommitAutosave confirms a previously presigned autosave upload against its
+// reservation and commits it as a new revision, after re-confirming
+// cmd.ActorUserID may write the document's working content.
 func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*CommitResult, error) {
 	if cmd.PageCount != nil && *cmd.PageCount <= 0 {
 		return nil, domain.ErrInvalidPageCount
@@ -694,6 +772,9 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*C
 	return res, nil
 }
 
+// SyncArtifactMetadata re-syncs the current revision's page count/size
+// metadata (e.g. after a client-side re-render) without creating a new
+// revision.
 func (s *Service) SyncArtifactMetadata(ctx context.Context, cmd SyncArtifactMetadataCmd) (*CommitResult, error) {
 	if cmd.PageCount != nil && *cmd.PageCount <= 0 {
 		return nil, domain.ErrInvalidPageCount
@@ -742,6 +823,9 @@ func (s *Service) SyncArtifactMetadata(ctx context.Context, cmd SyncArtifactMeta
 	)
 }
 
+// AcquireSession acquires (or reports as already-taken) an editor session on
+// docID for userID, after confirming userID may write the document's working
+// content.
 func (s *Service) AcquireSession(ctx context.Context, tenantID, docID, userID string) (*domain.Session, bool, error) {
 	doc, err := s.repo.GetDocument(ctx, tenantID, docID)
 	if err != nil {
@@ -765,6 +849,8 @@ func (s *Service) AcquireSession(ctx context.Context, tenantID, docID, userID st
 	return sess, false, nil
 }
 
+// HeartbeatSession refreshes sessionID's liveness for userID, resolving the
+// tenant from ctx.
 func (s *Service) HeartbeatSession(ctx context.Context, sessionID, userID string) error {
 	tenantID, err := tenant.FromContext(ctx)
 	if err != nil {
@@ -773,6 +859,8 @@ func (s *Service) HeartbeatSession(ctx context.Context, sessionID, userID string
 	return s.repo.HeartbeatSession(ctx, tenantID, sessionID, userID)
 }
 
+// ReleaseSession releases sessionID and records a session.released audit
+// entry.
 func (s *Service) ReleaseSession(ctx context.Context, tenantID, sessionID, userID, docID string) error {
 	if err := s.repo.ReleaseSession(ctx, tenantID, sessionID, userID); err != nil {
 		return err
@@ -781,6 +869,8 @@ func (s *Service) ReleaseSession(ctx context.Context, tenantID, sessionID, userI
 	return nil
 }
 
+// ForceReleaseSession forcibly releases sessionID as adminID and records a
+// session.force_released audit entry in the same transaction.
 func (s *Service) ForceReleaseSession(ctx context.Context, tenantID, adminID, sessionID, docID string) error {
 	return s.runner.Do(ctx, func(tx *sql.Tx) error {
 		if err := s.repo.ForceReleaseSessionTx(ctx, tx, tenantID, adminID, sessionID); err != nil {
@@ -793,6 +883,8 @@ func (s *Service) ForceReleaseSession(ctx context.Context, tenantID, adminID, se
 	})
 }
 
+// CreateCheckpoint creates a labeled checkpoint of docID's current revision
+// and records a document.checkpoint_created audit entry.
 func (s *Service) CreateCheckpoint(ctx context.Context, tenantID, docID, actorID, label string) (*domain.Checkpoint, error) {
 	cp, err := s.repo.CreateCheckpoint(ctx, tenantID, docID, actorID, label)
 	if err != nil {
@@ -802,6 +894,8 @@ func (s *Service) CreateCheckpoint(ctx context.Context, tenantID, docID, actorID
 	return cp, nil
 }
 
+// ListCheckpoints lists docID's checkpoints, after asserting actorID holds
+// document.view (tenant-grade).
 func (s *Service) ListCheckpoints(ctx context.Context, tenantID, actorID, docID string) ([]domain.Checkpoint, error) {
 	// Gate: document.view is tenant-grade (ADR 0022 Phase 8); mirrors RequireDocumentView.
 	// RW tx: F8 bypass audit may INSERT.
@@ -814,10 +908,13 @@ func (s *Service) ListCheckpoints(ctx context.Context, tenantID, actorID, docID 
 	return s.repo.ListCheckpoints(ctx, tenantID, docID)
 }
 
+// ListRevisionHistory lists docID's revision history.
 func (s *Service) ListRevisionHistory(ctx context.Context, tenantID, docID string) ([]domain.RevisionHistoryItem, error) {
 	return s.repo.ListRevisionHistory(ctx, tenantID, docID)
 }
 
+// RestoreCheckpoint restores docID to the checkpoint at versionNum as a new
+// revision, and records a document.checkpoint_restored audit entry.
 func (s *Service) RestoreCheckpoint(ctx context.Context, tenantID, docID, actorID string, versionNum int) (*RestoreResult, error) {
 	res, err := s.repo.RestoreCheckpoint(ctx, tenantID, docID, actorID, versionNum)
 	if err != nil {
@@ -833,6 +930,8 @@ func (s *Service) RestoreCheckpoint(ctx context.Context, tenantID, docID, actorI
 	return res, nil
 }
 
+// Archive marks docID archived and records a document.archived audit entry
+// in the same transaction.
 func (s *Service) Archive(ctx context.Context, tenantID, docID, actorID string) error {
 	return s.runner.Do(ctx, func(tx *sql.Tx) error {
 		if err := s.repo.MarkArchivedTx(ctx, tx, tenantID, docID, actorID); err != nil {
@@ -845,6 +944,7 @@ func (s *Service) Archive(ctx context.Context, tenantID, docID, actorID string) 
 	})
 }
 
+// SignedRevisionURL presigns a short-lived GET URL for revID's stored object.
 func (s *Service) SignedRevisionURL(ctx context.Context, tenantID, docID, revID string) (string, error) {
 	rev, err := s.repo.GetRevision(ctx, tenantID, docID, revID)
 	if err != nil {

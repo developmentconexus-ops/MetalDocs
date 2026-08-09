@@ -124,34 +124,9 @@ func (h *MembershipHandler) listMemberships(w http.ResponseWriter, r *http.Reque
 	//     memberships only in their managed areas, filtered IN SQL (R3).
 	//   - self-only    → every other role: own memberships regardless of the
 	//     userId filter they pass.
-	actor, ok := authn.UserIDFromContext(r.Context())
-	actor = strings.TrimSpace(actor)
-	if !ok || actor == "" {
-		h.writeProblem(w, problem.New(http.StatusForbidden, problem.CodePermissionDenied, "Insufficient permissions"))
+	userID, tenantWide, hasManagedAreas, actor, ok := h.resolveMembershipsListScope(w, r, tenantID, userID)
+	if !ok {
 		return
-	}
-	tenantWide, hasManagedAreas, err := h.svc.DirectoryScope(r.Context(), tenantID, actor, string(iamdomain.CapMembershipManage))
-	if err != nil {
-		slog.Error("iam memberships: resolve directory scope failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to list memberships"))
-		return
-	}
-
-	if !tenantWide && !hasManagedAreas {
-		// Self-only: ignore any userId filter that isn't the actor (no probing).
-		if userID != "" && !strings.EqualFold(userID, actor) {
-			h.writeProblem(w, problem.New(http.StatusForbidden, problem.CodePermissionDenied, "Insufficient permissions"))
-			return
-		}
-		userID = actor
-	}
-
-	// When a specific target user is in scope, preserve the cross-tenant 404
-	// guard (an attacker must not distinguish "exists elsewhere" from "absent").
-	if userID != "" {
-		if !h.guardMembershipUserInTenant(w, r, tenantID, userID) {
-			return
-		}
 	}
 
 	var items []iamdomain.UserProcessArea
@@ -172,6 +147,46 @@ func (h *MembershipHandler) listMemberships(w http.ResponseWriter, r *http.Reque
 		dtos = append(dtos, toMembershipDTO(m))
 	}
 	writeJSON(w, http.StatusOK, listMembershipsResponse{Items: dtos})
+}
+
+// resolveMembershipsListScope resolves the requesting actor's directory
+// scope for listMemberships, applies the self-only userID restriction when
+// the actor holds neither tenant-wide nor managed-area visibility, and
+// enforces the cross-tenant existence guard when a specific target user is
+// in scope. On failure it writes the problem+json response itself and
+// returns ok=false; callers must return immediately without writing again.
+func (h *MembershipHandler) resolveMembershipsListScope(w http.ResponseWriter, r *http.Request, tenantID, userID string) (resolvedUserID string, tenantWide, hasManagedAreas bool, actor string, ok bool) {
+	actor, hasActor := authn.UserIDFromContext(r.Context())
+	actor = strings.TrimSpace(actor)
+	if !hasActor || actor == "" {
+		h.writeProblem(w, problem.New(http.StatusForbidden, problem.CodePermissionDenied, "Insufficient permissions"))
+		return "", false, false, actor, false
+	}
+	tenantWide, hasManagedAreas, err := h.svc.DirectoryScope(r.Context(), tenantID, actor, string(iamdomain.CapMembershipManage))
+	if err != nil {
+		slog.Error("iam memberships: resolve directory scope failed", "err", err)
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to list memberships"))
+		return "", false, false, actor, false
+	}
+
+	if !tenantWide && !hasManagedAreas {
+		// Self-only: ignore any userId filter that isn't the actor (no probing).
+		if userID != "" && !strings.EqualFold(userID, actor) {
+			h.writeProblem(w, problem.New(http.StatusForbidden, problem.CodePermissionDenied, "Insufficient permissions"))
+			return "", false, false, actor, false
+		}
+		userID = actor
+	}
+
+	// When a specific target user is in scope, preserve the cross-tenant 404
+	// guard (an attacker must not distinguish "exists elsewhere" from "absent").
+	if userID != "" {
+		if !h.guardMembershipUserInTenant(w, r, tenantID, userID) {
+			return "", false, false, actor, false
+		}
+	}
+
+	return userID, tenantWide, hasManagedAreas, actor, true
 }
 
 // grantMembership — operationId grantAreaMembership.

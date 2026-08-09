@@ -5,6 +5,8 @@ import (
 	"errors"
 )
 
+// ErrSnapshotTemplateNotFound is returned when the template version a
+// document's snapshot should be resolved from cannot be found.
 var ErrSnapshotTemplateNotFound = errors.New("snapshot_template_not_found")
 
 // TemplateSnapshot holds the template artifacts copied onto a document at create time.

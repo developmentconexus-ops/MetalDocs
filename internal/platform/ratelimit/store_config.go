@@ -16,6 +16,7 @@ const (
 	EnvMultiReplica           = "METALDOCS_MULTI_REPLICA"
 )
 
+// Store backend values for StoreConfig.Backend.
 const (
 	StoreBackendMemory = "memory"
 	StoreBackendRedis  = "redis"

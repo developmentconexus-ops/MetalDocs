@@ -14,8 +14,11 @@ import (
 	"metaldocs/internal/platform/db"
 )
 
+// PostgresRepository is the Postgres-backed implementation of
+// domain.Repository for the tokens module.
 type PostgresRepository struct{}
 
+// NewPostgresRepository constructs a PostgresRepository.
 func NewPostgresRepository() *PostgresRepository { return &PostgresRepository{} }
 
 var _ domain.Repository = (*PostgresRepository)(nil)
@@ -124,7 +127,7 @@ func (r *PostgresRepository) List(ctx context.Context, tx db.Tx, tenantID string
 	if err != nil {
 		return nil, fmt.Errorf("tokens: list entries: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []domain.Entry
 	for rows.Next() {
 		e, err := scanEntry(rows)

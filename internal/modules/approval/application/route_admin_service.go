@@ -313,68 +313,13 @@ func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in
 			return err
 		}
 
-		route := domain.Route{
-			TenantID:    in.TenantID,
-			ProfileCode: in.ProfileCode,
-			Subject:     subject,
-			Version:     1,
-			Stages:      in.Stages,
-		}
-		if err := route.Validate(policy); err != nil {
+		routeID, err := s.insertRouteTx(ctx, tx, in, subject, policy)
+		if err != nil {
 			return err
 		}
 
-		var routeID string
-		err = tx.QueryRowContext(ctx, `
-			INSERT INTO approval_routes
-				(tenant_id, profile_code, name, version, created_by, active, subject_kind, subject_key)
-			VALUES ($1, $2, $3, 1, $4, TRUE, $5, $6)
-			RETURNING id`,
-			in.TenantID, in.ProfileCode, in.Name, in.ActorUserID,
-			string(route.Subject.Kind), route.Subject.Key,
-		).Scan(&routeID)
-		if err != nil {
-			mapped := infrastructure.MapPgError(err, infrastructure.MapHints{})
-			// Only a 23503 violation of the profile FK means the profile is not
-			// registered for the tenant — map that to a validation error. Any other
-			// FK violation falls through to a wrapped error so WriteError logs it at 500.
-			if errors.Is(mapped, infrastructure.ErrFKViolation) {
-				var pgErr *pgconn.PgError
-				if errors.As(err, &pgErr) && pgErr.ConstraintName == routeProfileFKConstraint {
-					return ErrRouteProfileUnknown
-				}
-			}
-			return fmt.Errorf("insert route: %w", mapped)
-		}
-
-		if err := insertRouteStages(ctx, tx, in.TenantID, routeID, in.Stages); err != nil {
+		if err := s.emitRouteCreatedEvent(ctx, tx, in, subject, routeID); err != nil {
 			return err
-		}
-
-		// profile_code is always present now (ADR 0086): every route, both
-		// kinds, is keyed by a profile. subject_kind/subject_key carry the
-		// canonical resolved values, not the raw possibly-defaulted input.
-		payload, err := json.Marshal(map[string]any{
-			"route_id":      routeID,
-			"profile_code":  in.ProfileCode,
-			"subject_kind":  string(subject.Kind),
-			"subject_key":   subject.Key,
-			"stage_count":   len(in.Stages),
-			"initial_state": "active",
-		})
-		if err != nil {
-			return fmt.Errorf("marshal event payload: %w", err)
-		}
-		if err := s.emitter.Emit(ctx, tx, GovernanceEvent{
-			TenantID:     in.TenantID,
-			EventType:    EventTypeRouteConfigCreated,
-			ActorUserID:  in.ActorUserID,
-			ResourceType: "approval_route",
-			ResourceID:   routeID,
-			PayloadJSON:  payload,
-			OccurredAt:   s.clock.Now(),
-		}); err != nil {
-			return fmt.Errorf("emit event: %w", err)
 		}
 
 		// F-E4-2: build the response from the PERSISTED row + stages, read back
@@ -393,6 +338,82 @@ func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in
 		return CreateRouteResult{}, err
 	}
 	return result, nil
+}
+
+// insertRouteTx validates the route against the resolved profile policy and
+// persists it plus its stages, returning the new route id. A violation of
+// the profile FK is mapped to the actionable ErrRouteProfileUnknown; any
+// other FK violation falls through to a wrapped error so WriteError logs it
+// at 500.
+func (s *RouteAdminService) insertRouteTx(ctx context.Context, tx *sql.Tx, in CreateRouteInput, subject domain.Subject, policy taxonomydomain.RoutePolicy) (string, error) {
+	route := domain.Route{
+		TenantID:    in.TenantID,
+		ProfileCode: in.ProfileCode,
+		Subject:     subject,
+		Version:     1,
+		Stages:      in.Stages,
+	}
+	if err := route.Validate(policy); err != nil {
+		return "", err
+	}
+
+	var routeID string
+	err := tx.QueryRowContext(ctx, `
+		INSERT INTO approval_routes
+			(tenant_id, profile_code, name, version, created_by, active, subject_kind, subject_key)
+		VALUES ($1, $2, $3, 1, $4, TRUE, $5, $6)
+		RETURNING id`,
+		in.TenantID, in.ProfileCode, in.Name, in.ActorUserID,
+		string(route.Subject.Kind), route.Subject.Key,
+	).Scan(&routeID)
+	if err != nil {
+		mapped := infrastructure.MapPgError(err, infrastructure.MapHints{})
+		// Only a 23503 violation of the profile FK means the profile is not
+		// registered for the tenant — map that to a validation error. Any other
+		// FK violation falls through to a wrapped error so WriteError logs it at 500.
+		if errors.Is(mapped, infrastructure.ErrFKViolation) {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.ConstraintName == routeProfileFKConstraint {
+				return "", ErrRouteProfileUnknown
+			}
+		}
+		return "", fmt.Errorf("insert route: %w", mapped)
+	}
+
+	if err := insertRouteStages(ctx, tx, in.TenantID, routeID, in.Stages); err != nil {
+		return "", err
+	}
+	return routeID, nil
+}
+
+// emitRouteCreatedEvent emits the route.config.created governance event.
+// profile_code is always present now (ADR 0086): every route, both kinds, is
+// keyed by a profile. subject_kind/subject_key carry the canonical resolved
+// values, not the raw possibly-defaulted input.
+func (s *RouteAdminService) emitRouteCreatedEvent(ctx context.Context, tx *sql.Tx, in CreateRouteInput, subject domain.Subject, routeID string) error {
+	payload, err := json.Marshal(map[string]any{
+		"route_id":      routeID,
+		"profile_code":  in.ProfileCode,
+		"subject_kind":  string(subject.Kind),
+		"subject_key":   subject.Key,
+		"stage_count":   len(in.Stages),
+		"initial_state": "active",
+	})
+	if err != nil {
+		return fmt.Errorf("marshal event payload: %w", err)
+	}
+	if err := s.emitter.Emit(ctx, tx, GovernanceEvent{
+		TenantID:     in.TenantID,
+		EventType:    EventTypeRouteConfigCreated,
+		ActorUserID:  in.ActorUserID,
+		ResourceType: "approval_route",
+		ResourceID:   routeID,
+		PayloadJSON:  payload,
+		OccurredAt:   s.clock.Now(),
+	}); err != nil {
+		return fmt.Errorf("emit event: %w", err)
+	}
+	return nil
 }
 
 // loadRouteProjection reads a route's persisted projection in its own short
@@ -737,31 +758,13 @@ func (s *RouteAdminService) Deactivate(ctx context.Context, runner db.TxRunner, 
 	}
 
 	if reason == "" {
-		if committer != nil {
-			if ferr := committer.Fail(ErrRouteDeactivateReasonRequired); ferr != nil {
-				slog.ErrorContext(ctx, "route_admin: committer.Fail failed; idempotency slot may be orphaned",
-					"op", op,
-					"key", in.IdempotencyKey,
-					"primary_err", ErrRouteDeactivateReasonRequired,
-					"fail_err", ferr,
-				)
-			}
-		}
+		s.failRouteAdminReplay(ctx, committer, op, in.IdempotencyKey, ErrRouteDeactivateReasonRequired)
 		return DeactivateRouteResult{}, ErrRouteDeactivateReasonRequired
 	}
 
 	result, err := s.deactivateTx(ctx, runner, in)
 	if err != nil {
-		if committer != nil {
-			if ferr := committer.Fail(err); ferr != nil {
-				slog.ErrorContext(ctx, "route_admin: committer.Fail failed; idempotency slot may be orphaned",
-					"op", op,
-					"key", in.IdempotencyKey,
-					"primary_err", err,
-					"fail_err", ferr,
-				)
-			}
-		}
+		s.failRouteAdminReplay(ctx, committer, op, in.IdempotencyKey, err)
 		return DeactivateRouteResult{}, wrapRouteAdminErr(op, err)
 	}
 	if committer != nil {
@@ -772,78 +775,123 @@ func (s *RouteAdminService) Deactivate(ctx context.Context, runner db.TxRunner, 
 	return result, nil
 }
 
+// failRouteAdminReplay tells the idempotency store that this attempt failed,
+// so a retry with the same key is not permanently blocked by an orphaned
+// in-flight slot. A failure to record the failure itself is logged (not
+// returned) — the primary error is what the caller must still surface.
+func (s *RouteAdminService) failRouteAdminReplay(ctx context.Context, committer RouteAdminReplayCommitter, op, key string, primaryErr error) {
+	if committer == nil {
+		return
+	}
+	if ferr := committer.Fail(primaryErr); ferr != nil {
+		slog.ErrorContext(ctx, "route_admin: committer.Fail failed; idempotency slot may be orphaned",
+			"op", op,
+			"key", key,
+			"primary_err", primaryErr,
+			"fail_err", ferr,
+		)
+	}
+}
+
 func (s *RouteAdminService) deactivateTx(ctx context.Context, runner db.TxRunner, in DeactivateRouteInput) (DeactivateRouteResult, error) {
 	var result DeactivateRouteResult
 	err := runner.Do(ctx, func(tx *sql.Tx) error {
-		ctx := authz.WithCapCache(ctx)
-
-		if err := authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant"); err != nil {
-			return err
-		}
-
-		lockedRoute, err := lockRouteForUpdate(ctx, tx, in.TenantID, in.RouteID)
+		res, err := s.deactivateRouteTx(ctx, tx, in)
 		if err != nil {
 			return err
 		}
-		if !lockedRoute.Active {
-			if in.ExpectedVersion > 0 && lockedRoute.Version != in.ExpectedVersion {
-				return infrastructure.ErrStaleRevision
-			}
-			return ErrRouteAlreadyInactive
-		}
-
-		res, err := tx.ExecContext(ctx, `
-			UPDATE approval_routes
-			   SET active = FALSE,
-			       version = version + 1
-			 WHERE id = $1
-			   AND tenant_id = $2
-			   AND active = TRUE
-			   AND ($3 = 0 OR version = $3)`,
-			in.RouteID, in.TenantID, in.ExpectedVersion,
-		)
-		if err != nil {
-			mapped := infrastructure.MapPgError(err, infrastructure.MapHints{})
-			if errors.Is(mapped, infrastructure.ErrRouteInUse) {
-				return mapped
-			}
-			return fmt.Errorf("deactivate route: %w", mapped)
-		}
-		rows, err := res.RowsAffected()
-		if err != nil {
-			return fmt.Errorf("deactivate route rows affected: %w", err)
-		}
-		if rows == 0 {
-			return infrastructure.ErrStaleRevision
-		}
-
-		payload, err := json.Marshal(map[string]any{
-			"route_id": in.RouteID,
-			"active":   false,
-			"reason":   in.Reason,
-		})
-		if err != nil {
-			return fmt.Errorf("marshal event payload: %w", err)
-		}
-		if err := s.emitter.Emit(ctx, tx, GovernanceEvent{
-			TenantID:     in.TenantID,
-			EventType:    EventTypeRouteConfigDeactivated,
-			ActorUserID:  in.ActorUserID,
-			ResourceType: "approval_route",
-			ResourceID:   in.RouteID,
-			PayloadJSON:  payload,
-			OccurredAt:   s.clock.Now(),
-		}); err != nil {
-			return fmt.Errorf("emit event: %w", err)
-		}
-
-		result = DeactivateRouteResult{RouteID: in.RouteID}
+		result = res
 		return nil
 	})
 	if err != nil {
 		return DeactivateRouteResult{}, err
 	}
 	return result, nil
+}
+
+// deactivateRouteTx is the tx-scoped core of Deactivate: authz, the
+// legality guard (already-inactive / stale), the OCC UPDATE, and the
+// governance event.
+func (s *RouteAdminService) deactivateRouteTx(ctx context.Context, tx *sql.Tx, in DeactivateRouteInput) (DeactivateRouteResult, error) {
+	ctx = authz.WithCapCache(ctx)
+
+	if err := authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant"); err != nil {
+		return DeactivateRouteResult{}, err
+	}
+
+	lockedRoute, err := lockRouteForUpdate(ctx, tx, in.TenantID, in.RouteID)
+	if err != nil {
+		return DeactivateRouteResult{}, err
+	}
+	if !lockedRoute.Active {
+		if in.ExpectedVersion > 0 && lockedRoute.Version != in.ExpectedVersion {
+			return DeactivateRouteResult{}, infrastructure.ErrStaleRevision
+		}
+		return DeactivateRouteResult{}, ErrRouteAlreadyInactive
+	}
+
+	if err := applyDeactivateUpdate(ctx, tx, in); err != nil {
+		return DeactivateRouteResult{}, err
+	}
+
+	if err := s.emitDeactivateEvent(ctx, tx, in); err != nil {
+		return DeactivateRouteResult{}, err
+	}
+
+	return DeactivateRouteResult{RouteID: in.RouteID}, nil
+}
+
+// applyDeactivateUpdate runs the OCC UPDATE flipping the route inactive.
+func applyDeactivateUpdate(ctx context.Context, tx *sql.Tx, in DeactivateRouteInput) error {
+	res, err := tx.ExecContext(ctx, `
+		UPDATE approval_routes
+		   SET active = FALSE,
+		       version = version + 1
+		 WHERE id = $1
+		   AND tenant_id = $2
+		   AND active = TRUE
+		   AND ($3 = 0 OR version = $3)`,
+		in.RouteID, in.TenantID, in.ExpectedVersion,
+	)
+	if err != nil {
+		mapped := infrastructure.MapPgError(err, infrastructure.MapHints{})
+		if errors.Is(mapped, infrastructure.ErrRouteInUse) {
+			return mapped
+		}
+		return fmt.Errorf("deactivate route: %w", mapped)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("deactivate route rows affected: %w", err)
+	}
+	if rows == 0 {
+		return infrastructure.ErrStaleRevision
+	}
+	return nil
+}
+
+// emitDeactivateEvent emits the route.config.deactivated governance event.
+func (s *RouteAdminService) emitDeactivateEvent(ctx context.Context, tx *sql.Tx, in DeactivateRouteInput) error {
+	payload, err := json.Marshal(map[string]any{
+		"route_id": in.RouteID,
+		"active":   false,
+		"reason":   in.Reason,
+	})
+	if err != nil {
+		return fmt.Errorf("marshal event payload: %w", err)
+	}
+	if err := s.emitter.Emit(ctx, tx, GovernanceEvent{
+		TenantID:     in.TenantID,
+		EventType:    EventTypeRouteConfigDeactivated,
+		ActorUserID:  in.ActorUserID,
+		ResourceType: "approval_route",
+		ResourceID:   in.RouteID,
+		PayloadJSON:  payload,
+		OccurredAt:   s.clock.Now(),
+	}); err != nil {
+		return fmt.Errorf("emit event: %w", err)
+	}
+	return nil
 }
 
 // List loads tenant-scoped routes inside a single transaction that owns the
@@ -1073,6 +1121,29 @@ func insertRouteStageSelectors(ctx context.Context, tx *sql.Tx, tenantID, routeI
 }
 
 func loadRouteStagesTx(ctx context.Context, tx *sql.Tx, routeID string) ([]domain.Stage, error) {
+	out, stageIDs, err := scanRouteStagesTx(ctx, tx, routeID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Selectors is the sole source of truth (slice 6b); load them here too so
+	// stagesEqual's DeepEqual comparison against in.Stages (whose Selectors is
+	// always populated by the HTTP boundary synthesis) is meaningful rather
+	// than spuriously "changed" on every update.
+	if len(stageIDs) > 0 {
+		if err := attachRouteStageSelectors(ctx, tx, out, stageIDs); err != nil {
+			return nil, err
+		}
+	}
+
+	return out, nil
+}
+
+// scanRouteStagesTx reads the approval_route_stages rows for routeID,
+// returning the decoded stages in stage_order and, positionally
+// corresponding, their DB stage ids (needed by attachRouteStageSelectors to
+// correlate selector rows back onto out[i]).
+func scanRouteStagesTx(ctx context.Context, tx *sql.Tx, routeID string) ([]domain.Stage, []string, error) {
 	rows, err := tx.QueryContext(ctx, `
 		SELECT id, stage_order, name, required_capability, quorum, quorum_m, on_eligibility_drift, stage_kind, due_in_days
 		  FROM approval_route_stages
@@ -1081,9 +1152,9 @@ func loadRouteStagesTx(ctx context.Context, tx *sql.Tx, routeID string) ([]domai
 		routeID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("route_admin: load stages: %w", infrastructure.MapPgError(err, infrastructure.MapHints{}))
+		return nil, nil, fmt.Errorf("route_admin: load stages: %w", infrastructure.MapPgError(err, infrastructure.MapHints{}))
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []domain.Stage
 	var stageIDs []string
@@ -1096,7 +1167,7 @@ func loadRouteStagesTx(ctx context.Context, tx *sql.Tx, routeID string) ([]domai
 			dueInDays sql.NullInt64
 		)
 		if err := rows.Scan(&stageID, &st.Order, &st.Name, &st.RequiredCapability, &st.Quorum, &quorumM, &st.OnEligibilityDrift, &kindStr, &dueInDays); err != nil {
-			return nil, fmt.Errorf("route_admin: scan stage: %w", err)
+			return nil, nil, fmt.Errorf("route_admin: scan stage: %w", err)
 		}
 		if quorumM.Valid {
 			m := int(quorumM.Int64)
@@ -1111,54 +1182,53 @@ func loadRouteStagesTx(ctx context.Context, tx *sql.Tx, routeID string) ([]domai
 		stageIDs = append(stageIDs, stageID)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("route_admin: iterate stages: %w", err)
+		return nil, nil, fmt.Errorf("route_admin: iterate stages: %w", err)
 	}
+	return out, stageIDs, nil
+}
 
-	// Selectors is the sole source of truth (slice 6b); load them here too so
-	// stagesEqual's DeepEqual comparison against in.Stages (whose Selectors is
-	// always populated by the HTTP boundary synthesis) is meaningful rather
-	// than spuriously "changed" on every update.
-	if len(stageIDs) > 0 {
-		selRows, err := tx.QueryContext(ctx, `
-			SELECT route_stage_id, kind, user_id, role, area_code
-			  FROM approval_route_stage_selectors
-			 WHERE route_stage_id = ANY($1)
-			 ORDER BY route_stage_id, selector_order ASC`,
-			pq.Array(stageIDs),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("route_admin: load stage selectors: %w", infrastructure.MapPgError(err, infrastructure.MapHints{}))
-		}
-		defer selRows.Close()
-
-		selectorsByStageID := make(map[string][]domain.ActorSelector, len(stageIDs))
-		for selRows.Next() {
-			var stageID, kind string
-			var userID, role, areaCode sql.NullString
-			if err := selRows.Scan(&stageID, &kind, &userID, &role, &areaCode); err != nil {
-				return nil, fmt.Errorf("route_admin: scan stage selector: %w", err)
-			}
-			sel := domain.ActorSelector{Kind: domain.SelectorKind(kind)}
-			if userID.Valid {
-				sel.UserID = userID.String
-			}
-			if role.Valid {
-				sel.Role = role.String
-			}
-			if areaCode.Valid {
-				sel.AreaCode = areaCode.String
-			}
-			selectorsByStageID[stageID] = append(selectorsByStageID[stageID], sel)
-		}
-		if err := selRows.Err(); err != nil {
-			return nil, fmt.Errorf("route_admin: iterate stage selectors: %w", err)
-		}
-		for i, stageID := range stageIDs {
-			out[i].Selectors = selectorsByStageID[stageID]
-		}
+// attachRouteStageSelectors loads the approval_route_stage_selectors rows for
+// stageIDs and stamps out[i].Selectors, relying on out and stageIDs being
+// positionally aligned (both produced together by scanRouteStagesTx).
+func attachRouteStageSelectors(ctx context.Context, tx *sql.Tx, out []domain.Stage, stageIDs []string) error {
+	selRows, err := tx.QueryContext(ctx, `
+		SELECT route_stage_id, kind, user_id, role, area_code
+		  FROM approval_route_stage_selectors
+		 WHERE route_stage_id = ANY($1)
+		 ORDER BY route_stage_id, selector_order ASC`,
+		pq.Array(stageIDs),
+	)
+	if err != nil {
+		return fmt.Errorf("route_admin: load stage selectors: %w", infrastructure.MapPgError(err, infrastructure.MapHints{}))
 	}
+	defer func() { _ = selRows.Close() }()
 
-	return out, nil
+	selectorsByStageID := make(map[string][]domain.ActorSelector, len(stageIDs))
+	for selRows.Next() {
+		var stageID, kind string
+		var userID, role, areaCode sql.NullString
+		if err := selRows.Scan(&stageID, &kind, &userID, &role, &areaCode); err != nil {
+			return fmt.Errorf("route_admin: scan stage selector: %w", err)
+		}
+		sel := domain.ActorSelector{Kind: domain.SelectorKind(kind)}
+		if userID.Valid {
+			sel.UserID = userID.String
+		}
+		if role.Valid {
+			sel.Role = role.String
+		}
+		if areaCode.Valid {
+			sel.AreaCode = areaCode.String
+		}
+		selectorsByStageID[stageID] = append(selectorsByStageID[stageID], sel)
+	}
+	if err := selRows.Err(); err != nil {
+		return fmt.Errorf("route_admin: iterate stage selectors: %w", err)
+	}
+	for i, stageID := range stageIDs {
+		out[i].Selectors = selectorsByStageID[stageID]
+	}
+	return nil
 }
 
 // stagesEqual compares stage sets for the update-diff decision. Kind is

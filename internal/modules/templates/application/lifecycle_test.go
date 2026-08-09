@@ -70,7 +70,7 @@ func TestArchiveTemplate_UsesTemplateArchiveCapability(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := newFakeRepo()
 	template := &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}

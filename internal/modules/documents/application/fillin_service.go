@@ -17,6 +17,8 @@ import (
 	"metaldocs/internal/platform/db"
 )
 
+// SchemaReader loads the placeholder schema a document's fill-in values are
+// validated against.
 type SchemaReader interface {
 	// LoadPlaceholderSchema loads the placeholder schema snapshot for a document.
 	// docID is a documents.id (the snapshot lives on the documents row); the param
@@ -26,12 +28,18 @@ type SchemaReader interface {
 	LoadPlaceholderSchema(ctx context.Context, tenantID, docID string) ([]templatesdomain.Placeholder, error)
 }
 
+// FillInWriter persists placeholder value writes and reads back a
+// placeholder's current value source, used to enforce the author-editable
+// governance rule (SP-2 D11).
 type FillInWriter interface {
 	UpsertValue(ctx context.Context, v infrastructure.PlaceholderValue, q ...infrastructure.DBTX) error
 	UpsertAuthorValue(ctx context.Context, v infrastructure.PlaceholderValue, q ...infrastructure.DBTX) (int64, error)
 	CurrentSource(ctx context.Context, tenantID, revisionID, placeholderID string) (string, bool, error)
 }
 
+// FillInService validates and writes author-supplied placeholder values for a
+// document revision, enforcing document.edit authz and the author-editable
+// governance rule that rejects writes to computed/dictionary-sourced rows.
 type FillInService struct {
 	runner        db.TxRunner
 	schemas       SchemaReader
@@ -64,14 +72,19 @@ func (s *FillInService) WithIAMReader(r IAMUserOptionsReader) *FillInService {
 	return s
 }
 
+// SnapshotSchemaReader implements SchemaReader by reading the placeholder
+// schema frozen onto a document's placeholder_schema_snapshot column.
 type SnapshotSchemaReader struct {
 	db *sql.DB
 }
 
+// NewSnapshotSchemaReader constructs a SnapshotSchemaReader over db.
 func NewSnapshotSchemaReader(db *sql.DB) *SnapshotSchemaReader {
 	return &SnapshotSchemaReader{db: db}
 }
 
+// LoadPlaceholderSchema implements SchemaReader by reading and parsing the
+// document's placeholder_schema_snapshot column.
 func (r *SnapshotSchemaReader) LoadPlaceholderSchema(ctx context.Context, tenantID, docID string) ([]templatesdomain.Placeholder, error) {
 	var raw []byte
 	if err := r.db.QueryRowContext(ctx, `
@@ -109,6 +122,9 @@ func parsePlaceholderSchema(raw []byte) ([]templatesdomain.Placeholder, error) {
 	return wrapped.Placeholders, nil
 }
 
+// SetPlaceholderValue validates raw against placeholderID's schema and writes
+// it as an author value on revisionID, after enforcing document.edit authz and
+// rejecting writes to governed (computed/dictionary-sourced) rows.
 func (s *FillInService) SetPlaceholderValue(ctx context.Context, tenantID, actorID, revisionID, placeholderID, raw string) error {
 	if err := requireDocEditDraft(ctx, s.runner, s.cdRead, tenantID, actorID, revisionID); err != nil {
 		return err
@@ -171,6 +187,32 @@ func findPlaceholder(phs []templatesdomain.Placeholder, id string) (templatesdom
 }
 
 func validateValue(ctx context.Context, tenantID string, p templatesdomain.Placeholder, raw string, iam IAMUserOptionsReader) error {
+	if err := validateCommonConstraints(p, raw); err != nil {
+		return err
+	}
+
+	switch p.Type {
+	case templatesdomain.PHNumber:
+		return validateNumberValue(p, raw)
+	case templatesdomain.PHDate:
+		return validateDateValue(p, raw)
+	case templatesdomain.PHSelect:
+		return validateSelectValue(p, raw)
+	case templatesdomain.PHUser:
+		return validateUserValue(ctx, tenantID, p, raw, iam)
+	case templatesdomain.PHText, templatesdomain.PHPicture, templatesdomain.PHComputed, templatesdomain.PHDictionary:
+		// No additional type-specific validation: required/max_length/regex are
+		// already enforced above. PHComputed/PHDictionary values can never reach
+		// an actual write as author content — SetPlaceholderValue's CurrentSource
+		// governance check rejects governed rows before the DB write runs.
+	}
+
+	return nil
+}
+
+// validateCommonConstraints enforces the type-independent constraints every
+// placeholder value is subject to: required, max_length, and regex.
+func validateCommonConstraints(p templatesdomain.Placeholder, raw string) error {
 	if p.Required && raw == "" {
 		return fmt.Errorf("%w: %s required", v2domain.ErrValidationFailed, p.ID)
 	}
@@ -186,57 +228,71 @@ func validateValue(ctx context.Context, tenantID string, p templatesdomain.Place
 			return fmt.Errorf("%w: %s regex mismatch", v2domain.ErrValidationFailed, p.ID)
 		}
 	}
-
-	switch p.Type {
-	case templatesdomain.PHNumber:
-		n, err := strconv.ParseFloat(raw, 64)
-		if err != nil {
-			return fmt.Errorf("%w: %s not a number", v2domain.ErrValidationFailed, p.ID)
-		}
-		if p.MinNumber != nil && n < *p.MinNumber {
-			return fmt.Errorf("%w: %s < min_number", v2domain.ErrValidationFailed, p.ID)
-		}
-		if p.MaxNumber != nil && n > *p.MaxNumber {
-			return fmt.Errorf("%w: %s > max_number", v2domain.ErrValidationFailed, p.ID)
-		}
-	case templatesdomain.PHDate:
-		if _, err := time.Parse("2006-01-02", raw); err != nil {
-			return fmt.Errorf("%w: %s not YYYY-MM-DD", v2domain.ErrValidationFailed, p.ID)
-		}
-		if p.MinDate != nil && raw < *p.MinDate {
-			return fmt.Errorf("%w: %s < min_date", v2domain.ErrValidationFailed, p.ID)
-		}
-		if p.MaxDate != nil && raw > *p.MaxDate {
-			return fmt.Errorf("%w: %s > max_date", v2domain.ErrValidationFailed, p.ID)
-		}
-	case templatesdomain.PHSelect:
-		for _, opt := range p.Options {
-			if opt == raw {
-				return nil
-			}
-		}
-		return fmt.Errorf("%w: %s not in options", v2domain.ErrValidationFailed, p.ID)
-	case templatesdomain.PHUser:
-		if iam == nil {
-			// Fail-closed: an unconfigured IAM reader must never silently accept any
-			// value. Production wiring MUST call WithIAMReader (module.go); a missing
-			// reader is a misconfiguration, not a permissive default (mirrors the
-			// nil-area → deny posture of requireDocEditDraft in fillin_authz.go).
-			return fmt.Errorf("%w: IAM reader not wired, cannot validate PHUser placeholder %q", v2domain.ErrValidationFailed, p.ID)
-		}
-		opts, err := iam.ListUserOptions(ctx, tenantID)
-		if err != nil {
-			return err
-		}
-		for _, o := range opts {
-			if o.UserID == raw {
-				return nil
-			}
-		}
-		return fmt.Errorf("%w: %s unknown user %s", v2domain.ErrValidationFailed, p.ID, raw)
-	}
-
 	return nil
+}
+
+// validateNumberValue validates a PHNumber raw value: parseable as a float,
+// within min_number/max_number when set.
+func validateNumberValue(p templatesdomain.Placeholder, raw string) error {
+	n, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return fmt.Errorf("%w: %s not a number", v2domain.ErrValidationFailed, p.ID)
+	}
+	if p.MinNumber != nil && n < *p.MinNumber {
+		return fmt.Errorf("%w: %s < min_number", v2domain.ErrValidationFailed, p.ID)
+	}
+	if p.MaxNumber != nil && n > *p.MaxNumber {
+		return fmt.Errorf("%w: %s > max_number", v2domain.ErrValidationFailed, p.ID)
+	}
+	return nil
+}
+
+// validateDateValue validates a PHDate raw value: YYYY-MM-DD, within
+// min_date/max_date when set.
+func validateDateValue(p templatesdomain.Placeholder, raw string) error {
+	if _, err := time.Parse("2006-01-02", raw); err != nil {
+		return fmt.Errorf("%w: %s not YYYY-MM-DD", v2domain.ErrValidationFailed, p.ID)
+	}
+	if p.MinDate != nil && raw < *p.MinDate {
+		return fmt.Errorf("%w: %s < min_date", v2domain.ErrValidationFailed, p.ID)
+	}
+	if p.MaxDate != nil && raw > *p.MaxDate {
+		return fmt.Errorf("%w: %s > max_date", v2domain.ErrValidationFailed, p.ID)
+	}
+	return nil
+}
+
+// validateSelectValue validates a PHSelect raw value against p.Options.
+func validateSelectValue(p templatesdomain.Placeholder, raw string) error {
+	for _, opt := range p.Options {
+		if opt == raw {
+			return nil
+		}
+	}
+	return fmt.Errorf("%w: %s not in options", v2domain.ErrValidationFailed, p.ID)
+}
+
+// validateUserValue validates a PHUser raw value against the IAM-backed
+// user option list, failing closed when iam is nil (see the fail-closed note
+// below).
+func validateUserValue(ctx context.Context, tenantID string, p templatesdomain.Placeholder, raw string, iam IAMUserOptionsReader) error {
+	if iam == nil {
+		// Fail-closed: an unconfigured IAM reader must never silently accept any
+		// value. Production wiring MUST call WithIAMReader (module.go); a missing
+		// reader is a misconfiguration, not a permissive default (mirrors the
+		// nil-area → deny posture of requireDocEditDraft in fillin_authz.go).
+		return fmt.Errorf("%w: IAM reader not wired, cannot validate PHUser placeholder %q", v2domain.ErrValidationFailed, p.ID)
+	}
+	opts, err := iam.ListUserOptions(ctx, tenantID)
+	if err != nil {
+		return err
+	}
+	for _, o := range opts {
+		if o.UserID == raw {
+			return nil
+		}
+	}
+	return fmt.Errorf("%w: %s unknown user %s", v2domain.ErrValidationFailed, p.ID, raw)
 }
 
 // FillInReader reads current fill-in values from the DB.
@@ -256,10 +312,15 @@ type TemplateVersionSchemaReader struct {
 	tplVersions templatesdomain.TemplateVersionPort
 }
 
+// NewTemplateVersionSchemaReader constructs a TemplateVersionSchemaReader
+// backed by db and the templates-owned TemplateVersionPort.
 func NewTemplateVersionSchemaReader(db *sql.DB, tplVersions templatesdomain.TemplateVersionPort) *TemplateVersionSchemaReader {
 	return &TemplateVersionSchemaReader{db: db, tplVersions: tplVersions}
 }
 
+// LoadFillInSchema resolves docID's template version on the documents table,
+// then reads that version's placeholder schema through the templates-owned
+// TemplateVersionPort.
 func (r *TemplateVersionSchemaReader) LoadFillInSchema(ctx context.Context, tenantID, docID string) ([]templatesdomain.Placeholder, error) {
 	// Resolve the document's template version on the documents-owned table.
 	var versionID string
@@ -300,6 +361,8 @@ func (s *FillInService) WithTemplateSchemaReader(r *TemplateVersionSchemaReader)
 	return s
 }
 
+// GetPlaceholderValues returns docID's current fill-in values via the wired
+// FillInReader.
 func (s *FillInService) GetPlaceholderValues(ctx context.Context, tenantID, docID string) ([]infrastructure.PlaceholderValue, error) {
 	if s.reader == nil {
 		return nil, errors.New("fill-in reader not configured")
@@ -307,6 +370,8 @@ func (s *FillInService) GetPlaceholderValues(ctx context.Context, tenantID, docI
 	return s.reader.ListValues(ctx, tenantID, docID)
 }
 
+// GetFillInSchema returns docID's fill-in placeholder schema via the wired
+// template-version schema reader.
 func (s *FillInService) GetFillInSchema(ctx context.Context, tenantID, docID string) ([]templatesdomain.Placeholder, error) {
 	if s.schemaFromTpl == nil {
 		return nil, errors.New("fill-in schema reader not configured")

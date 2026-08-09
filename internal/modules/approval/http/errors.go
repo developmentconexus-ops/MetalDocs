@@ -201,6 +201,214 @@ func (e *ValidationError) Error() string {
 	return e.msg
 }
 
+// errorMapping is one entry of approvalErrorMappings: a predicate over err
+// plus the HTTP status and problem.Code to use when it matches.
+type errorMapping struct {
+	match  func(err error) bool
+	status int
+	code   problem.Code
+}
+
+// matchIs reports errors.Is(err, target) for any target in targets — an
+// error matches the mapping if it matches ANY of them (mirrors a switch case
+// with multiple comma-separated conditions sharing one body).
+func matchIs(targets ...error) func(error) bool {
+	return func(err error) bool {
+		for _, target := range targets {
+			if errors.Is(err, target) {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+// matchAs reports errors.As(err, &target) for a fresh zero-value T — the
+// generic counterpart of a `var x T; errors.As(err, &x)` case clause.
+func matchAs[T error]() func(error) bool {
+	return func(err error) bool {
+		var target T
+		return errors.As(err, &target)
+	}
+}
+
+// approvalErrorMappings is the ordered dispatch table MapErrorToResponse
+// evaluates top to bottom, taking the status/code of the first match — the
+// flat equivalent of the switch statement this table replaced (a plain
+// outer `switch { case errors.Is(...): ... }` falls through to its default
+// only when nothing above matched, which is exactly the same "first match
+// wins across everything" semantics as one ordered list). Order matters:
+// entries are transcribed in their original evaluation order and must not be
+// reordered.
+var approvalErrorMappings = []errorMapping{
+	{matchIs(infrastructure.ErrStaleRevision), http.StatusConflict, approvalCodeConflictStaleRevision},
+	{matchIs(infrastructure.ErrNoActiveInstance), http.StatusNotFound, approvalCodeNotFoundInstance},
+	// F8, spec.md §6.3: cross-boundary = not-found. Same 404 status as
+	// ErrNoActiveInstance but a distinct problem.Code (see the constant's doc
+	// comment) so server-side logs/monitoring can distinguish the two cases
+	// without the client-visible response revealing which one fired.
+	{matchIs(infrastructure.ErrInstanceNotVisible), http.StatusNotFound, approvalCodeNotFoundInstanceNotVisible},
+	{matchIs(infrastructure.ErrDuplicateSubmission), http.StatusConflict, approvalCodeConflictDuplicate},
+	{matchIs(infrastructure.ErrActorAlreadySigned), http.StatusConflict, approvalCodeSignoffDuplicate},
+	{matchIs(infrastructure.ErrInvalidSupersedeTarget), http.StatusConflict, approvalCodeValidationSupersedeTargetInvalid},
+	{matchIs(infrastructure.ErrInstanceCompleted), http.StatusConflict, approvalCodeStateInstanceCompleted},
+	{matchIs(infrastructure.ErrRouteInUse), http.StatusConflict, approvalCodeRouteInUse},
+	{matchIs(infrastructure.ErrDuplicateRouteProfile), http.StatusConflict, approvalCodeRouteDuplicateProfile},
+	{matchIs(domain.ErrActorNotEligible), http.StatusForbidden, approvalCodeSignoffNotEligible},
+	{matchIs(domain.ErrAuthorCannotSign), http.StatusForbidden, approvalCodeSodSubmitterCannotSign},
+	{matchIs(domain.ErrActorAlreadySigned), http.StatusForbidden, approvalCodeSodCrossStageDuplicate},
+	{matchIs(v2dom.ErrEffectiveDateMissing), http.StatusUnprocessableEntity, approvalCodeFreezeEffDateMissing},
+	// F6.3 §5.3: REV>=1 submit without a structured reason is a friendly
+	// first-line validation failure — 422 (semantically valid JSON,
+	// business-rule rejection), mirroring the effective-date-missing case.
+	{matchIs(application.ErrReasonForChangeRequired), http.StatusUnprocessableEntity, approvalCodeValidationReasonForChangeRequired},
+	{matchIs(application.ErrReasonCategoryInvalid), http.StatusUnprocessableEntity, approvalCodeValidationReasonCategoryInvalid},
+	// ADR 0073: canonical /submit now returns this (was finalize-only). REV>=1
+	// submit without a revision title is a friendly business-rule rejection —
+	// 422, mirroring the reason-for-change case above.
+	{matchIs(application.ErrRevisionTitleRequired), http.StatusUnprocessableEntity, approvalCodeValidationRevisionTitleRequired},
+	// M3 P3.S2b-2: a document-kind route create with subject_key != profile_code
+	// is a friendly first-line validation failure (semantically valid JSON,
+	// business-rule rejection) — 422, mirroring the reason-for-change/revision-
+	// title cases above.
+	{matchIs(application.ErrDocumentSubjectKeyMismatch), http.StatusUnprocessableEntity, approvalCodeValidationDocumentSubjectKeyMismatch},
+	// ADR 0086: a template route is profile-keyed, so subject_key != profile_code
+	// is the same class of friendly business-rule rejection as the document case.
+	{matchIs(application.ErrTemplateSubjectKeyMismatch), http.StatusUnprocessableEntity, approvalCodeValidationTemplateSubjectKeyMismatch},
+	// In-tx submit resolution surfaces the finalize-era sentinels (ADR 0073).
+	// Document not in draft = illegal state for the submit write → 409.
+	{matchIs(v2dom.ErrDocumentNotDraft), http.StatusConflict, approvalCodeStateDocumentNotDraft},
+	// Controlled document has no profile → the server cannot resolve a route.
+	// Actionable request problem (finalize mapped it 400 ValidationError).
+	{matchIs(v2dom.ErrProfileNotConfigured), http.StatusBadRequest, approvalCodeValidationProfileNotConfigured},
+	// No active approval route for the profile (finalize mapped it 409).
+	{matchIs(v2dom.ErrApprovalRouteMissing), http.StatusConflict, approvalCodeStateApprovalRouteMissing},
+	{matchIs(ErrIfMatchRequired), http.StatusPreconditionRequired, approvalCodePreconditionIfMatch},
+	{matchIs(ErrIfMatchMalformed), http.StatusBadRequest, approvalCodeValidationIfMatchBad},
+	{matchIs(ErrIdempotencyRequired, idempotency.ErrKeyRequired, application.ErrIdempotencyKeyRequired), http.StatusBadRequest, approvalCodeIdempotencyRequired},
+	// F-QA4-6: bespoke-replay handlers enforce the same UUID wire rule the
+	// idempotency.Require middleware enforces, and deliberately surface the
+	// PLATFORM code here (not a module-local dialect) so a malformed key
+	// looks identical to clients whether or not the route is wrapped.
+	{matchIs(idempotency.ErrKeyInvalid), http.StatusBadRequest, problem.CodeRequestIdempotencyKeyInvalid},
+	// Same Idempotency-Key reused with a different request fingerprint: the
+	// caller must rotate the key for a genuinely new attempt.
+	{matchIs(idempotency.ErrConflict), http.StatusConflict, approvalCodeIdempotencyKeyConflict},
+	{matchIs(ErrContentHashMismatch), http.StatusPreconditionFailed, approvalCodePreconditionHashMismatch},
+	{matchIs(approvalsignature.ErrInvalidCredentials), http.StatusUnauthorized, approvalCodeAuthnSignatureInvalid},
+	{matchIs(approvalsignature.ErrRateLimited), http.StatusTooManyRequests, approvalCodeAuthnRateLimited},
+	// Signature-verifier misconfiguration (registry/limiter unwired). Unreachable
+	// in production wiring; distinct 500 code so monitoring separates it from a
+	// DB-layer 500. Client body stays the generic "internal error".
+	{matchIs(application.ErrReauthNotConfigured, approvalsignature.ErrUnknownSignatureMethod, approvalsignature.ErrRateLimiterConfig), http.StatusInternalServerError, approvalCodeInternalSigMisconfigured},
+	{matchIs(infrastructure.ErrInsufficientPrivilege), http.StatusInternalServerError, approvalCodeInternalDBPrivilege},
+	{matchIs(infrastructure.ErrUnknownDB), http.StatusInternalServerError, approvalCodeInternalDBUnknown},
+	// annex R-14: "no active stage" and "the instance is completed" are
+	// different conditions with different operator remedies, so this sentinel
+	// no longer folds onto state.approval_instance_completed — which now
+	// carries only infrastructure.ErrInstanceCompleted. Status is unchanged.
+	{matchIs(domain.ErrNoActiveStage), http.StatusConflict, approvalCodeStateApprovalStageNotActive},
+	// R3/G2: a `ready` verdict targeting an approval-kind stage is a
+	// business-rule rejection of a semantically-valid request — 422,
+	// mirroring the v2dom.ErrEffectiveDateMissing / ErrReasonForChangeRequired
+	// precedent above.
+	{matchIs(domain.ErrVerdictReadyOnApprovalStage), http.StatusUnprocessableEntity, approvalCodeStateVerdictReadyOnApprovalStage},
+	// Only reachable if an active stage carries a kind outside the
+	// DB-constrained {review,approval} set — corrupted internal state, not a
+	// client-caused condition. 500 with a distinct internal.* code, matching
+	// the ErrInsufficientPrivilege / ErrUnknownDB precedent above (not the 422
+	// business-rule class used for ready-on-approval).
+	{matchIs(domain.ErrVerdictWrongStageKind), http.StatusInternalServerError, approvalCodeInternalVerdictWrongStageKind},
+	// ADR 0087: the profile is livre — its route is configured to require no
+	// approval, so it must carry ZERO stages. Adding one is a business-rule
+	// rejection of a structurally-valid request (422), and it gets a
+	// dedicated code so the route builder can say precisely why. The DB
+	// trigger (assert_route_shape, migration 0316) rejects the same shape at
+	// COMMIT; this is the friendly first line.
+	{matchIs(domain.ErrRouteStagesNotPermittedForProfile), http.StatusUnprocessableEntity, approvalCodeValidationRouteStagesNotPermitted},
+	// controlado: the route must contain >=1 approval-kind stage.
+	{matchIs(domain.ErrApprovalStageRequired), http.StatusUnprocessableEntity, approvalCodeValidationApprovalStageRequired},
+	// simples: review-only is fine, stageless is not (that shape is livre's).
+	{matchIs(domain.ErrRouteStageRequired), http.StatusUnprocessableEntity, approvalCodeValidationRouteStageRequired},
+	{matchIs(application.ErrDocumentNotFound), http.StatusNotFound, approvalCodeNotFoundDocument},
+	// Friendly first-line precondition (mark-reviewed requires published);
+	// 409 mirrors the other illegal-state-for-write cases above (stale
+	// revision / instance completed), not a validation 4xx.
+	{matchIs(application.ErrDocumentNotPublished), http.StatusConflict, approvalCodeStateDocumentNotPublished},
+	// 409, mirroring infrastructure.ErrStaleRevision above: the mark-reviewed
+	// route's openapi response set is {400,401,403,404,409,428,500} — no
+	// 412 — so the OCC conflict is a 409 Conflict, not 412.
+	{matchIs(application.ErrMarkReviewedStaleRevision), http.StatusConflict, approvalCodeConflictMarkReviewedStaleRevision},
+	{matchIs(application.ErrReviewDueBeforeEffective), http.StatusUnprocessableEntity, approvalCodeValidationReviewDueBeforeEffective},
+	{matchIs(application.ErrEffectiveToNotAfterEffectiveFrom), http.StatusUnprocessableEntity, approvalCodeValidationEffectiveToNotAfterFrom},
+	{matchIs(domain.ErrSelfDelegation), http.StatusUnprocessableEntity, approvalCodeValidationSelfDelegation},
+	{matchIs(domain.ErrInvalidDelegationWindow), http.StatusUnprocessableEntity, approvalCodeValidationDelegationWindow},
+	{matchIs(application.ErrDelegationNotFoundOrNotOwned), http.StatusNotFound, approvalCodeNotFoundDelegation},
+	// Shortening a deadline is a different act with different governance
+	// consequences and is out of scope for this route — 422, a
+	// business-rule rejection of a semantically valid request.
+	{matchIs(application.ErrSLAExtensionNotForward), http.StatusUnprocessableEntity, approvalCodeSLANotForward},
+	// No active stage, or the active stage carries no deadline — nothing
+	// to extend. Illegal state for the write, mirroring the module's
+	// other "no active stage" / "instance completed" 409s.
+	{matchIs(application.ErrSLAExtensionNoActiveStage), http.StatusConflict, approvalCodeSLANoActiveStage},
+	{matchIs(application.ErrSLAExtensionReasonRequired), http.StatusUnprocessableEntity, approvalCodeSLAReasonRequired},
+	// R5: the actor's `ready` verdict was recorded but did not satisfy the
+	// active stage's quorum (e.g. all_of with a co-reviewer still pending) —
+	// an illegal state for the fast-forward composite write, not a client
+	// validation error. 409, mirroring the other illegal-state-for-write
+	// cases above (stale revision / instance completed).
+	{matchIs(domain.ErrFastForwardStageNotCompleted), http.StatusConflict, approvalCodeStateFastForwardStageNotCompleted},
+	// R5: the verdict completed the stage, but the instance is already
+	// approved, there is no next stage, or the actor is not in the next
+	// (approval-kind) stage's eligible pool — the composite fast-forward
+	// write cannot proceed as one transaction. 409, same class as above.
+	{matchIs(domain.ErrFastForwardNotEligible), http.StatusConflict, approvalCodeStateFastForwardNotEligible},
+	// F2 (W6): a stage whose eligibility resolution yields zero actors is a
+	// business-rule rejection at submit time (422), not a 500 — and this
+	// mapping also closes a pre-existing gap for decision_service.go's
+	// quorum-evaluation path, which returned this sentinel unmapped before.
+	{matchIs(domain.ErrEmptyEligiblePool), http.StatusUnprocessableEntity, approvalCodeValidationEmptyEligiblePool},
+	// M4, unit 3.2, slice 5: a submit_choice-governed stage has no
+	// matching (or empty) chosen_actors entry — fail-closed business-rule
+	// rejection at submit time, 422 mirroring ErrEmptyEligiblePool above.
+	{matchIs(domain.ErrSubmitChoiceRequired), http.StatusUnprocessableEntity, approvalCodeValidationSubmitChoiceRequired},
+	// M4, unit 3.2, slice 5: either a chosen user does not satisfy the
+	// submit_choice selector's role x area_code constraint, or a
+	// chosen_actors entry targets a stage_order with no submit_choice
+	// selector (no-fallback principle) — both 422.
+	{matchIs(domain.ErrSubmitChoiceConstraintViolated), http.StatusUnprocessableEntity, approvalCodeValidationSubmitChoiceConstraint},
+
+	// The remaining entries were the inner `default:` switch — reached only
+	// when nothing above matched, which this flat table reproduces simply by
+	// listing them after every case above (first match still wins).
+	{matchAs[*ValidationError](), http.StatusBadRequest, approvalCodeValidationRequestInvalid},
+	{matchAs[*approvalapi.InvalidParamFormatError](), http.StatusBadRequest, approvalCodeValidationParamFormat},
+	{matchAs[*approvalapi.UnmarshalingParamError](), http.StatusBadRequest, approvalCodeValidationParamUnmarshal},
+	{matchAs[*approvalapi.RequiredParamError](), http.StatusBadRequest, approvalCodeValidationParamRequired},
+	{matchAs[*approvalapi.RequiredHeaderError](), http.StatusBadRequest, approvalCodeValidationHeaderRequired},
+	{matchAs[*approvalapi.TooManyValuesForParamError](), http.StatusBadRequest, approvalCodeValidationParamTooMany},
+	{matchAs[authz.ErrCapDenied](), http.StatusForbidden, approvalCodeAuthzCapDenied},
+	{matchIs(application.ErrApprovalBlockedByUnresolvedComments), http.StatusConflict, approvalCodeApprovalUnresolved},
+	{matchIs(application.ErrReasonRequired, application.ErrRouteDeactivateReasonRequired), http.StatusBadRequest, approvalCodeValidationReasonRequired},
+	{matchIs(application.ErrInvalidObsoleteSource), http.StatusBadRequest, approvalCodeValidationRequestInvalid},
+	// FK violation on (tenant_id, profile_code) → the document profile
+	// does not exist for this tenant. Actionable 4xx, never a 500.
+	{matchIs(application.ErrRouteProfileUnknown), http.StatusUnprocessableEntity, approvalCodeValidationProfileUnknown},
+	{matchIs(application.ErrRouteNotFound), http.StatusNotFound, approvalCodeNotFoundRoute},
+	{matchIs(application.ErrRouteAlreadyInactive), http.StatusConflict, approvalCodeStateRouteInactive},
+	{matchIs(context.DeadlineExceeded, context.Canceled), http.StatusGatewayTimeout, approvalCodeTimeout},
+	{matchAs[*json.SyntaxError](), http.StatusBadRequest, approvalCodeValidationJSONDecode},
+	{matchIs(io.ErrUnexpectedEOF), http.StatusBadRequest, approvalCodeValidationJSONDecode},
+	{func(err error) bool { return err != nil && strings.HasPrefix(err.Error(), "json: unknown field") }, http.StatusBadRequest, approvalCodeValidationJSONDecode},
+	{matchAs[*json.UnmarshalTypeError](), http.StatusBadRequest, approvalCodeValidationJSONTypeError},
+	{matchIs(io.EOF), http.StatusBadRequest, approvalCodeValidationEmptyBody},
+	{matchIs(strictjson.ErrContentType), http.StatusUnsupportedMediaType, approvalCodeValidationContentType},
+	{matchIs(strictjson.ErrBodyTooLarge), http.StatusRequestEntityTooLarge, approvalCodeValidationBodyTooLarge},
+	{matchIs(strictjson.ErrEmptyBody), http.StatusBadRequest, approvalCodeValidationEmptyBody},
+	{matchIs(contracts.ErrValidation), http.StatusBadRequest, approvalCodeValidationRequestInvalid},
+}
+
 // MapErrorToResponse translates a domain/repository/contract error into an RFC
 // 9457 problem+json response, choosing the HTTP status and typed problem.Code
 // that best matches err. Unrecognized errors fall back to a generic 500 with
@@ -209,340 +417,10 @@ func MapErrorToResponse(err error) *problem.Problem {
 	statusCode := http.StatusInternalServerError
 	code := approvalCodeInternalUnknown
 
-	switch {
-	case errors.Is(err, infrastructure.ErrStaleRevision):
-		statusCode = http.StatusConflict
-		code = approvalCodeConflictStaleRevision
-	case errors.Is(err, infrastructure.ErrNoActiveInstance):
-		statusCode = http.StatusNotFound
-		code = approvalCodeNotFoundInstance
-	case errors.Is(err, infrastructure.ErrInstanceNotVisible):
-		// F8, spec.md §6.3: cross-boundary = not-found. Same 404 status as
-		// ErrNoActiveInstance but a distinct problem.Code (see the constant's
-		// doc comment) so server-side logs/monitoring can distinguish the two
-		// cases without the client-visible response revealing which one fired.
-		statusCode = http.StatusNotFound
-		code = approvalCodeNotFoundInstanceNotVisible
-	case errors.Is(err, infrastructure.ErrDuplicateSubmission):
-		statusCode = http.StatusConflict
-		code = approvalCodeConflictDuplicate
-	case errors.Is(err, infrastructure.ErrActorAlreadySigned):
-		statusCode = http.StatusConflict
-		code = approvalCodeSignoffDuplicate
-	case errors.Is(err, infrastructure.ErrInvalidSupersedeTarget):
-		statusCode = http.StatusConflict
-		code = approvalCodeValidationSupersedeTargetInvalid
-	case errors.Is(err, infrastructure.ErrInstanceCompleted):
-		statusCode = http.StatusConflict
-		code = approvalCodeStateInstanceCompleted
-	case errors.Is(err, infrastructure.ErrRouteInUse):
-		statusCode = http.StatusConflict
-		code = approvalCodeRouteInUse
-	case errors.Is(err, infrastructure.ErrDuplicateRouteProfile):
-		statusCode = http.StatusConflict
-		code = approvalCodeRouteDuplicateProfile
-	case errors.Is(err, domain.ErrActorNotEligible):
-		statusCode = http.StatusForbidden
-		code = approvalCodeSignoffNotEligible
-	case errors.Is(err, domain.ErrAuthorCannotSign):
-		statusCode = http.StatusForbidden
-		code = approvalCodeSodSubmitterCannotSign
-	case errors.Is(err, domain.ErrActorAlreadySigned):
-		statusCode = http.StatusForbidden
-		code = approvalCodeSodCrossStageDuplicate
-	case errors.Is(err, v2dom.ErrEffectiveDateMissing):
-		statusCode = http.StatusUnprocessableEntity
-		code = approvalCodeFreezeEffDateMissing
-	case errors.Is(err, application.ErrReasonForChangeRequired):
-		// F6.3 §5.3: REV>=1 submit without a structured reason is a friendly
-		// first-line validation failure — 422 (semantically valid JSON,
-		// business-rule rejection), mirroring the effective-date-missing case.
-		statusCode = http.StatusUnprocessableEntity
-		code = approvalCodeValidationReasonForChangeRequired
-	case errors.Is(err, application.ErrReasonCategoryInvalid):
-		statusCode = http.StatusUnprocessableEntity
-		code = approvalCodeValidationReasonCategoryInvalid
-	case errors.Is(err, application.ErrRevisionTitleRequired):
-		// ADR 0073: canonical /submit now returns this (was finalize-only). REV>=1
-		// submit without a revision title is a friendly business-rule rejection —
-		// 422, mirroring the reason-for-change case above.
-		statusCode = http.StatusUnprocessableEntity
-		code = approvalCodeValidationRevisionTitleRequired
-	case errors.Is(err, application.ErrDocumentSubjectKeyMismatch):
-		// M3 P3.S2b-2: a document-kind route create with subject_key != profile_code
-		// is a friendly first-line validation failure (semantically valid JSON,
-		// business-rule rejection) — 422, mirroring the reason-for-change/revision-
-		// title cases above.
-		statusCode = http.StatusUnprocessableEntity
-		code = approvalCodeValidationDocumentSubjectKeyMismatch
-	case errors.Is(err, application.ErrTemplateSubjectKeyMismatch):
-		// ADR 0086: a template route is profile-keyed, so subject_key != profile_code
-		// is the same class of friendly business-rule rejection as the document case.
-		statusCode = http.StatusUnprocessableEntity
-		code = approvalCodeValidationTemplateSubjectKeyMismatch
-	case errors.Is(err, v2dom.ErrDocumentNotDraft):
-		// In-tx submit resolution surfaces the finalize-era sentinels (ADR 0073).
-		// Document not in draft = illegal state for the submit write → 409.
-		statusCode = http.StatusConflict
-		code = approvalCodeStateDocumentNotDraft
-	case errors.Is(err, v2dom.ErrProfileNotConfigured):
-		// Controlled document has no profile → the server cannot resolve a route.
-		// Actionable request problem (finalize mapped it 400 ValidationError).
-		statusCode = http.StatusBadRequest
-		code = approvalCodeValidationProfileNotConfigured
-	case errors.Is(err, v2dom.ErrApprovalRouteMissing):
-		// No active approval route for the profile (finalize mapped it 409).
-		statusCode = http.StatusConflict
-		code = approvalCodeStateApprovalRouteMissing
-	case errors.Is(err, ErrIfMatchRequired):
-		statusCode = http.StatusPreconditionRequired
-		code = approvalCodePreconditionIfMatch
-	case errors.Is(err, ErrIfMatchMalformed):
-		statusCode = http.StatusBadRequest
-		code = approvalCodeValidationIfMatchBad
-	case errors.Is(err, ErrIdempotencyRequired),
-		errors.Is(err, idempotency.ErrKeyRequired),
-		errors.Is(err, application.ErrIdempotencyKeyRequired):
-		statusCode = http.StatusBadRequest
-		code = approvalCodeIdempotencyRequired
-	case errors.Is(err, idempotency.ErrKeyInvalid):
-		// F-QA4-6: bespoke-replay handlers enforce the same UUID wire rule the
-		// idempotency.Require middleware enforces, and deliberately surface the
-		// PLATFORM code here (not a module-local dialect) so a malformed key
-		// looks identical to clients whether or not the route is wrapped.
-		statusCode = http.StatusBadRequest
-		code = problem.CodeRequestIdempotencyKeyInvalid
-	case errors.Is(err, idempotency.ErrConflict):
-		// Same Idempotency-Key reused with a different request fingerprint: the
-		// caller must rotate the key for a genuinely new attempt.
-		statusCode = http.StatusConflict
-		code = approvalCodeIdempotencyKeyConflict
-	case errors.Is(err, ErrContentHashMismatch):
-		statusCode = http.StatusPreconditionFailed
-		code = approvalCodePreconditionHashMismatch
-	case errors.Is(err, approvalsignature.ErrInvalidCredentials):
-		statusCode = http.StatusUnauthorized
-		code = approvalCodeAuthnSignatureInvalid
-	case errors.Is(err, approvalsignature.ErrRateLimited):
-		statusCode = http.StatusTooManyRequests
-		code = approvalCodeAuthnRateLimited
-	case errors.Is(err, application.ErrReauthNotConfigured),
-		errors.Is(err, approvalsignature.ErrUnknownSignatureMethod),
-		errors.Is(err, approvalsignature.ErrRateLimiterConfig):
-		// Signature-verifier misconfiguration (registry/limiter unwired). Unreachable
-		// in production wiring; distinct 500 code so monitoring separates it from a
-		// DB-layer 500. Client body stays the generic "internal error".
-		statusCode = http.StatusInternalServerError
-		code = approvalCodeInternalSigMisconfigured
-	case errors.Is(err, infrastructure.ErrInsufficientPrivilege):
-		statusCode = http.StatusInternalServerError
-		code = approvalCodeInternalDBPrivilege
-	case errors.Is(err, infrastructure.ErrUnknownDB):
-		statusCode = http.StatusInternalServerError
-		code = approvalCodeInternalDBUnknown
-	case errors.Is(err, domain.ErrNoActiveStage):
-		// annex R-14: "no active stage" and "the instance is completed" are
-		// different conditions with different operator remedies, so this sentinel
-		// no longer folds onto state.approval_instance_completed — which now
-		// carries only infrastructure.ErrInstanceCompleted. Status is unchanged.
-		statusCode = http.StatusConflict
-		code = approvalCodeStateApprovalStageNotActive
-	case errors.Is(err, domain.ErrVerdictReadyOnApprovalStage):
-		// R3/G2: a `ready` verdict targeting an approval-kind stage is a
-		// business-rule rejection of a semantically-valid request — 422,
-		// mirroring the v2dom.ErrEffectiveDateMissing / ErrReasonForChangeRequired
-		// precedent above.
-		statusCode = http.StatusUnprocessableEntity
-		code = approvalCodeStateVerdictReadyOnApprovalStage
-	case errors.Is(err, domain.ErrVerdictWrongStageKind):
-		// Only reachable if an active stage carries a kind outside the
-		// DB-constrained {review,approval} set — corrupted internal state, not a
-		// client-caused condition. 500 with a distinct internal.* code, matching
-		// the ErrInsufficientPrivilege / ErrUnknownDB precedent above (not the 422
-		// business-rule class used for ready-on-approval).
-		statusCode = http.StatusInternalServerError
-		code = approvalCodeInternalVerdictWrongStageKind
-	case errors.Is(err, domain.ErrRouteStagesNotPermittedForProfile):
-		// ADR 0087: the profile is livre — its route is configured to require no
-		// approval, so it must carry ZERO stages. Adding one is a business-rule
-		// rejection of a structurally-valid request (422), and it gets a
-		// dedicated code so the route builder can say precisely why. The DB
-		// trigger (assert_route_shape, migration 0316) rejects the same shape at
-		// COMMIT; this is the friendly first line.
-		statusCode = http.StatusUnprocessableEntity
-		code = approvalCodeValidationRouteStagesNotPermitted
-	case errors.Is(err, domain.ErrApprovalStageRequired):
-		// controlado: the route must contain >=1 approval-kind stage.
-		statusCode = http.StatusUnprocessableEntity
-		code = approvalCodeValidationApprovalStageRequired
-	case errors.Is(err, domain.ErrRouteStageRequired):
-		// simples: review-only is fine, stageless is not (that shape is livre's).
-		statusCode = http.StatusUnprocessableEntity
-		code = approvalCodeValidationRouteStageRequired
-	case errors.Is(err, application.ErrDocumentNotFound):
-		statusCode = http.StatusNotFound
-		code = approvalCodeNotFoundDocument
-	case errors.Is(err, application.ErrDocumentNotPublished):
-		// Friendly first-line precondition (mark-reviewed requires published);
-		// 409 mirrors the other illegal-state-for-write cases above (stale
-		// revision / instance completed), not a validation 4xx.
-		statusCode = http.StatusConflict
-		code = approvalCodeStateDocumentNotPublished
-	case errors.Is(err, application.ErrMarkReviewedStaleRevision):
-		// 409, mirroring infrastructure.ErrStaleRevision above: the mark-reviewed
-		// route's openapi response set is {400,401,403,404,409,428,500} — no
-		// 412 — so the OCC conflict is a 409 Conflict, not 412.
-		statusCode = http.StatusConflict
-		code = approvalCodeConflictMarkReviewedStaleRevision
-	case errors.Is(err, application.ErrReviewDueBeforeEffective):
-		statusCode = http.StatusUnprocessableEntity
-		code = approvalCodeValidationReviewDueBeforeEffective
-	case errors.Is(err, application.ErrEffectiveToNotAfterEffectiveFrom):
-		statusCode = http.StatusUnprocessableEntity
-		code = approvalCodeValidationEffectiveToNotAfterFrom
-	case errors.Is(err, domain.ErrSelfDelegation):
-		statusCode = http.StatusUnprocessableEntity
-		code = approvalCodeValidationSelfDelegation
-	case errors.Is(err, domain.ErrInvalidDelegationWindow):
-		statusCode = http.StatusUnprocessableEntity
-		code = approvalCodeValidationDelegationWindow
-	case errors.Is(err, application.ErrDelegationNotFoundOrNotOwned):
-		statusCode = http.StatusNotFound
-		code = approvalCodeNotFoundDelegation
-	case errors.Is(err, application.ErrSLAExtensionNotForward):
-		// Shortening a deadline is a different act with different governance
-		// consequences and is out of scope for this route — 422, a
-		// business-rule rejection of a semantically valid request.
-		statusCode = http.StatusUnprocessableEntity
-		code = approvalCodeSLANotForward
-	case errors.Is(err, application.ErrSLAExtensionNoActiveStage):
-		// No active stage, or the active stage carries no deadline — nothing
-		// to extend. Illegal state for the write, mirroring the module's
-		// other "no active stage" / "instance completed" 409s.
-		statusCode = http.StatusConflict
-		code = approvalCodeSLANoActiveStage
-	case errors.Is(err, application.ErrSLAExtensionReasonRequired):
-		statusCode = http.StatusUnprocessableEntity
-		code = approvalCodeSLAReasonRequired
-	case errors.Is(err, domain.ErrFastForwardStageNotCompleted):
-		// R5: the actor's `ready` verdict was recorded but did not satisfy the
-		// active stage's quorum (e.g. all_of with a co-reviewer still pending) —
-		// an illegal state for the fast-forward composite write, not a client
-		// validation error. 409, mirroring the other illegal-state-for-write
-		// cases above (stale revision / instance completed).
-		statusCode = http.StatusConflict
-		code = approvalCodeStateFastForwardStageNotCompleted
-	case errors.Is(err, domain.ErrFastForwardNotEligible):
-		// R5: the verdict completed the stage, but the instance is already
-		// approved, there is no next stage, or the actor is not in the next
-		// (approval-kind) stage's eligible pool — the composite fast-forward
-		// write cannot proceed as one transaction. 409, same class as above.
-		statusCode = http.StatusConflict
-		code = approvalCodeStateFastForwardNotEligible
-	case errors.Is(err, domain.ErrEmptyEligiblePool):
-		// F2 (W6): a stage whose eligibility resolution yields zero actors is a
-		// business-rule rejection at submit time (422), not a 500 — and this
-		// mapping also closes a pre-existing gap for decision_service.go's
-		// quorum-evaluation path, which returned this sentinel unmapped before.
-		statusCode = http.StatusUnprocessableEntity
-		code = approvalCodeValidationEmptyEligiblePool
-	case errors.Is(err, domain.ErrSubmitChoiceRequired):
-		// M4, unit 3.2, slice 5: a submit_choice-governed stage has no
-		// matching (or empty) chosen_actors entry — fail-closed business-rule
-		// rejection at submit time, 422 mirroring ErrEmptyEligiblePool above.
-		statusCode = http.StatusUnprocessableEntity
-		code = approvalCodeValidationSubmitChoiceRequired
-	case errors.Is(err, domain.ErrSubmitChoiceConstraintViolated):
-		// M4, unit 3.2, slice 5: either a chosen user does not satisfy the
-		// submit_choice selector's role x area_code constraint, or a
-		// chosen_actors entry targets a stage_order with no submit_choice
-		// selector (no-fallback principle) — both 422.
-		statusCode = http.StatusUnprocessableEntity
-		code = approvalCodeValidationSubmitChoiceConstraint
-	default:
-		var capabilityDenied authz.ErrCapDenied
-		var syntaxErr *json.SyntaxError
-		var typeErr *json.UnmarshalTypeError
-		var validationErr *ValidationError
-		var invalidParamErr *approvalapi.InvalidParamFormatError
-		var unmarshalParamErr *approvalapi.UnmarshalingParamError
-		var requiredParamErr *approvalapi.RequiredParamError
-		var requiredHeaderErr *approvalapi.RequiredHeaderError
-		var tooManyValuesErr *approvalapi.TooManyValuesForParamError
-
-		switch {
-		case errors.As(err, &validationErr):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationRequestInvalid
-		case errors.As(err, &invalidParamErr):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationParamFormat
-		case errors.As(err, &unmarshalParamErr):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationParamUnmarshal
-		case errors.As(err, &requiredParamErr):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationParamRequired
-		case errors.As(err, &requiredHeaderErr):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationHeaderRequired
-		case errors.As(err, &tooManyValuesErr):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationParamTooMany
-		case errors.As(err, &capabilityDenied):
-			statusCode = http.StatusForbidden
-			code = approvalCodeAuthzCapDenied
-		case errors.Is(err, application.ErrApprovalBlockedByUnresolvedComments):
-			statusCode = http.StatusConflict
-			code = approvalCodeApprovalUnresolved
-		case errors.Is(err, application.ErrReasonRequired),
-			errors.Is(err, application.ErrRouteDeactivateReasonRequired):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationReasonRequired
-		case errors.Is(err, application.ErrInvalidObsoleteSource):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationRequestInvalid
-		case errors.Is(err, application.ErrRouteProfileUnknown):
-			// FK violation on (tenant_id, profile_code) → the document profile
-			// does not exist for this tenant. Actionable 4xx, never a 500.
-			statusCode = http.StatusUnprocessableEntity
-			code = approvalCodeValidationProfileUnknown
-		case errors.Is(err, application.ErrRouteNotFound):
-			statusCode = http.StatusNotFound
-			code = approvalCodeNotFoundRoute
-		case errors.Is(err, application.ErrRouteAlreadyInactive):
-			statusCode = http.StatusConflict
-			code = approvalCodeStateRouteInactive
-		case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
-			statusCode = http.StatusGatewayTimeout
-			code = approvalCodeTimeout
-		case errors.As(err, &syntaxErr):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationJSONDecode
-		case errors.Is(err, io.ErrUnexpectedEOF):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationJSONDecode
-		case err != nil && strings.HasPrefix(err.Error(), "json: unknown field"):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationJSONDecode
-		case errors.As(err, &typeErr):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationJSONTypeError
-		case errors.Is(err, io.EOF):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationEmptyBody
-		case errors.Is(err, strictjson.ErrContentType):
-			statusCode = http.StatusUnsupportedMediaType
-			code = approvalCodeValidationContentType
-		case errors.Is(err, strictjson.ErrBodyTooLarge):
-			statusCode = http.StatusRequestEntityTooLarge
-			code = approvalCodeValidationBodyTooLarge
-		case errors.Is(err, strictjson.ErrEmptyBody):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationEmptyBody
-		case errors.Is(err, contracts.ErrValidation):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationRequestInvalid
+	for _, m := range approvalErrorMappings {
+		if m.match(err) {
+			statusCode, code = m.status, m.code
+			break
 		}
 	}
 

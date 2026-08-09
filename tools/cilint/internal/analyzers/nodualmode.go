@@ -66,74 +66,89 @@ func NoDualMode(files []string) []Finding {
 			if !ok {
 				return true
 			}
-			// The condition must be a binary expression: X == nil or X != nil.
-			bin, ok := ifStmt.Cond.(*ast.BinaryExpr)
-			if !ok {
-				return true
+			if finding, flagged := dualModeFinding(fset, path, src, ifStmt); flagged {
+				out = append(out, finding)
 			}
-			isEqNil := bin.Op.String() == "==" && isNilIdent(bin.Y)
-			isNeqNil := bin.Op.String() == "!=" && isNilIdent(bin.Y)
-			// Also handle nil on left side (rare but possible).
-			if !isEqNil && !isNeqNil {
-				isEqNil = bin.Op.String() == "==" && isNilIdent(bin.X)
-				isNeqNil = bin.Op.String() == "!=" && isNilIdent(bin.X)
-			}
-			if !isEqNil && !isNeqNil {
-				return true
-			}
-
-			// Determine the variable/selector being checked.
-			subject := nilCheckSubject(bin)
-			if subject == "" {
-				return true
-			}
-			// Apply the db/port identifier heuristic to the leaf name.
-			if !dualModeIdentRe.MatchString(leafName(subject)) {
-				return true
-			}
-
-			// Check allow-directive on the if-statement line.
-			pos := fset.Position(ifStmt.Pos())
-			line := getLine(src, pos.Line)
-			if strings.Contains(line, noDualModeAllow) {
-				return true
-			}
-
-			// ── Exemption: fail-loud guard ────────────────────────────────
-			// Pattern: if x == nil { panic(...) or return ... } with NO else.
-			// This is a required-dep precondition guard — not a dual-mode branch.
-			if isEqNil && ifStmt.Else == nil && isTerminatingBody(ifStmt.Body) {
-				return true
-			}
-
-			// ── Flag rule 1: explicit else (alternate path) ───────────────
-			if ifStmt.Else != nil {
-				out = append(out, Finding{
-					Analyzer: "nodualmode",
-					File:     path,
-					Line:     pos.Line,
-					Message:  "dual-mode branch on db/port identifier '" + subject + "': nil/non-nil if-else forms alternate execution paths; application services must be single-mode (Task 6, F-10)",
-				})
-				return true
-			}
-
-			// ── Flag rule 2: if x != nil { ... } — conditional skip ───────
-			// No else, but the != nil form means the block is silently skipped
-			// when the dependency is absent — that is the conditional-skip-a-write
-			// dual-mode anti-pattern.
-			if isNeqNil {
-				out = append(out, Finding{
-					Analyzer: "nodualmode",
-					File:     path,
-					Line:     pos.Line,
-					Message:  "conditional skip on db/port identifier '" + subject + "': if x != nil { ... } with no else silently skips work when the dependency is nil; application services must be single-mode (Task 6, F-10)",
-				})
-			}
-
 			return true
 		})
 	}
 	return out
+}
+
+// dualModeFinding evaluates a single if-statement against the dual-mode
+// nil-check pattern (see NoDualMode doc comment for the two flag rules and
+// the fail-loud exemption) and returns the Finding to emit, if any.
+func dualModeFinding(fset *token.FileSet, path, src string, ifStmt *ast.IfStmt) (Finding, bool) {
+	// The condition must be a binary expression: X == nil or X != nil.
+	bin, ok := ifStmt.Cond.(*ast.BinaryExpr)
+	if !ok {
+		return Finding{}, false
+	}
+	isEqNil, isNeqNil := classifyNilCheck(bin)
+	if !isEqNil && !isNeqNil {
+		return Finding{}, false
+	}
+
+	// Determine the variable/selector being checked.
+	subject := nilCheckSubject(bin)
+	if subject == "" {
+		return Finding{}, false
+	}
+	// Apply the db/port identifier heuristic to the leaf name.
+	if !dualModeIdentRe.MatchString(leafName(subject)) {
+		return Finding{}, false
+	}
+
+	// Check allow-directive on the if-statement line.
+	pos := fset.Position(ifStmt.Pos())
+	line := getLine(src, pos.Line)
+	if strings.Contains(line, noDualModeAllow) {
+		return Finding{}, false
+	}
+
+	// ── Exemption: fail-loud guard ────────────────────────────────────
+	// Pattern: if x == nil { panic(...) or return ... } with NO else.
+	// This is a required-dep precondition guard — not a dual-mode branch.
+	if isEqNil && ifStmt.Else == nil && isTerminatingBody(ifStmt.Body) {
+		return Finding{}, false
+	}
+
+	// ── Flag rule 1: explicit else (alternate path) ────────────────────
+	if ifStmt.Else != nil {
+		return Finding{
+			Analyzer: "nodualmode",
+			File:     path,
+			Line:     pos.Line,
+			Message:  "dual-mode branch on db/port identifier '" + subject + "': nil/non-nil if-else forms alternate execution paths; application services must be single-mode (Task 6, F-10)",
+		}, true
+	}
+
+	// ── Flag rule 2: if x != nil { ... } — conditional skip ────────────
+	// No else, but the != nil form means the block is silently skipped
+	// when the dependency is absent — that is the conditional-skip-a-write
+	// dual-mode anti-pattern.
+	if isNeqNil {
+		return Finding{
+			Analyzer: "nodualmode",
+			File:     path,
+			Line:     pos.Line,
+			Message:  "conditional skip on db/port identifier '" + subject + "': if x != nil { ... } with no else silently skips work when the dependency is nil; application services must be single-mode (Task 6, F-10)",
+		}, true
+	}
+
+	return Finding{}, false
+}
+
+// classifyNilCheck reports whether bin is an X == nil or X != nil comparison,
+// checking both operand orders (nil may appear on either side).
+func classifyNilCheck(bin *ast.BinaryExpr) (isEqNil, isNeqNil bool) {
+	isEqNil = bin.Op.String() == "==" && isNilIdent(bin.Y)
+	isNeqNil = bin.Op.String() == "!=" && isNilIdent(bin.Y)
+	if !isEqNil && !isNeqNil {
+		isEqNil = bin.Op.String() == "==" && isNilIdent(bin.X)
+		isNeqNil = bin.Op.String() == "!=" && isNilIdent(bin.X)
+	}
+	return isEqNil, isNeqNil
 }
 
 // inApplicationLayer reports whether the file path is under an

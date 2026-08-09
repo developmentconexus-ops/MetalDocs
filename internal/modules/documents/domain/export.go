@@ -22,6 +22,10 @@ type ExportResult struct {
 	Cached bool
 }
 
+// Export error sentinels: ErrExportGotenbergFailed signals the Gotenberg PDF
+// conversion call failed, ErrExportDocxMissing signals the source docx body
+// could not be located, and ErrInvalidExport signals the requested export
+// parameters (e.g. paper size) are invalid.
 var (
 	ErrExportGotenbergFailed = errors.New("gotenberg_conversion_failed")
 	ErrExportDocxMissing     = errors.New("docx_missing")
@@ -36,6 +40,8 @@ var allowedPaperSizes = map[string]struct{}{
 	"Tabloid": {},
 }
 
+// NewExport constructs an Export after validating that paperSize is one of
+// the allowed sizes, returning ErrInvalidExport otherwise.
 func NewExport(tenantID, documentID, revisionID string, compositeHash []byte, storageKey string, sizeBytes int64, paperSize string, landscape bool, docgenV2Ver string) (*Export, error) {
 	if _, ok := allowedPaperSizes[paperSize]; !ok {
 		return nil, ErrInvalidExport

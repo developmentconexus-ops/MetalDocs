@@ -16,7 +16,7 @@ func TestMaterializeOutboxRepository_Enqueue_UsesTx(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	mock.ExpectBegin()
 	mock.ExpectQuery(`INSERT INTO metaldocs\.materialize_dispatch_outbox \(tenant_id, revision_id, values_hash, release_generation_id\)`).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("row-1"))
@@ -46,7 +46,7 @@ func TestPDFOutboxRepository_EnqueuePDF_PersistsFinalDocxKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	mock.ExpectBegin()
 	mock.ExpectQuery(`INSERT INTO metaldocs\.pdf_dispatch_outbox \(tenant_id, revision_id, frozen_docx_hash, final_docx_s3_key, release_generation_id\)`).
 		WithArgs("t1", "r1", []byte("hash"), "tenants/t1/r1/frozen.docx", "").
@@ -76,7 +76,7 @@ func TestPDFOutboxRepository_EnqueuePDF_EmptyKeyFailsClosed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	// No ExpectQuery: the guard must reject before touching the DB.
 	mock.ExpectBegin()
 	tx, _ := db.BeginTx(context.Background(), nil)
@@ -95,7 +95,7 @@ func TestPDFOutboxRepository_Enqueue_NilTxRejected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	// A nil tx must fail loud, not silently autocommit the outbox row outside the
 	// caller's business transaction (db.Tx contract / transactional-outbox atomicity).
 	repo := NewPDFOutboxRepository(db)
@@ -119,7 +119,7 @@ func TestMaterializeOutboxRepository_Enqueue_Idempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	mock.ExpectBegin()
 	// ON CONFLICT DO NOTHING → 0 rows returned on a duplicate; Enqueue must not error.
 	mock.ExpectQuery("INSERT INTO metaldocs.materialize_dispatch_outbox").
@@ -148,7 +148,7 @@ func TestStagingOutbox_Enqueue_PanicsOnPDFTable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	mock.ExpectBegin()
 	tx, _ := db.BeginTx(context.Background(), nil)
 
@@ -165,7 +165,7 @@ func TestStagingOutbox_EnqueuePDF_PanicsOnMaterializeTable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	mock.ExpectBegin()
 	tx, _ := db.BeginTx(context.Background(), nil)
 
@@ -183,7 +183,7 @@ func TestMaterializeOutboxRepository_Enqueue_NilTxRejected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	repo := NewMaterializeOutboxRepository(db)
 	id, err := repo.Enqueue(context.Background(), nil, "t1", "r1", []byte("hash"), "")
 	if err == nil {
@@ -204,7 +204,7 @@ func TestPDFOutboxRepository_MarkDispatched(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	mock.MatchExpectationsInOrder(true)
 	mock.ExpectBegin()
 	mock.ExpectExec(`SELECT set_config\('metaldocs\.tenant_id', \$1, true\)`).
@@ -236,7 +236,7 @@ func TestPDFOutboxRepository_MarkFailed_FinalizePath_SetsDeadLetteredAndFailedSt
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	mock.MatchExpectationsInOrder(true)
 	mock.ExpectBegin()
 	mock.ExpectExec(`SELECT set_config\('metaldocs\.tenant_id', \$1, true\)`).
@@ -263,7 +263,7 @@ func TestPDFOutboxRepository_MarkFailed_RowNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	mock.MatchExpectationsInOrder(true)
 	mock.ExpectBegin()
 	mock.ExpectExec(`SELECT set_config\('metaldocs\.tenant_id', \$1, true\)`).

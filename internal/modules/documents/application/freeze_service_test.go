@@ -83,17 +83,17 @@ func (f fakeSnapshotReader) ReadFreezeAt(_ context.Context, _, _ string, _ ...in
 }
 
 type fakeFanoutClient struct {
-	req   fanout.FanoutRequest
-	resp  fanout.FanoutResponse
+	req   fanout.Request
+	resp  fanout.Response
 	err   error
 	calls int
 }
 
-func (f *fakeFanoutClient) Fanout(_ context.Context, req fanout.FanoutRequest) (fanout.FanoutResponse, error) {
+func (f *fakeFanoutClient) Fanout(_ context.Context, req fanout.Request) (fanout.Response, error) {
 	f.calls++
 	f.req = req
 	if f.err != nil {
-		return fanout.FanoutResponse{}, f.err
+		return fanout.Response{}, f.err
 	}
 	return f.resp, nil
 }

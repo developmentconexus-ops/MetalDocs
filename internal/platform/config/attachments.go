@@ -7,16 +7,20 @@ import (
 	"strings"
 )
 
+// Storage provider values for METALDOCS_STORAGE_PROVIDER.
 const (
 	StorageProviderMemory StorageProvider = "memory"
 	StorageProviderLocal  StorageProvider = "local"
 	StorageProviderMinIO  StorageProvider = "minio"
 )
 
+// StorageProvider identifies which attachment storage backend is active.
 type StorageProvider string
 
+// AppEnv identifies the deployment environment (local, dev, staging, production).
 type AppEnv string
 
+// Deployment environment values for APP_ENV.
 const (
 	AppEnvLocal      AppEnv = "local"
 	AppEnvDev        AppEnv = "dev"
@@ -24,6 +28,8 @@ const (
 	AppEnvProduction AppEnv = "production"
 )
 
+// AttachmentsConfig holds attachment storage configuration read from
+// environment variables at startup.
 type AttachmentsConfig struct {
 	Provider              StorageProvider
 	AppEnv                AppEnv
@@ -40,6 +46,7 @@ type AttachmentsConfig struct {
 	MinIOAutoCreateBucket bool
 }
 
+// LoadAttachmentsConfig reads attachment storage config from environment variables.
 func LoadAttachmentsConfig() (AttachmentsConfig, error) {
 	appEnv := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
 	if appEnv == "" {
@@ -87,27 +94,36 @@ func LoadAttachmentsConfig() (AttachmentsConfig, error) {
 	}
 
 	if provider == StorageProviderMinIO {
-		cfg.MinIOEndpoint = strings.TrimSpace(os.Getenv("METALDOCS_MINIO_ENDPOINT"))
-		cfg.MinIOPublicEndpoint = strings.TrimSpace(os.Getenv("METALDOCS_MINIO_PUBLIC_ENDPOINT"))
-		cfg.MinIOAccessKey = strings.TrimSpace(os.Getenv("METALDOCS_MINIO_ACCESS_KEY"))
-		cfg.MinIOSecretKey = os.Getenv("METALDOCS_MINIO_SECRET_KEY")
-		cfg.MinIOBucket = strings.TrimSpace(os.Getenv("METALDOCS_MINIO_BUCKET"))
-		cfg.MinIORegion = strings.TrimSpace(os.Getenv("METALDOCS_MINIO_REGION"))
-		if cfg.MinIORegion == "" {
-			cfg.MinIORegion = "us-east-1"
-		}
-		cfg.MinIOUseSSL = parseBoolEnv("METALDOCS_MINIO_USE_SSL", false)
-		cfg.MinIOAutoCreateBucket = parseBoolEnv("METALDOCS_MINIO_AUTO_CREATE_BUCKET", false)
-
-		if cfg.MinIOEndpoint == "" || cfg.MinIOAccessKey == "" || cfg.MinIOSecretKey == "" || cfg.MinIOBucket == "" {
-			return AttachmentsConfig{}, fmt.Errorf("minio config missing: set METALDOCS_MINIO_ENDPOINT/METALDOCS_MINIO_ACCESS_KEY/METALDOCS_MINIO_SECRET_KEY/METALDOCS_MINIO_BUCKET")
-		}
-		if cfg.MinIOPublicEndpoint == "" {
-			cfg.MinIOPublicEndpoint = cfg.MinIOEndpoint
+		if err := applyMinIOConfig(&cfg); err != nil {
+			return AttachmentsConfig{}, err
 		}
 	}
 
 	return cfg, nil
+}
+
+// applyMinIOConfig reads the METALDOCS_MINIO_* environment variables into cfg
+// and validates that the required fields are present.
+func applyMinIOConfig(cfg *AttachmentsConfig) error {
+	cfg.MinIOEndpoint = strings.TrimSpace(os.Getenv("METALDOCS_MINIO_ENDPOINT"))
+	cfg.MinIOPublicEndpoint = strings.TrimSpace(os.Getenv("METALDOCS_MINIO_PUBLIC_ENDPOINT"))
+	cfg.MinIOAccessKey = strings.TrimSpace(os.Getenv("METALDOCS_MINIO_ACCESS_KEY"))
+	cfg.MinIOSecretKey = os.Getenv("METALDOCS_MINIO_SECRET_KEY")
+	cfg.MinIOBucket = strings.TrimSpace(os.Getenv("METALDOCS_MINIO_BUCKET"))
+	cfg.MinIORegion = strings.TrimSpace(os.Getenv("METALDOCS_MINIO_REGION"))
+	if cfg.MinIORegion == "" {
+		cfg.MinIORegion = "us-east-1"
+	}
+	cfg.MinIOUseSSL = parseBoolEnv("METALDOCS_MINIO_USE_SSL", false)
+	cfg.MinIOAutoCreateBucket = parseBoolEnv("METALDOCS_MINIO_AUTO_CREATE_BUCKET", false)
+
+	if cfg.MinIOEndpoint == "" || cfg.MinIOAccessKey == "" || cfg.MinIOSecretKey == "" || cfg.MinIOBucket == "" {
+		return fmt.Errorf("minio config missing: set METALDOCS_MINIO_ENDPOINT/METALDOCS_MINIO_ACCESS_KEY/METALDOCS_MINIO_SECRET_KEY/METALDOCS_MINIO_BUCKET")
+	}
+	if cfg.MinIOPublicEndpoint == "" {
+		cfg.MinIOPublicEndpoint = cfg.MinIOEndpoint
+	}
+	return nil
 }
 
 // ParseBoolEnv reads an environment variable and interprets it as a boolean.

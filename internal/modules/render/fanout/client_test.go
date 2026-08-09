@@ -34,7 +34,7 @@ func TestClient_Fanout_Success(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient(srv.URL, "", srv.Client())
-	resp, err := c.Fanout(context.Background(), FanoutRequest{
+	resp, err := c.Fanout(context.Background(), Request{
 		TenantID:          "t1",
 		RevisionID:        "r1",
 		BodyDocxS3Key:     "templates/x.docx",
@@ -69,7 +69,7 @@ func TestClient_Fanout_Non200(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient(srv.URL, "", srv.Client())
-	_, err := c.Fanout(context.Background(), FanoutRequest{})
+	_, err := c.Fanout(context.Background(), Request{})
 	if err == nil {
 		t.Fatal("expected error on non-200")
 	}
@@ -85,7 +85,7 @@ func TestFanout_ClassifiesTemplateDefectAsNonRetryable(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, err := NewClient(srv.URL, "", srv.Client()).Fanout(context.Background(), FanoutRequest{})
+	_, err := NewClient(srv.URL, "", srv.Client()).Fanout(context.Background(), Request{})
 	var re *RenderError
 	if !errors.As(err, &re) {
 		t.Fatalf("want *RenderError, got %T (%v)", err, err)
@@ -130,7 +130,7 @@ func TestClient_Fanout_InjectsTraceparent_WhenSpanActive(t *testing.T) {
 	defer span.End()
 
 	c := NewClient(srv.URL, "", srv.Client())
-	if _, err := c.Fanout(ctx, FanoutRequest{}); err != nil {
+	if _, err := c.Fanout(ctx, Request{}); err != nil {
 		t.Fatalf("fanout err: %v", err)
 	}
 
@@ -167,7 +167,7 @@ func TestClient_Fanout_NoTraceparent_WhenPropagatorUnset(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient(srv.URL, "", srv.Client())
-	if _, err := c.Fanout(context.Background(), FanoutRequest{}); err != nil {
+	if _, err := c.Fanout(context.Background(), Request{}); err != nil {
 		t.Fatalf("fanout err: %v", err)
 	}
 	if sawHeader {
@@ -182,7 +182,7 @@ func TestFanout_ClassifiesUnknownAsRetryable(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, err := NewClient(srv.URL, "", srv.Client()).Fanout(context.Background(), FanoutRequest{})
+	_, err := NewClient(srv.URL, "", srv.Client()).Fanout(context.Background(), Request{})
 	var re *RenderError
 	if !errors.As(err, &re) {
 		t.Fatalf("want *RenderError, got %T", err)

@@ -9,6 +9,7 @@ import (
 	"metaldocs/internal/platform/problem"
 )
 
+// OriginProtectionConfig configures OriginProtection.
 type OriginProtectionConfig struct {
 	Enabled           bool
 	SessionCookieName string
@@ -20,6 +21,9 @@ type OriginProtectionConfig struct {
 	TrustedProxyCIDRs []netip.Prefix
 }
 
+// OriginProtection blocks cross-site cookie-authenticated state-changing
+// requests (CSRF) by validating the Origin/Referer against same-origin or a
+// trusted-origins allowlist.
 type OriginProtection struct {
 	enabled           bool
 	cookieName        string
@@ -27,6 +31,7 @@ type OriginProtection struct {
 	trustedProxyCIDRs []netip.Prefix
 }
 
+// NewOriginProtection constructs an OriginProtection from cfg.
 func NewOriginProtection(cfg OriginProtectionConfig) *OriginProtection {
 	trusted := make(map[string]struct{}, len(cfg.TrustedOrigins))
 	for _, origin := range cfg.TrustedOrigins {
@@ -44,6 +49,9 @@ func NewOriginProtection(cfg OriginProtectionConfig) *OriginProtection {
 	}
 }
 
+// Wrap returns next wrapped with same-origin enforcement for cookie-carrying
+// state-changing requests, rejecting requests whose Origin/Referer fails the
+// same-origin-or-trusted-origins check.
 func (p *OriginProtection) Wrap(next http.Handler) http.Handler {
 	if !p.enabled || p.cookieName == "" {
 		return next

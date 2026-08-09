@@ -77,7 +77,7 @@ SELECT id::text, tenant_id::text, code, name, status, review_due_at
 	if err != nil {
 		return nil, fmt.Errorf("list due for review: query: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []documentsdomain.ReviewDueView
 	for rows.Next() {
@@ -118,7 +118,7 @@ SELECT DISTINCT tenant_id::text
 	if err != nil {
 		return nil, fmt.Errorf("list tenants with due reviews: query: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []string
 	for rows.Next() {

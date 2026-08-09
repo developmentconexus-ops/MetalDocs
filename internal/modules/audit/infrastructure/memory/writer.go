@@ -107,6 +107,20 @@ func (w *Writer) CountEvents(_ context.Context, query domain.ListEventsQuery) (i
 }
 
 func matches(e domain.Event, q domain.ListEventsQuery) bool {
+	if !matchesIdentity(e, q) {
+		return false
+	}
+	if !matchesAction(e, q) {
+		return false
+	}
+	if !matchesTimeWindow(e, q) {
+		return false
+	}
+	return matchesSearch(e, q)
+}
+
+// matchesIdentity checks the tenant/resource-type/resource-id/actor-id filters.
+func matchesIdentity(e domain.Event, q domain.ListEventsQuery) bool {
 	if q.TenantID != "" && e.TenantID != q.TenantID {
 		return false
 	}
@@ -119,28 +133,40 @@ func matches(e domain.Event, q domain.ListEventsQuery) bool {
 	if a := strings.TrimSpace(q.ActorID); a != "" && !strings.EqualFold(e.ActorID, a) {
 		return false
 	}
-	if act := strings.TrimSpace(q.Action); act != "" {
-		if strings.HasSuffix(act, "*") {
-			if !strings.HasPrefix(e.Action, strings.TrimSuffix(act, "*")) {
-				return false
-			}
-		} else if !strings.EqualFold(e.Action, act) {
-			return false
-		}
+	return true
+}
+
+// matchesAction checks the action filter, including trailing-"*" prefix matches.
+func matchesAction(e domain.Event, q domain.ListEventsQuery) bool {
+	act := strings.TrimSpace(q.Action)
+	if act == "" {
+		return true
 	}
+	if strings.HasSuffix(act, "*") {
+		return strings.HasPrefix(e.Action, strings.TrimSuffix(act, "*"))
+	}
+	return strings.EqualFold(e.Action, act)
+}
+
+// matchesTimeWindow checks the OccurredAfter/OccurredBefore bounds.
+func matchesTimeWindow(e domain.Event, q domain.ListEventsQuery) bool {
 	if !q.OccurredAfter.IsZero() && e.OccurredAt.Before(q.OccurredAfter) {
 		return false
 	}
 	if !q.OccurredBefore.IsZero() && !e.OccurredAt.Before(q.OccurredBefore) {
 		return false
 	}
-	if needle := strings.TrimSpace(q.Query); needle != "" {
-		hay := strings.ToLower(strings.Join([]string{e.Action, e.ActorID, e.ResourceID, e.PayloadJSON}, " "))
-		if !strings.Contains(hay, strings.ToLower(needle)) {
-			return false
-		}
-	}
 	return true
+}
+
+// matchesSearch checks the free-text Query filter against action/actor/resource/payload.
+func matchesSearch(e domain.Event, q domain.ListEventsQuery) bool {
+	needle := strings.TrimSpace(q.Query)
+	if needle == "" {
+		return true
+	}
+	hay := strings.ToLower(strings.Join([]string{e.Action, e.ActorID, e.ResourceID, e.PayloadJSON}, " "))
+	return strings.Contains(hay, strings.ToLower(needle))
 }
 
 // ValidateIntegrity always fails: the in-memory store keeps no hash chain, so

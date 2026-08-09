@@ -14,6 +14,9 @@ type FillInRepository struct {
 	schema string
 }
 
+// PlaceholderValue is a document_placeholder_values row: a single template
+// placeholder's resolved value plus its provenance (source, computed-from,
+// resolver version, inputs hash).
 type PlaceholderValue struct {
 	TenantID        string
 	RevisionID      string
@@ -44,6 +47,8 @@ func (r *FillInRepository) table(name string) string {
 	return fmt.Sprintf("%q.%q", r.schema, name)
 }
 
+// UpsertValue inserts or unconditionally overwrites a placeholder value row.
+// For the author-editable-only guarded write, use UpsertAuthorValue instead.
 func (r *FillInRepository) UpsertValue(ctx context.Context, v PlaceholderValue, q ...DBTX) error {
 	var valueTyped any
 	if v.ValueTyped != nil {
@@ -79,6 +84,7 @@ func (r *FillInRepository) UpsertValue(ctx context.Context, v PlaceholderValue, 
 	return err
 }
 
+// ListValues returns every placeholder value row recorded for a revision.
 func (r *FillInRepository) ListValues(ctx context.Context, tenantID, revisionID string) ([]PlaceholderValue, error) {
 	rows, err := r.db.QueryContext(ctx, fmt.Sprintf(`
 		SELECT placeholder_id, value_text, value_typed, source, computed_from, resolver_version, inputs_hash
@@ -89,7 +95,7 @@ func (r *FillInRepository) ListValues(ctx context.Context, tenantID, revisionID 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []PlaceholderValue
 	for rows.Next() {

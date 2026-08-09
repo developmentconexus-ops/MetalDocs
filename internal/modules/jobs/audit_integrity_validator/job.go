@@ -11,8 +11,11 @@ import (
 	auditdomain "metaldocs/internal/modules/audit/domain"
 )
 
+// JobName identifies this job type to River and in logs.
 const JobName = "audit_integrity_validator"
 
+// ErrIntegrityViolation is returned when the audit_events hash chain fails
+// validation.
 var ErrIntegrityViolation = errors.New("audit integrity violation")
 
 // AuditIntegrityValidatorArgs is the (empty) River job payload for the audit

@@ -158,7 +158,7 @@ SELECT DISTINCT rc.capability
 	if err != nil {
 		return nil, fmt.Errorf("caps for user: query: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	caps := make([]iamdomain.Capability, 0, 8)
 	for rows.Next() {

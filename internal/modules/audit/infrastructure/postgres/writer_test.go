@@ -16,7 +16,7 @@ func TestWriterRecordTxStoresHashChainColumns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { _ = db.Close() })
 
 	mock.ExpectBegin()
 	tx, err := db.BeginTx(context.Background(), nil)
@@ -82,7 +82,7 @@ func TestWriterListEventsExactPageHasNoMore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { _ = db.Close() })
 
 	// limit=3 → reader probes for limit+1 (4); only 3 rows exist → no probe row.
 	// AnyArg() for the leading filter args + a literal last arg asserts the probe
@@ -116,7 +116,7 @@ func TestWriterListEventsTrimsProbeRow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { _ = db.Close() })
 
 	// limit=3 → probe for 4; 4 rows returned → trimmed to 3 + hasMore=true.
 	// AnyArg() for the leading filter args + a literal last arg asserts the probe
@@ -147,7 +147,7 @@ func TestWriterValidateIntegrityReportsBrokenChain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { _ = db.Close() })
 
 	rows := sqlmock.NewRows([]string{
 		"audit_sequence",
@@ -185,7 +185,7 @@ func TestWriterValidateIntegrityAllowsRetainedFirstRow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { _ = db.Close() })
 
 	hash := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	rows := sqlmock.NewRows([]string{
@@ -216,7 +216,7 @@ func TestWriterValidateIntegrityStopsCollectingAfterIssueLimit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { _ = db.Close() })
 
 	rows := sqlmock.NewRows([]string{
 		"audit_sequence",

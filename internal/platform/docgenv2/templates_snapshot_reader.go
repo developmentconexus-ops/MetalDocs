@@ -12,14 +12,19 @@ import (
 
 var _ application.SnapshotTemplateReader = (*TemplatesSnapshotReader)(nil)
 
+// TemplatesSnapshotReader implements application.SnapshotTemplateReader by
+// loading published template versions authored via the templates module.
 type TemplatesSnapshotReader struct {
 	db *sql.DB
 }
 
+// NewTemplatesSnapshotReader constructs a TemplatesSnapshotReader backed by db.
 func NewTemplatesSnapshotReader(db *sql.DB) *TemplatesSnapshotReader {
 	return &TemplatesSnapshotReader{db: db}
 }
 
+// LoadForSnapshot returns the placeholder schema and DOCX storage key for the
+// published template version, for embedding into a document snapshot.
 func (r *TemplatesSnapshotReader) LoadForSnapshot(ctx context.Context, tenantID, templateVersionID string) (domain.TemplateSnapshot, error) {
 	if r.db == nil {
 		return domain.TemplateSnapshot{}, errors.New("templates snapshot reader: db is nil")

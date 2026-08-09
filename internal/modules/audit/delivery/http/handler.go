@@ -65,6 +65,12 @@ func (h *Handler) WithExporter(exporter AuditExporter) *Handler {
 	return h
 }
 
+// Name returns the module name ("audit") this handler mounts routes for.
+func (h *Handler) Name() string { return "audit" }
+
+// Tag returns the routing tag ("audit") grouping this handler's routes.
+func (h *Handler) Tag() string { return "audit" }
+
 // Mount mounts the audit module's routes onto mux via the generated
 // auditapi.ServerInterface router (HandlerWithOptions), replacing the prior
 // hand-written mux.HandleFunc registrations (T-008, residual of CON-09).
@@ -84,9 +90,6 @@ func (h *Handler) WithExporter(exporter AuditExporter) *Handler {
 // and keys off method + path, which the generated router preserves
 // byte-for-byte (AD-1: BaseURL "/api/v1" + spec's relative paths), so it is
 // unaffected by this mount-mechanism swap.
-func (h *Handler) Name() string { return "audit" }
-func (h *Handler) Tag() string  { return "audit" }
-
 func (h *Handler) Mount(mux httprouter.Muxer) {
 	auditapi.HandlerWithOptions(h, auditapi.StdHTTPServerOptions{
 		BaseRouter: mux,

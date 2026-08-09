@@ -9,6 +9,8 @@ import (
 
 type contextKey struct{}
 
+// WithTraceID returns a copy of ctx carrying traceID, provided traceID
+// normalizes to a valid value; otherwise ctx is returned unchanged.
 func WithTraceID(ctx context.Context, traceID string) context.Context {
 	if ctx == nil {
 		ctx = context.Background()
@@ -19,6 +21,8 @@ func WithTraceID(ctx context.Context, traceID string) context.Context {
 	return ctx
 }
 
+// FromContext returns the normalized trace ID stored in ctx by WithTraceID,
+// and whether one was present.
 func FromContext(ctx context.Context) (string, bool) {
 	if ctx == nil {
 		return "", false
@@ -31,6 +35,8 @@ func FromContext(ctx context.Context) (string, bool) {
 	return traceID, ok
 }
 
+// Resolve returns the trace ID carried by ctx, or generates a fresh UUID when
+// none is present.
 func Resolve(ctx context.Context) string {
 	if traceID, ok := FromContext(ctx); ok {
 		return traceID
@@ -38,6 +44,8 @@ func Resolve(ctx context.Context) string {
 	return uuid.NewString()
 }
 
+// Normalize trims raw and validates it as a trace ID: non-empty, at most 128
+// bytes, and printable ASCII only. Returns ("", false) when raw fails validation.
 func Normalize(raw string) (string, bool) {
 	traceID := strings.TrimSpace(raw)
 	if traceID == "" || len(traceID) > 128 {

@@ -18,7 +18,7 @@ func TestHasAnyRole_FiltersByTenant(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock new: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
 SELECT COUNT(*)
@@ -47,7 +47,7 @@ func TestUpsertUserAndAssignRole_PassesTenantID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectBegin()
 	mock.ExpectExec(regexp.QuoteMeta(`
@@ -107,7 +107,7 @@ func TestUpsertUserAndAssignRole_WrapsAuthzError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectBegin()
 	mock.ExpectRollback()
@@ -134,7 +134,7 @@ func TestReplaceUserRoles_DeleteThenInsert_PersistsSingleRole(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectBegin()
 	mock.ExpectExec(regexp.QuoteMeta(`
@@ -197,7 +197,7 @@ func TestHasAnyRole_OtherTenantReturnsZero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock new: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	otherTenant := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 	mock.ExpectQuery(regexp.QuoteMeta(`

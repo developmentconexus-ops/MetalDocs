@@ -87,6 +87,8 @@ func (r *MaterializeJobRunner) WithArtifactFactRecorder(rec ArtifactFactRecorder
 	return r
 }
 
+// NewMaterializeJobRunner constructs a MaterializeJobRunner from its
+// collaborators. Panics if authzSeam is nil.
 func NewMaterializeJobRunner(
 	invoker MaterializeInvoker,
 	finalDocx MaterializeFinalDocxPersister,
@@ -106,6 +108,9 @@ func NewMaterializeJobRunner(
 	}
 }
 
+// Handle processes an EventTypeMaterializeFanout event: calls the
+// docx-renderer fanout, then persists the final docx key and enqueues the PDF
+// dispatch outbox row in a single transaction.
 func (r *MaterializeJobRunner) Handle(ctx context.Context, event messaging.Event) error {
 	if r.authzSeam == nil {
 		return fmt.Errorf("materialize job runner: authz seam not configured")

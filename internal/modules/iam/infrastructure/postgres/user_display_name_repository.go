@@ -66,7 +66,7 @@ func (r *UserDisplayNameRepository) DisplayNames(ctx context.Context, tenantID s
 	if err != nil {
 		return nil, fmt.Errorf("iam: DisplayNames(%s): %w", tenantID, err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := make(map[string]string, len(userIDs))
 	for rows.Next() {

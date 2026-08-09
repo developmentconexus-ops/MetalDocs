@@ -44,8 +44,11 @@ func NewTenantDataPort(db *sql.DB) *TenantDataPort {
 
 var _ tenantdata.Port = (*TenantDataPort)(nil)
 
+// Module returns the owning module name ("audit"), identifying this port in
+// the tenant-data-export/erase registry.
 func (p *TenantDataPort) Module() string { return "audit" }
 
+// Tables returns the fully qualified tables this port owns.
 func (p *TenantDataPort) Tables() []string {
 	return []string{
 		"metaldocs.audit_events",
@@ -59,6 +62,8 @@ func (p *TenantDataPort) Tables() []string {
 const auditEventSkeletonColumns = `id, occurred_at, actor_id, action, resource_type, resource_id,
        trace_id, tenant_id, audit_sequence, prev_hash, row_hash`
 
+// ExportTenantData exports the audit_events PII-excluding skeleton plus the
+// full audit_export_jobs and governance_events rows for tenantID.
 func (p *TenantDataPort) ExportTenantData(ctx context.Context, db *sql.DB, tenantID string) ([]tenantdata.TableExport, error) {
 	skeleton, err := p.exportAuditEventSkeleton(ctx, db, tenantID)
 	if err != nil {
@@ -89,7 +94,7 @@ func (p *TenantDataPort) exportAuditEventSkeleton(ctx context.Context, db *sql.D
 	if err != nil {
 		return tenantdata.TableExport{}, fmt.Errorf("tenantdata: export audit_events skeleton: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := tenantdata.TableExport{Table: "metaldocs.audit_events", Rows: []json.RawMessage{}}
 	for rows.Next() {
@@ -105,6 +110,9 @@ func (p *TenantDataPort) exportAuditEventSkeleton(ctx context.Context, db *sql.D
 	return out, nil
 }
 
+// EraseTenantData deletes audit_export_jobs and governance_events rows for
+// tenantID within tx and reports 0 for audit_events, which is append-only
+// (crypto-shredding, not row deletion, is what erases its payload).
 func (p *TenantDataPort) EraseTenantData(ctx context.Context, tx *sql.Tx, tenantID string) (map[string]int64, error) {
 	counts := map[string]int64{
 		// audit_events: crypto-shred handles the payload (a separate

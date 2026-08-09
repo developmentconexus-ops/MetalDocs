@@ -13,6 +13,8 @@ type cacheEntry struct {
 	expiresAt time.Time
 }
 
+// CachedRoleProvider wraps a RoleProvider with TTL cache and explicit invalidation.
+//
 // CacheContract (REQ-CACHE-1, RF-3):
 //
 //	Source of truth: postgres RoleProvider. Cache-aside, per (user,tenant) key.
@@ -33,8 +35,6 @@ type cacheEntry struct {
 //	Eviction: background ticker goroutine (period = TTL) sweeps expired entries.
 //	  TTL-based expiry also evicts on the read path before returning a stale hit.
 //	Redis: no Redis cache for this provider — all caching is in-process.
-//
-// CachedRoleProvider wraps a RoleProvider with TTL cache and explicit invalidation.
 type CachedRoleProvider struct {
 	base domain.RoleProvider
 	ttl  time.Duration
@@ -84,6 +84,9 @@ func roleCacheKey(userID, tenantID string) string {
 	return userID + "|" + tenantID
 }
 
+// RolesByUserID returns the cached role set for (userID, tenantID) when the
+// entry is present and unexpired, otherwise fetches from the base provider
+// and populates the cache before returning.
 func (c *CachedRoleProvider) RolesByUserID(ctx context.Context, userID, tenantID string) ([]domain.Role, error) {
 	key := roleCacheKey(userID, tenantID)
 	now := time.Now().UTC()

@@ -166,7 +166,7 @@ func TestCommitAutosave_WithDBSetsTemplateEditAuthz(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := newFakeRepo()
 	repo.templates["tpl-1"] = &domain.Template{
@@ -301,7 +301,7 @@ func TestCommitAutosave_WithDB_LoserCommitEnvelopeRollsBack(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := newFakeRepo()
 	repo.templates["tpl-1"] = &domain.Template{

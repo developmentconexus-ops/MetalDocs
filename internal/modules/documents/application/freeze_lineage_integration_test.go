@@ -44,11 +44,11 @@ const freezeLineageTenantID = tenant.DevTenantID
 // follow the pin?".
 type recordingFanout struct {
 	calls int
-	req   fanout.FanoutRequest
-	resp  fanout.FanoutResponse
+	req   fanout.Request
+	resp  fanout.Response
 }
 
-func (f *recordingFanout) Fanout(_ context.Context, req fanout.FanoutRequest) (fanout.FanoutResponse, error) {
+func (f *recordingFanout) Fanout(_ context.Context, req fanout.Request) (fanout.Response, error) {
 	f.calls++
 	f.req = req
 	return f.resp, nil
@@ -152,7 +152,7 @@ func TestFreezeLineage_Integration_PinThenMaterializeFollowsPin(t *testing.T) {
 	body := []byte("PK\x03\x04 approved revision body")
 	revID, storageKey := stageRevisionBody(t, sqlDB, docID, body)
 
-	fanoutClient := &recordingFanout{resp: fanout.FanoutResponse{
+	fanoutClient := &recordingFanout{resp: fanout.Response{
 		ContentHash:    "deadbeef00000000000000000000000000000000000000000000000000000000",
 		FinalDocxS3Key: "final/" + docID + ".docx",
 	}}

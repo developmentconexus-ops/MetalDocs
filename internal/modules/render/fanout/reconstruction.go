@@ -8,15 +8,15 @@ import (
 	"time"
 )
 
-// FanoutInputsReader supplies the inputs needed to re-render a frozen revision
+// InputsReader supplies the inputs needed to re-render a frozen revision
 // plus the stored content_hash that pinned the original output.
-type FanoutInputsReader interface {
-	ReadForReconstruction(ctx context.Context, tenantID, revisionID string) (FanoutRequest, []byte, error)
+type InputsReader interface {
+	ReadForReconstruction(ctx context.Context, tenantID, revisionID string) (Request, []byte, error)
 }
 
-// FanoutClient is the narrow port implemented by *Client.
-type FanoutClient interface {
-	Fanout(ctx context.Context, req FanoutRequest) (FanoutResponse, error)
+// ClientPort is the narrow port implemented by *Client.
+type ClientPort interface {
+	Fanout(ctx context.Context, req Request) (Response, error)
 }
 
 // ReconstructionWriter persists a JSON entry into documents.reconstruction_attempts
@@ -45,20 +45,25 @@ type ReconstructionEntry struct {
 // ReconstructService re-renders a frozen revision for forensic comparison. It
 // never updates final_docx_s3_key or content_hash — only appends an audit entry.
 type ReconstructService struct {
-	inputs  FanoutInputsReader
-	client  FanoutClient
+	inputs  InputsReader
+	client  ClientPort
 	writer  ReconstructionWriter
 	engine  EngineVersions
 	nowFunc func() time.Time
 }
 
-func NewReconstructService(inputs FanoutInputsReader, client FanoutClient, writer ReconstructionWriter, engine EngineVersions, nowFunc func() time.Time) *ReconstructService {
+// NewReconstructService builds a ReconstructService from its dependencies. If
+// nowFunc is nil, time.Now is used.
+func NewReconstructService(inputs InputsReader, client ClientPort, writer ReconstructionWriter, engine EngineVersions, nowFunc func() time.Time) *ReconstructService {
 	if nowFunc == nil {
 		nowFunc = time.Now
 	}
 	return &ReconstructService{inputs: inputs, client: client, writer: writer, engine: engine, nowFunc: nowFunc}
 }
 
+// Reconstruct re-renders the frozen revision identified by tenantID and
+// revisionID, appends a forensic ReconstructionEntry recording whether the
+// result matches the originally pinned content hash, and returns that entry.
 func (s *ReconstructService) Reconstruct(ctx context.Context, tenantID, revisionID string) (ReconstructionEntry, error) {
 	req, originalHash, err := s.inputs.ReadForReconstruction(ctx, tenantID, revisionID)
 	if err != nil {

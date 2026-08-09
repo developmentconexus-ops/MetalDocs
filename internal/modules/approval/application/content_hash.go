@@ -74,44 +74,57 @@ func canonicalize(v any) ([]byte, error) {
 		normalized := norm.NFC.String(val)
 		return json.Marshal(normalized)
 	case []any:
-		out := []byte("[")
-		for i, elem := range val {
-			b, err := canonicalize(elem)
-			if err != nil {
-				return nil, err
-			}
-			if i > 0 {
-				out = append(out, ',')
-			}
-			out = append(out, b...)
-		}
-		return append(out, ']'), nil
+		return canonicalizeArray(val)
 	case map[string]any:
-		keys := make([]string, 0, len(val))
-		for k := range val {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-
-		out := []byte("{")
-		for i, k := range keys {
-			kb, _ := json.Marshal(norm.NFC.String(k))
-			vb, err := canonicalize(val[k])
-			if err != nil {
-				return nil, err
-			}
-			if i > 0 {
-				out = append(out, ',')
-			}
-			out = append(out, kb...)
-			out = append(out, ':')
-			out = append(out, vb...)
-		}
-		return append(out, '}'), nil
+		return canonicalizeObject(val)
 	default:
 		// Fallback for json.Number etc.
 		return json.Marshal(val)
 	}
+}
+
+// canonicalizeArray canonicalizes a JSON array element-by-element,
+// preserving original element order (array order is semantic, unlike object
+// key order).
+func canonicalizeArray(val []any) ([]byte, error) {
+	out := []byte("[")
+	for i, elem := range val {
+		b, err := canonicalize(elem)
+		if err != nil {
+			return nil, err
+		}
+		if i > 0 {
+			out = append(out, ',')
+		}
+		out = append(out, b...)
+	}
+	return append(out, ']'), nil
+}
+
+// canonicalizeObject canonicalizes a JSON object with keys sorted byte-wise
+// (UTF-8) for determinism, each key NFC-normalized before encoding.
+func canonicalizeObject(val map[string]any) ([]byte, error) {
+	keys := make([]string, 0, len(val))
+	for k := range val {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	out := []byte("{")
+	for i, k := range keys {
+		kb, _ := json.Marshal(norm.NFC.String(k))
+		vb, err := canonicalize(val[k])
+		if err != nil {
+			return nil, err
+		}
+		if i > 0 {
+			out = append(out, ',')
+		}
+		out = append(out, kb...)
+		out = append(out, ':')
+		out = append(out, vb...)
+	}
+	return append(out, '}'), nil
 }
 
 func validateNoFloats(m map[string]any) error {

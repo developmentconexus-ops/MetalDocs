@@ -190,370 +190,11 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 	var instanceID string
 	err := runner.Do(ctx, func(tx *sql.Tx) error {
 		ctx := authz.WithCapCache(ctx)
-
-		// document.submit is area-grade: pass the resolved area as-is ("" fail-closes,
-		// denying non-system actors). ADR 0022 Phase 11 (F7): shared LoadDocumentAreaCode.
-		areaCode, err := resolveSubjectAreaCode(ctx, tx, s.cdRead, req.TenantID, domain.NewDocumentSubject(req.DocumentID))
-		if err != nil {
-			return fmt.Errorf("submit: load document area: %w", err)
-		}
-		if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentSubmit), areaCode); err != nil {
-			return err
-		}
-		if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
-			return err
-		}
-
-		// Step 4a-bis (ADR 0085): a publication plan that names a CROSS-document
-		// supersede target requires document.supersede on the TARGET's area —
-		// not the submitting document's. Authority over retiring a document
-		// belongs to that document's area, and this is the one moment the
-		// caller is present to be asked; the release coordinator later acts as
-		// a system principal with no human authority to check.
-		//
-		// H-PRE-1: this authz-recording read runs here, at the top of the tx,
-		// BEFORE any FOR UPDATE. The target validation below it is likewise a
-		// plain non-locking SELECT.
-		if supersedeTargetID := strings.TrimSpace(req.SupersedeTargetID); supersedeTargetID != "" {
-			if supersedeTargetID == req.DocumentID {
-				return infrastructure.ErrInvalidSupersedeTarget
-			}
-			targetAreaCode, err := resolveSubjectAreaCode(ctx, tx, s.cdRead, req.TenantID, domain.NewDocumentSubject(supersedeTargetID))
-			if err != nil {
-				return fmt.Errorf("submit: load supersede target area: %w", err)
-			}
-			if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentSupersede), targetAreaCode); err != nil {
-				return err
-			}
-			if err := s.repo.ValidateCrossDocumentSupersedeTarget(ctx, tx, req.TenantID, req.DocumentID, supersedeTargetID); err != nil {
-				return err
-			}
-		}
-
-		// Step 4b: derive the governed documents.revision_number in-tx (T8b).
-		// This value is NEVER trusted from the client — SubmitRequest has no
-		// RevisionNumber field. Reading it here (tenant-scoped, via the caller's
-		// tx for GUC/RLS correctness) is what makes the REV>=1
-		// reason_for_change/revision_title gates and the content-hash binding
-		// fire correctly on live traffic instead of silently defaulting to 0.
-		revisionNumber, err := s.repo.LoadGovernedRevisionNumber(ctx, tx, req.TenantID, req.DocumentID)
-		if err != nil {
-			return fmt.Errorf("submit: load governed revision number: %w", err)
-		}
-
-		// Step 4c: resolve the approval route in-tx when the client omits route_id
-		// (ADR 0073 §2). An author cannot supply route_id (route listing needs an
-		// admin read the author lacks); the server resolves the single active route
-		// for the document's controlled-document profile inside the SAME
-		// transaction, closing the wrapper-era off-tx TOCTOU. Explicit client
-		// route_id keeps its exact prior semantics. Resolution runs only when the
-		// resolver is wired (production + F1 integration); unit tests that always
-		// pass an explicit route_id leave it nil and are unaffected.
-		routeID := req.RouteID
-		if strings.TrimSpace(routeID) == "" {
-			resolvedRouteID, rerr := s.resolveActiveRoute(ctx, tx, req.TenantID, req.DocumentID)
-			if rerr != nil {
-				return rerr
-			}
-			routeID = resolvedRouteID
-		}
-
-		// Step 5: load route with stages.
-		route, err := s.repo.LoadRoute(ctx, tx, req.TenantID, routeID)
-		if err != nil {
-			return fmt.Errorf("submit: load route: %w", err)
-		}
-
-		// Step 6: validate route structural invariants. The G1 per-profile
-		// route-signature policy is intentionally NOT re-read here (operator-
-		// ratified 2026-07-10, ADR 0073-era constraints; see ADR on per-profile
-		// signature policy). The invariant "every ACTIVE route conforms to its
-		// profile's current governance class" is held by construction at the
-		// write boundaries: route-admin Validate(policy) off-tx + the DEFERRABLE
-		// both-directions DB trigger (route writes AND reclassification). Submit
-		// binds only active routes, so the bound route already conforms; a livre
-		// profile's active route conforms by carrying ZERO stages, which is the
-		// shape the auto-approve step below keys off (ADR 0087 — livre profiles
-		// DO have an active route now). Re-reading the
-		// policy here cannot satisfy ADR 0073 (route/profile resolved in-tx) and
-		// H-PRE-1 (no recording CapTaxonomyView read inside this lock-holding tx)
-		// simultaneously — in-tx enforcement is structurally wrong, not merely
-		// harder. So Validate runs structural-only (empty Kind fail-closes to
-		// approval).
-		if err := route.Validate(""); err != nil {
-			return fmt.Errorf("submit: invalid route: %w", err)
-		}
-
-		revisionTitle, err := normalizeGovernedRevisionTitle(revisionNumber, req.RevisionTitle)
+		id, err := s.submitInTx(ctx, tx, req, idempotencyKey)
 		if err != nil {
 			return err
 		}
-
-		reasonForChange, reasonCategory, err := normalizeReasonForChange(revisionNumber, req.ReasonForChange, req.ReasonCategory)
-		if err != nil {
-			return err
-		}
-
-		// Step 6b: compute the content hash bound to the SAME derived governed
-		// revision_number (HS-2: this changes the hash for REV>=1 submits versus
-		// the prior always-0 behavior — see submit_service.go package docs /
-		// T8b handoff notes for the governed-semantics consequence).
-		// Step 6b-pre: resolve the head content hash in-tx when the client omits it
-		// (ADR 0073 §2). The HTTP submit boundary conveys the client hash through the
-		// reserved `_content_hash` form-data key; an empty value there means "author
-		// did not supply one" — bind the head autosaved revision's stored hash,
-		// exactly as the finalize wrapper did (prereqs.ContentHash → `_content_hash`),
-		// so content_hash_at_submit semantics are unchanged (HS-2). No `_content_hash`
-		// key at all (service-level callers passing real form data) → no resolution.
-		formData, err := s.resolveContentFormData(ctx, tx, req.TenantID, req.DocumentID, req.ContentFormData)
-		if err != nil {
-			return err
-		}
-
-		contentHash, err := ComputeContentHash(ContentHashInput{
-			TenantID:       req.TenantID,
-			DocumentID:     req.DocumentID,
-			RevisionNumber: revisionNumber,
-			FormData:       formData,
-		})
-		if err != nil {
-			return fmt.Errorf("submit: content hash: %w", err)
-		}
-
-		// Step 7: create the approval instance.
-		instanceID = uuid.New().String()
-		now := s.clock.Now()
-
-		inst := domain.Instance{
-			ID:                   instanceID,
-			TenantID:             req.TenantID,
-			DocumentID:           req.DocumentID,
-			Subject:              domain.NewDocumentSubject(req.DocumentID),
-			RouteID:              routeID,
-			RouteVersionSnapshot: route.Version,
-			Status:               domain.InstanceInProgress,
-			SubmittedBy:          req.SubmittedBy,
-			SubmittedAt:          now,
-			ContentHashAtSubmit:  contentHash,
-			IdempotencyKey:       idempotencyKey,
-			RevisionVersion:      req.RevisionVersion,
-		}
-
-		if err := s.repo.InsertInstance(ctx, tx, inst); err != nil {
-			// Pass through duplicate submission sentinel unwrapped.
-			if errors.Is(err, infrastructure.ErrDuplicateSubmission) {
-				return err
-			}
-			return fmt.Errorf("submit: %w", err)
-		}
-
-		// Step 7b: submit_choice pre-pass (M4, unit 3.2, slice 5). Fail-closed:
-		// any ChosenActors entry naming a stage_order with no submit_choice
-		// selector is rejected before any stage instance is created — no
-		// silent accept of an out-of-scope choice (no-fallback principle).
-		submitChoiceStages := stagesWithSubmitChoice(route.Stages)
-		if err := validateChosenActorsTargets(req.ChosenActors, submitChoiceStages); err != nil {
-			return err
-		}
-
-		// Step 8: create stage instances.
-		// First stage is active; all others start pending.
-		stageInstances := make([]domain.StageInstance, len(route.Stages))
-		for i, stage := range route.Stages {
-			status := domain.StagePending
-			var openedAt *time.Time
-			if i == 0 {
-				status = domain.StageActive
-				openedAt = &now
-			}
-			eligibleIDs, err := s.repo.ResolveEligibleActorsForSelectors(ctx, tx, req.TenantID, stage.Selectors, areaCode)
-			if err != nil {
-				return fmt.Errorf("submit: resolve eligible actors for stage %d: %w", stage.Order, err)
-			}
-			var chosenIDs []string
-			if sel, ok := submitChoiceStages[stage.Order]; ok {
-				chosenIDs, err = resolveSubmitChoiceEligibleIDs(ctx, tx, s.repo, req.TenantID, sel, req.ChosenActors, stage.Order)
-				if err != nil {
-					return err
-				}
-				eligibleIDs = unionUserIDs(eligibleIDs, chosenIDs)
-			}
-			if len(eligibleIDs) == 0 {
-				// W6: a stage pool that resolves to zero eligible actors can never be
-				// signed off — fail closed at submit rather than creating a stuck
-				// instance. Shared sentinel with decision_service.go's quorum-eval gap.
-				return domain.ErrEmptyEligiblePool
-			}
-			flatRole, flatArea := domain.FlatRoleArea(stage.Selectors)
-			stageInstances[i] = domain.StageInstance{
-				ID:                         uuid.New().String(),
-				ApprovalInstanceID:         instanceID,
-				StageOrder:                 stage.Order,
-				NameSnapshot:               stage.Name,
-				RequiredRoleSnapshot:       flatRole,
-				RequiredCapabilitySnapshot: stage.RequiredCapability,
-				AreaCodeSnapshot:           flatArea,
-				QuorumSnapshot:             stage.Quorum,
-				QuorumMSnapshot:            stage.QuorumM,
-				OnEligibilityDriftSnapshot: stage.OnEligibilityDrift,
-				Kind:                       stage.Kind,
-				EligibleActorIDs:           eligibleIDs,
-				Status:                     status,
-				OpenedAt:                   openedAt,
-				// DueInDaysSnapshot (F8, spec.md §4/W4): captured for EVERY
-				// stage at submit time, not just the first — a stage that
-				// activates later (via AdvanceStage) still needs its own SLA
-				// config pinned to what the route looked like at submit,
-				// consistent with every other *Snapshot field on this struct
-				// (F2 route-version pinning: in-flight instances stay pinned
-				// to the version they started on).
-				DueInDaysSnapshot: stage.DueInDays,
-				SelectorsSnapshot: materializeSelectorsSnapshot(stage.Selectors, chosenIDs),
-			}
-		}
-
-		if err := s.repo.InsertStageInstances(ctx, tx, stageInstances); err != nil {
-			return fmt.Errorf("submit: %w", err)
-		}
-
-		// Freeze boundary (F5, design spec.md §2.2): approval-only routes (no
-		// review-kind stage anywhere) have no review→approval transition for
-		// ReviewVerdictService to hook into, so this is the ONLY point content
-		// becomes immutable for them — at submit time, using the hash already
-		// computed above. Routes containing a review stage freeze later, from
-		// ReviewVerdictService.RecordVerdict's stage-advance path.
-		hasReviewStage := false
-		for _, stage := range route.Stages {
-			if stage.Kind == domain.StageKindReview {
-				hasReviewStage = true
-				break
-			}
-		}
-		if !hasReviewStage {
-			if err := executeFreeze(ctx, tx, s.repo, req.TenantID, &inst); err != nil {
-				return fmt.Errorf("submit: freeze: %w", err)
-			}
-		}
-
-		// Step 8b: transition document draft → under_review and persist the ADR
-		// 0085 publication plan in the SAME write. Friendly first-line legality
-		// check (M4/F4.1) mirrors the DB trigger; the OCC WHERE below remains
-		// the atomic CAS + optimistic-lock enforcement.
-		//
-		// The plan columns are set unconditionally, not COALESCEd: the plan is
-		// declared per submission, so a resubmission that omits it clears the
-		// previous submission's plan rather than silently inheriting it (a
-		// stale inherited effective date would hold a release nobody asked to
-		// hold). effective_from is NOT touched here — it is the actual release
-		// instant, owned solely by the release transaction.
-		if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusDraft, docsdomain.DocStatusUnderReview); err != nil {
-			return err
-		}
-		res, err := tx.ExecContext(ctx, `
-			UPDATE documents
-			   SET status                 = 'under_review',
-			       revision_title         = $4,
-			       reason_for_change      = $5,
-			       reason_category        = $6,
-			       planned_effective_from = $7,
-			       effective_to           = $8,
-			       review_due_at          = $9,
-			       superseded_document_id = $10,
-			       revision_version       = revision_version + 1
-			 WHERE id               = $1
-			   AND tenant_id        = $2
-			   AND status           = 'draft'
-			   AND revision_version = $3`,
-			req.DocumentID, req.TenantID, req.RevisionVersion, revisionTitle,
-			nullableString(reasonForChange), nullableString(reasonCategory),
-			nullableTime(req.PlannedEffectiveFrom), nullableTime(req.EffectiveTo),
-			nullableTime(req.ReviewDueAt), nullableString(strings.TrimSpace(req.SupersedeTargetID)),
-		)
-		if err != nil {
-			return fmt.Errorf("submit: transition document to under_review: %w", err)
-		}
-		n, err := res.RowsAffected()
-		if err != nil {
-			return fmt.Errorf("submit: rows affected: %w", err)
-		}
-		if n == 0 {
-			return infrastructure.ErrStaleRevision
-		}
-
-		// Step 9: emit governance event. reason_for_change/reason_category ride
-		// along in the SAME in-tx payload (F6.3 §5.2) — no second write, no
-		// separate audit call; empty/unset fields are omitted rather than
-		// serialized as "".
-		payloadMap := map[string]any{
-			"instance_id":  instanceID,
-			"route_id":     routeID,
-			"content_hash": contentHash,
-		}
-		if reasonForChange != "" {
-			payloadMap["reason_for_change"] = reasonForChange
-		}
-		if reasonCategory != "" {
-			payloadMap["reason_category"] = reasonCategory
-		}
-		payloadBytes, err := json.Marshal(payloadMap)
-		if err != nil {
-			return fmt.Errorf("submit: marshal event payload: %w", err)
-		}
-
-		event := GovernanceEvent{
-			TenantID:     req.TenantID,
-			EventType:    "approval_submitted",
-			ActorUserID:  req.SubmittedBy,
-			ResourceType: "document",
-			ResourceID:   req.DocumentID,
-			PayloadJSON:  json.RawMessage(payloadBytes),
-			OccurredAt:   now,
-		}
-		if err := s.emitter.Emit(ctx, tx, event); err != nil {
-			return fmt.Errorf("submit: emit event: %w", err)
-		}
-
-		// The audit event above is a governance record; this is the
-		// notification. They are deliberately separate paths with separate
-		// consumers — conflating them is what left submit silent.
-		//
-		// Recipients are the ACTIVE stage's eligible actors, resolved above and
-		// already snapshotted onto the stage instance. A livre route has no
-		// active stage, so recipients come out empty and nothing is enqueued —
-		// the degenerate case needs no branch of its own.
-		if recipients := activeStageEligibleIDs(stageInstances); len(recipients) > 0 {
-			if err := s.notifierOrNoop().EnqueueApprovalNotificationTx(ctx, tx, domain.ApprovalNotificationArgs{
-				EventID:          uuid.New().String(),
-				TenantID:         req.TenantID,
-				EventType:        domain.EventTypeApprovalPending,
-				SubjectKind:      "document",
-				SubjectID:        req.DocumentID,
-				RecipientUserIDs: recipients,
-				ActorUserID:      req.SubmittedBy,
-				OccurredAt:       now,
-			}); err != nil {
-				// NOT swallowed. If the notification cannot be promised, the
-				// submission is not confirmed: a half-transaction that reports
-				// success and tells nobody is the defect this feature exists to
-				// remove.
-				return fmt.Errorf("submit: enqueue approval notification: %w", err)
-			}
-		}
-
-		// Step 10 (ADR 0087): a route bound to a livre profile carries ZERO
-		// stages, so the instance created above has nothing left to satisfy and
-		// reaches terminal approval in THIS transaction. This is not a bypass —
-		// the instance exists, its audit trail exists, and the completion runs
-		// through the very same shared terminal-approval path a signoff-driven
-		// approval runs through (approval fact + pin + coordinator evaluation +
-		// documents transition + lifecycle event, ADR 0085/0044). What livre
-		// removes is human sign-off, not governance.
-		if len(route.Stages) == 0 {
-			if err := s.autoApprove(ctx, tx, req, &inst, route, areaCode, now); err != nil {
-				return err
-			}
-		}
-
+		instanceID = id
 		return nil
 	})
 	if err != nil {
@@ -562,6 +203,457 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 
 	// Step 5: return result.
 	return SubmitResult{InstanceID: instanceID}, nil
+}
+
+// submitInTx is the tx-scoped core of SubmitRevisionForReview: authz +
+// supersede-target guard, route resolution, content preparation, instance +
+// stage-instance creation, the freeze boundary, the draft→under_review
+// transition, the governance event, the pending-approval notification, and
+// (ADR 0087) the zero-stage auto-approve leg. Returns the new instance id.
+func (s *SubmitService) submitInTx(ctx context.Context, tx *sql.Tx, req SubmitRequest, idempotencyKey string) (string, error) {
+	areaCode, err := s.authorizeSubmit(ctx, tx, req)
+	if err != nil {
+		return "", err
+	}
+
+	revisionNumber, routeID, route, err := s.resolveSubmitRoute(ctx, tx, req)
+	if err != nil {
+		return "", err
+	}
+
+	revisionTitle, reasonForChange, reasonCategory, contentHash, err := s.prepareSubmitContent(ctx, tx, req, revisionNumber)
+	if err != nil {
+		return "", err
+	}
+
+	// Step 7: create the approval instance.
+	instanceID := uuid.New().String()
+	now := s.clock.Now()
+
+	inst := domain.Instance{
+		ID:                   instanceID,
+		TenantID:             req.TenantID,
+		DocumentID:           req.DocumentID,
+		Subject:              domain.NewDocumentSubject(req.DocumentID),
+		RouteID:              routeID,
+		RouteVersionSnapshot: route.Version,
+		Status:               domain.InstanceInProgress,
+		SubmittedBy:          req.SubmittedBy,
+		SubmittedAt:          now,
+		ContentHashAtSubmit:  contentHash,
+		IdempotencyKey:       idempotencyKey,
+		RevisionVersion:      req.RevisionVersion,
+	}
+
+	if err := s.repo.InsertInstance(ctx, tx, inst); err != nil {
+		// Pass through duplicate submission sentinel unwrapped.
+		if errors.Is(err, infrastructure.ErrDuplicateSubmission) {
+			return "", err
+		}
+		return "", fmt.Errorf("submit: %w", err)
+	}
+
+	// Step 7b: submit_choice pre-pass (M4, unit 3.2, slice 5). Fail-closed:
+	// any ChosenActors entry naming a stage_order with no submit_choice
+	// selector is rejected before any stage instance is created — no
+	// silent accept of an out-of-scope choice (no-fallback principle).
+	submitChoiceStages := stagesWithSubmitChoice(route.Stages)
+	if err := validateChosenActorsTargets(req.ChosenActors, submitChoiceStages); err != nil {
+		return "", err
+	}
+
+	// Step 8: create stage instances. First stage is active; all others start
+	// pending.
+	stageInstances, err := s.buildStageInstances(ctx, tx, req, route, areaCode, instanceID, submitChoiceStages, now)
+	if err != nil {
+		return "", err
+	}
+
+	if err := s.repo.InsertStageInstances(ctx, tx, stageInstances); err != nil {
+		return "", fmt.Errorf("submit: %w", err)
+	}
+
+	// Step 8a-8b: freeze boundary + document transition to under_review.
+	if err := s.freezeAndTransition(ctx, tx, req, route, &inst, revisionTitle, reasonForChange, reasonCategory); err != nil {
+		return "", err
+	}
+
+	// Step 9: emit governance event.
+	if err := s.emitSubmitEvent(ctx, tx, req, instanceID, routeID, contentHash, reasonForChange, reasonCategory, now); err != nil {
+		return "", err
+	}
+
+	// The audit event above is a governance record; this is the
+	// notification. They are deliberately separate paths with separate
+	// consumers — conflating them is what left submit silent.
+	if err := s.notifySubmit(ctx, tx, req, stageInstances, now); err != nil {
+		return "", err
+	}
+
+	// Step 10 (ADR 0087): a route bound to a livre profile carries ZERO
+	// stages, so the instance created above has nothing left to satisfy and
+	// reaches terminal approval in THIS transaction. This is not a bypass —
+	// the instance exists, its audit trail exists, and the completion runs
+	// through the very same shared terminal-approval path a signoff-driven
+	// approval runs through (approval fact + pin + coordinator evaluation +
+	// documents transition + lifecycle event, ADR 0085/0044). What livre
+	// removes is human sign-off, not governance.
+	if len(route.Stages) == 0 {
+		if err := s.autoApprove(ctx, tx, req, &inst, route, areaCode, now); err != nil {
+			return "", err
+		}
+	}
+
+	return instanceID, nil
+}
+
+// freezeAndTransition runs the two write steps that follow stage-instance
+// creation: the freeze boundary (F5, design spec.md §2.2) — approval-only
+// routes (no review-kind stage anywhere) have no review→approval transition
+// for ReviewVerdictService to hook into, so this is the ONLY point content
+// becomes immutable for them, at submit time, using the hash already
+// computed by the caller; routes containing a review stage freeze later,
+// from ReviewVerdictService.RecordVerdict's stage-advance path — and the
+// document draft → under_review transition that persists the ADR 0085
+// publication plan in the SAME write.
+func (s *SubmitService) freezeAndTransition(ctx context.Context, tx *sql.Tx, req SubmitRequest, route domain.Route, inst *domain.Instance, revisionTitle, reasonForChange, reasonCategory string) error {
+	if !routeHasReviewStage(route) {
+		if err := executeFreeze(ctx, tx, s.repo, req.TenantID, inst); err != nil {
+			return fmt.Errorf("submit: freeze: %w", err)
+		}
+	}
+	if err := s.transitionDocumentToUnderReview(ctx, tx, req, revisionTitle, reasonForChange, reasonCategory); err != nil {
+		return err
+	}
+	return nil
+}
+
+// authorizeSubmit resolves the document's area code (document.submit is
+// area-grade: pass the resolved area as-is — "" fail-closes, denying
+// non-system actors; ADR 0022 Phase 11 (F7): shared LoadDocumentAreaCode),
+// asserts document.submit and document.edit for it, and enforces the
+// cross-document supersede authority guard.
+func (s *SubmitService) authorizeSubmit(ctx context.Context, tx *sql.Tx, req SubmitRequest) (string, error) {
+	areaCode, err := resolveSubjectAreaCode(ctx, tx, s.cdRead, req.TenantID, domain.NewDocumentSubject(req.DocumentID))
+	if err != nil {
+		return "", fmt.Errorf("submit: load document area: %w", err)
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentSubmit), areaCode); err != nil {
+		return "", err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
+		return "", err
+	}
+
+	if err := s.authorizeSupersedeTarget(ctx, tx, req); err != nil {
+		return "", err
+	}
+	return areaCode, nil
+}
+
+// authorizeSupersedeTarget enforces the Step 4a-bis (ADR 0085) rule: a
+// publication plan that names a CROSS-document supersede target requires
+// document.supersede on the TARGET's area — not the submitting document's.
+// Authority over retiring a document belongs to that document's area, and
+// this is the one moment the caller is present to be asked; the release
+// coordinator later acts as a system principal with no human authority to
+// check.
+//
+// H-PRE-1: this authz-recording read runs at the top of the tx, BEFORE any
+// FOR UPDATE. The target validation below it is likewise a plain
+// non-locking SELECT.
+func (s *SubmitService) authorizeSupersedeTarget(ctx context.Context, tx *sql.Tx, req SubmitRequest) error {
+	supersedeTargetID := strings.TrimSpace(req.SupersedeTargetID)
+	if supersedeTargetID == "" {
+		return nil
+	}
+	if supersedeTargetID == req.DocumentID {
+		return infrastructure.ErrInvalidSupersedeTarget
+	}
+	targetAreaCode, err := resolveSubjectAreaCode(ctx, tx, s.cdRead, req.TenantID, domain.NewDocumentSubject(supersedeTargetID))
+	if err != nil {
+		return fmt.Errorf("submit: load supersede target area: %w", err)
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentSupersede), targetAreaCode); err != nil {
+		return err
+	}
+	return s.repo.ValidateCrossDocumentSupersedeTarget(ctx, tx, req.TenantID, req.DocumentID, supersedeTargetID)
+}
+
+// resolveSubmitRoute derives the governed documents.revision_number in-tx
+// (T8b — this value is NEVER trusted from the client; SubmitRequest has no
+// RevisionNumber field), then resolves the approval route: the
+// client-supplied route_id when present (Step 4c — an author cannot supply
+// route_id, so this is the wrapper-era exact-semantics path), otherwise the
+// single active route for the document's profile resolved in-tx (ADR 0073
+// §2, closing the wrapper-era off-tx TOCTOU).
+func (s *SubmitService) resolveSubmitRoute(ctx context.Context, tx *sql.Tx, req SubmitRequest) (int, string, domain.Route, error) {
+	revisionNumber, err := s.repo.LoadGovernedRevisionNumber(ctx, tx, req.TenantID, req.DocumentID)
+	if err != nil {
+		return 0, "", domain.Route{}, fmt.Errorf("submit: load governed revision number: %w", err)
+	}
+
+	routeID := req.RouteID
+	if strings.TrimSpace(routeID) == "" {
+		resolvedRouteID, rerr := s.resolveActiveRoute(ctx, tx, req.TenantID, req.DocumentID)
+		if rerr != nil {
+			return 0, "", domain.Route{}, rerr
+		}
+		routeID = resolvedRouteID
+	}
+
+	// Step 5: load route with stages.
+	route, err := s.repo.LoadRoute(ctx, tx, req.TenantID, routeID)
+	if err != nil {
+		return 0, "", domain.Route{}, fmt.Errorf("submit: load route: %w", err)
+	}
+
+	// Step 6: validate route structural invariants. The G1 per-profile
+	// route-signature policy is intentionally NOT re-read here (operator-
+	// ratified 2026-07-10, ADR 0073-era constraints; see ADR on per-profile
+	// signature policy). The invariant "every ACTIVE route conforms to its
+	// profile's current governance class" is held by construction at the
+	// write boundaries: route-admin Validate(policy) off-tx + the DEFERRABLE
+	// both-directions DB trigger (route writes AND reclassification). Submit
+	// binds only active routes, so the bound route already conforms; a livre
+	// profile's active route conforms by carrying ZERO stages, which is the
+	// shape the auto-approve step below keys off (ADR 0087 — livre profiles
+	// DO have an active route now). Re-reading the
+	// policy here cannot satisfy ADR 0073 (route/profile resolved in-tx) and
+	// H-PRE-1 (no recording CapTaxonomyView read inside this lock-holding tx)
+	// simultaneously — in-tx enforcement is structurally wrong, not merely
+	// harder. So Validate runs structural-only (empty Kind fail-closes to
+	// approval).
+	if err := route.Validate(""); err != nil {
+		return 0, "", domain.Route{}, fmt.Errorf("submit: invalid route: %w", err)
+	}
+
+	return revisionNumber, routeID, route, nil
+}
+
+// prepareSubmitContent normalizes the revision title and structured
+// reason-for-change, then computes the content hash bound to the SAME
+// derived governed revision_number (HS-2: this changes the hash for REV>=1
+// submits versus the prior always-0 behavior — see submit_service.go
+// package docs / T8b handoff notes for the governed-semantics consequence).
+// Step 6b-pre: resolves the head content hash in-tx when the client omits
+// it (ADR 0073 §2) — see resolveContentFormData.
+func (s *SubmitService) prepareSubmitContent(ctx context.Context, tx *sql.Tx, req SubmitRequest, revisionNumber int) (revisionTitle, reasonForChange, reasonCategory, contentHash string, err error) {
+	revisionTitle, err = normalizeGovernedRevisionTitle(revisionNumber, req.RevisionTitle)
+	if err != nil {
+		return "", "", "", "", err
+	}
+
+	reasonForChange, reasonCategory, err = normalizeReasonForChange(revisionNumber, req.ReasonForChange, req.ReasonCategory)
+	if err != nil {
+		return "", "", "", "", err
+	}
+
+	formData, err := s.resolveContentFormData(ctx, tx, req.TenantID, req.DocumentID, req.ContentFormData)
+	if err != nil {
+		return "", "", "", "", err
+	}
+
+	contentHash, err = ComputeContentHash(ContentHashInput{
+		TenantID:       req.TenantID,
+		DocumentID:     req.DocumentID,
+		RevisionNumber: revisionNumber,
+		FormData:       formData,
+	})
+	if err != nil {
+		return "", "", "", "", fmt.Errorf("submit: content hash: %w", err)
+	}
+	return revisionTitle, reasonForChange, reasonCategory, contentHash, nil
+}
+
+// buildStageInstances builds the StageInstance rows for route.Stages: the
+// first stage active (all others pending), each stage's eligible pool
+// resolved from its selectors and, for submit_choice stages, unioned with
+// the caller's validated chosen actors (M4, unit 3.2 slice 5). Fails closed
+// with domain.ErrEmptyEligiblePool when a stage's resolved pool is empty
+// (W6: shared sentinel with decision_service.go's quorum-eval gap) — a
+// stage nobody can sign off must never reach the DB.
+func (s *SubmitService) buildStageInstances(ctx context.Context, tx *sql.Tx, req SubmitRequest, route domain.Route, areaCode, instanceID string, submitChoiceStages map[int]domain.ActorSelector, now time.Time) ([]domain.StageInstance, error) {
+	stageInstances := make([]domain.StageInstance, len(route.Stages))
+	for i, stage := range route.Stages {
+		status := domain.StagePending
+		var openedAt *time.Time
+		if i == 0 {
+			status = domain.StageActive
+			openedAt = &now
+		}
+		eligibleIDs, err := s.repo.ResolveEligibleActorsForSelectors(ctx, tx, req.TenantID, stage.Selectors, areaCode)
+		if err != nil {
+			return nil, fmt.Errorf("submit: resolve eligible actors for stage %d: %w", stage.Order, err)
+		}
+		var chosenIDs []string
+		if sel, ok := submitChoiceStages[stage.Order]; ok {
+			chosenIDs, err = resolveSubmitChoiceEligibleIDs(ctx, tx, s.repo, req.TenantID, sel, req.ChosenActors, stage.Order)
+			if err != nil {
+				return nil, err
+			}
+			eligibleIDs = unionUserIDs(eligibleIDs, chosenIDs)
+		}
+		if len(eligibleIDs) == 0 {
+			return nil, domain.ErrEmptyEligiblePool
+		}
+		flatRole, flatArea := domain.FlatRoleArea(stage.Selectors)
+		stageInstances[i] = domain.StageInstance{
+			ID:                         uuid.New().String(),
+			ApprovalInstanceID:         instanceID,
+			StageOrder:                 stage.Order,
+			NameSnapshot:               stage.Name,
+			RequiredRoleSnapshot:       flatRole,
+			RequiredCapabilitySnapshot: stage.RequiredCapability,
+			AreaCodeSnapshot:           flatArea,
+			QuorumSnapshot:             stage.Quorum,
+			QuorumMSnapshot:            stage.QuorumM,
+			OnEligibilityDriftSnapshot: stage.OnEligibilityDrift,
+			Kind:                       stage.Kind,
+			EligibleActorIDs:           eligibleIDs,
+			Status:                     status,
+			OpenedAt:                   openedAt,
+			// DueInDaysSnapshot (F8, spec.md §4/W4): captured for EVERY
+			// stage at submit time, not just the first — a stage that
+			// activates later (via AdvanceStage) still needs its own SLA
+			// config pinned to what the route looked like at submit,
+			// consistent with every other *Snapshot field on this struct
+			// (F2 route-version pinning: in-flight instances stay pinned
+			// to the version they started on).
+			DueInDaysSnapshot: stage.DueInDays,
+			SelectorsSnapshot: materializeSelectorsSnapshot(stage.Selectors, chosenIDs),
+		}
+	}
+	return stageInstances, nil
+}
+
+// routeHasReviewStage reports whether route contains any review-kind stage.
+func routeHasReviewStage(route domain.Route) bool {
+	for _, stage := range route.Stages {
+		if stage.Kind == domain.StageKindReview {
+			return true
+		}
+	}
+	return false
+}
+
+// transitionDocumentToUnderReview transitions the document draft →
+// under_review and persists the ADR 0085 publication plan in the SAME
+// write. Friendly first-line legality check (M4/F4.1) mirrors the DB
+// trigger; the OCC WHERE below remains the atomic CAS + optimistic-lock
+// enforcement.
+//
+// The plan columns are set unconditionally, not COALESCEd: the plan is
+// declared per submission, so a resubmission that omits it clears the
+// previous submission's plan rather than silently inheriting it (a stale
+// inherited effective date would hold a release nobody asked to hold).
+// effective_from is NOT touched here — it is the actual release instant,
+// owned solely by the release transaction.
+func (s *SubmitService) transitionDocumentToUnderReview(ctx context.Context, tx *sql.Tx, req SubmitRequest, revisionTitle, reasonForChange, reasonCategory string) error {
+	if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusDraft, docsdomain.DocStatusUnderReview); err != nil {
+		return err
+	}
+	res, err := tx.ExecContext(ctx, `
+		UPDATE documents
+		   SET status                 = 'under_review',
+		       revision_title         = $4,
+		       reason_for_change      = $5,
+		       reason_category        = $6,
+		       planned_effective_from = $7,
+		       effective_to           = $8,
+		       review_due_at          = $9,
+		       superseded_document_id = $10,
+		       revision_version       = revision_version + 1
+		 WHERE id               = $1
+		   AND tenant_id        = $2
+		   AND status           = 'draft'
+		   AND revision_version = $3`,
+		req.DocumentID, req.TenantID, req.RevisionVersion, revisionTitle,
+		nullableString(reasonForChange), nullableString(reasonCategory),
+		nullableTime(req.PlannedEffectiveFrom), nullableTime(req.EffectiveTo),
+		nullableTime(req.ReviewDueAt), nullableString(strings.TrimSpace(req.SupersedeTargetID)),
+	)
+	if err != nil {
+		return fmt.Errorf("submit: transition document to under_review: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("submit: rows affected: %w", err)
+	}
+	if n == 0 {
+		return infrastructure.ErrStaleRevision
+	}
+	return nil
+}
+
+// emitSubmitEvent emits the approval_submitted governance event.
+// reason_for_change/reason_category ride along in the SAME in-tx payload
+// (F6.3 §5.2) — no second write, no separate audit call; empty/unset fields
+// are omitted rather than serialized as "".
+func (s *SubmitService) emitSubmitEvent(ctx context.Context, tx *sql.Tx, req SubmitRequest, instanceID, routeID, contentHash, reasonForChange, reasonCategory string, now time.Time) error {
+	payloadMap := map[string]any{
+		"instance_id":  instanceID,
+		"route_id":     routeID,
+		"content_hash": contentHash,
+	}
+	if reasonForChange != "" {
+		payloadMap["reason_for_change"] = reasonForChange
+	}
+	if reasonCategory != "" {
+		payloadMap["reason_category"] = reasonCategory
+	}
+	payloadBytes, err := json.Marshal(payloadMap)
+	if err != nil {
+		return fmt.Errorf("submit: marshal event payload: %w", err)
+	}
+
+	event := GovernanceEvent{
+		TenantID:     req.TenantID,
+		EventType:    "approval_submitted",
+		ActorUserID:  req.SubmittedBy,
+		ResourceType: "document",
+		ResourceID:   req.DocumentID,
+		PayloadJSON:  json.RawMessage(payloadBytes),
+		OccurredAt:   now,
+	}
+	if err := s.emitter.Emit(ctx, tx, event); err != nil {
+		return fmt.Errorf("submit: emit event: %w", err)
+	}
+	return nil
+}
+
+// notifySubmit enqueues the approval.pending notification (Task 6) inside
+// the same submit transaction as the audit GovernanceEvent — the
+// transactional-outbox discipline: state write and the promise to notify
+// commit together. nil notifier is treated as
+// domain.NoopApprovalNotificationEnqueuer (notifierOrNoop).
+//
+// Recipients are the ACTIVE stage's eligible actors, resolved above and
+// already snapshotted onto the stage instance. A livre route has no active
+// stage, so recipients come out empty and nothing is enqueued — the
+// degenerate case needs no branch of its own.
+func (s *SubmitService) notifySubmit(ctx context.Context, tx *sql.Tx, req SubmitRequest, stageInstances []domain.StageInstance, now time.Time) error {
+	recipients := activeStageEligibleIDs(stageInstances)
+	if len(recipients) == 0 {
+		return nil
+	}
+	if err := s.notifierOrNoop().EnqueueApprovalNotificationTx(ctx, tx, domain.ApprovalNotificationArgs{
+		EventID:          uuid.New().String(),
+		TenantID:         req.TenantID,
+		EventType:        domain.EventTypeApprovalPending,
+		SubjectKind:      "document",
+		SubjectID:        req.DocumentID,
+		RecipientUserIDs: recipients,
+		ActorUserID:      req.SubmittedBy,
+		OccurredAt:       now,
+	}); err != nil {
+		// NOT swallowed. If the notification cannot be promised, the
+		// submission is not confirmed: a half-transaction that reports
+		// success and tells nobody is the defect this feature exists to
+		// remove.
+		return fmt.Errorf("submit: enqueue approval notification: %w", err)
+	}
+	return nil
 }
 
 // autoApprove completes a stageless instance inside the submit transaction

@@ -13,27 +13,32 @@ import (
 	"metaldocs/internal/platform/tenantdata"
 )
 
-// TenantDataPort is the jobs module's M7 F7.3 TenantDataPort. It owns
+// Port is the jobs module's M7 F7.3 TenantDataPort. It owns
 // metaldocs.idempotency_keys (§3.2: operational/ephemeral, TTL'd — delete
 // rows). No FK dependencies in either direction.
-type TenantDataPort struct {
+type Port struct {
 	db *sql.DB
 }
 
 // NewTenantDataPort constructs the jobs TenantDataPort backed by db.
-func NewTenantDataPort(db *sql.DB) *TenantDataPort {
-	return &TenantDataPort{db: db}
+func NewTenantDataPort(db *sql.DB) *Port {
+	return &Port{db: db}
 }
 
-var _ tenantdata.Port = (*TenantDataPort)(nil)
+var _ tenantdata.Port = (*Port)(nil)
 
-func (p *TenantDataPort) Module() string { return "jobs" }
+// Module returns the owning module name ("jobs"), identifying this port in
+// the tenant-data-export/erase registry.
+func (p *Port) Module() string { return "jobs" }
 
-func (p *TenantDataPort) Tables() []string {
+// Tables returns the fully qualified tables this port owns.
+func (p *Port) Tables() []string {
 	return []string{"metaldocs.idempotency_keys"}
 }
 
-func (p *TenantDataPort) ExportTenantData(ctx context.Context, db *sql.DB, tenantID string) ([]tenantdata.TableExport, error) {
+// ExportTenantData exports every metaldocs.idempotency_keys row for
+// tenantID.
+func (p *Port) ExportTenantData(ctx context.Context, db *sql.DB, tenantID string) ([]tenantdata.TableExport, error) {
 	exp, err := tenantdata.ExportTable(ctx, db, "metaldocs.idempotency_keys", "tenant_id", tenantID)
 	if err != nil {
 		return nil, err
@@ -41,7 +46,9 @@ func (p *TenantDataPort) ExportTenantData(ctx context.Context, db *sql.DB, tenan
 	return []tenantdata.TableExport{exp}, nil
 }
 
-func (p *TenantDataPort) EraseTenantData(ctx context.Context, tx *sql.Tx, tenantID string) (map[string]int64, error) {
+// EraseTenantData deletes every metaldocs.idempotency_keys row for tenantID
+// within tx, returning the per-table row count erased.
+func (p *Port) EraseTenantData(ctx context.Context, tx *sql.Tx, tenantID string) (map[string]int64, error) {
 	n, err := tenantdata.EraseTable(ctx, tx, "metaldocs.idempotency_keys", "tenant_id", tenantID)
 	if err != nil {
 		return nil, err

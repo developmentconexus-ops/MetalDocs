@@ -27,45 +27,62 @@ type seedConfig struct {
 }
 
 func main() {
+	os.Exit(run())
+}
+
+// run performs the e2e seed and returns the process exit code. Body of the
+// former main(): extracted so os.Exit is called exactly once, after run
+// returns, letting `defer deps.Cleanup()` (and any later defers) run on
+// every early-return path instead of being skipped by an in-place os.Exit
+// (gocritic exitAfterDefer).
+func run() int {
 	ctx := context.Background()
 
 	repoMode, err := config.RepositoryMode()
 	if err != nil {
-		log.Fatalf("invalid repository mode: %v", err)
+		log.Printf("invalid repository mode: %v", err)
+		return 1
 	}
 	if repoMode != config.RepositoryPostgres {
-		log.Fatalf("metaldocs-e2e-seed requires postgres repository mode")
+		log.Printf("metaldocs-e2e-seed requires postgres repository mode")
+		return 1
 	}
 	attachmentsCfg, err := config.LoadAttachmentsConfig()
 	if err != nil {
-		log.Fatalf("invalid attachments config: %v", err)
+		log.Printf("invalid attachments config: %v", err)
+		return 1
 	}
 	authCfg, err := authn.LoadRuntimeConfig()
 	if err != nil {
-		log.Fatalf("invalid auth config: %v", err)
+		log.Printf("invalid auth config: %v", err)
+		return 1
 	}
 
 	deps, err := bootstrap.BuildAPIDependencies(ctx, repoMode, attachmentsCfg)
 	if err != nil {
-		log.Fatalf("build api dependencies: %v", err)
+		log.Printf("build api dependencies: %v", err)
+		return 1
 	}
 	defer deps.Cleanup()
 
 	authService, err := authapp.NewService(deps.AuthRepo, deps.RoleProvider, deps.RoleAdminRepo, iampg.NewLoginContextRepository(deps.SQLDB), authCfg)
 	if err != nil {
-		log.Fatalf("new auth service: %v", err)
+		log.Printf("new auth service: %v", err)
+		return 1
 	}
 	iamAdmin := iamapp.NewAdminService(deps.RoleAdminRepo, nil, nil, nil)
 	seed := loadSeedConfig()
 
 	exists, err := userExists(ctx, authService, seed.UserID)
 	if err != nil {
-		log.Fatalf("check existing user: %v", err)
+		log.Printf("check existing user: %v", err)
+		return 1
 	}
 
 	if !exists {
 		if err := authService.CreateUser(ctx, seed.UserID, seed.Username, seed.Email, seed.DisplayName, seed.Password, tenant.DevTenantID, []iamdomain.Role{iamdomain.RoleSystemAdmin}, "e2e-seed"); err != nil {
-			log.Fatalf("create e2e user: %v", err)
+			log.Printf("create e2e user: %v", err)
+			return 1
 		}
 	} else {
 		active := true
@@ -79,15 +96,18 @@ func main() {
 			IsActive:           &active,
 			MustChangePassword: &mustChangePassword,
 		}, seed.Password); err != nil {
-			log.Fatalf("reset e2e user: %v", err)
+			log.Printf("reset e2e user: %v", err)
+			return 1
 		}
 	}
 
 	if err := iamAdmin.UpsertUserAndAssignRole(ctx, seed.UserID, seed.DisplayName, tenant.DevTenantID, iamdomain.RoleSystemAdmin, "e2e-seed", "e2e-seed"); err != nil {
-		log.Fatalf("ensure admin role: %v", err)
+		log.Printf("ensure admin role: %v", err)
+		return 1
 	}
 
 	slog.Info("e2e seed ready", "user_id", seed.UserID, "username", seed.Username)
+	return 0
 }
 
 func loadSeedConfig() seedConfig {

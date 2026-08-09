@@ -93,33 +93,12 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		cookie, err := r.Cookie(m.cfg.SessionCookieName)
-		if err != nil || strings.TrimSpace(cookie.Value) == "" {
-			_ = problem.Write(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		currentUser, ok := m.resolveSessionOrReject(w, r)
+		if !ok {
 			return
 		}
-
-		currentUser, err := m.service.ResolveSession(r.Context(), cookie.Value)
-		if err != nil {
-			if errors.Is(err, authdomain.ErrSessionNotFound) || errors.Is(err, authdomain.ErrSessionExpired) || errors.Is(err, authdomain.ErrSessionRevoked) || errors.Is(err, authdomain.ErrIdentityInactive) {
-				_ = problem.Write(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
-				return
-			}
-			slog.Error("auth resolve session failed", "err", err)
-			_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Authentication failed"))
+		if !m.enforcePasswordChangeGate(w, r, currentUser) {
 			return
-		}
-		if currentUser.MustChangePassword {
-			// Nil checker is a misconfiguration — fail closed, never silently
-			// admit a must-change-password principal.
-			if m.passwordChangeChecker == nil {
-				_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Password change allowed checker not configured"))
-				return
-			}
-			if !m.passwordChangeChecker(r) {
-				_ = problem.Write(w, problem.New(http.StatusForbidden, problem.CodeAuthPasswordChangeRequired, "Password change is required before accessing the application"))
-				return
-			}
 		}
 
 		// Report the principal outward to the observability middleware,
@@ -136,4 +115,49 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 		r2.Header.Del("X-Tenant-ID")
 		next.ServeHTTP(w, r2)
 	})
+}
+
+// resolveSessionOrReject extracts the session cookie and resolves it via
+// m.service, writing the appropriate problem+json response and returning
+// ok=false on any failure. Extracted from Wrap; behavior unchanged.
+func (m *Middleware) resolveSessionOrReject(w http.ResponseWriter, r *http.Request) (authdomain.CurrentUser, bool) {
+	cookie, err := r.Cookie(m.cfg.SessionCookieName)
+	if err != nil || strings.TrimSpace(cookie.Value) == "" {
+		_ = problem.Write(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		return authdomain.CurrentUser{}, false
+	}
+
+	currentUser, err := m.service.ResolveSession(r.Context(), cookie.Value)
+	if err != nil {
+		if errors.Is(err, authdomain.ErrSessionNotFound) || errors.Is(err, authdomain.ErrSessionExpired) || errors.Is(err, authdomain.ErrSessionRevoked) || errors.Is(err, authdomain.ErrIdentityInactive) {
+			_ = problem.Write(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+			return authdomain.CurrentUser{}, false
+		}
+		slog.Error("auth resolve session failed", "err", err)
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Authentication failed"))
+		return authdomain.CurrentUser{}, false
+	}
+	return currentUser, true
+}
+
+// enforcePasswordChangeGate rejects a MustChangePassword principal unless
+// the route is one of the allowed exceptions, writing the appropriate
+// problem+json response and returning false on rejection. A principal that
+// does not have MustChangePassword set always passes. Extracted from Wrap;
+// behavior unchanged.
+func (m *Middleware) enforcePasswordChangeGate(w http.ResponseWriter, r *http.Request, currentUser authdomain.CurrentUser) bool {
+	if !currentUser.MustChangePassword {
+		return true
+	}
+	// Nil checker is a misconfiguration — fail closed, never silently
+	// admit a must-change-password principal.
+	if m.passwordChangeChecker == nil {
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Password change allowed checker not configured"))
+		return false
+	}
+	if !m.passwordChangeChecker(r) {
+		_ = problem.Write(w, problem.New(http.StatusForbidden, problem.CodeAuthPasswordChangeRequired, "Password change is required before accessing the application"))
+		return false
+	}
+	return true
 }

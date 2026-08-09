@@ -19,11 +19,15 @@ const (
 	maxPDFBodyBytes   = 64 * 1024 * 1024
 )
 
+// Client is a thin HTTP client for the Gotenberg document-conversion service
+// (Chromium HTML→PDF and LibreOffice docx→PDF routes).
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
 }
 
+// NewClient constructs a Client for the Gotenberg service at baseURL, which
+// must be an absolute http(s) URL.
 func NewClient(baseURL string) (*Client, error) {
 	baseURL = strings.TrimSpace(baseURL)
 	if baseURL == "" {
@@ -86,7 +90,7 @@ func (c *Client) ConvertHTMLToPDF(ctx context.Context, htmlBytes []byte, cssByte
 	if err != nil {
 		return nil, fmt.Errorf("gotenberg: html request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		payload, err := readLimitedBody(resp.Body, maxErrorBodyBytes)
@@ -103,6 +107,8 @@ func (c *Client) ConvertHTMLToPDF(ctx context.Context, htmlBytes []byte, cssByte
 	return pdfBytes, nil
 }
 
+// ConvertDocxToPDF converts docxContent to PDF via the LibreOffice route,
+// preserving the docx's own page geometry.
 func (c *Client) ConvertDocxToPDF(ctx context.Context, docxContent []byte) ([]byte, error) {
 	return c.ConvertDocxToPDFWithOptions(ctx, docxContent, "", false)
 }
@@ -156,7 +162,7 @@ func (c *Client) ConvertDocxToPDFWithOptions(ctx context.Context, docxContent []
 	if err != nil {
 		return nil, fmt.Errorf("gotenberg: request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, err := readLimitedBody(resp.Body, maxErrorBodyBytes)
