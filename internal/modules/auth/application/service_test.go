@@ -623,6 +623,9 @@ func TestResolveSession_ReadsTenantFromSession(t *testing.T) {
 // whose absolute TTL is still valid but whose last activity is older than the
 // idle window must be rejected with ErrSessionExpired; activity within the window
 // resolves normally. The check is measured against the pre-touch LastSeenAt.
+// Also guards REQ-AUTHN-3's bounded-TTL clause: a session token that resolved
+// before its window closed must stop resolving after — the token's validity
+// is bounded, not indefinite.
 func TestResolveSession_IdleTimeout(t *testing.T) {
 	const idleWindow = 30 * time.Minute
 	base := time.Date(2026, 6, 8, 9, 0, 0, 0, time.UTC)
@@ -1030,6 +1033,10 @@ SELECT EXISTS (
 	}
 }
 
+// TestLogout_EmptyAndMalformedTokenReturnError also guards REQ-AUTHN-3's
+// comparison clause: a malformed/tampered cookie value is rejected via
+// tokenHashFromCookieValue's hmac.Equal signature check (service.go:1223),
+// never treated as a valid session lookup key.
 func TestLogout_EmptyAndMalformedTokenReturnError(t *testing.T) {
 	svc := mustNewService(t, memory.NewRepository(), newMockRoleProvider(), newMockRoleAdminRepository(), Config{
 		SessionSecret: testSessionSecret,
@@ -1045,7 +1052,9 @@ func TestLogout_EmptyAndMalformedTokenReturnError(t *testing.T) {
 
 // TestChangePasswordForUser_RevokesSessions guards A3 (CWE-613): a self-service
 // password change must revoke the user's existing sessions so a stolen or stale
-// session cannot survive the change.
+// session cannot survive the change. Also guards REQ-AUTHN-3's server-side
+// revocation clause (bulk path): revocation happens on the server without any
+// cooperation from the bearer, and a revoked token stops resolving immediately.
 func TestChangePasswordForUser_RevokesSessions(t *testing.T) {
 	repo := memory.NewRepository()
 	roleProvider := newMockRoleProvider()
@@ -1137,7 +1146,8 @@ func f8_4NewActiveUserService(t *testing.T, userID string) (*Service, *memory.Re
 
 // TestUpdateUser_DeactivateRevokesSessions guards F8.4 (CWE-613, write path): when
 // auth.UpdateUser flips IsActive false, every existing session for that user is
-// revoked so it cannot survive deactivation.
+// revoked so it cannot survive deactivation. Also guards REQ-AUTHN-3's
+// server-side revocation clause (bulk path, deactivation trigger).
 func TestUpdateUser_DeactivateRevokesSessions(t *testing.T) {
 	userID := "deact-revoke-user"
 	svc, _, ctx := f8_4NewActiveUserService(t, userID)

@@ -120,7 +120,7 @@ sequenceDiagram
 
 - **REQ-AUTHN-1** Passwords hashed with a memory-hard KDF (Argon2id family); verification constant-time; failure responses identical for unknown-user vs wrong-password. (MUST)
 - **REQ-AUTHN-2** Sessions/tokens are revocable, carry tenant + principal, and expire. Sensitive operations require step-up re-authentication (existing reauth flow is the pattern). (MUST)
-- **REQ-AUTHN-3** Token handling follows RFC 8725 (alg pinning, no `none`, audience/issuer checks, short TTL). (MUST)
+- **REQ-AUTHN-3** Session tokens are opaque and carry no self-asserted authorization claims; token material is CSPRNG-generated with at least 256 bits of entropy; the server-side-persisted form is a one-way hash of the token, never the raw token; presented-token verification uses a constant-time comparison; sessions have a bounded TTL (absolute and/or sliding); sessions are revocable server-side (single-session and bulk-by-user) without cooperation from the bearer. RFC 8725 (JWT Best Current Practices) does not apply — there is no JWT in this codebase and adopting one for sessions would be a downgrade (loses cheap server-side revocation); see ADR 0094 for the clause-by-clause disposition. (MUST — see ADR [0094](../decisions/0094-session-tokens-opaque-rfc8725-not-applicable.md))
 - **REQ-AUTHN-4** Login, logout, failed login, session revocation, and re-auth all emit audit events. (MUST)
 
 ### 3.2 Authorization — the single PDP (per ADR 0022, end state)
