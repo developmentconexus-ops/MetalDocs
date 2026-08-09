@@ -60,14 +60,15 @@ const (
 
 func main() {
 	var (
-		profile = flag.String("profile", ProfileFast, "which profile to run: "+strings.Join(profileOrder, ", "))
-		list    = flag.Bool("list", false, "print the registry grouped by profile and exit")
-		audit   = flag.Bool("audit", false, "report checks with no CI job, and exit non-zero if any exist")
-		only    = flag.String("only", "", "comma-separated check IDs to run, ignoring the profile")
-		changed = flag.Bool("changed", false, "narrow whatever selection --only/--profile made to checks whose declared Paths the diff against --base touches; --profile=changed implies this")
-		base    = flag.String("base", "origin/main", "base ref for --changed / --profile=changed")
-		jobs    = flag.Int("j", defaultParallelism(), "how many checks to run concurrently")
-		verbose = flag.Bool("v", false, "stream output of passing checks too")
+		profile           = flag.String("profile", ProfileFast, "which profile to run: "+strings.Join(profileOrder, ", "))
+		list              = flag.Bool("list", false, "print the registry grouped by profile and exit")
+		audit             = flag.Bool("audit", false, "report checks with no CI job, and exit non-zero if any exist")
+		testdbBypassGuard = flag.Bool("testdb-bypass-guard", false, "report _test.go files that bypass testdb.Open via raw DATABASE_URL/METALDOCS_DATABASE_URL + sql.Open, and exit non-zero if any exist")
+		only              = flag.String("only", "", "comma-separated check IDs to run, ignoring the profile")
+		changed           = flag.Bool("changed", false, "narrow whatever selection --only/--profile made to checks whose declared Paths the diff against --base touches; --profile=changed implies this")
+		base              = flag.String("base", "origin/main", "base ref for --changed / --profile=changed")
+		jobs              = flag.Int("j", defaultParallelism(), "how many checks to run concurrently")
+		verbose           = flag.Bool("v", false, "stream output of passing checks too")
 		// In CI a SKIP is indistinguishable from a PASS at the exit code, so a
 		// job can report green over zero executed tests. This flag makes
 		// "cannot run here" fatal, and CI always passes it.
@@ -93,6 +94,8 @@ func main() {
 		return
 	case *audit:
 		os.Exit(printAudit(filepath.Join(".github", "workflows")))
+	case *testdbBypassGuard:
+		os.Exit(printTestdbBypassGuard())
 	}
 
 	selected, scoped, err := selectChecks(*profile, *only, *base, *changed)

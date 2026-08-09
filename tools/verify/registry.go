@@ -303,6 +303,25 @@ var checks = []Check{
 		Paths:    []string{"scripts/check-test-discipline.sh", "scripts/check-test-discipline-selftest.sh", "scripts/testdata/test-discipline/"},
 		CIJob:    "ci.yml:verify",
 	},
+	{
+		ID:   "testdb-bypass-guard",
+		Desc: "no _test.go file bypasses testdb.Open via raw DATABASE_URL/METALDOCS_DATABASE_URL + sql.Open (ADR 0034) — the class of defect fixed at least five times, most recently 1a0663f5",
+		// Same self-invocation shape as verify-audit below: the check's own
+		// logic lives in tools/verify itself (testdbbypass.go), tested by
+		// go test ./tools/verify/... like any other file in this package,
+		// and its Argv shells back into `go run ./tools/verify
+		// --testdb-bypass-guard` as a subprocess rather than a separate
+		// script or tool directory.
+		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
+		Argv:     []string{"go", "run", "./tools/verify", "--testdb-bypass-guard"},
+		// tools/verify/ is the check's own definition (whole-branch review
+		// C2 class): without it here, a PR that only weakens
+		// testdbbypass.go's detection while touching no internal/, apps/,
+		// or tests/ file selects zero checks over the change that most
+		// needs catching.
+		Paths: []string{"internal/", "apps/", "tests/", "tools/verify/"},
+		CIJob: "ci.yml:verify",
+	},
 
 	// ---- Governance -------------------------------------------------------
 	{
