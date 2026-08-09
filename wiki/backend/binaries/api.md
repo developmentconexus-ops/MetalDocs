@@ -76,7 +76,7 @@ All environment variables are parsed and validated before any module is construc
 | `ENABLE_JOB_STUCK_INSTANCE_WATCHDOG` | **enabled unless `false`** | — | `main.go:528-540, 835-837` | Leased job gate (opt-out semantics) |
 | `ENABLE_JOB_IDEMPOTENCY_JANITOR` | **enabled unless `false`** | — | `main.go:541-548, 835-837` | Leased job gate |
 | `ENABLE_JOB_AUDIT_INTEGRITY_VALIDATOR` | **enabled unless `false`** | — | `main.go:549-555, 835-837` | Leased job gate |
-| `ENABLE_JOB_LEASE_REAPER` | **enabled unless `false`** | — | `main.go:556-559, 835-837` | Leased job gate |
+| ~~`ENABLE_JOB_LEASE_REAPER`~~ | — | — | — | **Retired (M5)** with the Postgres-lease scheduler; periodic jobs now run via River (ADR 0067). The `ENABLE_JOB_*` rows above date from the lease-scheduler era — verify against current `main.go` before relying on them. *(annotation 2026-08-09)* |
 | `AUDIT_RETENTION_DAYS` | 0 (disabled) | — | `main.go:575` | Daily audit-events purge; 0 = no purge |
 | `APP_PORT` | `8080` | — | `main.go:604-611` | Listen port (`scripts/start-api.ps1:241` sets `8081` for dev) |
 | `APP_ENV` | — | — | `authn/config.go:39, 139` | Governs auth-disabled allowance and cookie security defaults |
