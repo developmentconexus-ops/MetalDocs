@@ -135,6 +135,20 @@ type argon2idParams struct {
 // it cannot be used to skip, weaken, or reconfigure the KDF itself — every
 // increment sits directly next to the real compute call it measures, not a
 // substitute for it.
+//
+// Execution-phase invariant: this counter is process-wide and read as a
+// before/after delta across a single call
+// (internal/modules/auth/application/service_test.go's
+// TestAuthenticate_TimingConstant), so any other test that invokes the KDF
+// concurrently with that delta read would corrupt it. This is currently safe
+// only because Go's test runner defers every t.Parallel() test's body until
+// all serial (non-parallel) tests in the package finish — see
+// TestAuthenticate_ConcurrentWrongPasswordBoundedByLock, which is
+// t.Parallel() and fires the KDF 50x concurrently, but by construction never
+// overlaps a serial test's delta read. If a future auth test calls
+// t.Parallel() and invokes the KDF without also being serialized after
+// TestAuthenticate_TimingConstant, the delta-based assertion can silently
+// undercount or overcount.
 var kdfInvocations atomic.Uint64
 
 // KDFInvocations returns the number of KDF computations (Argon2id or

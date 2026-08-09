@@ -281,6 +281,42 @@ func TestAuthenticate_PreservesPasswordWhitespace(t *testing.T) {
 // still take longer than a KDF could ever run instantaneously. Contention
 // only ever pushes elapsed time up, never down, so this floor cannot flake
 // under load the way the old cross-path ratio comparison could.
+//
+// A cross-path wall-clock ratio is also kept, but it is now a coarse
+// backstop, not the precise guarantee — that job belongs to the KDF-count
+// assertion above, which proves neither path short-circuits *before* the
+// KDF runs. The ratio's only remaining job is to catch gross asymmetry
+// *downstream* of the KDF: e.g. the known-identifier branch growing extra
+// synchronous work after passwordhash.Verify (service.go:358) that the
+// unknown-identifier branch never performs (it returns immediately after
+// its dummy-hash compare, service.go:329-330). A real instance of that shape
+// already exists in production: the known-user wrong-password branch calls
+// tx.RecordFailedLogin inside the WithinLoginLock transaction (service.go:371),
+// which issues a Postgres UPDATE...RETURNING and commits the advisory-lock
+// transaction — real network round trips the unknown-identifier path never
+// makes. The in-memory repository used here also does a (much cheaper)
+// mutex-protected map write for the same branch, so this test's own known
+// path is never perfectly symmetric with its unknown path either — that
+// residual is why the bound below has to be wide.
+//
+// The bound was chosen by measurement, not guessed: across ~65 runs of this
+// probe under sustained CPU contention (2-3 concurrent `go build -a ./...`
+// processes racing this test for cores), the observed unknown/known wall-clock
+// ratio ranged ~1.00-2.68x on pure OS-scheduling noise alone (no code
+// asymmetry present - repo is in-memory, both branches are O(1) beyond the
+// KDF). A prior run of the old 3.0x bound was independently observed to hit
+// 5.93x under load before this rewrite. 10x sits with real headroom above
+// both data points (≈1.7x above the worst historical sample, ≈3.7x above the
+// worst sample measured for this change) so ordinary contention cannot trip
+// it. That headroom is also why it is deliberately NOT tight enough to catch
+// a single extra DB round trip (the production case above moves the ratio by
+// a few percent, not by 10x) - only a gross asymmetry (an accidental extra
+// KDF-equivalent computation, a blocking network call, an unbounded loop)
+// added to one path and not the other would move the ratio this far. That
+// narrower class of bug (a modest, single extra synchronous write on only one
+// path) is a real, accepted, uncovered gap - see the production-asymmetry
+// note above; no wall-clock bound can both stay contention-immune and catch
+// it, so it is not this test's job to catch it.
 func TestAuthenticate_TimingConstant(t *testing.T) {
 	repo := memory.NewRepository()
 	roleProvider := newMockRoleProvider()
@@ -362,6 +398,19 @@ func TestAuthenticate_TimingConstant(t *testing.T) {
 	}
 	if knownElapsed < floor {
 		t.Fatalf("known-user path too fast (%v < %v)", knownElapsed, floor)
+	}
+
+	// Coarse cross-path backstop (see doc comment above for how this bound
+	// was measured and why it is this wide): only a gross asymmetry
+	// downstream of the KDF — not a single extra DB round trip — can trip it.
+	const maxRatio = 10.0
+	ratio := float64(unknownElapsed) / float64(knownElapsed)
+	if ratio < 1 {
+		ratio = 1 / ratio
+	}
+	if ratio > maxRatio {
+		t.Fatalf("cross-path wall-clock ratio = %.2f (unknown=%v known=%v), want <= %.1f: gross downstream asymmetry",
+			ratio, unknownElapsed, knownElapsed, maxRatio)
 	}
 }
 
