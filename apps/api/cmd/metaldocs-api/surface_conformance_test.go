@@ -316,14 +316,48 @@ func firstRoleNotIn(all, granting []string) string {
 	panic("firstRoleNotIn: granting is not a proper subset of all — caller invariant violated")
 }
 
+// unreachableBaseline pins the CURRENT unreachable-operation frontier so
+// TestNoDeclaredOperationIsUnreachable stays a ratchet instead of a
+// permanently-red gate.
+//
+// TRANSITIONAL — this baseline is a local maximum, not the fix. The defect it
+// pins is the tier-1/tier-2 grant-table split (ADR 0007): metaldocs.role_capabilities
+// seeds area_admin, qms_admin and signer, which chk_iam_user_roles_role_code
+// forbids ever assigning to a real user, so any capability granted only by
+// those roles (or by no role at all) is unreachable by any real user in any
+// environment. The global-maximum structure that actually closes the gap is
+// the authz-grant-unification design
+// (docs/superpowers/specs/2026-08-07-authz-grant-unification-design.md,
+// status "design, pending operator review"). The milestone that deletes this
+// baseline is that program's acceptance criterion F7: "TestNoDeclaredOperationIsUnreachable
+// green by the unreachable set being empty." When a fix shrinks the live
+// finding set, delete the corresponding entry here in the SAME commit — do
+// not widen this baseline to paper over a new regression, and once it is
+// empty, delete this var and the diff logic below, restoring the plain
+// empty-set assertion this test used before the ratchet.
+//
+// Keyed by capability -> sorted unassignable-granter roles (not capability
+// name alone): a seed change that keeps a capability unreachable but changes
+// WHO would grant it if the role catalog were widened is itself a frontier
+// change, and must fail the ratchet rather than passing silently.
+var unreachableBaseline = map[string][]string{
+	"distribution.read": nil,
+	"document.obsolete": {"area_admin", "qms_admin"},
+	"document.review":   {"area_admin", "qms_admin"},
+	"notification.read": nil,
+	"template.archive":  {"qms_admin"},
+}
+
 // TestNoDeclaredOperationIsUnreachable is the finding, extracted: a
 // permission-guarded operation whose capability is granted by no ASSIGNABLE
 // role can be invoked by no user in any environment. Pre-existing:
 // metaldocs.role_capabilities seeds area_admin, qms_admin and signer, which
-// chk_iam_user_roles_role_code forbids assigning. This test is red until the
-// role-catalog decision lands — it is not this suite's job to fix the seed
-// data, only to make the gap loud, precise, and impossible to bury inside 10
-// scattered per-operation subtest failures.
+// chk_iam_user_roles_role_code forbids assigning. The live finding set is
+// compared against unreachableBaseline (see its comment for why this is a
+// ratchet, not a bypass) rather than asserted empty outright — it is not this
+// suite's job to fix the seed data, only to make the gap loud, precise, and
+// impossible to bury inside 10 scattered per-operation subtest failures, AND
+// to catch any NEW unreachable operation the instant it appears.
 func TestNoDeclaredOperationIsUnreachable(t *testing.T) {
 	db := testdb.New(t)
 
@@ -351,28 +385,66 @@ func TestNoDeclaredOperationIsUnreachable(t *testing.T) {
 		}
 	}
 
-	if len(findings) == 0 {
+	allCapabilities := make(map[string]struct{}, len(findings)+len(unreachableBaseline))
+	for capability := range findings {
+		allCapabilities[capability] = struct{}{}
+	}
+	for capability := range unreachableBaseline {
+		allCapabilities[capability] = struct{}{}
+	}
+
+	var extra, missing []string
+	for capability := range allCapabilities {
+		live, isLive := findings[capability]
+		baselineGranters, inBaseline := unreachableBaseline[capability]
+		switch {
+		case isLive && !inBaseline:
+			extra = append(extra, capability)
+		case !isLive && inBaseline:
+			missing = append(missing, capability)
+		case isLive && inBaseline && !equalRoleSets(live.unassignableGranters, baselineGranters):
+			// Still unreachable, but the set of roles that WOULD grant it
+			// changed — the frontier moved even though membership didn't.
+			// Report it on both sides so the diff table shows old vs new.
+			extra = append(extra, capability)
+			missing = append(missing, capability)
+		}
+	}
+
+	if len(extra) == 0 && len(missing) == 0 {
 		return
 	}
 
-	capabilities := make([]string, 0, len(findings))
-	for capability := range findings {
-		capabilities = append(capabilities, capability)
-	}
-	sort.Strings(capabilities)
+	sort.Strings(extra)
+	sort.Strings(missing)
 
-	var b strings.Builder
-	b.WriteString("permission-guarded operation(s) gated on a capability NO assignable role grants — unreachable by any real user in any environment (pre-existing: metaldocs.role_capabilities seeds area_admin/qms_admin/signer, which chk_iam_user_roles_role_code forbids assigning to a real user):\n")
-	fmt.Fprintf(&b, "%-24s | %-30s | %s\n", "capability", "granting unassignable roles", "operations")
-	for _, capability := range capabilities {
-		f := findings[capability]
+	renderRow := func(b *strings.Builder, capability string, f *finding) {
 		sort.Strings(f.operations)
 		granters := "(none — no role at all, assignable or not, grants this)"
 		if len(f.unassignableGranters) > 0 {
 			granters = strings.Join(f.unassignableGranters, ",")
 		}
-		fmt.Fprintf(&b, "%-24s | %-30s | %s\n", capability, granters, strings.Join(f.operations, ", "))
+		fmt.Fprintf(b, "%-24s | %-30s | %s\n", capability, granters, strings.Join(f.operations, ", "))
 	}
+
+	var b strings.Builder
+	b.WriteString("TestNoDeclaredOperationIsUnreachable: live unreachable-operation set does not match the pinned baseline (unreachableBaseline, this file).\n")
+
+	if len(extra) > 0 {
+		b.WriteString("\nNEW unreachable operation — fix the grant, do not add to this baseline without an ADR:\n")
+		fmt.Fprintf(&b, "%-24s | %-30s | %s\n", "capability", "granting unassignable roles", "operations")
+		for _, capability := range extra {
+			renderRow(&b, capability, findings[capability])
+		}
+	}
+
+	if len(missing) > 0 {
+		b.WriteString("\nfrontier shrank — delete this baseline entry in the same commit:\n")
+		for _, capability := range missing {
+			fmt.Fprintf(&b, "  %-24s | baseline granters: %s\n", capability, strings.Join(unreachableBaseline[capability], ","))
+		}
+	}
+
 	t.Errorf("%s", b.String())
 }
 
