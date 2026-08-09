@@ -48,12 +48,45 @@ function Test-RealCodeChange([string]$file) {
   return (($added -join "`n") -ne ($removed -join "`n"))
 }
 
+# A rule below asks a human-judgment question ("did this change the
+# contract?"), so it needs a human-answer channel that is not a bypass:
+# an auditable waiver. A waiver is valid ONLY for the diff that ADDS it —
+# this checks `git diff $BaseRef...HEAD` of the waiver file, never its merged
+# contents, so merged entries are permanent audit records that waive nothing
+# for later PRs. The reviewer sees the waiver claim in the PR diff and can
+# contest it. Default stays fail-closed: no added entry, rule fails as before.
+function Test-Waived([string]$ruleId) {
+  $added = git diff -w "$BaseRef...HEAD" -- scripts/check-governance-waivers.txt |
+    Where-Object { ($_ -match '^\+') -and ($_ -notmatch '^\+\+\+') } |
+    ForEach-Object { $_.Substring(1) }
+  $entries = @($added | Where-Object { $_ -match "^\s*$([regex]::Escape($ruleId))\s*\|" })
+  if ($entries.Count -gt 0) {
+    Write-Host "[governance-check] rule '$ruleId' waived by entry added in this diff:"
+    $entries | ForEach-Object { Write-Host "  $_" }
+    return $true
+  }
+  return $false
+}
+
 # API contract-impacting changes must update OpenAPI.
 # We intentionally scope to delivery/http handlers and API spec files to avoid false positives
 # for non-contract bootstrap changes in apps/api.
 # _test.go is excluded deliberately: a test exercises the contract, it cannot
 # change it. Demanding an openapi.yaml edit because a handler TEST moved is
 # the same cry-wolf failure as the whitespace case above.
+#
+# TRANSITIONAL RULE (labelled per CLAUDE.md "Global Maximum, Not Local
+# Maximum"). This is a heuristic proxy: "handler file changed" ≈ "contract may
+# have changed". It exists because only 4 of 15 modules sit behind the
+# generated boundary (the contract-sync gated set); in every other module a
+# hand-written handler CAN change wire behaviour (status, shape) without
+# touching the spec, and no deterministic check catches that. Global-maximum
+# structure: generated boundary in every module — typed responses make wire
+# drift unrepresentable, contract-sync goes total, and this rule plus its
+# waiver file are DELETED. Deletion milestone: contract-sync covers all 15
+# modules (ROADMAP: generated-boundary expansion). Because the rule asks a
+# human-judgment question, it carries a human-answer channel — see
+# Test-Waived and scripts/check-governance-waivers.txt.
 if ($changedText -match '(?m)^internal/modules/.+/delivery/http/.+(?<!_test)\.go$') {
   if ($changedText -notmatch '(?m)^api/openapi/v1/openapi.yaml$') {
     # Comment-only exemption — see Test-RealCodeChange (found for real: the
@@ -63,15 +96,21 @@ if ($changedText -match '(?m)^internal/modules/.+/delivery/http/.+(?<!_test)\.go
       $_ -match '^internal/modules/.+/delivery/http/' -and $_ -match '\.go$' -and $_ -notmatch '_test\.go$'
     }
     $realChange = @($handlerFiles | Where-Object { Test-RealCodeChange $_ })
-    if ($realChange.Count -gt 0) {
-      Fail "API contract change detected without OpenAPI update."
+    if ($realChange.Count -gt 0 -and -not (Test-Waived 'api-contract-openapi')) {
+      Fail "API contract change detected without OpenAPI update. If the handler change provably does not alter the wire contract, add a justified waiver line to scripts/check-governance-waivers.txt (see its header)."
     }
   }
 }
 
+# Same judgment-question class as the contract rule above ("does this domain
+# change need new tests?"), so it shares the same adjudication channel. A
+# mechanical refactor (lint sweep, rename, decomposition) whose behaviour is
+# already pinned by the existing suites has no honest tests/ edit to make.
 if ($changedText -match '(?m)^internal/modules/') {
   if ($changedText -notmatch '(?m)^tests/') {
-    Fail "Domain change detected without test updates under tests/."
+    if (-not (Test-Waived 'domain-tests')) {
+      Fail "Domain change detected without test updates under tests/. If the change provably needs no new tests (behaviour pinned by existing suites), add a justified waiver line to scripts/check-governance-waivers.txt (see its header)."
+    }
   }
 }
 
