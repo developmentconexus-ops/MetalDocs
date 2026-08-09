@@ -82,16 +82,18 @@ func TestExtractReqs_Fixture(t *testing.T) {
 }
 
 // TestExtractReqs_RealDoc smoke-tests extraction against the actual governing
-// architecture doc: 67 unique REQ IDs, 61 MUST-classified, 6 SHOULD-classified,
-// 0 MAY-classified (verified facts from the F9.2 spec/plan).
+// architecture doc: 68 unique REQ IDs, 61 MUST-classified, 7 SHOULD-classified,
+// 0 MAY-classified. Was 67/61/6/0 (F9.2 spec/plan) until ADR 0095 split
+// REQ-SEARCH-1 into REQ-SEARCH-1 (kept, MUST) + REQ-SEARCH-2 (new, SHOULD) —
+// total +1, MUST unchanged, SHOULD +1.
 func TestExtractReqs_RealDoc(t *testing.T) {
 	path := filepath.Join("..", "..", "wiki", "architecture", "backend-target-architecture.md")
 	reqs, err := ExtractReqs(path)
 	if err != nil {
 		t.Fatalf("ExtractReqs real doc: %v", err)
 	}
-	if len(reqs) != 67 {
-		t.Fatalf("want 67 unique REQ IDs, got %d", len(reqs))
+	if len(reqs) != 68 {
+		t.Fatalf("want 68 unique REQ IDs, got %d", len(reqs))
 	}
 	var must, should, may int
 	for _, r := range reqs {
@@ -107,8 +109,8 @@ func TestExtractReqs_RealDoc(t *testing.T) {
 	if must != 61 {
 		t.Errorf("MUST count = %d, want 61", must)
 	}
-	if should != 6 {
-		t.Errorf("SHOULD count = %d, want 6", should)
+	if should != 7 {
+		t.Errorf("SHOULD count = %d, want 7", should)
 	}
 	if may != 0 {
 		t.Errorf("MAY count = %d, want 0", may)
