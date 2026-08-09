@@ -433,17 +433,28 @@ var checks = []Check{
 	{
 		ID:   "govulncheck",
 		Desc: "no known-vulnerable symbol is reachable from any binary",
-		// 19 total findings, but only 2 are called/reachable (GO-2026-5970 in
+		// 19 total findings, but only 2 were called/reachable (GO-2026-5970 in
 		// golang.org/x/text, GO-2026-5856 in stdlib crypto/tls) — both
-		// call-graph-verified, not a naive dependency match. Those 2 are NOT
-		// yet remediated as of this registration, so this stays `full`-only
-		// (advisory), never `pr`-blocking, until they are.
+		// call-graph-verified, not a naive dependency match. As of 2026-08-08
+		// both are remediated (golang.org/x/text bumped to v0.39.0, Go
+		// toolchain bumped to go1.26.5 — both versions confirmed as the fix
+		// from govulncheck's own "Fixed in" output, not assumed): a fresh
+		// govulncheck run reports 0 called vulnerabilities. This entry's
+		// remediation criteria are met.
+		//
+		// It still stays `full`-only (advisory), never `pr`-blocking: A6
+		// requires every ProfilePR check's CIJob to sit inside ci.yml's
+		// required-gate needs: closure, and this CIJob (nightly.yml:
+		// security-scan) sits outside it. The live branch ruleset also still
+		// requires 21 legacy status contexts with bypass_actors: []. Promoting
+		// this check is safe only as part of the ruleset-swap phase, not
+		// before.
 		//
 		// Global-maximum structure: govulncheck blocking in `pr` + `full` with
 		// zero called vulnerabilities outstanding. Promoting milestone:
-		// "called-CVE remediation" — unscheduled on docs/superpowers/ROADMAP.md
-		// as of 2026-08-08; its two entry criteria are already measured: bump
-		// golang.org/x/text to v0.39.0, bump the Go toolchain to go1.26.5.
+		// "ruleset swap" — unscheduled on docs/superpowers/ROADMAP.md as of
+		// 2026-08-08; its remaining entry criterion is the closure-safety /
+		// ruleset-swap work, not further CVE remediation.
 		Profiles: []string{ProfileFull},
 		Argv:     []string{"go", "run", "golang.org/x/vuln/cmd/govulncheck@latest", "./..."},
 		Needs:    []string{needsNetwork},
