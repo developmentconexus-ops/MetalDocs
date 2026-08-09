@@ -310,3 +310,27 @@ Implementation sub-slices may be planned under the owning issue without pretendi
 Engineering rules for module ownership, consumer-owned ports, data ownership, layering, platform/composition, transaction spine, API/errors and architecture verification live in:
 
 `docs/superpowers/analysis/2026-08-09-metaldocs-architecture-engineering-rulebook.md`
+
+## 16. Workstation reproduction addendum (2026-08-09 local session)
+
+A full local reproduction pass (15 audit passes, fresh `go list`-derived graph, Tarjan SCC,
+SQL/sentinel scans) was executed at the same baseline SHA in an isolated worktree. Canonical
+detailed artifacts: `docs/superpowers/analysis/audit-2026-08-09/` (PASS 1–14 +
+`final-synthesis.md`). Where this document and the reproduction disagree, the reproduction
+wins. Material corrections to the numbers above:
+
+| Claim above | Reproduced-current correction | Evidence |
+|---|---|---|
+| "7 known module cycles" (F-AUD-01) | 7 reciprocal pairs confirmed **plus one module SCC of size 9** {approval, auth, controlleddocuments, documents, iam, render, security, taxonomy, templates} — the property to break is the SCC, not just the pairs | PASS 2 |
+| "17+ foreign-table SQL reads" (F-AUD-02) | **55 foreign reads + 12 foreign writes** (67 statements, 10 directed pairs); approval issues 10 raw `UPDATE documents`; iam deletes audit-owned `governance_events`. Historical count was read-only and undercounted ~4× | PASS 5 |
+| "62 cross-module `errors.Is`" (F-AUD-03) | **19 true cross-module sites** — the 62 included same-module aliased imports; iam→auth alone is 10 of 19 | PASS 6-8 |
+| "20 platform→module edges / 6 packages" (F-AUD-04) | **9 package edges across 4 platform packages** (authn, bootstrap, docgenv2, tripwire); docgenv2 additionally raw-SQLs templates-owned tables (S-edge invisible to import graph); tripwire is a documented legitimate exception | PASS 2 / PASS 9 |
+| ADR 0093 absorption note (F-AUD-02 owner) | **0 of the 67 foreign-SQL statements become intra-context** under ADR 0093 — approval stays subject-generic forever; A9 does not absorb approval seams | PASS 5 |
+| §12 sequencing | refined in `audit-2026-08-09/final-synthesis.md` §D (adds guard-only quick win + A7 split) | synthesis |
+
+New findings from the reproduction (all subsumed, zero new issues): `jobs` module is
+composition-shaped orchestration mis-filed under `internal/modules` (→ #93); security module
+raw-SQLs auth/audit-owned tables portlessly (→ #93); 8 periodic jobs exist, not 7 (→ #95);
+ADR 0092 is referenced by issues/wiki but has no file under `wiki/decisions/` (→ F-AUD-05);
+3 parallel tx abstractions, not 2 (→ #92). `db.Tx` in application-owned ports is
+ADR-0044-ratified convention, not debt.

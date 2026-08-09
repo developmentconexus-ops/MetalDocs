@@ -4,6 +4,17 @@
 **Baseline:** `main@418070bf38a9f358f9131bcc36b7a6bcbc069273`  
 **Status:** checked-in mechanical evidence + direct current-source validation; not re-executed in this ChatGPT terminal.
 
+> **Superseded on measurements (2026-08-09 workstation session):** a fresh local
+> reproduction at the same baseline SHA now lives in
+> `docs/superpowers/analysis/audit-2026-08-09/` (PASS 1–14 + `final-synthesis.md`)
+> and outranks this file wherever the two disagree. Key corrections:
+> whole-repo package count is **158** (136 was `./internal/...` only); the module
+> graph has **one SCC of size 9** on top of the 7 reciprocal pairs; foreign SQL is
+> **55 reads + 12 writes** (not "17+ reads"); true cross-module `errors.Is` is
+> **19** (62 counted same-module aliases); platform→module is **4 packages / 9
+> package edges** at this baseline. This file remains valid as provenance for the
+> earlier checked-in inventory lane.
+
 ## 1. Provenance
 
 The repository already contains a prior architecture discovery artifact at `docs/superpowers/analysis/inventory/layering.md`. It records commands and computed results from a local repository pass, including `go list -json ./internal/...`, Tarjan SCC analysis, fan-in/fan-out calculation, symmetric module-edge analysis, grep-based SQL checks and direct source inspection.
