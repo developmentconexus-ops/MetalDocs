@@ -5,6 +5,8 @@ import (
 	"fmt"
 )
 
+// DecodePayload unmarshals payloadJSON into the concrete Payload type
+// registered for eventType, falling back to UnknownPayload for unrecognized types.
 func DecodePayload(eventType EventType, payloadJSON []byte) (Payload, error) {
 	switch eventType {
 	case EventTypePDFConvert:
@@ -28,6 +30,8 @@ func DecodePayload(eventType EventType, payloadJSON []byte) (Payload, error) {
 	}
 }
 
+// MaterializeFanoutPayloadFrom extracts event.Payload as a MaterializeFanoutPayload,
+// erroring if the event carries a different payload type.
 func MaterializeFanoutPayloadFrom(event Event) (MaterializeFanoutPayload, error) {
 	payload, ok := event.Payload.(MaterializeFanoutPayload)
 	if !ok {
@@ -36,6 +40,8 @@ func MaterializeFanoutPayloadFrom(event Event) (MaterializeFanoutPayload, error)
 	return payload, nil
 }
 
+// PDFConvertPayloadFrom extracts event.Payload as a PDFConvertPayload,
+// erroring if the event carries a different payload type.
 func PDFConvertPayloadFrom(event Event) (PDFConvertPayload, error) {
 	payload, ok := event.Payload.(PDFConvertPayload)
 	if !ok {

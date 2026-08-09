@@ -1,6 +1,9 @@
 package approvalhttp
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestParseIfMatch(t *testing.T) {
 	// The "*" wildcard is NOT a valid precondition on a governed transition. It
@@ -9,7 +12,7 @@ func TestParseIfMatch(t *testing.T) {
 	// no longer offers it and the parser rejects it as malformed.
 	t.Run("wildcard rejected", func(t *testing.T) {
 		version, err := parseIfMatch("*")
-		if err != ErrIfMatchMalformed {
+		if !errors.Is(err, ErrIfMatchMalformed) {
 			t.Fatalf("err = %v (version %d), want %v", err, version, ErrIfMatchMalformed)
 		}
 	})
@@ -32,7 +35,7 @@ func TestParseIfMatch(t *testing.T) {
 		if err == nil {
 			t.Fatalf("expected malformed If-Match error, got version %d", version)
 		}
-		if err != ErrIfMatchMalformed {
+		if !errors.Is(err, ErrIfMatchMalformed) {
 			t.Fatalf("err = %v, want %v", err, ErrIfMatchMalformed)
 		}
 	})
@@ -68,19 +71,19 @@ func TestParseSubmitIfMatch(t *testing.T) {
 	// version" from "I require version 0". Rejecting "*" keeps v0 unambiguous.
 	t.Run("wildcard rejected (not confusable with v0)", func(t *testing.T) {
 		version, err := parseSubmitIfMatch("*")
-		if err != ErrIfMatchMalformed {
+		if !errors.Is(err, ErrIfMatchMalformed) {
 			t.Fatalf("err = %v (version %d), want %v", err, version, ErrIfMatchMalformed)
 		}
 	})
 
 	t.Run("negative version rejected", func(t *testing.T) {
-		if _, err := parseSubmitIfMatch(`"v-1"`); err != ErrIfMatchMalformed {
+		if _, err := parseSubmitIfMatch(`"v-1"`); !errors.Is(err, ErrIfMatchMalformed) {
 			t.Fatalf("err = %v, want %v", err, ErrIfMatchMalformed)
 		}
 	})
 
 	t.Run("missing header rejected", func(t *testing.T) {
-		if _, err := parseSubmitIfMatch(""); err != ErrIfMatchRequired {
+		if _, err := parseSubmitIfMatch(""); !errors.Is(err, ErrIfMatchRequired) {
 			t.Fatalf("err = %v, want %v", err, ErrIfMatchRequired)
 		}
 	})

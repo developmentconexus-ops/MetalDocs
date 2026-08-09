@@ -67,7 +67,7 @@ SELECT m.id::text, ai.tenant_id::text, ai.subject_kind, ai.subject_key,
 	if err != nil {
 		return nil, fmt.Errorf("mark stages overdue surfaced: update: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []approvaldomain.SurfacedStage
 	for rows.Next() {

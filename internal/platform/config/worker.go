@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+// WorkerConfig holds the async outbox worker configuration read from
+// environment variables at startup.
 type WorkerConfig struct {
 	PollIntervalSeconds int
 	BatchSize           int
@@ -17,6 +19,8 @@ type WorkerConfig struct {
 	RetryMaxSeconds  int
 }
 
+// LoadWorkerConfig reads the worker configuration from environment
+// variables, applying defaults for anything unset.
 func LoadWorkerConfig() (WorkerConfig, error) {
 	cfg := WorkerConfig{
 		PollIntervalSeconds: 10,

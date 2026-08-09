@@ -17,11 +17,17 @@ import (
 const maxRequestBodyBytes = 64 * 1024
 
 var (
-	ErrContentType  = errors.New("content-type must be application/json")
+	// ErrContentType is returned when the request's Content-Type is not application/json.
+	ErrContentType = errors.New("content-type must be application/json")
+	// ErrBodyTooLarge is returned when the request body exceeds the 64 KB cap.
 	ErrBodyTooLarge = errors.New("request body too large (max 64 KB)")
-	ErrEmptyBody    = errors.New("request body must not be empty")
+	// ErrEmptyBody is returned when the request body is missing or empty.
+	ErrEmptyBody = errors.New("request body must not be empty")
 )
 
+// Decode strictly decodes r's JSON body into dst: requires
+// application/json, enforces a 64 KB size cap, rejects unknown fields, and
+// rejects a body containing more than one JSON value.
 func Decode(r *http.Request, dst any) error {
 	if r == nil || r.Body == nil {
 		return ErrEmptyBody

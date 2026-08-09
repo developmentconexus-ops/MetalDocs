@@ -12,20 +12,30 @@ import (
 	"metaldocs/internal/platform/db"
 )
 
+// ReconstructionRunner performs the actual document reconstruction against
+// the render fanout pipeline.
 type ReconstructionRunner interface {
 	Reconstruct(ctx context.Context, tenantID, revisionID string) (fanout.ReconstructionEntry, error)
 }
 
+// ReconstructionService authorizes and drives document reconstruction: it
+// checks document.edit off-tx, then delegates the reconstruction itself to
+// the wired ReconstructionRunner.
 type ReconstructionService struct {
 	txRunner db.TxRunner
 	runner   ReconstructionRunner
 	cdRead   controlleddocumentsdomain.CDFieldReader
 }
 
+// NewReconstructionService constructs a ReconstructionService wired to its
+// tx runner, reconstruction runner, and controlled-document field reader
+// (used to resolve the area for the document.edit authz check).
 func NewReconstructionService(txRunner db.TxRunner, runner ReconstructionRunner, cdRead controlleddocumentsdomain.CDFieldReader) *ReconstructionService {
 	return &ReconstructionService{txRunner: txRunner, runner: runner, cdRead: cdRead}
 }
 
+// GetReconstruction authorizes actorID for document.edit on docID's area,
+// then reconstructs and returns the document entry.
 func (s *ReconstructionService) GetReconstruction(ctx context.Context, tenantID, actorID, docID string) (fanout.ReconstructionEntry, error) {
 	ctx = authz.WithCapCache(ctx)
 

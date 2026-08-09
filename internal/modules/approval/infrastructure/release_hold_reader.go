@@ -100,7 +100,7 @@ SELECT g.id::text, g.tenant_id::text, g.document_id::text, g.approval_instance_i
 	if err != nil {
 		return nil, fmt.Errorf("list stuck release holds: query: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []approvaldomain.StuckReleaseHoldView
 	for rows.Next() {
@@ -137,7 +137,7 @@ SELECT DISTINCT g.tenant_id::text
 	if err != nil {
 		return nil, fmt.Errorf("list tenants with stuck release holds: query: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []string
 	for rows.Next() {

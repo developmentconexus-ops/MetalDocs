@@ -14,16 +14,19 @@ import (
 	"metaldocs/internal/platform/iamtypes"
 )
 
-// Role, its canonical constants, and the Role-only helpers (IsValidRole,
-// IsAreaRole, AreaRoles) now live in internal/platform/iamtypes — a neutral
-// platform package with no dependency on IAM's application/infrastructure
-// layers or on the auth module. This alias keeps every existing
-// `domain.Role` / `iamdomain.Role` call site across the codebase compiling
-// unchanged (ARC-06: closes the auth<->iam bidirectional module dependency
-// that existed solely because Role lived inside iam/domain). See
-// iamtypes.Role godoc for the canonical-roles source and rationale.
+// Role is an alias for iamtypes.Role. Its canonical constants and the
+// Role-only helpers (IsValidRole, IsAreaRole, AreaRoles) now live in
+// internal/platform/iamtypes — a neutral platform package with no dependency
+// on IAM's application/infrastructure layers or on the auth module. This
+// alias keeps every existing `domain.Role` / `iamdomain.Role` call site
+// across the codebase compiling unchanged (ARC-06: closes the auth<->iam
+// bidirectional module dependency that existed solely because Role lived
+// inside iam/domain). See iamtypes.Role godoc for the canonical-roles source
+// and rationale.
 type Role = iamtypes.Role
 
+// Re-exported Role constants; canonical values are defined on iamtypes.Role
+// (see the Role alias doc above).
 const (
 	RoleApprover    = iamtypes.RoleApprover
 	RoleAreaAdmin   = iamtypes.RoleAreaAdmin
@@ -72,6 +75,8 @@ func AreaRoles() []Role {
 // else in the codebase.
 type Capability string
 
+// Capability constants — every value here MUST also be registered in
+// validCapabilities below (the single source of truth); see IsValidCapability.
 const (
 	CapDocumentView      Capability = "document.view"
 	CapDocumentCreate    Capability = "document.create"
@@ -132,7 +137,9 @@ const (
 	CapDistributionRead            Capability = "distribution.read"
 	CapNotificationRead            Capability = "notification.read"
 
-	// Token dictionary (SP-1). Both ScopeTenant — tenant-wide, not area-scoped.
+	// CapTokenView gates read access to the token dictionary (SP-1). Both it
+	// and CapTokenDictionaryManage below are ScopeTenant — tenant-wide, not
+	// area-scoped.
 	CapTokenView             Capability = "token.view"
 	CapTokenDictionaryManage Capability = "token_dictionary.manage"
 

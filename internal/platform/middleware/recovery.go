@@ -3,6 +3,7 @@
 package middleware
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -30,7 +31,7 @@ func Recovery(next http.Handler) http.Handler {
 			if rec == nil {
 				return
 			}
-			if rec == http.ErrAbortHandler {
+			if recErr, ok := rec.(error); ok && errors.Is(recErr, http.ErrAbortHandler) {
 				panic(rec)
 			}
 			slog.Error("http panic recovered",

@@ -268,8 +268,8 @@ func (rt *Router) ListUsers(w http.ResponseWriter, r *http.Request, _ iamapi.Lis
 	rt.people.handleListUsers(w, r)
 }
 
-// CreateManagedUser: see package doc comment. Dead, deprecated spec op with
-// no runtime implementation prior to this change either.
+// CreateManagedUser is a dead, deprecated spec op with no runtime
+// implementation prior to this change either; see package doc comment.
 func (rt *Router) CreateManagedUser(w http.ResponseWriter, r *http.Request) {
 	writeIAMNotImplemented(w, "createManagedUser is deprecated and not implemented; use POST /iam/users/invite")
 }
@@ -304,13 +304,13 @@ func (rt *Router) ResetPassword(w http.ResponseWriter, r *http.Request, _ string
 }
 
 // UpsertUserRole delegates to AdminHandler.handleUserRoleUpsert.
-func (rt *Router) UpsertUserRole(w http.ResponseWriter, r *http.Request, userId string) {
-	rt.admin.handleUserRoleUpsert(w, r, userId)
+func (rt *Router) UpsertUserRole(w http.ResponseWriter, r *http.Request, userID string) {
+	rt.admin.handleUserRoleUpsert(w, r, userID)
 }
 
 // ReplaceUserRoles delegates to AdminHandler.handleReplaceUserRoles.
-func (rt *Router) ReplaceUserRoles(w http.ResponseWriter, r *http.Request, userId string) {
-	rt.admin.handleReplaceUserRoles(w, r, userId)
+func (rt *Router) ReplaceUserRoles(w http.ResponseWriter, r *http.Request, userID string) {
+	rt.admin.handleReplaceUserRoles(w, r, userID)
 }
 
 // UnlockUser delegates to PeopleHandler.handleUnlock.
@@ -331,22 +331,22 @@ func (rt *Router) OnboardTenant(w http.ResponseWriter, r *http.Request) {
 
 // ExportTenant delegates to TenantHandler.handleExportTenant (M7 F7.3).
 // Answers 501 when tenants is not wired (SQLDB-less boot path).
-func (rt *Router) ExportTenant(w http.ResponseWriter, r *http.Request, tenantId openapi_types.UUID) {
+func (rt *Router) ExportTenant(w http.ResponseWriter, r *http.Request, tenantID openapi_types.UUID) {
 	if rt.tenants == nil {
 		writeIAMNotImplemented(w, "Tenant lifecycle service is not configured")
 		return
 	}
-	rt.tenants.handleExportTenant(w, r, tenantId.String())
+	rt.tenants.handleExportTenant(w, r, tenantID.String())
 }
 
 // EraseTenant delegates to TenantHandler.handleEraseTenant (M7 F7.3).
 // Answers 501 when tenants is not wired (SQLDB-less boot path).
-func (rt *Router) EraseTenant(w http.ResponseWriter, r *http.Request, tenantId openapi_types.UUID) {
+func (rt *Router) EraseTenant(w http.ResponseWriter, r *http.Request, tenantID openapi_types.UUID) {
 	if rt.tenants == nil {
 		writeIAMNotImplemented(w, "Tenant lifecycle service is not configured")
 		return
 	}
-	rt.tenants.handleEraseTenant(w, r, tenantId.String())
+	rt.tenants.handleEraseTenant(w, r, tenantID.String())
 }
 
 func writeIAMNotImplemented(w http.ResponseWriter, detail string) {

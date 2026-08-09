@@ -218,7 +218,7 @@ WHERE tenant_id = $1`
 	if err != nil {
 		return nil, false, fmt.Errorf("list controlled documents: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := make([]controlleddocumentsdomain.ControlledDocument, 0, limit+1)
 	for rows.Next() {
@@ -262,7 +262,7 @@ ORDER BY area_code`, tenantID, controlledDocumentID)
 	if err != nil {
 		return nil, fmt.Errorf("query controlled document area grants: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := []string{}
 	for rows.Next() {
@@ -287,7 +287,7 @@ ORDER BY user_id`, tenantID, controlledDocumentID)
 	if err != nil {
 		return nil, fmt.Errorf("query controlled document user grants: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := []string{}
 	for rows.Next() {
@@ -327,7 +327,7 @@ ORDER BY controlled_document_id, area_code`, tenantID, pgtype.FlatArray[string](
 	if err != nil {
 		return fmt.Errorf("query controlled document area grants: %w", err)
 	}
-	defer areaRows.Close()
+	defer func() { _ = areaRows.Close() }()
 	for areaRows.Next() {
 		var docID, areaCode string
 		if err := areaRows.Scan(&docID, &areaCode); err != nil {
@@ -349,7 +349,7 @@ ORDER BY controlled_document_id, user_id`, tenantID, pgtype.FlatArray[string](id
 	if err != nil {
 		return fmt.Errorf("query controlled document user grants: %w", err)
 	}
-	defer userRows.Close()
+	defer func() { _ = userRows.Close() }()
 	for userRows.Next() {
 		var docID, userID string
 		if err := userRows.Scan(&docID, &userID); err != nil {

@@ -17,6 +17,7 @@ type MfaCoverage struct {
 	ByRole        []MfaRoleSlice
 }
 
+// MfaRoleSlice is one role's MFA enrollment slice within MfaCoverage.ByRole.
 type MfaRoleSlice struct {
 	Role       string
 	Total      int

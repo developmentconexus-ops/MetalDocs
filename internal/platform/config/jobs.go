@@ -9,6 +9,8 @@ import (
 	"github.com/riverqueue/river"
 )
 
+// JobsConfig holds River jobs configuration read from environment variables
+// at startup.
 type JobsConfig struct {
 	Enabled     bool
 	RiverSchema string
@@ -16,6 +18,7 @@ type JobsConfig struct {
 	Queues map[string]river.QueueConfig
 }
 
+// LoadJobsConfig reads River jobs config from environment variables.
 func LoadJobsConfig() (JobsConfig, error) {
 	cfg := JobsConfig{
 		Enabled:     true,

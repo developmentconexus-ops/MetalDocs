@@ -234,6 +234,9 @@ func buildStageActors(stage domain.StageInstance, eligibleNames map[string]strin
 		pendingStatus = "active"
 	case domain.StagePending:
 		pendingStatus = "waiting"
+	case domain.StageCompleted, domain.StageSkipped, domain.StageRejectedHere:
+		// Terminal stage statuses never contribute a pending-actor entry —
+		// every eligible actor is already accounted for via signoffs above.
 	}
 	if pendingStatus == "" {
 		return actors

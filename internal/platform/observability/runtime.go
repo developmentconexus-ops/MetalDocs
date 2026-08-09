@@ -9,12 +9,15 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// RuntimeStatusProvider serves liveness, readiness, and runtime metrics data
+// for the /live, /ready, and /metrics endpoints.
 type RuntimeStatusProvider interface {
 	Live(ctx context.Context) (int, map[string]any)
 	Ready(ctx context.Context) (int, map[string]any)
 	RuntimeMetrics(ctx context.Context) map[string]any
 }
 
+// DependencyCheckResult is the outcome of one DependencyCheck invocation.
 type DependencyCheckResult struct {
 	Status string
 	Detail string
@@ -22,11 +25,15 @@ type DependencyCheckResult struct {
 	Meta map[string]any
 }
 
+// DependencyCheck is a named readiness probe run against an external dependency.
 type DependencyCheck struct {
 	Name  string
 	Check func(context.Context) (DependencyCheckResult, error)
 }
 
+// StaticRuntimeStatusProvider implements RuntimeStatusProvider from
+// statically configured repository/storage mode flags plus a set of
+// dependency checks, with no live database access of its own.
 type StaticRuntimeStatusProvider struct {
 	repositoryMode  string
 	storageProvider string
@@ -34,6 +41,7 @@ type StaticRuntimeStatusProvider struct {
 	checks          []DependencyCheck
 }
 
+// NewStaticRuntimeStatusProvider constructs a StaticRuntimeStatusProvider.
 func NewStaticRuntimeStatusProvider(repositoryMode, storageProvider string, authEnabled bool, checks ...DependencyCheck) *StaticRuntimeStatusProvider {
 	return &StaticRuntimeStatusProvider{
 		repositoryMode:  repositoryMode,
@@ -43,6 +51,7 @@ func NewStaticRuntimeStatusProvider(repositoryMode, storageProvider string, auth
 	}
 }
 
+// Live returns the liveness status; it is process-local and never fails.
 func (p *StaticRuntimeStatusProvider) Live(_ context.Context) (int, map[string]any) {
 	return 200, map[string]any{
 		"status": "live",
@@ -52,6 +61,9 @@ func (p *StaticRuntimeStatusProvider) Live(_ context.Context) (int, map[string]a
 	}
 }
 
+// Ready returns the readiness status, running the configured dependency
+// checks (this static provider always reports its own repository/storage/auth
+// checks as up).
 func (p *StaticRuntimeStatusProvider) Ready(ctx context.Context) (int, map[string]any) {
 	// Exposure: the /api/v1/metrics payload is gated by CapMetricsView in
 	// permissions.go (tier-1); health/readiness endpoints are intentionally
@@ -69,6 +81,8 @@ func (p *StaticRuntimeStatusProvider) Ready(ctx context.Context) (int, map[strin
 	}
 }
 
+// RuntimeMetrics returns static runtime metrics with zeroed counters (no
+// database access).
 func (p *StaticRuntimeStatusProvider) RuntimeMetrics(_ context.Context) map[string]any {
 	// Exposure: the /api/v1/metrics payload is gated by CapMetricsView in
 	// permissions.go (tier-1); health/readiness endpoints are intentionally
@@ -100,12 +114,17 @@ func (p *StaticRuntimeStatusProvider) RuntimeMetrics(_ context.Context) map[stri
 	}
 }
 
+// PostgresRuntimeStatusProvider implements RuntimeStatusProvider backed by a
+// live Postgres connection, overriding Ready and RuntimeMetrics to query the
+// database while falling back to StaticRuntimeStatusProvider behavior.
 type PostgresRuntimeStatusProvider struct {
 	// embedded for JSON serialization; do not add methods to the embedded type.
 	*StaticRuntimeStatusProvider
 	db *sql.DB
 }
 
+// NewPostgresRuntimeStatusProvider constructs a PostgresRuntimeStatusProvider
+// backed by db.
 func NewPostgresRuntimeStatusProvider(db *sql.DB, repositoryMode, storageProvider string, authEnabled bool, checks ...DependencyCheck) *PostgresRuntimeStatusProvider {
 	return &PostgresRuntimeStatusProvider{
 		StaticRuntimeStatusProvider: NewStaticRuntimeStatusProvider(repositoryMode, storageProvider, authEnabled, checks...),
@@ -113,6 +132,8 @@ func NewPostgresRuntimeStatusProvider(db *sql.DB, repositoryMode, storageProvide
 	}
 }
 
+// Ready returns the readiness status, pinging the database and running the
+// configured dependency checks.
 func (p *PostgresRuntimeStatusProvider) Ready(ctx context.Context) (int, map[string]any) {
 	// Exposure: the /api/v1/metrics payload is gated by CapMetricsView in
 	// permissions.go (tier-1); health/readiness endpoints are intentionally
@@ -152,6 +173,8 @@ func (p *PostgresRuntimeStatusProvider) Ready(ctx context.Context) (int, map[str
 	}
 }
 
+// RuntimeMetrics returns live auth, session, and outbox counters queried from
+// the database, omitting any section whose query failed.
 func (p *PostgresRuntimeStatusProvider) RuntimeMetrics(ctx context.Context) map[string]any {
 	// Exposure: the /api/v1/metrics payload is gated by CapMetricsView in
 	// permissions.go (tier-1); health/readiness endpoints are intentionally

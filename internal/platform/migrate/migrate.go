@@ -37,7 +37,7 @@ func Apply(ctx context.Context, db *sql.DB, dir string, log *slog.Logger) (retEr
 	if err != nil {
 		return fmt.Errorf("migrate: acquire connection: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_lock($1)`, migrateLockKey); err != nil {
 		return fmt.Errorf("migrate: acquire advisory lock: %w", err)
@@ -139,7 +139,7 @@ func ApplyGrants(ctx context.Context, db *sql.DB, dir string, log *slog.Logger) 
 	if err != nil {
 		return fmt.Errorf("migrate: acquire connection: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	// Same advisory lock as Apply: the grants stage runs immediately before it,
 	// and two replicas booting together must not interleave DDL/ACL work.
@@ -185,7 +185,7 @@ func loadApplied(ctx context.Context, db queryer) (map[string]bool, error) {
 		}
 		return nil, fmt.Errorf("load applied: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var v string
 		if err := rows.Scan(&v); err != nil {

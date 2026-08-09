@@ -16,6 +16,8 @@ type FeatureFlagsConfig struct {
 	MDDMNativeExportRolloutPercent int
 }
 
+// ErrInvalidPercentage is returned when a rollout percentage env var is
+// outside the valid 0-100 range.
 var ErrInvalidPercentage = errors.New("invalid percentage")
 
 // LoadFeatureFlagsConfig reads feature flag config from environment variables.

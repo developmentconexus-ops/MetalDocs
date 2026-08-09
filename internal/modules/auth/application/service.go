@@ -402,6 +402,8 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 		return authdomain.AuthenticatedSession{}, authdomain.ErrIdentityInactive
 	case loginInvalid:
 		return authdomain.AuthenticatedSession{}, authdomain.ErrInvalidCredentials
+	case loginOK:
+		// Credentials verified; fall through to session issuance below.
 	}
 
 	now := s.now().UTC()
@@ -592,7 +594,7 @@ func (s *Service) ChangePasswordForUser(ctx context.Context, currentUser authdom
 	repoTx, repoTxOK := s.repo.(updateUserTxRepository)
 	revokeTx, revokeTxOK := s.repo.(revokeSessionsByUserIDTxRepository)
 	beginner, beginOK := s.repo.(beginTxRepository)
-	if !(repoTxOK && revokeTxOK && beginOK) {
+	if !repoTxOK || !revokeTxOK || !beginOK {
 		// Fallback: repo does not support tx variants (e.g. in-memory test repo).
 		// No transaction is available here, so the steps run sequentially as
 		// separate autocommits; the audit Record is best-effort. (This branch
@@ -745,13 +747,13 @@ func (s *Service) CreateUserWithInput(ctx context.Context, input authdomain.Crea
 		}
 		if err := repoTx.CreateUserTx(ctx, tx, params); err != nil {
 			if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
-				return fmt.Errorf("create auth identity tx: %w (rollback failed: %v)", err, rollbackErr)
+				return fmt.Errorf("create auth identity tx: %w (rollback failed: %w)", err, rollbackErr)
 			}
 			return err
 		}
 		if err := roleTx.ReplaceUserRolesTx(ctx, tx, fields.userID, fields.displayName, fields.tenantID, fields.role, fields.createdBy); err != nil {
 			if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
-				return fmt.Errorf("replace user roles tx: %w (rollback failed: %v)", err, rollbackErr)
+				return fmt.Errorf("replace user roles tx: %w (rollback failed: %w)", err, rollbackErr)
 			}
 			return err
 		}
@@ -801,7 +803,7 @@ func (s *Service) UpdateUser(ctx context.Context, params authdomain.UpdateUserPa
 	repoTx, repoTxOK := s.repo.(updateUserTxRepository)
 	revokeTx, revokeTxOK := s.repo.(revokeSessionsByUserIDTxRepository)
 	beginner, beginOK := s.repo.(beginTxRepository)
-	if !(repoTxOK && revokeTxOK && beginOK) {
+	if !repoTxOK || !revokeTxOK || !beginOK {
 		// Fallback: in-memory / test repo — no tx available, so the mutation and the
 		// revoke run as separate autocommits.
 		if err := s.repo.UpdateUser(ctx, params); err != nil {
@@ -867,7 +869,7 @@ func (s *Service) AdminResetPassword(ctx context.Context, userID, newPassword st
 	repoTx, repoTxOK := s.repo.(updateUserTxRepository)
 	revokeTx, revokeTxOK := s.repo.(revokeSessionsByUserIDTxRepository)
 	beginner, beginOK := s.repo.(beginTxRepository)
-	if !(repoTxOK && revokeTxOK && beginOK) {
+	if !repoTxOK || !revokeTxOK || !beginOK {
 		// Fallback: in-memory / test repo.
 		// No transaction is available here, so the steps run sequentially as
 		// separate autocommits; the audit Record is best-effort. (This branch
@@ -950,7 +952,7 @@ func (s *Service) UnlockUser(ctx context.Context, userID string) error {
 
 	repoTx, repoTxOK := s.repo.(updateUserTxRepository)
 	beginner, beginOK := s.repo.(beginTxRepository)
-	if !(repoTxOK && beginOK) {
+	if !repoTxOK || !beginOK {
 		// Fallback: in-memory / test repo.
 		// No transaction is available here, so the steps run sequentially as
 		// separate autocommits; the audit Record is best-effort. (This branch

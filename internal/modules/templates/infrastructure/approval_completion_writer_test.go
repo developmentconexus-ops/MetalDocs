@@ -89,7 +89,7 @@ func TestMarkTemplateVersionUnderReview_ZeroRowCASDisambiguates(t *testing.T) {
 			if err != nil {
 				t.Fatalf("sqlmock.New: %v", err)
 			}
-			defer mockDB.Close()
+			defer func() { _ = mockDB.Close() }()
 
 			mock.ExpectBegin()
 			mock.ExpectExec("UPDATE templates_template_version").
@@ -123,7 +123,7 @@ func TestMarkTemplateVersionUnderReview_ZeroRowCASAbsentRow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer mockDB.Close()
+	defer func() { _ = mockDB.Close() }()
 
 	mock.ExpectBegin()
 	mock.ExpectExec("UPDATE templates_template_version").

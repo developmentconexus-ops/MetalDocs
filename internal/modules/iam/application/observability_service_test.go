@@ -198,7 +198,7 @@ func TestGetKpi_RoleDistributionPropagates(t *testing.T) {
 
 func TestGetUsage_UsesPlanTierPrefix(t *testing.T) {
 	repo := newFakeObsRepo()
-	repo.apiByPrefix[tA+"|"+iamapp.ApiCallActionPrefix] = 7
+	repo.apiByPrefix[tA+"|"+iamapp.APICallActionPrefix] = 7
 	svc := iamapp.NewObservabilityService(repo, fakeMfa{})
 
 	got, err := svc.GetUsage(context.Background(), tA)
@@ -208,7 +208,7 @@ func TestGetUsage_UsesPlanTierPrefix(t *testing.T) {
 	if got.APICalls.Last24h != 7 {
 		t.Fatalf("apiCalls.last24h = %d, want 7", got.APICalls.Last24h)
 	}
-	if repo.lastSeenPrefix != iamapp.ApiCallActionPrefix {
-		t.Fatalf("lastSeenPrefix = %q, want %q", repo.lastSeenPrefix, iamapp.ApiCallActionPrefix)
+	if repo.lastSeenPrefix != iamapp.APICallActionPrefix {
+		t.Fatalf("lastSeenPrefix = %q, want %q", repo.lastSeenPrefix, iamapp.APICallActionPrefix)
 	}
 }

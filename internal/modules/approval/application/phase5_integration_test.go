@@ -127,7 +127,7 @@ func (r *phase5Repo) LoadRoute(ctx context.Context, tx db.Tx, tenantID, routeID 
 	if err != nil {
 		return domain.Route{}, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var stage domain.Stage
 		var quorumM sql.NullInt32
@@ -167,7 +167,7 @@ func (r *phase5Repo) ResolveEligibleActors(ctx context.Context, tx db.Tx, tenant
 	if err != nil {
 		return []string{}, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var ids []string
 	for rows.Next() {
 		var uid string
@@ -231,7 +231,7 @@ func (r *phase5Repo) LoadPriorSignoffs(ctx context.Context, tx db.Tx, tenantID, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanDecisionSignoffRows(rows)
 }
 
@@ -255,7 +255,7 @@ func (r *phase5Repo) LoadStageSignoffs(ctx context.Context, tx db.Tx, tenantID, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanDecisionSignoffRows(rows)
 }
 

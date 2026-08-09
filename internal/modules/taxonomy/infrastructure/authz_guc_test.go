@@ -18,7 +18,7 @@ func TestFamilyRepository_Create_SetsAuthzGUCBeforeRequire(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := NewFamilyRepository(db)
 	ctx := iamdomain.WithAuthContext(tenant.WithTenantID(context.Background(), "tenant-a"), "actor-1", nil)
@@ -46,7 +46,7 @@ func TestProfileRepository_Create_SetsAuthzGUCBeforeRequire(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := NewProfileRepository(db)
 	ctx := iamdomain.WithAuthContext(tenant.WithTenantID(context.Background(), "tenant-a"), "actor-1", nil)
@@ -76,7 +76,7 @@ func TestAreaRepository_Create_SetsAuthzGUCBeforeRequire(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := NewAreaRepository(db)
 	ctx := iamdomain.WithAuthContext(tenant.WithTenantID(context.Background(), "tenant-a"), "actor-1", nil)
@@ -106,7 +106,7 @@ func TestFamilyRepository_GetByCodeForUpdate_RequiresAuthzBeforeLock(t *testing.
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := NewFamilyRepository(db)
 	ctx := iamdomain.WithAuthContext(tenant.WithTenantID(context.Background(), "tenant-a"), "actor-1", nil)
@@ -144,7 +144,7 @@ func TestProfileRepository_GetByCodeForUpdate_RequiresAuthzBeforeLock(t *testing
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := NewProfileRepository(db)
 	ctx := iamdomain.WithAuthContext(tenant.WithTenantID(context.Background(), "tenant-a"), "actor-1", nil)
@@ -183,7 +183,7 @@ func TestAreaRepository_GetByCodeForUpdate_RequiresAuthzBeforeLock(t *testing.T)
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := NewAreaRepository(db)
 	ctx := iamdomain.WithAuthContext(tenant.WithTenantID(context.Background(), "tenant-a"), "actor-1", nil)

@@ -137,12 +137,13 @@ type Writer interface {
 	RecordTx(ctx context.Context, tx db.Tx, event Event) error
 }
 
-// ListEvents intentionally lives on Reader rather than Writer so write-only
-// implementations are allowed even when they do not support query workloads.
-// It returns up to query.Limit events plus hasMore: implementations fetch a
-// limit+1 probe row and report hasMore=true only when that extra row exists, so
-// an exact-multiple last page no longer falsely advertises a next page
-// (AIP-158; matches the documents / controlled-documents keyset shape).
+// Reader is the audit query port. ListEvents intentionally lives on Reader
+// rather than Writer so write-only implementations are allowed even when they
+// do not support query workloads. It returns up to query.Limit events plus
+// hasMore: implementations fetch a limit+1 probe row and report hasMore=true
+// only when that extra row exists, so an exact-multiple last page no longer
+// falsely advertises a next page (AIP-158; matches the documents /
+// controlled-documents keyset shape).
 type Reader interface {
 	ListEvents(ctx context.Context, query ListEventsQuery) (items []Event, hasMore bool, err error)
 }
@@ -166,7 +167,9 @@ type IntegrityValidator interface {
 type ExportFormat string
 
 const (
-	ExportFormatCSV   ExportFormat = "csv"
+	// ExportFormatCSV requests a comma-separated-values export.
+	ExportFormatCSV ExportFormat = "csv"
+	// ExportFormatJSONL requests a newline-delimited-JSON export.
 	ExportFormatJSONL ExportFormat = "jsonl"
 )
 
@@ -179,12 +182,18 @@ func (f ExportFormat) Valid() bool {
 type ExportStatus string
 
 const (
+	// ExportStatusPending is the initial state of an export job before it
+	// starts running.
 	ExportStatusPending ExportStatus = "pending"
+	// ExportStatusRunning means the export job is actively producing its
+	// payload.
 	ExportStatusRunning ExportStatus = "running"
 	// ExportStatusReady means the export payload is persisted and downloadable.
 	// Synchronous exports move straight to Ready in the same call that creates
 	// the job.
-	ExportStatusReady  ExportStatus = "ready"
+	ExportStatusReady ExportStatus = "ready"
+	// ExportStatusFailed means the export attempt errored and produced no
+	// downloadable payload.
 	ExportStatusFailed ExportStatus = "failed"
 )
 

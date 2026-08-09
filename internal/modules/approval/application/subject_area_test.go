@@ -20,7 +20,7 @@ func TestResolveSubjectAreaCode_Template(t *testing.T) {
 	if err != nil {
 		t.Fatalf("begin tx: %v", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	got, err := resolveSubjectAreaCode(context.Background(), tx, nil, conn.tenantID, domain.Subject{Kind: domain.SubjectKindTemplate, Key: "tmpl-1"})
 	if err != nil {
@@ -42,7 +42,7 @@ func TestResolveSubjectAreaCode_Document(t *testing.T) {
 	if err != nil {
 		t.Fatalf("begin tx: %v", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	got, err := resolveSubjectAreaCode(context.Background(), tx, nil, conn.tenantID, domain.NewDocumentSubject("doc-1"))
 	if err != nil {
@@ -62,7 +62,7 @@ func TestResolveSubjectAreaCode_UnknownKind(t *testing.T) {
 	if err != nil {
 		t.Fatalf("begin tx: %v", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	_, err = resolveSubjectAreaCode(context.Background(), tx, nil, conn.tenantID, domain.Subject{Kind: "bogus", Key: "x"})
 	if err == nil {

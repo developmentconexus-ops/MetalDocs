@@ -54,7 +54,7 @@ SELECT ur.role_code,
 	if err != nil {
 		return nil, fmt.Errorf("iam: TenantMfaCountsByRole(%s): %w", tenantID, err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []iamdomain.RoleMfaCounts
 	for rows.Next() {

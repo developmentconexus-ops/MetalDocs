@@ -17,7 +17,7 @@ func TestUpdateUser_NoOpChecksExistenceOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
 SELECT EXISTS (
@@ -42,7 +42,7 @@ func TestUpdateUser_NoOpMissingIdentityReturnsNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
 SELECT EXISTS (
@@ -68,7 +68,7 @@ func TestTouchSession_UsesGraceWindowComparison(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	seenAt := time.Date(2026, time.May, 27, 17, 0, 0, 0, time.UTC)
 

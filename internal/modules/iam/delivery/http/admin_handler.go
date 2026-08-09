@@ -399,10 +399,10 @@ func parseRoles(items []string) ([]iamdomain.Role, bool) {
 func parseExactlyOneRole(items []string) (iamdomain.Role, error) {
 	roles, ok := parseRoles(items)
 	if !ok {
-		return "", errors.New("Invalid roles")
+		return "", errors.New("invalid roles")
 	}
 	if len(roles) != 1 {
-		return "", errors.New("Exactly one role is required")
+		return "", errors.New("exactly one role is required")
 	}
 	return roles[0], nil
 }

@@ -55,8 +55,10 @@ func NewTenantDataPort(db *sql.DB) *TenantDataPort {
 
 var _ tenantdata.Port = (*TenantDataPort)(nil)
 
+// Module returns the tenantdata.Port module identifier for this port.
 func (p *TenantDataPort) Module() string { return "documents-approval" }
 
+// Tables returns the tenant-scoped tables this port owns for export/erase.
 func (p *TenantDataPort) Tables() []string {
 	return []string{
 		"public.approval_instances",
@@ -69,6 +71,7 @@ func (p *TenantDataPort) Tables() []string {
 	}
 }
 
+// ExportTenantData exports every table owned by this port for tenantID.
 func (p *TenantDataPort) ExportTenantData(ctx context.Context, db *sql.DB, tenantID string) ([]tenantdata.TableExport, error) {
 	instances, err := tenantdata.ExportTable(ctx, db, "public.approval_instances", "tenant_id", tenantID)
 	if err != nil {
@@ -102,6 +105,9 @@ func (p *TenantDataPort) ExportTenantData(ctx context.Context, db *sql.DB, tenan
 	return []tenantdata.TableExport{instances, routes, selectors, signoffs, verdicts, delegations, generations}, nil
 }
 
+// EraseTenantData deletes every row owned by this port for tenantID, in the
+// child-before-parent order required by the FKs documented on TenantDataPort,
+// and returns the per-table row counts erased.
 func (p *TenantDataPort) EraseTenantData(ctx context.Context, tx *sql.Tx, tenantID string) (map[string]int64, error) {
 	counts := make(map[string]int64)
 

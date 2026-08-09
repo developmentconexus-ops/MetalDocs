@@ -9,6 +9,7 @@ import (
 	"metaldocs/internal/platform/problem"
 )
 
+// CORS enforces the configured cross-origin policy on incoming requests.
 type CORS struct {
 	enabled          bool
 	allowedOrigins   map[string]struct{}
@@ -20,6 +21,7 @@ type CORS struct {
 	maxAgeSeconds    int
 }
 
+// NewCORS constructs a CORS enforcer from cfg.
 func NewCORS(cfg config.CORSConfig) *CORS {
 	origins := make(map[string]struct{}, len(cfg.AllowedOrigins))
 	allowAll := false
@@ -47,6 +49,8 @@ func NewCORS(cfg config.CORSConfig) *CORS {
 	}
 }
 
+// Wrap returns next wrapped with CORS header enforcement, rejecting
+// disallowed cross-origin requests and answering preflight OPTIONS requests.
 func (c *CORS) Wrap(next http.Handler) http.Handler {
 	if !c.enabled {
 		return next

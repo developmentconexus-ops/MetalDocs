@@ -2,6 +2,7 @@ package middleware_test
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -63,7 +64,8 @@ func TestRecovery_RepanicsOnErrAbortHandler(t *testing.T) {
 	}))
 
 	defer func() {
-		if recover() != http.ErrAbortHandler {
+		recErr, ok := recover().(error)
+		if !ok || !errors.Is(recErr, http.ErrAbortHandler) {
 			t.Fatal("expected http.ErrAbortHandler to propagate")
 		}
 	}()

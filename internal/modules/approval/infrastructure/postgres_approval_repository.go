@@ -731,7 +731,7 @@ func (r *postgresApprovalRepository) ListRoutes(ctx context.Context, tenantID st
 	if err != nil {
 		return nil, MapPgError(err, MapHints{})
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	routes, err := scanRouteListRows(rows)
 	if err != nil {
 		return nil, err
@@ -747,7 +747,7 @@ func (r *postgresApprovalRepository) ListRoutesTx(ctx context.Context, tx db.Tx,
 	if err != nil {
 		return nil, MapPgError(err, MapHints{})
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	routes, err := scanRouteListRows(rows)
 	if err != nil {
 		return nil, err
@@ -939,7 +939,7 @@ func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx 
 	if err != nil {
 		return nil, MapPgError(err, MapHints{})
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var stages []domain.StageInstance
 	for rows.Next() {
@@ -1044,7 +1044,7 @@ func (r *postgresApprovalRepository) loadSignoffsForInstance(ctx context.Context
 	if err != nil {
 		return nil, MapPgError(err, MapHints{})
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := map[string][]*domain.Signoff{}
 	for rows.Next() {
@@ -1129,7 +1129,7 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 	if err != nil {
 		return nil, MapPgError(err, MapHints{})
 	}
-	defer headerRows.Close()
+	defer func() { _ = headerRows.Close() }()
 
 	// Maintain insertion order from ids slice (deduped above).
 	byID := make(map[string]*domain.Instance, len(ids))
@@ -1211,7 +1211,7 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 	if err != nil {
 		return nil, MapPgError(err, MapHints{})
 	}
-	defer stageRows.Close()
+	defer func() { _ = stageRows.Close() }()
 
 	stagesByInst := make(map[string][]domain.StageInstance, len(byID))
 	for stageRows.Next() {
@@ -1296,7 +1296,7 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 	if err != nil {
 		return nil, MapPgError(err, MapHints{})
 	}
-	defer signoffRows.Close()
+	defer func() { _ = signoffRows.Close() }()
 
 	// signoffsByStage: stageInstanceID → []*Signoff
 	signoffsByStage := make(map[string][]*domain.Signoff)
@@ -1569,7 +1569,7 @@ func (r *postgresApprovalRepository) LoadStageVerdicts(ctx context.Context, tx d
 	if err != nil {
 		return nil, MapPgError(err, MapHints{})
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	return scanVerdicts(rows)
 }
@@ -1599,7 +1599,7 @@ func (r *postgresApprovalRepository) LoadInstanceVerdicts(ctx context.Context, t
 	if err != nil {
 		return nil, MapPgError(err, MapHints{})
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	return scanVerdicts(rows)
 }
@@ -1660,7 +1660,7 @@ func (r *postgresApprovalRepository) LoadPriorSignoffs(ctx context.Context, tx d
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanSignoffsRows(rows)
 }
 
@@ -1686,7 +1686,7 @@ func (r *postgresApprovalRepository) LoadStageSignoffs(ctx context.Context, tx d
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanSignoffsRows(rows)
 }
 
@@ -1854,7 +1854,7 @@ func (r *postgresApprovalRepository) ResolveEligibleActors(ctx context.Context, 
 	if err != nil {
 		return []string{}, fmt.Errorf("resolveEligibleActors: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var ids []string
 	for rows.Next() {
@@ -2119,7 +2119,7 @@ func (r *postgresApprovalRepository) LoadRoute(ctx context.Context, tx db.Tx, te
 	if err != nil {
 		return domain.Route{}, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var stageIDs []string
 	for rows.Next() {
@@ -2180,7 +2180,7 @@ func loadRouteStageSelectors(ctx context.Context, tx db.Tx, stageIDs []string) (
 	if err != nil {
 		return nil, fmt.Errorf("load route stage selectors: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := make(map[string][]domain.ActorSelector, len(stageIDs))
 	for rows.Next() {
@@ -2265,7 +2265,7 @@ func (r *postgresApprovalRepository) LoadActiveDelegationsFor(ctx context.Contex
 	if err != nil {
 		return nil, MapPgError(err, MapHints{})
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var delegations []domain.Delegation
 	for rows.Next() {

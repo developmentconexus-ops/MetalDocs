@@ -22,11 +22,13 @@ func NewRecorder(inner Muxer) *Recorder {
 	return &Recorder{inner: inner}
 }
 
+// Handle records pattern and delegates registration to the wrapped Muxer.
 func (r *Recorder) Handle(pattern string, handler http.Handler) {
 	r.patterns = append(r.patterns, pattern)
 	r.inner.Handle(pattern, handler)
 }
 
+// HandleFunc records pattern and delegates registration to the wrapped Muxer.
 func (r *Recorder) HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request)) {
 	r.patterns = append(r.patterns, pattern)
 	r.inner.HandleFunc(pattern, handler)

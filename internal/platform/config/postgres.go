@@ -7,11 +7,16 @@ import (
 	"strings"
 )
 
+// PostgresConfig holds the Postgres connection configuration read from
+// environment variables at startup.
 type PostgresConfig struct {
 	// DSN is set once at startup; do not mutate after initialization.
 	DSN string
 }
 
+// LoadPostgresConfig reads Postgres connection config from environment
+// variables, preferring METALDOCS_DATABASE_URL/DATABASE_URL and falling back
+// to discrete PG* variables.
 func LoadPostgresConfig() (PostgresConfig, error) {
 	// Precedence: METALDOCS_DATABASE_URL wins over DATABASE_URL when both are
 	// set. METALDOCS_DATABASE_URL is this repo's project-prefixed convention

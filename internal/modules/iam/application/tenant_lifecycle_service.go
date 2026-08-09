@@ -305,7 +305,7 @@ func (s *TenantLifecycleService) RunJob(ctx context.Context, jobID string) error
 
 	if runErr != nil {
 		if err := s.store.MarkLifecycleJobFailed(ctx, jobID, runErr.Error()); err != nil {
-			return fmt.Errorf("mark job failed (after run error %v): %w", runErr, err)
+			return fmt.Errorf("mark job failed (after run error %w): %w", runErr, err)
 		}
 		return runErr
 	}

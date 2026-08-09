@@ -5,12 +5,17 @@ import (
 	"time"
 )
 
+// DocCodeResolver resolves the "doc_code" placeholder to the controlled
+// document's registry code.
 type DocCodeResolver struct{}
 
+// Key returns the resolver's registry key, "doc_code".
 func (DocCodeResolver) Key() string { return "doc_code" }
 
+// Version returns the resolver's version.
 func (DocCodeResolver) Version() int { return 1 }
 
+// Resolve computes the doc_code value for in.
 func (DocCodeResolver) Resolve(ctx context.Context, in ResolveInput) (ResolvedValue, error) {
 	if err := requireTenantID("doc_code", in.TenantID); err != nil {
 		return ResolvedValue{}, err

@@ -14,7 +14,7 @@ func TestCapabilityService_CanDo_GroupPathEnforcesTenantScope(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
 SELECT EXISTS (
@@ -68,7 +68,7 @@ func TestCapabilityService_CanDo_InvalidCapabilityDenied(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	svc := NewCapabilityService(db)
 	err = svc.CanDo(context.Background(), "user-1", "tenant-1", "invalid.cap")

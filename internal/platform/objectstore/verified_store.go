@@ -59,6 +59,10 @@ type VerifiedStore struct {
 	maxSizeBytes  int64
 }
 
+// NewVerifiedStore constructs a VerifiedStore against client (internal
+// server-to-server endpoint) and signingClient (public presign endpoint,
+// defaulting to client when nil), scoped to bucket. maxSizeBytes bounds
+// object size and defaults to defaultMaxObjectBytes when non-positive.
 func NewVerifiedStore(client, signingClient *minio.Client, bucket string, maxSizeBytes int64) *VerifiedStore {
 	if signingClient == nil {
 		signingClient = client
@@ -92,6 +96,8 @@ func (s *VerifiedStore) assertTenant(tenantID, key string) error {
 
 // --- write path (tenant-guarded) ---
 
+// PresignPut returns a presigned PUT URL for a tenant-scoped key, guarded by
+// assertTenant.
 func (s *VerifiedStore) PresignPut(ctx context.Context, tenantID, key string, ttl time.Duration) (string, error) {
 	if err := s.assertTenant(tenantID, key); err != nil {
 		return "", err
@@ -117,7 +123,7 @@ func (s *VerifiedStore) Confirm(ctx context.Context, tenantID, key, expectedHash
 		}
 		return VerifiedPointer{}, fmt.Errorf("objectstore: confirm get: %w", err)
 	}
-	defer obj.Close()
+	defer func() { _ = obj.Close() }()
 
 	h := sha256.New()
 	n, err := io.Copy(h, io.LimitReader(obj, s.maxSizeBytes+1))
@@ -241,7 +247,7 @@ func (s *VerifiedStore) ReadObject(ctx context.Context, key string, maxBytes int
 		}
 		return nil, fmt.Errorf("objectstore: read get: %w", err)
 	}
-	defer obj.Close()
+	defer func() { _ = obj.Close() }()
 
 	payload, err := io.ReadAll(io.LimitReader(obj, maxBytes+1))
 	if err != nil {
@@ -256,6 +262,7 @@ func (s *VerifiedStore) ReadObject(ctx context.Context, key string, maxBytes int
 	return payload, nil
 }
 
+// Exists reports whether an object exists at key (NOT tenant-guarded).
 func (s *VerifiedStore) Exists(ctx context.Context, key string) (bool, error) {
 	_, err := s.client.StatObject(ctx, s.bucket, key, minio.StatObjectOptions{})
 	if err == nil {
@@ -267,6 +274,7 @@ func (s *VerifiedStore) Exists(ctx context.Context, key string) (bool, error) {
 	return false, fmt.Errorf("objectstore: exists: %w", err)
 }
 
+// Size returns the object's size in bytes at key (NOT tenant-guarded).
 func (s *VerifiedStore) Size(ctx context.Context, key string) (int64, error) {
 	info, err := s.client.StatObject(ctx, s.bucket, key, minio.StatObjectOptions{})
 	if err != nil {
@@ -280,6 +288,8 @@ func (s *VerifiedStore) Size(ctx context.Context, key string) (int64, error) {
 
 // --- lifecycle (NOT guarded) ---
 
+// Delete removes the object at key, treating a missing object as success
+// (NOT tenant-guarded).
 func (s *VerifiedStore) Delete(ctx context.Context, key string) error {
 	err := s.client.RemoveObject(ctx, s.bucket, key, minio.RemoveObjectOptions{})
 	if err == nil || isNoSuchKeyErr(err) {

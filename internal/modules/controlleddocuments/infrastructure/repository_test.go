@@ -17,7 +17,7 @@ func TestPostgresControlledDocumentRepository_GetByIDLoadsVisibilityGrants(t *te
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := NewPostgresControlledDocumentRepository(db, documentsdomain.NoopActiveInstanceReader{})
 	now := time.Date(2026, 5, 14, 12, 0, 0, 0, time.UTC)
@@ -74,7 +74,7 @@ func TestPostgresControlledDocumentRepository_UpdateStatus_RowsAffectedError(t *
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := NewPostgresControlledDocumentRepository(db, documentsdomain.NoopActiveInstanceReader{})
 	rowsErr := errors.New("rows affected failed")

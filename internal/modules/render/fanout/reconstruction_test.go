@@ -10,25 +10,25 @@ import (
 )
 
 type fakeReconstructInputs struct {
-	req          FanoutRequest
+	req          Request
 	originalHash []byte
 	err          error
 }
 
-func (f fakeReconstructInputs) ReadForReconstruction(_ context.Context, _, _ string) (FanoutRequest, []byte, error) {
+func (f fakeReconstructInputs) ReadForReconstruction(_ context.Context, _, _ string) (Request, []byte, error) {
 	if f.err != nil {
-		return FanoutRequest{}, nil, f.err
+		return Request{}, nil, f.err
 	}
 	return f.req, f.originalHash, nil
 }
 
 type fakeFanoutClient struct {
-	resp FanoutResponse
+	resp Response
 	err  error
-	got  FanoutRequest
+	got  Request
 }
 
-func (f *fakeFanoutClient) Fanout(_ context.Context, req FanoutRequest) (FanoutResponse, error) {
+func (f *fakeFanoutClient) Fanout(_ context.Context, req Request) (Response, error) {
 	f.got = req
 	return f.resp, f.err
 }
@@ -64,13 +64,13 @@ func newReconstructService(t *testing.T, inputs fakeReconstructInputs, client *f
 func TestReconstruct_MatchesOriginal(t *testing.T) {
 	original, _ := hex.DecodeString("aa" + "bb" + "cc" + "dd" +
 		"00000000000000000000000000000000000000000000000000000000")
-	client := &fakeFanoutClient{resp: FanoutResponse{
+	client := &fakeFanoutClient{resp: Response{
 		ContentHash:    hex.EncodeToString(original),
 		FinalDocxS3Key: "ignored/by/reconstruct",
 	}}
 	writer := &fakeReconstructionWriter{}
 	svc := newReconstructService(t, fakeReconstructInputs{
-		req:          FanoutRequest{TenantID: "t", RevisionID: "r"},
+		req:          Request{TenantID: "t", RevisionID: "r"},
 		originalHash: original,
 	}, client, writer)
 
@@ -108,12 +108,12 @@ func TestReconstruct_MatchesOriginal(t *testing.T) {
 func TestReconstruct_MismatchMarksDivergence(t *testing.T) {
 	original := make([]byte, 32)
 	original[0] = 0x01
-	client := &fakeFanoutClient{resp: FanoutResponse{
+	client := &fakeFanoutClient{resp: Response{
 		ContentHash: hex.EncodeToString([]byte("different-hash-000000000000000000")),
 	}}
 	writer := &fakeReconstructionWriter{}
 	svc := newReconstructService(t, fakeReconstructInputs{
-		req:          FanoutRequest{TenantID: "t", RevisionID: "r"},
+		req:          Request{TenantID: "t", RevisionID: "r"},
 		originalHash: original,
 	}, client, writer)
 
@@ -130,13 +130,13 @@ func TestReconstruct_MismatchMarksDivergence(t *testing.T) {
 }
 
 func TestReconstruct_FanoutRequestPropagated(t *testing.T) {
-	req := FanoutRequest{
+	req := Request{
 		TenantID:          "t",
 		RevisionID:        "r",
 		BodyDocxS3Key:     "body.docx",
 		PlaceholderValues: map[string]string{"title": "Hello"},
 	}
-	client := &fakeFanoutClient{resp: FanoutResponse{ContentHash: "00"}}
+	client := &fakeFanoutClient{resp: Response{ContentHash: "00"}}
 	svc := newReconstructService(t, fakeReconstructInputs{req: req, originalHash: []byte{0}}, client, &fakeReconstructionWriter{})
 
 	if _, err := svc.Reconstruct(context.Background(), "t", "r"); err != nil {
@@ -149,7 +149,7 @@ func TestReconstruct_FanoutRequestPropagated(t *testing.T) {
 
 func TestReconstruct_FanoutErrorPropagates(t *testing.T) {
 	svc := newReconstructService(t,
-		fakeReconstructInputs{req: FanoutRequest{}, originalHash: []byte{0}},
+		fakeReconstructInputs{req: Request{}, originalHash: []byte{0}},
 		&fakeFanoutClient{err: errors.New("boom")},
 		&fakeReconstructionWriter{},
 	)

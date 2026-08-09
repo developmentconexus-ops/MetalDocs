@@ -8,6 +8,9 @@ import (
 	"sort"
 )
 
+// ComputeValuesHash computes a deterministic sha256 hex digest over a
+// placeholder values map, sorting keys first so the result is stable
+// regardless of map iteration order.
 func ComputeValuesHash(values map[string]any) (string, error) {
 	keys := make([]string, 0, len(values))
 	for k := range values {

@@ -36,6 +36,8 @@ type ViewService struct {
 	outbox    PDFOutboxStateReader // optional; nil → assume pending
 }
 
+// NewViewService constructs a ViewService wired to its tx runner, presigner,
+// and (optional) pdf_outbox state reader.
 func NewViewService(runner db.TxRunner, presigner ViewPresigner, outbox PDFOutboxStateReader) *ViewService {
 	return &ViewService{runner: runner, presigner: presigner, outbox: outbox}
 }

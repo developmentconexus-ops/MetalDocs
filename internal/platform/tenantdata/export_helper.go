@@ -27,7 +27,7 @@ func ExportTable(ctx context.Context, db *sql.DB, table, tenantColumn, tenantID 
 	if err != nil {
 		return TableExport{}, fmt.Errorf("tenantdata: export %s: %w", table, err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := TableExport{Table: table, Rows: []json.RawMessage{}}
 	for rows.Next() {
@@ -56,7 +56,7 @@ func ExportTableTextTenant(ctx context.Context, db *sql.DB, table, tenantColumn,
 	if err != nil {
 		return TableExport{}, fmt.Errorf("tenantdata: export %s: %w", table, err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := TableExport{Table: table, Rows: []json.RawMessage{}}
 	for rows.Next() {

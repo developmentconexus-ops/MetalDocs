@@ -317,7 +317,7 @@ func TestStream_TenantIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}
-	defer c.Close(websocket.StatusNormalClosure, "")
+	defer func() { _ = c.Close(websocket.StatusNormalClosure, "") }()
 
 	// Initial snapshot should contain only tenant-a's user.
 	ev := readEvent(t, ctx, c)
@@ -384,7 +384,7 @@ func TestStream_SnapshotMatchesHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}
-	defer c.Close(websocket.StatusNormalClosure, "")
+	defer func() { _ = c.Close(websocket.StatusNormalClosure, "") }()
 
 	ev := readEvent(t, ctx, c)
 	if ev.Type != "snapshot" {

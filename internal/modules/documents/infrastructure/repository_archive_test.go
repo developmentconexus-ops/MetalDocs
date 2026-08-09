@@ -28,7 +28,7 @@ func TestLoadDocumentArea_FailClosed(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer db.Close()
+		defer func() { _ = db.Close() }()
 		mock.ExpectBegin()
 		mock.ExpectQuery(regexp.QuoteMeta(q)).WithArgs("tenant-1", "missing").WillReturnError(sql.ErrNoRows)
 		tx, _ := db.Begin()
@@ -43,7 +43,7 @@ func TestLoadDocumentArea_FailClosed(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer db.Close()
+		defer func() { _ = db.Close() }()
 		mock.ExpectBegin()
 		mock.ExpectQuery(regexp.QuoteMeta(q)).WithArgs("tenant-1", "doc-1").
 			WillReturnRows(sqlmock.NewRows([]string{"process_area_code_snapshot"}).AddRow("qms"))
@@ -61,7 +61,7 @@ func TestMarkArchived_StampsTimestampWithoutStatusChange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	r := New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{}, taxonomydomain.NoopAreaCatalogReader{})
 
 	mock.ExpectBegin()
@@ -85,7 +85,7 @@ func TestMarkArchived_NoRowsReturnsError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	r := New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{}, taxonomydomain.NoopAreaCatalogReader{})
 
 	mock.ExpectBegin()
@@ -110,7 +110,7 @@ func TestUnarchive_ClearsTimestamp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	r := New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{}, taxonomydomain.NoopAreaCatalogReader{})
 
 	mock.ExpectBegin()
@@ -134,7 +134,7 @@ func TestUnarchive_NoRowsReturnsError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	r := New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{}, taxonomydomain.NoopAreaCatalogReader{})
 
 	mock.ExpectBegin()

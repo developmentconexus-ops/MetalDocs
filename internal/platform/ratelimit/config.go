@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+// RouteKey identifies a rate-limited route for per-route quota lookup.
+//
 // Per-route quotas from spec §Rate limits. Values are requests-per-minute
 // per user. Routes not listed here are unlimited.
 //
@@ -16,6 +18,7 @@ import (
 // store_config.go for METALDOCS_RATELIMIT_STORE and related vars.
 type RouteKey string
 
+// Route key values, keyed to their spec-defined per-route quotas.
 const (
 	// RouteAuthLogin is the pre-auth IP-keyed login limit (REQ-MW-5); it is
 	// enforced before authentication, so its limiter instance always keys by
@@ -35,6 +38,8 @@ const (
 	RouteExportPDF       RouteKey = "export_pdf"
 )
 
+// Config holds the rate-limit middleware's per-route quotas plus sweeper and
+// store configuration.
 type Config struct {
 	quotas map[RouteKey]int // req/min; validated >= 1 by NewConfig
 

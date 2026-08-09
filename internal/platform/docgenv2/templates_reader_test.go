@@ -13,7 +13,7 @@ func TestTemplatesTemplateReader_GetPublishedVersion_AllowsSystemTemplateTenant(
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	reader := NewTemplatesTemplateReader(db)
 

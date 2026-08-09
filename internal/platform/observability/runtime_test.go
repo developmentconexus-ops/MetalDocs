@@ -65,7 +65,7 @@ func TestPostgresRuntimeStatusProviderRuntimeMetricsOmitsFailedSections(t *testi
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectQuery("FROM metaldocs.auth_identities").
 		WillReturnError(errors.New("auth query failed"))

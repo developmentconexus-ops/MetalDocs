@@ -32,8 +32,10 @@ func NewTenantDataPort(db *sql.DB) *TenantDataPort {
 
 var _ tenantdata.Port = (*TenantDataPort)(nil)
 
+// Module returns the owning module's name ("documents").
 func (p *TenantDataPort) Module() string { return "documents" }
 
+// Tables returns the tenant-scoped tables this port exports/erases.
 func (p *TenantDataPort) Tables() []string {
 	return []string{
 		"public.documents",
@@ -44,6 +46,8 @@ func (p *TenantDataPort) Tables() []string {
 	}
 }
 
+// ExportTenantData exports every row this port owns for tenantID, one
+// tenantdata.TableExport per table in Tables().
 func (p *TenantDataPort) ExportTenantData(ctx context.Context, db *sql.DB, tenantID string) ([]tenantdata.TableExport, error) {
 	var out []tenantdata.TableExport
 	for _, table := range p.Tables() {
@@ -68,6 +72,9 @@ func countTenantRows(ctx context.Context, tx *sql.Tx, table, tenantColumn, tenan
 	return n, nil
 }
 
+// EraseTenantData deletes public.documents for tenantID (cascading through FKs
+// to every other owned table) and returns the per-table row counts erased,
+// keyed by the same names Tables() reports.
 func (p *TenantDataPort) EraseTenantData(ctx context.Context, tx *sql.Tx, tenantID string) (map[string]int64, error) {
 	counts := make(map[string]int64)
 

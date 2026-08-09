@@ -28,6 +28,7 @@ type Replay struct {
 	Body   []byte
 }
 
+// Validate checks that the cached response status is a well-formed HTTP status code.
 func (r Replay) Validate() error {
 	if r.Status < 100 || r.Status > 599 {
 		return fmt.Errorf("idempotency: corrupt response_status %d", r.Status)

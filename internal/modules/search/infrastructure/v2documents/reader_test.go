@@ -44,7 +44,7 @@ func TestListDocumentsFiltersByTenantID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	rows := sqlmock.NewRows(readerCols).AddRow(
 		"doc-1", "Manual", "ACTIVE", "profile-a", "profile-a",
@@ -86,7 +86,7 @@ func TestListDocumentsBindsActorForVisibility(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	rows := sqlmock.NewRows(readerCols).AddRow(
 		"doc-2", "Instruction", "ACTIVE", "profile-b", "profile-b",

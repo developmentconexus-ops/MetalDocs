@@ -125,10 +125,8 @@ func (r Route) Validate(policy taxonomydomain.RoutePolicy) error {
 			if *s.QuorumM < 1 {
 				return fmt.Errorf("stage %q: QuorumM must be >= 1", s.Name)
 			}
-		} else {
-			if s.QuorumM != nil {
-				return fmt.Errorf("stage %q: QuorumM must be nil for quorum %s", s.Name, s.Quorum)
-			}
+		} else if s.QuorumM != nil {
+			return fmt.Errorf("stage %q: QuorumM must be nil for quorum %s", s.Name, s.Quorum)
 		}
 
 		// Unique names.

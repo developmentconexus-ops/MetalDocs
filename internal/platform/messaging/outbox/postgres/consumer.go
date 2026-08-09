@@ -10,11 +10,16 @@ import (
 	"metaldocs/internal/platform/messaging"
 )
 
+// Consumer implements messaging.Consumer against the Postgres-backed
+// transactional outbox table.
 type Consumer struct {
 	db         *sql.DB
 	claimLease time.Duration
 }
 
+// NewConsumer constructs a Consumer backed by db. claimLease bounds how long
+// a claimed event is held before it becomes eligible for reclaim; it defaults
+// to 30 seconds when zero or negative.
 func NewConsumer(db *sql.DB, claimLease time.Duration) *Consumer {
 	if claimLease <= 0 {
 		claimLease = 30 * time.Second
@@ -22,6 +27,8 @@ func NewConsumer(db *sql.DB, claimLease time.Duration) *Consumer {
 	return &Consumer{db: db, claimLease: claimLease}
 }
 
+// ClaimUnpublished claims up to limit unpublished outbox events for
+// processing, using SKIP LOCKED so concurrent consumers do not collide.
 func (c *Consumer) ClaimUnpublished(ctx context.Context, limit int) ([]messaging.Event, error) {
 	if limit <= 0 {
 		limit = 20
@@ -65,7 +72,7 @@ ORDER BY occurred_at ASC
 	if err != nil {
 		return nil, fmt.Errorf("claim unpublished outbox events: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var events []messaging.Event
 	for rows.Next() {
@@ -125,6 +132,8 @@ ORDER BY occurred_at ASC
 	return events, nil
 }
 
+// MarkPublished marks the given outbox events as published, clearing their
+// retry state.
 func (c *Consumer) MarkPublished(ctx context.Context, eventIDs []messaging.EventID) error {
 	if len(eventIDs) == 0 {
 		return nil
@@ -150,6 +159,8 @@ WHERE event_id IN (%s)
 	return nil
 }
 
+// MarkFailed records a failed publish attempt, scheduling a retry or
+// dead-lettering the event per failure's fields.
 func (c *Consumer) MarkFailed(ctx context.Context, failure messaging.FailedEvent) error {
 	if strings.TrimSpace(string(failure.EventID)) == "" {
 		return fmt.Errorf("event id is required")

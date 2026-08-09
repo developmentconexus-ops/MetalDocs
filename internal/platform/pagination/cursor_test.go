@@ -1,6 +1,7 @@
 package pagination
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -45,13 +46,13 @@ func TestDecodeCursor_BlankIsFirstPage(t *testing.T) {
 
 func TestDecodeCursor_Malformed(t *testing.T) {
 	for _, c := range []string{"!!!notbase64", EncodeCursor("only", "")[:4]} {
-		if _, _, err := DecodeCursor(c); err != ErrInvalidCursor {
+		if _, _, err := DecodeCursor(c); !errors.Is(err, ErrInvalidCursor) {
 			t.Fatalf("expected ErrInvalidCursor for %q, got %v", c, err)
 		}
 	}
 	// base64 of a value with no "|" separator.
 	bad := EncodeCursor("", "") // "|" with empty parts → invalid
-	if _, _, err := DecodeCursor(bad); err != ErrInvalidCursor {
+	if _, _, err := DecodeCursor(bad); !errors.Is(err, ErrInvalidCursor) {
 		t.Fatalf("expected ErrInvalidCursor for empty-parts cursor, got %v", err)
 	}
 }

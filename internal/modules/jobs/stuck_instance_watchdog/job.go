@@ -16,12 +16,19 @@ import (
 )
 
 const (
-	JobName     = "stuck_instance_watchdog"
-	StuckAfter  = 7 * 24 * time.Hour
-	BatchSize   = 50
+	// JobName identifies this job type to River and in logs.
+	JobName = "stuck_instance_watchdog"
+	// StuckAfter is the age threshold past which an in-progress approval
+	// instance is reported stuck.
+	StuckAfter = 7 * 24 * time.Hour
+	// BatchSize caps how many stuck instances are reported per tick.
+	BatchSize = 50
+	// SystemActor is the stable system principal alerts are attributed to.
 	SystemActor = "system:watchdog"
 )
 
+// StuckInstance is one approval instance the watchdog found stuck
+// in_progress past StuckAfter.
 type StuckInstance struct {
 	ID          string
 	TenantID    string
@@ -113,7 +120,7 @@ func listStuckInstances(ctx context.Context, db *sql.DB) ([]StuckInstance, error
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := authz.BypassSystem(ctx, tx); err != nil {
 		return nil, err
@@ -136,7 +143,7 @@ LIMIT $1`, BatchSize, int64(StuckAfter/time.Second))
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := make([]StuckInstance, 0, BatchSize)
 	for rows.Next() {
@@ -161,7 +168,7 @@ func emitStuckAlert(ctx context.Context, db *sql.DB, emitter governanceEmitter, 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := authz.BypassSystem(ctx, tx); err != nil {
 		return err

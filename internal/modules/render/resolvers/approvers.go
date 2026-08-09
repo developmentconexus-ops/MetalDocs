@@ -6,11 +6,17 @@ import (
 	"time"
 )
 
+// ApproversResolver resolves the "approvers" placeholder to a comma-separated
+// list of approver display names, or a pending-approval placeholder string.
 type ApproversResolver struct{}
 
-func (ApproversResolver) Key() string  { return "approvers" }
+// Key returns the resolver's registry key, "approvers".
+func (ApproversResolver) Key() string { return "approvers" }
+
+// Version returns the resolver's version.
 func (ApproversResolver) Version() int { return 1 }
 
+// Resolve computes the approvers value for in.
 func (ApproversResolver) Resolve(ctx context.Context, in ResolveInput) (ResolvedValue, error) {
 	if err := requireTenantID("approvers", in.TenantID); err != nil {
 		return ResolvedValue{}, err

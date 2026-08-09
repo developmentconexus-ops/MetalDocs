@@ -245,7 +245,7 @@ func TestProblem_New_PanicsOnInvalidStatus(t *testing.T) {
 					t.Fatalf("expected panic for status %d", tt.status)
 				}
 			}()
-			New(tt.status, CodeInternalUnknown, "test")
+			_ = New(tt.status, CodeInternalUnknown, "test")
 		})
 	}
 }

@@ -74,7 +74,7 @@ ORDER BY u.last_seen_at DESC
 	if err != nil {
 		return nil, fmt.Errorf("presence: snapshot query: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	items := make([]Item, 0)
 	for rows.Next() {
@@ -104,7 +104,7 @@ WHERE last_seen_at >= $1
 	if err != nil {
 		return nil, fmt.Errorf("presence: tenants query: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := make([]string, 0)
 	for rows.Next() {

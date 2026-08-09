@@ -24,8 +24,10 @@ func NewTenantDataPort(db *sql.DB) *TenantDataPort {
 
 var _ tenantdata.Port = (*TenantDataPort)(nil)
 
+// Module returns the owning module name, "render".
 func (p *TenantDataPort) Module() string { return "render" }
 
+// Tables returns the tenant-scoped tables this port exports/erases.
 func (p *TenantDataPort) Tables() []string {
 	return []string{
 		"metaldocs.pdf_dispatch_outbox",
@@ -33,6 +35,8 @@ func (p *TenantDataPort) Tables() []string {
 	}
 }
 
+// ExportTenantData exports every row scoped to tenantID from each table
+// returned by Tables.
 func (p *TenantDataPort) ExportTenantData(ctx context.Context, db *sql.DB, tenantID string) ([]tenantdata.TableExport, error) {
 	var out []tenantdata.TableExport
 	for _, table := range p.Tables() {
@@ -45,6 +49,8 @@ func (p *TenantDataPort) ExportTenantData(ctx context.Context, db *sql.DB, tenan
 	return out, nil
 }
 
+// EraseTenantData deletes every row scoped to tenantID from each table
+// returned by Tables, returning the per-table row counts erased.
 func (p *TenantDataPort) EraseTenantData(ctx context.Context, tx *sql.Tx, tenantID string) (map[string]int64, error) {
 	counts := make(map[string]int64)
 	for _, table := range p.Tables() {

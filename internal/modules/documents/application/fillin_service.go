@@ -17,6 +17,8 @@ import (
 	"metaldocs/internal/platform/db"
 )
 
+// SchemaReader loads the placeholder schema a document's fill-in values are
+// validated against.
 type SchemaReader interface {
 	// LoadPlaceholderSchema loads the placeholder schema snapshot for a document.
 	// docID is a documents.id (the snapshot lives on the documents row); the param
@@ -26,12 +28,18 @@ type SchemaReader interface {
 	LoadPlaceholderSchema(ctx context.Context, tenantID, docID string) ([]templatesdomain.Placeholder, error)
 }
 
+// FillInWriter persists placeholder value writes and reads back a
+// placeholder's current value source, used to enforce the author-editable
+// governance rule (SP-2 D11).
 type FillInWriter interface {
 	UpsertValue(ctx context.Context, v infrastructure.PlaceholderValue, q ...infrastructure.DBTX) error
 	UpsertAuthorValue(ctx context.Context, v infrastructure.PlaceholderValue, q ...infrastructure.DBTX) (int64, error)
 	CurrentSource(ctx context.Context, tenantID, revisionID, placeholderID string) (string, bool, error)
 }
 
+// FillInService validates and writes author-supplied placeholder values for a
+// document revision, enforcing document.edit authz and the author-editable
+// governance rule that rejects writes to computed/dictionary-sourced rows.
 type FillInService struct {
 	runner        db.TxRunner
 	schemas       SchemaReader
@@ -64,14 +72,19 @@ func (s *FillInService) WithIAMReader(r IAMUserOptionsReader) *FillInService {
 	return s
 }
 
+// SnapshotSchemaReader implements SchemaReader by reading the placeholder
+// schema frozen onto a document's placeholder_schema_snapshot column.
 type SnapshotSchemaReader struct {
 	db *sql.DB
 }
 
+// NewSnapshotSchemaReader constructs a SnapshotSchemaReader over db.
 func NewSnapshotSchemaReader(db *sql.DB) *SnapshotSchemaReader {
 	return &SnapshotSchemaReader{db: db}
 }
 
+// LoadPlaceholderSchema implements SchemaReader by reading and parsing the
+// document's placeholder_schema_snapshot column.
 func (r *SnapshotSchemaReader) LoadPlaceholderSchema(ctx context.Context, tenantID, docID string) ([]templatesdomain.Placeholder, error) {
 	var raw []byte
 	if err := r.db.QueryRowContext(ctx, `
@@ -109,6 +122,9 @@ func parsePlaceholderSchema(raw []byte) ([]templatesdomain.Placeholder, error) {
 	return wrapped.Placeholders, nil
 }
 
+// SetPlaceholderValue validates raw against placeholderID's schema and writes
+// it as an author value on revisionID, after enforcing document.edit authz and
+// rejecting writes to governed (computed/dictionary-sourced) rows.
 func (s *FillInService) SetPlaceholderValue(ctx context.Context, tenantID, actorID, revisionID, placeholderID, raw string) error {
 	if err := requireDocEditDraft(ctx, s.runner, s.cdRead, tenantID, actorID, revisionID); err != nil {
 		return err
@@ -234,6 +250,11 @@ func validateValue(ctx context.Context, tenantID string, p templatesdomain.Place
 			}
 		}
 		return fmt.Errorf("%w: %s unknown user %s", v2domain.ErrValidationFailed, p.ID, raw)
+	case templatesdomain.PHText, templatesdomain.PHPicture, templatesdomain.PHComputed, templatesdomain.PHDictionary:
+		// No additional type-specific validation: required/max_length/regex are
+		// already enforced above. PHComputed/PHDictionary values can never reach
+		// an actual write as author content — SetPlaceholderValue's CurrentSource
+		// governance check rejects governed rows before the DB write runs.
 	}
 
 	return nil
@@ -256,10 +277,15 @@ type TemplateVersionSchemaReader struct {
 	tplVersions templatesdomain.TemplateVersionPort
 }
 
+// NewTemplateVersionSchemaReader constructs a TemplateVersionSchemaReader
+// backed by db and the templates-owned TemplateVersionPort.
 func NewTemplateVersionSchemaReader(db *sql.DB, tplVersions templatesdomain.TemplateVersionPort) *TemplateVersionSchemaReader {
 	return &TemplateVersionSchemaReader{db: db, tplVersions: tplVersions}
 }
 
+// LoadFillInSchema resolves docID's template version on the documents table,
+// then reads that version's placeholder schema through the templates-owned
+// TemplateVersionPort.
 func (r *TemplateVersionSchemaReader) LoadFillInSchema(ctx context.Context, tenantID, docID string) ([]templatesdomain.Placeholder, error) {
 	// Resolve the document's template version on the documents-owned table.
 	var versionID string
@@ -300,6 +326,8 @@ func (s *FillInService) WithTemplateSchemaReader(r *TemplateVersionSchemaReader)
 	return s
 }
 
+// GetPlaceholderValues returns docID's current fill-in values via the wired
+// FillInReader.
 func (s *FillInService) GetPlaceholderValues(ctx context.Context, tenantID, docID string) ([]infrastructure.PlaceholderValue, error) {
 	if s.reader == nil {
 		return nil, errors.New("fill-in reader not configured")
@@ -307,6 +335,8 @@ func (s *FillInService) GetPlaceholderValues(ctx context.Context, tenantID, docI
 	return s.reader.ListValues(ctx, tenantID, docID)
 }
 
+// GetFillInSchema returns docID's fill-in placeholder schema via the wired
+// template-version schema reader.
 func (s *FillInService) GetFillInSchema(ctx context.Context, tenantID, docID string) ([]templatesdomain.Placeholder, error) {
 	if s.schemaFromTpl == nil {
 		return nil, errors.New("fill-in schema reader not configured")

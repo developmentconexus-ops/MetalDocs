@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -19,7 +20,7 @@ func TestListDocumentsPaginated_StatusFilter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	r := New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{}, taxonomydomain.NoopAreaCatalogReader{})
 	now := time.Now()
@@ -68,7 +69,7 @@ func TestListDocumentsPaginated_CursorKeyset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	r := New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{}, taxonomydomain.NoopAreaCatalogReader{})
 	now := time.Now()
@@ -132,9 +133,9 @@ func TestListDocumentsPaginated_InvalidCursor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	r := New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{}, taxonomydomain.NoopAreaCatalogReader{})
-	if _, _, _, err := r.ListDocumentsPaginated(context.Background(), "tenant-1", ListOptions{Cursor: "!!!bad"}); err != pagination.ErrInvalidCursor {
+	if _, _, _, err := r.ListDocumentsPaginated(context.Background(), "tenant-1", ListOptions{Cursor: "!!!bad"}); !errors.Is(err, pagination.ErrInvalidCursor) {
 		t.Fatalf("want ErrInvalidCursor, got %v", err)
 	}
 }
@@ -145,7 +146,7 @@ func TestCountDocuments_RespectsFilters(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	r := New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{}, taxonomydomain.NoopAreaCatalogReader{})
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM documents WHERE`).

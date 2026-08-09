@@ -33,7 +33,12 @@ func resolveCurrentEligibleForDrift(
 	needsLiveArea := false
 	for _, sel := range stage.SelectorsSnapshot {
 		switch sel.Kind {
-		case domain.SelectorNamedUser:
+		case domain.SelectorNamedUser, domain.SelectorSubmitChoice:
+			// submit_choice never actually reaches SelectorsSnapshot —
+			// materializeSelectorsSnapshot (submit_service.go) rewrites every
+			// submit_choice selector into a concrete named_user selector at
+			// submit time. Kept here, exempt like named_user, only so this
+			// switch stays exhaustive over SelectorKind (defense in depth).
 			exemptIDs = append(exemptIDs, sel.UserID)
 		case domain.SelectorRoleInFixedArea:
 			poolSelectors = append(poolSelectors, sel)

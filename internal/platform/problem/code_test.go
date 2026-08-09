@@ -316,7 +316,7 @@ func TestNewFor_UsesRegisteredStatus(t *testing.T) {
 	}
 	// An unregistered code has no status to bind, so NewFor refuses rather than
 	// silently defaulting to 500 (no-fallback principle).
-	mustPanic(t, func() { NewFor(Code{}, "x") })
+	mustPanic(t, func() { _ = NewFor(Code{}, "x") })
 }
 
 // TestCode_BareStringLiteralDoesNotCompile is the load-bearing guarantee of ADR

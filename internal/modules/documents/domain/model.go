@@ -5,8 +5,13 @@ import (
 	"time"
 )
 
+// DocumentStatus is the lifecycle status of a Document, enforced both by
+// CanTransitionDocumentStatus and by the DB trigger
+// enforce_document_transition.
 type DocumentStatus string
 
+// Document lifecycle statuses; see CanTransitionDocumentStatus for the legal
+// transition graph.
 const (
 	DocStatusDraft       DocumentStatus = "draft"
 	DocStatusUnderReview DocumentStatus = "under_review" // migration 0142 retired the pre-cutover literal named in internal/platform/legacystatus (legacystatus.Retired); submit now yields under_review
@@ -18,8 +23,10 @@ const (
 	DocStatusArchived    DocumentStatus = "archived"
 )
 
+// SessionStatus is the lifecycle status of an editing Session.
 type SessionStatus string
 
+// Session lifecycle statuses.
 const (
 	SessionActive        SessionStatus = "active"
 	SessionExpired       SessionStatus = "expired"
@@ -27,6 +34,10 @@ const (
 	SessionForceReleased SessionStatus = "force_released"
 )
 
+// Document is the aggregate root for an authored document instance created
+// from a template version, carrying its current status, revision pointer,
+// controlled-document bridge fields, and (when queried) its latest release
+// projection.
 type Document struct {
 	ID                string         `json:"id"`
 	TenantID          string         `json:"tenant_id"`
@@ -116,6 +127,8 @@ type ReleaseProjection struct {
 	LastEvaluatedAt      *time.Time `json:"last_evaluated_at,omitempty"`
 }
 
+// Session is an active (or historical) editing lock on a Document, held by
+// one user at a time.
 type Session struct {
 	ID                         string
 	DocumentID                 string
@@ -127,6 +140,8 @@ type Session struct {
 	Status                     SessionStatus
 }
 
+// Revision is one saved document_revisions row: an immutable snapshot of a
+// document's body and form data at a point in the edit history.
 type Revision struct {
 	ID               string
 	DocumentID       string
@@ -139,6 +154,8 @@ type Revision struct {
 	CreatedAt        time.Time
 }
 
+// RevisionHistoryItem is a read-model row summarizing one revision for a
+// document's revision-history listing.
 type RevisionHistoryItem struct {
 	DocumentID     string
 	RevisionNumber int64
@@ -148,6 +165,8 @@ type RevisionHistoryItem struct {
 	IsCurrent      bool
 }
 
+// PendingUpload tracks a presigned-but-not-yet-confirmed content upload,
+// linking it to the session and base revision it was issued against.
 type PendingUpload struct {
 	ID             string
 	SessionID      string
@@ -160,6 +179,8 @@ type PendingUpload struct {
 	ConsumedAt     *time.Time
 }
 
+// Checkpoint is a user-labeled bookmark on a specific revision, letting
+// authors mark and later return to a meaningful point in the edit history.
 type Checkpoint struct {
 	ID         string
 	DocumentID string
@@ -170,6 +191,7 @@ type Checkpoint struct {
 	CreatedBy  string
 }
 
+// Sentinel errors returned by the documents domain and application layers.
 var (
 	ErrInvalidStateTransition = errors.New("invalid_state_transition")
 	ErrSessionInactive        = errors.New("session_inactive")

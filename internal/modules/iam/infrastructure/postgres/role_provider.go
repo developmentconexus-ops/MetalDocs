@@ -45,7 +45,7 @@ ORDER BY r.role_code ASC
 	if err != nil {
 		return nil, fmt.Errorf("query iam roles: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	found := false
 	roles := make([]domain.Role, 0, 4)
@@ -95,7 +95,7 @@ ORDER BY u.user_id, r.role_code ASC
 	if err != nil {
 		return nil, fmt.Errorf("batch query iam roles: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := make(map[string][]domain.Role, len(userIDs))
 	for rows.Next() {

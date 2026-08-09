@@ -17,6 +17,9 @@ import (
 	"metaldocs/internal/platform/ratelimit"
 )
 
+// Module is the documents bounded-context module: it wires the repository,
+// application services, and HTTP handlers built by New, and publishes them
+// for the composition root to mount.
 type Module struct {
 	Handler                   *dhttp.Handler
 	Service                   *application.Service
@@ -28,6 +31,10 @@ type Module struct {
 	repo                      *infrastructure.Repository
 }
 
+// Dependencies carries every external collaborator New needs to construct a
+// Module: the DB handle, cross-module read ports, and infrastructure
+// clients. Optional ports are nil-guarded in New with fail-closed Noop
+// defaults.
 type Dependencies struct {
 	DB                           *sql.DB
 	Presign                      application.Presigner
@@ -71,6 +78,10 @@ type Dependencies struct {
 	PDFOutboxReader application.PDFOutboxStateReader
 }
 
+// New constructs the documents Module from deps, wiring the repository,
+// application services (document, export, fill-in, view, reconstruction),
+// and their HTTP handlers. Panics if deps.Caps is nil, since handler
+// authorization cannot function without it.
 func New(deps Dependencies) *Module {
 	if deps.Caps == nil {
 		panic("documents.New: Caps (CapabilityChecker) is required for handler authorization")
@@ -174,6 +185,8 @@ func (m *Module) WithRateLimit(rl *ratelimit.Middleware, userFn func(*http.Reque
 	return m
 }
 
+// Repo returns the module's underlying Repository, for wiring other modules'
+// cross-module read ports at the composition root.
 func (m *Module) Repo() *infrastructure.Repository { return m.repo }
 
 type placeholderOptionsIAMAdapter struct {

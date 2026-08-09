@@ -98,7 +98,8 @@ func (r *CoverageRepository) Recipients(ctx context.Context, tenantID, cdID, cur
 	// This sentinel is non-empty, so pagination.DecodeCursor accepts it (it rejects "").
 	// On decode: cursorID=="" → first page; sortValue==nullAreaCursorSentinel → NULL bucket;
 	// else → non-NULL area_name bucket.
-	if cursorID == "" {
+	switch {
+	case cursorID == "":
 		// First page: no keyset filter.
 		const q = `
 			SELECT v.user_id,
@@ -115,7 +116,7 @@ func (r *CoverageRepository) Recipients(ctx context.Context, tenantID, cdID, cur
 			 LIMIT $3
 		`
 		rows, err = r.db.QueryContext(ctx, q, tenantID, cdID, limit+1)
-	} else if sortValue == nullAreaCursorSentinel {
+	case sortValue == nullAreaCursorSentinel:
 		// Cursor points to a NULL area_name row: next page is rows with NULL area_name
 		// and user_id > cursorID (since NULL NULLS LAST means all non-NULLs came first).
 		// There are no non-NULL area_name rows after a NULL area_name row, so we only
@@ -138,7 +139,7 @@ func (r *CoverageRepository) Recipients(ctx context.Context, tenantID, cdID, cur
 			 LIMIT $4
 		`
 		rows, err = r.db.QueryContext(ctx, q, tenantID, cdID, cursorID, limit+1)
-	} else {
+	default:
 		// Cursor points to a non-NULL area_name row.
 		// Next page: rows where (area_name, user_id) > (sortValue, cursorID).
 		// That means:
@@ -169,7 +170,7 @@ func (r *CoverageRepository) Recipients(ctx context.Context, tenantID, cdID, cur
 	if err != nil {
 		return distributiondomain.RecipientsPage{}, fmt.Errorf("distribution.Recipients query: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type rawRow struct {
 		userID   string
@@ -276,7 +277,7 @@ func (r *CoverageRepository) Coverage(ctx context.Context, tenantID, cdID string
 	if err != nil {
 		return nil, fmt.Errorf("distribution.Coverage query: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var result []distributiondomain.AreaCoverageRow
 	for rows.Next() {

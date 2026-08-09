@@ -44,6 +44,8 @@ type ActiveInstanceReader interface {
 // that do not exercise GetActiveInstance.
 type NoopActiveInstanceReader struct{}
 
+// ActiveInstanceForControlledDocument always returns (nil, nil), reporting no
+// active or published document for any input.
 func (NoopActiveInstanceReader) ActiveInstanceForControlledDocument(context.Context, string, string) (*ActiveInstanceView, error) {
 	return nil, nil
 }

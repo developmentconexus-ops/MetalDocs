@@ -75,7 +75,7 @@ func (r *fakeSubmitRepo) LoadRoute(ctx context.Context, tx db.Tx, tenantID, rout
 	if err != nil {
 		return domain.Route{}, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var stage domain.Stage
 		var quorumM sql.NullInt32
@@ -133,7 +133,7 @@ func (r *fakeSubmitRepo) ResolveEligibleActors(ctx context.Context, tx db.Tx, te
 	if err != nil {
 		return []string{}, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var ids []string
 	for rows.Next() {
 		var uid string

@@ -69,6 +69,8 @@ type AreaCatalogReader interface {
 // Postgres-backed reader.
 type PermissiveAreaCatalog struct{}
 
+// AreaCodeExists always returns true: the permissive catalog accepts every
+// areaCode without checking it against process_areas.
 func (PermissiveAreaCatalog) AreaCodeExists(_ context.Context, _, _ string) (bool, error) {
 	return true, nil
 }

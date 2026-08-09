@@ -97,7 +97,7 @@ func (r *fakeDecisionRepo) LoadPriorSignoffs(ctx context.Context, tx db.Tx, tena
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanDecisionSignoffRows(rows)
 }
 
@@ -121,7 +121,7 @@ func (r *fakeDecisionRepo) LoadStageSignoffs(ctx context.Context, tx db.Tx, tena
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanDecisionSignoffRows(rows)
 }
 
@@ -208,7 +208,7 @@ func (r *fakeDecisionRepo) ResolveEligibleActors(ctx context.Context, tx db.Tx, 
 	if err != nil {
 		return []string{}, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var ids []string
 	for rows.Next() {
 		var uid string

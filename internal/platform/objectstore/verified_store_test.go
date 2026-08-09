@@ -53,10 +53,10 @@ func TestVerifiedStore_WritePathGuardRejectsForeignTenant(t *testing.T) {
 	s := newTestStore(t)
 	foreign := "tenants/other/documents/d/revisions/h.docx"
 
-	if _, err := s.PresignPut(context.Background(), "t1", foreign, time.Minute); err != ErrKeyOutsideTenant {
+	if _, err := s.PresignPut(context.Background(), "t1", foreign, time.Minute); !errors.Is(err, ErrKeyOutsideTenant) {
 		t.Fatalf("PresignPut err = %v, want ErrKeyOutsideTenant", err)
 	}
-	if _, err := s.Confirm(context.Background(), "t1", foreign, "deadbeef"); err != ErrKeyOutsideTenant {
+	if _, err := s.Confirm(context.Background(), "t1", foreign, "deadbeef"); !errors.Is(err, ErrKeyOutsideTenant) {
 		t.Fatalf("Confirm err = %v, want ErrKeyOutsideTenant", err)
 	}
 }
@@ -74,7 +74,7 @@ func TestVerifiedStore_Copy_DestOutsideTenant_Rejected(t *testing.T) {
 	err := s.Copy(context.Background(), "tenant-a",
 		"tenants/tenant-a/templates/tpl-1/versions/1.docx",
 		"tenants/OTHER/templates/tpl-1/versions/2.docx")
-	if err != ErrKeyOutsideTenant {
+	if !errors.Is(err, ErrKeyOutsideTenant) {
 		t.Fatalf("expected ErrKeyOutsideTenant, got %v", err)
 	}
 }
@@ -102,7 +102,7 @@ func TestVerifiedStore_Copy_SrcOutsideTenant_Rejected(t *testing.T) {
 	err := s.Copy(context.Background(), "tenant-a",
 		"tenants/tenant-b/templates/tpl-1/versions/1.docx",
 		"tenants/tenant-a/templates/tpl-1/versions/2.docx")
-	if err != ErrKeyOutsideTenant {
+	if !errors.Is(err, ErrKeyOutsideTenant) {
 		t.Fatalf("expected ErrKeyOutsideTenant for foreign src, got %v", err)
 	}
 }
@@ -127,7 +127,7 @@ func TestVerifiedStore_AssertedPresignGet_ForeignKey_Rejected(t *testing.T) {
 	s := newTestStore(t)
 	_, err := s.AssertedPresignGet(context.Background(), "tenant-a",
 		"tenants/tenant-b/documents/d/exports/x.pdf", time.Minute)
-	if err != ErrKeyOutsideTenant {
+	if !errors.Is(err, ErrKeyOutsideTenant) {
 		t.Fatalf("expected ErrKeyOutsideTenant, got %v", err)
 	}
 }
@@ -174,7 +174,7 @@ func TestVerifiedStore_AssertedReadObject_ForeignKey_Rejected(t *testing.T) {
 	s := newTestStore(t)
 	_, err := s.AssertedReadObject(context.Background(), "tenant-a",
 		"tenants/tenant-b/templates/tpl/schema.json", 1024)
-	if err != ErrKeyOutsideTenant {
+	if !errors.Is(err, ErrKeyOutsideTenant) {
 		t.Fatalf("expected ErrKeyOutsideTenant, got %v", err)
 	}
 }
@@ -184,7 +184,7 @@ func TestVerifiedStore_AssertedReadObject_EmptyTenant_Rejected(t *testing.T) {
 	// Empty tenantID must never reduce the guard to the "tenants//" prefix.
 	_, err := s.AssertedReadObject(context.Background(), "",
 		"tenants//templates/tpl/schema.json", 1024)
-	if err != ErrKeyOutsideTenant {
+	if !errors.Is(err, ErrKeyOutsideTenant) {
 		t.Fatalf("expected ErrKeyOutsideTenant for empty tenant, got %v", err)
 	}
 }

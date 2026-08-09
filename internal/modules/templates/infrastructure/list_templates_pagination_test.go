@@ -19,7 +19,7 @@ func TestListTemplates_OrderByHasStableTiebreaker(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := New(db)
 
@@ -83,7 +83,7 @@ func TestListTemplates_ClampsLimitAndOffset(t *testing.T) {
 			if err != nil {
 				t.Fatalf("sqlmock.New: %v", err)
 			}
-			defer db.Close()
+			defer func() { _ = db.Close() }()
 
 			repo := New(db)
 
@@ -133,7 +133,7 @@ func TestListTemplates_PublishedOnlyEmitsPredicate(t *testing.T) {
 			if err != nil {
 				t.Fatalf("sqlmock.New: %v", err)
 			}
-			defer db.Close()
+			defer func() { _ = db.Close() }()
 
 			repo := New(db)
 

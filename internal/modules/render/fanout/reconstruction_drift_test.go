@@ -13,13 +13,13 @@ func TestReconstruct_DriftDetection(t *testing.T) {
 	}
 	differentHash := hex.EncodeToString(make([]byte, 32)) // all zeros — different from original
 
-	client := &fakeFanoutClient{resp: FanoutResponse{
+	client := &fakeFanoutClient{resp: Response{
 		ContentHash:    differentHash,
 		FinalDocxS3Key: "should/not/be/written",
 	}}
 	writer := &fakeReconstructionWriter{}
 	svc := NewReconstructService(
-		fakeReconstructInputs{req: FanoutRequest{TenantID: "t", RevisionID: "r"}, originalHash: original},
+		fakeReconstructInputs{req: Request{TenantID: "t", RevisionID: "r"}, originalHash: original},
 		client,
 		writer,
 		EngineVersions{EigenpalVer: "v1", DocxtemplaterVer: "v2"},

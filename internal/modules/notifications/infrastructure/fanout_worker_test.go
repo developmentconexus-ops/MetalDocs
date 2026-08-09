@@ -21,7 +21,7 @@ func TestNotificationsFanoutWorker_Work_SeedsTenantBeforeReaderInsert(t *testing
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	worker := NewNotificationsFanoutWorker(db)
 
@@ -59,7 +59,7 @@ func TestNotificationsFanoutWorker_Work_SeedsTenantBeforeAuthorInsert(t *testing
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	worker := NewNotificationsFanoutWorker(db)
 
@@ -102,7 +102,7 @@ func TestNotificationsFanoutWorker_Work_MultipleReaders_AllInserted(t *testing.T
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	worker := NewNotificationsFanoutWorker(db)
 
@@ -146,7 +146,7 @@ func TestNotificationsFanoutWorker_Work_UnhandledEventType_Errors(t *testing.T) 
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	worker := NewNotificationsFanoutWorker(db)
 

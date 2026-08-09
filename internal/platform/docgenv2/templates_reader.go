@@ -16,10 +16,13 @@ type TemplatesTemplateReader struct {
 	db *sql.DB
 }
 
+// NewTemplatesTemplateReader constructs a TemplatesTemplateReader backed by db.
 func NewTemplatesTemplateReader(db *sql.DB) *TemplatesTemplateReader {
 	return &TemplatesTemplateReader{db: db}
 }
 
+// GetPublishedVersion returns the DOCX storage key for the published template
+// version, allowing either the caller's own tenant or the system template tenant.
 func (r *TemplatesTemplateReader) GetPublishedVersion(ctx context.Context, tenantID, templateVersionID string) (docxKey, schemaKey, schemaJSON string, err error) {
 	if r.db == nil {
 		return "", "", "", errors.New("templates template reader: db is nil")

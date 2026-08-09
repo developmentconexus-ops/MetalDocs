@@ -38,6 +38,8 @@ type DBPoolStatsProvider interface {
 	DBPoolStats() map[string]any
 }
 
+// HTTPObservability serves the /metrics HTTP endpoint, aggregating runtime
+// status plus optional scheduler and DB pool stats.
 type HTTPObservability struct {
 	runtimeProvider  RuntimeStatusProvider
 	schedulerMetrics SchedulerMetricsProvider
@@ -92,6 +94,8 @@ func (o *HTTPObservability) SetDBPool(p DBPoolStatsProvider) {
 	o.dbPool = p
 }
 
+// Wrap returns next wrapped with request observability: trace-id resolution,
+// structured request logging, and metrics recording.
 func (o *HTTPObservability) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Trace-id resolution order (REQ-OBS-2): an active OTel span (created by
@@ -208,6 +212,7 @@ type MetricsResponse struct {
 	DBPool    map[string]any `json:"db_pool,omitempty"`
 }
 
+// MetricsHandler returns the HTTP handler serving the /metrics endpoint.
 func (o *HTTPObservability) MetricsHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {

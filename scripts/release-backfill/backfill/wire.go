@@ -40,7 +40,7 @@ func Wire(database *sql.DB, riverClient *river.Client[*sql.Tx]) (Deps, error) {
 	resolverReg := resolvers.NewRegistry()
 	resolvers.RegisterBuiltins(resolverReg)
 
-	// nil ResolverContextBuilder / nil FanoutClient mirror apps/worker's
+	// nil ResolverContextBuilder / nil fanout client mirror apps/worker's
 	// materialize wiring for the paths this tool never walks: the backfill
 	// never resolves placeholders and never calls docx-renderer itself.
 	freeze := docapp.NewFreezeService(schemaReader, fillInRepo, fillInRepo, resolverReg, snapRepo, nil, snapRepo, nil)

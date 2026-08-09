@@ -44,6 +44,10 @@ func CanTransitionDocumentStatus(cur, next DocumentStatus) error {
 		if next == DocStatusObsolete {
 			return nil
 		}
+	case DocStatusObsolete:
+		// Terminal status: no outbound arcs.
+	case DocStatusArchived:
+		// Not a real lifecycle status (see doc comment above); no outbound arcs.
 	}
 	return ErrInvalidStateTransition
 }

@@ -159,6 +159,17 @@ func e2eHandlersEnabled() bool {
 //go:generate go run metaldocs/cmd/gen-http-surface -public ../../../../api/openapi/v1/openapi.yaml -e2e ../../../../api/openapi/internal-e2e.yaml -out-dir . -registry ../../../../internal/modules/iam/domain/model.go
 
 func main() {
+	os.Exit(run())
+}
+
+// run wires and serves the API process; it is main()'s former body,
+// extracted so main can call os.Exit exactly once, after run returns. Every
+// early-exit branch below now `return`s an exit code instead of calling
+// os.Exit directly, so every defer registered along the way (deps.Cleanup,
+// stop, otelShutdown, rlStore.Close, the background sweepers, ...) always
+// unwinds — os.Exit used to skip them on every early-exit path (gocritic
+// exitAfterDefer).
+func run() int {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -169,7 +180,7 @@ func main() {
 	otelShutdown, otelEnabled, err := observability.SetupOTel(ctx, "metaldocs-api")
 	if err != nil {
 		slog.Error("setup otel", "err", err)
-		os.Exit(1)
+		return 1
 	}
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -185,45 +196,44 @@ func main() {
 	repoMode, err := config.RepositoryMode()
 	if err != nil {
 		slog.Error("invalid repository mode", "err", err)
-		os.Exit(1)
+		return 1
 	}
 	if err := requirePostgresRepositoryMode(repoMode); err != nil {
 		slog.Error("unsupported repository mode", "err", err)
-		os.Exit(1)
+		return 1
 	}
 	corsCfg, err := config.LoadCORSConfig()
 	if err != nil {
 		slog.Error("invalid cors config", "err", err)
-		os.Exit(1)
+		return 1
 	}
 	attachmentsCfg, err := config.LoadAttachmentsConfig()
 	if err != nil {
 		slog.Error("invalid attachments config", "err", err)
-		os.Exit(1)
+		return 1
 	}
 	authCfg, err := authn.LoadRuntimeConfig()
 	if err != nil {
 		slog.Error("invalid auth config", "err", err)
-		os.Exit(1)
+		return 1
 	}
 	featureFlagsCfg, err := config.LoadFeatureFlagsConfig()
 	if err != nil {
 		slog.Error("invalid feature flags config", "err", err)
-		os.Exit(1)
+		return 1
 	}
 
 	deps, err := bootstrap.BuildAPIDependencies(ctx, repoMode, attachmentsCfg)
 	if err != nil {
 		slog.Error("build api dependencies", "err", err)
-		os.Exit(1)
+		return 1
 	}
 	defer deps.Cleanup()
 
 	migrationCfg, err := config.LoadMigrationConfig()
 	if err != nil {
 		slog.Error("invalid migration config", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
+		return 1
 	}
 	if deps.SQLDB != nil && !migrationCfg.Skip {
 		// The grants stage runs BEFORE migrations and unconditionally (no
@@ -234,26 +244,22 @@ func main() {
 		// is fatal. See internal/platform/migrate.ApplyGrants.
 		if err := migrate.ApplyGrants(ctx, deps.SQLDB, migrationCfg.GrantsDir, slog.Default()); err != nil {
 			slog.Error("apply grants stage", "err", err)
-			deps.Cleanup()
-			os.Exit(1)
+			return 1
 		}
 		if err := migrate.Apply(ctx, deps.SQLDB, migrationCfg.Dir, slog.Default()); err != nil {
 			slog.Error("apply startup migrations", "err", err)
-			deps.Cleanup()
-			os.Exit(1)
+			return 1
 		}
 	}
 
 	authService, err := authapp.NewService(deps.AuthRepo, deps.RoleProvider, deps.RoleAdminRepo, iampg.NewLoginContextRepository(deps.SQLDB), authCfg, deps.AuditWriter)
 	if err != nil {
 		slog.Error("new auth service", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
+		return 1
 	}
 	if err := authService.BootstrapLocalAdmin(ctx); err != nil {
 		slog.Error("bootstrap local admin", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
+		return 1
 	}
 
 	// M7 F7.3: tenant DEK/KEK crypto-shred framework. tenantCrypto is nil when
@@ -266,13 +272,13 @@ func main() {
 		kek, kekConfigured, kekErr := config.LoadTenantKEK()
 		if kekErr != nil {
 			slog.Error("invalid tenant crypto KEK", "err", kekErr)
-			os.Exit(1)
+			return 1
 		}
 		if kekConfigured {
 			svc, err := securityapp.NewTenantCryptoService(securitypg.NewTenantKeyRepository(deps.SQLDB), kek)
 			if err != nil {
 				slog.Error("construct tenant crypto service", "err", err)
-				os.Exit(1)
+				return 1
 			}
 			tenantCrypto = svc
 		} else {
@@ -473,8 +479,7 @@ func main() {
 	rlStoreCfg, err := ratelimit.LoadStoreConfig(os.Getenv)
 	if err != nil {
 		slog.Error("rate limit store config", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
+		return 1
 	}
 	// nil for the memory backend — each limiter then builds its own private
 	// in-memory store (unchanged behavior). Non-nil (redis) is shared by BOTH
@@ -482,8 +487,7 @@ func main() {
 	rlStore, err := ratelimit.NewStoreFromConfig(rlStoreCfg, slog.Default())
 	if err != nil {
 		slog.Error("rate limit store init", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
+		return 1
 	}
 	if rlStore != nil {
 		defer rlStore.Close()
@@ -495,8 +499,7 @@ func main() {
 	loginRateCfg, err := ratelimit.NewConfig(map[ratelimit.RouteKey]int{ratelimit.RouteAuthLogin: 10})
 	if err != nil {
 		slog.Error("login rate limit config", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
+		return 1
 	}
 	loginRateCfg.TrustedProxyCIDRs = authCfg.TrustedProxyCIDRs
 	loginRateCfg.Store = rlStore
@@ -603,13 +606,11 @@ func main() {
 	fanoutClientCfg, err := config.LoadFanoutConfig()
 	if err != nil {
 		slog.Error("invalid fanout config", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
+		return 1
 	}
 	if err := requireApprovalRuntimeSupport(fanoutClientCfg.URL); err != nil {
 		slog.Error("approval runtime unavailable", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
+		return 1
 	}
 	fanoutCfg := buildFanoutComponents(deps, fanoutClientCfg, controlledDocumentsModule)
 
@@ -684,15 +685,13 @@ func main() {
 	jobsCfg, err := config.LoadJobsConfig()
 	if err != nil {
 		slog.Error("invalid jobs config", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
+		return 1
 	}
 	var riverBundle *riverjobs.ClientBundle
 	if deps.SQLDB != nil {
 		if err := bootstrap.MigrateRiverSchema(ctx, deps.SQLDB, jobsCfg.RiverSchema); err != nil {
 			slog.Error("migrate river schema", "err", err)
-			deps.Cleanup()
-			os.Exit(1)
+			return 1
 		}
 		riverBundle, err = riverjobs.NewClientBundle(deps.SQLDB, riverjobs.Config{
 			Queues: jobsCfg.Queues,
@@ -711,8 +710,7 @@ func main() {
 		}, nil)
 		if err != nil {
 			slog.Error("build river enqueuer client", "err", err)
-			deps.Cleanup()
-			os.Exit(1)
+			return 1
 		}
 		approvalServices.WithLifecycleEnqueuer(approvaljobs.NewLifecycleEventEnqueuer(riverBundle.Client))
 		// Task 6: wire the approval-owned notification port into BOTH submit
@@ -750,8 +748,7 @@ func main() {
 	}
 	if fanoutCfg.freezeService == nil {
 		slog.Error("approval runtime requires configured freeze service")
-		deps.Cleanup()
-		os.Exit(1)
+		return 1
 	}
 	pdfOutboxRepo := fanout.NewPDFOutboxRepository(deps.SQLDB)
 	materializeOutboxRepo := fanout.NewMaterializeOutboxRepository(deps.SQLDB)
@@ -759,8 +756,7 @@ func main() {
 	stagingOutboxWorkerCfg, err := config.LoadStagingOutboxWorkerConfig()
 	if err != nil {
 		slog.Error("invalid staging outbox worker config", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
+		return 1
 	}
 
 	// pdfDispatchEnqueuer produces the paired (outbox row, River job) write for
@@ -818,8 +814,7 @@ func main() {
 	templatesModule, templatesRepo, templatesStore, err := buildTemplatesModule(deps, capabilityService, sharedPresigner, displayNameRepo)
 	if err != nil {
 		slog.Error("build templates module", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
+		return 1
 	}
 	// M3 P3.S2b-4 (R2a): wire the approval kernel's published services into
 	// the templates HTTP handler so its two thin kernel routes
@@ -828,8 +823,7 @@ func main() {
 	// fully-ported instance FastForward and approvalHandler do.
 	if err := approvalServices.Decision.Ready(); err != nil {
 		slog.Error("approval decision service not fully wired", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
+		return 1
 	}
 	templatesModule.WithApprovalKernel(approvalServices.TemplateSubmit, approvalServices.Decision, approvalServices.Read, db.NewTxRunner(deps.SQLDB))
 	signoffIdempStore := approvalinfra.NewPostgresSignoffIdempStore(deps.SQLDB)
@@ -903,8 +897,7 @@ func main() {
 	// it.
 	if err := assertSurface(mounted, surface, expectedTags, publishers); err != nil {
 		slog.Error("http surface", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
+		return 1
 	}
 
 	if deps.SQLDB != nil {
@@ -935,8 +928,7 @@ func main() {
 	retentionCfg, err := config.LoadRetentionConfig()
 	if err != nil {
 		slog.Error("invalid retention config", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
+		return 1
 	}
 	startAuditRetention(ctx, deps, retentionCfg.Days)
 
@@ -975,8 +967,7 @@ func main() {
 	serverCfg, err := config.LoadServerConfig()
 	if err != nil {
 		slog.Error("invalid server config", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
+		return 1
 	}
 
 	server := &http.Server{
@@ -1036,15 +1027,12 @@ func main() {
 		metricsErr <- metricsServer.ListenAndServe()
 	}()
 
-	exitCode := shutdownServer(ctx, stop, server, metricsServer, serverErr, metricsErr)
-	if exitCode != 0 {
-		// os.Exit skips deferred functions, including deps.Cleanup. Invoke
-		// cleanup explicitly so DB / object-store handles are released on
-		// the error path too. closeDB swallows close-on-closed, so calling
-		// twice is safe.
-		deps.Cleanup()
-		os.Exit(exitCode)
-	}
+	// Returning (rather than os.Exit-ing here) lets every defer registered
+	// above — deps.Cleanup, stop, otelShutdown, rlStore.Close, the session/
+	// orphan/template sweepers — unwind on both the clean and the failed
+	// shutdown path; main's single os.Exit(run()) applies the exit code
+	// after that unwind completes.
+	return shutdownServer(ctx, stop, server, metricsServer, serverErr, metricsErr)
 }
 
 // shutdownServer waits for a listen error on EITHER server or ctx cancellation,

@@ -33,7 +33,7 @@ func TestAreaCapabilityReaderPG_AreasWithCapability_ReturnsGrantedAreas(t *testi
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectQuery("FROM metaldocs.role_capabilities rc").
 		WithArgs("actor-1", "tenant-a", string(iamdomain.CapControlledDocumentCreate), areaCapabilityNow).
@@ -65,7 +65,7 @@ func TestAreaCapabilityReaderPG_AreasWithCapability_TenantWide(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectQuery("iam_user_roles").
 		WillReturnRows(sqlmock.NewRows([]string{"tenant_wide", "area_codes"}).
@@ -97,7 +97,7 @@ func TestAreaCapabilityReaderPG_AreasWithCapability_PropagatesError(t *testing.T
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectQuery("role_capabilities").WillReturnError(boom)
 

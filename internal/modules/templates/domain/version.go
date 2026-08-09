@@ -110,6 +110,8 @@ func (v *TemplateVersion) CanTransition(next VersionStatus, hasReviewer bool) er
 		if next == VersionStatusObsolete {
 			return nil
 		}
+	case VersionStatusObsolete:
+		// Terminal state: obsolete versions never transition further.
 	}
 	return ErrInvalidStateTransition
 }

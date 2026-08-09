@@ -43,12 +43,19 @@ func NewTenantDataPort(db *sql.DB) *TenantDataPort {
 
 var _ tenantdata.Port = (*TenantDataPort)(nil)
 
+// Module returns the owning module name, "auth", for tenantdata.Port registration.
 func (p *TenantDataPort) Module() string { return "auth" }
 
+// Tables returns the auth module's tenant-scoped table census. It lists only
+// metaldocs.auth_sessions: metaldocs.auth_identities is scoped indirectly via
+// iam_users and is deliberately excluded — see the type doc comment.
 func (p *TenantDataPort) Tables() []string {
 	return []string{"metaldocs.auth_sessions"}
 }
 
+// ExportTenantData exports metaldocs.auth_sessions rows for tenantID. It
+// deliberately excludes metaldocs.auth_identities (credential material) —
+// see the type doc comment.
 func (p *TenantDataPort) ExportTenantData(ctx context.Context, db *sql.DB, tenantID string) ([]tenantdata.TableExport, error) {
 	exp, err := tenantdata.ExportTable(ctx, db, "metaldocs.auth_sessions", "tenant_id", tenantID)
 	if err != nil {
@@ -57,6 +64,10 @@ func (p *TenantDataPort) ExportTenantData(ctx context.Context, db *sql.DB, tenan
 	return []tenantdata.TableExport{exp}, nil
 }
 
+// EraseTenantData erases metaldocs.auth_identities (via a join through
+// iam_users) and metaldocs.auth_sessions for tenantID, returning the erased
+// row counts per table. See the type doc comment for the erase-order
+// dependency on iam's TenantDataPort.
 func (p *TenantDataPort) EraseTenantData(ctx context.Context, tx *sql.Tx, tenantID string) (map[string]int64, error) {
 	// auth_identities has no tenant_id column, so it cannot use
 	// tenantdata.EraseTable's direct-predicate helper: it is scoped via a

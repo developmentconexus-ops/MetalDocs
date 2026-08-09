@@ -8,6 +8,9 @@ import (
 	"metaldocs/internal/modules/documents/domain"
 )
 
+// InsertExport records a new document export, or returns the existing row
+// when the (tenant, document, composite_hash) conflict fires — export rows
+// are content-addressed and idempotent on that key.
 func (r *Repository) InsertExport(ctx context.Context, e *domain.Export) (*domain.Export, error) {
 	var inserted domain.Export
 	err := r.db.QueryRowContext(ctx,
@@ -31,6 +34,8 @@ func (r *Repository) InsertExport(ctx context.Context, e *domain.Export) (*domai
 	return &inserted, nil
 }
 
+// GetExportByHash returns the export row matching the given composite hash.
+// Returns domain.ErrNotFound if no such export exists.
 func (r *Repository) GetExportByHash(ctx context.Context, tenantID, documentID string, compositeHash []byte) (*domain.Export, error) {
 	var e domain.Export
 	err := r.db.QueryRowContext(ctx,

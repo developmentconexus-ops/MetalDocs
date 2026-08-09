@@ -9,8 +9,8 @@ import (
 type mockProvider struct{ method string }
 
 func (m *mockProvider) Method() string { return m.method }
-func (m *mockProvider) Sign(_ context.Context, _ SignRequest) (SignatureResult, error) {
-	return SignatureResult{Method: m.method}, nil
+func (m *mockProvider) Sign(_ context.Context, _ SignRequest) (Result, error) {
+	return Result{Method: m.method}, nil
 }
 
 func TestRegistryGet(t *testing.T) {

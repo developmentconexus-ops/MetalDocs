@@ -23,6 +23,8 @@ var (
 	errMaterializeRunnerNotConfigured = errors.New("worker: materialize runner not configured")
 )
 
+// Service drains the outbox consumer, dispatching claimed events to the
+// wired PDF / materialize job runners and recording success or failure.
 type Service struct {
 	consumer          messaging.Consumer
 	pdfRunner         *PDFJobRunner
@@ -30,6 +32,8 @@ type Service struct {
 	cfg               config.WorkerConfig
 }
 
+// NewService constructs a Service backed by consumer and cfg. Attach job
+// runners via WithPDFRunner / WithMaterializeRunner before calling RunOnce.
 func NewService(consumer messaging.Consumer, cfg config.WorkerConfig) *Service {
 	return &Service{
 		consumer: consumer,
@@ -49,6 +53,9 @@ func (s *Service) WithMaterializeRunner(r *MaterializeJobRunner) *Service {
 	return s
 }
 
+// RunOnce claims up to batchSize unpublished events and dispatches each to
+// its wired job runner, marking success or scheduling retry/dead-letter on
+// failure.
 func (s *Service) RunOnce(ctx context.Context, batchSize int) error {
 	if s.consumer == nil {
 		return fmt.Errorf("worker dependencies not configured")

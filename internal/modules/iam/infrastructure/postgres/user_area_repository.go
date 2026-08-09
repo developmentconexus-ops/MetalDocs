@@ -47,7 +47,7 @@ ORDER BY area_code ASC, effective_from DESC
 	if err != nil {
 		return nil, fmt.Errorf("query active user process areas: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	result := make([]iamdomain.UserProcessArea, 0, 8)
 	for rows.Next() {
@@ -83,7 +83,7 @@ ORDER BY user_id ASC, area_code ASC, effective_from DESC
 	if err != nil {
 		return nil, fmt.Errorf("batch query active user process areas: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := make(map[string][]iamdomain.UserProcessArea, len(userIDs))
 	for rows.Next() {
@@ -119,7 +119,7 @@ ORDER BY user_id ASC, area_code ASC, effective_from DESC
 	if err != nil {
 		return nil, fmt.Errorf("query tenant process areas: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	result := make([]iamdomain.UserProcessArea, 0, 16)
 	for rows.Next() {
@@ -213,7 +213,7 @@ ORDER BY user_id ASC, area_code ASC, effective_from DESC
 	if err != nil {
 		return nil, fmt.Errorf("query managed-area process areas: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	result := make([]iamdomain.UserProcessArea, 0, 16)
 	for rows.Next() {

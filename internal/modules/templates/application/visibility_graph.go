@@ -29,8 +29,8 @@ func DetectVisibilityCycle(phs []domain.Placeholder) error {
 	visit = func(id string, stack []string) error {
 		switch color[id] {
 		case nodeGray:
-			cycle := append(stack, id)
-			return fmt.Errorf("visibility cycle: %s: %w", strings.Join(cycle, " -> "), domain.ErrPlaceholderCycle)
+			stack = append(stack, id)
+			return fmt.Errorf("visibility cycle: %s: %w", strings.Join(stack, " -> "), domain.ErrPlaceholderCycle)
 		case nodeBlack:
 			return nil
 		}

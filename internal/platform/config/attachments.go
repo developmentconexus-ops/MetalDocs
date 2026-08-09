@@ -7,16 +7,20 @@ import (
 	"strings"
 )
 
+// Storage provider values for METALDOCS_STORAGE_PROVIDER.
 const (
 	StorageProviderMemory StorageProvider = "memory"
 	StorageProviderLocal  StorageProvider = "local"
 	StorageProviderMinIO  StorageProvider = "minio"
 )
 
+// StorageProvider identifies which attachment storage backend is active.
 type StorageProvider string
 
+// AppEnv identifies the deployment environment (local, dev, staging, production).
 type AppEnv string
 
+// Deployment environment values for APP_ENV.
 const (
 	AppEnvLocal      AppEnv = "local"
 	AppEnvDev        AppEnv = "dev"
@@ -24,6 +28,8 @@ const (
 	AppEnvProduction AppEnv = "production"
 )
 
+// AttachmentsConfig holds attachment storage configuration read from
+// environment variables at startup.
 type AttachmentsConfig struct {
 	Provider              StorageProvider
 	AppEnv                AppEnv
@@ -40,6 +46,7 @@ type AttachmentsConfig struct {
 	MinIOAutoCreateBucket bool
 }
 
+// LoadAttachmentsConfig reads attachment storage config from environment variables.
 func LoadAttachmentsConfig() (AttachmentsConfig, error) {
 	appEnv := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
 	if appEnv == "" {

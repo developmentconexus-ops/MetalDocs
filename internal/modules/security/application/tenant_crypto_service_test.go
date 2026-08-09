@@ -241,13 +241,13 @@ func TestTenantCryptoService_EncryptForTenantTx_ReadsThroughTxOnly(t *testing.T)
 	if err != nil {
 		t.Fatalf("sqlmock.New() error = %v", err)
 	}
-	defer mockDB.Close()
+	defer func() { _ = mockDB.Close() }()
 	mock.ExpectBegin()
 	tx, err := mockDB.Begin()
 	if err != nil {
 		t.Fatalf("mockDB.Begin() error = %v", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	envelope, err := svc.EncryptForTenantTx(ctx, tx, tenantID, []byte("classified payload"))
 	if err != nil {

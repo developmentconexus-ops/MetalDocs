@@ -86,6 +86,10 @@ type Service interface {
 	documentComments
 }
 
+// Handler serves the documents module's core HTTP routes (list/get/rename/
+// archive/duplicate, autosave, checkpoints, sessions, comments) and delegates
+// to optional sub-handlers (export, fillIn, placeholderOpts, view,
+// reconstruct) wired via WithSubHandlers.
 type Handler struct {
 	svc             Service
 	caps            application.CapabilityChecker
@@ -130,6 +134,7 @@ func (h *Handler) isSystemAdmin(ctx context.Context, userID, tenantID string) (b
 	return h.caps.IsSystemAdmin(ctx, userID, tenantID)
 }
 
+// NewHandler constructs a Handler backed by the given Service.
 func NewHandler(svc Service) *Handler { return &Handler{svc: svc} }
 
 // WithRateLimit wires the per-route rate limiter and user-identity extractor

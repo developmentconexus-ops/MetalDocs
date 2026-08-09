@@ -1083,7 +1083,7 @@ func loadRouteStagesTx(ctx context.Context, tx *sql.Tx, routeID string) ([]domai
 	if err != nil {
 		return nil, fmt.Errorf("route_admin: load stages: %w", infrastructure.MapPgError(err, infrastructure.MapHints{}))
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []domain.Stage
 	var stageIDs []string
@@ -1129,7 +1129,7 @@ func loadRouteStagesTx(ctx context.Context, tx *sql.Tx, routeID string) ([]domai
 		if err != nil {
 			return nil, fmt.Errorf("route_admin: load stage selectors: %w", infrastructure.MapPgError(err, infrastructure.MapHints{}))
 		}
-		defer selRows.Close()
+		defer func() { _ = selRows.Close() }()
 
 		selectorsByStageID := make(map[string][]domain.ActorSelector, len(stageIDs))
 		for selRows.Next() {

@@ -206,7 +206,7 @@ LIMIT $3 OFFSET $4`
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := make([]*domain.TemplateRead, 0)
 	for rows.Next() {
@@ -776,7 +776,7 @@ LIMIT $3 OFFSET $4`
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := make([]*domain.AuditEvent, 0)
 	for rows.Next() {
@@ -813,7 +813,7 @@ func (r *Repository) TenantIDsWithTemplates(ctx context.Context) ([]string, erro
 	if err != nil {
 		return nil, fmt.Errorf("templates repository tenant ids with templates: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []string
 	for rows.Next() {
 		var id string
@@ -855,7 +855,7 @@ WHERE t.tenant_id = $1::uuid`
 	if err != nil {
 		return nil, fmt.Errorf("templates repository referenced template object refs: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []ReferencedTemplateObjectRef
 	for rows.Next() {
 		var ref ReferencedTemplateObjectRef

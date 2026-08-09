@@ -37,8 +37,11 @@ func NewTenantDataPort(db *sql.DB) *TenantDataPort {
 
 var _ tenantdata.Port = (*TenantDataPort)(nil)
 
+// Module returns the owning module name, "templates".
 func (p *TenantDataPort) Module() string { return "templates" }
 
+// Tables returns the tenant-scoped tables this port owns: templates_template
+// and templates_template_version.
 func (p *TenantDataPort) Tables() []string {
 	return []string{
 		"public.templates_template",
@@ -46,6 +49,8 @@ func (p *TenantDataPort) Tables() []string {
 	}
 }
 
+// ExportTenantData exports every row of this port's owned tables for
+// tenantID, one tenantdata.TableExport per table.
 func (p *TenantDataPort) ExportTenantData(ctx context.Context, db *sql.DB, tenantID string) ([]tenantdata.TableExport, error) {
 	var out []tenantdata.TableExport
 	for _, table := range p.Tables() {
@@ -58,6 +63,10 @@ func (p *TenantDataPort) ExportTenantData(ctx context.Context, db *sql.DB, tenan
 	return out, nil
 }
 
+// EraseTenantData deletes tenantID's rows from this port's owned tables
+// within tx, breaking the templates_template <-> templates_template_version
+// cycle first (see the type doc), and returns the per-table deleted-row
+// counts.
 func (p *TenantDataPort) EraseTenantData(ctx context.Context, tx *sql.Tx, tenantID string) (map[string]int64, error) {
 	counts := make(map[string]int64)
 

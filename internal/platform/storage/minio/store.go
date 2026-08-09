@@ -11,6 +11,7 @@ import (
 	"metaldocs/internal/platform/config"
 )
 
+// Store is an object-storage adapter backed by a MinIO (S3-compatible) client.
 type Store struct {
 	client           *miniogo.Client
 	bucket           string
@@ -27,6 +28,8 @@ func NewStore(client *miniogo.Client, cfg config.AttachmentsConfig) *Store {
 	}
 }
 
+// EnsureBucket verifies the configured bucket exists, creating it when
+// autoCreateBucket is enabled and it does not.
 func (s *Store) EnsureBucket(ctx context.Context) error {
 	exists, err := s.client.BucketExists(ctx, s.bucket)
 	if err != nil {
@@ -44,6 +47,7 @@ func (s *Store) EnsureBucket(ctx context.Context) error {
 	return nil
 }
 
+// Save writes content to storageKey in the configured bucket.
 func (s *Store) Save(ctx context.Context, storageKey string, content []byte) error {
 	reader := bytes.NewReader(content)
 	_, err := s.client.PutObject(ctx, s.bucket, storageKey, reader, int64(len(content)), miniogo.PutObjectOptions{
@@ -55,6 +59,7 @@ func (s *Store) Save(ctx context.Context, storageKey string, content []byte) err
 	return nil
 }
 
+// Open returns a reader for the object at storageKey in the configured bucket.
 func (s *Store) Open(ctx context.Context, storageKey string) (io.ReadCloser, error) {
 	object, err := s.client.GetObject(ctx, s.bucket, storageKey, miniogo.GetObjectOptions{})
 	if err != nil {
@@ -67,6 +72,7 @@ func (s *Store) Open(ctx context.Context, storageKey string) (io.ReadCloser, err
 	return object, nil
 }
 
+// Delete removes the object at storageKey from the configured bucket.
 func (s *Store) Delete(ctx context.Context, storageKey string) error {
 	if err := s.client.RemoveObject(ctx, s.bucket, storageKey, miniogo.RemoveObjectOptions{}); err != nil {
 		return fmt.Errorf("delete attachment content from minio: %w", err)

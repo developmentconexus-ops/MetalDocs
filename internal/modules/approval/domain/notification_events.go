@@ -69,6 +69,8 @@ type ApprovalNotificationEnqueuer interface {
 // nothing and reports success.
 type NoopApprovalNotificationEnqueuer struct{}
 
+// EnqueueApprovalNotificationTx enqueues nothing and always reports success —
+// the fail-closed no-op implementation of ApprovalNotificationEnqueuer.
 func (NoopApprovalNotificationEnqueuer) EnqueueApprovalNotificationTx(context.Context, db.Tx, ApprovalNotificationArgs) error {
 	return nil
 }

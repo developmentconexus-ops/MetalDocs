@@ -85,37 +85,37 @@ func (p *PasswordReauthProvider) Method() string { return "password_reauth" }
 // compare failure (never distinguishing "user not found" from "wrong
 // password" from "unrecognized algorithm"). On success it resets the rate
 // limiter and returns an opaque attestation — the raw password is never
-// included in SignatureResult.Payload.
-func (p *PasswordReauthProvider) Sign(ctx context.Context, req SignRequest) (SignatureResult, error) {
+// included in Result.Payload.
+func (p *PasswordReauthProvider) Sign(ctx context.Context, req SignRequest) (Result, error) {
 	password, ok := req.Credentials["password"]
 	if !ok || password == "" {
-		return SignatureResult{}, ErrInvalidCredentials
+		return Result{}, ErrInvalidCredentials
 	}
 
 	if p.limiter == nil {
-		return SignatureResult{}, ErrRateLimiterConfig
+		return Result{}, ErrRateLimiterConfig
 	}
 
 	allowed, err := p.limiter.Allow(ctx, req.ActorUserID)
 	if err != nil {
 		slog.ErrorContext(ctx, "signature: auth-failure limiter Allow failed; failing closed",
 			"actor_user_id", req.ActorUserID, "err", err)
-		return SignatureResult{}, ErrRateLimited
+		return Result{}, ErrRateLimited
 	}
 	if !allowed {
-		return SignatureResult{}, ErrRateLimited
+		return Result{}, ErrRateLimited
 	}
 
 	hash, algo, err := p.reader.GetPasswordHash(ctx, req.ActorUserID)
 	if err != nil {
 		// User missing → same error as wrong password (disclosure-safe).
 		if err := p.limiter.RecordFailure(ctx, req.ActorUserID); err != nil {
-			return SignatureResult{}, ErrRateLimited
+			return Result{}, ErrRateLimited
 		}
 		if p.emitter != nil {
 			p.emitter.EmitAuthFailed(ctx, req.ActorUserID, "user_not_found")
 		}
-		return SignatureResult{}, ErrInvalidCredentials
+		return Result{}, ErrInvalidCredentials
 	}
 
 	// passwordOK stays false (and verifyErr is swallowed into a generic
@@ -128,7 +128,7 @@ func (p *PasswordReauthProvider) Sign(ctx context.Context, req SignRequest) (Sig
 	}
 	if !passwordOK {
 		if err := p.limiter.RecordFailure(ctx, req.ActorUserID); err != nil {
-			return SignatureResult{}, ErrRateLimited
+			return Result{}, ErrRateLimited
 		}
 		if p.emitter != nil {
 			reason := "wrong_password"
@@ -137,12 +137,12 @@ func (p *PasswordReauthProvider) Sign(ctx context.Context, req SignRequest) (Sig
 			}
 			p.emitter.EmitAuthFailed(ctx, req.ActorUserID, reason)
 		}
-		return SignatureResult{}, ErrInvalidCredentials
+		return Result{}, ErrInvalidCredentials
 	}
 
 	// Success — clear failure state.
 	if err := p.limiter.Reset(ctx, req.ActorUserID); err != nil {
-		return SignatureResult{}, ErrRateLimited
+		return Result{}, ErrRateLimited
 	}
 
 	now := time.Now().UTC()
@@ -167,5 +167,5 @@ func (p *PasswordReauthProvider) Sign(ctx context.Context, req SignRequest) (Sig
 		}
 	}
 	payload, _ := json.Marshal(attestation)
-	return SignatureResult{Method: "password_reauth", Payload: payload, SignedAt: now}, nil
+	return Result{Method: "password_reauth", Payload: payload, SignedAt: now}, nil
 }

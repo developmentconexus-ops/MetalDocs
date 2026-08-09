@@ -166,7 +166,7 @@ func TestFamilyService_Deactivate_BlockedByProfiles(t *testing.T) {
 	svc := NewFamilyService(repo, &fakeGovernanceLogger{})
 
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
-	if err := svc.Deactivate(ctx, "policy"); err != domain.ErrFamilyHasProfiles {
+	if err := svc.Deactivate(ctx, "policy"); !errors.Is(err, domain.ErrFamilyHasProfiles) {
 		t.Fatalf("want ErrFamilyHasProfiles, got %v", err)
 	}
 	if repo.lastTenantID != "tenant-a" {

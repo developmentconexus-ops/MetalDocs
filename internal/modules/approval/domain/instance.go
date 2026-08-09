@@ -217,6 +217,8 @@ func (inst *Instance) Cancel(reason string) error {
 	switch inst.Status {
 	case InstanceApproved, InstanceRejected, InstanceCancelled:
 		return ErrInstanceTerminal
+	case InstanceInProgress, InstanceChangesRequested:
+		// Non-terminal — cancellation proceeds below.
 	}
 	now := time.Now().UTC()
 	inst.Status = InstanceCancelled

@@ -159,7 +159,7 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request) {
 	// WS lifetime explicitly rather than being torn down mid-write.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	defer c.Close(websocket.StatusNormalClosure, "")
+	defer func() { _ = c.Close(websocket.StatusNormalClosure, "") }()
 
 	// Initial snapshot — produced and sent BEFORE Subscribe seeds the
 	// hub room so the wire-side snapshot is guaranteed to match what

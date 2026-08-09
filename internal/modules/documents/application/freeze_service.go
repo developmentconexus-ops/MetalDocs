@@ -19,6 +19,9 @@ import (
 	"metaldocs/internal/platform/db"
 )
 
+// FreezeFinalizer writes the freeze marker (values_hash + values_frozen_at +
+// the frozen_revision_id lineage pin) onto a document in a single update.
+//
 // NOTE on the `documentID` parameter naming below: the freeze pipeline's
 // identity parameter has always carried documents.id, even where older code
 // named it revisionID (see RepairMaterialization's note). These ports name it
@@ -31,6 +34,8 @@ type FreezeFinalizer interface {
 	WriteFreeze(ctx context.Context, tenantID, documentID string, valuesHash []byte, frozenRevisionID string, frozenAt time.Time, q ...infrastructure.DBTX) error
 }
 
+// SnapshotReader reads a document's template snapshot, freeze timestamp, and
+// current/frozen revision references used by Pin and Materialize.
 type SnapshotReader interface {
 	ReadSnapshotWithFreezeAt(ctx context.Context, tenantID, documentID string, q ...infrastructure.DBTX) (v2dom.TemplateSnapshot, *time.Time, error)
 	ReadFreezeAt(ctx context.Context, tenantID, documentID string, q ...infrastructure.DBTX) (*time.Time, error)
@@ -64,8 +69,10 @@ const maxRevisionBodyBytes = 25 * 1024 * 1024
 // produced when it fires.
 var ErrFrozenBodyHashMismatch = errors.New("frozen body hash mismatch")
 
+// FanoutClient dispatches the frozen document body plus resolved placeholder
+// values to the docx-renderer fanout for materialization.
 type FanoutClient interface {
-	Fanout(ctx context.Context, req fanout.FanoutRequest) (fanout.FanoutResponse, error)
+	Fanout(ctx context.Context, req fanout.Request) (fanout.Response, error)
 }
 
 // materializeDispatchEnqueuer is the minimal published interface for the
@@ -82,6 +89,10 @@ type MaterializeResult struct {
 	ContentHash    []byte
 }
 
+// FreezeService implements the async freeze split (ADR 0015): Pin validates,
+// resolves computed placeholders, and writes the freeze marker in-tx; the
+// separate Materialize step later renders the pinned revision via the
+// docx-renderer fanout.
 type FreezeService struct {
 	schemas    SchemaReader
 	values     FillInWriter
@@ -97,11 +108,16 @@ type FreezeService struct {
 	bodies            RevisionBodyReader
 }
 
+// ApproverContext carries the acting approver's identity and capabilities
+// into computed-placeholder resolution during Pin.
 type ApproverContext struct {
 	UserID       string
 	Capabilities []string
 }
 
+// ResolverContextBuilder builds the resolvers.ResolveInput used to resolve
+// computed placeholders, either for a real approver (Build) or for draft-time
+// preview resolution with no approver (BuildForDraft).
 type ResolverContextBuilder interface {
 	Build(ctx context.Context, tenantID, revisionID string, approver ApproverContext) (resolvers.ResolveInput, error)
 	BuildForDraft(ctx context.Context, tenantID, revisionID string) (resolvers.ResolveInput, error)
@@ -109,6 +125,9 @@ type ResolverContextBuilder interface {
 
 var _ FanoutClient = (*fanout.Client)(nil)
 
+// NewFreezeService constructs a FreezeService wired to its schema reader,
+// value reader/writer, computed-placeholder resolver registry, freeze
+// finalizer, resolver-context builder, snapshot reader, and fanout client.
 func NewFreezeService(
 	schemas SchemaReader, values FillInWriter,
 	valuesRead interface {
@@ -453,7 +472,7 @@ func (s *FreezeService) Materialize(ctx context.Context, tenantID, documentID st
 		return MaterializeResult{}, err
 	}
 
-	resp, err := s.fanout.Fanout(ctx, fanout.FanoutRequest{
+	resp, err := s.fanout.Fanout(ctx, fanout.Request{
 		TenantID:          tenantID,
 		RevisionID:        documentID,
 		BodyDocxS3Key:     pinned.StorageKey,

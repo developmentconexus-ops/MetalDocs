@@ -24,8 +24,8 @@ type SignRequest struct {
 	Credentials   map[string]string // method-specific; "password" key for password_reauth
 }
 
-// SignatureResult is the opaque attestation returned on successful signing.
-type SignatureResult struct {
+// Result is the opaque attestation returned on successful signing.
+type Result struct {
 	Method   string
 	Payload  json.RawMessage // opaque bag — no secrets
 	SignedAt time.Time
@@ -35,7 +35,7 @@ type SignatureResult struct {
 // means implementing Provider and registering it — zero service-code change.
 type Provider interface {
 	Method() string
-	Sign(ctx context.Context, req SignRequest) (SignatureResult, error)
+	Sign(ctx context.Context, req SignRequest) (Result, error)
 }
 
 // Registry dispatches Sign calls by method name.

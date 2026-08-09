@@ -72,7 +72,7 @@ RETURNING id::text, review_due_at`,
 	if err != nil {
 		return nil, fmt.Errorf("mark surfaced: update: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []documentsdomain.SurfacedDoc
 	for rows.Next() {

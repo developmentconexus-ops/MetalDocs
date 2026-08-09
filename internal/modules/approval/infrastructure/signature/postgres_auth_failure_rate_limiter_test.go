@@ -16,7 +16,7 @@ func newMockLimiter(t *testing.T) (*PostgresAuthFailureRateLimiter, sqlmock.Sqlm
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { _ = db.Close() })
 	return NewPostgresAuthFailureRateLimiter(db), mock
 }
 
@@ -144,6 +144,6 @@ func TestPostgresLimiter_Reset_NoRow(t *testing.T) {
 // TestPostgresLimiter_ImplementsInterface verifies the type satisfies the port.
 func TestPostgresLimiter_ImplementsInterface(t *testing.T) {
 	db, _, _ := sqlmock.New()
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	var _ AuthFailureRateLimiter = NewPostgresAuthFailureRateLimiter(db)
 }

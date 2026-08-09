@@ -33,6 +33,8 @@ func isInvalidUUID(err error) bool {
 	return errors.As(err, &pgErr) && pgErr.Code == "22P02"
 }
 
+// Repository is the documents module's primary SQL-backed persistence
+// gateway: documents, editor sessions, revisions, checkpoints, and comments.
 type Repository struct {
 	db          *sql.DB
 	displayName iamdomain.UserDisplayNameReader
@@ -394,6 +396,8 @@ func (r *Repository) GetDocument(ctx context.Context, tenantID, id string) (*dom
 	return &d, nil
 }
 
+// UpdateDocumentName renames a document, opening and committing its own tx
+// (authz-checked against document.edit for the document's area).
 func (r *Repository) UpdateDocumentName(ctx context.Context, tenantID, actorID, docID, name string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -426,6 +430,8 @@ func (r *Repository) UpdateDocumentName(ctx context.Context, tenantID, actorID, 
 	return tx.Commit()
 }
 
+// UpdateDocumentNameTx renames a document using the caller-owned tx. The
+// caller is responsible for authz GUC setup, commit, and rollback.
 func (r *Repository) UpdateDocumentNameTx(ctx context.Context, tx db.Tx, tenantID, actorID, docID, name string) error {
 	docArea, err := loadDocumentArea(ctx, tx, tenantID, docID)
 	if err != nil {
@@ -447,6 +453,9 @@ func (r *Repository) UpdateDocumentNameTx(ctx context.Context, tx db.Tx, tenantI
 	return nil
 }
 
+// ListDocuments returns every non-archived document in the tenant, newest
+// first. Unrestricted list path — see ListDocumentsForUser for the
+// ownership-scoped variant.
 func (r *Repository) ListDocuments(ctx context.Context, tenantID string) ([]domain.Document, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT id, tenant_id, template_version_id, name, status, form_data_json,
@@ -457,7 +466,7 @@ func (r *Repository) ListDocuments(ctx context.Context, tenantID string) ([]doma
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := []domain.Document{}
 	for rows.Next() {
 		var d domain.Document
@@ -484,7 +493,7 @@ func (r *Repository) ListDocumentsForUser(ctx context.Context, tenantID, userID 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := []domain.Document{}
 	for rows.Next() {
 		var d domain.Document
@@ -498,6 +507,8 @@ func (r *Repository) ListDocumentsForUser(ctx context.Context, tenantID, userID 
 	return out, rows.Err()
 }
 
+// ListOptions filters and paginates ListDocumentsPaginated / CountDocuments /
+// StatsByStatus / StatsByArea.
 type ListOptions struct {
 	// Cursor is the opaque forward keyset cursor (FD-2). Empty = first page.
 	Cursor          string
@@ -639,7 +650,7 @@ func (r *Repository) ListDocumentsPaginated(ctx context.Context, tenantID string
 	if err != nil {
 		return nil, 0, false, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := make([]*domain.Document, 0, limit+1)
 	for rows.Next() {
@@ -668,6 +679,7 @@ func (r *Repository) ListDocumentsPaginated(ctx context.Context, tenantID string
 	return out, total, false, nil
 }
 
+// CountDocuments returns the number of documents matching opts, ignoring pagination.
 func (r *Repository) CountDocuments(ctx context.Context, tenantID string, opts ListOptions) (int64, error) {
 	where, args := buildDocumentFilter(tenantID, opts)
 	q := fmt.Sprintf(`SELECT COUNT(*) FROM documents WHERE %s`, where) // #nosec G201 -- where is built entirely from static SQL fragments and numbered $N placeholders by buildDocumentFilter; every actual filter value is bound as a query arg, never interpolated into the SQL text.
@@ -678,6 +690,7 @@ func (r *Repository) CountDocuments(ctx context.Context, tenantID string, opts L
 	return n, nil
 }
 
+// StatsByStatus returns the count of matching documents grouped by status.
 func (r *Repository) StatsByStatus(ctx context.Context, tenantID string, opts ListOptions) (map[string]int64, error) {
 	where, args := buildDocumentFilter(tenantID, opts)
 	q := fmt.Sprintf(`SELECT status, COUNT(*) FROM documents WHERE %s GROUP BY status`, where) // #nosec G201 -- where is built entirely from static SQL fragments and numbered $N placeholders by buildDocumentFilter; every actual filter value is bound as a query arg, never interpolated into the SQL text.
@@ -685,7 +698,7 @@ func (r *Repository) StatsByStatus(ctx context.Context, tenantID string, opts Li
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := make(map[string]int64)
 	for rows.Next() {
@@ -699,6 +712,7 @@ func (r *Repository) StatsByStatus(ctx context.Context, tenantID string, opts Li
 	return out, rows.Err()
 }
 
+// StatsByArea returns the count of matching documents grouped by process area code.
 func (r *Repository) StatsByArea(ctx context.Context, tenantID string, opts ListOptions) (map[string]int64, error) {
 	where, args := buildDocumentFilter(tenantID, opts)
 	q := fmt.Sprintf(`SELECT COALESCE(process_area_code_snapshot, '') AS area, COUNT(*) FROM documents WHERE %s GROUP BY area`, where) // #nosec G201 -- where is built entirely from static SQL fragments and numbered $N placeholders by buildDocumentFilter; every actual filter value is bound as a query arg, never interpolated into the SQL text.
@@ -706,7 +720,7 @@ func (r *Repository) StatsByArea(ctx context.Context, tenantID string, opts List
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := make(map[string]int64)
 	for rows.Next() {
@@ -720,6 +734,9 @@ func (r *Repository) StatsByArea(ctx context.Context, tenantID string, opts List
 	return out, rows.Err()
 }
 
+// UpdateDocumentStatus transitions a document from cur to next (authz-checked
+// against document.edit), optionally stamping archived_at when transitioning
+// to DocStatusArchived. Returns ErrInvalidStateTransition if cur no longer matches.
 func (r *Repository) UpdateDocumentStatus(ctx context.Context, tenantID, actorID, id string, cur, next domain.DocumentStatus, stampTime bool) error {
 	col := ""
 	if stampTime {
@@ -768,7 +785,7 @@ func (r *Repository) AcquireSession(ctx context.Context, tenantID, docID, userID
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	ctx = authz.WithCapCache(ctx)
 	if err := authz.SeedTxIdentity(ctx, tx, tenantID, userID); err != nil {
 		return nil, err
@@ -832,6 +849,8 @@ func (r *Repository) AcquireSession(ctx context.Context, tenantID, docID, userID
 	return &domain.Session{ID: newID, DocumentID: docID, UserID: userID, LastAcknowledgedRevisionID: curRev, Status: domain.SessionActive, ExpiresAt: newExpiresAt}, tx.Commit()
 }
 
+// HeartbeatSession extends an active editor session's expiry by 5 minutes.
+// Returns ErrSessionInactive if the session is not active or not held by userID.
 func (r *Repository) HeartbeatSession(ctx context.Context, tenantID, sessionID, userID string) error {
 	res, err := r.db.ExecContext(ctx,
 		`UPDATE editor_sessions SET expires_at = now() + interval '5 minutes'
@@ -846,12 +865,16 @@ func (r *Repository) HeartbeatSession(ctx context.Context, tenantID, sessionID, 
 	return nil
 }
 
+// ReleaseSession voluntarily releases the caller's own active editor session,
+// clearing the document's active_session_id pointer. Authz-checked against
+// document.edit. Returns ErrSessionInactive if the session is not active or
+// not held by userID.
 func (r *Repository) ReleaseSession(ctx context.Context, tenantID, sessionID, userID string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	ctx = authz.WithCapCache(ctx)
 	if err := authz.SeedTxIdentity(ctx, tx, tenantID, userID); err != nil {
 		return err
@@ -879,12 +902,16 @@ func (r *Repository) ReleaseSession(ctx context.Context, tenantID, sessionID, us
 	return tx.Commit()
 }
 
+// ForceReleaseSession administratively releases ANOTHER user's active editor
+// session (authz-checked against membership.manage — an area-admin-grade
+// takeover, see the comment below on the capability choice). Opens and
+// commits its own tx; ForceReleaseSessionTx is the caller-owned-tx variant.
 func (r *Repository) ForceReleaseSession(ctx context.Context, tenantID, adminID, sessionID string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	ctx = authz.WithCapCache(ctx)
 	if err := authz.SeedTxIdentity(ctx, tx, tenantID, adminID); err != nil {
 		return err
@@ -975,13 +1002,17 @@ func (r *Repository) MarkArchivedTx(ctx context.Context, tx db.Tx, tenantID, doc
 	return nil
 }
 
+// ExpireStaleSessions expires any editor session whose expires_at is before
+// now (up to 500 per call) and clears the owning document's active_session_id
+// pointer, in one atomic tx. Returns the number of sessions expired. System-
+// scoped (authz.BypassSystem) — called by background maintenance, not a user.
 func (r *Repository) ExpireStaleSessions(ctx context.Context, now time.Time) (int, error) {
 	// Single atomic CTE: expire sessions and clear document pointers in one tx.
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	if err := authz.BypassSystem(ctx, tx); err != nil {
 		return 0, err
 	}
@@ -1013,12 +1044,16 @@ func (r *Repository) ExpireStaleSessions(ctx context.Context, now time.Time) (in
 	return n, tx.Commit()
 }
 
+// PresignReserve records a reserved autosave upload slot (pending row), after
+// verifying the session is active, held by userID, and still acked to
+// baseRevisionID. Idempotent on (session, base, hash) — a repeat presign for
+// the same content returns the existing pending row's id.
 func (r *Repository) PresignReserve(ctx context.Context, tenantID, sessionID, userID, docID, baseRevisionID, contentHash, storageKey string, expiresAt time.Time) (pendingID string, err error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return "", err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Verify session active, holder matches, and session points at base.
 	var sessUser, sessDoc, sessAck, sessStatus string
@@ -1066,6 +1101,9 @@ type CommitResult struct {
 	PageCountSource *string
 }
 
+// PendingCommitMeta is the minimal metadata GetPendingForCommit returns for a
+// reserved autosave upload, before the caller performs server-authoritative
+// hash verification.
 type PendingCommitMeta struct {
 	SessionID           string
 	DocumentID          string
@@ -1076,6 +1114,8 @@ type PendingCommitMeta struct {
 	ConsumedAt          *time.Time
 }
 
+// RestoreResult is what RestoreCheckpoint returns after appending a new head
+// revision copied from a checkpoint.
 type RestoreResult struct {
 	NewRevisionID   string
 	NewRevisionNum  int64
@@ -1120,7 +1160,7 @@ func (r *Repository) CommitUpload(ctx context.Context, tenantID, sessionID, user
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	ctx = authz.WithCapCache(ctx)
 	if err := authz.SeedTxIdentity(ctx, tx, tenantID, userID); err != nil {
 		return nil, err
@@ -1282,7 +1322,7 @@ func (r *Repository) SyncCurrentRevisionArtifactMetadata(ctx context.Context, te
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	ctx = authz.WithCapCache(ctx)
 	if err := authz.SeedTxIdentity(ctx, tx, tenantID, userID); err != nil {
 		return nil, err
@@ -1368,12 +1408,15 @@ func (r *Repository) SyncCurrentRevisionArtifactMetadata(ctx context.Context, te
 	return res, tx.Commit()
 }
 
+// DeleteExpiredPending deletes up to 500 unconsumed autosave pending-upload
+// rows whose expiry is before olderThan, returning the count deleted.
+// System-scoped (authz.BypassSystem) — background maintenance, not a user.
 func (r *Repository) DeleteExpiredPending(ctx context.Context, olderThan time.Time) (int, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	if err := authz.BypassSystem(ctx, tx); err != nil {
 		return 0, err
 	}
@@ -1400,12 +1443,15 @@ func (r *Repository) DeleteExpiredPending(ctx context.Context, olderThan time.Ti
 	return int(n), nil
 }
 
+// CreateCheckpoint snapshots the document's current revision as a named,
+// version-numbered checkpoint that RestoreCheckpoint can later restore to.
+// Authz-checked against document.edit.
 func (r *Repository) CreateCheckpoint(ctx context.Context, tenantID, docID, actorUserID, label string) (*domain.Checkpoint, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Tier-2 authz: document.edit is area-grade (ADR 0022); mirrors CommitUpload.
 	// RW tx: the F8 bypass audit may INSERT (ADR 0022 Phase 11).
@@ -1453,6 +1499,7 @@ func (r *Repository) CreateCheckpoint(ctx context.Context, tenantID, docID, acto
 	return cp, tx.Commit()
 }
 
+// ListCheckpoints returns a document's checkpoints, newest version first.
 func (r *Repository) ListCheckpoints(ctx context.Context, tenantID, docID string) ([]domain.Checkpoint, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT cp.id::text, cp.document_id::text, cp.revision_id::text, cp.version_num, coalesce(cp.label,''), cp.created_at, cp.created_by::text
@@ -1462,7 +1509,7 @@ func (r *Repository) ListCheckpoints(ctx context.Context, tenantID, docID string
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := []domain.Checkpoint{}
 	for rows.Next() {
 		var c domain.Checkpoint
@@ -1474,6 +1521,9 @@ func (r *Repository) ListCheckpoints(ctx context.Context, tenantID, docID string
 	return out, rows.Err()
 }
 
+// ListRevisionHistory returns every document row sharing docID's controlled-
+// document lineage (or just docID itself when it has none), newest revision
+// first, flagging which one is the current document.
 func (r *Repository) ListRevisionHistory(ctx context.Context, tenantID, docID string) ([]domain.RevisionHistoryItem, error) {
 	const q = `
 WITH anchor AS (
@@ -1499,7 +1549,7 @@ ORDER BY d.revision_number DESC, d.created_at DESC
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	items := make([]domain.RevisionHistoryItem, 0)
 	for rows.Next() {
@@ -1519,6 +1569,8 @@ ORDER BY d.revision_number DESC, d.created_at DESC
 	return items, rows.Err()
 }
 
+// GetRevision returns a single document revision by id. Returns
+// domain.ErrNotFound if no such revision exists (including a malformed UUID).
 func (r *Repository) GetRevision(ctx context.Context, tenantID, docID, revID string) (*domain.Revision, error) {
 	var rv domain.Revision
 	err := r.db.QueryRowContext(ctx,
@@ -1546,7 +1598,7 @@ func (r *Repository) RestoreCheckpoint(ctx context.Context, tenantID, docID, act
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Lock document + require active session held by actor.
 	var sessID, sessUser, sessStatus string
@@ -1647,6 +1699,7 @@ func (r *Repository) IsDocumentOwner(ctx context.Context, tenantID, docID, userI
 	return ok, err
 }
 
+// CreateComment inserts a new document comment (or reply, via ParentLibraryID).
 func (r *Repository) CreateComment(ctx context.Context, tenantID, documentID, authorID string, in domain.CommentCreateInput) (*domain.Comment, error) {
 	row := r.db.QueryRowContext(ctx,
 		`INSERT INTO document_comments (
@@ -1663,6 +1716,7 @@ func (r *Repository) CreateComment(ctx context.Context, tenantID, documentID, au
 	return comment, nil
 }
 
+// ListComments returns a document's comments oldest first.
 func (r *Repository) ListComments(ctx context.Context, tenantID, documentID string) ([]domain.Comment, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT id::text, tenant_id::text, document_id::text, library_comment_id, parent_library_id, author_id, author_display,
@@ -1675,7 +1729,7 @@ func (r *Repository) ListComments(ctx context.Context, tenantID, documentID stri
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := make([]domain.Comment, 0)
 	for rows.Next() {
@@ -1688,6 +1742,7 @@ func (r *Repository) ListComments(ctx context.Context, tenantID, documentID stri
 	return out, rows.Err()
 }
 
+// UpdateComment updates a comment's content and/or resolved state.
 func (r *Repository) UpdateComment(ctx context.Context, tenantID, documentID string, libraryID int, userID string, in domain.CommentUpdateInput) (*domain.Comment, error) {
 	now := time.Now().UTC()
 	q := `
@@ -1722,6 +1777,8 @@ func (r *Repository) UpdateComment(ctx context.Context, tenantID, documentID str
 	return comment, nil
 }
 
+// DeleteComment deletes a comment and any replies attached to it (matched by
+// library_comment_id or parent_library_id).
 func (r *Repository) DeleteComment(ctx context.Context, tenantID, documentID string, libraryID int) error {
 	res, err := r.db.ExecContext(ctx,
 		`DELETE FROM document_comments

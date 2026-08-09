@@ -17,7 +17,7 @@ func TestListDocuments_EscapesLikeWildcards(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	rows := sqlmock.NewRows(readerCols)
 

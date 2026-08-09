@@ -227,7 +227,7 @@ WHERE tenant_id = $1`
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := make([]domain.DocumentProfile, 0)
 	for rows.Next() {
@@ -607,7 +607,7 @@ WHERE tenant_id = $1`
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := make([]domain.ProcessArea, 0)
 	for rows.Next() {
@@ -826,7 +826,7 @@ SELECT code FROM ancestors`
 	if err != nil {
 		return nil, fmt.Errorf("query area ancestors tx %q: %w", code, err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	ancestors := make([]domain.AreaCode, 0)
 	for rows.Next() {
 		var ancestorCode domain.AreaCode
@@ -916,7 +916,7 @@ SELECT code FROM ancestors`
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	ancestors := make([]domain.AreaCode, 0)
 	for rows.Next() {

@@ -9,6 +9,8 @@ import (
 	"github.com/riverqueue/river/riverdriver/riverdatabasesql"
 )
 
+// Config holds the River client configuration: queues, schema, retention
+// policy, and registered periodic jobs.
 type Config struct {
 	Queues              map[string]river.QueueConfig
 	Schema              string
@@ -30,12 +32,15 @@ type Config struct {
 	DiscardedJobRetentionPeriod time.Duration
 }
 
+// ClientBundle bundles a River client with its underlying database driver.
 type ClientBundle struct {
 	// Driver is intentionally public for wiring; do not use outside bootstrap.
 	Driver *riverdatabasesql.Driver
 	Client *river.Client[*sql.Tx]
 }
 
+// NewClientBundle constructs a River client and driver bundle against db,
+// registering workers (or an empty river.Workers when nil).
 func NewClientBundle(db *sql.DB, cfg Config, workers *river.Workers) (*ClientBundle, error) {
 	if db == nil {
 		return nil, fmt.Errorf("river jobs: sql db is nil")

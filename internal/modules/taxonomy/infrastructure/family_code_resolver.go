@@ -66,7 +66,7 @@ ORDER BY code, CASE WHEN tenant_id = $1::uuid THEN 0 ELSE 1 END`
 	if err != nil {
 		return nil, fmt.Errorf("resolve family codes: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var code, family string
 		if err := rows.Scan(&code, &family); err != nil {
@@ -100,7 +100,7 @@ ORDER BY code`
 	if err != nil {
 		return nil, fmt.Errorf("profile codes for family: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := []domain.ProfileCode{}
 	for rows.Next() {
 		var code string

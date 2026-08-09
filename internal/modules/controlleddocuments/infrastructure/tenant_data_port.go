@@ -35,8 +35,12 @@ func NewTenantDataPort(db *sql.DB) *TenantDataPort {
 
 var _ tenantdata.Port = (*TenantDataPort)(nil)
 
+// Module returns the owning module name, "controlleddocuments", for
+// tenantdata.Port registration.
 func (p *TenantDataPort) Module() string { return "controlleddocuments" }
 
+// Tables returns the controlleddocuments module's tenant-scoped table census:
+// controlled_documents, its two grant tables, and cd_sequence_counters.
 func (p *TenantDataPort) Tables() []string {
 	return []string{
 		"public.controlled_documents",
@@ -46,6 +50,7 @@ func (p *TenantDataPort) Tables() []string {
 	}
 }
 
+// ExportTenantData exports every table in Tables() for tenantID.
 func (p *TenantDataPort) ExportTenantData(ctx context.Context, db *sql.DB, tenantID string) ([]tenantdata.TableExport, error) {
 	var out []tenantdata.TableExport
 	for _, table := range p.Tables() {
@@ -58,6 +63,10 @@ func (p *TenantDataPort) ExportTenantData(ctx context.Context, db *sql.DB, tenan
 	return out, nil
 }
 
+// EraseTenantData erases controlled_documents (cascading to its two grant
+// tables) and cd_sequence_counters for tenantID, returning erased row counts
+// per table. See the type doc comment for erase-order and cross-module FK
+// dependencies.
 func (p *TenantDataPort) EraseTenantData(ctx context.Context, tx *sql.Tx, tenantID string) (map[string]int64, error) {
 	counts := make(map[string]int64)
 

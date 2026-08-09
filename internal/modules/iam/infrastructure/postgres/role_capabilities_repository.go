@@ -33,7 +33,7 @@ SELECT role, capability
 	if err != nil {
 		return nil, fmt.Errorf("query role_capabilities: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := make([]iamdomain.RoleCapabilityLink, 0, 64)
 	for rows.Next() {

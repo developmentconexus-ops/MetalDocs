@@ -39,6 +39,8 @@ type RecentFailureSummary struct {
 	LastFailedAt string
 }
 
+// NewDeviceLogin is one session flagged by the new-device-login rule: a
+// (user_id, user_agent) pair not seen in the prior lookback window.
 type NewDeviceLogin struct {
 	SessionID   string
 	UserID      string
@@ -47,6 +49,8 @@ type NewDeviceLogin struct {
 	CreatedAt   string
 }
 
+// OffHoursAction is one admin-role audit event flagged by the
+// off-hours-admin-action rule.
 type OffHoursAction struct {
 	EventID      string
 	ActorID      string

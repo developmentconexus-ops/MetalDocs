@@ -27,7 +27,7 @@ func TestList_EscapesLikeWildcards(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := NewPostgresControlledDocumentRepository(db, documentsdomain.NoopActiveInstanceReader{})
 

@@ -14,8 +14,10 @@ import (
 // RevisionReader implements resolvers.RevisionReader backed by the documents table.
 type RevisionReader struct{ db *sql.DB }
 
+// NewRevisionReader constructs a RevisionReader backed by db.
 func NewRevisionReader(db *sql.DB) *RevisionReader { return &RevisionReader{db: db} }
 
+// GetRevisionNumber returns the document's revision_number.
 func (r *RevisionReader) GetRevisionNumber(ctx context.Context, tenantID, revisionID string) (int64, error) {
 	var n int64
 	err := r.db.QueryRowContext(ctx,
@@ -24,6 +26,8 @@ func (r *RevisionReader) GetRevisionNumber(ctx context.Context, tenantID, revisi
 	return n, err
 }
 
+// GetEffectiveFrom returns the document's effective_from timestamp, or the
+// zero time when it has not been set.
 func (r *RevisionReader) GetEffectiveFrom(ctx context.Context, tenantID, revisionID string) (time.Time, error) {
 	var nt sql.NullTime
 	err := r.db.QueryRowContext(ctx,
@@ -38,6 +42,8 @@ func (r *RevisionReader) GetEffectiveFrom(ctx context.Context, tenantID, revisio
 	return nt.Time, nil
 }
 
+// GetAuthor returns the document's creator id and display name (falling back
+// to the id when no display-name snapshot was recorded).
 func (r *RevisionReader) GetAuthor(ctx context.Context, tenantID, revisionID string) (resolvers.AuthorInfo, error) {
 	var userID string
 	var displayName string
@@ -50,6 +56,7 @@ func (r *RevisionReader) GetAuthor(ctx context.Context, tenantID, revisionID str
 	return resolvers.AuthorInfo{UserID: userID, DisplayName: displayName}, nil
 }
 
+// GetDocumentTitle returns the document's name.
 func (r *RevisionReader) GetDocumentTitle(ctx context.Context, tenantID, revisionID string) (string, error) {
 	var title string
 	err := r.db.QueryRowContext(ctx,
@@ -62,6 +69,7 @@ func (r *RevisionReader) GetDocumentTitle(ctx context.Context, tenantID, revisio
 // WorkflowReader implements resolvers.WorkflowReader backed by approval tables.
 type WorkflowReader struct{ db *sql.DB }
 
+// NewWorkflowReader constructs a WorkflowReader backed by db.
 func NewWorkflowReader(db *sql.DB) *WorkflowReader { return &WorkflowReader{db: db} }
 
 // AutoApprovalDisplayName is what the approvers block renders for an instance
@@ -80,6 +88,11 @@ const AutoApprovalDisplayName = "Aprovação automática — rota livre"
 // date would silently become the common one.
 var ErrNoApprovalDate = errors.New("documents: no approval date for document (no signoff and no completed approval instance)")
 
+// GetApprovers returns the approve-decision signoffs for an approval
+// instance, oldest first. When there are none, it distinguishes a genuine
+// zero-stage livre auto-approval (ADR 0087, rendered as a synthetic
+// AutoApprovalDisplayName entry) from every other no-signoff case (returned
+// as an empty, non-error result) — see the inline comments below.
 func (r *WorkflowReader) GetApprovers(ctx context.Context, tenantID, revisionID, approvalInstanceID string) ([]resolvers.ApproverInfo, error) {
 	if approvalInstanceID == "" {
 		return nil, nil
@@ -95,7 +108,7 @@ func (r *WorkflowReader) GetApprovers(ctx context.Context, tenantID, revisionID,
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []resolvers.ApproverInfo
 	for rows.Next() {
 		var a resolvers.ApproverInfo
@@ -183,11 +196,12 @@ func (r *WorkflowReader) GetFinalApprovalDate(ctx context.Context, tenantID, rev
 // FanoutInputsReader reads stored fanout inputs for forensic reconstruction.
 type FanoutInputsReader struct{ db *sql.DB }
 
+// NewFanoutInputsReader constructs a FanoutInputsReader backed by db.
 func NewFanoutInputsReader(db *sql.DB) *FanoutInputsReader { return &FanoutInputsReader{db: db} }
 
 // ReadForReconstruction loads the snapshot + stored values needed to re-render a frozen revision.
-// Returns the FanoutRequest to replay and the original content_hash for comparison.
-func (r *FanoutInputsReader) ReadForReconstruction(ctx context.Context, tenantID, revisionID string) (fanout.FanoutRequest, []byte, error) {
+// Returns the fanout.Request to replay and the original content_hash for comparison.
+func (r *FanoutInputsReader) ReadForReconstruction(ctx context.Context, tenantID, revisionID string) (fanout.Request, []byte, error) {
 	var bodyDocxKey string
 	var compositionRaw []byte
 	var contentHash []byte
@@ -200,14 +214,14 @@ func (r *FanoutInputsReader) ReadForReconstruction(ctx context.Context, tenantID
 		 WHERE tenant_id=$1::uuid AND id=$2::uuid`,
 		tenantID, revisionID).Scan(&bodyDocxKey, &compositionRaw, &contentHash)
 	if err != nil {
-		return fanout.FanoutRequest{}, nil, err
+		return fanout.Request{}, nil, err
 	}
 
 	fillIn := NewFillInRepository(r.db)
 
 	values, err := fillIn.ListValues(ctx, tenantID, revisionID)
 	if err != nil {
-		return fanout.FanoutRequest{}, nil, err
+		return fanout.Request{}, nil, err
 	}
 	placeholders := make(map[string]string, len(values))
 	for _, v := range values {
@@ -216,7 +230,7 @@ func (r *FanoutInputsReader) ReadForReconstruction(ctx context.Context, tenantID
 		}
 	}
 
-	req := fanout.FanoutRequest{
+	req := fanout.Request{
 		TenantID:          tenantID,
 		RevisionID:        revisionID,
 		BodyDocxS3Key:     bodyDocxKey,

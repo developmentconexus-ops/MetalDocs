@@ -6,12 +6,17 @@ import (
 	"time"
 )
 
+// AuthorResolver resolves the "author" placeholder to the revision author's
+// display name, falling back to their user ID when no display name is set.
 type AuthorResolver struct{}
 
+// Key returns the resolver's registry key, "author".
 func (AuthorResolver) Key() string { return "author" }
 
+// Version returns the resolver's version.
 func (AuthorResolver) Version() int { return 1 }
 
+// Resolve computes the author value for in.
 func (AuthorResolver) Resolve(ctx context.Context, in ResolveInput) (ResolvedValue, error) {
 	if err := requireTenantID("author", in.TenantID); err != nil {
 		return ResolvedValue{}, err

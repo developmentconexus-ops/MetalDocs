@@ -14,6 +14,8 @@ import (
 	"metaldocs/internal/platform/config"
 )
 
+// Enabled reports whether authentication is enabled, read from
+// METALDOCS_AUTH_ENABLED (defaults to true when unset).
 func Enabled() bool {
 	raw := strings.ToLower(strings.TrimSpace(os.Getenv("METALDOCS_AUTH_ENABLED")))
 	if raw == "" {
@@ -22,6 +24,8 @@ func Enabled() bool {
 	return raw == "1" || raw == "true" || raw == "yes" || raw == "on"
 }
 
+// CacheTTL returns the authz cache TTL, read from
+// METALDOCS_AUTHZ_CACHE_TTL_SECONDS (defaults to 30 seconds when unset or invalid).
 func CacheTTL() time.Duration {
 	raw := strings.TrimSpace(os.Getenv("METALDOCS_AUTHZ_CACHE_TTL_SECONDS"))
 	if raw == "" {
@@ -34,6 +38,9 @@ func CacheTTL() time.Duration {
 	return time.Duration(seconds) * time.Second
 }
 
+// LoadRuntimeConfig reads the authn/authz runtime configuration from
+// environment variables, enforcing that METALDOCS_AUTH_ENABLED=false is only
+// permitted when APP_ENV=local.
 func LoadRuntimeConfig() (authapp.Config, error) {
 	rawAppEnv := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
 	if !Enabled() && rawAppEnv != "local" {
