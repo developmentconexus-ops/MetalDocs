@@ -83,7 +83,7 @@ func TestHandleReplaceUserRoles_RejectsMultipleRoles(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
-	if got := rec.Body.String(); !bytes.Contains([]byte(got), []byte("Exactly one role is required")) {
+	if got := rec.Body.String(); !bytes.Contains([]byte(got), []byte("exactly one role is required")) {
 		t.Fatalf("response body %q does not mention single-role requirement", got)
 	}
 }

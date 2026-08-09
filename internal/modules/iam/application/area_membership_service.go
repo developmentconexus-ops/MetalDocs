@@ -179,35 +179,45 @@ func (s *AreaMembershipService) Grant(
 		if existing.Role == role {
 			return ErrMembershipExists
 		}
-		tx, err := s.repo.BeginTx(ctx)
-		if err != nil {
-			return fmt.Errorf("begin grant tx: %w", err)
-		}
-		committed := false
-		defer func() {
-			if !committed {
-				_ = tx.Rollback()
+		if err := s.commitMembershipMutation(ctx, "grant", membership, func(ctx context.Context, tx domain.MembershipTx) error {
+			if err := s.repo.GrantAtomicTx(ctx, tx, *existing, membership); err != nil {
+				return fmt.Errorf("grant membership atomically: %w", err)
 			}
-		}()
-		if err := s.repo.GrantAtomicTx(ctx, tx, *existing, membership); err != nil {
-			return fmt.Errorf("grant membership atomically: %w", err)
+			return nil
+		}); err != nil {
+			return err
 		}
-		if err := s.logger.LogTx(ctx, tx, "role.grant", membership); err != nil {
-			return fmt.Errorf("log grant governance: %w", err)
-		}
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit grant tx: %w", err)
-		}
-		committed = true
 		// Flush the actor's cached roles once the mutation and governance are
 		// committed atomically (A3).
 		s.invalidate(userID, tenantID)
 		return nil
 	}
 
+	if err := s.commitMembershipMutation(ctx, "insert", membership, func(ctx context.Context, tx domain.MembershipTx) error {
+		if err := s.repo.InsertTx(ctx, tx, membership); err != nil {
+			return fmt.Errorf("insert membership: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	// Flush the actor's cached roles once the mutation and governance are
+	// committed atomically (A3).
+	s.invalidate(userID, tenantID)
+	return nil
+}
+
+// commitMembershipMutation opens a transaction, runs mutate to perform the
+// membership row change, writes the "role.grant" governance-log entry for the
+// same mutation, and commits — the shared atomic-commit envelope
+// (REQ-ASYNC-1) used by both of Grant's branches (role-change vs first
+// grant). txLabel names the tx in the begin/commit wrap error only ("grant"
+// or "insert"); the governance action logged is always role.grant, matching
+// the pre-extraction behavior of both branches.
+func (s *AreaMembershipService) commitMembershipMutation(ctx context.Context, txLabel string, membership domain.UserProcessArea, mutate func(ctx context.Context, tx domain.MembershipTx) error) error {
 	tx, err := s.repo.BeginTx(ctx)
 	if err != nil {
-		return fmt.Errorf("begin insert tx: %w", err)
+		return fmt.Errorf("begin %s tx: %w", txLabel, err)
 	}
 	committed := false
 	defer func() {
@@ -215,19 +225,16 @@ func (s *AreaMembershipService) Grant(
 			_ = tx.Rollback()
 		}
 	}()
-	if err := s.repo.InsertTx(ctx, tx, membership); err != nil {
-		return fmt.Errorf("insert membership: %w", err)
+	if err := mutate(ctx, tx); err != nil {
+		return err
 	}
 	if err := s.logger.LogTx(ctx, tx, "role.grant", membership); err != nil {
 		return fmt.Errorf("log grant governance: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit insert tx: %w", err)
+		return fmt.Errorf("commit %s tx: %w", txLabel, err)
 	}
 	committed = true
-	// Flush the actor's cached roles once the mutation and governance are
-	// committed atomically (A3).
-	s.invalidate(userID, tenantID)
 	return nil
 }
 

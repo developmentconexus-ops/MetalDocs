@@ -556,85 +556,210 @@ var (
 	codeCDAreaArchived = problem.CodeStateProcessAreaArchived
 )
 
+// cdDomainErrorEntry is one row of cdDomainErrorHandlers: match reports
+// whether err is the sentinel/type this row handles, write emits that row's
+// RFC 9457 response.
+type cdDomainErrorEntry struct {
+	match func(error) bool
+	write func(w http.ResponseWriter, err error)
+}
+
+// cdDomainErrorHandlers is writeDomainError's dispatch table, in the same
+// order as (and byte-identical in effect to) the switch it replaces. This is
+// a 1:1 sentinel->response mapping with no real decision logic — the
+// gocyclo cost was almost entirely the case count — so per the wave-2 lint
+// brief's guidance ("a switch that drives dispatch can become a map"), it is
+// data instead of 26 case branches in one function body. First match wins,
+// same as the original switch; errors.As(capDenied) stays a dedicated check
+// in writeDomainError itself since it needs a typed target, not an
+// errors.Is sentinel.
+var cdDomainErrorHandlers = []cdDomainErrorEntry{
+	{
+		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrNoActiveInstance) },
+		write: func(w http.ResponseWriter, _ error) {
+			httpresponse.WriteError(w, http.StatusNotFound, codeCDNotFoundActiveInstance, "no active document instance for this controlled document")
+		},
+	},
+	{
+		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrCDNotFound) },
+		write: func(w http.ResponseWriter, _ error) {
+			httpresponse.WriteError(w, http.StatusNotFound, codeCDNotFoundControlledDocument, "controlled document not found")
+		},
+	},
+	{
+		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrCDNotActive) },
+		write: func(w http.ResponseWriter, _ error) {
+			httpresponse.WriteError(w, http.StatusConflict, codeCDStateNotActive, "controlled document is not active")
+		},
+	},
+	{
+		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrActiveRevisionExists) },
+		write: func(w http.ResponseWriter, _ error) {
+			httpresponse.WriteError(w, http.StatusConflict, codeCDStateActiveRevisionExists, "controlled document already has an active revision")
+		},
+	},
+	{
+		// Hard creation gate (D2): the profile has no active approval route, so the
+		// document could never be submitted. Mirrors the SAME wire contract the
+		// submit path already emits — 409 + "state.approval_route_missing"
+		// (internal/modules/approval/http/errors.go) — so both surfaces are one
+		// contract for the client.
+		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrApprovalRouteMissing) },
+		write: func(w http.ResponseWriter, _ error) {
+			httpresponse.WriteError(w, http.StatusConflict, problem.CodeStateApprovalRouteMissing, "profile has no active approval route")
+		},
+	},
+	{
+		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrCDCodeTaken) },
+		write: func(w http.ResponseWriter, _ error) {
+			httpresponse.WriteError(w, http.StatusConflict, codeCDConflictCodeTaken, "controlled document code already taken")
+		},
+	},
+	{
+		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrCDArchivedCodeReuse) },
+		write: func(w http.ResponseWriter, _ error) {
+			httpresponse.WriteError(w, http.StatusConflict, codeCDConflictCodeArchived, "cannot reuse code from archived controlled document")
+		},
+	},
+	// annex R-20: the three reason/scope rejections moved 400 -> 422 with the
+	// rename, so the status now comes from the registration (NewFor) instead of
+	// being restated at the call site — ADR 0089 decision 3.
+	{
+		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrManualCodeReasonRequired) },
+		write: func(w http.ResponseWriter, _ error) {
+			_ = problem.Write(w, problem.NewFor(codeCDValidationManualCodeReason, "manual code reason is required"))
+		},
+	},
+	{
+		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrOverrideReasonRequired) },
+		write: func(w http.ResponseWriter, _ error) {
+			_ = problem.Write(w, problem.NewFor(codeCDValidationOverrideReason, "override reason is required"))
+		},
+	},
+	{
+		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrVisibilityScopeInvalid) },
+		write: func(w http.ResponseWriter, _ error) {
+			_ = problem.Write(w, problem.NewFor(codeCDValidationVisibilityScope, "visibility scope is invalid"))
+		},
+	},
+	{
+		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrOverrideTemplateDeleted) },
+		write: func(w http.ResponseWriter, _ error) {
+			httpresponse.WriteError(w, http.StatusConflict, codeCDStateOverrideTplDeleted, "override template deleted")
+		},
+	},
+	{
+		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrOverrideNotPublished) },
+		write: func(w http.ResponseWriter, _ error) {
+			httpresponse.WriteError(w, http.StatusConflict, codeCDStateOverrideTplNotPublished, "override template is not published")
+		},
+	},
+	{
+		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrDictionaryTokenMissing) },
+		write: func(w http.ResponseWriter, _ error) {
+			httpresponse.WriteError(w, http.StatusUnprocessableEntity, codeCDValidationDictionaryToken, "a referenced dictionary token does not exist")
+		},
+	},
+	{
+		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrTemplateProfileMismatch) },
+		write: func(w http.ResponseWriter, _ error) {
+			_ = problem.Write(w, problem.NewFor(codeCDTemplateInvalid, "template version does not match the document profile"))
+		},
+	},
+	{
+		match: func(err error) bool { return errors.Is(err, application.ErrTemplateArtifactMissing) },
+		write: func(w http.ResponseWriter, _ error) {
+			httpresponse.WriteError(w, http.StatusConflict, codeCDStateTemplateArtifactMissing, "template artifact missing")
+		},
+	},
+	{
+		match: func(err error) bool { return errors.Is(err, application.ErrTemplateArtifactInvariantUnconfigured) },
+		write: func(w http.ResponseWriter, _ error) {
+			httpresponse.WriteError(w, http.StatusInternalServerError, codeCDInternalTemplateArtifactUnconfigured, "template artifact invariant not configured")
+		},
+	},
+	{
+		match: func(err error) bool { return errors.Is(err, application.ErrCreationContextUnconfigured) },
+		write: func(w http.ResponseWriter, _ error) {
+			httpresponse.WriteError(w, http.StatusInternalServerError, codeCDInternalCreationContextUnconfigured, "creation context is not configured")
+		},
+	},
+	{
+		match: func(err error) bool { return errors.Is(err, application.ErrActorMissing) },
+		write: func(w http.ResponseWriter, _ error) {
+			httpresponse.WriteError(w, http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "authentication required")
+		},
+	},
+	{
+		match: func(err error) bool { return errors.Is(err, errTenantIDInvalid) },
+		write: func(w http.ResponseWriter, err error) {
+			slog.Error("controlled-documents request has invalid tenant id in context",
+				"route", "controlledDocuments.writeDomainError",
+				"error", err,
+			)
+			httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
+		},
+	},
+	{
+		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrProfileHasNoDefaultTemplate) },
+		write: func(w http.ResponseWriter, _ error) {
+			httpresponse.WriteError(w, http.StatusConflict, codeCDStateProfileNoDefaultTemplate, "profile has no default template")
+		},
+	},
+	{
+		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrDefaultObsolete) },
+		write: func(w http.ResponseWriter, _ error) {
+			httpresponse.WriteError(w, http.StatusConflict, codeCDStateDefaultTemplateObsolete, "default template is obsolete")
+		},
+	},
+	{
+		match: func(err error) bool { return errors.Is(err, taxonomydomain.ErrProfileNotFound) },
+		write: func(w http.ResponseWriter, _ error) {
+			httpresponse.WriteError(w, http.StatusNotFound, problem.CodeNotFoundDocumentProfile, "profile not found")
+		},
+	},
+	{
+		match: func(err error) bool { return errors.Is(err, taxonomydomain.ErrAreaNotFound) },
+		write: func(w http.ResponseWriter, _ error) {
+			httpresponse.WriteError(w, http.StatusNotFound, codeCDAreaNotFound, "process area not found")
+		},
+	},
+	{
+		match: func(err error) bool { return errors.Is(err, taxonomydomain.ErrProfileArchived) },
+		write: func(w http.ResponseWriter, _ error) {
+			httpresponse.WriteError(w, http.StatusConflict, problem.CodeStateDocumentProfileArchived, "profile is archived")
+		},
+	},
+	{
+		match: func(err error) bool { return errors.Is(err, taxonomydomain.ErrAreaArchived) },
+		write: func(w http.ResponseWriter, _ error) {
+			httpresponse.WriteError(w, http.StatusConflict, codeCDAreaArchived, "process area is archived")
+		},
+	},
+}
+
 func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
-	var capDenied authz.ErrCapDenied
-	switch {
 	// ADR 0022 tier-2: an in-tx authz.Require denial (e.g. PeekSeq's preview-code
 	// create check) is "you lack this capability" — surface it as 403
 	// permission.capability_denied problem+json, the same client-visible code the documents
 	// module emits, never the default 500. (Without this case the wrapped denial
 	// fell through to internal.unknown.)
-	case errors.As(err, &capDenied):
+	var capDenied authz.ErrCapDenied
+	if errors.As(err, &capDenied) {
 		httpresponse.WriteError(w, http.StatusForbidden, problem.CodePermissionCapabilityDenied, "you do not have the required capability in this area")
-	case errors.Is(err, controlleddocumentsdomain.ErrNoActiveInstance):
-		httpresponse.WriteError(w, http.StatusNotFound, codeCDNotFoundActiveInstance, "no active document instance for this controlled document")
-	case errors.Is(err, controlleddocumentsdomain.ErrCDNotFound):
-		httpresponse.WriteError(w, http.StatusNotFound, codeCDNotFoundControlledDocument, "controlled document not found")
-	case errors.Is(err, controlleddocumentsdomain.ErrCDNotActive):
-		httpresponse.WriteError(w, http.StatusConflict, codeCDStateNotActive, "controlled document is not active")
-	case errors.Is(err, controlleddocumentsdomain.ErrActiveRevisionExists):
-		httpresponse.WriteError(w, http.StatusConflict, codeCDStateActiveRevisionExists, "controlled document already has an active revision")
-	// Hard creation gate (D2): the profile has no active approval route, so the
-	// document could never be submitted. Mirrors the SAME wire contract the
-	// submit path already emits — 409 + "state.approval_route_missing"
-	// (internal/modules/approval/http/errors.go) — so both surfaces are one
-	// contract for the client.
-	case errors.Is(err, controlleddocumentsdomain.ErrApprovalRouteMissing):
-		httpresponse.WriteError(w, http.StatusConflict, problem.CodeStateApprovalRouteMissing, "profile has no active approval route")
-	case errors.Is(err, controlleddocumentsdomain.ErrCDCodeTaken):
-		httpresponse.WriteError(w, http.StatusConflict, codeCDConflictCodeTaken, "controlled document code already taken")
-	case errors.Is(err, controlleddocumentsdomain.ErrCDArchivedCodeReuse):
-		httpresponse.WriteError(w, http.StatusConflict, codeCDConflictCodeArchived, "cannot reuse code from archived controlled document")
-	// annex R-20: the three reason/scope rejections moved 400 -> 422 with the
-	// rename, so the status now comes from the registration (NewFor) instead of
-	// being restated at the call site — ADR 0089 decision 3.
-	case errors.Is(err, controlleddocumentsdomain.ErrManualCodeReasonRequired):
-		_ = problem.Write(w, problem.NewFor(codeCDValidationManualCodeReason, "manual code reason is required"))
-	case errors.Is(err, controlleddocumentsdomain.ErrOverrideReasonRequired):
-		_ = problem.Write(w, problem.NewFor(codeCDValidationOverrideReason, "override reason is required"))
-	case errors.Is(err, controlleddocumentsdomain.ErrVisibilityScopeInvalid):
-		_ = problem.Write(w, problem.NewFor(codeCDValidationVisibilityScope, "visibility scope is invalid"))
-	case errors.Is(err, controlleddocumentsdomain.ErrOverrideTemplateDeleted):
-		httpresponse.WriteError(w, http.StatusConflict, codeCDStateOverrideTplDeleted, "override template deleted")
-	case errors.Is(err, controlleddocumentsdomain.ErrOverrideNotPublished):
-		httpresponse.WriteError(w, http.StatusConflict, codeCDStateOverrideTplNotPublished, "override template is not published")
-	case errors.Is(err, controlleddocumentsdomain.ErrDictionaryTokenMissing):
-		httpresponse.WriteError(w, http.StatusUnprocessableEntity, codeCDValidationDictionaryToken, "a referenced dictionary token does not exist")
-	case errors.Is(err, controlleddocumentsdomain.ErrTemplateProfileMismatch):
-		_ = problem.Write(w, problem.NewFor(codeCDTemplateInvalid, "template version does not match the document profile"))
-	case errors.Is(err, application.ErrTemplateArtifactMissing):
-		httpresponse.WriteError(w, http.StatusConflict, codeCDStateTemplateArtifactMissing, "template artifact missing")
-	case errors.Is(err, application.ErrTemplateArtifactInvariantUnconfigured):
-		httpresponse.WriteError(w, http.StatusInternalServerError, codeCDInternalTemplateArtifactUnconfigured, "template artifact invariant not configured")
-	case errors.Is(err, application.ErrCreationContextUnconfigured):
-		httpresponse.WriteError(w, http.StatusInternalServerError, codeCDInternalCreationContextUnconfigured, "creation context is not configured")
-	case errors.Is(err, application.ErrActorMissing):
-		httpresponse.WriteError(w, http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "authentication required")
-	case errors.Is(err, errTenantIDInvalid):
-		slog.Error("controlled-documents request has invalid tenant id in context",
-			"route", "controlledDocuments.writeDomainError",
-			"error", err,
-		)
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
-	case errors.Is(err, controlleddocumentsdomain.ErrProfileHasNoDefaultTemplate):
-		httpresponse.WriteError(w, http.StatusConflict, codeCDStateProfileNoDefaultTemplate, "profile has no default template")
-	case errors.Is(err, controlleddocumentsdomain.ErrDefaultObsolete):
-		httpresponse.WriteError(w, http.StatusConflict, codeCDStateDefaultTemplateObsolete, "default template is obsolete")
-	case errors.Is(err, taxonomydomain.ErrProfileNotFound):
-		httpresponse.WriteError(w, http.StatusNotFound, problem.CodeNotFoundDocumentProfile, "profile not found")
-	case errors.Is(err, taxonomydomain.ErrAreaNotFound):
-		httpresponse.WriteError(w, http.StatusNotFound, codeCDAreaNotFound, "process area not found")
-	case errors.Is(err, taxonomydomain.ErrProfileArchived):
-		httpresponse.WriteError(w, http.StatusConflict, problem.CodeStateDocumentProfileArchived, "profile is archived")
-	case errors.Is(err, taxonomydomain.ErrAreaArchived):
-		httpresponse.WriteError(w, http.StatusConflict, codeCDAreaArchived, "process area is archived")
-	default:
-		slog.Error("controlled-documents request failed",
-			"route", "controlledDocuments.writeDomainError",
-			"error", err,
-		)
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
+		return
 	}
+	for _, entry := range cdDomainErrorHandlers {
+		if entry.match(err) {
+			entry.write(w, err)
+			return
+		}
+	}
+	slog.Error("controlled-documents request failed",
+		"route", "controlledDocuments.writeDomainError",
+		"error", err,
+	)
+	httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
 }
 
 func tenantIDFromRequest(r *http.Request) (string, error) {
@@ -648,39 +773,43 @@ func tenantIDFromRequest(r *http.Request) (string, error) {
 	return tenantID, nil
 }
 
-func filterFromListParams(params controlleddocumentsapi.ListControlledDocumentsParams) (application.CDFilter, error) {
-	filter := application.CDFilter{}
+// trimmedOptionalFilter trims value and returns a pointer to the trimmed
+// string, or nil when value is nil or blank after trimming. Shared by every
+// plain string filter field in filterFromListParams — extracted so each
+// field no longer needs its own nested nil/blank-check pair.
+func trimmedOptionalFilter(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
+}
 
-	if params.ProfileCode != nil {
-		value := strings.TrimSpace(*params.ProfileCode)
-		if value != "" {
-			filter.ProfileCode = &value
-		}
+// applyListLimit validates limit (1-100) and, when present, copies it onto
+// filter.Limit. Extracted from filterFromListParams; behavior unchanged.
+func applyListLimit(filter *application.CDFilter, limit *int) error {
+	if limit == nil {
+		return nil
 	}
-	if params.ProcessAreaCode != nil {
-		value := strings.TrimSpace(*params.ProcessAreaCode)
-		if value != "" {
-			filter.ProcessAreaCode = &value
-		}
+	if *limit < 1 || *limit > 100 {
+		return errors.New("limit must be between 1 and 100")
 	}
-	if params.DepartmentCode != nil {
-		value := strings.TrimSpace(*params.DepartmentCode)
-		if value != "" {
-			filter.DepartmentCode = &value
-		}
+	filter.Limit = *limit
+	return nil
+}
+
+func filterFromListParams(params controlleddocumentsapi.ListControlledDocumentsParams) (application.CDFilter, error) {
+	filter := application.CDFilter{
+		ProfileCode:     trimmedOptionalFilter(params.ProfileCode),
+		ProcessAreaCode: trimmedOptionalFilter(params.ProcessAreaCode),
+		DepartmentCode:  trimmedOptionalFilter(params.DepartmentCode),
+		OwnerUserID:     trimmedOptionalFilter(params.OwnerUserId),
+		Query:           trimmedOptionalFilter(params.Q),
 	}
-	if params.OwnerUserId != nil {
-		value := strings.TrimSpace(*params.OwnerUserId)
-		if value != "" {
-			filter.OwnerUserID = &value
-		}
-	}
-	if params.Q != nil {
-		value := strings.TrimSpace(*params.Q)
-		if value != "" {
-			filter.Query = &value
-		}
-	}
+
 	if params.Status != nil {
 		if !params.Status.Valid() {
 			return application.CDFilter{}, errors.New("invalid status value")
@@ -688,11 +817,8 @@ func filterFromListParams(params controlleddocumentsapi.ListControlledDocumentsP
 		status := controlleddocumentsdomain.CDStatus(*params.Status)
 		filter.Status = &status
 	}
-	if params.Limit != nil {
-		if *params.Limit < 1 || *params.Limit > 100 {
-			return application.CDFilter{}, errors.New("limit must be between 1 and 100")
-		}
-		filter.Limit = *params.Limit
+	if err := applyListLimit(&filter, params.Limit); err != nil {
+		return application.CDFilter{}, err
 	}
 	if params.Cursor != nil {
 		filter.Cursor = strings.TrimSpace(*params.Cursor)

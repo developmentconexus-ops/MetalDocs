@@ -218,42 +218,60 @@ func HGCrossModule(files []string) []Finding {
 		}
 		f := raw.(*ast.File)
 		src := readSource(path)
-		seen := map[string]bool{} // dedupe per (line,table) within a file
+		out = append(out, hgScanFile(fset, path, reader, f, src)...)
+	}
+	return out
+}
 
-		ast.Inspect(f, func(n ast.Node) bool {
-			lit, ok := n.(*ast.BasicLit)
-			if !ok || lit.Kind != token.STRING {
-				return true
-			}
-			val := lit.Value
-			for _, m := range hgFromJoin.FindAllStringSubmatchIndex(val, -1) {
-				table := strings.ToLower(val[m[2]:m[3]])
-				owner, owned := hgOwnerByTable[table]
-				if !owned || owner == reader {
-					continue // unknown table or own-table read (D3c) — compliant
-				}
-				line := fset.Position(lit.Pos()).Line + strings.Count(val[:m[0]], "\n")
-				if hgListed(path, table, hgPendingRemediation) || hgListed(path, table, hgExempt) {
-					continue
-				}
-				if strings.Contains(getLine(src, line), hgCrossModuleAllow) {
-					continue
-				}
-				key := fmt.Sprintf("%d|%s", line, table)
-				if seen[key] {
-					continue
-				}
-				seen[key] = true
-				out = append(out, Finding{
-					Analyzer: "hgcrossmodule",
-					File:     path,
-					Line:     line,
-					Message: fmt.Sprintf(
-						"module %q reads %q's base table %q with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
-						reader, owner, table),
-				})
-			}
+// hgScanFile scans a single parsed file for cross-module base-table reads,
+// returning one Finding per (line,table) violation found in its string
+// literals.
+func hgScanFile(fset *token.FileSet, path, reader string, f *ast.File, src string) []Finding {
+	var out []Finding
+	seen := map[string]bool{} // dedupe per (line,table) within a file
+
+	ast.Inspect(f, func(n ast.Node) bool {
+		lit, ok := n.(*ast.BasicLit)
+		if !ok || lit.Kind != token.STRING {
 			return true
+		}
+		out = append(out, hgScanLiteral(fset, path, reader, lit, src, seen)...)
+		return true
+	})
+	return out
+}
+
+// hgScanLiteral scans a single string literal for FROM/JOIN references to
+// another module's owned base table, returning one Finding per newly-seen
+// (line,table) violation not covered by an allowlist or inline directive.
+func hgScanLiteral(fset *token.FileSet, path, reader string, lit *ast.BasicLit, src string, seen map[string]bool) []Finding {
+	var out []Finding
+	val := lit.Value
+	for _, m := range hgFromJoin.FindAllStringSubmatchIndex(val, -1) {
+		table := strings.ToLower(val[m[2]:m[3]])
+		owner, owned := hgOwnerByTable[table]
+		if !owned || owner == reader {
+			continue // unknown table or own-table read (D3c) — compliant
+		}
+		line := fset.Position(lit.Pos()).Line + strings.Count(val[:m[0]], "\n")
+		if hgListed(path, table, hgPendingRemediation) || hgListed(path, table, hgExempt) {
+			continue
+		}
+		if strings.Contains(getLine(src, line), hgCrossModuleAllow) {
+			continue
+		}
+		key := fmt.Sprintf("%d|%s", line, table)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, Finding{
+			Analyzer: "hgcrossmodule",
+			File:     path,
+			Line:     line,
+			Message: fmt.Sprintf(
+				"module %q reads %q's base table %q with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
+				reader, owner, table),
 		})
 	}
 	return out

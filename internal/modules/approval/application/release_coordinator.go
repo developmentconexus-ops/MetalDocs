@@ -303,14 +303,15 @@ func (c *ReleaseCoordinator) evaluateTx(ctx context.Context, runner db.TxRunner,
 }
 
 // applyDecision executes one outcome of the ADR 0085 decision table. The branch
-// count IS that table; splitting it across helpers would hide which outcome
-// each conjunct produces.
+// count IS that table — each case's body is extracted to a small,
+// outcome-named helper (scheduleReleaseTx, lockAndRedecide/releaseTx) so the
+// dispatch itself stays a flat, readable switch; the case list is never
+// split or turned into a lookup map, which would hide which outcome each
+// conjunct of the table produces.
 //
 // locked reports whether the document lock set is already held: the release
 // branch takes the locks, re-decides under them and re-enters here exactly once
 // with the fresh decision.
-//
-//nolint:gocyclo // see above
 func (c *ReleaseCoordinator) applyDecision(ctx context.Context, tx *sql.Tx, rc releaseDecisionContext, doc documentReleaseState, decision domain.ReleaseDecision, locked bool) error {
 	gen := rc.gen
 	*rc.out = ReleaseEvaluation{DocumentID: gen.DocumentID, Action: decision.Action, Hold: decision.Hold}
@@ -323,47 +324,7 @@ func (c *ReleaseCoordinator) applyDecision(ctx context.Context, tx *sql.Tx, rc r
 		return touchEvaluatedTx(ctx, tx, gen.ID, decision.Hold)
 
 	case domain.ReleaseActionSchedule:
-		if doc.Status == string(docsdomain.DocStatusApproved) {
-			if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusApproved, docsdomain.DocStatusScheduled); err != nil {
-				return err
-			}
-			// No document pre-lock: this guarded UPDATE is itself the row lock
-			// AND the CAS. Zero rows means a concurrent evaluation won.
-			res, err := tx.ExecContext(ctx, `
-				UPDATE documents
-				   SET status              = 'scheduled',
-				       effective_from      = NULL,
-				       revision_version    = revision_version + 1,
-				       schedule_generation = schedule_generation + 1
-				 WHERE id = $1::uuid AND tenant_id = $2::uuid
-				   AND status = 'approved' AND revision_version = $3`,
-				gen.DocumentID, gen.TenantID, doc.RevisionVersion)
-			if err != nil {
-				return fmt.Errorf("release: transition to scheduled: %w", err)
-			}
-			affected, err := res.RowsAffected()
-			if err != nil {
-				return fmt.Errorf("release: scheduled rows affected: %w", err)
-			}
-			if affected == 0 {
-				// Lost the CAS to a concurrent evaluation.
-				rc.out.Action = domain.ReleaseActionNoop
-				rc.out.Hold = ""
-				return touchEvaluatedTx(ctx, tx, gen.ID, "")
-			}
-		}
-		if err := touchEvaluatedTx(ctx, tx, gen.ID, decision.Hold); err != nil {
-			return err
-		}
-		// Arm the effective-date timer. Firing just re-runs this same
-		// evaluation, so a duplicate timer is harmless.
-		if c.evaluationEnqueuer != nil && doc.PlannedFrom != nil {
-			if err := c.evaluationEnqueuer.EnqueueReleaseEvaluationTx(ctx, tx, gen.Key(), *doc.PlannedFrom); err != nil {
-				return fmt.Errorf("release: arm effective-date timer: %w", err)
-			}
-			rc.out.ScheduledFor = doc.PlannedFrom
-		}
-		return nil
+		return c.scheduleReleaseTx(ctx, tx, rc, doc, decision)
 
 	case domain.ReleaseActionRelease:
 		if !locked {
@@ -372,6 +333,54 @@ func (c *ReleaseCoordinator) applyDecision(ctx context.Context, tx *sql.Tx, rc r
 		return c.releaseTx(ctx, tx, rc, doc)
 	}
 	return fmt.Errorf("release: unhandled action %q", decision.Action)
+}
+
+// scheduleReleaseTx handles the ADR 0085 ReleaseActionSchedule outcome: CAS
+// the document approved -> scheduled (a lost CAS falls back to the noop
+// outcome), records the evaluation, and arms the effective-date timer.
+func (c *ReleaseCoordinator) scheduleReleaseTx(ctx context.Context, tx *sql.Tx, rc releaseDecisionContext, doc documentReleaseState, decision domain.ReleaseDecision) error {
+	gen := rc.gen
+	if doc.Status == string(docsdomain.DocStatusApproved) {
+		if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusApproved, docsdomain.DocStatusScheduled); err != nil {
+			return err
+		}
+		// No document pre-lock: this guarded UPDATE is itself the row lock
+		// AND the CAS. Zero rows means a concurrent evaluation won.
+		res, err := tx.ExecContext(ctx, `
+			UPDATE documents
+			   SET status              = 'scheduled',
+			       effective_from      = NULL,
+			       revision_version    = revision_version + 1,
+			       schedule_generation = schedule_generation + 1
+			 WHERE id = $1::uuid AND tenant_id = $2::uuid
+			   AND status = 'approved' AND revision_version = $3`,
+			gen.DocumentID, gen.TenantID, doc.RevisionVersion)
+		if err != nil {
+			return fmt.Errorf("release: transition to scheduled: %w", err)
+		}
+		affected, err := res.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("release: scheduled rows affected: %w", err)
+		}
+		if affected == 0 {
+			// Lost the CAS to a concurrent evaluation.
+			rc.out.Action = domain.ReleaseActionNoop
+			rc.out.Hold = ""
+			return touchEvaluatedTx(ctx, tx, gen.ID, "")
+		}
+	}
+	if err := touchEvaluatedTx(ctx, tx, gen.ID, decision.Hold); err != nil {
+		return err
+	}
+	// Arm the effective-date timer. Firing just re-runs this same
+	// evaluation, so a duplicate timer is harmless.
+	if c.evaluationEnqueuer != nil && doc.PlannedFrom != nil {
+		if err := c.evaluationEnqueuer.EnqueueReleaseEvaluationTx(ctx, tx, gen.Key(), *doc.PlannedFrom); err != nil {
+			return fmt.Errorf("release: arm effective-date timer: %w", err)
+		}
+		rc.out.ScheduledFor = doc.PlannedFrom
+	}
+	return nil
 }
 
 // lockAndRedecide is the ADR 0085 deterministic lock step: discover the

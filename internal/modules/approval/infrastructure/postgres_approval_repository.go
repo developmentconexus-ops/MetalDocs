@@ -803,81 +803,102 @@ const listRoutesQuery = `
 		 WHERE r.tenant_id = $1::uuid
 		 ORDER BY r.created_at DESC, s.stage_order ASC`
 
-func scanRouteListRows(rows *sql.Rows) ([]Route, error) {
+// routeListRow holds one scanned row of listRoutesQuery: a route header
+// joined with one of its stages.
+type routeListRow struct {
+	routeID, routeName, routeTenantID string
+	profileCode                       sql.NullString
+	subjectKind, subjectKey           string
+	active                            bool
+	version                           int
+	createdAt, updatedAt              time.Time
+	stageID                           string
+	stageOrder                        int
+	stageName, stageCapability        sql.NullString
+	stageQuorum, stageDrift           sql.NullString
+	stageQuorumM                      sql.NullInt64
+	stageKind                         sql.NullString
+	stageDueInDays                    sql.NullInt64
+	totalCount                        int64
+}
 
+func scanRouteListRow(rows *sql.Rows) (routeListRow, error) {
+	var row routeListRow
+	if err := rows.Scan(
+		&row.routeID, &row.routeName, &row.routeTenantID, &row.profileCode, &row.subjectKind, &row.subjectKey, &row.active, &row.version, &row.createdAt, &row.updatedAt,
+		&row.stageID, &row.stageOrder, &row.stageName, &row.stageCapability, &row.stageQuorum, &row.stageQuorumM, &row.stageDrift,
+		&row.stageKind, &row.stageDueInDays,
+		&row.totalCount,
+	); err != nil {
+		return routeListRow{}, fmt.Errorf("scan approval route list row: %w", err)
+	}
+	return row, nil
+}
+
+// newRouteFromListRow builds a route header (with an empty Stages slice) from
+// the header columns of row.
+func newRouteFromListRow(row routeListRow) *Route {
+	return &Route{
+		ID:          row.routeID,
+		Name:        row.routeName,
+		TenantID:    row.routeTenantID,
+		ProfileCode: row.profileCode.String,
+		SubjectKind: row.subjectKind,
+		SubjectKey:  row.subjectKey,
+		Active:      row.active,
+		Version:     row.version,
+		CreatedAt:   row.createdAt,
+		UpdatedAt:   row.updatedAt,
+		Stages:      []RouteStage{},
+		Total:       int(row.totalCount),
+	}
+}
+
+// stageFromListRow builds one RouteStage from the stage columns of row.
+func stageFromListRow(row routeListRow) RouteStage {
+	stage := RouteStage{ID: row.stageID, Order: row.stageOrder}
+	if row.stageName.Valid {
+		stage.Name = row.stageName.String
+	}
+	if row.stageCapability.Valid {
+		stage.RequiredCapability = row.stageCapability.String
+	}
+	if row.stageQuorum.Valid {
+		stage.Quorum = row.stageQuorum.String
+	}
+	if row.stageQuorumM.Valid {
+		m := int(row.stageQuorumM.Int64)
+		stage.QuorumM = &m
+	}
+	if row.stageDrift.Valid {
+		stage.DriftPolicy = row.stageDrift.String
+	}
+	if row.stageKind.Valid {
+		stage.Kind = row.stageKind.String
+	}
+	if row.stageDueInDays.Valid {
+		v := int(row.stageDueInDays.Int64)
+		stage.DueInDays = &v
+	}
+	return stage
+}
+
+func scanRouteListRows(rows *sql.Rows) ([]Route, error) {
 	routeMap := make(map[string]*Route)
 	var routeOrder []string
 	for rows.Next() {
-		var (
-			routeID, routeName, routeTenantID string
-			profileCode                       sql.NullString
-			subjectKind, subjectKey           string
-			active                            bool
-			version                           int
-			createdAt, updatedAt              time.Time
-			stage                             RouteStage
-			stageID                           string
-			stageName, stageCapability        sql.NullString
-			stageQuorum, stageDrift           sql.NullString
-			stageQuorumM                      sql.NullInt64
-			stageKind                         sql.NullString
-			stageDueInDays                    sql.NullInt64
-			totalCount                        int64
-		)
-		if err := rows.Scan(
-			&routeID, &routeName, &routeTenantID, &profileCode, &subjectKind, &subjectKey, &active, &version, &createdAt, &updatedAt,
-			&stageID, &stage.Order, &stageName, &stageCapability, &stageQuorum, &stageQuorumM, &stageDrift,
-			&stageKind, &stageDueInDays,
-			&totalCount,
-		); err != nil {
-			return nil, fmt.Errorf("scan approval route list row: %w", err)
+		row, err := scanRouteListRow(rows)
+		if err != nil {
+			return nil, err
 		}
-		stage.ID = stageID
 
-		route := routeMap[routeID]
+		route := routeMap[row.routeID]
 		if route == nil {
-			route = &Route{
-				ID:          routeID,
-				Name:        routeName,
-				TenantID:    routeTenantID,
-				ProfileCode: profileCode.String,
-				SubjectKind: subjectKind,
-				SubjectKey:  subjectKey,
-				Active:      active,
-				Version:     version,
-				CreatedAt:   createdAt,
-				UpdatedAt:   updatedAt,
-				Stages:      []RouteStage{},
-				Total:       int(totalCount),
-			}
-			routeMap[routeID] = route
-			routeOrder = append(routeOrder, routeID)
+			route = newRouteFromListRow(row)
+			routeMap[row.routeID] = route
+			routeOrder = append(routeOrder, row.routeID)
 		}
-
-		if stageName.Valid {
-			stage.Name = stageName.String
-		}
-		if stageCapability.Valid {
-			stage.RequiredCapability = stageCapability.String
-		}
-		if stageQuorum.Valid {
-			stage.Quorum = stageQuorum.String
-		}
-		if stageQuorumM.Valid {
-			m := int(stageQuorumM.Int64)
-			stage.QuorumM = &m
-		}
-		if stageDrift.Valid {
-			stage.DriftPolicy = stageDrift.String
-		}
-		if stageKind.Valid {
-			stage.Kind = stageKind.String
-		}
-		if stageDueInDays.Valid {
-			v := int(stageDueInDays.Int64)
-			stage.DueInDays = &v
-		}
-		route.Stages = append(route.Stages, stage)
+		route.Stages = append(route.Stages, stageFromListRow(row))
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate approval route list rows: %w", err)
@@ -943,66 +964,10 @@ func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx 
 
 	var stages []domain.StageInstance
 	for rows.Next() {
-		var s domain.StageInstance
-		var quorumMSnapshot sql.NullInt32
-		var effectiveDenominator sql.NullInt32
-		var openedAt, completedAt, dueAt sql.NullTime
-		var eligibleJSON []byte
-		var skipReason sql.NullString
-		var kindStr string
-		var dueInDaysSnapshot sql.NullInt32
-		var selectorsJSON []byte
-
-		err := rows.Scan(
-			&s.ID, &s.ApprovalInstanceID, &s.StageOrder, &s.NameSnapshot,
-			&s.RequiredRoleSnapshot, &s.RequiredCapabilitySnapshot, &s.AreaCodeSnapshot,
-			&s.QuorumSnapshot, &quorumMSnapshot,
-			&s.OnEligibilityDriftSnapshot,
-			&eligibleJSON, &effectiveDenominator,
-			&s.Status, &openedAt, &completedAt, &skipReason,
-			&kindStr, &dueAt, &dueInDaysSnapshot, &selectorsJSON,
-		)
+		s, err := scanStageInstanceRow(rows, fmt.Sprintf("scan stage instance for approval instance %s", instanceID))
 		if err != nil {
-			return nil, fmt.Errorf("scan stage instance for approval instance %s: %w", instanceID, err)
+			return nil, err
 		}
-
-		if quorumMSnapshot.Valid {
-			v := int(quorumMSnapshot.Int32)
-			s.QuorumMSnapshot = &v
-		}
-		if effectiveDenominator.Valid {
-			v := int(effectiveDenominator.Int32)
-			s.EffectiveDenominator = &v
-		}
-		if openedAt.Valid {
-			s.OpenedAt = &openedAt.Time
-		}
-		if completedAt.Valid {
-			s.CompletedAt = &completedAt.Time
-		}
-		if skipReason.Valid {
-			s.SkipReason = skipReason.String
-		}
-		s.Kind = domain.StageKind(kindStr)
-		if dueAt.Valid {
-			s.DueAt = &dueAt.Time
-		}
-		if dueInDaysSnapshot.Valid {
-			v := int(dueInDaysSnapshot.Int32)
-			s.DueInDaysSnapshot = &v
-		}
-
-		if len(eligibleJSON) > 0 {
-			if err := json.Unmarshal(eligibleJSON, &s.EligibleActorIDs); err != nil {
-				return nil, fmt.Errorf("unmarshal eligible_actor_ids for stage %s: %w", s.ID, err)
-			}
-		}
-		if len(selectorsJSON) > 0 {
-			if err := json.Unmarshal(selectorsJSON, &s.SelectorsSnapshot); err != nil {
-				return nil, fmt.Errorf("unmarshal selectors_snapshot for stage %s: %w", s.ID, err)
-			}
-		}
-
 		stages = append(stages, s)
 	}
 	if err := rows.Err(); err != nil {
@@ -1020,6 +985,76 @@ func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx 
 		}
 	}
 	return stages, nil
+}
+
+// scanStageInstanceRow scans one approval_stage_instances row (shared by
+// loadStageInstances' single-instance query and LoadInstancesByIDs' batch
+// query, whose SELECT column lists are identical) into a domain.StageInstance,
+// including nullable-field projection and the two JSON snapshot columns.
+// scanErrContext prefixes the top-level Scan error only — the two callers use
+// different wording there (one names the instance, the batch load does not)
+// while every other error message below is identical between them.
+func scanStageInstanceRow(rows *sql.Rows, scanErrContext string) (domain.StageInstance, error) {
+	var s domain.StageInstance
+	var quorumMSnapshot sql.NullInt32
+	var effectiveDenominator sql.NullInt32
+	var openedAt, completedAt, dueAt sql.NullTime
+	var eligibleJSON []byte
+	var skipReason sql.NullString
+	var kindStr string
+	var dueInDaysSnapshot sql.NullInt32
+	var selectorsJSON []byte
+
+	err := rows.Scan(
+		&s.ID, &s.ApprovalInstanceID, &s.StageOrder, &s.NameSnapshot,
+		&s.RequiredRoleSnapshot, &s.RequiredCapabilitySnapshot, &s.AreaCodeSnapshot,
+		&s.QuorumSnapshot, &quorumMSnapshot,
+		&s.OnEligibilityDriftSnapshot,
+		&eligibleJSON, &effectiveDenominator,
+		&s.Status, &openedAt, &completedAt, &skipReason,
+		&kindStr, &dueAt, &dueInDaysSnapshot, &selectorsJSON,
+	)
+	if err != nil {
+		return domain.StageInstance{}, fmt.Errorf("%s: %w", scanErrContext, err)
+	}
+
+	if quorumMSnapshot.Valid {
+		v := int(quorumMSnapshot.Int32)
+		s.QuorumMSnapshot = &v
+	}
+	if effectiveDenominator.Valid {
+		v := int(effectiveDenominator.Int32)
+		s.EffectiveDenominator = &v
+	}
+	if openedAt.Valid {
+		s.OpenedAt = &openedAt.Time
+	}
+	if completedAt.Valid {
+		s.CompletedAt = &completedAt.Time
+	}
+	if skipReason.Valid {
+		s.SkipReason = skipReason.String
+	}
+	s.Kind = domain.StageKind(kindStr)
+	if dueAt.Valid {
+		s.DueAt = &dueAt.Time
+	}
+	if dueInDaysSnapshot.Valid {
+		v := int(dueInDaysSnapshot.Int32)
+		s.DueInDaysSnapshot = &v
+	}
+
+	if len(eligibleJSON) > 0 {
+		if err := json.Unmarshal(eligibleJSON, &s.EligibleActorIDs); err != nil {
+			return domain.StageInstance{}, fmt.Errorf("unmarshal eligible_actor_ids for stage %s: %w", s.ID, err)
+		}
+	}
+	if len(selectorsJSON) > 0 {
+		if err := json.Unmarshal(selectorsJSON, &s.SelectorsSnapshot); err != nil {
+			return domain.StageInstance{}, fmt.Errorf("unmarshal selectors_snapshot for stage %s: %w", s.ID, err)
+		}
+	}
+	return s, nil
 }
 
 // loadSignoffsForInstance fetches all signoffs for an approval instance,
@@ -1095,9 +1130,54 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 	if len(ids) == 0 {
 		return nil, nil
 	}
-
 	// Dedupe ids preserving first-occurrence order so duplicate inputs cannot
 	// produce duplicate rows in the result.
+	ids = dedupeInstanceIDs(ids)
+
+	byID, err := r.loadInstanceHeadersByIDs(ctx, tx, tenantID, ids)
+	if err != nil {
+		return nil, err
+	}
+	if len(byID) == 0 {
+		return nil, nil
+	}
+
+	knownIDs := make([]string, 0, len(byID))
+	for id := range byID {
+		knownIDs = append(knownIDs, id)
+	}
+
+	stagesByInst, err := r.loadBatchStageInstances(ctx, tx, tenantID, knownIDs)
+	if err != nil {
+		return nil, err
+	}
+	signoffsByStage, err := r.loadBatchSignoffs(ctx, tx, tenantID, knownIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Assemble in input order.
+	result := make([]domain.Instance, 0, len(ids))
+	for _, id := range ids {
+		inst, ok := byID[id]
+		if !ok {
+			continue
+		}
+		stages := stagesByInst[id]
+		for i := range stages {
+			if sigs, ok := signoffsByStage[stages[i].ID]; ok {
+				stages[i].Signoffs = sigs
+			}
+		}
+		inst.Stages = stages
+		result = append(result, *inst)
+	}
+	return result, nil
+}
+
+// dedupeInstanceIDs returns ids with duplicates removed, preserving
+// first-occurrence order.
+func dedupeInstanceIDs(ids []string) []string {
 	seen := make(map[string]struct{}, len(ids))
 	deduped := make([]string, 0, len(ids))
 	for _, id := range ids {
@@ -1106,11 +1186,14 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 			deduped = append(deduped, id)
 		}
 	}
-	ids = deduped
+	return deduped
+}
 
-	// ── 1. Load instance headers ──────────────────────────────────────────────
-	// P3.S2b-1 (M3 kernel extraction): LEFT JOIN documents — see LoadInstance's
-	// comment for why (template rows have NULL document_id).
+// loadInstanceHeadersByIDs loads the approval_instances header row for each
+// of ids, keyed by instance ID. P3.S2b-1 (M3 kernel extraction): LEFT JOIN
+// documents — see LoadInstance's comment for why (template rows have NULL
+// document_id).
+func (r *postgresApprovalRepository) loadInstanceHeadersByIDs(ctx context.Context, tx db.Tx, tenantID string, ids []string) (map[string]*domain.Instance, error) {
 	headerRows, err := tx.QueryContext(ctx, `
 		SELECT ai.id, ai.tenant_id, ai.document_id, ai.route_id, ai.route_version_snapshot,
 		       d.revision_version,
@@ -1131,63 +1214,71 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 	}
 	defer func() { _ = headerRows.Close() }()
 
-	// Maintain insertion order from ids slice (deduped above).
+	// Maintain insertion order from ids slice (deduped by the caller).
 	byID := make(map[string]*domain.Instance, len(ids))
 	for headerRows.Next() {
-		var inst domain.Instance
-		var completedAt sql.NullTime
-		var frozenContentHash, cancelReason sql.NullString
-		var subjectKind, subjectKey string
-		var documentID sql.NullString
-		var revisionVersion sql.NullInt64
-		if err := headerRows.Scan(
-			&inst.ID, &inst.TenantID, &documentID, &inst.RouteID, &inst.RouteVersionSnapshot,
-			&revisionVersion,
-			&inst.Status, &inst.SubmittedBy, &inst.SubmittedAt, &completedAt,
-			&inst.ContentHashAtSubmit, &inst.IdempotencyKey,
-			&frozenContentHash, &cancelReason,
-			&subjectKind, &subjectKey,
-		); err != nil {
-			return nil, fmt.Errorf("scan approval instance header: %w", err)
+		inst, err := scanInstanceHeaderRow(headerRows)
+		if err != nil {
+			return nil, err
 		}
-		if documentID.Valid {
-			inst.DocumentID = documentID.String
-		}
-		if revisionVersion.Valid {
-			inst.RevisionVersion = int(revisionVersion.Int64)
-		}
-		// P3.S2b-1 (M3 kernel extraction) — no-fallback fail-closed guard,
-		// mirrors LoadInstance: a document-subject row with a NULL
-		// revision_version means the LEFT JOIN found no matching in-tenant
-		// document. Refuse to substitute RevisionVersion=0; fail loud.
-		if subjectKind == string(domain.SubjectKindDocument) && !revisionVersion.Valid {
-			return nil, fmt.Errorf("approval: LoadInstancesByIDs %s: document-subject instance has no matching in-tenant document (integrity violation)", inst.ID)
-		}
-		if completedAt.Valid {
-			inst.CompletedAt = &completedAt.Time
-		}
-		if frozenContentHash.Valid {
-			inst.FrozenContentHash = &frozenContentHash.String
-		}
-		if cancelReason.Valid {
-			inst.CancelReason = &cancelReason.String
-		}
-		inst.Subject = domain.Subject{Kind: domain.SubjectKind(subjectKind), Key: subjectKey}
 		cp := inst
 		byID[inst.ID] = &cp
 	}
 	if err := headerRows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate approval instance headers: %w", err)
 	}
-	if len(byID) == 0 {
-		return nil, nil
-	}
+	return byID, nil
+}
 
-	// ── 2. Load all stage instances for the found set ─────────────────────────
-	knownIDs := make([]string, 0, len(byID))
-	for id := range byID {
-		knownIDs = append(knownIDs, id)
+// scanInstanceHeaderRow scans one row of loadInstanceHeadersByIDs' query into
+// a domain.Instance, including nullable-field projection and the
+// document-subject fail-closed integrity guard.
+func scanInstanceHeaderRow(headerRows *sql.Rows) (domain.Instance, error) {
+	var inst domain.Instance
+	var completedAt sql.NullTime
+	var frozenContentHash, cancelReason sql.NullString
+	var subjectKind, subjectKey string
+	var documentID sql.NullString
+	var revisionVersion sql.NullInt64
+	if err := headerRows.Scan(
+		&inst.ID, &inst.TenantID, &documentID, &inst.RouteID, &inst.RouteVersionSnapshot,
+		&revisionVersion,
+		&inst.Status, &inst.SubmittedBy, &inst.SubmittedAt, &completedAt,
+		&inst.ContentHashAtSubmit, &inst.IdempotencyKey,
+		&frozenContentHash, &cancelReason,
+		&subjectKind, &subjectKey,
+	); err != nil {
+		return domain.Instance{}, fmt.Errorf("scan approval instance header: %w", err)
 	}
+	if documentID.Valid {
+		inst.DocumentID = documentID.String
+	}
+	if revisionVersion.Valid {
+		inst.RevisionVersion = int(revisionVersion.Int64)
+	}
+	// P3.S2b-1 (M3 kernel extraction) — no-fallback fail-closed guard,
+	// mirrors LoadInstance: a document-subject row with a NULL
+	// revision_version means the LEFT JOIN found no matching in-tenant
+	// document. Refuse to substitute RevisionVersion=0; fail loud.
+	if subjectKind == string(domain.SubjectKindDocument) && !revisionVersion.Valid {
+		return domain.Instance{}, fmt.Errorf("approval: LoadInstancesByIDs %s: document-subject instance has no matching in-tenant document (integrity violation)", inst.ID)
+	}
+	if completedAt.Valid {
+		inst.CompletedAt = &completedAt.Time
+	}
+	if frozenContentHash.Valid {
+		inst.FrozenContentHash = &frozenContentHash.String
+	}
+	if cancelReason.Valid {
+		inst.CancelReason = &cancelReason.String
+	}
+	inst.Subject = domain.Subject{Kind: domain.SubjectKind(subjectKind), Key: subjectKey}
+	return inst, nil
+}
+
+// loadBatchStageInstances loads all stage instances for knownIDs, keyed by
+// approval_instance_id.
+func (r *postgresApprovalRepository) loadBatchStageInstances(ctx context.Context, tx db.Tx, tenantID string, knownIDs []string) (map[string][]domain.StageInstance, error) {
 	stageRows, err := tx.QueryContext(ctx, `
 		SELECT id, approval_instance_id, stage_order, name_snapshot,
 		       required_role_snapshot, required_capability_snapshot, area_code_snapshot,
@@ -1213,70 +1304,23 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 	}
 	defer func() { _ = stageRows.Close() }()
 
-	stagesByInst := make(map[string][]domain.StageInstance, len(byID))
+	stagesByInst := make(map[string][]domain.StageInstance, len(knownIDs))
 	for stageRows.Next() {
-		var s domain.StageInstance
-		var quorumMSnapshot sql.NullInt32
-		var effectiveDenominator sql.NullInt32
-		var openedAt, completedAt, dueAt sql.NullTime
-		var eligibleJSON []byte
-		var skipReason sql.NullString
-		var kindStr string
-		var dueInDaysSnapshot sql.NullInt32
-		var selectorsJSON []byte
-		if err := stageRows.Scan(
-			&s.ID, &s.ApprovalInstanceID, &s.StageOrder, &s.NameSnapshot,
-			&s.RequiredRoleSnapshot, &s.RequiredCapabilitySnapshot, &s.AreaCodeSnapshot,
-			&s.QuorumSnapshot, &quorumMSnapshot,
-			&s.OnEligibilityDriftSnapshot,
-			&eligibleJSON, &effectiveDenominator,
-			&s.Status, &openedAt, &completedAt, &skipReason,
-			&kindStr, &dueAt, &dueInDaysSnapshot, &selectorsJSON,
-		); err != nil {
-			return nil, fmt.Errorf("scan stage instance in batch load: %w", err)
-		}
-		if quorumMSnapshot.Valid {
-			v := int(quorumMSnapshot.Int32)
-			s.QuorumMSnapshot = &v
-		}
-		if effectiveDenominator.Valid {
-			v := int(effectiveDenominator.Int32)
-			s.EffectiveDenominator = &v
-		}
-		if openedAt.Valid {
-			s.OpenedAt = &openedAt.Time
-		}
-		if completedAt.Valid {
-			s.CompletedAt = &completedAt.Time
-		}
-		if skipReason.Valid {
-			s.SkipReason = skipReason.String
-		}
-		s.Kind = domain.StageKind(kindStr)
-		if dueAt.Valid {
-			s.DueAt = &dueAt.Time
-		}
-		if dueInDaysSnapshot.Valid {
-			v := int(dueInDaysSnapshot.Int32)
-			s.DueInDaysSnapshot = &v
-		}
-		if len(eligibleJSON) > 0 {
-			if err := json.Unmarshal(eligibleJSON, &s.EligibleActorIDs); err != nil {
-				return nil, fmt.Errorf("unmarshal eligible_actor_ids for stage %s: %w", s.ID, err)
-			}
-		}
-		if len(selectorsJSON) > 0 {
-			if err := json.Unmarshal(selectorsJSON, &s.SelectorsSnapshot); err != nil {
-				return nil, fmt.Errorf("unmarshal selectors_snapshot for stage %s: %w", s.ID, err)
-			}
+		s, err := scanStageInstanceRow(stageRows, "scan stage instance in batch load")
+		if err != nil {
+			return nil, err
 		}
 		stagesByInst[s.ApprovalInstanceID] = append(stagesByInst[s.ApprovalInstanceID], s)
 	}
 	if err := stageRows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate stage instances in batch load: %w", err)
 	}
+	return stagesByInst, nil
+}
 
-	// ── 3. Load all signoffs for the found set ────────────────────────────────
+// loadBatchSignoffs loads all signoffs for knownIDs, keyed by
+// stage_instance_id.
+func (r *postgresApprovalRepository) loadBatchSignoffs(ctx context.Context, tx db.Tx, tenantID string, knownIDs []string) (map[string][]*domain.Signoff, error) {
 	signoffRows, err := tx.QueryContext(ctx, `
 		SELECT id, approval_instance_id, stage_instance_id, actor_user_id,
 		       actor_tenant_id, decision, coalesce(comment,''), signed_at,
@@ -1298,7 +1342,6 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 	}
 	defer func() { _ = signoffRows.Close() }()
 
-	// signoffsByStage: stageInstanceID → []*Signoff
 	signoffsByStage := make(map[string][]*domain.Signoff)
 	for signoffRows.Next() {
 		var (
@@ -1337,24 +1380,7 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 	if err := signoffRows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate signoff rows in batch load: %w", err)
 	}
-
-	// ── 4. Assemble in input order ────────────────────────────────────────────
-	result := make([]domain.Instance, 0, len(ids))
-	for _, id := range ids {
-		inst, ok := byID[id]
-		if !ok {
-			continue
-		}
-		stages := stagesByInst[id]
-		for i := range stages {
-			if sigs, ok := signoffsByStage[stages[i].ID]; ok {
-				stages[i].Signoffs = sigs
-			}
-		}
-		inst.Stages = stages
-		result = append(result, *inst)
-	}
-	return result, nil
+	return signoffsByStage, nil
 }
 
 // UpdateStageStatus applies an OCC (optimistic concurrency control) UPDATE.

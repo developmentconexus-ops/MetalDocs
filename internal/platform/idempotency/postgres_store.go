@@ -85,10 +85,27 @@ func (s *Store) BeginReplay(ctx context.Context, tenantID, actorID, key, payload
 		return nil, nil, fmt.Errorf("idempotency: begin tx: %w", err)
 	}
 
-	// Step 1: try to claim the slot. ON CONFLICT DO NOTHING means only the
-	// row-inserting transaction observes RETURNING.
+	won, err := s.tryClaimSlot(ctx, tx, tenantID, actorID, key, payloadHash)
+	if err != nil {
+		_ = tx.Rollback()
+		return nil, nil, err
+	}
+	if won {
+		// Winner. Caller owns the handle until Complete/Fail.
+		return &ReplayHandle{tx: tx, tenantID: tenantID, actorID: actorID, key: key}, nil, nil
+	}
+
+	return s.resolveExistingSlot(ctx, tx, tenantID, actorID, key, payloadHash)
+}
+
+// tryClaimSlot attempts to atomically claim the (tenant, actor, route, key)
+// in_flight slot via INSERT ... ON CONFLICT DO NOTHING (only the
+// row-inserting transaction observes RETURNING). won=true means this
+// transaction owns the slot; won=false means the row already existed and the
+// caller must fall through to resolveExistingSlot.
+func (s *Store) tryClaimSlot(ctx context.Context, tx *sql.Tx, tenantID, actorID, key, payloadHash string) (bool, error) {
 	var claimedTenant string
-	err = tx.QueryRowContext(ctx, `
+	err := tx.QueryRowContext(ctx, `
 		-- TODO(phase11): event_id/idempotency_key are still TEXT-backed in the current schema; tighten column bounds in the pending DB migration.
 		INSERT INTO metaldocs.idempotency_keys
 			(tenant_id, actor_user_id, route_template, key, payload_hash, status, expires_at)
@@ -99,16 +116,19 @@ func (s *Store) BeginReplay(ctx context.Context, tenantID, actorID, key, payload
 		tenantID, actorID, s.routeTemplate, key, payloadHash,
 	).Scan(&claimedTenant)
 	if err == nil {
-		// Winner. Caller owns the handle until Complete/Fail.
-		return &ReplayHandle{tx: tx, tenantID: tenantID, actorID: actorID, key: key}, nil, nil
+		return true, nil
 	}
-	if !errors.Is(err, sql.ErrNoRows) {
-		_ = tx.Rollback()
-		return nil, nil, fmt.Errorf("idempotency: insert in_flight: %w", err)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
 	}
+	return false, fmt.Errorf("idempotency: insert in_flight: %w", err)
+}
 
-	// Step 2: loser. Row exists; block on the writer's row-level lock until
-	// the winner commits or rolls back, then re-read state.
+// resolveExistingSlot handles the loser path from BeginReplay: the
+// (tenant, actor, route, key) row already existed when tryClaimSlot ran. It
+// blocks on the winner's row-level lock (FOR UPDATE) until the winner
+// commits or rolls back, then reacts to the row's terminal state.
+func (s *Store) resolveExistingSlot(ctx context.Context, tx *sql.Tx, tenantID, actorID, key, payloadHash string) (*ReplayHandle, *Replay, error) {
 	var (
 		status         string
 		storedHash     string
@@ -116,7 +136,7 @@ func (s *Store) BeginReplay(ctx context.Context, tenantID, actorID, key, payload
 		respBody       []byte
 		expiresExpired bool
 	)
-	err = tx.QueryRowContext(ctx, `
+	err := tx.QueryRowContext(ctx, `
 		SELECT status, payload_hash, response_status, response_body, expires_at <= now()
 		  FROM metaldocs.idempotency_keys
 		 WHERE tenant_id      = $1
@@ -143,66 +163,80 @@ func (s *Store) BeginReplay(ctx context.Context, tenantID, actorID, key, payload
 
 	switch status {
 	case "completed":
-		if !respStatus.Valid {
-			_ = tx.Rollback()
-			return nil, nil, fmt.Errorf("idempotency: completed row missing response_status")
-		}
-		replay := Replay{Status: int(respStatus.Int64), Body: respBody}
-		if err := replay.Validate(); err != nil {
-			_ = tx.Rollback()
-			return nil, nil, err
-		}
-		_ = tx.Commit()
-		return nil, &replay, nil
-
+		return completeReplayFromRow(tx, respStatus, respBody)
 	case "in_flight":
-		// Reached only if the prior writer crashed without rolling back and
-		// the connection-level lock has since been released. Treat an expired
-		// orphan as reclaimable; otherwise refuse and let the janitor sweep.
-		if expiresExpired {
-			if _, err := tx.ExecContext(ctx, `
-				DELETE FROM metaldocs.idempotency_keys
-				 WHERE tenant_id      = $1
-				   AND actor_user_id  = $2
-				   AND route_template = $3
-				   AND key            = $4
-				   AND status         = 'in_flight'`,
-				tenantID, actorID, s.routeTemplate, key,
-			); err != nil {
-				_ = tx.Rollback()
-				return nil, nil, fmt.Errorf("idempotency: reclaim expired in_flight: %w", err)
-			}
-			if err := tx.Commit(); err != nil {
-				return nil, nil, fmt.Errorf("idempotency: commit reclaim: %w", err)
-			}
-			return s.BeginReplay(ctx, tenantID, actorID, key, payloadHash)
-		}
-		_ = tx.Commit()
-		return nil, nil, fmt.Errorf("idempotency: in_flight orphan (key in use)")
-
+		return s.reclaimOrRefuseInFlight(ctx, tx, tenantID, actorID, key, payloadHash, expiresExpired)
 	case "failed":
-		// Prior attempt marked failed. Delete and retry so this caller claims.
-		if _, err := tx.ExecContext(ctx, `
-			DELETE FROM metaldocs.idempotency_keys
-			 WHERE tenant_id      = $1
-			   AND actor_user_id  = $2
-			   AND route_template = $3
-			   AND key            = $4
-			   AND status         = 'failed'`,
-			tenantID, actorID, s.routeTemplate, key,
-		); err != nil {
-			_ = tx.Rollback()
-			return nil, nil, fmt.Errorf("idempotency: clear failed row: %w", err)
-		}
-		if err := tx.Commit(); err != nil {
-			return nil, nil, fmt.Errorf("idempotency: commit clear failed: %w", err)
-		}
-		return s.BeginReplay(ctx, tenantID, actorID, key, payloadHash)
-
+		return s.retryAfterFailedRow(ctx, tx, tenantID, actorID, key, payloadHash)
 	default:
 		_ = tx.Rollback()
 		return nil, nil, fmt.Errorf("idempotency: unknown status %q", status)
 	}
+}
+
+// completeReplayFromRow builds the Replay to hand back to the caller for a
+// status='completed' row found by resolveExistingSlot.
+func completeReplayFromRow(tx *sql.Tx, respStatus sql.NullInt64, respBody []byte) (*ReplayHandle, *Replay, error) {
+	if !respStatus.Valid {
+		_ = tx.Rollback()
+		return nil, nil, fmt.Errorf("idempotency: completed row missing response_status")
+	}
+	replay := Replay{Status: int(respStatus.Int64), Body: respBody}
+	if err := replay.Validate(); err != nil {
+		_ = tx.Rollback()
+		return nil, nil, err
+	}
+	_ = tx.Commit()
+	return nil, &replay, nil
+}
+
+// reclaimOrRefuseInFlight handles a status='in_flight' row found by
+// resolveExistingSlot. Reached only if the prior writer crashed without
+// rolling back and the connection-level lock has since been released. Treat
+// an expired orphan as reclaimable; otherwise refuse and let the janitor sweep.
+func (s *Store) reclaimOrRefuseInFlight(ctx context.Context, tx *sql.Tx, tenantID, actorID, key, payloadHash string, expiresExpired bool) (*ReplayHandle, *Replay, error) {
+	if !expiresExpired {
+		_ = tx.Commit()
+		return nil, nil, fmt.Errorf("idempotency: in_flight orphan (key in use)")
+	}
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM metaldocs.idempotency_keys
+		 WHERE tenant_id      = $1
+		   AND actor_user_id  = $2
+		   AND route_template = $3
+		   AND key            = $4
+		   AND status         = 'in_flight'`,
+		tenantID, actorID, s.routeTemplate, key,
+	); err != nil {
+		_ = tx.Rollback()
+		return nil, nil, fmt.Errorf("idempotency: reclaim expired in_flight: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, nil, fmt.Errorf("idempotency: commit reclaim: %w", err)
+	}
+	return s.BeginReplay(ctx, tenantID, actorID, key, payloadHash)
+}
+
+// retryAfterFailedRow handles a status='failed' row found by
+// resolveExistingSlot: the prior attempt marked failed. Delete and retry so
+// this caller claims the slot.
+func (s *Store) retryAfterFailedRow(ctx context.Context, tx *sql.Tx, tenantID, actorID, key, payloadHash string) (*ReplayHandle, *Replay, error) {
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM metaldocs.idempotency_keys
+		 WHERE tenant_id      = $1
+		   AND actor_user_id  = $2
+		   AND route_template = $3
+		   AND key            = $4
+		   AND status         = 'failed'`,
+		tenantID, actorID, s.routeTemplate, key,
+	); err != nil {
+		_ = tx.Rollback()
+		return nil, nil, fmt.Errorf("idempotency: clear failed row: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, nil, fmt.Errorf("idempotency: commit clear failed: %w", err)
+	}
+	return s.BeginReplay(ctx, tenantID, actorID, key, payloadHash)
 }
 
 // CompleteReplay finalizes the slot owned by `handle` with the given response

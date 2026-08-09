@@ -133,6 +133,12 @@ func buildRevisionBodyReader() (*objectstore.VerifiedStore, error) {
 const maxRevisionBodyBytes = 25 * 1024 * 1024
 
 func main() {
+	os.Exit(runMain())
+}
+
+// runMain holds main's body so deferred cleanups (signal stop, otel shutdown,
+// deps.Cleanup) run on every exit path; os.Exit in main proper would skip them.
+func runMain() int {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -143,7 +149,7 @@ func main() {
 	otelShutdown, otelEnabled, err := observability.SetupOTel(ctx, "metaldocs-worker")
 	if err != nil {
 		slog.Error("setup otel", "err", err)
-		os.Exit(1)
+		return 1
 	}
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -159,15 +165,43 @@ func main() {
 	workerCfg, err := config.LoadWorkerConfig()
 	if err != nil {
 		slog.Error("invalid worker config", "err", err)
-		os.Exit(1)
+		return 1
 	}
 	deps, err := bootstrap.BuildWorkerDependencies(ctx, workerCfg)
 	if err != nil {
 		slog.Error("build worker dependencies", "err", err)
-		os.Exit(1)
+		return 1
 	}
 	defer deps.Cleanup()
 
+	workerSvc, ok := buildWorkerService(deps, workerCfg)
+	if !ok {
+		return 1
+	}
+
+	if workerCfg.RunOnce {
+		if err := runWorkerBatch(ctx, workerSvc, workerCfg.BatchSize); err != nil {
+			slog.Error("worker run failed", "err", err)
+			return 1
+		}
+		return 0
+	}
+
+	ticker := time.NewTicker(time.Duration(workerCfg.PollIntervalSeconds) * time.Second)
+	defer ticker.Stop()
+	slog.Info("MetalDocs Worker running",
+		"poll_interval_s", workerCfg.PollIntervalSeconds, "batch_size", workerCfg.BatchSize,
+		"max_attempts", workerCfg.MaxAttempts, "retry_base_seconds", workerCfg.RetryBaseSeconds,
+		"retry_max_seconds", workerCfg.RetryMaxSeconds)
+
+	runWorkerLoop(ctx, workerSvc, workerCfg.BatchSize, ticker.C)
+	return 0
+}
+
+// buildWorkerService wires the base outbox service plus the optional PDF and
+// materialize runners. Wiring failures are logged at the failing site; the
+// false return tells the caller to exit non-zero (cleanup runs via its defers).
+func buildWorkerService(deps bootstrap.WorkerDependencies, workerCfg config.WorkerConfig) (*workerapp.Service, bool) {
 	workerSvc := workerapp.NewService(deps.Consumer, workerCfg)
 
 	// ADR 0085: both artifact writers record their release fact through the
@@ -180,8 +214,7 @@ func main() {
 		jobsCfg, err := config.LoadJobsConfig()
 		if err != nil {
 			slog.Error("invalid jobs config", "err", err)
-			deps.Cleanup()
-			os.Exit(1)
+			return nil, false
 		}
 		sharedRiverBundle, err = riverjobs.NewClientBundle(deps.SQLDB, riverjobs.Config{
 			Schema:              jobsCfg.RiverSchema,
@@ -189,8 +222,7 @@ func main() {
 		}, nil)
 		if err != nil {
 			slog.Error("build release evaluation enqueuer client", "err", err)
-			deps.Cleanup()
-			os.Exit(1)
+			return nil, false
 		}
 		artifactFactRecorder = approvalapp.NewArtifactFactWriter(
 			approvaljobs.NewReleaseEvaluationEnqueuer(sharedRiverBundle.Client))
@@ -206,85 +238,76 @@ func main() {
 	}
 
 	if deps.FanoutURL != "" && deps.SQLDB != nil {
-		fanoutClient := fanoutpkg.NewClient(deps.FanoutURL, deps.FanoutToken, httpclient.NewInternalClient())
-		snapRepo := docrepo.NewSnapshotRepository(deps.SQLDB)
-		fillInRepo := docrepo.NewFillInRepository(deps.SQLDB)
-		schemaReader := docapp.NewSnapshotSchemaReader(deps.SQLDB)
-		resolverReg := resolvers.NewRegistry()
-		resolvers.RegisterBuiltins(resolverReg)
-
-		// ctxBuilder not needed for Materialize (reads already-resolved values).
-		freezeSvc := docapp.NewFreezeService(
-			schemaReader, fillInRepo, fillInRepo,
-			resolverReg, snapRepo, nil,
-			snapRepo, fanoutClient,
-		)
-
-		// Materialize verifies the pinned revision's bytes against that
-		// revision's recorded content_hash before rendering anything (F-QA3-1
-		// lineage, fail closed). Without a blob reader it cannot verify, and it
-		// refuses to render rather than skip the check — so a Gotenberg/MinIO-less
-		// deploy fails loudly here instead of silently producing unverified
-		// artifacts.
-		blobs, err := buildRevisionBodyReader()
-		if err != nil {
-			slog.Error("build revision body reader", "err", err)
-			deps.Cleanup()
-			os.Exit(1)
+		materializeRunner, ok := buildMaterializeRunner(deps, sharedRiverBundle, artifactFactRecorder)
+		if !ok {
+			return nil, false
 		}
-		if blobs == nil {
-			slog.Error("materialize requires a MinIO attachments provider to verify frozen lineage")
-			deps.Cleanup()
-			os.Exit(1)
-		}
-		freezeSvc = freezeSvc.WithRevisionBodyReader(blobs)
-
-		pdfOutboxRepo := fanoutpkg.NewPDFOutboxRepository(deps.SQLDB)
-		// The Enqueuer constructor needs both staging outbox repos even though
-		// this binary only ever enqueues pdf dispatch (M5 F5.3 T3).
-		materializeOutboxRepo := fanoutpkg.NewMaterializeOutboxRepository(deps.SQLDB)
-
-		stagingOutboxWorkerCfg, err := config.LoadStagingOutboxWorkerConfig()
-		if err != nil {
-			slog.Error("invalid staging outbox worker config", "err", err)
-			deps.Cleanup()
-			os.Exit(1)
-		}
-
-		// Enqueue-only River client bundle (built once above): no Queues, no
-		// Workers, no PeriodicJobs — this binary only calls InsertTx via the
-		// Enqueuers, it never subscribes a queue or executes jobs, mirroring
-		// how metaldocs-api builds its own enqueue-only bundle.
-		pdfDispatchEnqueuer := dispatchjobs.NewEnqueuer(sharedRiverBundle.Client, pdfOutboxRepo, materializeOutboxRepo, stagingOutboxWorkerCfg.MaxAttempts)
-
-		materializeRunner := workerapp.NewMaterializeJobRunner(
-			materializeInvokerAdapter{svc: freezeSvc},
-			snapshotFinalDocxAdapter{repo: snapRepo},
-			pdfDispatchEnqueuer,
-			authzSeamAdapter{},
-			deps.SQLDB,
-		).WithArtifactFactRecorder(artifactFactRecorder)
 		workerSvc = workerSvc.WithMaterializeRunner(materializeRunner)
 		slog.Info("materialize runner active", "fanout_url", deps.FanoutURL)
 	}
 
-	if workerCfg.RunOnce {
-		if err := runWorkerBatch(ctx, workerSvc, workerCfg.BatchSize); err != nil {
-			slog.Error("worker run failed", "err", err)
-			deps.Cleanup()
-			os.Exit(1)
-		}
-		return
+	return workerSvc, true
+}
+
+// buildMaterializeRunner wires the freeze service, verified blob reader and
+// pdf-dispatch enqueuer behind the materialize job runner (ADR 0015 path).
+func buildMaterializeRunner(deps bootstrap.WorkerDependencies, sharedRiverBundle *riverjobs.ClientBundle, artifactFactRecorder *approvalapp.ArtifactFactWriter) (*workerapp.MaterializeJobRunner, bool) {
+	fanoutClient := fanoutpkg.NewClient(deps.FanoutURL, deps.FanoutToken, httpclient.NewInternalClient())
+	snapRepo := docrepo.NewSnapshotRepository(deps.SQLDB)
+	fillInRepo := docrepo.NewFillInRepository(deps.SQLDB)
+	schemaReader := docapp.NewSnapshotSchemaReader(deps.SQLDB)
+	resolverReg := resolvers.NewRegistry()
+	resolvers.RegisterBuiltins(resolverReg)
+
+	// ctxBuilder not needed for Materialize (reads already-resolved values).
+	freezeSvc := docapp.NewFreezeService(
+		schemaReader, fillInRepo, fillInRepo,
+		resolverReg, snapRepo, nil,
+		snapRepo, fanoutClient,
+	)
+
+	// Materialize verifies the pinned revision's bytes against that
+	// revision's recorded content_hash before rendering anything (F-QA3-1
+	// lineage, fail closed). Without a blob reader it cannot verify, and it
+	// refuses to render rather than skip the check — so a Gotenberg/MinIO-less
+	// deploy fails loudly here instead of silently producing unverified
+	// artifacts.
+	blobs, err := buildRevisionBodyReader()
+	if err != nil {
+		slog.Error("build revision body reader", "err", err)
+		return nil, false
+	}
+	if blobs == nil {
+		slog.Error("materialize requires a MinIO attachments provider to verify frozen lineage")
+		return nil, false
+	}
+	freezeSvc = freezeSvc.WithRevisionBodyReader(blobs)
+
+	pdfOutboxRepo := fanoutpkg.NewPDFOutboxRepository(deps.SQLDB)
+	// The Enqueuer constructor needs both staging outbox repos even though
+	// this binary only ever enqueues pdf dispatch (M5 F5.3 T3).
+	materializeOutboxRepo := fanoutpkg.NewMaterializeOutboxRepository(deps.SQLDB)
+
+	stagingOutboxWorkerCfg, err := config.LoadStagingOutboxWorkerConfig()
+	if err != nil {
+		slog.Error("invalid staging outbox worker config", "err", err)
+		return nil, false
 	}
 
-	ticker := time.NewTicker(time.Duration(workerCfg.PollIntervalSeconds) * time.Second)
-	defer ticker.Stop()
-	slog.Info("MetalDocs Worker running",
-		"poll_interval_s", workerCfg.PollIntervalSeconds, "batch_size", workerCfg.BatchSize,
-		"max_attempts", workerCfg.MaxAttempts, "retry_base_seconds", workerCfg.RetryBaseSeconds,
-		"retry_max_seconds", workerCfg.RetryMaxSeconds)
+	// Enqueue-only River client bundle (built once above): no Queues, no
+	// Workers, no PeriodicJobs — this binary only calls InsertTx via the
+	// Enqueuers, it never subscribes a queue or executes jobs, mirroring
+	// how metaldocs-api builds its own enqueue-only bundle.
+	pdfDispatchEnqueuer := dispatchjobs.NewEnqueuer(sharedRiverBundle.Client, pdfOutboxRepo, materializeOutboxRepo, stagingOutboxWorkerCfg.MaxAttempts)
 
-	runWorkerLoop(ctx, workerSvc, workerCfg.BatchSize, ticker.C)
+	materializeRunner := workerapp.NewMaterializeJobRunner(
+		materializeInvokerAdapter{svc: freezeSvc},
+		snapshotFinalDocxAdapter{repo: snapRepo},
+		pdfDispatchEnqueuer,
+		authzSeamAdapter{},
+		deps.SQLDB,
+	).WithArtifactFactRecorder(artifactFactRecorder)
+	return materializeRunner, true
 }
 
 func runWorkerBatch(ctx context.Context, runner workerBatchRunner, batchSize int) error {
@@ -305,10 +328,11 @@ func runWorkerBatch(ctx context.Context, runner workerBatchRunner, batchSize int
 // bounded so the process does not hang indefinitely on a slow job.
 func runWorkerLoop(ctx context.Context, runner workerBatchRunner, batchSize int, ticks <-chan time.Time) {
 	for {
-		// Use a detached context for the batch so that a signal arriving
-		// mid-batch does not abort it; the outer loop's post-batch select
+		// Intentional cancellation detach (WithoutCancel): a signal arriving
+		// mid-batch must not abort it; the outer loop's post-batch select
 		// will detect ctx.Done() and exit cleanly after the batch finishes.
-		batchCtx, batchCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		// Context VALUES (trace, baggage) still flow from ctx.
+		batchCtx, batchCancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 		err := runner.RunOnce(batchCtx, batchSize)
 		batchCancel()
 

@@ -155,9 +155,10 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request) {
 		h.log.Warn("presence: ws accept failed", "tenant_id", tenantID, "err", err)
 		return
 	}
-	// Detach from the request context so server shutdown can drive the
-	// WS lifetime explicitly rather than being torn down mid-write.
-	ctx, cancel := context.WithCancel(context.Background())
+	// Detach from the request context (but keep its values, e.g. trace ID)
+	// so server shutdown -- not the inbound HTTP request's cancellation --
+	// drives the WS lifetime explicitly rather than tearing it down mid-write.
+	ctx, cancel := context.WithCancel(context.WithoutCancel(r.Context()))
 	defer cancel()
 	defer func() { _ = c.Close(websocket.StatusNormalClosure, "") }()
 
@@ -178,9 +179,15 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request) {
 	conn := h.hub.Subscribe(tenantID, items)
 	defer conn.Close()
 
-	// Reader: discards client frames (presence stream is one-way for
-	// now) but enables ping-induced read deadlines via SetReadLimit +
-	// the inactivity timer below. Errors close the connection.
+	startPresenceReader(ctx, c, cancel)
+	h.runPresenceSendLoop(ctx, c, conn)
+}
+
+// startPresenceReader spawns the WS reader goroutine. It discards client
+// frames (presence stream is one-way for now) but enables ping-induced read
+// deadlines via SetReadLimit. Any read error (including ctx cancellation via
+// c.Read) ends the goroutine and cancels ctx, unwinding the send loop below.
+func startPresenceReader(ctx context.Context, c *websocket.Conn, cancel context.CancelFunc) {
 	go func() {
 		defer cancel()
 		c.SetReadLimit(1024)
@@ -190,7 +197,13 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}()
+}
 
+// runPresenceSendLoop forwards presence diff events from conn to the WS
+// client until ctx is cancelled, the hub room closes conn's channel, or the
+// client goes idle past ClientIdleTimeout (in which case the connection is
+// closed with StatusPolicyViolation).
+func (h *Handler) runPresenceSendLoop(ctx context.Context, c *websocket.Conn, conn *Conn) {
 	idleTimer := time.NewTimer(ClientIdleTimeout)
 	defer idleTimer.Stop()
 

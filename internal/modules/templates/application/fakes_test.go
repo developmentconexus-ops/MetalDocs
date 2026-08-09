@@ -159,8 +159,8 @@ func (r *fakeRepo) CreateVersion(_ context.Context, v *domain.TemplateVersion) e
 	return nil
 }
 
-func (r *fakeRepo) CreateVersionTx(_ context.Context, _ db.Tx, v *domain.TemplateVersion) error {
-	return r.CreateVersion(context.Background(), v)
+func (r *fakeRepo) CreateVersionTx(ctx context.Context, _ db.Tx, v *domain.TemplateVersion) error {
+	return r.CreateVersion(ctx, v)
 }
 
 func (r *fakeRepo) GetVersion(_ context.Context, tenantID, templateID string, n int) (*domain.TemplateVersion, error) {
@@ -253,21 +253,21 @@ func (r *fakeRepo) UpdateVersionSchemaCAS(_ context.Context, tenantID string, v 
 	return nil
 }
 
-func (r *fakeRepo) UpdateVersionSchemaCASTx(_ context.Context, _ db.Tx, tenantID string, v *domain.TemplateVersion, expectedLockVersion int) error {
-	return r.UpdateVersionSchemaCAS(context.Background(), tenantID, v, expectedLockVersion)
+func (r *fakeRepo) UpdateVersionSchemaCASTx(ctx context.Context, _ db.Tx, tenantID string, v *domain.TemplateVersion, expectedLockVersion int) error {
+	return r.UpdateVersionSchemaCAS(ctx, tenantID, v, expectedLockVersion)
 }
 
-func (r *fakeRepo) CreateTemplateTx(_ context.Context, _ db.Tx, t *domain.Template) error {
-	return r.CreateTemplate(context.Background(), t)
+func (r *fakeRepo) CreateTemplateTx(ctx context.Context, _ db.Tx, t *domain.Template) error {
+	return r.CreateTemplate(ctx, t)
 }
 
-func (r *fakeRepo) UpdateTemplateTx(_ context.Context, _ db.Tx, t *domain.Template) error {
+func (r *fakeRepo) UpdateTemplateTx(ctx context.Context, _ db.Tx, t *domain.Template) error {
 	r.UpdateTemplateTxCalls = append(r.UpdateTemplateTxCalls, t.LatestVersion)
-	return r.UpdateTemplate(context.Background(), t)
+	return r.UpdateTemplate(ctx, t)
 }
 
-func (r *fakeRepo) UpdateVersionTx(_ context.Context, _ db.Tx, tenantID string, v *domain.TemplateVersion) error {
-	return r.UpdateVersion(context.Background(), tenantID, v)
+func (r *fakeRepo) UpdateVersionTx(ctx context.Context, _ db.Tx, tenantID string, v *domain.TemplateVersion) error {
+	return r.UpdateVersion(ctx, tenantID, v)
 }
 
 func (r *fakeRepo) ObsoletePreviousPublished(_ context.Context, _ /*tenantID*/ string, templateID, keepVersionID string) error {
@@ -288,8 +288,8 @@ func (r *fakeRepo) ObsoletePreviousPublished(_ context.Context, _ /*tenantID*/ s
 	return nil
 }
 
-func (r *fakeRepo) ObsoletePreviousPublishedTx(_ context.Context, _ db.Tx, tenantID, templateID, keepVersionID string) error {
-	return r.ObsoletePreviousPublished(context.Background(), tenantID, templateID, keepVersionID)
+func (r *fakeRepo) ObsoletePreviousPublishedTx(ctx context.Context, _ db.Tx, tenantID, templateID, keepVersionID string) error {
+	return r.ObsoletePreviousPublished(ctx, tenantID, templateID, keepVersionID)
 }
 
 func (r *fakeRepo) AppendAudit(_ context.Context, e *domain.AuditEvent) error {
@@ -297,8 +297,8 @@ func (r *fakeRepo) AppendAudit(_ context.Context, e *domain.AuditEvent) error {
 	return nil
 }
 
-func (r *fakeRepo) AppendAuditTx(_ context.Context, _ db.Tx, e *domain.AuditEvent) error {
-	return r.AppendAudit(context.Background(), e)
+func (r *fakeRepo) AppendAuditTx(ctx context.Context, _ db.Tx, e *domain.AuditEvent) error {
+	return r.AppendAudit(ctx, e)
 }
 
 func (r *fakeRepo) ListAudit(_ context.Context, tenantID, templateID string, limit, offset int) ([]*domain.AuditEvent, error) {

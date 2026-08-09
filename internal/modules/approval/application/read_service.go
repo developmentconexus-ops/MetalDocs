@@ -604,126 +604,16 @@ func (s *ReadService) ListWorklist(ctx context.Context, runner db.TxRunner, tena
 			}
 		}
 
-		// eligibilityPredicate is switched off entirely for scope=oversee (list
-		// every in-progress instance in the tenant), rather than passed a
-		// wildcard actor value, so the SQL shape itself documents the two
-		// distinct listing modes. $2::jsonb IS NOT NULL is a tautology (actorJSON
-		// is always a valid non-nil marshaled array) kept ONLY so $2 still
-		// appears in the query text with an inferable type in the oversee
-		// branch — Postgres's parameter-type inference (SQLSTATE 42P18) fails
-		// if a placeholder is bound but never referenced anywhere in the SQL,
-		// which happened when this branch was the bare literal TRUE. F10
-		// live-QA caught this: scope=oversee 500'd on every call against real
-		// Postgres (never caught by sqlmock-based unit tests, which don't
-		// model Postgres's parameter-type inference at all).
-		eligibilityPredicate := "asi.eligible_actor_ids @> $2::jsonb"
-		if filter.Oversee {
-			eligibilityPredicate = "($2::jsonb IS NOT NULL)"
-		}
-
-		stageKindPredicate := "$6 = '' OR asi.stage_kind = $6"
-		stageKindArg := string(filter.StageKind)
-
-		dueBeforePredicate := "$7::timestamptz IS NULL OR (asi.due_at IS NOT NULL AND asi.due_at <= $7::timestamptz)"
-		var dueBeforeArg *time.Time
-		if filter.DueBefore != nil {
-			v := filter.DueBefore.UTC()
-			dueBeforeArg = &v
-		}
-
-		totalSelect := "COUNT(*) OVER() AS total_count"
-
-		rows, err := tx.QueryContext(ctx, `
-			SELECT
-				ai.id,
-				ai.subject_kind,
-				ai.subject_key,
-				ai.document_id,
-				COALESCE(d.controlled_document_id::text, '') AS controlled_document_id,
-				COALESCE(cd.code, '') AS controlled_document_code,
-				COALESCE(d.name, '') AS doc_title,
-				COALESCE(asi.area_code_snapshot, '') AS area_code,
-				ai.submitted_by,
-				ai.submitted_at,
-				COALESCE(asi.name_snapshot, '') AS stage_label,
-				COALESCE(
-					CASE asi.quorum_snapshot
-						WHEN 'all_of'  THEN COALESCE(jsonb_array_length(asi.eligible_actor_ids), 0)
-						WHEN 'm_of_n'  THEN COALESCE(asi.quorum_m_snapshot, 1)
-						ELSE 1
-					END, 1) AS required,
-				COALESCE((
-					SELECT count(*)
-					FROM approval_signoffs s
-					WHERE s.approval_instance_id = ai.id
-					  AND s.stage_instance_id = asi.id
-					  AND s.actor_tenant_id = ai.tenant_id
-					  AND s.decision = 'approve'
-				), 0) AS signed,
-				asi.stage_kind,
-				asi.due_at,
-				`+totalSelect+`
-			FROM approval_instances ai
-			JOIN approval_stage_instances asi
-			  ON asi.approval_instance_id = ai.id
-			 AND asi.status = 'active'
-			LEFT JOIN documents d
-			  ON d.id = ai.document_id AND d.tenant_id = ai.tenant_id
-			-- F-QA4-8: the inbox renders the CANONICAL human code
-			-- (controlled_documents.code, NOT NULL), never the documents.code
-			-- snapshot and never the raw uuid. LEFT JOIN so a template-subject
-			-- row (no document) still returns, with an empty code.
-			LEFT JOIN controlled_documents cd
-			  ON cd.id = d.controlled_document_id AND cd.tenant_id = d.tenant_id
-			WHERE ai.tenant_id = $1::uuid
-			  AND ai.status = 'in_progress'
-			  AND (`+eligibilityPredicate+`)
-			  AND ($3 = '' OR asi.area_code_snapshot = $3)
-			  AND (`+stageKindPredicate+`)
-			  AND (`+dueBeforePredicate+`)
-			ORDER BY ai.submitted_at DESC, ai.id DESC
-			LIMIT $4 OFFSET $5`,
-			tenantID, actorJSON, areaCode, limit, offset, stageKindArg, dueBeforeArg,
-		)
+		rows, err := s.queryWorklistRows(ctx, tx, tenantID, actorJSON, areaCode, filter, limit, offset)
 		if err != nil {
-			return fmt.Errorf("list worklist: query: %w", err)
+			return err
 		}
 		defer func() { _ = rows.Close() }() // #nosec G104 -- deferred cleanup; rows.Err() (checked below) is the authoritative signal for loop failures, and *sql.Rows.Close is a no-op once already consumed to error.
 
-		for rows.Next() {
-			var v InboxView
-			var docTitle string
-			// ai.document_id is NULL for template-subject rows (migration 0297
-			// relaxed it) — scan into NullString, never a bare string.
-			var documentID sql.NullString
-			var signed, required, rowTotal int
-			var stageKind string
-			var dueAt sql.NullTime
-			if err := rows.Scan(
-				&v.InstanceID, &v.SubjectKind, &v.SubjectKey, &documentID,
-				&v.ControlledDocumentID, &v.ControlledDocumentCode, &docTitle,
-				&v.AreaCode, &v.SubmittedBy, &v.SubmittedAt,
-				&v.StageLabel, &required, &signed, &stageKind, &dueAt, &rowTotal,
-			); err != nil {
-				return fmt.Errorf("list worklist: scan: %w", err)
-			}
-			if v.SubjectKind == string(domain.SubjectKindDocument) {
-				// Documents keep the existing LEFT JOIN-sourced title/ref — this
-				// path is UNCHANGED (Unit 4.2 §10 locked constraint 1).
-				v.SubjectTitle = docTitle
-				v.SubjectRef = documentID.String
-			}
-			v.QuorumProgress = fmt.Sprintf("%d/%d", signed, required)
-			v.StageKind = domain.StageKind(stageKind)
-			if dueAt.Valid {
-				t := dueAt.Time
-				v.DueAt = &t
-			}
-			items = append(items, v)
-			total = rowTotal
-		}
-		if err := rows.Err(); err != nil {
-			return fmt.Errorf("list worklist: rows: %w", err)
+		var scanErr error
+		items, total, scanErr = scanWorklistRows(rows)
+		if scanErr != nil {
+			return scanErr
 		}
 
 		// Unit 4.2: resolve template-subject rows' display metadata via the
@@ -731,32 +621,7 @@ func (s *ReadService) ListWorklist(ctx context.Context, runner db.TxRunner, tena
 		// crosses into templates (no raw join into templates_template*). A
 		// version id missing from the batch result (not found, or cross-tenant)
 		// simply leaves that row's title/ref empty (no-fallback principle).
-		templateReader := s.templateRead
-		if templateReader != nil {
-			var versionIDs []string
-			for i := range items {
-				if items[i].SubjectKind == string(domain.SubjectKindTemplate) {
-					versionIDs = append(versionIDs, items[i].SubjectKey)
-				}
-			}
-			if len(versionIDs) > 0 {
-				meta, err := templateReader.LoadTemplateInboxMeta(ctx, tx, tenantID, versionIDs)
-				if err != nil {
-					return fmt.Errorf("list worklist: load template inbox meta: %w", err)
-				}
-				for i := range items {
-					if items[i].SubjectKind != string(domain.SubjectKindTemplate) {
-						continue
-					}
-					if m, ok := meta[items[i].SubjectKey]; ok {
-						items[i].SubjectTitle = m.Title
-						items[i].SubjectRef = m.TemplateID
-					}
-				}
-			}
-		}
-
-		return nil
+		return s.resolveWorklistTemplateMeta(ctx, tx, tenantID, items)
 	})
 	if err != nil {
 		return nil, 0, err
@@ -774,6 +639,177 @@ func (s *ReadService) ListWorklist(ctx context.Context, runner db.TxRunner, tena
 		total = count
 	}
 	return items, total, nil
+}
+
+// queryWorklistRows executes the worklist SELECT and returns the raw rows
+// for scanning. Predicate/argument construction mirrors countWorklist's
+// WHERE shape (kept in lockstep — see countWorklist's doc comment).
+func (s *ReadService) queryWorklistRows(ctx context.Context, tx *sql.Tx, tenantID string, actorJSON []byte, areaCode string, filter InboxFilter, limit, offset int) (*sql.Rows, error) {
+	// eligibilityPredicate is switched off entirely for scope=oversee (list
+	// every in-progress instance in the tenant), rather than passed a
+	// wildcard actor value, so the SQL shape itself documents the two
+	// distinct listing modes. $2::jsonb IS NOT NULL is a tautology (actorJSON
+	// is always a valid non-nil marshaled array) kept ONLY so $2 still
+	// appears in the query text with an inferable type in the oversee
+	// branch — Postgres's parameter-type inference (SQLSTATE 42P18) fails
+	// if a placeholder is bound but never referenced anywhere in the SQL,
+	// which happened when this branch was the bare literal TRUE. F10
+	// live-QA caught this: scope=oversee 500'd on every call against real
+	// Postgres (never caught by sqlmock-based unit tests, which don't
+	// model Postgres's parameter-type inference at all).
+	eligibilityPredicate := "asi.eligible_actor_ids @> $2::jsonb"
+	if filter.Oversee {
+		eligibilityPredicate = "($2::jsonb IS NOT NULL)"
+	}
+
+	stageKindPredicate := "$6 = '' OR asi.stage_kind = $6"
+	stageKindArg := string(filter.StageKind)
+
+	dueBeforePredicate := "$7::timestamptz IS NULL OR (asi.due_at IS NOT NULL AND asi.due_at <= $7::timestamptz)"
+	var dueBeforeArg *time.Time
+	if filter.DueBefore != nil {
+		v := filter.DueBefore.UTC()
+		dueBeforeArg = &v
+	}
+
+	totalSelect := "COUNT(*) OVER() AS total_count"
+
+	rows, err := tx.QueryContext(ctx, `
+		SELECT
+			ai.id,
+			ai.subject_kind,
+			ai.subject_key,
+			ai.document_id,
+			COALESCE(d.controlled_document_id::text, '') AS controlled_document_id,
+			COALESCE(cd.code, '') AS controlled_document_code,
+			COALESCE(d.name, '') AS doc_title,
+			COALESCE(asi.area_code_snapshot, '') AS area_code,
+			ai.submitted_by,
+			ai.submitted_at,
+			COALESCE(asi.name_snapshot, '') AS stage_label,
+			COALESCE(
+				CASE asi.quorum_snapshot
+					WHEN 'all_of'  THEN COALESCE(jsonb_array_length(asi.eligible_actor_ids), 0)
+					WHEN 'm_of_n'  THEN COALESCE(asi.quorum_m_snapshot, 1)
+					ELSE 1
+				END, 1) AS required,
+			COALESCE((
+				SELECT count(*)
+				FROM approval_signoffs s
+				WHERE s.approval_instance_id = ai.id
+				  AND s.stage_instance_id = asi.id
+				  AND s.actor_tenant_id = ai.tenant_id
+				  AND s.decision = 'approve'
+			), 0) AS signed,
+			asi.stage_kind,
+			asi.due_at,
+			`+totalSelect+`
+		FROM approval_instances ai
+		JOIN approval_stage_instances asi
+		  ON asi.approval_instance_id = ai.id
+		 AND asi.status = 'active'
+		LEFT JOIN documents d
+		  ON d.id = ai.document_id AND d.tenant_id = ai.tenant_id
+		-- F-QA4-8: the inbox renders the CANONICAL human code
+		-- (controlled_documents.code, NOT NULL), never the documents.code
+		-- snapshot and never the raw uuid. LEFT JOIN so a template-subject
+		-- row (no document) still returns, with an empty code.
+		LEFT JOIN controlled_documents cd
+		  ON cd.id = d.controlled_document_id AND cd.tenant_id = d.tenant_id
+		WHERE ai.tenant_id = $1::uuid
+		  AND ai.status = 'in_progress'
+		  AND (`+eligibilityPredicate+`)
+		  AND ($3 = '' OR asi.area_code_snapshot = $3)
+		  AND (`+stageKindPredicate+`)
+		  AND (`+dueBeforePredicate+`)
+		ORDER BY ai.submitted_at DESC, ai.id DESC
+		LIMIT $4 OFFSET $5`,
+		tenantID, actorJSON, areaCode, limit, offset, stageKindArg, dueBeforeArg,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list worklist: query: %w", err)
+	}
+	return rows, nil
+}
+
+// scanWorklistRows drains the worklist SELECT into InboxView values.
+// Document-subject rows get their title/ref filled directly from the LEFT
+// JOIN result (Unit 4.2 §10 locked constraint 1 — unchanged); template-subject
+// rows are backfilled separately by resolveWorklistTemplateMeta.
+func scanWorklistRows(rows *sql.Rows) ([]InboxView, int, error) {
+	var items []InboxView
+	var total int
+	for rows.Next() {
+		var v InboxView
+		var docTitle string
+		// ai.document_id is NULL for template-subject rows (migration 0297
+		// relaxed it) — scan into NullString, never a bare string.
+		var documentID sql.NullString
+		var signed, required, rowTotal int
+		var stageKind string
+		var dueAt sql.NullTime
+		if err := rows.Scan(
+			&v.InstanceID, &v.SubjectKind, &v.SubjectKey, &documentID,
+			&v.ControlledDocumentID, &v.ControlledDocumentCode, &docTitle,
+			&v.AreaCode, &v.SubmittedBy, &v.SubmittedAt,
+			&v.StageLabel, &required, &signed, &stageKind, &dueAt, &rowTotal,
+		); err != nil {
+			return nil, 0, fmt.Errorf("list worklist: scan: %w", err)
+		}
+		if v.SubjectKind == string(domain.SubjectKindDocument) {
+			// Documents keep the existing LEFT JOIN-sourced title/ref — this
+			// path is UNCHANGED (Unit 4.2 §10 locked constraint 1).
+			v.SubjectTitle = docTitle
+			v.SubjectRef = documentID.String
+		}
+		v.QuorumProgress = fmt.Sprintf("%d/%d", signed, required)
+		v.StageKind = domain.StageKind(stageKind)
+		if dueAt.Valid {
+			t := dueAt.Time
+			v.DueAt = &t
+		}
+		items = append(items, v)
+		total = rowTotal
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("list worklist: rows: %w", err)
+	}
+	return items, total, nil
+}
+
+// resolveWorklistTemplateMeta backfills template-subject rows' display
+// metadata via the approval-owned TemplateVersionReader port — the ONLY seam
+// this crosses into templates (no raw join into templates_template*). A
+// version id missing from the batch result (not found, or cross-tenant)
+// simply leaves that row's title/ref empty (no-fallback principle).
+func (s *ReadService) resolveWorklistTemplateMeta(ctx context.Context, tx *sql.Tx, tenantID string, items []InboxView) error {
+	templateReader := s.templateRead
+	if templateReader == nil {
+		return nil
+	}
+	var versionIDs []string
+	for i := range items {
+		if items[i].SubjectKind == string(domain.SubjectKindTemplate) {
+			versionIDs = append(versionIDs, items[i].SubjectKey)
+		}
+	}
+	if len(versionIDs) == 0 {
+		return nil
+	}
+	meta, err := templateReader.LoadTemplateInboxMeta(ctx, tx, tenantID, versionIDs)
+	if err != nil {
+		return fmt.Errorf("list worklist: load template inbox meta: %w", err)
+	}
+	for i := range items {
+		if items[i].SubjectKind != string(domain.SubjectKindTemplate) {
+			continue
+		}
+		if m, ok := meta[items[i].SubjectKey]; ok {
+			items[i].SubjectTitle = m.Title
+			items[i].SubjectRef = m.TemplateID
+		}
+	}
+	return nil
 }
 
 // countWorklist mirrors ListWorklist's WHERE clause (minus LIMIT/OFFSET) for

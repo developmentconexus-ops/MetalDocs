@@ -72,60 +72,73 @@ func NoResponseMap(files []string) []Finding {
 			if !ok || fn.Body == nil {
 				return true
 			}
-			// Pass 1: collect identifiers bound to a map[string]any literal in
-			// this function body (built-then-written locals).
-			boundMapIdents := map[string]bool{}
-			ast.Inspect(fn.Body, func(m ast.Node) bool {
-				as, ok := m.(*ast.AssignStmt)
-				if !ok {
-					return true
-				}
-				for i, rhs := range as.Rhs {
-					if i >= len(as.Lhs) {
-						break
-					}
-					if !isMapStringLiteral(rhs) {
-						continue
-					}
-					if id, ok := as.Lhs[i].(*ast.Ident); ok && id.Name != "_" {
-						boundMapIdents[id.Name] = true
-					}
-				}
-				return true
-			})
-
-			// Pass 2: flag writer calls whose args are a map literal or a bound ident.
-			ast.Inspect(fn.Body, func(m ast.Node) bool {
-				call, ok := m.(*ast.CallExpr)
-				if !ok || !isResponseWriter(call.Fun) {
-					return true
-				}
-				pos := fset.Position(call.Pos())
-				if strings.Contains(getLine(src, pos.Line), noResponseMapAllow) {
-					return true
-				}
-				for _, arg := range call.Args {
-					flagged := isMapStringLiteral(arg)
-					if !flagged {
-						if id, ok := arg.(*ast.Ident); ok && boundMapIdents[id.Name] {
-							flagged = true
-						}
-					}
-					if flagged {
-						out = append(out, Finding{
-							Analyzer: "noresponsemap",
-							File:     path,
-							Line:     pos.Line,
-							Message:  "map[string]<T> response literal passed to a 2xx body writer on a registered route (H-D, api-contract.md §5b): every 200/201 body must be a typed struct; convert it or record an explicit exemption",
-						})
-						return true
-					}
-				}
-				return true
-			})
+			boundMapIdents := collectBoundMapIdents(fn.Body)
+			out = append(out, flagResponseMapWriters(fset, path, src, fn.Body, boundMapIdents)...)
 			return true
 		})
 	}
+	return out
+}
+
+// collectBoundMapIdents finds identifiers bound (via assignment) to a
+// map[string]<T> composite literal within the function body — the
+// built-then-written locals pattern, e.g. `page := map[string]any{...}`.
+func collectBoundMapIdents(body *ast.BlockStmt) map[string]bool {
+	boundMapIdents := map[string]bool{}
+	ast.Inspect(body, func(m ast.Node) bool {
+		as, ok := m.(*ast.AssignStmt)
+		if !ok {
+			return true
+		}
+		for i, rhs := range as.Rhs {
+			if i >= len(as.Lhs) {
+				break
+			}
+			if !isMapStringLiteral(rhs) {
+				continue
+			}
+			if id, ok := as.Lhs[i].(*ast.Ident); ok && id.Name != "_" {
+				boundMapIdents[id.Name] = true
+			}
+		}
+		return true
+	})
+	return boundMapIdents
+}
+
+// flagResponseMapWriters flags 2xx writer calls in body whose argument is a
+// map[string]<T> literal, or an identifier previously bound to one via
+// collectBoundMapIdents.
+func flagResponseMapWriters(fset *token.FileSet, path, src string, body *ast.BlockStmt, boundMapIdents map[string]bool) []Finding {
+	var out []Finding
+	ast.Inspect(body, func(m ast.Node) bool {
+		call, ok := m.(*ast.CallExpr)
+		if !ok || !isResponseWriter(call.Fun) {
+			return true
+		}
+		pos := fset.Position(call.Pos())
+		if strings.Contains(getLine(src, pos.Line), noResponseMapAllow) {
+			return true
+		}
+		for _, arg := range call.Args {
+			flagged := isMapStringLiteral(arg)
+			if !flagged {
+				if id, ok := arg.(*ast.Ident); ok && boundMapIdents[id.Name] {
+					flagged = true
+				}
+			}
+			if flagged {
+				out = append(out, Finding{
+					Analyzer: "noresponsemap",
+					File:     path,
+					Line:     pos.Line,
+					Message:  "map[string]<T> response literal passed to a 2xx body writer on a registered route (H-D, api-contract.md §5b): every 200/201 body must be a typed struct; convert it or record an explicit exemption",
+				})
+				return true
+			}
+		}
+		return true
+	})
 	return out
 }
 

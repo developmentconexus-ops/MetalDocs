@@ -209,244 +209,11 @@ func (s *TemplateSubmitService) SubmitTemplateVersionForReview(ctx context.Conte
 	var instanceID string
 	err := runner.Do(ctx, func(tx *sql.Tx) error {
 		ctx := authz.WithCapCache(ctx)
-
-		// template.submit is the ratified capability for a template-subject
-		// submit (ADR 0083). It is ScopeTenant, so the "tenant" area
-		// sentinel is the correct area-blind enforcement — templates carry
-		// no process area to resolve (P3.S2b-3a) — and api-lint's
-		// area-scope-binding rule is satisfied (ScopeTenant caps are
-		// enforced area-blind by design, unlike area-grade CapDocumentSubmit).
-		// The DB tripwire on approval_instances is now subject-discriminated
-		// (ADR 0083, migration 0299): the template arm accepts template.submit,
-		// the document arm accepts document.submit, fail-closed ELSE.
-		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateSubmit), "tenant"); err != nil {
+		id, err := s.submitTemplateInTx(ctx, tx, req, idempotencyKey)
+		if err != nil {
 			return err
 		}
-
-		// Precondition: the version must be draft before it can enter
-		// approval. Read through the approval-owned port only — never a
-		// direct SQL read against templates_template_version.
-		if s.versionReader == nil {
-			return ErrTemplateVersionNotFound
-		}
-		status, ok, err := s.versionReader.LoadTemplateVersionStatus(ctx, tx, req.TenantID, req.TemplateVersionID)
-		if err != nil {
-			return fmt.Errorf("template submit: load template version status: %w", err)
-		}
-		if !ok {
-			return ErrTemplateVersionNotFound
-		}
-		if status != "draft" {
-			return ErrTemplateVersionNotDraft
-		}
-
-		// Precondition (F-E4-1): the version must carry committed content
-		// before it can enter approval. This read is the FRIENDLY FAST PATH
-		// only — it is not the enforcement point. Read Committed lets a
-		// concurrent edit clear content_hash after this read and before the
-		// flip below, so the authoritative precondition lives in the
-		// submit-lock CAS predicate itself (see TemplateVersionSubmitWriter),
-		// with the DB's chk_template_version_content_hash_non_draft CHECK as
-		// the backstop behind that. ok is false for an absent row, a
-		// cross-tenant id, or an empty/never-set hash; the row existence case
-		// is already resolved above, so !ok here means "no committed content".
-		if _, ok, err := s.versionReader.LoadTemplateVersionContentHash(ctx, tx, req.TenantID, req.TemplateVersionID); err != nil {
-			return fmt.Errorf("template submit: load template version content hash: %w", err)
-		} else if !ok {
-			return ErrTemplateVersionNoContent
-		}
-
-		// Submit-lock (M3 P3.S2b-3b-iii-b, hub Option (a)): flip the version's
-		// own status column draft -> under_review inside this same tx,
-		// atomically with the approval-instance creation below. This closes
-		// the concurrent-edit hole — the templates module's edit/upload gates
-		// permit writes only while status='draft', so a kernel-submitted
-		// version becomes immutable to the author for the approval's duration.
-		// Fail-closed on a nil writer or a 0-row CAS (draft precondition
-		// lost). template.submit is already asserted above in this tx, so the
-		// tripwire GUC authorizes the UPDATE without a second assertion.
-		if s.versionWriter == nil {
-			return fmt.Errorf("template submit: version submit-writer not configured")
-		}
-		if err := s.versionWriter.MarkTemplateVersionUnderReview(ctx, tx, req.TenantID, req.TemplateVersionID); err != nil {
-			// The CAS lost to a concurrent edit that cleared the content hash:
-			// same condition the fast path above reports, so it surfaces as the
-			// same sentinel (409 UPLOAD_MISSING) rather than an opaque wrap.
-			if errors.Is(err, ErrTemplateVersionNoContent) {
-				return ErrTemplateVersionNoContent
-			}
-			return fmt.Errorf("template submit: lock version under_review: %w", err)
-		}
-
-		// Resolve the active route by the template's PROFILE (doc_type_code) —
-		// ROUTE.subject_key = doc_type_code (ADR 0086: a route is
-		// configuration, one per profile), distinct from INSTANCE.subject_key =
-		// template_version_id (the two-level keying). The doc_type_code is read
-		// in-tx through the approval-owned port and fails closed; PreviewRoute
-		// resolves it through the SAME method so preview and submit can never
-		// disagree about which route governs a template.
-		if s.routeResolver == nil {
-			return fmt.Errorf("template submit: route resolver not configured")
-		}
-		docTypeCode, err := s.versionReader.LoadTemplateDocTypeCode(ctx, tx, req.TenantID, req.TemplateID)
-		if err != nil {
-			return fmt.Errorf("template submit: resolve template doc_type_code: %w", err)
-		}
-		routeID, err := s.routeResolver.LoadActiveRouteIDBySubject(ctx, tx, req.TenantID, string(domain.SubjectKindTemplate), docTypeCode)
-		if err != nil {
-			if errors.Is(err, infrastructure.ErrNoActiveApprovalRoute) {
-				return infrastructure.ErrNoActiveApprovalRoute
-			}
-			return fmt.Errorf("template submit: resolve active route: %w", err)
-		}
-
-		route, err := s.repo.LoadRoute(ctx, tx, req.TenantID, routeID)
-		if err != nil {
-			return fmt.Errorf("template submit: load route: %w", err)
-		}
-		if err := route.Validate(""); err != nil {
-			return fmt.Errorf("template submit: invalid route: %w", err)
-		}
-
-		instanceID = uuid.New().String()
-		now := s.clock.Now()
-
-		inst := domain.Instance{
-			ID:                   instanceID,
-			TenantID:             req.TenantID,
-			Subject:              domain.NewTemplateSubject(req.TemplateVersionID),
-			RouteID:              routeID,
-			RouteVersionSnapshot: route.Version,
-			Status:               domain.InstanceInProgress,
-			SubmittedBy:          req.SubmittedBy,
-			SubmittedAt:          now,
-			IdempotencyKey:       idempotencyKey,
-		}
-
-		if err := s.repo.InsertInstance(ctx, tx, inst); err != nil {
-			if errors.Is(err, infrastructure.ErrDuplicateSubmission) {
-				return err
-			}
-			return fmt.Errorf("template submit: %w", err)
-		}
-
-		// submit_choice pre-pass (M4, unit 3.2, slice 5): mirrors
-		// SubmitService.SubmitRevisionForReview's Step 7b. Fail-closed before
-		// any stage instance is created.
-		submitChoiceStages := stagesWithSubmitChoice(route.Stages)
-		if err := validateChosenActorsTargets(req.ChosenActors, submitChoiceStages); err != nil {
-			return err
-		}
-
-		stageInstances := make([]domain.StageInstance, len(route.Stages))
-		for i, stage := range route.Stages {
-			status := domain.StagePending
-			var openedAt *time.Time
-			if i == 0 {
-				status = domain.StageActive
-				openedAt = &now
-			}
-			flatRole, flatArea := domain.FlatRoleArea(stage.Selectors)
-			eligibleIDs, err := s.repo.ResolveEligibleActorsForSelectors(ctx, tx, req.TenantID, stage.Selectors, flatArea)
-			if err != nil {
-				return fmt.Errorf("template submit: resolve eligible actors for stage %d: %w", stage.Order, err)
-			}
-			var chosenIDs []string
-			if sel, ok := submitChoiceStages[stage.Order]; ok {
-				chosenIDs, err = resolveSubmitChoiceEligibleIDs(ctx, tx, s.repo, req.TenantID, sel, req.ChosenActors, stage.Order)
-				if err != nil {
-					return err
-				}
-				eligibleIDs = unionUserIDs(eligibleIDs, chosenIDs)
-			}
-			if len(eligibleIDs) == 0 {
-				return domain.ErrEmptyEligiblePool
-			}
-			stageInstances[i] = domain.StageInstance{
-				ID:                         uuid.New().String(),
-				ApprovalInstanceID:         instanceID,
-				StageOrder:                 stage.Order,
-				NameSnapshot:               stage.Name,
-				RequiredRoleSnapshot:       flatRole,
-				RequiredCapabilitySnapshot: stage.RequiredCapability,
-				AreaCodeSnapshot:           flatArea,
-				QuorumSnapshot:             stage.Quorum,
-				QuorumMSnapshot:            stage.QuorumM,
-				OnEligibilityDriftSnapshot: stage.OnEligibilityDrift,
-				Kind:                       stage.Kind,
-				EligibleActorIDs:           eligibleIDs,
-				Status:                     status,
-				OpenedAt:                   openedAt,
-				DueInDaysSnapshot:          stage.DueInDays,
-				SelectorsSnapshot:          materializeSelectorsSnapshot(stage.Selectors, chosenIDs),
-			}
-		}
-
-		if err := s.repo.InsertStageInstances(ctx, tx, stageInstances); err != nil {
-			return fmt.Errorf("template submit: %w", err)
-		}
-
-		// Governance event payload — no content_hash (document-only concern
-		// omitted per rails).
-		payloadBytes, err := json.Marshal(map[string]any{
-			"instance_id": instanceID,
-			"route_id":    routeID,
-		})
-		if err != nil {
-			return fmt.Errorf("template submit: marshal event payload: %w", err)
-		}
-
-		event := GovernanceEvent{
-			TenantID:     req.TenantID,
-			EventType:    "approval_submitted",
-			ActorUserID:  req.SubmittedBy,
-			ResourceType: "template",
-			ResourceID:   req.TemplateVersionID,
-			PayloadJSON:  json.RawMessage(payloadBytes),
-			OccurredAt:   now,
-		}
-		if err := s.emitter.Emit(ctx, tx, event); err != nil {
-			return fmt.Errorf("template submit: emit event: %w", err)
-		}
-
-		// The audit event above is a governance record; this is the
-		// notification. They are deliberately separate paths with separate
-		// consumers — conflating them is what left submit silent.
-		//
-		// Recipients are the ACTIVE stage's eligible actors, resolved above and
-		// already snapshotted onto the stage instance. A livre route has no
-		// active stage, so recipients come out empty and nothing is enqueued —
-		// the degenerate case needs no branch of its own.
-		if recipients := activeStageEligibleIDs(stageInstances); len(recipients) > 0 {
-			if err := s.notifierOrNoop().EnqueueApprovalNotificationTx(ctx, tx, domain.ApprovalNotificationArgs{
-				EventID:          uuid.New().String(),
-				TenantID:         req.TenantID,
-				EventType:        domain.EventTypeApprovalPending,
-				SubjectKind:      "template",
-				SubjectID:        req.TemplateVersionID,
-				RecipientUserIDs: recipients,
-				ActorUserID:      req.SubmittedBy,
-				OccurredAt:       now,
-			}); err != nil {
-				// NOT swallowed. If the notification cannot be promised, the
-				// submission is not confirmed: a half-transaction that reports
-				// success and tells nobody is the defect this feature exists to
-				// remove.
-				return fmt.Errorf("template submit: enqueue approval notification: %w", err)
-			}
-		}
-
-		// ADR 0087 §5: a route bound to a livre profile carries ZERO stages, so
-		// the instance created above has nothing left to satisfy and reaches
-		// terminal approval in THIS transaction — for BOTH subjects. Without
-		// this, a livre template submit left an in_progress instance behind an
-		// under_review version that nothing could ever advance.
-		if len(route.Stages) == 0 {
-			if err := s.autoApprove(ctx, tx, req, &inst, route, now); err != nil {
-				return err
-			}
-		}
-
+		instanceID = id
 		return nil
 	})
 	if err != nil {
@@ -454,6 +221,302 @@ func (s *TemplateSubmitService) SubmitTemplateVersionForReview(ctx context.Conte
 	}
 
 	return TemplateSubmitResult{InstanceID: instanceID}, nil
+}
+
+// submitTemplateInTx is the tx-scoped core of SubmitTemplateVersionForReview:
+// authz + draft/content preconditions + the submit-lock CAS, route
+// resolution, instance + stage-instance creation, the governance event, the
+// pending-approval notification, and (ADR 0087 §5) the zero-stage
+// auto-approve leg. Returns the new instance id.
+func (s *TemplateSubmitService) submitTemplateInTx(ctx context.Context, tx *sql.Tx, req TemplateSubmitRequest, idempotencyKey string) (string, error) {
+	if err := s.lockTemplateVersionForSubmit(ctx, tx, req); err != nil {
+		return "", err
+	}
+
+	routeID, route, err := s.resolveTemplateRoute(ctx, tx, req)
+	if err != nil {
+		return "", err
+	}
+
+	instanceID := uuid.New().String()
+	now := s.clock.Now()
+
+	inst := domain.Instance{
+		ID:                   instanceID,
+		TenantID:             req.TenantID,
+		Subject:              domain.NewTemplateSubject(req.TemplateVersionID),
+		RouteID:              routeID,
+		RouteVersionSnapshot: route.Version,
+		Status:               domain.InstanceInProgress,
+		SubmittedBy:          req.SubmittedBy,
+		SubmittedAt:          now,
+		IdempotencyKey:       idempotencyKey,
+	}
+
+	if err := s.repo.InsertInstance(ctx, tx, inst); err != nil {
+		if errors.Is(err, infrastructure.ErrDuplicateSubmission) {
+			return "", err
+		}
+		return "", fmt.Errorf("template submit: %w", err)
+	}
+
+	// submit_choice pre-pass (M4, unit 3.2, slice 5): mirrors
+	// SubmitService.SubmitRevisionForReview's Step 7b. Fail-closed before
+	// any stage instance is created.
+	submitChoiceStages := stagesWithSubmitChoice(route.Stages)
+	if err := validateChosenActorsTargets(req.ChosenActors, submitChoiceStages); err != nil {
+		return "", err
+	}
+
+	stageInstances, err := s.buildTemplateStageInstances(ctx, tx, req, route, instanceID, submitChoiceStages, now)
+	if err != nil {
+		return "", err
+	}
+
+	if err := s.repo.InsertStageInstances(ctx, tx, stageInstances); err != nil {
+		return "", fmt.Errorf("template submit: %w", err)
+	}
+
+	if err := s.emitTemplateSubmitEvent(ctx, tx, req, instanceID, routeID, now); err != nil {
+		return "", err
+	}
+
+	// The audit event above is a governance record; this is the
+	// notification. They are deliberately separate paths with separate
+	// consumers — conflating them is what left submit silent.
+	if err := s.notifyTemplateSubmit(ctx, tx, req, stageInstances, now); err != nil {
+		return "", err
+	}
+
+	// ADR 0087 §5: a route bound to a livre profile carries ZERO stages, so
+	// the instance created above has nothing left to satisfy and reaches
+	// terminal approval in THIS transaction — for BOTH subjects. Without
+	// this, a livre template submit left an in_progress instance behind an
+	// under_review version that nothing could ever advance.
+	if len(route.Stages) == 0 {
+		if err := s.autoApprove(ctx, tx, req, &inst, route, now); err != nil {
+			return "", err
+		}
+	}
+
+	return instanceID, nil
+}
+
+// lockTemplateVersionForSubmit asserts template.submit, checks the draft +
+// committed-content preconditions (friendly fast path only — the CAS below
+// is the enforcement point), and flips the version draft -> under_review
+// inside this tx, atomically with the approval-instance creation that
+// follows (M3 P3.S2b-3b-iii-b, hub Option (a)).
+func (s *TemplateSubmitService) lockTemplateVersionForSubmit(ctx context.Context, tx *sql.Tx, req TemplateSubmitRequest) error {
+	// template.submit is the ratified capability for a template-subject
+	// submit (ADR 0083). It is ScopeTenant, so the "tenant" area
+	// sentinel is the correct area-blind enforcement — templates carry
+	// no process area to resolve (P3.S2b-3a) — and api-lint's
+	// area-scope-binding rule is satisfied (ScopeTenant caps are
+	// enforced area-blind by design, unlike area-grade CapDocumentSubmit).
+	// The DB tripwire on approval_instances is now subject-discriminated
+	// (ADR 0083, migration 0299): the template arm accepts template.submit,
+	// the document arm accepts document.submit, fail-closed ELSE.
+	if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateSubmit), "tenant"); err != nil {
+		return err
+	}
+
+	// Precondition: the version must be draft before it can enter
+	// approval. Read through the approval-owned port only — never a
+	// direct SQL read against templates_template_version.
+	if s.versionReader == nil {
+		return ErrTemplateVersionNotFound
+	}
+	status, ok, err := s.versionReader.LoadTemplateVersionStatus(ctx, tx, req.TenantID, req.TemplateVersionID)
+	if err != nil {
+		return fmt.Errorf("template submit: load template version status: %w", err)
+	}
+	if !ok {
+		return ErrTemplateVersionNotFound
+	}
+	if status != "draft" {
+		return ErrTemplateVersionNotDraft
+	}
+
+	// Precondition (F-E4-1): the version must carry committed content
+	// before it can enter approval. This read is the FRIENDLY FAST PATH
+	// only — it is not the enforcement point. Read Committed lets a
+	// concurrent edit clear content_hash after this read and before the
+	// flip below, so the authoritative precondition lives in the
+	// submit-lock CAS predicate itself (see TemplateVersionSubmitWriter),
+	// with the DB's chk_template_version_content_hash_non_draft CHECK as
+	// the backstop behind that. ok is false for an absent row, a
+	// cross-tenant id, or an empty/never-set hash; the row existence case
+	// is already resolved above, so !ok here means "no committed content".
+	if _, ok, err := s.versionReader.LoadTemplateVersionContentHash(ctx, tx, req.TenantID, req.TemplateVersionID); err != nil {
+		return fmt.Errorf("template submit: load template version content hash: %w", err)
+	} else if !ok {
+		return ErrTemplateVersionNoContent
+	}
+
+	// Submit-lock (M3 P3.S2b-3b-iii-b, hub Option (a)): flip the version's
+	// own status column draft -> under_review inside this same tx,
+	// atomically with the approval-instance creation below. This closes
+	// the concurrent-edit hole — the templates module's edit/upload gates
+	// permit writes only while status='draft', so a kernel-submitted
+	// version becomes immutable to the author for the approval's duration.
+	// Fail-closed on a nil writer or a 0-row CAS (draft precondition
+	// lost). template.submit is already asserted above in this tx, so the
+	// tripwire GUC authorizes the UPDATE without a second assertion.
+	if s.versionWriter == nil {
+		return fmt.Errorf("template submit: version submit-writer not configured")
+	}
+	if err := s.versionWriter.MarkTemplateVersionUnderReview(ctx, tx, req.TenantID, req.TemplateVersionID); err != nil {
+		// The CAS lost to a concurrent edit that cleared the content hash:
+		// same condition the fast path above reports, so it surfaces as the
+		// same sentinel (409 UPLOAD_MISSING) rather than an opaque wrap.
+		if errors.Is(err, ErrTemplateVersionNoContent) {
+			return ErrTemplateVersionNoContent
+		}
+		return fmt.Errorf("template submit: lock version under_review: %w", err)
+	}
+	return nil
+}
+
+// resolveTemplateRoute resolves the active route by the template's PROFILE
+// (doc_type_code) — ROUTE.subject_key = doc_type_code (ADR 0086: a route is
+// configuration, one per profile), distinct from INSTANCE.subject_key =
+// template_version_id (the two-level keying). The doc_type_code is read
+// in-tx through the approval-owned port and fails closed; PreviewRoute
+// resolves it through the SAME method so preview and submit can never
+// disagree about which route governs a template.
+func (s *TemplateSubmitService) resolveTemplateRoute(ctx context.Context, tx *sql.Tx, req TemplateSubmitRequest) (string, domain.Route, error) {
+	if s.routeResolver == nil {
+		return "", domain.Route{}, fmt.Errorf("template submit: route resolver not configured")
+	}
+	docTypeCode, err := s.versionReader.LoadTemplateDocTypeCode(ctx, tx, req.TenantID, req.TemplateID)
+	if err != nil {
+		return "", domain.Route{}, fmt.Errorf("template submit: resolve template doc_type_code: %w", err)
+	}
+	routeID, err := s.routeResolver.LoadActiveRouteIDBySubject(ctx, tx, req.TenantID, string(domain.SubjectKindTemplate), docTypeCode)
+	if err != nil {
+		if errors.Is(err, infrastructure.ErrNoActiveApprovalRoute) {
+			return "", domain.Route{}, infrastructure.ErrNoActiveApprovalRoute
+		}
+		return "", domain.Route{}, fmt.Errorf("template submit: resolve active route: %w", err)
+	}
+
+	route, err := s.repo.LoadRoute(ctx, tx, req.TenantID, routeID)
+	if err != nil {
+		return "", domain.Route{}, fmt.Errorf("template submit: load route: %w", err)
+	}
+	if err := route.Validate(""); err != nil {
+		return "", domain.Route{}, fmt.Errorf("template submit: invalid route: %w", err)
+	}
+	return routeID, route, nil
+}
+
+// buildTemplateStageInstances mirrors SubmitService.buildStageInstances for
+// the template subject: there is no document area_code input — each stage's
+// own flatArea (derived from its selectors) is what
+// ResolveEligibleActorsForSelectors scopes against, since templates carry
+// no process area of their own.
+func (s *TemplateSubmitService) buildTemplateStageInstances(ctx context.Context, tx *sql.Tx, req TemplateSubmitRequest, route domain.Route, instanceID string, submitChoiceStages map[int]domain.ActorSelector, now time.Time) ([]domain.StageInstance, error) {
+	stageInstances := make([]domain.StageInstance, len(route.Stages))
+	for i, stage := range route.Stages {
+		status := domain.StagePending
+		var openedAt *time.Time
+		if i == 0 {
+			status = domain.StageActive
+			openedAt = &now
+		}
+		flatRole, flatArea := domain.FlatRoleArea(stage.Selectors)
+		eligibleIDs, err := s.repo.ResolveEligibleActorsForSelectors(ctx, tx, req.TenantID, stage.Selectors, flatArea)
+		if err != nil {
+			return nil, fmt.Errorf("template submit: resolve eligible actors for stage %d: %w", stage.Order, err)
+		}
+		var chosenIDs []string
+		if sel, ok := submitChoiceStages[stage.Order]; ok {
+			chosenIDs, err = resolveSubmitChoiceEligibleIDs(ctx, tx, s.repo, req.TenantID, sel, req.ChosenActors, stage.Order)
+			if err != nil {
+				return nil, err
+			}
+			eligibleIDs = unionUserIDs(eligibleIDs, chosenIDs)
+		}
+		if len(eligibleIDs) == 0 {
+			return nil, domain.ErrEmptyEligiblePool
+		}
+		stageInstances[i] = domain.StageInstance{
+			ID:                         uuid.New().String(),
+			ApprovalInstanceID:         instanceID,
+			StageOrder:                 stage.Order,
+			NameSnapshot:               stage.Name,
+			RequiredRoleSnapshot:       flatRole,
+			RequiredCapabilitySnapshot: stage.RequiredCapability,
+			AreaCodeSnapshot:           flatArea,
+			QuorumSnapshot:             stage.Quorum,
+			QuorumMSnapshot:            stage.QuorumM,
+			OnEligibilityDriftSnapshot: stage.OnEligibilityDrift,
+			Kind:                       stage.Kind,
+			EligibleActorIDs:           eligibleIDs,
+			Status:                     status,
+			OpenedAt:                   openedAt,
+			DueInDaysSnapshot:          stage.DueInDays,
+			SelectorsSnapshot:          materializeSelectorsSnapshot(stage.Selectors, chosenIDs),
+		}
+	}
+	return stageInstances, nil
+}
+
+// emitTemplateSubmitEvent emits the approval_submitted governance event —
+// no content_hash (document-only concern omitted per rails).
+func (s *TemplateSubmitService) emitTemplateSubmitEvent(ctx context.Context, tx *sql.Tx, req TemplateSubmitRequest, instanceID, routeID string, now time.Time) error {
+	payloadBytes, err := json.Marshal(map[string]any{
+		"instance_id": instanceID,
+		"route_id":    routeID,
+	})
+	if err != nil {
+		return fmt.Errorf("template submit: marshal event payload: %w", err)
+	}
+
+	event := GovernanceEvent{
+		TenantID:     req.TenantID,
+		EventType:    "approval_submitted",
+		ActorUserID:  req.SubmittedBy,
+		ResourceType: "template",
+		ResourceID:   req.TemplateVersionID,
+		PayloadJSON:  json.RawMessage(payloadBytes),
+		OccurredAt:   now,
+	}
+	if err := s.emitter.Emit(ctx, tx, event); err != nil {
+		return fmt.Errorf("template submit: emit event: %w", err)
+	}
+	return nil
+}
+
+// notifyTemplateSubmit enqueues the approval.pending notification (Task 6)
+// inside the same submit transaction as the audit GovernanceEvent.
+// Recipients are the ACTIVE stage's eligible actors, resolved above and
+// already snapshotted onto the stage instance. A livre route has no active
+// stage, so recipients come out empty and nothing is enqueued — the
+// degenerate case needs no branch of its own.
+func (s *TemplateSubmitService) notifyTemplateSubmit(ctx context.Context, tx *sql.Tx, req TemplateSubmitRequest, stageInstances []domain.StageInstance, now time.Time) error {
+	recipients := activeStageEligibleIDs(stageInstances)
+	if len(recipients) == 0 {
+		return nil
+	}
+	if err := s.notifierOrNoop().EnqueueApprovalNotificationTx(ctx, tx, domain.ApprovalNotificationArgs{
+		EventID:          uuid.New().String(),
+		TenantID:         req.TenantID,
+		EventType:        domain.EventTypeApprovalPending,
+		SubjectKind:      "template",
+		SubjectID:        req.TemplateVersionID,
+		RecipientUserIDs: recipients,
+		ActorUserID:      req.SubmittedBy,
+		OccurredAt:       now,
+	}); err != nil {
+		// NOT swallowed. If the notification cannot be promised, the
+		// submission is not confirmed: a half-transaction that reports
+		// success and tells nobody is the defect this feature exists to
+		// remove.
+		return fmt.Errorf("template submit: enqueue approval notification: %w", err)
+	}
+	return nil
 }
 
 // autoApprove completes a stageless template instance inside the submit

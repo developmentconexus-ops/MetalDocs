@@ -98,104 +98,94 @@ var (
 	codeTplSodSubmitterCannotSign    = problem.CodePermissionSodSubmitterCannotSign
 )
 
+// errMapping pairs an error-matching predicate with the HTTP status/problem
+// code MapErr should answer when it matches. Order matters — mapErrTable is
+// scanned top to bottom and the first match wins, exactly as the switch it
+// replaces evaluated cases top to bottom.
+type errMapping struct {
+	match  func(error) bool
+	status int
+	code   problem.Code
+}
+
+func isErr(target error) func(error) bool {
+	return func(err error) bool { return errors.Is(err, target) }
+}
+
+// mapErrTable is the templates module's domain/application-error → HTTP
+// classification table. Kept as data (not a switch) so MapErr itself stays a
+// single small dispatch loop — see gocyclo note below.
+var mapErrTable = []errMapping{
+	{isErr(domain.ErrNotFound), http.StatusNotFound, codeTplNotFound},
+	{isErr(domain.ErrKeyConflict), http.StatusConflict, codeTplKeyConflict},
+	{isErr(domain.ErrInvalidStateTransition), http.StatusConflict, codeTplInvalidStateTransition},
+	{isErr(domain.ErrStaleBase), http.StatusConflict, codeTplStaleBase},
+	{isErr(domain.ErrConcurrentTransition), http.StatusConflict, codeTplInvalidStateTransition},
+	{isErr(domain.ErrStaleLockVersion), http.StatusPreconditionFailed, codeTplStaleLockVersion},
+	{isErr(domain.ErrContentHashMismatch), http.StatusPreconditionFailed, codeTplContentHashMismatch},
+	{isErr(domain.ErrUploadMissing), http.StatusConflict, codeTplUploadMissing},
+	{isErr(domain.ErrUploadTooLarge), http.StatusRequestEntityTooLarge, codeTplUploadTooLarge},
+	{isErr(domain.ErrISOSegregationViolation), http.StatusForbidden, codeTplISOSegregation},
+	{func(err error) bool { return errors.As(err, new(iamauthz.ErrCapDenied)) }, http.StatusForbidden, problem.CodePermissionCapabilityDenied},
+	{isErr(domain.ErrForbidden), http.StatusForbidden, codeTplForbidden},
+	{isErr(domain.ErrSystemTemplateImmutable), http.StatusConflict, codeTplSystemImmutable},
+	{isErr(domain.ErrArchived), http.StatusConflict, codeTplArchived},
+	{isErr(domain.ErrPlaceholderNameInvalid), http.StatusUnprocessableEntity, codeTplPlaceholderNameInvalid},
+	{isErr(domain.ErrPlaceholderReservedName), http.StatusUnprocessableEntity, codeTplPlaceholderNameInvalid},
+	{isErr(domain.ErrPlaceholderDictionaryInvalid), http.StatusUnprocessableEntity, codeTplPlaceholderNameInvalid},
+	{isErr(domain.ErrDuplicatePlaceholderName), http.StatusUnprocessableEntity, codeTplDuplicatePlaceholder},
+	// ADR 0086: doc_type_code is mandatory (generic templates are gone). 422
+	// is declared on createTemplate for exactly this validation.
+	{isErr(domain.ErrDocTypeCodeRequired), http.StatusUnprocessableEntity, codeTplDocTypeCodeRequired},
+	// ADR 0086 config-first creation gate — same 409 code the submit path
+	// already raises when no active template route resolves.
+	{isErr(domain.ErrApprovalRouteMissing), http.StatusConflict, codeTplApprovalRouteMissing},
+	{isErr(approvalapp.ErrTemplateVersionNotFound), http.StatusNotFound, codeTplApprovalNotFound},
+	{isErr(approvalapp.ErrTemplateVersionNotDraft), http.StatusConflict, codeTplApprovalConflict},
+	// F-E4-1: submitting a version with no committed content_hash used to
+	// reach the DB CHECK constraint and surface as a raw 500. It is a
+	// missing-prerequisite conflict of exactly the same taxonomy family as
+	// APPROVAL_ROUTE_MISSING, and the condition ("this version has no
+	// committed DOCX content") is the one UPLOAD_MISSING already names —
+	// including its friendly message (handler.go friendlyMsg) and the
+	// frontend catalog entry. 409 is declared on the submit route; 422 is
+	// not, so no spec change is involved.
+	{isErr(approvalapp.ErrTemplateVersionNoContent), http.StatusConflict, codeTplUploadMissing},
+	{isErr(approvalapp.ErrNoActiveApprovalRoute), http.StatusConflict, codeTplApprovalRouteMissing},
+	{isErr(approvalapp.ErrDuplicateSubmission), http.StatusConflict, codeTplDuplicateSubmission},
+	{isErr(approvalapp.ErrNoActiveInstance), http.StatusNotFound, codeTplApprovalNotFound},
+	{isErr(approvalapp.ErrInstanceCompleted), http.StatusConflict, codeTplApprovalInstanceCompleted},
+	{isErr(approvalapp.ErrStageNotActive), http.StatusConflict, codeTplApprovalStageNotActive},
+	{isErr(approvalapp.ErrContentHashMismatch), http.StatusPreconditionFailed, codeTplContentHashMismatch},
+	{isErr(approvalapp.ErrIdempotencyKeyRequired), http.StatusBadRequest, problem.CodeRequestIdempotencyKeyRequired},
+	{isErr(approvaldomain.ErrEmptyEligiblePool), http.StatusUnprocessableEntity, codeTplEmptyEligiblePool},
+	// M4, unit 3.2, slice 5: symmetric with the document submit mapping
+	// (approval/http/errors.go) — a submit_choice-governed stage has no
+	// matching/non-empty chosen_actors entry.
+	{isErr(approvaldomain.ErrSubmitChoiceRequired), http.StatusUnprocessableEntity, codeTplSubmitChoiceRequired},
+	// M4, unit 3.2, slice 5: chosen user fails the role x area_code
+	// constraint, or chosen_actors targets a non-submit_choice stage.
+	{isErr(approvaldomain.ErrSubmitChoiceConstraintViolated), http.StatusUnprocessableEntity, codeTplSubmitChoiceConstraint},
+	{isErr(approvaldomain.ErrNoActiveStage), http.StatusConflict, codeTplApprovalConflict},
+	{isErr(approvaldomain.ErrActorNotEligible), http.StatusForbidden, codeTplSignoffActorNotEligible},
+	{isErr(approvaldomain.ErrAuthorCannotSign), http.StatusForbidden, codeTplSodSubmitterCannotSign},
+}
+
 // MapErr translates a domain/application error from the templates module into
 // the HTTP status and problem+json code that should be returned to the
 // caller. A nil err maps to 200 OK with an empty code; unrecognized errors
-// fall back to 500 Internal Server Error.
+// fall back to 500 Internal Server Error. Matching walks mapErrTable in
+// order and returns on the first hit, preserving the precedence the
+// original switch encoded (some conditions satisfy more than one
+// errors.Is/As check, so order is significant).
 func MapErr(err error) (httpStatus int, code problem.Code) {
-	switch {
-	case err == nil:
+	if err == nil {
 		return http.StatusOK, problem.Code{}
-	case errors.Is(err, domain.ErrNotFound):
-		return http.StatusNotFound, codeTplNotFound
-	case errors.Is(err, domain.ErrKeyConflict):
-		return http.StatusConflict, codeTplKeyConflict
-	case errors.Is(err, domain.ErrInvalidStateTransition):
-		return http.StatusConflict, codeTplInvalidStateTransition
-	case errors.Is(err, domain.ErrStaleBase):
-		return http.StatusConflict, codeTplStaleBase
-	case errors.Is(err, domain.ErrConcurrentTransition):
-		return http.StatusConflict, codeTplInvalidStateTransition
-	case errors.Is(err, domain.ErrStaleLockVersion):
-		return http.StatusPreconditionFailed, codeTplStaleLockVersion
-	case errors.Is(err, domain.ErrContentHashMismatch):
-		return http.StatusPreconditionFailed, codeTplContentHashMismatch
-	case errors.Is(err, domain.ErrUploadMissing):
-		return http.StatusConflict, codeTplUploadMissing
-	case errors.Is(err, domain.ErrUploadTooLarge):
-		return http.StatusRequestEntityTooLarge, codeTplUploadTooLarge
-	case errors.Is(err, domain.ErrISOSegregationViolation):
-		return http.StatusForbidden, codeTplISOSegregation
-	case errors.As(err, new(iamauthz.ErrCapDenied)):
-		return http.StatusForbidden, problem.CodePermissionCapabilityDenied
-	case errors.Is(err, domain.ErrForbidden):
-		return http.StatusForbidden, codeTplForbidden
-	case errors.Is(err, domain.ErrSystemTemplateImmutable):
-		return http.StatusConflict, codeTplSystemImmutable
-	case errors.Is(err, domain.ErrArchived):
-		return http.StatusConflict, codeTplArchived
-	case errors.Is(err, domain.ErrPlaceholderNameInvalid):
-		return http.StatusUnprocessableEntity, codeTplPlaceholderNameInvalid
-	case errors.Is(err, domain.ErrPlaceholderReservedName):
-		return http.StatusUnprocessableEntity, codeTplPlaceholderNameInvalid
-	case errors.Is(err, domain.ErrPlaceholderDictionaryInvalid):
-		return http.StatusUnprocessableEntity, codeTplPlaceholderNameInvalid
-	case errors.Is(err, domain.ErrDuplicatePlaceholderName):
-		return http.StatusUnprocessableEntity, codeTplDuplicatePlaceholder
-	case errors.Is(err, domain.ErrDocTypeCodeRequired):
-		// ADR 0086: doc_type_code is mandatory (generic templates are gone).
-		// 422 is declared on createTemplate for exactly this validation.
-		return http.StatusUnprocessableEntity, codeTplDocTypeCodeRequired
-	case errors.Is(err, domain.ErrApprovalRouteMissing):
-		// ADR 0086 config-first creation gate — same 409 code the submit path
-		// already raises when no active template route resolves.
-		return http.StatusConflict, codeTplApprovalRouteMissing
-	case errors.Is(err, approvalapp.ErrTemplateVersionNotFound):
-		return http.StatusNotFound, codeTplApprovalNotFound
-	case errors.Is(err, approvalapp.ErrTemplateVersionNotDraft):
-		return http.StatusConflict, codeTplApprovalConflict
-	case errors.Is(err, approvalapp.ErrTemplateVersionNoContent):
-		// F-E4-1: submitting a version with no committed content_hash used to
-		// reach the DB CHECK constraint and surface as a raw 500. It is a
-		// missing-prerequisite conflict of exactly the same taxonomy family as
-		// APPROVAL_ROUTE_MISSING, and the condition ("this version has no
-		// committed DOCX content") is the one UPLOAD_MISSING already names —
-		// including its friendly message (handler.go friendlyMsg) and the
-		// frontend catalog entry. 409 is declared on the submit route; 422 is
-		// not, so no spec change is involved.
-		return http.StatusConflict, codeTplUploadMissing
-	case errors.Is(err, approvalapp.ErrNoActiveApprovalRoute):
-		return http.StatusConflict, codeTplApprovalRouteMissing
-	case errors.Is(err, approvalapp.ErrDuplicateSubmission):
-		return http.StatusConflict, codeTplDuplicateSubmission
-	case errors.Is(err, approvalapp.ErrNoActiveInstance):
-		return http.StatusNotFound, codeTplApprovalNotFound
-	case errors.Is(err, approvalapp.ErrInstanceCompleted):
-		return http.StatusConflict, codeTplApprovalInstanceCompleted
-	case errors.Is(err, approvalapp.ErrStageNotActive):
-		return http.StatusConflict, codeTplApprovalStageNotActive
-	case errors.Is(err, approvalapp.ErrContentHashMismatch):
-		return http.StatusPreconditionFailed, codeTplContentHashMismatch
-	case errors.Is(err, approvalapp.ErrIdempotencyKeyRequired):
-		return http.StatusBadRequest, problem.CodeRequestIdempotencyKeyRequired
-	case errors.Is(err, approvaldomain.ErrEmptyEligiblePool):
-		return http.StatusUnprocessableEntity, codeTplEmptyEligiblePool
-	case errors.Is(err, approvaldomain.ErrSubmitChoiceRequired):
-		// M4, unit 3.2, slice 5: symmetric with the document submit mapping
-		// (approval/http/errors.go) — a submit_choice-governed stage has no
-		// matching/non-empty chosen_actors entry.
-		return http.StatusUnprocessableEntity, codeTplSubmitChoiceRequired
-	case errors.Is(err, approvaldomain.ErrSubmitChoiceConstraintViolated):
-		// M4, unit 3.2, slice 5: chosen user fails the role x area_code
-		// constraint, or chosen_actors targets a non-submit_choice stage.
-		return http.StatusUnprocessableEntity, codeTplSubmitChoiceConstraint
-	case errors.Is(err, approvaldomain.ErrNoActiveStage):
-		return http.StatusConflict, codeTplApprovalConflict
-	case errors.Is(err, approvaldomain.ErrActorNotEligible):
-		return http.StatusForbidden, codeTplSignoffActorNotEligible
-	case errors.Is(err, approvaldomain.ErrAuthorCannotSign):
-		return http.StatusForbidden, codeTplSodSubmitterCannotSign
-	default:
-		return http.StatusInternalServerError, codeTplInternalError
 	}
+	for _, m := range mapErrTable {
+		if m.match(err) {
+			return m.status, m.code
+		}
+	}
+	return http.StatusInternalServerError, codeTplInternalError
 }

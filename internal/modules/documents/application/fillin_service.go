@@ -187,6 +187,32 @@ func findPlaceholder(phs []templatesdomain.Placeholder, id string) (templatesdom
 }
 
 func validateValue(ctx context.Context, tenantID string, p templatesdomain.Placeholder, raw string, iam IAMUserOptionsReader) error {
+	if err := validateCommonConstraints(p, raw); err != nil {
+		return err
+	}
+
+	switch p.Type {
+	case templatesdomain.PHNumber:
+		return validateNumberValue(p, raw)
+	case templatesdomain.PHDate:
+		return validateDateValue(p, raw)
+	case templatesdomain.PHSelect:
+		return validateSelectValue(p, raw)
+	case templatesdomain.PHUser:
+		return validateUserValue(ctx, tenantID, p, raw, iam)
+	case templatesdomain.PHText, templatesdomain.PHPicture, templatesdomain.PHComputed, templatesdomain.PHDictionary:
+		// No additional type-specific validation: required/max_length/regex are
+		// already enforced above. PHComputed/PHDictionary values can never reach
+		// an actual write as author content — SetPlaceholderValue's CurrentSource
+		// governance check rejects governed rows before the DB write runs.
+	}
+
+	return nil
+}
+
+// validateCommonConstraints enforces the type-independent constraints every
+// placeholder value is subject to: required, max_length, and regex.
+func validateCommonConstraints(p templatesdomain.Placeholder, raw string) error {
 	if p.Required && raw == "" {
 		return fmt.Errorf("%w: %s required", v2domain.ErrValidationFailed, p.ID)
 	}
@@ -202,62 +228,71 @@ func validateValue(ctx context.Context, tenantID string, p templatesdomain.Place
 			return fmt.Errorf("%w: %s regex mismatch", v2domain.ErrValidationFailed, p.ID)
 		}
 	}
-
-	switch p.Type {
-	case templatesdomain.PHNumber:
-		n, err := strconv.ParseFloat(raw, 64)
-		if err != nil {
-			return fmt.Errorf("%w: %s not a number", v2domain.ErrValidationFailed, p.ID)
-		}
-		if p.MinNumber != nil && n < *p.MinNumber {
-			return fmt.Errorf("%w: %s < min_number", v2domain.ErrValidationFailed, p.ID)
-		}
-		if p.MaxNumber != nil && n > *p.MaxNumber {
-			return fmt.Errorf("%w: %s > max_number", v2domain.ErrValidationFailed, p.ID)
-		}
-	case templatesdomain.PHDate:
-		if _, err := time.Parse("2006-01-02", raw); err != nil {
-			return fmt.Errorf("%w: %s not YYYY-MM-DD", v2domain.ErrValidationFailed, p.ID)
-		}
-		if p.MinDate != nil && raw < *p.MinDate {
-			return fmt.Errorf("%w: %s < min_date", v2domain.ErrValidationFailed, p.ID)
-		}
-		if p.MaxDate != nil && raw > *p.MaxDate {
-			return fmt.Errorf("%w: %s > max_date", v2domain.ErrValidationFailed, p.ID)
-		}
-	case templatesdomain.PHSelect:
-		for _, opt := range p.Options {
-			if opt == raw {
-				return nil
-			}
-		}
-		return fmt.Errorf("%w: %s not in options", v2domain.ErrValidationFailed, p.ID)
-	case templatesdomain.PHUser:
-		if iam == nil {
-			// Fail-closed: an unconfigured IAM reader must never silently accept any
-			// value. Production wiring MUST call WithIAMReader (module.go); a missing
-			// reader is a misconfiguration, not a permissive default (mirrors the
-			// nil-area → deny posture of requireDocEditDraft in fillin_authz.go).
-			return fmt.Errorf("%w: IAM reader not wired, cannot validate PHUser placeholder %q", v2domain.ErrValidationFailed, p.ID)
-		}
-		opts, err := iam.ListUserOptions(ctx, tenantID)
-		if err != nil {
-			return err
-		}
-		for _, o := range opts {
-			if o.UserID == raw {
-				return nil
-			}
-		}
-		return fmt.Errorf("%w: %s unknown user %s", v2domain.ErrValidationFailed, p.ID, raw)
-	case templatesdomain.PHText, templatesdomain.PHPicture, templatesdomain.PHComputed, templatesdomain.PHDictionary:
-		// No additional type-specific validation: required/max_length/regex are
-		// already enforced above. PHComputed/PHDictionary values can never reach
-		// an actual write as author content — SetPlaceholderValue's CurrentSource
-		// governance check rejects governed rows before the DB write runs.
-	}
-
 	return nil
+}
+
+// validateNumberValue validates a PHNumber raw value: parseable as a float,
+// within min_number/max_number when set.
+func validateNumberValue(p templatesdomain.Placeholder, raw string) error {
+	n, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return fmt.Errorf("%w: %s not a number", v2domain.ErrValidationFailed, p.ID)
+	}
+	if p.MinNumber != nil && n < *p.MinNumber {
+		return fmt.Errorf("%w: %s < min_number", v2domain.ErrValidationFailed, p.ID)
+	}
+	if p.MaxNumber != nil && n > *p.MaxNumber {
+		return fmt.Errorf("%w: %s > max_number", v2domain.ErrValidationFailed, p.ID)
+	}
+	return nil
+}
+
+// validateDateValue validates a PHDate raw value: YYYY-MM-DD, within
+// min_date/max_date when set.
+func validateDateValue(p templatesdomain.Placeholder, raw string) error {
+	if _, err := time.Parse("2006-01-02", raw); err != nil {
+		return fmt.Errorf("%w: %s not YYYY-MM-DD", v2domain.ErrValidationFailed, p.ID)
+	}
+	if p.MinDate != nil && raw < *p.MinDate {
+		return fmt.Errorf("%w: %s < min_date", v2domain.ErrValidationFailed, p.ID)
+	}
+	if p.MaxDate != nil && raw > *p.MaxDate {
+		return fmt.Errorf("%w: %s > max_date", v2domain.ErrValidationFailed, p.ID)
+	}
+	return nil
+}
+
+// validateSelectValue validates a PHSelect raw value against p.Options.
+func validateSelectValue(p templatesdomain.Placeholder, raw string) error {
+	for _, opt := range p.Options {
+		if opt == raw {
+			return nil
+		}
+	}
+	return fmt.Errorf("%w: %s not in options", v2domain.ErrValidationFailed, p.ID)
+}
+
+// validateUserValue validates a PHUser raw value against the IAM-backed
+// user option list, failing closed when iam is nil (see the fail-closed note
+// below).
+func validateUserValue(ctx context.Context, tenantID string, p templatesdomain.Placeholder, raw string, iam IAMUserOptionsReader) error {
+	if iam == nil {
+		// Fail-closed: an unconfigured IAM reader must never silently accept any
+		// value. Production wiring MUST call WithIAMReader (module.go); a missing
+		// reader is a misconfiguration, not a permissive default (mirrors the
+		// nil-area → deny posture of requireDocEditDraft in fillin_authz.go).
+		return fmt.Errorf("%w: IAM reader not wired, cannot validate PHUser placeholder %q", v2domain.ErrValidationFailed, p.ID)
+	}
+	opts, err := iam.ListUserOptions(ctx, tenantID)
+	if err != nil {
+		return err
+	}
+	for _, o := range opts {
+		if o.UserID == raw {
+			return nil
+		}
+	}
+	return fmt.Errorf("%w: %s unknown user %s", v2domain.ErrValidationFailed, p.ID, raw)
 }
 
 // FillInReader reads current fill-in values from the DB.

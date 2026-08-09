@@ -91,17 +91,8 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 			m.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Permission resolver not configured"))
 			return
 		}
-		capability, visibility := m.resolver(r)
-		switch visibility {
-		case VisibilityPublic, VisibilitySessionRequired, VisibilityPermissionGuarded:
-		case VisibilityUnresolved:
-			slog.Warn("iam: route matched a pattern with no rule", "method", r.Method, "path", r.URL.Path)
-			m.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Route resolved to no policy"))
-			return
-		default:
-			// STAYS: genuinely unknown values.
-			slog.Warn("iam: unknown route visibility", "method", r.Method, "path", r.URL.Path, "visibility", visibility)
-			m.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Permission resolver returned unknown visibility"))
+		capability, visibility, ok := m.resolveVisibilityCapability(w, r)
+		if !ok {
 			return
 		}
 
@@ -111,28 +102,19 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		// C1: userID must come from the authenticated session context only.
-		// Legacy X-User-Id header fallback removed — trusting a client-supplied
-		// header bypasses cookie/HMAC/revocation/expiry/tenant checks entirely.
-		userID := iamdomain.UserIDFromContext(r.Context())
-		if userID == "" {
-			m.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
-			return
-		}
-
-		// C7: tenantID must come from the authenticated session context only.
-		// Fallback to X-Tenant-ID header or DevTenantID removed — both are
-		// client-controllable and allow cross-tenant access.
-		tenantID, err := tenant.FromContext(r.Context())
-		if err != nil {
-			m.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		// C1/C7: userID and tenantID must come from the authenticated session
+		// context only. Legacy X-User-Id/X-Tenant-ID header fallbacks removed —
+		// trusting client-supplied headers bypasses cookie/HMAC/revocation/
+		// expiry/tenant checks entirely.
+		userID, tenantID, ok := m.sessionIdentity(w, r)
+		if !ok {
 			return
 		}
 
 		// C4: VisibilitySessionRequired — session is verified above; skip capability
 		// check but still enrich context with roles for downstream handlers.
 		if visibility == VisibilitySessionRequired {
-			ctx, ok := m.resolveRoles(w, r, userID, tenantID)
+			ctx, ok := m.resolveRoles(r.Context(), w, userID, tenantID)
 			if !ok {
 				return
 			}
@@ -153,7 +135,7 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		ctx, ok := m.resolveRoles(w, r, userID, tenantID)
+		ctx, ok := m.resolveRoles(r.Context(), w, userID, tenantID)
 		if !ok {
 			return
 		}
@@ -161,17 +143,58 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 	})
 }
 
+// resolveVisibilityCapability resolves the route's capability/visibility
+// tier via m.resolver and validates it against the known Visibility values.
+// On an unresolved or unrecognized tier it writes the problem response
+// itself (fail-closed) and returns ok=false.
+func (m *Middleware) resolveVisibilityCapability(w http.ResponseWriter, r *http.Request) (capability iamdomain.Capability, visibility Visibility, ok bool) {
+	capability, visibility = m.resolver(r)
+	switch visibility {
+	case VisibilityPublic, VisibilitySessionRequired, VisibilityPermissionGuarded:
+		return capability, visibility, true
+	case VisibilityUnresolved:
+		slog.Warn("iam: route matched a pattern with no rule", "method", r.Method, "path", r.URL.Path)
+		m.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Route resolved to no policy"))
+		return capability, visibility, false
+	default:
+		// STAYS: genuinely unknown values.
+		slog.Warn("iam: unknown route visibility", "method", r.Method, "path", r.URL.Path, "visibility", visibility)
+		m.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Permission resolver returned unknown visibility"))
+		return capability, visibility, false
+	}
+}
+
+// sessionIdentity resolves userID/tenantID from the authenticated session
+// context only (C1/C7 — never client-supplied headers). Writes the 401
+// problem response itself and returns ok=false when either is missing.
+func (m *Middleware) sessionIdentity(w http.ResponseWriter, r *http.Request) (userID, tenantID string, ok bool) {
+	userID = iamdomain.UserIDFromContext(r.Context())
+	if userID == "" {
+		m.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		return "", "", false
+	}
+	var err error
+	tenantID, err = tenant.FromContext(r.Context())
+	if err != nil {
+		m.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		return "", "", false
+	}
+	return userID, tenantID, true
+}
+
 // resolveRoles enriches the request context with the user's IAM roles when no
 // CurrentUser is already present. Returns the updated context and true on
-// success, or writes an error response and returns false on failure.
-func (m *Middleware) resolveRoles(w http.ResponseWriter, r *http.Request, userID, tenantID string) (context.Context, bool) {
-	rctx := r.Context()
+// success, or writes an error response and returns false on failure. ctx must
+// be the caller's inherited request context (r.Context()) so role-lookup
+// calls stay attached to the request's cancellation/deadline chain.
+func (m *Middleware) resolveRoles(ctx context.Context, w http.ResponseWriter, userID, tenantID string) (context.Context, bool) {
+	rctx := ctx
 	if _, hasUser := authdomain.CurrentUserFromContext(rctx); hasUser {
 		return rctx, true //nolint:nilerr
 	}
 	var roles []iamdomain.Role
 	if m.roleProvider != nil {
-		resolvedRoles, err := m.roleProvider.RolesByUserID(r.Context(), userID, tenantID)
+		resolvedRoles, err := m.roleProvider.RolesByUserID(ctx, userID, tenantID)
 		if errors.Is(err, iamdomain.ErrUserNotFound) || errors.Is(err, iamdomain.ErrUserInactive) {
 			m.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "User is not authorized"))
 			return nil, false

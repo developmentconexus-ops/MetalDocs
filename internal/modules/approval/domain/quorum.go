@@ -56,60 +56,77 @@ func EvaluateQuorumResult(stage StageInstance, approvals []Signoff, rejections [
 		return QuorumResult{Outcome: QuorumRejectedStage}
 	}
 
-	approveCount := 0
-	rejectCount := 0
-
-	eligible := make(map[string]bool, len(stage.EligibleActorIDs))
-	for _, id := range stage.EligibleActorIDs {
-		eligible[id] = true
-	}
-	for _, s := range approvals {
-		if eligible[s.ActorUserID()] {
-			approveCount++
-		}
-	}
-	for _, s := range rejections {
-		if eligible[s.ActorUserID()] {
-			rejectCount++
-		}
-	}
+	eligible := eligibleActorSet(stage.EligibleActorIDs)
+	approveCount := countEligibleSignoffs(eligible, approvals)
+	rejectCount := countEligibleSignoffs(eligible, rejections)
 
 	switch stage.QuorumSnapshot {
 	case QuorumAny1Of:
-		if approveCount >= 1 {
-			return QuorumResult{Outcome: QuorumApprovedStage}
-		}
-		if rejectCount >= 1 {
-			return QuorumResult{Outcome: QuorumRejectedStage}
-		}
-		return QuorumResult{Outcome: QuorumPending}
-
+		return evaluateAny1Of(approveCount, rejectCount)
 	case QuorumAllOf:
-		if rejectCount >= 1 {
-			return QuorumResult{Outcome: QuorumRejectedStage}
-		}
-		if approveCount >= effectiveDenominator {
-			return QuorumResult{Outcome: QuorumApprovedStage}
-		}
-		return QuorumResult{Outcome: QuorumPending}
-
+		return evaluateAllOf(approveCount, rejectCount, effectiveDenominator)
 	case QuorumMofN:
-		m := 1
-		switch {
-		case stage.QuorumMSnapshot == nil:
-		case *stage.QuorumMSnapshot < 1:
-			return QuorumResult{Outcome: QuorumRejectedStage}
-		default:
-			m = *stage.QuorumMSnapshot
-		}
-		if approveCount >= m {
-			return QuorumResult{Outcome: QuorumApprovedStage}
-		}
-		if rejectCount > effectiveDenominator-m {
-			return QuorumResult{Outcome: QuorumRejectedStage}
-		}
-		return QuorumResult{Outcome: QuorumPending}
+		return evaluateMofN(stage.QuorumMSnapshot, approveCount, rejectCount, effectiveDenominator)
 	default:
 		return QuorumResult{Outcome: QuorumError, Reason: fmt.Sprintf("unknown quorum type: %q", stage.QuorumSnapshot)}
 	}
+}
+
+// eligibleActorSet builds a membership set from a stage's eligible actor IDs.
+func eligibleActorSet(eligibleActorIDs []string) map[string]bool {
+	eligible := make(map[string]bool, len(eligibleActorIDs))
+	for _, id := range eligibleActorIDs {
+		eligible[id] = true
+	}
+	return eligible
+}
+
+// countEligibleSignoffs counts signoffs cast by actors present in eligible.
+// Signoffs from actors NOT in the eligible set are ignored.
+func countEligibleSignoffs(eligible map[string]bool, signoffs []Signoff) int {
+	count := 0
+	for _, s := range signoffs {
+		if eligible[s.ActorUserID()] {
+			count++
+		}
+	}
+	return count
+}
+
+func evaluateAny1Of(approveCount, rejectCount int) QuorumResult {
+	if approveCount >= 1 {
+		return QuorumResult{Outcome: QuorumApprovedStage}
+	}
+	if rejectCount >= 1 {
+		return QuorumResult{Outcome: QuorumRejectedStage}
+	}
+	return QuorumResult{Outcome: QuorumPending}
+}
+
+func evaluateAllOf(approveCount, rejectCount, effectiveDenominator int) QuorumResult {
+	if rejectCount >= 1 {
+		return QuorumResult{Outcome: QuorumRejectedStage}
+	}
+	if approveCount >= effectiveDenominator {
+		return QuorumResult{Outcome: QuorumApprovedStage}
+	}
+	return QuorumResult{Outcome: QuorumPending}
+}
+
+func evaluateMofN(quorumMSnapshot *int, approveCount, rejectCount, effectiveDenominator int) QuorumResult {
+	m := 1
+	switch {
+	case quorumMSnapshot == nil:
+	case *quorumMSnapshot < 1:
+		return QuorumResult{Outcome: QuorumRejectedStage}
+	default:
+		m = *quorumMSnapshot
+	}
+	if approveCount >= m {
+		return QuorumResult{Outcome: QuorumApprovedStage}
+	}
+	if rejectCount > effectiveDenominator-m {
+		return QuorumResult{Outcome: QuorumRejectedStage}
+	}
+	return QuorumResult{Outcome: QuorumPending}
 }

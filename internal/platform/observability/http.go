@@ -98,22 +98,7 @@ func (o *HTTPObservability) SetDBPool(p DBPoolStatsProvider) {
 // structured request logging, and metrics recording.
 func (o *HTTPObservability) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Trace-id resolution order (REQ-OBS-2): an active OTel span (created by
-		// the otelhttp link when OTel is configured, seeded from an inbound W3C
-		// traceparent if present) wins, so logs/metrics correlate with exported
-		// spans. Otherwise fall back to the X-Trace-Id header, then requesttrace.
-		// When OTel is off SpanContext is invalid and behaviour is unchanged.
-		traceID := ""
-		if sc := trace.SpanContextFromContext(r.Context()); sc.IsValid() {
-			traceID = sc.TraceID().String()
-		}
-		if traceID == "" {
-			var ok bool
-			traceID, ok = requesttrace.Normalize(r.Header.Get("X-Trace-Id"))
-			if !ok {
-				traceID = requesttrace.Resolve(r.Context())
-			}
-		}
+		traceID := resolveTraceID(r)
 		r = r.WithContext(withPrincipalSlot(requesttrace.WithTraceID(r.Context(), traceID)))
 
 		// Emit the resolved trace id on the response so a client can
@@ -136,64 +121,87 @@ func (o *HTTPObservability) Wrap(next http.Handler) http.Handler {
 				// (REQ-MW-1). The panic itself is NOT swallowed.
 				sw.status = http.StatusInternalServerError
 			}
-
-			path := strings.ReplaceAll(r.URL.Path, "\n", "")
-			route := routeLabel(r, path)
-			method := r.Method
-			elapsedMs := time.Since(start).Milliseconds()
-			if elapsedMs < 0 {
-				elapsedMs = 0
-			}
-			durationMs := uint64(elapsedMs)
-			isError := sw.status >= 400
-
-			m := o.getMetric(route, method)
-			atomic.AddUint64(&m.requests, 1)
-			if isError {
-				atomic.AddUint64(&m.errors, 1)
-			}
-			atomic.AddUint64(&m.durationMs, durationMs)
-			m.record(durationMs)
-
-			// Prometheus instrumentation reuses the same route/method/duration
-			// already computed above — no double-counting, no second timer.
-			// This coexists with the JSON byKey snapshot; each has its own
-			// storage (atomic counters vs. prometheus vecs).
-			prom := o.prometheusState()
-			prom.requestsTotal.WithLabelValues(route, method).Inc()
-			if isError {
-				prom.errorsTotal.WithLabelValues(route, method).Inc()
-			}
-			prom.durationSeconds.WithLabelValues(route, method).Observe(float64(durationMs) / 1000.0)
-
-			// Attribution order: principal slot (set outward by authn when
-			// this middleware runs outside auth, REQ-MW-4) → injected
-			// resolver (works when wrapped inside auth, e.g. tests).
-			userID := "anonymous"
-			if id := principalFromContext(r.Context()); id != "" {
-				userID = id
-			} else if o.userIDResolver != nil {
-				if id := strings.TrimSpace(o.userIDResolver(r)); id != "" {
-					userID = id
-				}
-			}
-			documentID, profileCode := extractRouteContext(path)
-
-			slog.Info("http_request",
-				"trace_id", traceID,
-				"user_id", userID,
-				"method", method,
-				"path", path,
-				"route", route,
-				"status", sw.status,
-				"duration_ms", durationMs,
-				"document_id", documentID,
-				"profile_code", profileCode,
-			)
+			o.recordRequest(r, sw, traceID, start)
 		}()
 		next.ServeHTTP(sw, r)
 		panicked = false
 	})
+}
+
+// resolveTraceID implements the trace-id resolution order (REQ-OBS-2): an
+// active OTel span (created by the otelhttp link when OTel is configured,
+// seeded from an inbound W3C traceparent if present) wins, so logs/metrics
+// correlate with exported spans. Otherwise fall back to the X-Trace-Id
+// header, then requesttrace. When OTel is off SpanContext is invalid and
+// behaviour is unchanged.
+func resolveTraceID(r *http.Request) string {
+	if sc := trace.SpanContextFromContext(r.Context()); sc.IsValid() {
+		return sc.TraceID().String()
+	}
+	traceID, ok := requesttrace.Normalize(r.Header.Get("X-Trace-Id"))
+	if !ok {
+		traceID = requesttrace.Resolve(r.Context())
+	}
+	return traceID
+}
+
+// recordRequest records RED metrics (JSON byKey snapshot + Prometheus) and
+// emits the structured access log line for a completed request. Called from
+// Wrap's deferred closure once sw.status is final.
+func (o *HTTPObservability) recordRequest(r *http.Request, sw *statusWriter, traceID string, start time.Time) {
+	path := strings.ReplaceAll(r.URL.Path, "\n", "")
+	route := routeLabel(r, path)
+	method := r.Method
+	elapsedMs := time.Since(start).Milliseconds()
+	if elapsedMs < 0 {
+		elapsedMs = 0
+	}
+	durationMs := uint64(elapsedMs)
+	isError := sw.status >= 400
+
+	m := o.getMetric(route, method)
+	atomic.AddUint64(&m.requests, 1)
+	if isError {
+		atomic.AddUint64(&m.errors, 1)
+	}
+	atomic.AddUint64(&m.durationMs, durationMs)
+	m.record(durationMs)
+
+	// Prometheus instrumentation reuses the same route/method/duration
+	// already computed above — no double-counting, no second timer.
+	// This coexists with the JSON byKey snapshot; each has its own
+	// storage (atomic counters vs. prometheus vecs).
+	prom := o.prometheusState()
+	prom.requestsTotal.WithLabelValues(route, method).Inc()
+	if isError {
+		prom.errorsTotal.WithLabelValues(route, method).Inc()
+	}
+	prom.durationSeconds.WithLabelValues(route, method).Observe(float64(durationMs) / 1000.0)
+
+	// Attribution order: principal slot (set outward by authn when
+	// this middleware runs outside auth, REQ-MW-4) → injected
+	// resolver (works when wrapped inside auth, e.g. tests).
+	userID := "anonymous"
+	if id := principalFromContext(r.Context()); id != "" {
+		userID = id
+	} else if o.userIDResolver != nil {
+		if id := strings.TrimSpace(o.userIDResolver(r)); id != "" {
+			userID = id
+		}
+	}
+	documentID, profileCode := extractRouteContext(path)
+
+	slog.Info("http_request",
+		"trace_id", traceID,
+		"user_id", userID,
+		"method", method,
+		"path", path,
+		"route", route,
+		"status", sw.status,
+		"duration_ms", durationMs,
+		"document_id", documentID,
+		"profile_code", profileCode,
+	)
 }
 
 // MetricsResponse is the typed envelope for GET /api/v1/metrics. It is

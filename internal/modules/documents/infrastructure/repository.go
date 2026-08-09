@@ -130,55 +130,93 @@ func (r *Repository) CreateDocumentTx(ctx context.Context, tx db.Tx, d *domain.D
 		return "", "", "", err
 	}
 
-	// Serialise revision_number allocation per (tenant, controlled_document).
-	// pg_advisory_xact_lock auto-releases at COMMIT/ROLLBACK.
+	// ADR 0022 Phase 7: a document is created INTO a process area — authorize
+	// against that area (area-grade). system_admin bypasses tier-2. Also
+	// serialises revision_number allocation per (tenant, controlled_document)
+	// via an advisory lock (auto-releases at COMMIT/ROLLBACK).
+	docArea := docAreaSnapshot(d.ProcessAreaCodeSnapshot)
+	if err := r.authorizeDocumentCreate(ctx, tx, d, docArea); err != nil {
+		return "", "", "", err
+	}
+
+	// Deferrable FKs allow inserting doc -> session -> revision in any order in tx.
+	// COALESCE handles hypothetical NULL CD (schema enforces NOT NULL since migration 0129).
+	createdByDisplayName, areaName, err := r.resolveCreateDocumentSnapshots(ctx, tx, d)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	docID, revID, sessionID, err = r.insertDocumentRevisionSession(ctx, tx, d, initialContentHash, initialStorageKey, createdByDisplayName, areaName)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	if err := r.finalizeDocumentPointers(ctx, tx, d, docArea, docID, revID, sessionID); err != nil {
+		return "", "", "", err
+	}
+
+	if err := r.writeCreateDocumentSnapshotAndPlaceholders(ctx, tx, d, docID, revID, requiredPlaceholders); err != nil {
+		return "", "", "", err
+	}
+
+	return docID, revID, sessionID, nil
+}
+
+// authorizeDocumentCreate serialises revision_number allocation per
+// (tenant, controlled_document) via an advisory lock, then enforces
+// document.create against docArea (ADR 0022 Phase 7, area-grade;
+// system_admin bypasses tier-2). pg_advisory_xact_lock auto-releases at
+// COMMIT/ROLLBACK.
+func (r *Repository) authorizeDocumentCreate(ctx context.Context, tx db.Tx, d *domain.Document, docArea string) error {
 	if d.ControlledDocumentID != nil && *d.ControlledDocumentID != "" {
 		lockKey := d.TenantID + ":" + *d.ControlledDocumentID
 		if _, err := tx.ExecContext(ctx,
 			`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, lockKey,
 		); err != nil {
-			return "", "", "", fmt.Errorf("acquire revision lock: %w", err)
+			return fmt.Errorf("acquire revision lock: %w", err)
 		}
 	}
-
-	// ADR 0022 Phase 7: a document is created INTO a process area — authorize
-	// against that area (area-grade). system_admin bypasses tier-2.
-	docArea := docAreaSnapshot(d.ProcessAreaCodeSnapshot)
 	if err := authz.Require(ctx, mustSQLTx(tx), string(iamdomain.CapDocumentCreate), docArea); err != nil {
-		return "", "", "", fmt.Errorf("create document: authz check: %w", err)
+		return fmt.Errorf("create document: authz check: %w", err)
 	}
+	return nil
+}
 
-	// Deferrable FKs allow inserting doc -> session -> revision in any order in tx.
-	// COALESCE handles hypothetical NULL CD (schema enforces NOT NULL since migration 0129).
-
-	// M4/F4.1: read display_name via the iam-owned port (off-tx, tenant-scoped).
-	// The port reads the iam connection pool so the snapshot is never inside the
-	// create tx (H-PRE-1). Becomes tenant-scoped — deliberate correctness
-	// tightening (spec §non-goals, two bounded divergences).
+// resolveCreateDocumentSnapshots reads the two immutable name snapshots
+// written onto the document at creation: created_by's display name (M4/F4.1,
+// off-tx via the iam-owned port so the read is never inside the create tx —
+// H-PRE-1) and the process area's display name (M2/F2.3, via the
+// taxonomy-owned AreaCatalogReader port, ADR-0039 D3(b), run inside tx so it
+// stays non-recording — HS-PRE-1). found == false reproduces the prior
+// sql.ErrNoRows branch (NULL area_name_snapshot).
+func (r *Repository) resolveCreateDocumentSnapshots(ctx context.Context, tx db.Tx, d *domain.Document) (createdByDisplayName, areaName sql.NullString, err error) {
 	rawDisplayName, err := r.displayName.DisplayName(ctx, d.TenantID, d.CreatedBy)
 	if err != nil {
-		return "", "", "", fmt.Errorf("create document: lookup created_by display name: %w", err)
+		return sql.NullString{}, sql.NullString{}, fmt.Errorf("create document: lookup created_by display name: %w", err)
 	}
-	var createdByDisplayName sql.NullString
 	if rawDisplayName != "" {
 		createdByDisplayName = sql.NullString{String: rawDisplayName, Valid: true}
 	}
 
-	// M2/F2.3: read the area name through the taxonomy-owned AreaCatalogReader
-	// port (ADR-0039 D3(b)) instead of raw cross-module SQL. tx is passed so the
-	// read runs inside this create tx and stays non-recording (HS-PRE-1); found
-	// == false reproduces the prior sql.ErrNoRows branch (NULL area_name_snapshot).
-	var areaName sql.NullString
 	if d.ProcessAreaCodeSnapshot != nil && *d.ProcessAreaCodeSnapshot != "" {
 		name, found, err := r.areaCatalog.AreaName(ctx, tx, d.TenantID, *d.ProcessAreaCodeSnapshot)
 		if err != nil {
-			return "", "", "", fmt.Errorf("create document: lookup area name: %w", err)
+			return sql.NullString{}, sql.NullString{}, fmt.Errorf("create document: lookup area name: %w", err)
 		}
 		if found {
 			areaName = sql.NullString{String: name, Valid: true}
 		}
 	}
+	return createdByDisplayName, areaName, nil
+}
 
+// insertDocumentRevisionSession performs the three inserts that create a
+// document: the documents row, its initial editor_sessions row, and its
+// initial document_revisions row.
+func (r *Repository) insertDocumentRevisionSession(
+	ctx context.Context, tx db.Tx, d *domain.Document, initialContentHash, initialStorageKey string,
+	createdByDisplayName, areaName sql.NullString,
+) (docID, revID, sessionID string, err error) {
 	if err := tx.QueryRowContext(ctx,
 		`INSERT INTO documents (tenant_id, template_version_id, name, status, form_data_json, created_by, controlled_document_id, profile_code_snapshot, process_area_code_snapshot, code, revision_number, created_by_display_name_snapshot, area_name_snapshot)
 		 SELECT $1, $2, $3, 'draft', $4, $5, $6, $7, $8, $9,
@@ -206,25 +244,37 @@ func (r *Repository) CreateDocumentTx(ctx context.Context, tx db.Tx, d *domain.D
 		return "", "", "", fmt.Errorf("insert revision: %w", err)
 	}
 
+	return docID, revID, sessionID, nil
+}
+
+// finalizeDocumentPointers re-checks document.edit (initialize-document-
+// pointers authz gate), acks the initial revision on the editor session, and
+// points the document at its initial revision/session.
+func (r *Repository) finalizeDocumentPointers(ctx context.Context, tx db.Tx, d *domain.Document, docArea, docID, revID, sessionID string) error {
 	if err := authz.Require(ctx, mustSQLTx(tx), string(iamdomain.CapDocumentEdit), docArea); err != nil {
-		return "", "", "", fmt.Errorf("initialize document pointers: authz check: %w", err)
+		return fmt.Errorf("initialize document pointers: authz check: %w", err)
 	}
 
 	if _, err := tx.ExecContext(ctx,
 		`UPDATE editor_sessions SET last_acknowledged_revision_id = $1 WHERE id = $2 AND tenant_id = $3::uuid`,
 		revID, sessionID, d.TenantID,
 	); err != nil {
-		return "", "", "", fmt.Errorf("update session ack: %w", err)
+		return fmt.Errorf("update session ack: %w", err)
 	}
 
 	if _, err := tx.ExecContext(ctx,
 		`UPDATE documents SET current_revision_id = $1, active_session_id = $2, updated_at = now() WHERE id = $3`,
 		revID, sessionID, docID,
 	); err != nil {
-		return "", "", "", fmt.Errorf("update document pointers: %w", err)
+		return fmt.Errorf("update document pointers: %w", err)
 	}
+	return nil
+}
 
-	// Write snapshot columns in same tx (C2/C4: atomic creation).
+// writeCreateDocumentSnapshotAndPlaceholders writes the frozen template
+// snapshot columns (C2/C4: atomic creation) and seeds the required
+// placeholder_values rows (C4), both in the caller's create tx.
+func (r *Repository) writeCreateDocumentSnapshotAndPlaceholders(ctx context.Context, tx db.Tx, d *domain.Document, docID, revID string, requiredPlaceholders []templatesdomain.Placeholder) error {
 	if snap := d.TemplateSnapshot; snap.PlaceholderSchemaJSON != nil || snap.CompositionJSON != nil || snap.BodyDocxS3Key != "" {
 		h := snap.Hashes()
 		if _, err := tx.ExecContext(ctx, `
@@ -241,11 +291,10 @@ func (r *Repository) CreateDocumentTx(ctx context.Context, tx db.Tx, d *domain.D
 			snap.BodyDocxS3Key, h.BodyDocxHash,
 			docID,
 		); err != nil {
-			return "", "", "", fmt.Errorf("write snapshot: %w", err)
+			return fmt.Errorf("write snapshot: %w", err)
 		}
 	}
 
-	// Seed required placeholder_values rows in same tx (C4).
 	for _, p := range requiredPlaceholders {
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO public.document_placeholder_values
@@ -254,11 +303,10 @@ func (r *Repository) CreateDocumentTx(ctx context.Context, tx db.Tx, d *domain.D
 			ON CONFLICT DO NOTHING`,
 			d.TenantID, revID, p.ID,
 		); err != nil {
-			return "", "", "", fmt.Errorf("seed placeholder %q: %w", p.ID, err)
+			return fmt.Errorf("seed placeholder %q: %w", p.ID, err)
 		}
 	}
-
-	return docID, revID, sessionID, nil
+	return nil
 }
 
 // SeedDictionaryValuesTx pins resolved dictionary placeholder values (keyed by
@@ -1173,9 +1221,55 @@ func (r *Repository) CommitUpload(ctx context.Context, tenantID, sessionID, user
 		return nil, fmt.Errorf("commit autosave: authz check: %w", err)
 	}
 
-	// Lock pending row.
+	p, err := lockPendingUpload(ctx, tx, tenantID, pendingID)
+	if err != nil {
+		return nil, err
+	}
+	if p.SessionID != sessionID || p.DocumentID != docID {
+		return nil, domain.ErrMisbound
+	}
+	if p.ConsumedAt != nil {
+		// Idempotent replay: the upload already committed. Session state is intentionally
+		// not checked — the revision exists regardless of whether the session is still
+		// active. Return the existing revision so the client can ack it safely.
+		res, err := replayCommittedRevision(ctx, tx, docID, p.ContentHash)
+		if err != nil {
+			return nil, err
+		}
+		return res, tx.Commit()
+	}
+	if time.Now().After(p.ExpiresAt) {
+		return nil, domain.ErrExpiredUpload
+	}
+
+	if err := verifyEditorSessionForCommit(ctx, tx, tenantID, sessionID, userID, p.BaseRevisionID); err != nil {
+		return nil, err
+	}
+
+	// TOCTOU guard: service verified S3 hash matches pending.content_hash moments
+	// before this call, but a concurrent tx could have rewritten the pending row.
+	// Re-check under lock.
+	if serverComputedHash != p.ContentHash {
+		return nil, domain.ErrContentHashMismatch
+	}
+
+	effectiveFormData, err := resolveEffectiveFormData(ctx, tx, tenantID, docID, formDataSnapshot)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := insertCommittedRevision(ctx, tx, tenantID, docID, sessionID, pendingID, p, effectiveFormData, fileSizeBytes, pageCount, pageCountSource)
+	if err != nil {
+		return nil, err
+	}
+	return res, tx.Commit()
+}
+
+// lockPendingUpload row-locks (FOR UPDATE) and returns the pending autosave
+// upload row CommitUpload validates and consumes.
+func lockPendingUpload(ctx context.Context, tx db.Tx, tenantID, pendingID string) (*domain.PendingUpload, error) {
 	var p domain.PendingUpload
-	err = tx.QueryRowContext(ctx,
+	err := tx.QueryRowContext(ctx,
 		`SELECT p.id::text, p.session_id::text, p.document_id::text, p.base_revision_id::text, p.content_hash,
 		        p.storage_key, p.expires_at, p.consumed_at
 		 FROM autosave_pending_uploads p
@@ -1188,89 +1282,94 @@ func (r *Repository) CommitUpload(ctx context.Context, tenantID, sessionID, user
 	if err != nil {
 		return nil, err
 	}
+	return &p, nil
+}
 
-	if p.SessionID != sessionID || p.DocumentID != docID {
-		return nil, domain.ErrMisbound
+// replayCommittedRevision looks up the revision an already-consumed pending
+// upload produced, for CommitUpload's idempotent-replay branch.
+func replayCommittedRevision(ctx context.Context, tx db.Tx, docID, contentHash string) (*CommitResult, error) {
+	var rid string
+	var rnum int64
+	var replayFileSize sql.NullInt64
+	var replayPageCount sql.NullInt64
+	var replayPageCountSource sql.NullString
+	if err := tx.QueryRowContext(ctx,
+		`SELECT id::text, revision_num, file_size_bytes, page_count, page_count_source FROM document_revisions
+		 WHERE document_id=$1 AND content_hash=$2`, docID, contentHash,
+	).Scan(&rid, &rnum, &replayFileSize, &replayPageCount, &replayPageCountSource); err != nil {
+		return nil, fmt.Errorf("replay lookup: %w", err)
 	}
-	if p.ConsumedAt != nil {
-		// Idempotent replay: the upload already committed. Session state is intentionally
-		// not checked — the revision exists regardless of whether the session is still
-		// active. Return the existing revision so the client can ack it safely.
-		var rid string
-		var rnum int64
-		var replayFileSize sql.NullInt64
-		var replayPageCount sql.NullInt64
-		var replayPageCountSource sql.NullString
-		if err := tx.QueryRowContext(ctx,
-			`SELECT id::text, revision_num, file_size_bytes, page_count, page_count_source FROM document_revisions
-			 WHERE document_id=$1 AND content_hash=$2`, docID, p.ContentHash,
-		).Scan(&rid, &rnum, &replayFileSize, &replayPageCount, &replayPageCountSource); err != nil {
-			return nil, fmt.Errorf("replay lookup: %w", err)
-		}
-		res := &CommitResult{RevisionID: rid, RevisionNum: rnum, AlreadyConsumed: true}
-		if replayFileSize.Valid {
-			res.FileSizeBytes = &replayFileSize.Int64
-		}
-		if replayPageCount.Valid {
-			pc := int(replayPageCount.Int64)
-			res.PageCount = &pc
-		}
-		if replayPageCountSource.Valid {
-			res.PageCountSource = &replayPageCountSource.String
-		}
-		return res, tx.Commit()
+	res := &CommitResult{RevisionID: rid, RevisionNum: rnum, AlreadyConsumed: true}
+	if replayFileSize.Valid {
+		res.FileSizeBytes = &replayFileSize.Int64
 	}
-	if time.Now().After(p.ExpiresAt) {
-		return nil, domain.ErrExpiredUpload
+	if replayPageCount.Valid {
+		pc := int(replayPageCount.Int64)
+		res.PageCount = &pc
 	}
+	if replayPageCountSource.Valid {
+		res.PageCountSource = &replayPageCountSource.String
+	}
+	return res, nil
+}
 
-	// Re-verify session still active + holder + ack still matches base.
+// verifyEditorSessionForCommit re-verifies (FOR UPDATE) that the editor
+// session is still active, still held by userID, and still acknowledges
+// baseRevisionID before CommitUpload writes a new revision.
+func verifyEditorSessionForCommit(ctx context.Context, tx db.Tx, tenantID, sessionID, userID, baseRevisionID string) error {
 	var sessUser, sessAck, sessStatus string
-	err = tx.QueryRowContext(ctx,
+	err := tx.QueryRowContext(ctx,
 		`SELECT user_id::text, last_acknowledged_revision_id::text, status
 		 FROM editor_sessions WHERE id=$1 AND tenant_id=$2::uuid FOR UPDATE`, sessionID, tenantID,
 	).Scan(&sessUser, &sessAck, &sessStatus)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if sessStatus != string(domain.SessionActive) {
-		return nil, domain.ErrSessionInactive
+		return domain.ErrSessionInactive
 	}
 	if sessUser != userID {
-		return nil, domain.ErrSessionNotHolder
+		return domain.ErrSessionNotHolder
 	}
-	if sessAck != p.BaseRevisionID {
-		return nil, domain.ErrStaleBase
+	if sessAck != baseRevisionID {
+		return domain.ErrStaleBase
 	}
+	return nil
+}
 
-	// TOCTOU guard: service verified S3 hash matches pending.content_hash moments
-	// before this call, but a concurrent tx could have rewritten the pending row.
-	// Re-check under lock.
-	if serverComputedHash != p.ContentHash {
-		return nil, domain.ErrContentHashMismatch
+// resolveEffectiveFormData implements the OPTIONAL form_data_snapshot
+// partial-update contract (commitDocumentAutosave in
+// api/openapi/v1/openapi.yaml): an autosave that only changes the artifact
+// carries no form data. Absent means "leave the form data as it is", so the
+// effective snapshot is the document's current form_data_json. Writing the
+// nil through instead would hit the documents.form_data_json NOT NULL
+// constraint (a contract-conforming request turning into a 500), and
+// substituting `{}` would wipe real user data. Race-safe: the documents row
+// is already held FOR UPDATE by the pending-upload lock in CommitUpload, so
+// nothing can change form_data_json between this read and the caller's
+// UPDATE.
+func resolveEffectiveFormData(ctx context.Context, tx db.Tx, tenantID, docID string, formDataSnapshot []byte) ([]byte, error) {
+	if len(formDataSnapshot) != 0 {
+		return formDataSnapshot, nil
 	}
-
-	// form_data_snapshot is OPTIONAL in the contract (commitDocumentAutosave in
-	// api/openapi/v1/openapi.yaml): an autosave that only changes the artifact
-	// carries no form data. Partial-update semantics — absent means "leave the
-	// form data as it is", so the effective snapshot is the document's current
-	// form_data_json. Writing the nil through instead would hit the
-	// documents.form_data_json NOT NULL constraint (a contract-conforming
-	// request turning into a 500), and substituting `{}` would wipe real user
-	// data. The same preserved value is stamped on the new revision so revision
-	// history and checkpoint restore (which copies form_data_snapshot back into
-	// documents.form_data_json) stay coherent. Race-safe: the documents row is
-	// already held FOR UPDATE by the pending-upload lock above, so nothing can
-	// change form_data_json between this read and the UPDATE below.
-	effectiveFormData := formDataSnapshot
-	if len(effectiveFormData) == 0 {
-		if err := tx.QueryRowContext(ctx,
-			`SELECT form_data_json FROM documents WHERE id=$1 AND tenant_id=$2::uuid`, docID, tenantID,
-		).Scan(&effectiveFormData); err != nil {
-			return nil, fmt.Errorf("preserve current form data: %w", err)
-		}
+	var effectiveFormData []byte
+	if err := tx.QueryRowContext(ctx,
+		`SELECT form_data_json FROM documents WHERE id=$1 AND tenant_id=$2::uuid`, docID, tenantID,
+	).Scan(&effectiveFormData); err != nil {
+		return nil, fmt.Errorf("preserve current form data: %w", err)
 	}
+	return effectiveFormData, nil
+}
 
+// insertCommittedRevision inserts the new document_revisions row and updates
+// the document/session/pending-upload pointers that mark it current — the
+// same preserved effectiveFormData is stamped on the new revision so revision
+// history and checkpoint restore (which copies form_data_snapshot back into
+// documents.form_data_json) stay coherent.
+func insertCommittedRevision(
+	ctx context.Context, tx db.Tx, tenantID, docID, sessionID, pendingID string, p *domain.PendingUpload,
+	effectiveFormData []byte, fileSizeBytes int64, pageCount *int, pageCountSource *string,
+) (*CommitResult, error) {
 	var revID string
 	var revNum int64
 	var committedFileSize sql.NullInt64
@@ -1314,9 +1413,12 @@ func (r *Repository) CommitUpload(ctx context.Context, tenantID, sessionID, user
 	if committedPageCountSource.Valid {
 		res.PageCountSource = &committedPageCountSource.String
 	}
-	return res, tx.Commit()
+	return res, nil
 }
 
+// SyncCurrentRevisionArtifactMetadata updates the current revision's stored
+// artifact metadata (file size, page count and its source) in a single tx and
+// returns the resulting commit view.
 func (r *Repository) SyncCurrentRevisionArtifactMetadata(ctx context.Context, tenantID, sessionID, userID, docID string, fileSizeBytes int64, pageCount *int, pageCountSource *string) (*CommitResult, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -1335,6 +1437,27 @@ func (r *Repository) SyncCurrentRevisionArtifactMetadata(ctx context.Context, te
 		return nil, fmt.Errorf("sync artifact metadata: authz check: %w", err)
 	}
 
+	currentRevisionID, err := lockDraftDocumentForSync(ctx, tx, tenantID, sessionID, docID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := verifySyncEditorSession(ctx, tx, tenantID, sessionID, userID); err != nil {
+		return nil, err
+	}
+
+	res, err := writeSyncedArtifactMetadata(ctx, tx, currentRevisionID, docID, fileSizeBytes, pageCount, pageCountSource)
+	if err != nil {
+		return nil, err
+	}
+	return res, tx.Commit()
+}
+
+// lockDraftDocumentForSync row-locks (FOR UPDATE) the document and returns
+// its current_revision_id, after enforcing the draft-status and
+// active-session-holder invariants SyncCurrentRevisionArtifactMetadata
+// depends on.
+func lockDraftDocumentForSync(ctx context.Context, tx db.Tx, tenantID, sessionID, docID string) (string, error) {
 	var currentRevisionID, activeSessionID, status string
 	if err := tx.QueryRowContext(ctx,
 		`SELECT coalesce(current_revision_id::text,''), coalesce(active_session_id::text,''), status
@@ -1344,20 +1467,25 @@ func (r *Repository) SyncCurrentRevisionArtifactMetadata(ctx context.Context, te
 		docID, tenantID,
 	).Scan(&currentRevisionID, &activeSessionID, &status); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, domain.ErrNotFound
+			return "", domain.ErrNotFound
 		}
-		return nil, err
+		return "", err
 	}
 	if status != string(domain.DocStatusDraft) {
-		return nil, domain.ErrInvalidStateTransition
+		return "", domain.ErrInvalidStateTransition
 	}
 	if activeSessionID == "" {
-		return nil, domain.ErrSessionInactive
+		return "", domain.ErrSessionInactive
 	}
 	if activeSessionID != sessionID {
-		return nil, domain.ErrSessionNotHolder
+		return "", domain.ErrSessionNotHolder
 	}
+	return currentRevisionID, nil
+}
 
+// verifySyncEditorSession row-locks (FOR UPDATE) and re-verifies the editor
+// session is still active and still held by userID.
+func verifySyncEditorSession(ctx context.Context, tx db.Tx, tenantID, sessionID, userID string) error {
 	var sessUser, sessStatus string
 	if err := tx.QueryRowContext(ctx,
 		`SELECT user_id::text, status
@@ -1366,15 +1494,21 @@ func (r *Repository) SyncCurrentRevisionArtifactMetadata(ctx context.Context, te
 		  FOR UPDATE`,
 		sessionID, tenantID,
 	).Scan(&sessUser, &sessStatus); err != nil {
-		return nil, err
+		return err
 	}
 	if sessStatus != string(domain.SessionActive) {
-		return nil, domain.ErrSessionInactive
+		return domain.ErrSessionInactive
 	}
 	if sessUser != userID {
-		return nil, domain.ErrSessionNotHolder
+		return domain.ErrSessionNotHolder
 	}
+	return nil
+}
 
+// writeSyncedArtifactMetadata persists the artifact metadata (file size,
+// page count, page count source) synced onto the document's current
+// revision.
+func writeSyncedArtifactMetadata(ctx context.Context, tx db.Tx, currentRevisionID, docID string, fileSizeBytes int64, pageCount *int, pageCountSource *string) (*CommitResult, error) {
 	var committedFileSize sql.NullInt64
 	var committedPageCount sql.NullInt64
 	var committedPageCountSource sql.NullString
@@ -1405,7 +1539,7 @@ func (r *Repository) SyncCurrentRevisionArtifactMetadata(ctx context.Context, te
 	if committedPageCountSource.Valid {
 		res.PageCountSource = &committedPageCountSource.String
 	}
-	return res, tx.Commit()
+	return res, nil
 }
 
 // DeleteExpiredPending deletes up to 500 unconsumed autosave pending-upload

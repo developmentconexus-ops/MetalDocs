@@ -83,6 +83,76 @@ type docSignoffRequest struct {
 	ContentHash string `json:"content_hash"`
 }
 
+// decodeSignoffRequest reads and validates the docSignoffRequest wire body,
+// trimming and mapping it onto contracts.SignoffRequest.
+func decodeSignoffRequest(r *http.Request) (contracts.SignoffRequest, error) {
+	var body docSignoffRequest
+	if err := strictjson.Decode(r, &body); err != nil {
+		return contracts.SignoffRequest{}, err
+	}
+	contractReq := contracts.SignoffRequest{
+		Decision:      contracts.Decision(strings.TrimSpace(body.Decision)),
+		Reason:        strings.TrimSpace(body.Reason),
+		PasswordToken: strings.TrimSpace(body.Password),
+		ContentHash:   strings.TrimSpace(body.ContentHash),
+	}
+	if err := contractReq.Validate(); err != nil {
+		return contracts.SignoffRequest{}, NewValidationError(err.Error())
+	}
+	return contractReq, nil
+}
+
+// resolveSignoffReplay begins (or replays) a document-signoff idempotency
+// slot. handled is true when the caller must return immediately: either the
+// begin call failed (error already written) or a prior attempt is being
+// replayed (response already written). handled is false only when a fresh
+// replayHandle (possibly nil, when no idempStore is wired) is ready for the
+// caller to carry through the write.
+func (h *Handler) resolveSignoffReplay(w http.ResponseWriter, r *http.Request, tenantID, actorID, idempKey, payloadHash string) (replayHandle application.SignoffReplayCommitter, handled bool) {
+	if h.idempStore == nil {
+		return nil, false
+	}
+	handle, replay, err := h.idempStore.BeginDocumentReplay(r.Context(), tenantID, actorID, idempKey, payloadHash)
+	if err != nil {
+		WriteError(w, err)
+		return nil, true
+	}
+	if replay != nil {
+		WriteJSON(w, http.StatusOK, contracts.SignoffResponse{
+			SignoffID: replay.SignoffID,
+			WasReplay: true,
+			Outcome:   replay.Outcome,
+		})
+		return nil, true
+	}
+	return handle, false
+}
+
+// resolveActiveSignoffStage loads the document's active instance+stage and
+// checks the acting user's eligibility, releasing replayHandle on any
+// failure exit (failReplaySlot is a no-op for a nil handle).
+func (h *Handler) resolveActiveSignoffStage(r *http.Request, replayHandle application.SignoffReplayCommitter, tenantID, actorID, docID string) (*domain.Instance, *domain.StageInstance, error) {
+	inst, err := h.loadActiveInstanceByDocumentForMutation(r, tenantID, docID)
+	if err != nil {
+		failReplaySlot(replayHandle, err)
+		if errors.Is(err, infrastructure.ErrNoActiveInstance) {
+			return nil, nil, infrastructure.ErrNoActiveInstance
+		}
+		return nil, nil, err
+	}
+
+	activeStage := inst.Active()
+	if activeStage == nil {
+		failReplaySlot(replayHandle, infrastructure.ErrInstanceCompleted)
+		return nil, nil, infrastructure.ErrInstanceCompleted
+	}
+	if err := domain.CheckEligibility(actorID, activeStage.EligibleActorIDs); err != nil {
+		failReplaySlot(replayHandle, err)
+		return nil, nil, err
+	}
+	return inst, activeStage, nil
+}
+
 // SignoffByDocumentHandler handles POST /api/v1/documents/{id}/signoff.
 // It finds the active instance+stage for the document and records the signoff.
 func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Request) {
@@ -111,19 +181,9 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	var body docSignoffRequest
-	if err := strictjson.Decode(r, &body); err != nil {
+	contractReq, err := decodeSignoffRequest(r)
+	if err != nil {
 		WriteError(w, err)
-		return
-	}
-	contractReq := contracts.SignoffRequest{
-		Decision:      contracts.Decision(strings.TrimSpace(body.Decision)),
-		Reason:        strings.TrimSpace(body.Reason),
-		PasswordToken: strings.TrimSpace(body.Password),
-		ContentHash:   strings.TrimSpace(body.ContentHash),
-	}
-	if err := contractReq.Validate(); err != nil {
-		WriteError(w, NewValidationError(err.Error()))
 		return
 	}
 	decision := domain.Decision(contractReq.Decision)
@@ -137,43 +197,13 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 	// carries no document ID, so docID is also what isolates distinct documents
 	// under a reused key.
 	payloadHash := signoffPayloadHash(docID, "", "", decision, contractReq.Reason, contractReq.ContentHash)
-	var replayHandle application.SignoffReplayCommitter
-	if h.idempStore != nil {
-		handle, replay, err := h.idempStore.BeginDocumentReplay(r.Context(), tenantID, actorID, idempKey, payloadHash)
-		if err != nil {
-			WriteError(w, err)
-			return
-		}
-		if replay != nil {
-			WriteJSON(w, http.StatusOK, contracts.SignoffResponse{
-				SignoffID: replay.SignoffID,
-				WasReplay: true,
-				Outcome:   replay.Outcome,
-			})
-			return
-		}
-		replayHandle = handle
+	replayHandle, handled := h.resolveSignoffReplay(w, r, tenantID, actorID, idempKey, payloadHash)
+	if handled {
+		return
 	}
 
-	inst, err := h.loadActiveInstanceByDocumentForMutation(r, tenantID, docID)
+	inst, activeStage, err := h.resolveActiveSignoffStage(r, replayHandle, tenantID, actorID, docID)
 	if err != nil {
-		failReplaySlot(replayHandle, err)
-		if errors.Is(err, infrastructure.ErrNoActiveInstance) {
-			WriteError(w, infrastructure.ErrNoActiveInstance)
-			return
-		}
-		WriteError(w, err)
-		return
-	}
-
-	activeStage := inst.Active()
-	if activeStage == nil {
-		failReplaySlot(replayHandle, infrastructure.ErrInstanceCompleted)
-		WriteError(w, infrastructure.ErrInstanceCompleted)
-		return
-	}
-	if err := domain.CheckEligibility(actorID, activeStage.EligibleActorIDs); err != nil {
-		failReplaySlot(replayHandle, err)
 		WriteError(w, err)
 		return
 	}

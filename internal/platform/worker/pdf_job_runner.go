@@ -182,19 +182,30 @@ func (r *PDFJobRunner) Handle(ctx context.Context, event messaging.Event) error 
 	}
 
 	if r.db == nil {
-		// Legacy untransacted path (NewPDFJobRunner) — no RLS tenant seed.
-		// A release generation cannot be honoured here: its fact must commit
-		// with the artifact write, and there is no transaction to join. Fail
-		// closed rather than silently dropping the fact.
-		if payload.ReleaseGenerationID != "" {
-			return fmt.Errorf("pdf job runner: release generation %s requires the transacted path (NewPDFJobRunnerWithDB)", payload.ReleaseGenerationID)
-		}
-		if err := r.persister.WritePDF(ctx, req); err != nil {
-			return fmt.Errorf("pdf job runner: persist pdf: %w", err)
-		}
-		return nil
+		return r.persistLegacy(ctx, payload, req)
 	}
+	return r.persistInTx(ctx, payload, req)
+}
 
+// persistLegacy runs the untransacted write path (NewPDFJobRunner) — no RLS
+// tenant seed. A release generation cannot be honoured here: its fact must
+// commit with the artifact write, and there is no transaction to join. Fail
+// closed rather than silently dropping the fact.
+func (r *PDFJobRunner) persistLegacy(ctx context.Context, payload messaging.PDFConvertPayload, req PDFWriteRequest) error {
+	if payload.ReleaseGenerationID != "" {
+		return fmt.Errorf("pdf job runner: release generation %s requires the transacted path (NewPDFJobRunnerWithDB)", payload.ReleaseGenerationID)
+	}
+	if err := r.persister.WritePDF(ctx, req); err != nil {
+		return fmt.Errorf("pdf job runner: persist pdf: %w", err)
+	}
+	return nil
+}
+
+// persistInTx runs the transacted write path (NewPDFJobRunnerWithDB): the
+// PDF write and, when a release generation is present, the ADR 0085 artifact
+// fact commit together in one tenant-seeded transaction (M3 F3.2 —
+// validation-contract.md §2.2 site 2).
+func (r *PDFJobRunner) persistInTx(ctx context.Context, payload messaging.PDFConvertPayload, req PDFWriteRequest) error {
 	inTx, ok := r.persister.(PDFPersisterInTx)
 	if !ok {
 		return fmt.Errorf("pdf job runner: persister %T does not implement PDFPersisterInTx (required when constructed via NewPDFJobRunnerWithDB)", r.persister)

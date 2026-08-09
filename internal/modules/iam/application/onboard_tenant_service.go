@@ -144,102 +144,167 @@ func NewOnboardTenantService(tenants tenantRepository, createUserTx createUserTx
 // domain.ErrTenantSlugConflict / domain.ErrTenantAdminUserConflict on unique
 // violations, and authz.ErrCapDenied when actorID lacks tenant.onboard.
 func (s *OnboardTenantService) OnboardTenant(ctx context.Context, in OnboardTenantInput, actorID, actorTenantID string) (OnboardTenantResult, error) {
-	name := strings.TrimSpace(in.Name)
-	slug := strings.TrimSpace(in.Slug)
-	adminUserID := strings.TrimSpace(in.AdminUserID)
-	adminDisplayName := strings.TrimSpace(in.AdminDisplayName)
-	adminPassword := in.AdminPassword
-	actorID = strings.TrimSpace(actorID)
-	actorTenantID = strings.TrimSpace(actorTenantID)
-
-	if err := validateOnboardTenantInput(name, slug, adminUserID, adminDisplayName, adminPassword); err != nil {
+	f, err := normalizeOnboardTenantInput(in, actorID, actorTenantID)
+	if err != nil {
 		return OnboardTenantResult{}, err
-	}
-	if actorID == "" {
-		return OnboardTenantResult{}, fmt.Errorf("%w: actor id required", iamdomain.ErrTenantOnboardValidation)
-	}
-	if actorTenantID == "" {
-		return OnboardTenantResult{}, fmt.Errorf("%w: actor tenant id required", iamdomain.ErrTenantOnboardValidation)
 	}
 	if s.runner == nil || s.audit == nil || s.tenants == nil || s.createUserTx == nil || s.hashPassword == nil {
 		return OnboardTenantResult{}, fmt.Errorf("iam: OnboardTenantService is not fully wired")
 	}
 
-	passwordHash, passwordAlgo, err := s.hashPassword(adminPassword)
+	passwordHash, passwordAlgo, err := s.hashPassword(f.adminPassword)
 	if err != nil {
 		return OnboardTenantResult{}, fmt.Errorf("iam: hash admin password: %w", err)
 	}
 
 	tenantID := uuid.NewString()
 
-	ev, err := s.buildOnboardedAuditEvent(ctx, tenantID, adminUserID, actorID, name, slug)
+	ev, err := s.buildOnboardedAuditEvent(ctx, tenantID, f.adminUserID, f.actorID, f.name, f.slug)
 	if err != nil {
 		return OnboardTenantResult{}, err
 	}
 
-	err = s.runner.Do(ctx, func(tx *sql.Tx) error {
-		// Tripwire requires the caps asserted BEFORE any guarded INSERT, and
-		// grants are tenant-scoped, so both Requires resolve under the
-		// ACTOR's tenant (the new tenant has zero roles by definition).
-		// tenant.onboard guards the tenants INSERT; user.manage guards the
-		// iam_users/iam_user_roles INSERTs this provisioning also performs.
-		txCtx := authz.WithCapCache(ctx)
-		if err := authz.SeedTxIdentity(txCtx, tx, actorTenantID, actorID); err != nil {
-			return fmt.Errorf("seed tenant.onboard authorization: %w", err)
-		}
-		if err := authz.Require(txCtx, tx, string(iamdomain.CapTenantOnboard), "tenant"); err != nil {
-			return fmt.Errorf("require tenant.onboard authorization: %w", err)
-		}
-		if err := authz.Require(txCtx, tx, string(iamdomain.CapUserManage), "tenant"); err != nil {
-			return fmt.Errorf("require user.manage authorization: %w", err)
-		}
-
-		// Provisioning rows (tenants/iam_users/iam_user_roles/audit) all
-		// carry tenant_id = the NEW tenant, so re-seed the tx-local tenant
-		// GUC to it before writing — under FORCE RLS (M7 F7.4) the WITH
-		// CHECK clause compares row tenant_id against this GUC. The
-		// asserted_caps GUC set by the Requires above is tx-local and
-		// persists across this switch.
-		if err := authz.SeedTxTenant(txCtx, tx, tenantID); err != nil {
-			return fmt.Errorf("seed provisioning tenant: %w", err)
-		}
-
-		if err := s.tenants.InsertTenantTx(txCtx, tx, tenantID, name, slug); err != nil {
-			return err
-		}
-
-		if err := s.keys.ProvisionTenantKey(txCtx, tx, tenantID); err != nil {
-			return fmt.Errorf("provision tenant key: %w", err)
-		}
-
-		if err := s.createUserTx.CreateUserTx(txCtx, tx, authdomain.CreateUserParams{
-			UserID:             adminUserID,
-			Username:           adminUserID,
-			Email:              adminEmailOrEmpty(adminUserID),
-			DisplayName:        adminDisplayName,
-			PasswordHash:       authdomain.PasswordHash(string(passwordHash)),
-			PasswordAlgo:       passwordAlgo,
-			MustChangePassword: true,
-			IsActive:           true,
-			CreatedBy:          actorID,
-		}); err != nil {
-			if errors.Is(err, authdomain.ErrUserAlreadyExists) {
-				return iamdomain.ErrTenantAdminUserConflict
-			}
-			return fmt.Errorf("create tenant admin identity: %w", err)
-		}
-
-		if err := upsertUserAndSystemAdminRoleTx(txCtx, tx, adminUserID, adminDisplayName, tenantID, actorID); err != nil {
-			return err
-		}
-
-		return s.audit.RecordTx(txCtx, tx, ev)
-	})
-	if err != nil {
+	params := provisionTenantParams{
+		tenantID:         tenantID,
+		name:             f.name,
+		slug:             f.slug,
+		adminUserID:      f.adminUserID,
+		adminDisplayName: f.adminDisplayName,
+		actorID:          f.actorID,
+		actorTenantID:    f.actorTenantID,
+		passwordHash:     passwordHash,
+		passwordAlgo:     passwordAlgo,
+		auditEvent:       ev,
+	}
+	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
+		return s.provisionTenantTx(ctx, tx, params)
+	}); err != nil {
 		return OnboardTenantResult{}, err
 	}
 
-	return OnboardTenantResult{TenantID: tenantID, AdminUserID: adminUserID}, nil
+	return OnboardTenantResult{TenantID: tenantID, AdminUserID: f.adminUserID}, nil
+}
+
+// onboardTenantFields is the normalized (trimmed) form of OnboardTenant's
+// input plus the caller identity, produced by normalizeOnboardTenantInput.
+type onboardTenantFields struct {
+	name             string
+	slug             string
+	adminUserID      string
+	adminDisplayName string
+	adminPassword    string
+	actorID          string
+	actorTenantID    string
+}
+
+// normalizeOnboardTenantInput trims all textual fields, validates the
+// tenant/admin input via validateOnboardTenantInput, and requires both
+// actorID and actorTenantID be present — both must come from the
+// authenticated request context, never the client payload.
+func normalizeOnboardTenantInput(in OnboardTenantInput, actorID, actorTenantID string) (onboardTenantFields, error) {
+	f := onboardTenantFields{
+		name:             strings.TrimSpace(in.Name),
+		slug:             strings.TrimSpace(in.Slug),
+		adminUserID:      strings.TrimSpace(in.AdminUserID),
+		adminDisplayName: strings.TrimSpace(in.AdminDisplayName),
+		adminPassword:    in.AdminPassword,
+		actorID:          strings.TrimSpace(actorID),
+		actorTenantID:    strings.TrimSpace(actorTenantID),
+	}
+	if err := validateOnboardTenantInput(f.name, f.slug, f.adminUserID, f.adminDisplayName, f.adminPassword); err != nil {
+		return onboardTenantFields{}, err
+	}
+	if f.actorID == "" {
+		return onboardTenantFields{}, fmt.Errorf("%w: actor id required", iamdomain.ErrTenantOnboardValidation)
+	}
+	if f.actorTenantID == "" {
+		return onboardTenantFields{}, fmt.Errorf("%w: actor tenant id required", iamdomain.ErrTenantOnboardValidation)
+	}
+	return f, nil
+}
+
+// provisionTenantParams bundles the values provisionTenantTx needs to run
+// the in-tx provisioning body — the tenant/admin identity being created plus
+// the pre-computed audit event and password hash — so the tx closure in
+// OnboardTenant stays a thin call into that method.
+type provisionTenantParams struct {
+	tenantID         string
+	name             string
+	slug             string
+	adminUserID      string
+	adminDisplayName string
+	actorID          string
+	actorTenantID    string
+	passwordHash     authdomain.PasswordHash
+	passwordAlgo     string
+	auditEvent       auditdomain.Event
+}
+
+// provisionTenantTx runs the full in-tx provisioning sequence: authz.Require
+// under the ACTOR's tenant (grants are tenant-scoped and the new tenant has
+// zero roles by definition) -> INSERT tenants -> TenantKeyProvisioner ->
+// admin auth identity (CreateUserTx) -> iam_users/iam_user_roles -> audit.
+// Kept as a single method (not split further): the tripwire ordering
+// (assert caps before any guarded INSERT) and the tenant-GUC reseed ahead of
+// the provisioning INSERTs are one atomicity invariant that splitting across
+// functions would obscure rather than clarify.
+func (s *OnboardTenantService) provisionTenantTx(ctx context.Context, tx *sql.Tx, p provisionTenantParams) error {
+	// Tripwire requires the caps asserted BEFORE any guarded INSERT, and
+	// grants are tenant-scoped, so both Requires resolve under the
+	// ACTOR's tenant (the new tenant has zero roles by definition).
+	// tenant.onboard guards the tenants INSERT; user.manage guards the
+	// iam_users/iam_user_roles INSERTs this provisioning also performs.
+	txCtx := authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(txCtx, tx, p.actorTenantID, p.actorID); err != nil {
+		return fmt.Errorf("seed tenant.onboard authorization: %w", err)
+	}
+	if err := authz.Require(txCtx, tx, string(iamdomain.CapTenantOnboard), "tenant"); err != nil {
+		return fmt.Errorf("require tenant.onboard authorization: %w", err)
+	}
+	if err := authz.Require(txCtx, tx, string(iamdomain.CapUserManage), "tenant"); err != nil {
+		return fmt.Errorf("require user.manage authorization: %w", err)
+	}
+
+	// Provisioning rows (tenants/iam_users/iam_user_roles/audit) all
+	// carry tenant_id = the NEW tenant, so re-seed the tx-local tenant
+	// GUC to it before writing — under FORCE RLS (M7 F7.4) the WITH
+	// CHECK clause compares row tenant_id against this GUC. The
+	// asserted_caps GUC set by the Requires above is tx-local and
+	// persists across this switch.
+	if err := authz.SeedTxTenant(txCtx, tx, p.tenantID); err != nil {
+		return fmt.Errorf("seed provisioning tenant: %w", err)
+	}
+
+	if err := s.tenants.InsertTenantTx(txCtx, tx, p.tenantID, p.name, p.slug); err != nil {
+		return err
+	}
+
+	if err := s.keys.ProvisionTenantKey(txCtx, tx, p.tenantID); err != nil {
+		return fmt.Errorf("provision tenant key: %w", err)
+	}
+
+	if err := s.createUserTx.CreateUserTx(txCtx, tx, authdomain.CreateUserParams{
+		UserID:             p.adminUserID,
+		Username:           p.adminUserID,
+		Email:              adminEmailOrEmpty(p.adminUserID),
+		DisplayName:        p.adminDisplayName,
+		PasswordHash:       authdomain.PasswordHash(string(p.passwordHash)),
+		PasswordAlgo:       p.passwordAlgo,
+		MustChangePassword: true,
+		IsActive:           true,
+		CreatedBy:          p.actorID,
+	}); err != nil {
+		if errors.Is(err, authdomain.ErrUserAlreadyExists) {
+			return iamdomain.ErrTenantAdminUserConflict
+		}
+		return fmt.Errorf("create tenant admin identity: %w", err)
+	}
+
+	if err := upsertUserAndSystemAdminRoleTx(txCtx, tx, p.adminUserID, p.adminDisplayName, p.tenantID, p.actorID); err != nil {
+		return err
+	}
+
+	return s.audit.RecordTx(txCtx, tx, p.auditEvent)
 }
 
 // upsertUserAndSystemAdminRoleTx writes the new admin's iam_users row and its

@@ -304,61 +304,57 @@ func queryRuntimeMetric(ctx context.Context, timeout time.Duration, query func(c
 	return query(queryCtx)
 }
 
+// applyDependencyChecks runs every configured dependency check and appends
+// its result entry to checks. status/code are optional out-params so Ready
+// can reuse this helper without allocating a result wrapper for the common
+// static-provider fast path.
 func (p *StaticRuntimeStatusProvider) applyDependencyChecks(ctx context.Context, checks []map[string]any, status *string, code *int) []map[string]any {
 	if len(p.checks) == 0 {
 		return checks
 	}
 
-	// status/code are optional out-params so Ready can reuse this helper without
-	// allocating a result wrapper for the common static-provider fast path.
-	//
-	// All dependency checks share a single 5s budget via errgroup so the probe
-	// latency is bounded by the slowest single check, not their sum.
-	type checkEntry struct {
-		index int
-		entry map[string]any
-	}
-
-	active := make([]DependencyCheck, 0, len(p.checks))
-	for _, c := range p.checks {
-		if c.Check != nil {
-			active = append(active, c)
-		}
-	}
+	active := activeDependencyChecks(p.checks)
 	if len(active) == 0 {
 		return checks
 	}
 
+	// All dependency checks share a single 5s budget via errgroup so the probe
+	// latency is bounded by the slowest single check, not their sum.
 	budgetCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	results := make([]checkEntry, len(active))
+	for _, entry := range runDependencyChecksConcurrently(budgetCtx, active) {
+		checks = append(checks, entry)
+		degradeStatusIfUnhealthy(entry, status, code)
+	}
+	return checks
+}
+
+// activeDependencyChecks filters out entries with a nil Check func.
+func activeDependencyChecks(all []DependencyCheck) []DependencyCheck {
+	active := make([]DependencyCheck, 0, len(all))
+	for _, c := range all {
+		if c.Check != nil {
+			active = append(active, c)
+		}
+	}
+	return active
+}
+
+// runDependencyChecksConcurrently runs each check under budgetCtx via
+// errgroup and returns one result entry per check, in the same order as
+// active.
+func runDependencyChecksConcurrently(budgetCtx context.Context, active []DependencyCheck) []map[string]any {
+	results := make([]map[string]any, len(active))
 	var mu sync.Mutex
 
 	g, gCtx := errgroup.WithContext(budgetCtx)
 	for i, check := range active {
 		i, check := i, check
 		g.Go(func() error {
-			result, err := check.Check(gCtx)
-			entry := map[string]any{
-				"name":   check.Name,
-				"status": "up",
-			}
-			if result.Status != "" {
-				entry["status"] = result.Status
-			}
-			if result.Detail != "" {
-				entry["detail"] = result.Detail
-			}
-			for key, value := range result.Meta {
-				entry[key] = value
-			}
-			if err != nil {
-				entry["status"] = "down"
-				entry["detail"] = truncateReadinessError(err)
-			}
+			entry := runSingleDependencyCheck(gCtx, check)
 			mu.Lock()
-			results[i] = checkEntry{index: i, entry: entry}
+			results[i] = entry
 			mu.Unlock()
 			return nil
 		})
@@ -366,18 +362,44 @@ func (p *StaticRuntimeStatusProvider) applyDependencyChecks(ctx context.Context,
 	// errgroup.Go callbacks never return a non-nil error here; wait only for
 	// completion.
 	_ = g.Wait()
+	return results
+}
 
-	for _, r := range results {
-		checks = append(checks, r.entry)
-		state := r.entry["status"]
-		if state != "up" && state != "skipped" {
-			if status != nil {
-				*status = "degraded"
-			}
-			if code != nil {
-				*code = 503
-			}
-		}
+// runSingleDependencyCheck invokes check.Check and shapes its result/error
+// into the wire entry: {"name", "status", "detail"?, ...Meta}.
+func runSingleDependencyCheck(ctx context.Context, check DependencyCheck) map[string]any {
+	result, err := check.Check(ctx)
+	entry := map[string]any{
+		"name":   check.Name,
+		"status": "up",
 	}
-	return checks
+	if result.Status != "" {
+		entry["status"] = result.Status
+	}
+	if result.Detail != "" {
+		entry["detail"] = result.Detail
+	}
+	for key, value := range result.Meta {
+		entry[key] = value
+	}
+	if err != nil {
+		entry["status"] = "down"
+		entry["detail"] = truncateReadinessError(err)
+	}
+	return entry
+}
+
+// degradeStatusIfUnhealthy flips the optional out-params to "degraded"/503
+// when entry's status is neither "up" nor "skipped".
+func degradeStatusIfUnhealthy(entry map[string]any, status *string, code *int) {
+	state := entry["status"]
+	if state == "up" || state == "skipped" {
+		return
+	}
+	if status != nil {
+		*status = "degraded"
+	}
+	if code != nil {
+		*code = 503
+	}
 }

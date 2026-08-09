@@ -205,7 +205,10 @@ func run(ctx context.Context) error {
 
 	<-ctx.Done()
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	// Intentional cancellation detach (WithoutCancel): ctx is already done at
+	// this point — the shutdown needs its own fresh 15 s deadline while still
+	// carrying ctx's values (trace, baggage).
+	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
 	defer cancel()
 
 	if err := deps.River.Client.Stop(shutdownCtx); err != nil && !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
@@ -285,6 +288,12 @@ func buildTenantLifecycleWorker(db *sql.DB) (*iamjobs.TenantLifecycleWorker, err
 }
 
 func main() {
+	os.Exit(runMain())
+}
+
+// runMain holds main's body so deferred cleanups (signal stop, otel shutdown)
+// run on every exit path; os.Exit in main proper would skip them.
+func runMain() int {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -295,7 +304,7 @@ func main() {
 	otelShutdown, otelEnabled, err := observability.SetupOTel(ctx, "metaldocs-jobs")
 	if err != nil {
 		slog.Error("setup otel", "err", err)
-		os.Exit(1)
+		return 1
 	}
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -310,6 +319,7 @@ func main() {
 
 	if err := run(ctx); err != nil {
 		slog.Error("jobs exited with error", "err", err)
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }

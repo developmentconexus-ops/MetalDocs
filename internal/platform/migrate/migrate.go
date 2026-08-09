@@ -43,7 +43,11 @@ func Apply(ctx context.Context, db *sql.DB, dir string, log *slog.Logger) (retEr
 		return fmt.Errorf("migrate: acquire advisory lock: %w", err)
 	}
 	defer func() {
-		if _, err := conn.ExecContext(context.Background(), `SELECT pg_advisory_unlock($1)`, migrateLockKey); err != nil && retErr == nil {
+		// Detached on purpose: the advisory lock must still be released if ctx
+		// was canceled mid-migration, so this uses WithoutCancel (not
+		// Background) — it keeps request-scoped values (e.g. trace id) while
+		// dropping only the cancellation/deadline.
+		if _, err := conn.ExecContext(context.WithoutCancel(ctx), `SELECT pg_advisory_unlock($1)`, migrateLockKey); err != nil && retErr == nil {
 			retErr = fmt.Errorf("migrate: release advisory lock: %w", err)
 		}
 	}()
@@ -52,14 +56,39 @@ func Apply(ctx context.Context, db *sql.DB, dir string, log *slog.Logger) (retEr
 	if err != nil {
 		return fmt.Errorf("migrate: load schema_migrations: %w", err)
 	}
+	files, err := collectMigrationFiles(dir)
+	if err != nil {
+		return err
+	}
+
+	skipped, ran := 0, 0
+	for _, f := range files {
+		if applied[f.version] {
+			skipped++
+			continue
+		}
+		if err := applyMigrationFile(ctx, conn, log, f); err != nil {
+			return err
+		}
+		ran++
+	}
+	log.Info("migrations done", "applied_now", ran, "already_applied", skipped, "total", len(files))
+	return nil
+}
+
+type migrationFile struct {
+	version, path, name string
+}
+
+// collectMigrationFiles lists dir for *.sql files matching the leading
+// 4-digit version prefix, returning them sorted in lexical (application)
+// order.
+func collectMigrationFiles(dir string) ([]migrationFile, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return fmt.Errorf("read migrations dir %q: %w", dir, err)
+		return nil, fmt.Errorf("read migrations dir %q: %w", dir, err)
 	}
-	type file struct {
-		version, path, name string
-	}
-	var files []file
+	var files []migrationFile
 	for _, e := range entries {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") {
 			continue
@@ -68,30 +97,26 @@ func Apply(ctx context.Context, db *sql.DB, dir string, log *slog.Logger) (retEr
 		if m == nil {
 			continue
 		}
-		files = append(files, file{version: m[1], path: filepath.Join(dir, e.Name()), name: e.Name()})
+		files = append(files, migrationFile{version: m[1], path: filepath.Join(dir, e.Name()), name: e.Name()})
 	}
 	sort.Slice(files, func(i, j int) bool { return files[i].name < files[j].name })
+	return files, nil
+}
 
-	skipped, ran := 0, 0
-	for _, f := range files {
-		if applied[f.version] {
-			skipped++
-			continue
-		}
-		body, err := os.ReadFile(f.path)
-		if err != nil {
-			return fmt.Errorf("read %s: %w", f.name, err)
-		}
-		if err := requireExplicitTransactionGuard(string(body)); err != nil {
-			return fmt.Errorf("apply %s: %w", f.name, err)
-		}
-		log.Info("applying migration", "version", f.version, "file", f.name)
-		if _, err := conn.ExecContext(ctx, string(body)); err != nil {
-			return fmt.Errorf("apply %s: %w", f.name, err)
-		}
-		ran++
+// applyMigrationFile reads, validates, and executes a single migration file
+// as one Exec, per Apply's self-contained-SQL contract.
+func applyMigrationFile(ctx context.Context, conn *sql.Conn, log *slog.Logger, f migrationFile) error {
+	body, err := os.ReadFile(f.path)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", f.name, err)
 	}
-	log.Info("migrations done", "applied_now", ran, "already_applied", skipped, "total", len(files))
+	if err := requireExplicitTransactionGuard(string(body)); err != nil {
+		return fmt.Errorf("apply %s: %w", f.name, err)
+	}
+	log.Info("applying migration", "version", f.version, "file", f.name)
+	if _, err := conn.ExecContext(ctx, string(body)); err != nil {
+		return fmt.Errorf("apply %s: %w", f.name, err)
+	}
 	return nil
 }
 
@@ -147,7 +172,10 @@ func ApplyGrants(ctx context.Context, db *sql.DB, dir string, log *slog.Logger) 
 		return fmt.Errorf("migrate: acquire advisory lock: %w", err)
 	}
 	defer func() {
-		if _, err := conn.ExecContext(context.Background(), `SELECT pg_advisory_unlock($1)`, migrateLockKey); err != nil && retErr == nil {
+		// Detached on purpose: see the matching comment in Apply — the lock
+		// must be released even if ctx was canceled, so use WithoutCancel
+		// rather than Background to keep carrying request-scoped values.
+		if _, err := conn.ExecContext(context.WithoutCancel(ctx), `SELECT pg_advisory_unlock($1)`, migrateLockKey); err != nil && retErr == nil {
 			retErr = fmt.Errorf("migrate: release advisory lock: %w", err)
 		}
 	}()

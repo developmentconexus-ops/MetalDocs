@@ -95,27 +95,58 @@ func (p *PasswordReauthProvider) Sign(ctx context.Context, req SignRequest) (Res
 	if p.limiter == nil {
 		return Result{}, ErrRateLimiterConfig
 	}
+	if err := p.checkAuthFailureLimiter(ctx, req.ActorUserID); err != nil {
+		return Result{}, err
+	}
 
-	allowed, err := p.limiter.Allow(ctx, req.ActorUserID)
+	hash, algo, err := p.verifyPassword(ctx, req.ActorUserID, password)
+	if err != nil {
+		return Result{}, err
+	}
+
+	// Success — clear failure state.
+	if err := p.limiter.Reset(ctx, req.ActorUserID); err != nil {
+		return Result{}, ErrRateLimited
+	}
+
+	now := time.Now().UTC()
+	attestation := signAttestation(algo, hash, now)
+	payload, _ := json.Marshal(attestation)
+	return Result{Method: "password_reauth", Payload: payload, SignedAt: now}, nil
+}
+
+// checkAuthFailureLimiter reports whether the actor is currently allowed to
+// attempt a re-auth, failing closed (ErrRateLimited) on any limiter error.
+func (p *PasswordReauthProvider) checkAuthFailureLimiter(ctx context.Context, actorUserID string) error {
+	allowed, err := p.limiter.Allow(ctx, actorUserID)
 	if err != nil {
 		slog.ErrorContext(ctx, "signature: auth-failure limiter Allow failed; failing closed",
-			"actor_user_id", req.ActorUserID, "err", err)
-		return Result{}, ErrRateLimited
+			"actor_user_id", actorUserID, "err", err)
+		return ErrRateLimited
 	}
 	if !allowed {
-		return Result{}, ErrRateLimited
+		return ErrRateLimited
 	}
+	return nil
+}
 
-	hash, algo, err := p.reader.GetPasswordHash(ctx, req.ActorUserID)
+// verifyPassword looks up the actor's stored password hash and verifies
+// password against it, recording a rate-limiter failure and emitting an
+// audit event on any lookup or verification failure. Both collapse to
+// ErrInvalidCredentials (disclosure-safe — never reveals which case fired).
+// On success it returns the raw stored hash and algo; the caller resets the
+// rate limiter itself once every subsequent step also succeeds.
+func (p *PasswordReauthProvider) verifyPassword(ctx context.Context, actorUserID, password string) ([]byte, string, error) {
+	hash, algo, err := p.reader.GetPasswordHash(ctx, actorUserID)
 	if err != nil {
 		// User missing → same error as wrong password (disclosure-safe).
-		if err := p.limiter.RecordFailure(ctx, req.ActorUserID); err != nil {
-			return Result{}, ErrRateLimited
+		if err := p.limiter.RecordFailure(ctx, actorUserID); err != nil {
+			return nil, "", ErrRateLimited
 		}
 		if p.emitter != nil {
-			p.emitter.EmitAuthFailed(ctx, req.ActorUserID, "user_not_found")
+			p.emitter.EmitAuthFailed(ctx, actorUserID, "user_not_found")
 		}
-		return Result{}, ErrInvalidCredentials
+		return nil, "", ErrInvalidCredentials
 	}
 
 	// passwordOK stays false (and verifyErr is swallowed into a generic
@@ -127,35 +158,33 @@ func (p *PasswordReauthProvider) Sign(ctx context.Context, req SignRequest) (Res
 		passwordOK = false
 	}
 	if !passwordOK {
-		if err := p.limiter.RecordFailure(ctx, req.ActorUserID); err != nil {
-			return Result{}, ErrRateLimited
+		if err := p.limiter.RecordFailure(ctx, actorUserID); err != nil {
+			return nil, "", ErrRateLimited
 		}
 		if p.emitter != nil {
 			reason := "wrong_password"
 			if verifyErr != nil {
 				reason = "unverifiable_credential"
 			}
-			p.emitter.EmitAuthFailed(ctx, req.ActorUserID, reason)
+			p.emitter.EmitAuthFailed(ctx, actorUserID, reason)
 		}
-		return Result{}, ErrInvalidCredentials
+		return nil, "", ErrInvalidCredentials
 	}
+	return hash, algo, nil
+}
 
-	// Success — clear failure state.
-	if err := p.limiter.Reset(ctx, req.ActorUserID); err != nil {
-		return Result{}, ErrRateLimited
-	}
-
-	now := time.Now().UTC()
+// signAttestation builds the opaque attestation payload recorded for a
+// successful Sign, including the KDF cost actually spent, per algorithm —
+// "bcrypt_cost" is kept unchanged (backward-compatible field name/shape) for
+// actors still on the legacy algorithm; "argon2_params" is the analogous
+// record for the target algorithm (REQ-AUTHN-1). Only one of the two is ever
+// present, matching the algo that verified.
+func signAttestation(algo string, hash []byte, now time.Time) map[string]any {
 	attestation := map[string]any{
 		"method":      "password_reauth",
 		"algo":        algo,
 		"verified_at": now.Format(time.RFC3339),
 	}
-	// The attestation records the KDF cost actually spent, per algorithm —
-	// "bcrypt_cost" is kept unchanged (backward-compatible field name/shape)
-	// for actors still on the legacy algorithm; "argon2_params" is the
-	// analogous record for the target algorithm (REQ-AUTHN-1). Only one of
-	// the two is ever present, matching the algo that verified.
 	switch algo {
 	case passwordhash.AlgoBcrypt:
 		if cost, costErr := bcryptCost(hash); costErr == nil {
@@ -166,6 +195,5 @@ func (p *PasswordReauthProvider) Sign(ctx context.Context, req SignRequest) (Res
 			attestation["argon2_params"] = summary
 		}
 	}
-	payload, _ := json.Marshal(attestation)
-	return Result{Method: "password_reauth", Payload: payload, SignedAt: now}, nil
+	return attestation
 }

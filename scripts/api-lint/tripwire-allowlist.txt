@@ -58,6 +58,12 @@ internal/modules/approval/infrastructure/postgres_approval_repository.go|UpdateS
 internal/modules/approval/infrastructure/postgres_approval_repository.go|InsertDelegation
 internal/modules/approval/infrastructure/postgres_approval_repository.go|DeleteDelegation
 internal/modules/documents/infrastructure/repository.go|SeedDictionaryValuesTx
+# Lint burn-down decomposition (2026-08-09): these two helpers were extracted
+# from CreateDocumentTx / CommitUpload respectively; each runs on the caller's
+# tx and the caller performs authz.Require(CapDocumentEdit) in that same tx
+# before invoking the helper — enforcement is one layer up, unchanged.
+internal/modules/documents/infrastructure/repository.go|writeCreateDocumentSnapshotAndPlaceholders
+internal/modules/documents/infrastructure/repository.go|insertCommittedRevision
 internal/modules/documents/infrastructure/repository.go|DeleteComment
 internal/modules/documents/infrastructure/repository.go|DeleteExpiredPending
 internal/modules/documents/infrastructure/repository.go|HeartbeatSession

@@ -142,6 +142,25 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
+
+	kpiSnapshot, onlineUsers, presenceItems, recentEvents, err := h.fetchOverviewSnapshots(r.Context(), tenantID)
+	if err != nil {
+		slog.Error("iam admin: overview composition failed", "err", err)
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to load admin overview"))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, iamapi.AdminOverviewResponse{
+		Kpi:              kpiToOverviewTyped(kpiSnapshot),
+		Presence:         h.toOverviewPresence(onlineUsers, presenceItems),
+		RecentActivities: toOverviewAuditEvents(recentEvents),
+	})
+}
+
+// fetchOverviewSnapshots runs the three independent Admin Center Overview
+// reads (KPI, presence, recent audit events) concurrently via errgroup so the
+// wall-clock budget is max(kpi, presence, audit) rather than the legacy sum.
+func (h *AdminHandler) fetchOverviewSnapshots(ctx context.Context, tenantID string) (iamdomain.KpiSnapshot, []authdomain.OnlineUser, []iampresence.Item, []auditdomain.Event, error) {
 	now := time.Now().UTC()
 	activeSince := now.Add(-10 * time.Minute)
 
@@ -152,7 +171,7 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 		recentEvents  []auditdomain.Event
 	)
 
-	g, gctx := errgroup.WithContext(r.Context())
+	g, gctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
 		if h.kpi == nil {
@@ -199,16 +218,20 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 	})
 
 	if err := g.Wait(); err != nil {
-		slog.Error("iam admin: overview composition failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to load admin overview"))
-		return
+		return iamdomain.KpiSnapshot{}, nil, nil, nil, err
 	}
+	return kpiSnapshot, onlineUsers, presenceItems, recentEvents, nil
+}
 
-	presenceOut := make([]iamapi.OnlinePresenceItem, 0, len(onlineUsers)+len(presenceItems))
+// toOverviewPresence maps the overview's two mutually-exclusive presence
+// sources (PresenceReader items when wired, else the legacy OnlineUser
+// window) onto the generated OnlinePresenceItem wire shape.
+func (h *AdminHandler) toOverviewPresence(onlineUsers []authdomain.OnlineUser, presenceItems []iampresence.Item) []iamapi.OnlinePresenceItem {
+	out := make([]iamapi.OnlinePresenceItem, 0, len(onlineUsers)+len(presenceItems))
 	if h.presence != nil {
 		for _, item := range presenceItems {
 			status := iamapi.OnlinePresenceItemStatus(string(item.Status))
-			presenceOut = append(presenceOut, iamapi.OnlinePresenceItem{
+			out = append(out, iamapi.OnlinePresenceItem{
 				UserId:      item.UserID,
 				Username:    item.Username,
 				DisplayName: item.DisplayName,
@@ -216,24 +239,32 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 				Status:      &status,
 			})
 		}
-	} else {
-		for _, item := range onlineUsers {
-			presenceOut = append(presenceOut, iamapi.OnlinePresenceItem{
-				UserId:      item.UserID,
-				Username:    item.Username,
-				DisplayName: item.DisplayName,
-				LastSeenAt:  item.LastSeenAt.UTC(),
-			})
-		}
+		return out
 	}
-	eventOut := make([]iamapi.AuditEventItem, 0, len(recentEvents))
+	for _, item := range onlineUsers {
+		out = append(out, iamapi.OnlinePresenceItem{
+			UserId:      item.UserID,
+			Username:    item.Username,
+			DisplayName: item.DisplayName,
+			LastSeenAt:  item.LastSeenAt.UTC(),
+		})
+	}
+	return out
+}
+
+// toOverviewAuditEvents maps recent audit events onto the generated
+// AuditEventItem wire shape, best-effort decoding the stored payload JSON
+// (a malformed payload degrades to an empty map rather than failing the
+// whole overview).
+func toOverviewAuditEvents(recentEvents []auditdomain.Event) []iamapi.AuditEventItem {
+	out := make([]iamapi.AuditEventItem, 0, len(recentEvents))
 	for _, item := range recentEvents {
 		// AuditEventItem.Payload is map[string]interface{} per codegen contract.
 		payload := make(map[string]interface{})
 		if strings.TrimSpace(item.PayloadJSON) != "" {
 			_ = json.Unmarshal([]byte(item.PayloadJSON), &payload)
 		}
-		eventOut = append(eventOut, iamapi.AuditEventItem{
+		out = append(out, iamapi.AuditEventItem{
 			Id:           item.ID,
 			OccurredAt:   item.OccurredAt.UTC(),
 			ActorId:      item.ActorID,
@@ -244,11 +275,7 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 			TraceId:      item.TraceID,
 		})
 	}
-	writeJSON(w, http.StatusOK, iamapi.AdminOverviewResponse{
-		Kpi:              kpiToOverviewTyped(kpiSnapshot),
-		Presence:         presenceOut,
-		RecentActivities: eventOut,
-	})
+	return out
 }
 
 // kpiToOverviewTyped folds the domain KpiSnapshot into the strict-server

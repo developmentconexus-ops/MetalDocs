@@ -159,43 +159,82 @@ func (s *Service) ExportEvents(ctx context.Context, actorID string, format domai
 		return domain.ExportJob{}, ErrInvalidFormat
 	}
 
+	normalizedSizing, estimatedRows, err := s.sizeExport(ctx, filter)
+	if err != nil {
+		return domain.ExportJob{}, err
+	}
+
+	payload, actualRows, err := s.renderExportPayload(ctx, normalizedSizing, format)
+	if err != nil {
+		return domain.ExportJob{}, err
+	}
+
+	job, err := s.buildExportJob(actorID, format, filter, normalizedSizing.TenantID, estimatedRows, actualRows, payload)
+	if err != nil {
+		return domain.ExportJob{}, err
+	}
+
+	if err := s.exportRepo.Save(ctx, job); err != nil {
+		return domain.ExportJob{}, fmt.Errorf("audit: persist export job: %w", err)
+	}
+
+	s.recordExportRequested(ctx, job, filter, estimatedRows)
+
+	return job, nil
+}
+
+// sizeExport normalizes filter into a cursor/limit-stripped sizing query and
+// estimates its row count via s.counter. Refuses with ErrExportTooLarge when
+// the estimate exceeds SyncExportRowLimit.
+func (s *Service) sizeExport(ctx context.Context, filter domain.ListEventsQuery) (domain.ListEventsQuery, int64, error) {
 	sizingFilter := filter
 	sizingFilter.Limit = 0
 	sizingFilter.Cursor = domain.Cursor{}
 	normalizedSizing, err := normalizeQuery(sizingFilter)
 	if err != nil {
-		return domain.ExportJob{}, err
+		return domain.ListEventsQuery{}, 0, err
 	}
 	estimatedRows, err := s.counter.CountEvents(ctx, normalizedSizing)
 	if err != nil {
-		return domain.ExportJob{}, fmt.Errorf("audit: estimate export rows: %w", err)
+		return domain.ListEventsQuery{}, 0, fmt.Errorf("audit: estimate export rows: %w", err)
 	}
 	if estimatedRows > SyncExportRowLimit {
-		return domain.ExportJob{}, fmt.Errorf("%w: %d rows exceeds limit %d", ErrExportTooLarge, estimatedRows, SyncExportRowLimit)
+		return domain.ListEventsQuery{}, 0, fmt.Errorf("%w: %d rows exceeds limit %d", ErrExportTooLarge, estimatedRows, SyncExportRowLimit)
 	}
+	return normalizedSizing, estimatedRows, nil
+}
 
+// renderExportPayload fetches every event matching normalizedSizing and
+// renders them in the requested format, returning the rendered payload and
+// the actual row count.
+func (s *Service) renderExportPayload(ctx context.Context, normalizedSizing domain.ListEventsQuery, format domain.ExportFormat) ([]byte, int64, error) {
 	events, err := s.fetchAll(ctx, normalizedSizing)
 	if err != nil {
-		return domain.ExportJob{}, fmt.Errorf("audit: fetch export rows: %w", err)
+		return nil, 0, fmt.Errorf("audit: fetch export rows: %w", err)
 	}
-
 	payload, err := render(format, events)
 	if err != nil {
-		return domain.ExportJob{}, fmt.Errorf("audit: render export: %w", err)
+		return nil, 0, fmt.Errorf("audit: render export: %w", err)
 	}
+	return payload, int64(len(events)), nil
+}
 
+// buildExportJob assembles the ExportJob record: marshals the (unnormalized)
+// filter for storage, parses tenantID (the normalized sizing filter's tenant)
+// into a uuid, and stamps a fresh ID/token/timestamps.
+func (s *Service) buildExportJob(actorID string, format domain.ExportFormat, filter domain.ListEventsQuery, tenantID string, estimatedRows, actualRows int64, payload []byte) (domain.ExportJob, error) {
 	filterJSON, err := json.Marshal(filterPayload(filter))
 	if err != nil {
 		return domain.ExportJob{}, fmt.Errorf("audit: marshal filter: %w", err)
 	}
 
-	tenantUUID, err := uuid.Parse(normalizedSizing.TenantID)
+	tenantUUID, err := uuid.Parse(tenantID)
 	if err != nil {
-		return domain.ExportJob{}, fmt.Errorf("audit: invalid tenant id %q: %w", normalizedSizing.TenantID, err)
+		return domain.ExportJob{}, fmt.Errorf("audit: invalid tenant id %q: %w", tenantID, err)
 	}
 
 	now := s.now()
-	job := domain.ExportJob{
+	return domain.ExportJob{
 		ID:            uuid.NewString(),
 		TenantID:      tenantUUID,
 		ActorID:       actorID,
@@ -205,31 +244,32 @@ func (s *Service) ExportEvents(ctx context.Context, actorID string, format domai
 		DownloadToken: randomToken(),
 		ExpiresAt:     now.Add(ExportTTL),
 		EstimatedRows: estimatedRows,
-		ActualRows:    int64(len(events)),
+		ActualRows:    actualRows,
 		Payload:       payload,
 		CreatedAt:     now,
 		CompletedAt:   now,
-	}
-	if err := s.exportRepo.Save(ctx, job); err != nil {
-		return domain.ExportJob{}, fmt.Errorf("audit: persist export job: %w", err)
-	}
+	}, nil
+}
 
+// recordExportRequested emits the best-effort "audit.export.requested"
+// governance event for job. The export job is already persisted by the time
+// this runs, so a construction/record failure here is logged, not returned —
+// but a silent drop would lose an audit-trail record with no trace.
+func (s *Service) recordExportRequested(ctx context.Context, job domain.ExportJob, filter domain.ListEventsQuery, estimatedRows int64) {
 	summary := map[string]any{
-		"format":        string(format),
+		"format":        string(job.Format),
 		"filterSummary": filterSummary(filter),
 		"estimatedRows": estimatedRows,
 		"actualRows":    job.ActualRows,
 		"export_id":     job.ID,
 	}
-	if event, evErr := domain.NewEvent(job.TenantID.String(), "audit_export", job.ID, actorID, "audit.export.requested", summary); evErr == nil {
-		// Best-effort governance event (the export job is already persisted), but a
-		// silent drop would lose an audit-trail record with no trace — log it.
-		if recErr := s.writer.Record(ctx, event); recErr != nil {
-			slog.Warn("audit export governance event dropped", "export_id", job.ID, "err", recErr)
-		}
+	event, evErr := domain.NewEvent(job.TenantID.String(), "audit_export", job.ID, job.ActorID, "audit.export.requested", summary)
+	if evErr != nil {
+		return
 	}
-
-	return job, nil
+	if recErr := s.writer.Record(ctx, event); recErr != nil {
+		slog.Warn("audit export governance event dropped", "export_id", job.ID, "err", recErr)
+	}
 }
 
 // GetExportStatus returns an export job, enforcing tenant + actor scoping.

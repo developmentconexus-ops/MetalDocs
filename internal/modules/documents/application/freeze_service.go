@@ -182,52 +182,16 @@ func (s *FreezeService) pinValidateAndHash(
 		byID[v.PlaceholderID] = v
 	}
 
-	isComputed := func(p tmpldom.Placeholder) bool {
-		return p.Computed || p.Type == tmpldom.PHComputed
-	}
-
-	for _, p := range schema {
-		if !p.Required || isComputed(p) {
-			continue
-		}
-		v, ok := byID[p.ID]
-		if !ok || v.ValueText == nil || *v.ValueText == "" {
-			return nil, nil, fmt.Errorf("%w: placeholder %s required", v2dom.ErrValidationFailed, p.ID)
-		}
+	if err := requireNonComputedPlaceholdersSet(schema, byID); err != nil {
+		return nil, nil, err
 	}
 
 	resolveIn, err := s.resolveCtx.Build(ctx, tenantID, documentID, approver)
 	if err != nil {
 		return nil, nil, err
 	}
-	for _, p := range schema {
-		if !isComputed(p) {
-			continue
-		}
-		if p.ResolverKey == nil {
-			return nil, nil, fmt.Errorf("%w: placeholder %s computed without resolver_key",
-				v2dom.ErrValidationFailed, p.ID)
-		}
-		r, ok := s.resolvers.Get(*p.ResolverKey)
-		if !ok {
-			return nil, nil, fmt.Errorf("%w: placeholder %s resolver %s",
-				tmpldom.ErrUnknownResolver, p.ID, *p.ResolverKey)
-		}
-		rv, err := r.Resolve(ctx, resolveIn)
-		if err != nil {
-			return nil, nil, fmt.Errorf("resolver %s failed: %w", *p.ResolverKey, err)
-		}
-		strVal := fmt.Sprintf("%v", rv.Value)
-		key, ver := *p.ResolverKey, rv.ResolverVer
-		if err := s.values.UpsertValue(ctx, infrastructure.PlaceholderValue{
-			TenantID: tenantID, RevisionID: documentID, PlaceholderID: p.ID,
-			ValueText: &strVal, Source: "computed",
-			ComputedFrom: &key, ResolverVersion: &ver,
-			InputsHash: rv.InputsHash,
-		}, tx); err != nil {
-			return nil, nil, err
-		}
-		byID[p.ID] = infrastructure.PlaceholderValue{ValueText: &strVal}
+	if err := s.resolveComputedPlaceholders(ctx, tx, tenantID, documentID, schema, byID, resolveIn); err != nil {
+		return nil, nil, err
 	}
 
 	valMap := make(map[string]any, len(byID))
@@ -258,6 +222,68 @@ func (s *FreezeService) pinValidateAndHash(
 		return nil, nil, err
 	}
 	return valMap, schema, nil
+}
+
+// isComputedPlaceholder reports whether p is a computed placeholder, either
+// via the explicit Computed flag or the PHComputed type.
+func isComputedPlaceholder(p tmpldom.Placeholder) bool {
+	return p.Computed || p.Type == tmpldom.PHComputed
+}
+
+// requireNonComputedPlaceholdersSet enforces that every required,
+// non-computed placeholder in schema already has a non-empty author value in
+// byID, ahead of computed-placeholder resolution.
+func requireNonComputedPlaceholdersSet(schema []tmpldom.Placeholder, byID map[string]infrastructure.PlaceholderValue) error {
+	for _, p := range schema {
+		if !p.Required || isComputedPlaceholder(p) {
+			continue
+		}
+		v, ok := byID[p.ID]
+		if !ok || v.ValueText == nil || *v.ValueText == "" {
+			return fmt.Errorf("%w: placeholder %s required", v2dom.ErrValidationFailed, p.ID)
+		}
+	}
+	return nil
+}
+
+// resolveComputedPlaceholders runs each computed placeholder's resolver,
+// persists the resolved value (source="computed"), and updates byID in place
+// so pinValidateAndHash's subsequent values_hash computation sees the
+// resolved values.
+func (s *FreezeService) resolveComputedPlaceholders(
+	ctx context.Context, tx db.Tx, tenantID, documentID string,
+	schema []tmpldom.Placeholder, byID map[string]infrastructure.PlaceholderValue, resolveIn resolvers.ResolveInput,
+) error {
+	for _, p := range schema {
+		if !isComputedPlaceholder(p) {
+			continue
+		}
+		if p.ResolverKey == nil {
+			return fmt.Errorf("%w: placeholder %s computed without resolver_key",
+				v2dom.ErrValidationFailed, p.ID)
+		}
+		r, ok := s.resolvers.Get(*p.ResolverKey)
+		if !ok {
+			return fmt.Errorf("%w: placeholder %s resolver %s",
+				tmpldom.ErrUnknownResolver, p.ID, *p.ResolverKey)
+		}
+		rv, err := r.Resolve(ctx, resolveIn)
+		if err != nil {
+			return fmt.Errorf("resolver %s failed: %w", *p.ResolverKey, err)
+		}
+		strVal := fmt.Sprintf("%v", rv.Value)
+		key, ver := *p.ResolverKey, rv.ResolverVer
+		if err := s.values.UpsertValue(ctx, infrastructure.PlaceholderValue{
+			TenantID: tenantID, RevisionID: documentID, PlaceholderID: p.ID,
+			ValueText: &strVal, Source: "computed",
+			ComputedFrom: &key, ResolverVersion: &ver,
+			InputsHash: rv.InputsHash,
+		}, tx); err != nil {
+			return err
+		}
+		byID[p.ID] = infrastructure.PlaceholderValue{ValueText: &strVal}
+	}
+	return nil
 }
 
 // Pin is the in-transaction half of the async freeze split (ADR 0015).
@@ -417,39 +443,9 @@ func (s *FreezeService) Materialize(ctx context.Context, tenantID, documentID st
 		return MaterializeResult{}, fmt.Errorf("materialize: document %s not yet pinned", documentID)
 	}
 
-	schema, err := s.schemas.LoadPlaceholderSchema(ctx, tenantID, documentID)
+	placeholderVals, resolvedForSubblocks, err := s.resolveMaterializeValues(ctx, tenantID, documentID)
 	if err != nil {
-		return MaterializeResult{}, fmt.Errorf("materialize: load schema: %w", err)
-	}
-
-	existing, err := s.valuesRead.ListValues(ctx, tenantID, documentID)
-	if err != nil {
-		return MaterializeResult{}, fmt.Errorf("materialize: list values: %w", err)
-	}
-
-	byID := map[string]string{}
-	for _, v := range existing {
-		if v.ValueText != nil {
-			byID[v.PlaceholderID] = *v.ValueText
-		}
-	}
-
-	idToName := make(map[string]string, len(schema))
-	for _, p := range schema {
-		if p.Name != "" {
-			idToName[p.ID] = p.Name
-		}
-	}
-
-	placeholderVals := map[string]string{}
-	resolvedForSubblocks := map[string]any{}
-	for id, sv := range byID {
-		key := id
-		if n, ok := idToName[id]; ok {
-			key = n
-		}
-		placeholderVals[key] = sv
-		resolvedForSubblocks[id] = sv
+		return MaterializeResult{}, err
 	}
 
 	composition := snap.CompositionJSON
@@ -492,6 +488,50 @@ func (s *FreezeService) Materialize(ctx context.Context, tenantID, documentID st
 		FinalDocxS3Key: resp.FinalDocxS3Key,
 		ContentHash:    contentHashBytes,
 	}, nil
+}
+
+// resolveMaterializeValues loads the frozen placeholder values for
+// documentID and maps them into the two keying schemes Fanout expects:
+// placeholderVals is keyed by placeholder NAME (falling back to id) for
+// template substitution, resolvedForSubblocks stays keyed by placeholder ID
+// for subblock resolution.
+func (s *FreezeService) resolveMaterializeValues(ctx context.Context, tenantID, documentID string) (map[string]string, map[string]any, error) {
+	schema, err := s.schemas.LoadPlaceholderSchema(ctx, tenantID, documentID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("materialize: load schema: %w", err)
+	}
+
+	existing, err := s.valuesRead.ListValues(ctx, tenantID, documentID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("materialize: list values: %w", err)
+	}
+
+	byID := map[string]string{}
+	for _, v := range existing {
+		if v.ValueText != nil {
+			byID[v.PlaceholderID] = *v.ValueText
+		}
+	}
+
+	idToName := make(map[string]string, len(schema))
+	for _, p := range schema {
+		if p.Name != "" {
+			idToName[p.ID] = p.Name
+		}
+	}
+
+	placeholderVals := map[string]string{}
+	resolvedForSubblocks := map[string]any{}
+	for id, sv := range byID {
+		key := id
+		if n, ok := idToName[id]; ok {
+			key = n
+		}
+		placeholderVals[key] = sv
+		resolvedForSubblocks[id] = sv
+	}
+
+	return placeholderVals, resolvedForSubblocks, nil
 }
 
 // verifyPinnedBody fetches the pinned revision's stored bytes and proves they

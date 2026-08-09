@@ -88,8 +88,8 @@ func (r *fakeFamilyRepo) BeginTx(_ context.Context) (domain.FamilyTx, error) {
 	return fakeFamilyTx{}, nil
 }
 
-func (r *fakeFamilyRepo) GetByCodeForUpdate(_ context.Context, _ domain.FamilyTx, tenantID string, code domain.FamilyCode) (*domain.DocumentFamily, error) {
-	return r.GetByCode(context.Background(), tenantID, code)
+func (r *fakeFamilyRepo) GetByCodeForUpdate(ctx context.Context, _ domain.FamilyTx, tenantID string, code domain.FamilyCode) (*domain.DocumentFamily, error) {
+	return r.GetByCode(ctx, tenantID, code)
 }
 
 func (r *fakeFamilyRepo) HasActiveProfilesTx(_ context.Context, _ domain.FamilyTx, tenantID string, familyCode domain.FamilyCode) (bool, error) {
@@ -97,8 +97,8 @@ func (r *fakeFamilyRepo) HasActiveProfilesTx(_ context.Context, _ domain.FamilyT
 	return r.activeProfiles[string(familyCode)], nil
 }
 
-func (r *fakeFamilyRepo) UpdateTx(_ context.Context, _ domain.FamilyTx, f *domain.DocumentFamily) error {
-	return r.Update(context.Background(), f)
+func (r *fakeFamilyRepo) UpdateTx(ctx context.Context, _ domain.FamilyTx, f *domain.DocumentFamily) error {
+	return r.Update(ctx, f)
 }
 
 func TestFamilyService_Create(t *testing.T) {

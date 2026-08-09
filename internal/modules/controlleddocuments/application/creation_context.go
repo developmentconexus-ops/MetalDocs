@@ -90,22 +90,6 @@ func (s *ControlledDocumentService) CreationContext(ctx context.Context, tenantI
 		return nil, fmt.Errorf("controlled_documents: read approval route readiness: %w", err)
 	}
 
-	out := &CreationContext{
-		Profiles: make([]CreationContextProfile, 0, len(profiles)),
-		Areas:    make([]CreationContextArea, 0),
-	}
-	for _, p := range profiles {
-		if !p.IsActive() {
-			continue
-		}
-		_, ready := readyKeys[string(p.Code)]
-		out.Profiles = append(out.Profiles, CreationContextProfile{
-			Code:           string(p.Code),
-			Name:           p.Name,
-			HasActiveRoute: ready,
-		})
-	}
-
 	areas, err := s.areaList.ListAreas(ctx, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("controlled_documents: list areas for creation context: %w", err)
@@ -116,10 +100,41 @@ func (s *ControlledDocumentService) CreationContext(ctx context.Context, tenantI
 	if err != nil {
 		return nil, fmt.Errorf("controlled_documents: read caller create-capability areas: %w", err)
 	}
+
+	return &CreationContext{
+		Profiles: creationContextActiveProfiles(profiles, readyKeys),
+		Areas:    creationContextVisibleAreas(areas, tenantWide, grantedAreas),
+	}, nil
+}
+
+// creationContextActiveProfiles filters profiles to the active ones,
+// annotated with their approval-route readiness from readyKeys. Extracted
+// from CreationContext; behavior unchanged.
+func creationContextActiveProfiles(profiles []taxonomydomain.DocumentProfile, readyKeys map[string]struct{}) []CreationContextProfile {
+	out := make([]CreationContextProfile, 0, len(profiles))
+	for _, p := range profiles {
+		if !p.IsActive() {
+			continue
+		}
+		_, ready := readyKeys[string(p.Code)]
+		out = append(out, CreationContextProfile{
+			Code:           string(p.Code),
+			Name:           p.Name,
+			HasActiveRoute: ready,
+		})
+	}
+	return out
+}
+
+// creationContextVisibleAreas filters areas to the active ones the caller
+// may create into: the full active set when tenantWide, otherwise narrowed
+// to grantedAreas. Extracted from CreationContext; behavior unchanged.
+func creationContextVisibleAreas(areas []taxonomydomain.ProcessArea, tenantWide bool, grantedAreas []string) []CreationContextArea {
 	granted := make(map[string]struct{}, len(grantedAreas))
 	for _, code := range grantedAreas {
 		granted[code] = struct{}{}
 	}
+	out := make([]CreationContextArea, 0)
 	for _, a := range areas {
 		if !a.IsActive() {
 			continue
@@ -129,8 +144,7 @@ func (s *ControlledDocumentService) CreationContext(ctx context.Context, tenantI
 				continue
 			}
 		}
-		out.Areas = append(out.Areas, CreationContextArea{Code: string(a.Code), Name: a.Name})
+		out = append(out, CreationContextArea{Code: string(a.Code), Name: a.Name})
 	}
-
-	return out, nil
+	return out
 }

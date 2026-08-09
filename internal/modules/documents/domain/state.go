@@ -1,5 +1,36 @@
 package domain
 
+// validDocumentTransitions is the legal-arc table CanTransitionDocumentStatus
+// dispatches against. DocStatusObsolete and DocStatusArchived are
+// deliberately absent (no entry == empty set == no outbound arcs): the former
+// is terminal, the latter isn't a real lifecycle status (see
+// CanTransitionDocumentStatus's doc comment below).
+var validDocumentTransitions = map[DocumentStatus]map[DocumentStatus]bool{
+	DocStatusDraft: {
+		DocStatusUnderReview: true,
+	},
+	DocStatusUnderReview: {
+		DocStatusApproved: true,
+		DocStatusDraft:    true,
+	},
+	DocStatusApproved: {
+		DocStatusPublished: true,
+		DocStatusScheduled: true,
+		DocStatusDraft:     true,
+	},
+	DocStatusScheduled: {
+		DocStatusPublished: true,
+		DocStatusDraft:     true,
+	},
+	DocStatusPublished: {
+		DocStatusSuperseded: true,
+		DocStatusObsolete:   true,
+	},
+	DocStatusSuperseded: {
+		DocStatusObsolete: true,
+	},
+}
+
 // CanTransitionDocumentStatus reports whether moving a document from cur to
 // next is a legal lifecycle transition, mirroring the DB trigger
 // enforce_document_transition (db/baseline/0001_current_schema.sql) exactly.
@@ -19,35 +50,8 @@ package domain
 // only reports the arc as legal, it does not enforce the GUC (that remains a
 // DB-only concern).
 func CanTransitionDocumentStatus(cur, next DocumentStatus) error {
-	switch cur {
-	case DocStatusDraft:
-		if next == DocStatusUnderReview {
-			return nil
-		}
-	case DocStatusUnderReview:
-		if next == DocStatusApproved || next == DocStatusDraft {
-			return nil
-		}
-	case DocStatusApproved:
-		if next == DocStatusPublished || next == DocStatusScheduled || next == DocStatusDraft {
-			return nil
-		}
-	case DocStatusScheduled:
-		if next == DocStatusPublished || next == DocStatusDraft {
-			return nil
-		}
-	case DocStatusPublished:
-		if next == DocStatusSuperseded || next == DocStatusObsolete {
-			return nil
-		}
-	case DocStatusSuperseded:
-		if next == DocStatusObsolete {
-			return nil
-		}
-	case DocStatusObsolete:
-		// Terminal status: no outbound arcs.
-	case DocStatusArchived:
-		// Not a real lifecycle status (see doc comment above); no outbound arcs.
+	if validDocumentTransitions[cur][next] {
+		return nil
 	}
 	return ErrInvalidStateTransition
 }

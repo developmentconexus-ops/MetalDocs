@@ -162,84 +162,125 @@ func (s *TenantLifecycleService) RequestErase(ctx context.Context, tenantID, act
 }
 
 func (s *TenantLifecycleService) request(ctx context.Context, tenantID, actorID, actorTenantID, kind, capability string) (string, error) {
-	tenantID = strings.TrimSpace(tenantID)
-	actorID = strings.TrimSpace(actorID)
-	actorTenantID = strings.TrimSpace(actorTenantID)
-	if tenantID == "" {
-		return "", fmt.Errorf("%w: tenant id required", iamdomain.ErrTenantOnboardValidation)
-	}
-	if actorID == "" || actorTenantID == "" {
-		return "", fmt.Errorf("%w: actor identity required", iamdomain.ErrTenantOnboardValidation)
+	tenantID, actorID, actorTenantID, err := normalizeLifecycleRequestInput(tenantID, actorID, actorTenantID)
+	if err != nil {
+		return "", err
 	}
 	if s.runner == nil || s.tenants == nil || s.jobs == nil {
 		return "", fmt.Errorf("iam: TenantLifecycleService is not fully wired")
 	}
 
 	jobID := uuid.NewString()
-
-	err := s.runner.Do(ctx, func(tx *sql.Tx) error {
-		// Tier-2 authz FIRST (before any lookup of the target row), mirroring
-		// OnboardTenantService: grants are resolved under the ACTOR's own
-		// tenant, never the target tenant (the actor may hold tenant.export /
-		// tenant.erase in their own tenant while the target is a different
-		// tenant entirely — this is an operator-tooling capability, not a
-		// same-tenant action).
-		txCtx := authz.WithCapCache(ctx)
-		if err := authz.SeedTxIdentity(txCtx, tx, actorTenantID, actorID); err != nil {
-			return fmt.Errorf("seed %s authorization: %w", capability, err)
-		}
-		if err := authz.Require(txCtx, tx, capability, "tenant"); err != nil {
-			return fmt.Errorf("require %s authorization: %w", capability, err)
-		}
-
-		found, erased, err := s.tenants.TenantLookupTx(txCtx, tx, tenantID)
-		if err != nil {
-			return err
-		}
-		if !found {
-			return iamdomain.ErrTenantNotFound
-		}
-		if erased {
-			// Export of an erased tenant is equally meaningless (its data is
-			// gone) — both kinds refuse an erased target with the same 409.
-			return iamdomain.ErrTenantAlreadyErased
-		}
-
-		// tenant_lifecycle_jobs is tenant-scoped (FORCE RLS) and its INSERT
-		// tripwire arm (migration 0279) requires tenant.export/tenant.erase —
-		// already asserted above by Require, which appended the cap to
-		// metaldocs.asserted_caps on this same tx. Re-seed the tenant GUC to
-		// the TARGET tenant (not the actor's) before the INSERT, mirroring
-		// OnboardTenantService's SeedTxTenant-before-provisioning-write step,
-		// so RLS's WITH CHECK compares row tenant_id against the row's own
-		// tenant, not the actor's.
-		if err := authz.SeedTxTenant(txCtx, tx, tenantID); err != nil {
-			return fmt.Errorf("seed target tenant: %w", err)
-		}
-
-		if err := s.jobs.InsertLifecycleJobTx(txCtx, tx, jobID, tenantID, kind, actorID); err != nil {
-			return err
-		}
-
-		if s.river != nil {
-			if err := s.river.EnqueueTenantLifecycleJobTx(txCtx, tx, iamdomain.TenantLifecycleJobArgs{JobID: jobID, TenantID: tenantID, JobKind: kind}); err != nil {
-				return fmt.Errorf("enqueue river job: %w", err)
-			}
-		}
-
-		if s.audit == nil {
-			return nil
-		}
-		ev, err := buildLifecycleRequestedEvent(ctx, jobID, tenantID, actorID, kind)
-		if err != nil {
-			return err
-		}
-		return s.audit.RecordTx(txCtx, tx, ev)
-	})
-	if err != nil {
+	params := lifecycleRequestParams{
+		jobID:         jobID,
+		tenantID:      tenantID,
+		actorID:       actorID,
+		actorTenantID: actorTenantID,
+		kind:          kind,
+		capability:    capability,
+	}
+	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
+		return s.enqueueLifecycleJobTx(ctx, tx, params)
+	}); err != nil {
 		return "", err
 	}
 	return jobID, nil
+}
+
+// normalizeLifecycleRequestInput trims tenantID/actorID/actorTenantID and
+// requires all three be present before request opens its enqueue tx.
+func normalizeLifecycleRequestInput(tenantID, actorID, actorTenantID string) (string, string, string, error) {
+	tenantID = strings.TrimSpace(tenantID)
+	actorID = strings.TrimSpace(actorID)
+	actorTenantID = strings.TrimSpace(actorTenantID)
+	if tenantID == "" {
+		return "", "", "", fmt.Errorf("%w: tenant id required", iamdomain.ErrTenantOnboardValidation)
+	}
+	if actorID == "" || actorTenantID == "" {
+		return "", "", "", fmt.Errorf("%w: actor identity required", iamdomain.ErrTenantOnboardValidation)
+	}
+	return tenantID, actorID, actorTenantID, nil
+}
+
+// lifecycleRequestParams bundles the values enqueueLifecycleJobTx needs to
+// run the in-tx enqueue body, so the tx closure in request stays a thin call
+// into that method.
+type lifecycleRequestParams struct {
+	jobID         string
+	tenantID      string
+	actorID       string
+	actorTenantID string
+	kind          string
+	capability    string
+}
+
+// enqueueLifecycleJobTx runs the full in-tx enqueue sequence shared by
+// RequestExport/RequestErase: tier-2 authz under the ACTOR's own tenant ->
+// target-tenant lookup/erased-guard -> INSERT tenant_lifecycle_jobs -> paired
+// River job -> audit. Kept as a single method (not split further): the
+// tripwire ordering (assert caps before the target lookup, reseed the tenant
+// GUC to the TARGET before the INSERT) is one atomicity invariant that
+// splitting across functions would obscure rather than clarify. ctx is the
+// caller's (non-tx-scoped) context, used only for requesttrace resolution in
+// buildLifecycleRequestedEvent — every DB call below derives from txCtx.
+func (s *TenantLifecycleService) enqueueLifecycleJobTx(ctx context.Context, tx *sql.Tx, p lifecycleRequestParams) error {
+	// Tier-2 authz FIRST (before any lookup of the target row), mirroring
+	// OnboardTenantService: grants are resolved under the ACTOR's own
+	// tenant, never the target tenant (the actor may hold tenant.export /
+	// tenant.erase in their own tenant while the target is a different
+	// tenant entirely — this is an operator-tooling capability, not a
+	// same-tenant action).
+	txCtx := authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(txCtx, tx, p.actorTenantID, p.actorID); err != nil {
+		return fmt.Errorf("seed %s authorization: %w", p.capability, err)
+	}
+	if err := authz.Require(txCtx, tx, p.capability, "tenant"); err != nil {
+		return fmt.Errorf("require %s authorization: %w", p.capability, err)
+	}
+
+	found, erased, err := s.tenants.TenantLookupTx(txCtx, tx, p.tenantID)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return iamdomain.ErrTenantNotFound
+	}
+	if erased {
+		// Export of an erased tenant is equally meaningless (its data is
+		// gone) — both kinds refuse an erased target with the same 409.
+		return iamdomain.ErrTenantAlreadyErased
+	}
+
+	// tenant_lifecycle_jobs is tenant-scoped (FORCE RLS) and its INSERT
+	// tripwire arm (migration 0279) requires tenant.export/tenant.erase —
+	// already asserted above by Require, which appended the cap to
+	// metaldocs.asserted_caps on this same tx. Re-seed the tenant GUC to
+	// the TARGET tenant (not the actor's) before the INSERT, mirroring
+	// OnboardTenantService's SeedTxTenant-before-provisioning-write step,
+	// so RLS's WITH CHECK compares row tenant_id against the row's own
+	// tenant, not the actor's.
+	if err := authz.SeedTxTenant(txCtx, tx, p.tenantID); err != nil {
+		return fmt.Errorf("seed target tenant: %w", err)
+	}
+
+	if err := s.jobs.InsertLifecycleJobTx(txCtx, tx, p.jobID, p.tenantID, p.kind, p.actorID); err != nil {
+		return err
+	}
+
+	if s.river != nil {
+		if err := s.river.EnqueueTenantLifecycleJobTx(txCtx, tx, iamdomain.TenantLifecycleJobArgs{JobID: p.jobID, TenantID: p.tenantID, JobKind: p.kind}); err != nil {
+			return fmt.Errorf("enqueue river job: %w", err)
+		}
+	}
+
+	if s.audit == nil {
+		return nil
+	}
+	ev, err := buildLifecycleRequestedEvent(ctx, p.jobID, p.tenantID, p.actorID, p.kind)
+	if err != nil {
+		return err
+	}
+	return s.audit.RecordTx(txCtx, tx, ev)
 }
 
 func buildLifecycleRequestedEvent(ctx context.Context, jobID, tenantID, actorID, kind string) (auditdomain.Event, error) {
@@ -500,7 +541,32 @@ func (s *TenantLifecycleService) runErase(ctx context.Context, job TenantLifecyc
 	// Phase 1: row erasure, one tx, background-bypass context (H-PRE-1: this
 	// is a worker-triggered background job, never an HTTP request path).
 	bgCtx := authz.WithBackgroundBypass(ctx)
-	err := s.runner.Do(bgCtx, func(tx *sql.Tx) error {
+	if err := s.eraseTenantRowsTx(bgCtx, job); err != nil {
+		return fmt.Errorf("erase rows: %w", err)
+	}
+
+	// Phase 2: blob deletion — network I/O, deliberately outside the DB tx
+	// above (state-write + network never share a tx, per CLAUDE.md
+	// invariants).
+	if err := s.eraseTenantBlobs(ctx, job); err != nil {
+		return err
+	}
+
+	// Phase 3: crypto-shred + tombstone, a second small tx.
+	if err := s.cryptoShredAndTombstoneTx(bgCtx, job); err != nil {
+		return fmt.Errorf("crypto-shred + tombstone: %w", err)
+	}
+
+	// Phase 4: erasure-tombstone audit event, recorded after both txs above
+	// have committed (H-PRE-1).
+	return s.recordErasureAudit(ctx, job)
+}
+
+// eraseTenantRowsTx runs runErase's phase 1: one tx erases every port's rows
+// in FK-safe order under the tenant-erasure GUC + scheduler bypass token.
+// bgCtx must already carry authz.WithBackgroundBypass.
+func (s *TenantLifecycleService) eraseTenantRowsTx(bgCtx context.Context, job TenantLifecycleJob) error {
+	return s.runner.Do(bgCtx, func(tx *sql.Tx) error {
 		if err := authz.SeedTxTenant(bgCtx, tx, job.TenantID); err != nil {
 			return fmt.Errorf("seed erasure tenant: %w", err)
 		}
@@ -537,33 +603,35 @@ func (s *TenantLifecycleService) runErase(ctx context.Context, job TenantLifecyc
 		}
 		return nil
 	})
+}
+
+// eraseTenantBlobs runs runErase's phase 2: blob deletion. Idempotent:
+// VerifiedStore.Delete treats a missing key as success, and
+// ListTenantObjects on an already-emptied prefix returns an empty slice.
+func (s *TenantLifecycleService) eraseTenantBlobs(ctx context.Context, job TenantLifecycleJob) error {
+	if s.blobs == nil {
+		return nil
+	}
+	prefix := "tenants/" + job.TenantID + "/"
+	objs, err := s.blobs.ListTenantObjects(ctx, job.TenantID, prefix)
 	if err != nil {
-		return fmt.Errorf("erase rows: %w", err)
+		return fmt.Errorf("list tenant blobs for erasure: %w", err)
 	}
-
-	// Phase 2: blob deletion — network I/O, deliberately outside the DB tx
-	// above (state-write + network never share a tx, per CLAUDE.md
-	// invariants). Idempotent: VerifiedStore.Delete treats a missing key as
-	// success, and ListTenantObjects on an already-emptied prefix returns
-	// an empty slice.
-	if s.blobs != nil {
-		prefix := "tenants/" + job.TenantID + "/"
-		objs, err := s.blobs.ListTenantObjects(ctx, job.TenantID, prefix)
-		if err != nil {
-			return fmt.Errorf("list tenant blobs for erasure: %w", err)
-		}
-		for _, obj := range objs {
-			if err := s.blobs.Delete(ctx, obj.Key); err != nil {
-				return fmt.Errorf("delete tenant blob %s: %w", obj.Key, err)
-			}
+	for _, obj := range objs {
+		if err := s.blobs.Delete(ctx, obj.Key); err != nil {
+			return fmt.Errorf("delete tenant blob %s: %w", obj.Key, err)
 		}
 	}
+	return nil
+}
 
-	// Phase 3: crypto-shred + tombstone, a second small tx. Runs even if
-	// crypto is disabled (s.crypto nil) — DestroyTenantKeyTx becomes a
-	// no-op call skipped entirely below, matching the established nil-safe
-	// pattern; the tombstone UPDATE still must happen.
-	err = s.runner.Do(bgCtx, func(tx *sql.Tx) error {
+// cryptoShredAndTombstoneTx runs runErase's phase 3. Runs even if crypto is
+// disabled (s.crypto nil) — DestroyTenantKeyTx becomes a no-op call skipped
+// entirely below, matching the established nil-safe pattern; the tombstone
+// UPDATE still must happen. bgCtx must already carry
+// authz.WithBackgroundBypass.
+func (s *TenantLifecycleService) cryptoShredAndTombstoneTx(bgCtx context.Context, job TenantLifecycleJob) error {
+	return s.runner.Do(bgCtx, func(tx *sql.Tx) error {
 		if s.crypto != nil {
 			if err := s.crypto.DestroyTenantKeyTx(bgCtx, tx, job.TenantID); err != nil {
 				return fmt.Errorf("destroy tenant key: %w", err)
@@ -583,41 +651,40 @@ UPDATE metaldocs.tenants
 		}
 		return nil
 	})
+}
+
+// recordErasureAudit runs runErase's phase 4. H-PRE-1: the erasure-tombstone
+// audit event is recorded AFTER commit, off any lock-holding tx, via Record
+// (its own new tx) — never RecordTx sharing either fan-out tx above. Written
+// plaintext by design: the tenant's own DEK is already destroyed, so an
+// enveloped write here would be unreadable the instant it lands;
+// audit.RecordTx/Record never receive a TenantCrypto themselves for this
+// call (composition-root wiring only touches the audit WRITER's own
+// envelope decision, not this orchestrator's).
+func (s *TenantLifecycleService) recordErasureAudit(ctx context.Context, job TenantLifecycleJob) error {
+	if s.audit == nil {
+		return nil
+	}
+	payloadJSON, err := json.Marshal(map[string]any{
+		"job_id":    job.ID,
+		"tenant_id": job.TenantID,
+	})
 	if err != nil {
-		return fmt.Errorf("crypto-shred + tombstone: %w", err)
+		return fmt.Errorf("marshal erasure audit payload: %w", err)
 	}
-
-	// H-PRE-1: the erasure-tombstone audit event is recorded AFTER commit,
-	// off any lock-holding tx, via Record (its own new tx) — never RecordTx
-	// sharing the fan-out tx above. Written plaintext by design: the
-	// tenant's own DEK is already destroyed, so an enveloped write here
-	// would be unreadable the instant it lands; audit.RecordTx/Record never
-	// receive a TenantCrypto themselves for this call (composition-root
-	// wiring only touches the audit WRITER's own envelope decision, not this
-	// orchestrator's).
-	if s.audit != nil {
-		payloadJSON, err := json.Marshal(map[string]any{
-			"job_id":    job.ID,
-			"tenant_id": job.TenantID,
-		})
-		if err != nil {
-			return fmt.Errorf("marshal erasure audit payload: %w", err)
-		}
-		if err := s.audit.Record(ctx, auditdomain.Event{
-			ID:           "evt_" + uuid.NewString(),
-			OccurredAt:   time.Now().UTC(),
-			ActorID:      job.RequestedBy,
-			Action:       "tenant.erased",
-			ResourceType: "tenant",
-			ResourceID:   job.TenantID,
-			PayloadJSON:  string(payloadJSON),
-			TraceID:      requesttrace.Resolve(ctx),
-			TenantID:     job.TenantID,
-		}); err != nil {
-			return fmt.Errorf("record erasure audit event: %w", err)
-		}
+	if err := s.audit.Record(ctx, auditdomain.Event{
+		ID:           "evt_" + uuid.NewString(),
+		OccurredAt:   time.Now().UTC(),
+		ActorID:      job.RequestedBy,
+		Action:       "tenant.erased",
+		ResourceType: "tenant",
+		ResourceID:   job.TenantID,
+		PayloadJSON:  string(payloadJSON),
+		TraceID:      requesttrace.Resolve(ctx),
+		TenantID:     job.TenantID,
+	}); err != nil {
+		return fmt.Errorf("record erasure audit event: %w", err)
 	}
-
 	return nil
 }
 

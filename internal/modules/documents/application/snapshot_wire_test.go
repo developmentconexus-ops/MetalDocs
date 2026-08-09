@@ -35,10 +35,10 @@ type captureTxRepo struct {
 	initialHash string
 }
 
-func (r *captureTxRepo) CreateDocumentTx(_ context.Context, _ db.Tx, d *domain.Document, initialContentHash, _ string, _ []templatesdomain.Placeholder) (string, string, string, error) {
+func (r *captureTxRepo) CreateDocumentTx(ctx context.Context, _ db.Tx, d *domain.Document, initialContentHash, _ string, _ []templatesdomain.Placeholder) (string, string, string, error) {
 	r.createdDoc = d
 	r.initialHash = initialContentHash
-	return r.fakeRepo.CreateDocumentTx(context.Background(), (*sql.Tx)(nil), d, initialContentHash, "", nil)
+	return r.fakeRepo.CreateDocumentTx(ctx, (*sql.Tx)(nil), d, initialContentHash, "", nil)
 }
 
 func TestCloneIntoTx_SnapshotPopulated(t *testing.T) {

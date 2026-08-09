@@ -68,7 +68,7 @@ func (m *BumpMiddleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		userID := iamdomain.UserIDFromContext(r.Context())
 		if userID != "" {
-			m.maybeBump(userID)
+			m.maybeBump(r.Context(), userID)
 		}
 		next.ServeHTTP(w, r)
 	})
@@ -77,8 +77,12 @@ func (m *BumpMiddleware) Wrap(next http.Handler) http.Handler {
 // maybeBump consults the in-memory debounce map and, if the user is
 // outside the window, fires a background UPDATE. The update runs on
 // its own goroutine + bounded context so the HTTP request never waits
-// on the database.
-func (m *BumpMiddleware) maybeBump(userID string) {
+// on the database. ctx is the inbound request's context; the goroutine
+// intentionally detaches from its cancellation (via context.WithoutCancel)
+// because the bump must complete even after the response has been written
+// and the request context torn down, while still carrying request-scoped
+// values (e.g. trace ID) into the update.
+func (m *BumpMiddleware) maybeBump(ctx context.Context, userID string) {
 	now := m.now()
 	m.mu.Lock()
 	last, seen := m.lastBump[userID]
@@ -89,13 +93,13 @@ func (m *BumpMiddleware) maybeBump(userID string) {
 	m.lastBump[userID] = now
 	m.mu.Unlock()
 
-	go func(uid string, ts time.Time) {
-		ctx, cancel := m.updateCtx(context.Background())
+	go func(uid string, ts time.Time, parentCtx context.Context) {
+		updateCtx, cancel := m.updateCtx(context.WithoutCancel(parentCtx))
 		defer cancel()
-		if err := m.repo.BumpLastSeen(ctx, uid, ts); err != nil {
+		if err := m.repo.BumpLastSeen(updateCtx, uid, ts); err != nil {
 			m.log.Warn("presence: bump last_seen_at failed", "user_id", uid, "err", err)
 		}
-	}(userID, now)
+	}(userID, now, ctx)
 }
 
 // StartCleanup spawns a background goroutine that periodically evicts

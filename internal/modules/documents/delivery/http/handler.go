@@ -445,14 +445,14 @@ func listOptionsFromParams(r *http.Request, params documentsapi.ListDocumentsPar
 }
 
 func (h *Handler) getDocument(w http.ResponseWriter, r *http.Request) {
-	r = withAdminCtx(r)
+	ctx := withAdminCtx(r.Context(), r)
 	docID := r.PathValue("id")
-	tenantID, _, ok := h.authorizeDocumentScope(w, r, docID)
+	tenantID, _, ok := h.authorizeDocumentScope(w, r, ctx, docID)
 	if !ok {
 		return
 	}
 
-	doc, err := h.svc.GetDocument(r.Context(), tenantID, docID)
+	doc, err := h.svc.GetDocument(ctx, tenantID, docID)
 	if err != nil {
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
@@ -596,9 +596,9 @@ func toDocumentReleaseProjection(doc domain.Document) (*documentsapi.DocumentRel
 }
 
 func (h *Handler) renameDocument(w http.ResponseWriter, r *http.Request) {
-	r = withAdminCtx(r)
+	ctx := withAdminCtx(r.Context(), r)
 	docID := r.PathValue("id")
-	tenantID, userID, ok := h.authorizeDocumentScope(w, r, docID)
+	tenantID, userID, ok := h.authorizeDocumentScope(w, r, ctx, docID)
 	if !ok {
 		return
 	}
@@ -615,7 +615,7 @@ func (h *Handler) renameDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.RenameDocument(r.Context(), tenantID, userID, docID, req.Name); err != nil {
+	if err := h.svc.RenameDocument(ctx, tenantID, userID, docID, req.Name); err != nil {
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
 		return
@@ -627,14 +627,14 @@ func (h *Handler) renameDocument(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) archiveDocument(w http.ResponseWriter, r *http.Request) {
-	r = withAdminCtx(r)
+	ctx := withAdminCtx(r.Context(), r)
 	docID := r.PathValue("id")
-	tenantID, userID, ok := h.authorizeDocumentScope(w, r, docID)
+	tenantID, userID, ok := h.authorizeDocumentScope(w, r, ctx, docID)
 	if !ok {
 		return
 	}
 
-	if err := h.svc.Archive(r.Context(), tenantID, docID, userID); err != nil {
+	if err := h.svc.Archive(ctx, tenantID, docID, userID); err != nil {
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
 		return
@@ -643,14 +643,14 @@ func (h *Handler) archiveDocument(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) duplicateDocument(w http.ResponseWriter, r *http.Request) {
-	r = withAdminCtx(r)
+	ctx := withAdminCtx(r.Context(), r)
 	docID := r.PathValue("id")
-	tenantID, userID, ok := h.authorizeDocumentScope(w, r, docID)
+	tenantID, userID, ok := h.authorizeDocumentScope(w, r, ctx, docID)
 	if !ok {
 		return
 	}
 
-	res, err := h.svc.DuplicateDocument(r.Context(), tenantID, userID, docID)
+	res, err := h.svc.DuplicateDocument(ctx, tenantID, userID, docID)
 	if err != nil {
 		status, msg := mapErr(err)
 		if status == http.StatusInternalServerError {
@@ -695,14 +695,14 @@ func parseCreateResultUUIDs(documentID, initialRevisionID, sessionID string) (uu
 }
 
 func (h *Handler) acquireSession(w http.ResponseWriter, r *http.Request) {
-	r = withAdminCtx(r)
+	ctx := withAdminCtx(r.Context(), r)
 	docID := r.PathValue("id")
-	tenantID, userID, ok := h.authorizeDocumentScope(w, r, docID)
+	tenantID, userID, ok := h.authorizeDocumentScope(w, r, ctx, docID)
 	if !ok {
 		return
 	}
 
-	sess, readonly, err := h.svc.AcquireSession(r.Context(), tenantID, docID, userID)
+	sess, readonly, err := h.svc.AcquireSession(ctx, tenantID, docID, userID)
 	if err != nil {
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
@@ -736,9 +736,9 @@ func (h *Handler) acquireSession(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) heartbeatSession(w http.ResponseWriter, r *http.Request) {
-	r = withAdminCtx(r)
+	ctx := withAdminCtx(r.Context(), r)
 	docID := r.PathValue("id")
-	_, userID, ok := h.authorizeDocumentScope(w, r, docID)
+	_, userID, ok := h.authorizeDocumentScope(w, r, ctx, docID)
 	if !ok {
 		return
 	}
@@ -751,7 +751,7 @@ func (h *Handler) heartbeatSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.HeartbeatSession(r.Context(), req.SessionID, userID); err != nil {
+	if err := h.svc.HeartbeatSession(ctx, req.SessionID, userID); err != nil {
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
 		return
@@ -760,9 +760,9 @@ func (h *Handler) heartbeatSession(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) releaseSession(w http.ResponseWriter, r *http.Request) {
-	r = withAdminCtx(r)
+	ctx := withAdminCtx(r.Context(), r)
 	docID := r.PathValue("id")
-	tenantID, userID, ok := h.authorizeDocumentScope(w, r, docID)
+	tenantID, userID, ok := h.authorizeDocumentScope(w, r, ctx, docID)
 	if !ok {
 		return
 	}
@@ -775,7 +775,7 @@ func (h *Handler) releaseSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.ReleaseSession(r.Context(), tenantID, req.SessionID, userID, docID); err != nil {
+	if err := h.svc.ReleaseSession(ctx, tenantID, req.SessionID, userID, docID); err != nil {
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
 		return
@@ -784,7 +784,7 @@ func (h *Handler) releaseSession(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) forceReleaseSession(w http.ResponseWriter, r *http.Request) {
-	r = withAdminCtx(r)
+	ctx := withAdminCtx(r.Context(), r)
 	docID := r.PathValue("id")
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
@@ -801,7 +801,7 @@ func (h *Handler) forceReleaseSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.ForceReleaseSession(r.Context(), tenantID, adminID, req.SessionID, docID); err != nil {
+	if err := h.svc.ForceReleaseSession(ctx, tenantID, adminID, req.SessionID, docID); err != nil {
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
 		return
@@ -810,9 +810,9 @@ func (h *Handler) forceReleaseSession(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) presignAutosave(w http.ResponseWriter, r *http.Request) {
-	r = withAdminCtx(r)
+	ctx := withAdminCtx(r.Context(), r)
 	docID := r.PathValue("id")
-	tenantID, userID, ok := h.authorizeDocumentScope(w, r, docID)
+	tenantID, userID, ok := h.authorizeDocumentScope(w, r, ctx, docID)
 	if !ok {
 		return
 	}
@@ -827,7 +827,7 @@ func (h *Handler) presignAutosave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := h.svc.PresignAutosave(r.Context(), application.PresignAutosaveCmd{
+	res, err := h.svc.PresignAutosave(ctx, application.PresignAutosaveCmd{
 		TenantID:       tenantID,
 		ActorUserID:    userID,
 		DocumentID:     docID,
@@ -853,9 +853,9 @@ func (h *Handler) presignAutosave(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
-	r = withAdminCtx(r)
+	ctx := withAdminCtx(r.Context(), r)
 	docID := r.PathValue("id")
-	tenantID, userID, ok := h.authorizeDocumentScope(w, r, docID)
+	tenantID, userID, ok := h.authorizeDocumentScope(w, r, ctx, docID)
 	if !ok {
 		return
 	}
@@ -881,7 +881,7 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := h.svc.CommitAutosave(r.Context(), application.CommitAutosaveCmd{
+	res, err := h.svc.CommitAutosave(ctx, application.CommitAutosaveCmd{
 		TenantID:         tenantID,
 		ActorUserID:      userID,
 		DocumentID:       docID,
@@ -919,14 +919,14 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) listCheckpoints(w http.ResponseWriter, r *http.Request) {
-	r = withAdminCtx(r)
+	ctx := withAdminCtx(r.Context(), r)
 	docID := r.PathValue("id")
-	tenantID, userID, ok := h.authorizeDocumentScope(w, r, docID)
+	tenantID, userID, ok := h.authorizeDocumentScope(w, r, ctx, docID)
 	if !ok {
 		return
 	}
 
-	items, err := h.svc.ListCheckpoints(r.Context(), tenantID, userID, docID)
+	items, err := h.svc.ListCheckpoints(ctx, tenantID, userID, docID)
 	if err != nil {
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
@@ -942,14 +942,14 @@ func (h *Handler) listCheckpoints(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) listRevisionHistory(w http.ResponseWriter, r *http.Request) {
-	r = withAdminCtx(r)
+	ctx := withAdminCtx(r.Context(), r)
 	docID := r.PathValue("id")
-	tenantID, _, ok := h.authorizeDocumentScope(w, r, docID)
+	tenantID, _, ok := h.authorizeDocumentScope(w, r, ctx, docID)
 	if !ok {
 		return
 	}
 
-	items, err := h.svc.ListRevisionHistory(r.Context(), tenantID, docID)
+	items, err := h.svc.ListRevisionHistory(ctx, tenantID, docID)
 	if err != nil {
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
@@ -1022,9 +1022,9 @@ func toAPIRevisionHistoryItems(items []domain.RevisionHistoryItem) ([]documentsa
 }
 
 func (h *Handler) createCheckpoint(w http.ResponseWriter, r *http.Request) {
-	r = withAdminCtx(r)
+	ctx := withAdminCtx(r.Context(), r)
 	docID := r.PathValue("id")
-	tenantID, userID, ok := h.authorizeDocumentScope(w, r, docID)
+	tenantID, userID, ok := h.authorizeDocumentScope(w, r, ctx, docID)
 	if !ok {
 		return
 	}
@@ -1041,7 +1041,7 @@ func (h *Handler) createCheckpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cp, err := h.svc.CreateCheckpoint(r.Context(), tenantID, docID, userID, req.Label)
+	cp, err := h.svc.CreateCheckpoint(ctx, tenantID, docID, userID, req.Label)
 	if err != nil {
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
@@ -1057,9 +1057,9 @@ func (h *Handler) createCheckpoint(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) restoreCheckpoint(w http.ResponseWriter, r *http.Request) {
-	r = withAdminCtx(r)
+	ctx := withAdminCtx(r.Context(), r)
 	docID := r.PathValue("id")
-	tenantID, userID, ok := h.authorizeDocumentScope(w, r, docID)
+	tenantID, userID, ok := h.authorizeDocumentScope(w, r, ctx, docID)
 	if !ok {
 		return
 	}
@@ -1070,7 +1070,7 @@ func (h *Handler) restoreCheckpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := h.svc.RestoreCheckpoint(r.Context(), tenantID, docID, userID, versionNum)
+	res, err := h.svc.RestoreCheckpoint(ctx, tenantID, docID, userID, versionNum)
 	if err != nil {
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
@@ -1091,14 +1091,14 @@ func (h *Handler) restoreCheckpoint(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) signedRevisionURL(w http.ResponseWriter, r *http.Request) {
-	r = withAdminCtx(r)
+	ctx := withAdminCtx(r.Context(), r)
 	docID := r.PathValue("id")
-	tenantID, _, ok := h.authorizeDocumentScope(w, r, docID)
+	tenantID, _, ok := h.authorizeDocumentScope(w, r, ctx, docID)
 	if !ok {
 		return
 	}
 
-	url, err := h.svc.SignedRevisionURL(r.Context(), tenantID, docID, r.PathValue("rid"))
+	url, err := h.svc.SignedRevisionURL(ctx, tenantID, docID, r.PathValue("rid"))
 	if err != nil {
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
@@ -1108,14 +1108,14 @@ func (h *Handler) signedRevisionURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) listComments(w http.ResponseWriter, r *http.Request) {
-	r = withAdminCtx(r)
+	ctx := withAdminCtx(r.Context(), r)
 	docID := r.PathValue("id")
-	tenantID, _, ok := h.authorizeDocumentScope(w, r, docID)
+	tenantID, _, ok := h.authorizeDocumentScope(w, r, ctx, docID)
 	if !ok {
 		return
 	}
 
-	comments, err := h.svc.ListDocumentComments(r.Context(), tenantID, docID)
+	comments, err := h.svc.ListDocumentComments(ctx, tenantID, docID)
 	if err != nil {
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
@@ -1129,9 +1129,9 @@ func (h *Handler) listComments(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) createComment(w http.ResponseWriter, r *http.Request) {
-	r = withAdminCtx(r)
+	ctx := withAdminCtx(r.Context(), r)
 	docID := r.PathValue("id")
-	tenantID, userID, ok := h.authorizeDocumentScope(w, r, docID)
+	tenantID, userID, ok := h.authorizeDocumentScope(w, r, ctx, docID)
 	if !ok {
 		return
 	}
@@ -1147,7 +1147,7 @@ func (h *Handler) createComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	comment, err := h.svc.AddDocumentComment(r.Context(), tenantID, userID, req.AuthorDisplay, docID, domain.CommentCreateInput{
+	comment, err := h.svc.AddDocumentComment(ctx, tenantID, userID, req.AuthorDisplay, docID, domain.CommentCreateInput{
 		LibraryCommentID: req.LibraryCommentID,
 		ParentLibraryID:  req.ParentLibraryID,
 		AuthorDisplay:    req.AuthorDisplay,
@@ -1162,9 +1162,9 @@ func (h *Handler) createComment(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) updateComment(w http.ResponseWriter, r *http.Request) {
-	r = withAdminCtx(r)
+	ctx := withAdminCtx(r.Context(), r)
 	docID := r.PathValue("id")
-	tenantID, userID, ok := h.authorizeDocumentScope(w, r, docID)
+	tenantID, userID, ok := h.authorizeDocumentScope(w, r, ctx, docID)
 	if !ok {
 		return
 	}
@@ -1183,7 +1183,7 @@ func (h *Handler) updateComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	comment, err := h.svc.UpdateDocumentComment(r.Context(), tenantID, userID, docID, libraryID, domain.CommentUpdateInput{
+	comment, err := h.svc.UpdateDocumentComment(ctx, tenantID, userID, docID, libraryID, domain.CommentUpdateInput{
 		ContentJSON: req.Content,
 		Done:        req.Done,
 	})
@@ -1196,9 +1196,9 @@ func (h *Handler) updateComment(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) deleteComment(w http.ResponseWriter, r *http.Request) {
-	r = withAdminCtx(r)
+	ctx := withAdminCtx(r.Context(), r)
 	docID := r.PathValue("id")
-	tenantID, userID, ok := h.authorizeDocumentScope(w, r, docID)
+	tenantID, userID, ok := h.authorizeDocumentScope(w, r, ctx, docID)
 	if !ok {
 		return
 	}
@@ -1208,7 +1208,7 @@ func (h *Handler) deleteComment(w http.ResponseWriter, r *http.Request) {
 		httpErr(w, http.StatusBadRequest, problem.CodeRequestInvalid)
 		return
 	}
-	if err := h.svc.DeleteDocumentComment(r.Context(), tenantID, userID, docID, libraryID); err != nil {
+	if err := h.svc.DeleteDocumentComment(ctx, tenantID, userID, docID, libraryID); err != nil {
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
 		return
@@ -1251,14 +1251,14 @@ func decodeCommentContent(raw json.RawMessage) []documentsapi.DocumentCommentCon
 // via iam_user_roles) bypasses the capability gate when the caps checker is wired.
 // Non-admin actors are gate-checked via RequireDocumentView (SeedTxIdentity +
 // authz.Require(CapDocumentView, "tenant") inside a RW tx), mirroring ViewService.
-func (h *Handler) authorizeDocumentScope(w http.ResponseWriter, r *http.Request, docID string) (tenantID string, userID string, ok bool) {
+func (h *Handler) authorizeDocumentScope(w http.ResponseWriter, r *http.Request, ctx context.Context, docID string) (tenantID string, userID string, ok bool) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
 		httpErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown)
 		return "", "", false
 	}
 	userID = userIDFromReq(r)
-	admin, err := h.isSystemAdmin(r.Context(), userID, tenantID)
+	admin, err := h.isSystemAdmin(ctx, userID, tenantID)
 	if err != nil {
 		httpErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown)
 		return "", "", false
@@ -1267,7 +1267,7 @@ func (h *Handler) authorizeDocumentScope(w http.ResponseWriter, r *http.Request,
 		return tenantID, userID, true
 	}
 
-	if err := h.svc.RequireDocumentView(r.Context(), tenantID, userID, docID); err != nil {
+	if err := h.svc.RequireDocumentView(ctx, tenantID, userID, docID); err != nil {
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
 		return "", "", false
@@ -1275,18 +1275,22 @@ func (h *Handler) authorizeDocumentScope(w http.ResponseWriter, r *http.Request,
 	return tenantID, userID, true
 }
 
-func withAdminCtx(r *http.Request) *http.Request {
+// withAdminCtx extends the caller-supplied ctx (the request's inherited
+// context, passed explicitly so contextcheck can trace the chain across this
+// call boundary) with the caller's admin auth info (userID + roles), used by
+// authorizeDocumentScope's isSystemAdmin shortcut and by the handler's
+// downstream service calls.
+func withAdminCtx(ctx context.Context, r *http.Request) context.Context {
 	userID := userIDFromReq(r)
 	if userID == "" {
-		return r
+		return ctx
 	}
 
-	roles := iamdomain.RolesFromContext(r.Context())
+	roles := iamdomain.RolesFromContext(ctx)
 	if len(roles) == 0 {
-		return r
+		return ctx
 	}
-	ctx := iamdomain.WithAuthContext(r.Context(), userID, roles)
-	return r.WithContext(ctx)
+	return iamdomain.WithAuthContext(ctx, userID, roles)
 }
 
 func tenantIDFromReq(r *http.Request) (string, error) {
