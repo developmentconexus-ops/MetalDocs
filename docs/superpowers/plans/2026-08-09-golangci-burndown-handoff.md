@@ -46,3 +46,28 @@ These were bot review threads on #97, resolved to unblock merge (thread-resoluti
 - `golangci-lint run` (configured scope) exits 0 whole-tree.
 - PR merged with `required` green for the right reason.
 - Findings fixed at root cause; any allowlist/nolint addition needs an in-code justification comment and operator visibility.
+
+## Closure status (2026-08-09, session 2)
+
+Burn-down executed in 3 waves + orchestrator passes; branch `ci/golangci-burndown`:
+
+- `aa939136` — ci.yml: only-new-issues + TRANSITIONAL block deleted; lint-go whole-tree blocking.
+- `09f3a9d9` — wave 1 (mechanical: revive/errcheck/errorlint/staticcheck/gocritic/exhaustive), 247 files, 891 findings.
+- `eda1ca26` — wave 2 (contextcheck/gocognit/gocyclo, 155 findings) + api-lint allowlist re-true + full-suite green.
+- `801114b8` — wave 3 (gosec/nilerr/bodyclose, 24 findings incl. 3 in out-of-scope apps/jobs+worker).
+
+**Definition-of-done evidence:**
+- only-new-issues: zero live-config references (grep whole repo — remaining matches are historical analysis/spec/report docs describing the pre-removal state; ledger doc documents the transitional label as history).
+- `golangci-lint run --max-issues-per-linter=0 --max-same-issues=0 ./apps/api/... ./internal/... ./tools/...` → **0 issues, exit 0** (uncapped; the default caps HIDE findings — any future gate run must uncap). `./apps/...` (jobs/worker, outside CI scope) also 0.
+- `go build ./...`, `go vet -tags integration ./...`, `go test ./...` green (full suite re-run at wave-2 gate; wave-3 touched packages re-run green; final full suite run at closure).
+- nolint additions on the branch (all with in-code justification): 4 revive (OpenAPI operationId-pinned ServerInterface method names), 18 gosec (12 G706 slog-JSONHandler FPs, 4 G118 cancel-returned-as-stop FPs, 1 G117 redacted-before-marshal, 1 G705 cached self-produced JSON replay), 2 nilerr (best-effort WalkDir, shutdown-mid-batch).
+
+**Deviations / operator-visibility items:**
+1. `submit_service_test.go` structural text-scan test widened from the old monolithic function's source span to whole-file scan (wave-2 decomposition made the old span meaningless); the authz-before-UPDATE ordering assertion is preserved.
+2. api-lint allowlists re-trued after decomposition: seed-chokepoint line pins remapped (same 13 sites, monotonic shift, no new seeds); tripwire allowlist +2 extracted documents-repo helpers (`writeCreateDocumentSnapshotAndPlaceholders`, `insertCommittedRevision`) — callers `CreateDocumentTx`/`CommitUpload` hold `authz.Require(CapDocumentEdit)` in the same tx (verified).
+3. Latent shutdown defect FIXED in all 3 binaries' mains: os.Exit skipped deferred cleanups (otel shutdown, signal stop, deps cleanup, rate-limit store close) on failure paths — mains now `os.Exit(runMain())` with defers running on every path.
+4. A pre-existing `//nolint:gocyclo` in release_coordinator was removed by genuine decomposition (net nolint delta on gocyclo: −1).
+5. **CI lint scope gap (pre-existing, not changed by this branch):** lint-go covers `./apps/api/... ./internal/... ./tools/...` only — `apps/jobs` and `apps/worker` are unlinted in CI. Their findings were fixed anyway on this branch (now 0); adding them to the scope is a one-line args change when the operator wants it.
+6. The non-lint accepted-open items (nightly.yml persist-credentials + exit-1 health loop, verify path-scoping P1/P2) remain open — separate follow-ups, not this branch's scope.
+
+**Remaining to done:** push branch + open PR (operator OK required), `required` green in CI, merge.
