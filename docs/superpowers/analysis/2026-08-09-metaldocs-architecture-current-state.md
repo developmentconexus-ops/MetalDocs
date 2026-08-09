@@ -104,7 +104,7 @@ Nine of fifteen domain packages import `database/sql` and/or `internal/platform/
 
 ### 4.5 Platform inversion (`P`)
 
-The target architecture requires `internal/platform` to be domain-free. The measured inventory identifies module-specific imports from platform packages including `bootstrap`, `authn`, `docgenv2`, `tripwire` and `worker`, separate from legitimate composition wiring.
+The target architecture requires `internal/platform` to be domain-free. The measured inventory identified module-specific imports from platform packages including `bootstrap`, `authn`, `docgenv2`, `tripwire` and `worker` *(historical list — the reproduction narrows this to **4 packages / 9 package edges: authn, bootstrap, docgenv2, tripwire**; `worker` is NOT among them, §16)*, separate from legitimate composition wiring.
 
 ### 4.6 Composition-only wiring (`W`)
 
@@ -272,9 +272,9 @@ This is dependency guidance derived from owning issue/ADR constraints; it is not
 
 ### F-AUD-02 — Import boundaries alone cannot enforce data ownership
 
-**Evidence:** 17+ foreign-table SQL reads reproduced in the layering lane.
+**Evidence:** 17+ foreign-table SQL reads reproduced in the layering lane *(historical figure — full reproduction: **55 foreign reads + 12 foreign writes**, §16)*.
 
-**Owner:** #93 / A4 (with A9 absorbing seams that become intra-context after ADR 0093 execution).
+**Owner:** #93 / A4. *(Corrected 2026-08-09: an earlier revision of this row claimed A9 would absorb seams that become intra-context under ADR 0093 — the reproduction shows **0 of the 67 foreign-SQL statements become intra-context**; approval stays subject-generic permanently, so A9 absorbs none of them — §16.)*
 
 **Acceptance property:** a single machine-readable table-ownership catalog plus SQL identifier analysis makes foreign-table coupling visible at verification time.
 

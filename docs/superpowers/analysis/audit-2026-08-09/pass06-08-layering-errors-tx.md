@@ -469,6 +469,6 @@ These three are the largest hand-written-SQL surfaces in the codebase (combined 
 
 ## Cross-reference to issue taxonomy
 
-- **Layering / type-leak (#93 A4 + #92 A5):** §6.2 (db.Tx/db.DB — mostly ADR-legitimate, 1 genuine leak), §6.3 (application-layer SQL + HTTP-in-application + oversized approval/application + twin FSMs + byte-identical objectstore switch), §6.4 (delivery importing infrastructure types, Postgres-error-code-in-delivery).
+- **Layering / type-leak (#93 A4 + #92 A5):** §6.2 (db.Tx/db.DB — three classes: ADR-0044-sanctioned event boundary; non-event domain-port usage current-architecture/unresolved pending explicit ruling; auth raw `database/sql` confirmed debt), §6.3 (application-layer SQL + HTTP-in-application + oversized approval/application + twin FSMs + byte-identical objectstore switch), §6.4 (delivery importing infrastructure types, Postgres-error-code-in-delivery).
 - **Error seams (#93 A4 + #90 A3):** §7.2 (true cross-module errors.Is = 19, not 65/62; iam↔auth undeclared integration contract), §7.3 (writeProblem duplication + silent 500s).
 - **Tx mechanics (#92 A5):** §8.1-§8.3 (3 module-specific tx abstractions, 3 byte-identical twin methods), §8.5 (delivery-layer pg-error checks), §8.6 (justified N+1), §8.7 (network-in-tx clean on sampled scope).
