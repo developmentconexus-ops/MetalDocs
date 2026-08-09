@@ -80,6 +80,44 @@ var (
 	ErrMalformedHash = errors.New("passwordhash: malformed argon2id hash")
 )
 
+// Bounds on the m/t/p triple a stored argon2id PHC string may encode.
+//
+// These exist to reject garbage, not to reject the system's own hashes or a
+// future parameter bump: the current minting params (argon2idMemory=19456,
+// argon2idTime=16, argon2idThreads=1, above) sit far inside every bound
+// here, with headroom for the params to grow substantially before a bound
+// would need revisiting.
+//
+//   - maxArgon2idMemoryKiB caps the slice argon2.IDKey allocates. A stored
+//     hash with an attacker-controlled negative m parses via Sscanf's signed
+//     %d with no error, and casting that straight to uint32 (as this parser
+//     used to) wraps to near math.MaxUint32 KiB - a ~4 TiB allocation
+//     request. That is a Go runtime OOM (runtime.throw), which panic_recovery
+//     middleware cannot catch: it kills the whole metaldocs-api process, not
+//     just the request. 1 GiB is two orders of magnitude above the 19 MiB
+//     minting default - room for real parameter growth - while still being
+//     an allocation size any host running this service can satisfy without
+//     risking the process.
+//   - The lower bound on m is derived as 8*p (not a fixed constant), which
+//     argon2.IDKey itself requires (see golang.org/x/crypto/argon2); a hash
+//     violating it is malformed regardless of sign.
+//   - maxArgon2idTime bounds the CPU a single verify can burn. t is a
+//     multiplicative pass count over the memory block; unbounded t lets one
+//     stored hash pin a CPU core indefinitely on every login attempt against
+//     that account. 64 is 4x the t=16 minting default, generous for a future
+//     bump, still boundable CPU time.
+//   - maxArgon2idParallelism keeps p inside uint8 (the wire type) and bounds
+//     the goroutine fan-out argon2.IDKey spins up per call; p=1 today, 64
+//     leaves headroom without letting a single verify spawn hundreds of
+//     goroutines.
+const (
+	maxArgon2idMemoryKiB   = 1 << 20 // 1 GiB
+	minArgon2idTime        = 1
+	maxArgon2idTime        = 64
+	minArgon2idParallelism = 1
+	maxArgon2idParallelism = 64
+)
+
 // argon2idParams is the parameter triple encoded in an argon2id PHC string.
 type argon2idParams struct {
 	memory  uint32
@@ -127,6 +165,9 @@ func parseArgon2id(encoded string) (argon2idParams, []byte, []byte, error) {
 	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &m, &t, &par); err != nil {
 		return argon2idParams{}, nil, nil, fmt.Errorf("%w: params: %v", ErrMalformedHash, err)
 	}
+	if err := validateArgon2idParams(m, t, par); err != nil {
+		return argon2idParams{}, nil, nil, err
+	}
 	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
 	if err != nil {
 		return argon2idParams{}, nil, nil, fmt.Errorf("%w: salt: %v", ErrMalformedHash, err)
@@ -136,6 +177,27 @@ func parseArgon2id(encoded string) (argon2idParams, []byte, []byte, error) {
 		return argon2idParams{}, nil, nil, fmt.Errorf("%w: hash: %v", ErrMalformedHash, err)
 	}
 	return argon2idParams{memory: uint32(m), time: uint32(t), threads: uint8(par)}, salt, hash, nil
+}
+
+// validateArgon2idParams rejects an m/t/p triple parsed from a stored PHC
+// string before it is cast to the unsigned wire types and handed to
+// argon2.IDKey. Sscanf's %d parses signed integers with no bounds check, so
+// a malicious or corrupted hash can encode a negative m/t/p that would
+// otherwise wrap to a huge unsigned value on cast (e.g. m=-1 -> a ~4 TiB
+// allocation request, an unrecoverable Go runtime OOM). No-fallback
+// principle: any violation here is a hard rejection (ErrMalformedHash), never
+// a clamp or substituted default.
+func validateArgon2idParams(m, t, p int) error {
+	if p < minArgon2idParallelism || p > maxArgon2idParallelism {
+		return fmt.Errorf("%w: parallelism %d out of range [%d,%d]", ErrMalformedHash, p, minArgon2idParallelism, maxArgon2idParallelism)
+	}
+	if m < 8*p || m > maxArgon2idMemoryKiB {
+		return fmt.Errorf("%w: memory %d out of range [%d,%d]", ErrMalformedHash, m, 8*p, maxArgon2idMemoryKiB)
+	}
+	if t < minArgon2idTime || t > maxArgon2idTime {
+		return fmt.Errorf("%w: time %d out of range [%d,%d]", ErrMalformedHash, t, minArgon2idTime, maxArgon2idTime)
+	}
+	return nil
 }
 
 // VerifyArgon2id parses an argon2id PHC-format hash and compares it against

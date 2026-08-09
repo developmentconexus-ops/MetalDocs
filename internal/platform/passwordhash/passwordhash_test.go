@@ -107,3 +107,35 @@ func TestVerify_FailsClosedOnMalformedArgon2idHash(t *testing.T) {
 		t.Fatalf("err = %v, want ErrMalformedHash", err)
 	}
 }
+
+// TestVerify_FailsClosedOnOutOfRangeArgon2idParams proves the bounds check in
+// parseArgon2id: a stored PHC string with an out-of-range m/t/p must be
+// rejected with ErrMalformedHash rather than reaching argon2.IDKey. The
+// negative-m case is the concrete defect this guards - Sscanf's %d parses a
+// negative m with no error, and casting it straight to uint32 wraps to a
+// ~4 TiB allocation request, which crashes the whole process (an
+// unrecoverable Go runtime OOM, not a request-scoped panic).
+func TestVerify_FailsClosedOnOutOfRangeArgon2idParams(t *testing.T) {
+	tests := []struct {
+		name   string
+		params string
+	}{
+		{name: "negative memory", params: "m=-1,t=1,p=1"},
+		{name: "oversized memory", params: "m=99999999999,t=1,p=1"},
+		{name: "zero time", params: "m=19456,t=0,p=1"},
+		{name: "negative time", params: "m=19456,t=-1,p=1"},
+		{name: "zero parallelism", params: "m=19456,t=1,p=0"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			encoded := "$argon2id$v=19$" + tt.params + "$c29tZXNhbHQ$c29tZWhhc2g"
+			ok, err := passwordhash.Verify(passwordhash.AlgoArgon2id, []byte(encoded), []byte("secret"))
+			if ok {
+				t.Fatalf("Verify(%q) = true, want false (fail closed)", tt.params)
+			}
+			if !errors.Is(err, passwordhash.ErrMalformedHash) {
+				t.Fatalf("Verify(%q) err = %v, want ErrMalformedHash", tt.params, err)
+			}
+		})
+	}
+}
