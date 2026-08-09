@@ -178,6 +178,20 @@ func TestLogout_RevokesSession_REQ_AUTHN_3(t *testing.T) {
 		PasswordMinLength:      8,
 		LoginMaxFailedAttempts: 5,
 		LoginLockDuration:      15 * time.Minute,
+		// SessionTTL was previously unset (zero value), which sets
+		// ExpiresAt == CreatedAt. That is not "immediately expired" by
+		// construction -- Before() is a strict less-than -- but it leaves
+		// zero headroom: ExpiresAt and the ResolveSession-time now() are two
+		// independent time.Now() reads with the monotonic component
+		// stripped by .UTC() (see service.go), so they only need to land on
+		// different wall-clock ticks (a certainty once anything schedules a
+		// goroutine between them, e.g. contention from a concurrent `go
+		// build`) for ExpiresAt.Before(now) to flip true and this test to
+		// fail on ErrSessionExpired before it ever reaches the revocation
+		// assertion it exists to prove. Giving the session a real TTL, like
+		// every other session-bearing test in this package, removes that
+		// race entirely and lets the test verify what it claims to verify.
+		SessionTTL:             24 * time.Hour,
 		AllowDevTenantFallback: true,
 		CookieSecure:           false,
 	})

@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/bcrypt"
@@ -125,6 +126,24 @@ type argon2idParams struct {
 	threads uint8
 }
 
+// kdfInvocations counts every real KDF computation this package performs —
+// each argon2.IDKey call (HashArgon2id, VerifyArgon2id) and each
+// bcrypt.CompareHashAndPassword call (Verify's bcrypt branch). It exists so
+// callers with no other way to observe "did the expensive comparison
+// actually run" (e.g. a timing-oracle regression test that must not assert
+// on wall-clock) can assert on invocation counts instead. It only counts;
+// it cannot be used to skip, weaken, or reconfigure the KDF itself — every
+// increment sits directly next to the real compute call it measures, not a
+// substitute for it.
+var kdfInvocations atomic.Uint64
+
+// KDFInvocations returns the number of KDF computations (Argon2id or
+// bcrypt) this process has performed since start. Intended for tests that
+// need a deterministic substitute for wall-clock timing assertions.
+func KDFInvocations() uint64 {
+	return kdfInvocations.Load()
+}
+
 // HashArgon2id hashes password with this package's current Argon2id
 // parameters and a freshly generated random salt, returning the standard
 // PHC string form: $argon2id$v=19$m=...,t=...,p=...$salt$hash.
@@ -133,6 +152,7 @@ func HashArgon2id(password []byte) (string, error) {
 	if _, err := rand.Read(salt); err != nil {
 		return "", fmt.Errorf("passwordhash: generate salt: %w", err)
 	}
+	kdfInvocations.Add(1)
 	hash := argon2.IDKey(password, salt, argon2idTime, argon2idMemory, argon2idThreads, argon2idKeyLen)
 	return encodeArgon2id(argon2idParams{memory: argon2idMemory, time: argon2idTime, threads: argon2idThreads}, salt, hash), nil
 }
@@ -210,6 +230,7 @@ func VerifyArgon2id(encoded string, password []byte) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	kdfInvocations.Add(1)
 	got := argon2.IDKey(password, salt, params.time, params.memory, params.threads, uint32(len(want)))
 	return subtle.ConstantTimeCompare(got, want) == 1, nil
 }
@@ -235,6 +256,7 @@ func Argon2ParamsSummary(encoded string) (string, error) {
 func Verify(algo string, hash, password []byte) (bool, error) {
 	switch algo {
 	case AlgoBcrypt:
+		kdfInvocations.Add(1)
 		return bcrypt.CompareHashAndPassword(hash, password) == nil, nil
 	case AlgoArgon2id:
 		return VerifyArgon2id(string(hash), password)
