@@ -106,9 +106,9 @@ func main() {
 	if !*dryRun {
 		mode = "APPLY (writes committed per document)"
 	}
-	pass := "BACKFILL (approval fact + materialization + evaluation)"
+	pass := "BACKFILL (approval fact + materialization + evaluation)" // #nosec G101 -- "pass" is a run-mode label printed to stdout, not a credential; gosec matches on the variable name substring only.
 	if *repairOnly {
-		pass = "REPAIR-ONLY (re-materialization only; approval facts untouched)"
+		pass = "REPAIR-ONLY (re-materialization only; approval facts untouched)" // #nosec G101 -- same run-mode label, reassigned; not a credential.
 	}
 	fmt.Printf("release-backfill: %s, %s, %d document(s)\n", pass, mode, len(docs))
 
