@@ -283,22 +283,27 @@ func TestAuthenticate_PreservesPasswordWhitespace(t *testing.T) {
 // only ever pushes elapsed time up, never down, so this floor cannot flake
 // under load the way the old cross-path ratio comparison could.
 //
-// A cross-path wall-clock ratio is also kept, but it is now a coarse
-// backstop, not the precise guarantee — that job belongs to the KDF-count
-// assertion above, which proves neither path short-circuits *before* the
-// KDF runs. The ratio's only remaining job is to catch gross asymmetry
-// *downstream* of the KDF: e.g. the known-identifier branch growing extra
-// synchronous work after passwordhash.Verify (service.go:358) that the
-// unknown-identifier branch never performs (it returns immediately after
-// its dummy-hash compare, service.go:329-330). A real instance of that shape
-// already exists in production: the known-user wrong-password branch calls
-// tx.RecordFailedLogin inside the WithinLoginLock transaction (service.go:371),
-// which issues a Postgres UPDATE...RETURNING and commits the advisory-lock
-// transaction — real network round trips the unknown-identifier path never
-// makes. The in-memory repository used here also does a (much cheaper)
-// mutex-protected map write for the same branch, so this test's own known
-// path is never perfectly symmetric with its unknown path either — that
-// residual is why the bound below has to be wide.
+// A cross-path wall-clock ratio backstop exists too, but it is scoped
+// deliberately: it only ever compares two Argon2id-migrated identities (the
+// unknown-identifier dummy-hash compare vs a known, already-migrated
+// identity's wrong-password compare), never the bcrypt-window pair. Reason:
+// during the bcrypt->Argon2id migration, a not-yet-rehashed identity's
+// wrong-password attempt costs real bcrypt-equivalent time, which
+// service.go:303-315 already documents as a real, NAMED, ACCEPTED residual —
+// production explicitly does not promise the bcrypt-window pair costs the
+// same wall-clock time as the unknown path; it promises the gap "closes
+// automatically as accounts rehash on login and disappears entirely once no
+// bcrypt identity remains." Asserting a wall-clock bound over that pair
+// would assert a guarantee the system does not make. So the bcrypt-window
+// pair below keeps ONLY the deterministic KDF-invocation-count equality
+// assertion and the 50ms floors — proof that neither path ever short-circuits
+// before the KDF runs, with no claim about relative cost. The ratio backstop
+// is measured on a separate, same-KDF-class pair where a bound is honest:
+// once both sides run Argon2id, any asymmetry the ratio catches is genuine
+// downstream work added to one path and not the other (e.g. the known-path
+// branch's tx.RecordFailedLogin round trip inside WithinLoginLock,
+// service.go:371 — the in-memory repo's cheaper mutex-protected map write for
+// the same branch is why even the same-KDF-class bound has to stay wide).
 //
 // The bound was chosen by measurement, not guessed: across ~65 runs of this
 // probe under sustained CPU contention (2-3 concurrent `go build -a ./...`
@@ -313,14 +318,7 @@ func TestAuthenticate_PreservesPasswordWhitespace(t *testing.T) {
 // a single extra DB round trip (the production case above moves the ratio by
 // a few percent, not by 10x) - only a gross asymmetry (a blocking network
 // call, an unbounded loop) added to one path and not the other would move the
-// ratio this far. Note what 10x does NOT catch: an extra KDF call on one path
-// only doubles that path's cost (that path is already KDF-dominated), landing
-// near 2x - inside the measured noise band. That case is caught by the
-// KDF-invocation-count equality assertion below, not by this ratio. That
-// narrower class of bug (a modest, single extra synchronous write on only one
-// path) is a real, accepted, uncovered gap - see the production-asymmetry
-// note above; no wall-clock bound can both stay contention-immune and catch
-// it, so it is not this test's job to catch it.
+// ratio this far.
 //
 // The ratio is measured from the MEDIAN of several sequential, alternating
 // samples per path (not a single draw), with the very first round discarded
@@ -328,24 +326,30 @@ func TestAuthenticate_PreservesPasswordWhitespace(t *testing.T) {
 // the same identity — it owns a private repo instance and only one goroutine
 // ever touches it, so the per-identity login lock (service.go
 // WithinLoginLock) is never contended here and cannot be the source of a
-// slow sample. What was observed instead: a single bcrypt(cost=12) call's
-// wall time on a CPU-starved CI runner (2-core box, `go test ./...` running
-// many packages' test binaries concurrently, `-race` instrumentation
-// overhead) can land an order of magnitude above its typical cost on any
-// individual draw with zero code-path asymmetry — one CI run measured a
-// single known-path call at 4.316s (~17x its ~250ms typical cost) against an
-// unlucky-fast 418ms unknown-path draw, tripping the 10x bound on pure
-// single-sample scheduler noise. Comparing medians of multiple samples fixes
-// this: one scheduler hiccup landing on a single draw no longer swings the
-// reported ratio, because the rest of that path's samples are unaffected.
+// slow sample. What was observed instead, BEFORE this pair was rescoped to
+// same-KDF-class identities: a single bcrypt(cost=12) call's wall time under
+// `-race` (Go's race-detector instrumentation cost is highly
+// algorithm-dependent — bcrypt's Blowfish key schedule accrues far more of
+// it than Argon2id's block-oriented mixing does for comparable real CPU
+// work) reproducibly landed ~11-17x its typical cost, not as noise but as a
+// systematic multiplier — median-of-N could not fix that because it was not
+// an outlier, every sample showed it. Comparing an unknown identifier
+// against another Argon2id identity removes that source entirely: both
+// sides pay the same instrumentation profile, so medians of multiple
+// samples now guard only against genuine per-attempt scheduler noise (one
+// hiccup landing on a single draw no longer swings the reported ratio,
+// because the rest of that path's samples are unaffected) and real
+// downstream asymmetry, not an algorithm-class artifact.
 func TestAuthenticate_TimingConstant(t *testing.T) {
 	repo := memory.NewRepository()
 	roleProvider := newMockRoleProvider()
 	roleAdmin := newMockRoleAdminRepository()
 	ctx := context.Background()
 
-	// Seed a real user with a cost-12 hash so the known-user wrong-password path
-	// runs the same bcrypt cost as the precomputed dummy hash.
+	// Seed a real user with a cost-12 bcrypt hash — this identity represents
+	// the accepted bcrypt-migration-window scenario (service.go:303-315) and
+	// is used ONLY for the deterministic KDF-count/floor checks below, never
+	// for the wall-clock ratio backstop (see doc comment above for why).
 	const userID = "timing-user"
 	knownHash, err := bcrypt.GenerateFromPassword([]byte("CorrectPassword123!"), 12)
 	if err != nil {
@@ -357,7 +361,27 @@ func TestAuthenticate_TimingConstant(t *testing.T) {
 		Email:        "timing@example.com",
 		DisplayName:  "Timing User",
 		PasswordHash: authdomain.PasswordHash(string(knownHash)),
-		PasswordAlgo: "bcrypt",
+		PasswordAlgo: passwordhash.AlgoBcrypt,
+		IsActive:     true,
+	}); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	// Seed a second user already migrated to Argon2id — this is the identity
+	// the wall-clock ratio backstop below measures against, so both sides of
+	// that comparison run the same KDF class (see doc comment above).
+	const migratedUserID = "timing-user-migrated"
+	migratedHash, err := passwordhash.HashArgon2id([]byte("CorrectPassword123!"))
+	if err != nil {
+		t.Fatalf("HashArgon2id: %v", err)
+	}
+	if err := repo.CreateUser(ctx, authdomain.CreateUserParams{
+		UserID:       migratedUserID,
+		Username:     migratedUserID,
+		Email:        "timing-migrated@example.com",
+		DisplayName:  "Timing User Migrated",
+		PasswordHash: authdomain.PasswordHash(migratedHash),
+		PasswordAlgo: passwordhash.AlgoArgon2id,
 		IsActive:     true,
 	}); err != nil {
 		t.Fatalf("CreateUser: %v", err)
@@ -389,6 +413,8 @@ func TestAuthenticate_TimingConstant(t *testing.T) {
 		return passwordhash.KDFInvocations() - before, elapsed
 	}
 
+	// --- Bcrypt-window pair: deterministic guard only, no ratio ------------
+	// userID (bcrypt) represents the accepted migration-window scenario.
 	unknownKDFCalls, unknownElapsed := probe("does-not-exist")
 	knownKDFCalls, knownElapsed := probe(userID)
 
@@ -399,15 +425,17 @@ func TestAuthenticate_TimingConstant(t *testing.T) {
 	// property REQ-AUTHN-1 actually requires is that the count is equal and
 	// nonzero, not that the two different algorithms cost the same
 	// wall-clock time (that residual gap during bcrypt->argon2id migration
-	// is named and accepted, see the Authenticate doc comment).
+	// is named and accepted, see the Authenticate doc comment and the
+	// service.go:303-315 reference in this test's doc comment — no ratio
+	// bound is asserted over this pair for exactly that reason).
 	if unknownKDFCalls == 0 {
 		t.Fatalf("unknown-identifier path performed no KDF computation: timing oracle not closed")
 	}
 	if knownKDFCalls == 0 {
-		t.Fatalf("known-user path performed no KDF computation")
+		t.Fatalf("known-user (bcrypt) path performed no KDF computation")
 	}
 	if unknownKDFCalls != knownKDFCalls {
-		t.Fatalf("KDF invocation count diverges: unknown=%d known=%d, want equal", unknownKDFCalls, knownKDFCalls)
+		t.Fatalf("KDF invocation count diverges: unknown=%d known(bcrypt)=%d, want equal", unknownKDFCalls, knownKDFCalls)
 	}
 
 	// Loose sanity floor on top: a real KDF call cannot complete
@@ -418,22 +446,24 @@ func TestAuthenticate_TimingConstant(t *testing.T) {
 		t.Fatalf("unknown-identifier path too fast (%v < %v): timing oracle not closed", unknownElapsed, floor)
 	}
 	if knownElapsed < floor {
-		t.Fatalf("known-user path too fast (%v < %v)", knownElapsed, floor)
+		t.Fatalf("known-user (bcrypt) path too fast (%v < %v)", knownElapsed, floor)
 	}
 
-	// Coarse cross-path backstop (see doc comment above for how this bound
-	// was measured and why it is this wide, and why it is computed from
-	// medians of repeated sequential samples rather than the single pair
-	// above): only a gross asymmetry downstream of the KDF — not a single
-	// extra DB round trip, and not ordinary host scheduling noise — can trip
-	// it. The pair measured above (unknownElapsed/knownElapsed) served as
-	// this backstop's warm-up round and is intentionally excluded here.
+	// --- Same-KDF-class pair: wall-clock ratio backstop --------------------
+	// migratedUserID (Argon2id) vs the unknown-identifier dummy hash
+	// (also Argon2id) — both sides pay the same KDF and the same
+	// race-instrumentation profile, so a bound here is honest (see doc
+	// comment above). One warm-up round is discarded before the measured
+	// samples, same rationale as the deterministic pair's own first call.
+	_, _ = probe("does-not-exist")
+	_, _ = probe(migratedUserID)
+
 	const rtSamples = 5 // per path; modest to keep -race runtime bounded
 	unknownSamples := make([]time.Duration, rtSamples)
 	knownSamples := make([]time.Duration, rtSamples)
 	for i := 0; i < rtSamples; i++ {
 		_, unknownSamples[i] = probe("does-not-exist")
-		_, knownSamples[i] = probe(userID)
+		_, knownSamples[i] = probe(migratedUserID)
 	}
 	unknownMedian := medianDuration(unknownSamples)
 	knownMedian := medianDuration(knownSamples)
@@ -444,7 +474,7 @@ func TestAuthenticate_TimingConstant(t *testing.T) {
 		ratio = 1 / ratio
 	}
 	if ratio > maxRatio {
-		t.Fatalf("cross-path wall-clock ratio (median of %d sequential samples/path) = %.2f (unknown=%v known=%v), want <= %.1f: gross downstream asymmetry",
+		t.Fatalf("cross-path wall-clock ratio (median of %d sequential samples/path, same-KDF-class pair) = %.2f (unknown=%v known(argon2id)=%v), want <= %.1f: gross downstream asymmetry",
 			rtSamples, ratio, unknownMedian, knownMedian, maxRatio)
 	}
 }
