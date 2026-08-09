@@ -1,7 +1,7 @@
 # ADR 0093 — Controlled Information is one bounded context; a template is a version-scoped role, not a peer aggregate
 
 > **Status:** Accepted as a design ruling 2026-08-07. Not implemented — no code or schema change is authorized by this ADR alone.
-> **Scope:** Aggregate and bounded-context boundaries for document authoring, document control, and templates. Not the grant model (see [`0092`](0092-authz-grant-unification.md), pending), not the approval kernel's internals (see [`0082`](0082-approval-kernel-extraction.md)).
+> **Scope:** Aggregate and bounded-context boundaries for document authoring, document control, and templates. Not the grant model (see [`0092`](0092-authz-grant-unification.md) — materialized 2026-08-09; Accepted, not implemented), not the approval kernel's internals (see [`0082`](0082-approval-kernel-extraction.md)).
 > **Supersedes:** the "no backend module merge" ruling in `docs/superpowers/specs/2026-06-30-template-document-parity-design.md` §D1.
 
 ## Context
