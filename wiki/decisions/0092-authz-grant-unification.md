@@ -1,7 +1,7 @@
 # ADR 0092 — AuthZ Grant-Model Unification: one binding relation, scope on the binding
 
 > **Status:** Accepted (operator-ratified 2026-08-06). **Not implemented — no code or schema change is authorized by this ADR alone.** Materialized as a filed ADR on 2026-08-09 (Phase G governance reconciliation); this filing **records** the 2026-08-06 ruling, it does not reopen it.
-> **Decision source:** `docs/superpowers/analysis/2026-08-06-authz-grant-unification-decisions.md` (operator-ratified decision record, D1–D4 + red-lane ruling) and `docs/superpowers/analysis/2026-08-06-authz-grant-unification-system-impact.md` (system-impact gate output). Those documents are the original analysis; this ADR is the numbered decision artifact ADR 0093 and issue #89 forward-reference.
+> **Decision source:** `docs/superpowers/analysis/2026-08-06-authz-grant-unification-decisions.md` (operator-ratified decision record, D1–D4 + red-lane ruling) and `docs/superpowers/analysis/2026-08-06-authz-grant-unification-system-impact.md` (system-impact gate output). Those documents are the original analysis; this file is the numbered ADR 0092 decision artifact that ADR 0093 and issue #89 forward-reference.
 > **Scope:** The grant/assignment side of authorization — which tables record who holds which role at which scope, and which single source both PDP tiers read.
 > **Out of scope:** The capability model itself (roles → capability bundles via `role_capabilities` stays — ADR 0022); the two-tier PDP *shape* (two enforcement points stay — ADR 0007's tiers as defense-in-depth); tier-1's data source for route→capability mapping (ADR 0090); bounded-context boundaries (ADR 0093).
 > **Relations:**
