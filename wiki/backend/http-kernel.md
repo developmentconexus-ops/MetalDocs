@@ -244,7 +244,7 @@ All goroutines launched by the kernel:
 | Per-request presence bump | `presence/middleware.go:92-98` | fire-and-forget per debounced user | 2s timeout ctx |
 | PDF staging outbox worker | `main.go:960-974` | `fanout.StagingOutboxWorker.Run` (generic worker, PDF instance; wired via `startOutboxWorkers`, `main.go:945`); no restart wrapper — `Run` returns nil only on ctx cancel | root ctx; `workerWG` |
 | Materialize staging outbox worker | `main.go:976-989` | same generic worker, materialize instance | root ctx; `workerWG` |
-| Job scheduler | `main.go:561-566` | stuck-instance-watchdog 5min, idempotency-janitor 15min, audit-integrity-validator 1h, lease-reaper 10min; all `SkipOnPressure`; leader ID = `hostname:pid` (`main.go:839-845`) | root ctx; `schedulerWG` |
+| ~~Job scheduler~~ *(retired M5/ADR 0067 — annotation 2026-08-09)* | — | Former ticker scheduler (watchdog/janitor/validator/lease-reaper) retired; API now joins River leader election to enqueue the periodic maintenance jobs, executed by `metaldocs-jobs` | — |
 | Documents session sweeper | `main.go:568` | 60s | returned stop func (deferred `main.go:570`) |
 | Orphan pending sweeper | `main.go:569` | 1h interval, 24h max age | stop func (deferred `main.go:571`) |
 | Audit retention purge | `main.go:576-592` | 24h ticker | root ctx |

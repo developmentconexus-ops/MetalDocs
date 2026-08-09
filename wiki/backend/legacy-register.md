@@ -6,7 +6,7 @@
 > **Key files:**
 > - `apps/api/cmd/metaldocs-api/main.go` — composition root; source of F-01, F-05, F-07, F-14, F-19 evidence
 > - `internal/platform/` — platform packages; source of F-02, F-08, F-09, F-15, F-16, F-17 evidence
-> - `internal/modules/` — 12 business modules; source of F-06, F-07, F-10, F-11, F-12, F-13, F-14 evidence
+> - `internal/modules/` — 12 business modules *(count as of register time; 15 as of 2026-08-09)*; source of F-06, F-07, F-10, F-11, F-12, F-13, F-14 evidence
 > - `api/openapi/` — contract surface; source of F-03, F-13 evidence
 > - `cmd/seed-test-document/main.go` — critical F-18 finding (hardcoded credentials)
 
