@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -320,6 +321,23 @@ func TestAuthenticate_PreservesPasswordWhitespace(t *testing.T) {
 // path) is a real, accepted, uncovered gap - see the production-asymmetry
 // note above; no wall-clock bound can both stay contention-immune and catch
 // it, so it is not this test's job to catch it.
+//
+// The ratio is measured from the MEDIAN of several sequential, alternating
+// samples per path (not a single draw), with the very first round discarded
+// as warm-up. This test never runs concurrent Authenticate attempts against
+// the same identity — it owns a private repo instance and only one goroutine
+// ever touches it, so the per-identity login lock (service.go
+// WithinLoginLock) is never contended here and cannot be the source of a
+// slow sample. What was observed instead: a single bcrypt(cost=12) call's
+// wall time on a CPU-starved CI runner (2-core box, `go test ./...` running
+// many packages' test binaries concurrently, `-race` instrumentation
+// overhead) can land an order of magnitude above its typical cost on any
+// individual draw with zero code-path asymmetry — one CI run measured a
+// single known-path call at 4.316s (~17x its ~250ms typical cost) against an
+// unlucky-fast 418ms unknown-path draw, tripping the 10x bound on pure
+// single-sample scheduler noise. Comparing medians of multiple samples fixes
+// this: one scheduler hiccup landing on a single draw no longer swings the
+// reported ratio, because the rest of that path's samples are unaffected.
 func TestAuthenticate_TimingConstant(t *testing.T) {
 	repo := memory.NewRepository()
 	roleProvider := newMockRoleProvider()
@@ -404,17 +422,47 @@ func TestAuthenticate_TimingConstant(t *testing.T) {
 	}
 
 	// Coarse cross-path backstop (see doc comment above for how this bound
-	// was measured and why it is this wide): only a gross asymmetry
-	// downstream of the KDF — not a single extra DB round trip — can trip it.
+	// was measured and why it is this wide, and why it is computed from
+	// medians of repeated sequential samples rather than the single pair
+	// above): only a gross asymmetry downstream of the KDF — not a single
+	// extra DB round trip, and not ordinary host scheduling noise — can trip
+	// it. The pair measured above (unknownElapsed/knownElapsed) served as
+	// this backstop's warm-up round and is intentionally excluded here.
+	const rtSamples = 5 // per path; modest to keep -race runtime bounded
+	unknownSamples := make([]time.Duration, rtSamples)
+	knownSamples := make([]time.Duration, rtSamples)
+	for i := 0; i < rtSamples; i++ {
+		_, unknownSamples[i] = probe("does-not-exist")
+		_, knownSamples[i] = probe(userID)
+	}
+	unknownMedian := medianDuration(unknownSamples)
+	knownMedian := medianDuration(knownSamples)
+
 	const maxRatio = 10.0
-	ratio := float64(unknownElapsed) / float64(knownElapsed)
+	ratio := float64(unknownMedian) / float64(knownMedian)
 	if ratio < 1 {
 		ratio = 1 / ratio
 	}
 	if ratio > maxRatio {
-		t.Fatalf("cross-path wall-clock ratio = %.2f (unknown=%v known=%v), want <= %.1f: gross downstream asymmetry",
-			ratio, unknownElapsed, knownElapsed, maxRatio)
+		t.Fatalf("cross-path wall-clock ratio (median of %d sequential samples/path) = %.2f (unknown=%v known=%v), want <= %.1f: gross downstream asymmetry",
+			rtSamples, ratio, unknownMedian, knownMedian, maxRatio)
 	}
+}
+
+// medianDuration returns the median of samples. samples is sorted in place;
+// callers must not rely on its original order afterward. Used by
+// TestAuthenticate_TimingConstant's cross-path ratio backstop so a single
+// scheduler-noise outlier on one path cannot swing the reported ratio.
+func medianDuration(samples []time.Duration) time.Duration {
+	sort.Slice(samples, func(i, j int) bool { return samples[i] < samples[j] })
+	n := len(samples)
+	if n == 0 {
+		return 0
+	}
+	if n%2 == 1 {
+		return samples[n/2]
+	}
+	return (samples[n/2-1] + samples[n/2]) / 2
 }
 
 // TestAuthenticate_InactiveConstantTime proves the inactive (and, by the same
