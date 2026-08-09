@@ -29,8 +29,14 @@ jobs:
         with: { go-version-file: go.mod, cache: true }
       - run: pnpm install --frozen-lockfile
       # Check set for this job lives in tools/verify/registry.go
-      # (docx-typecheck, docx-build, docx-test) — see CIJob:
-      # "docx-renderer.yml:node".
+      # (docx-typecheck, docx-build, docx-test). The registry now points
+      # their CIJob at "ci.yml:verify" — that is the required-gate coverage
+      # for these checks. This job re-runs the same three checks on its own
+      # trigger (pull_request + push to main, no path filter — see this
+      # file's header comment) as a redundant belt outside the required
+      # gate. Known duplication; disposition (keep as a belt-and-suspenders
+      # re-run, or delete now that ci.yml:verify covers it) is pending. The
+      # job itself is unchanged here.
       #
       # ONE invocation. docx-test contains bundle-guard.test.ts, which
       # reads dist/meta.json to assert the server bundle is framework-free —

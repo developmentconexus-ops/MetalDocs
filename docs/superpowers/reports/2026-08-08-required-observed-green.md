@@ -19,7 +19,7 @@
 - Run: https://github.com/developmentconexus-ops/MetalDocs/actions/runs/31300439165 — conclusion **failure**
 - `verify` **failed** (real defects from the gosec-triage diff: line-pinned allowlist drift + governance comment-only false positives + gofmt misalignment — all subsequently fixed in `40d8eacc`)
 - `test-integration` reported **skipped** with `completedAt < startedAt` (zero duration — it never started and consumed no runner minutes)
-- `required` reported **failure**: the jq gate accepts `skipped` only for `test-integration` and never accepts `failure` from any job
+- `required` reported **failure**: the jq gate requires literal `"success"` from all four jobs — `test-integration` reporting `skipped` fails the gate exactly like `verify`'s `failure` does; this run failed on both counts at once
 
 **Deviation from the plan's Step 4, recorded:** the plan prescribed a deliberate gofmt break to manufacture a red run. A *real* red run occurred first (the gosec-triage diff tripped three genuine gates, gofmt among them) and exercised exactly the semantics Step 4 exists to prove — a cheap gate failing, the staging edge holding, and `required` red for the right reason. That evidence is strictly stronger than a manufactured break, so no artificial red commit was pushed. Step 5's "green returns after revert" is the green run above, produced by fixing the real defects rather than reverting a fake one.
 
@@ -36,4 +36,4 @@
 
 ## Statement
 
-`required` has now reported both **success** (all gates green, 40d8eacc) and **failure** (gate red with `test-integration` skipped-not-run, 1304ba79) on a real PR, each for the correct reason. The aggregator's allowlist logic (skipped accepted only for `test-integration`, failure never accepted) was exercised live in both directions. The precondition spec §8 sets for the ruleset swap is met.
+`required` has now reported both **success** (all gates green, 40d8eacc) and **failure** (gate red with `test-integration` skipped-not-run, 1304ba79) on a real PR, each for the correct reason. The aggregator requires literal `"success"` from all four jobs — no allowance for `skipped` from any of them, including `test-integration` — and that exact-set-equality logic was exercised live in both directions. The precondition spec §8 sets for the ruleset swap is met.

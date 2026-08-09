@@ -567,11 +567,11 @@ then audited for agreement after the fact. That converts all four inventories ab
 declaration with three projections, the same "unrepresentable beats guarded" move ME-01, ME-05,
 and ME-11 already name for their own surfaces (no-fallback-principle doctrine, cited there).
 
-**Follow-on milestone:** unscheduled on `docs/superpowers/ROADMAP.md` as of 2026-08-09 — same
-status as the `gosec`/`govulncheck` promotion work these renames left behind
-(`tools/verify/registry.go`, "ruleset swap" milestone). Working name: **"generated CI manifest"**,
-entered on the roadmap only when a program is ready to take it, not implied by this entry's
-existence. Under this repository's Global Maximum rule (CLAUDE.md), shipping §4's rename +
+**Follow-on milestone:** scheduled on `docs/superpowers/ROADMAP.md` §4, row **4.7 "generated CI
+manifest"** (added 2026-08-09), queued after this CI-restructure program merges. Working name:
+**"generated CI manifest"** — one manifest owning registry membership, job routing (`--only`
+lists), the `required`-gate `needs`/jq set, and the workflow YAML generated from it; deletes this
+entry on landing. Under this repository's Global Maximum rule (CLAUDE.md), shipping §4's rename +
 re-export without this label would itself be the defect the rule exists to catch.
 
 **Owner:** unrouted. Cheap to defer, expensive to forget — record here rather than let the next
