@@ -5,13 +5,26 @@ package infrastructure_test
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"testing"
 
 	"metaldocs/internal/modules/templates/domain"
 	"metaldocs/internal/modules/templates/infrastructure"
 	"metaldocs/tests/integration/testdb"
 )
+
+// contentHashFor derives a syntactically valid 64-hex content_hash from a
+// fixture's own docx storage key, so chk_template_version_content_hash_non_draft
+// (migration 0317, ADR 0088) is satisfied with a value tied to the fixture
+// rather than an unexplained literal. This test's subject is tenant-id RLS
+// parity, not content-hash semantics, so the hash's provenance (storage key,
+// not actual docx bytes) has no bearing on what is asserted below.
+func contentHashFor(storageKey string) string {
+	sum := sha256.Sum256([]byte(storageKey))
+	return hex.EncodeToString(sum[:])
+}
 
 // TestTemplateVersion_TenantID_RLSParity proves migration 0256: the
 // templates_template_version table now carries its own tenant_id column and is
@@ -81,6 +94,7 @@ func TestTemplateVersion_TenantID_RLSParity(t *testing.T) {
 			PlaceholderSchema: []domain.Placeholder{},
 			AuthorID:          actorA,
 			DocxStorageKey:    "templates/rls-a/body.docx",
+			ContentHash:       contentHashFor("templates/rls-a/body.docx"),
 		}); err != nil {
 			return err
 		}
@@ -97,6 +111,7 @@ func TestTemplateVersion_TenantID_RLSParity(t *testing.T) {
 			PlaceholderSchema: []domain.Placeholder{},
 			AuthorID:          actorB,
 			DocxStorageKey:    "templates/rls-b/body.docx",
+			ContentHash:       contentHashFor("templates/rls-b/body.docx"),
 		})
 	})
 
