@@ -405,17 +405,37 @@ var checks = []Check{
 	{
 		ID:   "gosec",
 		Desc: "no gosec rule fires on the Go tree",
-		// 64 findings across 11 rules (top: G304=23, G201=10, G104=8), a mix of
-		// real issues and false positives on the sample triaged — not a clean
-		// tree, so `full`-only/advisory, not blocking.
+		// The 64-finding backlog measured in
+		// docs/superpowers/reports/2026-08-08-gosec-govulncheck-measurement.md
+		// (Task 4) was triaged to zero in Task 9 (D9): every finding is either
+		// a genuine fix (raw-string-comment corruption bugs, defer-based
+		// sql.Rows.Close ordering, %w error wrapping) or a `// #nosec Gxxx --
+		// reason` suppression on the exact flagged line, with the reason
+		// stating the concrete fact that makes the code safe (a fixed literal
+		// path/table/argv, a bounds-checked conversion, a computed
+		// placeholder index never a value, an env var NAME not a credential).
+		// `-nosec-require-rules -nosec-require-justification` enforce this
+		// shape going forward: gosec itself now rejects a bare `#nosec` or one
+		// missing a rule ID, so the triage can't silently rot back into an
+		// unscoped blanket suppression. The two pre-existing `//nolint:gosec`
+		// comments (tools/verify/main.go, tools/verify/audit.go,
+		// tools/verify/testdbbypass.go) were converted to gosec-native
+		// `// #nosec` syntax in the same pass — `//nolint:gosec` is
+		// golangci-lint syntax; standalone gosec never read it, so those
+		// suppressions were dead and the underlying findings were live under
+		// a naive registration.
 		//
-		// Global-maximum structure: gosec blocking in `pr` + `full`, every
-		// finding fixed or carrying a gosec-native `#nosec Gxxx -- reason`
-		// suppression (`//nolint:gosec` is golangci-lint syntax; standalone
-		// gosec does not read it — the two existing comments on this pattern,
-		// tools/verify/main.go:335 and tools/verify/audit.go:76, show up as
-		// live findings under a naive registration for exactly this reason).
-		// Promoting milestone: "gosec backlog triage" — unscheduled on
+		// Global-maximum structure: gosec blocking in `pr` + `full` with a
+		// clean, justified-suppression tree (this state). It still stays
+		// `full`-only (advisory), never `pr`-blocking, for the same A6 reason
+		// as govulncheck below: A6 requires every ProfilePR check's CIJob to
+		// sit inside ci.yml's required-gate needs: closure, and this CIJob
+		// (nightly.yml:security-scan) sits outside it. The live branch
+		// ruleset also still requires 21 legacy status contexts with
+		// bypass_actors: []. Promoting this check is safe only as part of the
+		// ruleset-swap phase, not before — the tree is clean now, but
+		// promotion is a closure-safety decision, not a re-triage decision.
+		// Promoting milestone: "ruleset swap" — unscheduled on
 		// docs/superpowers/ROADMAP.md as of 2026-08-08.
 		//
 		// -exclude-dir=.claude is load-bearing, not cosmetic: an unexcluded
@@ -426,7 +446,7 @@ var checks = []Check{
 		// measurement's own invocation is deliberately NOT carried over: this
 		// registration must fail the check like any other, not just record it.
 		Profiles: []string{ProfileFull},
-		Argv:     []string{"go", "run", "github.com/securego/gosec/v2/cmd/gosec@latest", "-quiet", "-exclude-dir=.claude", "./..."},
+		Argv:     []string{"go", "run", "github.com/securego/gosec/v2/cmd/gosec@latest", "-quiet", "-exclude-dir=.claude", "-nosec-require-rules", "-nosec-require-justification", "./..."},
 		Needs:    []string{needsNetwork},
 		CIJob:    "nightly.yml:security-scan",
 	},
