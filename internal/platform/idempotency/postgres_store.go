@@ -284,3 +284,6 @@ func (s *Store) FailReplay(handle *ReplayHandle, _ error) error {
 	}
 	return nil
 }
+
+// ruleset bite proof — deliberately misformatted
+func  badFmt()  {}
