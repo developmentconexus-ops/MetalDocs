@@ -1,220 +1,159 @@
 # MetalDocs Architecture Audit — Reproduced Inventory Evidence
 
 **Date:** 2026-08-09  
-**Status:** connector-retrieved evidence from an existing mechanically-produced inventory; not re-executed in this ChatGPT runtime.
+**Baseline:** `main@418070bf38a9f358f9131bcc36b7a6bcbc069273`  
+**Status:** checked-in mechanical evidence + direct current-source validation; not re-executed in this ChatGPT terminal.
 
 ## 1. Provenance
 
-The repository already contains a prior architecture discovery artifact at:
+The repository already contains a prior architecture discovery artifact at `docs/superpowers/analysis/inventory/layering.md`. It records commands and computed results from a local repository pass, including `go list -json ./internal/...`, Tarjan SCC analysis, fan-in/fan-out calculation, symmetric module-edge analysis, grep-based SQL checks and direct source inspection.
 
-- `docs/superpowers/analysis/inventory/layering.md`
-
-That artifact records commands and computed results from a local repository pass, including `go list -json ./internal/...`, Tarjan SCC analysis, fan-in/fan-out calculation, symmetric module-edge analysis, grep-based SQL checks, and direct source inspection.
-
-This file promotes the parts relevant to the current architecture-audit program into one traceable snapshot. It does **not** claim that this ChatGPT session re-ran those local commands. The terminal available in this session could not resolve `github.com`, so local clone/re-execution remains a workstation verification step.
+The current assistant terminal cannot resolve `github.com`, so it cannot clone the repository and pretend to freshly rerun `go list`. Direct GitHub source/index inspection is available and has been used to validate representative seams and current topology at the pinned baseline.
 
 ## 2. Graph facts already mechanically measured
 
 The existing inventory reports:
 
-- **136 first-party packages** in the `./internal/...` Go graph;
-- **0 multi-node package-level SCCs** under Tarjan analysis — expected because Go forbids import cycles;
-- **7 module-level cycles** after collapsing package edges to module identity / testing symmetric module edges;
+- **136 first-party packages** in `./internal/...`;
+- **0 multi-node package-level SCCs** under Tarjan analysis;
+- **7 module-level reciprocal relationships** after collapsing package edges to module identity;
 - **0 intra-module layer inversions** where a module's own `domain` imports its own `infrastructure`/`delivery`, or its own `application` imports its own `delivery`;
-- `iam/domain` fan-in = **32 importers**;
-- `iam/authz` fan-in = **26 importers**;
-- `platform/db` fan-in = **32 importers**;
-- `platform/httprouter` fan-in = **21 importers**.
+- `iam/domain` fan-in = **32** importers;
+- `iam/authz` fan-in = **26** importers;
+- `platform/db` fan-in = **32** importers;
+- `platform/httprouter` fan-in = **21** importers.
 
-The critical distinction is therefore:
+Critical distinction:
 
 ```text
 package graph acyclic  !=  module graph acyclic
 ```
 
-The current Go package structure successfully routes around compiler-level import cycles while still allowing reciprocal semantic dependencies between bounded-context candidates.
+The Go package structure avoids compiler-level cycles while reciprocal semantic dependencies still exist after collapsing to bounded-context/module identity.
 
-## 3. Persistence leakage through domain contracts
+## 3. Actual current module topology
+
+At `main@418070bf...`, `internal/modules/` contains **15** directories:
+
+`approval`, `audit`, `auth`, `controlleddocuments`, `distribution`, `documents`, `iam`, `jobs`, `notifications`, `render`, `search`, `security`, `taxonomy`, `templates`, `tokens`.
+
+Older wiki artifacts that report 11/12 modules, describe nested `documents/approval`, or say top-level Approval is absent are stale/historical on those facts.
+
+## 4. Persistence leakage through domain contracts
 
 The inventory records two related classes:
 
-### LAYERING-01
+- direct `database/sql` types in domain port signatures (`*sql.Tx`, `sql.NullTime`);
+- domain packages importing `internal/platform/db` transaction plumbing.
 
-Direct `database/sql` types leak into domain port signatures, including `*sql.Tx` and `sql.NullTime`.
+Scale: **9 of 15** module domain packages import `database/sql` and/or `platform/db`.
 
-Sampled evidence includes:
+Current policy interpretation after inspecting `internal/platform/db/runner.go` and `tx.go`:
 
-- `internal/modules/approval/domain/release_hold_port.go`
-- `internal/modules/approval/domain/sla_port.go`
-- `internal/modules/auth/domain/session_admin.go`
-- `internal/modules/documents/domain/review_due_port.go`
-- `internal/modules/documents/domain/review_surface_port.go`
-- `internal/modules/security/domain/tenant_crypto.go`
-- `internal/modules/tokens/domain/port.go`
+- `TxRunner` deliberately exposes the live transaction in an application callback as a bounded concession while owning begin/commit/rollback;
+- this does not grant business `domain` packages permission to accumulate persistence-driver vocabulary;
+- application/infrastructure transaction seams can use the shared abstraction transitionally where atomicity requires it;
+- new domain persistence-type leakage is frozen pending A4/A5 migration.
 
-Scale recorded: **7 files, 5 modules, ~20 signatures**.
+## 5. Producer-owned contracts at module seams
 
-### LAYERING-02
+The inventory confirms both directions of the same design problem.
 
-Domain packages also import `internal/platform/db` transaction plumbing in port signatures.
+Examples:
 
-Scale recorded: **9 of 15 module domain packages** import either `database/sql` and/or `platform/db`.
-
-This is not being split into nine defects. It is a repo-wide seam convention that belongs to the architecture/persistence programs (#93 / A4 with #92 / A5).
-
-## 4. Producer-owned contracts at module seams
-
-The existing inventory confirms both directions of the same design problem.
-
-### Consumer reaches into producer types/functions
-
-Examples recorded:
-
-- `documents/application` constructs `controlleddocumentsdomain.TemplateVersionCandidate` and calls `controlleddocumentsdomain.Resolve(...)`;
-- `documents/application` exposes `templatesdomain.Placeholder` in a method signature;
-- `approval/application` accepts `docapp.ApproverContext`;
-- `approval/application` calls `docapp.LoadDocumentAreaCode(...)`.
-
-### Consumer is typed by producer-declared interfaces
-
-Examples recorded:
-
-- `security/infrastructure/postgres` consumes multiple interfaces declared by `iam/domain`;
-- `iam/infrastructure/postgres` consumes `taxonomydomain.AreaCatalogReader` declared by `taxonomy/domain`.
+- Documents application constructs/uses ControlledDocuments domain types/functions;
+- Documents exposes Templates domain values in application signatures;
+- Approval application accepts Documents application/domain types;
+- Security infrastructure is typed by reader interfaces declared in IAM domain;
+- IAM infrastructure consumes a reader interface declared in Taxonomy domain.
 
 ### Positive counter-example
 
-`documents/application` declares its own `DictionaryValueReader`, and the composition root supplies an adapter in `apps/api/cmd/metaldocs-api/dictionary_reader_adapter.go`.
+`documents/application` declares its own `DictionaryValueReader`. `apps/api/cmd/metaldocs-api/dictionary_reader_adapter.go` adapts Tokens to that consumer-owned port and translates `tokensdomain.ErrNotFound` at the composition root.
 
-This is the pattern the remediation program should generalize:
+Desired shape:
 
 ```text
 consumer owns required capability contract
-        ↓
-composition root owns adapter
-        ↓
-producer implementation stays private
+        ↑
+composition adapter
+        ↑
+producer implementation
 ```
 
 Root-cause owner: **#93 / A4**.
 
-## 5. Foreign error identity as an undeclared contract
+## 6. Foreign error identity as an undeclared contract
 
-The inventory reproduces:
+Measured inventory:
 
 - **62** `errors.Is(err, <foreign>domain.Err...)` call sites;
-- spread across **6 modules**: approval, auth, controlleddocuments, documents, iam, templates.
+- across approval, auth, controlleddocuments, documents, iam and templates.
 
-The important architectural property is not the raw count. It is that sentinel identity is functioning as a cross-context API without an explicit contract boundary.
+The important property is not the count: producer sentinel identity is functioning as a cross-context API without an explicit seam contract.
 
-Root-cause ownership:
+Owners:
 
 - seam design: **#93 / A4**;
-- HTTP/runtime error translation conventions: **#90 / A3**.
+- HTTP/runtime error translation: **#90 / A3**.
 
-## 6. Cross-module SQL / data ownership
+## 7. Cross-module SQL / data ownership
 
-The existing inventory gives concrete evidence for at least **17+ foreign-table reads** across three module directions.
+The inventory reproduces at least **17+ foreign-table reads**:
 
-### Approval -> Documents
+- Approval -> Documents: multiple `documents` / `document_comments` reads in `postgres_approval_repository.go`;
+- Documents -> Approval: reads of `approval_instances`, `approval_signoffs`, `release_generations` across Documents infrastructure/application files;
+- Approval -> ControlledDocuments: direct `controlled_documents` join.
 
-`internal/modules/approval/infrastructure/postgres_approval_repository.go` directly reads `documents` / `document_comments` through multiple `FROM` / `JOIN` sites.
+This proves that Go import rules alone cannot establish data ownership.
 
-Recorded scale: **9+ sites** in this direction.
+Owner: **#93 / A4**, coordinated with #92/A5; ADR 0093/A9 will absorb seams that legitimately become intra-context after Controlled Information consolidation.
 
-### Documents -> Approval
+## 8. Platform -> module direction
 
-Documents code directly reads tables owned by Approval, including:
+The inventory distinguishes legitimate composition from misplaced module-specific platform code.
 
-- `approval_instances`
-- `approval_signoffs`
-- `release_generations`
+- `internal/composition/tenantdata/registry` imports 12/15 module infrastructure packages to assemble the registry: composition-shaped, not automatically a domain defect.
+- platform packages `bootstrap`, `authn`, `docgenv2`, `tripwire`, `worker` carry **11** module-specific edges outside that registry.
 
-Recorded evidence spans:
+Target REQ-TOP-2 says platform is domain-free. A4 owns the migration of module-specific concerns out of generic platform locations.
 
-- `internal/modules/documents/infrastructure/active_instance_reader.go`
-- `internal/modules/documents/infrastructure/repository.go`
-- `internal/modules/documents/infrastructure/resolver_readers.go`
-- `internal/modules/documents/application/context_builder.go`
+## 9. Architecture properties that are currently healthy
 
-Recorded scale: **7 sites**.
+Preserve:
 
-### Approval -> Controlled Documents
+1. zero package-level import cycles;
+2. zero measured same-module layer inversions of the `domain -> infrastructure/delivery` / `application -> delivery` classes;
+3. no literal SQL execution in domain packages;
+4. explicit composition-root wiring with no reflection DI framework;
+5. the consumer-owned DictionaryValueReader adapter pattern;
+6. explicit SQL, parameter binding and DB constraints rather than an ORM rewrite.
 
-`internal/modules/approval/application/read_service.go` directly joins `controlled_documents`.
+## 10. Recent-current-state correction for #87/#91
 
-Recorded scale: **1 site**.
+The original issue evidence predates merged #97/#99.
 
-This confirms that Go-import guards alone cannot prove bounded-context data ownership.
+At baseline `418070bf...`:
 
-Root-cause owner: **#93 / A4**, coordinated with #92 / A5 for persistence mechanisms.
+- `.github/workflows/` contains 5 files, not the original 20-workflow topology;
+- `tools/verify/` exists as a substantial Go verifier/registry with tests;
+- PR #99 removed `only-new-issues` and reports whole-tree golangci burn-down to zero for its configured scope.
 
-## 7. Platform -> module inversion
+These are completed improvements and must not be reimplemented. #87 and #91 remain governed by their **acceptance properties**, with their original counts treated as filing-time evidence.
 
-The prior inventory distinguishes composition-shaped wiring from generic platform concerns.
+## 11. What remains to make the architecture graph itself a durable product
 
-### Composition registry
+1. promote module graph derivation into the trusted verifier (#87), not a one-off audit script;
+2. emit machine-readable module adjacency/SCC evidence from current Go packages;
+3. derive SQL ownership violations against one authoritative ownership catalog;
+4. classify/rachet foreign sentinel/type coupling mechanically;
+5. enforce platform domain-freedom while distinguishing composition roots;
+6. keep new domain persistence leakage red while A4/A5 burn down existing debt;
+7. keep wiki module topology/maturity synchronized from code truth after each owning program lands.
 
-`internal/composition/tenantdata/registry` imports **12 of 15 modules' infrastructure packages** to register tenant-data ports. This package is composition-root-shaped and should be evaluated as composition, not blindly counted as a platform violation.
+## 12. Remediation ownership
 
-### Module-specific dependencies housed under `internal/platform`
-
-The inventory records five platform packages with module-specific imports outside that registry:
-
-- `bootstrap`
-- `authn`
-- `docgenv2`
-- `tripwire`
-- `worker`
-
-Recorded scale: **11 module edges** across those five packages.
-
-Examples include:
-
-- `platform/bootstrap` -> IAM/Auth/Audit domain/infrastructure packages;
-- `platform/authn` -> Auth application + IAM domain;
-- `platform/docgenv2` -> Documents application/domain;
-- `platform/tripwire` -> IAM domain;
-- `platform/worker` -> IAM authz.
-
-This is direct evidence against the target rule that platform remain domain-free, while also showing why composition wiring needs its own classification (`W`) rather than being mixed into `P`.
-
-Root-cause owner: **#93 / A4**.
-
-## 8. Architecture properties that are currently healthy
-
-The audit must preserve positive evidence and avoid turning every unusual shape into a defect.
-
-The existing inventory records:
-
-1. **0 package-level import cycles**;
-2. **0 intra-module layer inversions** at package-import granularity;
-3. domain packages contain **no literal SQL execution** — raw SQL is outside domain;
-4. explicit composition-root hand-wiring is legible and no DI framework is hiding ownership;
-5. the `DictionaryValueReader` adapter demonstrates a correct consumer-owned seam already exists in production code.
-
-These should become regression-preservation properties during remediation.
-
-## 9. What remains mechanically unresolved
-
-Even with the existing inventory, the current audit still needs a workstation pass for exact reproducibility and artifact generation:
-
-1. record the exact current `main` SHA and Go version;
-2. re-run the 136-package graph against that SHA;
-3. emit the **exact seven module-cycle pairs/SCC membership** as a generated artifact rather than relying on prose;
-4. generate a machine-readable module adjacency matrix with per-edge source paths;
-5. reconcile the 15-module inventory with older topology docs that list fewer modules;
-6. derive foreign SQL edges from a single machine-readable ownership catalog;
-7. classify all 62 foreign-sentinel call sites by layer (delivery/application/etc.);
-8. distinguish legitimate shared vocabulary from accidental producer-owned contracts;
-9. verify whether `*sql.Tx` / `platform/db.Tx` in domain ports has an explicit ADR or is an unlabeled convention;
-10. feed any future guard into #87's single verifier with a proven negative fixture.
-
-## 10. Remediation ownership — no new root cause discovered yet
-
-Current evidence still fits the existing program:
-
-| Finding family | Existing owner |
+| Finding family | Owner |
 |---|---|
 | module cycles / seam direction / producer-owned contracts | #93 / A4 |
 | foreign SQL ownership | #93 / A4 + #92 / A5 |
@@ -225,4 +164,4 @@ Current evidence still fits the existing program:
 | Controlled Information decomposition | #94 / A9 |
 | access-semantics dependency | #89 / A8 |
 
-**Decision:** do not create another remediation issue from this evidence. The audit umbrella remains #100, and #87–#95 remain the implementation owners.
+No new root-cause issue is justified by this evidence.
