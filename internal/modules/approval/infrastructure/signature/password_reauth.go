@@ -8,7 +8,15 @@ import (
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
+
+	"metaldocs/internal/platform/passwordhash"
 )
+
+// bcryptCost reports the cost factor of a bcrypt hash, for the legacy
+// "bcrypt_cost" attestation field only (never for verification).
+func bcryptCost(hash []byte) (int, error) {
+	return bcrypt.Cost(hash)
+}
 
 var (
 	// ErrInvalidCredentials is returned for a missing/wrong password or an unknown actor
@@ -22,9 +30,12 @@ var (
 	ErrRateLimiterConfig = errors.New("signature: auth-failure rate limiter not configured")
 )
 
-// IamUserReader abstracts password-hash lookup for testability.
+// IamUserReader abstracts password-hash lookup for testability. It returns
+// the stored hash bytes plus the password_algo discriminator ("bcrypt" or
+// "argon2id") the hash was minted with (REQ-AUTHN-1) — Sign dispatches its
+// comparison on the algo, never assumes a single algorithm.
 type IamUserReader interface {
-	GetPasswordHash(ctx context.Context, userID string) ([]byte, error)
+	GetPasswordHash(ctx context.Context, userID string) ([]byte, string, error)
 }
 
 // EventEmitterStub abstracts audit-event emission for Phase 3 (Phase 5 wires real one).
@@ -64,13 +75,17 @@ func NewPasswordReauthProvider(reader IamUserReader, emitter EventEmitterStub, l
 // Method returns "password_reauth", identifying this Provider in the Registry.
 func (p *PasswordReauthProvider) Method() string { return "password_reauth" }
 
-// Sign verifies req.Credentials["password"] against the actor's bcrypt hash in
-// iam_users, subject to the wired AuthFailureRateLimiter. It fails closed:
-// ErrRateLimiterConfig if no limiter is wired, ErrRateLimited if the limiter
-// denies or errors, and ErrInvalidCredentials for any lookup or compare
-// failure (never distinguishing "user not found" from "wrong password").
-// On success it resets the rate limiter and returns an opaque attestation —
-// the raw password is never included in SignatureResult.Payload.
+// Sign verifies req.Credentials["password"] against the actor's stored
+// password hash in iam_users, dispatching the comparison on the stored
+// password_algo (REQ-AUTHN-1: bcrypt or argon2id — never guessed, never
+// falls through to a different algorithm on an unrecognized value), subject
+// to the wired AuthFailureRateLimiter. It fails closed: ErrRateLimiterConfig
+// if no limiter is wired, ErrRateLimited if the limiter denies or errors,
+// and ErrInvalidCredentials for any lookup, unrecognized-algorithm, or
+// compare failure (never distinguishing "user not found" from "wrong
+// password" from "unrecognized algorithm"). On success it resets the rate
+// limiter and returns an opaque attestation — the raw password is never
+// included in SignatureResult.Payload.
 func (p *PasswordReauthProvider) Sign(ctx context.Context, req SignRequest) (SignatureResult, error) {
 	password, ok := req.Credentials["password"]
 	if !ok || password == "" {
@@ -91,7 +106,7 @@ func (p *PasswordReauthProvider) Sign(ctx context.Context, req SignRequest) (Sig
 		return SignatureResult{}, ErrRateLimited
 	}
 
-	hash, err := p.reader.GetPasswordHash(ctx, req.ActorUserID)
+	hash, algo, err := p.reader.GetPasswordHash(ctx, req.ActorUserID)
 	if err != nil {
 		// User missing → same error as wrong password (disclosure-safe).
 		if err := p.limiter.RecordFailure(ctx, req.ActorUserID); err != nil {
@@ -103,13 +118,24 @@ func (p *PasswordReauthProvider) Sign(ctx context.Context, req SignRequest) (Sig
 		return SignatureResult{}, ErrInvalidCredentials
 	}
 
-	cost, _ := bcrypt.Cost(hash)
-	if err := bcrypt.CompareHashAndPassword(hash, []byte(password)); err != nil {
+	// passwordOK stays false (and verifyErr is swallowed into a generic
+	// failure) for both a wrong password and an unrecognized/malformed
+	// stored algorithm — no-fallback principle: an unrecognized password_algo
+	// never matches and never tries a different comparison.
+	passwordOK, verifyErr := passwordhash.Verify(algo, hash, []byte(password))
+	if verifyErr != nil {
+		passwordOK = false
+	}
+	if !passwordOK {
 		if err := p.limiter.RecordFailure(ctx, req.ActorUserID); err != nil {
 			return SignatureResult{}, ErrRateLimited
 		}
 		if p.emitter != nil {
-			p.emitter.EmitAuthFailed(ctx, req.ActorUserID, "wrong_password")
+			reason := "wrong_password"
+			if verifyErr != nil {
+				reason = "unverifiable_credential"
+			}
+			p.emitter.EmitAuthFailed(ctx, req.ActorUserID, reason)
 		}
 		return SignatureResult{}, ErrInvalidCredentials
 	}
@@ -120,10 +146,26 @@ func (p *PasswordReauthProvider) Sign(ctx context.Context, req SignRequest) (Sig
 	}
 
 	now := time.Now().UTC()
-	payload, _ := json.Marshal(map[string]any{
+	attestation := map[string]any{
 		"method":      "password_reauth",
-		"bcrypt_cost": cost,
+		"algo":        algo,
 		"verified_at": now.Format(time.RFC3339),
-	})
+	}
+	// The attestation records the KDF cost actually spent, per algorithm —
+	// "bcrypt_cost" is kept unchanged (backward-compatible field name/shape)
+	// for actors still on the legacy algorithm; "argon2_params" is the
+	// analogous record for the target algorithm (REQ-AUTHN-1). Only one of
+	// the two is ever present, matching the algo that verified.
+	switch algo {
+	case passwordhash.AlgoBcrypt:
+		if cost, costErr := bcryptCost(hash); costErr == nil {
+			attestation["bcrypt_cost"] = cost
+		}
+	case passwordhash.AlgoArgon2id:
+		if summary, summaryErr := passwordhash.Argon2ParamsSummary(string(hash)); summaryErr == nil {
+			attestation["argon2_params"] = summary
+		}
+	}
+	payload, _ := json.Marshal(attestation)
 	return SignatureResult{Method: "password_reauth", Payload: payload, SignedAt: now}, nil
 }

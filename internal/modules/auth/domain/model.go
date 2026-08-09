@@ -135,13 +135,17 @@ type CreateUserInput struct {
 }
 
 // UpdateUserParams carries a partial update for an existing user; nil pointer
-// fields are left unchanged. NewPasswordHash must already be hashed by the caller.
+// fields are left unchanged. NewPasswordHash must already be hashed by the
+// caller. NewPasswordAlgo must be set together with NewPasswordHash (the
+// algorithm the hash was produced with, e.g. "argon2id") — password_algo
+// must never be inferred or hard-coded downstream of this struct.
 type UpdateUserParams struct {
 	UserID             string
 	DisplayName        *string
 	Email              *string
 	IsActive           *bool
 	NewPasswordHash    *PasswordHash
+	NewPasswordAlgo    *string
 	MustChangePassword *bool
 	ResetLockState     bool
 }

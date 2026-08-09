@@ -322,14 +322,14 @@ type loginTx struct {
 
 func (t *loginTx) LoadLoginState(ctx context.Context, userID string) (authdomain.LoginState, error) {
 	const q = `
-SELECT password_hash, is_active, locked_until
+SELECT password_hash, password_algo, is_active, locked_until
 FROM metaldocs.auth_identities
 WHERE user_id = $1
 `
 	var state authdomain.LoginState
 	var hash string
 	var lockedUntil sql.NullTime
-	if err := t.tx.QueryRowContext(ctx, q, userID).Scan(&hash, &state.IsActive, &lockedUntil); err != nil {
+	if err := t.tx.QueryRowContext(ctx, q, userID).Scan(&hash, &state.PasswordAlgo, &state.IsActive, &lockedUntil); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return authdomain.LoginState{}, authdomain.ErrIdentityNotFound
 		}
@@ -345,6 +345,25 @@ WHERE user_id = $1
 
 func (t *loginTx) RecordFailedLogin(ctx context.Context, userID string, maxAttempts int, lockDurationSeconds int, ip string) (int, *time.Time, error) {
 	return recordFailedLogin(ctx, t.tx, userID, maxAttempts, lockDurationSeconds, ip)
+}
+
+// RehashPassword implements authdomain.LoginTx: it persists newHash/newAlgo
+// for userID inside the login-lock transaction (rehash-on-login migration,
+// REQ-AUTHN-1). The caller (Service.Authenticate) treats any returned error
+// as non-fatal to the login — see the RehashPassword doc on the LoginTx
+// interface.
+func (t *loginTx) RehashPassword(ctx context.Context, userID string, newHash authdomain.PasswordHash, newAlgo string) error {
+	const q = `
+UPDATE metaldocs.auth_identities
+SET password_hash = $2,
+    password_algo = $3,
+    updated_at = NOW()
+WHERE user_id = $1
+`
+	if _, err := t.tx.ExecContext(ctx, q, userID, string(newHash), newAlgo); err != nil {
+		return fmt.Errorf("rehash password: %w", err)
+	}
+	return nil
 }
 
 // WithinLoginLock serializes concurrent login attempts for userID via a
@@ -541,13 +560,13 @@ WHERE user_id = $1
 UPDATE metaldocs.auth_identities
 SET email = COALESCE($2, email),
     password_hash = COALESCE($3, password_hash),
-    password_algo = CASE WHEN $3 IS NULL THEN password_algo ELSE 'bcrypt' END,
+    password_algo = CASE WHEN $3 IS NULL THEN password_algo ELSE COALESCE($6, password_algo) END,
     must_change_password = COALESCE($4, must_change_password),
     failed_login_attempts = CASE WHEN $3 IS NOT NULL OR $5 THEN 0 ELSE failed_login_attempts END,
     locked_until = CASE WHEN $3 IS NOT NULL OR $5 THEN NULL ELSE locked_until END,
     updated_at = NOW()
 WHERE user_id = $1
-`, params.UserID, nullableText(params.Email), nullablePasswordHash(params.NewPasswordHash), nullableBool(params.MustChangePassword), params.ResetLockState)
+`, params.UserID, nullableText(params.Email), nullablePasswordHash(params.NewPasswordHash), nullableBool(params.MustChangePassword), params.ResetLockState, nullableText(params.NewPasswordAlgo))
 		if err != nil {
 			if isUniqueViolation(err) {
 				return authdomain.ErrUserAlreadyExists

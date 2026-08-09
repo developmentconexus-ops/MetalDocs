@@ -4,7 +4,7 @@
 > detects drift between this file and a fresh regeneration and fails as stale.
 > Local command: `go run ./scripts/req-trace`
 
-**Totals:** 67 REQ IDs (61 MUST, 6 SHOULD, 0 MAY). Uncovered MUST: 4.
+**Totals:** 67 REQ IDs (61 MUST, 6 SHOULD, 0 MAY). Uncovered MUST: 3.
 
 | REQ ID | Class | Evidence | Pointer |
 |---|---|---|---|
@@ -22,7 +22,7 @@
 | REQ-H-1 | MUST | commit | commit ea996da2 — F-06b: extracts delivery-layer raw SQL out of handlers into repositories (handlers stop doing SQL/business rules) across controlled-documents + documents; commit ea996da2. |
 | REQ-H-2 | MUST | commit | commit 6b0bb338 — F-ENVELOPE-DOCSHTTP: migrates documents/http delivery package to RFC 9457 Problem responses; commit 6b0bb338. |
 | REQ-H-3 | MUST | commit | commit 0b88b38e — ADR 0022 Phase 3: membership area-scoping closes the area_admin 403-vs-404 boundary decision; commit 0b88b38e. |
-| REQ-AUTHN-1 | MUST | none | — |
+| REQ-AUTHN-1 | MUST | test | internal/modules/approval/infrastructure/signature/password_reauth_test.go; internal/modules/auth/application/service_argon2_test.go; internal/modules/auth/application/service_test.go; internal/platform/passwordhash/passwordhash_test.go |
 | REQ-AUTHN-2 | MUST | commit | commit b5f00d73 — feat(auth): constant-time login + sliding idle timeout + complete role-cache invalidation — sessions revocable/expiring with step-up reauth; commit b5f00d73 (also cited: 7fa91bed, 9921b323). |
 | REQ-AUTHN-3 | MUST | none | — |
 | REQ-AUTHN-4 | MUST | commit | commit 492882d3 — ADR 0022 Phase 11 F8: deny-default matrix + bypass audit establishes the audit-on-authn-decision pattern that auth login/logout/reauth flows use; commit 492882d3. |

@@ -22,6 +22,7 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	iampostgres "metaldocs/internal/modules/iam/infrastructure/postgres"
 	"metaldocs/internal/platform/iamtypes"
+	"metaldocs/internal/platform/passwordhash"
 	"metaldocs/internal/platform/tenant"
 
 	"golang.org/x/crypto/bcrypt"
@@ -473,7 +474,10 @@ func TestAuthenticate_ConcurrentWrongPasswordBoundedByLock(t *testing.T) {
 	}
 }
 
-func TestHashPassword_UsesCost12(t *testing.T) {
+// TestHashPassword_UsesArgon2id replaces the retired bcrypt-cost assertion:
+// new password hashes must be Argon2id (REQ-AUTHN-1, memory-hard KDF), not
+// bcrypt, and the PHC string must carry recoverable params.
+func TestHashPassword_UsesArgon2id(t *testing.T) {
 	svc := mustNewService(t, memory.NewRepository(), newMockRoleProvider(), newMockRoleAdminRepository(), Config{
 		SessionSecret: testSessionSecret,
 	})
@@ -481,12 +485,11 @@ func TestHashPassword_UsesCost12(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hashPassword: %v", err)
 	}
-	cost, err := bcrypt.Cost([]byte(hash))
-	if err != nil {
-		t.Fatalf("bcrypt cost: %v", err)
+	if !strings.HasPrefix(string(hash), "$argon2id$v=") {
+		t.Fatalf("hash = %q, want $argon2id$v=... PHC format", hash)
 	}
-	if cost != bcryptCost {
-		t.Fatalf("cost = %d, want %d", cost, bcryptCost)
+	if _, err := passwordhash.Argon2ParamsSummary(string(hash)); err != nil {
+		t.Fatalf("Argon2ParamsSummary: %v", err)
 	}
 }
 
@@ -938,7 +941,7 @@ func TestCreateUser_RollbackWhenReplaceUserRolesFails(t *testing.T) {
 INSERT INTO metaldocs.auth_identities (user_id, username, email, display_name, is_active, password_hash, password_algo, must_change_password, last_login_at, failed_login_attempts, locked_until, created_at, updated_at)
 VALUES ($1, $2, NULLIF($3, ''), $4, $5, $6, $7, $8, NULL, 0, NULL, NOW(), NOW())
 `)).
-		WithArgs("alice", "alice", "alice@example.com", "Alice", true, sqlmock.AnyArg(), "bcrypt", true).
+		WithArgs("alice", "alice", "alice@example.com", "Alice", true, sqlmock.AnyArg(), "argon2id", true).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(regexp.QuoteMeta(`
 SELECT

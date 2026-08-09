@@ -17,26 +17,33 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/netip"
 	"strings"
+	"sync"
 	"time"
 
 	auditdomain "metaldocs/internal/modules/audit/domain"
 	authdomain "metaldocs/internal/modules/auth/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/iamtypes"
+	"metaldocs/internal/platform/passwordhash"
 	"metaldocs/internal/platform/requesttrace"
 	"metaldocs/internal/platform/security"
 	"metaldocs/internal/platform/tenant"
 
 	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
 )
 
+// passwordAlgoBcrypt and passwordAlgoArgon2id are re-exported locally (not
+// just referenced as passwordhash.AlgoBcrypt/AlgoArgon2id at each call site)
+// so the algorithm names read naturally against authdomain.CreateUserParams
+// / UpdateUserParams field names in this file; both are the same string
+// value as their passwordhash counterparts — one source, no drift.
 const (
-	passwordAlgoBcrypt = "bcrypt"
-	bcryptCost         = 12
+	passwordAlgoBcrypt   = passwordhash.AlgoBcrypt
+	passwordAlgoArgon2id = passwordhash.AlgoArgon2id
 )
 
 // Secret holds a config value that must never be logged (session HMAC key,
@@ -124,11 +131,39 @@ type Service struct {
 	audit auditdomain.Writer
 	cfg   Config
 	now   func() time.Time
-	// dummyHash is a fixed bcrypt hash compared against on the unknown-identifier
-	// path so that login spends bcrypt-equivalent time whether or not the account
-	// exists. This removes the timing oracle that let wall-clock latency reveal
-	// account existence (OWASP Authentication Cheat Sheet — equalize work).
-	dummyHash []byte
+	// dummyHash is a fixed Argon2id PHC hash compared against on the
+	// unknown-identifier path so that login spends Argon2id-equivalent time
+	// whether or not the account exists. This removes the timing oracle that
+	// let wall-clock latency reveal account existence (OWASP Authentication
+	// Cheat Sheet — equalize work). It is the package-level
+	// constantTimeDummyHash() value — computed once per process (see there),
+	// never once per Service.
+	dummyHash string
+}
+
+// constantTimeDummyHash and its guarding sync.Once make dummy-hash
+// generation a once-per-process cost, not a once-per-Service cost. Before
+// this fix, every NewService call ran a full KDF (bcrypt.GenerateFromPassword)
+// to mint a value that is thrown away — no caller ever inspects it, it only
+// exists to be compared against, spending KDF-equivalent wall-clock time on
+// the unknown-identifier login path (see Authenticate). TestSurfaceConformance
+// builds a fresh Service per route (147 routes) under -race, so a
+// once-per-construction KDF run pushed apps/api/cmd/metaldocs-api's
+// integration package past its timeout — and Argon2id is more expensive than
+// bcrypt by design, so leaving the per-construction cost in place would have
+// made that strictly worse. sync.Once bounds the real cost to one KDF run for
+// the lifetime of the process, however many Services get built.
+var (
+	constantTimeDummyHashOnce sync.Once
+	constantTimeDummyHashVal  string
+	constantTimeDummyHashErr  error
+)
+
+func constantTimeDummyHash() (string, error) {
+	constantTimeDummyHashOnce.Do(func() {
+		constantTimeDummyHashVal, constantTimeDummyHashErr = passwordhash.HashArgon2id([]byte("metaldocs-constant-time-dummy"))
+	})
+	return constantTimeDummyHashVal, constantTimeDummyHashErr
 }
 
 // WithCapabilityProvider wires an optional CapabilityProvider so /auth/me and
@@ -170,9 +205,11 @@ func NewService(repo authdomain.Repository, roleProvider iamdomain.RoleProvider,
 	if len(cfg.SessionSecret.Value()) < 32 {
 		return nil, fmt.Errorf("new auth service: session secret must be at least 32 characters")
 	}
-	// Precompute once: the unknown-identifier path compares against this so login
-	// latency is bcrypt-dominated regardless of account existence (A1, timing oracle).
-	dummyHash, err := bcrypt.GenerateFromPassword([]byte("metaldocs-constant-time-dummy"), bcryptCost)
+	// Computed once per process (constantTimeDummyHash, guarded by sync.Once),
+	// not once per Service: the unknown-identifier path compares against this
+	// so login latency is Argon2id-dominated regardless of account existence
+	// (A1, timing oracle) without paying a fresh KDF run on every construction.
+	dummyHash, err := constantTimeDummyHash()
 	if err != nil {
 		return nil, fmt.Errorf("new auth service: generate constant-time hash: %w", err)
 	}
@@ -226,7 +263,7 @@ func (s *Service) BootstrapLocalAdmin(ctx context.Context) error {
 		Email:              strings.TrimSpace(s.cfg.BootstrapAdminEmail),
 		DisplayName:        strings.TrimSpace(s.cfg.BootstrapAdminName),
 		PasswordHash:       passwordHash,
-		PasswordAlgo:       passwordAlgoBcrypt,
+		PasswordAlgo:       passwordAlgoArgon2id,
 		MustChangePassword: true,
 	})
 	if err != nil || !created {
@@ -257,11 +294,25 @@ const (
 // session and returns an AuthenticatedSession. It runs the credential check
 // inside a per-identity login lock so the lockout check and failed-attempt
 // write are atomic (closes a TOCTOU window across concurrent attempts), and
-// spends bcrypt-equivalent time on every failure path — unknown identifier,
+// spends KDF-equivalent time on every failure path — unknown identifier,
 // locked, inactive, or wrong password — so wall-clock latency never discloses
 // account existence or state (OWASP Authentication Cheat Sheet). Returns
 // ErrInvalidCredentials, ErrIdentityLocked, ErrIdentityInactive,
 // ErrTenantNotPermitted, or ErrTenantClaimRequired depending on outcome.
+//
+// REQ-AUTHN-1 timing note: the unknown-identifier path (below) spends
+// Argon2id-equivalent time via the package-level dummy hash — that is the
+// algorithm every identity converges to, so once migration completes this
+// path's cost matches every real comparison. During migration, a
+// not-yet-rehashed bcrypt identity's wrong-password attempt still costs
+// bcrypt-equivalent time (this function's known-identity branch dispatches
+// on the identity's own stored algorithm), which is more expensive than
+// Argon2id at this package's chosen parameters. That gap is a real, named
+// residual: for the duration of the migration window, a wrong-password
+// attempt against a legacy-bcrypt identity is wall-clock distinguishable
+// from one against an unknown identifier or an already-migrated argon2id
+// identity. It closes automatically as accounts rehash on login and
+// disappears entirely once no bcrypt identity remains.
 func (s *Service) Authenticate(ctx context.Context, identifier, password string, r *http.Request) (authdomain.AuthenticatedSession, error) {
 	identifier = strings.TrimSpace(identifier)
 	if identifier == "" || password == "" {
@@ -270,11 +321,12 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 
 	identity, err := s.repo.FindIdentityByIdentifier(ctx, identifier)
 	if err != nil {
-		// Unknown identifier: spend bcrypt-equivalent time before returning the
-		// generic credential error so wall-clock latency does not reveal whether
-		// the account exists (A1). Any other error is a real fault — return it.
+		// Unknown identifier: spend Argon2id-equivalent time (this package's
+		// target algorithm) before returning the generic credential error so
+		// wall-clock latency does not reveal whether the account exists (A1).
+		// Any other error is a real fault — return it.
 		if errors.Is(err, authdomain.ErrIdentityNotFound) {
-			_ = bcrypt.CompareHashAndPassword(s.dummyHash, []byte(password))
+			_, _ = passwordhash.VerifyArgon2id(s.dummyHash, []byte(password))
 			return authdomain.AuthenticatedSession{}, authdomain.ErrInvalidCredentials
 		}
 		return authdomain.AuthenticatedSession{}, err
@@ -283,21 +335,30 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 	// Verify credentials while holding a per-identity lock so the lockout check
 	// and the failed-attempt write are atomic. Concurrent attempts on the same
 	// identity are serialized: once the threshold lock is set, the remaining
-	// in-flight attempts observe it and are rejected before bcrypt runs — closing
-	// the read-check-then-write TOCTOU window that previously let a parallel burst
-	// exceed LoginMaxFailedAttempts guesses within a single lock window.
+	// in-flight attempts observe it and are rejected before the KDF runs —
+	// closing the read-check-then-write TOCTOU window that previously let a
+	// parallel burst exceed LoginMaxFailedAttempts guesses within a single
+	// lock window.
 	outcome := loginOK
 	if lockErr := s.repo.WithinLoginLock(ctx, identity.UserID, func(tx authdomain.LoginTx) error {
 		state, err := tx.LoadLoginState(ctx, identity.UserID)
 		if err != nil {
 			return err
 		}
-		// Run the bcrypt comparison before branching so a locked or inactive account
-		// spends the same time as an active one — the fast no-bcrypt path would
-		// otherwise leak account state by wall-clock (OWASP Authentication Cheat
-		// Sheet — equalize work on every failure path). The distinct locked/inactive
-		// errors are kept deliberately (admin UX), only the timing is equalized.
-		passwordOK := bcrypt.CompareHashAndPassword([]byte(state.PasswordHash), []byte(password)) == nil
+		// Run the credential comparison before branching so a locked or inactive
+		// account spends the same time as an active one — the fast no-KDF path
+		// would otherwise leak account state by wall-clock (OWASP Authentication
+		// Cheat Sheet — equalize work on every failure path). The distinct
+		// locked/inactive errors are kept deliberately (admin UX), only the
+		// timing is equalized. Verify dispatches on state.PasswordAlgo
+		// (REQ-AUTHN-1) and fails closed — verifyErr != nil (unrecognized
+		// algorithm or a malformed stored hash) is treated as a failed
+		// comparison, never as a match and never by falling through to a
+		// different algorithm (no-fallback principle).
+		passwordOK, verifyErr := passwordhash.Verify(state.PasswordAlgo, []byte(state.PasswordHash), []byte(password))
+		if verifyErr != nil {
+			passwordOK = false
+		}
 		if state.LockedUntil != nil && state.LockedUntil.After(s.now().UTC()) {
 			outcome = loginLocked
 			return nil
@@ -312,6 +373,23 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 			}
 			outcome = loginInvalid
 			return nil
+		}
+		// Rehash-on-login migration (REQ-AUTHN-1): a successful login against a
+		// legacy bcrypt hash rehashes the verified plaintext to Argon2id and
+		// persists it in the same locked transaction. A write failure here must
+		// NOT fail the login — the user already authenticated correctly with the
+		// credential on file; a migration hiccup must not lock them out. Log and
+		// move on; the identity simply stays on bcrypt and gets another rehash
+		// attempt on its next successful login.
+		if state.PasswordAlgo == passwordAlgoBcrypt {
+			newHash, hashErr := passwordhash.HashArgon2id([]byte(password))
+			if hashErr != nil {
+				slog.ErrorContext(ctx, "auth: rehash-on-login: hash password failed; login proceeds on legacy bcrypt hash",
+					"user_id", identity.UserID, "err", hashErr)
+			} else if rehashErr := tx.RehashPassword(ctx, identity.UserID, authdomain.PasswordHash(newHash), passwordAlgoArgon2id); rehashErr != nil {
+				slog.ErrorContext(ctx, "auth: rehash-on-login: persist argon2id hash failed; login proceeds on legacy bcrypt hash",
+					"user_id", identity.UserID, "err", rehashErr)
+			}
 		}
 		return nil
 	}); lockErr != nil {
@@ -453,6 +531,18 @@ func (s *Service) Logout(ctx context.Context, rawToken string) error {
 	return s.repo.RevokeSession(ctx, sessionID, s.now().UTC())
 }
 
+// currentPasswordMatches dispatches on identity.PasswordAlgo (REQ-AUTHN-1)
+// to compare candidate against the stored hash, failing closed (false) on
+// any verification error — an unrecognized algorithm or a malformed stored
+// hash is never treated as a match.
+func (s *Service) currentPasswordMatches(identity authdomain.Identity, candidate string) bool {
+	ok, err := passwordhash.Verify(identity.PasswordAlgo, []byte(identity.PasswordHash), []byte(candidate))
+	if err != nil {
+		return false
+	}
+	return ok
+}
+
 // ChangePasswordForUser changes currentUser's password to newPassword,
 // verifying currentPassword first unless MustChangePassword is set. On
 // success it revokes all of the user's other sessions (CWE-613: a stolen or
@@ -476,11 +566,11 @@ func (s *Service) ChangePasswordForUser(ctx context.Context, currentUser authdom
 		if currentPassword == "" {
 			return authdomain.ErrInvalidCredentials
 		}
-		if bcrypt.CompareHashAndPassword([]byte(identity.PasswordHash), []byte(currentPassword)) != nil {
+		if !s.currentPasswordMatches(identity, currentPassword) {
 			return authdomain.ErrInvalidCredentials
 		}
 	}
-	if currentUser.MustChangePassword && currentPassword != "" && bcrypt.CompareHashAndPassword([]byte(identity.PasswordHash), []byte(currentPassword)) != nil {
+	if currentUser.MustChangePassword && currentPassword != "" && !s.currentPasswordMatches(identity, currentPassword) {
 		return authdomain.ErrInvalidCredentials
 	}
 
@@ -490,9 +580,11 @@ func (s *Service) ChangePasswordForUser(ctx context.Context, currentUser authdom
 	}
 
 	required := false
+	newAlgo := passwordAlgoArgon2id
 	updateParams := authdomain.UpdateUserParams{
 		UserID:             userID,
 		NewPasswordHash:    &passwordHash,
+		NewPasswordAlgo:    &newAlgo,
 		MustChangePassword: &required,
 	}
 	now := s.now().UTC()
@@ -690,7 +782,9 @@ func (s *Service) UpdateUser(ctx context.Context, params authdomain.UpdateUserPa
 		if err != nil {
 			return err
 		}
+		newAlgo := passwordAlgoArgon2id
 		params.NewPasswordHash = &passwordHash
+		params.NewPasswordAlgo = &newAlgo
 	}
 
 	// Deactivation revokes all of the user's sessions (F8.4, CWE-613): a session must
@@ -751,9 +845,11 @@ func (s *Service) AdminResetPassword(ctx context.Context, userID, newPassword st
 		return err
 	}
 	required := true
+	newAlgo := passwordAlgoArgon2id
 	updateParams := authdomain.UpdateUserParams{
 		UserID:             userID,
 		NewPasswordHash:    &passwordHash,
+		NewPasswordAlgo:    &newAlgo,
 		MustChangePassword: &required,
 		ResetLockState:     true,
 	}
@@ -1022,24 +1118,25 @@ func (s *Service) hashPassword(password string) (authdomain.PasswordHash, error)
 }
 
 func (s *Service) hashPasswordBytes(password []byte) (authdomain.PasswordHash, error) {
-	hash, err := bcrypt.GenerateFromPassword(password, bcryptCost)
+	hash, err := passwordhash.HashArgon2id(password)
 	if err != nil {
 		return "", fmt.Errorf("hash password: %w", err)
 	}
-	return authdomain.PasswordHash(string(hash)), nil
+	return authdomain.PasswordHash(hash), nil
 }
 
 // HashPassword is auth's published password-hashing seam for cross-module
 // callers (M7 F7.2: iam's OnboardTenantService hashes the first admin's
-// password inside its own provisioning tx). It uses the same bcrypt mechanism
-// and the same unexported bcryptCost as Service.hashPassword, so the cost
-// factor has exactly one home and cannot drift across modules.
+// password inside its own provisioning tx). It uses the same Argon2id
+// mechanism and the same passwordhash package as Service.hashPassword
+// (REQ-AUTHN-1), so the KDF params have exactly one home and cannot drift
+// across modules.
 func HashPassword(plain string) (authdomain.PasswordHash, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(plain), bcryptCost)
+	hash, err := passwordhash.HashArgon2id([]byte(plain))
 	if err != nil {
 		return "", fmt.Errorf("hash password: %w", err)
 	}
-	return authdomain.PasswordHash(string(hash)), nil
+	return authdomain.PasswordHash(hash), nil
 }
 
 type createUserFields struct {
@@ -1099,7 +1196,7 @@ func (s *Service) buildCreateUserParams(fields createUserFields) (authdomain.Cre
 		Email:              fields.email,
 		DisplayName:        fields.displayName,
 		PasswordHash:       passwordHash,
-		PasswordAlgo:       passwordAlgoBcrypt,
+		PasswordAlgo:       passwordAlgoArgon2id,
 		MustChangePassword: true,
 		IsActive:           true,
 		Roles:              nil,
