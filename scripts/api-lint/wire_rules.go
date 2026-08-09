@@ -96,7 +96,7 @@ import (
 //     collision appears later, the fix is to narrow the match (e.g. scope by
 //     package/struct as well as name) — not to relax the rule silently.
 func checkWireNullableOmitempty(specPath, modulesRoot string) ([]Violation, error) {
-	data, err := os.ReadFile(specPath)
+	data, err := os.ReadFile(specPath) // #nosec G304 -- specPath is main.go's first CLI positional argument (the openapi.yaml to lint); operator-controlled, not external input.
 	if err != nil {
 		return nil, err
 	}

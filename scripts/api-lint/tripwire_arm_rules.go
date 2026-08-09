@@ -153,7 +153,7 @@ func checkTripwireArmParity(modulesRoot string, strict bool) ([]Violation, error
 
 	// (ii) the generated migration must byte-equal the committed 0271 file.
 	migPath := filepath.Join(modulesRoot, filepath.FromSlash(tripwireGoldenPath))
-	committed, err := os.ReadFile(migPath)
+	committed, err := os.ReadFile(migPath) // #nosec G304 -- path is modulesRoot (CLI-supplied repo root) joined with the fixed literal tripwireGoldenPath constant; not external input.
 	if err != nil {
 		if os.IsNotExist(err) {
 			if cerr := requireCoreFile(strict, "internal/platform/tripwire/golden (tripwire golden render)", migPath); cerr != nil {

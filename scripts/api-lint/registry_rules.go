@@ -287,7 +287,7 @@ func bannedRoleSet(modulesRoot string, fset *token.FileSet, strict bool) (map[st
 // "system_admin"). Mirrors parseCapabilityConsts but matches Role-typed consts.
 func parseRoleConsts(modulesRoot string, fset *token.FileSet, strict bool) (map[string]iamdomain.Role, error) {
 	modelPath := filepath.Join(modulesRoot, "internal", "modules", "iam", "domain", "model.go")
-	raw, err := os.ReadFile(modelPath)
+	raw, err := os.ReadFile(modelPath) // #nosec G304 -- path is modulesRoot (CLI-supplied repo root) joined with the fixed literal internal/modules/iam/domain/model.go; not external input.
 	if err != nil {
 		if os.IsNotExist(err) {
 			if cerr := requireCoreFile(strict, "iam/domain/model.go (Role registry)", modelPath); cerr != nil {
@@ -533,7 +533,7 @@ func capConstName(arg ast.Expr) (string, bool) {
 // reflectable: the call site carries the const identifier, not its value.
 func parseCapabilityConsts(modulesRoot string, fset *token.FileSet, strict bool) (map[string]iamdomain.Capability, error) {
 	modelPath := filepath.Join(modulesRoot, "internal", "modules", "iam", "domain", "model.go")
-	raw, err := os.ReadFile(modelPath)
+	raw, err := os.ReadFile(modelPath) // #nosec G304 -- path is modulesRoot (CLI-supplied repo root) joined with the fixed literal internal/modules/iam/domain/model.go; not external input.
 	if err != nil {
 		if os.IsNotExist(err) {
 			if cerr := requireCoreFile(strict, "iam/domain/model.go (Capability registry)", modelPath); cerr != nil {
@@ -655,7 +655,7 @@ func isCapabilityConversion(fun ast.Expr) bool {
 // explicitly deferred). Wired into the lint binary, not just the unit test.
 func checkSeedRegistryParity(modulesRoot string, strict bool) ([]Violation, error) {
 	seedPath := filepath.Join(modulesRoot, "db", "reference-data", "0001_product_reference_data.sql")
-	raw, err := os.ReadFile(seedPath)
+	raw, err := os.ReadFile(seedPath) // #nosec G304 -- path is modulesRoot (CLI-supplied repo root) joined with the fixed literal db/reference-data/0001_product_reference_data.sql; not external input.
 	if err != nil {
 		if os.IsNotExist(err) {
 			if cerr := requireCoreFile(strict, "db/reference-data/0001_product_reference_data.sql (role_capabilities seed)", seedPath); cerr != nil {
@@ -725,7 +725,7 @@ func checkWikiCapabilityParity(modulesRoot string, strict bool) ([]Violation, er
 	out := []Violation{}
 	for _, rel := range wikiAuthzDocs {
 		path := filepath.Join(modulesRoot, rel)
-		raw, err := os.ReadFile(path)
+		raw, err := os.ReadFile(path) // #nosec G304 -- rel iterates the fixed wikiAuthzDocs literal slice, joined onto modulesRoot (CLI-supplied repo root); not external input.
 		if err != nil {
 			if os.IsNotExist(err) {
 				// In strict mode (production root) these are FIXED, known authz

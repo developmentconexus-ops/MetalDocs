@@ -42,7 +42,7 @@ type rawOperation struct {
 // assumed: a trailing slash is normalized away and "/" maps to "" so an
 // empty base and a root base compare equal.
 func LoadDocument(path string) (Document, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- path is a main.go CLI flag (publicPath/e2ePath) pointing at the OpenAPI spec; operator-controlled, not external input.
 	if err != nil {
 		return Document{}, fmt.Errorf("%s: %w", path, err)
 	}

@@ -48,7 +48,7 @@ func seedChokepointAllowlistPath(modulesRoot string) string {
 // wrong-repo-root signal.
 func loadSeedChokepointAllowlist(modulesRoot string) (map[string]struct{}, error) {
 	path := seedChokepointAllowlistPath(modulesRoot)
-	raw, err := os.ReadFile(path)
+	raw, err := os.ReadFile(path) // #nosec G304 -- path is modulesRoot (CLI-supplied repo root) joined with a fixed literal allowlist filename; not external input.
 	if err != nil {
 		if os.IsNotExist(err) {
 			return map[string]struct{}{}, nil

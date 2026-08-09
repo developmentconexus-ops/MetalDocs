@@ -99,7 +99,7 @@ func parseFile(fset *token.FileSet, path string) (*token.File, any) {
 }
 
 func readSource(path string) string {
-	b, _ := os.ReadFile(path)
+	b, _ := os.ReadFile(path) // #nosec G304 -- path comes from collectGoFiles' filepath.WalkDir over the repo tree, not external input.
 	return string(b)
 }
 

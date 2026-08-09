@@ -38,7 +38,7 @@ func ScanTestCitations(root string, dirs []string) (map[string][]string, error) 
 			if !strings.HasSuffix(path, "_test.go") {
 				return nil
 			}
-			content, rerr := os.ReadFile(path)
+			content, rerr := os.ReadFile(path) // #nosec G122 G304 -- path is produced by filepath.Walk over root-joined, caller-supplied dirs (fixed CLI config, not external input); this is a local CI tool walking its own repo checkout, not a multi-tenant service, so symlink TOCTOU is not an exploitable trust-boundary crossing here.
 			if rerr != nil {
 				return fmt.Errorf("read %s: %w", path, rerr)
 			}
