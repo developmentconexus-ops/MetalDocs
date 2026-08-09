@@ -139,3 +139,52 @@ func TestVerify_FailsClosedOnOutOfRangeArgon2idParams(t *testing.T) {
 		})
 	}
 }
+
+// TestVerify_FailsClosedOnShortSaltOrHash proves the salt/hash length guard
+// in parseArgon2id: a PHC string with an empty or truncated salt/hash
+// segment must be rejected with ErrMalformedHash rather than reaching
+// argon2.IDKey. base64-decoding an empty or short segment succeeds with no
+// error (an empty string decodes to an empty byte slice), so without this
+// guard a malformed stored hash reaches the KDF and the underlying blake2b
+// implementation panics (nil-pointer) instead of returning an error - inside
+// Authenticate's login-lock tx, that is a per-account 500 loop, not a
+// request-scoped failure.
+func TestVerify_FailsClosedOnShortSaltOrHash(t *testing.T) {
+	tests := []struct {
+		name    string
+		encoded string
+	}{
+		{name: "empty hash segment", encoded: "$argon2id$v=19$m=19456,t=16,p=1$c29tZXNhbHRzYWx0$"},
+		{name: "empty salt segment", encoded: "$argon2id$v=19$m=19456,t=16,p=1$$c29tZWhhc2hzb21laGFzaA"},
+		{name: "truncated salt (1 byte)", encoded: "$argon2id$v=19$m=19456,t=16,p=1$AA$c29tZWhhc2hzb21laGFzaA"},
+		{name: "truncated hash (1 byte)", encoded: "$argon2id$v=19$m=19456,t=16,p=1$c29tZXNhbHRzYWx0$AA"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ok, err := passwordhash.Verify(passwordhash.AlgoArgon2id, []byte(tt.encoded), []byte("secret"))
+			if ok {
+				t.Fatalf("Verify(%q) = true, want false (fail closed)", tt.encoded)
+			}
+			if !errors.Is(err, passwordhash.ErrMalformedHash) {
+				t.Fatalf("Verify(%q) err = %v, want ErrMalformedHash", tt.encoded, err)
+			}
+		})
+	}
+}
+
+// TestVerify_ValidHashStillVerifiesAfterLengthGuard proves the salt/hash
+// length guard does not reject this package's own real hashes - only the
+// too-short case introduced above.
+func TestVerify_ValidHashStillVerifiesAfterLengthGuard(t *testing.T) {
+	encoded, err := passwordhash.HashArgon2id([]byte("CorrectHorseBatteryStaple!"))
+	if err != nil {
+		t.Fatalf("HashArgon2id: %v", err)
+	}
+	ok, err := passwordhash.Verify(passwordhash.AlgoArgon2id, []byte(encoded), []byte("CorrectHorseBatteryStaple!"))
+	if err != nil {
+		t.Fatalf("Verify(valid hash): %v", err)
+	}
+	if !ok {
+		t.Fatal("Verify(valid hash) = false, want true")
+	}
+}

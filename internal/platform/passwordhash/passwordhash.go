@@ -119,6 +119,20 @@ const (
 	maxArgon2idParallelism = 64
 )
 
+// Lower bounds on the decoded salt/hash byte lengths a stored argon2id PHC
+// string may encode. base64 decoding an empty or truncated segment succeeds
+// with no error (an empty string decodes to an empty slice), so nothing
+// upstream of parseArgon2id catches a too-short salt or hash — and passing
+// either to argon2.IDKey / the underlying blake2b implementation panics
+// rather than erroring. 8 bytes is well below this package's own
+// argon2idSaltLen (16); 16 bytes is well below argon2idKeyLen (32) and any
+// reasonable KDF output. Both exist to reject garbage, the same rationale as
+// the m/t/p bounds above, not to constrain this package's own minted hashes.
+const (
+	minArgon2idSaltBytes = 8
+	minArgon2idHashBytes = 16
+)
+
 // argon2idParams is the parameter triple encoded in an argon2id PHC string.
 type argon2idParams struct {
 	memory  uint32
@@ -209,6 +223,18 @@ func parseArgon2id(encoded string) (argon2idParams, []byte, []byte, error) {
 	hash, err := base64.RawStdEncoding.DecodeString(parts[5])
 	if err != nil {
 		return argon2idParams{}, nil, nil, fmt.Errorf("%w: hash: %w", ErrMalformedHash, err)
+	}
+	// A PHC string with an empty or truncated salt/hash segment (e.g.
+	// "$argon2id$v=19$m=...,t=...,p=...$$") decodes without error here — an
+	// empty byte slice is a valid base64 decode of an empty string. Left
+	// unchecked, that slice reaches argon2.IDKey (VerifyArgon2id) with a
+	// too-short salt or is compared against a too-short want hash, and the
+	// underlying blake2b implementation panics (nil-pointer) rather than
+	// returning an error. No-fallback principle: reject here, at parse time,
+	// the same way the m/t/p triple is rejected above, rather than letting a
+	// malformed stored value reach the KDF at all.
+	if len(salt) < minArgon2idSaltBytes || len(hash) < minArgon2idHashBytes {
+		return argon2idParams{}, nil, nil, fmt.Errorf("%w: salt/hash too short (salt=%d, hash=%d bytes)", ErrMalformedHash, len(salt), len(hash))
 	}
 	return argon2idParams{memory: uint32(m), time: uint32(t), threads: uint8(par)}, salt, hash, nil // #nosec G115 -- m, t, par were bounds-checked by validateArgon2idParams above (line 202): p in [minArgon2idParallelism, maxArgon2idParallelism]=[1,64], m in [8*p, maxArgon2idMemoryKiB]=[8p,1<<20], t in [minArgon2idTime, maxArgon2idTime]=[1,64]; every range fits well inside uint32/uint8, gosec just cannot see the earlier call in this analysis (known FP shape, gosec issue #1212).
 }
