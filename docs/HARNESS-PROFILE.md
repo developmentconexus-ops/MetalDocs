@@ -35,11 +35,14 @@ append-only log at the bottom.
 `status: ratified` · `provenance: 2026-07-16 · migrated from HARNESS.md §5 (field-proven across GMR M0–M9 + units 2.x–4.6)`
 
 - **L0** — `go build ./...` · `npm run typecheck:docx-v2` (when docx touched) · FE typecheck
-  (when FE touched) · governance lanes: api-lint, `module-boundaries.yml`,
-  check-test-discipline, capability-coherence. Zero findings.
+  (when FE touched) · governance lanes: api-lint (registry ID `api-lint`),
+  `module-imports`, `test-conventions`, capability-coherence — all run via
+  `go run ./tools/verify` since the 2026-08 CI restructure collapsed the legacy
+  workflows into `ci.yml`. Zero findings.
   **api-lint runs `-strict`, always** (amended 2026-08-05):
   `go run ./scripts/api-lint/ -strict api/openapi/v1/openapi.yaml .` — the exact string CI
-  uses (`.github/workflows/api-contract.yml:100`). The binary defaults to non-strict
+  uses (registry `api-lint` Argv in `tools/verify/registry.go`; formerly
+  `api-contract.yml:100`, deleted in the restructure). The binary defaults to non-strict
   (`scripts/api-lint/main.go:19`), so a bare `api-lint` is a strictly weaker check than the
   one that decides the build. Field lesson: on the approval accountability loop a line shift
   de-anchored a tripwire allowlist entry, and the weaker local lane let it through review.
