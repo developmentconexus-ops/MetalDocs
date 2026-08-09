@@ -153,12 +153,12 @@ func (m *Middleware) resolveVisibilityCapability(w http.ResponseWriter, r *http.
 	case VisibilityPublic, VisibilitySessionRequired, VisibilityPermissionGuarded:
 		return capability, visibility, true
 	case VisibilityUnresolved:
-		slog.Warn("iam: route matched a pattern with no rule", "method", r.Method, "path", r.URL.Path)
+		slog.Warn("iam: route matched a pattern with no rule", "method", r.Method, "path", r.URL.Path) //nolint:gosec // G706: slog default is JSONHandler (set at process start) — control chars are JSON-escaped, log-line injection not possible
 		m.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Route resolved to no policy"))
 		return capability, visibility, false
 	default:
 		// STAYS: genuinely unknown values.
-		slog.Warn("iam: unknown route visibility", "method", r.Method, "path", r.URL.Path, "visibility", visibility)
+		slog.Warn("iam: unknown route visibility", "method", r.Method, "path", r.URL.Path, "visibility", visibility) //nolint:gosec // G706: slog default is JSONHandler (set at process start) — control chars are JSON-escaped, log-line injection not possible
 		m.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Permission resolver returned unknown visibility"))
 		return capability, visibility, false
 	}

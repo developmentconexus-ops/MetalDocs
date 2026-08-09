@@ -45,7 +45,7 @@ func NewBumpMiddleware(repo Repository, log *slog.Logger) *BumpMiddleware {
 		lastBump: make(map[string]time.Time),
 		debounce: BumpDebounce,
 		updateCtx: func(parent context.Context) (context.Context, context.CancelFunc) {
-			return context.WithTimeout(parent, 2*time.Second)
+			return context.WithTimeout(parent, 2*time.Second) //nolint:gosec // G118: the cancel func is returned to the caller, which defers it (bump goroutine above)
 		},
 	}
 }

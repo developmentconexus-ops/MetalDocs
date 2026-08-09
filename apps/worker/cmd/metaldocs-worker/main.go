@@ -159,7 +159,7 @@ func runMain() int {
 		}
 	}()
 	if otelEnabled {
-		slog.Info("OpenTelemetry tracing enabled", "exporter", os.Getenv("OTEL_TRACES_EXPORTER"))
+		slog.Info("OpenTelemetry tracing enabled", "exporter", os.Getenv("OTEL_TRACES_EXPORTER")) //nolint:gosec // G706: slog default is JSONHandler (set at process start) — control chars are JSON-escaped, log-line injection not possible
 	}
 
 	workerCfg, err := config.LoadWorkerConfig()
@@ -313,7 +313,8 @@ func buildMaterializeRunner(deps bootstrap.WorkerDependencies, sharedRiverBundle
 func runWorkerBatch(ctx context.Context, runner workerBatchRunner, batchSize int) error {
 	if err := runner.RunOnce(ctx, batchSize); err != nil {
 		if ctx.Err() != nil {
-			return nil
+			// Shutdown signal arrived mid-batch: not a batch failure.
+			return nil //nolint:nilerr // ctx cancellation is a clean exit, not an error
 		}
 		return err
 	}

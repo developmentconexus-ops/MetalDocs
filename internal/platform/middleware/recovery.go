@@ -34,7 +34,7 @@ func Recovery(next http.Handler) http.Handler {
 			if recErr, ok := rec.(error); ok && errors.Is(recErr, http.ErrAbortHandler) {
 				panic(rec)
 			}
-			slog.Error("http panic recovered",
+			slog.Error("http panic recovered", //nolint:gosec // G706: slog default is JSONHandler (set at process start) — control chars are JSON-escaped, log-line injection not possible
 				"trace_id", traceID,
 				"method", r.Method,
 				"path", r.URL.Path,

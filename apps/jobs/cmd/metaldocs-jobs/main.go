@@ -314,7 +314,7 @@ func runMain() int {
 		}
 	}()
 	if otelEnabled {
-		slog.Info("OpenTelemetry tracing enabled", "exporter", os.Getenv("OTEL_TRACES_EXPORTER"))
+		slog.Info("OpenTelemetry tracing enabled", "exporter", os.Getenv("OTEL_TRACES_EXPORTER")) //nolint:gosec // G706: slog default is JSONHandler (set at process start) — control chars are JSON-escaped, log-line injection not possible
 	}
 
 	if err := run(ctx); err != nil {

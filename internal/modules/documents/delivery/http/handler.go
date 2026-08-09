@@ -654,7 +654,7 @@ func (h *Handler) duplicateDocument(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		status, msg := mapErr(err)
 		if status == http.StatusInternalServerError {
-			slog.Error("documents duplicate failed", "doc_id", docID, "tenant_id", tenantID, "actor_id", userID, "err", err)
+			slog.Error("documents duplicate failed", "doc_id", docID, "tenant_id", tenantID, "actor_id", userID, "err", err) //nolint:gosec // G706: slog default is JSONHandler (set at process start) — control chars are JSON-escaped, log-line injection not possible
 			httpErr(w, status, msg)
 			return
 		}
@@ -663,7 +663,7 @@ func (h *Handler) duplicateDocument(w http.ResponseWriter, r *http.Request) {
 	}
 	docUUID, ridUUID, sidUUID, parseErr := parseCreateResultUUIDs(res.DocumentID, res.InitialRevisionID, res.SessionID)
 	if parseErr != nil {
-		slog.Error("documents duplicate produced unparseable id", "doc_id", docID, "tenant_id", tenantID, "actor_id", userID, "err", parseErr)
+		slog.Error("documents duplicate produced unparseable id", "doc_id", docID, "tenant_id", tenantID, "actor_id", userID, "err", parseErr) //nolint:gosec // G706: slog default is JSONHandler (set at process start) — control chars are JSON-escaped, log-line injection not possible
 		httpErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown)
 		return
 	}
@@ -891,7 +891,7 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 		PageCount:        req.PageCount,
 	})
 	if err != nil {
-		slog.Error("documents.commit_autosave failed", "doc_id", docID, "tenant_id", tenantID, "actor_id", userID, "session_id", redactID(req.SessionID), "pending_upload_id", redactID(req.PendingUploadID), "err", err)
+		slog.Error("documents.commit_autosave failed", "doc_id", docID, "tenant_id", tenantID, "actor_id", userID, "session_id", redactID(req.SessionID), "pending_upload_id", redactID(req.PendingUploadID), "err", err) //nolint:gosec // G706: slog default is JSONHandler (set at process start) — control chars are JSON-escaped, log-line injection not possible
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
 		return
@@ -934,7 +934,7 @@ func (h *Handler) listCheckpoints(w http.ResponseWriter, r *http.Request) {
 	}
 	resp, err := toAPICheckpoints(items)
 	if err != nil {
-		slog.Error("documents.list_checkpoints malformed uuid", "doc_id", docID, "tenant_id", tenantID, "err", err)
+		slog.Error("documents.list_checkpoints malformed uuid", "doc_id", docID, "tenant_id", tenantID, "err", err) //nolint:gosec // G706: slog default is JSONHandler (set at process start) — control chars are JSON-escaped, log-line injection not possible
 		httpErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown)
 		return
 	}
@@ -1049,7 +1049,7 @@ func (h *Handler) createCheckpoint(w http.ResponseWriter, r *http.Request) {
 	}
 	resp, err := toAPICheckpoint(*cp)
 	if err != nil {
-		slog.Error("documents.create_checkpoint malformed uuid", "doc_id", docID, "tenant_id", tenantID, "err", err)
+		slog.Error("documents.create_checkpoint malformed uuid", "doc_id", docID, "tenant_id", tenantID, "err", err) //nolint:gosec // G706: slog default is JSONHandler (set at process start) — control chars are JSON-escaped, log-line injection not possible
 		httpErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown)
 		return
 	}

@@ -183,7 +183,7 @@ func writeReplay(w http.ResponseWriter, replay *Replay) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Idempotent-Replay", "true")
 	w.WriteHeader(replay.Status)
-	_, _ = w.Write(replay.Body)
+	_, _ = w.Write(replay.Body) //nolint:gosec // G705: replay.Body is a response OUR OWN handlers produced earlier (cached verbatim), served as application/json — not reflectable markup
 }
 
 // runClaimedHandler runs next for the caller that won the BeginReplay claim

@@ -313,7 +313,10 @@ func TestStream_TenantIsolation(t *testing.T) {
 	wsURL := strings.Replace(srv.URL, "http://", "ws://", 1)
 	dialCtx, dialCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer dialCancel()
-	c, _, err := websocket.Dial(dialCtx, wsURL+"?"+url.Values{"tenant": []string{"tenant-a"}}.Encode(), nil)
+	c, dialResp, err := websocket.Dial(dialCtx, wsURL+"?"+url.Values{"tenant": []string{"tenant-a"}}.Encode(), nil)
+	if dialResp != nil && dialResp.Body != nil {
+		defer func() { _ = dialResp.Body.Close() }()
+	}
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}
@@ -380,7 +383,10 @@ func TestStream_SnapshotMatchesHTTP(t *testing.T) {
 	wsURL := strings.Replace(srv.URL, "http://", "ws://", 1)
 	dialCtx, dialCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer dialCancel()
-	c, _, err := websocket.Dial(dialCtx, wsURL, nil)
+	c, dialResp, err := websocket.Dial(dialCtx, wsURL, nil)
+	if dialResp != nil && dialResp.Body != nil {
+		defer func() { _ = dialResp.Body.Close() }()
+	}
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}

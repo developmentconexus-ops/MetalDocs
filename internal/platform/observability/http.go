@@ -191,7 +191,7 @@ func (o *HTTPObservability) recordRequest(r *http.Request, sw *statusWriter, tra
 	}
 	documentID, profileCode := extractRouteContext(path)
 
-	slog.Info("http_request",
+	slog.Info("http_request", //nolint:gosec // G706: slog default is JSONHandler (set at process start) — control chars are JSON-escaped, log-line injection not possible
 		"trace_id", traceID,
 		"user_id", userID,
 		"method", method,

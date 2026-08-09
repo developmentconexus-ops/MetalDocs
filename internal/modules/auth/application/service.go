@@ -113,7 +113,7 @@ func (c Config) String() string {
 func (c Config) MarshalJSON() ([]byte, error) {
 	type configAlias Config
 	redacted := configAlias(c.redacted())
-	return json.Marshal(redacted)
+	return json.Marshal(redacted) //nolint:gosec // G117: SessionSecret/BootstrapAdminPassword are replaced with "***" by c.redacted() above before marshal
 }
 
 // Service implements the auth module's application logic: login/logout,
