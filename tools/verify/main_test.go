@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -14,9 +15,25 @@ import (
 // silent and harmless under a normal `go test ./tools/verify/...`.
 //
 // Argv shape: {os.Args[0], "-test.run=^TestHelperProcess$", "--", mode, arg...}
-//   - mode=append  arg=<file> <id>            append <id>\n to <file>, exit 0
-//   - mode=sleep   arg=<file> <id> <millis>    sleep, then append, exit 0
-//   - mode=fail                                exit 1 immediately
+//   - mode=append   arg=<file> <id>                       append <id>\n to <file>, exit 0
+//   - mode=sleep    arg=<file> <id> <millis>               sleep, then append, exit 0
+//   - mode=fail                                            exit 1 immediately
+//   - mode=barrier  arg=<arrivedFile> <doneFile> <id> <n>  see below
+//
+// barrier proves genuine concurrency without measuring duration: it appends
+// <id> to arrivedFile, then polls arrivedFile until it holds >= n lines (n
+// being the number of peers in the barrier), then appends <id> to doneFile
+// and exits 0. A peer can only ever observe n arrivals if all n peers were
+// spawned and got far enough to write their own line — which is impossible
+// if the runner spawned them one-after-another and waited for each to exit
+// before starting the next, because the first spawned would still be
+// blocked *waiting* on the others' arrivals (not yet exited) when the next
+// would need to start. So reaching doneFile is direct proof of overlap, not
+// an inference from how long anything took. A capped poll deadline guards
+// against a genuine hang (e.g. the runner regresses to true serialization)
+// turning this into an indefinite hang; it is deliberately generous (10s)
+// so it is a deadlock backstop, not a race window — crossing it is only
+// possible when the checks truly never overlapped.
 func TestHelperProcess(t *testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
@@ -47,9 +64,45 @@ func TestHelperProcess(t *testing.T) {
 		file, id := args[1], args[2]
 		appendLine(file, id)
 		os.Exit(0)
+	case "barrier":
+		arrivedFile, doneFile, id, nStr := args[1], args[2], args[3], args[4]
+		n, err := strconv.Atoi(nStr)
+		if err != nil {
+			os.Exit(2)
+		}
+		appendLine(arrivedFile, id)
+		deadline := time.Now().Add(10 * time.Second)
+		for countLines(arrivedFile) < n {
+			if time.Now().After(deadline) {
+				// Never observed every peer arrive: they did not overlap in
+				// time. Reported as a normal check failure (non-zero exit),
+				// not a test-framework panic, so it surfaces through the
+				// same PASS/FAIL path every other check result does.
+				os.Exit(3)
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+		appendLine(doneFile, id)
+		os.Exit(0)
 	default:
 		os.Exit(2)
 	}
+}
+
+// countLines reports how many non-empty lines a file has, treating a
+// missing file as zero. Used by the barrier helper mode above; kept
+// separate from readLines because that one takes a *testing.T and this
+// runs inside a re-exec'd subprocess with no testing context.
+func countLines(file string) int {
+	b, err := os.ReadFile(file)
+	if err != nil {
+		return 0
+	}
+	s := strings.TrimSpace(string(b))
+	if s == "" {
+		return 0
+	}
+	return len(strings.Split(s, "\n"))
 }
 
 func appendLine(file, id string) {
@@ -115,26 +168,57 @@ func TestRunHonoursAfterOrdering(t *testing.T) {
 	}
 }
 
+// TestRunKeepsIndependentChecksConcurrent guards a real property of the
+// check runner: two checks with no After edge between them must be
+// scheduled without one waiting on the other. That matters because this
+// registry check runs inside a blocking required CI gate — if independent
+// checks silently serialized, a profile sized (and time-budgeted) for
+// concurrent execution would blow past CI's timeout, and a flaky assertion
+// here would teach people to re-run the gate until green, which defeats the
+// point of a single required check.
+//
+// The previous version inferred concurrency from wall-clock duration
+// (two 150ms sleeps, asserting elapsed < 280ms). That inference's premise —
+// that re-exec'ing this test binary as a subprocess costs much less than
+// 150ms — does not hold everywhere: reproduced locally, both helpers
+// consistently finished together (proving they DID run concurrently: same
+// individual duration, same finish time) while each individual invocation
+// cost 500-900ms of pure process-spawn overhead, pushing total elapsed past
+// the fixed threshold even though scheduling was correct. That is a
+// too-slow environmental flake against an assumed-cheap constant, not a
+// scheduling defect — but a wall-clock threshold cannot tell the two apart,
+// which is exactly the failure mode a required gate cannot carry.
+//
+// This version proves overlap directly instead of inferring it from
+// duration: see the "barrier" mode on TestHelperProcess. Neither helper can
+// reach doneFile without having observed both arrivals, and neither could
+// arrive-then-observe-both unless the other had also already started — a
+// spawn-one-wait-then-spawn-the-other execution would leave the first
+// helper blocked at the barrier (eventually timing out and FAILing) rather
+// than silently reporting a false PASS. So there is no duration threshold
+// left to cross, in either direction, under load or on a fast machine.
 func TestRunKeepsIndependentChecksConcurrent(t *testing.T) {
 	t.Setenv("GO_WANT_HELPER_PROCESS", "1")
-	file := t.TempDir() + "/concurrent.log"
+	dir := t.TempDir()
+	arrived := dir + "/arrived.log"
+	done := dir + "/done.log"
 
-	a := Check{ID: "fixture-a", Argv: helperArgv("sleep", file, "fixture-a", "150")}
-	b := Check{ID: "fixture-b", Argv: helperArgv("sleep", file, "fixture-b", "150")}
+	a := Check{ID: "fixture-a", Argv: helperArgv("barrier", arrived, done, "fixture-a", "2")}
+	b := Check{ID: "fixture-b", Argv: helperArgv("barrier", arrived, done, "fixture-b", "2")}
 
-	start := time.Now()
 	got := run([]Check{a, b}, 2, false, false)
-	elapsed := time.Since(start)
-
 	for _, r := range got {
 		if r.status != statusPass {
-			t.Fatalf("check %s: want PASS, got %s", r.check.ID, r.status)
+			t.Fatalf("check %s: want PASS, got %s (%s)\n%s", r.check.ID, r.status, r.reason, r.output)
 		}
 	}
-	// Serialized would take >= 300ms; concurrent should finish well under
-	// that. Generous margin for CI jitter.
-	if elapsed >= 280*time.Millisecond {
-		t.Fatalf("independent checks did not run concurrently: took %s", elapsed)
+
+	doneIDs := map[string]bool{}
+	for _, l := range readLines(t, done) {
+		doneIDs[l] = true
+	}
+	if !doneIDs["fixture-a"] || !doneIDs["fixture-b"] {
+		t.Fatalf("want both fixture-a and fixture-b past the barrier, got %v", doneIDs)
 	}
 }
 
