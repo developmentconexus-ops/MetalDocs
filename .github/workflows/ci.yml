@@ -191,18 +191,20 @@ jobs:
       # golangci-lint is not a tools/verify registry check (it needs its own
       # setup-go via the Action below), so this job is exactly this one step.
       #
-      # TRANSITIONAL. golangci-lint is the single Go lint umbrella (spec §4.6)
-      # but stays advisory: 1078 findings at the configured scope, 1173 whole
-      # tree, and apps/worker and apps/jobs had no lint coverage at all before
-      # this restructure. The global-maximum structure is a clean tree with
-      # this job blocking and continue-on-error deleted. The milestone that
-      # deletes this comment is the golangci-lint backlog burn-down, which is
-      # named in spec §11.1 as work with its own sequencing.
+      # TRANSITIONAL. golangci-lint is the single Go lint umbrella (spec §4.6),
+      # blocking on NEW issues only (only-new-issues: true, diff-scoped
+      # against the PR's base) because the whole tree carries ~1078 findings
+      # at this configured scope — a whole-tree-blocking gate would red every
+      # PR on day one, including ones that touch none of them. The
+      # global-maximum structure is a clean tree with only-new-issues dropped
+      # and this job blocking on the whole tree, not just the diff. The
+      # milestone that deletes this comment is the golangci-lint backlog
+      # burn-down, named in spec §11.1 as work with its own sequencing.
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        continue-on-error: true
         with:
           version: v2.11
           args: --timeout=5m ./apps/api/... ./internal/... ./tools/...
+          only-new-issues: true
 
   required:
     name: required

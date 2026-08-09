@@ -1,5 +1,37 @@
 # Workflow deletion ledger — Task 12 Step 1
 
+## Post-scriptum: §8.2 renames (added after Task 13, commit 7a16a325)
+
+This ledger is a point-in-time record of Task 12 Step 1 and is not rewritten below. Task 13
+(spec §8.2) subsequently renamed the 13 registry IDs in its own table, plus
+`test-discipline-selftest` which follows its renamed parent — 14 IDs total, every pre-rename ID
+this ledger cites — and
+every `tools/verify/registry.go` line range it quotes — predates commit `7a16a325` and reads
+against the names/lines as they existed at that point in time, not as they exist today. Old →
+new map, applied repo-wide in Task 13:
+
+| Old ID | New ID |
+|---|---|
+| `cilint` | `arch-lint` |
+| `problem-codes-fresh` | `problem-codes-drift` |
+| `api-lint-strict` | `api-lint` |
+| `api-lint-base-path-e2e` | `api-lint-e2e-base-path` |
+| `module-boundaries` | `module-imports` |
+| `test-discipline` | `test-conventions` |
+| `test-discipline-selftest` | `test-conventions-selftest` |
+| `wiki-tally` | `wiki-debt-tally` |
+| `db-dictionary` | `db-docs-coverage` |
+| `fe-eslint` | `eslint` |
+| `css-token-discipline` | `css-tokens` |
+| `docx-v2-typecheck` | `docx-typecheck` |
+| `docx-v2-build` | `docx-build` |
+| `docx-v2-test` | `docx-test` |
+
+(`test-discipline-selftest` follows its parent rename per the plan's Task 13 table note; the
+other 13 rows are the table's own entries, with the `docx-v2-*` row split into its three IDs.)
+
+---
+
 Scope: prove every control in the 18 workflow files slated for deletion has a named,
 **verified** successor before `git rm` runs. Each row below was checked two ways: (1) the
 claimed successor location was read directly (`ci.yml`, `nightly.yml`, `release.yml`,
@@ -76,7 +108,7 @@ reading `ci.yml:38-70`, whose comments say exactly that.
 | `cilint` | `go run ./tools/cilint --sarif` | registry `cilint` → `ci.yml:verify` | Yes — `registry.go:116-121`, `Argv: go run ./tools/cilint ./...` |
 | `cilint` | "Upload SARIF" (`continue-on-error: true`, advisory telemetry) | **NO SUCCESSOR** — dropped silently | Not evidenced anywhere as intentional. Low severity: the step was itself `continue-on-error: true` and non-blocking, so no gate is lost, only a SARIF/Security-tab artifact. Flagging per the brief's "do not fudge" instruction rather than omitting it. |
 | `migration-gapless` | gapless-sequence + no-historical-edit check (raw bash) | registry `migration-gapless` → `ci.yml:verify` | Yes — `registry.go:364-373`, `Argv: bash scripts/check-migration-gapless.sh`, `Needs: needsGitDepth`. **This is the control the brief calls out as "the one nearly lost before" — confirmed present and correctly targeted.** |
-| `staticcheck` | `verify --only=gofmt,go-vet,go-vet-integration,staticcheck` (4 checks in 1 step) | registry `gofmt`, `go-vet`, `go-vet-integration` → `ci.yml:verify`; registry `staticcheck` → **DELETED** (separate from the six-control table — this is the 3rd registry deletion named in brief Step 3 / spec §4.6, distinct from `go-build`/`api-lint-base-path-v1`) | Yes — `registry.go:87-132`. Deletion evidence: §4.6 — golangci-lint becomes the sole umbrella, `.golangci.yml` already enables `staticcheck`, so standalone `staticcheck` is dropped for redundancy, not brokenness. |
+| `staticcheck` | `verify --only=gofmt,go-vet,go-vet-integration,staticcheck` (4 checks in 1 step) | registry `gofmt`, `go-vet`, `go-vet-integration` → `ci.yml:verify`; registry `staticcheck` → golangci-lint umbrella, blocking (only-new-issues) (separate from the six-control table — this is the 3rd registry deletion named in brief Step 3 / spec §4.6, distinct from `go-build`/`api-lint-base-path-v1`) | Yes — `registry.go:87-132`. Deletion evidence: §4.6 — golangci-lint becomes the sole umbrella, `.golangci.yml` already enables `staticcheck`, so standalone `staticcheck` is dropped for redundancy, not brokenness; the umbrella job blocks on new issues (`ci.yml:lint-go`, `only-new-issues: true`, no `continue-on-error`), matching main's pre-branch golangci-lint.yml enforcement level. |
 
 ## 7. `lint.yml` (60 lines, 3 jobs)
 
