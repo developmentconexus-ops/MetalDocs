@@ -609,6 +609,7 @@ func (r *Repository) ListDocumentsPaginated(ctx context.Context, tenantID string
 
 	limit := opts.Limit()
 	args = append(args, limit+1) // +1 probe row to detect hasMore
+	// #nosec G201 -- where/cursorClause are built entirely from static SQL fragments and numbered $N placeholders by buildDocumentFilter/the cursor block above; every actual filter value (opts.CreatedBy, opts.Status, opts.AreaCode, opts.ProfileCode, opts.Q, cursorTS, cursorID) is bound as a query arg, never interpolated into the SQL text.
 	q := fmt.Sprintf(`WITH filtered AS (
 			SELECT id, tenant_id, template_version_id, name, status, form_data_json,
 				coalesce(current_revision_id::text, '') AS current_revision_id,
@@ -669,7 +670,7 @@ func (r *Repository) ListDocumentsPaginated(ctx context.Context, tenantID string
 
 func (r *Repository) CountDocuments(ctx context.Context, tenantID string, opts ListOptions) (int64, error) {
 	where, args := buildDocumentFilter(tenantID, opts)
-	q := fmt.Sprintf(`SELECT COUNT(*) FROM documents WHERE %s`, where)
+	q := fmt.Sprintf(`SELECT COUNT(*) FROM documents WHERE %s`, where) // #nosec G201 -- where is built entirely from static SQL fragments and numbered $N placeholders by buildDocumentFilter; every actual filter value is bound as a query arg, never interpolated into the SQL text.
 	var n int64
 	if err := r.db.QueryRowContext(ctx, q, args...).Scan(&n); err != nil {
 		return 0, err
@@ -679,7 +680,7 @@ func (r *Repository) CountDocuments(ctx context.Context, tenantID string, opts L
 
 func (r *Repository) StatsByStatus(ctx context.Context, tenantID string, opts ListOptions) (map[string]int64, error) {
 	where, args := buildDocumentFilter(tenantID, opts)
-	q := fmt.Sprintf(`SELECT status, COUNT(*) FROM documents WHERE %s GROUP BY status`, where)
+	q := fmt.Sprintf(`SELECT status, COUNT(*) FROM documents WHERE %s GROUP BY status`, where) // #nosec G201 -- where is built entirely from static SQL fragments and numbered $N placeholders by buildDocumentFilter; every actual filter value is bound as a query arg, never interpolated into the SQL text.
 	rows, err := r.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err
@@ -700,7 +701,7 @@ func (r *Repository) StatsByStatus(ctx context.Context, tenantID string, opts Li
 
 func (r *Repository) StatsByArea(ctx context.Context, tenantID string, opts ListOptions) (map[string]int64, error) {
 	where, args := buildDocumentFilter(tenantID, opts)
-	q := fmt.Sprintf(`SELECT COALESCE(process_area_code_snapshot, '') AS area, COUNT(*) FROM documents WHERE %s GROUP BY area`, where)
+	q := fmt.Sprintf(`SELECT COALESCE(process_area_code_snapshot, '') AS area, COUNT(*) FROM documents WHERE %s GROUP BY area`, where) // #nosec G201 -- where is built entirely from static SQL fragments and numbered $N placeholders by buildDocumentFilter; every actual filter value is bound as a query arg, never interpolated into the SQL text.
 	rows, err := r.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err

@@ -221,7 +221,7 @@ WHERE tenant_id = $1`
 	if !includeArchived {
 		q += " AND archived_at IS NULL"
 	}
-	q += " ORDER BY code ASC LIMIT " + strconv.Itoa(maxTaxonomyListRows) // TODO: add pagination instead of returning the full profile catalog.
+	q += " ORDER BY code ASC LIMIT " + strconv.Itoa(maxTaxonomyListRows) // #nosec G202 -- maxTaxonomyListRows is a package-level compile-time int constant, never derived from user/tenant input. TODO: add pagination instead of returning the full profile catalog.
 
 	rows, err := tx.QueryContext(ctx, q, tenantID)
 	if err != nil {
@@ -601,7 +601,7 @@ WHERE tenant_id = $1`
 	if !includeArchived {
 		q += " AND archived_at IS NULL"
 	}
-	q += " ORDER BY code ASC LIMIT " + strconv.Itoa(maxTaxonomyListRows) // TODO: add pagination instead of returning the full area catalog.
+	q += " ORDER BY code ASC LIMIT " + strconv.Itoa(maxTaxonomyListRows) // #nosec G202 -- maxTaxonomyListRows is a package-level compile-time int constant, never derived from user/tenant input. TODO: add pagination instead of returning the full area catalog.
 
 	rows, err := tx.QueryContext(ctx, q, tenantID)
 	if err != nil {

@@ -992,6 +992,7 @@ func insertRouteStages(ctx context.Context, tx *sql.Tx, tenantID, routeID string
 			st.DueInDays,
 		)
 	}
+	// #nosec G202 -- placeholders is a slice of computed "($N,$N,...)" placeholder groups built above from a loop index (base), never from field values; every actual stage field is bound positionally via args.
 	query := `
 		INSERT INTO approval_route_stages
 			(route_id, stage_order, name, required_capability, quorum, quorum_m, on_eligibility_drift, stage_kind, due_in_days)
@@ -1054,6 +1055,7 @@ func insertRouteStageSelectors(ctx context.Context, tx *sql.Tx, tenantID, routeI
 	routeIDPlaceholder := len(args) + 1
 	args = append(args, routeID)
 
+	// #nosec G201 -- placeholders is a slice of computed "($N::int,...)" placeholder groups built above from a loop index (base), never from field values; routeIDPlaceholder is a computed index too; every actual selector/route-id value is bound positionally via args.
 	query := fmt.Sprintf(`
 		INSERT INTO approval_route_stage_selectors
 			(tenant_id, route_stage_id, selector_order, kind, user_id, role, area_code)
