@@ -23,6 +23,66 @@ func TestBypassesFactory(t *testing.T) {
 }
 `
 
+const pgxConnectFixture = `package postgres_test
+
+import (
+	"context"
+	"os"
+	"testing"
+
+	"github.com/jackc/pgx/v5"
+)
+
+func TestBypassesFactoryViaPgxConnect(t *testing.T) {
+	dsn := os.Getenv("DATABASE_URL")
+	conn, err := pgx.Connect(context.Background(), dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = conn
+}
+`
+
+const pgxpoolNewFixture = `package postgres_test
+
+import (
+	"context"
+	"os"
+	"testing"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+func TestBypassesFactoryViaPgxpoolNew(t *testing.T) {
+	dsn := os.Getenv("METALDOCS_DATABASE_URL")
+	pool, err := pgxpool.New(context.Background(), dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = pool
+}
+`
+
+const pgxpoolConnectFixture = `package postgres_test
+
+import (
+	"context"
+	"os"
+	"testing"
+
+	"github.com/jackc/pgx/v4/pgxpool"
+)
+
+func TestBypassesFactoryViaPgxpoolConnect(t *testing.T) {
+	dsn := os.Getenv("DATABASE_URL")
+	pool, err := pgxpool.Connect(context.Background(), dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = pool
+}
+`
+
 const testdbFixture = `package postgres_test
 
 import (
@@ -65,6 +125,45 @@ func TestFileBypassesTestdb_FlagsRawDSNPlusSQLOpen(t *testing.T) {
 	}
 	if line != 11 {
 		t.Errorf("line = %d, want 11 (the sql.Open call site)", line)
+	}
+}
+
+func TestFileBypassesTestdb_FlagsPgxConnect(t *testing.T) {
+	line, bypass, err := fileBypassesTestdb("pgx_connect_test.go", []byte(pgxConnectFixture))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if !bypass {
+		t.Fatal("want bypass=true for a file that reads DATABASE_URL and calls pgx.Connect, got false")
+	}
+	if line != 13 {
+		t.Errorf("line = %d, want 13 (the pgx.Connect call site)", line)
+	}
+}
+
+func TestFileBypassesTestdb_FlagsPgxpoolNew(t *testing.T) {
+	line, bypass, err := fileBypassesTestdb("pgxpool_new_test.go", []byte(pgxpoolNewFixture))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if !bypass {
+		t.Fatal("want bypass=true for a file that reads METALDOCS_DATABASE_URL and calls pgxpool.New, got false")
+	}
+	if line != 13 {
+		t.Errorf("line = %d, want 13 (the pgxpool.New call site)", line)
+	}
+}
+
+func TestFileBypassesTestdb_FlagsPgxpoolConnect(t *testing.T) {
+	line, bypass, err := fileBypassesTestdb("pgxpool_connect_test.go", []byte(pgxpoolConnectFixture))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if !bypass {
+		t.Fatal("want bypass=true for a file that reads DATABASE_URL and calls pgxpool.Connect, got false")
+	}
+	if line != 13 {
+		t.Errorf("line = %d, want 13 (the pgxpool.Connect call site)", line)
 	}
 }
 

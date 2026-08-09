@@ -12,7 +12,8 @@ import (
 
 // testdb-bypass-guard closes a class of defect that has recurred at least
 // five times: a `_test.go` file reads DATABASE_URL/METALDOCS_DATABASE_URL
-// out of the environment and sql.Open's it directly instead of going through
+// out of the environment and opens it directly (sql.Open, or a raw pgx entry
+// point — pgx.Connect, pgxpool.New, pgxpool.Connect) instead of going through
 // tests/integration/testdb.Open (ADR 0034). Locally that works, because a
 // developer's own database was populated by
 // scripts/dev-bootstrap-baseline.ps1. In CI it does not: the workflow starts
@@ -23,9 +24,16 @@ import (
 // special" instead of a check saying "this file is wrong"; this is the
 // check.
 //
+// The scan itself (trackedTestFiles) is repo-wide — `git ls-files
+// "*_test.go"`, not scoped to any subtree — because a bypassing test can
+// land under cmd/ or scripts/ just as easily as under internal/ or tests/;
+// see the registry.go comment on this check's (deliberately absent) Paths
+// for why that check-vs-declared-scope distinction matters for CI selection.
+//
 // Detection is AST-based rather than a text grep: fileBypassesTestdb only
 // looks at string literal tokens (never comment text) and at genuine
-// `sql.Open(...)` call expressions, so a file that merely *mentions*
+// call expressions matching one of the recognised connection forms (see
+// dbConnectionCalls / isDBConnectionCall), so a file that merely *mentions*
 // DATABASE_URL in a comment cannot false-positive, and the reported line
 // number is the real call site, not a regex match position. This is more
 // precise than the equivalent grep-shaped rule in
@@ -92,22 +100,56 @@ func validateAllowlistEntries(entries []testdbBypassEntry, exists func(string) b
 	return findings
 }
 
-// isSQLOpenCall reports whether call is exactly `sql.Open(...)`.
-func isSQLOpenCall(call *ast.CallExpr) bool {
+// dbConnectionCalls is the fixed set of package.Function call forms this
+// check treats as "opens a real database connection". Each is a raw driver
+// entry point that a test could point straight at a DATABASE_URL-derived DSN
+// instead of going through testdb.Open — sql.Open is the database/sql form,
+// the other three are the pgx equivalents (a direct connection and the two
+// pool constructors across pgx's v4/v5 naming). Deliberately a flat literal
+// table rather than a cleverer match on import paths or types: the brief for
+// this guard preferred an obviously-correct rule over one that has to be
+// trusted.
+var dbConnectionCalls = map[string]string{
+	"sql":     "Open",
+	"pgx":     "Connect",
+	"pgxpool": "New",
+}
+
+// isDBConnectionCall reports whether call is exactly one of the recognised
+// `package.Function(...)` forms in dbConnectionCalls — sql.Open, pgx.Connect,
+// or pgxpool.New — or the additional pgxpool.Connect form (pgx v4).
+func isDBConnectionCall(call *ast.CallExpr) bool {
 	sel, ok := call.Fun.(*ast.SelectorExpr)
-	if !ok || sel.Sel.Name != "Open" {
+	if !ok {
 		return false
 	}
 	ident, ok := sel.X.(*ast.Ident)
-	return ok && ident.Name == "sql"
+	if !ok {
+		return false
+	}
+	if want, ok := dbConnectionCalls[ident.Name]; ok && sel.Sel.Name == want {
+		return true
+	}
+	// pgxpool.Connect is pgx v4's pool constructor; v5 renamed it to
+	// pgxpool.New (already covered above via dbConnectionCalls). Both are
+	// live in the wild, so both are recognised.
+	return ident.Name == "pgxpool" && sel.Sel.Name == "Connect"
 }
 
 // fileBypassesTestdb parses one Go source file (already-read bytes, so this
 // stays pure and testable without disk I/O) and reports whether it both
 // references DATABASE_URL/METALDOCS_DATABASE_URL in a string literal — never
 // in a comment, since comments are not literal tokens the parser walks —
-// and calls sql.Open. line is the position of the first sql.Open call,
-// valid only when bypass is true.
+// and calls one of the recognised raw-connection forms (sql.Open,
+// pgx.Connect, pgxpool.New, pgxpool.Connect; see dbConnectionCalls). line is
+// the position of the first such call, valid only when bypass is true.
+//
+// Known limitation: both signals must appear in this same file. A helper in
+// one file that reads DATABASE_URL and returns it to a consumer in another
+// file of the same package, which then opens the connection, defeats this
+// check — the AST walk never looks across files. Accepted for a
+// deliberately simple, obviously-correct rule; not a defect to silently
+// widen later without noting it here.
 func fileBypassesTestdb(filename string, src []byte) (line int, bypass bool, err error) {
 	fset := token.NewFileSet()
 	astFile, err := parser.ParseFile(fset, filename, src, 0)
@@ -116,7 +158,7 @@ func fileBypassesTestdb(filename string, src []byte) (line int, bypass bool, err
 	}
 
 	referencesDBURL := false
-	sqlOpenLine := 0
+	openLine := 0
 	ast.Inspect(astFile, func(n ast.Node) bool {
 		switch node := n.(type) {
 		case *ast.BasicLit:
@@ -124,14 +166,14 @@ func fileBypassesTestdb(filename string, src []byte) (line int, bypass bool, err
 				referencesDBURL = true
 			}
 		case *ast.CallExpr:
-			if sqlOpenLine == 0 && isSQLOpenCall(node) {
-				sqlOpenLine = fset.Position(node.Pos()).Line
+			if openLine == 0 && isDBConnectionCall(node) {
+				openLine = fset.Position(node.Pos()).Line
 			}
 		}
 		return true
 	})
 
-	return sqlOpenLine, referencesDBURL && sqlOpenLine != 0, nil
+	return openLine, referencesDBURL && openLine != 0, nil
 }
 
 // bypassMessage is the reader-facing finding: what fired, what to do about
@@ -139,7 +181,8 @@ func fileBypassesTestdb(filename string, src []byte) (line int, bypass bool, err
 // half-built check.
 func bypassMessage(relPath string, line int) string {
 	return fmt.Sprintf(
-		"%s:%d: bypasses the testdb factory — reads DATABASE_URL/METALDOCS_DATABASE_URL and calls sql.Open directly. "+
+		"%s:%d: bypasses the testdb factory — reads DATABASE_URL/METALDOCS_DATABASE_URL and calls sql.Open, pgx.Connect, "+
+			"pgxpool.New, or pgxpool.Connect directly. "+
 			"Use testdb.Open(t) instead (see internal/modules/iam/infrastructure/postgres/role_provider_integration_test.go "+
 			"for a worked example). Locally your own database already has a schema, so this passes; CI's bare postgres:16 "+
 			"service container never gets one from this path, and the test fails with `relation \"...\" does not exist`. "+
@@ -159,6 +202,10 @@ func scanTestdbBypassFindings(entries []testdbBypassEntry, files []string) ([]st
 		if strings.HasPrefix(relPath, testdbBypassExcludedDir) || isAllowlisted(entries, relPath) {
 			continue
 		}
+		// Same G304 idiom as tools/verify/audit.go's parseWorkflowJobs and
+		// parseRequiredGateKeys — a suppression this codebase already relies
+		// on for the identical "path comes from a fixed, non-user-controlled
+		// enumeration" shape, not a one-off exemption invented here.
 		src, err := os.ReadFile(relPath) //nolint:gosec // G304 — relPath comes from `git ls-files`, a fixed tracked-file enumeration, not external input.
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", relPath, err)

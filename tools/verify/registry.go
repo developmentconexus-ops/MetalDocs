@@ -314,12 +314,18 @@ var checks = []Check{
 		// script or tool directory.
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "./tools/verify", "--testdb-bypass-guard"},
-		// tools/verify/ is the check's own definition (whole-branch review
-		// C2 class): without it here, a PR that only weakens
-		// testdbbypass.go's detection while touching no internal/, apps/,
-		// or tests/ file selects zero checks over the change that most
-		// needs catching.
-		Paths: []string{"internal/", "apps/", "tests/", "tools/verify/"},
+		// Deliberately no Paths. The check's own scan (trackedTestFiles in
+		// testdbbypass.go) is `git ls-files "*_test.go"` — repo-wide, not
+		// scoped to internal/, apps/, or tests/. A `_test.go` file under
+		// cmd/ or scripts/ (both tracked, both outside those trees) can
+		// bypass the factory exactly like one under internal/ can, so any
+		// Paths list here would have to enumerate every directory that can
+		// ever hold a `_test.go` file — a claim that silently rots as the
+		// repo grows new ones. matchesPaths' documented default (no declared
+		// Paths -> repo-scoped, always runs) is the fail-closed answer:
+		// narrowing this check to a path set is a claim that nothing outside
+		// it can break the check, and the repo-wide scan disproves that
+		// claim on its face.
 		CIJob: "ci.yml:verify",
 	},
 
