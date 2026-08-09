@@ -1,5 +1,13 @@
 module metaldocs
 
+// Deliberately the `go` directive, not `toolchain`, to remediate
+// GO-2026-5856 (crypto/tls): actions/setup-go parses only this line, never
+// `toolchain`, so a `toolchain`-only bump would leave CI provisioning
+// 1.25.x and force every job to download a second toolchain at build time.
+// The usual downside of bumping the declared minimum (forcing it up for
+// downstream consumers) does not apply here -- this is an application
+// module with no external consumers. Do not "correct" this back to
+// `toolchain`.
 go 1.26.5
 
 require (
