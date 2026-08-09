@@ -15,8 +15,10 @@
 // infrastructure package, so there is no import-cycle and no cross-module
 // reach into auth's persistence internals — only auth's own exported tx
 // method is invoked. Password hashing goes through auth's published seam
-// authapp.HashPassword (injected as the PasswordHashFunc port) — iam never
-// invokes bcrypt itself, so the cost factor lives in exactly one module.
+// authapp.HashPassword (injected as the PasswordHashFunc port), which
+// returns the algo discriminator alongside the hash — iam never invokes the
+// KDF itself and never stamps its own algo literal, so the mechanism and its
+// params live in exactly one module and cannot drift from what was stored.
 package application
 
 import (
@@ -43,9 +45,12 @@ import (
 
 // PasswordHashFunc is the password-hashing port OnboardTenantService depends
 // on. The production implementation is authapp.HashPassword — auth's
-// published seam wrapping its own bcrypt mechanism + cost factor — so iam
-// never declares crypto parameters of its own.
-type PasswordHashFunc func(plain string) (authdomain.PasswordHash, error)
+// published seam wrapping its own Argon2id mechanism (KDF params live in
+// internal/platform/passwordhash, iam never declares crypto parameters of its
+// own). It returns the algo discriminator ALONGSIDE the hash so the caller
+// always stores the algo the hash was actually produced with — never a
+// caller-chosen literal that can drift from the seam's real mechanism.
+type PasswordHashFunc func(plain string) (authdomain.PasswordHash, string, error)
 
 // OnboardTenantInput is the application-layer request to provision a new
 // tenant + its first admin identity. AdminPassword is plaintext in transit
@@ -160,7 +165,7 @@ func (s *OnboardTenantService) OnboardTenant(ctx context.Context, in OnboardTena
 		return OnboardTenantResult{}, fmt.Errorf("iam: OnboardTenantService is not fully wired")
 	}
 
-	passwordHash, err := s.hashPassword(adminPassword)
+	passwordHash, passwordAlgo, err := s.hashPassword(adminPassword)
 	if err != nil {
 		return OnboardTenantResult{}, fmt.Errorf("iam: hash admin password: %w", err)
 	}
@@ -213,7 +218,7 @@ func (s *OnboardTenantService) OnboardTenant(ctx context.Context, in OnboardTena
 			Email:              adminEmailOrEmpty(adminUserID),
 			DisplayName:        adminDisplayName,
 			PasswordHash:       authdomain.PasswordHash(string(passwordHash)),
-			PasswordAlgo:       "bcrypt",
+			PasswordAlgo:       passwordAlgo,
 			MustChangePassword: true,
 			IsActive:           true,
 			CreatedBy:          actorID,

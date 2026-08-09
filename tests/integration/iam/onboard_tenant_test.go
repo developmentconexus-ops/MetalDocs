@@ -140,7 +140,7 @@ func newOnboardTenantService(sqlDB *sql.DB) *iamapp.OnboardTenantService {
 		db.NewTxRunner(sqlDB),
 		auditpg.NewWriter(sqlDB),
 		nil, // NoopTenantKeyProvisioner
-		nil, // defaults to authapp.HashPassword (auth's published bcrypt seam)
+		nil, // defaults to authapp.HashPassword (auth's published Argon2id seam)
 	)
 }
 
@@ -213,7 +213,7 @@ func TestOnboardTenant_CreatesTenantAdminAndAudit(t *testing.T) {
 
 	var identityCount int
 	if err := sqlDB.QueryRowContext(ctx,
-		`SELECT count(*) FROM metaldocs.auth_identities WHERE user_id = $1 AND password_algo = 'bcrypt'`,
+		`SELECT count(*) FROM metaldocs.auth_identities WHERE user_id = $1 AND password_algo = 'argon2id'`,
 		adminUserID,
 	).Scan(&identityCount); err != nil {
 		t.Fatalf("read auth_identities row: %v", err)

@@ -1130,13 +1130,17 @@ func (s *Service) hashPasswordBytes(password []byte) (authdomain.PasswordHash, e
 // password inside its own provisioning tx). It uses the same Argon2id
 // mechanism and the same passwordhash package as Service.hashPassword
 // (REQ-AUTHN-1), so the KDF params have exactly one home and cannot drift
-// across modules.
-func HashPassword(plain string) (authdomain.PasswordHash, error) {
+// across modules. It returns the algo discriminator ALONGSIDE the hash (the
+// passwordhash.AlgoArgon2id constant, never a literal) so no caller can pair
+// the hash with a stale or hand-typed algo stamp — the mis-pair that broke
+// first login for every onboarded tenant admin when this seam migrated to
+// Argon2id but iam kept hard-coding "bcrypt" is now unrepresentable.
+func HashPassword(plain string) (authdomain.PasswordHash, string, error) {
 	hash, err := passwordhash.HashArgon2id([]byte(plain))
 	if err != nil {
-		return "", fmt.Errorf("hash password: %w", err)
+		return "", "", fmt.Errorf("hash password: %w", err)
 	}
-	return authdomain.PasswordHash(hash), nil
+	return authdomain.PasswordHash(hash), passwordAlgoArgon2id, nil
 }
 
 type createUserFields struct {

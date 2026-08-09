@@ -17,7 +17,7 @@
 //     Authenticate path (authapp.Service backed by the real Postgres
 //     authpg.Repository — the same construction auth's own service tests use
 //     against authmemory.Repository, here against Postgres) — proving the
-//     bcrypt hash OnboardTenant wrote is a real, verifiable credential. The
+//     Argon2id hash OnboardTenant wrote is a real, verifiable credential. The
 //     admin is provisioned with MustChangePassword=true; Authenticate does
 //     NOT hard-block on that flag (service.go: MustChangePassword only gates
 //     ChangePassword's currentPassword requirement, not Authenticate), so
@@ -154,7 +154,7 @@ func TestOnboardTenant_EndToEnd_LoginAndAct(t *testing.T) {
 	}
 
 	// A wrong password must still be rejected — the identity is a real,
-	// verifiable bcrypt credential, not a stub.
+	// verifiable Argon2id credential, not a stub.
 	if _, err := authSvc.Authenticate(ctx, adminUserID, "definitely-wrong-password", loginRequestForE2E()); !errors.Is(err, authdomain.ErrInvalidCredentials) {
 		t.Fatalf("Authenticate(new admin, wrong password) = %v, want authdomain.ErrInvalidCredentials", err)
 	}
