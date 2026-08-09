@@ -206,7 +206,7 @@ func scanTestdbBypassFindings(entries []testdbBypassEntry, files []string) ([]st
 		// parseRequiredGateKeys — a suppression this codebase already relies
 		// on for the identical "path comes from a fixed, non-user-controlled
 		// enumeration" shape, not a one-off exemption invented here.
-		src, err := os.ReadFile(relPath) //nolint:gosec // G304 — relPath comes from `git ls-files`, a fixed tracked-file enumeration, not external input.
+		src, err := os.ReadFile(relPath) // #nosec G304 -- relPath comes from `git ls-files`, a fixed tracked-file enumeration, not external input.
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", relPath, err)
 		}

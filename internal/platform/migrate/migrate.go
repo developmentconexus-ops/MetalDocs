@@ -153,6 +153,7 @@ func ApplyGrants(ctx context.Context, db *sql.DB, dir string, log *slog.Logger) 
 	}()
 
 	for _, name := range names {
+		// #nosec G304 -- name is drawn from os.ReadDir(dir)'s own directory listing (line 122), and dir is the operator-configured grants directory (METALDOCS_GRANTS_DIR / deploy config) resolved once at process boot, never per-request; no request-scoped or tenant-scoped value reaches this path.
 		body, err := os.ReadFile(filepath.Join(dir, name))
 		if err != nil {
 			return fmt.Errorf("read %s: %w", name, err)

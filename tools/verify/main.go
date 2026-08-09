@@ -459,8 +459,7 @@ func nvmrcVersion() string {
 // Adding an exec call anywhere else in this package defeats that argument.
 // Route it through here instead.
 func command(ctx context.Context, dir string, argv []string) *exec.Cmd {
-	//nolint:gosec // G204 — argv is compile-time literals or refPattern-validated; see the invariant above.
-	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...) // #nosec G204 -- argv is compile-time literals or refPattern-validated; see the invariant above.
 	cmd.Dir = dir
 	return cmd
 }

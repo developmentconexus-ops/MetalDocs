@@ -165,7 +165,7 @@ func parseWorkflows(dir string) ([]workflowJob, error) {
 
 	var out []workflowJob
 	for _, p := range paths {
-		b, err := os.ReadFile(p) //nolint:gosec // G304 — path comes from a glob of a fixed directory.
+		b, err := os.ReadFile(p) // #nosec G304 -- path comes from a glob of a fixed directory.
 		if err != nil {
 			return nil, err
 		}
@@ -373,7 +373,7 @@ var requiredGateKeyArrayPattern = regexp.MustCompile(`\[\s*((?:"[^"]*"\s*,?\s*)+
 var requiredGateKeyPattern = regexp.MustCompile(`"([^"]*)"`)
 
 func parseRequiredGateKeys(path string) ([]string, error) {
-	b, err := os.ReadFile(path) //nolint:gosec // G304 — path is the fixed scripts/required-gate.jq literal, not user input.
+	b, err := os.ReadFile(path) // #nosec G304 -- path is the fixed scripts/required-gate.jq literal, not user input.
 	if err != nil {
 		return nil, err
 	}
