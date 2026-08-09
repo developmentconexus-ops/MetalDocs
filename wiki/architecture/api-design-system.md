@@ -104,7 +104,7 @@ route by which a wrong code can reach the wire:
 | Same code registered twice | `Register` panics at init | process start |
 | Status that departs from the family default | `RegisterWithStatus` demands a reason | compile |
 | New module's codes missing from the artifacts | `PROBLEM-DUMP-IMPORT` (api-lint) | CI |
-| Artifacts not regenerated | `problem-codes-freshness` (`-check`) | CI |
+| Artifacts not regenerated | `problem-codes-drift` (`-check`) | CI |
 | Backend code with no PT-BR message, or a message for a dead code | `errorMessages.coverage.test.ts` | CI |
 | A frontend `if (error.code === 'X')` branch left dead by a rename | `problemCodeVocabulary.test.ts` | CI |
 

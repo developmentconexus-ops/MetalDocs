@@ -314,7 +314,7 @@ func TestValidateOrderingAcceptsDAG(t *testing.T) {
 // The prior ruling here was "run the dependent anyway, warn loudly, do not
 // refuse." A reproduction proved that fail-open: `dist/meta.json` already
 // existed on disk from an earlier, unrelated build, and
-// `--only=docx-v2-test` ran the bundle-guard test anyway — it read the
+// `--only=docx-test` ran the bundle-guard test anyway — it read the
 // stale file and reported PASS without ever re-validating current source.
 // The ruling is now: a selection that includes a check without its After
 // predecessor is refused, not run. See validateSelectionOrdering (selection
@@ -347,24 +347,24 @@ func TestValidateSelectionOrderingAcceptsCompleteSelection(t *testing.T) {
 }
 
 // This is the reviewer's exact reproduction, at the unit level: selecting
-// docx-v2-test alone, via the real registry, through the same selectChecks
-// path `--only=docx-v2-test` goes through. Before the fix this returned the
+// docx-test alone, via the real registry, through the same selectChecks
+// path `--only=docx-test` goes through. Before the fix this returned the
 // check with no error, and main() ran it anyway over whatever
 // dist/meta.json happened to be on disk.
 func TestSelectChecksRefusesOnlyDocxV2TestAlone(t *testing.T) {
-	_, _, err := selectChecks(ProfileFast, "docx-v2-test", "origin/main", false)
+	_, _, err := selectChecks(ProfileFast, "docx-test", "origin/main", false)
 	if err == nil {
-		t.Fatal("want an error: --only=docx-v2-test excludes its After predecessor docx-v2-build")
+		t.Fatal("want an error: --only=docx-test excludes its After predecessor docx-build")
 	}
-	if !strings.Contains(err.Error(), "docx-v2-build") {
-		t.Errorf("error should name the missing predecessor docx-v2-build, got %v", err)
+	if !strings.Contains(err.Error(), "docx-build") {
+		t.Errorf("error should name the missing predecessor docx-build, got %v", err)
 	}
 }
 
 // selectChecks must still resolve a complete pair without error — the fix
 // must not make an ordinary, order-complete selection refuse.
 func TestSelectChecksAcceptsDocxV2BuildAndTestTogether(t *testing.T) {
-	selected, _, err := selectChecks(ProfileFast, "docx-v2-build,docx-v2-test", "origin/main", false)
+	selected, _, err := selectChecks(ProfileFast, "docx-build,docx-test", "origin/main", false)
 	if err != nil {
 		t.Fatalf("want no error when both sides of the edge are selected, got %v", err)
 	}

@@ -139,7 +139,7 @@ mismatch.
 **Status in this repo: CLOSED for error codes (ADR 0089, 2026-08-04).** The evidence
 above is preserved as observed. `dump-error-codes.go` is deleted; `cmd/problem-codes-dump`
 reads the runtime registry and generates both the FE snapshot and the wiki table, with a
-CI job (`problem-codes-freshness`) that regenerates and byte-compares. The spec now
+CI job (`problem-codes-drift`) that regenerates and byte-compares. The spec now
 carries a `pattern` — deliberately not the enum this catalog originally called for, since
 an enum makes adding an error code a breaking change; see the ADR's Implementation record.
 The wiki table is no longer hand-written at all, which is why its 15 stale rows could

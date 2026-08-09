@@ -69,11 +69,11 @@ jobs:
           git fetch origin "${{ github.event.pull_request.base.sha }}"
           git show "${{ github.event.pull_request.base.sha }}:api/openapi/v1/openapi.yaml" > /tmp/openapi.base.yaml
       # Every registry check whose declared Paths the diff touches — gofmt,
-      # go vet, cilint, module-boundaries, test-discipline,
-      # contract sync/codegen/oasdiff/openapi lint, fe-eslint,
-      # css-token-discipline, eigenpal-selector-pin, fe-typecheck, fe-test,
-      # docx-v2-build/test, go-test-unit, adr-status, wiki-tally,
-      # db-dictionary, migration-gapless, governance-diff-rules,
+      # go vet, arch-lint, module-imports, test-conventions,
+      # contract sync/codegen/oasdiff/openapi lint, eslint,
+      # css-tokens, eigenpal-selector-pin, fe-typecheck, fe-test,
+      # docx-build/test, go-test-unit, adr-status, wiki-debt-tally,
+      # db-docs-coverage, migration-gapless, governance-diff-rules,
       # invariant-coverage-map, req-trace(-selftest), required-gate-selftest,
       # verify-audit (registry.go's "Anti-drift" section — runs `verify
       # --audit` itself, so this job's own drift against the registry is

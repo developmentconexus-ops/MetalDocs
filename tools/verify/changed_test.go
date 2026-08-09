@@ -117,7 +117,7 @@ func TestSelectChecksComposesOnlyWithChanged(t *testing.T) {
 	t.Setenv("GITHUB_EVENT_NAME", "pull_request")
 	// HEAD vs the working tree: this checkout is clean, so the diff is empty
 	// and a path-scoped check must be dropped.
-	selected, scoped, err := selectChecks(ProfileFast, "css-token-discipline", "HEAD", true)
+	selected, scoped, err := selectChecks(ProfileFast, "css-tokens", "HEAD", true)
 	if err != nil {
 		t.Fatalf("selectChecks: %v", err)
 	}

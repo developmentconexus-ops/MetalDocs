@@ -77,8 +77,8 @@ for f in "${FILES[@]}"; do
 done
 
 if (( violations > 0 )); then
-  echo "css-token-discipline: $violations violation(s) found — see output above"
-  echo "css-token-discipline: use var(--token-name) from src/styles/tokens.css instead of a raw hex literal"
+  echo "css-tokens: $violations violation(s) found — see output above"
+  echo "css-tokens: use var(--token-name) from src/styles/tokens.css instead of a raw hex literal"
   exit 1
 fi
-echo "css-token-discipline: clean (${#FILES[@]} module.css files checked, ${#ALLOWLIST[@]} grandfathered)"
+echo "css-tokens: clean (${#FILES[@]} module.css files checked, ${#ALLOWLIST[@]} grandfathered)"

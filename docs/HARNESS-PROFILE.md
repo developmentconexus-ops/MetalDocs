@@ -121,7 +121,7 @@ False-alarm signatures (check BEFORE debugging a "failure"):
 | FE surface | `frontend/apps/web/src/features/<domain>` component trees; router/nav/layout = named owned seams |
 | Migration | `db/migrations/` 4-digit sequential; hub pre-allocates disjoint blocks per track in chip prompts; unplanned need = `REQUEST migration-number` |
 | DB shape | per-table exclusive ownership; tenant-port registrations (`TenantDataPort`) = shared file, one named owner |
-| Module | `internal/modules/<name>` internals; cross-module edges only via application service / published Go interface (module-boundaries lint enforces) |
+| Module | `internal/modules/<name>` internals; cross-module edges only via application service / published Go interface (module-imports lint enforces) |
 
 ## 6. Shared seams & owners
 `status: ratified` · `provenance: 2026-07-16 · migrated from HARNESS.md §2/§9.2`

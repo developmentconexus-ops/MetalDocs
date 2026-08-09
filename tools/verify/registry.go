@@ -52,8 +52,8 @@ type Check struct {
 	// different field from Needs so the two classes of dependency can never
 	// be confused by a reader or a future PR: Needs asks "is Postgres up",
 	// After asks "did check X already succeed". Only declare an edge when a
-	// later check consumes an earlier one's output (docx-v2-test reads the
-	// dist/meta.json docx-v2-build produces) — most checks are independent
+	// later check consumes an earlier one's output (docx-test reads the
+	// dist/meta.json docx-build produces) — most checks are independent
 	// and must stay that way so -j keeps meaning what it means. A selection
 	// that includes a check without its After predecessor is refused, not
 	// run — see validateSelectionOrdering in main.go. A predecessor and its
@@ -111,7 +111,7 @@ var checks = []Check{
 
 	// ---- Go: lint ---------------------------------------------------------
 	{
-		ID:       "cilint",
+		ID:       "arch-lint",
 		Desc:     "custom Go analyzers (hgcrossmodule, nosqltxindomain, platformboundary, txownership, legacyvocab) against the recorded baseline",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "./tools/cilint", "./..."},
@@ -126,7 +126,7 @@ var checks = []Check{
 
 	// ---- Contract ---------------------------------------------------------
 	{
-		ID:       "problem-codes-fresh",
+		ID:       "problem-codes-drift",
 		Desc:     "generated problem-code artifacts match the registry",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "./cmd/problem-codes-dump", "-check"},
@@ -141,12 +141,12 @@ var checks = []Check{
 	// api-lint-base-path-v1 (PATH-BASE-PREFIX on the v1 spec, standalone
 	// -only run) deleted Task 12 (six-control table, spec §4.5): -only is a
 	// filter, not a mode (scripts/api-lint/main.go:21,64-67), so
-	// PATH-BASE-PREFIX already runs inside api-lint-strict below on the same
-	// v1 spec file. api-lint-base-path-e2e survives unchanged — api-lint-strict
+	// PATH-BASE-PREFIX already runs inside api-lint below on the same
+	// v1 spec file. api-lint-e2e-base-path survives unchanged — api-lint
 	// never touches internal-e2e.yaml, so that file's base-prefix rule still
 	// needs its own gate.
 	{
-		ID:       "api-lint-base-path-e2e",
+		ID:       "api-lint-e2e-base-path",
 		Desc:     "PATH-BASE-PREFIX on the internal-e2e spec",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "./scripts/api-lint", "-only", "PATH-BASE-PREFIX", "api/openapi/internal-e2e.yaml"},
@@ -157,7 +157,7 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "api-lint-strict",
+		ID:       "api-lint",
 		Desc:     "full API design-system lint, strict",
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "./scripts/api-lint/", "-strict", "api/openapi/v1/openapi.yaml", "."},
@@ -260,7 +260,7 @@ var checks = []Check{
 
 	// ---- Architecture invariants -----------------------------------------
 	{
-		ID:       "module-boundaries",
+		ID:       "module-imports",
 		Desc:     "cross-module access goes through published interfaces",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"pwsh", "-NoProfile", "-File", "./scripts/check-module-boundaries.ps1"},
@@ -270,7 +270,7 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "test-discipline",
+		ID:       "test-conventions",
 		Desc:     "new tests use the canonical framework for their class",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-test-discipline.sh"},
@@ -280,7 +280,7 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "test-discipline-selftest",
+		ID:       "test-conventions-selftest",
 		Desc:     "check-test-discipline.sh reads code and ignores Go line comments",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-test-discipline-selftest.sh"},
@@ -325,7 +325,7 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "wiki-tally",
+		ID:       "wiki-debt-tally",
 		Desc:     "every module doc's severity tally matches its tech-debt register",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"pwsh", "-NoProfile", "-File", "./scripts/wiki-tally-check.ps1", "-All"},
@@ -335,7 +335,7 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "db-dictionary",
+		ID:       "db-docs-coverage",
 		Desc:     "every baseline table has a wiki dictionary page",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"pwsh", "-NoProfile", "-File", "./scripts/check-db-dictionary-coverage.ps1"},
@@ -467,7 +467,7 @@ var checks = []Check{
 
 	// ---- Frontend ---------------------------------------------------------
 	{
-		ID:       "fe-eslint",
+		ID:       "eslint",
 		Desc:     "eslint across the workspace, including the eigenpal import boundary",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"pnpm", "run", "lint"},
@@ -480,7 +480,7 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "css-token-discipline",
+		ID:       "css-tokens",
 		Desc:     "no new raw hex colors in module.css",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-css-token-discipline.sh"},
@@ -524,7 +524,7 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "docx-v2-typecheck",
+		ID:       "docx-typecheck",
 		Desc:     "tsc over the docx-v2 workspace",
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"pnpm", "run", "typecheck:docx-v2"},
@@ -539,19 +539,19 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "docx-v2-build",
-		Desc:     "the docx-v2 workspace builds; produces the dist/meta.json that docx-v2-test's bundle guard reads",
+		ID:       "docx-build",
+		Desc:     "the docx-v2 workspace builds; produces the dist/meta.json that docx-test's bundle guard reads",
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"pnpm", "run", "build:docx-v2"},
 		// Same C3 fix as fe-typecheck above, same reason.
 		Paths: []string{"apps/docx-renderer/", "packages/", "pnpm-lock.yaml", "package.json", "pnpm-workspace.yaml", ".nvmrc"},
-		// I8: same CIJob reasoning as docx-v2-typecheck above.
+		// I8: same CIJob reasoning as docx-typecheck above.
 		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:   "docx-v2-test",
+		ID:   "docx-test",
 		Desc: "docx-v2 unit tests",
-		// D-14 (closed by R4): depends on docx-v2-build having already run —
+		// D-14 (closed by R4): depends on docx-build having already run —
 		// bundle-guard.test.ts reads dist/meta.json. This used to be enforced
 		// only by docx-renderer.yml:node splitting into two `verify`
 		// invocations, so the now-required ci.yml:verify job — which runs
@@ -564,19 +564,19 @@ var checks = []Check{
 		// calls used to be `pnpm -r run <script>`, which is recursive over
 		// EVERY workspace including frontend/apps/web — so this check and
 		// fe-test ran the same 154-file vitest suite concurrently in the same
-		// tree, with docx-v2-build's `pnpm -r run build` writing
+		// tree, with docx-build's `pnpm -r run build` writing
 		// frontend/apps/web/dist underneath both. That race, not the
 		// build-before-test ordering, was the reproducible source of
 		// flaky/contradictory results between this check and fe-test. The npm
 		// scripts now filter to `./packages/**` + `./apps/**` only, which does
-		// not include frontend/apps/web — so docx-v2-test and fe-test no
+		// not include frontend/apps/web — so docx-test and fe-test no
 		// longer touch the same files at all.
 		Profiles: []string{ProfilePR, ProfileFull},
 		Argv:     []string{"pnpm", "run", "test:docx-v2"},
-		After:    []string{"docx-v2-build"},
+		After:    []string{"docx-build"},
 		// Same C3 fix as fe-typecheck above, same reason.
 		Paths: []string{"apps/docx-renderer/", "packages/", "pnpm-lock.yaml", "package.json", "pnpm-workspace.yaml", ".nvmrc"},
-		// I8: same CIJob reasoning as docx-v2-typecheck above.
+		// I8: same CIJob reasoning as docx-typecheck above.
 		CIJob: "ci.yml:verify",
 	},
 

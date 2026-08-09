@@ -171,13 +171,13 @@ func selectChecks(profile, only, base string, changedFlag bool) (selected []Chec
 // The prior ruling — run the dependent anyway, warn on stderr, do not
 // refuse — was proven fail-open by reproduction: `apps/docx-renderer/dist/meta.json`
 // already existed on disk from an earlier, unrelated build, and
-// `--only=docx-v2-test` alone ran bundle-guard.test.ts anyway, which read
+// `--only=docx-test` alone ran bundle-guard.test.ts anyway, which read
 // that stale file and reported PASS without ever re-validating current
 // source. verify has no state that survives past its own process, so it
 // cannot tell "the predecessor already ran and passed elsewhere" apart from
 // "the predecessor never ran" — refusing is the only answer that isn't a
 // guess. A caller that wants both checks must include both in the same
-// selection, e.g. `--only=docx-v2-build,docx-v2-test`, which is what
+// selection, e.g. `--only=docx-build,docx-test`, which is what
 // docx-renderer.yml now does (see that file).
 func validateSelectionOrdering(selected []Check) error {
 	inSelection := make(map[string]bool, len(selected))

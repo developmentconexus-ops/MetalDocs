@@ -29,19 +29,19 @@ jobs:
         with: { go-version-file: go.mod, cache: true }
       - run: pnpm install --frozen-lockfile
       # Check set for this job lives in tools/verify/registry.go
-      # (docx-v2-typecheck, docx-v2-build, docx-v2-test) — see CIJob:
+      # (docx-typecheck, docx-build, docx-test) — see CIJob:
       # "docx-renderer.yml:node".
       #
-      # ONE invocation. docx-v2-test contains bundle-guard.test.ts, which
+      # ONE invocation. docx-test contains bundle-guard.test.ts, which
       # reads dist/meta.json to assert the server bundle is framework-free —
-      # so it consumes docx-v2-build's output. That ordering used to be
+      # so it consumes docx-build's output. That ordering used to be
       # enforced only by splitting this job into two `verify` invocations
       # (build, then test); the registry's Check.After edge
-      # (docx-v2-test After docx-v2-build) now enforces it inside a single
+      # (docx-test After docx-build) now enforces it inside a single
       # invocation instead, so the split is no longer needed. It would also
       # now be refused: `verify` rejects a selection that contains a check
-      # without its After predecessor (--only=docx-v2-test alone excludes
-      # docx-v2-build), specifically because running it anyway is how a
+      # without its After predecessor (--only=docx-test alone excludes
+      # docx-build), specifically because running it anyway is how a
       # stale dist/meta.json from an earlier build used to pass the guard
       # without re-validating current source.
       # --require-infra: without it, a missing pnpm/node (or any other
@@ -50,7 +50,7 @@ jobs:
       # this job's checks are why docx-renderer.yml matters (bundle-guard.test.ts
       # is what asserts the server bundle stays framework-free; see this
       # file's header comment).
-      - run: go run ./tools/verify --require-infra --only=docx-v2-typecheck,docx-v2-build,docx-v2-test
+      - run: go run ./tools/verify --require-infra --only=docx-typecheck,docx-build,docx-test
 
 # The `go` job that used to live here ran `go build ./...` plus `go test` over
 # seven hand-listed packages. Every one of them is already covered by

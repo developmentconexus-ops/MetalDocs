@@ -1,7 +1,13 @@
 {
-  "name": "main",
-  "target": "branch",
-  "enforcement": "active",
+  "_links": {
+    "html": {
+      "href": "https://github.com/developmentconexus-ops/MetalDocs/rules/20560142"
+    },
+    "self": {
+      "href": "https://api.github.com/repos/developmentconexus-ops/MetalDocs/rulesets/20560142"
+    }
+  },
+  "bypass_actors": [],
   "conditions": {
     "ref_name": {
       "exclude": [],
@@ -10,6 +16,12 @@
       ]
     }
   },
+  "created_at": "2026-08-07T12:44:55.043-03:00",
+  "current_user_can_bypass": "never",
+  "enforcement": "active",
+  "id": 20560142,
+  "name": "main",
+  "node_id": "RRS_lACqUmVwb3NpdG9yec5GyCQizgE5uQ4",
   "rules": [
     {
       "type": "deletion"
@@ -18,93 +30,36 @@
       "type": "non_fast_forward"
     },
     {
-      "type": "pull_request",
       "parameters": {
-        "required_approving_review_count": 0,
-        "dismiss_stale_reviews_on_push": true,
-        "required_reviewers": [],
-        "require_code_owner_review": false,
-        "require_last_push_approval": false,
-        "required_review_thread_resolution": true,
         "allowed_merge_methods": [
           "squash",
           "merge",
           "rebase"
-        ]
-      }
+        ],
+        "dismiss_stale_reviews_on_push": true,
+        "require_code_owner_review": false,
+        "require_last_push_approval": false,
+        "required_approving_review_count": 0,
+        "required_review_thread_resolution": true,
+        "required_reviewers": []
+      },
+      "type": "pull_request"
     },
     {
-      "type": "required_status_checks",
       "parameters": {
-        "strict_required_status_checks_policy": false,
         "do_not_enforce_on_create": false,
         "required_status_checks": [
           {
-            "context": "golangci-lint"
-          },
-          {
-            "context": "cilint — custom Go linters"
-          },
-          {
-            "context": "Migration monotonicity check"
-          },
-          {
-            "context": "gofmt + go vet + staticcheck"
-          },
-          {
-            "context": "api-design-system-lint"
-          },
-          {
-            "context": "backend-codegen-drift"
-          },
-          {
-            "context": "contract-sync"
-          },
-          {
-            "context": "frontend-codegen-drift"
-          },
-          {
-            "context": "openapi-lint"
-          },
-          {
-            "context": "problem-codes-freshness"
-          },
-          {
-            "context": "spec-base-path-gate"
-          },
-          {
-            "context": "eslint"
-          },
-          {
-            "context": "css-token-discipline"
-          },
-          {
-            "context": "eigenpal-selector-pin"
-          },
-          {
-            "context": "web-typecheck-test"
-          },
-          {
-            "context": "node"
-          },
-          {
-            "context": "check"
-          },
-          {
-            "context": "wiki module/tech-debt tally sync"
-          },
-          {
-            "context": "unit"
-          },
-          {
-            "context": "smoke"
-          },
-          {
-            "context": "gitleaks"
+            "context": "required"
           }
-        ]
-      }
+        ],
+        "strict_required_status_checks_policy": true
+      },
+      "type": "required_status_checks"
     }
   ],
-  "bypass_actors": []
+  "source": "developmentconexus-ops/MetalDocs",
+  "source_type": "Repository",
+  "target": "branch",
+  "updated_at": "2026-08-09T04:57:38.576-03:00"
 }
