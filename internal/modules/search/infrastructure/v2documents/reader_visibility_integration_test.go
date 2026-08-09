@@ -17,6 +17,8 @@ import (
 // a document only when the caller can see it per the unified model (AD-3):
 // company-scoped → everyone; restricted → owner / area-grant / direct user-grant;
 // standalone (no controlled document) → creator only. No system_admin bypass.
+// Also guards REQ-SEARCH-1: visibility is enforced by the same grant-table SQL
+// join every other read path uses, never a search-owned authz decision. See ADR 0095.
 func TestListDocuments_EnforcesUnifiedVisibility(t *testing.T) {
 	ctx := context.Background()
 	db, schema := testdb.Open(t)

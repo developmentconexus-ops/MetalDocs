@@ -222,7 +222,8 @@ flowchart LR
 ### 5.3 Blobs & derived stores
 
 - **REQ-BLOB-1** Bytes never proxy through the API when a presigned URL can carry them; artifacts are content-hashed at freeze and the hash persisted. (MUST)
-- **REQ-SEARCH-1** Search indexes are derived and rebuildable; a full reindex procedure exists and is tested. Search is never consulted for authz decisions. (MUST)
+- **REQ-SEARCH-1** Search is never consulted for authz decisions — visibility is enforced in the same SQL-level grant join every other read path uses, never decided by the search layer itself. (MUST)
+- **REQ-SEARCH-2** Search indexes are derived and rebuildable; a full reindex procedure exists and is tested. (SHOULD — not yet built; search is a live `ILIKE` query over live tables today, deliberately deferred pending the promotion trigger in ADR [0095](../decisions/0095-search-live-query-derived-index-deferred.md))
 
 ---
 

@@ -119,6 +119,11 @@ func rawVisibleIDs(t *testing.T, db *sql.DB, ctx context.Context, tenantID, acto
 	return ids
 }
 
+// TestListDocuments_ContractParityWithFrozenRaw also guards REQ-SEARCH-1: it
+// proves the rewritten reader changes "no authz/visibility/ordering" (see the
+// file header) relative to the frozen pre-rewrite baseline query — the reader
+// is bound to the same visibility predicate before and after, never a search-
+// owned decision. See ADR 0095.
 func TestListDocuments_ContractParityWithFrozenRaw(t *testing.T) {
 	ctx := context.Background()
 	db, schema := testdb.Open(t)
