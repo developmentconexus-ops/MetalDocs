@@ -343,6 +343,89 @@ jobs:
               body: `The \`axe\` job in \`nightly.yml\` failed. See run: ${runUrl}`
             });
 
+  stress:
+    name: stress
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: metaldocs
+          POSTGRES_PASSWORD: metaldocs
+          POSTGRES_DB: metaldocs
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      # test-nightly.yml's nightly job, moved verbatim (Task 12 controller
+      # adjudication: this is the one control in the deletion ledger with no
+      # named successor — race-mode integration stress at N=500 has no
+      # equivalent anywhere else in the restructured CI surface, so it is
+      # ported rather than deleted).
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Run nightly stress tests
+        env:
+          METALDOCS_DATABASE_URL: postgres://metaldocs:metaldocs@localhost:5432/metaldocs?sslmode=disable
+          INTEGRATION_STRESS_N: "500"
+        run: |
+          go test -tags integration -count=1 -race -timeout 3600s ./tests/... ./internal/... ./apps/...
+        timeout-minutes: 60
+      - name: Open or comment on issue on failure
+        if: failure()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const title = 'nightly: stress job failing';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            // A1: listForRepo used to run unguarded — if it threw (rate limit,
+            // transient API error, permission hiccup), the uncaught exception
+            // failed this step before issues.create ever ran, so a real nightly
+            // red silently produced no tracking issue at all. Fall back to
+            // creating unconditionally rather than let a failed lookup erase
+            // the signal. issues.create/createComment stay unwrapped below so
+            // that if creation itself fails, the failure is visible (this step
+            // fails, same as any other error) instead of swallowed.
+            let existing = [];
+            try {
+              const { data } = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                labels: 'nightly-failure,stress',
+              });
+              existing = data;
+            } catch (err) {
+              console.log(`Failed to list existing issues (${err.message}); creating a new issue unconditionally.`);
+            }
+            const match = existing.find(issue => issue.title === title);
+            if (match) {
+              console.log(`Open nightly-failure issue for stress already exists (#${match.number}); adding a comment.`);
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: match.number,
+                body: `Still failing. See run: ${runUrl}`,
+              });
+              return;
+            }
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              labels: ['nightly-failure', 'stress'],
+              body: `The \`stress\` job in \`nightly.yml\` failed. See run: ${runUrl}`
+            });
+
   security-scan:
     name: security-scan
     runs-on: ubuntu-latest
