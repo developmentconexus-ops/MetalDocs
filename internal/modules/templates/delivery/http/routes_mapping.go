@@ -37,8 +37,8 @@ func toAPIVersionDTO(v *domain.TemplateVersion) (templatesapi.VersionDTO, error)
 		return templatesapi.VersionDTO{}, fmt.Errorf("version placeholder_schema: %w", err)
 	}
 
-	revisionNumber := int32(v.RevisionNumber)
-	lockVersion := int32(v.LockVersion)
+	revisionNumber := int32(v.RevisionNumber) // #nosec G115 -- RevisionNumber is a monotonic DB-managed counter column (internal/modules/templates/domain/version.go), incremented one-per-revision by this service, never derived from external input; it cannot approach int32 range within a template's lifetime.
+	lockVersion := int32(v.LockVersion)       // #nosec G115 -- LockVersion is a monotonic DB-managed optimistic-lock counter column, incremented one-per-write by this service, never derived from external input; it cannot approach int32 range within a version's lifetime.
 
 	dto := templatesapi.VersionDTO{
 		Id:                id,
@@ -120,7 +120,7 @@ func toAPIVersionRef(r domain.VersionRef) (templatesapi.TemplateVersionRef, erro
 	return templatesapi.TemplateVersionRef{
 		Id:             id,
 		Number:         r.Number,
-		RevisionNumber: int32(r.RevisionNumber),
+		RevisionNumber: int32(r.RevisionNumber), // #nosec G115 -- RevisionNumber is the same monotonic DB-managed counter as toAPIVersionDTO above, never derived from external input; it cannot approach int32 range within a template's lifetime.
 		Status:         templatesapi.TemplateVersionRefStatus(r.Status),
 	}, nil
 }

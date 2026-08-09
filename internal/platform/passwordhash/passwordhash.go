@@ -190,27 +190,27 @@ func parseArgon2id(encoded string) (argon2idParams, []byte, []byte, error) {
 	}
 	var version int
 	if _, err := fmt.Sscanf(parts[2], "v=%d", &version); err != nil {
-		return argon2idParams{}, nil, nil, fmt.Errorf("%w: version: %v", ErrMalformedHash, err)
+		return argon2idParams{}, nil, nil, fmt.Errorf("%w: version: %w", ErrMalformedHash, err)
 	}
 	if version != argon2.Version {
 		return argon2idParams{}, nil, nil, fmt.Errorf("%w: unsupported version %d", ErrMalformedHash, version)
 	}
 	var m, t, par int
 	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &m, &t, &par); err != nil {
-		return argon2idParams{}, nil, nil, fmt.Errorf("%w: params: %v", ErrMalformedHash, err)
+		return argon2idParams{}, nil, nil, fmt.Errorf("%w: params: %w", ErrMalformedHash, err)
 	}
 	if err := validateArgon2idParams(m, t, par); err != nil {
 		return argon2idParams{}, nil, nil, err
 	}
 	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
 	if err != nil {
-		return argon2idParams{}, nil, nil, fmt.Errorf("%w: salt: %v", ErrMalformedHash, err)
+		return argon2idParams{}, nil, nil, fmt.Errorf("%w: salt: %w", ErrMalformedHash, err)
 	}
 	hash, err := base64.RawStdEncoding.DecodeString(parts[5])
 	if err != nil {
-		return argon2idParams{}, nil, nil, fmt.Errorf("%w: hash: %v", ErrMalformedHash, err)
+		return argon2idParams{}, nil, nil, fmt.Errorf("%w: hash: %w", ErrMalformedHash, err)
 	}
-	return argon2idParams{memory: uint32(m), time: uint32(t), threads: uint8(par)}, salt, hash, nil
+	return argon2idParams{memory: uint32(m), time: uint32(t), threads: uint8(par)}, salt, hash, nil // #nosec G115 -- m, t, par were bounds-checked by validateArgon2idParams above (line 202): p in [minArgon2idParallelism, maxArgon2idParallelism]=[1,64], m in [8*p, maxArgon2idMemoryKiB]=[8p,1<<20], t in [minArgon2idTime, maxArgon2idTime]=[1,64]; every range fits well inside uint32/uint8, gosec just cannot see the earlier call in this analysis (known FP shape, gosec issue #1212).
 }
 
 // validateArgon2idParams rejects an m/t/p triple parsed from a stored PHC
@@ -245,7 +245,7 @@ func VerifyArgon2id(encoded string, password []byte) (bool, error) {
 		return false, err
 	}
 	kdfInvocations.Add(1)
-	got := argon2.IDKey(password, salt, params.time, params.memory, params.threads, uint32(len(want)))
+	got := argon2.IDKey(password, salt, params.time, params.memory, params.threads, uint32(len(want))) // #nosec G115 -- len(want) is the decoded byte length of an argon2id hash parsed from a PHC string (typically 32 bytes); len() is non-negative and this codebase's stored hashes never approach the uint32 range, so the conversion cannot overflow in practice.
 	return subtle.ConstantTimeCompare(got, want) == 1, nil
 }
 

@@ -1015,7 +1015,7 @@ func (s *Service) SessionCookie(rawToken string, expiresAt time.Time) *http.Cook
 	if seconds < 0 {
 		seconds = 0
 	}
-	return &http.Cookie{
+	return &http.Cookie{ // #nosec G124 -- HttpOnly and SameSite=Strict are hard literals below; Secure is config-driven (internal/platform/authn/config.go: METALDOCS_AUTH_COOKIE_SECURE defaults true everywhere except appEnv=="local"), not omitted — gosec only recognizes a literal `Secure: true`, not a variable that resolves to true in every non-local environment.
 		Name:     s.cfg.SessionCookieName,
 		Value:    rawToken,
 		Path:     "/",
@@ -1037,7 +1037,7 @@ func (s *Service) SessionCookieName() string {
 // ExpiredSessionCookie returns a cookie that instructs the browser to delete
 // the session cookie (empty value, MaxAge -1, Expires in the past).
 func (s *Service) ExpiredSessionCookie() *http.Cookie {
-	return &http.Cookie{
+	return &http.Cookie{ // #nosec G124 -- HttpOnly and SameSite=Strict are hard literals below; Secure is config-driven (internal/platform/authn/config.go: METALDOCS_AUTH_COOKIE_SECURE defaults true everywhere except appEnv=="local"), not omitted — gosec only recognizes a literal `Secure: true`, not a variable that resolves to true in every non-local environment.
 		Name:     s.cfg.SessionCookieName,
 		Value:    "",
 		Path:     "/",
