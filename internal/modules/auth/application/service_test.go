@@ -310,9 +310,12 @@ func TestAuthenticate_PreservesPasswordWhitespace(t *testing.T) {
 // worst sample measured for this change) so ordinary contention cannot trip
 // it. That headroom is also why it is deliberately NOT tight enough to catch
 // a single extra DB round trip (the production case above moves the ratio by
-// a few percent, not by 10x) - only a gross asymmetry (an accidental extra
-// KDF-equivalent computation, a blocking network call, an unbounded loop)
-// added to one path and not the other would move the ratio this far. That
+// a few percent, not by 10x) - only a gross asymmetry (a blocking network
+// call, an unbounded loop) added to one path and not the other would move the
+// ratio this far. Note what 10x does NOT catch: an extra KDF call on one path
+// only doubles that path's cost (that path is already KDF-dominated), landing
+// near 2x - inside the measured noise band. That case is caught by the
+// KDF-invocation-count equality assertion below, not by this ratio. That
 // narrower class of bug (a modest, single extra synchronous write on only one
 // path) is a real, accepted, uncovered gap - see the production-asymmetry
 // note above; no wall-clock bound can both stay contention-immune and catch
