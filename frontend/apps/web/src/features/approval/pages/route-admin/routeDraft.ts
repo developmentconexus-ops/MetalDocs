@@ -1,4 +1,3 @@
-// @ts-expect-error uuid package exists in workspace, no typings exposed in this app.
 import { v4 as uuidv4 } from 'uuid';
 
 import type { CreateRouteRequest, RouteSummary, StageRequest } from '../../api/routeAdminApi';
