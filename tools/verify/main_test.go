@@ -31,9 +31,18 @@ import (
 // would need to start. So reaching doneFile is direct proof of overlap, not
 // an inference from how long anything took. A capped poll deadline guards
 // against a genuine hang (e.g. the runner regresses to true serialization)
-// turning this into an indefinite hang; it is deliberately generous (10s)
-// so it is a deadlock backstop, not a race window — crossing it is only
-// possible when the checks truly never overlapped.
+// turning this into an indefinite hang.
+//
+// Be honest about that deadline: it is a bounded residual risk, not a proof.
+// A scheduling stall longer than the cap between the two spawns would fail
+// this test spuriously, and one such failure was observed under heavy load
+// at a 10s cap. It is set high (60s) because raising it is free on the
+// passing path — a genuine overlap satisfies the barrier in tens of
+// milliseconds regardless of the cap, so the cap only bounds how long a
+// truly-serialized runner hangs before failing. The old assertion, by
+// contrast, compared total elapsed time against a ~130ms margin and so
+// flaked whenever subprocess spawn cost spiked. This shrinks the flake
+// surface by orders of magnitude; it does not mathematically eliminate it.
 func TestHelperProcess(t *testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
@@ -71,7 +80,7 @@ func TestHelperProcess(t *testing.T) {
 			os.Exit(2)
 		}
 		appendLine(arrivedFile, id)
-		deadline := time.Now().Add(10 * time.Second)
+		deadline := time.Now().Add(60 * time.Second)
 		for countLines(arrivedFile) < n {
 			if time.Now().After(deadline) {
 				// Never observed every peer arrive: they did not overlap in
@@ -180,14 +189,17 @@ func TestRunHonoursAfterOrdering(t *testing.T) {
 // The previous version inferred concurrency from wall-clock duration
 // (two 150ms sleeps, asserting elapsed < 280ms). That inference's premise —
 // that re-exec'ing this test binary as a subprocess costs much less than
-// 150ms — does not hold everywhere: reproduced locally, both helpers
-// consistently finished together (proving they DID run concurrently: same
-// individual duration, same finish time) while each individual invocation
-// cost 500-900ms of pure process-spawn overhead, pushing total elapsed past
-// the fixed threshold even though scheduling was correct. That is a
-// too-slow environmental flake against an assumed-cheap constant, not a
-// scheduling defect — but a wall-clock threshold cannot tell the two apart,
-// which is exactly the failure mode a required gate cannot carry.
+// 150ms — does not hold reliably. Reproduced locally: both helpers always
+// finished together (proving they DID run concurrently: same individual
+// duration, same finish time), but subprocess spawn cost is spiky rather
+// than constant. Typical passing runs completed in ~170-220ms total, while
+// an intermittent cold-start/scheduling spike (~3-10% of runs here) pushed
+// individual invocations to 500-900ms and total elapsed past the fixed
+// threshold even though scheduling was correct. Do not read those upper
+// numbers as this codebase's steady-state subprocess cost; they are the
+// tail, and the tail is the whole problem. A too-slow environmental spike
+// and a real scheduling defect are indistinguishable to a wall-clock
+// threshold, which is exactly the failure mode a required gate cannot carry.
 //
 // This version proves overlap directly instead of inferring it from
 // duration: see the "barrier" mode on TestHelperProcess. Neither helper can
