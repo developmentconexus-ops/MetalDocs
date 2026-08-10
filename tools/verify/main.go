@@ -64,6 +64,7 @@ func main() {
 		list              = flag.Bool("list", false, "print the registry grouped by profile and exit")
 		audit             = flag.Bool("audit", false, "report checks with no CI job, and exit non-zero if any exist")
 		testdbBypassGuard = flag.Bool("testdb-bypass-guard", false, "report _test.go files that bypass testdb.Open via raw DATABASE_URL/METALDOCS_DATABASE_URL + sql.Open, and exit non-zero if any exist")
+		guardFixtures     = flag.Bool("guard-fixtures", false, "feed each guard its negative fixture and require a non-zero exit; --only narrows to specific check IDs")
 		only              = flag.String("only", "", "comma-separated check IDs to run, ignoring the profile")
 		changed           = flag.Bool("changed", false, "narrow whatever selection --only/--profile made to checks whose declared Paths the diff against --base touches; --profile=changed implies this")
 		base              = flag.String("base", "origin/main", "base ref for --changed / --profile=changed")
@@ -96,6 +97,14 @@ func main() {
 		os.Exit(printAudit(filepath.Join(".github", "workflows")))
 	case *testdbBypassGuard:
 		os.Exit(printTestdbBypassGuard())
+	case *guardFixtures:
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		if err := runGuardFixtures(ctx, root, splitIDs(*only)); err != nil {
+			fmt.Fprintf(os.Stderr, "verify: %v\n", err)
+			os.Exit(1)
+		}
+		return
 	}
 
 	selected, scoped, err := selectChecks(*profile, *only, *base, *changed)

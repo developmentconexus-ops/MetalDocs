@@ -1,0 +1,8 @@
+# E2E invariant coverage — guard fixture
+
+Deliberately unmapped invariant. See scripts/testdata/guard-fixtures/README.md.
+
+| ID | Invariant | Spec IDs | Status |
+|---|---|---|---|
+| P1-I01 | fixture invariant with no mapped spec | — | ❌ |
+| F1 | second fixture invariant, also unmapped | — | ❌ |

@@ -1,0 +1,7 @@
+package bad
+
+// Deliberately unformatted: gofmt would collapse the spacing and re-indent
+// the body. See scripts/testdata/guard-fixtures/README.md.
+func  Sum( a int ,b int )  int {
+		return a+b
+}

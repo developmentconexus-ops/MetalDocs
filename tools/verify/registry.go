@@ -71,6 +71,18 @@ type Check struct {
 	// Empty means the check is local-only and no CI job runs it, which
 	// --audit reports as a gap.
 	CIJob string
+
+	// Fixture is the mechanical proof that this check can fail: bad input
+	// fed to the check's own command, which must exit non-zero. See
+	// fixtures.go. Nil is allowed only with a FixtureWaiver.
+	Fixture *Fixture
+
+	// FixtureWaiver records, in one sentence, why this blocking check carries
+	// no negative fixture, and who owns closing that. It is not a bypass —
+	// it is the audit trail for a known hole. Audit rule A7 requires every
+	// blocking check to carry exactly one of Fixture or FixtureWaiver, so a
+	// hole cannot exist without being named.
+	FixtureWaiver string
 }
 
 // checks is the registry. Keep it sorted by ID.
@@ -91,6 +103,10 @@ var checks = []Check{
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-gofmt.sh"},
 		CIJob:    "ci.yml:verify",
+		Fixture: &Fixture{
+			Dir:  "gofmt",
+			Want: "internal/bad/unformatted.go",
+		},
 	},
 	{
 		ID:       "go-vet",
@@ -311,6 +327,10 @@ var checks = []Check{
 		// it can break the check, and the repo-wide scan disproves that
 		// claim on its face.
 		CIJob: "ci.yml:verify",
+		Fixture: &Fixture{
+			Dir:  "testdb-bypass-guard",
+			Want: "internal/fixture/bypass_test.go",
+		},
 	},
 
 	// ---- Governance -------------------------------------------------------
@@ -323,6 +343,10 @@ var checks = []Check{
 		// (whole-branch review C2 class).
 		Paths: []string{"wiki/decisions/", "scripts/check-adr-status.sh"},
 		CIJob: "ci.yml:verify",
+		Fixture: &Fixture{
+			Dir:  "adr-status",
+			Want: "ADR status-field budget exceeded",
+		},
 	},
 	{
 		ID:       "wiki-debt-tally",
@@ -378,6 +402,10 @@ var checks = []Check{
 		// finding.
 		Paths: []string{"frontend/apps/web/e2e/COVERAGE.md", "scripts/check-invariant-coverage-map.sh"},
 		CIJob: "ci.yml:verify",
+		Fixture: &Fixture{
+			Dir:  "invariant-coverage-map",
+			Want: "Unmapped invariants found",
+		},
 	},
 
 	// ---- Security -----------------------------------------------------------
@@ -484,6 +512,10 @@ var checks = []Check{
 		Desc:     "no new raw hex colors in module.css",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-css-token-discipline.sh"},
+		Fixture: &Fixture{
+			Dir:  "css-tokens",
+			Want: "RAW-HEX",
+		},
 		// scripts/check-css-token-discipline.sh is the check's own
 		// definition — named explicitly in the whole-branch review's C2
 		// finding.
