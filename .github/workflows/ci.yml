@@ -106,19 +106,41 @@ jobs:
       - name: verify --profile=changed
         run: go run ./tools/verify --require-infra --profile=changed --ci-job=ci.yml:verify
 
-  # test-integration needs the Postgres service container and runs
-  # ~20 minutes, so it stages behind `verify` in its own job. `needs: [verify]`
-  # carries no `if:` — the implicit success() means this job is SKIPPED
-  # (not run) when verify fails, which is the staging: don't start the
-  # 20-minute suite when the cheap checks already failed. That is safe here
-  # specifically because the new required-gate.jq requires literal "success"
-  # from every upstream job, with no "skipped is green" allowance — a skip
-  # here fails the gate exactly like a failure would, so skip propagation
-  # cannot silently pass a PR.
+  # test-integration used to carry `needs: [verify]`, which staged the long
+  # suite behind the cheap checks so a red `verify` skipped it. That bought
+  # runner minutes on FAILING PRs and cost 214 seconds of wall clock on every
+  # PASSING one — and passing is the common case. Measured on run 31402055141:
+  # 17m17s total, of which 15m42s was this one serial chain. The edge is gone;
+  # the two jobs now start together.
+  #
+  # The suite itself is sharded four ways. That is not a rewrite of the suite:
+  # unit 4.6 already took it from ~50 minutes to its current band, and it
+  # measured no within-package parallelism headroom left — on the dev host's
+  # storage stack, a verdict that document scopes to that stack rather than
+  # stating as a property of Postgres (docs/superpowers/ROADMAP.md, unit 4.6:
+  # "scoped to this storage stack, not a Postgres law"). This runner is a
+  # different stack and has never been measured. What is certain either way is
+  # that the suite was sharing ONE Postgres, and what this matrix buys is more
+  # runners each with its OWN service container: four smaller suites against
+  # four uncontended databases instead of one large one against a shared one.
+  #
+  # The shards partition a package set that neither this file nor the registry
+  # enumerates — `go list` resolves it on the commit under test (see
+  # tools/verify/partition.go), so a new test package joins the suite by
+  # existing. The one hand-synced pair left is `shard: [1, 2, 3, 4]` against
+  # the `/4` below, and audit rule A11 fails the build if they ever disagree:
+  # a matrix of [1, 2, 3] against `/4` would run three quarters of the suite
+  # and report green.
   test-integration:
     name: test-integration
-    needs: [verify]
     runs-on: ubuntu-latest
+    strategy:
+      # A failing shard must not cancel its siblings: one red shard should tell
+      # you about the other three's failures in the same run, not hide them
+      # behind a cancellation and cost another 6 minutes to discover.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     # services:, the postgres user/db names and timeout-minutes: 20 below are
     # copied verbatim from this file's prior test-integration job (itself
     # copied from test-full.yml:full).
@@ -168,7 +190,7 @@ jobs:
       - name: verify (go-test-integration)
         env:
           METALDOCS_DATABASE_URL: postgres://metaldocs:metaldocs@localhost:5432/metaldocs?sslmode=disable
-        run: go run ./tools/verify --require-infra --only=go-test-integration --changed
+        run: go run ./tools/verify --require-infra --only=go-test-integration --changed --shard=${{ matrix.shard }}/4
         timeout-minutes: 20
 
   security:

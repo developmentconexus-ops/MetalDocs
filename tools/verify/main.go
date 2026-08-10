@@ -70,6 +70,7 @@ func main() {
 		changed           = flag.Bool("changed", false, "narrow whatever selection --only/--profile made to checks whose declared Paths the diff against --base touches; --profile=changed implies this")
 		base              = flag.String("base", "origin/main", "base ref for --changed / --profile=changed")
 		jobs              = flag.Int("j", defaultParallelism(), "how many checks to run concurrently")
+		shard             = flag.String("shard", "", "run only shard i of n (e.g. 2/4) of any selected check that declares a Partition; unset runs the whole subject, which is what a local run wants")
 		verbose           = flag.Bool("v", false, "stream output of passing checks too")
 		// In CI a SKIP is indistinguishable from a PASS at the exit code, so a
 		// job can report green over zero executed tests. This flag makes
@@ -109,6 +110,19 @@ func main() {
 	if len(selected) == 0 {
 		fmt.Println(emptySelectionMessage(scoped, *base))
 		return
+	}
+
+	// Sharding happens after selection, not inside it: --shard narrows what a
+	// check RUNS OVER, never which checks run. Keeping the two apart means a
+	// shard can never quietly drop a whole check the way a selection filter
+	// could.
+	shardSpec, err := parseShard(*shard)
+	if err != nil {
+		fatalf("%v", err)
+	}
+	selected, err = applyPartition(selected, shardSpec)
+	if err != nil {
+		fatalf("%v", err)
 	}
 
 	warns := preflight()
