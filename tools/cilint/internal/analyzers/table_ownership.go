@@ -141,30 +141,12 @@ func ownerByTable(cat ownershipCatalog) (map[string]string, error) {
 		}
 		seen[e.Table] = true
 
-		switch e.Class {
-		case classModule:
-			// Fail closed on unknown ownership INSIDE the governed universe: a
-			// table listed as module-owned with no owner would load as "not
-			// owned", i.e. silently unguarded — the same failure mode F1 was
-			// raised about, one level down.
-			if e.Owner == "" {
-				return nil, fmt.Errorf("table-ownership.json classifies %q as module-owned with no owner", e.Table)
-			}
-			out[e.Table] = e.Owner
-		case classPlatform, classHistorical, classOutOfScope:
-			// Classified as having no enforcement owner. The reason is
-			// mandatory: an unexplained non-module class is indistinguishable
-			// from someone silencing a finding.
-			if e.Owner != "" {
-				return nil, fmt.Errorf("table-ownership.json gives %q class %q AND owner %q — pick one", e.Table, e.Class, e.Owner)
-			}
-			if e.Note == "" {
-				return nil, fmt.Errorf("table-ownership.json puts %q outside enforcement (class %q) with no reason", e.Table, e.Class)
-			}
-		case "":
-			return nil, fmt.Errorf("table-ownership.json entry %q has no class — omission is not a classification", e.Table)
-		default:
-			return nil, fmt.Errorf("table-ownership.json entry %q has unknown class %q", e.Table, e.Class)
+		owner, err := enforcedOwner(e)
+		if err != nil {
+			return nil, err
+		}
+		if owner != "" {
+			out[e.Table] = owner
 		}
 	}
 
@@ -179,4 +161,40 @@ func ownerByTable(cat ownershipCatalog) (map[string]string, error) {
 	}
 
 	return out, nil
+}
+
+// enforcedOwner reads one entry's class and returns the module the analyzer
+// should enforce for it, or "" when the entry is deliberately outside
+// enforcement. Every error path here is a state where the analyzer would keep
+// running while guarding less than it appears to.
+func enforcedOwner(e ownershipEntry) (string, error) {
+	switch e.Class {
+	case classModule:
+		// Fail closed on unknown ownership INSIDE the governed universe: a
+		// table listed as module-owned with no owner would load as "not owned",
+		// i.e. silently unguarded — the same failure mode F1 was raised about,
+		// one level down.
+		if e.Owner == "" {
+			return "", fmt.Errorf("table-ownership.json classifies %q as module-owned with no owner", e.Table)
+		}
+		return e.Owner, nil
+
+	case classPlatform, classHistorical, classOutOfScope:
+		// Classified as having no enforcement owner. The reason is mandatory:
+		// an unexplained non-module class is indistinguishable from someone
+		// silencing a finding.
+		if e.Owner != "" {
+			return "", fmt.Errorf("table-ownership.json gives %q class %q AND owner %q — pick one", e.Table, e.Class, e.Owner)
+		}
+		if e.Note == "" {
+			return "", fmt.Errorf("table-ownership.json puts %q outside enforcement (class %q) with no reason", e.Table, e.Class)
+		}
+		return "", nil
+
+	case "":
+		return "", fmt.Errorf("table-ownership.json entry %q has no class — omission is not a classification", e.Table)
+
+	default:
+		return "", fmt.Errorf("table-ownership.json entry %q has unknown class %q", e.Table, e.Class)
+	}
 }

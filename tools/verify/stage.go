@@ -3,11 +3,14 @@ package main
 import (
 	"archive/tar"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // STAGING — why the verifier grew a pre-step (#87/A1 review F2).
@@ -66,13 +69,27 @@ func stage(ctx context.Context, mode, root string) (string, func(), error) {
 
 // stageTracked extracts `git archive HEAD` into a fresh directory under root.
 func stageTracked(ctx context.Context, root string) (string, func(), error) {
+	sweepStages(root)
+
 	dir, err := os.MkdirTemp(root, stagePrefix)
 	if err != nil {
 		return "", func() {}, fmt.Errorf("create staging directory: %w", err)
 	}
-	cleanup := func() { _ = os.RemoveAll(dir) }
+	cleanup := func() { removeStage(dir) }
 
-	cmd := command(ctx, root, []string{"git", "archive", "--format=tar", "HEAD"})
+	// -c core.autocrlf=false -c core.eol=lf is the difference between "same
+	// commit, same file set" and "same commit, same bytes". git archive applies
+	// working-tree conversion, so on a machine with autocrlf=true (the Windows
+	// default, and this box's setting) every staged text file gains CRLF while
+	// the committed blob and the Linux runner keep LF. Measured, not assumed.
+	// Grype would not read a different dependency out of it, but a scan subject
+	// that is byte-identical only on some platforms is the class of divergence
+	// this whole change exists to remove. Explicit .gitattributes rules still
+	// apply — those are a repo decision and hold on every host.
+	cmd := command(ctx, root, []string{
+		"git", "-c", "core.autocrlf=false", "-c", "core.eol=lf",
+		"archive", "--format=tar", "HEAD",
+	})
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		cleanup()
@@ -86,15 +103,77 @@ func stageTracked(ctx context.Context, root string) (string, func(), error) {
 		return "", func() {}, fmt.Errorf("git archive: %w", err)
 	}
 	if err := untar(stdout, dir); err != nil {
-		_ = cmd.Wait()
+		_ = drainAndWait(cmd, stdout)
 		cleanup()
 		return "", func() {}, err
 	}
-	if err := cmd.Wait(); err != nil {
+	if err := drainAndWait(cmd, stdout); err != nil {
 		cleanup()
 		return "", func() {}, fmt.Errorf("git archive: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}
 	return dir, cleanup, nil
+}
+
+// drainAndWait reads whatever is left on the pipe before waiting for git.
+//
+// This is not defensive padding, it is a deadlock fix. tar.Reader stops at the
+// end-of-archive marker (two zero blocks), but `git archive` pads its output to
+// a 10240-byte blocking factor, so up to ~10KB of zeros are still queued when
+// untar returns. A Windows anonymous pipe buffers 4KB by default: git blocks
+// writing the tail, exec.Wait blocks on the process, and nobody moves. Whether
+// it hangs depends on total archive size mod 10240 — deterministic per commit,
+// which is why the fixture repo passed while this repository hung at 7487 files
+// with the whole tree already extracted.
+func drainAndWait(cmd *exec.Cmd, stdout io.Reader) error {
+	_, _ = io.Copy(io.Discard, stdout)
+	return cmd.Wait()
+}
+
+// staleStage is how old a leftover has to be before a later run will delete it.
+// Two verifier processes staging at once is not hypothetical — a test run and a
+// profile run overlap easily — so the sweep must never touch a directory that
+// could still be live. A stage is written and consumed in minutes; an hour is
+// far outside that and far inside "this is junk from a crash".
+const staleStage = time.Hour
+
+// removeStage deletes a staging directory, retrying briefly. A single
+// os.RemoveAll is not enough on Windows: a virus scanner or the indexer opens
+// freshly written files and holds the handle for a moment, and the delete comes
+// back with "used by another process" having already removed part of the tree.
+// Measured here: the first call failed, the second succeeded.
+//
+// A cleanup failure is reported, never swallowed. It does not fail the check —
+// the check's verdict is about the scan, not about housekeeping — but 7k files
+// left in the repo must not be something the tool does quietly.
+func removeStage(dir string) {
+	var err error
+	for i := 0; i < 5; i++ {
+		if err = os.RemoveAll(dir); err == nil {
+			return
+		}
+		time.Sleep(time.Duration(i+1) * 200 * time.Millisecond)
+	}
+	fmt.Fprintf(os.Stderr, "verify: could not remove staging directory %s: %v\n"+
+		"verify: it is gitignored and safe to delete by hand; the next run older than an hour will sweep it\n", dir, err)
+}
+
+// sweepStages removes leftovers a crashed or blocked run left behind, so they
+// cannot accumulate a full tracked-tree copy per run.
+func sweepStages(root string) {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if !e.IsDir() || !strings.HasPrefix(e.Name(), stagePrefix) {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil || time.Since(info.ModTime()) < staleStage {
+			continue
+		}
+		_ = os.RemoveAll(filepath.Join(root, e.Name()))
+	}
 }
 
 // untar writes a tar stream into dest. Only regular files and directories are
@@ -104,7 +183,7 @@ func untar(r io.Reader, dest string) error {
 	tr := tar.NewReader(r)
 	for {
 		h, err := tr.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return nil
 		}
 		if err != nil {
@@ -143,7 +222,7 @@ func writeStagedFile(target string, r io.Reader) error {
 	// Bounded copy: a tar entry claiming to be larger than this repo could ever
 	// be is a malformed stream, not a file worth writing.
 	const maxStagedFile = 512 << 20
-	if _, err := io.CopyN(f, r, maxStagedFile); err != nil && err != io.EOF {
+	if _, err := io.CopyN(f, r, maxStagedFile); err != nil && !errors.Is(err, io.EOF) {
 		_ = f.Close()
 		return fmt.Errorf("stage %s: %w", target, err)
 	}
