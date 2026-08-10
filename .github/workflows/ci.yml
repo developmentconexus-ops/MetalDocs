@@ -82,11 +82,19 @@ jobs:
       # --audit` itself, so this job's own drift against the registry is
       # gated on every PR, not just when a human types it).
       # A check with no declared Paths (matchesPaths' fail-closed default)
-      # always runs. golangci-lint is not a registry check — it stays a
-      # GitHub Action step in the lint-go job below, because it needs the
-      # Action, not because it needs a different job to be scoped correctly.
+      # always runs.
+      #
+      # --ci-job=ci.yml:verify narrows the profile to the checks that declare
+      # THIS job as their owner. The profile answers "what blocks a PR" — all
+      # of it, so a local `verify --profile=pr` is the real answer — while CI
+      # still splits that set across jobs that install different
+      # prerequisites. Without it this step also selected golangci-lint,
+      # owned by lint-go below, and failed on "golangci-lint is not on PATH".
+      # Ownership lives in the registry's CIJob field (executable now, not
+      # documentation); `verify --audit` reads the same flag, so a check that
+      # no job owns is a finding rather than a silent gap.
       - name: verify --profile=changed
-        run: go run ./tools/verify --require-infra --profile=changed
+        run: go run ./tools/verify --require-infra --profile=changed --ci-job=ci.yml:verify
 
   # test-integration needs the Postgres service container and runs
   # ~20 minutes, so it stages behind `verify` in its own job. `needs: [verify]`

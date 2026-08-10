@@ -66,6 +66,7 @@ func main() {
 		testdbBypassGuard = flag.Bool("testdb-bypass-guard", false, "report _test.go files that bypass testdb.Open via raw DATABASE_URL/METALDOCS_DATABASE_URL + sql.Open, and exit non-zero if any exist")
 		guardFixtures     = flag.Bool("guard-fixtures", false, "feed each guard its negative fixture and require a non-zero exit; --only narrows to specific check IDs")
 		only              = flag.String("only", "", "comma-separated check IDs to run, ignoring the profile")
+		ciJob             = flag.String("ci-job", "", "narrow the selection to checks whose declared CIJob is this workflow job (e.g. ci.yml:verify); a CI job passes its own name so ownership is decided by the registry, not by the workflow")
 		changed           = flag.Bool("changed", false, "narrow whatever selection --only/--profile made to checks whose declared Paths the diff against --base touches; --profile=changed implies this")
 		base              = flag.String("base", "origin/main", "base ref for --changed / --profile=changed")
 		jobs              = flag.Int("j", defaultParallelism(), "how many checks to run concurrently")
@@ -101,7 +102,7 @@ func main() {
 		os.Exit(printGuardFixtures(root, splitIDs(*only)))
 	}
 
-	selected, scoped, err := selectChecks(*profile, *only, *base, *changed)
+	selected, scoped, err := selectChecks(*profile, *only, *base, *changed, *ciJob)
 	if err != nil {
 		fatalf("%v", err)
 	}
@@ -137,7 +138,7 @@ func main() {
 // The returned bool tells the caller whether scoping was actually applied,
 // so an empty result can be explained: "0 checks, diff-scoped" is a fact
 // worth printing, "0 checks" alone is not (see emptySelectionMessage).
-func selectChecks(profile, only, base string, changedFlag bool) (selected []Check, scoped bool, err error) {
+func selectChecks(profile, only, base string, changedFlag bool, ciJob string) (selected []Check, scoped bool, err error) {
 	scoped = changedFlag
 	switch {
 	case only != "":
@@ -153,6 +154,12 @@ func selectChecks(profile, only, base string, changedFlag bool) (selected []Chec
 	}
 	if err != nil {
 		return nil, false, err
+	}
+	if ciJob != "" {
+		selected, err = scopeToCIJob(selected, ciJob)
+		if err != nil {
+			return nil, false, err
+		}
 	}
 	if scoped {
 		selected, err = scopeToChanged(selected, base)
@@ -239,6 +246,46 @@ func selectByIDs(only string) ([]Check, error) {
 		}
 		sort.Strings(unknown)
 		return nil, fmt.Errorf("unknown check ID(s): %s", strings.Join(unknown, ", "))
+	}
+	return out, nil
+}
+
+// scopeToCIJob narrows `selected` to the checks that declare this CI job as
+// their owner. It is what lets a profile stay the honest answer to "what
+// blocks a PR" while CI still splits that set across several jobs.
+//
+// Without it, a profile and a job were the same thing: ci.yml:verify runs
+// `--profile=changed`, so it ran EVERY `pr` check, including ones whose
+// declared CIJob is another job with another job's prerequisites installed.
+// That was not hypothetical — registering golangci-lint (A1.1) put a check
+// owned by ci.yml:lint-go into the verify job's selection, where the binary
+// does not exist, and the job failed with "golangci-lint is not on PATH".
+// The two escapes from that are both worse: drop the check out of `pr` (and
+// lie about what blocks a PR, which is what A1.1 exists to stop), or install
+// every job's prerequisites in every job (and pay for the duplicated run).
+//
+// An unknown job name is an error, not an empty selection: a workflow step
+// naming a job no check owns must go red, exactly as --only does for an
+// unknown ID. Ownership is checked against the whole registry, not the
+// current selection, so a legitimately empty *scoped* result (the diff
+// touched none of this job's checks) still reads as zero checks rather than
+// as a typo.
+func scopeToCIJob(selected []Check, ciJob string) ([]Check, error) {
+	known := false
+	for _, c := range checks {
+		if c.CIJob == ciJob {
+			known = true
+			break
+		}
+	}
+	if !known {
+		return nil, fmt.Errorf("--ci-job=%q: no registry check declares that CIJob", ciJob)
+	}
+	var out []Check
+	for _, c := range selected {
+		if c.CIJob == ciJob {
+			out = append(out, c)
+		}
 	}
 	return out, nil
 }

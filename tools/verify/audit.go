@@ -71,6 +71,9 @@ var onlyPattern = regexp.MustCompile(`--?only=([A-Za-z0-9_,-]+)`)
 // does not run the check"), which is false: the job does run it, by profile.
 var profilePattern = regexp.MustCompile(`--?profile=([a-z]+)`)
 
+// ciJobPattern reads a --ci-job=file.yml:job flag out of a run: block.
+var ciJobPattern = regexp.MustCompile(`--?ci-job=([A-Za-z0-9_.:-]+)`)
+
 // idsForProfile resolves a --profile=X value to the check IDs it selects, by
 // the same rule selectChecks (main.go) uses at run time: "changed" means the
 // `pr` set (the profile it filters), everything else means checks that
@@ -115,21 +118,53 @@ func workflowFiles(dir string) ([]string, error) {
 // of one loop doing both.
 func onlyIDsForStep(run string) []string {
 	if onlyPattern.MatchString(run) {
-		var ids []string
-		for _, m := range onlyPattern.FindAllStringSubmatch(run, -1) {
-			for _, id := range strings.Split(m[1], ",") {
-				if id = strings.TrimSpace(id); id != "" {
-					ids = append(ids, id)
-				}
-			}
-		}
-		return ids
+		return idsFromOnlyFlags(run)
 	}
 	var ids []string
 	for _, m := range profilePattern.FindAllStringSubmatch(run, -1) {
 		ids = append(ids, idsForProfile(m[1])...)
 	}
+	// --ci-job=X narrows a profile selection to the checks that job owns
+	// (scopeToCIJob, main.go). Without mirroring it here the audit would
+	// credit ci.yml:verify with running every `pr` check, including the ones
+	// it deliberately leaves to another job — an audit that describes a
+	// selection the command does not make is the drift this tool exists to
+	// catch.
+	for _, m := range ciJobPattern.FindAllStringSubmatch(run, -1) {
+		ids = filterIDsByCIJob(ids, m[1])
+	}
 	return ids
+}
+
+// idsFromOnlyFlags reads every --only=a,b list out of one run: block.
+func idsFromOnlyFlags(run string) []string {
+	var ids []string
+	for _, m := range onlyPattern.FindAllStringSubmatch(run, -1) {
+		for _, id := range strings.Split(m[1], ",") {
+			if id = strings.TrimSpace(id); id != "" {
+				ids = append(ids, id)
+			}
+		}
+	}
+	return ids
+}
+
+// filterIDsByCIJob keeps only the IDs whose registry entry declares ciJob as
+// its owner — the audit-side mirror of main.go's scopeToCIJob.
+func filterIDsByCIJob(ids []string, ciJob string) []string {
+	owned := map[string]bool{}
+	for _, c := range checks {
+		if c.CIJob == ciJob {
+			owned[c.ID] = true
+		}
+	}
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if owned[id] {
+			out = append(out, id)
+		}
+	}
+	return out
 }
 
 // jobsInWorkflow turns one parsed workflow file's Jobs map into the sorted

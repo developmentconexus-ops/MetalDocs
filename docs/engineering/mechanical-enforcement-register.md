@@ -569,6 +569,14 @@ observed once during that work); **A9** — everything CI executes names an immu
 the gate accepts with no diff to review. The fixture spine itself runs as the `guard-fixtures`
 check in `ci.yml:verify`.
 
+The same work moved the second inventory one rung closer to level 1: job routing is no longer
+asserted twice. A workflow job passes `--ci-job=<file.yml:job>` and the verifier selects the checks
+whose registry `CIJob` names that job, so "which job runs this check" is read from the registry
+instead of being restated in the workflow and compared afterwards. The workflow still names its own
+job (that string can still be wrong), so this is level 2, not level 1 — but a check can no longer
+be run by a job that does not own it, which is how the first CI run of #87/A1 failed
+(`ci.yml:verify` selected `golangci-lint`, whose binary only `ci.yml:lint-go` installs).
+
 **Global-maximum structure** — one generated CI manifest that *owns* registry membership, job
 routing (which job runs which check, via which `--only=`), and `required`'s gate dependency
 (`needs:` closure), with the workflow YAML **generated from it** rather than hand-authored and

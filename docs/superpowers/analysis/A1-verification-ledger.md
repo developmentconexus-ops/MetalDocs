@@ -43,6 +43,11 @@ the rewiring.
   `go vet -tags integration`, now wired.
 - `--only=id,id` runs specific checks; `--profile=changed` runs the `pr` set
   filtered by the diff.
+- `--ci-job=file.yml:job` narrows a selection to the checks that declare that
+  job as their owner (§6.7). A CI job passes its own name, so which job runs a
+  check is decided by the registry, not by the workflow.
+- `--guard-fixtures` feeds every guard its negative fixture and requires a
+  non-zero exit (§6.1).
 
 Three properties are deliberate:
 
@@ -348,6 +353,13 @@ It ran as a bare `golangci-lint-action` step, so `--audit` could not see it and
 `ci.yml:lint-go` now installs the pinned binary (v2.11.4, the exact patch the
 Action's `version: v2.11` was resolving to) and calls the verifier.
 
+Registering it exposed the second half of the same problem: `ci.yml:verify`
+runs `--profile=changed`, which selected **every** `pr` check, including one
+owned by another job with another job's binaries installed. The first CI run of
+this branch failed on `golangci-lint is not on PATH`. The fix is `--ci-job=`
+(§6.8), not dropping the check out of `pr` — a profile that omits a check which
+blocks a PR is the exact lie A1.1 exists to remove.
+
 ### 6.6 A4.0 — foreign-SQL *writes*
 
 `hgcrossmodule` matched reads only (`FROM`/`JOIN`); `UPDATE documents SET ...`
@@ -364,7 +376,44 @@ Mandatory negative fixture:
 `scripts/testdata/guard-fixtures/arch-lint/` contains a synthetic
 `approval -> UPDATE documents`, and the guard fails on it.
 
-### 6.7 Explicitly not closed
+### 6.7 `--ci-job=` — CIJob becomes executable (A1.1)
+
+`Check.CIJob` was documentation read only by `--audit`. It is a selector now:
+`--ci-job=ci.yml:verify` narrows a profile to the checks that declare that job
+as their owner, and `--audit` mirrors the same narrowing when it reads a
+workflow's `run:` block, so the audit describes the selection the command
+actually makes.
+
+This is what lets the two claims coexist: a profile is the honest full answer
+to "what blocks a PR" (so a local `--profile=pr` is the same definition CI
+uses), while CI still splits that set across jobs that install different
+prerequisites. An unknown job name is an error, exactly as an unknown
+`--only=` ID is.
+
+### 6.8 First live catch by the fixture spine — `module-imports`
+
+The first CI run of this branch reported, in the same job:
+
+```
+PASS  module-imports              1.5s
+FAIL  module-imports   exited 0 on bad input — the guard does not guard
+```
+
+`scripts/check-module-boundaries.ps1` appended a literal `\` to the repo root
+before comparing paths. Under pwsh on Linux the separator is `/`, so no file
+matched the root prefix, every file kept its absolute path, failed the
+`^internal/modules/` match and was skipped: **zero files inspected, exit 0**,
+on the only platform that gates a merge. The guard had been decorative in CI
+for as long as it had run there, and every green `module-imports` status on a
+Linux runner was green over nothing.
+
+Fixed by normalising both sides to forward slashes, plus a fail-closed
+inspected-file counter so "inspected nothing" and "found nothing" stop sharing
+an exit code. This is the A1.2 property paying for itself on its first run:
+no unit test of the script's internals would have reported it, because the
+helper logic is correct — the *command* was not.
+
+### 6.9 Explicitly not closed
 
 - `deploy/compose/docker-compose.yml` pins `minio/minio` and `minio/mc` at
   `:latest`. Same class as A1.3, different axis — nothing in CI or the verifier

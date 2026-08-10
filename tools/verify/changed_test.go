@@ -117,7 +117,7 @@ func TestSelectChecksComposesOnlyWithChanged(t *testing.T) {
 	t.Setenv("GITHUB_EVENT_NAME", "pull_request")
 	// HEAD vs the working tree: this checkout is clean, so the diff is empty
 	// and a path-scoped check must be dropped.
-	selected, scoped, err := selectChecks(ProfileFast, "css-tokens", "HEAD", true)
+	selected, scoped, err := selectChecks(ProfileFast, "css-tokens", "HEAD", true, "")
 	if err != nil {
 		t.Fatalf("selectChecks: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestSelectChecksComposesOnlyWithChanged(t *testing.T) {
 // diff — same fail-closed default as the unscoped case.
 func TestSelectChecksKeepsPathlessCheckUnderChanged(t *testing.T) {
 	t.Setenv("GITHUB_EVENT_NAME", "pull_request")
-	selected, scoped, err := selectChecks(ProfileFast, "go-vet", "HEAD", true)
+	selected, scoped, err := selectChecks(ProfileFast, "go-vet", "HEAD", true, "")
 	if err != nil {
 		t.Fatalf("selectChecks: %v", err)
 	}
@@ -172,7 +172,7 @@ func TestSelectChecksKeepsPathlessCheckUnderChanged(t *testing.T) {
 // implies scoped=true — without ever reading the working tree.
 func TestProfileChangedResolvesToPRSetAndImpliesScoping(t *testing.T) {
 	t.Setenv("GITHUB_EVENT_NAME", "push")
-	selected, scoped, err := selectChecks(ProfileChanged, "", "irrelevant-on-non-pr-fallback", false)
+	selected, scoped, err := selectChecks(ProfileChanged, "", "irrelevant-on-non-pr-fallback", false, "")
 	if err != nil {
 		t.Fatalf("selectChecks: %v", err)
 	}
@@ -195,7 +195,7 @@ func TestProfileChangedResolvesToPRSetAndImpliesScoping(t *testing.T) {
 // exists to close.
 func TestSelectChecksNonPRFallsBackToFullSet(t *testing.T) {
 	t.Setenv("GITHUB_EVENT_NAME", "push")
-	selected, scoped, err := selectChecks(ProfileFast, "", "not-a-real-ref!!", true)
+	selected, scoped, err := selectChecks(ProfileFast, "", "not-a-real-ref!!", true, "")
 	if err != nil {
 		t.Fatalf("fallback must not need a valid --base: %v", err)
 	}

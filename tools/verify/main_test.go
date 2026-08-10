@@ -352,7 +352,7 @@ func TestValidateSelectionOrderingAcceptsCompleteSelection(t *testing.T) {
 // check with no error, and main() ran it anyway over whatever
 // dist/meta.json happened to be on disk.
 func TestSelectChecksRefusesOnlyDocxV2TestAlone(t *testing.T) {
-	_, _, err := selectChecks(ProfileFast, "docx-test", "origin/main", false)
+	_, _, err := selectChecks(ProfileFast, "docx-test", "origin/main", false, "")
 	if err == nil {
 		t.Fatal("want an error: --only=docx-test excludes its After predecessor docx-build")
 	}
@@ -364,7 +364,7 @@ func TestSelectChecksRefusesOnlyDocxV2TestAlone(t *testing.T) {
 // selectChecks must still resolve a complete pair without error — the fix
 // must not make an ordinary, order-complete selection refuse.
 func TestSelectChecksAcceptsDocxV2BuildAndTestTogether(t *testing.T) {
-	selected, _, err := selectChecks(ProfileFast, "docx-build,docx-test", "origin/main", false)
+	selected, _, err := selectChecks(ProfileFast, "docx-build,docx-test", "origin/main", false, "")
 	if err != nil {
 		t.Fatalf("want no error when both sides of the edge are selected, got %v", err)
 	}
@@ -439,5 +439,63 @@ func TestRunnableCheckPassesUnderRequireInfra(t *testing.T) {
 	got := run([]Check{ok}, 1, false, true)
 	if len(got) != 1 || got[0].status != statusPass {
 		t.Fatalf("want one PASS, got %+v", got)
+	}
+}
+
+// --ci-job is what keeps a profile honest about what blocks a PR while CI
+// still splits that set across jobs with different prerequisites installed.
+// The property: the pr profile contains checks owned by more than one job,
+// and scoping to one job returns exactly that job's share.
+func TestScopeToCIJobPartitionsTheProfile(t *testing.T) {
+	pr := selectByProfile(ProfilePR)
+
+	byJob := map[string]int{}
+	for _, c := range pr {
+		byJob[c.CIJob]++
+	}
+	if len(byJob) < 2 {
+		t.Fatalf("the pr profile is owned by a single CI job (%v); --ci-job would be pointless and this test no longer proves anything", byJob)
+	}
+
+	total := 0
+	for job, want := range byJob {
+		got, err := scopeToCIJob(pr, job)
+		if err != nil {
+			t.Fatalf("scopeToCIJob(%q): %v", job, err)
+		}
+		if len(got) != want {
+			t.Errorf("--ci-job=%s selected %d checks, want %d", job, len(got), want)
+		}
+		for _, c := range got {
+			if c.CIJob != job {
+				t.Errorf("--ci-job=%s selected %s, which is owned by %s", job, c.ID, c.CIJob)
+			}
+		}
+		total += len(got)
+	}
+	if total != len(pr) {
+		t.Errorf("the per-job shares sum to %d but the profile has %d checks — some check is reachable from no job", total, len(pr))
+	}
+}
+
+// A job name no check owns is a typo, and a typo must go red rather than
+// verify nothing — the same rule --only already applies to unknown IDs.
+func TestScopeToCIJobRejectsAnUnownedJob(t *testing.T) {
+	if _, err := scopeToCIJob(selectByProfile(ProfilePR), "ci.yml:does-not-exist"); err == nil {
+		t.Fatal("want an error for a CIJob no registry check declares, got nil")
+	}
+}
+
+// The regression this flag closed: ci.yml:verify must not select a check
+// owned by ci.yml:lint-go, whose binary only that job installs.
+func TestVerifyJobDoesNotSelectAnotherJobsCheck(t *testing.T) {
+	selected, _, err := selectChecks(ProfilePR, "", "origin/main", false, "ci.yml:verify")
+	if err != nil {
+		t.Fatalf("selectChecks: %v", err)
+	}
+	for _, c := range selected {
+		if c.ID == "golangci-lint" {
+			t.Fatal("ci.yml:verify selected golangci-lint, which ci.yml:lint-go owns and installs")
+		}
 	}
 }
