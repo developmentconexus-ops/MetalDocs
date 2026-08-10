@@ -126,12 +126,19 @@ jobs:
   #
   # Measured on run 31410242704, the first run in which the shards actually
   # selected the check: 522.9s / 94.5s / 164.6s / 117.8s. 899.8s of test time
-  # across four runners, with a makespan of 522.9s — so the suite's
-  # contribution to PR wall-clock fell from ~11 minutes to ~9, not to the ~4
-  # an even split would give. The gap is entirely tools/verify/
-  # testweights.json being empty, which makes shardOf balance by package COUNT
-  # and drop the heavy package wherever it happens to fall. Weights are what
-  # closes it; the mechanism is already correct.
+  # across four runners, with a makespan of 522.9s.
+  #
+  # Run 31412988724 then published per-package timings, and they say the
+  # remaining imbalance is not the splitter's: apps/api/cmd/metaldocs-api is
+  # 439.9s of the suite's 864.8s — 51% of the whole thing in ONE package.
+  # Package-level sharding cannot go below its slowest package, so with real
+  # weights LPT gives 439.9 / 141.8 / 141.0 / 142.0 against a perfect split of
+  # 216.2. The weights are still worth having (they take the makespan from
+  # 522.9 to 439.9 and stop the split from being luck), but the next minute
+  # does not come from more shards — adding a fifth changes nothing. It comes
+  # from that package, whose surface_conformance suite walks every route
+  # against every role on a real database. That is test topology, a different
+  # unit from CI topology, and it is filed rather than smuggled in here.
   #
   # The shards partition a package set that neither this file nor the registry
   # enumerates — `go list` resolves it on the commit under test (see

@@ -64,6 +64,11 @@ const packagesPlaceholder = "{{packages}}"
 // precision — an unlisted package is weighted at the median of the listed
 // ones, so a brand-new heavy package is not assumed free.
 //
+// The current values come from CI run 31412988724 and are worth reading once:
+// apps/api/cmd/metaldocs-api is 439.9s of 864.8s. No package-level splitter
+// can produce a shard faster than its slowest package, so that one entry is
+// the floor of this whole scheme, and adding shards past four buys nothing.
+//
 //go:embed testweights.json
 var testWeightsJSON []byte
 
