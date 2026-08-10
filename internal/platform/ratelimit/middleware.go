@@ -139,7 +139,7 @@ func (m *Middleware) Limit(key RouteKey, userExtractor func(*http.Request) strin
 				"route", string(key),
 				"remote_addr", r.RemoteAddr,
 			)
-			writeRateLimitError(w, quota, 60)
+			writeRateLimitError(w, r, quota, 60)
 			return
 		}
 
@@ -160,7 +160,7 @@ func (m *Middleware) Limit(key RouteKey, userExtractor func(*http.Request) strin
 			if retrySec < 1 {
 				retrySec = 1
 			}
-			writeRateLimitError(w, quota, retrySec)
+			writeRateLimitError(w, r, quota, retrySec)
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -213,12 +213,12 @@ func (m *Middleware) GlobalEnvelopeWrap(userExtractor func(*http.Request) string
 	})
 }
 
-func writeRateLimitError(w http.ResponseWriter, quota, retryAfterSec int) {
+func writeRateLimitError(w http.ResponseWriter, r *http.Request, quota, retryAfterSec int) {
 	// RFC 9457 (AD-2): one error shape across the API. The quota/retry detail
 	// the legacy body carried is preserved via the standard Retry-After header
 	// plus the human-readable detail string.
 	w.Header().Set("Retry-After", strconv.Itoa(retryAfterSec))
 	prob := problem.New(http.StatusTooManyRequests, problem.CodeRateLimitExceeded, "Too many requests").
 		WithDetail(fmt.Sprintf("Rate limit of %d requests per minute exceeded; retry after %d seconds.", quota, retryAfterSec))
-	_ = problem.Write(w, prob)
+	problem.Respond(w, r, prob)
 }

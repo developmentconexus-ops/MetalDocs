@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	openapiv1 "metaldocs/api/openapi/v1"
 	approvalapp "metaldocs/internal/modules/approval/application"
 	approvalhttp "metaldocs/internal/modules/approval/http"
 	approvalrepo "metaldocs/internal/modules/approval/infrastructure"
@@ -81,6 +82,7 @@ import (
 	"metaldocs/internal/platform/migrate"
 	"metaldocs/internal/platform/objectstore"
 	"metaldocs/internal/platform/observability"
+	"metaldocs/internal/platform/openapivalidate"
 	"metaldocs/internal/platform/ratelimit"
 	"metaldocs/internal/platform/security"
 	e2etest "metaldocs/internal/test"
@@ -590,6 +592,18 @@ func run() int {
 	// asserted by chain_test.go (REQ-MW-7).
 	// otel link is nil (skipped by buildChain) unless an exporter is configured;
 	// recovery stays outermost, otel wraps everything else (Z-1, REQ-OBS-1).
+	// Contract validation is built from the embedded api/openapi/v1/openapi.yaml
+	// — the SSOT itself, not a generated copy of it. A spec that will not load
+	// is a boot failure: serving with the contract unenforced is the state this
+	// link exists to end, so falling back to it silently would be worse than
+	// not serving at all.
+	contractValidator, err := openapivalidate.New(openapiv1.SpecYAML(), openapivalidate.DefaultMaxBodyBytes)
+	if err != nil {
+		slog.Error("OpenAPI contract validator failed to initialize", "err", err)
+		return 1
+	}
+	slog.Info("OpenAPI request validation active", contractValidator.LogSummary())
+
 	handler := buildChain(mux, apiChain(
 		platformmw.Recovery,
 		buildOtelWrap(otelEnabled),
@@ -601,6 +615,9 @@ func run() int {
 		iamMiddleware.Wrap,
 		buildPresenceWrap(presenceBump),
 		func(next http.Handler) http.Handler { return globalLimiter.GlobalEnvelopeWrap(userIDExtractor, next) },
+		// Reject anything the contract forbids before a handler can act on it
+		// (A3.2). Placement rationale lives in chain.go.
+		contractValidator.Wrap,
 		// Innermost (nearest the mux): rewrite the stdlib text/plain 404/405 the
 		// method-routed ServeMux emits into problem+json, preserving Allow (D-03).
 		platformmw.MethodNotAllowedJSON,

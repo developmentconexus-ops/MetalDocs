@@ -91,16 +91,16 @@ func (h *SessionsHandler) WithSessionService(svc *iamapp.SessionService) *Sessio
 
 func (h *SessionsHandler) handleSessions(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		httpresponse.WriteMethodNotAllowed(w, "GET")
+		httpresponse.WriteMethodNotAllowed(w, r, "GET")
 		return
 	}
 	if h.sessions == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "Sessions service is not configured"))
+		problem.Respond(w, r, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "Sessions service is not configured"))
 		return
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
 		return
 	}
 
@@ -112,7 +112,7 @@ func (h *SessionsHandler) handleSessions(w http.ResponseWriter, r *http.Request)
 	items, err := h.sessions.ListActiveSessions(r.Context(), q)
 	if err != nil {
 		slog.Error("iam sessions: list failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to list sessions"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to list sessions"))
 		return
 	}
 
@@ -160,7 +160,7 @@ func (h *SessionsHandler) parseSessionsListQuery(w http.ResponseWriter, r *http.
 	if v := strings.TrimSpace(r.URL.Query().Get("is_active")); v != "" {
 		active, perr := strconv.ParseBool(v)
 		if perr != nil {
-			h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "is_active must be a boolean"))
+			problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "is_active must be a boolean"))
 			return authdomain.SessionAdminQuery{}, 0, false
 		}
 		q.IncludeRevoked = !active
@@ -169,7 +169,7 @@ func (h *SessionsHandler) parseSessionsListQuery(w http.ResponseWriter, r *http.
 	if v := strings.TrimSpace(r.URL.Query().Get("limit")); v != "" {
 		limit, perr := strconv.Atoi(v)
 		if perr != nil || limit < 1 || limit > 100 {
-			h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "limit must be between 1 and 100"))
+			problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "limit must be between 1 and 100"))
 			return authdomain.SessionAdminQuery{}, 0, false
 		}
 		requestedLimit = limit
@@ -228,22 +228,22 @@ func toSessionItems(items []authdomain.SessionListItem, displayNames map[string]
 
 func (h *SessionsHandler) handleSessionByID(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
-		httpresponse.WriteMethodNotAllowed(w, "DELETE")
+		httpresponse.WriteMethodNotAllowed(w, r, "DELETE")
 		return
 	}
 	if h.sessions == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "Sessions service is not configured"))
+		problem.Respond(w, r, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "Sessions service is not configured"))
 		return
 	}
 	sessionID := strings.TrimPrefix(r.URL.Path, "/api/v1/auth/sessions/")
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID == "" || strings.Contains(sessionID, "/") {
-		h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Session not found"))
+		problem.Respond(w, r, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Session not found"))
 		return
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
 		return
 	}
 
@@ -253,15 +253,15 @@ func (h *SessionsHandler) handleSessionByID(w http.ResponseWriter, r *http.Reque
 	session, err := h.sessions.FindSession(r.Context(), sessionID)
 	if err != nil {
 		if errors.Is(err, authdomain.ErrSessionNotFound) {
-			h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Session not found"))
+			problem.Respond(w, r, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Session not found"))
 			return
 		}
 		slog.Error("iam sessions: find failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to revoke session"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to revoke session"))
 		return
 	}
 	if session.TenantID != tenantID {
-		h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Session not found"))
+		problem.Respond(w, r, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Session not found"))
 		return
 	}
 
@@ -273,11 +273,11 @@ func (h *SessionsHandler) handleSessionByID(w http.ResponseWriter, r *http.Reque
 
 	if err := h.revokeSession(r.Context(), session, reason, actor); err != nil {
 		if errors.Is(err, authdomain.ErrSessionNotFound) {
-			h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Session not found"))
+			problem.Respond(w, r, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Session not found"))
 			return
 		}
 		slog.Error("iam sessions: revoke failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to revoke session"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to revoke session"))
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -339,10 +339,4 @@ func (h *SessionsHandler) resolveDisplayNames(ctx context.Context, tenantID stri
 		return map[string]string{}
 	}
 	return names
-}
-
-func (h *SessionsHandler) writeProblem(w http.ResponseWriter, p *problem.Problem) {
-	if err := problem.Write(w, p); err != nil {
-		slog.Warn("iam sessions: write response failed", "err", err)
-	}
 }

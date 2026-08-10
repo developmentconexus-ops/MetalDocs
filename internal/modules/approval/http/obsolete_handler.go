@@ -23,7 +23,7 @@ func (h *Handler) markObsolete(ctx context.Context, runner db.TxRunner, req appl
 func (h *Handler) ObsoleteHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	actorID := actorIDFromRequest(r)
@@ -31,17 +31,17 @@ func (h *Handler) ObsoleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
 	var body contracts.ObsoleteRequest
 	if err := strictjson.Decode(r, &body); err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	if err := body.Validate(); err != nil {
-		WriteError(w, NewValidationError(err.Error()))
+		WriteError(w, r, NewValidationError(err.Error()))
 		return
 	}
 
@@ -53,11 +53,11 @@ func (h *Handler) ObsoleteHandler(w http.ResponseWriter, r *http.Request) {
 		Reason:          body.Reason,
 	})
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
-	WriteJSON(w, http.StatusOK, contracts.ObsoleteResponse{
+	WriteJSON(w, r, http.StatusOK, contracts.ObsoleteResponse{
 		DocumentID: documentID,
 	})
 }

@@ -239,7 +239,7 @@ var checks = []Check{
 		// actually invokes. It said five for as long as there were ten
 		// (pass13-guards.md §3) — a registry that describes the wrong product
 		// is the same class of untruth as a check that does not run.
-		Desc:     "custom Go analyzers (hgcrossmodule, nosqltxindomain, platformboundary, txownership, legacyvocab, outboxpair, postcommitaudit, deliveryauditsink, nodualmode, noresponsemap) against the recorded baseline",
+		Desc:     "custom Go analyzers (hgcrossmodule, nosqltxindomain, platformboundary, txownership, legacyvocab, outboxpair, postcommitaudit, deliveryauditsink, nodualmode, noresponsemap, problemwriter) against the recorded baseline",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "./tools/cilint", "./..."},
 		CIJob:    "ci.yml:verify",
@@ -259,6 +259,23 @@ var checks = []Check{
 				// fails — which is the only way "a read exemption is not a write
 				// permit" is a fact rather than a comment.
 				`writes "audit"'s base table "audit_events"`,
+				// A3.1: the same sandbox carries a thirteenth local
+				// writeProblem. Both halves of the ban are pinned, because
+				// either one alone leaves the clone buildable — a serializer
+				// that skips the media type is still a serializer, and a
+				// hand-written envelope is still an envelope even if the
+				// function never names *problem.Problem.
+				`takes both an http.ResponseWriter and a *problem.Problem`,
+				`naming it here means a second error envelope`,
+				// A3.2 gate C3: the same sandbox carries a second clone written
+				// against import ALIASES (h "net/http", p ".../problem"). The
+				// function name is pinned because the two unqualified Want
+				// lines above are already satisfied by the unaliased clone —
+				// without naming it, an analyzer that went back to matching the
+				// identifiers "http" and "problem" would still pass this
+				// fixture. That file names no media type, so the only rule that
+				// can report it is the signature rule resolving by import path.
+				`function writeAliasedProblem takes both an http.ResponseWriter and a *problem.Problem`,
 			},
 		},
 	},

@@ -7,24 +7,25 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	templatesapi "metaldocs/internal/modules/templates/api"
 	"metaldocs/internal/modules/templates/application"
+	"metaldocs/internal/platform/problem"
 )
 
 func (h *Handler) presignAutosave(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	actorID := userIDFromReq(r)
 	templateID := r.PathValue("id")
 	versionNum, err := strconv.Atoi(r.PathValue("n"))
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidParam, "version must be an integer")
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, codeTplInvalidParam, "version must be an integer"))
 		return
 	}
 
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateEdit)); err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
@@ -35,7 +36,7 @@ func (h *Handler) presignAutosave(w http.ResponseWriter, r *http.Request) {
 		VersionNumber: versionNum,
 	})
 	if err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
@@ -49,19 +50,19 @@ func (h *Handler) presignAutosave(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	actorID := userIDFromReq(r)
 	templateID := r.PathValue("id")
 	versionNum, err := strconv.Atoi(r.PathValue("n"))
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidParam, "version must be an integer")
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, codeTplInvalidParam, "version must be an integer"))
 		return
 	}
 
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateEdit)); err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
@@ -69,7 +70,7 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 		ExpectedContentHash string `json:"expected_content_hash"`
 	}
 	if err := readStrictJSON(r, &req); err != nil {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, err.Error())
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, codeTplInvalidBody, err.Error()))
 		return
 	}
 
@@ -81,13 +82,13 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 		ExpectedContentHash: req.ExpectedContentHash,
 	})
 	if err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
 	dto, err := toAPIVersionDTO(v)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	writeJSON(w, http.StatusOK, dto)

@@ -20,7 +20,7 @@ import (
 func (h *Handler) InboxHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	actorID := iamdomain.UserIDFromContext(r.Context())
@@ -28,24 +28,24 @@ func (h *Handler) InboxHandler(w http.ResponseWriter, r *http.Request) {
 
 	limit, err := parseInboxLimit(r.URL.Query().Get("limit"))
 	if err != nil {
-		WriteError(w, NewValidationError(err.Error()))
+		WriteError(w, r, NewValidationError(err.Error()))
 		return
 	}
 
 	offset, err := parseInboxOffset(r.URL.Query().Get("offset"))
 	if err != nil {
-		WriteError(w, NewValidationError(err.Error()))
+		WriteError(w, r, NewValidationError(err.Error()))
 		return
 	}
 
 	filter, err := parseInboxFilter(r.URL.Query())
 	if err != nil {
-		WriteError(w, NewValidationError(err.Error()))
+		WriteError(w, r, NewValidationError(err.Error()))
 		return
 	}
 
 	if h.readSvc == nil {
-		WriteError(w, errors.New("read service not configured"))
+		WriteError(w, r, errors.New("read service not configured"))
 		return
 	}
 
@@ -57,7 +57,7 @@ func (h *Handler) InboxHandler(w http.ResponseWriter, r *http.Request) {
 	// ListInboxItemsWithTotal contract — an empty filter behaves identically.
 	views, total, err := h.readSvc.ListWorklist(r.Context(), h.runner, tenantID, actorID, areaCode, filter, limit, offset)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
@@ -102,7 +102,7 @@ func (h *Handler) InboxHandler(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	WriteJSON(w, http.StatusOK, contracts.InboxResponse{
+	WriteJSON(w, r, http.StatusOK, contracts.InboxResponse{
 		Items: respItems,
 		Total: total,
 	})

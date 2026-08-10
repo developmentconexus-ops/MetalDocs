@@ -18,7 +18,7 @@ import (
 func (h *Handler) DocumentApprovalPreviewHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	documentID := r.PathValue("id")
@@ -28,17 +28,17 @@ func (h *Handler) DocumentApprovalPreviewHandler(w http.ResponseWriter, r *http.
 		submitSvc = h.services.Submit
 	}
 	if submitSvc == nil {
-		WriteError(w, errors.New("submit service not configured"))
+		WriteError(w, r, errors.New("submit service not configured"))
 		return
 	}
 
 	preview, err := submitSvc.PreviewRoute(r.Context(), h.runner, tenantID, documentID)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
-	WriteJSON(w, http.StatusOK, mapRoutePreviewToWire(preview))
+	WriteJSON(w, r, http.StatusOK, mapRoutePreviewToWire(preview))
 }
 
 // mapRoutePreviewToWire maps application.RoutePreview to the OpenAPI-shaped

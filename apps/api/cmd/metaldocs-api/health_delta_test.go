@@ -47,6 +47,7 @@ func buildHealthDeltaChain(t *testing.T) http.Handler {
 		nil, // iam_authz
 		nil, // presence_bump
 		nil, // rate_limit
+		nil, // contract_validation
 		nil, // method_not_allowed
 	))
 }

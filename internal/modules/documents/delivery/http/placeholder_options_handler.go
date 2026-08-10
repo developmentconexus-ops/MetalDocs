@@ -41,7 +41,7 @@ func NewPlaceholderOptionsHandler(schema placeholderOptionsSchemaReader, iam pla
 func (h *PlaceholderOptionsHandler) HandleGetOptions(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		writeFillInError(w, requestID(r), err)
+		writeFillInError(w, r, requestID(r), err)
 		return
 	}
 	docID := r.PathValue("id")
@@ -49,7 +49,7 @@ func (h *PlaceholderOptionsHandler) HandleGetOptions(w http.ResponseWriter, r *h
 
 	schema, err := h.schema.LoadPlaceholderSchema(r.Context(), tenantID, docID)
 	if err != nil {
-		writeFillInError(w, requestID(r), err)
+		writeFillInError(w, r, requestID(r), err)
 		return
 	}
 
@@ -61,7 +61,7 @@ func (h *PlaceholderOptionsHandler) HandleGetOptions(w http.ResponseWriter, r *h
 		}
 	}
 	if ph == nil {
-		writeFillInError(w, requestID(r), errNotChoicePlaceholder(placeholderID))
+		writeFillInError(w, r, requestID(r), errNotChoicePlaceholder(placeholderID))
 		return
 	}
 
@@ -70,16 +70,16 @@ func (h *PlaceholderOptionsHandler) HandleGetOptions(w http.ResponseWriter, r *h
 	// preserving the prior wire {"options":[...]} byte-for-byte.
 	switch ph.Type {
 	case templatesdomain.PHSelect:
-		writeFillInJSON(w, http.StatusOK, documentsapi.PlaceholderOptionsResponse{Options: toAnySlice(selectOptions(ph.Options))})
+		writeFillInJSON(w, r, http.StatusOK, documentsapi.PlaceholderOptionsResponse{Options: toAnySlice(selectOptions(ph.Options))})
 	case templatesdomain.PHUser:
 		opts, err := h.iam.ListUserOptions(r.Context(), tenantID)
 		if err != nil {
-			writeFillInError(w, requestID(r), err)
+			writeFillInError(w, r, requestID(r), err)
 			return
 		}
-		writeFillInJSON(w, http.StatusOK, documentsapi.PlaceholderOptionsResponse{Options: toAnySlice(opts)})
+		writeFillInJSON(w, r, http.StatusOK, documentsapi.PlaceholderOptionsResponse{Options: toAnySlice(opts)})
 	default:
-		writeFillInError(w, requestID(r), errNotChoicePlaceholder(placeholderID))
+		writeFillInError(w, r, requestID(r), errNotChoicePlaceholder(placeholderID))
 	}
 }
 

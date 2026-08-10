@@ -53,6 +53,7 @@ func RunAll(targets []string) []Finding {
 	out = append(out, NoDualMode(files)...)
 	out = append(out, NoResponseMap(files)...)
 	out = append(out, HGCrossModule(files)...)
+	out = append(out, ProblemWriter(files)...)
 	return out
 }
 

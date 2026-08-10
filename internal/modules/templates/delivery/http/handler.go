@@ -212,7 +212,7 @@ func (h *Handler) Mount(mux httprouter.Muxer) {
 			middleware,
 		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			writeErr(w, http.StatusBadRequest, codeTplInvalidRequest, err.Error())
+			problem.Respond(w, r, problem.New(http.StatusBadRequest, codeTplInvalidRequest, err.Error()))
 		},
 	})
 }
@@ -253,17 +253,11 @@ func userIDFromReq(r *http.Request) string {
 	return iamdomain.UserIDFromContext(r.Context())
 }
 
-func writeErr(w http.ResponseWriter, status int, code problem.Code, message string) {
-	if err := problem.Write(w, problem.New(status, code, message)); err != nil {
-		slog.Warn("templates http: problem write failed", "err", err, "status", status, "code", code)
-	}
-}
-
 var friendlyMsg = map[problem.Code]string{
 	codeTplUploadMissing: "DOCX file not yet uploaded. Please upload the template file before submitting for review.",
 }
 
-func writeMappedErr(w http.ResponseWriter, err error) {
+func writeMappedErr(w http.ResponseWriter, r *http.Request, err error) {
 	status, code := MapErr(err)
 	// F-E4-1 (second half of the finding): an UNMAPPED error is by definition
 	// an internal fault, and echoing err.Error() into problem.title leaked the
@@ -273,7 +267,7 @@ func writeMappedErr(w http.ResponseWriter, err error) {
 	// title and the real cause goes to the server log instead.
 	if code == codeTplInternalError {
 		slog.Error("templates http: unmapped error", "err", err)
-		writeErr(w, status, code, "internal server error")
+		problem.Respond(w, r, problem.New(status, code, "internal server error"))
 		return
 	}
 	msg := friendlyMsg[code]
@@ -283,5 +277,5 @@ func writeMappedErr(w http.ResponseWriter, err error) {
 	if msg == "" {
 		msg = code.String()
 	}
-	writeErr(w, status, code, msg)
+	problem.Respond(w, r, problem.New(status, code, msg))
 }

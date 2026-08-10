@@ -68,7 +68,7 @@ func (h *Handler) Mount(mux httprouter.Muxer) {
 			middleware,
 		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			WriteError(w, err)
+			WriteError(w, r, err)
 		},
 	})
 }

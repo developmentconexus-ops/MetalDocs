@@ -32,7 +32,7 @@ func NewReconstructHandler(svc ReconstructService) *ReconstructHandler {
 func (h *ReconstructHandler) HandleReconstruct(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		writeReconstructError(r.Context(), w, "", r.PathValue("id"), requestID(r), err)
+		writeReconstructError(r.Context(), w, r, "", r.PathValue("id"), requestID(r), err)
 		return
 	}
 
@@ -43,18 +43,18 @@ func (h *ReconstructHandler) HandleReconstruct(w http.ResponseWriter, r *http.Re
 		r.PathValue("id"),
 	)
 	if err != nil {
-		writeReconstructError(r.Context(), w, tenantID, r.PathValue("id"), requestID(r), err)
+		writeReconstructError(r.Context(), w, r, tenantID, r.PathValue("id"), requestID(r), err)
 		return
 	}
 
-	writeFillInJSON(w, http.StatusOK, entry)
+	writeFillInJSON(w, r, http.StatusOK, entry)
 }
 
-func writeReconstructError(ctx context.Context, w http.ResponseWriter, tenantID, documentID, reqID string, err error) {
+func writeReconstructError(ctx context.Context, w http.ResponseWriter, r *http.Request, tenantID, documentID, reqID string, err error) {
 	// Unified RFC 9457 writer (AD-2); mapFillInError classifies ErrCapDenied (403)
 	// / ErrNotFound (404) and defaults to 500. Keep the log for the 500 case.
 	if !errors.As(err, &authz.ErrCapDenied{}) && !errors.Is(err, v2dom.ErrNotFound) {
 		slog.ErrorContext(ctx, "reconstruct document failed", "tenant_id", tenantID, "document_id", documentID, "err", err)
 	}
-	writeFillInError(w, reqID, err)
+	writeFillInError(w, r, reqID, err)
 }

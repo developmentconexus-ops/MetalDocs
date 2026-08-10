@@ -29,9 +29,9 @@ func MethodNotAllowedJSON(next http.Handler) http.Handler {
 		// only overwrites Content-Type, so the header is preserved.
 		switch ic.status {
 		case http.StatusMethodNotAllowed:
-			_ = problem.Write(w, problem.New(http.StatusMethodNotAllowed, problem.CodeRequestMethodNotAllowed, "Method not allowed"))
+			problem.Respond(w, r, problem.New(http.StatusMethodNotAllowed, problem.CodeRequestMethodNotAllowed, "Method not allowed"))
 		default:
-			_ = problem.Write(w, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Not found"))
+			problem.Respond(w, r, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "Not found"))
 		}
 	})
 }

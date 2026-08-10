@@ -130,23 +130,23 @@ func (h *AdminHandler) WithPresenceReader(r PresenceReader) *AdminHandler {
 //     budget is max(kpi, presence, audit) rather than the legacy sum.
 func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		httpresponse.WriteMethodNotAllowed(w, "GET")
+		httpresponse.WriteMethodNotAllowed(w, r, "GET")
 		return
 	}
 	if h.authService == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "User management service is not configured"))
+		problem.Respond(w, r, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "User management service is not configured"))
 		return
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 
 	kpiSnapshot, onlineUsers, presenceItems, recentEvents, err := h.fetchOverviewSnapshots(r.Context(), tenantID)
 	if err != nil {
 		slog.Error("iam admin: overview composition failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to load admin overview"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to load admin overview"))
 		return
 	}
 
@@ -308,23 +308,23 @@ func kpiToOverviewTyped(k iamdomain.KpiSnapshot) iamapi.IamKpiSnapshot {
 
 func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Request, userID string) {
 	if r.Method != http.MethodPost {
-		httpresponse.WriteMethodNotAllowed(w, "POST")
+		httpresponse.WriteMethodNotAllowed(w, r, "POST")
 		return
 	}
 
 	var req UpsertUserRoleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON payload"))
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON payload"))
 		return
 	}
 
 	role, err := iamdomain.ParseRole(req.Role)
 	if errors.Is(err, iamdomain.ErrInvalidRole) && strings.TrimSpace(req.Role) == "" {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Role is required"))
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Role is required"))
 		return
 	}
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid role"))
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid role"))
 		return
 	}
 
@@ -339,12 +339,12 @@ func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Reque
 	}
 	upsertTenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 
 	if err := h.service.UpsertUserAndAssignRole(r.Context(), userID, req.DisplayName, upsertTenantID, role, assignedBy, actorID); err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to upsert user role"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to upsert user role"))
 		return
 	}
 
@@ -364,13 +364,13 @@ func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Reque
 func (h *AdminHandler) handleReplaceUserRoles(w http.ResponseWriter, r *http.Request, userID string) {
 	var req ReplaceUserRolesRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON payload"))
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON payload"))
 		return
 	}
 
 	role, err := parseExactlyOneRole(req.Roles)
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
 		return
 	}
 
@@ -381,12 +381,12 @@ func (h *AdminHandler) handleReplaceUserRoles(w http.ResponseWriter, r *http.Req
 	}
 	replaceTenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 
 	if err := h.service.ReplaceUserRoles(r.Context(), userID, req.DisplayName, replaceTenantID, role, assignedBy, actorID); err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to replace user roles"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to replace user roles"))
 		return
 	}
 
@@ -396,12 +396,6 @@ func (h *AdminHandler) handleReplaceUserRoles(w http.ResponseWriter, r *http.Req
 		Roles:       []iamapi.UserRole{iamapi.UserRole(role)},
 	})
 	// Audit is now emitted in-tx by AdminService.ReplaceUserRoles (H-3b).
-}
-
-func (h *AdminHandler) writeProblem(w http.ResponseWriter, p *problem.Problem) {
-	if werr := problem.Write(w, p); werr != nil {
-		slog.Warn("iam: write response failed", "err", werr)
-	}
 }
 
 func parseRoles(items []string) ([]iamdomain.Role, bool) {

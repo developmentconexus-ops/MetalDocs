@@ -6,19 +6,20 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	templatesapi "metaldocs/internal/modules/templates/api"
 	"metaldocs/internal/modules/templates/application"
+	"metaldocs/internal/platform/problem"
 )
 
 func (h *Handler) archiveTemplate(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	actorID := userIDFromReq(r)
 	templateID := r.PathValue("id")
 
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateArchive)); err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
@@ -28,13 +29,13 @@ func (h *Handler) archiveTemplate(w http.ResponseWriter, r *http.Request) {
 		TemplateID:  templateID,
 	})
 	if err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
 	dto, err := toAPITemplateDTO(tpl, h.resolveCreatedByDisplayName(r.Context(), tenantID, tpl.CreatedBy))
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	var resp templatesapi.ArchiveTemplateResponse

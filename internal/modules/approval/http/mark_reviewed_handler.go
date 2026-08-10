@@ -28,7 +28,7 @@ var markReviewed = func(h *Handler, ctx context.Context, runner db.TxRunner, req
 func (h *Handler) MarkReviewedHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	actorID := actorIDFromRequest(r)
@@ -36,23 +36,23 @@ func (h *Handler) MarkReviewedHandler(w http.ResponseWriter, r *http.Request) {
 
 	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
 	var body contracts.MarkReviewedRequest
 	if err := strictjson.Decode(r, &body); err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	if err := body.Validate(); err != nil {
-		WriteError(w, NewValidationError(err.Error()))
+		WriteError(w, r, NewValidationError(err.Error()))
 		return
 	}
 
 	reviewDueAt, err := body.ParsedReviewDueAt()
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
@@ -71,12 +71,12 @@ func (h *Handler) MarkReviewedHandler(w http.ResponseWriter, r *http.Request) {
 		ReviewedBy:              actorID,
 	})
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
 	w.Header().Set("ETag", instanceETag(result.RevisionVersion))
-	WriteJSON(w, http.StatusOK, contracts.MarkReviewedResponse{
+	WriteJSON(w, r, http.StatusOK, contracts.MarkReviewedResponse{
 		DocumentID: result.DocumentID,
 		NewStatus:  string(docsdomain.DocStatusPublished),
 	})

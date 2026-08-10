@@ -1,0 +1,38 @@
+package http
+
+import (
+	"encoding/json"
+	"net/http"
+
+	"metaldocs/internal/platform/problem"
+)
+
+// A3.1 negative fixture: a delivery package growing its own thirteenth
+// writeProblem. This is the exact shape that produced G-07 — twelve packages
+// each owning status, Content-Type, marshalling and (inconsistently) logging,
+// so "the API's error contract" was whatever twelve files happened to agree on.
+//
+// Two independent properties are proven here, and both must be reported:
+//
+//   - the SIGNATURE rule: a function taking an http.ResponseWriter together
+//     with a *problem.Problem is a serializer, whatever it is named. Renaming
+//     it emitErr or respondProblem must not buy an exemption.
+//   - the MEDIA TYPE rule: writing "application/problem+json" by hand is the
+//     other half of the clone. problem.Write is unexported, so this is the only
+//     remaining way to rebuild the envelope.
+//
+// If a future edit collapsed the two rules into one, one of the Want strings in
+// the arch-lint fixture stops appearing and this fixture fails — which is how
+// "both halves are enforced" stays a fact rather than a comment.
+//
+// See scripts/testdata/guard-fixtures/README.md.
+func writeProblem(w http.ResponseWriter, p *problem.Problem) {
+	payload, err := json.Marshal(p)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(p.Status)
+	_, _ = w.Write(payload)
+}

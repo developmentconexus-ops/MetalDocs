@@ -9,6 +9,7 @@ import (
 	approvaldomain "metaldocs/internal/modules/approval/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	templatesapi "metaldocs/internal/modules/templates/api"
+	"metaldocs/internal/platform/problem"
 )
 
 // SubmitTemplateVersionForApproval and SignoffTemplateVersion (this file) are
@@ -33,24 +34,24 @@ func (h *Handler) nilApprovalKernel() bool {
 func (h *Handler) SubmitTemplateVersionForApproval(w http.ResponseWriter, r *http.Request, id uuid.UUID, n int, params templatesapi.SubmitTemplateVersionForApprovalParams) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	if h.nilApprovalKernel() {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "approval kernel not configured")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "approval kernel not configured"))
 		return
 	}
 	actorID := userIDFromReq(r)
 	templateID := id.String()
 
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateSubmit)); err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
 	version, err := h.svc.GetVersion(r.Context(), tenantID, templateID, n)
 	if err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
@@ -63,7 +64,7 @@ func (h *Handler) SubmitTemplateVersionForApproval(w http.ResponseWriter, r *htt
 	if r.ContentLength != 0 {
 		var body templatesapi.TemplateSubmitForApprovalRequest
 		if err := readJSON(r, &body); err != nil {
-			writeErr(w, http.StatusBadRequest, codeTplInvalidBody, err.Error())
+			problem.Respond(w, r, problem.New(http.StatusBadRequest, codeTplInvalidBody, err.Error()))
 			return
 		}
 		if body.ChosenActors != nil {
@@ -85,13 +86,13 @@ func (h *Handler) SubmitTemplateVersionForApproval(w http.ResponseWriter, r *htt
 		ChosenActors:      chosenActors,
 	})
 	if err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
 	instanceID, err := uuid.Parse(res.InstanceID)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	var resp templatesapi.TemplateApprovalSubmitResponse
@@ -110,29 +111,29 @@ func (h *Handler) SubmitTemplateVersionForApproval(w http.ResponseWriter, r *htt
 func (h *Handler) SignoffTemplateVersion(w http.ResponseWriter, r *http.Request, id uuid.UUID, n int, params templatesapi.SignoffTemplateVersionParams) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	if h.nilApprovalKernel() {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "approval kernel not configured")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "approval kernel not configured"))
 		return
 	}
 	actorID := userIDFromReq(r)
 	templateID := id.String()
 
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateApprove)); err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
 	var body templatesapi.SignoffTemplateVersionRequest
 	if err := readJSON(r, &body); err != nil {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, err.Error())
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, codeTplInvalidBody, err.Error()))
 		return
 	}
 	decision := approvaldomain.Decision(body.Decision)
 	if decision != approvaldomain.DecisionApprove && decision != approvaldomain.DecisionReject {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, "decision must be 'approve' or 'reject'")
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, codeTplInvalidBody, "decision must be 'approve' or 'reject'"))
 		return
 	}
 	reason := ""
@@ -142,18 +143,18 @@ func (h *Handler) SignoffTemplateVersion(w http.ResponseWriter, r *http.Request,
 
 	version, err := h.svc.GetVersion(r.Context(), tenantID, templateID, n)
 	if err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
 	inst, err := h.approvalRead.LoadActiveInstanceBySubjectForMutation(r.Context(), h.approvalRunner, tenantID, string(approvaldomain.SubjectKindTemplate), version.ID)
 	if err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 	activeStage := inst.Active()
 	if activeStage == nil {
-		writeMappedErr(w, approvaldomain.ErrNoActiveStage)
+		writeMappedErr(w, r, approvaldomain.ErrNoActiveStage)
 		return
 	}
 
@@ -172,7 +173,7 @@ func (h *Handler) SignoffTemplateVersion(w http.ResponseWriter, r *http.Request,
 		},
 	})
 	if err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 

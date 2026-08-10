@@ -33,28 +33,28 @@ var errTenantIDInvalid = errors.New("controlled_documents: tenant id invalid")
 func (h *Handler) ListControlledDocuments(w http.ResponseWriter, r *http.Request, params controlleddocumentsapi.ListControlledDocumentsParams) {
 	filter, err := filterFromListParams(params)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, err.Error())
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
 		return
 	}
 
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		h.writeDomainError(w, err)
+		h.writeDomainError(w, r, err)
 		return
 	}
 
 	items, hasMore, err := h.svc.List(r.Context(), tenantID, filter)
 	if err != nil {
 		if errors.Is(err, pagination.ErrInvalidCursor) {
-			httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "invalid cursor")
+			problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "invalid cursor"))
 			return
 		}
-		h.writeDomainError(w, err)
+		h.writeDomainError(w, r, err)
 		return
 	}
 	respItems, err := controlledDocumentResponses(items)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 
@@ -77,18 +77,18 @@ func (h *Handler) ListControlledDocuments(w http.ResponseWriter, r *http.Request
 func (h *Handler) AtomicCreateControlledDocument(w http.ResponseWriter, r *http.Request, params controlleddocumentsapi.AtomicCreateControlledDocumentParams) {
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		h.writeDomainError(w, err)
+		h.writeDomainError(w, r, err)
 		return
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, maxControlledDocumentsJSONBodyBytes)
 	var req controlleddocumentsapi.CreateAtomicRequest
 	if err := decodeStrictJSON(r, &req); err != nil {
-		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, err.Error())
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
 		return
 	}
 	if field := missingAtomicCreateField(req); field != "" {
-		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "field "+field+" is required")
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "field "+field+" is required"))
 		return
 	}
 
@@ -101,7 +101,7 @@ func (h *Handler) AtomicCreateControlledDocument(w http.ResponseWriter, r *http.
 
 	actorUserID, ok := authn.UserIDFromContext(r.Context())
 	if !ok {
-		h.writeDomainError(w, application.ErrActorMissing)
+		h.writeDomainError(w, r, application.ErrActorMissing)
 		return
 	}
 
@@ -125,17 +125,17 @@ func (h *Handler) AtomicCreateControlledDocument(w http.ResponseWriter, r *http.
 		VisibilityUserIDs:         req.Visibility.UserIds,
 	})
 	if err != nil {
-		h.writeDomainError(w, err)
+		h.writeDomainError(w, r, err)
 		return
 	}
 	cd, err := controlledDocumentResponse(*res.ControlledDocument)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 	doc, err := documentRefResponse(res.DocumentRef)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusCreated, controlleddocumentsapi.AtomicCreateResponse{
@@ -193,17 +193,17 @@ func (h *Handler) PreviewControlledDocumentCode(w http.ResponseWriter, r *http.R
 	profileCode := strings.TrimSpace(params.ProfileCode)
 	areaCode := strings.TrimSpace(params.AreaCode)
 	if profileCode == "" || areaCode == "" {
-		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "profile_code and area_code query parameters are required")
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "profile_code and area_code query parameters are required"))
 		return
 	}
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		h.writeDomainError(w, err)
+		h.writeDomainError(w, r, err)
 		return
 	}
 	next, err := h.svc.PeekSeq(r.Context(), tenantID, profileCode, areaCode)
 	if err != nil {
-		h.writeDomainError(w, err)
+		h.writeDomainError(w, r, err)
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, controlleddocumentsapi.PreviewCodeResponse{
@@ -223,12 +223,12 @@ func (h *Handler) PreviewControlledDocumentCode(w http.ResponseWriter, r *http.R
 func (h *Handler) GetControlledDocumentCreationContext(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		h.writeDomainError(w, err)
+		h.writeDomainError(w, r, err)
 		return
 	}
 	cc, err := h.svc.CreationContext(r.Context(), tenantID)
 	if err != nil {
-		h.writeDomainError(w, err)
+		h.writeDomainError(w, r, err)
 		return
 	}
 	resp := controlleddocumentsapi.ControlledDocumentCreationContextResponse{
@@ -260,18 +260,18 @@ func (h *Handler) CreateControlledDocumentRevision(w http.ResponseWriter, r *htt
 	r.SetPathValue("id", id.String())
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		h.writeDomainError(w, err)
+		h.writeDomainError(w, r, err)
 		return
 	}
 	cdID := r.PathValue("id")
 	r.Body = http.MaxBytesReader(w, r.Body, maxControlledDocumentsJSONBodyBytes)
 	var body controlleddocumentsapi.CreateRevisionRequest
 	if err := decodeStrictJSON(r, &body); err != nil {
-		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, err.Error())
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
 		return
 	}
 	if field := missingCreateRevisionField(body); field != "" {
-		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "field "+field+" is required")
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "field "+field+" is required"))
 		return
 	}
 	formData := map[string]any(nil)
@@ -286,12 +286,12 @@ func (h *Handler) CreateControlledDocumentRevision(w http.ResponseWriter, r *htt
 		TemplateVersionID: uuidStringPtr(body.TemplateVersionId),
 	})
 	if err != nil {
-		h.writeDomainError(w, err)
+		h.writeDomainError(w, r, err)
 		return
 	}
 	respRef, err := documentRefResponse(ref)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusCreated, controlleddocumentsapi.RevisionResponse{Document: respRef})
@@ -310,18 +310,18 @@ func (h *Handler) GetControlledDocument(w http.ResponseWriter, r *http.Request, 
 	r.SetPathValue("id", id.String())
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		h.writeDomainError(w, err)
+		h.writeDomainError(w, r, err)
 		return
 	}
 
 	doc, err := h.svc.Get(r.Context(), tenantID, r.PathValue("id"))
 	if err != nil {
-		h.writeDomainError(w, err)
+		h.writeDomainError(w, r, err)
 		return
 	}
 	resp, err := controlledDocumentResponse(*doc)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, resp)
@@ -335,18 +335,18 @@ func (h *Handler) GetActiveDocument(w http.ResponseWriter, r *http.Request, id o
 	r.SetPathValue("id", id.String())
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		h.writeDomainError(w, err)
+		h.writeDomainError(w, r, err)
 		return
 	}
 	cdID := r.PathValue("id")
 
 	inst, err := h.svc.GetActiveInstance(r.Context(), tenantID, cdID)
 	if err != nil {
-		h.writeDomainError(w, err)
+		h.writeDomainError(w, r, err)
 		return
 	}
 	if inst == nil {
-		httpresponse.WriteError(w, http.StatusNotFound, codeCDNotFoundActiveInstance, "no active document instance for this controlled document")
+		problem.Respond(w, r, problem.New(http.StatusNotFound, codeCDNotFoundActiveInstance, "no active document instance for this controlled document"))
 		return
 	}
 
@@ -354,7 +354,7 @@ func (h *Handler) GetActiveDocument(w http.ResponseWriter, r *http.Request, id o
 	if inst.DocumentID != nil {
 		parsed, err := uuid.Parse(*inst.DocumentID)
 		if err != nil {
-			httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
+			problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 			return
 		}
 		resp.DocumentId = &parsed
@@ -372,7 +372,7 @@ func (h *Handler) GetActiveDocument(w http.ResponseWriter, r *http.Request, id o
 	if inst.PublishedDocumentID != nil {
 		parsed, err := uuid.Parse(*inst.PublishedDocumentID)
 		if err != nil {
-			httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
+			problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 			return
 		}
 		resp.PublishedDocumentId = &parsed
@@ -380,7 +380,7 @@ func (h *Handler) GetActiveDocument(w http.ResponseWriter, r *http.Request, id o
 	if inst.ApprovalInstanceID != nil {
 		parsed, err := uuid.Parse(*inst.ApprovalInstanceID)
 		if err != nil {
-			httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
+			problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 			return
 		}
 		resp.ApprovalInstanceId = &parsed
@@ -399,11 +399,11 @@ func (h *Handler) ObsoleteControlledDocument(w http.ResponseWriter, r *http.Requ
 	r.SetPathValue("id", id.String())
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		h.writeDomainError(w, err)
+		h.writeDomainError(w, r, err)
 		return
 	}
 	if err := h.svc.Obsolete(r.Context(), tenantID, r.PathValue("id")); err != nil {
-		h.writeDomainError(w, err)
+		h.writeDomainError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -419,11 +419,11 @@ func (h *Handler) SupersedeControlledDocument(w http.ResponseWriter, r *http.Req
 	r.SetPathValue("id", id.String())
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		h.writeDomainError(w, err)
+		h.writeDomainError(w, r, err)
 		return
 	}
 	if err := h.svc.Supersede(r.Context(), tenantID, r.PathValue("id")); err != nil {
-		h.writeDomainError(w, err)
+		h.writeDomainError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -561,7 +561,7 @@ var (
 // RFC 9457 response.
 type cdDomainErrorEntry struct {
 	match func(error) bool
-	write func(w http.ResponseWriter, err error)
+	write func(w http.ResponseWriter, r *http.Request, err error)
 }
 
 // cdDomainErrorHandlers is writeDomainError's dispatch table, in the same
@@ -576,26 +576,26 @@ type cdDomainErrorEntry struct {
 var cdDomainErrorHandlers = []cdDomainErrorEntry{
 	{
 		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrNoActiveInstance) },
-		write: func(w http.ResponseWriter, _ error) {
-			httpresponse.WriteError(w, http.StatusNotFound, codeCDNotFoundActiveInstance, "no active document instance for this controlled document")
+		write: func(w http.ResponseWriter, r *http.Request, _ error) {
+			problem.Respond(w, r, problem.New(http.StatusNotFound, codeCDNotFoundActiveInstance, "no active document instance for this controlled document"))
 		},
 	},
 	{
 		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrCDNotFound) },
-		write: func(w http.ResponseWriter, _ error) {
-			httpresponse.WriteError(w, http.StatusNotFound, codeCDNotFoundControlledDocument, "controlled document not found")
+		write: func(w http.ResponseWriter, r *http.Request, _ error) {
+			problem.Respond(w, r, problem.New(http.StatusNotFound, codeCDNotFoundControlledDocument, "controlled document not found"))
 		},
 	},
 	{
 		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrCDNotActive) },
-		write: func(w http.ResponseWriter, _ error) {
-			httpresponse.WriteError(w, http.StatusConflict, codeCDStateNotActive, "controlled document is not active")
+		write: func(w http.ResponseWriter, r *http.Request, _ error) {
+			problem.Respond(w, r, problem.New(http.StatusConflict, codeCDStateNotActive, "controlled document is not active"))
 		},
 	},
 	{
 		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrActiveRevisionExists) },
-		write: func(w http.ResponseWriter, _ error) {
-			httpresponse.WriteError(w, http.StatusConflict, codeCDStateActiveRevisionExists, "controlled document already has an active revision")
+		write: func(w http.ResponseWriter, r *http.Request, _ error) {
+			problem.Respond(w, r, problem.New(http.StatusConflict, codeCDStateActiveRevisionExists, "controlled document already has an active revision"))
 		},
 	},
 	{
@@ -605,20 +605,20 @@ var cdDomainErrorHandlers = []cdDomainErrorEntry{
 		// (internal/modules/approval/http/errors.go) — so both surfaces are one
 		// contract for the client.
 		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrApprovalRouteMissing) },
-		write: func(w http.ResponseWriter, _ error) {
-			httpresponse.WriteError(w, http.StatusConflict, problem.CodeStateApprovalRouteMissing, "profile has no active approval route")
+		write: func(w http.ResponseWriter, r *http.Request, _ error) {
+			problem.Respond(w, r, problem.New(http.StatusConflict, problem.CodeStateApprovalRouteMissing, "profile has no active approval route"))
 		},
 	},
 	{
 		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrCDCodeTaken) },
-		write: func(w http.ResponseWriter, _ error) {
-			httpresponse.WriteError(w, http.StatusConflict, codeCDConflictCodeTaken, "controlled document code already taken")
+		write: func(w http.ResponseWriter, r *http.Request, _ error) {
+			problem.Respond(w, r, problem.New(http.StatusConflict, codeCDConflictCodeTaken, "controlled document code already taken"))
 		},
 	},
 	{
 		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrCDArchivedCodeReuse) },
-		write: func(w http.ResponseWriter, _ error) {
-			httpresponse.WriteError(w, http.StatusConflict, codeCDConflictCodeArchived, "cannot reuse code from archived controlled document")
+		write: func(w http.ResponseWriter, r *http.Request, _ error) {
+			problem.Respond(w, r, problem.New(http.StatusConflict, codeCDConflictCodeArchived, "cannot reuse code from archived controlled document"))
 		},
 	},
 	// annex R-20: the three reason/scope rejections moved 400 -> 422 with the
@@ -626,119 +626,119 @@ var cdDomainErrorHandlers = []cdDomainErrorEntry{
 	// being restated at the call site — ADR 0089 decision 3.
 	{
 		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrManualCodeReasonRequired) },
-		write: func(w http.ResponseWriter, _ error) {
-			_ = problem.Write(w, problem.NewFor(codeCDValidationManualCodeReason, "manual code reason is required"))
+		write: func(w http.ResponseWriter, r *http.Request, _ error) {
+			problem.Respond(w, r, problem.NewFor(codeCDValidationManualCodeReason, "manual code reason is required"))
 		},
 	},
 	{
 		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrOverrideReasonRequired) },
-		write: func(w http.ResponseWriter, _ error) {
-			_ = problem.Write(w, problem.NewFor(codeCDValidationOverrideReason, "override reason is required"))
+		write: func(w http.ResponseWriter, r *http.Request, _ error) {
+			problem.Respond(w, r, problem.NewFor(codeCDValidationOverrideReason, "override reason is required"))
 		},
 	},
 	{
 		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrVisibilityScopeInvalid) },
-		write: func(w http.ResponseWriter, _ error) {
-			_ = problem.Write(w, problem.NewFor(codeCDValidationVisibilityScope, "visibility scope is invalid"))
+		write: func(w http.ResponseWriter, r *http.Request, _ error) {
+			problem.Respond(w, r, problem.NewFor(codeCDValidationVisibilityScope, "visibility scope is invalid"))
 		},
 	},
 	{
 		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrOverrideTemplateDeleted) },
-		write: func(w http.ResponseWriter, _ error) {
-			httpresponse.WriteError(w, http.StatusConflict, codeCDStateOverrideTplDeleted, "override template deleted")
+		write: func(w http.ResponseWriter, r *http.Request, _ error) {
+			problem.Respond(w, r, problem.New(http.StatusConflict, codeCDStateOverrideTplDeleted, "override template deleted"))
 		},
 	},
 	{
 		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrOverrideNotPublished) },
-		write: func(w http.ResponseWriter, _ error) {
-			httpresponse.WriteError(w, http.StatusConflict, codeCDStateOverrideTplNotPublished, "override template is not published")
+		write: func(w http.ResponseWriter, r *http.Request, _ error) {
+			problem.Respond(w, r, problem.New(http.StatusConflict, codeCDStateOverrideTplNotPublished, "override template is not published"))
 		},
 	},
 	{
 		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrDictionaryTokenMissing) },
-		write: func(w http.ResponseWriter, _ error) {
-			httpresponse.WriteError(w, http.StatusUnprocessableEntity, codeCDValidationDictionaryToken, "a referenced dictionary token does not exist")
+		write: func(w http.ResponseWriter, r *http.Request, _ error) {
+			problem.Respond(w, r, problem.New(http.StatusUnprocessableEntity, codeCDValidationDictionaryToken, "a referenced dictionary token does not exist"))
 		},
 	},
 	{
 		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrTemplateProfileMismatch) },
-		write: func(w http.ResponseWriter, _ error) {
-			_ = problem.Write(w, problem.NewFor(codeCDTemplateInvalid, "template version does not match the document profile"))
+		write: func(w http.ResponseWriter, r *http.Request, _ error) {
+			problem.Respond(w, r, problem.NewFor(codeCDTemplateInvalid, "template version does not match the document profile"))
 		},
 	},
 	{
 		match: func(err error) bool { return errors.Is(err, application.ErrTemplateArtifactMissing) },
-		write: func(w http.ResponseWriter, _ error) {
-			httpresponse.WriteError(w, http.StatusConflict, codeCDStateTemplateArtifactMissing, "template artifact missing")
+		write: func(w http.ResponseWriter, r *http.Request, _ error) {
+			problem.Respond(w, r, problem.New(http.StatusConflict, codeCDStateTemplateArtifactMissing, "template artifact missing"))
 		},
 	},
 	{
 		match: func(err error) bool { return errors.Is(err, application.ErrTemplateArtifactInvariantUnconfigured) },
-		write: func(w http.ResponseWriter, _ error) {
-			httpresponse.WriteError(w, http.StatusInternalServerError, codeCDInternalTemplateArtifactUnconfigured, "template artifact invariant not configured")
+		write: func(w http.ResponseWriter, r *http.Request, _ error) {
+			problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeCDInternalTemplateArtifactUnconfigured, "template artifact invariant not configured"))
 		},
 	},
 	{
 		match: func(err error) bool { return errors.Is(err, application.ErrCreationContextUnconfigured) },
-		write: func(w http.ResponseWriter, _ error) {
-			httpresponse.WriteError(w, http.StatusInternalServerError, codeCDInternalCreationContextUnconfigured, "creation context is not configured")
+		write: func(w http.ResponseWriter, r *http.Request, _ error) {
+			problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeCDInternalCreationContextUnconfigured, "creation context is not configured"))
 		},
 	},
 	{
 		match: func(err error) bool { return errors.Is(err, application.ErrActorMissing) },
-		write: func(w http.ResponseWriter, _ error) {
-			httpresponse.WriteError(w, http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "authentication required")
+		write: func(w http.ResponseWriter, r *http.Request, _ error) {
+			problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "authentication required"))
 		},
 	},
 	{
 		match: func(err error) bool { return errors.Is(err, errTenantIDInvalid) },
-		write: func(w http.ResponseWriter, err error) {
+		write: func(w http.ResponseWriter, r *http.Request, err error) {
 			slog.Error("controlled-documents request has invalid tenant id in context",
 				"route", "controlledDocuments.writeDomainError",
 				"error", err,
 			)
-			httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
+			problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		},
 	},
 	{
 		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrProfileHasNoDefaultTemplate) },
-		write: func(w http.ResponseWriter, _ error) {
-			httpresponse.WriteError(w, http.StatusConflict, codeCDStateProfileNoDefaultTemplate, "profile has no default template")
+		write: func(w http.ResponseWriter, r *http.Request, _ error) {
+			problem.Respond(w, r, problem.New(http.StatusConflict, codeCDStateProfileNoDefaultTemplate, "profile has no default template"))
 		},
 	},
 	{
 		match: func(err error) bool { return errors.Is(err, controlleddocumentsdomain.ErrDefaultObsolete) },
-		write: func(w http.ResponseWriter, _ error) {
-			httpresponse.WriteError(w, http.StatusConflict, codeCDStateDefaultTemplateObsolete, "default template is obsolete")
+		write: func(w http.ResponseWriter, r *http.Request, _ error) {
+			problem.Respond(w, r, problem.New(http.StatusConflict, codeCDStateDefaultTemplateObsolete, "default template is obsolete"))
 		},
 	},
 	{
 		match: func(err error) bool { return errors.Is(err, taxonomydomain.ErrProfileNotFound) },
-		write: func(w http.ResponseWriter, _ error) {
-			httpresponse.WriteError(w, http.StatusNotFound, problem.CodeNotFoundDocumentProfile, "profile not found")
+		write: func(w http.ResponseWriter, r *http.Request, _ error) {
+			problem.Respond(w, r, problem.New(http.StatusNotFound, problem.CodeNotFoundDocumentProfile, "profile not found"))
 		},
 	},
 	{
 		match: func(err error) bool { return errors.Is(err, taxonomydomain.ErrAreaNotFound) },
-		write: func(w http.ResponseWriter, _ error) {
-			httpresponse.WriteError(w, http.StatusNotFound, codeCDAreaNotFound, "process area not found")
+		write: func(w http.ResponseWriter, r *http.Request, _ error) {
+			problem.Respond(w, r, problem.New(http.StatusNotFound, codeCDAreaNotFound, "process area not found"))
 		},
 	},
 	{
 		match: func(err error) bool { return errors.Is(err, taxonomydomain.ErrProfileArchived) },
-		write: func(w http.ResponseWriter, _ error) {
-			httpresponse.WriteError(w, http.StatusConflict, problem.CodeStateDocumentProfileArchived, "profile is archived")
+		write: func(w http.ResponseWriter, r *http.Request, _ error) {
+			problem.Respond(w, r, problem.New(http.StatusConflict, problem.CodeStateDocumentProfileArchived, "profile is archived"))
 		},
 	},
 	{
 		match: func(err error) bool { return errors.Is(err, taxonomydomain.ErrAreaArchived) },
-		write: func(w http.ResponseWriter, _ error) {
-			httpresponse.WriteError(w, http.StatusConflict, codeCDAreaArchived, "process area is archived")
+		write: func(w http.ResponseWriter, r *http.Request, _ error) {
+			problem.Respond(w, r, problem.New(http.StatusConflict, codeCDAreaArchived, "process area is archived"))
 		},
 	},
 }
 
-func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
+func (h *Handler) writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 	// ADR 0022 tier-2: an in-tx authz.Require denial (e.g. PeekSeq's preview-code
 	// create check) is "you lack this capability" — surface it as 403
 	// permission.capability_denied problem+json, the same client-visible code the documents
@@ -746,12 +746,12 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 	// fell through to internal.unknown.)
 	var capDenied authz.ErrCapDenied
 	if errors.As(err, &capDenied) {
-		httpresponse.WriteError(w, http.StatusForbidden, problem.CodePermissionCapabilityDenied, "you do not have the required capability in this area")
+		problem.Respond(w, r, problem.New(http.StatusForbidden, problem.CodePermissionCapabilityDenied, "you do not have the required capability in this area"))
 		return
 	}
 	for _, entry := range cdDomainErrorHandlers {
 		if entry.match(err) {
-			entry.write(w, err)
+			entry.write(w, r, err)
 			return
 		}
 	}
@@ -759,7 +759,7 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 		"route", "controlledDocuments.writeDomainError",
 		"error", err,
 	)
-	httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
+	problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 }
 
 func tenantIDFromRequest(r *http.Request) (string, error) {

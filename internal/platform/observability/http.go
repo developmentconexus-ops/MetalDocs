@@ -224,7 +224,7 @@ type MetricsResponse struct {
 func (o *HTTPObservability) MetricsHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
-			httpresponse.WriteMethodNotAllowed(w, "GET")
+			httpresponse.WriteMethodNotAllowed(w, r, "GET")
 			return
 		}
 

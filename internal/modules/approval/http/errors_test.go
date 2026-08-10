@@ -376,8 +376,9 @@ func TestMapErrorToResponse_ErrNoActiveStage(t *testing.T) {
 
 func TestWriteError(t *testing.T) {
 	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/x/signoff", nil)
 
-	WriteError(rr, infrastructure.ErrStaleRevision)
+	WriteError(rr, req, infrastructure.ErrStaleRevision)
 
 	if rr.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want %d", rr.Code, http.StatusConflict)
@@ -398,8 +399,9 @@ func TestWriteError(t *testing.T) {
 func TestWriteJSON(t *testing.T) {
 	rr := httptest.NewRecorder()
 	payload := map[string]string{"ok": "yes"}
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances", nil)
 
-	WriteJSON(rr, http.StatusAccepted, payload)
+	WriteJSON(rr, req, http.StatusAccepted, payload)
 
 	if rr.Code != http.StatusAccepted {
 		t.Fatalf("status = %d, want %d", rr.Code, http.StatusAccepted)

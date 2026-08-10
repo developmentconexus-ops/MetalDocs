@@ -3,7 +3,6 @@
 package problem
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 )
@@ -99,18 +98,10 @@ func FromValidation(fields []FieldError) *Problem {
 	}
 }
 
-// Write writes a problem details response as application/problem+json.
-func Write(w http.ResponseWriter, p *Problem) error {
-	body, err := json.Marshal(p)
-	if err != nil {
-		return err
-	}
-
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(p.Status)
-	_, _ = w.Write(body)
-	return nil
-}
+// Serialization lives in respond.go and is unexported (Respond / RespondCause
+// are the only ways out). The old exported Write is gone: it let every delivery
+// package own emission, which is exactly how the twelve local writeProblem
+// clones came to exist (G-07).
 
 // Error returns a short error-string representation of the problem.
 func (p *Problem) Error() string {

@@ -42,7 +42,7 @@ func (h *ExportHandler) exportPDF(w http.ResponseWriter, r *http.Request) {
 	docID := r.PathValue("id")
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown)
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, problem.CodeInternalUnknown.String()))
 		return
 	}
 	userID := userIDFromReq(r)
@@ -50,7 +50,7 @@ func (h *ExportHandler) exportPDF(w http.ResponseWriter, r *http.Request) {
 	req := exportPDFReq{PaperSize: "A4"}
 	if r.ContentLength != 0 {
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			httpErr(w, http.StatusBadRequest, problem.CodeRequestInvalid)
+			problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, problem.CodeRequestInvalid.String()))
 			return
 		}
 		if req.PaperSize == "" {
@@ -58,7 +58,7 @@ func (h *ExportHandler) exportPDF(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !isAllowedPaperSize(req.PaperSize) {
-		httpErr(w, http.StatusBadRequest, problem.CodeRequestInvalid)
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, problem.CodeRequestInvalid.String()))
 		return
 	}
 
@@ -68,13 +68,13 @@ func (h *ExportHandler) exportPDF(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		status, code := mapExportErr(err)
-		httpErr(w, status, code)
+		problem.Respond(w, r, problem.New(status, code, code.String()))
 		return
 	}
 
 	signedURL, err := h.svc.SignExportURL(r.Context(), res.Export.StorageKey)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown)
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, problem.CodeInternalUnknown.String()))
 		return
 	}
 
@@ -92,7 +92,7 @@ func (h *ExportHandler) exportDocxURL(w http.ResponseWriter, r *http.Request) {
 	docID := r.PathValue("id")
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, problem.CodeInternalUnknown)
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, problem.CodeInternalUnknown.String()))
 		return
 	}
 	userID := userIDFromReq(r)
@@ -100,14 +100,14 @@ func (h *ExportHandler) exportDocxURL(w http.ResponseWriter, r *http.Request) {
 	signedURL, err := h.svc.SignedDocxURL(r.Context(), tenantID, userID, docID)
 	if err != nil {
 		status, code := mapExportErr(err)
-		httpErr(w, status, code)
+		problem.Respond(w, r, problem.New(status, code, code.String()))
 		return
 	}
 
 	summary, err := h.svc.GetDocumentSummary(r.Context(), tenantID, docID)
 	if err != nil {
 		status, code := mapExportErr(err)
-		httpErr(w, status, code)
+		problem.Respond(w, r, problem.New(status, code, code.String()))
 		return
 	}
 

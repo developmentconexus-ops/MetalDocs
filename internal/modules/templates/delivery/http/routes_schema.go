@@ -8,24 +8,25 @@ import (
 	templatesapi "metaldocs/internal/modules/templates/api"
 	"metaldocs/internal/modules/templates/application"
 	"metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/platform/problem"
 )
 
 func (h *Handler) updateSchemas(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	actorID := userIDFromReq(r)
 	templateID := r.PathValue("id")
 	versionNum, err := strconv.Atoi(r.PathValue("n"))
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidParam, "version must be an integer")
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, codeTplInvalidParam, "version must be an integer"))
 		return
 	}
 
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateEdit)); err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
@@ -35,15 +36,15 @@ func (h *Handler) updateSchemas(w http.ResponseWriter, r *http.Request) {
 		ExpectedLockVersion *int                  `json:"expected_lock_version"`
 	}
 	if err := readJSON(r, &req); err != nil {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, err.Error())
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, codeTplInvalidBody, err.Error()))
 		return
 	}
 	if req.ExpectedLockVersion == nil {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, "expected_lock_version is required")
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, codeTplInvalidBody, "expected_lock_version is required"))
 		return
 	}
 	if *req.ExpectedLockVersion < 0 {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, "expected_lock_version must be >= 0")
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, codeTplInvalidBody, "expected_lock_version must be >= 0"))
 		return
 	}
 
@@ -57,13 +58,13 @@ func (h *Handler) updateSchemas(w http.ResponseWriter, r *http.Request) {
 		ExpectedLockVersion: *req.ExpectedLockVersion,
 	})
 	if err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
 	dto, err := toAPIVersionDTO(v)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	var resp templatesapi.UpdateTemplateSchema200JSONResponse

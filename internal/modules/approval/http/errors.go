@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log/slog"
 	"net/http"
 	"strings"
 
@@ -427,37 +426,27 @@ func MapErrorToResponse(err error) *problem.Problem {
 	return problem.New(statusCode, code, responseTitle(err, statusCode))
 }
 
-// WriteError maps err via MapErrorToResponse and writes it as a problem+json
-// response. Any 5xx is also logged server-side, since the client body is
-// intentionally generic and must not leak internal error detail.
-func WriteError(w http.ResponseWriter, err error) {
-	prob := MapErrorToResponse(err)
-	// Never swallow server-side failures: the client gets a generic "internal
-	// error" body, so the underlying cause must be logged for diagnosis.
-	if prob.Status >= http.StatusInternalServerError {
-		slog.Error("approval handler error",
-			slog.Int("status", prob.Status),
-			slog.String("code", prob.Code.String()),
-			slog.Any("error", err),
-		)
-	}
-	if writeErr := problem.Write(w, prob); writeErr != nil {
-		WriteJSON(w, http.StatusInternalServerError, problem.New(http.StatusInternalServerError, approvalCodeInternalUnknown, internalErrorMessage))
-	}
+// WriteError is approval's error-TRANSLATION seam (R-ERR-2): it maps a domain
+// or infrastructure error onto the module's problem catalog and hands the
+// result to the canonical writer. It owns the mapping and nothing else — no
+// status/header/body emission, no logging of its own — so 4xx and 5xx cannot
+// drift from the rest of the API.
+//
+// The cause goes to problem.RespondCause because the client body for a 5xx is
+// deliberately generic: the underlying error must still reach the log.
+func WriteError(w http.ResponseWriter, r *http.Request, err error) {
+	problem.RespondCause(w, r, MapErrorToResponse(err), err)
 }
 
-// WriteJSON marshals body and writes it with the given status code. If body
-// fails to marshal, it falls back to a generic 500 internal-error payload
-// rather than writing a broken response.
-func WriteJSON(w http.ResponseWriter, status int, body any) {
+// WriteJSON marshals body and writes it with the given status code. A marshal
+// failure is an error response, so it leaves through the canonical problem
+// writer instead of a hand-rolled application/json payload.
+func WriteJSON(w http.ResponseWriter, r *http.Request, status int, body any) {
 	payload, err := json.Marshal(body)
 	if err != nil {
-		fallback := problem.New(http.StatusInternalServerError, approvalCodeInternalUnknown, internalErrorMessage)
-		payload, err = json.Marshal(fallback)
-		if err != nil {
-			payload = []byte(`{"status":500,"title":"internal error"}`)
-		}
-		status = http.StatusInternalServerError
+		problem.RespondCause(w, r,
+			problem.New(http.StatusInternalServerError, approvalCodeInternalUnknown, internalErrorMessage), err)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")

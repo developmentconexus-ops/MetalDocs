@@ -27,7 +27,7 @@ var (
 func (h *Handler) SignoffHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	actorID := actorIDFromRequest(r)
@@ -38,33 +38,33 @@ func (h *Handler) SignoffHandler(w http.ResponseWriter, r *http.Request) {
 	// F-QA4-6: this route manages its own replay slot (no idempotency.Require
 	// wrapper), so it enforces the shared UUID wire rule itself.
 	if err := idempotency.ValidateKey(idempKey); err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	if h.decisionSvc == nil {
-		WriteError(w, errors.New("decision service not configured"))
+		WriteError(w, r, errors.New("decision service not configured"))
 		return
 	}
 
 	var body contracts.SignoffRequest
 	if err := strictjson.Decode(r, &body); err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	if err := body.Validate(); err != nil {
-		WriteError(w, NewValidationError(err.Error()))
+		WriteError(w, r, NewValidationError(err.Error()))
 		return
 	}
 	decision := domain.Decision(body.Decision)
 	switch decision {
 	case domain.DecisionApprove, domain.DecisionReject:
 	default:
-		WriteError(w, NewValidationError("decision must be one of: approve, reject"))
+		WriteError(w, r, NewValidationError("decision must be one of: approve, reject"))
 		return
 	}
 
@@ -73,11 +73,11 @@ func (h *Handler) SignoffHandler(w http.ResponseWriter, r *http.Request) {
 	if h.idempStore != nil {
 		handle, replay, err := h.idempStore.BeginStageReplay(r.Context(), tenantID, actorID, idempKey, payloadHash)
 		if err != nil {
-			WriteError(w, err)
+			WriteError(w, r, err)
 			return
 		}
 		if replay != nil {
-			WriteJSON(w, http.StatusOK, contracts.SignoffResponse{
+			WriteJSON(w, r, http.StatusOK, contracts.SignoffResponse{
 				SignoffID: replay.SignoffID,
 				WasReplay: true,
 				Outcome:   replay.Outcome,
@@ -103,7 +103,7 @@ func (h *Handler) SignoffHandler(w http.ResponseWriter, r *http.Request) {
 		if replayHandle != nil {
 			_ = replayHandle.Fail(err)
 		}
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
@@ -117,7 +117,7 @@ func (h *Handler) SignoffHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	WriteJSON(w, http.StatusOK, contracts.SignoffResponse{
+	WriteJSON(w, r, http.StatusOK, contracts.SignoffResponse{
 		SignoffID: result.SignoffID,
 		WasReplay: false,
 		Outcome:   outcome,

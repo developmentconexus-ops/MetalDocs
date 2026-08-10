@@ -31,13 +31,13 @@ func (h *ObservabilityHandler) handleUsage(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if h.service == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "Observability service is not configured"))
+		problem.Respond(w, r, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "Observability service is not configured"))
 		return
 	}
 	usage, err := h.service.GetUsage(r.Context(), tenantID)
 	if err != nil {
 		slog.Error("iam observability: usage failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to load usage"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to load usage"))
 		return
 	}
 	writeJSON(w, http.StatusOK, usageToJSON(usage))
@@ -49,13 +49,13 @@ func (h *ObservabilityHandler) handleKpi(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if h.service == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "Observability service is not configured"))
+		problem.Respond(w, r, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "Observability service is not configured"))
 		return
 	}
 	kpi, err := h.service.GetKpi(r.Context(), tenantID)
 	if err != nil {
 		slog.Error("iam observability: kpi failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to load KPI"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to load KPI"))
 		return
 	}
 	writeJSON(w, http.StatusOK, kpiToJSON(kpi))
@@ -64,16 +64,10 @@ func (h *ObservabilityHandler) handleKpi(w http.ResponseWriter, r *http.Request)
 func (h *ObservabilityHandler) requireTenant(w http.ResponseWriter, r *http.Request) (string, bool) {
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
 		return "", false
 	}
 	return tenantID, true
-}
-
-func (h *ObservabilityHandler) writeProblem(w http.ResponseWriter, p *problem.Problem) {
-	if err := problem.Write(w, p); err != nil {
-		slog.Warn("iam observability: write response failed", "err", err)
-	}
 }
 
 func usageToJSON(u iamdomain.UsageSnapshot) iamapi.UsageSnapshot {

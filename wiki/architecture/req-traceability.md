@@ -4,7 +4,7 @@
 > detects drift between this file and a fresh regeneration and fails as stale.
 > Local command: `go run ./scripts/req-trace`
 
-**Totals:** 68 REQ IDs (61 MUST, 7 SHOULD, 0 MAY). Uncovered MUST: 0.
+**Totals:** 69 REQ IDs (62 MUST, 7 SHOULD, 0 MAY). Uncovered MUST: 0.
 
 | REQ ID | Class | Evidence | Pointer |
 |---|---|---|---|
@@ -19,6 +19,7 @@
 | REQ-MW-5 | MUST | test | apps/api/cmd/metaldocs-api/chain_test.go |
 | REQ-MW-6 | MUST | commit | commit 5f62ba09 — ADR 0022 Phase 7: binds fine-grained (area-grade) authz to runtime at tier-2, keeping middleware route-level only; commit 5f62ba09. |
 | REQ-MW-7 | SHOULD | test | apps/api/cmd/metaldocs-api/chain_test.go |
+| REQ-MW-8 | MUST | doc-annotation | **satisfied A3.2:** `contract_validation` in `apps/api/cmd/metaldocs-api/chain.go`, backed by `internal/platform/openapivalidate` over the embedded `api/openapi/v1/openapi.yaml`; proven through the composed chain in `validator_ingress_test.go`. |
 | REQ-H-1 | MUST | commit | commit ea996da2 — F-06b: extracts delivery-layer raw SQL out of handlers into repositories (handlers stop doing SQL/business rules) across controlled-documents + documents; commit ea996da2. |
 | REQ-H-2 | MUST | commit | commit 6b0bb338 — F-ENVELOPE-DOCSHTTP: migrates documents/http delivery package to RFC 9457 Problem responses; commit 6b0bb338. |
 | REQ-H-3 | MUST | commit | commit 0b88b38e — ADR 0022 Phase 3: membership area-scoping closes the area_admin 403-vs-404 boundary decision; commit 0b88b38e. |

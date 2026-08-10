@@ -19,30 +19,30 @@ import (
 func (h *Handler) CreateRouteHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	actorID := actorIDFromRequest(r)
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	// F-QA4-6: shared Idempotency-Key wire rule (UUID everywhere).
 	if err := idempotency.ValidateKey(idempotencyKey); err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
 	var req contracts.CreateRouteRequest
 	if err := strictjson.Decode(r, &req); err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	if err := req.Validate(); err != nil {
-		WriteError(w, NewValidationError(err.Error()))
+		WriteError(w, r, NewValidationError(err.Error()))
 		return
 	}
 
 	routeAdminSvc := h.routeAdmin
 	if routeAdminSvc == nil {
-		WriteError(w, errors.New("route admin service not configured"))
+		WriteError(w, r, errors.New("route admin service not configured"))
 		return
 	}
 
@@ -62,7 +62,7 @@ func (h *Handler) CreateRouteHandler(w http.ResponseWriter, r *http.Request) {
 		Stages:         mapStageRequests(req.Stages),
 	})
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
@@ -74,7 +74,7 @@ func (h *Handler) CreateRouteHandler(w http.ResponseWriter, r *http.Request) {
 	// column — no "" sentinel on the wire (QR-A finding C) — which is the same
 	// truth req.ProfileCode carried but sourced from the DB rather than the
 	// request.
-	WriteJSON(w, http.StatusCreated, mapCreatedRoute(result))
+	WriteJSON(w, r, http.StatusCreated, mapCreatedRoute(result))
 }
 
 // mapCreatedRoute renders a persisted create projection as the wire
@@ -121,7 +121,7 @@ func mapStagesToResponse(stages []domain.Stage) []contracts.StageResponse {
 func (h *Handler) UpdateRouteHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	actorID := actorIDFromRequest(r)
@@ -129,28 +129,28 @@ func (h *Handler) UpdateRouteHandler(w http.ResponseWriter, r *http.Request) {
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	// F-QA4-6: shared Idempotency-Key wire rule (UUID everywhere).
 	if err := idempotency.ValidateKey(idempotencyKey); err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	expectedVersion, err := parseIfMatch(r.Header.Get("If-Match"))
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
 	var req contracts.UpdateRouteRequest
 	if err := strictjson.Decode(r, &req); err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	if err := req.Validate(); err != nil {
-		WriteError(w, NewValidationError(err.Error()))
+		WriteError(w, r, NewValidationError(err.Error()))
 		return
 	}
 
 	routeAdminSvc := h.routeAdmin
 	if routeAdminSvc == nil {
-		WriteError(w, errors.New("route admin service not configured"))
+		WriteError(w, r, errors.New("route admin service not configured"))
 		return
 	}
 
@@ -164,11 +164,11 @@ func (h *Handler) UpdateRouteHandler(w http.ResponseWriter, r *http.Request) {
 		Stages:          mapStageRequests(req.Stages),
 	})
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
-	WriteJSON(w, http.StatusOK, contracts.RouteResponse{
+	WriteJSON(w, r, http.StatusOK, contracts.RouteResponse{
 		RouteID:    result.RouteID,
 		NewVersion: intPtr(result.NewVersion),
 	})
@@ -180,7 +180,7 @@ func (h *Handler) UpdateRouteHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DeactivateRouteHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	actorID := actorIDFromRequest(r)
@@ -188,29 +188,29 @@ func (h *Handler) DeactivateRouteHandler(w http.ResponseWriter, r *http.Request)
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	// F-QA4-6: shared Idempotency-Key wire rule (UUID everywhere).
 	if err := idempotency.ValidateKey(idempotencyKey); err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	expectedVersion, err := parseIfMatch(r.Header.Get("If-Match"))
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
 	var body contracts.DeactivateRouteRequest
 	if err := strictjson.Decode(r, &body); err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	if err := body.Validate(); err != nil {
-		WriteError(w, NewValidationError(err.Error()))
+		WriteError(w, r, NewValidationError(err.Error()))
 		return
 	}
 	reason := strings.TrimSpace(body.Reason)
 
 	routeAdminSvc := h.routeAdmin
 	if routeAdminSvc == nil {
-		WriteError(w, errors.New("route admin service not configured"))
+		WriteError(w, r, errors.New("route admin service not configured"))
 		return
 	}
 
@@ -223,11 +223,11 @@ func (h *Handler) DeactivateRouteHandler(w http.ResponseWriter, r *http.Request)
 		ExpectedVersion: expectedVersion,
 	})
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
-	WriteJSON(w, http.StatusOK, contracts.RouteResponse{
+	WriteJSON(w, r, http.StatusOK, contracts.RouteResponse{
 		RouteID: result.RouteID,
 	})
 }
@@ -236,20 +236,20 @@ func (h *Handler) DeactivateRouteHandler(w http.ResponseWriter, r *http.Request)
 func (h *Handler) ListRoutesHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	actorID := actorIDFromRequest(r)
 
 	routeAdminSvc := h.routeAdmin
 	if routeAdminSvc == nil {
-		WriteError(w, errors.New("route admin service not configured"))
+		WriteError(w, r, errors.New("route admin service not configured"))
 		return
 	}
 
 	out, err := routeAdminSvc.List(r.Context(), h.runner, tenantID, actorID)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
@@ -262,7 +262,7 @@ func (h *Handler) ListRoutesHandler(w http.ResponseWriter, r *http.Request) {
 	if len(out.Routes) > 0 {
 		total = out.Routes[0].Total
 	}
-	WriteJSON(w, http.StatusOK, contracts.ListRoutesResponse{
+	WriteJSON(w, r, http.StatusOK, contracts.ListRoutesResponse{
 		Routes: routes,
 		Total:  total,
 	})

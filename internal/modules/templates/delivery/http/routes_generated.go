@@ -10,6 +10,7 @@ import (
 	templatesapi "metaldocs/internal/modules/templates/api"
 	"metaldocs/internal/modules/templates/application"
 	"metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/platform/problem"
 )
 
 var _ templatesapi.ServerInterface = (*Handler)(nil)
@@ -29,22 +30,22 @@ func (h *Handler) ListTemplates(w http.ResponseWriter, r *http.Request, params t
 func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request, _ templatesapi.CreateTemplateParams) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	actorID := userIDFromReq(r)
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateCreate)); err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
 	var req templatesapi.CreateTemplateJSONRequestBody
 	if err := readStrictJSON(r, &req); err != nil {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, err.Error())
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, codeTplInvalidBody, err.Error()))
 		return
 	}
 	if field := missingCreateTemplateField(req); field != "" {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, "field "+field+" is required")
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, codeTplInvalidBody, "field "+field+" is required"))
 		return
 	}
 
@@ -66,7 +67,7 @@ func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request, _ templ
 		DocTypeCode: strings.TrimSpace(req.DocTypeCode),
 	})
 	if err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
@@ -84,12 +85,12 @@ func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request, _ templ
 	}
 	tplDTO, err := toAPITemplateDTO(read, h.resolveCreatedByDisplayName(r.Context(), tenantID, res.Template.CreatedBy))
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	vDTO, err := toAPIVersionDTO(res.Version)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	var resp templatesapi.CreateTemplateResponse
@@ -144,12 +145,12 @@ func (h *Handler) PresignTemplateDocxUploadUrl(w http.ResponseWriter, r *http.Re
 func (h *Handler) PresignTemplateSchemaUploadUrl(w http.ResponseWriter, r *http.Request, id string, n int) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	actorID := userIDFromReq(r)
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateEdit)); err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 	res, err := h.svc.PresignTemplateSchemaUpload(r.Context(), application.PresignTemplateUploadCmd{
@@ -159,7 +160,7 @@ func (h *Handler) PresignTemplateSchemaUploadUrl(w http.ResponseWriter, r *http.
 		VersionNumber: n,
 	})
 	if err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, templatesapi.PresignTemplateSchemaUploadUrl200JSONResponse{
@@ -174,12 +175,12 @@ func (h *Handler) PresignTemplateSchemaUploadUrl(w http.ResponseWriter, r *http.
 func (h *Handler) presignTemplateUpload(w http.ResponseWriter, r *http.Request, id string, n int) (string, string, bool) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return "", "", false
 	}
 	actorID := userIDFromReq(r)
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateEdit)); err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return "", "", false
 	}
 
@@ -190,7 +191,7 @@ func (h *Handler) presignTemplateUpload(w http.ResponseWriter, r *http.Request, 
 		VersionNumber: n,
 	})
 	if err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return "", "", false
 	}
 	return res.UploadURL, res.StorageKey, true
@@ -203,12 +204,12 @@ func (h *Handler) presignTemplateUpload(w http.ResponseWriter, r *http.Request, 
 func (h *Handler) PublishTemplateVersion(w http.ResponseWriter, r *http.Request, id string, n int, _ templatesapi.PublishTemplateVersionParams) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	actorID := userIDFromReq(r)
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplatePublish)); err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
@@ -219,7 +220,7 @@ func (h *Handler) PublishTemplateVersion(w http.ResponseWriter, r *http.Request,
 		VersionNumber: n,
 	})
 	if err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 	// Strict-server typed response — exactly the 1 field declared at

@@ -9,6 +9,7 @@ import (
 	approvaldomain "metaldocs/internal/modules/approval/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	templatesapi "metaldocs/internal/modules/templates/api"
+	"metaldocs/internal/platform/problem"
 )
 
 // GetTemplateVersionApprovalPreview implements
@@ -26,28 +27,28 @@ import (
 func (h *Handler) GetTemplateVersionApprovalPreview(w http.ResponseWriter, r *http.Request, id uuid.UUID, n int) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	if h.nilApprovalKernel() {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "approval kernel not configured")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "approval kernel not configured"))
 		return
 	}
 	templateID := id.String()
 
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateSubmit)); err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
 	if _, err := h.svc.GetVersion(r.Context(), tenantID, templateID, n); err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
 	preview, err := h.approvalSubmit.PreviewRoute(r.Context(), h.approvalRunner, tenantID, templateID)
 	if err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 

@@ -17,10 +17,14 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
-var (
-	writeJSON  = httpresponse.WriteJSON
-	writeError = httpresponse.WriteError
-)
+var writeJSON = httpresponse.WriteJSON
+
+// writeError is taxonomy's problem CONSTRUCTOR shorthand: it builds the Problem
+// and hands it to the canonical writer. It owns no serialization of its own
+// (problem.Respond is the only emitter in the process).
+func writeError(w http.ResponseWriter, r *http.Request, status int, code problem.Code, message string) {
+	problem.Respond(w, r, problem.New(status, code, message))
+}
 
 // Taxonomy document-profile codes.
 //
@@ -113,19 +117,19 @@ type setDefaultTemplateRequest struct {
 func (h *Handler) listProfiles(w http.ResponseWriter, r *http.Request) {
 	includeArchived, err := parseIncludeArchived(r)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "include_archived must be true or false")
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "include_archived must be true or false"))
 		return
 	}
 
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 
 	items, err := h.profiles.List(r.Context(), tenantID, includeArchived)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "failed to list profiles")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "failed to list profiles"))
 		return
 	}
 	// Bulk approval-route readiness for the whole page (never N+1), one read
@@ -134,7 +138,7 @@ func (h *Handler) listProfiles(w http.ResponseWriter, r *http.Request) {
 	// documents (or new templates, ADR 0086).
 	ready, err := h.profiles.RouteReadySubjects(r.Context(), tenantID)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "failed to resolve approval route readiness")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "failed to resolve approval route readiness"))
 		return
 	}
 	dtos := make([]taxonomyapi.DocumentProfileItem, len(items))
@@ -149,12 +153,12 @@ func (h *Handler) listProfiles(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) createProfile(w http.ResponseWriter, r *http.Request) {
 	var req profileUpsertRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "invalid JSON payload")
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "invalid JSON payload"))
 		return
 	}
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 
@@ -180,12 +184,12 @@ func (h *Handler) createProfile(w http.ResponseWriter, r *http.Request) {
 		GovernanceClass:          governanceClassOrDefault(req.GovernanceClass),
 	}
 	if profile.Code == "" {
-		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "code is required")
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "code is required"))
 		return
 	}
 
 	if err := h.profiles.Create(r.Context(), profile); err != nil {
-		h.writeProfileError(w, err)
+		h.writeProfileError(w, r, err)
 		return
 	}
 	// A just-created profile cannot already have an approval route of either
@@ -197,18 +201,18 @@ func (h *Handler) createProfile(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) getProfile(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 
 	profile, err := h.profiles.Get(r.Context(), tenantID, domain.ProfileCode(r.PathValue("code")))
 	if err != nil {
-		h.writeProfileError(w, err)
+		h.writeProfileError(w, r, err)
 		return
 	}
 	hasRoute, hasTemplateRoute, err := h.profileHasActiveRoute(r, tenantID, profile.Code)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "failed to resolve approval route readiness")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "failed to resolve approval route readiness"))
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, toDocumentProfileItem(profile, hasRoute, hasTemplateRoute))
@@ -230,17 +234,17 @@ func (h *Handler) profileHasActiveRoute(r *http.Request, tenantID string, code d
 func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 	var req profileUpsertRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "invalid JSON payload")
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "invalid JSON payload"))
 		return
 	}
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 	current, err := h.profiles.Get(r.Context(), tenantID, domain.ProfileCode(r.PathValue("code")))
 	if err != nil {
-		h.writeProfileError(w, err)
+		h.writeProfileError(w, r, err)
 		return
 	}
 
@@ -265,7 +269,7 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 		EditableByRole:           strings.TrimSpace(req.EditableByRole),
 	}
 	if err := h.profiles.Update(r.Context(), profile); err != nil {
-		h.writeProfileError(w, err)
+		h.writeProfileError(w, r, err)
 		return
 	}
 
@@ -279,11 +283,11 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 	if req.GovernanceClass != "" && newClass != current.GovernanceClass {
 		actorUserID, ok := authn.UserIDFromContext(r.Context())
 		if !ok {
-			httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
+			problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 			return
 		}
 		if err := h.profiles.Reclassify(r.Context(), tenantID, domain.ProfileCode(updateCode), newClass, actorUserID); err != nil {
-			h.writeProfileError(w, err)
+			h.writeProfileError(w, r, err)
 			return
 		}
 		profile.GovernanceClass = newClass
@@ -293,7 +297,7 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	hasRoute, hasTemplateRoute, err := h.profileHasActiveRoute(r, tenantID, profile.Code)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "failed to resolve approval route readiness")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "failed to resolve approval route readiness"))
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, toDocumentProfileItem(profile, hasRoute, hasTemplateRoute))
@@ -314,22 +318,22 @@ func governanceClassOrDefault(raw string) domain.GovernanceClass {
 func (h *Handler) setDefaultTemplate(w http.ResponseWriter, r *http.Request) {
 	var req setDefaultTemplateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "invalid JSON payload")
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "invalid JSON payload"))
 		return
 	}
 	if strings.TrimSpace(req.TemplateVersionID) == "" {
-		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "templateVersionId is required")
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "templateVersionId is required"))
 		return
 	}
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 
 	actorUserID, ok := authn.UserIDFromContext(r.Context())
 	if !ok {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 	if err := h.profiles.SetDefaultTemplate(
@@ -339,7 +343,7 @@ func (h *Handler) setDefaultTemplate(w http.ResponseWriter, r *http.Request) {
 		req.TemplateVersionID,
 		actorUserID,
 	); err != nil {
-		h.writeProfileError(w, err)
+		h.writeProfileError(w, r, err)
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, taxonomyapi.SetTaxonomyProfileDefaultTemplate200Response{})
@@ -348,13 +352,13 @@ func (h *Handler) setDefaultTemplate(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) archiveProfile(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 
 	actorUserID, ok := authn.UserIDFromContext(r.Context())
 	if !ok {
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 	if err := h.profiles.Archive(
@@ -363,7 +367,7 @@ func (h *Handler) archiveProfile(w http.ResponseWriter, r *http.Request) {
 		domain.ProfileCode(r.PathValue("code")),
 		actorUserID,
 	); err != nil {
-		h.writeProfileError(w, err)
+		h.writeProfileError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -380,42 +384,42 @@ func editableByRoleMessage() string {
 	return "editable_by_role must be one of: " + strings.Join(codes, ", ")
 }
 
-func (h *Handler) writeProfileError(w http.ResponseWriter, err error) {
+func (h *Handler) writeProfileError(w http.ResponseWriter, r *http.Request, err error) {
 	var pgErr *pgconn.PgError
 	switch {
 	case errors.Is(err, domain.ErrProfileNotFound):
-		httpresponse.WriteError(w, http.StatusNotFound, codeTaxProfileNotFound, "profile not found")
+		problem.Respond(w, r, problem.New(http.StatusNotFound, codeTaxProfileNotFound, "profile not found"))
 	case errors.Is(err, domain.ErrProfileArchived):
-		httpresponse.WriteError(w, http.StatusConflict, codeTaxProfileArchived, "profile is archived")
+		problem.Respond(w, r, problem.New(http.StatusConflict, codeTaxProfileArchived, "profile is archived"))
 	case errors.Is(err, domain.ErrTemplateNotPublished):
-		httpresponse.WriteError(w, http.StatusConflict, codeTaxTemplateNotPublished, "template version is not published")
+		problem.Respond(w, r, problem.New(http.StatusConflict, codeTaxTemplateNotPublished, "template version is not published"))
 	case errors.Is(err, domain.ErrTemplateProfileMismatch):
 		// R-22: 409 -> 422, bound to validation.template_profile_mismatch.
-		httpresponse.WriteError(w, http.StatusUnprocessableEntity, codeTaxTemplateProfileMismatch, "template version belongs to different profile")
+		problem.Respond(w, r, problem.New(http.StatusUnprocessableEntity, codeTaxTemplateProfileMismatch, "template version belongs to different profile"))
 	case errors.Is(err, domain.ErrProfileCodeImmutable):
 		// R-20: 400 -> 422, bound to validation.profile_code_immutable.
-		httpresponse.WriteError(w, http.StatusUnprocessableEntity, codeTaxProfileCodeImmutable, "profile code is immutable")
+		problem.Respond(w, r, problem.New(http.StatusUnprocessableEntity, codeTaxProfileCodeImmutable, "profile code is immutable"))
 	case errors.Is(err, domain.ErrInvalidGovernanceClass):
-		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "governance_class must be one of: controlado, simples, livre")
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "governance_class must be one of: controlado, simples, livre"))
 	case errors.Is(err, domain.ErrInvalidEditableByRole):
 		// annex R-6: this site answered 422 while carrying request.invalid, whose
 		// registered default is 400 — a code/status contradiction. The generic 422
 		// is validation.failed (annex row #121); the status now comes from the
 		// registration via NewFor instead of being restated here.
-		_ = problem.Write(w, problem.NewFor(problem.CodeValidationFailed, editableByRoleMessage()))
+		problem.Respond(w, r, problem.NewFor(problem.CodeValidationFailed, editableByRoleMessage()))
 	case errors.Is(err, domain.ErrClassChangeRouteConflict):
-		httpresponse.WriteError(w, http.StatusConflict, codeTaxProfileClassRouteConflict, "reclassification conflicts with an active approval route")
+		problem.Respond(w, r, problem.New(http.StatusConflict, codeTaxProfileClassRouteConflict, "reclassification conflicts with an active approval route"))
 	case errors.As(err, &pgErr) && pgErr.Code == "23514":
-		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, "request violates data constraints")
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "request violates data constraints"))
 	case errors.As(err, &pgErr) && pgErr.Code == "23505":
-		httpresponse.WriteError(w, http.StatusConflict, codeTaxProfileAlreadyExists, "profile code already exists")
+		problem.Respond(w, r, problem.New(http.StatusConflict, codeTaxProfileAlreadyExists, "profile code already exists"))
 	case errors.As(err, &pgErr) && pgErr.Code == "23503":
 		// R-26 / annex #153b: the referenced family_code is a supplied value that
 		// does not resolve — 409 -> 422 (behaviour-visible, ratified).
-		httpresponse.WriteError(w, http.StatusUnprocessableEntity, codeTaxFamilyUnknown, "referenced family does not exist")
+		problem.Respond(w, r, problem.New(http.StatusUnprocessableEntity, codeTaxFamilyUnknown, "referenced family does not exist"))
 	default:
 		slog.Error("taxonomy profile error", "err", err)
-		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 	}
 }
 

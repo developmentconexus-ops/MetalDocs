@@ -6,16 +6,17 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	renderdomain "metaldocs/internal/modules/render/domain"
 	templatesapi "metaldocs/internal/modules/templates/api"
+	"metaldocs/internal/platform/problem"
 )
 
 func (h *Handler) listPlaceholderCatalog(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateView)); err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 	var entries []templatesapi.PlaceholderCatalogEntry

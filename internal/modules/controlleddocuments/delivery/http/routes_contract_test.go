@@ -363,7 +363,9 @@ func TestWriteDomainError_TemplateMismatchIs422(t *testing.T) {
 	handler := &Handler{}
 	rec := httptest.NewRecorder()
 
-	handler.writeDomainError(rec, controlleddocumentsdomain.ErrTemplateProfileMismatch)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents", nil)
+
+	handler.writeDomainError(rec, req, controlleddocumentsdomain.ErrTemplateProfileMismatch)
 
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusUnprocessableEntity, rec.Body.String())
@@ -383,7 +385,9 @@ func TestWriteDomainError_TemplateArtifactMissingIs409(t *testing.T) {
 	handler := &Handler{}
 	rec := httptest.NewRecorder()
 
-	handler.writeDomainError(rec, application.ErrTemplateArtifactMissing)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents", nil)
+
+	handler.writeDomainError(rec, req, application.ErrTemplateArtifactMissing)
 
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusConflict, rec.Body.String())
@@ -403,7 +407,9 @@ func TestWriteDomainError_ActorMissingIs401(t *testing.T) {
 	handler := &Handler{}
 	rec := httptest.NewRecorder()
 
-	handler.writeDomainError(rec, application.ErrActorMissing)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents", nil)
+
+	handler.writeDomainError(rec, req, application.ErrActorMissing)
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusUnauthorized, rec.Body.String())
@@ -447,7 +453,9 @@ func TestWriteDomainError_TemplateArtifactInvariantUnconfiguredIs500(t *testing.
 	handler := &Handler{}
 	rec := httptest.NewRecorder()
 
-	handler.writeDomainError(rec, application.ErrTemplateArtifactInvariantUnconfigured)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents", nil)
+
+	handler.writeDomainError(rec, req, application.ErrTemplateArtifactInvariantUnconfigured)
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusInternalServerError, rec.Body.String())
@@ -481,7 +489,9 @@ func TestWriteDomainError_CapabilityDeniedIs403(t *testing.T) {
 			ActorID:    "user-1",
 		})
 
-	handler.writeDomainError(rec, wrapped)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents", nil)
+
+	handler.writeDomainError(rec, req, wrapped)
 
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusForbidden, rec.Body.String())

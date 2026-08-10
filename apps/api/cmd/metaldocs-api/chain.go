@@ -22,7 +22,7 @@ type chainLink struct {
 // the process, but otel wraps everything else so httpObs sees the active span
 // for trace-id correlation. chain_test.go asserts both the declared order and
 // the composed execution order; reorder here and the build breaks, not production.
-func apiChain(recovery, otel, httpObs, cors, origin, preAuthLoginLimit, authn, iamAuthz, presence, rateLimit, methodNotAllowed func(http.Handler) http.Handler) []chainLink {
+func apiChain(recovery, otel, httpObs, cors, origin, preAuthLoginLimit, authn, iamAuthz, presence, rateLimit, contractValidation, methodNotAllowed func(http.Handler) http.Handler) []chainLink {
 	return []chainLink{
 		{"panic_recovery", recovery},
 		{"otel", otel},
@@ -34,6 +34,21 @@ func apiChain(recovery, otel, httpObs, cors, origin, preAuthLoginLimit, authn, i
 		{"iam_authz", iamAuthz},
 		{"presence_bump", presence},
 		{"rate_limit", rateLimit},
+		// Contract validation runs here — after authn/iam_authz/rate_limit, and
+		// before the mux — and the position is the whole design.
+		//
+		// AFTER the security layers, so an unauthenticated or unauthorized
+		// caller still gets 401/403/429 and learns nothing about the shape of a
+		// body they were never entitled to submit. Validating first would turn
+		// this link into an oracle.
+		//
+		// INSIDE method_not_allowed, so the mux keeps owning 404 and 405: when
+		// the contract router finds no operation the request passes through
+		// untouched. That is safe rather than a bypass because assertSurface
+		// refuses to boot unless the mounted routes equal the spec-generated
+		// surface — "unknown to the contract" and "unknown to the mux" are the
+		// same set, proven at startup.
+		{"contract_validation", contractValidation},
 		// Innermost (nearest the mux): rewrite the stdlib text/plain 404/405 the
 		// method-routed ServeMux emits into problem+json, preserving Allow (D-03).
 		{"method_not_allowed", methodNotAllowed},

@@ -45,11 +45,11 @@ func (h *Handler) resolveReviewVerdictReplay(w http.ResponseWriter, r *http.Requ
 	}
 	handle, replay, err := h.idempStore.BeginStageReplay(r.Context(), tenantID, actorID, idempKey, payloadHash)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return nil, true
 	}
 	if replay != nil {
-		WriteJSON(w, http.StatusOK, contracts.ReviewVerdictResponse{
+		WriteJSON(w, r, http.StatusOK, contracts.ReviewVerdictResponse{
 			VerdictID: replay.SignoffID,
 			WasReplay: true,
 			Outcome:   replay.Outcome,
@@ -67,7 +67,7 @@ func (h *Handler) resolveReviewVerdictReplay(w http.ResponseWriter, r *http.Requ
 func (h *Handler) ReviewVerdictHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	actorID := actorIDFromRequest(r)
@@ -78,22 +78,22 @@ func (h *Handler) ReviewVerdictHandler(w http.ResponseWriter, r *http.Request) {
 	// F-QA4-6: self-managed replay slot (no idempotency.Require wrapper), so the
 	// shared UUID wire rule is enforced here.
 	if err := idempotency.ValidateKey(idempKey); err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	if h.reviewVerdictSvc == nil {
-		WriteError(w, errors.New("review verdict service not configured"))
+		WriteError(w, r, errors.New("review verdict service not configured"))
 		return
 	}
 
 	body, verdict, err := decodeReviewVerdictRequest(r)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
@@ -116,7 +116,7 @@ func (h *Handler) ReviewVerdictHandler(w http.ResponseWriter, r *http.Request) {
 		if replayHandle != nil {
 			_ = replayHandle.Fail(err)
 		}
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
@@ -139,7 +139,7 @@ func (h *Handler) ReviewVerdictHandler(w http.ResponseWriter, r *http.Request) {
 	if result.NextStageID != nil {
 		resp.NextStageID = *result.NextStageID
 	}
-	WriteJSON(w, http.StatusOK, resp)
+	WriteJSON(w, r, http.StatusOK, resp)
 }
 
 func reviewVerdictOutcome(result application.ReviewVerdictResult) string {

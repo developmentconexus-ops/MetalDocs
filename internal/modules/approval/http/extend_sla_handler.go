@@ -34,7 +34,7 @@ import (
 func (h *Handler) ExtendSLAHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	actorID := actorIDFromRequest(r)
@@ -42,17 +42,17 @@ func (h *Handler) ExtendSLAHandler(w http.ResponseWriter, r *http.Request) {
 
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	if err := idempotency.ValidateKey(idempotencyKey); err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
 	var body contracts.ExtendSLARequest
 	if err := strictjson.Decode(r, &body); err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	if err := body.Validate(); err != nil {
-		WriteError(w, NewValidationError(err.Error()))
+		WriteError(w, r, NewValidationError(err.Error()))
 		return
 	}
 
@@ -65,12 +65,12 @@ func (h *Handler) ExtendSLAHandler(w http.ResponseWriter, r *http.Request) {
 	// is the friendly, fail-fast first line that also matches the
 	// contract's advertised status/code before any transaction opens.
 	if strings.TrimSpace(body.Reason) == "" {
-		WriteError(w, application.ErrSLAExtensionReasonRequired)
+		WriteError(w, r, application.ErrSLAExtensionReasonRequired)
 		return
 	}
 
 	if h.slaExtensionSvc == nil {
-		WriteError(w, errors.New("sla extension service not configured"))
+		WriteError(w, r, errors.New("sla extension service not configured"))
 		return
 	}
 	if err := h.slaExtensionSvc.Extend(r.Context(), h.runner, application.ExtendRequest{
@@ -80,7 +80,7 @@ func (h *Handler) ExtendSLAHandler(w http.ResponseWriter, r *http.Request) {
 		NewDueAt:   body.DueAtTime(),
 		Reason:     body.Reason,
 	}); err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 

@@ -4145,6 +4145,7 @@ export interface operations {
                     "application/json": components["schemas"]["AuthLoginResponse"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             500: components["responses"]["InternalServerError"];
         };
@@ -4416,6 +4417,7 @@ export interface operations {
                     "application/json": components["schemas"]["ResetManagedUserPasswordResponse"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
