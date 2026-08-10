@@ -1,54 +1,389 @@
 {
-  "_doc": "Base-table ownership, as data. This file is the single enforcement source consumed by the hgcrossmodule analyzer (ADR-0039 D1: a module emitting raw SQL against a table another module owns is a violation). It replaces the hand-maintained Go map that used to live in hgcrossmodule.go, where an ownership fact could go stale silently — and did: governance_events was recorded as approval-owned because approval writes it, contradicting ADR 0044, which keeps it audit-owned. That single stale entry hid two foreign writes from the A4.0 census.\n\nThis file is NOT a second truth. table_ownership_parity_test.go asserts, on every `go test ./...`, that each entry agrees with the governed documentation in wiki/database/tables/<table>.md ('> **Owner:** <module>') after alias normalisation. A doc and this file disagreeing is a red build, not a judgement call. Where the governed doc labels a table with something that is not a module directory under internal/modules/ (platform-layer owners), the entry must acknowledge that label verbatim in wiki_owner — an explicit, reviewable divergence rather than a silent one.\n\nOwner values are the top-level directory name under internal/modules/. 'Top-level' matters: iam/presence is inside iam, so a read across sub-packages of one module is not cross-module.",
+  "_doc": "Base-table ownership and classification, as data. This file is the single enforcement source consumed by the hgcrossmodule analyzer (ADR-0039 D1: a module emitting raw SQL against a table another module owns is a violation).\n\nCOMPLETENESS IS THE POINT (#87/A1 review F1). This file used to hold only the tables whose ownership had already come up - 37 of the 56 live base tables. hgViolation treats an unknown table as a non-violation, so every omitted table was an unguarded table: a foreign `UPDATE document_images ...` was invisible and nothing failed. The old parity test walked catalog -> docs, a direction that cannot see an omission. `tables` below is now the COMPLETE base-table universe of the governed schema, and table_ownership_completeness_test.go proves it in both directions against db/baseline + db/migrations. Omission is not a classification: a live base table that is not here is a red build.\n\nCLASSES. Every live base table carries exactly one.\n  module       - owned by one enforcement module (internal/modules/<owner>); foreign raw SQL is a violation.\n  platform     - cross-cutting by architectural design, no module owner, so there is no foreign access to define.\n  historical   - in the schema with no live owner; recorded, not enforced. Currently empty: every live base table has a governed owner. The class exists so that a future dead table gets classified instead of omitted.\n  out-of-scope - deliberately outside H-G enforcement, with the reason stated.\n\n`retired` is the other half of the parity: tables that wiki/database/tables still documents but the live schema no longer has. Naming them here lets the doc set and the schema be reconciled mechanically instead of by reading, and gives `document_attachments` an answer that is checked rather than remembered.\n\nThis file is NOT a second truth. table_ownership_parity_test.go asserts, on every `go test ./...`, that each entry agrees with wiki/database/tables/<table>.md ('**Owner:** <module>') after alias normalisation. Where the governed doc labels a table with something that is not a module directory under internal/modules/, the entry must record that label verbatim in wiki_owner - an explicit, reviewable divergence rather than a silent one.\n\nOwner values are the top-level directory name under internal/modules/. 'Top-level' matters: iam/presence is inside iam, so a read across sub-packages of one module is not cross-module.",
   "aliases": {
     "controlled-documents": "controlleddocuments"
   },
   "tables": [
-    { "table": "controlled_documents", "owner": "controlleddocuments" },
-    { "table": "controlled_document_area_grants", "owner": "controlleddocuments" },
-    { "table": "controlled_document_user_grants", "owner": "controlleddocuments" },
-    { "table": "cd_sequence_counters", "owner": "controlleddocuments" },
-
-    { "table": "documents", "owner": "documents" },
-    { "table": "document_revisions", "owner": "documents" },
-    { "table": "document_comments", "owner": "documents" },
-    { "table": "document_checkpoints", "owner": "documents" },
-    { "table": "document_exports", "owner": "documents" },
-    { "table": "document_placeholder_values", "owner": "documents" },
-    { "table": "editor_sessions", "owner": "documents" },
-    { "table": "autosave_pending_uploads", "owner": "documents" },
-
-    { "table": "approval_instances", "owner": "approval" },
-    { "table": "approval_routes", "owner": "approval" },
-    { "table": "approval_route_stages", "owner": "approval" },
-    { "table": "approval_stage_instances", "owner": "approval" },
-    { "table": "approval_signoffs", "owner": "approval" },
-    { "table": "auth_failure_counters", "owner": "approval", "note": "approval's signature-reauth limiter; the governed doc agrees despite the auth_ prefix." },
-    { "table": "release_generations", "owner": "approval", "note": "ADR 0085 release-hold state machine." },
-    { "table": "approval_delegations", "owner": "approval" },
-    { "table": "approval_review_verdicts", "owner": "approval" },
-    { "table": "approval_route_stage_selectors", "owner": "approval" },
-
-    { "table": "document_process_areas", "owner": "taxonomy" },
-    { "table": "document_profiles", "owner": "taxonomy" },
-    { "table": "document_families", "owner": "taxonomy" },
-
-    { "table": "iam_users", "owner": "iam" },
-    { "table": "iam_user_roles", "owner": "iam" },
-    { "table": "user_process_areas", "owner": "iam" },
-
-    { "table": "auth_identities", "owner": "auth" },
-    { "table": "auth_sessions", "owner": "auth" },
-
-    { "table": "audit_events", "owner": "audit" },
-    { "table": "audit_export_jobs", "owner": "audit" },
-    { "table": "governance_events", "owner": "audit", "note": "ADR 0044: the domain-event sink is audit-owned. approval INSERTs into it and iam DELETEs from it; both are foreign writes, and recording the writer as the owner (the pre-B4 state) made them invisible to the A4.0 census." },
-
-    { "table": "templates_template", "owner": "templates" },
-    { "table": "templates_template_version", "owner": "templates" },
-
-    { "table": "idempotency_keys", "owner": "jobs", "wiki_owner": "platform/idempotency", "note": "The governed doc labels this a platform concern rather than a module; enforcement needs a module directory, and internal/modules/jobs is where the store lives." },
-
-    { "table": "notifications", "owner": "notifications", "wiki_owner": "platform/workers", "note": "The governed doc labels the whole outbox/worker family platform/workers; the notifications module owns this table's writes." }
+    {
+      "table": "cd_sequence_counters",
+      "class": "module",
+      "owner": "controlleddocuments"
+    },
+    {
+      "table": "controlled_document_area_grants",
+      "class": "module",
+      "owner": "controlleddocuments"
+    },
+    {
+      "table": "controlled_document_user_grants",
+      "class": "module",
+      "owner": "controlleddocuments"
+    },
+    {
+      "table": "controlled_documents",
+      "class": "module",
+      "owner": "controlleddocuments"
+    },
+    {
+      "table": "autosave_pending_uploads",
+      "class": "module",
+      "owner": "documents"
+    },
+    {
+      "table": "document_checkpoints",
+      "class": "module",
+      "owner": "documents"
+    },
+    {
+      "table": "document_comments",
+      "class": "module",
+      "owner": "documents"
+    },
+    {
+      "table": "document_exports",
+      "class": "module",
+      "owner": "documents"
+    },
+    {
+      "table": "document_images",
+      "class": "module",
+      "owner": "documents",
+      "note": "Live base table with a governed doc, omitted from this catalog until the F1 completeness pass - exactly the shape reverse completeness now makes impossible. TestHGCrossModule_Positive_ForeignWriteToPreviouslyOmittedTable is its negative fixture."
+    },
+    {
+      "table": "document_placeholder_values",
+      "class": "module",
+      "owner": "documents"
+    },
+    {
+      "table": "document_revisions",
+      "class": "module",
+      "owner": "documents"
+    },
+    {
+      "table": "documents",
+      "class": "module",
+      "owner": "documents"
+    },
+    {
+      "table": "editor_sessions",
+      "class": "module",
+      "owner": "documents"
+    },
+    {
+      "table": "mddm_shadow_diff_events",
+      "class": "module",
+      "owner": "documents",
+      "note": "Created by archive/migrations/0070 for the MDDM shadow-diff comparison; no Go code references it today. Kept module-owned rather than classified historical: it is in the live schema, the governed doc names an owner, and enforcing it costs nothing."
+    },
+    {
+      "table": "approval_delegations",
+      "class": "module",
+      "owner": "approval"
+    },
+    {
+      "table": "approval_instances",
+      "class": "module",
+      "owner": "approval"
+    },
+    {
+      "table": "approval_review_verdicts",
+      "class": "module",
+      "owner": "approval"
+    },
+    {
+      "table": "approval_route_stage_selectors",
+      "class": "module",
+      "owner": "approval"
+    },
+    {
+      "table": "approval_route_stages",
+      "class": "module",
+      "owner": "approval"
+    },
+    {
+      "table": "approval_routes",
+      "class": "module",
+      "owner": "approval"
+    },
+    {
+      "table": "approval_signoffs",
+      "class": "module",
+      "owner": "approval"
+    },
+    {
+      "table": "approval_stage_instances",
+      "class": "module",
+      "owner": "approval"
+    },
+    {
+      "table": "auth_failure_counters",
+      "class": "module",
+      "owner": "approval",
+      "note": "approval's signature-reauth limiter; the governed doc agrees despite the auth_ prefix."
+    },
+    {
+      "table": "release_generations",
+      "class": "module",
+      "owner": "approval",
+      "note": "ADR 0085 release-hold state machine."
+    },
+    {
+      "table": "document_departments",
+      "class": "module",
+      "owner": "taxonomy"
+    },
+    {
+      "table": "document_families",
+      "class": "module",
+      "owner": "taxonomy"
+    },
+    {
+      "table": "document_process_areas",
+      "class": "module",
+      "owner": "taxonomy"
+    },
+    {
+      "table": "document_profiles",
+      "class": "module",
+      "owner": "taxonomy"
+    },
+    {
+      "table": "document_type_schema_versions",
+      "class": "module",
+      "owner": "taxonomy"
+    },
+    {
+      "table": "document_types",
+      "class": "module",
+      "owner": "taxonomy"
+    },
+    {
+      "table": "iam_group_members",
+      "class": "module",
+      "owner": "iam"
+    },
+    {
+      "table": "iam_group_roles",
+      "class": "module",
+      "owner": "iam"
+    },
+    {
+      "table": "iam_groups",
+      "class": "module",
+      "owner": "iam"
+    },
+    {
+      "table": "iam_user_roles",
+      "class": "module",
+      "owner": "iam"
+    },
+    {
+      "table": "iam_users",
+      "class": "module",
+      "owner": "iam"
+    },
+    {
+      "table": "role_capabilities",
+      "class": "module",
+      "owner": "iam"
+    },
+    {
+      "table": "tenant_lifecycle_jobs",
+      "class": "module",
+      "owner": "iam"
+    },
+    {
+      "table": "tenant_plans",
+      "class": "module",
+      "owner": "iam",
+      "wiki_owner": "IAM Admin Center observability",
+      "note": "The governed doc names a product surface rather than a module; iam owns the writes (internal/modules/iam/infrastructure/postgres/tenant_data_port.go)."
+    },
+    {
+      "table": "user_process_areas",
+      "class": "module",
+      "owner": "iam"
+    },
+    {
+      "table": "auth_identities",
+      "class": "module",
+      "owner": "auth"
+    },
+    {
+      "table": "auth_sessions",
+      "class": "module",
+      "owner": "auth"
+    },
+    {
+      "table": "tenants",
+      "class": "module",
+      "owner": "auth",
+      "wiki_owner": "auth/platform",
+      "note": "The doc labels the tenant registry auth/platform. Enforced as auth-owned rather than left unenforced: several modules read it and those reads are recorded in the cilint baseline as #93/A4 debt, but a NEW foreign WRITE to the tenant registry is rejected from today."
+    },
+    {
+      "table": "audit_events",
+      "class": "module",
+      "owner": "audit"
+    },
+    {
+      "table": "audit_export_jobs",
+      "class": "module",
+      "owner": "audit"
+    },
+    {
+      "table": "governance_events",
+      "class": "module",
+      "owner": "audit",
+      "note": "ADR 0044: the domain-event sink is audit-owned. approval INSERTs into it and iam DELETEs from it; both are foreign writes, and recording the writer as the owner (the pre-B4 state) made them invisible to the A4.0 census."
+    },
+    {
+      "table": "document_template_versions",
+      "class": "module",
+      "owner": "templates"
+    },
+    {
+      "table": "templates_template",
+      "class": "module",
+      "owner": "templates"
+    },
+    {
+      "table": "templates_template_version",
+      "class": "module",
+      "owner": "templates"
+    },
+    {
+      "table": "materialize_dispatch_outbox",
+      "class": "module",
+      "owner": "render",
+      "wiki_owner": "render/fanout",
+      "note": "The doc names a path inside render rather than a module directory; render is the enforcement owner."
+    },
+    {
+      "table": "pdf_dispatch_outbox",
+      "class": "module",
+      "owner": "render",
+      "wiki_owner": "platform/workers",
+      "note": "Same divergence as notifications: the doc labels the outbox family platform/workers, and render is the only module emitting SQL against this dispatch outbox."
+    },
+    {
+      "table": "idempotency_keys",
+      "class": "module",
+      "owner": "jobs",
+      "wiki_owner": "platform/idempotency",
+      "note": "The governed doc labels this a platform concern rather than a module; enforcement needs a module directory, and internal/modules/jobs is where the store lives."
+    },
+    {
+      "table": "notifications",
+      "class": "module",
+      "owner": "notifications",
+      "wiki_owner": "platform/workers",
+      "note": "The governed doc labels the whole outbox/worker family platform/workers; the notifications module owns this table's writes."
+    },
+    {
+      "table": "tenant_keys",
+      "class": "module",
+      "owner": "security"
+    },
+    {
+      "table": "token_dictionary_entries",
+      "class": "module",
+      "owner": "tokens"
+    },
+    {
+      "table": "outbox_events",
+      "class": "platform",
+      "wiki_owner": "platform/workers",
+      "note": "The transactional-outbox invariant makes every module a writer by design (state-write and side effect share one tx; internal/platform/outbox is the writer). No module owns it, so there is no foreign access to define. Classified, not omitted."
+    },
+    {
+      "table": "schema_migrations",
+      "class": "out-of-scope",
+      "wiki_owner": "platform/db tooling",
+      "note": "Written by the migration runner under db/, never by module SQL. Deliberately outside H-G enforcement; no file under internal/modules references it."
+    }
+  ],
+  "retired": [
+    {
+      "table": "document_attachments",
+      "note": "archive/migrations/0014_init_document_attachments.sql created it; the 2026-07-29 baseline fold did not carry it forward."
+    },
+    {
+      "table": "document_collaboration_presence",
+      "note": "archive/migrations/0038; presence moved to iam/presence."
+    },
+    {
+      "table": "document_edit_locks",
+      "note": "archive/migrations/0038; superseded by editor_sessions."
+    },
+    {
+      "table": "document_profile_governance",
+      "note": "archive/migrations/0027; folded into document_profiles."
+    },
+    {
+      "table": "document_profile_schema_versions",
+      "note": "archive/migrations/0027; folded into document_type_schema_versions."
+    },
+    {
+      "table": "document_profile_template_defaults",
+      "note": "archive-era profile/template defaults; not carried into the baseline."
+    },
+    {
+      "table": "document_sequences",
+      "note": "superseded by cd_sequence_counters."
+    },
+    {
+      "table": "document_template_assignments",
+      "note": "archive-era template assignment; superseded by document_template_versions."
+    },
+    {
+      "table": "document_template_versions_mddm",
+      "note": "MDDM-era shadow table; not carried into the baseline."
+    },
+    {
+      "table": "document_version_images",
+      "note": "pre-MDDM versioning companion; superseded by document_images."
+    },
+    {
+      "table": "document_versions",
+      "note": "pre-MDDM versioning; superseded by document_revisions (ADR 0065)."
+    },
+    {
+      "table": "document_versions_mddm",
+      "note": "MDDM-era shadow table; not carried into the baseline."
+    },
+    {
+      "table": "job_leases",
+      "note": "the retired Postgres-lease scheduler (M5); River replaced it."
+    },
+    {
+      "table": "template_audit_log",
+      "note": "archive-era; superseded by audit_events."
+    },
+    {
+      "table": "template_drafts",
+      "note": "archive-era; superseded by templates_template_version drafts."
+    },
+    {
+      "table": "template_versions",
+      "note": "archive-era; superseded by templates_template_version."
+    },
+    {
+      "table": "templates",
+      "note": "archive/migrations/0054; superseded by templates_template."
+    },
+    {
+      "table": "templates_approval_config",
+      "note": "archive-era; superseded by approval_routes (ADR 0086)."
+    },
+    {
+      "table": "templates_audit_log",
+      "note": "archive-era; superseded by audit_events."
+    },
+    {
+      "table": "workflow_approvals",
+      "note": "archive/migrations/0016; superseded by the approval_* family (ADR 0082)."
+    }
   ]
 }

@@ -66,6 +66,7 @@ func governedOwner(body string) (string, bool) {
 
 func TestTableOwnershipMatchesGovernedDocs(t *testing.T) {
 	root := repoRoot(t)
+	modules := moduleDirs(t, root)
 
 	for _, e := range ownershipEntries {
 		path := filepath.Join(root, "wiki", "database", "tables", e.Table+".md")
@@ -87,6 +88,22 @@ func TestTableOwnershipMatchesGovernedDocs(t *testing.T) {
 			normalised = alias
 		}
 
+		// A table classified out of module enforcement still has a governed
+		// label, and it still has to match: the class says "no module owns
+		// this", not "the docs stop applying". Recording the label verbatim is
+		// what makes a doc change that re-homes the table a red build.
+		if e.Class != classModule {
+			if e.WikiOwner != wikiOwner {
+				t.Errorf("%s (class %s): wiki_owner=%q but the governed doc says %q",
+					e.Table, e.Class, e.WikiOwner, wikiOwner)
+			}
+			if modules[normalised] {
+				t.Errorf("%s: the governed doc names the module %q, so it is module-owned, not %q",
+					e.Table, normalised, e.Class)
+			}
+			continue
+		}
+
 		if normalised == e.Owner {
 			if e.WikiOwner != "" {
 				t.Errorf("%s: wiki_owner=%q is set but the governed doc already agrees with owner=%q — drop the acknowledgement",
@@ -96,8 +113,8 @@ func TestTableOwnershipMatchesGovernedDocs(t *testing.T) {
 		}
 
 		// Divergence is allowed only where the governed label is not a module
-		// directory (a platform-layer owner) AND the entry acknowledges the
-		// exact governed label. Anything else is drift.
+		// directory (a platform-layer owner, or a product surface) AND the entry
+		// acknowledges the exact governed label. Anything else is drift.
 		if e.WikiOwner == "" {
 			t.Errorf("%s: governed doc says owner %q, catalog says %q — reconcile the doc or record wiki_owner with the reason",
 				e.Table, wikiOwner, e.Owner)
@@ -108,9 +125,13 @@ func TestTableOwnershipMatchesGovernedDocs(t *testing.T) {
 				e.Table, e.WikiOwner, wikiOwner)
 			continue
 		}
-		if !strings.Contains(e.WikiOwner, "/") {
-			t.Errorf("%s: wiki_owner=%q looks like a module name, so this is drift, not a platform-layer divergence",
-				e.Table, e.WikiOwner)
+		// The old form of this rule asked whether the label contained a "/",
+		// which is a guess at "is this a module name". The tree answers it
+		// exactly: if the governed label IS one of the module directories, then
+		// the catalog naming a different owner is drift, full stop.
+		if modules[normalised] {
+			t.Errorf("%s: the governed doc names the module %q and the catalog says %q — that is drift, not a platform-layer divergence",
+				e.Table, normalised, e.Owner)
 		}
 		if e.Note == "" {
 			t.Errorf("%s: diverges from the governed doc (%q vs %q) with no note explaining why", e.Table, wikiOwner, e.Owner)
