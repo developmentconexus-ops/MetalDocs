@@ -267,6 +267,15 @@ var checks = []Check{
 				// function never names *problem.Problem.
 				`takes both an http.ResponseWriter and a *problem.Problem`,
 				`naming it here means a second error envelope`,
+				// A3.2 gate C3: the same sandbox carries a second clone written
+				// against import ALIASES (h "net/http", p ".../problem"). The
+				// function name is pinned because the two unqualified Want
+				// lines above are already satisfied by the unaliased clone —
+				// without naming it, an analyzer that went back to matching the
+				// identifiers "http" and "problem" would still pass this
+				// fixture. That file names no media type, so the only rule that
+				// can report it is the signature rule resolving by import path.
+				`function writeAliasedProblem takes both an http.ResponseWriter and a *problem.Problem`,
 			},
 		},
 	},

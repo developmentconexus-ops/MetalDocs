@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -30,10 +32,22 @@ import (
 // specSpy stands in for a business handler mounted at a real spec route. If it
 // ever runs on invalid input, the API executed business logic against a request
 // the contract forbids — which is the entire defect A3.2 closes.
-type specSpy struct{ called bool }
+//
+// It records more than "was I reached", because reachability is only half of
+// what this link must not break. Validating a request body means CONSUMING it,
+// and a handler downstream of the validator still has to be able to decode the
+// same bytes the client sent. So the spy also reads r.Body and keeps both the
+// bytes and the read error, letting the control assert replay rather than
+// assume it.
+type specSpy struct {
+	called  bool
+	body    []byte
+	readErr error
+}
 
-func (s *specSpy) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
+func (s *specSpy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.called = true
+	s.body, s.readErr = io.ReadAll(r.Body)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -209,11 +223,29 @@ func TestIngress_MalformedJSON_RejectedBeforeHandler(t *testing.T) {
 
 // The control. Without it, every assertion above is satisfiable by a chain that
 // rejects everything.
-func TestIngress_ValidRequest_ReachesHandler(t *testing.T) {
+//
+// It also proves the property the rejection tests structurally cannot: that the
+// body survives validation intact. openapi3filter has to READ the body to check
+// it against the schema, which consumes the stream; every body-decoding handler
+// in this API is downstream of that read. If the validator returned a body that
+// was empty, truncated, or re-serialized, no status assertion anywhere would
+// notice — the request would be accepted and then silently decode into the
+// wrong thing.
+//
+// The submitted bytes are deliberately NOT canonical JSON: they carry newlines,
+// indentation and a space before a colon that any marshal/unmarshal round trip
+// would normalize away. Comparing byte-for-byte therefore proves replay of the
+// original stream, not merely that something semantically equivalent arrived.
+// A weaker assertion (valid JSON, or equal after re-marshalling) would pass on
+// a validator that rebuilt the body, which is exactly the failure mode worth
+// catching.
+func TestIngress_ValidRequest_ReachesHandlerWithTheExactSubmittedBody(t *testing.T) {
 	h, spy := buildValidatingIngress(t)
+	submitted := "{\n  \"identifier\" : \"someone@example.com\",\n" +
+		"  \"password\": \"correct-horse-battery\"\n}"
+
 	rr := httptest.NewRecorder()
-	h.ServeHTTP(rr, postJSON("/api/v1/auth/login",
-		`{"identifier":"someone@example.com","password":"correct-horse-battery"}`))
+	h.ServeHTTP(rr, postJSON("/api/v1/auth/login", submitted))
 
 	if !spy.called {
 		t.Fatalf("a contract-valid request did not reach the handler (status %d, body %s)",
@@ -221,6 +253,13 @@ func TestIngress_ValidRequest_ReachesHandler(t *testing.T) {
 	}
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rr.Code)
+	}
+	if spy.readErr != nil {
+		t.Fatalf("the handler could not read r.Body after the validator consumed it: %v", spy.readErr)
+	}
+	if !bytes.Equal(spy.body, []byte(submitted)) {
+		t.Fatalf("the handler received a body the client never sent\nsubmitted (%d bytes): %q\nreceived  (%d bytes): %q",
+			len(submitted), submitted, len(spy.body), string(spy.body))
 	}
 }
 

@@ -3,6 +3,7 @@ package analyzers
 import (
 	"go/ast"
 	"go/token"
+	"strconv"
 	"strings"
 )
 
@@ -16,6 +17,16 @@ const problemMediaType = "application/problem+json"
 
 // canonicalWriterPkg is the ONLY package allowed to serialize a Problem.
 const canonicalWriterPkg = "internal/platform/problem/"
+
+// The two import paths that make up the forbidden signature. They are matched
+// by PATH rather than by the local identifier a file happens to bind them to,
+// because the identifier is the author's free choice and the rule must not be.
+// `import h "net/http"` names the same package as `import "net/http"`, and a
+// serializer written against the alias is the same serializer.
+const (
+	httpImportPath    = "net/http"
+	problemImportPath = "metaldocs/internal/platform/problem"
+)
 
 // ProblemWriter flags any attempt to build a second HTTP error-serialization
 // path (G-07, rulebook R-ERR-1). MetalDocs has exactly one: problem.Respond /
@@ -73,10 +84,11 @@ func scanProblemWriterFile(fset *token.FileSet, path string) []Finding {
 	}
 	f := raw.(*ast.File)
 	src := readSource(path)
+	aliases := importAliases(f)
 
 	var out []Finding
 	ast.Inspect(f, func(n ast.Node) bool {
-		if msg, pos, ok := problemWriterViolation(n); ok {
+		if msg, pos, ok := problemWriterViolation(n, aliases); ok {
 			out = appendProblemFinding(out, fset, src, path, pos, msg)
 		}
 		return true
@@ -84,18 +96,53 @@ func scanProblemWriterFile(fset *token.FileSet, path string) []Finding {
 	return out
 }
 
+// importAliases maps every local qualifier in a file to the import path it
+// stands for, so the signature rule can ask "is this net/http.ResponseWriter"
+// instead of "is this spelled http.ResponseWriter".
+//
+// The unaliased case resolves to the path's last segment. That is an
+// approximation of the real package name — a package whose clause disagrees
+// with its directory would resolve wrongly — but it is exact for the only two
+// paths this analyzer asks about, both of which are named for their directory.
+// Reading the actual package clause would mean type-checking the whole import
+// graph to settle a question the file's own ImportSpecs already answer.
+func importAliases(f *ast.File) map[string]string {
+	out := make(map[string]string, len(f.Imports))
+	for _, spec := range f.Imports {
+		path, err := strconv.Unquote(spec.Path.Value)
+		if err != nil {
+			continue
+		}
+		local := path[strings.LastIndex(path, "/")+1:]
+		if spec.Name != nil {
+			// "_" binds nothing and "." puts the names in file scope, where
+			// they are plain idents rather than the SelectorExpr this rule
+			// matches. Neither can be a selector qualifier, so neither belongs
+			// in the map. A dot-imported ResponseWriter is therefore outside
+			// what the signature rule sees — the media-type rule still stands,
+			// and no code in this repository dot-imports.
+			if spec.Name.Name == "_" || spec.Name.Name == "." {
+				continue
+			}
+			local = spec.Name.Name
+		}
+		out[local] = path
+	}
+	return out
+}
+
 // problemWriterViolation reports whether a single node is one of the two
 // refused shapes, and with what message.
-func problemWriterViolation(n ast.Node) (msg string, pos token.Pos, ok bool) {
+func problemWriterViolation(n ast.Node, aliases map[string]string) (msg string, pos token.Pos, ok bool) {
 	switch node := n.(type) {
 	case *ast.FuncDecl:
-		if node.Type != nil && isProblemWriterSignature(node.Type.Params) {
+		if node.Type != nil && isProblemWriterSignature(node.Type.Params, aliases) {
 			return "function " + node.Name.Name + " takes both an http.ResponseWriter and a *problem.Problem, " +
 				"which is the local problem-writer shape (G-07, R-ERR-1); call problem.Respond / " +
 				"problem.RespondCause instead — serialization has exactly one owner", node.Pos(), true
 		}
 	case *ast.FuncLit:
-		if node.Type != nil && isProblemWriterSignature(node.Type.Params) {
+		if node.Type != nil && isProblemWriterSignature(node.Type.Params, aliases) {
 			return "function literal takes both an http.ResponseWriter and a *problem.Problem, " +
 				"which is the local problem-writer shape (G-07, R-ERR-1); call problem.Respond / " +
 				"problem.RespondCause instead", node.Pos(), true
@@ -137,37 +184,45 @@ func appendProblemFinding(out []Finding, fset *token.FileSet, src, path string, 
 	})
 }
 
-// isProblemWriterSignature reports whether a parameter list carries both an
-// http.ResponseWriter and a *problem.Problem.
-func isProblemWriterSignature(params *ast.FieldList) bool {
+// isProblemWriterSignature reports whether a parameter list carries both a
+// net/http.ResponseWriter and a *problem.Problem, whatever local names the file
+// imported those packages under.
+func isProblemWriterSignature(params *ast.FieldList, aliases map[string]string) bool {
 	if params == nil {
 		return false
 	}
 	var hasWriter, hasProblem bool
 	for _, field := range params.List {
 		switch {
-		case isSelector(field.Type, "http", "ResponseWriter"):
+		case isSelector(field.Type, aliases, httpImportPath, "ResponseWriter"):
 			hasWriter = true
-		case isPointerToSelector(field.Type, "problem", "Problem"):
+		case isPointerToSelector(field.Type, aliases, problemImportPath, "Problem"):
 			hasProblem = true
 		}
 	}
 	return hasWriter && hasProblem
 }
 
-func isSelector(expr ast.Expr, pkg, name string) bool {
+// isSelector matches a qualified type by the import PATH behind its qualifier,
+// so `http.ResponseWriter` and `h.ResponseWriter` are the same type to the rule
+// — which is the point: the local identifier is the author's to choose, and a
+// guard keyed to it is a guard the author can opt out of by renaming.
+func isSelector(expr ast.Expr, aliases map[string]string, pkgPath, name string) bool {
 	sel, ok := expr.(*ast.SelectorExpr)
 	if !ok {
 		return false
 	}
 	ident, ok := sel.X.(*ast.Ident)
-	return ok && ident.Name == pkg && sel.Sel.Name == name
+	if !ok || sel.Sel.Name != name {
+		return false
+	}
+	return aliases[ident.Name] == pkgPath
 }
 
-func isPointerToSelector(expr ast.Expr, pkg, name string) bool {
+func isPointerToSelector(expr ast.Expr, aliases map[string]string, pkgPath, name string) bool {
 	star, ok := expr.(*ast.StarExpr)
 	if !ok {
 		return false
 	}
-	return isSelector(star.X, pkg, name)
+	return isSelector(star.X, aliases, pkgPath, name)
 }

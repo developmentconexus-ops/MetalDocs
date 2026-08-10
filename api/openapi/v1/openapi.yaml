@@ -115,6 +115,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthLoginResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
@@ -401,6 +403,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ResetManagedUserPasswordResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
