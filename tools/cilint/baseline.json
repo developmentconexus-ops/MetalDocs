@@ -11,6 +11,38 @@
     },
     {
       "analyzer": "hgcrossmodule",
+      "file": "internal/modules/approval/application/cancel_service.go",
+      "message": "module \"approval\" writes \"documents\"'s base table \"documents\" with raw SQL (H-G, ADR-0039 D1): route the mutation through the owner's application service, or record an explicit exemption",
+      "count": 1,
+      "reason": "A4.0 census: pre-existing foreign-table write, invisible until the hgcrossmodule write scan landed. Recorded, not fixed — porting it is #93/A4's property, and repairing it here would be another axis's debt silently cleaned to keep a new guard green.",
+      "owner": "#93/A4 — cross-module SQL closure"
+    },
+    {
+      "analyzer": "hgcrossmodule",
+      "file": "internal/modules/approval/application/decision_service.go",
+      "message": "module \"approval\" writes \"documents\"'s base table \"documents\" with raw SQL (H-G, ADR-0039 D1): route the mutation through the owner's application service, or record an explicit exemption",
+      "count": 1,
+      "reason": "A4.0 census: pre-existing foreign-table write, invisible until the hgcrossmodule write scan landed. Recorded, not fixed — porting it is #93/A4's property, and repairing it here would be another axis's debt silently cleaned to keep a new guard green.",
+      "owner": "#93/A4 — cross-module SQL closure"
+    },
+    {
+      "analyzer": "hgcrossmodule",
+      "file": "internal/modules/approval/application/document_terminal_approval.go",
+      "message": "module \"approval\" writes \"documents\"'s base table \"documents\" with raw SQL (H-G, ADR-0039 D1): route the mutation through the owner's application service, or record an explicit exemption",
+      "count": 1,
+      "reason": "A4.0 census: pre-existing foreign-table write, invisible until the hgcrossmodule write scan landed. Recorded, not fixed — porting it is #93/A4's property, and repairing it here would be another axis's debt silently cleaned to keep a new guard green.",
+      "owner": "#93/A4 — cross-module SQL closure"
+    },
+    {
+      "analyzer": "hgcrossmodule",
+      "file": "internal/modules/approval/application/events.go",
+      "message": "module \"approval\" writes \"audit\"'s base table \"governance_events\" with raw SQL (H-G, ADR-0039 D1): route the mutation through the owner's application service, or record an explicit exemption",
+      "count": 1,
+      "reason": "A4.0 census: pre-existing foreign-table write, invisible until the hgcrossmodule write scan landed. Recorded, not fixed — porting it is #93/A4's property, and repairing it here would be another axis's debt silently cleaned to keep a new guard green.",
+      "owner": "#93/A4 — cross-module SQL closure"
+    },
+    {
+      "analyzer": "hgcrossmodule",
       "file": "internal/modules/approval/application/mark_reviewed_service.go",
       "message": "module \"approval\" reads \"documents\"'s base table \"documents\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
       "count": 1,
@@ -19,11 +51,27 @@
     },
     {
       "analyzer": "hgcrossmodule",
+      "file": "internal/modules/approval/application/mark_reviewed_service.go",
+      "message": "module \"approval\" writes \"documents\"'s base table \"documents\" with raw SQL (H-G, ADR-0039 D1): route the mutation through the owner's application service, or record an explicit exemption",
+      "count": 1,
+      "reason": "A4.0 census: pre-existing foreign-table write, invisible until the hgcrossmodule write scan landed. Recorded, not fixed — porting it is #93/A4's property, and repairing it here would be another axis's debt silently cleaned to keep a new guard green.",
+      "owner": "#93/A4 — cross-module SQL closure"
+    },
+    {
+      "analyzer": "hgcrossmodule",
       "file": "internal/modules/approval/application/obsolete_service.go",
       "message": "module \"approval\" reads \"documents\"'s base table \"documents\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
       "count": 1,
       "reason": "obsolete_service.go:67 SELECT status, revision_version, process_area_code_snapshot FROM documents to validate the subject document before marking its approval obsolete; not ported to a documents-owned read-port.",
       "owner": "unclassified — no owner identified as of 2026-08-07"
+    },
+    {
+      "analyzer": "hgcrossmodule",
+      "file": "internal/modules/approval/application/obsolete_service.go",
+      "message": "module \"approval\" writes \"documents\"'s base table \"documents\" with raw SQL (H-G, ADR-0039 D1): route the mutation through the owner's application service, or record an explicit exemption",
+      "count": 1,
+      "reason": "A4.0 census: pre-existing foreign-table write, invisible until the hgcrossmodule write scan landed. Recorded, not fixed — porting it is #93/A4's property, and repairing it here would be another axis's debt silently cleaned to keep a new guard green.",
+      "owner": "#93/A4 — cross-module SQL closure"
     },
     {
       "analyzer": "hgcrossmodule",
@@ -51,6 +99,14 @@
     },
     {
       "analyzer": "hgcrossmodule",
+      "file": "internal/modules/approval/application/release_coordinator.go",
+      "message": "module \"approval\" writes \"documents\"'s base table \"documents\" with raw SQL (H-G, ADR-0039 D1): route the mutation through the owner's application service, or record an explicit exemption",
+      "count": 2,
+      "reason": "A4.0 census: pre-existing foreign-table write, invisible until the hgcrossmodule write scan landed. Recorded, not fixed — porting it is #93/A4's property, and repairing it here would be another axis's debt silently cleaned to keep a new guard green.",
+      "owner": "#93/A4 — cross-module SQL closure"
+    },
+    {
+      "analyzer": "hgcrossmodule",
       "file": "internal/modules/approval/application/release_facts.go",
       "message": "module \"approval\" reads \"documents\"'s base table \"documents\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
       "count": 1,
@@ -64,6 +120,22 @@
       "count": 1,
       "reason": "release_terminal_approval.go:185 SELECT final_docx_s3_key, final_pdf_s3_key FROM documents to fetch the rendered document's storage keys as part of terminal-approval processing; not ported to a documents-owned read-port.",
       "owner": "unclassified — no owner identified as of 2026-08-07"
+    },
+    {
+      "analyzer": "hgcrossmodule",
+      "file": "internal/modules/approval/application/review_verdict_service.go",
+      "message": "module \"approval\" writes \"documents\"'s base table \"documents\" with raw SQL (H-G, ADR-0039 D1): route the mutation through the owner's application service, or record an explicit exemption",
+      "count": 1,
+      "reason": "A4.0 census: pre-existing foreign-table write, invisible until the hgcrossmodule write scan landed. Recorded, not fixed — porting it is #93/A4's property, and repairing it here would be another axis's debt silently cleaned to keep a new guard green.",
+      "owner": "#93/A4 — cross-module SQL closure"
+    },
+    {
+      "analyzer": "hgcrossmodule",
+      "file": "internal/modules/approval/application/submit_service.go",
+      "message": "module \"approval\" writes \"documents\"'s base table \"documents\" with raw SQL (H-G, ADR-0039 D1): route the mutation through the owner's application service, or record an explicit exemption",
+      "count": 1,
+      "reason": "A4.0 census: pre-existing foreign-table write, invisible until the hgcrossmodule write scan landed. Recorded, not fixed — porting it is #93/A4's property, and repairing it here would be another axis's debt silently cleaned to keep a new guard green.",
+      "owner": "#93/A4 — cross-module SQL closure"
     },
     {
       "analyzer": "hgcrossmodule",
@@ -88,6 +160,14 @@
       "count": 13,
       "reason": "postgres_approval_repository.go's approval-instance query family (lines ~363-648) JOIN/LEFT JOIN documents d repeatedly to decorate approval instance rows with the subject document's fields (status, code, area) across list/get/exists queries; not ported to a documents-owned read-port.",
       "owner": "unclassified — no owner identified as of 2026-08-07"
+    },
+    {
+      "analyzer": "hgcrossmodule",
+      "file": "internal/modules/approval/infrastructure/postgres_approval_repository.go",
+      "message": "module \"approval\" writes \"documents\"'s base table \"documents\" with raw SQL (H-G, ADR-0039 D1): route the mutation through the owner's application service, or record an explicit exemption",
+      "count": 1,
+      "reason": "A4.0 census: pre-existing foreign-table write, invisible until the hgcrossmodule write scan landed. Recorded, not fixed — porting it is #93/A4's property, and repairing it here would be another axis's debt silently cleaned to keep a new guard green.",
+      "owner": "#93/A4 — cross-module SQL closure"
     },
     {
       "analyzer": "hgcrossmodule",
@@ -172,10 +252,10 @@
     {
       "analyzer": "hgcrossmodule",
       "file": "internal/modules/iam/application/tenant_lifecycle_service.go",
-      "message": "module \"iam\" reads \"approval\"'s base table \"governance_events\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
+      "message": "module \"iam\" writes \"audit\"'s base table \"governance_events\" with raw SQL (H-G, ADR-0039 D1): route the mutation through the owner's application service, or record an explicit exemption",
       "count": 1,
-      "reason": "NEWLY REVEALED by this task's census fix (ADR 0082 flip; governance_events also moved documents-\u003eapproval per this task, since its live INSERT site is approval/application/events.go), not new debt: tenant_lifecycle_service.go:535 DELETE FROM public.governance_events WHERE tenant_id=$1 as the final sweep step of tenant crypto-shred erasure. Was invisible while governance_events was mis-owned to documents; genuine cross-module write now that approval is the real owner. Not exempted — recorded as debt per this task's binding resolution.",
-      "owner": "unclassified — no owner identified as of 2026-08-07"
+      "reason": "A4.0 census: pre-existing foreign-table write, invisible until the hgcrossmodule write scan landed. Recorded, not fixed — porting it is #93/A4's property, and repairing it here would be another axis's debt silently cleaned to keep a new guard green.",
+      "owner": "#93/A4 — cross-module SQL closure"
     },
     {
       "analyzer": "platformboundary",

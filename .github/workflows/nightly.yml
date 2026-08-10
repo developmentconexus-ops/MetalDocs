@@ -351,7 +351,11 @@ jobs:
       issues: write
     services:
       postgres:
-        image: postgres:16
+        # Digest-pinned, not `postgres:16` (#87/A1 review B2) — a service
+        # container is code CI executes; audit rule A9 covers `services:`
+        # images, so a regression to a mutable tag is a finding. Digest is
+        # postgres:16 as of 2026-08-09, same pin as ci.yml.
+        image: postgres@sha256:95206741a5b214807675e14165369d05b93a9cf692223b616d07cca227e74b0b
         env:
           POSTGRES_USER: metaldocs
           POSTGRES_PASSWORD: metaldocs
@@ -438,23 +442,12 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      # gosec: full-only, transitional under this repository's local-maximum
-      # rule. Promoting milestone: "gosec backlog triage" (unscheduled on
-      # docs/superpowers/ROADMAP.md as of 2026-08-08). Global-maximum
-      # structure: gosec blocking in both `pr` and `full`, every finding
-      # fixed or carrying a gosec-native `#nosec Gxxx -- reason` suppression
-      # (`//nolint:gosec` is golangci-lint syntax; standalone gosec does not
-      # read it), and this -exclude-dir=.claude carried forward so a sibling
-      # git worktree's own go.mod never re-contaminates the scan (measured:
-      # 333 → 176 import directories, 157 → 0 from .claude/worktrees, with
-      # this flag).
-      #
-      # govulncheck: full-only, transitional. Promoting milestone:
-      # "called-CVE remediation" (unscheduled as of 2026-08-08) — bump
-      # golang.org/x/text to v0.39.0 (GO-2026-5970) and the Go toolchain to
-      # go1.26.5 (GO-2026-5856), the two called-and-reachable CVEs out of the
-      # 19 total findings. Only once both land does this promote to blocking
-      # in `pr` + `full`.
+      # Both scanners are `pr`-blocking as of 2026-08-09 (A1.4) and run in
+      # ci.yml:verify on every PR. This nightly run is not a duplicate gate,
+      # it is the time-based one: govulncheck's input is a live vulnerability
+      # database, so a CVE disclosed after a branch merges is invisible to any
+      # PR-triggered run. This job is what notices, and it opens an issue.
+      # gosec rides along because it is the same command and the same setup.
       - name: registry checks (gosec, govulncheck)
         run: go run ./tools/verify --require-infra --only=gosec,govulncheck
       - name: Open or comment on issue on failure

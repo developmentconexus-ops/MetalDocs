@@ -97,3 +97,7 @@ scratch_qa/
 
 # gitleaks JSON report — local triage artifact, never committed.
 .gitleaks-report.json
+
+# grype SARIF report, written by the `vuln-scan` registry check so
+# ci.yml:security can upload it. A run artifact, not a source.
+.grype.sarif

@@ -183,7 +183,8 @@ func writeReplay(w http.ResponseWriter, replay *Replay) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Idempotent-Replay", "true")
 	w.WriteHeader(replay.Status)
-	_, _ = w.Write(replay.Body) //nolint:gosec // G705: replay.Body is a response OUR OWN handlers produced earlier (cached verbatim), served as application/json — not reflectable markup
+	// #nosec G705 -- replay.Body is a response OUR OWN handlers produced earlier and cached verbatim, replayed with Content-Type: application/json set two lines above; no attacker-controlled markup is reflected here. Written as a gosec-native directive, not //nolint:gosec: standalone gosec (the registry's `gosec` check) never reads golangci-lint's nolint syntax, so the previous comment suppressed nothing there and this finding was live under the pinned scanner.
+	_, _ = w.Write(replay.Body)
 }
 
 // runClaimedHandler runs next for the caller that won the BeginReplay claim

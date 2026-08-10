@@ -3,6 +3,7 @@ package analyzers_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"metaldocs/tools/cilint/internal/analyzers"
@@ -123,6 +124,51 @@ func TestHGCrossModule_Negative_AllowDirective(t *testing.T) {
 	findings := analyzers.HGCrossModule([]string{path})
 	if len(findings) != 0 {
 		t.Fatalf("inline allow directive must suppress finding, got %d: %+v", len(findings), findings)
+	}
+}
+
+// #87/A1 review F1's negative fixture. document_images is a live base table with
+// a governed doc (wiki/database/tables/document_images.md, "**Owner:** documents")
+// that was NOT in table-ownership.json until the completeness pass. Before that,
+// this exact write — approval mutating a documents-owned table — produced zero
+// findings, because hgViolation reports nothing for a table it does not know.
+// The bug was never in the rule; it was in the rule's input being a subset.
+//
+// The review named document_attachments as the example. That one is not usable
+// as a fixture and the reason is itself the F1 property: it is documented but
+// NOT in the live schema (archive/migrations/0014 created it, the 2026-07-29
+// baseline fold did not carry it forward), so it is now on the catalog's
+// `retired` list and TestGovernedDocsReconcileWithLiveAndRetired is what holds
+// that classification honest. document_images is the same class of omission with
+// a table that actually exists.
+func TestHGCrossModule_Positive_ForeignWriteToPreviouslyOmittedTable(t *testing.T) {
+	src := "package application\n" +
+		"func q() string {\n" +
+		"\treturn `UPDATE document_images SET checksum = $1 WHERE document_id = $2 AND tenant_id = $3`\n" +
+		"}\n"
+	path := hgFixture(t, "internal/modules/approval/application/attach_service.go", src)
+	findings := analyzers.HGCrossModule([]string{path})
+	if len(findings) == 0 {
+		t.Fatal("approval writing documents' document_images must flag: an omitted table is an unguarded table")
+	}
+	if !strings.Contains(findings[0].Message, "writes") || !strings.Contains(findings[0].Message, "document_images") {
+		t.Fatalf("finding must name the verb and the table, got: %s", findings[0].Message)
+	}
+}
+
+// The same shape one class over: a table classified out of module enforcement
+// carries no owner, so an access to it cannot be foreign. This is what keeps the
+// non-module classes honest as classifications rather than as silence — the
+// table IS in the catalog, and the completeness test can see it.
+func TestHGCrossModule_Negative_PlatformClassTableHasNoOwner(t *testing.T) {
+	src := "package infrastructure\n" +
+		"func q() string {\n" +
+		"\treturn `INSERT INTO outbox_events (aggregate_id, payload) VALUES ($1, $2)`\n" +
+		"}\n"
+	path := hgFixture(t, "internal/modules/documents/infrastructure/postgres/outbox.go", src)
+	findings := analyzers.HGCrossModule([]string{path})
+	if len(findings) != 0 {
+		t.Fatalf("outbox_events is class platform (every module writes it by design), got %d: %+v", len(findings), findings)
 	}
 }
 

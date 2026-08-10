@@ -1,0 +1,4 @@
+// Code generated. DO NOT EDIT.
+package api
+
+const Operations = "ListTemplates,CreateTemplate,GetTemplate,SubmitTemplateVersionForApproval"

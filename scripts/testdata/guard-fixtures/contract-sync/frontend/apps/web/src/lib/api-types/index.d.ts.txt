@@ -1,0 +1,14 @@
+// Generated. DO NOT EDIT.
+export interface paths {
+  "/templates": unknown;
+  "/templates/{id}/versions/{n}/submit-for-approval": unknown;
+  "/templates/placeholder-catalog": unknown;
+  "/documents": unknown;
+  "/documents/{id}": unknown;
+  "/controlled-documents": unknown;
+  "/controlled-documents/{id}": unknown;
+  "/controlled-documents/{id}/revisions": unknown;
+  "/taxonomy/profiles": unknown;
+  "/taxonomy/areas": unknown;
+  "/taxonomy/families": unknown;
+}

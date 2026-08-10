@@ -64,7 +64,9 @@ func main() {
 		list              = flag.Bool("list", false, "print the registry grouped by profile and exit")
 		audit             = flag.Bool("audit", false, "report checks with no CI job, and exit non-zero if any exist")
 		testdbBypassGuard = flag.Bool("testdb-bypass-guard", false, "report _test.go files that bypass testdb.Open via raw DATABASE_URL/METALDOCS_DATABASE_URL + sql.Open, and exit non-zero if any exist")
+		guardFixtures     = flag.Bool("guard-fixtures", false, "feed each guard its negative fixture and require a non-zero exit; --only narrows to specific check IDs")
 		only              = flag.String("only", "", "comma-separated check IDs to run, ignoring the profile")
+		ciJob             = flag.String("ci-job", "", "narrow the selection to checks whose declared CIJob is this workflow job (e.g. ci.yml:verify); a CI job passes its own name so ownership is decided by the registry, not by the workflow")
 		changed           = flag.Bool("changed", false, "narrow whatever selection --only/--profile made to checks whose declared Paths the diff against --base touches; --profile=changed implies this")
 		base              = flag.String("base", "origin/main", "base ref for --changed / --profile=changed")
 		jobs              = flag.Int("j", defaultParallelism(), "how many checks to run concurrently")
@@ -96,9 +98,11 @@ func main() {
 		os.Exit(printAudit(filepath.Join(".github", "workflows")))
 	case *testdbBypassGuard:
 		os.Exit(printTestdbBypassGuard())
+	case *guardFixtures:
+		os.Exit(printGuardFixtures(root, splitIDs(*only)))
 	}
 
-	selected, scoped, err := selectChecks(*profile, *only, *base, *changed)
+	selected, scoped, err := selectChecks(*profile, *only, *base, *changed, *ciJob)
 	if err != nil {
 		fatalf("%v", err)
 	}
@@ -134,7 +138,7 @@ func main() {
 // The returned bool tells the caller whether scoping was actually applied,
 // so an empty result can be explained: "0 checks, diff-scoped" is a fact
 // worth printing, "0 checks" alone is not (see emptySelectionMessage).
-func selectChecks(profile, only, base string, changedFlag bool) (selected []Check, scoped bool, err error) {
+func selectChecks(profile, only, base string, changedFlag bool, ciJob string) (selected []Check, scoped bool, err error) {
 	scoped = changedFlag
 	switch {
 	case only != "":
@@ -150,6 +154,12 @@ func selectChecks(profile, only, base string, changedFlag bool) (selected []Chec
 	}
 	if err != nil {
 		return nil, false, err
+	}
+	if ciJob != "" {
+		selected, err = scopeToCIJob(selected, ciJob)
+		if err != nil {
+			return nil, false, err
+		}
 	}
 	if scoped {
 		selected, err = scopeToChanged(selected, base)
@@ -240,6 +250,46 @@ func selectByIDs(only string) ([]Check, error) {
 	return out, nil
 }
 
+// scopeToCIJob narrows `selected` to the checks that declare this CI job as
+// their owner. It is what lets a profile stay the honest answer to "what
+// blocks a PR" while CI still splits that set across several jobs.
+//
+// Without it, a profile and a job were the same thing: ci.yml:verify runs
+// `--profile=changed`, so it ran EVERY `pr` check, including ones whose
+// declared CIJob is another job with another job's prerequisites installed.
+// That was not hypothetical — registering golangci-lint (A1.1) put a check
+// owned by ci.yml:lint-go into the verify job's selection, where the binary
+// does not exist, and the job failed with "golangci-lint is not on PATH".
+// The two escapes from that are both worse: drop the check out of `pr` (and
+// lie about what blocks a PR, which is what A1.1 exists to stop), or install
+// every job's prerequisites in every job (and pay for the duplicated run).
+//
+// An unknown job name is an error, not an empty selection: a workflow step
+// naming a job no check owns must go red, exactly as --only does for an
+// unknown ID. Ownership is checked against the whole registry, not the
+// current selection, so a legitimately empty *scoped* result (the diff
+// touched none of this job's checks) still reads as zero checks rather than
+// as a typo.
+func scopeToCIJob(selected []Check, ciJob string) ([]Check, error) {
+	known := false
+	for _, c := range checks {
+		if c.CIJob == ciJob {
+			known = true
+			break
+		}
+	}
+	if !known {
+		return nil, fmt.Errorf("--ci-job=%q: no registry check declares that CIJob", ciJob)
+	}
+	var out []Check
+	for _, c := range selected {
+		if c.CIJob == ciJob {
+			out = append(out, c)
+		}
+	}
+	return out, nil
+}
+
 // scopeToChanged narrows `selected` to the checks whose declared Paths
 // intersect the diff against base — except outside a pull request, where it
 // returns `selected` unchanged.
@@ -307,6 +357,15 @@ func selectByProfile(profile string) []Check {
 }
 
 func hasProfile(c Check, p string) bool {
+	// `release` is defined by exclusion, not membership — see releaseExcluded
+	// in registry.go for why. Anything `full` runs, `release` runs too, unless
+	// it is named there.
+	if p == ProfileRelease {
+		if _, excluded := releaseExcluded[c.ID]; excluded {
+			return false
+		}
+		return hasProfile(c, ProfileFull)
+	}
 	for _, cp := range c.Profiles {
 		if cp == p {
 			return true
@@ -458,10 +517,46 @@ func nvmrcVersion() string {
 //
 // Adding an exec call anywhere else in this package defeats that argument.
 // Route it through here instead.
+//
+// The one non-literal element an Argv may carry is repoRootPlaceholder,
+// expanded here by expandArgv. It exists because a container check must hand
+// `docker -v` an ABSOLUTE host path, and there is no shell here to say $PWD.
+// Expanding it here (rather than letting registry entries call os.Getwd
+// themselves) keeps the invariant above true: the substitution set is closed,
+// it is one function, and its value comes from the process's own working
+// directory, never from a check's input.
 func command(ctx context.Context, dir string, argv []string) *exec.Cmd {
-	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...) // #nosec G204 -- argv is compile-time literals or refPattern-validated; see the invariant above.
+	argv = expandArgv(argv)
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...) // #nosec G204 -- argv is compile-time literals, refPattern-validated, or an expandArgv token; see the invariant above.
 	cmd.Dir = dir
 	return cmd
+}
+
+// repoRootPlaceholder expands to the absolute path of the directory the
+// verifier is running in — the repo root, since every Check's paths are
+// repo-relative.
+//
+// Deliberately not named with any of gosec G101's credential words (token,
+// secret, key, pw). The first spelling of this constant was `repoToken`, and
+// G101 fired on it at HIGH/LOW-confidence in both gosec and golangci-lint —
+// a false positive, but one whose only other cure is a #nosec suppression.
+// Renaming removes the finding instead of silencing it.
+const repoRootPlaceholder = "{{repo}}"
+
+// expandArgv substitutes the closed token set into a copy of argv. A token
+// that cannot be resolved is left verbatim rather than silently dropped: the
+// command then fails loudly with the token visible in its own error, which is
+// what a reader needs to diagnose it.
+func expandArgv(argv []string) []string {
+	root, err := os.Getwd()
+	if err != nil {
+		return argv
+	}
+	out := make([]string, len(argv))
+	for i, a := range argv {
+		out[i] = strings.ReplaceAll(a, repoRootPlaceholder, root)
+	}
+	return out
 }
 
 func capture(argv ...string) ([]byte, error) {
@@ -705,7 +800,38 @@ func (st *runState) skipForMissingInfra(i int, c Check) bool {
 // execute runs c's Argv and records the PASS/FAIL result.
 func (st *runState) execute(i int, c Check) {
 	start := time.Now()
-	out, err := command(context.Background(), c.Dir, c.Argv).CombinedOutput()
+
+	argv := c.Argv
+	if c.Stage != "" {
+		root, err := repoRoot()
+		if err == nil {
+			var dir string
+			var cleanup func()
+			dir, cleanup, err = stage(context.Background(), c.Stage, root)
+			if err == nil {
+				defer cleanup()
+				argv = withStageDir(argv, dir)
+			}
+		}
+		if err != nil {
+			// A staging failure is a FAIL, never a silent fall-through to the
+			// working directory: falling back would run the check against a
+			// different subject than the one it declares, which is the whole
+			// defect staging exists to remove.
+			st.results[i] = result{
+				check:    c,
+				status:   statusFail,
+				output:   fmt.Sprintf("could not stage %s: %v", c.Stage, err),
+				duration: time.Since(start),
+			}
+			st.printMu.Lock()
+			fmt.Printf("  %-5s %-24s %6.1fs\n", statusFail, c.ID, time.Since(start).Seconds())
+			st.printMu.Unlock()
+			return
+		}
+	}
+
+	out, err := command(context.Background(), c.Dir, argv).CombinedOutput()
 	d := time.Since(start)
 
 	status := statusPass
@@ -779,7 +905,9 @@ func report(results []result, profile string) int {
 		fmt.Println("\n" + strings.Repeat("=", 72))
 		for _, r := range failed {
 			fmt.Printf("\nFAIL %s — %s\n", r.check.ID, r.check.Desc)
-			fmt.Printf("  $ %s\n", strings.Join(r.check.Argv, " "))
+			// Expanded, not raw: a reader copying this line into a shell must
+			// get the command that actually ran, tokens resolved.
+			fmt.Printf("  $ %s\n", strings.Join(expandArgv(r.check.Argv), " "))
 			if r.check.CIJob != "" {
 				fmt.Printf("  CI job: %s\n", r.check.CIJob)
 			}
@@ -804,6 +932,19 @@ func report(results []result, profile string) int {
 	}
 
 	if len(failed) > 0 {
+		return 1
+	}
+	return 0
+}
+
+// printGuardFixtures runs the negative-fixture spine and returns the process
+// exit code. The cancel() lives here rather than inline in main's switch so it
+// is not stranded by an os.Exit in the same function (gocritic exitAfterDefer).
+func printGuardFixtures(root string, only []string) int {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := runGuardFixtures(ctx, root, only); err != nil {
+		fmt.Fprintf(os.Stderr, "verify: %v\n", err)
 		return 1
 	}
 	return 0

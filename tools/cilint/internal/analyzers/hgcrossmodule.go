@@ -13,101 +13,34 @@ import (
 // of //cilint:allow-responsemap.
 const hgCrossModuleAllow = "//cilint:allow-hgcrossmodule"
 
-// hgOwnerByTable maps every owned base table to the TOP-LEVEL module that owns
-// it (holds its writes), per the F0.2 binding census
-// (docs/superpowers/milestones/backend-module-boundary-hardening/milestone-0-adr-and-census/f0.2-binding-census/census.md).
-// "Top-level" means the first segment under internal/modules/: iam/presence ⊂
-// iam — so an intra-context read across sub-packages is NOT cross-module.
-// This is the data ADR-0039 D1 (base table = violation) classifies against.
-// Kept in sync with the ADR that defines the module list — when an ADR
-// promotes or merges a module, this map is part of that ADR's diff.
-//
-// TRANSITIONAL — hand-synced enumeration, the repo's known meta-defect (see
-// design §9, docs/superpowers/specs/2026-08-07-ci-restructure-design.md). This
-// map is a local maximum: ownership is asserted here by hand instead of
-// derived from a single source of truth. The global maximum is ownership
-// derived from a single source — a module manifest, schema comments, or a
-// drift test that fails when a table appears in SQL under a module that
-// neither owns it nor is exempted. The milestone that deletes this map is
-// M3-final: cross-module SQL closure (design §8.1), whose deliverable (1) is
-// exactly re-deriving this census and turning it into a mechanism rather than
-// a hand-maintained list.
-var hgOwnerByTable = map[string]string{
-	// controlleddocuments
-	"controlled_documents":            "controlleddocuments",
-	"controlled_document_area_grants": "controlleddocuments",
-	"controlled_document_user_grants": "controlleddocuments",
-	"cd_sequence_counters":            "controlleddocuments",
-	// documents
-	"documents":                   "documents",
-	"document_revisions":          "documents",
-	"document_comments":           "documents",
-	"document_checkpoints":        "documents",
-	"document_exports":            "documents",
-	"document_placeholder_values": "documents",
-	"editor_sessions":             "documents",
-	"autosave_pending_uploads":    "documents",
-	// approval — promoted to a top-level module by ADR 0082, superseding
-	// ADR 0072's nested `documents/approval` ruling. The F0.2 binding census
-	// predates 0082 and assigned these tables to `documents`; that made the
-	// approval module's reads of its OWN tables report as cross-module.
-	"approval_instances":       "approval",
-	"approval_routes":          "approval",
-	"approval_route_stages":    "approval",
-	"approval_stage_instances": "approval",
-	"approval_signoffs":        "approval",
-	"auth_failure_counters":    "approval", // approval's signature reauth limiter
-	// governance_events is written by approval's SQLEmitter
-	// (internal/modules/approval/application/events.go:84 — INSERT INTO
-	// governance_events); it was mis-census'd to documents pre-0082 alongside
-	// the other approval tables. Verified via grep for the live INSERT sites,
-	// not by the ADR 0082 module-promotion text alone — internal/platform/
-	// tripwire/render.go:154 also inserts into it, so approval is the primary
-	// owner but not the sole writer.
-	"governance_events": "approval",
-	// release_generations, approval_delegations, approval_review_verdicts, and
-	// approval_route_stage_selectors were absent from this census entirely
-	// (not mis-owned, unrecorded) until this fix. All four are approval-owned:
-	// release_generations backs the ADR 0085 release-hold state machine
-	// (wiki/database/tables/release_generations.md), and the other three are
-	// approval's own delegation/verdict/selector tables (release_facts.go,
-	// review_verdict_service.go, tenant_data_port.go). Their absence let
-	// documents/infrastructure/repository.go:330's raw
-	// `FROM release_generations rg` read go undetected as cross-module.
-	"release_generations":            "approval",
-	"approval_delegations":           "approval",
-	"approval_review_verdicts":       "approval",
-	"approval_route_stage_selectors": "approval",
-	// taxonomy
-	"document_process_areas": "taxonomy",
-	"document_profiles":      "taxonomy",
-	"document_families":      "taxonomy",
-	// iam
-	"iam_users":          "iam",
-	"iam_user_roles":     "iam",
-	"user_process_areas": "iam",
-	// auth
-	"auth_identities": "auth",
-	"auth_sessions":   "auth",
-	// audit (cross-cutting platform append-sink — read projections exempt via D3d)
-	"audit_events":      "audit",
-	"audit_export_jobs": "audit",
-	// templates (templates_approval_config dropped by migration 0302,
-	// ADR 0082 phase c / unit 3.1a S5)
-	"templates_template":         "templates",
-	"templates_template_version": "templates",
-	// jobs
-	"idempotency_keys": "jobs",
-	// notifications
-	"notifications": "notifications",
-}
+// Ownership (hgOwnerByTable) is loaded from table-ownership.json — see
+// table_ownership.go. It is deliberately NOT a map literal here: an
+// architectural fact carried in analyzer source drifts silently from the ADRs
+// that decide it.
 
-// hgSite is a (file-suffix, table) allowlist key. The suffix is matched against
-// the slash-normalized path; the table must match the read. File+table (not
-// line) keeps entries stable under line drift.
+// Access modes. An allowlist entry authorises exactly one of them.
+const (
+	hgModeReads  = "reads"
+	hgModeWrites = "writes"
+)
+
+// hgSite is a (file-suffix, table, mode) allowlist key. The suffix is matched
+// against the slash-normalized path; the table must match the access; the mode
+// must match the SQL verb. File+table (not line) keeps entries stable under
+// line drift.
+//
+// The mode is load-bearing (#87/A1 review B5). Entries used to be keyed by
+// (file, table) only, so a file exempted for a foreign READ could start
+// UPDATE/INSERT/DELETE-ing that same table with no new finding — the guard's
+// central claim, that a foreign write is blocked from day one, was false for
+// every exempted file. Reading another module's table breaks its read contract;
+// writing it breaks its invariants, so the two are not one decision. A file
+// that genuinely needs both takes two entries, each with its own rationale.
 type hgSite struct {
 	fileSuffix string
 	table      string
+	mode       string
+	why        string
 }
 
 // hgPendingRemediation is the H-G DEBT LEDGER: the exact F0.2 in-scope sites
@@ -156,26 +89,29 @@ var hgPendingRemediation = []hgSite{
 // principled ADR-0039 D3(d)–(f) exemption (M0/F0.2 HS-6 operator ruling). Unlike
 // hgPendingRemediation, these are NOT scheduled for porting — they are recorded,
 // justified carve-outs. A new read here must be added with its rationale.
+// Every entry below is mode hgModeReads. That is the whole set as ruled: each
+// one was justified as a read projection or a dispositioned read. None of them
+// authorises a write, and none ever should have.
 var hgExempt = []hgSite{
 	// D3(d) — platform append-sink (audit_events): cross-cutting telemetry sink every
 	// module writes via AppendAudit[Tx]; read projections are a distinct class.
-	{"security/infrastructure/postgres/repository.go", "audit_events"},          // X3
-	{"iam/infrastructure/postgres/observability_repository.go", "audit_events"}, // X4
+	{"security/infrastructure/postgres/repository.go", "audit_events", hgModeReads, "X3 — D3(d) read projection over the append-sink"},
+	{"iam/infrastructure/postgres/observability_repository.go", "audit_events", hgModeReads, "X4 — D3(d) read projection over the append-sink"},
 	// X7 path reconciled 2026-08-07: F9.5 renamed templates/repository/ →
 	// templates/infrastructure/. scripts/check-test-discipline.sh:59 reconciled
 	// the same rename on 2026-07-06; this list did not, so the exemption had
 	// silently stopped matching and the read fell into the baseline instead.
-	{"templates/infrastructure/postgres.go", "audit_events"}, // X7
+	{"templates/infrastructure/postgres.go", "audit_events", hgModeReads, "X7 — D3(d) read projection over the append-sink"},
 	// D3(e) — parent grade-a-completion M4 dispositioned auth reads (ADR 0029/0031):
 	// auth_identities has no tenant_id, scoped via = ANY(ids); re-porting re-litigates 0031.
-	{"security/infrastructure/postgres/repository.go", "auth_identities"},          // X1
-	{"security/infrastructure/postgres/repository.go", "auth_sessions"},            // X2
-	{"iam/infrastructure/postgres/observability_repository.go", "auth_identities"}, // X5
-	{"iam/presence/repository.go", "auth_identities"},                              // X6
+	{"security/infrastructure/postgres/repository.go", "auth_identities", hgModeReads, "X1 — D3(e) dispositioned auth read (ADR 0029/0031)"},
+	{"security/infrastructure/postgres/repository.go", "auth_sessions", hgModeReads, "X2 — D3(e) dispositioned auth read (ADR 0029/0031)"},
+	{"iam/infrastructure/postgres/observability_repository.go", "auth_identities", hgModeReads, "X5 — D3(e) dispositioned auth read (ADR 0029/0031)"},
+	{"iam/presence/repository.go", "auth_identities", hgModeReads, "X6 — D3(e) dispositioned auth read (ADR 0029/0031)"},
 	// D3(f) — worker-layer (jobs): infrastructure operating on the approval domain;
 	// jobs-boundary rule deferred to a future pass.
-	{"jobs/stuck_instance_watchdog/job.go", "approval_instances"},       // X8
-	{"jobs/stuck_instance_watchdog/job.go", "approval_stage_instances"}, // X8
+	{"jobs/stuck_instance_watchdog/job.go", "approval_instances", hgModeReads, "X8 — D3(f) worker-layer read; the watchdog is alert-only (ADR 0068), it does not mutate"},
+	{"jobs/stuck_instance_watchdog/job.go", "approval_stage_instances", hgModeReads, "X8 — D3(f) worker-layer read; the watchdog is alert-only (ADR 0068), it does not mutate"},
 }
 
 // hgFromJoin matches a table token following FROM or JOIN (covering plain reads,
@@ -184,10 +120,38 @@ var hgExempt = []hgSite{
 // so `FROM\n  table` is caught.
 var hgFromJoin = regexp.MustCompile(`(?i)\b(?:from|join)\s+(?:public\.|metaldocs\.)?([a-z_][a-z0-9_]*)`)
 
-// HGCrossModule flags a raw cross-module base-table read (ADR-0039 D1): a FROM/JOIN
-// against another top-level module's owned base table, in a non-owner package,
-// outside the recorded allowlists. It is the H-G sibling of the H-D noResponseMap
-// guard and mechanizes ADR-0039 D6.
+// hgWrite matches a table token in write position: UPDATE <t>, INSERT INTO <t>,
+// DELETE FROM <t>. Same schema-prefix and case/newline handling as hgFromJoin.
+//
+// A4.0 (#87/A1 infrastructure, #93/A4 property owner). Until this existed the
+// guard was write-blind: hgFromJoin matches "FROM" and so caught DELETE FROM by
+// accident while UPDATE <t> SET and INSERT INTO <t> — the two shapes that
+// mutate another module's state — were invisible. The audit
+// (docs/superpowers/analysis/audit-2026-08-09/final-synthesis.md G-02) counted
+// 12 foreign-table writes the guard could not see, against 55 reads it could.
+// Reading another module's table breaks its read contract; writing it breaks
+// its invariants, so the blind half was the dangerous half.
+//
+// DELETE FROM is deliberately claimed by this pattern rather than left to
+// hgFromJoin: it is a write, and reporting it as a read is a wrong statement
+// about what the code does. hgScanLiteral resolves the overlap by classifying
+// write-position hits first.
+var hgWrite = regexp.MustCompile(`(?i)\b(?:update|insert\s+into|delete\s+from)\s+(?:public\.|metaldocs\.)?([a-z_][a-z0-9_]*)`)
+
+// HGCrossModule flags raw cross-module base-table ACCESS (ADR-0039 D1) in a
+// non-owner package, outside the recorded allowlists:
+//
+//	read  — FROM / JOIN <table>
+//	write — UPDATE <table> / INSERT INTO <table> / DELETE FROM <table>
+//
+// It is the H-G sibling of the H-D noResponseMap guard and mechanizes ADR-0039 D6.
+//
+// The write half is A4.0. The property is not "grep found a keyword" — it is
+// that a module cannot emit SQL against a business table owned by another
+// module unless that access is a deliberately classified exemption. A guard
+// that saw only reads asserted half of that and, worse, asserted it about the
+// harmless half: a foreign read breaks the owner's read contract, a foreign
+// write breaks its invariants.
 //
 // SCOPE — files under internal/modules/<module>/** (non-test; _test.go excluded by
 // the collector). The reader module is the first path segment under internal/modules/.
@@ -195,14 +159,18 @@ var hgFromJoin = regexp.MustCompile(`(?i)\b(?:from|join)\s+(?:public\.|metaldocs
 // DETECTION — only *ast.BasicLit STRING nodes are scanned (SQL lives in string
 // literals), so a foreign table named in a comment or Go identifier never flags —
 // the census found real such comments (people_service.go:690,
-// observability_repository.go:164). For each FROM/JOIN <table> whose owner ≠ the
-// reader module, a finding is emitted unless the (file,table) pair is on
-// hgPendingRemediation (the M1–M4 debt ledger) or hgExempt (permanent D3(d)–(f)),
-// or the source line carries //cilint:allow-hgcrossmodule.
+// observability_repository.go:164). For each read- or write-position <table>
+// whose owner ≠ the reader module, a finding is emitted unless the
+// (file,table,mode) triple is on hgPendingRemediation (the M1–M4 debt ledger) or
+// hgExempt (permanent D3(d)–(f)), or the source line carries
+// //cilint:allow-hgcrossmodule. Mode is part of the key: a read exemption does
+// not authorise a write.
 //
 // RESIDUAL — dynamically-assembled or aliased table names behind Go variables are
 // invisible to the literal-token scan (recorded in the F0.2 census coverage
-// statement, same residual as the H-D guard).
+// statement, same residual as the H-D guard). Also invisible: writes routed
+// through a query builder rather than a SQL literal, and CTE-form writes whose
+// target follows neither UPDATE/INSERT INTO/DELETE FROM nor FROM/JOIN.
 func HGCrossModule(files []string) []Finding {
 	var out []Finding
 	fset := token.NewFileSet()
@@ -247,34 +215,76 @@ func hgScanFile(fset *token.FileSet, path, reader string, f *ast.File, src strin
 func hgScanLiteral(fset *token.FileSet, path, reader string, lit *ast.BasicLit, src string, seen map[string]bool) []Finding {
 	var out []Finding
 	val := lit.Value
+
+	// Writes are classified first. DELETE FROM matches both patterns, and it
+	// is a write; letting hgFromJoin claim it would keep calling a deletion a
+	// read. hgWritten records the (line,table) pairs already accounted for so
+	// the read pass below skips them.
+	hgWritten := map[string]bool{}
+	for _, m := range hgWrite.FindAllStringSubmatchIndex(val, -1) {
+		table := strings.ToLower(val[m[2]:m[3]])
+		line := fset.Position(lit.Pos()).Line + strings.Count(val[:m[0]], "\n")
+		hgWritten[fmt.Sprintf("%d|%s", line, table)] = true
+		f, ok := hgViolation(path, reader, table, line, src, "writes", seen)
+		if ok {
+			out = append(out, f)
+		}
+	}
+
 	for _, m := range hgFromJoin.FindAllStringSubmatchIndex(val, -1) {
 		table := strings.ToLower(val[m[2]:m[3]])
-		owner, owned := hgOwnerByTable[table]
-		if !owned || owner == reader {
-			continue // unknown table or own-table read (D3c) — compliant
-		}
 		line := fset.Position(lit.Pos()).Line + strings.Count(val[:m[0]], "\n")
-		if hgListed(path, table, hgPendingRemediation) || hgListed(path, table, hgExempt) {
+		if hgWritten[fmt.Sprintf("%d|%s", line, table)] {
 			continue
 		}
-		if strings.Contains(getLine(src, line), hgCrossModuleAllow) {
-			continue
+		f, ok := hgViolation(path, reader, table, line, src, "reads", seen)
+		if ok {
+			out = append(out, f)
 		}
-		key := fmt.Sprintf("%d|%s", line, table)
-		if seen[key] {
-			continue
-		}
-		seen[key] = true
-		out = append(out, Finding{
-			Analyzer: "hgcrossmodule",
-			File:     path,
-			Line:     line,
-			Message: fmt.Sprintf(
-				"module %q reads %q's base table %q with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
-				reader, owner, table),
-		})
 	}
 	return out
+}
+
+// hgViolation applies the ownership rule and the three suppression layers to
+// one (table, line, verb) hit, returning the Finding to emit if any.
+//
+// The verb is part of the dedupe key and of the message. Both matter: a single
+// statement can read and write the same foreign table ("UPDATE documents SET x
+// = (SELECT ... FROM documents)"), and collapsing the two would report only
+// whichever the scanner reached first.
+func hgViolation(path, reader, table string, line int, src, verb string, seen map[string]bool) (Finding, bool) {
+	owner, owned := hgOwnerByTable[table]
+	if !owned || owner == reader {
+		return Finding{}, false // unknown table, or own-table access (D3c) — compliant
+	}
+	// The allowlists are keyed by (file, table, mode). A read exemption
+	// authorises reads and nothing else: a file cleared to project over
+	// audit_events that starts UPDATE-ing it is a new decision, and the guard
+	// makes someone take it.
+	if hgListed(path, table, verb, hgPendingRemediation) || hgListed(path, table, verb, hgExempt) {
+		return Finding{}, false
+	}
+	if strings.Contains(getLine(src, line), hgCrossModuleAllow) {
+		return Finding{}, false
+	}
+	key := fmt.Sprintf("%d|%s|%s", line, table, verb)
+	if seen[key] {
+		return Finding{}, false
+	}
+	seen[key] = true
+
+	remedy := "port to the owner's published view/read-port (D3a/b), or record an explicit exemption"
+	if verb == "writes" {
+		remedy = "route the mutation through the owner's application service, or record an explicit exemption"
+	}
+	return Finding{
+		Analyzer: "hgcrossmodule",
+		File:     path,
+		Line:     line,
+		Message: fmt.Sprintf(
+			"module %q %s %q's base table %q with raw SQL (H-G, ADR-0039 D1): %s",
+			reader, verb, owner, table, remedy),
+	}, true
 }
 
 // hgModuleOf returns the top-level module segment under internal/modules/, or ""
@@ -294,10 +304,12 @@ func hgModuleOf(path string) string {
 	return seg
 }
 
-func hgListed(path, table string, list []hgSite) bool {
+// hgListed reports whether (path, table, verb) is authorised by list. All three
+// must match: an entry for a different mode does not authorise this access.
+func hgListed(path, table, verb string, list []hgSite) bool {
 	s := strings.ReplaceAll(path, "\\", "/")
 	for _, site := range list {
-		if site.table == table && strings.HasSuffix(s, site.fileSuffix) {
+		if site.table == table && site.mode == verb && strings.HasSuffix(s, site.fileSuffix) {
 			return true
 		}
 	}

@@ -30,7 +30,7 @@ suppression wearing a ratchet's clothes.
 
 ## 1a. The verify entry point
 
-`go run ./tools/verify --profile={fast|changed|pr|full}` is the single
+`go run ./tools/verify --profile={fast|changed|pr|full|release}` is the single
 implementation of every deterministic check in this repo. CI jobs call it and
 nothing else, so "green locally" and "green in CI" are the same claim. Job
 names are unchanged, so the ruleset's required-check names are unaffected by
@@ -43,6 +43,11 @@ the rewiring.
   `go vet -tags integration`, now wired.
 - `--only=id,id` runs specific checks; `--profile=changed` runs the `pr` set
   filtered by the diff.
+- `--ci-job=file.yml:job` narrows a selection to the checks that declare that
+  job as their owner (§6.7). A CI job passes its own name, so which job runs a
+  check is decided by the registry, not by the workflow.
+- `--guard-fixtures` feeds every guard its negative fixture and requires a
+  non-zero exit (§6.1).
 
 Three properties are deliberate:
 
@@ -284,3 +289,136 @@ someone actually reads. All three keeps are cited above; none is an orphan.
 | 2026-08-07 | kin-openapi + grpc bumped; D-10…D-12 recorded for the five advisories the stop rule refused to force. staticcheck now 0 findings repo-wide → tier 1. |
 | 2026-08-07 | All 17 deterministic CI jobs rewired to `go run ./tools/verify --only=…` (item 5 complete). §1b added: a required check may not carry a `paths:` filter. `api-contract`/`lint`/`fe-ci` filters removed; `test-full` moved to `pull_request` (item 4). PR #96 opened as the evidence run — the first PR to exercise the whole check surface, and it immediately exposed the duplicate `gitleaks` name, the Linux-only cilint failure and the docx-v2 build ordering. gofmt gated; D-14 recorded. |
 | 2026-08-07 | **Item 6 complete.** `main` ruleset created (id `20560142`) with 22 required checks and zero bypass actors; blocking verified live against PR #96. §2 rewritten from real evidence — the previous tier-1 table listed *workflow* names (`Go Lint`, `api-contract`, `lint`, `Supply Chain`), none of which exists as a check context, so it could not have been applied as written. `ci.yml` filter removed and its `node` job promoted. D-15/D-16 recorded; D-16 supersedes D-2. |
+
+## 6. Phase 1 amendment — #87/A1 verifier spine (2026-08-09)
+
+This section records what Phase 1 changed, and what it deliberately did not.
+
+### 6.1 Negative-fixture spine (A1.2)
+
+`go run ./tools/verify --guard-fixtures` feeds each guard a tree of
+deliberately bad input and requires a non-zero exit. It runs the check's **own
+`Argv`**, not a library call — the property under test is that the command CI
+executes says no, which is not the same claim as "the guard's helper functions
+are unit-tested". Fixtures live in `scripts/testdata/guard-fixtures/<check>/`
+with a trailing `.txt` on every source file, because this repo's own guards
+walk `testdata/`.
+
+19 guards carry a fixture; 19 blocking checks carry a one-line
+`FixtureWaiver` naming why they do not (third-party tools, test suites that
+are their own evidence, and three transitional ones). Audit rule **A7** makes
+that coverage blocking: a `pr`-profile check with neither is a finding.
+
+The positive half of the property is not fixtured. Every one of these checks
+runs against this repository on every PR, and this repository is valid input —
+a synthetic good case would prove strictly less.
+
+Run: 19 fixtures, 0 failed, 1m6s wall (parallel). Wired as the
+`guard-fixtures` check in `ci.yml:verify`.
+
+### 6.2 Reachability (A1.4)
+
+`gosec` and `govulncheck` ran only in `nightly.yml:security-scan`, which no
+`needs:` edge connects to `ci.yml:required`. They gated nothing. Both are now
+`pr`-blocking with `CIJob: ci.yml:verify` — a repoint inside the existing
+required closure, so no branch-ruleset change is involved.
+
+Promotion was gated on a live run, and the run contradicted the prior triage
+note: gosec v2.28.0 reported a live G705 finding whose suppression was written
+in golangci-lint's `//nolint:gosec` syntax, which standalone gosec never reads.
+Converted to a gosec-native `#nosec G705 -- reason`; re-run clean.
+
+### 6.3 Toolchain pinning (A1.3)
+
+gosec `@v2.28.0`, govulncheck `@v1.6.0`, `smoke.yml`'s checkout SHA-pinned, and
+audit rule **A9** to keep it that way (workflow `uses:` must be a SHA; a check
+`Argv` may not fetch `@latest`). A9 was written first and observed firing on
+exactly those three gaps.
+
+### 6.4 `release` profile (A1.1)
+
+`release` = `full` minus the three checks whose subject is a PR diff
+(`oasdiff-breaking`, `governance-diff-rules`, `migration-gapless`) — on a tag
+they can only fail for the wrong reason. Membership is by exclusion, so a new
+check is in `release` by default.
+
+`release.yml` now runs it before publishing the SBOM. Until this change a tag
+could be pushed and an SBOM published with **no** verification behind it:
+`ci.yml` triggers on `pull_request` only.
+
+### 6.5 golangci-lint is a registry check (A1.1)
+
+It ran as a bare `golangci-lint-action` step, so `--audit` could not see it and
+`verify --profile=pr` did not run it — two definitions of "verified".
+`ci.yml:lint-go` now installs the pinned binary (v2.11.4, the exact patch the
+Action's `version: v2.11` was resolving to) and calls the verifier.
+
+Registering it exposed the second half of the same problem: `ci.yml:verify`
+runs `--profile=changed`, which selected **every** `pr` check, including one
+owned by another job with another job's binaries installed. The first CI run of
+this branch failed on `golangci-lint is not on PATH`. The fix is `--ci-job=`
+(§6.8), not dropping the check out of `pr` — a profile that omits a check which
+blocks a PR is the exact lie A1.1 exists to remove.
+
+### 6.6 A4.0 — foreign-SQL *writes*
+
+`hgcrossmodule` matched reads only (`FROM`/`JOIN`); `UPDATE documents SET ...`
+produced zero findings. It now matches `UPDATE`, `INSERT INTO` and
+`DELETE FROM` as well, in the same analyzer — not a second scanner.
+
+The census: **11 findings across 10 sites**, recorded in
+`tools/cilint/baseline.json` with `owner: "#93/A4"`. They are **not fixed
+here**. Porting a cross-module write to the owning module's application service
+is #93/A4's property; repairing it inside A1 would be another axis's debt
+cleaned silently to keep a new guard green.
+
+Mandatory negative fixture:
+`scripts/testdata/guard-fixtures/arch-lint/` contains a synthetic
+`approval -> UPDATE documents`, and the guard fails on it.
+
+### 6.7 `--ci-job=` — CIJob becomes executable (A1.1)
+
+`Check.CIJob` was documentation read only by `--audit`. It is a selector now:
+`--ci-job=ci.yml:verify` narrows a profile to the checks that declare that job
+as their owner, and `--audit` mirrors the same narrowing when it reads a
+workflow's `run:` block, so the audit describes the selection the command
+actually makes.
+
+This is what lets the two claims coexist: a profile is the honest full answer
+to "what blocks a PR" (so a local `--profile=pr` is the same definition CI
+uses), while CI still splits that set across jobs that install different
+prerequisites. An unknown job name is an error, exactly as an unknown
+`--only=` ID is.
+
+### 6.8 First live catch by the fixture spine — `module-imports`
+
+The first CI run of this branch reported, in the same job:
+
+```
+PASS  module-imports              1.5s
+FAIL  module-imports   exited 0 on bad input — the guard does not guard
+```
+
+`scripts/check-module-boundaries.ps1` appended a literal `\` to the repo root
+before comparing paths. Under pwsh on Linux the separator is `/`, so no file
+matched the root prefix, every file kept its absolute path, failed the
+`^internal/modules/` match and was skipped: **zero files inspected, exit 0**,
+on the only platform that gates a merge. The guard had been decorative in CI
+for as long as it had run there, and every green `module-imports` status on a
+Linux runner was green over nothing.
+
+Fixed by normalising both sides to forward slashes, plus a fail-closed
+inspected-file counter so "inspected nothing" and "found nothing" stop sharing
+an exit code. This is the A1.2 property paying for itself on its first run:
+no unit test of the script's internals would have reported it, because the
+helper logic is correct — the *command* was not.
+
+### 6.9 Explicitly not closed
+
+- `deploy/compose/docker-compose.yml` pins `minio/minio` and `minio/mc` at
+  `:latest`. Same class as A1.3, different axis — nothing in CI or the verifier
+  executes that file.
+- The four-inventory drift entry (ME-13 in
+  `docs/engineering/mechanical-enforcement-register.md`) still stands: A7–A9
+  make more drift visible, they do not make it unrepresentable. The global
+  maximum remains ROADMAP §4 row 4.7, "generated CI manifest".

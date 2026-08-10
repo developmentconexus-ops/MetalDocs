@@ -1,0 +1,9 @@
+package application
+
+// Reaches into another module's infrastructure package. Cross-module access
+// is allowed only through domain/application/api or a published package, so
+// this import is exactly what module-imports rejects.
+// See scripts/testdata/guard-fixtures/README.md.
+import (
+	_ "metaldocs/internal/modules/documents/infrastructure"
+)

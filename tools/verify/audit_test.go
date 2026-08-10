@@ -284,3 +284,232 @@ func TestAuditProfileInvocationSatisfiesCIJob(t *testing.T) {
 		}
 	}
 }
+
+// ---- A7: waiver kinds are a closed set ----
+
+// A waiver used to be free prose, and prose let three repo-authored guards
+// declare themselves uncovered ("TRANSITIONAL, no fixture yet") while A7
+// counted them as covered. The kind is what closes that: a check that fits no
+// admissible kind needs a fixture, not a new kind.
+func TestAuditA7RejectsWaiverKindOutsideTheEnum(t *testing.T) {
+	regs := []Check{{
+		ID:            "invented",
+		Profiles:      []string{ProfilePR},
+		CIJob:         "sample.yml:verify",
+		FixtureWaiver: &Waiver{Kind: "transitional", Why: "no fixture yet"},
+	}}
+	jobs := []workflowJob{{Workflow: "sample.yml", Job: "verify", OnlyIDs: []string{"invented"}}}
+
+	got := strings.Join(auditFindings(regs, jobs, nil), "\n")
+	if !strings.Contains(got, `A7 check "invented" has FixtureWaiver kind "transitional"`) {
+		t.Errorf("A7 did not reject an invented waiver kind; got:\n%s", got)
+	}
+}
+
+func TestAuditA7RequiresWhyAlongsideKind(t *testing.T) {
+	regs := []Check{{
+		ID:            "bare",
+		Profiles:      []string{ProfilePR},
+		CIJob:         "sample.yml:verify",
+		FixtureWaiver: &Waiver{Kind: WaiverThirdParty, Why: "   "},
+	}}
+	jobs := []workflowJob{{Workflow: "sample.yml", Job: "verify", OnlyIDs: []string{"bare"}}}
+
+	got := strings.Join(auditFindings(regs, jobs, nil), "\n")
+	if !strings.Contains(got, `A7 check "bare" has a FixtureWaiver with no Why`) {
+		t.Errorf("A7 accepted a waiver with no rationale; got:\n%s", got)
+	}
+}
+
+func TestAuditA7AcceptsAClassifiedWaiver(t *testing.T) {
+	regs := []Check{{
+		ID:            "vendor",
+		Profiles:      []string{ProfilePR},
+		CIJob:         "sample.yml:verify",
+		FixtureWaiver: &Waiver{Kind: WaiverThirdParty, Why: "pinned upstream linter; a fixture would test its rule engine"},
+	}}
+	jobs := []workflowJob{{Workflow: "sample.yml", Job: "verify", OnlyIDs: []string{"vendor"}}}
+
+	for _, f := range auditFindings(regs, jobs, nil) {
+		if strings.HasPrefix(f, "A7") {
+			t.Errorf("A7 fired on a properly classified waiver: %s", f)
+		}
+	}
+}
+
+// ---- A9 containers, A10 closure gates (#87/A1 review B1 + B2) -------------
+
+// closureJobs builds the smallest job set that puts `probe` inside
+// ci.yml:required's needs: closure, so the A10 tests below exercise the rule
+// rather than the closure computation.
+func closureJobs(probe workflowJob) []workflowJob {
+	probe.Workflow, probe.Job = "ci.yml", "probe"
+	return []workflowJob{
+		{Workflow: "ci.yml", Job: "required", Needs: []string{"probe"}},
+		probe,
+	}
+}
+
+func TestAuditA10FiresOnUnclassifiedStepInRequiredClosure(t *testing.T) {
+	jobs := closureJobs(workflowJob{Steps: []workflowStep{
+		{Name: "prereq: checkout", Uses: "actions/checkout@" + strings.Repeat("a", 40)},
+		{Name: "Run gitleaks", Run: `docker run --rm gitleaks@sha256:` + strings.Repeat("b", 64) + ` detect --exit-code 1`},
+	}})
+
+	got := strings.Join(auditFindings(nil, jobs, nil), "\n")
+	if !strings.Contains(got, "A10 ci.yml:probe step 2 (Run gitleaks)") {
+		t.Errorf("A10 did not reject an unregistered blocking gate inside the required closure; got:\n%s", got)
+	}
+}
+
+func TestAuditA10AcceptsVerifyPrereqAndReportSteps(t *testing.T) {
+	jobs := closureJobs(workflowJob{Steps: []workflowStep{
+		{Name: "prereq: checkout", Uses: "actions/checkout@" + strings.Repeat("a", 40)},
+		{Name: "verify (secret-scan)", Run: "go run ./tools/verify --require-infra --ci-job=ci.yml:probe --profile=pr"},
+		{Name: "report: upload SARIF", Uses: "github/codeql-action/upload-sarif@" + strings.Repeat("c", 40)},
+	}})
+
+	for _, f := range auditFindings(nil, jobs, nil) {
+		if strings.HasPrefix(f, "A10") {
+			t.Errorf("A10 fired on a fully classified job: %s", f)
+		}
+	}
+}
+
+func TestAuditA10IgnoresJobsOutsideTheRequiredClosure(t *testing.T) {
+	jobs := []workflowJob{
+		{Workflow: "ci.yml", Job: "required", Needs: []string{"verify"}},
+		{Workflow: "ci.yml", Job: "verify", Steps: []workflowStep{
+			{Name: "verify", Run: "go run ./tools/verify --profile=changed"},
+		}},
+		// nightly runs plenty of things nobody's merge waits on.
+		{Workflow: "nightly.yml", Job: "scan", Steps: []workflowStep{{Name: "scan", Run: "trivy fs ."}}},
+	}
+
+	for _, f := range auditFindings(nil, jobs, nil) {
+		if strings.HasPrefix(f, "A10") {
+			t.Errorf("A10 fired outside the required closure: %s", f)
+		}
+	}
+}
+
+func TestAuditA9FiresOnMutableServiceImage(t *testing.T) {
+	jobs := []workflowJob{{Workflow: "ci.yml", Job: "test-integration", Images: []string{"postgres:16"}}}
+
+	got := strings.Join(auditFindings(nil, jobs, nil), "\n")
+	if !strings.Contains(got, `A9: ci.yml:test-integration runs service container "postgres:16"`) {
+		t.Errorf("A9 did not reject a tag-pinned service container; got:\n%s", got)
+	}
+}
+
+func TestAuditA9AcceptsDigestPinnedServiceImage(t *testing.T) {
+	jobs := []workflowJob{{Workflow: "ci.yml", Job: "test-integration",
+		Images: []string{"postgres@sha256:" + strings.Repeat("0", 64)}}}
+
+	for _, f := range auditFindings(nil, jobs, nil) {
+		if strings.HasPrefix(f, "A9") {
+			t.Errorf("A9 fired on a digest-pinned service container: %s", f)
+		}
+	}
+}
+
+func TestAuditA9FiresOnMutableDockerRunInWorkflowStep(t *testing.T) {
+	jobs := closureJobs(workflowJob{Steps: []workflowStep{{
+		Name: "prereq: scan",
+		Run:  `docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.24.3 detect --source /repo`,
+	}}})
+
+	got := strings.Join(auditFindings(nil, jobs, nil), "\n")
+	if !strings.Contains(got, `runs container "ghcr.io/gitleaks/gitleaks:v8.24.3"`) {
+		t.Errorf("A9 did not reject a tag-pinned docker run; got:\n%s", got)
+	}
+}
+
+func TestAuditA9FiresOnMutableDockerRunInRegistryArgv(t *testing.T) {
+	regs := []Check{{
+		ID:            "container-check",
+		Profiles:      []string{ProfilePR},
+		CIJob:         "ci.yml:probe",
+		FixtureWaiver: &Waiver{Kind: WaiverThirdParty, Why: "pinned upstream scanner"},
+		Argv:          []string{"docker", "run", "--rm", "-v", repoRootPlaceholder + ":/src", "anchore/grype:v0.116.1", "dir:/src"},
+	}}
+	jobs := closureJobs(workflowJob{Steps: []workflowStep{
+		{Name: "verify", Run: "go run ./tools/verify --ci-job=ci.yml:probe --profile=pr"},
+	}})
+
+	got := strings.Join(auditFindings(regs, jobs, nil), "\n")
+	if !strings.Contains(got, `A9: check "container-check" runs container "anchore/grype:v0.116.1"`) {
+		t.Errorf("A9 did not reject a tag-pinned container in a registry Argv; got:\n%s", got)
+	}
+}
+
+func TestAuditA9AcceptsDigestPinnedRegistryArgv(t *testing.T) {
+	regs := []Check{{
+		ID:            "container-check",
+		Profiles:      []string{ProfilePR},
+		CIJob:         "ci.yml:probe",
+		FixtureWaiver: &Waiver{Kind: WaiverThirdParty, Why: "pinned upstream scanner"},
+		Argv: []string{"docker", "run", "--rm", "-v", repoRootPlaceholder + ":/src",
+			"anchore/grype@sha256:" + strings.Repeat("f", 64), "dir:/src"},
+	}}
+	jobs := closureJobs(workflowJob{Steps: []workflowStep{
+		{Name: "verify", Run: "go run ./tools/verify --ci-job=ci.yml:probe --profile=pr"},
+	}})
+
+	for _, f := range auditFindings(regs, jobs, nil) {
+		if strings.HasPrefix(f, "A9") {
+			t.Errorf("A9 fired on a digest-pinned registry Argv: %s", f)
+		}
+	}
+}
+
+// The image is the first NON-flag token, not the first token after `run` — a
+// parser that took the latter would read a -v mount as the image and then
+// "prove" every container unpinned or every container fine, depending on the
+// mount string. Both directions are silent failures, so pin the parse.
+func TestDockerRunImageOfSkipsFlagValues(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{`--rm -v C:/repo:/src anchore/grype@sha256:abc dir:/src`, "anchore/grype@sha256:abc"},
+		{`--rm --network host -e FOO=bar postgres:16 psql`, "postgres:16"},
+		{`--rm`, ""},
+	}
+	for _, c := range cases {
+		if got := dockerRunImageOf(dockerFields(c.in)); got != c.want {
+			t.Errorf("dockerRunImageOf(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+// A7's scope is "blocks a merge", not "is in the pr profile". go-test-integration
+// is the live instance: full-only, but run by ci.yml:test-integration, which is
+// inside ci.yml:required's closure.
+func TestAuditA7CoversRequiredClosureChecksOutsideThePRProfile(t *testing.T) {
+	jobs := closureJobs(workflowJob{})
+	regs := []Check{{
+		ID:       "closure-only",
+		Profiles: []string{ProfileFull},
+		Argv:     []string{"true"},
+		CIJob:    "ci.yml:probe",
+	}}
+
+	got := strings.Join(auditFindings(regs, jobs, nil), "\n")
+	if !strings.Contains(got, `A7 check "closure-only" blocks a merge`) {
+		t.Errorf("A7 ignored a merge-blocking check that is not in the pr profile; got:\n%s", got)
+	}
+}
+
+func TestAuditA7IgnoresChecksThatBlockNothing(t *testing.T) {
+	jobs := closureJobs(workflowJob{})
+	regs := []Check{{
+		ID:       "nightly-only",
+		Profiles: []string{ProfileFull},
+		Argv:     []string{"true"},
+		CIJob:    "nightly.yml:security-scan",
+	}}
+
+	for _, f := range auditFindings(regs, jobs, nil) {
+		if strings.Contains(f, "A7 ") {
+			t.Errorf("A7 fired on a check outside the required closure: %s", f)
+		}
+	}
+}

@@ -22,6 +22,15 @@ paths = [
     '''docs/superpowers/plans/.*''',
     # Screen-QA artifacts: idempotency-key UUIDs, captured payloads.
     '''frontend/apps/web/design-source/.*/artifacts/.*''',
+    # The secret-scan check's own negative fixture (#87/A1 review B1). That
+    # tree carries a fake AWS key on purpose: the fixture harness copies it —
+    # and this config — into a sandbox where the file lands at
+    # internal/config/aws.go, a path NO entry in this list matches, and then
+    # asserts that this config still trips on it. Without this exemption the
+    # repo's own full-history scan would flag the fixture whose entire purpose
+    # is to be flagged. Scoped to that single directory, so it cannot hide a
+    # credential committed anywhere else.
+    '''scripts/testdata/guard-fixtures/secret-scan/.*''',
 ]
 # Matched against each finding's own MATCH text (gitleaks' default target),
 # not the whole line. This was previously `regexTarget = "line"`, which
