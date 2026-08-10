@@ -537,42 +537,9 @@ func auditShardCoverage(regs []Check, jobs []workflowJob) []string {
 	var out []string
 	for _, j := range jobs {
 		key := j.Workflow + ":" + j.Job
-		denom := 0
-		for _, s := range j.Steps {
-			m := shardPattern.FindStringSubmatch(s.Run)
-			if m == nil {
-				continue
-			}
-			n, err := strconv.Atoi(m[1])
-			if err != nil || n < 1 {
-				out = append(out, fmt.Sprintf(
-					"A11 %s passes --shard with denominator %q, which is not a positive number", key, m[1]))
-				continue
-			}
-			if denom != 0 && denom != n {
-				out = append(out, fmt.Sprintf(
-					"A11 %s passes two different --shard denominators (%d and %d): one job cannot partition its subject two ways", key, denom, n))
-			}
-			denom = n
-		}
-		if denom == 0 {
-			if len(j.ShardMatrix) > 0 {
-				out = append(out, fmt.Sprintf(
-					"A11 %s declares a shard matrix %v but no step passes --shard: every matrix leg runs the whole subject, so the suite runs %d times over", key, j.ShardMatrix, len(j.ShardMatrix)))
-			}
-			continue
-		}
-		got := append([]int(nil), j.ShardMatrix...)
-		sort.Ints(got)
-		want := make([]int, denom)
-		for i := range want {
-			want[i] = i + 1
-		}
-		if !equalInts(got, want) {
-			out = append(out, fmt.Sprintf(
-				"A11 %s runs --shard=.../%d but its matrix is %v, not %v: the shards it does not run are silently skipped and the job still reports success",
-				key, denom, got, want))
-		}
+		denom, findings := shardDenominator(key, j.Steps)
+		out = append(out, findings...)
+		out = append(out, shardMatrixFindings(key, denom, j.ShardMatrix)...)
 	}
 
 	// The reverse direction: a partitioned check whose CI job never shards it
@@ -583,6 +550,55 @@ func auditShardCoverage(regs []Check, jobs []workflowJob) []string {
 	// reports the missing job, and this rule would only repeat it.
 	_ = regs
 	return out
+}
+
+// shardDenominator reads the n of --shard=i/n out of a job's steps. It returns
+// 0 when no step shards, which is the ordinary unsharded job.
+func shardDenominator(key string, steps []workflowStep) (int, []string) {
+	var out []string
+	denom := 0
+	for _, s := range steps {
+		m := shardPattern.FindStringSubmatch(s.Run)
+		if m == nil {
+			continue
+		}
+		n, err := strconv.Atoi(m[1])
+		if err != nil || n < 1 {
+			out = append(out, fmt.Sprintf(
+				"A11 %s passes --shard with denominator %q, which is not a positive number", key, m[1]))
+			continue
+		}
+		if denom != 0 && denom != n {
+			out = append(out, fmt.Sprintf(
+				"A11 %s passes two different --shard denominators (%d and %d): one job cannot partition its subject two ways", key, denom, n))
+		}
+		denom = n
+	}
+	return denom, out
+}
+
+// shardMatrixFindings compares the denominator a job's steps promise against
+// the matrix that is supposed to supply every index of it.
+func shardMatrixFindings(key string, denom int, matrix []int) []string {
+	if denom == 0 {
+		if len(matrix) == 0 {
+			return nil
+		}
+		return []string{fmt.Sprintf(
+			"A11 %s declares a shard matrix %v but no step passes --shard: every matrix leg runs the whole subject, so the suite runs %d times over", key, matrix, len(matrix))}
+	}
+	got := append([]int(nil), matrix...)
+	sort.Ints(got)
+	want := make([]int, denom)
+	for i := range want {
+		want[i] = i + 1
+	}
+	if equalInts(got, want) {
+		return nil
+	}
+	return []string{fmt.Sprintf(
+		"A11 %s runs --shard=.../%d but its matrix is %v, not %v: the shards it does not run are silently skipped and the job still reports success",
+		key, denom, got, want)}
 }
 
 func equalInts(a, b []int) bool {

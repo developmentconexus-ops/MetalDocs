@@ -30,19 +30,47 @@ function Fail([string]$msg) {
   exit 1
 }
 
+# Line-comment syntax per file type. The exemption below is opt-in: a type
+# absent from this table has no marker, so its diff always counts as real.
+# Only types that occur under the trees the rules police need an entry.
+$CommentMarker = @{
+  '.go'         = '//'
+  '.js'         = '//'
+  '.mjs'        = '//'
+  '.ps1'        = '#'
+  '.sh'         = '#'
+  '.yaml'       = '#'
+  '.yml'        = '#'
+  '.jq'         = '#'
+  '.dockerfile' = '#'
+  '.sql'        = '--'
+}
+
 # True when the file's diff contains a real code change; false when every
-# changed line differs only in "//" line comments (e.g. an appended
-# "// #nosec Gxxx -- reason" suppression). A comment cannot change an HTTP
-# contract or an operating procedure — failing on one is the same cry-wolf
-# class as the whitespace and _test.go exemptions. Go-style comments only;
-# a "//" inside a string literal is also stripped, which can only make a
-# rule MISS a change hidden in such a line — any other difference still
-# fails closed. Non-.go files always count as real changes.
+# changed line differs only in line comments (e.g. an appended
+# "// #nosec Gxxx -- reason" suppression, or a rewritten rationale block).
+# A comment cannot change an HTTP contract or an operating procedure —
+# failing on one is the same cry-wolf class as the whitespace and _test.go
+# exemptions.
+#
+# The marker is chosen by file type, not fixed to Go: the claim being made
+# is about comments, and a `.jq` or `.ps1` comment is no more capable of
+# changing an operating procedure than a `.go` one. Restricting it to "//"
+# meant the rule fired on a diff that provably could not violate it — the
+# exact failure this function exists to prevent, reintroduced by treating
+# one language's syntax as the concept. A marker inside a string literal is
+# also stripped, which can only make a rule MISS a change hidden in such a
+# line; any other difference still fails closed, as does any file type with
+# no entry in the table above.
 function Test-RealCodeChange([string]$file) {
-  if ($file -notmatch '\.go$') { return $true }
+  $ext = [System.IO.Path]::GetExtension($file).ToLowerInvariant()
+  if ($file -match '(^|/)Dockerfile(\.|$)') { $ext = '.dockerfile' }
+  $marker = $CommentMarker[$ext]
+  if (-not $marker) { return $true }
+  $stripPattern = [regex]::Escape($marker) + '.*$'
   $diffLines = git diff -w "$BaseRef...HEAD" -- $file |
     Where-Object { ($_ -match '^[+-]') -and ($_ -notmatch '^(\+\+\+|---)') }
-  $strip = { param($s) ($s.Substring(1) -replace '//.*$', '').TrimEnd() }
+  $strip = { param($s) ($s.Substring(1) -replace $stripPattern, '').TrimEnd() }
   $added   = @($diffLines | Where-Object { $_ -match '^\+' } | ForEach-Object { & $strip $_ } | Where-Object { $_ -ne '' } | Sort-Object)
   $removed = @($diffLines | Where-Object { $_ -match '^-' } | ForEach-Object { & $strip $_ } | Where-Object { $_ -ne '' } | Sort-Object)
   return (($added -join "`n") -ne ($removed -join "`n"))
@@ -147,7 +175,7 @@ if ($changedText -match '(?m)^internal/modules/') {
 $opsChanged = $changed | Where-Object {
   ($_ -match '^deploy/' -or
     ($_ -match '^scripts/' -and $_ -notmatch '^scripts/(check-|api-lint/|req-trace/|testdata/)')) -and
-  (Test-RealCodeChange $_)  # comment-only .go edits cannot change an operating procedure
+  (Test-RealCodeChange $_)  # comment-only edits cannot change an operating procedure
 }
 if ($opsChanged) {
   if ($changedText -notmatch '(?m)^docs/runbooks/') {

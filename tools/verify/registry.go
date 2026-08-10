@@ -995,10 +995,18 @@ var checks = []Check{
 		//     internal/platform/config read db/... at runtime) — a schema-only
 		//     edit here can break the suite with zero Go diff.
 		//   - internal/, apps/, tests/: the three roots the Argv actually runs.
+		//   - tools/verify/: this check's subject is now COMPUTED — which
+		//     packages run comes from partition.go's `go list`, and how they
+		//     are split comes from shardOf plus testweights.json. A PR that
+		//     edits the partitioner changes what the suite executes, so a
+		//     `--changed` selection that skipped the suite on such a PR would
+		//     be a change to the runner that the runner never ran. Found for
+		//     real: the PR that introduced sharding reported four green shards
+		//     that each selected zero checks.
 		// When in doubt this unit's brief says include the path, so this list
 		// is deliberately roots, not the narrower subset that happened to be
 		// touched by any one past incident.
-		Paths: []string{"go.mod", "go.sum", "db/", "internal/", "apps/", "tests/"},
+		Paths: []string{"go.mod", "go.sum", "db/", "internal/", "apps/", "tests/", "tools/verify/"},
 		CIJob: "ci.yml:test-integration",
 	},
 
