@@ -35,6 +35,14 @@
     },
     {
       "analyzer": "hgcrossmodule",
+      "file": "internal/modules/approval/application/events.go",
+      "message": "module \"approval\" writes \"audit\"'s base table \"governance_events\" with raw SQL (H-G, ADR-0039 D1): route the mutation through the owner's application service, or record an explicit exemption",
+      "count": 1,
+      "reason": "A4.0 census: pre-existing foreign-table write, invisible until the hgcrossmodule write scan landed. Recorded, not fixed — porting it is #93/A4's property, and repairing it here would be another axis's debt silently cleaned to keep a new guard green.",
+      "owner": "#93/A4 — cross-module SQL closure"
+    },
+    {
+      "analyzer": "hgcrossmodule",
       "file": "internal/modules/approval/application/mark_reviewed_service.go",
       "message": "module \"approval\" reads \"documents\"'s base table \"documents\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
       "count": 1,
@@ -244,7 +252,7 @@
     {
       "analyzer": "hgcrossmodule",
       "file": "internal/modules/iam/application/tenant_lifecycle_service.go",
-      "message": "module \"iam\" writes \"approval\"'s base table \"governance_events\" with raw SQL (H-G, ADR-0039 D1): route the mutation through the owner's application service, or record an explicit exemption",
+      "message": "module \"iam\" writes \"audit\"'s base table \"governance_events\" with raw SQL (H-G, ADR-0039 D1): route the mutation through the owner's application service, or record an explicit exemption",
       "count": 1,
       "reason": "A4.0 census: pre-existing foreign-table write, invisible until the hgcrossmodule write scan landed. Recorded, not fixed — porting it is #93/A4's property, and repairing it here would be another axis's debt silently cleaned to keep a new guard green.",
       "owner": "#93/A4 — cross-module SQL closure"

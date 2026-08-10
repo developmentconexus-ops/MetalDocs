@@ -1,0 +1,34 @@
+package postgres
+
+// B5 fixture (#87/A1 review): a read exemption must not become a write permit.
+//
+// This path is deliberately the exact path of a live exemption. hgExempt lists
+// (security/infrastructure/postgres/repository.go, audit_events, reads) under
+// ADR-0039 D3(d) — the audit append-sink is a cross-cutting platform table and
+// a read projection over it was a decided, justified carve-out.
+//
+// Before B5 the allowlist was keyed by (file, table) alone, so this same file
+// could start mutating audit_events and the guard would stay silent: the
+// exemption granted for reading covered writing too. The guard's headline claim
+// — "a new foreign write is blocked from day one" — was therefore false for
+// every exempted file, which is precisely the set of files most likely to reach
+// for one.
+//
+// The fixture proves the fix mechanically, and proves it at the command level:
+// the read below must stay silent (the exemption still works) while the write
+// must be reported (the exemption does not extend to it).
+
+const auditProjection = `
+	SELECT event_id, occurred_at
+	FROM audit_events
+	WHERE tenant_id = $1
+	ORDER BY occurred_at DESC
+	LIMIT 50
+`
+
+// The same file, the same table, a different verb. No exemption covers this.
+const auditBackfill = `
+	UPDATE audit_events
+	SET redacted = true
+	WHERE tenant_id = $1
+`

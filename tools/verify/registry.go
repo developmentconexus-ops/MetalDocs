@@ -127,7 +127,7 @@ var checks = []Check{
 		CIJob:    "ci.yml:verify",
 		Fixture: &Fixture{
 			Dir:  "gofmt",
-			Want: "internal/bad/unformatted.go",
+			Want: []string{"internal/bad/unformatted.go"},
 		},
 	},
 	{
@@ -189,8 +189,18 @@ var checks = []Check{
 			// no tools/cilint/baseline.json, and cilint fails on any finding
 			// when no baseline is configured — so the fixture proves the
 			// analyzer, not the ratchet.
-			Dir:  "arch-lint",
-			Want: `writes "documents"'s base table "documents"`,
+			Dir: "arch-lint",
+			Want: []string{
+				`writes "documents"'s base table "documents"`,
+				// B5: the sandbox also contains the exact path of a live READ
+				// exemption (security/.../postgres/repository.go x audit_events)
+				// which reads that table legally and then writes it. The write
+				// must be reported. If a future edit made exemptions
+				// verb-agnostic again, this line stops appearing and the fixture
+				// fails — which is the only way "a read exemption is not a write
+				// permit" is a fact rather than a comment.
+				`writes "audit"'s base table "audit_events"`,
+			},
 		},
 	},
 	// staticcheck (pinned honnef.co/go/tools/cmd/staticcheck) deleted Task 12
@@ -213,7 +223,7 @@ var checks = []Check{
 		// scripts/required-gate.jq (whole-branch review C2).
 		Paths:   []string{"internal/", "api/openapi/", "wiki/references/problem-codes.md", "cmd/problem-codes-dump/"},
 		CIJob:   "ci.yml:verify",
-		Fixture: &Fixture{Dir: "problem-codes-drift", Want: "problem-codes-dump"},
+		Fixture: &Fixture{Dir: "problem-codes-drift", Want: []string{"problem-codes-dump"}},
 	},
 	// api-lint-base-path-v1 (PATH-BASE-PREFIX on the v1 spec, standalone
 	// -only run) deleted Task 12 (six-control table, spec §4.5): -only is a
@@ -235,7 +245,7 @@ var checks = []Check{
 		Fixture: &Fixture{
 			Dir:          "api-lint-e2e-base-path",
 			ArgvOverride: []string{"go", "run", "./scripts/api-lint", "-only", "PATH-BASE-PREFIX", "{{fixture}}/bad-spec.yaml"},
-			Want:         "PATH-BASE-PREFIX",
+			Want:         []string{"PATH-BASE-PREFIX"},
 		},
 	},
 	{
@@ -252,7 +262,7 @@ var checks = []Check{
 			// its absence as a hard error, which would fail the fixture for the
 			// wrong reason. Only the spec argument is the bad input.
 			ArgvOverride: []string{"go", "run", "./scripts/api-lint/", "-strict", "{{fixture}}/bad-spec.yaml", "."},
-			Want:         "PATH-BASE-PREFIX",
+			Want:         []string{"PATH-BASE-PREFIX"},
 		},
 	},
 	{
@@ -366,14 +376,14 @@ var checks = []Check{
 		// (whole-branch review C2 class).
 		Paths:   []string{"internal/", "scripts/check-module-boundaries.ps1"},
 		CIJob:   "ci.yml:verify",
-		Fixture: &Fixture{Dir: "module-imports", Want: "[module-imports] FAIL"},
+		Fixture: &Fixture{Dir: "module-imports", Want: []string{"[module-imports] FAIL"}},
 	},
 	{
 		ID:       "test-conventions",
 		Desc:     "new tests use the canonical framework for their class",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-test-discipline.sh"},
-		Fixture:  &Fixture{Dir: "test-conventions", Want: "code_violation_integration_test.go"},
+		Fixture:  &Fixture{Dir: "test-conventions", Want: []string{"code_violation_integration_test.go"}},
 		// scripts/check-test-discipline.sh is the check's own definition
 		// (whole-branch review C2 class).
 		Paths: []string{"internal/", "tests/", "apps/", "scripts/check-test-discipline.sh"},
@@ -414,7 +424,7 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 		Fixture: &Fixture{
 			Dir:  "testdb-bypass-guard",
-			Want: "internal/fixture/bypass_test.go",
+			Want: []string{"internal/fixture/bypass_test.go"},
 		},
 	},
 
@@ -430,7 +440,7 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 		Fixture: &Fixture{
 			Dir:  "adr-status",
-			Want: "ADR status-field budget exceeded",
+			Want: []string{"ADR status-field budget exceeded"},
 		},
 	},
 	{
@@ -442,7 +452,7 @@ var checks = []Check{
 		// (whole-branch review C2 class).
 		Paths:   []string{"wiki/modules/", "scripts/wiki-tally-check.ps1"},
 		CIJob:   "ci.yml:verify",
-		Fixture: &Fixture{Dir: "wiki-debt-tally", Want: "SWEEP FAIL (1/1): fixture"},
+		Fixture: &Fixture{Dir: "wiki-debt-tally", Want: []string{"SWEEP FAIL (1/1): fixture"}},
 	},
 	{
 		ID:       "db-docs-coverage",
@@ -453,7 +463,7 @@ var checks = []Check{
 		// definition (whole-branch review C2 class).
 		Paths:   []string{"db/baseline/", "wiki/database/tables/", "scripts/check-db-dictionary-coverage.ps1"},
 		CIJob:   "ci.yml:verify",
-		Fixture: &Fixture{Dir: "db-docs-coverage", Want: "Missing dictionary pages"},
+		Fixture: &Fixture{Dir: "db-docs-coverage", Want: []string{"Missing dictionary pages"}},
 	},
 	{
 		ID:       "migration-gapless",
@@ -465,7 +475,7 @@ var checks = []Check{
 		// named explicitly in the whole-branch review's C2 finding.
 		Paths:   []string{"db/migrations/", "scripts/check-migration-gapless.sh"},
 		CIJob:   "ci.yml:verify",
-		Fixture: &Fixture{Dir: "migration-gapless", Want: "Gap: migration 0002 missing"},
+		Fixture: &Fixture{Dir: "migration-gapless", Want: []string{"Gap: migration 0002 missing"}},
 	},
 	{
 		ID:   "governance-diff-rules",
@@ -479,7 +489,7 @@ var checks = []Check{
 		Argv:     []string{"pwsh", "-NoProfile", "-File", "./scripts/check-governance.ps1"},
 		Needs:    []string{needsGitDepth},
 		CIJob:    "ci.yml:verify",
-		Fixture:  &Fixture{Dir: "governance-diff-rules", Want: "API contract change detected"},
+		Fixture:  &Fixture{Dir: "governance-diff-rules", Want: []string{"API contract change detected"}},
 	},
 	{
 		ID:       "invariant-coverage-map",
@@ -493,7 +503,7 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 		Fixture: &Fixture{
 			Dir:  "invariant-coverage-map",
-			Want: "Unmapped invariants found",
+			Want: []string{"Unmapped invariants found"},
 		},
 	},
 
@@ -620,7 +630,7 @@ var checks = []Check{
 		Argv:     []string{"bash", "scripts/check-css-token-discipline.sh"},
 		Fixture: &Fixture{
 			Dir:  "css-tokens",
-			Want: "RAW-HEX",
+			Want: []string{"RAW-HEX"},
 		},
 		// scripts/check-css-token-discipline.sh is the check's own
 		// definition — named explicitly in the whole-branch review's C2
@@ -789,7 +799,7 @@ var checks = []Check{
 		Fixture: &Fixture{
 			Dir:          "req-trace",
 			ArgvOverride: []string{"go", "run", "./scripts/req-trace", "-repo", "{{fixture}}"},
-			Want:         "UNCOVERED MUST REQ(s) (1):",
+			Want:         []string{"UNCOVERED MUST REQ(s) (1):"},
 		},
 	},
 	{
@@ -808,7 +818,7 @@ var checks = []Check{
 		Fixture: &Fixture{
 			Dir:          "required-gate-selftest",
 			CopyFromRepo: []string{"scripts/required-gate.jq"},
-			Want:         "pass-mislabelled.json",
+			Want:         []string{"pass-mislabelled.json"},
 		},
 		CIJob: "ci.yml:verify",
 	},
@@ -835,7 +845,7 @@ var checks = []Check{
 		Fixture: &Fixture{
 			Dir:          "verify-audit",
 			CopyFromRepo: []string{"scripts/required-gate.jq"},
-			Want:         "no-such-check-id",
+			Want:         []string{"no-such-check-id"},
 		},
 		CIJob: "ci.yml:verify",
 	},

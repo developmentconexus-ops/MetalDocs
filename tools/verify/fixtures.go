@@ -84,10 +84,16 @@ type Fixture struct {
 	// this is for what that script in turn reaches for.
 	CopyFromRepo []string
 
-	// Want, when set, must appear in the failing run's combined output. A
+	// Want, when set, must ALL appear in the failing run's combined output. A
 	// non-zero exit alone can come from the wrong cause (a syntax error, a
 	// missing file); Want pins the failure to the rule under test.
-	Want string
+	//
+	// It is a list because one bad tree can carry more than one property. The
+	// arch-lint fixture proves both that a foreign write is detected (A4.0) and
+	// that a file holding a read exemption for a table is still refused when it
+	// writes that same table (#87/A1 review B5) — two rules, one sandbox, and
+	// neither may be silently dropped by an edit to the other.
+	Want []string
 }
 
 // fixtureResult is one fixture's outcome.
@@ -222,11 +228,13 @@ func runOneFixture(ctx context.Context, root string, c Check) fixtureResult {
 	if !errors.As(runErr, &exitErr) {
 		return fixtureResult{id: c.ID, reason: fmt.Sprintf("could not run %s: %v", strings.Join(argv, " "), runErr), output: out}
 	}
-	if c.Fixture.Want != "" && !strings.Contains(out, c.Fixture.Want) {
-		return fixtureResult{
-			id:     c.ID,
-			reason: fmt.Sprintf("failed, but not for the reason under test: output does not contain %q", c.Fixture.Want),
-			output: out,
+	for _, want := range c.Fixture.Want {
+		if !strings.Contains(out, want) {
+			return fixtureResult{
+				id:     c.ID,
+				reason: fmt.Sprintf("failed, but not for the reason under test: output does not contain %q", want),
+				output: out,
+			}
 		}
 	}
 	return fixtureResult{id: c.ID, ok: true, reason: fmt.Sprintf("rejected bad input (exit %d)", exitErr.ExitCode())}
