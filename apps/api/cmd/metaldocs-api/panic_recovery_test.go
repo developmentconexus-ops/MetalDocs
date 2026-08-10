@@ -38,6 +38,7 @@ func TestPanicRecoveryYieldsProblemJSON(t *testing.T) {
 		nil, // iam_authz
 		nil, // presence_bump
 		nil, // rate_limit
+		nil, // contract_validation
 		nil, // method_not_allowed
 	))
 

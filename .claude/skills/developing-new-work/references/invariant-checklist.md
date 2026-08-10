@@ -54,7 +54,7 @@ module's application service or published Go interface.
 - **Errors are RFC 9457 `problem+json`**: never bare `http.Error`.
   `internal/platform/problem/problem.go:77` (`Write`); codes `internal/platform/problem/codes.go:9`.
 - **Fixed request lifecycle**: `panic_recovery → otel → http_obs → cors → origin_protection →
-  pre_auth_login_rate_limit → authn → iam_authz → presence_bump → rate_limit → method_not_allowed`
+  pre_auth_login_rate_limit → authn → iam_authz → presence_bump → rate_limit → contract_validation → method_not_allowed`
   is inherited; new routes don't re-wire it. `apps/api/cmd/metaldocs-api/chain.go:25`. Idempotency is
   **not** a chain link — it is enforced per-handler/per-service where needed (e.g.
   `internal/modules/documents/approval/application/signoff_idemp.go`).

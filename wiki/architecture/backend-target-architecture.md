@@ -88,6 +88,7 @@ flowchart LR
 - **REQ-MW-5** Login and credential endpoints carry the strictest pre-auth IP-keyed rate limit. (MUST)
 - **REQ-MW-6** Fine-grained (resource/area-level) authorization never lives in middleware — it lives at tier-2 inside the owning transaction (§3.3). Middleware does route-level tier-1 only. (MUST)
 - **REQ-MW-7** The chain order is asserted by a test against the composed handler; reordering breaks the build, not production. (SHOULD — **satisfied Wave 1 (F-01):** `chain_test.go` asserts composed execution order.)
+- **REQ-MW-8** A request that violates a constraint the OpenAPI contract declares — required field, enum, format, bound, content type — is rejected before the business handler runs, by ONE validator in the composed ingress rather than per module. It runs after authn/authz/rate-limiting (so 401/403/429 still precede 400 and the link is not a shape oracle) and outside the 404/405 layer (which the mux owns). Failures use the canonical problem writer. (MUST — **satisfied A3.2:** `contract_validation` in `apps/api/cmd/metaldocs-api/chain.go`, backed by `internal/platform/openapivalidate` over the embedded `api/openapi/v1/openapi.yaml`; proven through the composed chain in `validator_ingress_test.go`.)
 
 ### 2.2 Handler discipline
 

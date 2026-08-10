@@ -47,6 +47,7 @@ func buildPublicHandler(httpObs *observability.HTTPObservability) http.Handler {
 		denyAllMiddleware, // iam authz: fails closed, like production iamMiddleware.Wrap
 		nil,               // presence bump: nil when no SQL DB, same as production
 		func(next http.Handler) http.Handler { return next }, // global rate limit stub
+		nil, // contract validation: this fixture serves a stub route, not the spec surface
 		platformmw.MethodNotAllowedJSON,
 	)
 	return buildChain(apiMux, links)

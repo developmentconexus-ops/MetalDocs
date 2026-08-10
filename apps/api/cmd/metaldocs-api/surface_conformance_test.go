@@ -640,6 +640,13 @@ func chainOverSentinel(t *testing.T, db *sql.DB, pattern string, sentinel http.H
 		iamMiddleware.Wrap,
 		nil, // presence_bump
 		nil, // rate_limit
+		// contract_validation: nil for the same reason as the links above.
+		// This suite drives every route with a synthetic empty request to ask
+		// "who is admitted?", so a real validator would answer 400 on bodies
+		// the suite never intended to be valid — replacing the admission
+		// signal under test with a payload signal it makes no claim about.
+		// A3.2's own proofs run the real link (validator_ingress_test.go).
+		nil,
 		nil, // method_not_allowed
 	)
 	return buildChain(mux, links)
