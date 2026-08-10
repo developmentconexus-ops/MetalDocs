@@ -101,10 +101,3 @@ scratch_qa/
 # grype SARIF report, written by the `vuln-scan` registry check so
 # ci.yml:security can upload it. A run artifact, not a source.
 .grype.sarif
-
-# Staged tracked-tree snapshots (tools/verify stage.go). Created and removed
-# inside one check's run; the pattern is here so a crashed run leaves something
-# that is visibly junk and cannot be committed. It also has to stay ignored for
-# stage_test.go's probe, which proves an ignored file cannot enter the scan.
-.verify-stage-*
-.verify-probe-*

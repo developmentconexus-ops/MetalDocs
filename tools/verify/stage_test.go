@@ -321,6 +321,37 @@ func TestSweepRemovesOnlyStaleStages(t *testing.T) {
 	}
 }
 
+// A stage is a full second copy of the tree, so WHERE it lands is part of the
+// mechanism. The first cut put it under the repo root and relied on .gitignore.
+// That failed in the first full `--profile=pr` run, and not subtly: api-lint
+// walks the tree with filepath.WalkDir and a hard-coded skip list (.git,
+// .claude, node_modules, vendor), which does not consult .gitignore at all. It
+// read every module file twice and reported 40+ tripwire-pairing violations
+// against paths under the stage — vuln-scan failing OTHER checks in the same
+// run, on input that does not exist in the commit.
+//
+// Excluding the prefix in each walker is the exclude-list workaround F2 deletes,
+// one level up: it needs every current AND future tree-walker to know about it.
+// Outside the repository the hazard is unrepresentable instead — nothing rooted
+// at the repo can reach the stage, and no .gitignore entry is load-bearing.
+func TestStagedTreeLivesOutsideTheRepository(t *testing.T) {
+	root := stagedFixture(t)
+
+	dir, cleanup, err := stage(context.Background(), stageTrackedTree, root)
+	if err != nil {
+		t.Fatalf("stage: %v", err)
+	}
+	defer cleanup()
+
+	rel, err := filepath.Rel(root, dir)
+	if err != nil {
+		return // different volume: further outside than "outside" already requires
+	}
+	if !strings.HasPrefix(rel, "..") {
+		t.Errorf("the stage landed at %s, inside the repository at %s: every check that walks the tree would read the repo twice", dir, root)
+	}
+}
+
 // Staging is scoped: it never writes outside the directory it created, whatever
 // the archive claims. git archive does not emit escaping paths — the point is
 // that a file-writing loop must not depend on the producer being well-behaved,

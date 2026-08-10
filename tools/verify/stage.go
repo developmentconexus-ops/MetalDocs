@@ -48,13 +48,27 @@ const stageTrackedTree = "tracked-tree"
 // rule: the value comes from the verifier, never from a check's input.
 const trackedTreePlaceholder = "{{tracked}}"
 
-// stagePrefix names the staging directories. They live under the repo root
-// rather than the system temp dir for one practical reason: the repo root is
-// already a path this repo's container checks bind-mount successfully on every
-// developer machine, and %TEMP% is not guaranteed to be a shared drive under
-// Docker Desktop. .gitignore covers the prefix, so a crashed run leaves a
-// directory that is visibly junk and cannot be committed.
-const stagePrefix = ".verify-stage-"
+// stagePrefix names the staging directories, which live in the SYSTEM TEMP DIR,
+// never inside the repository.
+//
+// The first cut put them under the repo root, on the theory that the repo root
+// is a path this repo's container checks already bind-mount successfully while
+// %TEMP% might not be a shared drive under Docker Desktop. That theory was
+// wrong on both halves. %TEMP% mounts fine here (verified: `docker run -v
+// <tempdir>:/src alpine ls /src`), and putting a second copy of the tree inside
+// the repository broke other checks in the same run: api-lint walks the tree
+// with a hard-coded skip list (.git, .claude, node_modules, vendor), so it
+// found every module file twice and reported 40+ tripwire-pairing violations
+// against paths under .verify-stage-*. .gitignore does not help — a
+// filepath.WalkDir does not consult it.
+//
+// Keeping it in the repo would mean teaching every current and future
+// tree-walker about this prefix, which is the exact exclude-list workaround F2
+// exists to delete, one level up. Outside the repo the hazard is
+// unrepresentable: no walker rooted at the repo can reach the stage at all, no
+// .gitignore entry is load-bearing, and clean-tree assertions have nothing to
+// see. TestStagedTreeLivesOutsideTheRepository holds it there.
+const stagePrefix = "verify-stage-"
 
 // stage materialises a check's staging mode and returns the directory plus its
 // cleanup. The cleanup only ever removes a directory this function created.
@@ -67,11 +81,12 @@ func stage(ctx context.Context, mode, root string) (string, func(), error) {
 	}
 }
 
-// stageTracked extracts `git archive HEAD` into a fresh directory under root.
+// stageTracked extracts `git archive HEAD` of the repo at root into a fresh
+// directory in the system temp dir.
 func stageTracked(ctx context.Context, root string) (string, func(), error) {
-	sweepStages(root)
+	sweepStages(os.TempDir())
 
-	dir, err := os.MkdirTemp(root, stagePrefix)
+	dir, err := os.MkdirTemp("", stagePrefix)
 	if err != nil {
 		return "", func() {}, fmt.Errorf("create staging directory: %w", err)
 	}
@@ -154,13 +169,13 @@ func removeStage(dir string) {
 		time.Sleep(time.Duration(i+1) * 200 * time.Millisecond)
 	}
 	fmt.Fprintf(os.Stderr, "verify: could not remove staging directory %s: %v\n"+
-		"verify: it is gitignored and safe to delete by hand; the next run older than an hour will sweep it\n", dir, err)
+		"verify: it is outside the repository and safe to delete by hand; the next run older than an hour will sweep it\n", dir, err)
 }
 
-// sweepStages removes leftovers a crashed or blocked run left behind, so they
-// cannot accumulate a full tracked-tree copy per run.
-func sweepStages(root string) {
-	entries, err := os.ReadDir(root)
+// sweepStages removes leftovers a crashed or blocked run left behind in tmp, so
+// they cannot accumulate a full tracked-tree copy per run.
+func sweepStages(tmp string) {
+	entries, err := os.ReadDir(tmp)
 	if err != nil {
 		return
 	}
@@ -172,7 +187,7 @@ func sweepStages(root string) {
 		if err != nil || time.Since(info.ModTime()) < staleStage {
 			continue
 		}
-		_ = os.RemoveAll(filepath.Join(root, e.Name()))
+		_ = os.RemoveAll(filepath.Join(tmp, e.Name()))
 	}
 }
 
