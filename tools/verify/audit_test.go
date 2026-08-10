@@ -284,3 +284,55 @@ func TestAuditProfileInvocationSatisfiesCIJob(t *testing.T) {
 		}
 	}
 }
+
+// ---- A7: waiver kinds are a closed set ----
+
+// A waiver used to be free prose, and prose let three repo-authored guards
+// declare themselves uncovered ("TRANSITIONAL, no fixture yet") while A7
+// counted them as covered. The kind is what closes that: a check that fits no
+// admissible kind needs a fixture, not a new kind.
+func TestAuditA7RejectsWaiverKindOutsideTheEnum(t *testing.T) {
+	regs := []Check{{
+		ID:            "invented",
+		Profiles:      []string{ProfilePR},
+		CIJob:         "sample.yml:verify",
+		FixtureWaiver: &Waiver{Kind: "transitional", Why: "no fixture yet"},
+	}}
+	jobs := []workflowJob{{Workflow: "sample.yml", Job: "verify", OnlyIDs: []string{"invented"}}}
+
+	got := strings.Join(auditFindings(regs, jobs, nil), "\n")
+	if !strings.Contains(got, `A7 check "invented" has FixtureWaiver kind "transitional"`) {
+		t.Errorf("A7 did not reject an invented waiver kind; got:\n%s", got)
+	}
+}
+
+func TestAuditA7RequiresWhyAlongsideKind(t *testing.T) {
+	regs := []Check{{
+		ID:            "bare",
+		Profiles:      []string{ProfilePR},
+		CIJob:         "sample.yml:verify",
+		FixtureWaiver: &Waiver{Kind: WaiverThirdParty, Why: "   "},
+	}}
+	jobs := []workflowJob{{Workflow: "sample.yml", Job: "verify", OnlyIDs: []string{"bare"}}}
+
+	got := strings.Join(auditFindings(regs, jobs, nil), "\n")
+	if !strings.Contains(got, `A7 check "bare" has a FixtureWaiver with no Why`) {
+		t.Errorf("A7 accepted a waiver with no rationale; got:\n%s", got)
+	}
+}
+
+func TestAuditA7AcceptsAClassifiedWaiver(t *testing.T) {
+	regs := []Check{{
+		ID:            "vendor",
+		Profiles:      []string{ProfilePR},
+		CIJob:         "sample.yml:verify",
+		FixtureWaiver: &Waiver{Kind: WaiverThirdParty, Why: "pinned upstream linter; a fixture would test its rule engine"},
+	}}
+	jobs := []workflowJob{{Workflow: "sample.yml", Job: "verify", OnlyIDs: []string{"vendor"}}}
+
+	for _, f := range auditFindings(regs, jobs, nil) {
+		if strings.HasPrefix(f, "A7") {
+			t.Errorf("A7 fired on a properly classified waiver: %s", f)
+		}
+	}
+}

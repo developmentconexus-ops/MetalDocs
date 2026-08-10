@@ -471,17 +471,43 @@ func auditFixtureCoverage(regs []Check) []string {
 			continue // only blocking checks are in scope
 		}
 		switch {
-		case c.Fixture == nil && c.FixtureWaiver == "":
+		case c.Fixture == nil && c.FixtureWaiver == nil:
 			out = append(out, fmt.Sprintf(
 				"A7 check %q is in profile %s but declares neither Fixture nor FixtureWaiver: "+
 					"nothing proves this guard can fail", c.ID, ProfilePR))
-		case c.Fixture != nil && c.FixtureWaiver != "":
+		case c.Fixture != nil && c.FixtureWaiver != nil:
 			out = append(out, fmt.Sprintf(
 				"A7 check %q declares both a Fixture and a FixtureWaiver: a waiver explains an "+
 					"absent fixture, so keeping both leaves a stale claim in the registry", c.ID))
+		case c.FixtureWaiver != nil:
+			// The kind is the load-bearing part. Prose could always describe a
+			// fourth reason ("not yet", "the sandbox is hard"), and prose is
+			// what let three repo-authored guards count as covered while
+			// declaring themselves uncovered in the same sentence.
+			if !waiverKinds[c.FixtureWaiver.Kind] {
+				out = append(out, fmt.Sprintf(
+					"A7 check %q has FixtureWaiver kind %q, which is not one of %s: a guard that fits "+
+						"no admissible kind needs a fixture, not a new kind",
+					c.ID, c.FixtureWaiver.Kind, knownWaiverKinds()))
+			}
+			if strings.TrimSpace(c.FixtureWaiver.Why) == "" {
+				out = append(out, fmt.Sprintf(
+					"A7 check %q has a FixtureWaiver with no Why: the kind says which rule admits the "+
+						"waiver, Why must say why this check is an instance of it", c.ID))
+			}
 		}
 	}
 	return out
+}
+
+// knownWaiverKinds renders the closed set for a finding message.
+func knownWaiverKinds() string {
+	var kinds []string
+	for k := range waiverKinds {
+		kinds = append(kinds, string(k))
+	}
+	sort.Strings(kinds)
+	return strings.Join(kinds, ", ")
 }
 
 // auditDuplicateIDs rejects two checks sharing an ID. --only, --audit's own

@@ -1,0 +1,3 @@
+module codegendriftfixture
+
+go 1.26.5

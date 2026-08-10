@@ -1,0 +1,4 @@
+package http
+
+// Mounts the generated boundary for /api/v1/templates.
+func Register() { templatesapi.HandlerWithOptions(nil) }

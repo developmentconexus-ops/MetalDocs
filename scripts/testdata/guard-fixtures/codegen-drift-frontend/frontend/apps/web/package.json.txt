@@ -1,0 +1,7 @@
+{
+  "name": "codegen-drift-frontend-fixture",
+  "private": true,
+  "scripts": {
+    "gen:api": "node gen-api.mjs"
+  }
+}

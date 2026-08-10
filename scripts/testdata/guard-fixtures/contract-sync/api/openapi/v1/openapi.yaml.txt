@@ -1,0 +1,29 @@
+openapi: 3.0.3
+info:
+  title: contract-sync fixture
+  version: "1"
+servers:
+  - url: /api/v1
+paths:
+  /templates:
+    get: {}
+  /templates/{id}/versions/{n}/submit-for-approval:
+    post: {}
+  /templates/placeholder-catalog:
+    get: {}
+  /documents:
+    get: {}
+  /documents/{id}:
+    get: {}
+  /controlled-documents:
+    get: {}
+  /controlled-documents/{id}:
+    get: {}
+  /controlled-documents/{id}/revisions:
+    get: {}
+  /taxonomy/profiles:
+    get: {}
+  /taxonomy/areas:
+    get: {}
+  /taxonomy/families:
+    get: {}

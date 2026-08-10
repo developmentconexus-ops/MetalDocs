@@ -1,0 +1,4 @@
+const BASE = "/api/v1/controlled-documents";
+export type CDDto = components["schemas"]["ControlledDocument"];
+export const fetchControlledDocuments = () => BASE;
+export const createControlledDocumentAtomic = () => BASE;

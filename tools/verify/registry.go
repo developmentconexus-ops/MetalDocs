@@ -99,12 +99,55 @@ type Check struct {
 	// fixtures.go. Nil is allowed only with a FixtureWaiver.
 	Fixture *Fixture
 
-	// FixtureWaiver records, in one sentence, why this blocking check carries
-	// no negative fixture, and who owns closing that. It is not a bypass —
-	// it is the audit trail for a known hole. Audit rule A7 requires every
-	// blocking check to carry exactly one of Fixture or FixtureWaiver, so a
-	// hole cannot exist without being named.
-	FixtureWaiver string
+	// FixtureWaiver records why this blocking check carries no negative
+	// fixture. Audit rule A7 requires every blocking check to carry exactly
+	// one of Fixture or FixtureWaiver, so a hole cannot exist unnamed.
+	//
+	// The waiver is a CLASSIFICATION, not prose. It used to be a free string,
+	// and a free string is an escape hatch: three repo-authored guards carried
+	// "TRANSITIONAL, no fixture yet" and A7 counted them as covered, which is
+	// exactly the coverage claim the rule exists to prevent (#87/A1 review B3).
+	// Kind is a closed enum of the three reasons a fixture cannot exist —
+	// none of which is "not yet" — so an unfixtured repo-authored guard is now
+	// unrepresentable rather than merely discouraged.
+	FixtureWaiver *Waiver
+}
+
+// WaiverKind enumerates the only admissible reasons a blocking check has no
+// negative fixture. Adding a fourth kind is a deliberate, reviewable act; a
+// waiver that fits none of these means the check needs a fixture.
+type WaiverKind string
+
+const (
+	// WaiverThirdParty — the failing behaviour under test belongs to a pinned
+	// third-party tool. A fixture would assert that someone else's product
+	// works, which this repo neither owns nor can fix.
+	WaiverThirdParty WaiverKind = "third-party-tool"
+
+	// WaiverTestSuite — the check IS a test suite or a negative-fixture
+	// harness. Its bad-input proof is its own test cases; fixturing it would
+	// fixture a fixture.
+	WaiverTestSuite WaiverKind = "test-suite"
+
+	// WaiverBuildStep — the check is a build prerequisite producing an
+	// artifact, not a rule. It fails when the build fails; there is no bad
+	// input to feed a rule that does not exist.
+	WaiverBuildStep WaiverKind = "build-prerequisite"
+)
+
+// waiverKinds is the closed set A7 validates against.
+var waiverKinds = map[WaiverKind]bool{
+	WaiverThirdParty: true,
+	WaiverTestSuite:  true,
+	WaiverBuildStep:  true,
+}
+
+// Waiver is a classified absence of a fixture. Why is still required — the
+// kind says which rule admits the waiver, Why says why THIS check is an
+// instance of it — but Why can no longer smuggle in a fourth kind.
+type Waiver struct {
+	Kind WaiverKind
+	Why  string
 }
 
 // checks is the registry. Keep it sorted by ID.
@@ -132,7 +175,7 @@ var checks = []Check{
 	},
 	{
 		ID:            "go-vet",
-		FixtureWaiver: "third-party tool (cmd/vet), not a guard this repo authored; its own failure modes are Go's to prove, and a fixture here would test the Go toolchain.",
+		FixtureWaiver: &Waiver{Kind: WaiverThirdParty, Why: "third-party tool (cmd/vet), not a guard this repo authored; its own failure modes are Go's to prove, and a fixture here would test the Go toolchain."},
 		Desc:          "go vet ./...",
 		Profiles:      []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:          []string{"go", "vet", "./..."},
@@ -140,7 +183,7 @@ var checks = []Check{
 	},
 	{
 		ID:            "go-vet-integration",
-		FixtureWaiver: "same third-party tool as go-vet under a build tag; what this entry adds is the tag, which the registry declares rather than implements.",
+		FixtureWaiver: &Waiver{Kind: WaiverThirdParty, Why: "same third-party tool as go-vet under a build tag; what this entry adds is the tag, which the registry declares rather than implements."},
 		Desc:          "go vet -tags integration ./... — integration-tagged files are not compiled by an untagged build, so a seam signature change can break them invisibly",
 		// Deliberately in `fast`: this is cheap and it is the exact gap that
 		// has bitten this repo before (bit QR-C).
@@ -152,7 +195,7 @@ var checks = []Check{
 	// ---- Go: lint ---------------------------------------------------------
 	{
 		ID:            "golangci-lint",
-		FixtureWaiver: "third-party linter aggregator (pinned); a fixture here would test golangci-lint's own analyzers, not this repo. The repo-authored part is .golangci.yml's enabled set, which every run exercises against the whole tree.",
+		FixtureWaiver: &Waiver{Kind: WaiverThirdParty, Why: "third-party linter aggregator (pinned); a fixture here would test golangci-lint's own analyzers, not this repo. The repo-authored part is .golangci.yml's enabled set, which every run exercises against the whole tree."},
 		Desc:          "golangci-lint over apps/api, internal and tools (.golangci.yml scope)",
 		// A1.1. This ran for months as a bare golangci-lint-action step in
 		// ci.yml:lint-go — outside the registry, so `verify --audit` could not
@@ -267,7 +310,7 @@ var checks = []Check{
 	},
 	{
 		ID:            "api-lint-selftest",
-		FixtureWaiver: "this check IS a negative-fixture suite — scripts/api-lint/testdata plus exit_code_test.go already assert non-zero exit on bad specs. Fixturing it would fixture a fixture harness.",
+		FixtureWaiver: &Waiver{Kind: WaiverTestSuite, Why: "this check IS a negative-fixture suite — scripts/api-lint/testdata plus exit_code_test.go already assert non-zero exit on bad specs. Fixturing it would fixture a fixture harness."},
 		Desc:          "the api-lint tool's own tests",
 		Profiles:      []string{ProfilePR, ProfileFull},
 		Argv:          []string{"go", "test", "./scripts/api-lint/...", "-count=1"},
@@ -275,11 +318,30 @@ var checks = []Check{
 		CIJob:         "ci.yml:verify",
 	},
 	{
-		ID:            "contract-sync",
-		FixtureWaiver: "TRANSITIONAL, no fixture yet. The check drives pwsh scripts that regenerate and compare per-module contract artifacts, which needs a sandbox carrying the generator toolchain. Owner: #87/A1 remainder — recorded in the Phase 1 handoff as a known A1.2 gap, not deferred to another axis.",
-		Desc:          "spec/generated/runtime contract sync across modules",
-		Profiles:      []string{ProfilePR, ProfileFull},
-		Argv:          []string{"pwsh", "-NoProfile", "-File", "./scripts/check-contract-sync-all.ps1"},
+		ID: "contract-sync",
+		Fixture: &Fixture{
+			// The earlier waiver claimed this check "regenerates artifacts" and
+			// so needed a generator toolchain in the sandbox. Reading the script
+			// says otherwise: it compares surfaces that already exist — spec
+			// path keys, generated operation ids, the FE wrapper, the wiki
+			// status line. Nothing is regenerated, so nothing blocks a fixture.
+			//
+			// The tree carries all four gated modules with their surfaces
+			// aligned, then removes one operation id from documents' generated
+			// package — the exact shape of "the spec grew a route and the
+			// generated boundary did not". Three modules stay clean, so the
+			// fixture also proves the guard localises the drift rather than
+			// failing wholesale.
+			Dir:          "contract-sync",
+			CopyFromRepo: []string{"scripts/check-module-contract-sync.ps1"},
+			Want: []string{
+				"[DRIFT] generated backend package presence",
+				"drifted module(s): documents",
+			},
+		},
+		Desc:     "spec/generated/runtime contract sync across modules",
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv:     []string{"pwsh", "-NoProfile", "-File", "./scripts/check-contract-sync-all.ps1"},
 		// scripts/check-contract-sync-all.ps1 is the check's own definition;
 		// without it a PR editing only the script (weakening what it checks)
 		// selects zero checks (whole-branch review C2).
@@ -287,22 +349,39 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:            "codegen-drift-backend",
-		FixtureWaiver: "TRANSITIONAL, no fixture yet. Running it in a sandbox means running oapi-codegen and go generate there; the honest fixture is a recorded drift diff, which needs generator inputs the sandbox does not have. Owner: #87/A1 remainder.",
-		Desc:          "go generate ./... produces no diff in generated Go artifacts (api.gen.go, httpsurface_gen.go, httpsurface_e2e_gen.go)",
-		Profiles:      []string{ProfilePR, ProfileFull},
-		Argv:          []string{"bash", "scripts/check-codegen-drift-backend.sh"},
+		ID: "codegen-drift-backend",
+		Fixture: &Fixture{
+			// The property is "running the generator changes a committed
+			// generated file", and that is generator-agnostic: the sandbox is a
+			// tiny module whose //go:generate directive rewrites api.gen.go with
+			// one more operation id than the committed copy. oapi-codegen is not
+			// needed to prove the guard notices — that was the mistake in the
+			// waiver this replaces, which treated the repo's particular
+			// generator as part of the property.
+			Dir:  "codegen-drift-backend",
+			Want: []string{"Run 'go generate ./...' and commit"},
+		},
+		Desc:     "go generate ./... produces no diff in generated Go artifacts (api.gen.go, httpsurface_gen.go, httpsurface_e2e_gen.go)",
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-codegen-drift-backend.sh"},
 		// scripts/check-codegen-drift-backend.sh is the check's own
 		// definition (whole-branch review C2 class).
 		Paths: []string{"api/openapi/", "internal/", "apps/", "cmd/", "scripts/check-codegen-drift-backend.sh"},
 		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:            "codegen-drift-frontend",
-		FixtureWaiver: "TRANSITIONAL, no fixture yet. Same generator-toolchain problem as codegen-drift-backend, via pnpm run gen:api. Owner: #87/A1 remainder.",
-		Desc:          "pnpm run gen:api produces no diff in frontend/apps/web/src/lib/api-types/",
-		Profiles:      []string{ProfilePR, ProfileFull},
-		Argv:          []string{"bash", "scripts/check-codegen-drift-frontend.sh"},
+		ID: "codegen-drift-frontend",
+		Fixture: &Fixture{
+			// Same shape as codegen-drift-backend: the sandbox provides a
+			// frontend/apps/web with a real `gen:api` script that rewrites
+			// src/lib/api-types/index.d.ts, and a committed copy that predates
+			// it. openapi-typescript is not part of the property either.
+			Dir:  "codegen-drift-frontend",
+			Want: []string{"Run 'pnpm run gen:api' in frontend/apps/web and commit"},
+		},
+		Desc:     "pnpm run gen:api produces no diff in frontend/apps/web/src/lib/api-types/",
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-codegen-drift-frontend.sh"},
 		// scripts/check-codegen-drift-frontend.sh is the check's own
 		// definition (whole-branch review C2 class).
 		Paths: []string{"api/openapi/", "frontend/", "scripts/check-codegen-drift-frontend.sh"},
@@ -310,7 +389,7 @@ var checks = []Check{
 	},
 	{
 		ID:            "openapi-lint-v1",
-		FixtureWaiver: "third-party tool (@redocly/cli, pinned); a fixture here would test Redocly's rule engine, not this repo.",
+		FixtureWaiver: &Waiver{Kind: WaiverThirdParty, Why: "third-party tool (@redocly/cli, pinned); a fixture here would test Redocly's rule engine, not this repo."},
 		Desc:          "redocly lint on the v1 spec",
 		Profiles:      []string{ProfilePR, ProfileFull},
 		// Pinned to 2.46.0, latest at pin time (2026-08-08) — same reasoning
@@ -328,7 +407,7 @@ var checks = []Check{
 	},
 	{
 		ID:            "openapi-lint-e2e",
-		FixtureWaiver: "third-party tool (@redocly/cli, pinned); same as openapi-lint-v1.",
+		FixtureWaiver: &Waiver{Kind: WaiverThirdParty, Why: "third-party tool (@redocly/cli, pinned); same as openapi-lint-v1."},
 		Desc:          "redocly lint on the internal-e2e spec",
 		// Task 12: the e2e scaffolding document did not exist until now — a
 		// gate authored before its subject would pass vacuously. Same command
@@ -349,7 +428,7 @@ var checks = []Check{
 	},
 	{
 		ID:            "oasdiff-breaking",
-		FixtureWaiver: "third-party tool (oasdiff); it also needs a base-branch spec materialized by a workflow step, so a sandbox run would fail on the missing file rather than on a breaking change.",
+		FixtureWaiver: &Waiver{Kind: WaiverThirdParty, Why: "third-party tool (oasdiff); it also needs a base-branch spec materialized by a workflow step, so a sandbox run would fail on the missing file rather than on a breaking change."},
 		Desc:          "oasdiff breaking-change gate: PR head spec vs base-branch spec, --fail-on ERR",
 		// The base-branch spec this diffs against is materialized to
 		// /tmp/openapi.base.yaml by a workflow prerequisite step
@@ -391,7 +470,7 @@ var checks = []Check{
 	},
 	{
 		ID:            "test-conventions-selftest",
-		FixtureWaiver: "this check IS the negative-fixture harness for test-conventions (scripts/check-test-discipline-selftest.sh builds a throwaway repo and asserts finding counts).",
+		FixtureWaiver: &Waiver{Kind: WaiverTestSuite, Why: "this check IS the negative-fixture harness for test-conventions (scripts/check-test-discipline-selftest.sh builds a throwaway repo and asserts finding counts)."},
 		Desc:          "check-test-discipline.sh reads code and ignores Go line comments",
 		Profiles:      []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:          []string{"bash", "scripts/check-test-discipline-selftest.sh"},
@@ -572,7 +651,7 @@ var checks = []Check{
 		Profiles:      []string{ProfilePR, ProfileFull},
 		Argv:          []string{"go", "run", "github.com/securego/gosec/v2/cmd/gosec@v2.28.0", "-quiet", "-exclude-dir=.claude", "-nosec-require-rules", "-nosec-require-justification", "./..."},
 		Needs:         []string{needsNetwork},
-		FixtureWaiver: "third-party scanner (gosec, pinned); a fixture here would test gosec's own rule engine, not this repo. The repo-authored part is the #nosec justification shape, which -nosec-require-rules -nosec-require-justification enforce at every run.",
+		FixtureWaiver: &Waiver{Kind: WaiverThirdParty, Why: "third-party scanner (gosec, pinned); a fixture here would test gosec's own rule engine, not this repo. The repo-authored part is the #nosec justification shape, which -nosec-require-rules -nosec-require-justification enforce at every run."},
 		// No Paths, deliberately: a security scan scoped by path is a security
 		// scan that can be dodged by touching a file outside the list.
 		CIJob: "ci.yml:verify",
@@ -603,7 +682,7 @@ var checks = []Check{
 		Profiles:      []string{ProfilePR, ProfileFull},
 		Argv:          []string{"go", "run", "golang.org/x/vuln/cmd/govulncheck@v1.6.0", "./..."},
 		Needs:         []string{needsNetwork},
-		FixtureWaiver: "third-party scanner (govulncheck, pinned); its input is the live vulnerability database, so a synthetic bad fixture would assert against data this repo does not control.",
+		FixtureWaiver: &Waiver{Kind: WaiverThirdParty, Why: "third-party scanner (govulncheck, pinned); its input is the live vulnerability database, so a synthetic bad fixture would assert against data this repo does not control."},
 		// No Paths — same reasoning as gosec above.
 		CIJob: "ci.yml:verify",
 	},
@@ -611,7 +690,7 @@ var checks = []Check{
 	// ---- Frontend ---------------------------------------------------------
 	{
 		ID:            "eslint",
-		FixtureWaiver: "third-party tool; the repo-authored part is the eigenpal import boundary rule, whose fixture belongs with the eslint config — deferred, no owner assigned outside A1.",
+		FixtureWaiver: &Waiver{Kind: WaiverThirdParty, Why: "eslint, a pinned third-party engine; a fixture here would assert that eslint reports a rule violation. The one repo-authored rule in that config, the eigenpal import boundary, has its own registry check (eigenpal-selector-pin) and its own fixture."},
 		Desc:          "eslint across the workspace, including the eigenpal import boundary",
 		Profiles:      []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:          []string{"pnpm", "run", "lint"},
@@ -652,7 +731,7 @@ var checks = []Check{
 	},
 	{
 		ID:            "fe-typecheck",
-		FixtureWaiver: "third-party tool (tsc); a fixture would prove TypeScript rejects bad types.",
+		FixtureWaiver: &Waiver{Kind: WaiverThirdParty, Why: "third-party tool (tsc); a fixture would prove TypeScript rejects bad types."},
 		Desc:          "tsc over @metaldocs/web",
 		Profiles:      []string{ProfilePR, ProfileFull},
 		Argv:          []string{"pnpm", "--filter", "@metaldocs/web", "run", "typecheck"},
@@ -666,7 +745,7 @@ var checks = []Check{
 	},
 	{
 		ID:            "fe-test",
-		FixtureWaiver: "a test suite (vitest); same as go-test-unit.",
+		FixtureWaiver: &Waiver{Kind: WaiverTestSuite, Why: "a test suite (vitest); same as go-test-unit."},
 		Desc:          "vitest over @metaldocs/web",
 		Profiles:      []string{ProfilePR, ProfileFull},
 		Argv:          []string{"pnpm", "--filter", "@metaldocs/web", "run", "test"},
@@ -676,7 +755,7 @@ var checks = []Check{
 	},
 	{
 		ID:            "docx-typecheck",
-		FixtureWaiver: "third-party tool (tsc); same as fe-typecheck.",
+		FixtureWaiver: &Waiver{Kind: WaiverThirdParty, Why: "third-party tool (tsc); same as fe-typecheck."},
 		Desc:          "tsc over the docx-v2 workspace",
 		Profiles:      []string{ProfilePR, ProfileFull},
 		Argv:          []string{"pnpm", "run", "typecheck:docx-v2"},
@@ -692,7 +771,7 @@ var checks = []Check{
 	},
 	{
 		ID:            "docx-build",
-		FixtureWaiver: "a build step, not a guard — it produces dist/meta.json for docx-test. It fails when the workspace does not build; there is no rule to feed bad input to.",
+		FixtureWaiver: &Waiver{Kind: WaiverBuildStep, Why: "a build step, not a guard — it produces dist/meta.json for docx-test. It fails when the workspace does not build; there is no rule to feed bad input to."},
 		Desc:          "the docx-v2 workspace builds; produces the dist/meta.json that docx-test's bundle guard reads",
 		Profiles:      []string{ProfilePR, ProfileFull},
 		Argv:          []string{"pnpm", "run", "build:docx-v2"},
@@ -703,7 +782,7 @@ var checks = []Check{
 	},
 	{
 		ID:            "docx-test",
-		FixtureWaiver: "a test suite (vitest over docx-v2); same as go-test-unit.",
+		FixtureWaiver: &Waiver{Kind: WaiverTestSuite, Why: "a test suite (vitest over docx-v2); same as go-test-unit."},
 		Desc:          "docx-v2 unit tests",
 		// D-14 (closed by R4): depends on docx-build having already run —
 		// bundle-guard.test.ts reads dist/meta.json. This used to be enforced
@@ -737,7 +816,7 @@ var checks = []Check{
 	// ---- Tests ------------------------------------------------------------
 	{
 		ID:            "go-test-unit",
-		FixtureWaiver: "a test suite, not a guard: it fails when a test fails, which is the property, and every test in it is its own fixture.",
+		FixtureWaiver: &Waiver{Kind: WaiverTestSuite, Why: "a test suite, not a guard: it fails when a test fails, which is the property, and every test in it is its own fixture."},
 		Desc:          "go test ./... (no integration tag)",
 		Profiles:      []string{ProfilePR, ProfileFull},
 		Argv:          []string{"go", "test", "-count=1", "-timeout", "600s", "./..."},
@@ -773,7 +852,7 @@ var checks = []Check{
 	// ---- Traceability -----------------------------------------------------
 	{
 		ID:            "req-trace-selftest",
-		FixtureWaiver: "same shape as api-lint-selftest: a Go test suite over scripts/req-trace, with its own testdata.",
+		FixtureWaiver: &Waiver{Kind: WaiverTestSuite, Why: "same shape as api-lint-selftest: a Go test suite over scripts/req-trace, with its own testdata."},
 		Desc:          "the req-trace tool's own tests",
 		Profiles:      []string{ProfilePR, ProfileFull},
 		Argv:          []string{"go", "test", "./scripts/req-trace/...", "-count=1"},
@@ -875,7 +954,7 @@ var checks = []Check{
 		// the wrong reason is caught by Want. Audit rule A7 then makes the
 		// coverage itself blocking — a new ProfilePR check with neither Fixture
 		// nor FixtureWaiver fails verify-audit.
-		FixtureWaiver: "this check IS the negative-fixture harness; fixturing it would be circular (owner: #87/A1)",
+		FixtureWaiver: &Waiver{Kind: WaiverTestSuite, Why: "this check IS the negative-fixture harness: it fails when any guard exits 0 on bad input, and its own bad-input proof is the 22 fixtures it runs. Fixturing it would be circular."},
 		CIJob:         "ci.yml:verify",
 	},
 }
