@@ -355,8 +355,12 @@ func TestStagedTreeLivesOutsideTheRepository(t *testing.T) {
 // Staging is scoped: it never writes outside the directory it created, whatever
 // the archive claims. git archive does not emit escaping paths — the point is
 // that a file-writing loop must not depend on the producer being well-behaved,
-// and that it must give the same answer on every host. "/etc/passwd" is not
-// absolute to Windows' filepath.IsAbs; rejecting it is not platform-conditional.
+// and that it must give the same answer on every host.
+//
+// Both directions of that were real. "/etc/passwd" is not absolute to Windows'
+// filepath.IsAbs, and "C:/escape.txt" has no volume name on Linux — this test
+// passed on Windows and failed on ubuntu-latest until safeJoin stopped asking
+// the host and started matching the tar spelling.
 func TestStagedArchiveCannotEscape(t *testing.T) {
 	dest := t.TempDir()
 	for _, name := range []string{"../escape.txt", "/etc/passwd", `\escape.txt`, "C:/escape.txt", "a/../../escape.txt"} {

@@ -249,10 +249,21 @@ func writeStagedFile(target string, r io.Reader) error {
 // trustworthy" is not a property a file-writing loop should assume.
 func safeJoin(dest, name string) (string, error) {
 	// Rooted and volume-qualified names are rejected on their tar spelling, not
-	// on the host's. filepath.IsAbs("/etc/passwd") is FALSE on Windows, so a
-	// check that trusted it alone would reject the entry on Linux and quietly
-	// rewrite it to <dest>\etc\passwd on Windows — the same input, two answers.
-	if strings.HasPrefix(name, "/") || strings.HasPrefix(name, `\`) || filepath.VolumeName(name) != "" {
+	// on the host's. Every OS-dependent helper here gives two answers to the
+	// same input, and a scan subject that depends on the host is the whole
+	// defect class this file exists to remove:
+	//
+	//	filepath.IsAbs("/etc/passwd")     false on Windows, true on Linux
+	//	filepath.VolumeName("C:/escape")  "C:" on Windows, "" on Linux
+	//
+	// Trusting either alone means the entry is refused on one host and quietly
+	// rewritten under the stage on the other. CI caught the second one: this
+	// package's own escape test passed here and failed on ubuntu-latest.
+	//
+	// So the spellings are matched literally instead. git archive emits neither,
+	// which is the point — a file-writing loop must not depend on its producer
+	// being well-behaved, and it must not depend on which machine it runs on.
+	if strings.HasPrefix(name, "/") || strings.HasPrefix(name, `\`) || hasDriveLetter(name) {
 		return "", fmt.Errorf("staged archive entry escapes the staging directory: %q", name)
 	}
 	clean := filepath.Clean(filepath.FromSlash(name))
@@ -265,6 +276,16 @@ func safeJoin(dest, name string) (string, error) {
 		return "", fmt.Errorf("staged archive entry escapes the staging directory: %q", name)
 	}
 	return target, nil
+}
+
+// hasDriveLetter reports a DOS-style volume prefix ("C:", "z:") on a tar entry
+// name, on every host. filepath.VolumeName only sees one on Windows.
+func hasDriveLetter(name string) bool {
+	if len(name) < 2 || name[1] != ':' {
+		return false
+	}
+	c := name[0]
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 }
 
 // withStageDir substitutes trackedTreePlaceholder into a copy of argv.
