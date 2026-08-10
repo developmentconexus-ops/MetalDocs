@@ -20,6 +20,20 @@ type workflowJob struct {
 	Needs    []string
 	// Uses holds this job's `uses:` values verbatim, for the pinning rule (A9).
 	Uses []string
+	// Images holds this job's `services.<name>.image` values, for A9's
+	// container half — a service container is code CI executes just as much
+	// as an action is.
+	Images []string
+	// Steps holds every step reduced to what A9 and A10 read: the declared
+	// name (A10's classification carrier) and the run: body.
+	Steps []workflowStep
+}
+
+// workflowStep is one step, reduced to the fields the audit rules read.
+type workflowStep struct {
+	Name string
+	Run  string
+	Uses string
 }
 
 // needs: accepts a bare string or a sequence. Both appear in this repo, so
@@ -49,8 +63,12 @@ func (s *stringOrSlice) UnmarshalYAML(n *yaml.Node) error {
 
 type rawWorkflow struct {
 	Jobs map[string]struct {
-		Needs stringOrSlice `yaml:"needs"`
+		Needs    stringOrSlice `yaml:"needs"`
+		Services map[string]struct {
+			Image string `yaml:"image"`
+		} `yaml:"services"`
 		Steps []struct {
+			Name string `yaml:"name"`
 			Run  string `yaml:"run"`
 			Uses string `yaml:"uses"`
 		} `yaml:"steps"`
@@ -182,10 +200,23 @@ func jobsInWorkflow(fileBase string, wf rawWorkflow) []workflowJob {
 	for _, name := range names {
 		j := wf.Jobs[name]
 		var ids, uses []string
+		var steps []workflowStep
 		for _, s := range j.Steps {
 			ids = append(ids, onlyIDsForStep(s.Run)...)
 			if s.Uses != "" {
 				uses = append(uses, s.Uses)
+			}
+			steps = append(steps, workflowStep{Name: s.Name, Run: s.Run, Uses: s.Uses})
+		}
+		svcNames := make([]string, 0, len(j.Services))
+		for svc := range j.Services {
+			svcNames = append(svcNames, svc)
+		}
+		sort.Strings(svcNames)
+		images := make([]string, 0, len(svcNames))
+		for _, svc := range svcNames {
+			if img := j.Services[svc].Image; img != "" {
+				images = append(images, img)
 			}
 		}
 		out = append(out, workflowJob{
@@ -194,6 +225,8 @@ func jobsInWorkflow(fileBase string, wf rawWorkflow) []workflowJob {
 			OnlyIDs:  ids,
 			Needs:    []string(j.Needs),
 			Uses:     uses,
+			Images:   images,
+			Steps:    steps,
 		})
 	}
 	return out
@@ -356,9 +389,10 @@ func auditFindings(regs []Check, jobs []workflowJob, requiredGateKeys []string) 
 	findings = append(findings, auditCIJobClaims(regs, runsIn)...)
 	findings = append(findings, auditRequiredGateParity(jobs, requiredGateKeys)...)
 	findings = append(findings, auditRequiredClosure(regs, jobs)...)
-	findings = append(findings, auditFixtureCoverage(regs)...)
+	findings = append(findings, auditFixtureCoverage(regs, jobs)...)
 	findings = append(findings, auditDuplicateIDs(regs)...)
 	findings = append(findings, auditToolPinning(regs, jobs)...)
+	findings = append(findings, auditRequiredClosureGates(jobs)...)
 
 	sort.Strings(findings)
 	return findings
@@ -464,17 +498,26 @@ func printAudit(dir string) int {
 // that cannot. Before A1.2 that state was invisible — the audit could prove a
 // check ran in CI and could not prove it did anything when it ran. This rule
 // makes the hole enumerable: a check may lack a fixture, but not silently.
-func auditFixtureCoverage(regs []Check) []string {
+func auditFixtureCoverage(regs []Check, jobs []workflowJob) []string {
+	closure := requiredClosure(jobs)
 	var out []string
 	for _, c := range regs {
-		if !hasProfile(c, ProfilePR) {
-			continue // only blocking checks are in scope
+		// "Blocking" is not the same as "in the pr profile". go-test-integration
+		// is full-only, yet ci.yml:test-integration runs it with
+		// --only=go-test-integration and that job is inside ci.yml:required's
+		// closure — so it blocks a merge while sitting outside the rule's
+		// original scope, and it did: it was the one check in the registry with
+		// neither a fixture nor a waiver. Membership in the required closure is
+		// the honest definition of blocking, and it is the same closure A10 uses.
+		blocksMerge := hasProfile(c, ProfilePR) || (c.CIJob != "" && closure[c.CIJob])
+		if !blocksMerge {
+			continue
 		}
 		switch {
 		case c.Fixture == nil && c.FixtureWaiver == nil:
 			out = append(out, fmt.Sprintf(
-				"A7 check %q is in profile %s but declares neither Fixture nor FixtureWaiver: "+
-					"nothing proves this guard can fail", c.ID, ProfilePR))
+				"A7 check %q blocks a merge but declares neither Fixture nor FixtureWaiver: "+
+					"nothing proves this guard can fail", c.ID))
 		case c.Fixture != nil && c.FixtureWaiver != nil:
 			out = append(out, fmt.Sprintf(
 				"A7 check %q declares both a Fixture and a FixtureWaiver: a waiver explains an "+
@@ -510,6 +553,83 @@ func knownWaiverKinds() string {
 	return strings.Join(kinds, ", ")
 }
 
+// Step-name prefixes that declare a step is NOT a blocking gate (A10).
+// `prereq:` sets the stage (checkout, toolchain, install, fetch a ref);
+// `report:` publishes a result somewhere. Neither asserts a property about
+// the code under review — that is the verifier's job, and the verifier's
+// alone.
+const (
+	stepPrereqPrefix = "prereq:"
+	stepReportPrefix = "report:"
+)
+
+// verifyInvocation matches a run: block that calls the verifier. Path form
+// rather than binary name: `go run ./tools/verify`, `go run ./tools/verify/`
+// and a prebuilt `./tools/verify/verify` all contain it, and nothing else in
+// these workflows does.
+var verifyInvocation = "tools/verify"
+
+// auditRequiredClosureGates is A10 — inside ci.yml:required's transitive
+// closure, the ONLY thing allowed to decide whether a PR merges is the
+// verifier.
+//
+// This rule exists because of a concrete regression, not a hypothetical one:
+// ci.yml:security was inside the closure and carried two blocking gates
+// (gitleaks via `docker run`, grype via `anchore/scan-action` with
+// fail-build: true) that no registry check described. Every other audit rule
+// passed — A2/A3 because the job existed and ran what it claimed, A6 because
+// the job was in the closure, A7 because the registry had nothing to be
+// missing a fixture FOR. The gate was real, blocking, and invisible to the
+// product that is supposed to define what "verified" means. Moving those two
+// into the registry (review B1) fixed the instance; this rule fixes the class.
+//
+// Mechanism: every step in a closure job must be either a verifier
+// invocation or self-declared as not-a-gate by its `name:` prefix. That is a
+// declaration, not a proof — an author can still name a scanner
+// "prereq: scan". What it cannot be is silent: the declaration is a diff, in
+// the file the reviewer is already reading, on the line that introduces the
+// gate.
+//
+// ci.yml:required itself is excluded: it is the closure's root, and its one
+// step's job is precisely to aggregate the closure's verdicts.
+func auditRequiredClosureGates(jobs []workflowJob) []string {
+	closure := requiredClosure(jobs)
+	var findings []string
+	for _, j := range jobs {
+		key := j.Workflow + ":" + j.Job
+		if !closure[key] || key == "ci.yml:required" {
+			continue
+		}
+		for i, s := range j.Steps {
+			if strings.Contains(s.Run, verifyInvocation) {
+				continue
+			}
+			name := strings.ToLower(strings.TrimSpace(s.Name))
+			if strings.HasPrefix(name, stepPrereqPrefix) || strings.HasPrefix(name, stepReportPrefix) {
+				continue
+			}
+			findings = append(findings, fmt.Sprintf(
+				"A10 %s step %d (%s) is inside ci.yml:required's closure but neither invokes %s nor declares itself %s/%s: "+
+					"a blocking gate defined here is a second definition of \"verified\" that --audit cannot see and a local run does not execute",
+				key, i+1, describeStep(s), verifyInvocation, stepPrereqPrefix, stepReportPrefix))
+		}
+	}
+	return findings
+}
+
+// describeStep names a step for a finding message, preferring what the author
+// wrote over what the audit inferred.
+func describeStep(s workflowStep) string {
+	switch {
+	case strings.TrimSpace(s.Name) != "":
+		return strings.TrimSpace(s.Name)
+	case s.Uses != "":
+		return "uses " + s.Uses
+	default:
+		return "run " + strings.TrimSpace(strings.SplitN(strings.TrimSpace(s.Run), "\n", 2)[0])
+	}
+}
+
 // auditDuplicateIDs rejects two checks sharing an ID. --only, --audit's own
 // CIJob mapping and the fixture harness all address a check by ID, so a
 // duplicate silently shadows one of the two; this was introduced and caught by
@@ -542,6 +662,45 @@ var localUses = regexp.MustCompile(`^\.{1,2}/`)
 // "@latest" in "github.com/x/y/cmd/z@latest".
 var versionSuffix = regexp.MustCompile(`@([A-Za-z0-9._+-]+)$`)
 
+// digestPin matches an image reference pinned to a content digest —
+// `name@sha256:<64 hex>`. A tag (postgres:16, grype:v0.116.1) is a movable
+// pointer exactly like an action tag: the registry can republish it over
+// different bytes with no diff in this repository to review.
+var digestPin = regexp.MustCompile(`@sha256:[0-9a-f]{64}$`)
+
+// dockerRunImage pulls the image reference out of a `docker run ...` command
+// line. Everything before it is flags (and their values), which is why the
+// pattern skips them rather than taking the first token after "run".
+var dockerRunLine = regexp.MustCompile(`docker\s+run\s+([^\n]*)`)
+
+// dockerValueFlags are the `docker run` flags that consume the NEXT token, so
+// the image reference is not the token that follows them.
+var dockerValueFlags = map[string]bool{
+	"-v": true, "--volume": true, "-e": true, "--env": true,
+	"-w": true, "--workdir": true, "-u": true, "--user": true,
+	"--name": true, "--network": true, "--platform": true,
+	"--entrypoint": true, "-p": true, "--publish": true,
+	"--mount": true, "--label": true, "-l": true,
+}
+
+// dockerRunImageOf returns the image reference in a `docker run` argument
+// list, or "" if the list names none. Shared by A9's two container shapes
+// (workflow run: blocks and registry Argvs) so both read the command the same
+// way.
+func dockerRunImageOf(args []string) string {
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if strings.HasPrefix(a, "-") {
+			if dockerValueFlags[a] && !strings.Contains(a, "=") {
+				i++ // skip this flag's value
+			}
+			continue
+		}
+		return a
+	}
+	return ""
+}
+
 // auditToolPinning is A9 — everything CI executes must name an immutable
 // version.
 //
@@ -551,9 +710,16 @@ var versionSuffix = regexp.MustCompile(`@([A-Za-z0-9._+-]+)$`)
 // so a check can start or stop failing for reasons nobody chose. That is not
 // hypothetical drift — it is the reason a green run stops being evidence.
 //
-// Scope is deliberately what CI executes. Container images in deploy/ are the
-// same class of gap but belong to the deployment axis, not the verifier spine;
-// they are recorded there, not silently fixed here.
+// Four shapes now, still one property (#87/A1 review B2 added the last
+// three): a workflow `uses:`, a `services:` container, a `docker run` inside a
+// workflow step, and a `docker run` inside a registry Argv. A container is
+// code CI executes; leaving images on mutable tags while pinning actions to
+// SHAs pinned the half that was easy to see.
+//
+// Scope is deliberately what CI executes: the workflows and the registry.
+// Container images under deploy/ are the same class of gap but belong to the
+// deployment axis, not the verifier spine; they are recorded there, not
+// silently fixed here.
 func auditToolPinning(regs []Check, jobs []workflowJob) []string {
 	var findings []string
 	seen := map[string]bool{}
@@ -571,7 +737,9 @@ func auditToolPinning(regs []Check, jobs []workflowJob) []string {
 				"A9: %s uses %q, which is not SHA-pinned — a tag can be re-pointed at different code with no diff here to review",
 				j.Workflow, u))
 		}
+		findings = append(findings, auditJobContainers(j)...)
 	}
+	findings = append(findings, auditArgvContainers(regs)...)
 	for _, c := range regs {
 		for _, arg := range c.Argv {
 			m := versionSuffix.FindStringSubmatch(arg)
@@ -587,4 +755,66 @@ func auditToolPinning(regs []Check, jobs []workflowJob) []string {
 		}
 	}
 	return findings
+}
+
+// auditJobContainers is A9's workflow-container half: `services:` images and
+// any `docker run` a step issues must both name a digest.
+func auditJobContainers(j workflowJob) []string {
+	var findings []string
+	for _, img := range j.Images {
+		if digestPin.MatchString(img) {
+			continue
+		}
+		findings = append(findings, fmt.Sprintf(
+			"A9: %s:%s runs service container %q, which is not digest-pinned — a tag can be republished over different bytes with no diff here to review",
+			j.Workflow, j.Job, img))
+	}
+	for _, s := range j.Steps {
+		for _, m := range dockerRunLine.FindAllStringSubmatch(s.Run, -1) {
+			img := dockerRunImageOf(dockerFields(m[1]))
+			if img == "" || digestPin.MatchString(img) {
+				continue
+			}
+			findings = append(findings, fmt.Sprintf(
+				"A9: %s:%s runs container %q, which is not digest-pinned — a tag can be republished over different bytes with no diff here to review",
+				j.Workflow, j.Job, img))
+		}
+	}
+	return findings
+}
+
+// auditArgvContainers is A9's registry-container half. A check that shells out
+// to `docker run` is executing third-party bytes exactly like a workflow step
+// is, and moving a gate from YAML into the registry (review B1) must not be a
+// way to leave the pin behind.
+func auditArgvContainers(regs []Check) []string {
+	var findings []string
+	for _, c := range regs {
+		if len(c.Argv) < 2 || filepath.Base(c.Argv[0]) != "docker" || c.Argv[1] != "run" {
+			continue
+		}
+		img := dockerRunImageOf(c.Argv[2:])
+		if img == "" {
+			findings = append(findings, fmt.Sprintf(
+				"A9: check %q runs docker but names no image", c.ID))
+			continue
+		}
+		if !digestPin.MatchString(img) {
+			findings = append(findings, fmt.Sprintf(
+				"A9: check %q runs container %q, which is not digest-pinned — a tag can be republished over different bytes with no diff here to review",
+				c.ID, img))
+		}
+	}
+	return findings
+}
+
+// dockerFields splits a shell-ish command tail into tokens, dropping the
+// quotes YAML steps wrap paths in. It is not a shell parser and does not need
+// to be: the only thing read out of the result is which token is the image.
+func dockerFields(tail string) []string {
+	var out []string
+	for _, f := range strings.Fields(tail) {
+		out = append(out, strings.Trim(f, `"'`))
+	}
+	return out
 }

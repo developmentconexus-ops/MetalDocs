@@ -517,10 +517,46 @@ func nvmrcVersion() string {
 //
 // Adding an exec call anywhere else in this package defeats that argument.
 // Route it through here instead.
+//
+// The one non-literal element an Argv may carry is repoRootPlaceholder,
+// expanded here by expandArgv. It exists because a container check must hand
+// `docker -v` an ABSOLUTE host path, and there is no shell here to say $PWD.
+// Expanding it here (rather than letting registry entries call os.Getwd
+// themselves) keeps the invariant above true: the substitution set is closed,
+// it is one function, and its value comes from the process's own working
+// directory, never from a check's input.
 func command(ctx context.Context, dir string, argv []string) *exec.Cmd {
-	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...) // #nosec G204 -- argv is compile-time literals or refPattern-validated; see the invariant above.
+	argv = expandArgv(argv)
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...) // #nosec G204 -- argv is compile-time literals, refPattern-validated, or an expandArgv token; see the invariant above.
 	cmd.Dir = dir
 	return cmd
+}
+
+// repoRootPlaceholder expands to the absolute path of the directory the
+// verifier is running in — the repo root, since every Check's paths are
+// repo-relative.
+//
+// Deliberately not named with any of gosec G101's credential words (token,
+// secret, key, pw). The first spelling of this constant was `repoToken`, and
+// G101 fired on it at HIGH/LOW-confidence in both gosec and golangci-lint —
+// a false positive, but one whose only other cure is a #nosec suppression.
+// Renaming removes the finding instead of silencing it.
+const repoRootPlaceholder = "{{repo}}"
+
+// expandArgv substitutes the closed token set into a copy of argv. A token
+// that cannot be resolved is left verbatim rather than silently dropped: the
+// command then fails loudly with the token visible in its own error, which is
+// what a reader needs to diagnose it.
+func expandArgv(argv []string) []string {
+	root, err := os.Getwd()
+	if err != nil {
+		return argv
+	}
+	out := make([]string, len(argv))
+	for i, a := range argv {
+		out[i] = strings.ReplaceAll(a, repoRootPlaceholder, root)
+	}
+	return out
 }
 
 func capture(argv ...string) ([]byte, error) {
@@ -838,7 +874,9 @@ func report(results []result, profile string) int {
 		fmt.Println("\n" + strings.Repeat("=", 72))
 		for _, r := range failed {
 			fmt.Printf("\nFAIL %s — %s\n", r.check.ID, r.check.Desc)
-			fmt.Printf("  $ %s\n", strings.Join(r.check.Argv, " "))
+			// Expanded, not raw: a reader copying this line into a shell must
+			// get the command that actually ran, tokens resolved.
+			fmt.Printf("  $ %s\n", strings.Join(expandArgv(r.check.Argv), " "))
 			if r.check.CIJob != "" {
 				fmt.Printf("  CI job: %s\n", r.check.CIJob)
 			}

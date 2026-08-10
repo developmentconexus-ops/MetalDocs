@@ -309,7 +309,13 @@ func fixtureArgv(ctx context.Context, root, sandbox string, c Check) ([]string, 
 	// and there must not be — a module file would drag the whole dependency
 	// graph into a throwaway directory. Build the same package in the real
 	// module and run the resulting binary instead. Same code, same flags.
-	if len(c.Argv) >= 3 && c.Argv[0] == "go" && c.Argv[1] == "run" {
+	//
+	// Only LOCAL packages ("./..."), deliberately. `go run module@version`
+	// (secret-scan runs gitleaks that way) is already module-independent — it
+	// resolves and runs from the module cache with no go.mod in sight — and
+	// `go build -o bin module@version` is not even legal, so treating the two
+	// forms alike would break the fixture at build time.
+	if len(c.Argv) >= 3 && c.Argv[0] == "go" && c.Argv[1] == "run" && strings.HasPrefix(c.Argv[2], "./") {
 		pkg := c.Argv[2]
 		name := filepath.Base(pkg)
 		if runtime.GOOS == "windows" {

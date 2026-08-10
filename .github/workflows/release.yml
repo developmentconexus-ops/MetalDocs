@@ -22,7 +22,11 @@ jobs:
     # database into a failure rather than a silent SKIP.
     services:
       postgres:
-        image: postgres:16
+        # Digest-pinned, not `postgres:16` (#87/A1 review B2) — a service
+        # container is code CI executes; audit rule A9 covers `services:`
+        # images, so a regression to a mutable tag is a finding. Digest is
+        # postgres:16 as of 2026-08-09, same pin as ci.yml.
+        image: postgres@sha256:95206741a5b214807675e14165369d05b93a9cf692223b616d07cca227e74b0b
         env:
           POSTGRES_USER: metaldocs
           POSTGRES_PASSWORD: metaldocs

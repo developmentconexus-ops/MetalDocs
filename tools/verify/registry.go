@@ -686,6 +686,148 @@ var checks = []Check{
 		// No Paths — same reasoning as gosec above.
 		CIJob: "ci.yml:verify",
 	},
+	{
+		ID:   "secret-scan",
+		Desc: "no secret is committed anywhere in this repo's git history",
+		// MOVED OUT OF YAML (#87/A1 review B1). This gate used to exist only as
+		// a `docker run ghcr.io/gitleaks/gitleaks ...` step inside
+		// ci.yml:security, which made ci.yml the second definition of a
+		// blocking property: `verify --audit` could not see it, a local
+		// `verify --profile=pr` did not run it, and a change to what the gate
+		// accepts was reviewable only as workflow YAML. The property now lives
+		// here, like every other blocking property, and CI calls the verifier.
+		//
+		// Run from source rather than from the container the YAML step used:
+		// `go run <module>@<version>` is the same shape gosec and govulncheck
+		// already use, it needs no docker daemon (so a Windows dev machine can
+		// run the same command CI runs), and a module version is as immutable
+		// as an image digest. The version is the exact one the retired YAML
+		// step pinned — v8.24.3 — so this move changes where the gate is
+		// defined, not what it accepts.
+		//
+		// --config .gitleaks.toml is load-bearing: the repo-authored allowlist
+		// is what makes the difference between this scan and a stock gitleaks
+		// run, and it is the part a fixture must hold honest (see Fixture).
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv: []string{
+			"go", "run", "github.com/zricethezav/gitleaks/v8@v8.24.3",
+			"detect", "--source", ".", "--config", ".gitleaks.toml",
+			"--redact", "-v", "--exit-code", "1",
+		},
+		// needsGitDepth is not decoration: `detect` walks git history, so on a
+		// shallow clone it scans a truncated history and reports "no leaks
+		// found" over commits it never read — a green that means nothing.
+		Needs: []string{needsNetwork, needsGitDepth},
+		// No Paths, deliberately: a secret scan scoped by path is a secret
+		// scan that can be dodged by committing the secret somewhere else.
+		Fixture: &Fixture{
+			Dir: "secret-scan",
+			// The repo's own .gitleaks.toml, byte-identical — the fixture
+			// proves THIS config still detects, not that some other config
+			// would. The fixture's planted credential sits at a path the
+			// allowlist does not cover, so an allowlist edit that widens far
+			// enough to disarm the scan turns this fixture red.
+			CopyFromRepo: []string{".gitleaks.toml"},
+			Want:         []string{"aws-access-token", "Finding:"},
+		},
+		CIJob: "ci.yml:security",
+	},
+	{
+		ID:   "vuln-scan",
+		Desc: "no dependency carries a known high-or-critical vulnerability",
+		// MOVED OUT OF YAML (#87/A1 review B1), same reason as secret-scan
+		// above: this was `uses: anchore/scan-action` with `fail-build: true`,
+		// a blocking gate defined in workflow YAML and invisible to the
+		// registry. ci.yml:security now calls the verifier and keeps only the
+		// SARIF upload, which is reporting, not the gate.
+		//
+		// Container rather than `go run`, unlike secret-scan: building grype
+		// from source costs 9m11s cold on this machine (measured), against a
+		// pulled image that runs the scan in a fraction of that. The image is
+		// digest-pinned, not tagged (A9) — a tag is a movable pointer, and a
+		// scanner that silently changes version is a gate whose meaning
+		// changes with no diff here to review. The digest is anchore/grype
+		// v0.116.1.
+		//
+		// --fail-on high reproduces the retired step's severity-cutoff: high.
+		// The second -o writes SARIF for ci.yml:security's upload step; the
+		// file is gitignored because it is a run artifact, not a source.
+		//
+		// The --exclude patterns cost CI nothing and make the local run
+		// usable AND correct. ci.yml:security is a bare checkout — it never
+		// runs `pnpm install`, so node_modules does not exist there, and
+		// .claude/ is a local worktree directory that is not checked out at
+		// all; .git holds packfiles, not dependency manifests. A developer's
+		// tree has all three, and grype cataloging them takes the same scan
+		// from ~4 minutes to over half an hour (measured, both ways, on this
+		// machine). What CI scans is unchanged.
+		//
+		// *.exe and bin/ are excluded for a correctness reason, not a speed
+		// one, and the first real local run is what found it: a Go binary
+		// carries its build-time module graph, so a stale gitignored
+		// metaldocs-api.exe reported golang.org/x/crypto v0.31.0 and stdlib
+		// go1.26.1 as HIGH — while go.mod pins x/crypto v0.53.0. The gate's
+		// subject is "no DEPENDENCY carries a known vulnerability", and this
+		// repo's dependency truth is its manifests; a build output is a
+		// derivative of the same manifests, one rebuild out of date. Scanning
+		// it means a local run fails on a file CI does not have, which makes
+		// the local product untrustworthy exactly where B1 requires it to be
+		// trusted. No coverage is lost: every module in those binaries is in
+		// go.mod, which is scanned.
+		//
+		// .gocache/.gomodcache/.pnpm-store are the same defect one layer down:
+		// the Go build cache stores compiled objects, and syft catalogs them
+		// as Go binaries, so a cached object built inside .claude/worktrees/*
+		// (a sibling branch's checkout) reported x/crypto v0.51.0, x/text
+		// v0.37.0, x/net v0.55.0 and grpc v1.81.1 as HIGH — every one of them
+		// already fixed in this repo's go.mod.
+		//
+		// TRANSITIONAL, and the invariant that makes it sound is one line:
+		// every path excluded here is gitignored, so CI's bare checkout has
+		// none of them and CI's scan scope is unchanged by any of this. The
+		// global-maximum form is to stop scanning the WORKING directory at all
+		// and scan the tracked tree — `git archive HEAD` into a temp dir, or a
+		// syft SBOM built from tracked files, then `grype sbom:`. That needs
+		// the verifier to be able to stage a temp tree for a check, which it
+		// cannot do today (Argv is argv-only, no shell, no pre-step). Recorded
+		// as a remaining #87/A1 gap rather than papered over: until then, a new
+		// gitignored cache directory can re-introduce local false positives,
+		// and the cure is one more --exclude line here.
+		//
+		// The named volume caches the vulnerability database across runs. With
+		// --rm and no volume, every invocation re-downloads it — the same cost
+		// the retired step avoided with the Action's cache-db: true.
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv: []string{
+			"docker", "run", "--rm",
+			"-v", repoRootPlaceholder + ":/src",
+			"-v", "metaldocs-grype-db:/root/.cache/grype",
+			"anchore/grype@sha256:1e71065c0a4cff3e6bd3b8add525ffac4343eb4971694eb90a31cf6d4d3e85db",
+			"dir:/src", "--fail-on", "high",
+			"--exclude", "./.git/**",
+			"--exclude", "./.claude/**",
+			"--exclude", "./node_modules/**",
+			"--exclude", "./**/node_modules/**",
+			"--exclude", "./*.exe",
+			"--exclude", "./**/*.exe",
+			// `*.exe~` is a separate .gitignore line and a separate glob: the
+			// last HIGH standing after every other exclusion was a stale
+			// metaldocs-jobs.exe~, found by reading grype's JSON locations
+			// rather than guessing.
+			"--exclude", "./*.exe~",
+			"--exclude", "./**/*.exe~",
+			"--exclude", "./bin/**",
+			"--exclude", "./.gocache/**",
+			"--exclude", "./.gocache-build/**",
+			"--exclude", "./.gomodcache/**",
+			"--exclude", "./.pnpm-store/**",
+			"-o", "table", "-o", "sarif=/src/.grype.sarif",
+		},
+		Needs:         []string{needsDocker, needsNetwork},
+		FixtureWaiver: &Waiver{Kind: WaiverThirdParty, Why: "third-party scanner (grype, digest-pinned); its verdict is a join of this repo's dependency manifests with an externally maintained vulnerability database, so a synthetic bad fixture would assert against data this repo does not control — the same reason govulncheck is waived."},
+		// No Paths — same reasoning as gosec and secret-scan above.
+		CIJob: "ci.yml:security",
+	},
 
 	// ---- Frontend ---------------------------------------------------------
 	{
@@ -823,8 +965,15 @@ var checks = []Check{
 		CIJob:         "ci.yml:verify",
 	},
 	{
-		ID:   "go-test-integration",
-		Desc: "the full integration suite with -race",
+		ID: "go-test-integration",
+		// Same waiver as go-test-unit, and it should have carried one from the
+		// start. A7 originally scoped itself to the `pr` profile, and this check
+		// is `full`-only — so the one check in the registry with no fixture and
+		// no waiver was also a check that blocks a merge, via
+		// ci.yml:test-integration --only=go-test-integration. A7 now scopes on
+		// ci.yml:required's closure instead, which is why this line exists.
+		FixtureWaiver: &Waiver{Kind: WaiverTestSuite, Why: "a test suite, not a guard: it fails when a test fails, which is the property, and every test in it is its own fixture."},
+		Desc:          "the full integration suite with -race",
 		// A1 item 4: this is why `full` exists. It is push-only in CI today,
 		// which makes it a post-mortem rather than a gate.
 		Profiles: []string{ProfileFull},
