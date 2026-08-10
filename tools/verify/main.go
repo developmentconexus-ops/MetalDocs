@@ -98,13 +98,7 @@ func main() {
 	case *testdbBypassGuard:
 		os.Exit(printTestdbBypassGuard())
 	case *guardFixtures:
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		if err := runGuardFixtures(ctx, root, splitIDs(*only)); err != nil {
-			fmt.Fprintf(os.Stderr, "verify: %v\n", err)
-			os.Exit(1)
-		}
-		return
+		os.Exit(printGuardFixtures(root, splitIDs(*only)))
 	}
 
 	selected, scoped, err := selectChecks(*profile, *only, *base, *changed)
@@ -316,6 +310,15 @@ func selectByProfile(profile string) []Check {
 }
 
 func hasProfile(c Check, p string) bool {
+	// `release` is defined by exclusion, not membership — see releaseExcluded
+	// in registry.go for why. Anything `full` runs, `release` runs too, unless
+	// it is named there.
+	if p == ProfileRelease {
+		if _, excluded := releaseExcluded[c.ID]; excluded {
+			return false
+		}
+		return hasProfile(c, ProfileFull)
+	}
 	for _, cp := range c.Profiles {
 		if cp == p {
 			return true
@@ -813,6 +816,19 @@ func report(results []result, profile string) int {
 	}
 
 	if len(failed) > 0 {
+		return 1
+	}
+	return 0
+}
+
+// printGuardFixtures runs the negative-fixture spine and returns the process
+// exit code. The cancel() lives here rather than inline in main's switch so it
+// is not stranded by an os.Exit in the same function (gocritic exitAfterDefer).
+func printGuardFixtures(root string, only []string) int {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := runGuardFixtures(ctx, root, only); err != nil {
+		fmt.Fprintf(os.Stderr, "verify: %v\n", err)
 		return 1
 	}
 	return 0

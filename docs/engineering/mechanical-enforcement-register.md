@@ -546,19 +546,28 @@ every check."*
 | `ci.yml`'s `required` job `needs:` list (`verify, test-integration, security, lint-go`), validated by `scripts/required-gate.jq` / the `required-gate-selftest` registry check | which of those jobs must succeed before `required` — the sole required ruleset context — reports success |
 | the diff surface each check's `Paths` matches against under `--profile=changed` (`matchesPaths` in `tools/verify`) | whether a given PR's diff actually selected the check at all |
 
-**Kept correct by** `--audit` (registry rules A1–A6) and `required-gate.jq`'s exact-set-equality
+**Kept correct by** `--audit` (registry rules A1–A9) and `required-gate.jq`'s exact-set-equality
 assertion — both real, both load-bearing, and both proven in this task's own verification run. But
 per the ordering in "How to read an entry" above, that is level 3 (red build), not level 1
 (unrepresentable): a fifth inventory — a check registered, wired into a profile, matched by a
 job's `--only=`, inside `required`'s closure, but silently never selected because its `Paths` never
-matches the diff that actually needs it — is exactly the shape A1–A6 were built to catch, and the
+matches the diff that actually needs it — is exactly the shape A1–A9 were built to catch, and the
 existence of a catching lint is not the same claim as the drift being impossible. `--audit` and the
 set-equality guard make drift *visible*; they do not make it *impossible* (spec §9, quoted verbatim
 in the Task 13 brief).
 
-**Firing mechanism today** — level 3: `go run ./tools/verify --audit` (registry rules A1–A6),
+**Firing mechanism today** — level 3: `go run ./tools/verify --audit` (registry rules A1–A9),
 red build in `ci.yml:verify`'s `--profile=changed` invocation on every PR. `required-gate-selftest`
 pins the fourth inventory's aggregator (`scripts/required-gate.jq`) down the same way.
+
+Extended 2026-08-09 by #87/A1 (Phase 1) with three rules covering gaps this entry named but did
+not close: **A7** — a `pr`-profile check must declare either a negative fixture or a written
+waiver, so "the guard is blocking" and "the guard has been observed to fail" stop being separate
+claims; **A8** — duplicate check IDs are rejected (a duplicated ID silently shadows the original,
+observed once during that work); **A9** — everything CI executes names an immutable version
+(workflow `uses:` SHA-pinned, check `Argv` never `@latest`), because an unpinned tool changes what
+the gate accepts with no diff to review. The fixture spine itself runs as the `guard-fixtures`
+check in `ci.yml:verify`.
 
 **Global-maximum structure** — one generated CI manifest that *owns* registry membership, job
 routing (which job runs which check, via which `--only=`), and `required`'s gate dependency

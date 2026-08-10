@@ -15,9 +15,31 @@ const (
 	ProfileChanged = "changed" // `pr` restricted to checks whose paths changed
 	ProfilePR      = "pr"      // everything a PR must pass pre-merge
 	ProfileFull    = "full"    // `pr` + integration suites (needs Postgres)
+	ProfileRelease = "release" // `full` minus the checks whose subject is a PR diff
 )
 
-var profileOrder = []string{ProfileFast, ProfileChanged, ProfilePR, ProfileFull}
+var profileOrder = []string{ProfileFast, ProfileChanged, ProfilePR, ProfileFull, ProfileRelease}
+
+// releaseExcluded lists the checks `release` drops from `full`.
+//
+// `release` runs on a tag, where there is no pull request and therefore no
+// base to diff against. The three checks below do not merely happen to use git
+// — their subject IS the difference between a branch and its base, so on a tag
+// they can only fail for the wrong reason (a missing base spec, an empty
+// diff), and a gate that fails for the wrong reason teaches people to ignore
+// it. Everything else in `full` runs, including the integration suite and both
+// security scanners: a release is the one moment where "everything, no path
+// scoping, no exceptions" is the correct cost.
+//
+// Membership is expressed here rather than as a Profiles entry on 40-odd
+// checks so that a NEW check is in `release` by default. Opting out has to be
+// a deliberate line in this map, which is reviewable; forgetting to opt IN is
+// silent, and silence is how coverage rots.
+var releaseExcluded = map[string]string{
+	"oasdiff-breaking":      "diffs the PR head spec against a base-branch spec materialized by a PR-only workflow step; on a tag the file does not exist",
+	"governance-diff-rules": "rules about what a PR's diff must contain (contract change ships a spec update, etc.); a tag has no diff to rule on",
+	"migration-gapless":     "\"no historical migration edited after merge\" is a property of a diff against origin/main",
+}
 
 // Infra requirements. A check declaring any of these is skipped (loudly, with
 // its reason) when the requirement is absent, and is never silently dropped.
@@ -128,6 +150,30 @@ var checks = []Check{
 	},
 
 	// ---- Go: lint ---------------------------------------------------------
+	{
+		ID:            "golangci-lint",
+		FixtureWaiver: "third-party linter aggregator (pinned); a fixture here would test golangci-lint's own analyzers, not this repo. The repo-authored part is .golangci.yml's enabled set, which every run exercises against the whole tree.",
+		Desc:          "golangci-lint over apps/api, internal and tools (.golangci.yml scope)",
+		// A1.1. This ran for months as a bare golangci-lint-action step in
+		// ci.yml:lint-go — outside the registry, so `verify --audit` could not
+		// see it, `verify --profile=pr` did not run it, and a laptop run and a
+		// CI run disagreed about what "verified" means. That is a second,
+		// parallel definition of the gate, which is the exact thing A1 exists
+		// to remove. The command now lives here; the workflow installs the
+		// pinned binary and calls the verifier, the same shape ci.yml already
+		// uses for oasdiff.
+		//
+		// Pinned at v2.11.4 — the newest v2.11.x, which is what the Action's
+		// `version: v2.11` resolved to, so this pin changes no behaviour today
+		// and stops the resolution from moving tomorrow.
+		//
+		// No Paths: .golangci.yml at the repo root configures the whole run, and
+		// the scope below spans three trees. A path filter here would let a
+		// change loosen the config while selecting nothing that notices.
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv:     []string{"golangci-lint", "run", "--timeout=5m", "./apps/api/...", "./internal/...", "./tools/..."},
+		CIJob:    "ci.yml:lint-go",
+	},
 	{
 		ID: "arch-lint",
 		// The analyzer list is the one tools/cilint/internal/analyzers.RunAll

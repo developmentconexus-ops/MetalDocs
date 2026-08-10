@@ -311,7 +311,7 @@ func fixtureArgv(ctx context.Context, root, sandbox string, c Check) ([]string, 
 		build := command(ctx, root, []string{"go", "build", "-o", bin, pkg})
 		build.Env = fixtureEnv()
 		if out, err := build.CombinedOutput(); err != nil {
-			return nil, "", fmt.Errorf("go build %s: %v\n%s", pkg, err, out)
+			return nil, "", fmt.Errorf("go build %s: %w\n%s", pkg, err, out)
 		}
 		return append([]string{bin}, c.Argv[3:]...), dir, nil
 	}
@@ -350,7 +350,7 @@ func gitRun(ctx context.Context, dir string, args ...string) error {
 	cmd := command(ctx, dir, append([]string{"git"}, args...))
 	cmd.Env = fixtureEnv()
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git %s: %v\n%s", strings.Join(args, " "), err, out)
+		return fmt.Errorf("git %s: %w\n%s", strings.Join(args, " "), err, out)
 	}
 	return nil
 }

@@ -7,8 +7,60 @@ permissions:
   contents: read
 
 jobs:
+  # A1.1. Until now this workflow published an SBOM for a tag that nothing had
+  # verified: ci.yml only triggers on pull_request, so a tag pushed to a
+  # long-lived branch, or pushed after a force-push, produced a release
+  # artifact with no gate behind it. `release` is the profile for exactly this
+  # moment — everything `full` runs, no path scoping, minus the three checks
+  # whose subject is a PR diff and which therefore can only fail for the wrong
+  # reason on a tag (see releaseExcluded in tools/verify/registry.go).
+  verify:
+    name: verify (release profile)
+    runs-on: ubuntu-latest
+    # Same service definition as ci.yml:test-integration — the release profile
+    # includes go-test-integration, and --require-infra below turns a missing
+    # database into a failure rather than a silent SKIP.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: metaldocs
+          POSTGRES_PASSWORD: metaldocs
+          POSTGRES_DB: metaldocs
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0   # req-trace declares needs-git-history
+      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
+      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6 # v4.0.4
+        with: { node-version-file: .nvmrc, cache: pnpm, cache-dependency-path: pnpm-lock.yaml }
+      - run: pnpm install --frozen-lockfile
+      # Same pinned install ci.yml:lint-go uses; golangci-lint is a registry
+      # check, so the release profile selects it and the binary has to exist.
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4
+      # --require-infra is what makes this gate mean something: without it a
+      # missing database or an absent binary is a SKIP, and the job exits 0
+      # over an unverified tag.
+      - name: verify --profile=release
+        env:
+          METALDOCS_DATABASE_URL: postgres://metaldocs:metaldocs@localhost:5432/metaldocs?sslmode=disable
+        run: go run ./tools/verify --require-infra --profile=release
+        timeout-minutes: 45
+
   sbom:
     name: sbom
+    needs: [verify]
     runs-on: ubuntu-latest
     steps:
       # supply-chain.yml's tag-triggered sbom job, moved verbatim. The
@@ -16,6 +68,10 @@ jobs:
       # is dropped here — this workflow's own trigger (`push: tags: ['v*']`)
       # already makes that condition always true, so the guard would be
       # redundant rather than protective.
+      #
+      # `needs: [verify]` carries no `if:` — the implicit success() means a
+      # failed release verification skips the publish rather than shipping an
+      # SBOM for a tag that did not pass.
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
