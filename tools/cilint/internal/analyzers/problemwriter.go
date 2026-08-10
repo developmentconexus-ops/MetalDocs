@@ -52,48 +52,61 @@ const canonicalWriterPkg = "internal/platform/problem/"
 func ProblemWriter(files []string) []Finding {
 	var out []Finding
 	fset := token.NewFileSet()
-
 	for _, path := range files {
-		slashed := strings.ReplaceAll(path, "\\", "/")
-		if !inRuntimeTree(slashed) ||
-			strings.Contains(slashed, canonicalWriterPkg) ||
-			strings.HasSuffix(slashed, ".gen.go") {
-			continue
-		}
-		_, raw := parseFile(fset, path)
-		if raw == nil {
-			continue
-		}
-		f := raw.(*ast.File)
-		src := readSource(path)
-
-		ast.Inspect(f, func(n ast.Node) bool {
-			switch node := n.(type) {
-			case *ast.FuncDecl:
-				if node.Type != nil && isProblemWriterSignature(node.Type.Params) {
-					out = appendProblemFinding(out, fset, src, path, node.Pos(),
-						"function "+node.Name.Name+" takes both an http.ResponseWriter and a *problem.Problem, "+
-							"which is the local problem-writer shape (G-07, R-ERR-1); call problem.Respond / "+
-							"problem.RespondCause instead — serialization has exactly one owner")
-				}
-			case *ast.FuncLit:
-				if node.Type != nil && isProblemWriterSignature(node.Type.Params) {
-					out = appendProblemFinding(out, fset, src, path, node.Pos(),
-						"function literal takes both an http.ResponseWriter and a *problem.Problem, "+
-							"which is the local problem-writer shape (G-07, R-ERR-1); call problem.Respond / "+
-							"problem.RespondCause instead")
-				}
-			case *ast.BasicLit:
-				if node.Kind == token.STRING && strings.Contains(node.Value, problemMediaType) {
-					out = appendProblemFinding(out, fset, src, path, node.Pos(),
-						"the "+problemMediaType+" media type is written by internal/platform/problem and "+
-							"nowhere else (G-07, R-ERR-1); naming it here means a second error envelope")
-				}
-			}
-			return true
-		})
+		out = append(out, scanProblemWriterFile(fset, path)...)
 	}
 	return out
+}
+
+// scanProblemWriterFile applies both rules to one file, or none if the file is
+// outside the rule's subject matter (see inRuntimeTree and the .gen.go note).
+func scanProblemWriterFile(fset *token.FileSet, path string) []Finding {
+	slashed := strings.ReplaceAll(path, "\\", "/")
+	if !inRuntimeTree(slashed) ||
+		strings.Contains(slashed, canonicalWriterPkg) ||
+		strings.HasSuffix(slashed, ".gen.go") {
+		return nil
+	}
+	_, raw := parseFile(fset, path)
+	if raw == nil {
+		return nil
+	}
+	f := raw.(*ast.File)
+	src := readSource(path)
+
+	var out []Finding
+	ast.Inspect(f, func(n ast.Node) bool {
+		if msg, pos, ok := problemWriterViolation(n); ok {
+			out = appendProblemFinding(out, fset, src, path, pos, msg)
+		}
+		return true
+	})
+	return out
+}
+
+// problemWriterViolation reports whether a single node is one of the two
+// refused shapes, and with what message.
+func problemWriterViolation(n ast.Node) (msg string, pos token.Pos, ok bool) {
+	switch node := n.(type) {
+	case *ast.FuncDecl:
+		if node.Type != nil && isProblemWriterSignature(node.Type.Params) {
+			return "function " + node.Name.Name + " takes both an http.ResponseWriter and a *problem.Problem, " +
+				"which is the local problem-writer shape (G-07, R-ERR-1); call problem.Respond / " +
+				"problem.RespondCause instead — serialization has exactly one owner", node.Pos(), true
+		}
+	case *ast.FuncLit:
+		if node.Type != nil && isProblemWriterSignature(node.Type.Params) {
+			return "function literal takes both an http.ResponseWriter and a *problem.Problem, " +
+				"which is the local problem-writer shape (G-07, R-ERR-1); call problem.Respond / " +
+				"problem.RespondCause instead", node.Pos(), true
+		}
+	case *ast.BasicLit:
+		if node.Kind == token.STRING && strings.Contains(node.Value, problemMediaType) {
+			return "the " + problemMediaType + " media type is written by internal/platform/problem and " +
+				"nowhere else (G-07, R-ERR-1); naming it here means a second error envelope", node.Pos(), true
+		}
+	}
+	return "", token.NoPos, false
 }
 
 // inRuntimeTree limits the rule to code that can actually serve an HTTP

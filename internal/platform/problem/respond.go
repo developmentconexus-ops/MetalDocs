@@ -66,6 +66,11 @@ func RespondCause(w http.ResponseWriter, r *http.Request, p *Problem, cause erro
 const fallbackBody = `{"title":"Internal server error","status":500,"code":"internal.unknown"}`
 
 func respond(w http.ResponseWriter, r *http.Request, p *Problem, cause error) {
+	// nolint:contextcheck // there is no parent to inherit when r == nil (the
+	// tolerated non-HTTP-scoped call). Nothing is detached from a live request:
+	// ctx is overwritten with r.Context() immediately below whenever one exists,
+	// and this value is used only for the log line, never for cancellation or
+	// deadlines.
 	ctx := context.Background()
 	method, path := "", ""
 	if r != nil {
