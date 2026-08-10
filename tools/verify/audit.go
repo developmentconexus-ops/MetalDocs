@@ -18,6 +18,8 @@ type workflowJob struct {
 	Job      string
 	OnlyIDs  []string
 	Needs    []string
+	// Uses holds this job's `uses:` values verbatim, for the pinning rule (A9).
+	Uses []string
 }
 
 // needs: accepts a bare string or a sequence. Both appear in this repo, so
@@ -49,7 +51,8 @@ type rawWorkflow struct {
 	Jobs map[string]struct {
 		Needs stringOrSlice `yaml:"needs"`
 		Steps []struct {
-			Run string `yaml:"run"`
+			Run  string `yaml:"run"`
+			Uses string `yaml:"uses"`
 		} `yaml:"steps"`
 	} `yaml:"jobs"`
 }
@@ -143,15 +146,19 @@ func jobsInWorkflow(fileBase string, wf rawWorkflow) []workflowJob {
 	out := make([]workflowJob, 0, len(names))
 	for _, name := range names {
 		j := wf.Jobs[name]
-		var ids []string
+		var ids, uses []string
 		for _, s := range j.Steps {
 			ids = append(ids, onlyIDsForStep(s.Run)...)
+			if s.Uses != "" {
+				uses = append(uses, s.Uses)
+			}
 		}
 		out = append(out, workflowJob{
 			Workflow: fileBase,
 			Job:      name,
 			OnlyIDs:  ids,
 			Needs:    []string(j.Needs),
+			Uses:     uses,
 		})
 	}
 	return out
@@ -297,7 +304,7 @@ func auditRequiredClosure(regs []Check, jobs []workflowJob) []string {
 	return findings
 }
 
-// auditFindings applies the six rules. Pure, so the rules are testable
+// auditFindings applies the rules. Pure, so the rules are testable
 // without a repository on disk — requiredGateKeys is read from
 // scripts/required-gate.jq by the caller (parseRequiredGateKeys) and handed
 // in already parsed, same reason parseWorkflows' I/O stays out of this
@@ -316,6 +323,7 @@ func auditFindings(regs []Check, jobs []workflowJob, requiredGateKeys []string) 
 	findings = append(findings, auditRequiredClosure(regs, jobs)...)
 	findings = append(findings, auditFixtureCoverage(regs)...)
 	findings = append(findings, auditDuplicateIDs(regs)...)
+	findings = append(findings, auditToolPinning(regs, jobs)...)
 
 	sort.Strings(findings)
 	return findings
@@ -457,4 +465,65 @@ func auditDuplicateIDs(regs []Check) []string {
 		}
 	}
 	return out
+}
+
+// shaPin matches a 40-hex commit SHA, the only `uses:` form GitHub resolves to
+// an immutable object. A tag (@v4, @v4.2.2) is a movable pointer: the tag can
+// be re-pointed at different code with no diff in this repository to review.
+var shaPin = regexp.MustCompile(`@[0-9a-f]{40}$`)
+
+// localUses matches a `uses:` that names something inside this repository
+// (./path) or a reusable workflow in this repository — there is no upstream to
+// pin, the referenced code is the code under review.
+var localUses = regexp.MustCompile(`^\.{1,2}/`)
+
+// versionSuffix matches the @version of a Go module path in an Argv, e.g. the
+// "@latest" in "github.com/x/y/cmd/z@latest".
+var versionSuffix = regexp.MustCompile(`@([A-Za-z0-9._+-]+)$`)
+
+// auditToolPinning is A9 — everything CI executes must name an immutable
+// version.
+//
+// Two shapes, one property. A workflow `uses:` must be SHA-pinned, and a check
+// whose Argv fetches a tool by module path must not say "@latest". Both are
+// the same failure: the bytes CI runs can change with no diff here to review,
+// so a check can start or stop failing for reasons nobody chose. That is not
+// hypothetical drift — it is the reason a green run stops being evidence.
+//
+// Scope is deliberately what CI executes. Container images in deploy/ are the
+// same class of gap but belong to the deployment axis, not the verifier spine;
+// they are recorded there, not silently fixed here.
+func auditToolPinning(regs []Check, jobs []workflowJob) []string {
+	var findings []string
+	seen := map[string]bool{}
+	for _, j := range jobs {
+		for _, u := range j.Uses {
+			if shaPin.MatchString(u) || localUses.MatchString(u) {
+				continue
+			}
+			key := j.Workflow + ":" + u
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			findings = append(findings, fmt.Sprintf(
+				"A9: %s uses %q, which is not SHA-pinned — a tag can be re-pointed at different code with no diff here to review",
+				j.Workflow, u))
+		}
+	}
+	for _, c := range regs {
+		for _, arg := range c.Argv {
+			m := versionSuffix.FindStringSubmatch(arg)
+			if m == nil || !strings.Contains(arg, "/") {
+				continue
+			}
+			switch m[1] {
+			case "latest", "upgrade", "patch":
+				findings = append(findings, fmt.Sprintf(
+					"A9: check %q fetches %q — an unpinned tool version changes what this gate accepts without a diff here to review",
+					c.ID, arg))
+			}
+		}
+	}
+	return findings
 }

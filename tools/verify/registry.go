@@ -500,8 +500,14 @@ var checks = []Check{
 		// machine both before and after the flag. `-no-fail` from the
 		// measurement's own invocation is deliberately NOT carried over: this
 		// registration must fail the check like any other, not just record it.
+		//
+		// Pinned at v2.28.0 (latest release as of 2026-08-09), not @latest: a
+		// scanner that silently gains rules is a gate whose meaning changes with
+		// no diff here to review — a new rule class turns a green branch red for
+		// a reason nobody chose, and a withdrawn rule stops guarding just as
+		// quietly. Bump deliberately. Audit rule A9 keeps it that way.
 		Profiles: []string{ProfileFull},
-		Argv:     []string{"go", "run", "github.com/securego/gosec/v2/cmd/gosec@latest", "-quiet", "-exclude-dir=.claude", "-nosec-require-rules", "-nosec-require-justification", "./..."},
+		Argv:     []string{"go", "run", "github.com/securego/gosec/v2/cmd/gosec@v2.28.0", "-quiet", "-exclude-dir=.claude", "-nosec-require-rules", "-nosec-require-justification", "./..."},
 		Needs:    []string{needsNetwork},
 		CIJob:    "nightly.yml:security-scan",
 	},
@@ -530,8 +536,14 @@ var checks = []Check{
 		// "ruleset swap" — unscheduled on docs/superpowers/ROADMAP.md as of
 		// 2026-08-08; its remaining entry criterion is the closure-safety /
 		// ruleset-swap work, not further CVE remediation.
+		//
+		// Pinned at v1.6.0 (latest release as of 2026-08-09), not @latest — same
+		// reasoning as gosec above. Note the pin fixes the *analyzer*, not the
+		// vulnerability database: govulncheck queries vuln.go.dev at run time, so
+		// newly disclosed CVEs still surface. That is the intended split — data
+		// moves, tool does not.
 		Profiles: []string{ProfileFull},
-		Argv:     []string{"go", "run", "golang.org/x/vuln/cmd/govulncheck@latest", "./..."},
+		Argv:     []string{"go", "run", "golang.org/x/vuln/cmd/govulncheck@v1.6.0", "./..."},
 		Needs:    []string{needsNetwork},
 		CIJob:    "nightly.yml:security-scan",
 	},
