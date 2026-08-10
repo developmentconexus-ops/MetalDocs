@@ -45,6 +45,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 )
 
 // guardFixtureRoot is where fixture trees live, relative to the repo root.
@@ -106,10 +107,23 @@ func runGuardFixtures(ctx context.Context, root string, only []string) error {
 		return fmt.Errorf("no checks with fixtures selected")
 	}
 
-	var results []fixtureResult
-	for _, c := range selected {
-		results = append(results, runOneFixture(ctx, root, c))
+	// Each fixture is an independent subprocess against its own temp dir, so
+	// they parallelize freely. Serially this check is minutes; that cost lands
+	// on every PR, and a control nobody wants to wait for is a control that
+	// gets argued out of the gate.
+	results := make([]fixtureResult, len(selected))
+	sem := make(chan struct{}, defaultParallelism())
+	var wg sync.WaitGroup
+	for i, c := range selected {
+		wg.Add(1)
+		go func(i int, c Check) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			results[i] = runOneFixture(ctx, root, c)
+		}(i, c)
 	}
+	wg.Wait()
 
 	failed := 0
 	for _, r := range results {

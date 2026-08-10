@@ -1,0 +1,5 @@
+package http
+
+// Guard fixture: the wire status changes with no api/openapi/v1/openapi.yaml
+// edit in the same diff, which is what the contract rule rejects.
+func Status() int { return 204 }

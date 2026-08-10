@@ -314,6 +314,8 @@ func auditFindings(regs []Check, jobs []workflowJob, requiredGateKeys []string) 
 	findings = append(findings, auditCIJobClaims(regs, runsIn)...)
 	findings = append(findings, auditRequiredGateParity(jobs, requiredGateKeys)...)
 	findings = append(findings, auditRequiredClosure(regs, jobs)...)
+	findings = append(findings, auditFixtureCoverage(regs)...)
+	findings = append(findings, auditDuplicateIDs(regs)...)
 
 	sort.Strings(findings)
 	return findings
@@ -410,4 +412,49 @@ func printAudit(dir string) int {
 		fmt.Printf("  %s\n", f)
 	}
 	return 1
+}
+
+// auditFixtureCoverage is rule A7: every blocking check declares either a
+// negative fixture or a waiver saying why it does not, and never both.
+//
+// A guard with no evidence that it can fail is indistinguishable from a guard
+// that cannot. Before A1.2 that state was invisible — the audit could prove a
+// check ran in CI and could not prove it did anything when it ran. This rule
+// makes the hole enumerable: a check may lack a fixture, but not silently.
+func auditFixtureCoverage(regs []Check) []string {
+	var out []string
+	for _, c := range regs {
+		if !hasProfile(c, ProfilePR) {
+			continue // only blocking checks are in scope
+		}
+		switch {
+		case c.Fixture == nil && c.FixtureWaiver == "":
+			out = append(out, fmt.Sprintf(
+				"A7 check %q is in profile %s but declares neither Fixture nor FixtureWaiver: "+
+					"nothing proves this guard can fail", c.ID, ProfilePR))
+		case c.Fixture != nil && c.FixtureWaiver != "":
+			out = append(out, fmt.Sprintf(
+				"A7 check %q declares both a Fixture and a FixtureWaiver: a waiver explains an "+
+					"absent fixture, so keeping both leaves a stale claim in the registry", c.ID))
+		}
+	}
+	return out
+}
+
+// auditDuplicateIDs rejects two checks sharing an ID. --only, --audit's own
+// CIJob mapping and the fixture harness all address a check by ID, so a
+// duplicate silently shadows one of the two; this was introduced and caught by
+// accident while wiring A1.2, which is reason enough for it to be mechanical.
+func auditDuplicateIDs(regs []Check) []string {
+	seen := map[string]int{}
+	for _, c := range regs {
+		seen[c.ID]++
+	}
+	var out []string
+	for id, n := range seen {
+		if n > 1 {
+			out = append(out, fmt.Sprintf("A8 check ID %q is declared %d times; IDs address checks and must be unique", id, n))
+		}
+	}
+	return out
 }

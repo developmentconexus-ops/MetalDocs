@@ -109,15 +109,17 @@ var checks = []Check{
 		},
 	},
 	{
-		ID:       "go-vet",
-		Desc:     "go vet ./...",
-		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
-		Argv:     []string{"go", "vet", "./..."},
-		CIJob:    "ci.yml:verify",
+		ID:            "go-vet",
+		FixtureWaiver: "third-party tool (cmd/vet), not a guard this repo authored; its own failure modes are Go's to prove, and a fixture here would test the Go toolchain.",
+		Desc:          "go vet ./...",
+		Profiles:      []string{ProfileFast, ProfilePR, ProfileFull},
+		Argv:          []string{"go", "vet", "./..."},
+		CIJob:         "ci.yml:verify",
 	},
 	{
-		ID:   "go-vet-integration",
-		Desc: "go vet -tags integration ./... — integration-tagged files are not compiled by an untagged build, so a seam signature change can break them invisibly",
+		ID:            "go-vet-integration",
+		FixtureWaiver: "same third-party tool as go-vet under a build tag; what this entry adds is the tag, which the registry declares rather than implements.",
+		Desc:          "go vet -tags integration ./... — integration-tagged files are not compiled by an untagged build, so a seam signature change can break them invisibly",
 		// Deliberately in `fast`: this is cheap and it is the exact gap that
 		// has bitten this repo before (bit QR-C).
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
@@ -163,8 +165,9 @@ var checks = []Check{
 		// file) would select zero checks over the change that most needs
 		// catching. Same class of gap as required-gate-selftest's missing
 		// scripts/required-gate.jq (whole-branch review C2).
-		Paths: []string{"internal/", "api/openapi/", "wiki/references/problem-codes.md", "cmd/problem-codes-dump/"},
-		CIJob: "ci.yml:verify",
+		Paths:   []string{"internal/", "api/openapi/", "wiki/references/problem-codes.md", "cmd/problem-codes-dump/"},
+		CIJob:   "ci.yml:verify",
+		Fixture: &Fixture{Dir: "problem-codes-drift", Want: "problem-codes-dump"},
 	},
 	// api-lint-base-path-v1 (PATH-BASE-PREFIX on the v1 spec, standalone
 	// -only run) deleted Task 12 (six-control table, spec §4.5): -only is a
@@ -183,6 +186,11 @@ var checks = []Check{
 		// internal-e2e.yaml's base-prefix rule, so the gap was worse here.
 		Paths: []string{"api/openapi/", "scripts/api-lint/"},
 		CIJob: "ci.yml:verify",
+		Fixture: &Fixture{
+			Dir:          "api-lint-e2e-base-path",
+			ArgvOverride: []string{"go", "run", "./scripts/api-lint", "-only", "PATH-BASE-PREFIX", "{{fixture}}/bad-spec.yaml"},
+			Want:         "PATH-BASE-PREFIX",
+		},
 	},
 	{
 		ID:       "api-lint",
@@ -191,20 +199,31 @@ var checks = []Check{
 		Argv:     []string{"go", "run", "./scripts/api-lint/", "-strict", "api/openapi/v1/openapi.yaml", "."},
 		Paths:    []string{"api/openapi/", "scripts/api-lint/"},
 		CIJob:    "ci.yml:verify",
+		Fixture: &Fixture{
+			Dir: "api-lint",
+			// modulesRoot stays the real repo root: -strict's code rules read
+			// scripts/api-lint/tripwire-allowlist.txt relative to it and treat
+			// its absence as a hard error, which would fail the fixture for the
+			// wrong reason. Only the spec argument is the bad input.
+			ArgvOverride: []string{"go", "run", "./scripts/api-lint/", "-strict", "{{fixture}}/bad-spec.yaml", "."},
+			Want:         "PATH-BASE-PREFIX",
+		},
 	},
 	{
-		ID:       "api-lint-selftest",
-		Desc:     "the api-lint tool's own tests",
-		Profiles: []string{ProfilePR, ProfileFull},
-		Argv:     []string{"go", "test", "./scripts/api-lint/...", "-count=1"},
-		Paths:    []string{"scripts/api-lint/"},
-		CIJob:    "ci.yml:verify",
+		ID:            "api-lint-selftest",
+		FixtureWaiver: "this check IS a negative-fixture suite — scripts/api-lint/testdata plus exit_code_test.go already assert non-zero exit on bad specs. Fixturing it would fixture a fixture harness.",
+		Desc:          "the api-lint tool's own tests",
+		Profiles:      []string{ProfilePR, ProfileFull},
+		Argv:          []string{"go", "test", "./scripts/api-lint/...", "-count=1"},
+		Paths:         []string{"scripts/api-lint/"},
+		CIJob:         "ci.yml:verify",
 	},
 	{
-		ID:       "contract-sync",
-		Desc:     "spec/generated/runtime contract sync across modules",
-		Profiles: []string{ProfilePR, ProfileFull},
-		Argv:     []string{"pwsh", "-NoProfile", "-File", "./scripts/check-contract-sync-all.ps1"},
+		ID:            "contract-sync",
+		FixtureWaiver: "TRANSITIONAL, no fixture yet. The check drives pwsh scripts that regenerate and compare per-module contract artifacts, which needs a sandbox carrying the generator toolchain. Owner: #87/A1 remainder — recorded in the Phase 1 handoff as a known A1.2 gap, not deferred to another axis.",
+		Desc:          "spec/generated/runtime contract sync across modules",
+		Profiles:      []string{ProfilePR, ProfileFull},
+		Argv:          []string{"pwsh", "-NoProfile", "-File", "./scripts/check-contract-sync-all.ps1"},
 		// scripts/check-contract-sync-all.ps1 is the check's own definition;
 		// without it a PR editing only the script (weakening what it checks)
 		// selects zero checks (whole-branch review C2).
@@ -212,29 +231,32 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "codegen-drift-backend",
-		Desc:     "go generate ./... produces no diff in generated Go artifacts (api.gen.go, httpsurface_gen.go, httpsurface_e2e_gen.go)",
-		Profiles: []string{ProfilePR, ProfileFull},
-		Argv:     []string{"bash", "scripts/check-codegen-drift-backend.sh"},
+		ID:            "codegen-drift-backend",
+		FixtureWaiver: "TRANSITIONAL, no fixture yet. Running it in a sandbox means running oapi-codegen and go generate there; the honest fixture is a recorded drift diff, which needs generator inputs the sandbox does not have. Owner: #87/A1 remainder.",
+		Desc:          "go generate ./... produces no diff in generated Go artifacts (api.gen.go, httpsurface_gen.go, httpsurface_e2e_gen.go)",
+		Profiles:      []string{ProfilePR, ProfileFull},
+		Argv:          []string{"bash", "scripts/check-codegen-drift-backend.sh"},
 		// scripts/check-codegen-drift-backend.sh is the check's own
 		// definition (whole-branch review C2 class).
 		Paths: []string{"api/openapi/", "internal/", "apps/", "cmd/", "scripts/check-codegen-drift-backend.sh"},
 		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "codegen-drift-frontend",
-		Desc:     "pnpm run gen:api produces no diff in frontend/apps/web/src/lib/api-types/",
-		Profiles: []string{ProfilePR, ProfileFull},
-		Argv:     []string{"bash", "scripts/check-codegen-drift-frontend.sh"},
+		ID:            "codegen-drift-frontend",
+		FixtureWaiver: "TRANSITIONAL, no fixture yet. Same generator-toolchain problem as codegen-drift-backend, via pnpm run gen:api. Owner: #87/A1 remainder.",
+		Desc:          "pnpm run gen:api produces no diff in frontend/apps/web/src/lib/api-types/",
+		Profiles:      []string{ProfilePR, ProfileFull},
+		Argv:          []string{"bash", "scripts/check-codegen-drift-frontend.sh"},
 		// scripts/check-codegen-drift-frontend.sh is the check's own
 		// definition (whole-branch review C2 class).
 		Paths: []string{"api/openapi/", "frontend/", "scripts/check-codegen-drift-frontend.sh"},
 		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "openapi-lint-v1",
-		Desc:     "redocly lint on the v1 spec",
-		Profiles: []string{ProfilePR, ProfileFull},
+		ID:            "openapi-lint-v1",
+		FixtureWaiver: "third-party tool (@redocly/cli, pinned); a fixture here would test Redocly's rule engine, not this repo.",
+		Desc:          "redocly lint on the v1 spec",
+		Profiles:      []string{ProfilePR, ProfileFull},
 		// Pinned to 2.46.0, latest at pin time (2026-08-08) — same reasoning
 		// as ci.yml's oasdiff pin: an unpinned lint tool can change what it
 		// accepts with no diff in this repo to review.
@@ -249,8 +271,9 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:   "openapi-lint-e2e",
-		Desc: "redocly lint on the internal-e2e spec",
+		ID:            "openapi-lint-e2e",
+		FixtureWaiver: "third-party tool (@redocly/cli, pinned); same as openapi-lint-v1.",
+		Desc:          "redocly lint on the internal-e2e spec",
 		// Task 12: the e2e scaffolding document did not exist until now — a
 		// gate authored before its subject would pass vacuously. Same command
 		// as openapi-lint-v1, second document; the file stays excluded from
@@ -269,8 +292,9 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:   "oasdiff-breaking",
-		Desc: "oasdiff breaking-change gate: PR head spec vs base-branch spec, --fail-on ERR",
+		ID:            "oasdiff-breaking",
+		FixtureWaiver: "third-party tool (oasdiff); it also needs a base-branch spec materialized by a workflow step, so a sandbox run would fail on the missing file rather than on a breaking change.",
+		Desc:          "oasdiff breaking-change gate: PR head spec vs base-branch spec, --fail-on ERR",
 		// The base-branch spec this diffs against is materialized to
 		// /tmp/openapi.base.yaml by a workflow prerequisite step
 		// (ci.yml:lint-contract "Materialize base-branch spec"), which needs
@@ -294,26 +318,29 @@ var checks = []Check{
 		Argv:     []string{"pwsh", "-NoProfile", "-File", "./scripts/check-module-boundaries.ps1"},
 		// scripts/check-module-boundaries.ps1 is the check's own definition
 		// (whole-branch review C2 class).
-		Paths: []string{"internal/", "scripts/check-module-boundaries.ps1"},
-		CIJob: "ci.yml:verify",
+		Paths:   []string{"internal/", "scripts/check-module-boundaries.ps1"},
+		CIJob:   "ci.yml:verify",
+		Fixture: &Fixture{Dir: "module-imports", Want: "[module-imports] FAIL"},
 	},
 	{
 		ID:       "test-conventions",
 		Desc:     "new tests use the canonical framework for their class",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-test-discipline.sh"},
+		Fixture:  &Fixture{Dir: "test-conventions", Want: "code_violation_integration_test.go"},
 		// scripts/check-test-discipline.sh is the check's own definition
 		// (whole-branch review C2 class).
 		Paths: []string{"internal/", "tests/", "apps/", "scripts/check-test-discipline.sh"},
 		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "test-conventions-selftest",
-		Desc:     "check-test-discipline.sh reads code and ignores Go line comments",
-		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
-		Argv:     []string{"bash", "scripts/check-test-discipline-selftest.sh"},
-		Paths:    []string{"scripts/check-test-discipline.sh", "scripts/check-test-discipline-selftest.sh", "scripts/testdata/test-discipline/"},
-		CIJob:    "ci.yml:verify",
+		ID:            "test-conventions-selftest",
+		FixtureWaiver: "this check IS the negative-fixture harness for test-conventions (scripts/check-test-discipline-selftest.sh builds a throwaway repo and asserts finding counts).",
+		Desc:          "check-test-discipline.sh reads code and ignores Go line comments",
+		Profiles:      []string{ProfileFast, ProfilePR, ProfileFull},
+		Argv:          []string{"bash", "scripts/check-test-discipline-selftest.sh"},
+		Paths:         []string{"scripts/check-test-discipline.sh", "scripts/check-test-discipline-selftest.sh", "scripts/testdata/test-discipline/"},
+		CIJob:         "ci.yml:verify",
 	},
 	{
 		ID:   "testdb-bypass-guard",
@@ -367,8 +394,9 @@ var checks = []Check{
 		Argv:     []string{"pwsh", "-NoProfile", "-File", "./scripts/wiki-tally-check.ps1", "-All"},
 		// scripts/wiki-tally-check.ps1 is the check's own definition
 		// (whole-branch review C2 class).
-		Paths: []string{"wiki/modules/", "scripts/wiki-tally-check.ps1"},
-		CIJob: "ci.yml:verify",
+		Paths:   []string{"wiki/modules/", "scripts/wiki-tally-check.ps1"},
+		CIJob:   "ci.yml:verify",
+		Fixture: &Fixture{Dir: "wiki-debt-tally", Want: "SWEEP FAIL (1/1): fixture"},
 	},
 	{
 		ID:       "db-docs-coverage",
@@ -377,8 +405,9 @@ var checks = []Check{
 		Argv:     []string{"pwsh", "-NoProfile", "-File", "./scripts/check-db-dictionary-coverage.ps1"},
 		// scripts/check-db-dictionary-coverage.ps1 is the check's own
 		// definition (whole-branch review C2 class).
-		Paths: []string{"db/baseline/", "wiki/database/tables/", "scripts/check-db-dictionary-coverage.ps1"},
-		CIJob: "ci.yml:verify",
+		Paths:   []string{"db/baseline/", "wiki/database/tables/", "scripts/check-db-dictionary-coverage.ps1"},
+		CIJob:   "ci.yml:verify",
+		Fixture: &Fixture{Dir: "db-docs-coverage", Want: "Missing dictionary pages"},
 	},
 	{
 		ID:       "migration-gapless",
@@ -388,8 +417,9 @@ var checks = []Check{
 		Needs:    []string{needsGitDepth},
 		// scripts/check-migration-gapless.sh is the check's own definition —
 		// named explicitly in the whole-branch review's C2 finding.
-		Paths: []string{"db/migrations/", "scripts/check-migration-gapless.sh"},
-		CIJob: "ci.yml:verify",
+		Paths:   []string{"db/migrations/", "scripts/check-migration-gapless.sh"},
+		CIJob:   "ci.yml:verify",
+		Fixture: &Fixture{Dir: "migration-gapless", Want: "Gap: migration 0002 missing"},
 	},
 	{
 		ID:   "governance-diff-rules",
@@ -403,6 +433,7 @@ var checks = []Check{
 		Argv:     []string{"pwsh", "-NoProfile", "-File", "./scripts/check-governance.ps1"},
 		Needs:    []string{needsGitDepth},
 		CIJob:    "ci.yml:verify",
+		Fixture:  &Fixture{Dir: "governance-diff-rules", Want: "API contract change detected"},
 	},
 	{
 		ID:       "invariant-coverage-map",
@@ -507,10 +538,11 @@ var checks = []Check{
 
 	// ---- Frontend ---------------------------------------------------------
 	{
-		ID:       "eslint",
-		Desc:     "eslint across the workspace, including the eigenpal import boundary",
-		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
-		Argv:     []string{"pnpm", "run", "lint"},
+		ID:            "eslint",
+		FixtureWaiver: "third-party tool; the repo-authored part is the eigenpal import boundary rule, whose fixture belongs with the eslint config — deferred, no owner assigned outside A1.",
+		Desc:          "eslint across the workspace, including the eigenpal import boundary",
+		Profiles:      []string{ProfileFast, ProfilePR, ProfileFull},
+		Argv:          []string{"pnpm", "run", "lint"},
 		// package.json (root) is where the "lint" script this check invokes
 		// is defined — without it here, a PR rewriting "lint" to a no-op
 		// while touching no frontend/, packages/, apps/, or config file
@@ -539,6 +571,7 @@ var checks = []Check{
 		Desc:     "eigenpal version and selector counts are pinned together (ADR 0046, second half)",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-eigenpal-selector-pin.sh"},
+		Fixture:  &Fixture{Dir: "eigenpal-selector-pin"},
 		// scripts/check-eigenpal-selector-pin.sh is the check's own
 		// definition — named explicitly in the whole-branch review's C2
 		// finding.
@@ -546,10 +579,11 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "fe-typecheck",
-		Desc:     "tsc over @metaldocs/web",
-		Profiles: []string{ProfilePR, ProfileFull},
-		Argv:     []string{"pnpm", "--filter", "@metaldocs/web", "run", "typecheck"},
+		ID:            "fe-typecheck",
+		FixtureWaiver: "third-party tool (tsc); a fixture would prove TypeScript rejects bad types.",
+		Desc:          "tsc over @metaldocs/web",
+		Profiles:      []string{ProfilePR, ProfileFull},
+		Argv:          []string{"pnpm", "--filter", "@metaldocs/web", "run", "typecheck"},
 		// Root toolchain/dependency files, not just frontend/ and packages/:
 		// a lockfile-only or Node-version-only PR (Dependabot's normal shape)
 		// otherwise selects zero frontend checks while the pathless Go
@@ -559,19 +593,21 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "fe-test",
-		Desc:     "vitest over @metaldocs/web",
-		Profiles: []string{ProfilePR, ProfileFull},
-		Argv:     []string{"pnpm", "--filter", "@metaldocs/web", "run", "test"},
+		ID:            "fe-test",
+		FixtureWaiver: "a test suite (vitest); same as go-test-unit.",
+		Desc:          "vitest over @metaldocs/web",
+		Profiles:      []string{ProfilePR, ProfileFull},
+		Argv:          []string{"pnpm", "--filter", "@metaldocs/web", "run", "test"},
 		// Same C3 fix as fe-typecheck above, same reason.
 		Paths: []string{"frontend/", "packages/", "pnpm-lock.yaml", "package.json", "pnpm-workspace.yaml", ".nvmrc"},
 		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "docx-typecheck",
-		Desc:     "tsc over the docx-v2 workspace",
-		Profiles: []string{ProfilePR, ProfileFull},
-		Argv:     []string{"pnpm", "run", "typecheck:docx-v2"},
+		ID:            "docx-typecheck",
+		FixtureWaiver: "third-party tool (tsc); same as fe-typecheck.",
+		Desc:          "tsc over the docx-v2 workspace",
+		Profiles:      []string{ProfilePR, ProfileFull},
+		Argv:          []string{"pnpm", "run", "typecheck:docx-v2"},
 		// Same C3 fix as fe-typecheck above, same reason.
 		Paths: []string{"apps/docx-renderer/", "packages/", "pnpm-lock.yaml", "package.json", "pnpm-workspace.yaml", ".nvmrc"},
 		// I8: docx-renderer.yml:node is where this check actually runs today,
@@ -583,18 +619,20 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "docx-build",
-		Desc:     "the docx-v2 workspace builds; produces the dist/meta.json that docx-test's bundle guard reads",
-		Profiles: []string{ProfilePR, ProfileFull},
-		Argv:     []string{"pnpm", "run", "build:docx-v2"},
+		ID:            "docx-build",
+		FixtureWaiver: "a build step, not a guard — it produces dist/meta.json for docx-test. It fails when the workspace does not build; there is no rule to feed bad input to.",
+		Desc:          "the docx-v2 workspace builds; produces the dist/meta.json that docx-test's bundle guard reads",
+		Profiles:      []string{ProfilePR, ProfileFull},
+		Argv:          []string{"pnpm", "run", "build:docx-v2"},
 		// Same C3 fix as fe-typecheck above, same reason.
 		Paths: []string{"apps/docx-renderer/", "packages/", "pnpm-lock.yaml", "package.json", "pnpm-workspace.yaml", ".nvmrc"},
 		// I8: same CIJob reasoning as docx-typecheck above.
 		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:   "docx-test",
-		Desc: "docx-v2 unit tests",
+		ID:            "docx-test",
+		FixtureWaiver: "a test suite (vitest over docx-v2); same as go-test-unit.",
+		Desc:          "docx-v2 unit tests",
 		// D-14 (closed by R4): depends on docx-build having already run —
 		// bundle-guard.test.ts reads dist/meta.json. This used to be enforced
 		// only by docx-renderer.yml:node splitting into two `verify`
@@ -626,11 +664,12 @@ var checks = []Check{
 
 	// ---- Tests ------------------------------------------------------------
 	{
-		ID:       "go-test-unit",
-		Desc:     "go test ./... (no integration tag)",
-		Profiles: []string{ProfilePR, ProfileFull},
-		Argv:     []string{"go", "test", "-count=1", "-timeout", "600s", "./..."},
-		CIJob:    "ci.yml:verify",
+		ID:            "go-test-unit",
+		FixtureWaiver: "a test suite, not a guard: it fails when a test fails, which is the property, and every test in it is its own fixture.",
+		Desc:          "go test ./... (no integration tag)",
+		Profiles:      []string{ProfilePR, ProfileFull},
+		Argv:          []string{"go", "test", "-count=1", "-timeout", "600s", "./..."},
+		CIJob:         "ci.yml:verify",
 	},
 	{
 		ID:   "go-test-integration",
@@ -661,12 +700,13 @@ var checks = []Check{
 
 	// ---- Traceability -----------------------------------------------------
 	{
-		ID:       "req-trace-selftest",
-		Desc:     "the req-trace tool's own tests",
-		Profiles: []string{ProfilePR, ProfileFull},
-		Argv:     []string{"go", "test", "./scripts/req-trace/...", "-count=1"},
-		Paths:    []string{"scripts/req-trace/"},
-		CIJob:    "ci.yml:verify",
+		ID:            "req-trace-selftest",
+		FixtureWaiver: "same shape as api-lint-selftest: a Go test suite over scripts/req-trace, with its own testdata.",
+		Desc:          "the req-trace tool's own tests",
+		Profiles:      []string{ProfilePR, ProfileFull},
+		Argv:          []string{"go", "test", "./scripts/req-trace/...", "-count=1"},
+		Paths:         []string{"scripts/req-trace/"},
+		CIJob:         "ci.yml:verify",
 	},
 	{
 		ID:       "req-trace",
@@ -684,6 +724,11 @@ var checks = []Check{
 		// a diff that touches the tool.
 		Paths: []string{"wiki/architecture/", "internal/", "apps/", "scripts/req-trace/"},
 		CIJob: "ci.yml:verify",
+		Fixture: &Fixture{
+			Dir:          "req-trace",
+			ArgvOverride: []string{"go", "run", "./scripts/req-trace", "-repo", "{{fixture}}"},
+			Want:         "UNCOVERED MUST REQ(s) (1):",
+		},
 	},
 	{
 		ID:       "required-gate-selftest",
@@ -698,6 +743,11 @@ var checks = []Check{
 		// that can weaken the gate expression while selecting zero gate
 		// checks (whole-branch review C2).
 		Paths: []string{".github/workflows/ci.yml", "scripts/check-required-gate.sh", "scripts/required-gate.jq", "scripts/testdata/required-gate/"},
+		Fixture: &Fixture{
+			Dir:          "required-gate-selftest",
+			CopyFromRepo: []string{"scripts/required-gate.jq"},
+			Want:         "pass-mislabelled.json",
+		},
 		CIJob: "ci.yml:verify",
 	},
 
@@ -717,6 +767,43 @@ var checks = []Check{
 		// governance-diff-rules above.
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "./tools/verify", "--audit"},
-		CIJob:    "ci.yml:verify",
+		// verify-audit's fixture is a workflow that names an unknown check ID
+		// (rule A1). Rule A7 itself is proven by the guard-fixtures entry
+		// below being the thing A7 demands.
+		Fixture: &Fixture{
+			Dir:          "verify-audit",
+			CopyFromRepo: []string{"scripts/required-gate.jq"},
+			Want:         "no-such-check-id",
+		},
+		CIJob: "ci.yml:verify",
+	},
+	{
+		ID:   "guard-fixtures",
+		Desc: "every blocking guard is fed bad input and must exit non-zero (--guard-fixtures)",
+		// A1.2. Same argument as verify-audit directly above, applied one level
+		// up: a negative-fixture spine that only runs when someone remembers to
+		// type it proves nothing on the day a guard silently stops guarding.
+		// Registered like any other check so CI runs it, so --audit sees it, and
+		// so the required gate can depend on it.
+		//
+		// No Paths: a guard can be defanged from far outside its own directory
+		// (a script it calls, a config it reads, a registry Argv edit), so
+		// scoping this by path would reintroduce the reachability hole A1.4
+		// exists to close.
+		//
+		// Not in ProfileFast: each fixture is a real subprocess against a real
+		// sandbox. Parallel it is fast enough for PR and full, too slow for the
+		// inner loop.
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv:     []string{"go", "run", "./tools/verify", "--guard-fixtures"},
+		// The harness cannot have a negative fixture of its own without infinite
+		// regress. Its two failure modes were exercised by hand before it
+		// landed, and both are covered structurally: a check whose command exits
+		// 0 is reported as "the guard does not guard", and a check that fails for
+		// the wrong reason is caught by Want. Audit rule A7 then makes the
+		// coverage itself blocking — a new ProfilePR check with neither Fixture
+		// nor FixtureWaiver fails verify-audit.
+		FixtureWaiver: "this check IS the negative-fixture harness; fixturing it would be circular (owner: #87/A1)",
+		CIJob:         "ci.yml:verify",
 	},
 }

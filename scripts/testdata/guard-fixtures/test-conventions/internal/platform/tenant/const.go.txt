@@ -1,0 +1,5 @@
+package tenant
+
+// Stub so the R3 rule can resolve the dev tenant literal the fixture
+// hardcodes. See scripts/testdata/guard-fixtures/README.md.
+const DevTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"

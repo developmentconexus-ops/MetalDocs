@@ -1,0 +1,4 @@
+# Problem codes
+
+Deliberately stale: this catalog lists none of the codes the registry emits.
+See scripts/testdata/guard-fixtures/README.md.

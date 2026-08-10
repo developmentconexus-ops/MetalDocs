@@ -1,0 +1,7 @@
+{
+  "name": "@metaldocs/eigenpal-adapter",
+  "version": "0.0.0",
+  "dependencies": {
+    "eigenpal": "0.0.1"
+  }
+}
