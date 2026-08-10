@@ -4,6 +4,12 @@
 future program, NOT an ADR. The ADR is written inside that program, after the
 `developing-new-work` gate.
 
+> **Update 2026-08-09 (Phase G governance reconciliation):** the decisions below are now recorded as
+> **[ADR 0092](../../../wiki/decisions/0092-authz-grant-unification.md)** (Accepted, not implemented) —
+> materialized by operator instruction during the architecture-audit governance gate (#100 / PR #101),
+> ahead of the program the paragraph above anticipated. The ADR records; this document remains the
+> original analysis. Execution still requires the `developing-new-work` gate and is owned by issue #89/A8.
+
 **Origin.** Surfaced by the http-surface-protocol program's Task 17 conformance suite
 (`TestNoDeclaredOperationIsUnreachable`, red by design at commit `5bf81a57`). The suite reported
 capabilities that no role grants on tier-1's grant path. Investigation showed the cause is not

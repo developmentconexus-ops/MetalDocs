@@ -22,3 +22,10 @@
 # response body. Object key, not credential. NOT exempted as a class, because
 # `"key":"…"` in JSON is also the exact shape of a genuine leaked API key.
 665b2bae29faa9681dc762df4add6702e5b8b51b:docs/superpowers/reports/2026-07-16-unit-blank-docx-b-evidence.md:generic-api-key:96
+
+# Architecture-audit documentation: `DefaultLimit=20` in the pagination
+# policy table is a Go pagination configuration constant, not a credential or
+# access token. The generic-api-key rule is triggered by the nearby word
+# "keyset"; this fingerprint scopes the exemption to that single historical
+# finding so real secrets elsewhere remain detectable.
+7220bfa57c352c658e0eeaba2553d1bb346aba46:docs/superpowers/analysis/audit-2026-08-09/pass10-api-contract.md:generic-api-key:182

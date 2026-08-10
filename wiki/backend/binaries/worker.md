@@ -135,6 +135,8 @@ Runs four jobs, each in its own goroutine with a `time.Ticker`, protected by Pos
 | `audit-integrity-validator` | `modules/jobs/audit_integrity_validator` | 1 h | `SkipOnPressure` |
 | `lease-reaper` | `modules/jobs/scheduler` (built-in) | 10 min | `SkipOnPressure` |
 
+> **Retired (annotation 2026-08-09):** this scheduler table describes the pre-ADR-0067 Postgres-lease ticker scheduler, which is **retired (M5)** along with `lease-reaper`. The periodic maintenance jobs now run as River periodic jobs enqueued by the API's leader election and executed by `metaldocs-jobs` (`internal/modules/jobs/maintenance/periodic.go`). Kept as history; do not use as current runtime truth.
+
 Backpressure probe (`scheduler.go:302–359`): if `pg_stat_activity` active / max_connections ratio > 0.70 (enter) or < 0.60 (exit), jobs are skipped for that tick. Warning logged at 10 consecutive skips.
 
 Graceful drain at `drain()`: waits up to 30 s for in-flight jobs, then up to 5 s more with forced cancellation before releasing leases.

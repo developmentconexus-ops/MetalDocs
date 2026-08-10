@@ -75,6 +75,13 @@ A cross-module read is **compliant** iff it is one of:
 - **(b) Owner-published read-port.** A Go call through an interface the owner publishes in its `domain`
   package, implemented in the owner's `infrastructure`, wired at the composition root (the ADR
   0029/0030/0031/0038 pattern). The consumer imports the interface, never the owner's table.
+  *Status note (2026-08-09, Phase G — recorded, not re-ruled):* the 2026-08-09 architecture audit's
+  R-CONTRACT-1 taxonomy makes **consumer-owned** interfaces the default for synchronous capability
+  ports, which is in tension with this exemption's producer-owned shape (G-04 in
+  `docs/superpowers/analysis/audit-2026-08-09/final-synthesis.md`). Existing D3(b) sites remain
+  compliant under this ADR as written; at #93/A4 implementation time each site is either re-ruled
+  (kept producer-owned as a deliberate published contract) or given a consumer-owned adapter. No
+  change to this ADR's rulings is made now.
 - **(c) Own tables.** A module reading the tables it itself owns is never an H-G concern.
 - **(d) Platform append-sink read.** A read projection of a **cross-cutting platform sink** — a table the
   owning module exposes as an append-only telemetry/audit surface that *every* module writes via a published

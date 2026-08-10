@@ -198,6 +198,8 @@ Registered jobs and intervals:
 | `audit-integrity-validator` | 1 h | Calls `auditdomain.IntegrityValidator.ValidateIntegrity` |
 | `lease-reaper` | 10 min | Reclaims expired `job_leases` rows; inserts `governance_events` per reclaim |
 
+> **Retired (annotation 2026-08-09):** this job table and the flag below describe the pre-ADR-0067 lease scheduler, **retired (M5)** — the jobs above now run via River (enqueued by the API leader, executed by `metaldocs-jobs`). The `lease_reaper` JOIN bug was separately fixed in Wave 1.7 before retirement (see `wiki/backend/legacy-register.md` F-19). History only.
+
 Flag: `lease_reaper.go:37` joins `public.documents` by `job_name` to find a `tenant_id`. For the four scheduler jobs (whose names are strings like `"stuck-instance-watchdog"`), this query always returns NULL. Governance rows for reaped scheduler leases are never written. [runtime-unverified: confirmed as a code-reading finding; live behavior not checked.]
 
 ---

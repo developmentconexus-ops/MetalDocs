@@ -1,8 +1,8 @@
 # ADR 0007 — Two-Tier Authorization
 
-> **Status:** Accepted (amended 2026-05-11 — tripwire extended to all regulated modules)
-> **Current reality (2026-06):** Foundational two-tier model still in force; extended by ADR 0022 (capability coherence + authz-area-scope-binding guard) and ADR 0026 (unified authz enforcement). FD-1 amendment (2026-06-08) deleted `authz-call-present` lint rule; see ADR 0023 for area-marker replacement.
-> **Last verified:** 2026-06-08 (Phase F FD-1 amendment already embedded above — no anchor changes needed)
+> **Status:** Accepted; partially superseded by [ADR 0092](0092-authz-grant-unification.md). See Status history.
+> **Current reality:** Two enforcement tiers remain; the disjoint grant-table model is superseded by ADR 0092.
+> **Last verified:** 2026-08-09 (Phase G governance reconciliation)
 > **Scope:** Authorization boundary between HTTP middleware (tier 1) and in-transaction area checks (tier 2).
 > **Out of scope:** Authentication; Role/capability table definitions — see `wiki/modules/iam.md`.
 > **Key files:**
@@ -69,6 +69,12 @@ Replaced with two CI lint rules: `authz-call-present` (every op with `x-authz-ar
 **Amendment (2026-06-08, api-contract-hardening Phase F · FD-1): `authz-call-present` deleted.** The rule was dormant by design across every phase — it expected a handler-body `authz.Require(req.Body.AreaCode)`, but MetalDocs derives the area from the DB row inside the tx (the tx-coupling this amendment established), so that shape never existed and the rule's count was always 0. It was replaced not by activation (Option B, an interprocedural call-graph lint — rejected for re-proving what the DB already enforces) but by **honest positive `x-authz-area` markers** (`source: tx, derived_from` for DB-derived area; `source: body|path, field` for request-target area; `x-authz-area-none` for area-less ops), validated by `AUTHZ-DRIFT`. The standing static guarantees are `tripwire-pairing` (below), the `authz-area-scope-binding` AST guard (ADR 0022 Phase 7), and the Postgres tripwire (migration 0142b). See ADR [`0023-authz-area-markers.md`](0023-authz-area-markers.md).
 
 Full spike notes: `docs/superpowers/notes/2026-05-10-authz-codegen-feasibility.md`.
+
+## Status history
+
+- **2026-05-05 / 2026-05-10 / 2026-05-11 / 2026-06-08** — amendments recorded inline above (J2 wiring; codegen rejected; tripwire extension; `authz-call-present` deletion → ADR 0023).
+- **2026-08-06** — the http-surface-protocol program's conformance suite (`TestNoDeclaredOperationIsUnreachable`) proved the disjoint-grant-table split makes area-only principals unreachable at tier-1. The operator ratified the finding's classification: the Decision section's "distinct tiers … **not a unification gap**" framing was an incomplete migration ratified retroactively as architecture. Analysis: `docs/superpowers/analysis/2026-08-06-authz-grant-unification-decisions.md`.
+- **2026-08-09** — successor ruling filed as **[ADR 0092](0092-authz-grant-unification.md)** (one binding relation, scope on the binding; not yet implemented — execution owned by issue #89/A8). **What survives from this ADR:** the two enforcement points (edge + in-tx + DB tripwire) as defense in depth, the tx-coupling of `authz.Require`, and every amendment above. **What is withdrawn:** the claim that the disjoint grant *tables* are intentional design.
 
 ## References
 

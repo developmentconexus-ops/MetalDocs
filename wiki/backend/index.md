@@ -4,8 +4,8 @@
 > **Scope:** Atlas entrypoint for the MetalDocs backend Stage-1 truth map. Covers every binary, domain module, platform package, contract surface, and cross-cutting concern. Every behavioral claim carries a `file:line` anchor derived from Stage-1 audit artifacts. Runtime-only behavior tagged `[runtime-unverified]`.
 > **Key files:**
 > - `apps/api/cmd/metaldocs-api/main.go` — composition root (all wiring)
-> - `internal/modules/` — 12 business modules
-> - `internal/platform/` — 28 cross-cutting platform packages
+> - `internal/modules/` — 15 business modules
+> - `internal/platform/` — 37 cross-cutting platform packages
 > - `api/openapi/v1/openapi.yaml` — contract source of truth
 > - `wiki/backend/_artifacts/stage1/` — 21 Stage-1 audit artifacts (19 mappers + 2 syntheses)
 
@@ -345,7 +345,7 @@ graph LR
     subgraph API_Proc["metaldocs-api (process)"]
         direction TB
         HTTP_SRV["http.Server\n:8080 (APP_PORT=8081 in dev)"]
-        SCHED["Scheduler goroutines\nstuck-instance-watchdog 5m\nidempotency-janitor 15m\naudit-integrity-validator 1h\nlease-reaper 10m"]
+        SCHED["River leader election (enqueue-only)\nperiodic maintenance jobs enqueued here,\nexecuted by metaldocs-jobs (ADR 0067)\n(retired: ticker scheduler + lease-reaper, M5)"]
         PDF_RELAY["StagingOutboxWorker (PDF)\n5s poll\nmetaldocs.pdf_dispatch_outbox"]
         MAT_RELAY["StagingOutboxWorker (materialize)\n5s poll\nmetaldocs.materialize_dispatch_outbox"]
         SESS_SW["SessionSweeper\n60s"]
@@ -422,7 +422,7 @@ graph LR
 
 **Runtime topology notes:**
 
-- `metaldocs-api` is the only process that serves HTTP traffic. It also hosts 7 in-process async goroutines: two `StagingOutboxWorker` instances (PDF + materialize relay), `SessionSweeper`, `OrphanPendingSweeper`, 3 scheduler goroutines (watchdog, janitor, validator/lease-reaper), and the Presence Hub.
+- `metaldocs-api` is the only process that serves HTTP traffic. It also hosts in-process async goroutines: two `StagingOutboxWorker` instances (PDF + materialize relay), `SessionSweeper`, `OrphanPendingSweeper`, and the Presence Hub. *(Corrected 2026-08-09: the in-process ticker scheduler and its `lease-reaper` are retired — M5/ADR 0067; the API now joins River leader election to enqueue the periodic maintenance jobs, which `metaldocs-jobs` executes.)*
 - `metaldocs-worker` is stateless between ticks; it has no HTTP server. It interacts only with Postgres (`outbox_events`) and external services (Gotenberg, docx-renderer, MinIO).
 - `metaldocs-jobs` is a River worker host. It has no HTTP server. Its deployment status is a high-severity open gap: no Dockerfile, no compose service (`async-runtime.md §10`; `repo-topology.md §10`).
 - `docx-renderer` is a separate Node.js process. The worker calls it over HTTP; no direct DB access from docx-renderer.
