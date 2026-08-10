@@ -74,7 +74,10 @@ jobs:
       # css-tokens, eigenpal-selector-pin, fe-typecheck, fe-test,
       # docx-build/test, go-test-unit, adr-status, wiki-debt-tally,
       # db-docs-coverage, migration-gapless, governance-diff-rules,
-      # invariant-coverage-map, req-trace(-selftest), required-gate-selftest,
+      # invariant-coverage-map, gosec, govulncheck (both promoted into this
+      # job by A1.4 — a nightly-only scanner blocks no merge),
+      # guard-fixtures (every blocking guard fed bad input, must exit
+      # non-zero), req-trace(-selftest), required-gate-selftest,
       # verify-audit (registry.go's "Anti-drift" section — runs `verify
       # --audit` itself, so this job's own drift against the registry is
       # gated on every PR, not just when a human types it).

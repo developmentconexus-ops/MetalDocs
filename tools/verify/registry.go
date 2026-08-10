@@ -480,18 +480,25 @@ var checks = []Check{
 		// suppressions were dead and the underlying findings were live under
 		// a naive registration.
 		//
-		// Global-maximum structure: gosec blocking in `pr` + `full` with a
-		// clean, justified-suppression tree (this state). It still stays
-		// `full`-only (advisory), never `pr`-blocking, for the same A6 reason
-		// as govulncheck below: A6 requires every ProfilePR check's CIJob to
-		// sit inside ci.yml's required-gate needs: closure, and this CIJob
-		// (nightly.yml:security-scan) sits outside it. The live branch
-		// ruleset also still requires 21 legacy status contexts with
-		// bypass_actors: []. Promoting this check is safe only as part of the
-		// ruleset-swap phase, not before — the tree is clean now, but
-		// promotion is a closure-safety decision, not a re-triage decision.
-		// Promoting milestone: "ruleset swap" — unscheduled on
-		// docs/superpowers/ROADMAP.md as of 2026-08-08.
+		// PROMOTED to `pr` (A1.4, 2026-08-09). The blocker was never the
+		// findings — it was that this check's CIJob was nightly.yml:
+		// security-scan, which no needs: edge connects to ci.yml's required
+		// gate. "Runs in some workflow" is not closure: a nightly failure
+		// blocks nothing and merges anyway. Repointing the CIJob at
+		// ci.yml:verify (already inside the required closure, already running
+		// the `changed` profile) fixes that without adding a status context,
+		// so it needs no branch-ruleset change — the earlier note tying
+		// promotion to the ruleset swap conflated "new required job" with
+		// "existing required job runs one more check".
+		//
+		// Promotion was gated on a live run, not on the prior triage note:
+		// pinned gosec v2.28.0 reported 1 issue (G705 XSS-taint at
+		// internal/platform/idempotency/middleware.go:186) whose suppression
+		// was written as //nolint:gosec — golangci-lint syntax that standalone
+		// gosec has never read, so the suppression was dead and the finding
+		// live. Converted to a gosec-native `// #nosec G705 -- reason` in the
+		// same commit; re-run is clean. Comment syntax only, no behaviour
+		// change.
 		//
 		// -exclude-dir=.claude is load-bearing, not cosmetic: an unexcluded
 		// scan walks into .claude/worktrees/<sibling>/, a sibling git worktree
@@ -506,10 +513,13 @@ var checks = []Check{
 		// no diff here to review — a new rule class turns a green branch red for
 		// a reason nobody chose, and a withdrawn rule stops guarding just as
 		// quietly. Bump deliberately. Audit rule A9 keeps it that way.
-		Profiles: []string{ProfileFull},
-		Argv:     []string{"go", "run", "github.com/securego/gosec/v2/cmd/gosec@v2.28.0", "-quiet", "-exclude-dir=.claude", "-nosec-require-rules", "-nosec-require-justification", "./..."},
-		Needs:    []string{needsNetwork},
-		CIJob:    "nightly.yml:security-scan",
+		Profiles:      []string{ProfilePR, ProfileFull},
+		Argv:          []string{"go", "run", "github.com/securego/gosec/v2/cmd/gosec@v2.28.0", "-quiet", "-exclude-dir=.claude", "-nosec-require-rules", "-nosec-require-justification", "./..."},
+		Needs:         []string{needsNetwork},
+		FixtureWaiver: "third-party scanner (gosec, pinned); a fixture here would test gosec's own rule engine, not this repo. The repo-authored part is the #nosec justification shape, which -nosec-require-rules -nosec-require-justification enforce at every run.",
+		// No Paths, deliberately: a security scan scoped by path is a security
+		// scan that can be dodged by touching a file outside the list.
+		CIJob: "ci.yml:verify",
 	},
 	{
 		ID:   "govulncheck",
@@ -523,29 +533,23 @@ var checks = []Check{
 		// govulncheck run reports 0 called vulnerabilities. This entry's
 		// remediation criteria are met.
 		//
-		// It still stays `full`-only (advisory), never `pr`-blocking: A6
-		// requires every ProfilePR check's CIJob to sit inside ci.yml's
-		// required-gate needs: closure, and this CIJob (nightly.yml:
-		// security-scan) sits outside it. The live branch ruleset also still
-		// requires 21 legacy status contexts with bypass_actors: []. Promoting
-		// this check is safe only as part of the ruleset-swap phase, not
-		// before.
-		//
-		// Global-maximum structure: govulncheck blocking in `pr` + `full` with
-		// zero called vulnerabilities outstanding. Promoting milestone:
-		// "ruleset swap" — unscheduled on docs/superpowers/ROADMAP.md as of
-		// 2026-08-08; its remaining entry criterion is the closure-safety /
-		// ruleset-swap work, not further CVE remediation.
+		// PROMOTED to `pr` (A1.4, 2026-08-09), same reasoning as gosec above:
+		// the CIJob moved from nightly.yml:security-scan (outside ci.yml's
+		// required closure) to ci.yml:verify (inside it). Verified by a live
+		// run at the pinned version before promoting: 0 called vulnerabilities,
+		// 105s.
 		//
 		// Pinned at v1.6.0 (latest release as of 2026-08-09), not @latest — same
 		// reasoning as gosec above. Note the pin fixes the *analyzer*, not the
 		// vulnerability database: govulncheck queries vuln.go.dev at run time, so
 		// newly disclosed CVEs still surface. That is the intended split — data
 		// moves, tool does not.
-		Profiles: []string{ProfileFull},
-		Argv:     []string{"go", "run", "golang.org/x/vuln/cmd/govulncheck@v1.6.0", "./..."},
-		Needs:    []string{needsNetwork},
-		CIJob:    "nightly.yml:security-scan",
+		Profiles:      []string{ProfilePR, ProfileFull},
+		Argv:          []string{"go", "run", "golang.org/x/vuln/cmd/govulncheck@v1.6.0", "./..."},
+		Needs:         []string{needsNetwork},
+		FixtureWaiver: "third-party scanner (govulncheck, pinned); its input is the live vulnerability database, so a synthetic bad fixture would assert against data this repo does not control.",
+		// No Paths — same reasoning as gosec above.
+		CIJob: "ci.yml:verify",
 	},
 
 	// ---- Frontend ---------------------------------------------------------
