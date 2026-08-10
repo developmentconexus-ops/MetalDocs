@@ -1,8 +1,8 @@
 # ADR 0007 — Two-Tier Authorization
 
-> **Status:** Accepted; partially superseded by [ADR 0092](0092-authz-grant-unification.md). The disjoint-grant-table framing is withdrawn; the two enforcement points remain. See Status history.
-> **Current reality (2026-06):** Foundational two-tier model still in force; extended by ADR 0022 (capability coherence + authz-area-scope-binding guard) and ADR 0026 (unified authz enforcement). FD-1 amendment (2026-06-08) deleted `authz-call-present` lint rule; see ADR 0023 for area-marker replacement.
-> **Last verified:** 2026-06-08 (Phase F FD-1 amendment already embedded above — no anchor changes needed)
+> **Status:** Accepted; partially superseded by [ADR 0092](0092-authz-grant-unification.md). See Status history.
+> **Current reality:** Two enforcement tiers remain; the disjoint grant-table model is superseded by ADR 0092.
+> **Last verified:** 2026-08-09 (Phase G governance reconciliation)
 > **Scope:** Authorization boundary between HTTP middleware (tier 1) and in-transaction area checks (tier 2).
 > **Out of scope:** Authentication; Role/capability table definitions — see `wiki/modules/iam.md`.
 > **Key files:**
