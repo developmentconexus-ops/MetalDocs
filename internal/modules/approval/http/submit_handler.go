@@ -21,7 +21,7 @@ func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 	documentID := r.PathValue("id")
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	actorID := iamdomain.UserIDFromContext(r.Context())
@@ -34,23 +34,23 @@ func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 	// middleware (e.g. in a unit test).
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	if err := idempotency.ValidateKey(idempotencyKey); err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
 	expectedRevisionVersion, err := parseSubmitIfMatch(r.Header.Get("If-Match"))
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
 	var req contracts.SubmitRequest
 	if err := strictjson.Decode(r, &req); err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	if err := req.Validate(); err != nil {
-		WriteError(w, NewValidationError(err.Error()))
+		WriteError(w, r, NewValidationError(err.Error()))
 		return
 	}
 
@@ -59,7 +59,7 @@ func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 		submitSvc = h.services.Submit
 	}
 	if submitSvc == nil {
-		WriteError(w, errors.New("submit service not configured"))
+		WriteError(w, r, errors.New("submit service not configured"))
 		return
 	}
 
@@ -78,7 +78,7 @@ func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 	if raw := strings.TrimSpace(req.PlannedEffectiveFrom); raw != "" {
 		parsed, perr := time.Parse(time.RFC3339, raw)
 		if perr != nil {
-			WriteError(w, NewValidationError("planned_effective_from must be parseable RFC3339"))
+			WriteError(w, r, NewValidationError("planned_effective_from must be parseable RFC3339"))
 			return
 		}
 		utc := parsed.UTC()
@@ -112,13 +112,13 @@ func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 		SupersedeTargetID:    strings.TrimSpace(req.SupersededDocumentID),
 	})
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
 	newETag := "\"v" + strconv.Itoa(expectedRevisionVersion+1) + "\""
 	w.Header().Set("ETag", newETag)
-	WriteJSON(w, http.StatusCreated, contracts.SubmitResponse{
+	WriteJSON(w, r, http.StatusCreated, contracts.SubmitResponse{
 		InstanceID: result.InstanceID,
 		WasReplay:  false,
 		ETag:       newETag,

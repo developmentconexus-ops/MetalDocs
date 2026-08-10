@@ -46,33 +46,33 @@ func failReplaySlot(handle application.SignoffReplayCommitter, cause error) {
 func (h *Handler) GetInstanceByDocumentHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	docID := r.PathValue("id")
 
 	if h.readSvc == nil {
-		WriteError(w, errors.New("read service not configured"))
+		WriteError(w, r, errors.New("read service not configured"))
 		return
 	}
 
 	inst, viewer, verdicts, err := h.readSvc.LoadInstanceByDocumentForViewWithViewer(r.Context(), h.runner, tenantID, docID)
 	if err != nil {
 		if errors.Is(err, infrastructure.ErrNoActiveInstance) {
-			WriteError(w, infrastructure.ErrNoActiveInstance)
+			WriteError(w, r, infrastructure.ErrNoActiveInstance)
 			return
 		}
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
 	resp, err := h.mapInstanceResponse(r.Context(), tenantID, inst, &viewer, verdicts)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	w.Header().Set("ETag", resp.ETag)
-	WriteJSON(w, http.StatusOK, resp)
+	WriteJSON(w, r, http.StatusOK, resp)
 }
 
 // docSignoffRequest accepts the frontend's field name ("password" instead of "password_token").
@@ -114,11 +114,11 @@ func (h *Handler) resolveSignoffReplay(w http.ResponseWriter, r *http.Request, t
 	}
 	handle, replay, err := h.idempStore.BeginDocumentReplay(r.Context(), tenantID, actorID, idempKey, payloadHash)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return nil, true
 	}
 	if replay != nil {
-		WriteJSON(w, http.StatusOK, contracts.SignoffResponse{
+		WriteJSON(w, r, http.StatusOK, contracts.SignoffResponse{
 			SignoffID: replay.SignoffID,
 			WasReplay: true,
 			Outcome:   replay.Outcome,
@@ -158,7 +158,7 @@ func (h *Handler) resolveActiveSignoffStage(r *http.Request, replayHandle applic
 func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	actorID := actorIDFromRequest(r)
@@ -168,22 +168,22 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 	// F-QA4-6: self-managed replay slot (no idempotency.Require wrapper), so the
 	// shared UUID wire rule is enforced here.
 	if err := idempotency.ValidateKey(idempKey); err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	if h.decisionSvc == nil || h.readSvc == nil {
-		WriteError(w, errors.New("services not configured"))
+		WriteError(w, r, errors.New("services not configured"))
 		return
 	}
 
 	contractReq, err := decodeSignoffRequest(r)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	decision := domain.Decision(contractReq.Decision)
@@ -204,7 +204,7 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 
 	inst, activeStage, err := h.resolveActiveSignoffStage(r, replayHandle, tenantID, actorID, docID)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
@@ -222,7 +222,7 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 	})
 	if err != nil {
 		failReplaySlot(replayHandle, err)
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
@@ -235,7 +235,7 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 			slog.Warn("signoff idempotency record failed (non-fatal)", "err", err)
 		}
 	}
-	WriteJSON(w, http.StatusOK, contracts.SignoffResponse{
+	WriteJSON(w, r, http.StatusOK, contracts.SignoffResponse{
 		SignoffID: result.SignoffID,
 		WasReplay: false,
 		Outcome:   outcome,
@@ -247,7 +247,7 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 func (h *Handler) CancelByDocumentHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	actorID := actorIDFromRequest(r)
@@ -255,31 +255,31 @@ func (h *Handler) CancelByDocumentHandler(w http.ResponseWriter, r *http.Request
 
 	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	if h.readSvc == nil {
-		WriteError(w, errors.New("read service not configured"))
+		WriteError(w, r, errors.New("read service not configured"))
 		return
 	}
 
 	var body contracts.CancelRequest
 	if err := strictjson.Decode(r, &body); err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	if err := body.Validate(); err != nil {
-		WriteError(w, NewValidationError(err.Error()))
+		WriteError(w, r, NewValidationError(err.Error()))
 		return
 	}
 
 	inst, err := h.loadActiveInstanceByDocumentForMutation(r, tenantID, docID)
 	if err != nil {
 		if errors.Is(err, infrastructure.ErrNoActiveInstance) {
-			WriteError(w, infrastructure.ErrNoActiveInstance)
+			WriteError(w, r, infrastructure.ErrNoActiveInstance)
 			return
 		}
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
@@ -291,11 +291,11 @@ func (h *Handler) CancelByDocumentHandler(w http.ResponseWriter, r *http.Request
 		Reason:                  body.Reason,
 	})
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
-	WriteJSON(w, http.StatusOK, contracts.CancelResponse{
+	WriteJSON(w, r, http.StatusOK, contracts.CancelResponse{
 		DocumentID: result.DocumentID,
 	})
 }

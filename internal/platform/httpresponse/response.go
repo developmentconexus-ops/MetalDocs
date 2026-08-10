@@ -14,16 +14,16 @@ func WriteJSON(w http.ResponseWriter, status int, payload any) {
 	_ = json.NewEncoder(w).Encode(payload)
 }
 
-// WriteError writes an RFC 9457 problem+json error response.
-func WriteError(w http.ResponseWriter, status int, code problem.Code, message string) {
-	_ = problem.Write(w, problem.New(status, code, message))
-}
-
 // WriteMethodNotAllowed writes the canonical RFC 9457 405 response with the
 // RFC 9110 Allow header (D-03: no bare-status error responses).
-func WriteMethodNotAllowed(w http.ResponseWriter, allow string) {
+//
+// The former WriteError sibling is gone: it was a second emission entry point
+// for the same act, which is what G-07 exists to remove. Error responses go
+// through problem.Respond, and this helper does too — it only owns the Allow
+// header, not the envelope.
+func WriteMethodNotAllowed(w http.ResponseWriter, r *http.Request, allow string) {
 	w.Header().Set("Allow", allow)
-	WriteError(w, http.StatusMethodNotAllowed, problem.CodeRequestMethodNotAllowed, "Method not allowed")
+	problem.Respond(w, r, problem.New(http.StatusMethodNotAllowed, problem.CodeRequestMethodNotAllowed, "Method not allowed"))
 }
 
 // ReadJSON decodes the request body as JSON into v.

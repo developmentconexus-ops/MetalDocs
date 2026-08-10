@@ -48,7 +48,7 @@ func NewRolesCapsHandler(roleCaps RoleCapabilitiesReader) *RolesCapsHandler {
 
 func (h *RolesCapsHandler) listRoles(w http.ResponseWriter, r *http.Request) {
 	if _, err := tenant.FromContext(r.Context()); err != nil {
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 	writeJSON(w, http.StatusOK, iamapi.ListRolesResponse{Items: h.cachedRoles})
@@ -56,7 +56,7 @@ func (h *RolesCapsHandler) listRoles(w http.ResponseWriter, r *http.Request) {
 
 func (h *RolesCapsHandler) listCapabilities(w http.ResponseWriter, r *http.Request) {
 	if _, err := tenant.FromContext(r.Context()); err != nil {
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 	writeJSON(w, http.StatusOK, iamapi.ListCapabilitiesResponse{Items: h.cachedCaps})
@@ -64,16 +64,16 @@ func (h *RolesCapsHandler) listCapabilities(w http.ResponseWriter, r *http.Reque
 
 func (h *RolesCapsHandler) listRoleCapabilities(w http.ResponseWriter, r *http.Request) {
 	if _, err := tenant.FromContext(r.Context()); err != nil {
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 	if h.roleCaps == nil {
-		_ = problem.Write(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "role_capabilities repository is not configured"))
+		problem.Respond(w, r, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "role_capabilities repository is not configured"))
 		return
 	}
 	links, err := h.roleCaps.ListRoleCapabilities(r.Context())
 	if err != nil {
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to list role capabilities"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to list role capabilities"))
 		return
 	}
 	items := make([]iamapi.RoleCapabilityLink, 0, len(links))

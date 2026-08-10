@@ -7,32 +7,36 @@ import (
 	"testing"
 
 	"metaldocs/internal/platform/httpresponse"
-	"metaldocs/internal/platform/problem"
 )
 
-func TestWriteError_ProblemJSON(t *testing.T) {
+// The former TestWriteError_ProblemJSON is gone with httpresponse.WriteError:
+// error emission has exactly one entry point now (problem.Respond), and its
+// envelope is covered by internal/platform/problem's own tests. What remains
+// httpresponse's to prove is the piece it still owns — the Allow header on a
+// 405 — and that the envelope it delegates to is still problem+json.
+func TestWriteMethodNotAllowed_ProblemJSONWithAllowHeader(t *testing.T) {
 	rr := httptest.NewRecorder()
-	httpresponse.WriteError(rr, http.StatusNotFound, problem.CodeNotFoundResource, "resource not found")
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/iam/sessions", nil)
 
-	if got := rr.Code; got != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d", got, http.StatusNotFound)
+	httpresponse.WriteMethodNotAllowed(rr, req, "GET")
+
+	if rr.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusMethodNotAllowed)
 	}
-	ct := rr.Header().Get("Content-Type")
-	if ct != "application/problem+json" {
-		t.Fatalf("Content-Type = %q, want %q", ct, "application/problem+json")
+	if got := rr.Header().Get("Allow"); got != "GET" {
+		t.Fatalf("Allow = %q, want %q", got, "GET")
+	}
+	if got := rr.Header().Get("Content-Type"); got != "application/problem+json" {
+		t.Fatalf("Content-Type = %q, want %q", got, "application/problem+json")
 	}
 	var body struct {
 		Code   string `json:"code"`
-		Title  string `json:"title"`
 		Status int    `json:"status"`
 	}
 	if err := json.NewDecoder(rr.Body).Decode(&body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body.Code != "notfound.resource" {
-		t.Fatalf("code = %q, want NOT_FOUND", body.Code)
-	}
-	if body.Status != http.StatusNotFound {
-		t.Fatalf("status field = %d, want %d", body.Status, http.StatusNotFound)
+	if body.Code != "request.method_not_allowed" || body.Status != http.StatusMethodNotAllowed {
+		t.Fatalf("unexpected body: %+v", body)
 	}
 }

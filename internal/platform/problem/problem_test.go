@@ -161,7 +161,7 @@ func TestProblem_FromValidation(t *testing.T) {
 	}
 }
 
-func TestProblem_Write(t *testing.T) {
+func TestProblem_Respond(t *testing.T) {
 	p := New(422, CodeRequestInvalid, "Validation failed").
 		WithDetail("bad payload").
 		WithInstance("/v1/docs/1").
@@ -169,9 +169,7 @@ func TestProblem_Write(t *testing.T) {
 		WithFieldError("key", testFieldCodeRequired, "required")
 
 	rr := httptest.NewRecorder()
-	if err := Write(rr, p); err != nil {
-		t.Fatalf("write failed: %v", err)
-	}
+	Respond(rr, nil, p)
 
 	if got := rr.Header().Get("Content-Type"); got != "application/problem+json" {
 		t.Fatalf("unexpected content-type: %q", got)
@@ -215,13 +213,11 @@ func TestProblem_ErrorInterface(t *testing.T) {
 	}
 }
 
-func TestProblem_Write_HeaderSetBeforeStatus(t *testing.T) {
+func TestProblem_Respond_HeaderSetBeforeStatus(t *testing.T) {
 	p := New(400, CodeRequestInvalid, "Validation failed")
 	rr := httptest.NewRecorder()
 
-	if err := Write(rr, p); err != nil {
-		t.Fatalf("write failed: %v", err)
-	}
+	Respond(rr, nil, p)
 
 	if _, ok := rr.Result().Header["Content-Type"]; !ok {
 		t.Fatalf("content-type not present in header map")

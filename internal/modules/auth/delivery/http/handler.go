@@ -137,7 +137,7 @@ func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON payload"))
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON payload"))
 		return
 	}
 
@@ -152,7 +152,7 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 		h.recordAudit(r, "", "auth.login.failed", identifierHash, map[string]any{
 			"identifier_sha256": identifierHash,
 		})
-		h.writeAuthError(w, err)
+		h.writeAuthError(w, r, err)
 		return
 	}
 	http.SetCookie(w, h.service.SessionCookie(session.RawToken, session.ExpiresAt))
@@ -170,7 +170,7 @@ func (h *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 		if err := h.service.Logout(r.Context(), cookie.Value); err != nil {
 			slog.Error("auth logout failed", "err", err)
 			http.SetCookie(w, h.service.ExpiredSessionCookie())
-			h.writeAuthError(w, err)
+			h.writeAuthError(w, r, err)
 			return
 		}
 		if user, ok := authdomain.CurrentUserFromContext(r.Context()); ok {
@@ -184,7 +184,7 @@ func (h *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleMe(w http.ResponseWriter, r *http.Request) {
 	user, ok := authdomain.CurrentUserFromContext(r.Context())
 	if !ok {
-		h.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, user)
@@ -193,23 +193,23 @@ func (h *Handler) handleMe(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	user, ok := authdomain.CurrentUserFromContext(r.Context())
 	if !ok {
-		h.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
 		return
 	}
 
 	var req changePasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON payload"))
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON payload"))
 		return
 	}
 	if err := h.service.ChangePasswordForUser(r.Context(), user, req.CurrentPassword, req.NewPassword); err != nil {
 		slog.Warn("auth change password failed", "user_id", strings.TrimSpace(user.UserID), "err", err)
-		h.writeAuthError(w, err)
+		h.writeAuthError(w, r, err)
 		return
 	}
 	currentUser, err := h.service.CurrentUser(r.Context(), user.UserID, user.TenantID)
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Internal server error"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Internal server error"))
 		return
 	}
 	// F0.4: service already revoked all sessions (CWE-613). Mirror handleLogout
@@ -222,24 +222,24 @@ func (h *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	// Audit for auth.password.changed is now emitted inside the service tx (H-3b, F-07).
 }
 
-func (h *Handler) writeAuthError(w http.ResponseWriter, err error) {
+func (h *Handler) writeAuthError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, authdomain.ErrInvalidCredentials):
-		h.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthInvalidCredentials, "Invalid username/email or password"))
+		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthInvalidCredentials, "Invalid username/email or password"))
 	case errors.Is(err, authdomain.ErrIdentityNotFound):
-		h.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthInvalidCredentials, "Invalid username/email or password"))
+		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthInvalidCredentials, "Invalid username/email or password"))
 	case errors.Is(err, authdomain.ErrIdentityLocked):
-		h.writeProblem(w, problem.New(http.StatusForbidden, problem.CodeAuthAccountLocked, "Account is temporarily locked"))
+		problem.Respond(w, r, problem.New(http.StatusForbidden, problem.CodeAuthAccountLocked, "Account is temporarily locked"))
 	case errors.Is(err, authdomain.ErrPasswordPolicy):
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
 	case errors.Is(err, authdomain.ErrIdentityInactive):
-		h.writeProblem(w, problem.New(http.StatusForbidden, problem.CodeAuthAccountInactive, "User account is inactive"))
+		problem.Respond(w, r, problem.New(http.StatusForbidden, problem.CodeAuthAccountInactive, "User account is inactive"))
 	case errors.Is(err, authdomain.ErrTenantNotPermitted):
-		h.writeProblem(w, problem.New(http.StatusForbidden, problem.CodeAuthTenantForbidden, "User has no role in the requested tenant"))
+		problem.Respond(w, r, problem.New(http.StatusForbidden, problem.CodeAuthTenantForbidden, "User has no role in the requested tenant"))
 	case errors.Is(err, authdomain.ErrTenantClaimRequired):
-		h.writeProblem(w, problem.New(http.StatusForbidden, problem.CodeAuthTenantRequired, "Tenant selection required"))
+		problem.Respond(w, r, problem.New(http.StatusForbidden, problem.CodeAuthTenantRequired, "Tenant selection required"))
 	default:
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Internal server error"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Internal server error"))
 	}
 }
 
@@ -269,12 +269,6 @@ func (h *Handler) recordAudit(r *http.Request, actorID, action, resourceID strin
 		TenantID:     tenantID,
 	}); err != nil {
 		slog.Warn("auth audit write failed", "action", action, "actor", actorID, "err", err)
-	}
-}
-
-func (h *Handler) writeProblem(w http.ResponseWriter, p *problem.Problem) {
-	if err := problem.Write(w, p); err != nil {
-		slog.Warn("auth problem write failed", "err", err)
 	}
 }
 

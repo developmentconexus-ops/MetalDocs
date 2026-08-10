@@ -65,7 +65,7 @@ func (c *CORS) Wrap(next http.Handler) http.Handler {
 
 		origin := normalizeOrigin(rawOrigin)
 		if origin == "" || !c.isAllowedOrigin(origin) {
-			_ = problem.Write(w, problem.New(http.StatusForbidden, problem.CodePermissionOriginForbidden, "cross-origin request blocked"))
+			problem.Respond(w, req, problem.New(http.StatusForbidden, problem.CodePermissionOriginForbidden, "cross-origin request blocked"))
 			return
 		}
 

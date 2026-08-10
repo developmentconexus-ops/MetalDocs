@@ -85,7 +85,7 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 		// Nil checker is a misconfiguration — fail closed, never pass through
 		// as if the route were public.
 		if m.publicChecker == nil {
-			_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Public path checker not configured"))
+			problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Public path checker not configured"))
 			return
 		}
 		if m.publicChecker(r) {
@@ -123,18 +123,18 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 func (m *Middleware) resolveSessionOrReject(w http.ResponseWriter, r *http.Request) (authdomain.CurrentUser, bool) {
 	cookie, err := r.Cookie(m.cfg.SessionCookieName)
 	if err != nil || strings.TrimSpace(cookie.Value) == "" {
-		_ = problem.Write(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
 		return authdomain.CurrentUser{}, false
 	}
 
 	currentUser, err := m.service.ResolveSession(r.Context(), cookie.Value)
 	if err != nil {
 		if errors.Is(err, authdomain.ErrSessionNotFound) || errors.Is(err, authdomain.ErrSessionExpired) || errors.Is(err, authdomain.ErrSessionRevoked) || errors.Is(err, authdomain.ErrIdentityInactive) {
-			_ = problem.Write(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+			problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
 			return authdomain.CurrentUser{}, false
 		}
 		slog.Error("auth resolve session failed", "err", err)
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Authentication failed"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Authentication failed"))
 		return authdomain.CurrentUser{}, false
 	}
 	return currentUser, true
@@ -152,11 +152,11 @@ func (m *Middleware) enforcePasswordChangeGate(w http.ResponseWriter, r *http.Re
 	// Nil checker is a misconfiguration — fail closed, never silently
 	// admit a must-change-password principal.
 	if m.passwordChangeChecker == nil {
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Password change allowed checker not configured"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Password change allowed checker not configured"))
 		return false
 	}
 	if !m.passwordChangeChecker(r) {
-		_ = problem.Write(w, problem.New(http.StatusForbidden, problem.CodeAuthPasswordChangeRequired, "Password change is required before accessing the application"))
+		problem.Respond(w, r, problem.New(http.StatusForbidden, problem.CodeAuthPasswordChangeRequired, "Password change is required before accessing the application"))
 		return false
 	}
 	return true

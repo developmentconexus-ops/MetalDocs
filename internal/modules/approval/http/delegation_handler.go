@@ -21,7 +21,7 @@ import (
 func (h *Handler) CreateApprovalDelegation(w http.ResponseWriter, r *http.Request, params approvalapi.CreateApprovalDelegationParams) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	actorID := actorIDFromRequest(r)
@@ -32,32 +32,32 @@ func (h *Handler) CreateApprovalDelegation(w http.ResponseWriter, r *http.Reques
 	// for any mount that bypasses the generated wrapper (e.g. a unit-test mux).
 	idempotencyKey := strings.TrimSpace(params.IdempotencyKey.String())
 	if err := idempotency.ValidateKey(idempotencyKey); err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
 	var body contracts.CreateDelegationRequest
 	if err := strictjson.Decode(r, &body); err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	if err := body.Validate(); err != nil {
-		WriteError(w, NewValidationError(err.Error()))
+		WriteError(w, r, NewValidationError(err.Error()))
 		return
 	}
 
 	if h.services == nil || h.services.Delegation == nil {
-		WriteError(w, errors.New("delegation service not configured"))
+		WriteError(w, r, errors.New("delegation service not configured"))
 		return
 	}
 
 	d, err := h.services.Delegation.CreateDelegation(r.Context(), h.runner, tenantID, actorID, body.DelegateID, body.Reason, body.StartsAt, body.EndsAt)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
-	WriteJSON(w, http.StatusCreated, contracts.DelegationResponse{
+	WriteJSON(w, r, http.StatusCreated, contracts.DelegationResponse{
 		ID:          d.ID(),
 		TenantID:    d.TenantID(),
 		DelegatorID: d.DelegatorID(),
@@ -77,18 +77,18 @@ func (h *Handler) CreateApprovalDelegation(w http.ResponseWriter, r *http.Reques
 func (h *Handler) RevokeApprovalDelegation(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	actorID := actorIDFromRequest(r)
 
 	if h.services == nil || h.services.Delegation == nil {
-		WriteError(w, errors.New("delegation service not configured"))
+		WriteError(w, r, errors.New("delegation service not configured"))
 		return
 	}
 
 	if err := h.services.Delegation.RevokeDelegation(r.Context(), h.runner, tenantID, id.String(), actorID); err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 

@@ -19,7 +19,6 @@ import (
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/platform/apibase"
 	"metaldocs/internal/platform/authn"
-	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
@@ -72,7 +71,7 @@ func injectTenant(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tid, err := tenant.FromContext(r.Context())
 		if err != nil {
-			httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error")
+			problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 			return
 		}
 		ctx := context.WithValue(r.Context(), tenantContextKey{}, tid)
@@ -158,10 +157,10 @@ func (h *Handler) Mount(mux httprouter.Muxer) {
 		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			if requiresIdempotencyKey(r) && strings.Contains(err.Error(), "Idempotency-Key is required") {
-				httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestIdempotencyKeyRequired, "Idempotency-Key header is required")
+				problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestIdempotencyKeyRequired, "Idempotency-Key header is required"))
 				return
 			}
-			httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeRequestInvalid, err.Error())
+			problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
 		},
 	})
 }

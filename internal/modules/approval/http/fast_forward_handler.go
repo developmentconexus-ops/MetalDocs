@@ -24,7 +24,7 @@ import (
 func (h *Handler) FastForwardHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	actorID := actorIDFromRequest(r)
@@ -35,16 +35,16 @@ func (h *Handler) FastForwardHandler(w http.ResponseWriter, r *http.Request) {
 	// F-QA4-6: self-managed replay slot (no idempotency.Require wrapper), so the
 	// shared UUID wire rule is enforced here.
 	if err := idempotency.ValidateKey(idempKey); err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	if h.fastForwardSvc == nil {
-		WriteError(w, errors.New("fast forward service not configured"))
+		WriteError(w, r, errors.New("fast forward service not configured"))
 		return
 	}
 	// Fail closed (no-fallback principle): if the wiring did not produce a
@@ -52,17 +52,17 @@ func (h *Handler) FastForwardHandler(w http.ResponseWriter, r *http.Request) {
 	// protection on an idempotency guarantee. Refuse the request with a 500
 	// rather than proceeding without a duplicate-submission guard.
 	if h.fastForwardIdempStore == nil {
-		WriteError(w, errors.New("fast forward idempotency store not configured"))
+		WriteError(w, r, errors.New("fast forward idempotency store not configured"))
 		return
 	}
 
 	var body contracts.FastForwardRequest
 	if err := strictjson.Decode(r, &body); err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	if err := body.Validate(); err != nil {
-		WriteError(w, NewValidationError(err.Error()))
+		WriteError(w, r, NewValidationError(err.Error()))
 		return
 	}
 
@@ -71,11 +71,11 @@ func (h *Handler) FastForwardHandler(w http.ResponseWriter, r *http.Request) {
 	if h.fastForwardIdempStore != nil {
 		handle, replay, err := h.fastForwardIdempStore.BeginFastForwardReplay(r.Context(), tenantID, actorID, idempKey, payloadHash)
 		if err != nil {
-			WriteError(w, err)
+			WriteError(w, r, err)
 			return
 		}
 		if replay != nil {
-			WriteJSON(w, http.StatusOK, contracts.FastForwardResponse{
+			WriteJSON(w, r, http.StatusOK, contracts.FastForwardResponse{
 				SignoffID: replay.SignoffID,
 				WasReplay: true,
 				Outcome:   replay.Outcome,
@@ -100,7 +100,7 @@ func (h *Handler) FastForwardHandler(w http.ResponseWriter, r *http.Request) {
 		if replayHandle != nil {
 			_ = replayHandle.Fail(err)
 		}
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
@@ -114,7 +114,7 @@ func (h *Handler) FastForwardHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	WriteJSON(w, http.StatusOK, contracts.FastForwardResponse{
+	WriteJSON(w, r, http.StatusOK, contracts.FastForwardResponse{
 		SignoffID: result.Signoff.SignoffID,
 		WasReplay: false,
 		Outcome:   outcome,

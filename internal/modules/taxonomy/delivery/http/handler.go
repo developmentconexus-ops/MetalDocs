@@ -111,7 +111,7 @@ func (h *Handler) Mount(mux httprouter.Muxer) {
 			middleware,
 		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			writeError(w, http.StatusBadRequest, problem.CodeRequestInvalid, err.Error())
+			writeError(w, r, http.StatusBadRequest, problem.CodeRequestInvalid, err.Error())
 		},
 	})
 }

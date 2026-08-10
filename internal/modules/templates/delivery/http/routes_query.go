@@ -10,6 +10,7 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	templatesapi "metaldocs/internal/modules/templates/api"
 	"metaldocs/internal/modules/templates/application"
+	"metaldocs/internal/platform/problem"
 )
 
 // The system blank template's identity is declared ONCE, in the owning
@@ -25,11 +26,11 @@ const (
 func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request, params templatesapi.ListTemplatesParams) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateView)); err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
@@ -41,7 +42,7 @@ func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request, params t
 		limit = *params.Limit
 	}
 	if limit > 200 {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidLimit, "limit must be less than or equal to 200")
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, codeTplInvalidLimit, "limit must be less than or equal to 200"))
 		return
 	}
 	offset := 0
@@ -64,7 +65,7 @@ func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request, params t
 		Offset:        offset,
 	})
 	if err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
@@ -78,7 +79,7 @@ func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request, params t
 	for _, tpl := range templates {
 		dto, err := toAPITemplateDTO(tpl, displayNames[tpl.CreatedBy])
 		if err != nil {
-			writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+			problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 			return
 		}
 		out = append(out, dto)
@@ -98,31 +99,31 @@ func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request, params t
 func (h *Handler) GetSystemBlankTemplate(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateView)); err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 	tpl, err := h.svc.GetTemplate(r.Context(), systemBlankTemplateTenantID, systemBlankTemplateID)
 	if err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 	ver, err := h.svc.GetVersion(r.Context(), systemBlankTemplateTenantID, tpl.ID, tpl.LatestVersion)
 	if err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 	tplUUID, err := uuid.Parse(tpl.ID)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	verUUID, err := uuid.Parse(ver.ID)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	var resp templatesapi.SystemBlankTemplateResponse
@@ -135,35 +136,35 @@ func (h *Handler) GetSystemBlankTemplate(w http.ResponseWriter, r *http.Request)
 func (h *Handler) getTemplate(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	templateID := r.PathValue("id")
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateView)); err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
 	tpl, err := h.svc.GetTemplate(r.Context(), tenantID, templateID)
 	if err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
 	latest, err := h.svc.GetVersion(r.Context(), tenantID, templateID, tpl.LatestVersion)
 	if err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
 	tplDTO, err := toAPITemplateDTO(tpl, h.resolveCreatedByDisplayName(r.Context(), tenantID, tpl.CreatedBy))
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	latestDTO, err := toAPIVersionDTO(latest)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	var resp templatesapi.GetTemplateResponse
@@ -175,29 +176,29 @@ func (h *Handler) getTemplate(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) getVersion(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	templateID := r.PathValue("id")
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateView)); err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 	versionNum, err := strconv.Atoi(r.PathValue("n"))
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidParam, "version must be an integer")
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, codeTplInvalidParam, "version must be an integer"))
 		return
 	}
 
 	v, err := h.svc.GetVersion(r.Context(), tenantID, templateID, versionNum)
 	if err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
 	dto, err := toAPIVersionDTO(v)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	writeJSON(w, http.StatusOK, dto)
@@ -206,17 +207,17 @@ func (h *Handler) getVersion(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) getDocxURL(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	templateID := r.PathValue("id")
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateView)); err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 	versionNum, err := strconv.Atoi(r.PathValue("n"))
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidParam, "version must be an integer")
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, codeTplInvalidParam, "version must be an integer"))
 		return
 	}
 
@@ -226,7 +227,7 @@ func (h *Handler) getDocxURL(w http.ResponseWriter, r *http.Request) {
 		VersionNumber: versionNum,
 	})
 	if err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
@@ -238,31 +239,31 @@ func (h *Handler) getDocxURL(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) listAudit(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
 	templateID := r.PathValue("id")
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateView)); err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 	q := r.URL.Query()
 
 	limit, ok := readQueryInt(q.Get("limit"), 50)
 	if !ok {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidLimit, "limit must be an integer")
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, codeTplInvalidLimit, "limit must be an integer"))
 		return
 	}
 	offset, ok := readQueryInt(q.Get("offset"), 0)
 	if !ok {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidParam, "offset must be an integer")
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, codeTplInvalidParam, "offset must be an integer"))
 		return
 	}
 
 	// TODO(pagination): migrate templates audit listing to keyset pagination.
 	events, err := h.svc.ListAudit(r.Context(), tenantID, templateID, limit, offset)
 	if err != nil {
-		writeMappedErr(w, err)
+		writeMappedErr(w, r, err)
 		return
 	}
 
@@ -270,17 +271,17 @@ func (h *Handler) listAudit(w http.ResponseWriter, r *http.Request) {
 	for _, event := range events {
 		tenantUUID, err := uuid.Parse(event.TenantID)
 		if err != nil {
-			writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+			problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 			return
 		}
 		tplUUID, err := uuid.Parse(event.TemplateID)
 		if err != nil {
-			writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+			problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 			return
 		}
 		actorUUID, err := uuid.Parse(event.ActorID)
 		if err != nil {
-			writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+			problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 			return
 		}
 		e := templatesapi.TemplateAuditEvent{
@@ -293,7 +294,7 @@ func (h *Handler) listAudit(w http.ResponseWriter, r *http.Request) {
 		if event.VersionID != nil {
 			verUUID, err := uuid.Parse(*event.VersionID)
 			if err != nil {
-				writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+				problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 				return
 			}
 			e.VersionId = &verUUID

@@ -130,10 +130,10 @@ func serveWithIdempotency(store *Store, actorFromCtx func(context.Context) (stri
 	key := r.Header.Get("Idempotency-Key")
 	switch err := ValidateKey(key); {
 	case errors.Is(err, ErrKeyRequired):
-		writeErrJSON(w, 400, problem.CodeRequestIdempotencyKeyRequired, "Idempotency-Key header required")
+		problem.Respond(w, r, problem.New(400, problem.CodeRequestIdempotencyKeyRequired, "Idempotency-Key header required"))
 		return
 	case errors.Is(err, ErrKeyInvalid):
-		writeErrJSON(w, 400, problem.CodeRequestIdempotencyKeyInvalid, "Idempotency-Key must be a UUID")
+		problem.Respond(w, r, problem.New(400, problem.CodeRequestIdempotencyKeyInvalid, "Idempotency-Key must be a UUID"))
 		return
 	}
 
@@ -142,7 +142,7 @@ func serveWithIdempotency(store *Store, actorFromCtx func(context.Context) (stri
 	r.Body = http.MaxBytesReader(w, r.Body, maxIdempotencyRequestBodyBytes)
 	hash, err := RequestHash(r)
 	if err != nil {
-		writeRequestHashError(w, err)
+		writeRequestHashError(w, r, err)
 		return
 	}
 
@@ -150,13 +150,13 @@ func serveWithIdempotency(store *Store, actorFromCtx func(context.Context) (stri
 	if errors.Is(err, ErrConflict) {
 		// 409, not the pre-ADR-0089 422: the status is bound to
 		// conflict.idempotency_key_reused at registration (annex R-8).
-		writeErrJSON(w, http.StatusConflict, problem.CodeConflictIdempotencyKeyReused, "key reused with different payload")
+		problem.Respond(w, r, problem.New(http.StatusConflict, problem.CodeConflictIdempotencyKeyReused, "key reused with different payload"))
 		return
 	}
 	if err != nil {
 		slog.ErrorContext(ctx, "idempotency: begin failed",
 			"key", key, "tenant", tenantID, "err", err)
-		writeErrJSON(w, 500, problem.CodeInternalUnknown, "idempotency check failed")
+		problem.RespondCause(w, r, problem.New(500, problem.CodeInternalUnknown, "idempotency check failed"), err)
 		return
 	}
 	if replay != nil {
@@ -169,13 +169,13 @@ func serveWithIdempotency(store *Store, actorFromCtx func(context.Context) (stri
 
 // writeRequestHashError maps a RequestHash failure to its wire response: the
 // MaxBytesReader-triggered 413 case, or a generic 400 for any other read error.
-func writeRequestHashError(w http.ResponseWriter, err error) {
+func writeRequestHashError(w http.ResponseWriter, r *http.Request, err error) {
 	var maxBytesErr *http.MaxBytesError
 	if errors.As(err, &maxBytesErr) {
-		writeErrJSON(w, http.StatusRequestEntityTooLarge, problem.CodeRequestBodyTooLarge, "request body exceeds 1 MiB limit")
+		problem.Respond(w, r, problem.New(http.StatusRequestEntityTooLarge, problem.CodeRequestBodyTooLarge, "request body exceeds 1 MiB limit"))
 		return
 	}
-	writeErrJSON(w, 400, problem.CodeRequestInvalid, "cannot read body")
+	problem.RespondCause(w, r, problem.New(400, problem.CodeRequestInvalid, "cannot read body"), err)
 }
 
 // writeReplay writes a cached response on an idempotency replay hit.
@@ -268,14 +268,4 @@ func (r *responseRecorder) Flush() {
 	panic("idempotency: handler called Flush() on a wrapped ResponseWriter; " +
 		"streaming responses are incompatible with idempotency replay buffering. " +
 		"Use idempotency.WithStreamingOptOut(matcher) to skip wrapping for this route.")
-}
-
-// writeErrJSON emits an RFC 9457 Problem (application/problem+json) — the single
-// API error envelope (AD-2). The code parameter is typed problem.Code so call
-// sites must use catalog constants; the codes_catalog_guard_test enforces that
-// no raw string literal appears in the code position (F-09, REQ-API-5).
-func writeErrJSON(w http.ResponseWriter, status int, code problem.Code, msg string) {
-	if err := problem.Write(w, problem.New(status, code, msg)); err != nil {
-		slog.Warn("idempotency: problem write failed", "err", err, "status", status, "code", code)
-	}
 }

@@ -73,7 +73,7 @@ func (p *OriginProtection) Wrap(next http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
-			writeOriginError(w)
+			writeOriginError(w, r)
 			return
 		}
 
@@ -82,11 +82,11 @@ func (p *OriginProtection) Wrap(next http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
-			writeOriginError(w)
+			writeOriginError(w, r)
 			return
 		}
 
-		writeOriginError(w)
+		writeOriginError(w, r)
 	})
 }
 
@@ -159,6 +159,6 @@ func normalizeOrigin(origin string) string {
 	return strings.ToLower(parsed.Scheme) + "://" + strings.ToLower(parsed.Host)
 }
 
-func writeOriginError(w http.ResponseWriter) {
-	_ = problem.Write(w, problem.New(http.StatusForbidden, problem.CodePermissionOriginForbidden, "Cross-site session request blocked"))
+func writeOriginError(w http.ResponseWriter, r *http.Request) {
+	problem.Respond(w, r, problem.New(http.StatusForbidden, problem.CodePermissionOriginForbidden, "Cross-site session request blocked"))
 }

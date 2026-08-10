@@ -96,13 +96,13 @@ func (h *Handler) ServeSnapshot(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "tenant context missing"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "tenant context missing"))
 		return
 	}
 	items, err := h.repo.Snapshot(r.Context(), tenantID, time.Now().UTC())
 	if err != nil {
 		h.log.Warn("presence: snapshot failed", "tenant_id", tenantID, "err", err)
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "snapshot failed"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "snapshot failed"))
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, toPresenceSnapshotResponse(items))
@@ -136,13 +136,13 @@ func toPresenceSnapshotResponse(items []Item) iamapi.PresenceSnapshotResponse {
 // this shape) for a declared-but-unavailable dependency.
 func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request) {
 	if h == nil {
-		writePresenceStreamNotImplemented(w)
+		writePresenceStreamNotImplemented(w, r)
 		return
 	}
 
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "tenant context missing"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "tenant context missing"))
 		return
 	}
 
@@ -237,8 +237,8 @@ func (h *Handler) runPresenceSendLoop(ctx context.Context, c *websocket.Conn, co
 // StatusNotImplemented + CodeInternalNotImplemented code path — so the
 // stream endpoint's degraded response matches its snapshot sibling's shape
 // exactly rather than inventing a new idiom.
-func writePresenceStreamNotImplemented(w http.ResponseWriter) {
-	_ = problem.Write(w, problem.New(http.StatusNotImplemented, problem.CodeInternalNotImplemented, "Presence service is not configured"))
+func writePresenceStreamNotImplemented(w http.ResponseWriter, r *http.Request) {
+	problem.Respond(w, r, problem.New(http.StatusNotImplemented, problem.CodeInternalNotImplemented, "Presence service is not configured"))
 }
 
 func writeJSON(ctx context.Context, c *websocket.Conn, ev Event) error {

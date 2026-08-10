@@ -129,7 +129,7 @@ func (h *seedHandler) seed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.db == nil {
-		_ = problem.Write(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "e2e scaffolding requires a database"))
+		problem.Respond(w, r, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "e2e scaffolding requires a database"))
 		return
 	}
 
@@ -254,7 +254,7 @@ func (h *seedHandler) reset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.db == nil {
-		_ = problem.Write(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "e2e scaffolding requires a database"))
+		problem.Respond(w, r, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "e2e scaffolding requires a database"))
 		return
 	}
 
@@ -329,7 +329,7 @@ func (h *seedHandler) governanceEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.db == nil {
-		_ = problem.Write(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "e2e scaffolding requires a database"))
+		problem.Respond(w, r, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "e2e scaffolding requires a database"))
 		return
 	}
 
@@ -427,11 +427,11 @@ func (h *seedHandler) triggerSchedulerTick(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if h.db == nil {
-		_ = problem.Write(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "e2e scaffolding requires a database"))
+		problem.Respond(w, r, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "e2e scaffolding requires a database"))
 		return
 	}
 	if h.runSchedulerTick == nil {
-		_ = problem.Write(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "no scheduler tick is wired"))
+		problem.Respond(w, r, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "no scheduler tick is wired"))
 		return
 	}
 

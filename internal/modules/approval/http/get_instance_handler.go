@@ -17,33 +17,33 @@ import (
 func (h *Handler) GetInstanceHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	instanceID := r.PathValue("instance_id")
 
 	if h.readSvc == nil {
-		WriteError(w, errors.New("read service not configured"))
+		WriteError(w, r, errors.New("read service not configured"))
 		return
 	}
 
 	inst, err := h.readSvc.LoadInstance(r.Context(), h.runner, tenantID, instanceID)
 	if err != nil {
 		if errors.Is(err, infrastructure.ErrNoActiveInstance) {
-			WriteError(w, infrastructure.ErrNoActiveInstance)
+			WriteError(w, r, infrastructure.ErrNoActiveInstance)
 			return
 		}
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 
 	resp, err := h.mapInstanceResponse(r.Context(), tenantID, inst, nil, nil)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	w.Header().Set("ETag", resp.ETag)
-	WriteJSON(w, http.StatusOK, resp)
+	WriteJSON(w, r, http.StatusOK, resp)
 }
 
 // mapInstanceResponse builds the wire InstanceResponse from a loaded domain

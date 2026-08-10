@@ -88,7 +88,7 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 
 		// C3: nil resolver is a misconfiguration — fail closed, never pass unauthenticated.
 		if m.resolver == nil {
-			m.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Permission resolver not configured"))
+			problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Permission resolver not configured"))
 			return
 		}
 		capability, visibility, ok := m.resolveVisibilityCapability(w, r)
@@ -114,7 +114,7 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 		// C4: VisibilitySessionRequired — session is verified above; skip capability
 		// check but still enrich context with roles for downstream handlers.
 		if visibility == VisibilitySessionRequired {
-			ctx, ok := m.resolveRoles(r.Context(), w, userID, tenantID)
+			ctx, ok := m.resolveRoles(r.Context(), w, r, userID, tenantID)
 			if !ok {
 				return
 			}
@@ -126,16 +126,16 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 
 		// C8: nil caps is a misconfiguration — fail closed, never silently skip check.
 		if m.caps == nil {
-			m.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Capability service not configured"))
+			problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Capability service not configured"))
 			return
 		}
 
 		if err := m.caps.CanDo(r.Context(), userID, tenantID, string(capability)); err != nil {
-			m.writeProblem(w, problem.New(http.StatusForbidden, problem.CodePermissionDenied, "Insufficient permissions"))
+			problem.Respond(w, r, problem.New(http.StatusForbidden, problem.CodePermissionDenied, "Insufficient permissions"))
 			return
 		}
 
-		ctx, ok := m.resolveRoles(r.Context(), w, userID, tenantID)
+		ctx, ok := m.resolveRoles(r.Context(), w, r, userID, tenantID)
 		if !ok {
 			return
 		}
@@ -154,12 +154,12 @@ func (m *Middleware) resolveVisibilityCapability(w http.ResponseWriter, r *http.
 		return capability, visibility, true
 	case VisibilityUnresolved:
 		slog.Warn("iam: route matched a pattern with no rule", "method", r.Method, "path", r.URL.Path) //nolint:gosec // G706: slog default is JSONHandler (set at process start) — control chars are JSON-escaped, log-line injection not possible
-		m.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Route resolved to no policy"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Route resolved to no policy"))
 		return capability, visibility, false
 	default:
 		// STAYS: genuinely unknown values.
 		slog.Warn("iam: unknown route visibility", "method", r.Method, "path", r.URL.Path, "visibility", visibility) //nolint:gosec // G706: slog default is JSONHandler (set at process start) — control chars are JSON-escaped, log-line injection not possible
-		m.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Permission resolver returned unknown visibility"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Permission resolver returned unknown visibility"))
 		return capability, visibility, false
 	}
 }
@@ -170,13 +170,13 @@ func (m *Middleware) resolveVisibilityCapability(w http.ResponseWriter, r *http.
 func (m *Middleware) sessionIdentity(w http.ResponseWriter, r *http.Request) (userID, tenantID string, ok bool) {
 	userID = iamdomain.UserIDFromContext(r.Context())
 	if userID == "" {
-		m.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
 		return "", "", false
 	}
 	var err error
 	tenantID, err = tenant.FromContext(r.Context())
 	if err != nil {
-		m.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
 		return "", "", false
 	}
 	return userID, tenantID, true
@@ -187,7 +187,7 @@ func (m *Middleware) sessionIdentity(w http.ResponseWriter, r *http.Request) (us
 // success, or writes an error response and returns false on failure. ctx must
 // be the caller's inherited request context (r.Context()) so role-lookup
 // calls stay attached to the request's cancellation/deadline chain.
-func (m *Middleware) resolveRoles(ctx context.Context, w http.ResponseWriter, userID, tenantID string) (context.Context, bool) {
+func (m *Middleware) resolveRoles(ctx context.Context, w http.ResponseWriter, r *http.Request, userID, tenantID string) (context.Context, bool) {
 	rctx := ctx
 	if _, hasUser := authdomain.CurrentUserFromContext(rctx); hasUser {
 		return rctx, true //nolint:nilerr
@@ -196,24 +196,18 @@ func (m *Middleware) resolveRoles(ctx context.Context, w http.ResponseWriter, us
 	if m.roleProvider != nil {
 		resolvedRoles, err := m.roleProvider.RolesByUserID(ctx, userID, tenantID)
 		if errors.Is(err, iamdomain.ErrUserNotFound) || errors.Is(err, iamdomain.ErrUserInactive) {
-			m.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "User is not authorized"))
+			problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "User is not authorized"))
 			return nil, false
 		}
 		if errors.Is(err, iamdomain.ErrNoRolesAssigned) {
-			m.writeProblem(w, problem.New(http.StatusForbidden, problem.CodePermissionDenied, "Insufficient permissions"))
+			problem.Respond(w, r, problem.New(http.StatusForbidden, problem.CodePermissionDenied, "Insufficient permissions"))
 			return nil, false
 		}
 		if err != nil {
-			m.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Authorization lookup failed"))
+			problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Authorization lookup failed"))
 			return nil, false
 		}
 		roles = resolvedRoles
 	}
 	return iamdomain.WithAuthContext(rctx, userID, roles), true
-}
-
-func (m *Middleware) writeProblem(w http.ResponseWriter, p *problem.Problem) {
-	if err := problem.Write(w, p); err != nil {
-		slog.Warn("iam: write response failed", "err", err)
-	}
 }

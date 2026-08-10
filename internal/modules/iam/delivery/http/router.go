@@ -140,7 +140,7 @@ func (rt *Router) Mount(mux httprouter.Muxer) {
 		BaseRouter: mux,
 		BaseURL:    apibase.BaseURL,
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			_ = problem.Write(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
+			problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
 		},
 	})
 	rt.presence.MountStream(mux)
@@ -152,7 +152,7 @@ func (rt *Router) Mount(mux httprouter.Muxer) {
 // sessions is not wired (SQLDB-less boot path).
 func (rt *Router) ListSessions(w http.ResponseWriter, r *http.Request, _ iamapi.ListSessionsParams) {
 	if rt.sessions == nil {
-		writeIAMNotImplemented(w, "Sessions service is not configured")
+		writeIAMNotImplemented(w, r, "Sessions service is not configured")
 		return
 	}
 	rt.sessions.handleSessions(w, r)
@@ -162,7 +162,7 @@ func (rt *Router) ListSessions(w http.ResponseWriter, r *http.Request, _ iamapi.
 // when sessions is not wired.
 func (rt *Router) RevokeSession(w http.ResponseWriter, r *http.Request, _ string) {
 	if rt.sessions == nil {
-		writeIAMNotImplemented(w, "Sessions service is not configured")
+		writeIAMNotImplemented(w, r, "Sessions service is not configured")
 		return
 	}
 	// handleSessionByID re-derives session_id from r.URL.Path itself
@@ -231,7 +231,7 @@ func (rt *Router) ListRoleCapabilities(w http.ResponseWriter, r *http.Request) {
 // observability is not wired.
 func (rt *Router) GetKpi(w http.ResponseWriter, r *http.Request) {
 	if rt.observability == nil {
-		writeIAMNotImplemented(w, "Observability service is not configured")
+		writeIAMNotImplemented(w, r, "Observability service is not configured")
 		return
 	}
 	rt.observability.handleKpi(w, r)
@@ -241,7 +241,7 @@ func (rt *Router) GetKpi(w http.ResponseWriter, r *http.Request) {
 // observability is not wired.
 func (rt *Router) GetUsage(w http.ResponseWriter, r *http.Request) {
 	if rt.observability == nil {
-		writeIAMNotImplemented(w, "Observability service is not configured")
+		writeIAMNotImplemented(w, r, "Observability service is not configured")
 		return
 	}
 	rt.observability.handleUsage(w, r)
@@ -255,7 +255,7 @@ func (rt *Router) GetUsage(w http.ResponseWriter, r *http.Request) {
 // Router.Mount (see package doc).
 func (rt *Router) GetPresenceSnapshot(w http.ResponseWriter, r *http.Request) {
 	if rt.presence == nil {
-		writeIAMNotImplemented(w, "Presence service is not configured")
+		writeIAMNotImplemented(w, r, "Presence service is not configured")
 		return
 	}
 	rt.presence.ServeSnapshot(w, r)
@@ -271,7 +271,7 @@ func (rt *Router) ListUsers(w http.ResponseWriter, r *http.Request, _ iamapi.Lis
 // CreateManagedUser is a dead, deprecated spec op with no runtime
 // implementation prior to this change either; see package doc comment.
 func (rt *Router) CreateManagedUser(w http.ResponseWriter, r *http.Request) {
-	writeIAMNotImplemented(w, "createManagedUser is deprecated and not implemented; use POST /iam/users/invite")
+	writeIAMNotImplemented(w, r, "createManagedUser is deprecated and not implemented; use POST /iam/users/invite")
 }
 
 // BulkUsers delegates to PeopleHandler.handleBulk, applying a per-user
@@ -323,7 +323,7 @@ func (rt *Router) UnlockUser(w http.ResponseWriter, r *http.Request, _ string) {
 // the Task B stub's fallback behavior.
 func (rt *Router) OnboardTenant(w http.ResponseWriter, r *http.Request) {
 	if rt.tenants == nil {
-		writeIAMNotImplemented(w, "Tenant onboarding service is not configured")
+		writeIAMNotImplemented(w, r, "Tenant onboarding service is not configured")
 		return
 	}
 	rt.tenants.handleOnboardTenant(w, r)
@@ -333,7 +333,7 @@ func (rt *Router) OnboardTenant(w http.ResponseWriter, r *http.Request) {
 // Answers 501 when tenants is not wired (SQLDB-less boot path).
 func (rt *Router) ExportTenant(w http.ResponseWriter, r *http.Request, tenantID openapi_types.UUID) {
 	if rt.tenants == nil {
-		writeIAMNotImplemented(w, "Tenant lifecycle service is not configured")
+		writeIAMNotImplemented(w, r, "Tenant lifecycle service is not configured")
 		return
 	}
 	rt.tenants.handleExportTenant(w, r, tenantID.String())
@@ -343,14 +343,12 @@ func (rt *Router) ExportTenant(w http.ResponseWriter, r *http.Request, tenantID 
 // Answers 501 when tenants is not wired (SQLDB-less boot path).
 func (rt *Router) EraseTenant(w http.ResponseWriter, r *http.Request, tenantID openapi_types.UUID) {
 	if rt.tenants == nil {
-		writeIAMNotImplemented(w, "Tenant lifecycle service is not configured")
+		writeIAMNotImplemented(w, r, "Tenant lifecycle service is not configured")
 		return
 	}
 	rt.tenants.handleEraseTenant(w, r, tenantID.String())
 }
 
-func writeIAMNotImplemented(w http.ResponseWriter, detail string) {
-	if err := problem.Write(w, problem.New(http.StatusNotImplemented, problem.CodeInternalNotImplemented, detail)); err != nil {
-		panic(err) // writer failure is unrecoverable here; surfaces as a panic caught by platform/middleware.Recovery
-	}
+func writeIAMNotImplemented(w http.ResponseWriter, r *http.Request, detail string) {
+	problem.Respond(w, r, problem.New(http.StatusNotImplemented, problem.CodeInternalNotImplemented, detail))
 }

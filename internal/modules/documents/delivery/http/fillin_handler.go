@@ -43,13 +43,13 @@ func NewFillInHandler(service FillInService) *FillInHandler {
 func (h *FillInHandler) GetFillInSchema(w http.ResponseWriter, r *http.Request) {
 	tid, err := tenantID(r)
 	if err != nil {
-		writeFillInError(w, requestID(r), err)
+		writeFillInError(w, r, requestID(r), err)
 		return
 	}
 	docID := r.PathValue("id")
 	phs, err := h.service.GetFillInSchema(r.Context(), tid, docID)
 	if err != nil {
-		writeFillInError(w, requestID(r), err)
+		writeFillInError(w, r, requestID(r), err)
 		return
 	}
 	if phs == nil {
@@ -61,7 +61,7 @@ func (h *FillInHandler) GetFillInSchema(w http.ResponseWriter, r *http.Request) 
 	// marshals via its own json tags, yielding byte-identical wire with no conversion.
 	var resp documentsapi.DocumentFillInSchemaResponse
 	resp.Data.PlaceholderSchema = toAnySlice(phs)
-	writeFillInJSON(w, http.StatusOK, resp)
+	writeFillInJSON(w, r, http.StatusOK, resp)
 }
 
 // ListPlaceholderValues returns the currently stored placeholder values for a document.
@@ -69,13 +69,13 @@ func (h *FillInHandler) ListPlaceholderValues(w http.ResponseWriter, r *http.Req
 	docID := r.PathValue("id")
 	tid, err := tenantID(r)
 	if err != nil {
-		writeFillInError(w, requestID(r), err)
+		writeFillInError(w, r, requestID(r), err)
 		return
 	}
 
 	vals, err := h.service.GetPlaceholderValues(r.Context(), tid, docID)
 	if err != nil {
-		writeFillInError(w, requestID(r), err)
+		writeFillInError(w, r, requestID(r), err)
 		return
 	}
 	type out struct {
@@ -87,7 +87,7 @@ func (h *FillInHandler) ListPlaceholderValues(w http.ResponseWriter, r *http.Req
 	for i, v := range vals {
 		res[i] = out{PlaceholderID: v.PlaceholderID, ValueText: v.ValueText, Source: v.Source}
 	}
-	writeFillInJSON(w, http.StatusOK, res)
+	writeFillInJSON(w, r, http.StatusOK, res)
 }
 
 // PutPlaceholderValue sets a single placeholder's value on a document's draft revision.
@@ -96,12 +96,12 @@ func (h *FillInHandler) PutPlaceholderValue(w http.ResponseWriter, r *http.Reque
 		Value string `json:"value"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
-		writeFillInError(w, requestID(r), err)
+		writeFillInError(w, r, requestID(r), err)
 		return
 	}
 	tenantID, err := tenantID(r)
 	if err != nil {
-		writeFillInError(w, requestID(r), err)
+		writeFillInError(w, r, requestID(r), err)
 		return
 	}
 
@@ -113,13 +113,13 @@ func (h *FillInHandler) PutPlaceholderValue(w http.ResponseWriter, r *http.Reque
 		body.Value,
 	)
 	if err != nil {
-		writeFillInError(w, requestID(r), err)
+		writeFillInError(w, r, requestID(r), err)
 		return
 	}
 
 	// Truncate to the second so the generated time.Time field marshals RFC3339
 	// seconds-only, byte-identical to the prior Format(time.RFC3339) wire output.
-	writeFillInJSON(w, http.StatusOK, documentsapi.PutPlaceholderValueResponse{
+	writeFillInJSON(w, r, http.StatusOK, documentsapi.PutPlaceholderValueResponse{
 		PlaceholderId: r.PathValue("pid"),
 		UpdatedAt:     time.Now().UTC().Truncate(time.Second),
 	})
@@ -198,20 +198,20 @@ func mapFillInError(err error) problem.Code {
 
 // writeFillInError emits the unified RFC 9457 application/problem+json error
 // shape (AD-2). The request id, when present, rides in the Problem `instance`.
-func writeFillInError(w http.ResponseWriter, reqID string, err error) {
+func writeFillInError(w http.ResponseWriter, r *http.Request, reqID string, err error) {
 	code := mapFillInError(err)
 	status, _ := problem.StatusFor(code)
 	prob := problem.NewFor(code, errorMessage(err, status))
 	if reqID != "" {
 		prob = prob.WithInstance(reqID)
 	}
-	_ = problem.Write(w, prob)
+	problem.Respond(w, r, prob)
 }
 
-func writeFillInJSON(w http.ResponseWriter, status int, payload any) {
+func writeFillInJSON(w http.ResponseWriter, r *http.Request, status int, payload any) {
 	data, err := json.Marshal(payload)
 	if err != nil {
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, codeFillInternalUnknown, "internal error"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeFillInternalUnknown, "internal error"))
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

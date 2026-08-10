@@ -52,12 +52,12 @@ func NewPeopleHandler(service *iamapp.PeopleService, authSvc UserAdminService, a
 
 func (h *PeopleHandler) handleListUsers(w http.ResponseWriter, r *http.Request) {
 	if h.service == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "People service is not configured"))
+		problem.Respond(w, r, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "People service is not configured"))
 		return
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 	filters := iamapp.ListFilters{
@@ -70,7 +70,7 @@ func (h *PeopleHandler) handleListUsers(w http.ResponseWriter, r *http.Request) 
 	if rawRole := strings.TrimSpace(r.URL.Query().Get("role")); rawRole != "" {
 		role := iamdomain.Role(rawRole)
 		if !iamdomain.IsValidRole(role) {
-			h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid role filter"))
+			problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid role filter"))
 			return
 		}
 		filters.Role = &role
@@ -79,11 +79,11 @@ func (h *PeopleHandler) handleListUsers(w http.ResponseWriter, r *http.Request) 
 	result, err := h.service.ListFiltered(r.Context(), tenantID, filters)
 	if err != nil {
 		if errors.Is(err, iamapp.ErrCursorExpired) {
-			h.writeProblem(w, problem.New(http.StatusGone, problem.CodeRequestCursorExpired, "The pagination cursor refers to an item that is no longer available. Restart from the first page."))
+			problem.Respond(w, r, problem.New(http.StatusGone, problem.CodeRequestCursorExpired, "The pagination cursor refers to an item that is no longer available. Restart from the first page."))
 			return
 		}
 		slog.Error("iam people: list users failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to list users"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to list users"))
 		return
 	}
 
@@ -111,17 +111,17 @@ func (h *PeopleHandler) handleListUsers(w http.ResponseWriter, r *http.Request) 
 
 func (h *PeopleHandler) handleInvite(w http.ResponseWriter, r *http.Request) {
 	if h.service == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "People service is not configured"))
+		problem.Respond(w, r, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "People service is not configured"))
 		return
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 	var body iamapi.UserInviteRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON payload"))
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON payload"))
 		return
 	}
 	input := iamapp.InviteInput{
@@ -142,7 +142,7 @@ func (h *PeopleHandler) handleInvite(w http.ResponseWriter, r *http.Request) {
 	actor := authenticatedActor(r)
 	result, err := h.service.Invite(r.Context(), tenantID, actor, input)
 	if err != nil {
-		h.writePeopleError(w, err)
+		h.writePeopleError(w, r, err)
 		return
 	}
 	// Audit is now emitted by PeopleService.Invite at the application layer (H-3b).
@@ -157,17 +157,17 @@ func (h *PeopleHandler) handleInvite(w http.ResponseWriter, r *http.Request) {
 
 func (h *PeopleHandler) handlePatch(w http.ResponseWriter, r *http.Request) {
 	if h.service == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "People service is not configured"))
+		problem.Respond(w, r, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "People service is not configured"))
 		return
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 	userID := strings.TrimSpace(r.PathValue("user_id"))
 	if userID == "" {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "user_id required"))
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "user_id required"))
 		return
 	}
 	if !h.guardUserInTenant(w, r, userID) {
@@ -175,7 +175,7 @@ func (h *PeopleHandler) handlePatch(w http.ResponseWriter, r *http.Request) {
 	}
 	var body iamapi.UpdateManagedUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON payload"))
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON payload"))
 		return
 	}
 
@@ -192,7 +192,7 @@ func (h *PeopleHandler) handlePatch(w http.ResponseWriter, r *http.Request) {
 
 	actor := authenticatedActor(r)
 	if _, err := h.service.PatchAtomic(r.Context(), tenantID, actor, userID, input); err != nil {
-		h.writePeopleError(w, err)
+		h.writePeopleError(w, r, err)
 		return
 	}
 	// Audit is now emitted in-tx by PeopleService.PatchAtomic (H-3b).
@@ -201,7 +201,7 @@ func (h *PeopleHandler) handlePatch(w http.ResponseWriter, r *http.Request) {
 	// read the user back so the wire shape matches the generated FE types (A5).
 	updated, err := h.service.Get(r.Context(), tenantID, userID)
 	if err != nil {
-		h.writePeopleError(w, err)
+		h.writePeopleError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, toManagedUserCore(updated))
@@ -211,24 +211,24 @@ func (h *PeopleHandler) handlePatch(w http.ResponseWriter, r *http.Request) {
 
 func (h *PeopleHandler) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	if h.authSvc == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "Auth service is not configured"))
+		problem.Respond(w, r, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "Auth service is not configured"))
 		return
 	}
 	userID := strings.TrimSpace(r.PathValue("user_id"))
 	if userID == "" {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "user_id required"))
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "user_id required"))
 		return
 	}
 	var body iamapi.ResetManagedUserPasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON payload"))
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON payload"))
 		return
 	}
 	if !h.guardUserInTenant(w, r, userID) {
 		return
 	}
 	if err := h.authSvc.AdminResetPassword(r.Context(), userID, body.NewPassword); err != nil {
-		h.writeAuthError(w, err)
+		h.writeAuthError(w, r, err)
 		return
 	}
 	// Audit is now emitted in-tx by auth.Service.AdminResetPassword (H-3b Stage 1).
@@ -243,19 +243,19 @@ func (h *PeopleHandler) handleResetPassword(w http.ResponseWriter, r *http.Reque
 
 func (h *PeopleHandler) handleUnlock(w http.ResponseWriter, r *http.Request) {
 	if h.authSvc == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "Auth service is not configured"))
+		problem.Respond(w, r, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "Auth service is not configured"))
 		return
 	}
 	userID := strings.TrimSpace(r.PathValue("user_id"))
 	if userID == "" {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "user_id required"))
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "user_id required"))
 		return
 	}
 	if !h.guardUserInTenant(w, r, userID) {
 		return
 	}
 	if err := h.authSvc.UnlockUser(r.Context(), userID); err != nil {
-		h.writeAuthError(w, err)
+		h.writeAuthError(w, r, err)
 		return
 	}
 	// Audit is now emitted in-tx by auth.Service.UnlockUser (H-3b Stage 1).
@@ -266,21 +266,21 @@ func (h *PeopleHandler) handleUnlock(w http.ResponseWriter, r *http.Request) {
 
 func (h *PeopleHandler) handleBulk(w http.ResponseWriter, r *http.Request) {
 	if h.service == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "People service is not configured"))
+		problem.Respond(w, r, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "People service is not configured"))
 		return
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 	var body iamapi.UserBulkActionRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON payload"))
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON payload"))
 		return
 	}
 	if len(body.UserIds) == 0 {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "user_ids required"))
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "user_ids required"))
 		return
 	}
 	action := string(body.Action)
@@ -290,15 +290,15 @@ func (h *PeopleHandler) handleBulk(w http.ResponseWriter, r *http.Request) {
 		if iamapp.IsForceLogoutDeferred(err) {
 			// Spec: 501 with code NOT_IMPLEMENTED + detail "PR-7 dependency".
 			detail := "PR-7 dependency"
-			h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalNotImplemented, "Force logout is not yet implemented").WithDetail(detail))
+			problem.Respond(w, r, problem.New(http.StatusNotImplemented, problem.CodeInternalNotImplemented, "Force logout is not yet implemented").WithDetail(detail))
 			return
 		}
 		if errors.Is(err, iamapp.ErrPeopleValidation) {
-			h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
+			problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
 			return
 		}
 		slog.Error("iam people: bulk action failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Bulk action failed"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Bulk action failed"))
 		return
 	}
 
@@ -330,17 +330,17 @@ func (h *PeopleHandler) handleBulk(w http.ResponseWriter, r *http.Request) {
 
 func (h *PeopleHandler) handleListMemberships(w http.ResponseWriter, r *http.Request) {
 	if h.service == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "People service is not configured"))
+		problem.Respond(w, r, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "People service is not configured"))
 		return
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
 	userID := strings.TrimSpace(r.PathValue("user_id"))
 	if userID == "" {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "user_id required"))
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "user_id required"))
 		return
 	}
 	if !h.guardUserInTenant(w, r, userID) {
@@ -348,7 +348,7 @@ func (h *PeopleHandler) handleListMemberships(w http.ResponseWriter, r *http.Req
 	}
 	memberships, err := h.service.ListMemberships(r.Context(), tenantID, userID)
 	if err != nil {
-		h.writePeopleError(w, err)
+		h.writePeopleError(w, r, err)
 		return
 	}
 	resp := iamapi.ListMembershipsResponse{Items: make([]iamapi.AreaMembership, 0, len(memberships))}
@@ -377,67 +377,61 @@ func (h *PeopleHandler) handleListMemberships(w http.ResponseWriter, r *http.Req
 // distinguish "exists elsewhere" from "does not exist".
 func (h *PeopleHandler) guardUserInTenant(w http.ResponseWriter, r *http.Request, userID string) bool {
 	if h.service == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "People service is not configured"))
+		problem.Respond(w, r, problem.New(http.StatusNotImplemented, problem.CodeInternalUnknown, "People service is not configured"))
 		return false
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
 		return false
 	}
 	if err := h.service.VerifyUserInTenant(r.Context(), tenantID, userID); err != nil {
 		if errors.Is(err, iamapp.ErrUserNotInTenant) {
-			h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "User not found"))
+			problem.Respond(w, r, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "User not found"))
 			return false
 		}
 		slog.Error("iam people: verify user-in-tenant failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to verify user"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to verify user"))
 		return false
 	}
 	return true
 }
 
-func (h *PeopleHandler) writeProblem(w http.ResponseWriter, p *problem.Problem) {
-	if werr := problem.Write(w, p); werr != nil {
-		slog.Warn("iam people: write response failed", "err", werr)
-	}
-}
-
-func (h *PeopleHandler) writePeopleError(w http.ResponseWriter, err error) {
+func (h *PeopleHandler) writePeopleError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, iamapp.ErrPeopleValidation):
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
 	case errors.Is(err, iamapp.ErrAreaUnknown):
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
 	case errors.Is(err, iamapp.ErrUnknownRole):
 		// Invite carries area memberships, so it shares the membership route's
 		// vocabulary failure (F-QA4-2). Same sentinel → same 400 UNKNOWN_ROLE
 		// as POST /iam/area-memberships, never a 23514-driven 500.
-		h.writeProblem(w, problem.NewFor(problem.CodeValidationRoleUnknown, "Unknown role"))
+		problem.Respond(w, r, problem.NewFor(problem.CodeValidationRoleUnknown, "Unknown role"))
 	case errors.Is(err, authdomain.ErrUserAlreadyExists):
-		h.writeProblem(w, problem.New(http.StatusConflict, problem.CodeConflictGeneric, "User already exists"))
+		problem.Respond(w, r, problem.New(http.StatusConflict, problem.CodeConflictGeneric, "User already exists"))
 	case errors.Is(err, authdomain.ErrIdentityNotFound):
-		h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "User not found"))
+		problem.Respond(w, r, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "User not found"))
 	case errors.Is(err, iamapp.ErrUserNotInTenant):
-		h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "User not found"))
+		problem.Respond(w, r, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "User not found"))
 	case errors.Is(err, authdomain.ErrPasswordPolicy):
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
 	case errors.Is(err, iamdomain.ErrInvalidRole):
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid role"))
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid role"))
 	default:
 		slog.Error("iam people: handler error", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to process people request"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to process people request"))
 	}
 }
 
-func (h *PeopleHandler) writeAuthError(w http.ResponseWriter, err error) {
+func (h *PeopleHandler) writeAuthError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, authdomain.ErrPasswordPolicy):
-		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, err.Error()))
 	case errors.Is(err, authdomain.ErrIdentityNotFound):
-		h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "User not found"))
+		problem.Respond(w, r, problem.New(http.StatusNotFound, problem.CodeNotFoundResource, "User not found"))
 	default:
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to process auth request"))
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "Failed to process auth request"))
 	}
 }
 
