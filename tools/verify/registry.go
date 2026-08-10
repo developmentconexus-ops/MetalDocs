@@ -65,6 +65,13 @@ type Check struct {
 	// Dir is relative to repo root; empty means repo root.
 	Dir string
 
+	// Partition declares that this check's subject is a set of Go test
+	// packages that CI may split across runners. When set, Argv must spend
+	// packagesPlaceholder exactly once, and the package list that replaces it
+	// is resolved from `go list` at run time — never from a hand-kept list.
+	// See partition.go for why that distinction is the whole point.
+	Partition *Partition
+
 	// Stage names a subject the verifier materialises before running Argv,
 	// exposed to Argv as a placeholder. The only mode is stageTrackedTree
 	// ({{tracked}} — the tracked tree at HEAD, from `git archive`), and it
@@ -961,8 +968,21 @@ var checks = []Check{
 		// A1 item 4: this is why `full` exists. It is push-only in CI today,
 		// which makes it a post-mortem rather than a gate.
 		Profiles: []string{ProfileFull},
-		Argv:     []string{"go", "test", "-tags", "integration", "-count=1", "-race", "-timeout", "900s", "./tests/...", "./internal/...", "./apps/..."},
-		Needs:    []string{needsPostgres},
+		// The package list is not written here. It is `go list` over the roots
+		// the Partition below names, resolved on the commit under test, so a
+		// new test package joins this suite by existing rather than by being
+		// added to a second list. That is also what makes ci.yml's four-shard
+		// matrix safe: the shards partition a set neither this file nor that
+		// one enumerates. See partition.go.
+		Argv: []string{"go", "test", "-tags", "integration", "-count=1", "-race", "-timeout", "900s", packagesPlaceholder},
+		Partition: &Partition{
+			Roots: []string{"./tests/...", "./internal/...", "./apps/..."},
+			// Must equal the -tags above: integration tests are behind a build
+			// tag, and listing without it returns a universe that does not
+			// include a single one of them.
+			Tags: "integration",
+		},
+		Needs: []string{needsPostgres},
 		// Declared honestly wide (R3, ci.yml:test-integration --changed). The
 		// Argv above only names tests/, internal/, apps/, but anything that can
 		// change what those packages build against or run against can break
@@ -975,10 +995,18 @@ var checks = []Check{
 		//     internal/platform/config read db/... at runtime) — a schema-only
 		//     edit here can break the suite with zero Go diff.
 		//   - internal/, apps/, tests/: the three roots the Argv actually runs.
+		//   - tools/verify/: this check's subject is now COMPUTED — which
+		//     packages run comes from partition.go's `go list`, and how they
+		//     are split comes from shardOf plus testweights.json. A PR that
+		//     edits the partitioner changes what the suite executes, so a
+		//     `--changed` selection that skipped the suite on such a PR would
+		//     be a change to the runner that the runner never ran. Found for
+		//     real: the PR that introduced sharding reported four green shards
+		//     that each selected zero checks.
 		// When in doubt this unit's brief says include the path, so this list
 		// is deliberately roots, not the narrower subset that happened to be
 		// touched by any one past incident.
-		Paths: []string{"go.mod", "go.sum", "db/", "internal/", "apps/", "tests/"},
+		Paths: []string{"go.mod", "go.sum", "db/", "internal/", "apps/", "tests/", "tools/verify/"},
 		CIJob: "ci.yml:test-integration",
 	},
 

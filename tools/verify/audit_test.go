@@ -513,3 +513,87 @@ func TestAuditA7IgnoresChecksThatBlockNothing(t *testing.T) {
 		}
 	}
 }
+
+// ------------------------------------------------------------------ A11
+
+// The hazard A11 exists for: a matrix that does not cover the denominator the
+// job's own --shard flag promises. Every case below is a green CI run over a
+// suite that did not fully execute.
+func TestAuditA11CatchesAShardMatrixThatDoesNotCoverTheSuite(t *testing.T) {
+	shardStep := func(denom string) workflowStep {
+		return workflowStep{
+			Name: "verify (go-test-integration)",
+			Run:  "go run ./tools/verify --require-infra --only=go-test-integration --shard=${{ matrix.shard }}/" + denom,
+		}
+	}
+
+	for _, tc := range []struct {
+		name   string
+		job    workflowJob
+		want   string
+		silent bool
+	}{{
+		name: "matrix short of the denominator",
+		job:  workflowJob{Steps: []workflowStep{shardStep("4")}, ShardMatrix: []int{1, 2, 3}},
+		want: "not [1 2 3 4]",
+	}, {
+		name: "matrix repeats an index and skips another",
+		job:  workflowJob{Steps: []workflowStep{shardStep("3")}, ShardMatrix: []int{1, 2, 2}},
+		want: "not [1 2 3]",
+	}, {
+		name: "matrix is zero-based",
+		job:  workflowJob{Steps: []workflowStep{shardStep("3")}, ShardMatrix: []int{0, 1, 2}},
+		want: "not [1 2 3]",
+	}, {
+		name: "sharded step with no matrix at all",
+		job:  workflowJob{Steps: []workflowStep{shardStep("4")}},
+		want: "not [1 2 3 4]",
+	}, {
+		name: "matrix with no sharded step runs the whole suite four times",
+		job:  workflowJob{Steps: []workflowStep{{Name: "verify (x)", Run: "go run ./tools/verify --only=x"}}, ShardMatrix: []int{1, 2, 3, 4}},
+		want: "no step passes --shard",
+	}, {
+		name:   "matrix and denominator agree",
+		job:    workflowJob{Steps: []workflowStep{shardStep("4")}, ShardMatrix: []int{1, 2, 3, 4}},
+		silent: true,
+	}, {
+		name:   "matrix out of order still covers the suite",
+		job:    workflowJob{Steps: []workflowStep{shardStep("4")}, ShardMatrix: []int{4, 2, 1, 3}},
+		silent: true,
+	}, {
+		name:   "an ordinary unsharded job is none of A11's business",
+		job:    workflowJob{Steps: []workflowStep{{Name: "verify (x)", Run: "go run ./tools/verify --only=x"}}},
+		silent: true,
+	}} {
+		t.Run(tc.name, func(t *testing.T) {
+			job := tc.job
+			job.Workflow, job.Job = "ci.yml", "test-integration"
+			got := auditShardCoverage(nil, []workflowJob{job})
+			if tc.silent {
+				if len(got) != 0 {
+					t.Errorf("A11 fired on a correct configuration: %v", got)
+				}
+				return
+			}
+			if len(got) == 0 {
+				t.Fatalf("A11 stayed silent; this configuration runs a partial suite and reports success")
+			}
+			if !strings.Contains(got[0], tc.want) {
+				t.Errorf("A11 said %q, want it to mention %q", got[0], tc.want)
+			}
+		})
+	}
+}
+
+// The regex half, pinned separately: the index is a GitHub expression with
+// spaces in it, and a pattern that stops at the first space reads the real
+// workflow as unsharded. That exact bug shipped for one commit.
+func TestAuditA11ReadsTheDenominatorThroughAMatrixExpression(t *testing.T) {
+	m := shardPattern.FindStringSubmatch("go run ./tools/verify --only=go-test-integration --changed --shard=${{ matrix.shard }}/4")
+	if m == nil {
+		t.Fatal("shardPattern did not match a --shard whose index is a ${{ matrix.shard }} expression")
+	}
+	if m[1] != "4" {
+		t.Errorf("read denominator %q, want 4", m[1])
+	}
+}
