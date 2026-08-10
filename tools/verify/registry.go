@@ -65,6 +65,15 @@ type Check struct {
 	// Dir is relative to repo root; empty means repo root.
 	Dir string
 
+	// Stage names a subject the verifier materialises before running Argv,
+	// exposed to Argv as a placeholder. The only mode is stageTrackedTree
+	// ({{tracked}} — the tracked tree at HEAD, from `git archive`), and it
+	// exists because a check whose subject is "the working directory" has a
+	// different subject on every machine (#87/A1 review F2). Empty means the
+	// check runs against the repo as it stands, which is right for everything
+	// that reads source files rather than cataloguing them.
+	Stage string
+
 	// Needs lists infra requirements. Empty means it runs on a bare laptop
 	// with Go, Node, pnpm and git.
 	Needs []string
@@ -753,75 +762,50 @@ var checks = []Check{
 		// The second -o writes SARIF for ci.yml:security's upload step; the
 		// file is gitignored because it is a run artifact, not a source.
 		//
-		// The --exclude patterns cost CI nothing and make the local run
-		// usable AND correct. ci.yml:security is a bare checkout — it never
-		// runs `pnpm install`, so node_modules does not exist there, and
-		// .claude/ is a local worktree directory that is not checked out at
-		// all; .git holds packfiles, not dependency manifests. A developer's
-		// tree has all three, and grype cataloging them takes the same scan
-		// from ~4 minutes to over half an hour (measured, both ways, on this
-		// machine). What CI scans is unchanged.
+		// THE SUBJECT IS THE TRACKED TREE, NOT THE WORKING DIRECTORY (#87/A1
+		// review F2). `dir:/src` used to be the repo as it sits on disk, which
+		// gave the gate a different subject on every machine: CI runs a bare
+		// checkout, a developer's tree also has node_modules, build outputs,
+		// .gocache/.gomodcache/.pnpm-store and sibling worktrees under .claude/.
+		// Those are not this repo's dependencies, and grype does not know that —
+		// a stale metaldocs-api.exe reported x/crypto v0.31.0 and stdlib
+		// go1.26.1 as HIGH while go.mod pins x/crypto v0.53.0, and cached build
+		// objects from a sibling branch reported four more. The cure was a
+		// fifteen-line --exclude list, which is a workaround with a maintenance
+		// tail: every new gitignored directory needs another line, and the first
+		// one anybody forgets makes local and CI mean different things again.
 		//
-		// *.exe and bin/ are excluded for a correctness reason, not a speed
-		// one, and the first real local run is what found it: a Go binary
-		// carries its build-time module graph, so a stale gitignored
-		// metaldocs-api.exe reported golang.org/x/crypto v0.31.0 and stdlib
-		// go1.26.1 as HIGH — while go.mod pins x/crypto v0.53.0. The gate's
-		// subject is "no DEPENDENCY carries a known vulnerability", and this
-		// repo's dependency truth is its manifests; a build output is a
-		// derivative of the same manifests, one rebuild out of date. Scanning
-		// it means a local run fails on a file CI does not have, which makes
-		// the local product untrustworthy exactly where B1 requires it to be
-		// trusted. No coverage is lost: every module in those binaries is in
-		// go.mod, which is scanned.
+		// Stage: stageTrackedTree makes the subject a pure function of the
+		// commit. The verifier extracts `git archive HEAD` into a scratch
+		// directory and hands grype THAT — no untracked file, no ignored file,
+		// no cache, no build output, on any machine. Every --exclude line is
+		// gone because nothing is left to exclude, and CI's scan scope is
+		// unchanged: a bare checkout of HEAD is exactly what is now scanned
+		// everywhere. See stage.go for the mechanism and stage_test.go for the
+		// proof (a gitignored artifact cannot enter the scan; a tracked file
+		// always does).
 		//
-		// .gocache/.gomodcache/.pnpm-store are the same defect one layer down:
-		// the Go build cache stores compiled objects, and syft catalogs them
-		// as Go binaries, so a cached object built inside .claude/worktrees/*
-		// (a sibling branch's checkout) reported x/crypto v0.51.0, x/text
-		// v0.37.0, x/net v0.55.0 and grpc v1.81.1 as HIGH — every one of them
-		// already fixed in this repo's go.mod.
+		// Two mounts, and the split is load-bearing: /src is the staged tree
+		// (read subject) and /out is the real repo root, so the SARIF lands in
+		// the workspace where ci.yml:security's upload step looks for it rather
+		// than inside a directory that is deleted the moment the check ends.
 		//
-		// TRANSITIONAL, and the invariant that makes it sound is one line:
-		// every path excluded here is gitignored, so CI's bare checkout has
-		// none of them and CI's scan scope is unchanged by any of this. The
-		// global-maximum form is to stop scanning the WORKING directory at all
-		// and scan the tracked tree — `git archive HEAD` into a temp dir, or a
-		// syft SBOM built from tracked files, then `grype sbom:`. That needs
-		// the verifier to be able to stage a temp tree for a check, which it
-		// cannot do today (Argv is argv-only, no shell, no pre-step). Recorded
-		// as a remaining #87/A1 gap rather than papered over: until then, a new
-		// gitignored cache directory can re-introduce local false positives,
-		// and the cure is one more --exclude line here.
+		// The deliberate trade-off: an UNCOMMITTED dependency bump is not
+		// scanned, because it is not in HEAD. That is the same answer CI gives.
 		//
 		// The named volume caches the vulnerability database across runs. With
 		// --rm and no volume, every invocation re-downloads it — the same cost
 		// the retired step avoided with the Action's cache-db: true.
 		Profiles: []string{ProfilePR, ProfileFull},
+		Stage:    stageTrackedTree,
 		Argv: []string{
 			"docker", "run", "--rm",
-			"-v", repoRootPlaceholder + ":/src",
+			"-v", trackedTreePlaceholder + ":/src",
+			"-v", repoRootPlaceholder + ":/out",
 			"-v", "metaldocs-grype-db:/root/.cache/grype",
 			"anchore/grype@sha256:1e71065c0a4cff3e6bd3b8add525ffac4343eb4971694eb90a31cf6d4d3e85db",
 			"dir:/src", "--fail-on", "high",
-			"--exclude", "./.git/**",
-			"--exclude", "./.claude/**",
-			"--exclude", "./node_modules/**",
-			"--exclude", "./**/node_modules/**",
-			"--exclude", "./*.exe",
-			"--exclude", "./**/*.exe",
-			// `*.exe~` is a separate .gitignore line and a separate glob: the
-			// last HIGH standing after every other exclusion was a stale
-			// metaldocs-jobs.exe~, found by reading grype's JSON locations
-			// rather than guessing.
-			"--exclude", "./*.exe~",
-			"--exclude", "./**/*.exe~",
-			"--exclude", "./bin/**",
-			"--exclude", "./.gocache/**",
-			"--exclude", "./.gocache-build/**",
-			"--exclude", "./.gomodcache/**",
-			"--exclude", "./.pnpm-store/**",
-			"-o", "table", "-o", "sarif=/src/.grype.sarif",
+			"-o", "table", "-o", "sarif=/out/.grype.sarif",
 		},
 		Needs:         []string{needsDocker, needsNetwork},
 		FixtureWaiver: &Waiver{Kind: WaiverThirdParty, Why: "third-party scanner (grype, digest-pinned); its verdict is a join of this repo's dependency manifests with an externally maintained vulnerability database, so a synthetic bad fixture would assert against data this repo does not control — the same reason govulncheck is waived."},

@@ -800,7 +800,38 @@ func (st *runState) skipForMissingInfra(i int, c Check) bool {
 // execute runs c's Argv and records the PASS/FAIL result.
 func (st *runState) execute(i int, c Check) {
 	start := time.Now()
-	out, err := command(context.Background(), c.Dir, c.Argv).CombinedOutput()
+
+	argv := c.Argv
+	if c.Stage != "" {
+		root, err := repoRoot()
+		if err == nil {
+			var dir string
+			var cleanup func()
+			dir, cleanup, err = stage(context.Background(), c.Stage, root)
+			if err == nil {
+				defer cleanup()
+				argv = withStageDir(argv, dir)
+			}
+		}
+		if err != nil {
+			// A staging failure is a FAIL, never a silent fall-through to the
+			// working directory: falling back would run the check against a
+			// different subject than the one it declares, which is the whole
+			// defect staging exists to remove.
+			st.results[i] = result{
+				check:    c,
+				status:   statusFail,
+				output:   fmt.Sprintf("could not stage %s: %v", c.Stage, err),
+				duration: time.Since(start),
+			}
+			st.printMu.Lock()
+			fmt.Printf("  %-5s %-24s %6.1fs\n", statusFail, c.ID, time.Since(start).Seconds())
+			st.printMu.Unlock()
+			return
+		}
+	}
+
+	out, err := command(context.Background(), c.Dir, argv).CombinedOutput()
 	d := time.Since(start)
 
 	status := statusPass
