@@ -124,6 +124,15 @@ jobs:
   # runners each with its OWN service container: four smaller suites against
   # four uncontended databases instead of one large one against a shared one.
   #
+  # Measured on run 31410242704, the first run in which the shards actually
+  # selected the check: 522.9s / 94.5s / 164.6s / 117.8s. 899.8s of test time
+  # across four runners, with a makespan of 522.9s — so the suite's
+  # contribution to PR wall-clock fell from ~11 minutes to ~9, not to the ~4
+  # an even split would give. The gap is entirely tools/verify/
+  # testweights.json being empty, which makes shardOf balance by package COUNT
+  # and drop the heavy package wherever it happens to fall. Weights are what
+  # closes it; the mechanism is already correct.
+  #
   # The shards partition a package set that neither this file nor the registry
   # enumerates — `go list` resolves it on the commit under test (see
   # tools/verify/partition.go), so a new test package joins the suite by
@@ -187,10 +196,19 @@ jobs:
       # declared Paths (go.mod, go.sum, db/, internal/, apps/, tests/) — a
       # docs-only PR still runs this job, it just selects zero checks and
       # exits 0 saying so.
+      #
+      # -v streams the passing check's output, which for a non-verbose `go
+      # test` is exactly one "ok <package> <seconds>" line per package. That
+      # is what tools/verify/testweights.md's CI procedure reads: without it
+      # the verifier swallows the child's stdout on PASS and the only number
+      # that survives is the shard total, from which per-package weights
+      # cannot be recovered. ~40 extra log lines per shard is the price of the
+      # weights file being refreshable from any run instead of only from a
+      # developer's laptop.
       - name: verify (go-test-integration)
         env:
           METALDOCS_DATABASE_URL: postgres://metaldocs:metaldocs@localhost:5432/metaldocs?sslmode=disable
-        run: go run ./tools/verify --require-infra --only=go-test-integration --changed --shard=${{ matrix.shard }}/4
+        run: go run ./tools/verify -v --require-infra --only=go-test-integration --changed --shard=${{ matrix.shard }}/4
         timeout-minutes: 20
 
   security:

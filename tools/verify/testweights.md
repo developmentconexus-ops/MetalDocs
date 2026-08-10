@@ -31,12 +31,23 @@ package-level event carries the package's total elapsed time.
 ## Regenerate from a CI run
 
 Local timings are a usable proxy for relative cost but not for absolute cost —
-the runner is a different machine. To use real CI numbers, take the same
-`-json` output from each of the four shard legs and merge them; every package
-appears in exactly one leg, so a plain object merge is correct:
+the runner is a different machine, with a different storage stack and a
+different Postgres. Real CI numbers are preferable, and the shard step passes
+`verify -v` precisely so they survive: `-v` streams a passing check's output,
+and a non-verbose `go test` prints exactly one `ok <package> <seconds>` line
+per package. Without it the verifier swallows the child's stdout on PASS and
+the only number left is the shard total, from which per-package weights cannot
+be recovered.
+
+Every package appears in exactly one shard, so one pass over the whole run's
+log collects all four legs at once:
 
 ```bash
-jq -s 'add' shard-*.json > tools/verify/testweights.json
+gh run view <run-id> --log \
+  | grep -oE 'ok[[:space:]]+metaldocs/[^[:space:]]+[[:space:]]+[0-9.]+s' \
+  | awk '{sub(/s$/,"",$3); print $2, $3}' \
+  | jq -Rn '[inputs | split(" ") | {(.[0]): (.[1]|tonumber)}] | add' \
+  > tools/verify/testweights.json
 ```
 
 ## The version of this that does not rot
