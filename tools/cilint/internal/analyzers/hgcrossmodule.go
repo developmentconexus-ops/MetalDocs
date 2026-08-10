@@ -184,10 +184,38 @@ var hgExempt = []hgSite{
 // so `FROM\n  table` is caught.
 var hgFromJoin = regexp.MustCompile(`(?i)\b(?:from|join)\s+(?:public\.|metaldocs\.)?([a-z_][a-z0-9_]*)`)
 
-// HGCrossModule flags a raw cross-module base-table read (ADR-0039 D1): a FROM/JOIN
-// against another top-level module's owned base table, in a non-owner package,
-// outside the recorded allowlists. It is the H-G sibling of the H-D noResponseMap
-// guard and mechanizes ADR-0039 D6.
+// hgWrite matches a table token in write position: UPDATE <t>, INSERT INTO <t>,
+// DELETE FROM <t>. Same schema-prefix and case/newline handling as hgFromJoin.
+//
+// A4.0 (#87/A1 infrastructure, #93/A4 property owner). Until this existed the
+// guard was write-blind: hgFromJoin matches "FROM" and so caught DELETE FROM by
+// accident while UPDATE <t> SET and INSERT INTO <t> — the two shapes that
+// mutate another module's state — were invisible. The audit
+// (docs/superpowers/analysis/audit-2026-08-09/final-synthesis.md G-02) counted
+// 12 foreign-table writes the guard could not see, against 55 reads it could.
+// Reading another module's table breaks its read contract; writing it breaks
+// its invariants, so the blind half was the dangerous half.
+//
+// DELETE FROM is deliberately claimed by this pattern rather than left to
+// hgFromJoin: it is a write, and reporting it as a read is a wrong statement
+// about what the code does. hgScanLiteral resolves the overlap by classifying
+// write-position hits first.
+var hgWrite = regexp.MustCompile(`(?i)\b(?:update|insert\s+into|delete\s+from)\s+(?:public\.|metaldocs\.)?([a-z_][a-z0-9_]*)`)
+
+// HGCrossModule flags raw cross-module base-table ACCESS (ADR-0039 D1) in a
+// non-owner package, outside the recorded allowlists:
+//
+//	read  — FROM / JOIN <table>
+//	write — UPDATE <table> / INSERT INTO <table> / DELETE FROM <table>
+//
+// It is the H-G sibling of the H-D noResponseMap guard and mechanizes ADR-0039 D6.
+//
+// The write half is A4.0. The property is not "grep found a keyword" — it is
+// that a module cannot emit SQL against a business table owned by another
+// module unless that access is a deliberately classified exemption. A guard
+// that saw only reads asserted half of that and, worse, asserted it about the
+// harmless half: a foreign read breaks the owner's read contract, a foreign
+// write breaks its invariants.
 //
 // SCOPE — files under internal/modules/<module>/** (non-test; _test.go excluded by
 // the collector). The reader module is the first path segment under internal/modules/.
@@ -195,14 +223,18 @@ var hgFromJoin = regexp.MustCompile(`(?i)\b(?:from|join)\s+(?:public\.|metaldocs
 // DETECTION — only *ast.BasicLit STRING nodes are scanned (SQL lives in string
 // literals), so a foreign table named in a comment or Go identifier never flags —
 // the census found real such comments (people_service.go:690,
-// observability_repository.go:164). For each FROM/JOIN <table> whose owner ≠ the
-// reader module, a finding is emitted unless the (file,table) pair is on
-// hgPendingRemediation (the M1–M4 debt ledger) or hgExempt (permanent D3(d)–(f)),
-// or the source line carries //cilint:allow-hgcrossmodule.
+// observability_repository.go:164). For each read- or write-position <table>
+// whose owner ≠ the reader module, a finding is emitted unless the (file,table)
+// pair is on hgPendingRemediation (the M1–M4 debt ledger) or hgExempt (permanent
+// D3(d)–(f)), or the source line carries //cilint:allow-hgcrossmodule. The
+// allowlists are keyed by (file,table) and are therefore verb-agnostic — an
+// exemption says a file may touch a table, not that it may only read it.
 //
 // RESIDUAL — dynamically-assembled or aliased table names behind Go variables are
 // invisible to the literal-token scan (recorded in the F0.2 census coverage
-// statement, same residual as the H-D guard).
+// statement, same residual as the H-D guard). Also invisible: writes routed
+// through a query builder rather than a SQL literal, and CTE-form writes whose
+// target follows neither UPDATE/INSERT INTO/DELETE FROM nor FROM/JOIN.
 func HGCrossModule(files []string) []Finding {
 	var out []Finding
 	fset := token.NewFileSet()
@@ -247,34 +279,77 @@ func hgScanFile(fset *token.FileSet, path, reader string, f *ast.File, src strin
 func hgScanLiteral(fset *token.FileSet, path, reader string, lit *ast.BasicLit, src string, seen map[string]bool) []Finding {
 	var out []Finding
 	val := lit.Value
+
+	// Writes are classified first. DELETE FROM matches both patterns, and it
+	// is a write; letting hgFromJoin claim it would keep calling a deletion a
+	// read. hgWritten records the (line,table) pairs already accounted for so
+	// the read pass below skips them.
+	hgWritten := map[string]bool{}
+	for _, m := range hgWrite.FindAllStringSubmatchIndex(val, -1) {
+		table := strings.ToLower(val[m[2]:m[3]])
+		line := fset.Position(lit.Pos()).Line + strings.Count(val[:m[0]], "\n")
+		hgWritten[fmt.Sprintf("%d|%s", line, table)] = true
+		f, ok := hgViolation(path, reader, table, line, src, "writes", seen)
+		if ok {
+			out = append(out, f)
+		}
+	}
+
 	for _, m := range hgFromJoin.FindAllStringSubmatchIndex(val, -1) {
 		table := strings.ToLower(val[m[2]:m[3]])
-		owner, owned := hgOwnerByTable[table]
-		if !owned || owner == reader {
-			continue // unknown table or own-table read (D3c) — compliant
-		}
 		line := fset.Position(lit.Pos()).Line + strings.Count(val[:m[0]], "\n")
-		if hgListed(path, table, hgPendingRemediation) || hgListed(path, table, hgExempt) {
+		if hgWritten[fmt.Sprintf("%d|%s", line, table)] {
 			continue
 		}
-		if strings.Contains(getLine(src, line), hgCrossModuleAllow) {
-			continue
+		f, ok := hgViolation(path, reader, table, line, src, "reads", seen)
+		if ok {
+			out = append(out, f)
 		}
-		key := fmt.Sprintf("%d|%s", line, table)
-		if seen[key] {
-			continue
-		}
-		seen[key] = true
-		out = append(out, Finding{
-			Analyzer: "hgcrossmodule",
-			File:     path,
-			Line:     line,
-			Message: fmt.Sprintf(
-				"module %q reads %q's base table %q with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
-				reader, owner, table),
-		})
 	}
 	return out
+}
+
+// hgViolation applies the ownership rule and the three suppression layers to
+// one (table, line, verb) hit, returning the Finding to emit if any.
+//
+// The verb is part of the dedupe key and of the message. Both matter: a single
+// statement can read and write the same foreign table ("UPDATE documents SET x
+// = (SELECT ... FROM documents)"), and collapsing the two would report only
+// whichever the scanner reached first.
+func hgViolation(path, reader, table string, line int, src, verb string, seen map[string]bool) (Finding, bool) {
+	owner, owned := hgOwnerByTable[table]
+	if !owned || owner == reader {
+		return Finding{}, false // unknown table, or own-table access (D3c) — compliant
+	}
+	// The allowlists are keyed by (file, table), not by verb. That is
+	// deliberate: an exemption is a statement about a relationship between a
+	// file and a table ("this file may touch audit_events"), not about one SQL
+	// verb, and splitting it per verb would let a file exempted for reads
+	// start writing without anyone re-deciding.
+	if hgListed(path, table, hgPendingRemediation) || hgListed(path, table, hgExempt) {
+		return Finding{}, false
+	}
+	if strings.Contains(getLine(src, line), hgCrossModuleAllow) {
+		return Finding{}, false
+	}
+	key := fmt.Sprintf("%d|%s|%s", line, table, verb)
+	if seen[key] {
+		return Finding{}, false
+	}
+	seen[key] = true
+
+	remedy := "port to the owner's published view/read-port (D3a/b), or record an explicit exemption"
+	if verb == "writes" {
+		remedy = "route the mutation through the owner's application service, or record an explicit exemption"
+	}
+	return Finding{
+		Analyzer: "hgcrossmodule",
+		File:     path,
+		Line:     line,
+		Message: fmt.Sprintf(
+			"module %q %s %q's base table %q with raw SQL (H-G, ADR-0039 D1): %s",
+			reader, verb, owner, table, remedy),
+	}, true
 }
 
 // hgModuleOf returns the top-level module segment under internal/modules/, or ""

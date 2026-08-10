@@ -127,11 +127,23 @@ var checks = []Check{
 
 	// ---- Go: lint ---------------------------------------------------------
 	{
-		ID:       "arch-lint",
-		Desc:     "custom Go analyzers (hgcrossmodule, nosqltxindomain, platformboundary, txownership, legacyvocab) against the recorded baseline",
+		ID: "arch-lint",
+		// The analyzer list is the one tools/cilint/internal/analyzers.RunAll
+		// actually invokes. It said five for as long as there were ten
+		// (pass13-guards.md §3) — a registry that describes the wrong product
+		// is the same class of untruth as a check that does not run.
+		Desc:     "custom Go analyzers (hgcrossmodule, nosqltxindomain, platformboundary, txownership, legacyvocab, outboxpair, postcommitaudit, deliveryauditsink, nodualmode, noresponsemap) against the recorded baseline",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "./tools/cilint", "./..."},
 		CIJob:    "ci.yml:verify",
+		Fixture: &Fixture{
+			// A4.0: approval mutating documents' base table. The sandbox has
+			// no tools/cilint/baseline.json, and cilint fails on any finding
+			// when no baseline is configured — so the fixture proves the
+			// analyzer, not the ratchet.
+			Dir:  "arch-lint",
+			Want: `writes "documents"'s base table "documents"`,
+		},
 	},
 	// staticcheck (pinned honnef.co/go/tools/cmd/staticcheck) deleted Task 12
 	// / spec §4.6: golangci-lint becomes the single Go lint umbrella and

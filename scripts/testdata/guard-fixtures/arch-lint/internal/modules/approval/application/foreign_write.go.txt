@@ -1,0 +1,34 @@
+package application
+
+import (
+	"context"
+	"database/sql"
+)
+
+// A4.0 negative fixture: the approval module mutating the documents module's
+// base table directly. This is the write shape hgcrossmodule was blind to —
+// UPDATE <foreign table> SET matches neither FROM nor JOIN, so before the
+// write scan landed this file produced zero findings.
+//
+// The read below is the shape the guard already caught, kept alongside so the
+// fixture also proves the two are reported distinctly rather than one
+// swallowing the other.
+//
+// See scripts/testdata/guard-fixtures/README.md.
+func markPublished(ctx context.Context, tx *sql.Tx, id string) error {
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE documents SET status = 'published' WHERE id = $1`, id); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO document_revisions (document_id, status) VALUES ($1, 'published')`, id); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx,
+		`DELETE FROM document_comments WHERE document_id = $1`, id); err != nil {
+		return err
+	}
+	row := tx.QueryRowContext(ctx, `SELECT status FROM documents WHERE id = $1`, id)
+	var status string
+	return row.Scan(&status)
+}
