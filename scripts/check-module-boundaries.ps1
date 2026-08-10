@@ -94,23 +94,35 @@ function Test-DebtAllowed {
 }
 
 $violations = New-Object System.Collections.Generic.List[string]
+# Fail-closed counter. The Linux path bug fixed below was invisible because
+# "inspected nothing" and "found nothing" print the same OK. They are
+# different facts, so they get different exit codes.
+$inspected = 0
 
 $goFiles = Get-ChildItem -Path $moduleRoot -Recurse -Filter *.go -File `
   | Where-Object { $_.FullName -notmatch '_test\.go$' }
 
 foreach ($file in $goFiles) {
-  $fullName = (Resolve-Path $file.FullName).Path
-  $rootWithSep = $root.TrimEnd('\') + '\'
+  # Normalise to forward slashes on BOTH sides before comparing. The previous
+  # version appended a literal '\' to $root, so on Linux (pwsh on the CI
+  # runner, where separators are '/') no file path ever started with the root
+  # prefix; every file fell to the else branch keeping its ABSOLUTE path,
+  # failed the '^internal/modules/' match below and was skipped. The guard
+  # reported OK over zero inspected files on the only platform that gates a
+  # merge. Caught by its negative fixture (--guard-fixtures) on the CI runner.
+  $fullName = (Resolve-Path $file.FullName).Path.Replace("\", "/")
+  $rootWithSep = $root.Replace("\", "/").TrimEnd('/') + '/'
   if ($fullName.StartsWith($rootWithSep, [System.StringComparison]::OrdinalIgnoreCase)) {
-    $relativePath = $fullName.Substring($rootWithSep.Length).Replace("\", "/")
+    $relativePath = $fullName.Substring($rootWithSep.Length)
   } else {
-    $relativePath = $fullName.Replace("\", "/")
+    $relativePath = $fullName
   }
   if ($relativePath -notmatch '^internal/modules/([^/]+)/(.*)$') {
     continue
   }
   $currentModule = $Matches[1]
   $currentRest = $Matches[2]
+  $inspected++
 
   $currentIdentity = $currentModule
 
@@ -145,6 +157,13 @@ foreach ($file in $goFiles) {
 
     $violations.Add("$relativePath -> $importPath")
   }
+}
+
+if ($inspected -eq 0) {
+  Write-Host "[module-imports] FAIL"
+  Write-Host "Nenhum arquivo .go sob internal/modules foi inspecionado - o guard nao inspecionou nada."
+  Write-Host ("  root=" + $root + " moduleRoot=" + $moduleRoot)
+  exit 1
 }
 
 if ($violations.Count -gt 0) {
