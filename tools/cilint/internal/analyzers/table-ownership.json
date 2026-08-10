@@ -217,10 +217,9 @@
     },
     {
       "table": "tenants",
-      "class": "module",
-      "owner": "auth",
+      "class": "platform",
       "wiki_owner": "auth/platform",
-      "note": "The doc labels the tenant registry auth/platform. Enforced as auth-owned rather than left unenforced: several modules read it and those reads are recorded in the cilint baseline as #93/A4 debt, but a NEW foreign WRITE to the tenant registry is rejected from today."
+      "note": "The tenant registry is the multi-tenancy substrate, not one module's aggregate: every tenant table carries tenant_id and every module resolves against this registry, which is why the governed doc labels it auth/platform. #87/A1 review F3: an earlier revision enforced it as auth-owned to get write coverage, which manufactured a module owner the architecture had already declined to give it and reported iam's legitimate tenant-lifecycle SQL as foreign. No module owns it, so no access to it is foreign."
     },
     {
       "table": "audit_events",
@@ -255,31 +254,27 @@
     },
     {
       "table": "materialize_dispatch_outbox",
-      "class": "module",
-      "owner": "render",
+      "class": "platform",
       "wiki_owner": "render/fanout",
-      "note": "The doc names a path inside render rather than a module directory; render is the enforcement owner."
+      "note": "The other dispatch outbox, same family and same reasoning as pdf_dispatch_outbox. #87/A1 review F3: the governed doc names a fanout path rather than a module directory, and reading that as \"render owns it\" promoted a code location to an architectural boundary. No module owns it."
     },
     {
       "table": "pdf_dispatch_outbox",
-      "class": "module",
-      "owner": "render",
+      "class": "platform",
       "wiki_owner": "platform/workers",
-      "note": "Same divergence as notifications: the doc labels the outbox family platform/workers, and render is the only module emitting SQL against this dispatch outbox."
+      "note": "A dispatch outbox, governed platform/workers like the rest of the family. #87/A1 review F3: \"render is the only module emitting SQL against it today\" is an observation about the current tree, not an ownership boundary — the outbox pattern exists precisely so any producer can enqueue. No module owns it."
     },
     {
       "table": "idempotency_keys",
-      "class": "module",
-      "owner": "jobs",
+      "class": "platform",
       "wiki_owner": "platform/idempotency",
-      "note": "The governed doc labels this a platform concern rather than a module; enforcement needs a module directory, and internal/modules/jobs is where the store lives."
+      "note": "Idempotency is enforced per-handler and per-service across the whole request lifecycle (internal/platform/idempotency), so every module is a legitimate writer by design — the same shape as outbox_events. #87/A1 review F3: an earlier revision named jobs the owner because internal/modules/jobs is where a store lives, which is enforcement invented to fill a slot the architecture left empty."
     },
     {
       "table": "notifications",
-      "class": "module",
-      "owner": "notifications",
+      "class": "platform",
       "wiki_owner": "platform/workers",
-      "note": "The governed doc labels the whole outbox/worker family platform/workers; the notifications module owns this table's writes."
+      "note": "The governed doc labels the whole outbox/worker family platform/workers. #87/A1 review F3: the module directory sharing this table's name is not a claim of ownership — notification delivery is a cross-cutting worker concern that any module's event can enqueue, which is what platform/workers says. No module owns it."
     },
     {
       "table": "tenant_keys",

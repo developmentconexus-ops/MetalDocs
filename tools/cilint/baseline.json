@@ -258,30 +258,6 @@
       "owner": "#93/A4 — cross-module SQL closure"
     },
     {
-      "analyzer": "hgcrossmodule",
-      "file": "internal/modules/iam/application/tenant_lifecycle_service.go",
-      "message": "module \"iam\" writes \"auth\"'s base table \"tenants\" with raw SQL (H-G, ADR-0039 D1): route the mutation through the owner's application service, or record an explicit exemption",
-      "count": 1,
-      "reason": "F1 completeness pass: tenants was absent from table-ownership.json, so every access to the tenant registry was unguarded. Classifying it (auth-owned, per wiki/database/tables/tenants.md) made these pre-existing accesses visible for the first time. Recorded, not fixed — porting them is #93/A4's property, and repairing another axis's debt to keep a new guard green is the defect this baseline exists to prevent.",
-      "owner": "#93/A4 — cross-module SQL closure"
-    },
-    {
-      "analyzer": "hgcrossmodule",
-      "file": "internal/modules/iam/infrastructure/postgres/tenant_repository.go",
-      "message": "module \"iam\" reads \"auth\"'s base table \"tenants\" with raw SQL (H-G, ADR-0039 D1): port to the owner's published view/read-port (D3a/b), or record an explicit exemption",
-      "count": 1,
-      "reason": "F1 completeness pass: tenants was absent from table-ownership.json, so every access to the tenant registry was unguarded. Classifying it (auth-owned, per wiki/database/tables/tenants.md) made these pre-existing accesses visible for the first time. Recorded, not fixed — porting them is #93/A4's property, and repairing another axis's debt to keep a new guard green is the defect this baseline exists to prevent.",
-      "owner": "#93/A4 — cross-module SQL closure"
-    },
-    {
-      "analyzer": "hgcrossmodule",
-      "file": "internal/modules/iam/infrastructure/postgres/tenant_repository.go",
-      "message": "module \"iam\" writes \"auth\"'s base table \"tenants\" with raw SQL (H-G, ADR-0039 D1): route the mutation through the owner's application service, or record an explicit exemption",
-      "count": 1,
-      "reason": "F1 completeness pass: tenants was absent from table-ownership.json, so every access to the tenant registry was unguarded. Classifying it (auth-owned, per wiki/database/tables/tenants.md) made these pre-existing accesses visible for the first time. Recorded, not fixed — porting them is #93/A4's property, and repairing another axis's debt to keep a new guard green is the defect this baseline exists to prevent.",
-      "owner": "#93/A4 — cross-module SQL closure"
-    },
-    {
       "analyzer": "platformboundary",
       "file": "internal/platform/tripwire/arms.go",
       "message": "internal/platform must not import internal/modules (metaldocs/internal/modules/iam/domain); invert the dependency with a callback or port (REQ-TOP-2)",
