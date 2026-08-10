@@ -82,18 +82,19 @@ func TestExtractReqs_Fixture(t *testing.T) {
 }
 
 // TestExtractReqs_RealDoc smoke-tests extraction against the actual governing
-// architecture doc: 68 unique REQ IDs, 61 MUST-classified, 7 SHOULD-classified,
+// architecture doc: 69 unique REQ IDs, 62 MUST-classified, 7 SHOULD-classified,
 // 0 MAY-classified. Was 67/61/6/0 (F9.2 spec/plan) until ADR 0095 split
 // REQ-SEARCH-1 into REQ-SEARCH-1 (kept, MUST) + REQ-SEARCH-2 (new, SHOULD) —
-// total +1, MUST unchanged, SHOULD +1.
+// total +1, MUST unchanged, SHOULD +1. Then 68/61/7/0 until A3.2 added
+// REQ-MW-8 (single ingress OpenAPI request validator) — total +1, MUST +1.
 func TestExtractReqs_RealDoc(t *testing.T) {
 	path := filepath.Join("..", "..", "wiki", "architecture", "backend-target-architecture.md")
 	reqs, err := ExtractReqs(path)
 	if err != nil {
 		t.Fatalf("ExtractReqs real doc: %v", err)
 	}
-	if len(reqs) != 68 {
-		t.Fatalf("want 68 unique REQ IDs, got %d", len(reqs))
+	if len(reqs) != 69 {
+		t.Fatalf("want 69 unique REQ IDs, got %d", len(reqs))
 	}
 	var must, should, may int
 	for _, r := range reqs {
@@ -106,8 +107,8 @@ func TestExtractReqs_RealDoc(t *testing.T) {
 			may++
 		}
 	}
-	if must != 61 {
-		t.Errorf("MUST count = %d, want 61", must)
+	if must != 62 {
+		t.Errorf("MUST count = %d, want 62", must)
 	}
 	if should != 7 {
 		t.Errorf("SHOULD count = %d, want 7", should)
