@@ -505,11 +505,16 @@ var checks = []Check{
 		Argv:     []string{"bash", "scripts/check-dockerfile-go-version.sh"},
 		// scripts/check-dockerfile-go-version.sh is the check's own definition
 		// (whole-branch review C2 class); go.mod is its source of truth; the
-		// three Dockerfiles are its subject, discovered by `git ls-files`
-		// rather than hand-listed inside the script itself (Paths still needs
-		// them named, so a PR that edits only one Dockerfile still selects
-		// this check under `changed`).
-		Paths: []string{"go.mod", "deploy/docker/", "apps/docx-renderer/Dockerfile", "scripts/check-dockerfile-go-version.sh"},
+		// Dockerfiles are its subject, discovered by `git ls-files` rather than
+		// hand-listed. No Paths, deliberately: a hand-maintained prefix list is
+		// a selection hole waiting to happen — a stale Dockerfile added at a
+		// path the list didn't anticipate would never select this check under
+		// `changed`, even though the check's own git-ls-files discovery would
+		// have caught it once it ran (found live, 2026-08-11 review on #114:
+		// frontend/apps/web/Dockerfile.scratch-proof matched none of the old
+		// Paths prefixes and the check silently skipped). Same reasoning as
+		// governance-diff-rules below, which reads git diff itself for the
+		// same reason. Repo-scoped is the safe direction (see matchesPaths).
 		CIJob: "ci.yml:verify",
 		Fixture: &Fixture{
 			Dir: "dockerfile-go-version-drift",
