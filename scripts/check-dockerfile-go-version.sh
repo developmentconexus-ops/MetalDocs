@@ -40,6 +40,33 @@ set -euo pipefail
 # instruction, rather than silently skip a builder stage it cannot see. That
 # is a real constraint on this repo's Dockerfile style, written down here.
 #
+# "Is this a golang stage?" and "is its version parseable?" are two
+# different questions (independent review on #114, found live: a compliant
+# first stage plus a digest-pinned second stage -- `FROM golang@sha256:<hex>
+# AS builder`, normal supply-chain practice -- reported "all OK" and exited
+# 0). A single `grep -qiE 'golang:'` test used to answer both at once, which
+# dumped "golang, but no parseable tag" into the same bucket as "not golang
+# at all" and skipped it silently. This check now decides (a) first, from
+# the image reference's own repository component (the last `/`-segment,
+# digest and tag stripped) compared case-insensitively to `golang` -- and
+# only once that is yes does a missing/non-numeric tag become the existing
+# loud failure. This is deliberately over-inclusive in the same spirit as
+# the escape-directive and trailing-whitespace handling above: a vendored
+# `myorg/golang:1.26` image, or a local multi-stage alias literally named
+# `golang`, gets checked too. That costs an occasional false-positive
+# diagnostic; the alternative -- a narrower match -- costs a silent miss,
+# which is the one failure mode this check exists to close.
+#
+# TODO(#114 material 2, held pending operator decision): file discovery
+# (the `git ls-files` pathspec below) is still case-sensitive, so a
+# legitimately-spelled `worker.dockerfile` is invisible to this check. The
+# fix is `:(icase)` on the include patterns, but on this tree it also pulls
+# in four non-Dockerfile prose/doc files purely because "dockerfile" occurs
+# in their path case-insensitively (three of them only because their parent
+# directory is named `...-dockerfiles/`) -- see the worktree report for the
+# exact delta. Not shipped here without a ruling on whether that collateral
+# needs a scoping exclusion.
+#
 # Static: parses go.mod and tracked Dockerfiles. No Docker daemon, no network.
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -166,13 +193,54 @@ for df in "${dockerfiles[@]}"; do
       continue
     fi
 
-    printf '%s\n' "$from_line" | grep -qiE 'golang:' || continue
+    # "Is this a golang stage?" and "is its version parseable?" are two
+    # different questions, and they used to be one `grep -qiE 'golang:'`
+    # test -- which meant a digest-pinned stage (`FROM golang@sha256:<hex>
+    # AS builder`, normal supply-chain practice) contained no `golang:`
+    # substring at all and fell into the bare `continue` below with no
+    # diagnostic and no `checked` increment: a stale Go builder shipped
+    # silently, exit 0 (found live, 2026-08-11 review on #114). Answer (a)
+    # first, on the image reference alone; only once (a) is yes does an
+    # unparseable version become the existing loud failure instead of a
+    # silent skip.
+    #
+    # Extract the image reference: the first whitespace-delimited token
+    # after FROM and its optional `--platform=...` flag, i.e. everything up
+    # to (but not including) an ` AS <alias>`.
+    image_ref=""
+    if [[ "$from_line" =~ ^[[:space:]]*[Ff][Rr][Oo][Mm][[:space:]]+(--platform=[^[:space:]]+[[:space:]]+)?([^[:space:]]+) ]]; then
+      image_ref="${BASH_REMATCH[2]}"
+    fi
+    [[ -z "$image_ref" ]] && continue
+
+    # Repository component: the LAST `/`-separated path segment FIRST --
+    # otherwise a registry host with a port (`registry:5000/golang@sha256:x`)
+    # would have its `:5000` mistaken for a tag separator -- THEN strip an
+    # `@sha256:...` digest suffix, THEN strip a trailing `:tag`. Order
+    # matters; doing the tag/digest strip before the path split does not.
+    repo_component="${image_ref##*/}"
+    repo_component="${repo_component%%@*}"
+    repo_component="${repo_component%%:*}"
+    # Case-insensitive on purpose and deliberately over-inclusive: this
+    # matches `myorg/golang:1.26` (a vendored image merely named "golang",
+    # not the upstream one) and a local multi-stage alias literally named
+    # `golang` (`FROM previous AS golang` makes a later `FROM golang`
+    # resolve to that stage, not an image) just as readily as the real
+    # thing. Both get checked anyway -- same reasoning the escape-directive
+    # detector above already uses: a narrower match here only means fewer
+    # files fail closed, never more, so over-inclusive is the safe
+    # direction. A false positive costs one wasted diagnostic; a false
+    # negative ships the exact silent-bypass this check exists to prevent.
+    if [[ "${repo_component,,}" != "golang" ]]; then
+      continue
+    fi
     checked=$((checked + 1))
     # `|| true` for the same reason as mod_version above: `FROM golang:latest`
-    # (or any non-numeric tag) matches the outer discovery grep but not this
-    # one, and without the rescue the script would abort mid-loop instead of
-    # reporting the unparseable line -- silently, and before checking any
-    # remaining stage or Dockerfile.
+    # (or any non-numeric tag, or no tag at all -- digest-pinned or a bare
+    # `golang` stage alias) matches here but not this pattern, and without
+    # the rescue the script would abort mid-loop instead of reporting the
+    # unparseable line -- silently, and before checking any remaining stage
+    # or Dockerfile.
     df_version="$(printf '%s\n' "$from_line" | grep -oiE 'golang:[0-9]+(\.[0-9]+){0,2}' | head -1 | cut -d: -f2 || true)"
     if [[ -z "$df_version" ]]; then
       echo "DOCKERFILE-GO-VERSION-DRIFT: $df:$lineno: could not parse a numeric golang version from: $from_line" >&2

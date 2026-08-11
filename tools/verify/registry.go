@@ -554,6 +554,16 @@ var checks = []Check{
 				// character to a backtick, same bypass shape via a different
 				// escape char -- must also be refused, not silently skipped.
 				"found a '# escape=' parser directive",
+				// A digest-pinned golang stage (`FROM golang@sha256:<hex>`):
+				// normal supply-chain practice, and the OLD `grep -qiE
+				// 'golang:'` gate never saw it -- no `golang:` substring in a
+				// digest reference -- so it was skipped with a bare
+				// `continue`, no diagnostic, `checked` never incremented
+				// (independent review on #114). The image-reference/tag split
+				// now recognises the stage first and only then finds no
+				// numeric tag to compare, so this must surface as the
+				// existing loud "could not parse" failure, not silence.
+				"DOCKERFILE-GO-VERSION-DRIFT: deploy/docker/digest.Dockerfile:1: could not parse a numeric golang version from: FROM golang@sha256:8728bc8be765db56dd0dd650b1b31a0396b03cd4e46689dc0c3e2bc4de3ad587 AS builder",
 			},
 			// The scope exclusion is a rule, and this is its firing mechanism.
 			// The fixture tree carries vendor/go.opentelemetry.io/otel/
