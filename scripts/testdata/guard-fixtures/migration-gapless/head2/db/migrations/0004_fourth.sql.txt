@@ -1,4 +1,4 @@
--- guard fixture migration 0002 (branch-new -- does not exist on origin/main)
+-- guard fixture migration 0004 (branch-new -- does not exist on origin/main)
 -- FALSE POSITIVE shape: edited AGAIN in a second commit on this same
 -- branch, before merge. This file has never touched origin/main, so this
 -- second intra-branch edit is normal development, not a violation -- PR

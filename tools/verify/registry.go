@@ -797,39 +797,50 @@ var checks = []Check{
 		// named explicitly in the whole-branch review's C2 finding.
 		Paths: []string{"db/migrations/", "scripts/check-migration-gapless.sh"},
 		CIJob: "ci.yml:verify",
-		// The script exits at its FIRST failure (gap check, then
-		// historical-edit check), so one execution can only ever prove one
-		// of its two properties. This fixture proves the historical-edit
-		// property — the base-existence precondition (fix for PR #113's
-		// false positive) — which is the property this PR changes and had
-		// no negative-fixture coverage at all before this PR.
+		// The script is accumulate-then-exit (fail=0 up front, every
+		// violation printed and flagged, one `exit 1` at the bottom -- see
+		// the script's own header comment), so a single execution proves
+		// ALL of its properties at once, each pinned by its own Want/
+		// NotWant entry below. Each Want is satisfiable by exactly one
+		// fixture file, so none of them can rot silently behind another.
 		//
 		// Tree (layered, base + head + head2 — see Fixture.Dir doc comment
 		// for the head2 mechanism):
 		//   base:  0001 v1
-		//   head:  0001 v2 (edited)              0002 v1 (new)
-		//   head2:                                0002 v2 (edited again)
-		// Sequence stays gapless (0001..0002 both present), so execution
-		// reaches the historical-edit check rather than short-circuiting on
-		// the gap check.
+		//   head:  0001 v2 (edited)   0003 v1 (new)   0004 v1 (new)
+		//   head2:                                     0004 v2 (edited again)
+		// 0002 never exists in any layer -- that absence is itself the
+		// gap-detection fixture; 0003 fills out the range above the gap so
+		// the sequence check has something to range over without also
+		// becoming a historical-edit or false-positive candidate.
 		//
-		// 0001 exists on origin/main (base) and was edited afterward — a
-		// real violation of "an already-applied migration must never
-		// change" — and MUST still fire (Want). This is the proof that the
-		// base-existence precondition does not gut the guard.
+		// Property 1 -- gapless sequence (Want "Gap: migration 0002
+		// missing"): 0001, 0003, 0004 exist, 0002 does not -- a real gap,
+		// must always fire.
 		//
-		// 0002 does NOT exist on origin/main; it was added and then edited
-		// AGAIN, both within the same branch (head -> head2) -- exactly PR
-		// #113's shape. Pre-fix, `git log --diff-filter=M` over the branch
-		// range reports 0002 as Modified too (head2's diff against head),
-		// even though it never touched origin/main. Post-fix it must never
-		// be named (NotWant) -- this is the proof the false positive is
-		// gone.
+		// Property 2 -- historical edit, true positive (Want
+		// "db/migrations/0001_first.sql"): 0001 exists on origin/main
+		// (base) and was edited afterward -- a real violation of "an
+		// already-applied migration must never change" -- must still fire.
+		// This is the proof the base-existence precondition does not gut
+		// the guard.
+		//
+		// Property 3 -- historical edit, false positive (NotWant
+		// "db/migrations/0004_fourth.sql"): 0004 does NOT exist on
+		// origin/main; it was added and then edited AGAIN, both within the
+		// same branch (head -> head2) -- exactly PR #113's shape. Pre-fix,
+		// `git log --diff-filter=M` over the branch range reports 0004 as
+		// Modified too (head2's diff against head), even though it never
+		// touched origin/main. Post-fix it must never be named -- this is
+		// the proof the false positive is gone.
 		Fixture: &Fixture{
-			Dir:  "migration-gapless",
-			Want: []string{"db/migrations/0001_first.sql"},
+			Dir: "migration-gapless",
+			Want: []string{
+				"Gap: migration 0002 missing",
+				"db/migrations/0001_first.sql",
+			},
 			NotWant: []string{
-				"db/migrations/0002_second.sql",
+				"db/migrations/0004_fourth.sql",
 			},
 		},
 	},

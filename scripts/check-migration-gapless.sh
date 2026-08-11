@@ -21,6 +21,19 @@ set -euo pipefail
 # and does not close this gap.
 MIGRATION_DIR="db/migrations"
 
+# Accumulate-then-exit, not exit-on-first-failure: this script has TWO
+# independent properties (gapless sequence, no historical edit), and a
+# script that stops at its first failure can only ever demonstrate ONE of
+# them in a given run — a real defect, found in review, because it makes
+# the two properties mutually unprovable: no single fixture run can assert
+# both `Want`s, so one of them inevitably has no negative-fixture coverage
+# at all. Same pattern check-dockerfile-go-version.sh already uses on this
+# repo (`fail=1` set per-violation inside its loop, one `exit 1` at the
+# bottom) — established precedent, not a novel structure. Every violation
+# this script finds is still printed with its own diagnostic; only WHEN it
+# exits changed, not what it reports or how loudly.
+fail=0
+
 # After the 2026-07-29 fold (migrations 0257-0315 squashed into
 # db/baseline, files moved to
 # archive/migrations/post-baseline-2026-07-fold/) the directory holds
@@ -44,16 +57,20 @@ else
   MAX=$(echo "$nums" | tail -1)
 
   echo "Checking migrations $MIN..$MAX for gapless sequence..."
+  gap_found=0
   for n in $(seq "$MIN" "$MAX"); do
     padded=$(printf "%04d" "$n")
     hits=("$MIGRATION_DIR"/${padded}_*.sql)
     if [ ${#hits[@]} -eq 0 ]; then
       echo "❌ Gap: migration $padded missing"
-      exit 1
+      gap_found=1
+      fail=1
     fi
   done
 
-  echo "✅ Gapless $MIN..$MAX"
+  if [ "$gap_found" -eq 0 ]; then
+    echo "✅ Gapless $MIN..$MAX"
+  fi
 fi
 
 # Check no historical migrations were modified after merge
@@ -123,6 +140,11 @@ done <<<"$MODIFIED_CANDIDATES"
 
 if [ -n "$MODIFIED" ]; then
   echo "❌ Historical migrations modified: $MODIFIED"
+  fail=1
+else
+  echo "✅ No historical migration edits"
+fi
+
+if [ "$fail" -eq 1 ]; then
   exit 1
 fi
-echo "✅ No historical migration edits"
