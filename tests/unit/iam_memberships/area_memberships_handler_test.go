@@ -255,6 +255,12 @@ func (a *recordingAudit) RecordTx(_ context.Context, _ db.Tx, ev auditdomain.Eve
 	return a.Record(context.Background(), ev)
 }
 
+// IsErased satisfies auditdomain.Writer's embedded ErasureChecker. This
+// fixture never simulates an erased tenant.
+func (a *recordingAudit) IsErased(context.Context, string) (bool, error) {
+	return false, nil
+}
+
 func (a *recordingAudit) snapshot() []auditdomain.Event {
 	a.mu.Lock()
 	defer a.mu.Unlock()

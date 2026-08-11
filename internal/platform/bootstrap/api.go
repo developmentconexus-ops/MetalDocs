@@ -99,7 +99,12 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 				pdfConverter = servicebus.NewGotenbergPDFClient(store, gotenbergClient)
 			}
 		}
-		auditStore := auditpg.NewWriter(db)
+		// DEC-8: wire the erased-tenant read-path gate unconditionally — unlike
+		// WithPayloadCrypto (config-dependent, wired later in main.go once the
+		// KEK is loaded), this needs only db and must never be skippable, since
+		// its whole purpose is to withhold payload content for erased tenants
+		// even when crypto was never configured (the plaintext-row case).
+		auditStore := auditpg.NewWriter(db).WithTenantErasureCheck(iampg.NewTenantErasureRepository(db))
 		auditExports := auditpg.NewExportJobRepository(db)
 		return APIDependencies{
 			RoleProvider:      iampg.NewRoleProvider(db),

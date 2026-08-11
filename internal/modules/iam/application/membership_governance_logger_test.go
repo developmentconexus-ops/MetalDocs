@@ -27,6 +27,12 @@ func (w *recordingAuditWriter) RecordTx(_ context.Context, _ db.Tx, event auditd
 	return nil
 }
 
+// IsErased satisfies auditdomain.Writer's embedded ErasureChecker. This
+// fixture never simulates an erased tenant.
+func (w *recordingAuditWriter) IsErased(context.Context, string) (bool, error) {
+	return false, nil
+}
+
 func grantedByPtr(s string) *string { return &s }
 
 func TestAuditMembershipLogger_LogTx_MapsGrant(t *testing.T) {

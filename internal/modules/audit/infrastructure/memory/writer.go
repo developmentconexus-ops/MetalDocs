@@ -19,8 +19,11 @@ import (
 // IntegrityValidator, backed by a mutex-guarded slice. Suitable for unit
 // tests only — see the package doc.
 type Writer struct {
-	mu     sync.Mutex
-	events []domain.Event
+	mu               sync.Mutex
+	events           []domain.Event
+	erased           map[string]bool
+	erasedCheckErr   error
+	erasedCheckCalls int
 }
 
 // NewWriter constructs an empty in-memory Writer.
@@ -173,4 +176,47 @@ func matchesSearch(e domain.Event, q domain.ListEventsQuery) bool {
 // integrity validation is not meaningful here.
 func (w *Writer) ValidateIntegrity(context.Context) ([]domain.IntegrityIssue, error) {
 	return nil, errors.New("integrity validation not supported by memory writer")
+}
+
+// IsErased satisfies domain.ErasureChecker (embedded in domain.Writer). No
+// tenant is erased by default; tests that need to simulate an erased tenant
+// or a failed lookup use SetErased / SetErasedCheckError. Same fail-closed
+// contract as the real writer: a configured error is returned as-is, never
+// silently treated as "not erased".
+func (w *Writer) IsErased(_ context.Context, tenantID string) (bool, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.erasedCheckCalls++
+	if w.erasedCheckErr != nil {
+		return false, w.erasedCheckErr
+	}
+	return w.erased[tenantID], nil
+}
+
+// ErasedCheckCalls reports how many times IsErased has been called.
+// Test-only helper — used to assert a re-check happens exactly once per
+// export, not zero or repeated times.
+func (w *Writer) ErasedCheckCalls() int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.erasedCheckCalls
+}
+
+// SetErased marks tenantID as erased (or not) for subsequent IsErased calls.
+// Test-only control hook.
+func (w *Writer) SetErased(tenantID string, erased bool) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.erased == nil {
+		w.erased = make(map[string]bool)
+	}
+	w.erased[tenantID] = erased
+}
+
+// SetErasedCheckError makes every subsequent IsErased call fail with err,
+// simulating an erasure-status lookup failure. Test-only control hook.
+func (w *Writer) SetErasedCheckError(err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.erasedCheckErr = err
 }
