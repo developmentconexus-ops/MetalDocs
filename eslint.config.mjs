@@ -207,6 +207,40 @@ const featureBoundaryConfigs = FEATURE_NAMES.map((featureName) => {
 // larger judgment call about React Compiler readiness this repo hasn't made
 // yet). Enabling those is deliberately deferred to a future A2.1 follow-up,
 // not silently dropped.
+// A2.1 review round 2 (R2): two real, permanent limits of this ratchet, named
+// here rather than left for the next reader to discover by surprise. R1
+// (tools/verify check "eslint-suppression-baseline-growth") closes the
+// direction the baseline can move — it can never grow relative to the merge
+// base with origin/main — but it does not, and cannot, make the mechanism
+// below identity-preserving or self-pruning. Both limits are inherent to
+// ESLint 10's Suppressions feature as used here, not a gap this repo's own
+// code introduced.
+//
+// 1. Suppression is COUNT-based per (file, rule), not FINDING-based. ESLint's
+//    suppressions file records "file X has N violations of rule Y", not
+//    which N. Proven live in this PR's review: removing the one baselined
+//    `no-unused-vars` violation in
+//    frontend/apps/web/src/lib/api/problem.ts while introducing a DIFFERENT
+//    unused var in the same file leaves the count at 1, and `pnpm run lint`
+//    passes clean — the baseline silently swapped which finding it pins. A
+//    baselined file is a pinned COUNT, not a pinned set of findings; do not
+//    assume the suppressions file records what was originally baselined,
+//    only how much of it there was.
+//
+// 2. `--pass-on-unpruned-suppressions` (package.json's "lint" script)
+//    disables ESLint's prune-forcing behaviour. Confirmed against ESLint
+//    10.5.0 source (lib/cli.js:497-509): without the flag, fixing a
+//    baselined violation exits 2 with "There are suppressions left that do
+//    not occur anymore," forcing an immediate prune. With it, a stale count
+//    (the violation is long gone but the suppressions entry still claims it)
+//    sits indefinitely — the baseline can only shrink via a deliberate
+//    `--prune-suppressions` run (see `pnpm run lint:prune`). This is a
+//    DELIBERATE trade, not an oversight: without the flag, fixing one
+//    baselined finding as a drive-by in an unrelated PR would fail that PR's
+//    build over a count mismatch it did not cause. The compensating forcing
+//    function is eslint-suppressions.expiry.json's expiry date (checked by
+//    tools/verify's "eslint-suppression-expiry") — a rule's baseline cannot
+//    sit stale past its expiry regardless of pruning.
 const RATCHETED_TS_RULES = {
   '@typescript-eslint/no-unused-vars': 'error',
   '@typescript-eslint/no-explicit-any': 'error',
