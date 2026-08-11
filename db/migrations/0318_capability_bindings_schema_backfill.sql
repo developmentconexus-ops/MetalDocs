@@ -193,8 +193,17 @@ BEGIN;
 
 -- ── prerequisite unique keys (FK targets for capability_bindings) ──────────
 
--- ux_iam_users_tenant_user is a unique INDEX, not a unique CONSTRAINT; a bare
--- unique index cannot be an FK target. Promote it in place (no rebuild).
+-- ux_iam_users_tenant_user is a unique INDEX, not a unique CONSTRAINT. A bare
+-- unique index IS a valid FK target (Postgres only requires a non-partial,
+-- non-expression unique index covering exactly the referenced columns) -- the
+-- four pre-existing FKs named in the REVERSIBILITY note above already reference
+-- iam_users(tenant_id, user_id) through this very index. The promotion is for
+-- legibility/consistency, not capability: a named constraint shows up in
+-- information_schema.table_constraints and \d as a declared invariant, matching
+-- how iam_groups_tenant_id_id_uk below is expressed, where a bare index reads
+-- as "just a performance index". UNIQUE USING INDEX promotes it in place (no
+-- rebuild). See wiki/database/tables/capability_bindings.md, "Prerequisite
+-- schema changes".
 -- Postgres has no `ADD CONSTRAINT IF NOT EXISTS`, so replay safety is a
 -- manual pg_constraint existence check (see REPLAY SAFETY header note).
 DO $guard$
