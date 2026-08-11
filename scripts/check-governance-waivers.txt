@@ -34,6 +34,13 @@
 #   and trips the check exactly like real new debt would
 #   (scripts/check-eslint-suppression-baseline-growth.sh, "Two known,
 #   accepted gaps" comment).
+#   dead-code-baseline-growth — the "dead-code-baseline.json must not grow a
+#   dead file or (file, export) pair relative to the merge base with
+#   origin/main" rule (scripts/check-dead-code-baseline-growth.sh /
+#   tools/verify check "dead-code-baseline-growth", A2.2, issue #91).
+#   Structural twin of eslint-suppression-baseline-growth above, same waiver
+#   semantics: waive only for a genuinely reviewed, deliberate debt increase;
+#   burn-down never needs one.
 #
 api-contract-openapi | 2026-08-09 | ci/golangci-burndown PR #99 | golangci-lint whole-tree burn-down touched 22 delivery/http files (ST1005 error-string lowercasing, identifier renames, function decomposition). No route/status/shape change; contract verified green by codegen-drift-backend, codegen-drift-frontend, contract-sync, oasdiff breaking and openapi-lint. Only wire-visible change is problem+json detail text, whose truth artifact wiki/references/problem-codes.md was regenerated and is gated by problem-codes-drift.
 domain-tests | 2026-08-09 | ci/golangci-burndown PR #99 | Mechanical lint burn-down across internal/modules (error-string case, renames, decomposition, errcheck wraps) — no behaviour change to test. Existing behaviour stays pinned by the unchanged unit + integration suites, which ran green (test-integration job + touched-package ladder); adding a tests/ edit here would be artificial.

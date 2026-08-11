@@ -1,0 +1,231 @@
+{
+  "files": [
+    "apps/docx-renderer/test/fixtures.ts",
+    "frontend/apps/web/src/components/WorkspaceDataState.tsx",
+    "frontend/apps/web/src/features/approval/api/index.ts",
+    "frontend/apps/web/src/features/approval/components/index.ts",
+    "frontend/apps/web/src/features/approval/pages/index.ts",
+    "frontend/apps/web/src/features/approval/queries/useDelegationsMutations.ts",
+    "frontend/apps/web/src/features/auth/pages/AuthRoutePage.tsx",
+    "frontend/apps/web/src/features/auth/routes.tsx",
+    "frontend/apps/web/src/features/documents/canvas/DocumentCanvas.tsx",
+    "frontend/apps/web/src/features/documents/canvas/TemplateNodeRenderer.tsx",
+    "frontend/apps/web/src/features/documents/canvas/rich/metaldocsRich.ts",
+    "frontend/apps/web/src/features/documents/canvas/slotBindings.ts",
+    "frontend/apps/web/src/features/documents/canvas/slotValues.ts",
+    "frontend/apps/web/src/features/documents/canvas/slots/FieldSlot.tsx",
+    "frontend/apps/web/src/features/documents/canvas/slots/RichSlot.tsx",
+    "frontend/apps/web/src/features/documents/canvas/templateAdapters.ts",
+    "frontend/apps/web/src/features/documents/canvas/templateTypes.ts",
+    "frontend/apps/web/src/features/documents/components/CheckpointsDialog.tsx",
+    "frontend/apps/web/src/features/documents/components/CheckpointsPanel.tsx",
+    "frontend/apps/web/src/features/documents/components/PDFCell.tsx",
+    "frontend/apps/web/src/features/documents/components/Pagination.tsx",
+    "frontend/apps/web/src/features/documents/runtime/DynamicEditor.tsx",
+    "frontend/apps/web/src/features/documents/runtime/fields/RepeatField.tsx",
+    "frontend/apps/web/src/features/documents/runtime/fields/RichField.tsx",
+    "frontend/apps/web/src/features/documents/runtime/fields/ScalarField.tsx",
+    "frontend/apps/web/src/features/documents/runtime/fields/TableField.tsx",
+    "frontend/apps/web/src/features/documents/runtime/schemaRuntimeAdapters.ts",
+    "frontend/apps/web/src/features/documents/runtime/schemaRuntimeTypes.ts",
+    "frontend/apps/web/src/features/iam/queries/useOverviewQuery.ts",
+    "frontend/apps/web/src/features/shared/documentDisplay.ts",
+    "frontend/apps/web/src/features/shared/documentProfile.ts",
+    "frontend/apps/web/src/features/taxonomy/index.ts",
+    "frontend/apps/web/src/routing/workspaceRoutes.ts"
+  ],
+  "exports": [
+    {
+      "file": "frontend/apps/web/e2e/helpers/pixel-diff.ts",
+      "name": "pngDiffPercent"
+    },
+    {
+      "file": "frontend/apps/web/src/components/ui/index.ts",
+      "name": "Avatar"
+    },
+    {
+      "file": "frontend/apps/web/src/components/ui/index.ts",
+      "name": "Icon"
+    },
+    {
+      "file": "frontend/apps/web/src/components/ui/index.ts",
+      "name": "SelectableCard"
+    },
+    {
+      "file": "frontend/apps/web/src/components/ui/index.ts",
+      "name": "Stepper"
+    },
+    {
+      "file": "frontend/apps/web/src/components/ui/index.ts",
+      "name": "TabBar"
+    },
+    {
+      "file": "frontend/apps/web/src/components/ui/index.ts",
+      "name": "WorkspaceHeroHeader"
+    },
+    {
+      "file": "frontend/apps/web/src/features/approval/components/StateBadge.tsx",
+      "name": "STATE_CONFIG"
+    },
+    {
+      "file": "frontend/apps/web/src/features/approval/pages/route-admin/routeDraft.ts",
+      "name": "DEFAULT_SUBJECT_KIND"
+    },
+    {
+      "file": "frontend/apps/web/src/features/controlled-documents/api/controlledDocuments.ts",
+      "name": "obsoleteControlledDocument"
+    },
+    {
+      "file": "frontend/apps/web/src/features/controlled-documents/api/controlledDocuments.ts",
+      "name": "supersedeControlledDocument"
+    },
+    {
+      "file": "frontend/apps/web/src/features/documents/api/documents.ts",
+      "name": "createCheckpoint"
+    },
+    {
+      "file": "frontend/apps/web/src/features/documents/api/documents.ts",
+      "name": "forceReleaseSession"
+    },
+    {
+      "file": "frontend/apps/web/src/features/documents/api/documents.ts",
+      "name": "listCheckpoints"
+    },
+    {
+      "file": "frontend/apps/web/src/features/documents/api/documents.ts",
+      "name": "renameDocument"
+    },
+    {
+      "file": "frontend/apps/web/src/features/documents/api/documents.ts",
+      "name": "restoreCheckpoint"
+    },
+    {
+      "file": "frontend/apps/web/src/features/documents/api/exports.ts",
+      "name": "getDocxSignedURL"
+    },
+    {
+      "file": "frontend/apps/web/src/features/documents/components/wizard/CodePreviewBanner.tsx",
+      "name": "default"
+    },
+    {
+      "file": "frontend/apps/web/src/features/documents/components/wizard/WizardShell.tsx",
+      "name": "default"
+    },
+    {
+      "file": "frontend/apps/web/src/features/documents/components/wizard/steps/StepAreaCodeVisibility/index.tsx",
+      "name": "default"
+    },
+    {
+      "file": "frontend/apps/web/src/features/documents/components/wizard/steps/StepConfirm.tsx",
+      "name": "default"
+    },
+    {
+      "file": "frontend/apps/web/src/features/documents/components/wizard/steps/StepProfile.tsx",
+      "name": "default"
+    },
+    {
+      "file": "frontend/apps/web/src/features/documents/components/wizard/steps/StepTemplate.tsx",
+      "name": "default"
+    },
+    {
+      "file": "frontend/apps/web/src/features/documents/lib/approvalWorkflow.ts",
+      "name": "TRANSITION_POLICY"
+    },
+    {
+      "file": "frontend/apps/web/src/features/documents/lib/approvalWorkflow.ts",
+      "name": "actorStatusToFlowState"
+    },
+    {
+      "file": "frontend/apps/web/src/features/documents/lib/approvalWorkflow.ts",
+      "name": "toApprovalState"
+    },
+    {
+      "file": "frontend/apps/web/src/features/documents/lib/documentDetailMeta.ts",
+      "name": "DEFAULT_INITIAL_REVISION_TITLE"
+    },
+    {
+      "file": "frontend/apps/web/src/features/documents/lib/documentDetailMeta.ts",
+      "name": "formatShortDate"
+    },
+    {
+      "file": "frontend/apps/web/src/features/documents/lib/documentDetailMeta.ts",
+      "name": "formatSignedAt"
+    },
+    {
+      "file": "frontend/apps/web/src/features/documents/lib/documentDetailMeta.ts",
+      "name": "hasSettledSidebarIdentity"
+    },
+    {
+      "file": "frontend/apps/web/src/features/documents/lib/documentReleasePresentation.ts",
+      "name": "isReleaseSettling"
+    },
+    {
+      "file": "frontend/apps/web/src/features/featureFlags.ts",
+      "name": "isMddmNativeExportEnabled"
+    },
+    {
+      "file": "frontend/apps/web/src/features/shared/components/wizard/WizardShell.tsx",
+      "name": "default"
+    },
+    {
+      "file": "frontend/apps/web/src/features/taxonomy/api/taxonomy.ts",
+      "name": "fetchArea"
+    },
+    {
+      "file": "frontend/apps/web/src/features/taxonomy/api/taxonomy.ts",
+      "name": "fetchProfile"
+    },
+    {
+      "file": "frontend/apps/web/src/features/templates/adapters/useTemplateArtifact.ts",
+      "name": "resolveTemplateDetailHeroKind"
+    },
+    {
+      "file": "frontend/apps/web/src/features/templates/block-palette-rules.ts",
+      "name": "PALETTE_BLOCKS"
+    },
+    {
+      "file": "frontend/apps/web/src/features/templates/components/wizard/steps/StepConfirmation.tsx",
+      "name": "default"
+    },
+    {
+      "file": "frontend/apps/web/src/features/templates/components/wizard/steps/StepIdentity.tsx",
+      "name": "default"
+    },
+    {
+      "file": "frontend/apps/web/src/features/templates/components/wizard/steps/StepScope.tsx",
+      "name": "default"
+    },
+    {
+      "file": "frontend/apps/web/src/features/templates/components/wizard/steps/StepStructure.tsx",
+      "name": "default"
+    },
+    {
+      "file": "frontend/apps/web/src/features/templates/index.ts",
+      "name": "fetchPlaceholderCatalog"
+    },
+    {
+      "file": "frontend/apps/web/src/lib/api/problem.ts",
+      "name": "isProblem"
+    },
+    {
+      "file": "frontend/apps/web/src/lib/iam/roles.ts",
+      "name": "IAM_ROLES"
+    },
+    {
+      "file": "frontend/apps/web/src/lib/observability/apiTrace.ts",
+      "name": "markUx"
+    },
+    {
+      "file": "frontend/apps/web/src/lib/observability/apiTrace.ts",
+      "name": "reportUxSequence"
+    },
+    {
+      "file": "frontend/apps/web/src/lib/observability/apiTrace.ts",
+      "name": "startApiTrace"
+    },
+    {
+      "file": "frontend/apps/web/src/lib/observability/apiTrace.ts",
+      "name": "stopApiTrace"
+    }
+  ]
+}
