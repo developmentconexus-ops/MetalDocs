@@ -20,6 +20,10 @@ type stubAuditWriter struct{}
 func (stubAuditWriter) Record(_ context.Context, _ auditdomain.Event) error            { return nil }
 func (stubAuditWriter) RecordTx(_ context.Context, _ db.Tx, _ auditdomain.Event) error { return nil }
 
+// IsErased satisfies auditdomain.Writer's embedded ErasureChecker. This
+// fixture never simulates an erased tenant.
+func (stubAuditWriter) IsErased(_ context.Context, _ string) (bool, error) { return false, nil }
+
 func TestNew_UsesDefaultTemplateCheckerWhenDependencyIsNil(t *testing.T) {
 	mod := New(Dependencies{
 		TplChecker:           stubTemplateChecker{},

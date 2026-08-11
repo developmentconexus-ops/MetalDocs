@@ -135,6 +135,18 @@ type Writer interface {
 	// Used by callers (e.g. bypass/documents adapters) that need the audit
 	// record to share fate with the mutation itself.
 	RecordTx(ctx context.Context, tx db.Tx, event Event) error
+	// ErasureChecker is embedded so every Writer can answer its own erasure
+	// status. application.Service.WithExports already requires a non-nil
+	// Writer (it panics without one) and derives its pre-persist erasure
+	// re-check directly from that same instance (see refuseIfTenantErased) —
+	// there is no separate optional dependency to omit and no
+	// composition-root type assertion that can silently fail to match
+	// (PR #121 review round 1, P1 — fail-open remediation: a checker that
+	// could be left unwired, reached via a fragile type assertion, is a
+	// fail-open shape on an integrity gate; requiring it on the interface
+	// every Writer already must satisfy makes "unwired" unrepresentable
+	// instead of merely unusual).
+	ErasureChecker
 }
 
 // Reader is the audit query port. ListEvents intentionally lives on Reader
@@ -158,6 +170,17 @@ type Counter interface {
 // used by the audit-integrity-validator janitor to detect tampering.
 type IntegrityValidator interface {
 	ValidateIntegrity(ctx context.Context) ([]IntegrityIssue, error)
+}
+
+// ErasureChecker reports whether a tenant has been erased (ADR 0070
+// crypto-shred). application.Service.ExportEvents uses it to re-check status
+// immediately before persisting an export job, closing the window where a
+// tenant's erasure commits after the export's rows were fetched (an earlier,
+// separate read) but before the export job is written to durable storage
+// (PR #121 review round 1, P1 — export-persistence half). Implementations
+// must fail closed: a lookup error must not be treated as "not erased".
+type ErasureChecker interface {
+	IsErased(ctx context.Context, tenantID string) (bool, error)
 }
 
 // ---- Export job types -----------------------------------------------------
