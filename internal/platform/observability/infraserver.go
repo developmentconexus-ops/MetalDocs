@@ -41,5 +41,20 @@ func NewInfraServer(addr string, provider RuntimeStatusProvider, metricsHandler 
 		Addr:              addr,
 		Handler:           platformmw.Recovery(mux),
 		ReadHeaderTimeout: 5 * time.Second,
+		// F4 (review round 2): only ReadHeaderTimeout was set, leaving
+		// ReadTimeout/WriteTimeout/IdleTimeout unbounded — a reachable
+		// client could hold a connection open indefinitely (Slowloris,
+		// CWE-400) and stall /metrics scrapes or /live /ready probes until
+		// fds/goroutines exhaust. Values match metaldocs-api's own public
+		// server (apps/api/cmd/metaldocs-api/main.go buildServers,
+		// REQ-REL-1/2 / F-16) — api's own dedicated metrics listener next to
+		// it sets none of these either (a separate, pre-existing gap, out of
+		// this slice's fence), so the public server is the only bounded
+		// precedent this codebase has for an http.Server of this shape.
+		// live/ready/metrics payloads are all small and fast, so these
+		// bounds are generous headroom, not a tight fit.
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 60 * time.Second,
+		IdleTimeout:  90 * time.Second,
 	}
 }

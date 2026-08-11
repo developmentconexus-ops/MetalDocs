@@ -123,3 +123,29 @@ func TestNewInfraServer_NilMetricsHandlerOmitsRoute(t *testing.T) {
 		t.Fatalf("GET /metrics with no metrics handler wired = 200, want non-200 (no route mounted)")
 	}
 }
+
+// TestNewInfraServer_BoundsAllTimeouts is the F4 review round 2 RED-first
+// proof: NewInfraServer used to set only ReadHeaderTimeout, leaving
+// ReadTimeout/WriteTimeout/IdleTimeout at their zero-value (unbounded)
+// default — a reachable client could hold a connection open indefinitely
+// (Slowloris, CWE-400). All four must now be non-zero.
+func TestNewInfraServer_BoundsAllTimeouts(t *testing.T) {
+	provider := NewStaticRuntimeStatusProvider("postgres", "n/a", false)
+	server := NewInfraServer(":0", provider, nil)
+
+	if server.ReadHeaderTimeout <= 0 {
+		t.Error("ReadHeaderTimeout is unbounded (<= 0)")
+	}
+	if server.ReadTimeout <= 0 {
+		t.Error("ReadTimeout is unbounded (<= 0)")
+	}
+	if server.WriteTimeout <= 0 {
+		t.Error("WriteTimeout is unbounded (<= 0)")
+	}
+	if server.IdleTimeout <= 0 {
+		t.Error("IdleTimeout is unbounded (<= 0)")
+	}
+	if server.ReadTimeout < server.ReadHeaderTimeout {
+		t.Error("ReadTimeout should be >= ReadHeaderTimeout")
+	}
+}
