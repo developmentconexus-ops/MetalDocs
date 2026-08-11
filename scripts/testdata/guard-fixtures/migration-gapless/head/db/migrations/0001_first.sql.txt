@@ -1,0 +1,4 @@
+-- guard fixture migration 0001 (already applied -- exists on origin/main)
+-- TRUE POSITIVE (historical-edit): edited after merge. This must always be
+-- caught -- an already-applied migration changing content is exactly the
+-- invariant this check protects.

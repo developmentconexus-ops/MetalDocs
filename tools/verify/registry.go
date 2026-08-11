@@ -795,9 +795,75 @@ var checks = []Check{
 		Needs:    []string{needsGitDepth},
 		// scripts/check-migration-gapless.sh is the check's own definition —
 		// named explicitly in the whole-branch review's C2 finding.
-		Paths:   []string{"db/migrations/", "scripts/check-migration-gapless.sh"},
-		CIJob:   "ci.yml:verify",
-		Fixture: &Fixture{Dir: "migration-gapless", Want: []string{"Gap: migration 0002 missing"}},
+		Paths: []string{"db/migrations/", "scripts/check-migration-gapless.sh"},
+		CIJob: "ci.yml:verify",
+		// The script is accumulate-then-exit (fail=0 up front, every
+		// violation printed and flagged, one `exit 1` at the bottom -- see
+		// the script's own header comment), so a single execution proves
+		// ALL of its properties at once, each pinned by its own Want/
+		// NotWant entry below. Each Want is satisfiable by exactly one
+		// fixture file, so none of them can rot silently behind another.
+		//
+		// Tree (layered, base + head + head2 + base2 — see Fixture.Dir doc
+		// comment for the head2 and base2 mechanisms):
+		//   base:  0001 v1                                            0005 v1
+		//   head:  0001 v2 (edited)   0003 v1 (new)   0004 v1 (new)
+		//   head2:                                     0004 v2 (edited again)
+		//   base2:                                                    0005 v2 (edited by origin/main, post-fork)
+		// head2 is a second commit on the BRANCH (child of head); base2 is
+		// a sibling commit on origin/main itself (child of base, not of
+		// head/head2) -- see advanceOriginMain's doc comment for why that
+		// distinction needs git plumbing, not a second `git commit`.
+		// 0002 never exists in any layer -- that absence is itself the
+		// gap-detection fixture; 0003 fills out the range above the gap so
+		// the sequence check has something to range over without also
+		// becoming a historical-edit or false-positive candidate.
+		//
+		// Property 1 -- gapless sequence (Want "Gap: migration 0002
+		// missing"): 0001, 0003, 0004, 0005 exist, 0002 does not -- a real
+		// gap, must always fire.
+		//
+		// Property 2 -- historical edit, true positive (Want
+		// "db/migrations/0001_first.sql"): 0001 exists on origin/main
+		// (base) and was edited afterward -- a real violation of "an
+		// already-applied migration must never change" -- must still fire.
+		// This is the proof the base-existence precondition does not gut
+		// the guard.
+		//
+		// Property 3 -- historical edit, false positive #1, branch-only
+		// (NotWant "db/migrations/0004_fourth.sql"): 0004 does NOT exist
+		// on origin/main; it was added and then edited AGAIN, both within
+		// the same branch (head -> head2) -- exactly PR #113's shape.
+		// Pre-fix, `git log --diff-filter=M` over a range starting at
+		// origin/$BASE's tip reports 0004 as Modified too (head2's diff
+		// against head), even though it never touched origin/main.
+		// Post-fix it must never be named -- this is the proof that false
+		// positive is gone.
+		//
+		// Property 4 -- historical edit, false positive #2, base-only
+		// (NotWant "db/migrations/0005_fifth.sql"): 0005 DOES exist on
+		// origin/main at the merge base, but only origin/main's own
+		// post-fork commit (base2) edits it -- this branch (head/head2)
+		// never touches it. Pre-fix, the SYMMETRIC `origin/$BASE...HEAD`
+		// range walks base2 too (reachable from origin/main, not from
+		// HEAD), and since 0005 genuinely exists at the merge base the
+		// base-existence check does not save it -- flagged as a violation
+		// on a branch that made no such edit. This is the CodeRabbit
+		// finding from PR #123's own review: the identical defect as
+		// Property 3, the other lineage. Post-fix, the ASYMMETRIC
+		// `$MERGE_BASE..HEAD` range never reaches base2 at all, since it
+		// only walks commits reachable from HEAD.
+		Fixture: &Fixture{
+			Dir: "migration-gapless",
+			Want: []string{
+				"Gap: migration 0002 missing",
+				"db/migrations/0001_first.sql",
+			},
+			NotWant: []string{
+				"db/migrations/0004_fourth.sql",
+				"db/migrations/0005_fifth.sql",
+			},
+		},
 	},
 	{
 		ID:   "governance-diff-rules",
