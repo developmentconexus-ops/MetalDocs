@@ -423,12 +423,57 @@ func migration0318Path(t *testing.T) string {
 
 // TestMigration0318_BackfillPreservesHistory proves the backfill is a
 // straight row-count carryover from each source relation (provenance
-// preserved, nothing flattened) on a fresh bootstrap with only reference-data
-// seeded (no dev-seed rows), so the expected counts are the reference-data
-// grant rows themselves.
+// preserved, nothing flattened).
+//
+// CodeRabbit (PR #113 review round) caught this test vacuous as originally
+// written: testdb.OpenFreshDatabase's bootstrap seeds reference-data only
+// (db/reference-data, never db/dev-seeds — see ApplyCuratedBootstrap), and
+// reference-data inserts zero rows into iam_user_roles, user_process_areas,
+// or iam_group_roles. Every comparison below would have read srcCount=0,
+// boundCount=0 regardless of whether the three backfill INSERT...SELECT
+// statements in 0318 existed at all -- deleting the whole backfill would
+// still pass. TestMigration0318_ReplaySafe (above) already guards this exact
+// shape with an explicit non-zero precondition; this test had the identical
+// hole one function down.
+//
+// Fix: seed, don't just guard. A bare "fail if the count is zero"
+// precondition (CodeRabbit's proposed floor) would make the test *honest*
+// but still non-deterministic -- pass or fail would depend on whatever
+// db/reference-data happens to seed into these three tables today, which
+// this test does not own and should not need to track. Seeding rows this
+// test knows the shape of, using the SAME canonical fixture the sibling
+// replay-safety test already established (seedReplaySafeSourceRows,
+// testdb.SetCapsOnTx), makes the carryover proof self-contained and
+// deterministic instead. testdb.OpenFreshDatabase's own bootstrap already
+// ran 0318 once over the still-empty sources (a real no-op backfill), so
+// after seeding, this test must replay 0318's backfill INSERTs itself --
+// exactly the "seed, then run the file for real" first pass
+// TestMigration0318_ReplaySafe performs -- before the source-vs-backfilled
+// comparison means anything.
+//
+// Proven RED (2026-08-11): with the three backfill INSERT...SELECT
+// statements deleted from a scratch copy of 0318, this test failed with
+// "source_relation=iam_user_roles: capability_bindings has 0 rows, source
+// table has 1 rows" (and the same for the other two sources) -- proof the
+// comparison actually exercises the backfill, not 0==0.
 func TestMigration0318_BackfillPreservesHistory(t *testing.T) {
 	ctx := context.Background()
 	db, _ := testdb.OpenFreshDatabase(t)
+
+	// Seed one real row into each of 0318's three backfill sources (the same
+	// canonical fixture TestMigration0318_ReplaySafe uses), then replay
+	// 0318's own backfill INSERTs so those rows actually reach
+	// capability_bindings -- bootstrap's earlier run of 0318 saw only empty
+	// sources and backfilled nothing, so this is the first genuine backfill
+	// pass, not a replay.
+	seedReplaySafeSourceRows(t, ctx, db)
+	sqlBytes, err := os.ReadFile(migration0318Path(t))
+	if err != nil {
+		t.Fatalf("read migration 0318 file: %v", err)
+	}
+	if err := execWithSchedulerBypass(ctx, t, db, string(sqlBytes)); err != nil {
+		t.Fatalf("running migration 0318 against freshly-seeded source rows failed: %v", err)
+	}
 
 	for _, tc := range []struct {
 		source string
@@ -441,6 +486,9 @@ func TestMigration0318_BackfillPreservesHistory(t *testing.T) {
 		var srcCount, boundCount int
 		if err := db.QueryRowContext(ctx, tc.countQ).Scan(&srcCount); err != nil {
 			t.Fatalf("count %s: %v", tc.source, err)
+		}
+		if srcCount == 0 {
+			t.Fatalf("precondition failed: source %s has zero rows after seeding — comparison would prove nothing", tc.source)
 		}
 		if err := db.QueryRowContext(ctx,
 			`SELECT count(*) FROM metaldocs.capability_bindings WHERE source_relation = $1`,

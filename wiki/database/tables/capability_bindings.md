@@ -21,18 +21,24 @@ a reader against this table without first reading ADR 0092 and confirming A8.2 h
 shipped.
 
 **NOT AUTHORITATIVE (TRANSITIONAL — write cutover not landed):** the corollary of "nothing
-reads this table" is that nothing writes it either, past the one-time backfill.
-`role_admin_repository.go`, `user_area_repository.go`, and `onboard_tenant_service.go` —
-every current grant write site — still write exclusively to `iam_user_roles`,
-`user_process_areas`, and `iam_group_roles`; none dual-writes into
+reads this table" is that no *grant* write site issues rows here past the one-time
+backfill. `role_admin_repository.go`, `user_area_repository.go`, and
+`onboard_tenant_service.go` — every current grant write site — still write exclusively to
+`iam_user_roles`, `user_process_areas`, and `iam_group_roles`; none dual-writes into
 `capability_bindings`. From the moment 0318 merges, every grant issued afterwards is
 invisible here and this table drifts stale by construction. Harmless today because no
-read path consults it (above); becomes a live correctness hole the instant one does. Do
-not treat row counts or contents here as ground truth, and do not add a reader, until a
-write cutover (dual-write or repoint of the three sites above) lands — that cutover is
-not yet owned by any slice in the canonical A8.1–A8.4 decomposition and is tracked
-separately. Until then `iam_user_roles`, `user_process_areas`, and `iam_group_roles`
-remain the sole grant source of record.
+read path consults it (above); becomes a live correctness hole the instant one does. This
+does not mean the table is append-only or otherwise untouched: tenant erasure deletes from
+it (`EarlyEraser.EraseEarly`, `internal/modules/iam/infrastructure/postgres/tenant_data_port.go`,
+alongside `user_process_areas` — both hold an outbound FK into
+`document_process_areas` and must be cleared before taxonomy's ordered erase pass
+removes the areas they reference). Lifecycle-deletion paths may still remove rows here;
+it is only grant *issuance* that does not yet reach this table. Do not treat row counts or
+contents here as ground truth, and do not add a reader, until a write cutover (dual-write
+or repoint of the three sites above) lands — that cutover is not yet owned by any slice in
+the canonical A8.1–A8.4 decomposition and is tracked separately. Until then
+`iam_user_roles`, `user_process_areas`, and `iam_group_roles` remain the sole grant source
+of record.
 
 `iam_group_members` (group *membership* — who is in a group) is explicitly **not** one
 of the source relations folded in here; ADR 0092 D4 keeps membership and grants
@@ -64,7 +70,7 @@ dangling subject is a foreign-key violation, not an app-level check.
 | `effective_to` | `timestamptz` | yes | NULL = active (mirrors `user_process_areas`' ADR 0037 temporal model). |
 | `granted_by` | `text` | yes | Actor who created the binding. |
 | `revoked_by` | `text` | yes | Required whenever `effective_to` is set (`chk_capability_bindings_revoked_by_required`). |
-| `source_relation` | `text` | yes | `NULL` = native grant (A8.2+); else one of `'iam_user_roles'`/`'user_process_areas'`/`'iam_group_roles'` — backfill provenance. |
+| `source_relation` | `text` | yes | `NULL` = native grant, written directly against this table (not yet possible — see "not yet owned by any slice" below); else one of `'iam_user_roles'`/`'user_process_areas'`/`'iam_group_roles'` — backfill provenance. |
 
 ## Constraints (unrepresentable-by-construction, not app-validated)
 
@@ -89,8 +95,26 @@ dangling subject is a foreign-key violation, not an app-level check.
 ## Prerequisite schema changes (same migration)
 
 - `iam_users_tenant_user_uk` — promotes the pre-existing unique **index**
-  `ux_iam_users_tenant_user` to a unique **constraint** via `UNIQUE USING INDEX` (a bare
-  index cannot be an FK target).
+  `ux_iam_users_tenant_user` to a unique **constraint** via `UNIQUE USING INDEX`. **Not**
+  because a bare unique index cannot be an FK target — it can: PostgreSQL only requires a
+  non-partial, non-expression unique index covering exactly the referenced columns, and
+  creates no backing `pg_constraint` row when it uses one (verified empirically against
+  PostgreSQL 16.14, 2026-08-11: `ALTER TABLE ... ADD CONSTRAINT ... FOREIGN KEY`
+  referencing a plain `CREATE UNIQUE INDEX`-only column pair succeeds, and
+  `pg_constraint` for the referenced table has zero rows afterward). The four
+  pre-existing FKs this migration's own REVERSIBILITY note names
+  (`approval_instances_submitted_by_tenant_fkey`,
+  `approval_signoffs_actor_tenant_fkey`, `user_process_areas_granted_by_same_tenant`,
+  `user_process_areas_revoked_by_same_tenant`) already proved this in production: they
+  reference `iam_users(tenant_id, user_id)` and already depended on the bare
+  `ux_iam_users_tenant_user` index for that uniqueness before this migration ever ran. The
+  promotion's actual purpose is legibility/consistency — a named constraint is visible in
+  `information_schema.table_constraints` and `\d` output as a declared invariant, matching
+  how `iam_groups_tenant_id_id_uk` below is expressed, where a bare index would read as
+  "just a performance index" that happens to be relied on. Both forms are equally
+  protected against an accidental drop (PostgreSQL refuses `DROP INDEX` on either without
+  `CASCADE` once an FK depends on it) — the promotion buys documentation clarity, not
+  referential-integrity safety the bare index lacked.
 - `iam_groups_tenant_id_id_uk` — new `UNIQUE (tenant_id, id)` on `iam_groups` (no prior
   uniqueness on that pair existed; cheap since `id` alone is already PK-unique).
 
@@ -164,7 +188,12 @@ freely reversible.
 
 ## Notes and Debt
 
-- A8.2 (query builder) is the next slice: `Granted`/`GrantedAnyScope` predicates over
-  this table, still with no tier repointed yet.
+- A8.2 (query builder) is the next slice: `Granted`/`GrantedAnyScope` **read** predicates
+  over this table, still with no tier repointed and no write path added.
 - A8.3 repoints `metaldocs.roles` at generated catalogs; see that table's page.
 - A8.4 removes the `system_admin` tier bypass (ADR 0092 D2) — out of scope here.
+- The write cutover (dual-write or repoint of `role_admin_repository.go`,
+  `user_area_repository.go`, `onboard_tenant_service.go` — the only event that would ever
+  produce a `source_relation IS NULL` row) is a separate slice, not yet assigned within
+  A8.1–A8.4 or otherwise. Do not read "A8.2" as the milestone that starts native writes —
+  it isn't; see the NOT AUTHORITATIVE note above.

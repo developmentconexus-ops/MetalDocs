@@ -704,8 +704,8 @@ two branches merge. Whoever merges first should check for a genuine duplicate or
 
 ## ME-18 — the tenant-table registry is five hand-synced inventories, only one is forced
 
-**Found** 2026-08-11, coordinator-requested registry enumeration during the PR #113 (issue
-#89/A8.1) fix round, after that round's own BLOCKING finding (GDPR erase-order) turned out to
+**Found** 2026-08-11, coordinator-requested registry enumeration during the PR #113 (issue #89/A8.1)
+fix round, after that round's own BLOCKING finding (GDPR erase-order) turned out to
 be the fifth live instance of the class this register exists to catalog.
 
 Same shape as ME-15, one layer down: not "does every registered CI check actually gate a
