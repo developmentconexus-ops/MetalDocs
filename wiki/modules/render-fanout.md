@@ -86,9 +86,16 @@ attributable to the document.
 re-opens the archive the engine produced, re-adds every entry with
 `date: NORMALIZED_ZIP_DATE` (`1980-01-01T00:00:00.000Z`, the DOS floor) and
 `createFolders: false`, and re-serializes DEFLATE at level 6 — the same settings the
-engine used. `processTemplate` became `async` to accommodate it. The clock stops being
-an input; identical decompressed content produces identical bytes and therefore an
-identical hash.
+engine used. `processTemplate` became `async` to accommodate it. Entry order, entry
+paths, directory records and permissions are copied through unchanged, and archive-level
+and per-entry ZIP comments are preserved explicitly (dropping them would be silent
+metadata loss in the frozen artifact, even though determinism would hold without it).
+
+The claim this buys is narrow and worth stating precisely: decompressed content alone
+does not determine ZIP bytes — entry paths, entry order, directory entries, permissions
+and serialization settings all do. What the seam removes is the **clock**, the one input
+that varied between two renders of the same document. Given the same normalized archive
+structure and content, the bytes and therefore the hash are identical.
 
 **The guard.** `apps/docx-renderer/src/render/__tests__/fanout.test.ts` —
 `renders byte-identical ZIPs across clock instants with normalized entry dates` renders

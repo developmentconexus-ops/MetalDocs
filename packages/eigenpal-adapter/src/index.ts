@@ -160,6 +160,15 @@ interface OrderedZipEntry {
 async function normalizeZipTimestamps(buffer: ArrayBuffer): Promise<Uint8Array> {
   const source = await JSZip.loadAsync(buffer);
 
+  // jszip sets the archive-level comment on the instance at load time
+  // (lib/load.js: `zip.comment = zipEntries.zipComment`) and reads it back at
+  // generate time (lib/object.js: `opts.comment || this.comment || ""`), but
+  // its bundled index.d.ts never declares `comment` on the JSZip interface —
+  // only on JSZipObject and on the option bags. The narrow read below exists
+  // for that type gap alone; without it the archive comment is silently
+  // dropped on re-serialization.
+  const archiveComment = (source as unknown as { comment?: string | null }).comment ?? undefined;
+
   const ordered: OrderedZipEntry[] = [];
   source.forEach((relativePath, entry) => {
     ordered.push({ path: relativePath, entry });
@@ -172,6 +181,7 @@ async function normalizeZipTimestamps(buffer: ArrayBuffer): Promise<Uint8Array> 
         dir: true,
         createFolders: false,
         date: NORMALIZED_ZIP_DATE,
+        comment: entry.comment ?? undefined,
         unixPermissions: entry.unixPermissions ?? undefined,
         dosPermissions: entry.dosPermissions ?? undefined,
       });
@@ -181,6 +191,7 @@ async function normalizeZipTimestamps(buffer: ArrayBuffer): Promise<Uint8Array> 
     normalized.file(path, content, {
       createFolders: false,
       date: NORMALIZED_ZIP_DATE,
+      comment: entry.comment ?? undefined,
       compression: 'DEFLATE',
       compressionOptions: { level: 6 },
       unixPermissions: entry.unixPermissions ?? undefined,
@@ -192,6 +203,7 @@ async function normalizeZipTimestamps(buffer: ArrayBuffer): Promise<Uint8Array> 
     type: 'uint8array',
     compression: 'DEFLATE',
     compressionOptions: { level: 6 },
+    comment: archiveComment,
     platform: 'DOS',
   });
 }

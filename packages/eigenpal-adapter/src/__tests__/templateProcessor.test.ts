@@ -67,6 +67,26 @@ describe('TemplateProcessor', () => {
     expect(e.kind).toBe('template_render');
   });
 
+  it('preserves the archive comment and per-entry comments through normalization', async () => {
+    // Normalization re-serializes the archive from scratch, so anything it does
+    // not explicitly copy across is silently dropped. Comments are metadata of
+    // the frozen artifact; losing them is data loss even though determinism
+    // would hold either way (both renders would lose them identically).
+    const zip = new JSZip();
+    zip.file('word/document.xml', '<w:document/>', { comment: 'entry-comment' });
+    (zip as unknown as { comment: string }).comment = 'archive-comment';
+    const buffer = await zip.generateAsync({ type: 'arraybuffer' });
+
+    const tp = makeTemplateProcessor(
+      engineReturning({ buffer, replacedVariables: [], unreplacedVariables: [], warnings: [] }),
+    );
+    const r = await tp.processTemplate(new ArrayBuffer(0), {});
+
+    const out = await JSZip.loadAsync(r.buffer);
+    expect((out as unknown as { comment?: string }).comment).toBe('archive-comment');
+    expect(out.file('word/document.xml')?.comment).toBe('entry-comment');
+  });
+
   it('translates a malformed (non-ZIP) engine buffer to RenderError(unknown) rather than throwing raw', async () => {
     const tp = makeTemplateProcessor(
       engineReturning({ buffer: new Uint8Array([1, 2, 3]).buffer, replacedVariables: [], unreplacedVariables: [], warnings: [] }),
