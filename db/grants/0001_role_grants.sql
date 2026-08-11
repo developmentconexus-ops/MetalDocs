@@ -194,13 +194,15 @@ $$;
 -- ── audit_events insert/select-only hardening (from 0266 part a) ────────────
 -- Ordering constraint for this whole file: it must run AFTER the baseline (and
 -- reference data), because every GRANT/REVOKE below names tables that must
--- already exist. Ordering WITHIN the file is free -- the blanket
--- "GRANT ... ON ALL TABLES" above targets metaldocs_ci/metaldocs_runtime,
--- while this REVOKE targets metaldocs_app/metaldocs_runtime, so they never
--- touch the same (grantee, object) pair and neither can undo the other.
--- metaldocs_ci deliberately keeps DML on audit_events (it is a test role and
--- audit-chain tests need it); metaldocs_app and metaldocs_runtime must never
--- mutate or truncate the hash chain.
+-- already exist. Ordering WITHIN the file is NOT free for metaldocs_runtime:
+-- the blanket "GRANT ... ON ALL TABLES" above (metaldocs_runtime block)
+-- includes metaldocs.audit_events, and this REVOKE strips UPDATE/DELETE/
+-- TRUNCATE back off it. This block MUST stay AFTER the metaldocs_runtime
+-- grant block; if it is ever moved above it, the grant re-adds the
+-- privileges and the audit hardening is silently lost. metaldocs_ci is
+-- unaffected by ordering -- it deliberately keeps DML on audit_events (it is
+-- a test role and audit-chain tests need it); metaldocs_app and
+-- metaldocs_runtime must never mutate or truncate the hash chain.
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_app') THEN
