@@ -826,6 +826,14 @@ func auditExportDownloadURL(job auditdomain.ExportJob) string {
 
 // buildAuditService constructs the audit application service, wiring export
 // support when both the counter and export repositories are available.
+// WithExports derives its pre-persist erasure re-check (P1, PR #121 review
+// round 1) directly from deps.AuditWriter's embedded domain.ErasureChecker —
+// deps.AuditWriter is the same *auditpg.Writer instance already wired with
+// WithTenantErasureCheck in bootstrap.BuildAPIDependencies — so there is no
+// separate setter call here to omit and no type assertion that can silently
+// fail to match (contrast wireAuditPayloadCrypto below, which still needs its
+// own type assertion because WithPayloadCrypto is a genuinely optional,
+// non-Writer-contract capability).
 func buildAuditService(deps bootstrap.APIDependencies) *auditapp.Service {
 	auditService := auditapp.NewService(deps.AuditReader)
 	if deps.AuditCounter != nil && deps.AuditExports != nil {

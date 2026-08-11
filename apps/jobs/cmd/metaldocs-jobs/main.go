@@ -291,7 +291,13 @@ func buildTenantLifecycleWorker(db *sql.DB) (*iamjobs.TenantLifecycleWorker, err
 	// sealing while the api binary seals. tenant.erased itself is written
 	// after key destruction, so the adapter's ErrKeyDestroyed fall-through
 	// keeps that tombstone plaintext-survivable either way.
-	auditWriter := auditpg.NewWriter(db)
+	// DEC-8: wired unconditionally, mirroring bootstrap.BuildAPIDependencies —
+	// this Writer instance is constructed as a Writer here (Record/RecordTx,
+	// audit_integrity_validator), not as a Reader, so nothing in this binary
+	// exercises ListEvents today. Wired anyway so this composition root can
+	// never silently diverge from apps/api's if a future caller here starts
+	// reading through it.
+	auditWriter := auditpg.NewWriter(db).WithTenantErasureCheck(iampg.NewTenantErasureRepository(db))
 	if tenantCrypto != nil {
 		auditWriter.WithPayloadCrypto(auditPayloadCryptoAdapter{crypto: tenantCrypto})
 	}

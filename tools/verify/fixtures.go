@@ -65,6 +65,32 @@ type Fixture struct {
 	// commit, then "head/" is copied over it and committed. Diff-shaped
 	// guards (governance rules, migration gaplessness) need a real before and
 	// after, and inventing that history is the only way to give them one.
+	//
+	// Optional second branch commit: if the tree ALSO contains a "head2/"
+	// directory, it is copied over "head/"'s result and committed as a
+	// SECOND commit on top of "head/" (still on the sandbox's "main"
+	// branch — this models one branch's own history, not a merge). This
+	// exists for bugs that only manifest across multiple intra-branch
+	// commits: a file introduced in "head/" and edited again in "head2/" is
+	// invisible to `git diff base head` (which only ever compares two
+	// trees), but IS visible to `git log base...HEAD --diff-filter=M`,
+	// because that walks each commit's diff against its own parent —
+	// migration-gapless's PR #113 false positive was exactly this shape.
+	// "base/" alone is unaffected if "head2/" is absent.
+	//
+	// Optional divergent base-side commit: if the tree ALSO contains a
+	// "base2/" directory, it is committed as a SIBLING of "head/" — a
+	// second child of "base/"'s commit, NOT an ancestor of HEAD — and
+	// refs/remotes/origin/main is advanced to point at it. This models
+	// origin/$BASE moving forward, after the branch forked, with its own
+	// commit — the checked-out HEAD and working tree are untouched; only
+	// origin/main's ref moves. This exists for the sibling false-positive
+	// CodeRabbit found on PR #123: a SYMMETRIC `origin/$BASE...HEAD` range
+	// walks commits reachable from origin/$BASE alone too, so a
+	// post-fork main commit editing a migration that exists at the merge
+	// base gets misread as a branch violation, identically to the
+	// branch-only "head2/" shape but on the other lineage. "head/" and
+	// "head2/" are unaffected if "base2/" is absent.
 	Dir string
 
 	// ArgvOverride replaces the check's Argv, and runs from the REPO ROOT
@@ -94,6 +120,44 @@ type Fixture struct {
 	// writes that same table (#87/A1 review B5) — two rules, one sandbox, and
 	// neither may be silently dropped by an edit to the other.
 	Want []string
+
+	// NotWant, when set, must NOT appear in the failing run's output.
+	//
+	// Want can only assert that a guard FIRES. It cannot assert that a guard
+	// stays SILENT about something, and every scope exclusion a guard carries
+	// is exactly that shape: "discovery skips vendor/", "the fixture tree is
+	// not checked against itself". Those exclusions are rules too, and a rule
+	// with no firing mechanism is unguarded — drop the exclusion and every
+	// Want still matches, so the harness reports ok.
+	//
+	// Added 2026-08-11 for dockerfile-go-version-drift, whose discovery pattern
+	// matched vendor/go.opentelemetry.io/otel/dependencies.Dockerfile: upstream
+	// code this repo cannot edit, since `go mod vendor` overwrites it. Put the
+	// excluded thing in the fixture tree in a form that WOULD fire, and name it
+	// here; then deleting the exclusion turns the harness red.
+	NotWant []string
+
+	// Gitlinks lists sandbox-relative paths to register as raw git gitlink
+	// (submodule, mode 160000) tree entries, committed in their OWN commit
+	// after the fixture tree's normal commit (see commitGitlinks — folding
+	// this into the fixture tree's own `git add -A` does not work, proved
+	// empirically). `git ls-files` returns a gitlink path like any other, but
+	// nothing on disk backs it — no real submodule is ever added or
+	// initialized — so it reproduces "a path git discovers that is not a
+	// readable regular file" without needing a real OS symlink.
+	//
+	// Added 2026-08-11 for dockerfile-go-version-drift's `[[ -f "$df" ]]`
+	// discovery guard: the defect under test is also reproducible with a
+	// dangling symlink, but a symlink is not constructible on every checkout
+	// this harness runs on — a Windows checkout with `core.symlinks=false`
+	// (as confirmed on the checkout this fixture was authored on) never
+	// materializes a real symlink node, it falls back to a plain-content copy
+	// for a live target and fails outright for a dangling one, so `[[ -f ]]`
+	// would see a true, ordinary file and the fixture would silently prove
+	// nothing. A gitlink hits the identical `[[ -f ]]` failure and is
+	// platform-independent: `git update-index --cacheinfo 160000` needs no
+	// filesystem symlink support at all.
+	Gitlinks []string
 }
 
 // fixtureResult is one fixture's outcome.
@@ -237,6 +301,15 @@ func runOneFixture(ctx context.Context, root string, c Check) fixtureResult {
 			}
 		}
 	}
+	for _, notWant := range c.Fixture.NotWant {
+		if strings.Contains(out, notWant) {
+			return fixtureResult{
+				id:     c.ID,
+				reason: fmt.Sprintf("failed for the right reason, but also reported something it must stay silent about: output contains %q", notWant),
+				output: out,
+			}
+		}
+	}
 	return fixtureResult{id: c.ID, ok: true, reason: fmt.Sprintf("rejected bad input (exit %d)", exitErr.ExitCode())}
 }
 
@@ -270,9 +343,21 @@ func materializeFixture(ctx context.Context, root, sandbox string, c Check) erro
 		if err := copyTree(src, sandbox); err != nil {
 			return err
 		}
-		return gitCommit(ctx, sandbox, "fixture")
+		if err := gitCommit(ctx, sandbox, "fixture"); err != nil {
+			return err
+		}
+		return commitGitlinks(ctx, sandbox, c.Fixture.Gitlinks)
 	}
 
+	return materializeLayeredFixture(ctx, src, sandbox)
+}
+
+// materializeLayeredFixture commits "base/", points refs/remotes/origin/main
+// at it, commits "head/" on top, then commits an optional "head2/" on top of
+// that — see the Fixture.Dir doc comment for why a second branch-only commit
+// exists. Split out of materializeFixture to keep that function's branching
+// under the gocyclo cap; this is the layered-only half of the work.
+func materializeLayeredFixture(ctx context.Context, src, sandbox string) error {
 	if err := copyTree(filepath.Join(src, "base"), sandbox); err != nil {
 		return err
 	}
@@ -287,7 +372,106 @@ func materializeFixture(ctx context.Context, root, sandbox string, c Check) erro
 	if err := copyTree(filepath.Join(src, "head"), sandbox); err != nil {
 		return err
 	}
-	return gitCommit(ctx, sandbox, "head")
+	if err := gitCommit(ctx, sandbox, "head"); err != nil {
+		return err
+	}
+
+	// Optional second branch-only commit — see the Dir field's doc comment.
+	head2 := false
+	if fi, statErr := os.Stat(filepath.Join(src, "head2")); statErr == nil && fi.IsDir() {
+		head2 = true
+	}
+	if head2 {
+		if err := copyTree(filepath.Join(src, "head2"), sandbox); err != nil {
+			return err
+		}
+		if err := gitCommit(ctx, sandbox, "head2"); err != nil {
+			return err
+		}
+	}
+
+	// Optional divergent base-side commit — see the Dir field's doc
+	// comment. Runs regardless of head2, since it branches off "base",
+	// not off whatever HEAD currently is.
+	return advanceOriginMain(ctx, src, sandbox)
+}
+
+// advanceOriginMain models origin/$BASE moving forward, after the branch
+// forked, with its own commit — see the Dir field's doc comment for "base2/"
+// and why this exists (the CodeRabbit-found sibling of the head2 false
+// positive: PR #123 review, symmetric range walks origin/$BASE-only commits
+// too).
+//
+// The new commit must be a SIBLING of "head/"'s commit (both children of
+// "base/"'s commit), not a descendant of it — HEAD and the sandbox's real
+// working tree must stay exactly as materializeLayeredFixture already left
+// them. Building it with `git commit`/`git checkout` would move HEAD and
+// overwrite the working tree with the wrong content, so this uses plumbing
+// instead: a scratch GIT_WORK_TREE and GIT_INDEX_FILE pointed at the same
+// GIT_DIR, so the new commit lands in the same object database and
+// refs/remotes/origin/main can be pointed at it, without the primary
+// checkout ever being touched.
+func advanceOriginMain(ctx context.Context, src, sandbox string) error {
+	base2Src := filepath.Join(src, "base2")
+	fi, statErr := os.Stat(base2Src)
+	if statErr != nil || !fi.IsDir() {
+		return nil
+	}
+
+	baseOut, err := gitOutput(ctx, sandbox, "rev-parse", "refs/remotes/origin/main")
+	if err != nil {
+		return err
+	}
+	baseSHA := strings.TrimSpace(baseOut)
+
+	scratch, err := os.MkdirTemp("", "verify-fixture-base2-")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.RemoveAll(scratch) }()
+
+	gitDir := filepath.Join(sandbox, ".git")
+	idx := filepath.Join(scratch, ".index")
+	plumb := func(args ...string) (string, error) {
+		full := append([]string{"--git-dir=" + gitDir, "--work-tree=" + scratch}, args...)
+		cmd := command(ctx, scratch, append([]string{"git"}, full...))
+		cmd.Env = append(fixtureEnv(), "GIT_INDEX_FILE="+idx)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("git %s: %w\n%s", strings.Join(args, " "), err, out)
+		}
+		return string(out), nil
+	}
+
+	if _, err := plumb("read-tree", baseSHA); err != nil {
+		return err
+	}
+	if _, err := plumb("checkout-index", "-a"); err != nil {
+		return err
+	}
+	if err := copyTree(base2Src, scratch); err != nil {
+		return err
+	}
+	if _, err := plumb("add", "-A"); err != nil {
+		return err
+	}
+	treeOut, err := plumb("write-tree")
+	if err != nil {
+		return err
+	}
+	tree := strings.TrimSpace(treeOut)
+
+	commitOut, err := plumb(
+		"-c", "user.name=verify-fixture",
+		"-c", "user.email=verify-fixture@invalid",
+		"commit-tree", tree, "-p", baseSHA, "-m", "base2",
+	)
+	if err != nil {
+		return err
+	}
+	newSHA := strings.TrimSpace(commitOut)
+
+	return gitRun(ctx, sandbox, "update-ref", "refs/remotes/origin/main", newSHA)
 }
 
 // fixtureArgv resolves what to run and from where.
@@ -361,12 +545,21 @@ func scriptsInArgv(argv []string) []string {
 }
 
 func gitRun(ctx context.Context, dir string, args ...string) error {
+	_, err := gitOutput(ctx, dir, args...)
+	return err
+}
+
+// gitOutput is gitRun, but returns stdout+stderr on success too — for
+// callers that need what git printed (rev-parse, write-tree, commit-tree),
+// not just whether it succeeded.
+func gitOutput(ctx context.Context, dir string, args ...string) (string, error) {
 	cmd := command(ctx, dir, append([]string{"git"}, args...))
 	cmd.Env = fixtureEnv()
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git %s: %w\n%s", strings.Join(args, " "), err, out)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("git %s: %w\n%s", strings.Join(args, " "), err, out)
 	}
-	return nil
+	return string(out), nil
 }
 
 // gitCommit stages everything and commits with an identity supplied on the
@@ -379,6 +572,37 @@ func gitCommit(ctx context.Context, dir, msg string) error {
 		"-c", "user.name=verify-fixture",
 		"-c", "user.email=verify-fixture@invalid",
 		"commit", "-q", "--allow-empty", "-m", msg,
+	)
+}
+
+// commitGitlinks stages each path as a raw gitlink (submodule, mode 160000)
+// tree entry pointing at a fixed, arbitrary commit SHA — no real submodule is
+// ever added or cloned — and commits them in a SEPARATE commit, AFTER the
+// fixture tree's own commit.
+//
+// That ordering is load-bearing, proved empirically, not a style choice:
+// folding this into gitCommit's `git add -A` does not work. A gitlink has
+// nothing backing it in the working tree, and without a .gitmodules entry
+// marking it as a real submodule, `git add -A` reads "index entry, nothing
+// on disk" as a deletion and stages the gitlink right back out — the commit
+// that results never contains it, and `git ls-files` afterward silently
+// omits it, defeating the entire fixture. Committing it separately, with a
+// plain `git commit` that touches only what `update-index --cacheinfo`
+// staged, leaves it alone.
+func commitGitlinks(ctx context.Context, sandbox string, paths []string) error {
+	if len(paths) == 0 {
+		return nil
+	}
+	for _, p := range paths {
+		spec := "160000,0000000000000000000000000000000000000001," + filepath.ToSlash(p)
+		if err := gitRun(ctx, sandbox, "update-index", "--add", "--cacheinfo", spec); err != nil {
+			return fmt.Errorf("gitlink %s: %w", p, err)
+		}
+	}
+	return gitRun(ctx, sandbox,
+		"-c", "user.name=verify-fixture",
+		"-c", "user.email=verify-fixture@invalid",
+		"commit", "-q", "-m", "gitlinks",
 	)
 }
 

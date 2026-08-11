@@ -1,0 +1,11 @@
+-- guard fixture migration 0005 (already applied -- exists on origin/main).
+-- SECOND false-positive shape (CodeRabbit, PR #123 review): this is
+-- origin/main ADVANCING after this branch forked, with its own commit
+-- editing a migration that already existed at the merge base. This
+-- branch (head/head2) never touches 0005 at all. A SYMMETRIC git log
+-- range walks this commit too (it is reachable from origin/main, just
+-- not from HEAD) and, since 0005 genuinely exists at the merge base,
+-- the base-existence check does not save it -- flagged as a violation
+-- on a branch that made no such edit. An ASYMMETRIC $MERGE_BASE..HEAD
+-- range never reaches this commit at all, because it only walks commits
+-- reachable from HEAD.

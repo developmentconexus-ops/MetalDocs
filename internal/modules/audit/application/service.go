@@ -45,6 +45,14 @@ var (
 	// ErrExportsDisabled is returned when export operations are invoked on a
 	// Service whose writer dependency has not been wired via WithExports.
 	ErrExportsDisabled = errors.New("audit: export pipeline not configured")
+	// ErrExportTenantErased is returned when ExportEvents re-checks erasure
+	// status immediately before persisting the export job (see
+	// refuseIfTenantErased) and finds the tenant has been erased — or the
+	// check itself failed — since the export began. Fail-closed: "could not tell"
+	// is treated the same as "erased". The accumulated payload is discarded
+	// and no audit_export_jobs row is written (PR #121 review round 1, P1 —
+	// export-persistence half).
+	ErrExportTenantErased = errors.New("audit: tenant was erased during export; export discarded")
 )
 
 // SyncExportRowLimit is the threshold above which an export request is
@@ -69,6 +77,7 @@ type Service struct {
 	exportRepo domain.ExportJobRepository
 	writer     domain.Writer
 	signedURL  SignedURLBuilder
+	erasure    domain.ErasureChecker
 	now        func() time.Time
 }
 
@@ -83,6 +92,12 @@ func NewService(reader domain.Reader) *Service {
 
 // WithExports wires the export pipeline. All four dependencies are required;
 // passing nil for any of them panics.
+// writer's embedded domain.ErasureChecker doubles as ExportEvents' pre-persist
+// erasure re-check (see refuseIfTenantErased): since domain.Writer requires
+// IsErased, wiring exports can never leave the erasure gate unset — there is
+// no separate optional dependency for a composition root or test harness to
+// omit (PR #121 review round 1, P1 — fail-open remediation superseding the
+// prior WithErasureCheck setter, which this replaces).
 func (s *Service) WithExports(counter domain.Counter, repo domain.ExportJobRepository, writer domain.Writer, urlBuilder SignedURLBuilder) *Service {
 	if counter == nil || repo == nil || writer == nil || urlBuilder == nil {
 		panic("audit.WithExports: all export dependencies are required")
@@ -90,6 +105,7 @@ func (s *Service) WithExports(counter domain.Counter, repo domain.ExportJobRepos
 	s.counter = counter
 	s.exportRepo = repo
 	s.writer = writer
+	s.erasure = writer
 	s.signedURL = urlBuilder
 	return s
 }
@@ -174,6 +190,21 @@ func (s *Service) ExportEvents(ctx context.Context, actorID string, format domai
 		return domain.ExportJob{}, err
 	}
 
+	// EXPLICITLY TRANSITIONAL — deleted by ROADMAP unit 4.10, as part of that
+	// unit's definition-of-done, not as a follow-up.
+	//
+	// This re-check narrows the erasure race; it does not close it. A window
+	// remains between this IsErased round trip and the Save below. The reason
+	// it cannot be closed here is that the defect is not in this module:
+	// iam's runErase raises the erasure signal in its LAST phase, after the
+	// destructive phases have already run, so this gate is reading a signal
+	// that is absent for the entire interval it needs to cover. Unit 4.10
+	// moves that tombstone to its own transaction committed before phase 1,
+	// at which point this check has nothing left to narrow and goes away.
+	if err := s.refuseIfTenantErased(ctx, normalizedSizing.TenantID); err != nil {
+		return domain.ExportJob{}, err
+	}
+
 	if err := s.exportRepo.Save(ctx, job); err != nil {
 		return domain.ExportJob{}, fmt.Errorf("audit: persist export job: %w", err)
 	}
@@ -217,6 +248,34 @@ func (s *Service) renderExportPayload(ctx context.Context, normalizedSizing doma
 		return nil, 0, fmt.Errorf("audit: render export: %w", err)
 	}
 	return payload, int64(len(events)), nil
+}
+
+// refuseIfTenantErased re-checks tenant erasure status immediately before
+// ExportEvents persists its export job. renderExportPayload already fetched
+// every row via a separate, earlier read; if the tenant's erasure commits in
+// the interval between that fetch and this call, the accumulated payload is
+// stale plaintext that must never reach durable storage (PR #121 review
+// round 1, P1). s.erasure is guaranteed non-nil here: WithExports sets it
+// (from the same writer it requires) together with s.writer, and ExportEvents
+// already returned ErrExportsDisabled above if s.writer were nil — there is
+// no reachable path into this function with a nil checker. Fails closed: a
+// lookup error is treated the same as "erased" (ErrExportTenantErased either
+// way), because no caller downstream of this function can tell "confirmed
+// erased" apart from "could not tell" and safely choose to persist anyway.
+// EXPLICITLY TRANSITIONAL — this whole function is deleted by ROADMAP unit
+// 4.10 (erasure gate ordering). It exists only because the signal it consults
+// is currently raised too late to be trustworthy; once iam commits the
+// tombstone before the first destructive phase, the condition this guards
+// against is unrepresentable and the guard is dead weight.
+func (s *Service) refuseIfTenantErased(ctx context.Context, tenantID string) error {
+	erased, err := s.erasure.IsErased(ctx, tenantID)
+	if err != nil {
+		return fmt.Errorf("%w: erasure check failed: %w", ErrExportTenantErased, err)
+	}
+	if erased {
+		return ErrExportTenantErased
+	}
+	return nil
 }
 
 // buildExportJob assembles the ExportJob record: marshals the (unnormalized)

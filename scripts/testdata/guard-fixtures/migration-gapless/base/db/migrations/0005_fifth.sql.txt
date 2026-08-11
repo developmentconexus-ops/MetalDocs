@@ -1,0 +1,3 @@
+-- guard fixture migration 0005 (already applied -- exists on origin/main).
+-- Never touched by this branch (head/head2). Only origin/main itself
+-- edits it, in base2/ -- see that layer's file for why.
