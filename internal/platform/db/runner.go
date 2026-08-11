@@ -135,4 +135,3 @@ func ctxIdentity(ctx context.Context) (tenantID, actorID string, ok bool) {
 func (r *sqlTxRunner) Do(ctx context.Context, fn func(tx *sql.Tx) error) error {
 	return r.do(ctx, nil, fn)
 }
-
