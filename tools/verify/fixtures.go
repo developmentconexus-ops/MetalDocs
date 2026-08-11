@@ -65,6 +65,18 @@ type Fixture struct {
 	// commit, then "head/" is copied over it and committed. Diff-shaped
 	// guards (governance rules, migration gaplessness) need a real before and
 	// after, and inventing that history is the only way to give them one.
+	//
+	// Optional second branch commit: if the tree ALSO contains a "head2/"
+	// directory, it is copied over "head/"'s result and committed as a
+	// SECOND commit on top of "head/" (still on the sandbox's "main"
+	// branch — this models one branch's own history, not a merge). This
+	// exists for bugs that only manifest across multiple intra-branch
+	// commits: a file introduced in "head/" and edited again in "head2/" is
+	// invisible to `git diff base head` (which only ever compares two
+	// trees), but IS visible to `git log base...HEAD --diff-filter=M`,
+	// because that walks each commit's diff against its own parent —
+	// migration-gapless's PR #113 false positive was exactly this shape.
+	// "base/" alone is unaffected if "head2/" is absent.
 	Dir string
 
 	// ArgvOverride replaces the check's Argv, and runs from the REPO ROOT
@@ -323,6 +335,15 @@ func materializeFixture(ctx context.Context, root, sandbox string, c Check) erro
 		return commitGitlinks(ctx, sandbox, c.Fixture.Gitlinks)
 	}
 
+	return materializeLayeredFixture(ctx, src, sandbox)
+}
+
+// materializeLayeredFixture commits "base/", points refs/remotes/origin/main
+// at it, commits "head/" on top, then commits an optional "head2/" on top of
+// that — see the Fixture.Dir doc comment for why a second branch-only commit
+// exists. Split out of materializeFixture to keep that function's branching
+// under the gocyclo cap; this is the layered-only half of the work.
+func materializeLayeredFixture(ctx context.Context, src, sandbox string) error {
 	if err := copyTree(filepath.Join(src, "base"), sandbox); err != nil {
 		return err
 	}
@@ -337,7 +358,22 @@ func materializeFixture(ctx context.Context, root, sandbox string, c Check) erro
 	if err := copyTree(filepath.Join(src, "head"), sandbox); err != nil {
 		return err
 	}
-	return gitCommit(ctx, sandbox, "head")
+	if err := gitCommit(ctx, sandbox, "head"); err != nil {
+		return err
+	}
+
+	// Optional second branch-only commit — see the Dir field's doc comment.
+	head2 := false
+	if fi, statErr := os.Stat(filepath.Join(src, "head2")); statErr == nil && fi.IsDir() {
+		head2 = true
+	}
+	if !head2 {
+		return nil
+	}
+	if err := copyTree(filepath.Join(src, "head2"), sandbox); err != nil {
+		return err
+	}
+	return gitCommit(ctx, sandbox, "head2")
 }
 
 // fixtureArgv resolves what to run and from where.

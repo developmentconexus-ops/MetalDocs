@@ -5,6 +5,20 @@ set -euo pipefail
 # inline "Check gapless sequence + no historical edits" step (Task R2),
 # itself copied verbatim from invariants.yml:migration-gapless. Registered as
 # tools/verify check "migration-gapless".
+#
+# KNOWN LIMITATION (named, not fixed here — separate slice): the
+# historical-edit half of this check only sees commits already in
+# `origin/$BASE...HEAD` at the moment it runs. If a developer commits an
+# edit to an already-applied migration and then, in that SAME commit or
+# working session, runs this check locally BEFORE committing the edit,
+# `git log` cannot see a commit that does not exist yet — the check passes.
+# The instant the edit IS committed, the same check (run again, or run in
+# CI) fails on it. A check a commit can satisfy at run time and violate by
+# the act of committing has a blind spot by construction: it can only ever
+# catch the violation on a LATER run, never on the run that introduces it.
+# This PR narrows *what* counts as a violation (the base-existence
+# precondition below); it does not change *when* the check observes one,
+# and does not close this gap.
 MIGRATION_DIR="db/migrations"
 
 # After the 2026-07-29 fold (migrations 0257-0315 squashed into
@@ -64,7 +78,48 @@ if ! GIT_LOG_OUTPUT=$(git log --diff-filter=M --follow --name-only \
   echo "❌ git log failed while checking for historical migration edits (bad ref origin/$BASE?, shallow clone?)"
   exit 1
 fi
-MODIFIED=$(printf '%s\n' "$GIT_LOG_OUTPUT" | grep '\.sql$' || true)
+MODIFIED_CANDIDATES=$(printf '%s\n' "$GIT_LOG_OUTPUT" | grep '\.sql$' || true)
+
+# Base-existence precondition. The invariant this check protects is "a
+# migration that has already been APPLIED must never change" — but
+# `--diff-filter=M` above is not that predicate. `git log` over a commit
+# RANGE classifies each commit's own diff against ITS OWN PARENT, one
+# commit at a time. A file added by an earlier commit on THIS branch and
+# edited by a later commit on THIS branch shows up as Modified between
+# those two branch-only commits, even though the file has never touched
+# the base branch and nothing has ever "applied" it. The comment two lines
+# above this block ("only check files that exist in main already") already
+# named the intended invariant — it was just never enforced in code.
+#
+# Confirmed live on PR #113: db/migrations/0318_capability_bindings_schema_
+# backfill.sql was ADDED by that branch (`git cat-file -e
+# origin/main:db/migrations/0318_capability_bindings_schema_backfill.sql`
+# fails — the file does not exist on origin/main) and edited twice
+# afterward. The old predicate fired on it anyway, because it never asked
+# whether the file existed on the base branch at all — only whether some
+# pair of branch commits disagreed about its content.
+#
+# A migration is subject to the immutability rule ONLY if it exists on the
+# base branch tree. The comparison point is the merge base with
+# origin/$BASE, not origin/$BASE's current tip — same resolution
+# check-eslint-suppression-baseline-growth.sh uses and for the same reason:
+# origin/$BASE keeps moving while a PR is open, and the question is "did
+# this exist when the branch forked", not "does it exist on main right
+# now". Unresolvable fails closed, matching the `git log` failure handling
+# above — a comparison this check cannot prove must not silently pass.
+if ! MERGE_BASE=$(git merge-base "origin/$BASE" HEAD 2>&1); then
+  echo "❌ git merge-base origin/$BASE HEAD failed while checking for historical migration edits (bad ref origin/$BASE?, shallow clone?, unrelated histories?): $MERGE_BASE"
+  exit 1
+fi
+
+MODIFIED=""
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  if git cat-file -e "$MERGE_BASE:$f" 2>/dev/null; then
+    MODIFIED="$MODIFIED$f
+"
+  fi
+done <<<"$MODIFIED_CANDIDATES"
 
 if [ -n "$MODIFIED" ]; then
   echo "❌ Historical migrations modified: $MODIFIED"
