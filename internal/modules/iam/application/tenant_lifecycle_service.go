@@ -586,24 +586,10 @@ func (s *TenantLifecycleService) eraseTenantRowsTx(bgCtx context.Context, job Te
 			return fmt.Errorf("seed erasure lifecycle context: %w", err)
 		}
 
-		// Early phase (tenantdata.EarlyEraser, optional): runs BEFORE any
-		// ordered port below, for the narrow set of tables that hold an
-		// outbound FK into a module ranked LATER than their own owning
-		// module in eraseOrder — a two-way cross-module dependency a flat
-		// order cannot express in one direction alone. iam implements this
-		// today for user_process_areas and capability_bindings, both FK'd
-		// into taxonomy's document_process_areas (taxonomy is ranked before
-		// iam) — see tenantdata.EarlyEraser's doc and the iam TenantDataPort
-		// type doc for the full mechanism and the live-reproduced bug this
-		// closes.
-		for _, port := range s.ports {
-			early, ok := port.(tenantdata.EarlyEraser)
-			if !ok {
-				continue
-			}
-			if _, err := early.EraseEarly(bgCtx, tx, job.TenantID); err != nil {
-				return fmt.Errorf("erase tenant data early (%s): %w", port.Module(), err)
-			}
+		// Early phase (tenantdata.EarlyEraser, optional) runs before any
+		// ordered port below — see runEarlyErasers' doc for why it exists.
+		if err := s.runEarlyErasers(bgCtx, tx, job.TenantID); err != nil {
+			return err
 		}
 
 		for _, port := range orderedPorts(s.ports) {
@@ -624,6 +610,29 @@ func (s *TenantLifecycleService) eraseTenantRowsTx(bgCtx context.Context, job Te
 		}
 		return nil
 	})
+}
+
+// runEarlyErasers runs the tenantdata.EarlyEraser phase (optional, opt-in)
+// for the narrow set of ports that hold an outbound FK into a module ranked
+// LATER than their own owning module in eraseOrder — a two-way cross-module
+// dependency a flat order cannot express in one direction alone. iam
+// implements this today for user_process_areas and capability_bindings,
+// both FK'd into taxonomy's document_process_areas (taxonomy is ranked
+// before iam) — see tenantdata.EarlyEraser's doc and the iam
+// TenantDataPort type doc for the full mechanism and the live-reproduced
+// bug this closes. Extracted out of eraseTenantRowsTx to keep that
+// function's cognitive complexity under the repo's gocognit cap.
+func (s *TenantLifecycleService) runEarlyErasers(bgCtx context.Context, tx *sql.Tx, tenantID string) error {
+	for _, port := range s.ports {
+		early, ok := port.(tenantdata.EarlyEraser)
+		if !ok {
+			continue
+		}
+		if _, err := early.EraseEarly(bgCtx, tx, tenantID); err != nil {
+			return fmt.Errorf("erase tenant data early (%s): %w", port.Module(), err)
+		}
+	}
+	return nil
 }
 
 // eraseTenantBlobs runs runErase's phase 2: blob deletion. Idempotent:
