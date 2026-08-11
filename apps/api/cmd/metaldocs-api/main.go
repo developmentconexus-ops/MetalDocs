@@ -830,6 +830,16 @@ func buildAuditService(deps bootstrap.APIDependencies) *auditapp.Service {
 	auditService := auditapp.NewService(deps.AuditReader)
 	if deps.AuditCounter != nil && deps.AuditExports != nil {
 		auditService.WithExports(deps.AuditCounter, deps.AuditExports, deps.AuditWriter, auditExportDownloadURL)
+		// P1 (PR #121 review round 1): re-check erasure status immediately
+		// before ExportEvents persists an export job, closing the window
+		// where a tenant's erasure commits after rows were fetched but
+		// before the job is durably written. deps.AuditWriter is the same
+		// *auditpg.Writer instance already wired with WithTenantErasureCheck
+		// in bootstrap.BuildAPIDependencies (see wireAuditPayloadCrypto for
+		// the sibling type-assertion pattern).
+		if auditWriter, ok := deps.AuditWriter.(*auditpg.Writer); ok {
+			auditService.WithErasureCheck(auditWriter)
+		}
 	}
 	return auditService
 }

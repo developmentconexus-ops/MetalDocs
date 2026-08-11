@@ -269,6 +269,15 @@ func (w *Writer) tenantErased(ctx context.Context, tenantID string) (bool, error
 	return w.erasure.IsErased(ctx, tenantID)
 }
 
+// IsErased is the exported form of tenantErased, satisfying
+// domain.ErasureChecker so a caller with a longer-running flow than a single
+// read (application.Service.ExportEvents, via WithErasureCheck) can re-check
+// erasure status at a specific point of its own choosing rather than only at
+// ListEvents read time. Same fail-closed contract as tenantErased.
+func (w *Writer) IsErased(ctx context.Context, tenantID string) (bool, error) {
+	return w.tenantErased(ctx, tenantID)
+}
+
 // ValidateIntegrity re-derives prev_hash/row_hash for the most recent
 // auditIntegrityValidationWindow rows and reports any mismatch as an
 // IntegrityIssue, capped at auditIntegrityIssueLimit. Used by the

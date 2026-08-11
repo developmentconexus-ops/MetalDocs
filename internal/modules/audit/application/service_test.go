@@ -96,6 +96,107 @@ func TestGetExportStatus_RequiresActorID(t *testing.T) {
 	}
 }
 
+// stubErasureChecker is a configurable domain.ErasureChecker test double.
+type stubErasureChecker struct {
+	erased bool
+	err    error
+	calls  int
+}
+
+func (s *stubErasureChecker) IsErased(_ context.Context, _ string) (bool, error) {
+	s.calls++
+	return s.erased, s.err
+}
+
+// exportTestTenantID is a syntactically valid UUID — buildExportJob parses
+// TenantID with uuid.Parse, unlike ListEvents which treats it as an opaque
+// string, so the ExportEvents tests below need a real UUID, not "tenant-a".
+const exportTestTenantID = "11111111-1111-1111-1111-111111111111"
+
+func TestExportEvents_RefusesPersistWhenTenantErasedBeforeSave(t *testing.T) {
+	t.Parallel()
+
+	w := memory.NewWriter()
+	if err := w.Record(context.Background(), mustEvent(t, exportTestTenantID, "actor-1")); err != nil {
+		t.Fatalf("seed event: %v", err)
+	}
+	exports := memory.NewExportJobRepository()
+	erasure := &stubErasureChecker{erased: true}
+
+	svc := application.NewService(w).
+		WithExports(w, exports, w, func(domain.ExportJob) string { return "" }).
+		WithErasureCheck(erasure)
+
+	_, err := svc.ExportEvents(context.Background(), "actor-1", domain.ExportFormatCSV, domain.ListEventsQuery{TenantID: exportTestTenantID})
+	if !errors.Is(err, application.ErrExportTenantErased) {
+		t.Fatalf("ExportEvents error = %v, want ErrExportTenantErased", err)
+	}
+	if erasure.calls != 1 {
+		t.Fatalf("erasure.calls = %d, want exactly 1 (re-checked once, immediately before persist)", erasure.calls)
+	}
+	if got := exports.Len(); got != 0 {
+		t.Fatalf("export rows persisted = %d, want 0 — erasure committed before Save, nothing should have been written", got)
+	}
+}
+
+func TestExportEvents_RefusesPersistWhenErasureCheckErrors(t *testing.T) {
+	t.Parallel()
+
+	w := memory.NewWriter()
+	if err := w.Record(context.Background(), mustEvent(t, exportTestTenantID, "actor-1")); err != nil {
+		t.Fatalf("seed event: %v", err)
+	}
+	exports := memory.NewExportJobRepository()
+	erasure := &stubErasureChecker{err: errors.New("boom: erasure lookup unavailable")}
+
+	svc := application.NewService(w).
+		WithExports(w, exports, w, func(domain.ExportJob) string { return "" }).
+		WithErasureCheck(erasure)
+
+	_, err := svc.ExportEvents(context.Background(), "actor-1", domain.ExportFormatCSV, domain.ListEventsQuery{TenantID: exportTestTenantID})
+	if !errors.Is(err, application.ErrExportTenantErased) {
+		t.Fatalf("ExportEvents error = %v, want ErrExportTenantErased (fail closed on lookup error)", err)
+	}
+	if got := exports.Len(); got != 0 {
+		t.Fatalf("export rows persisted = %d, want 0 — an erasure-check error must fail closed, not persist", got)
+	}
+}
+
+func TestExportEvents_PersistsWhenTenantActive(t *testing.T) {
+	t.Parallel()
+
+	w := memory.NewWriter()
+	if err := w.Record(context.Background(), mustEvent(t, exportTestTenantID, "actor-1")); err != nil {
+		t.Fatalf("seed event: %v", err)
+	}
+	exports := memory.NewExportJobRepository()
+	erasure := &stubErasureChecker{erased: false}
+
+	svc := application.NewService(w).
+		WithExports(w, exports, w, func(domain.ExportJob) string { return "" }).
+		WithErasureCheck(erasure)
+
+	job, err := svc.ExportEvents(context.Background(), "actor-1", domain.ExportFormatCSV, domain.ListEventsQuery{TenantID: exportTestTenantID})
+	if err != nil {
+		t.Fatalf("ExportEvents: %v", err)
+	}
+	if got := exports.Len(); got != 1 {
+		t.Fatalf("export rows persisted = %d, want 1 for an active tenant (over-block guard)", got)
+	}
+	if job.ID == "" {
+		t.Fatal("job.ID empty, want a persisted export job")
+	}
+}
+
+func mustEvent(t *testing.T, tenantID, actorID string) domain.Event {
+	t.Helper()
+	event, err := domain.NewEvent(tenantID, "document", "doc-1", actorID, "document.viewed", map[string]string{"k": "v"})
+	if err != nil {
+		t.Fatalf("NewEvent: %v", err)
+	}
+	return event
+}
+
 func TestWithExportsPanicsOnNilDependency(t *testing.T) {
 	t.Parallel()
 

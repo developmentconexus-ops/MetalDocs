@@ -160,6 +160,17 @@ type IntegrityValidator interface {
 	ValidateIntegrity(ctx context.Context) ([]IntegrityIssue, error)
 }
 
+// ErasureChecker reports whether a tenant has been erased (ADR 0070
+// crypto-shred). application.Service.ExportEvents uses it to re-check status
+// immediately before persisting an export job, closing the window where a
+// tenant's erasure commits after the export's rows were fetched (an earlier,
+// separate read) but before the export job is written to durable storage
+// (PR #121 review round 1, P1 — export-persistence half). Implementations
+// must fail closed: a lookup error must not be treated as "not erased".
+type ErasureChecker interface {
+	IsErased(ctx context.Context, tenantID string) (bool, error)
+}
+
 // ---- Export job types -----------------------------------------------------
 
 // ExportFormat is the requested serialization for an audit export (csv or
