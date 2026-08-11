@@ -2572,6 +2572,9 @@ export interface components {
                 placeholder_schema: unknown[];
             };
         };
+        PutPlaceholderValueRequest: {
+            value: string;
+        };
         PutPlaceholderValueResponse: {
             placeholder_id: string;
             /** Format: date-time */
@@ -2622,6 +2625,9 @@ export interface components {
             held_by: string;
             /** Format: date-time */
             held_until: string;
+        };
+        DocumentSessionIdRequest: {
+            session_id: string;
         };
         DocumentAutosavePresignResponse: {
             upload_url: string;
@@ -2989,6 +2995,10 @@ export interface components {
             items: components["schemas"]["SessionItem"][];
             page: components["schemas"]["CursorPage"];
             total?: number;
+        };
+        /** @description Optional best-effort reason for the revoke, recorded in the audit payload only. An absent, empty, or malformed body is accepted — the revoke proceeds with an empty reason rather than failing the request. */
+        RevokeSessionRequest: {
+            reason?: string;
         };
         MfaCoverageRoleSlice: {
             role: components["schemas"]["UserRole"];
@@ -4835,7 +4845,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RevokeSessionRequest"];
+            };
+        };
         responses: {
             /** @description Sessao revogada */
             204: {
@@ -6724,7 +6738,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentSessionIdRequest"];
+            };
+        };
         responses: {
             /** @description heartbeat accepted */
             204: {
@@ -6750,7 +6768,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentSessionIdRequest"];
+            };
+        };
         responses: {
             /** @description released */
             204: {
@@ -6776,7 +6798,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentSessionIdRequest"];
+            };
+        };
         responses: {
             /** @description released */
             204: {
@@ -7265,7 +7291,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": components["schemas"]["PutPlaceholderValueRequest"];
             };
         };
         responses: {
