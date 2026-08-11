@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -180,6 +182,9 @@ func runMain() int {
 	}
 
 	if workerCfg.RunOnce {
+		// A one-shot batch invocation exits within this call; there is no
+		// persistent process for an orchestrator to probe, so the A7.1
+		// infra server is deliberately not started here (see infraserver.go).
 		if err := runWorkerBatch(ctx, workerSvc, workerCfg.BatchSize); err != nil {
 			slog.Error("worker run failed", "err", err)
 			return 1
@@ -187,14 +192,40 @@ func runMain() int {
 		return 0
 	}
 
+	// A7.1: liveness/readiness/metrics on a dedicated infra-port listener.
+	// A bind/serve failure here is logged, not fatal — it must not block the
+	// worker's actual job (draining the outbox) from proceeding, matching
+	// the roadmap's "additive endpoints, no behavior change" acceptance
+	// bound for this slice.
+	readiness := &workerReadiness{}
+	infraServer, err := buildInfraServer(deps, readiness)
+	if err != nil {
+		slog.Error("invalid worker infra server config", "err", err)
+		return 1
+	}
+	go func() {
+		if err := infraServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("worker infra server failed", "err", err)
+		}
+	}()
+
 	ticker := time.NewTicker(time.Duration(workerCfg.PollIntervalSeconds) * time.Second)
 	defer ticker.Stop()
 	slog.Info("MetalDocs Worker running",
 		"poll_interval_s", workerCfg.PollIntervalSeconds, "batch_size", workerCfg.BatchSize,
 		"max_attempts", workerCfg.MaxAttempts, "retry_base_seconds", workerCfg.RetryBaseSeconds,
-		"retry_max_seconds", workerCfg.RetryMaxSeconds)
+		"retry_max_seconds", workerCfg.RetryMaxSeconds, "infra_addr", infraServer.Addr)
 
+	readiness.MarkStarted()
 	runWorkerLoop(ctx, workerSvc, workerCfg.BatchSize, ticker.C)
+	readiness.MarkStopped()
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer shutdownCancel()
+	if err := infraServer.Shutdown(shutdownCtx); err != nil {
+		slog.Warn("worker infra server shutdown incomplete", "err", err)
+	}
+
 	return 0
 }
 
