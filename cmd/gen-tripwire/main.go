@@ -1,9 +1,8 @@
 // Command gen-tripwire writes the machine-generated tripwire SQL
 // (internal/platform/tripwire.RenderMigration()) to the committed golden render
-// at internal/platform/tripwire/golden/ (0301 as of unit 3.1a S5, ADR 0082
-// phase c: templates_template_version arm drops 'template.review' — the legacy
-// reviewer stage was deleted in S4 and the capability is retired from the
-// IAM registry in the same change-set).
+// at internal/platform/tripwire/golden/ (0319 as of issue #89/A8.1, ADR 0092
+// D1: capability_bindings + roles arms added, with one-time trigger
+// attachments on both new tables).
 //
 // The default target is a GOLDEN, not a migration: the 2026-07-29 fold squashed
 // migrations 0257-0315 into db/baseline and archived the files under
@@ -34,7 +33,7 @@ import (
 	"metaldocs/internal/platform/tripwire"
 )
 
-const defaultRelPath = "internal/platform/tripwire/golden/0301_tripwire_template_review_retired.sql"
+const defaultRelPath = "internal/platform/tripwire/golden/0319_capability_bindings_tripwire.sql"
 
 func main() {
 	out := defaultRelPath

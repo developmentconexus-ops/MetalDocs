@@ -30,11 +30,14 @@ func TestTripwireArms_CapsAreRegistryReal(t *testing.T) {
 // tenant.onboard — 19 entries), M7 §5 (F7.3, ADR 0070: +1
 // tenant_lifecycle_jobs/INSERT arm gated on tenant.export OR tenant.erase — 20
 // entries), ADR 0083 / M3 P3.S2b-3b-0 (approval_instances/INSERT arm #1
-// splits into two subject-discriminated entries — 21 entries), and ADR 0083's
+// splits into two subject-discriminated entries — 21 entries), ADR 0083's
 // follow-on / M3 P3.S2b-3b-iii-a (approval_signoffs/INSERT arm #2 splits into
-// two parent-lookup-discriminated entries — 22 entries). Divergence is HS-7.
-// The key includes WhenValue so the discriminated entries (same table+op,
-// different subject) are distinct rows rather than colliding.
+// two parent-lookup-discriminated entries — 22 entries), and issue #89/A8.1
+// (ADR 0092 D1: +1 capability_bindings/ANY arm gated on user.manage OR
+// membership.manage, +1 roles/ANY arm gated on user.manage — 24 entries).
+// Divergence is HS-7. The key includes WhenValue so the discriminated
+// entries (same table+op, different subject) are distinct rows rather than
+// colliding.
 func TestTripwireArms_MatchesContractTable(t *testing.T) {
 	type key struct {
 		table     string
@@ -86,6 +89,10 @@ func TestTripwireArms_MatchesContractTable(t *testing.T) {
 		// export/erase enqueue INSERTs metaldocs.tenant_lifecycle_jobs under
 		// tenant.export OR tenant.erase (match-one).
 		{"tenant_lifecycle_jobs", OpInsert, ""}: {iamdomain.CapTenantExport, iamdomain.CapTenantErase},
+		// Issue #89/A8.1 (ADR 0092 D1): the two tables migration 0318 creates,
+		// gated by migration 0319's arm extension.
+		{"capability_bindings", OpAny, ""}: {iamdomain.CapUserManage, iamdomain.CapMembershipManage},
+		{"roles", OpAny, ""}:               {iamdomain.CapUserManage},
 	}
 
 	if len(TripwireArms) != len(want) {
@@ -137,9 +144,13 @@ func TestTripwireArms_MatchesContractTable(t *testing.T) {
 // the parent approval_instances row's subject_kind + a nested CASE), then to
 // db/migrations/0301_*.sql (ADR 0082 phase c, unit 3.1a S5:
 // templates_template_version arm drops template.review — legacy reviewer
-// stage deleted in S4, capability retired from the IAM registry), so the
-// golden target advances with the latest rendered migration (M7
-// validation-contract.md §5, M6 §3, M2 §1.4/§1.5.a, ADR 0083 + follow-on).
+// stage deleted in S4, capability retired from the IAM registry), then to
+// db/migrations/0319_*.sql (issue #89/A8.1, ADR 0092 D1:
+// capability_bindings + roles arms added, gating the two tables migration
+// 0318 creates, with one-time trigger attachments on both), so the golden
+// target advances with the latest rendered migration (M7
+// validation-contract.md §5, M6 §3, M2 §1.4/§1.5.a, ADR 0083 + follow-on, ADR
+// 0092 D1).
 //
 // Since the 2026-07-29 migration fold the golden no longer lives in
 // db/migrations/ (0257-0315 were squashed into db/baseline and archived under
@@ -149,7 +160,7 @@ func TestTripwireArms_MatchesContractTable(t *testing.T) {
 // TRIPWIRE-ARM-PARITY rule from the same path. Any future tripwire vocabulary
 // change ships as a NEW forward migration in db/migrations/ regenerated to a
 // new version — see internal/platform/tripwire/golden/README.md.
-const goldenRelPath = "internal/platform/tripwire/golden/0301_tripwire_template_review_retired.sql"
+const goldenRelPath = "internal/platform/tripwire/golden/0319_capability_bindings_tripwire.sql"
 
 func TestRenderMigration_MatchesCommittedFile(t *testing.T) {
 	repoRoot, err := findRepoRoot()

@@ -1,9 +1,8 @@
 # Tripwire golden render
 
-`0301_tripwire_template_review_retired.sql` in this directory is **not a migration**.
-It is the committed golden artifact that pins
-`internal/platform/tripwire.RenderMigration()` byte-for-byte, so a hand-edit of the
-generated SQL or a stale regeneration is caught by two blocking gates:
+`0319_capability_bindings_tripwire.sql` in this directory is a committed golden
+artifact that pins `internal/platform/tripwire.RenderMigration()` byte-for-byte, so a
+hand-edit of the generated SQL or a stale regeneration is caught by two blocking gates:
 
 - `scripts/api-lint` rule `TRIPWIRE-ARM-PARITY` (`tripwire_arm_rules.go`, run with
   `-strict` by `.github/workflows/api-contract.yml`)
@@ -11,16 +10,20 @@ generated SQL or a stale regeneration is caught by two blocking gates:
 
 Regenerate it with `go run ./cmd/gen-tripwire` (no argument → this path).
 
-## Why it lives here and not in `db/migrations/`
+## Why it lives here and not only in `db/migrations/`
 
-It used to be the newest forward tripwire migration. The 2026-07-29 fold squashed
-migrations 0257–0315 into `db/baseline/0001_current_schema.sql` and archived the files
-under `archive/migrations/post-baseline-2026-07-fold/`, which is a conceptually
-immutable historical record — a regenerable golden cannot live there, and
-`db/migrations/` no longer carries the file at all. The golden was therefore re-homed
-next to the renderer that produces it. The archived copy at
-`archive/migrations/post-baseline-2026-07-fold/0301_tripwire_template_review_retired.sql`
-is byte-identical today and must stay untouched.
+Through 0301, this golden pinned a migration that had been folded into
+`db/baseline/0001_current_schema.sql` (the 2026-07-29 fold squashed migrations
+0257–0315 and archived the files under
+`archive/migrations/post-baseline-2026-07-fold/`, a conceptually immutable historical
+record) — so the regenerable golden lived only here, with no live counterpart in
+`db/migrations/`.
+
+0319 (issue #89/A8.1, ADR 0092 D1) is past that fold boundary: it is BOTH a real,
+unarchived forward migration at `db/migrations/0319_capability_bindings_tripwire.sql`
+AND pinned here byte-identically as the golden CI reads. The two copies must stay in
+sync — regenerating one without the other is exactly the drift TRIPWIRE-ARM-PARITY
+exists to catch.
 
 ## Changing the tripwire vocabulary
 

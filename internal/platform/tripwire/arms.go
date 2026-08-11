@@ -95,8 +95,11 @@ type Arm struct {
 // P3.S2b-3b-iii-a (approval_signoffs/INSERT arm #2 splits into two
 // parent-lookup-discriminated entries — 22 entries total; approval_signoffs
 // has no direct subject_kind column, so its discriminator resolves via the
-// parent approval_instances row, per ADR 0083 §Consequences). Any other
-// deviation is HS-7 (see those binding clauses).
+// parent approval_instances row, per ADR 0083 §Consequences), and issue
+// #89/A8.1 (ADR 0092 D1: migration 0318 creates metaldocs.capability_bindings
+// + metaldocs.roles; migration 0319 — machine-generated, this extension —
+// adds their arms, 24 entries total). Any other deviation is HS-7 (see those
+// binding clauses).
 var TripwireArms = []Arm{
 	{ // 1a — ADR 0083: approval_instances is a shared (subject_kind,
 		// subject_key) kernel table (ADR 0082). A flat match-one arm here would
@@ -284,5 +287,23 @@ var TripwireArms = []Arm{
 		Table: "tenant_lifecycle_jobs",
 		Op:    OpInsert,
 		Caps:  []iamdomain.Capability{iamdomain.CapTenantExport, iamdomain.CapTenantErase},
+	},
+	{ // 21 — issue #89/A8.1 (ADR 0092 D1): metaldocs.capability_bindings is the
+		// new grant relation (migration 0318); this migration (0319) is its own
+		// arm-attachment migration, the same "create table, then attach the
+		// trigger separately" precedent as #19/#20 (tenants, tenant_lifecycle_jobs).
+		// Backfill writers (iam_user_roles, user_process_areas, iam_group_roles
+		// grants/revokes) are user.manage or membership.manage today; match-one
+		// admits either until A8.2 introduces a dedicated native-grant writer.
+		Table: "capability_bindings",
+		Op:    OpAny,
+		Caps:  []iamdomain.Capability{iamdomain.CapUserManage, iamdomain.CapMembershipManage},
+	},
+	{ // 22 — issue #89/A8.1 companion entry: metaldocs.roles is a tenant-id-less
+		// global catalog (v_tenant_id := NULL in the trigger), mirroring the
+		// iam_group_roles (#18) precedent exactly.
+		Table: "roles",
+		Op:    OpAny,
+		Caps:  []iamdomain.Capability{iamdomain.CapUserManage},
 	},
 }

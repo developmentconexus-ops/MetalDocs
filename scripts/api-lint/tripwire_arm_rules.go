@@ -67,8 +67,10 @@ import (
 // require template.approve, never unioned), then to 0301 (ADR 0082 phase c,
 // unit 3.1a S5: templates_template_version arm drops template.review — the
 // legacy reviewer stage was deleted in S4 and the capability is retired from
-// the IAM registry in the same change-set).
-const tripwireGoldenPath = "internal/platform/tripwire/golden/0301_tripwire_template_review_retired.sql"
+// the IAM registry in the same change-set), then to 0319 (issue #89/A8.1, ADR
+// 0092 D1: capability_bindings + roles arms added, gating the two tables
+// migration 0318 creates, with one-time trigger attachments on both).
+const tripwireGoldenPath = "internal/platform/tripwire/golden/0319_capability_bindings_tripwire.sql"
 
 // gatedTableSet returns the set of table names present in TripwireArms — the
 // tables TRIPWIRE-ARM-DRIFT restricts its attention to (contract §1.5.b: "only

@@ -5,20 +5,23 @@ import (
 	"strings"
 )
 
-// RenderMigration renders the full 0301 forward-only migration SQL,
-// regenerated from the prior tripwire migration (0300) with every CASE branch
-// preserved byte-for-byte EXCEPT templates_template_version, whose
-// v_required_caps literal drops 'template.review' (ADR 0082 phase c, unit
-// 3.1a S5): the legacy reviewer stage (Service.Review) — the only writer that
-// asserted the cap on that table (added by 0269) — was deleted with the
-// legacy template-approval path, and CapTemplateReview is retired from the
-// IAM capability registry in the same change-set (compile-enforced: the arm
-// references the Go const, which no longer exists).
+// RenderMigration renders the full 0319 forward-only migration SQL,
+// regenerated from the prior tripwire migration (0301) with every CASE branch
+// preserved byte-for-byte PLUS two new arms (issue #89/A8.1, ADR 0092 D1):
+// metaldocs.capability_bindings (OpAny, user.manage OR membership.manage) and
+// metaldocs.roles (OpAny, user.manage, tenant-id-less like iam_group_roles).
+// Both tables are brand new (created by migration 0318, with no
+// capability-assertion trigger yet — see that file's header for why the
+// backfill runs before this migration attaches one), so this migration also
+// emits their one-time trigger attachments, the same "create table, attach
+// trigger separately" precedent as 0277 (tenants) / 0279
+// (tenant_lifecycle_jobs).
 // Branch order follows M2 validation-contract.md §1.2 as extended by M6 §3
 // (documents/UPDATE gains document.review), M7 §5 (tenants/INSERT arm), M7 §5
 // (tenant_lifecycle_jobs/INSERT arm), ADR 0083 (approval_instances/INSERT
-// subject discrimination), and ADR 0083's follow-on (approval_signoffs/INSERT
-// parent-lookup subject discrimination). Determinism: TripwireArms is a fixed
+// subject discrimination), ADR 0083's follow-on (approval_signoffs/INSERT
+// parent-lookup subject discrimination), and issue #89/A8.1 (ADR 0092 D1:
+// capability_bindings + roles arms). Determinism: TripwireArms is a fixed
 // slice, so this returns identical output every call.
 func RenderMigration() string {
 	return migrationHeader +
@@ -140,6 +143,15 @@ func RenderMigration() string {
 		"      -- metaldocs.tenant_lifecycle_jobs (kind discriminates which).\n" +
 		"      v_required_caps := " + renderArray(findArm("tenant_lifecycle_jobs", OpInsert)) + ";\n" +
 		"      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);\n" +
+		"    -- ── New branches (issue #89/A8.1, ADR 0092 D1) ──────────────────────────\n" +
+		"    WHEN TG_TABLE_NAME = 'capability_bindings' THEN\n" +
+		"      v_required_caps := " + renderArray(findArm("capability_bindings", OpAny)) + ";\n" +
+		"      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);\n" +
+		"    WHEN TG_TABLE_NAME = 'roles' THEN\n" +
+		"      v_required_caps := " + renderArray(findArm("roles", OpAny)) + ";\n" +
+		"      -- metaldocs.roles has no tenant_id column (global catalog); mirrors\n" +
+		"      -- the iam_group_roles precedent for tenant_id-less tables.\n" +
+		"      v_tenant_id     := NULL;\n" +
 		"    ELSE\n" +
 		"      -- Fail-closed: a table carrying this trigger with no capability mapping is a\n" +
 		"      -- wiring error, not a license to pass through. Refuse the write loudly.\n" +
@@ -243,51 +255,69 @@ func RenderMigration() string {
 		"  BEFORE INSERT ON metaldocs.tenant_lifecycle_jobs\n" +
 		"  FOR EACH ROW EXECUTE FUNCTION public.enforce_capability_asserted();\n" +
 		"\n" +
+		"-- One-time attachment on metaldocs.capability_bindings (issue #89/A8.1,\n" +
+		"-- ADR 0092 D1). OpAny (INSERT/UPDATE/DELETE): the relation carries the\n" +
+		"-- same grant/revoke/history lifecycle as the tables it succeeds\n" +
+		"-- (iam_user_roles/user_process_areas/iam_group_roles, all OpAny-gated), so\n" +
+		"-- every mutation kind is gated identically.\n" +
+		"DROP TRIGGER IF EXISTS trg_require_cap_asserted ON metaldocs.capability_bindings;\n" +
+		"CREATE TRIGGER trg_require_cap_asserted\n" +
+		"  BEFORE INSERT OR UPDATE OR DELETE ON metaldocs.capability_bindings\n" +
+		"  FOR EACH ROW EXECUTE FUNCTION public.enforce_capability_asserted();\n" +
+		"\n" +
+		"-- One-time attachment on metaldocs.roles (issue #89/A8.1 companion arm).\n" +
+		"-- OpAny, mirroring the iam_group_roles (0259) precedent for a small\n" +
+		"-- reference catalog with no tenant_id column.\n" +
+		"DROP TRIGGER IF EXISTS trg_require_cap_asserted ON metaldocs.roles;\n" +
+		"CREATE TRIGGER trg_require_cap_asserted\n" +
+		"  BEFORE INSERT OR UPDATE OR DELETE ON metaldocs.roles\n" +
+		"  FOR EACH ROW EXECUTE FUNCTION public.enforce_capability_asserted();\n" +
+		"\n" +
 		"-- ── schema_migrations ledger ─────────────────────────────────────────────────────────────\n" +
 		"\n" +
 		"INSERT INTO public.schema_migrations (version, description)\n" +
-		"VALUES ('0301', '" + ledgerDescription + "')\n" +
+		"VALUES ('0319', '" + ledgerDescription + "')\n" +
 		"ON CONFLICT (version) DO NOTHING;\n" +
 		"\n" +
 		"COMMIT;\n"
 }
 
-// migrationHeader is the file-header comment block for 0301, in
-// 0269/0270/0271/0275/0277/0283/0299/0300 house style: goal/incident framing,
-// root cause, writer inventory, fix statement.
-const migrationHeader = `-- 0301_tripwire_template_review_retired.sql
--- Unit 3.1a S5 (ADR 0082 phase c -- legacy template-approval retirement):
--- the legacy role-based template-approval path is deleted. S4 removed the 4
--- legacy routes and Service.Review -- the ONLY writer that asserted
--- 'template.review' while writing templates_template_version (the reason
--- 0269 added the cap to this arm) -- and this change-set (S5) retires the
--- 'template.review' capability from the IAM registry
--- (internal/modules/iam/domain/model.go), its catalog/scope entries, and the
--- role_capabilities reference seeds. The templates_template_version tripwire
--- arm is regenerated without it: keeping an unregistered capability string in
--- an arm is harmless at runtime (match-one semantics, no principal can hold
--- it) but the arm's Go source of truth references the CapTemplateReview
--- const, which no longer exists -- the removal is compile-enforced at the
--- generator, and the rendered SQL must follow.
+// migrationHeader is the file-header comment block for 0319, in
+// 0269/0270/0271/0275/0277/0283/0299/0300/0301 house style: goal/incident
+// framing, root cause, writer inventory, fix statement.
+const migrationHeader = `-- 0319_capability_bindings_tripwire.sql
+-- Issue #89/A8.1 (ADR 0092 D1 -- grant-model unification): the DB tripwire
+-- (enforce_capability_asserted) is extended to gate the two tables migration
+-- 0318 created -- metaldocs.capability_bindings and metaldocs.roles -- so the
+-- "DB enforces invariants; app checks are the friendly first line" backbone
+-- covers the new relation from day one, the same defense-in-depth every
+-- sibling grant table (iam_user_roles, user_process_areas, iam_group_roles)
+-- already has. Migration 0318 deliberately creates and backfills these
+-- tables BEFORE this trigger is attached (no writer other than 0318's own
+-- backfill exists yet, and no metaldocs.asserted_caps assertion is needed
+-- for a trigger that isn't attached); this migration closes that window
+-- before either table has a real application writer.
 --
 -- Fix, at the generator (internal/platform/tripwire/arms.go + render.go),
--- regenerated here: TripwireArms arm #14 (templates_template_version, ANY op)
--- drops 'template.review', leaving ARRAY['template.create', 'template.edit',
--- 'template.submit', 'template.approve', 'template.publish']. Reverses 0269
--- for the deleted reviewer stage; the surviving create/autosave/submit and
--- kernel-driven approve/publish writers are unaffected (their caps stay).
+-- regenerated here: TripwireArms gains #21 (capability_bindings, ANY op,
+-- ARRAY['user.manage', 'membership.manage'] match-one) and #22 (roles, ANY
+-- op, ARRAY['user.manage'], tenant-id-less like iam_group_roles). Both
+-- tables get one-time DROP TRIGGER IF EXISTS + CREATE TRIGGER attachments
+-- (the same precedent as 0277/tenants and 0279/tenant_lifecycle_jobs) for
+-- INSERT OR UPDATE OR DELETE, mirroring the OpAny lifecycle of the three
+-- relations capability_bindings succeeds.
 --
 -- No other arm/cap change of any kind -- every other CASE branch and its
--- v_required_caps literal are reproduced byte-for-byte from 0300. This
+-- v_required_caps literal are reproduced byte-for-byte from 0301. This
 -- migration is machine-generated from internal/platform/tripwire
 -- (TripwireArms + RenderMigration) per the M2 regeneration protocol
 -- (milestone-2-authz-enforcement-generation/validation-contract.md §1.2/§1.4)
--- as amended by ADR 0083 and its follow-on. Supersedes 0300 as the latest
--- definition of public.enforce_capability_asserted().
+-- as amended by ADR 0083, its follow-on, and ADR 0092 D1. Supersedes 0301 as
+-- the latest definition of public.enforce_capability_asserted().
 
 `
 
-const ledgerDescription = "Unit 3.1a S5 (ADR 0082 phase c): template.review removed from the templates_template_version tripwire arm -- the legacy reviewer stage (Service.Review, deleted in S4) was its only asserting writer and the capability itself is retired from the IAM registry in this change-set; reverses 0269 for the deleted stage. No other arm/cap change; every other branch byte-for-byte from 0300; machine-generated from internal/platform/tripwire."
+const ledgerDescription = "Issue #89/A8.1 (ADR 0092 D1): tripwire arms #21 (capability_bindings, user.manage OR membership.manage) and #22 (roles, user.manage, tenant-id-less) added, with one-time trigger attachments on both new tables (migration 0318). No other arm/cap change; every other branch byte-for-byte from 0301; machine-generated from internal/platform/tripwire."
 
 // findArm returns the single, undiscriminated Arm for (table, op), panicking
 // if absent or if the pair is discriminated (multiple entries share the
