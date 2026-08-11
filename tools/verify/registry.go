@@ -518,8 +518,24 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 		Fixture: &Fixture{
 			Dir: "dockerfile-go-version-drift",
+			// One property per line, and every parser shape the check claims to
+			// handle gets its own. Exit-code-only would be vacuous here: the
+			// first fixture alone already fails the run, so three fixtures
+			// covering lowercase/second-stage/--platform could be added, the
+			// parser fix reverted, and the harness would still report "ok"
+			// (measured 2026-08-11 on #114 — the pre-fix guard passed with all
+			// four fixtures present). Line numbers are deliberately excluded
+			// from the match: they pin the fixture's layout, not the rule.
 			Want: []string{
 				"DOCKERFILE-GO-VERSION-DRIFT: deploy/docker/worker.Dockerfile pins golang:1.25 but go.mod requires go >= 1.26.5",
+				// lowercase `from` — Dockerfile instructions are not case-sensitive.
+				"DOCKERFILE-GO-VERSION-DRIFT: deploy/docker/lowercase.Dockerfile pins golang:1.20 but go.mod requires go >= 1.26.5",
+				// a SECOND builder stage, indented, below a compliant first one:
+				// the defect the old head-1 parser could not see at all.
+				"DOCKERFILE-GO-VERSION-DRIFT: deploy/docker/multistage.Dockerfile pins golang:1.24 but go.mod requires go >= 1.26.5",
+				// `FROM --platform=<p> golang:...` — the flag sits between the
+				// instruction and the image reference.
+				"DOCKERFILE-GO-VERSION-DRIFT: deploy/docker/platform.Dockerfile pins golang:1.22 but go.mod requires go >= 1.26.5",
 			},
 		},
 	},
