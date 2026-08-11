@@ -227,6 +227,65 @@ func TestAuditHandler_ExportJobActorScoped(t *testing.T) {
 	}
 }
 
+// A3.4 cold-review Finding 5: occurred_after/occurred_before moved from a
+// hand-written parseTime (which explicitly treated "" as "not provided", no
+// error) to the generated type's *time.Time, decoded by encoding/json —
+// which rejects "" as a malformed RFC3339 timestamp and fails the WHOLE body
+// decode. sanitizeEmptyExportDates (handler.go) neutralizes an explicit ""
+// on these two fields before the generated-type decode runs, restoring the
+// pre-A3.4 tolerance without reintroducing a hand-written filter struct.
+// This proves the export request still succeeds with explicit "" values.
+func TestAuditHandler_ExportToleratesExplicitEmptyStringDates(t *testing.T) {
+	t.Parallel()
+
+	// A real UUID tenant — ExportJob.TenantID is uuid.UUID (matches the DB
+	// column type), same reasoning as TestAuditHandler_ExportCSVThenDownloadIsTenantScoped.
+	tenantID := uuid.MustParse("cccccccc-0000-0000-0000-000000000001")
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	events := []domain.Event{
+		{ID: "evt-1", OccurredAt: now, ActorID: "alice", Action: "doc.create", ResourceType: "document", ResourceID: "d1", PayloadJSON: `{}`, TenantID: tenantID.String()},
+	}
+	svc, _ := newExportService(t, events)
+	handler := httpdelivery.NewHandler(svc).WithExporter(svc)
+	mux := http.NewServeMux()
+	handler.Mount(mux)
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, authedRequest(t, http.MethodPost, "/api/v1/audit/events/export", tenantID.String(), "actor-test",
+		`{"format":"csv","filter":{"occurred_after":"","occurred_before":""}}`))
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected 202 (explicit \"\" on occurred_after/occurred_before should be treated as not-provided), got %d (%s)", rec.Code, rec.Body.String())
+	}
+	var export struct {
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &export); err != nil {
+		t.Fatalf("decode export: %v", err)
+	}
+	if export.Status != "ready" {
+		t.Fatalf("expected ready, got %+v", export)
+	}
+}
+
+// A real malformed (non-empty) timestamp must still be rejected — the
+// tolerance is scoped to exactly the "" case, not to every date-parse
+// failure.
+func TestAuditHandler_ExportRejectsMalformedNonEmptyDate(t *testing.T) {
+	t.Parallel()
+
+	svc, _ := newExportService(t, nil)
+	handler := httpdelivery.NewHandler(svc).WithExporter(svc)
+	mux := http.NewServeMux()
+	handler.Mount(mux)
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, authedRequest(t, http.MethodPost, "/api/v1/audit/events/export", "tenant-a", "actor-test",
+		`{"format":"csv","filter":{"occurred_after":"not-a-timestamp"}}`))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for a malformed non-empty timestamp, got %d (%s)", rec.Code, rec.Body.String())
+	}
+}
+
 func TestAuditHandler_ExportRejectsBadFormat(t *testing.T) {
 	t.Parallel()
 

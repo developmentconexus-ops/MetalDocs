@@ -539,8 +539,17 @@ var checks = []Check{
 		// Running `--only=oasdiff-breaking` on a laptop without first
 		// producing that file fails because the file does not exist, not
 		// because of a real breaking change — expected, not a defect.
+		//
+		// --err-ignore points at a repo-tracked, diff-reviewable allowlist
+		// (api/openapi/v1/oasdiff-err-ignore.txt) — the honest waiver
+		// channel for a disclosed, intentional breaking change, same audit
+		// shape as scripts/check-governance-waivers.txt: each line is the
+		// tool's own exact output text for one reviewed finding, not a
+		// blanket suppression. An undisclosed or newly-introduced breaking
+		// change still fails this gate, because its text won't match any
+		// line in the file.
 		Profiles: []string{ProfilePR, ProfileFull},
-		Argv:     []string{"oasdiff", "breaking", "/tmp/openapi.base.yaml", "api/openapi/v1/openapi.yaml", "--fail-on", "ERR"},
+		Argv:     []string{"oasdiff", "breaking", "/tmp/openapi.base.yaml", "api/openapi/v1/openapi.yaml", "--err-ignore", "api/openapi/v1/oasdiff-err-ignore.txt", "--fail-on", "ERR"},
 		Paths:    []string{"api/openapi/v1/"},
 		CIJob:    "ci.yml:verify",
 	},

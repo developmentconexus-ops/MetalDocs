@@ -514,7 +514,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Revoke (force-logout) a specific session. Gate CapSessionManage. */
+        /**
+         * Revoke (force-logout) a specific session. Gate CapSessionManage.
+         * @description Accepts an optional JSON body shaped like RevokeSessionRequest (`{"reason": "..."}`) purely as a best-effort, audit-only hint: an absent, empty, or malformed body never fails the revoke. This operation deliberately declares no requestBody schema — OpenAPI's validation semantics have no "validate if present, else ignore" mode, so any content schema here (even non-required) would make contract_validation reject a malformed or wrong-typed body before the handler's own best-effort decode ever ran, contradicting this contract (cold-review, PR #112 round 3: this route briefly carried a requestBody with exactly that self-contradiction — see the RevokeSessionRequest schema's own history in components.schemas — removed here, not loosened elsewhere).
+         */
         delete: operations["revokeSession"];
         options?: never;
         head?: never;
@@ -2572,6 +2575,9 @@ export interface components {
                 placeholder_schema: unknown[];
             };
         };
+        PutPlaceholderValueRequest: {
+            value: string;
+        };
         PutPlaceholderValueResponse: {
             placeholder_id: string;
             /** Format: date-time */
@@ -2622,6 +2628,10 @@ export interface components {
             held_by: string;
             /** Format: date-time */
             held_until: string;
+        };
+        DocumentSessionIdRequest: {
+            /** Format: uuid */
+            session_id: string;
         };
         DocumentAutosavePresignResponse: {
             upload_url: string;
@@ -2989,6 +2999,10 @@ export interface components {
             items: components["schemas"]["SessionItem"][];
             page: components["schemas"]["CursorPage"];
             total?: number;
+        };
+        /** @description Optional best-effort reason for the revoke, recorded in the audit payload only. An absent, empty, or malformed body is accepted — the revoke proceeds with an empty reason rather than failing the request. Kept here as a documentation-only type (used by the handler's own manual decode); intentionally NOT wired as revokeSession's requestBody — see that operation's description for why. */
+        RevokeSessionRequest: {
+            reason?: string;
         };
         MfaCoverageRoleSlice: {
             role: components["schemas"]["UserRole"];
@@ -6724,7 +6738,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentSessionIdRequest"];
+            };
+        };
         responses: {
             /** @description heartbeat accepted */
             204: {
@@ -6750,7 +6768,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentSessionIdRequest"];
+            };
+        };
         responses: {
             /** @description released */
             204: {
@@ -6776,7 +6798,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentSessionIdRequest"];
+            };
+        };
         responses: {
             /** @description released */
             204: {
@@ -7265,7 +7291,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": components["schemas"]["PutPlaceholderValueRequest"];
             };
         };
         responses: {

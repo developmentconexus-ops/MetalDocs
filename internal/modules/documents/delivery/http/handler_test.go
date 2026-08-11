@@ -55,6 +55,15 @@ type fakeSvc struct {
 	// distinct so a future content-write test can exercise notOwner in isolation.
 	notOwner   bool
 	viewDenied bool
+
+	// heartbeatCalled/releaseCalled/forceReleaseCalled prove absence, not just
+	// presence: a malformed session_id must be rejected by the handler's own
+	// json.Decode before any of these ever run (cold-review, PR #112 round 3
+	// thread @690) — a 400 alone does not prove that, since a future bug could
+	// call the service AND still return 400.
+	heartbeatCalled    bool
+	releaseCalled      bool
+	forceReleaseCalled bool
 }
 
 var _ httphandler.Service = (*fakeSvc)(nil)
@@ -139,11 +148,20 @@ func (f *fakeSvc) AcquireSession(_ context.Context, _, _, _ string) (*domain.Ses
 	return f.acquireSession, f.acquireRO, nil
 }
 
-func (f *fakeSvc) HeartbeatSession(_ context.Context, _, _ string) error { return nil }
+func (f *fakeSvc) HeartbeatSession(_ context.Context, _, _ string) error {
+	f.heartbeatCalled = true
+	return nil
+}
 
-func (f *fakeSvc) ReleaseSession(_ context.Context, _, _, _, _ string) error { return nil }
+func (f *fakeSvc) ReleaseSession(_ context.Context, _, _, _, _ string) error {
+	f.releaseCalled = true
+	return nil
+}
 
-func (f *fakeSvc) ForceReleaseSession(_ context.Context, _, _, _, _ string) error { return nil }
+func (f *fakeSvc) ForceReleaseSession(_ context.Context, _, _, _, _ string) error {
+	f.forceReleaseCalled = true
+	return nil
+}
 
 func (f *fakeSvc) PresignAutosave(_ context.Context, _ application.PresignAutosaveCmd) (*application.PresignAutosaveResult, error) {
 	return &application.PresignAutosaveResult{UploadURL: "https://example/upload", PendingUploadID: "cccccccc-cccc-4ccc-8ccc-000000000001", ExpiresAt: time.Now().Add(time.Minute)}, nil
@@ -483,7 +501,7 @@ func TestAcquireSession_Forbidden(t *testing.T) {
 func TestCommitAutosave_IdempotentReplay_Returns200(t *testing.T) {
 	mux := newMux(t, &fakeSvc{commitResult: &application.CommitResult{RevisionID: "bbbbbbbb-bbbb-4bbb-8bbb-000000000001", RevisionNum: 2, AlreadyConsumed: true}})
 
-	body := []byte(`{"session_id":"sess_1","pending_upload_id":"pending_1","form_data_snapshot":{"a":1}}`)
+	body := []byte(`{"session_id":"cccccccc-cccc-4ccc-8ccc-000000000099","pending_upload_id":"dddddddd-dddd-4ddd-8ddd-000000000099","form_data_snapshot":{"a":1}}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/autosave/commit", bytes.NewReader(body))
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
@@ -515,7 +533,7 @@ func TestCommitAutosave_AcceptsPageCountAndReturnsArtifactMetadata(t *testing.T)
 	}}
 	mux := newMux(t, svc)
 
-	body := []byte(`{"session_id":"sess_1","pending_upload_id":"pending_1","form_data_snapshot":{"a":1},"page_count":3}`)
+	body := []byte(`{"session_id":"cccccccc-cccc-4ccc-8ccc-000000000099","pending_upload_id":"dddddddd-dddd-4ddd-8ddd-000000000099","form_data_snapshot":{"a":1},"page_count":3}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/autosave/commit", bytes.NewReader(body))
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
@@ -546,7 +564,7 @@ func TestCommitAutosave_AcceptsPageCountAndReturnsArtifactMetadata(t *testing.T)
 func TestCommitAutosave_InvalidPageCountUsesProblemEnvelope(t *testing.T) {
 	mux := newMux(t, &fakeSvc{commitErr: domain.ErrInvalidPageCount})
 
-	body := []byte(`{"session_id":"sess_1","pending_upload_id":"pending_1","page_count":0}`)
+	body := []byte(`{"session_id":"cccccccc-cccc-4ccc-8ccc-000000000099","pending_upload_id":"dddddddd-dddd-4ddd-8ddd-000000000099","page_count":0}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/autosave/commit", bytes.NewReader(body))
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
@@ -571,7 +589,7 @@ func TestCommitAutosave_AbsentFormDataSnapshotForwardsNil(t *testing.T) {
 	svc := &fakeSvc{commitResult: &application.CommitResult{RevisionID: "bbbbbbbb-bbbb-4bbb-8bbb-000000000001", RevisionNum: 2}}
 	mux := newMux(t, svc)
 
-	body := []byte(`{"session_id":"sess_1","pending_upload_id":"pending_1"}`)
+	body := []byte(`{"session_id":"cccccccc-cccc-4ccc-8ccc-000000000099","pending_upload_id":"dddddddd-dddd-4ddd-8ddd-000000000099"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/autosave/commit", bytes.NewReader(body))
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
@@ -594,9 +612,9 @@ func TestCommitAutosave_NonObjectFormDataSnapshotRejected(t *testing.T) {
 		name string
 		body string
 	}{
-		{name: "null", body: `{"session_id":"sess_1","pending_upload_id":"pending_1","form_data_snapshot":null}`},
-		{name: "scalar", body: `{"session_id":"sess_1","pending_upload_id":"pending_1","form_data_snapshot":5}`},
-		{name: "array", body: `{"session_id":"sess_1","pending_upload_id":"pending_1","form_data_snapshot":[]}`},
+		{name: "null", body: `{"session_id":"cccccccc-cccc-4ccc-8ccc-000000000099","pending_upload_id":"dddddddd-dddd-4ddd-8ddd-000000000099","form_data_snapshot":null}`},
+		{name: "scalar", body: `{"session_id":"cccccccc-cccc-4ccc-8ccc-000000000099","pending_upload_id":"dddddddd-dddd-4ddd-8ddd-000000000099","form_data_snapshot":5}`},
+		{name: "array", body: `{"session_id":"cccccccc-cccc-4ccc-8ccc-000000000099","pending_upload_id":"dddddddd-dddd-4ddd-8ddd-000000000099","form_data_snapshot":[]}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			svc := &fakeSvc{}
@@ -620,14 +638,26 @@ func TestCommitAutosave_NonObjectFormDataSnapshotRejected(t *testing.T) {
 	}
 }
 
-// TestForceReleaseSession_HandlerNoLongerRoleGates replaces the former
-// _RequiresAdmin test. The handler no longer enforces a role gate here —
-// authorization is now the tier-1 CapMembershipManage rule (proven in
-// permissions_test.go). The handler simply forwards and returns 204.
-func TestForceReleaseSession_HandlerNoLongerRoleGates(t *testing.T) {
-	mux := newMux(t, &fakeSvc{}) // fakeCaps{admin:false} — handler does not gate
+// TestForceReleaseSession_HandlerLeavesCapabilityGateToMiddleware replaces
+// the former _RequiresAdmin test. AuthZ in this codebase is capabilities,
+// never roles (ADR 0022) — this handler performs no authorization decision
+// of its own; the tier-1 CapMembershipManage rule gates the route before the
+// handler runs, and permissions_test.go is what proves that gate. This test
+// only proves the handler forwards and returns 204 once past it — it uses
+// fakeCaps{admin:false} deliberately, to show the outcome is independent of
+// that flag, since the handler never consults it (cold-review, PR #112
+// round 3 thread @637: reworded off "role" language for the same reason).
+//
+// session_id is a real UUID here (cold-review Finding, PR #112 round 3):
+// DocumentSessionIdRequest.session_id gained `format: uuid` in openapi.yaml,
+// which oapi-codegen types as openapi_types.UUID — a non-UUID string like the
+// former "sess_1" now fails json.Decode before the handler ever calls the
+// service, so this control-case test needs a decodable id to keep proving
+// the happy path.
+func TestForceReleaseSession_HandlerLeavesCapabilityGateToMiddleware(t *testing.T) {
+	mux := newMux(t, &fakeSvc{}) // fakeCaps{admin:false} — irrelevant here: the handler never consults it
 
-	body := []byte(`{"session_id":"sess_1"}`)
+	body := []byte(`{"session_id":"cccccccc-cccc-4ccc-8ccc-000000000001"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/session/force-release", bytes.NewReader(body))
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
@@ -635,6 +665,62 @@ func TestForceReleaseSession_HandlerNoLongerRoleGates(t *testing.T) {
 	mux.ServeHTTP(rr, req)
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("expected 204, got %d body=%s", rr.Code, rr.Body.String())
+	}
+}
+
+// TestSessionRoutes_MalformedSessionID_RejectedByHandler proves the actual
+// fix for cold-review Finding threads on PR #112 round 3 (CodeRabbit: "session_id
+// should be format: uuid, else an invalid id reaches the database and
+// produces an internal error"; CodeRabbit separately: "an empty session_id
+// currently reaches the handler and 500s"). DocumentSessionIdRequest.session_id
+// is now openapi_types.UUID; any string that fails uuid.Parse — including ""
+// and a non-UUID token — fails json.Decode in the handler itself and returns
+// 400 request.invalid before the service (and therefore the database) is ever
+// called. This closes the empty-string gap that
+// apps/api/cmd/metaldocs-api/validator_ingress_session_routes_test.go's
+// TestIngress_SessionRoutes_EmptyStringSessionID_StillReachesHandler_KnownGap
+// documents at the contract_validation layer (that layer still has no
+// minLength and is unchanged by this fix — the rejection now happens one
+// layer downstream, in the real handler's own decode, which is what actually
+// stood between the client and the Postgres uuid-column 500 the finding
+// described).
+func TestSessionRoutes_MalformedSessionID_RejectedByHandler(t *testing.T) {
+	routes := []string{
+		"/api/v1/documents/11111111-1111-4111-8111-111111111111/session/heartbeat",
+		"/api/v1/documents/11111111-1111-4111-8111-111111111111/session/release",
+		"/api/v1/documents/11111111-1111-4111-8111-111111111111/session/force-release",
+	}
+	bodies := map[string]string{
+		"empty string":    `{"session_id":""}`,
+		"non-uuid string": `{"session_id":"sess_1"}`,
+	}
+	for _, route := range routes {
+		for name, body := range bodies {
+			t.Run(route+"/"+name, func(t *testing.T) {
+				svc := &fakeSvc{}
+				mux := newMux(t, svc)
+				req := httptest.NewRequest(http.MethodPost, route, bytes.NewReader([]byte(body)))
+				req.SetPathValue("id", "11111111-1111-4111-8111-111111111111")
+				withAuthHeaders(req, "editor")
+				rr := httptest.NewRecorder()
+
+				mux.ServeHTTP(rr, req)
+				if rr.Code != http.StatusBadRequest {
+					t.Fatalf("expected 400, got %d body=%s", rr.Code, rr.Body.String())
+				}
+				// A 400 alone does not prove the rejection happened before the DB
+				// was touched — a future handler bug could call the service AND
+				// still return 400, and this test would pass silently. The whole
+				// point of typing session_id as openapi_types.UUID is that
+				// json.Decode fails inside the handler before the service (and
+				// therefore Postgres) is ever reached, so assert absence directly
+				// (cold-review, PR #112 round 3 thread @690).
+				if svc.heartbeatCalled || svc.releaseCalled || svc.forceReleaseCalled {
+					t.Fatalf("service must not be called for a malformed session_id: heartbeat=%v release=%v forceRelease=%v",
+						svc.heartbeatCalled, svc.releaseCalled, svc.forceReleaseCalled)
+				}
+			})
+		}
 	}
 }
 

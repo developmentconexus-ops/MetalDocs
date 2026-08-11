@@ -352,3 +352,56 @@ func jsonBody(t *testing.T, body map[string]any) []byte {
 	}
 	return raw
 }
+
+// TestUpdateTemplateSchema_LargeIntegerPlaceholderDefaultPreservedExactly is
+// the templates-module analog of documents/delivery/http's
+// TestCreateComment_LargeIntegerContentPreservedExactly: domain.Placeholder.Default
+// is a freeform `any` field (cold-review Finding, PR #112 round 3 — CodeRabbit
+// flagged routes_schema.go alongside the comment-content sites this PR had
+// already fixed). Decoding the wire body into the generated
+// UpdateTemplateSchemaJSONBody's map[string]interface{}/[]map[string]interface{}
+// fields first — as remarshalSchemas did before this fix — collapses any JSON
+// number to float64, silently rounding an integer above 2^53 before it ever
+// reaches domain.Placeholder. This proves the fix (raw-body UseNumber() decode
+// straight into the domain type) preserves the exact digit string.
+func TestUpdateTemplateSchema_LargeIntegerPlaceholderDefaultPreservedExactly(t *testing.T) {
+	repo := newFakeRepo()
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{
+		ID:       "11111111-1111-1111-1111-111111111111",
+		TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+	}
+	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
+		ID:            "22222222-2222-4222-8222-222222222222",
+		TemplateID:    "11111111-1111-1111-1111-111111111111",
+		VersionNumber: 1,
+		Status:        domain.VersionStatusDraft,
+	}
+	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
+
+	const largeInt = "9007199254740993" // 2^53 + 1: first integer float64 cannot represent exactly
+	body := `{"metadata_schema":{"retention_days":1},"placeholder_schema":[` +
+		`{"id":"ph-1","label":"External ref","type":"number","required":false,"default":` + largeInt + `}` +
+		`],"expected_lock_version":0}`
+
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/schema", bytes.NewBufferString(body))
+	withHeaders(req)
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	stored, ok := repo.versions["22222222-2222-4222-8222-222222222222"]
+	if !ok || len(stored.PlaceholderSchema) != 1 {
+		t.Fatalf("expected 1 stored placeholder, got %+v", stored)
+	}
+	got := stored.PlaceholderSchema[0].Default
+	num, ok := got.(json.Number)
+	if !ok {
+		t.Fatalf("expected Default to decode as json.Number (UseNumber), got %T value=%v", got, got)
+	}
+	if num.String() != largeInt {
+		t.Fatalf("expected Default to preserve %q exactly, got %q (float64 round-trip would corrupt to 9007199254740992)", largeInt, num.String())
+	}
+}
