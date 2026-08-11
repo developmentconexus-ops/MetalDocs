@@ -108,10 +108,17 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("load migration config: %w", err)
 	}
-	if migrationCfg.Skip {
-		slog.Info("db provisioning skipped by configuration (METALDOCS_SKIP_STARTUP_MIGRATIONS=true)")
-		return nil
-	}
+	// METALDOCS_SKIP_STARTUP_MIGRATIONS gates ONLY the forward-migration stage
+	// (Stage 3's migrate.Apply call below), never the identity stages above
+	// it (PR #110 review, CodeRabbit). This flag predates this binary and
+	// historically skipped migrations run inside metaldocs-api's own startup;
+	// short-circuiting the whole run() body here on it would also skip
+	// prerequisites, role creation, grants, the runtime password rotation,
+	// and River schema setup. On a fresh volume that means db-provision exits
+	// 0, compose treats it as service_completed_successfully, and api/worker/
+	// jobs then start and fail because metaldocs_runtime does not exist or
+	// has no password -- exactly the deadlock this binary exists to close.
+	// (The actual skip -- and its log line -- happens at Stage 3 below.)
 
 	pgCfg, err := config.LoadPostgresConfig()
 	if err != nil {
@@ -186,12 +193,16 @@ func run(ctx context.Context) error {
 	}
 	defer func() { _ = ownerDB.Close() }()
 
-	if err := migrate.Apply(ctx, ownerDB, migrationCfg.Dir, slog.Default()); err != nil {
-		return fmt.Errorf("apply forward migrations: %w", err)
-	}
+	if migrationCfg.Skip {
+		slog.Info("forward migrations skipped by configuration (METALDOCS_SKIP_STARTUP_MIGRATIONS=true)")
+	} else {
+		if err := migrate.Apply(ctx, ownerDB, migrationCfg.Dir, slog.Default()); err != nil {
+			return fmt.Errorf("apply forward migrations: %w", err)
+		}
 
-	if err := migrateRiverSchema(ctx, ownerDB, jobsCfg.RiverSchema); err != nil {
-		return fmt.Errorf("migrate river schema: %w", err)
+		if err := migrateRiverSchema(ctx, ownerDB, jobsCfg.RiverSchema); err != nil {
+			return fmt.Errorf("migrate river schema: %w", err)
+		}
 	}
 
 	// Grant metaldocs_runtime DML access on a custom River schema now that
