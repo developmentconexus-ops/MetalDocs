@@ -104,6 +104,32 @@ BEGIN
     EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE metaldocs_owner IN SCHEMA metaldocs GRANT USAGE, SELECT ON SEQUENCES TO metaldocs_ci';
     EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE metaldocs_owner IN SCHEMA public   GRANT USAGE, SELECT ON SEQUENCES TO metaldocs_ci';
   END IF;
+
+  -- CURRENT_USER (CI-only gap, issue #88 A6.1 follow-up): the two blocks
+  -- above only cover objects later created BY metaldocs_app or
+  -- metaldocs_owner BY NAME. That is complete for apps/dbprovision's
+  -- production path (Stage 2/this file always runs as the bootstrap
+  -- superuser, and Stage 3 DDL always runs under SET ROLE metaldocs_owner --
+  -- see apps/dbprovision/cmd/metaldocs-dbprovision/main.go), and for local
+  -- dev (docker-compose's bootstrap superuser is literally named
+  -- metaldocs_app). It is NOT complete for
+  -- tests/integration/testdb.ApplyCuratedBootstrap, which applies this same
+  -- file plus the forward db/migrations/ tail back-to-back via a single
+  -- connection with no SET ROLE -- so any migration-tail table is created
+  -- by whatever role DATABASE_URL names. In CI that role is "metaldocs"
+  -- (.github/workflows/ci.yml POSTGRES_USER), a name neither hardcoded
+  -- block above ever mentions. Without this, a forward migration adding a
+  -- table reproduces SQLSTATE 42501 for metaldocs_ci/metaldocs_runtime in
+  -- CI only, never on a developer machine -- found and diagnosed by lane B
+  -- (PR #111) while wiring #112's generated handler bindings; out of their
+  -- write-set (db/grants/**), handed off here. CURRENT_USER covers every
+  -- caller in one block: metaldocs_app locally, metaldocs_owner mid-Stage-3,
+  -- metaldocs (or any other name) in CI, with no environment-specific
+  -- enumeration to keep in sync.
+  EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA metaldocs GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO metaldocs_ci', current_user);
+  EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO metaldocs_ci', current_user);
+  EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA metaldocs GRANT USAGE, SELECT ON SEQUENCES TO metaldocs_ci', current_user);
+  EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public   GRANT USAGE, SELECT ON SEQUENCES TO metaldocs_ci', current_user);
 END
 $$;
 
@@ -155,6 +181,13 @@ BEGIN
     EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE metaldocs_owner IN SCHEMA metaldocs GRANT USAGE, SELECT ON SEQUENCES TO metaldocs_runtime';
     EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE metaldocs_owner IN SCHEMA public   GRANT USAGE, SELECT ON SEQUENCES TO metaldocs_runtime';
   END IF;
+
+  -- CURRENT_USER (CI-only gap): same rationale as the matching block in the
+  -- metaldocs_ci DO block above -- see that comment.
+  EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA metaldocs GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO metaldocs_runtime', current_user);
+  EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO metaldocs_runtime', current_user);
+  EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA metaldocs GRANT USAGE, SELECT ON SEQUENCES TO metaldocs_runtime', current_user);
+  EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public   GRANT USAGE, SELECT ON SEQUENCES TO metaldocs_runtime', current_user);
 END
 $$;
 
