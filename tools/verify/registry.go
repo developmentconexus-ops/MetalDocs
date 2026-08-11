@@ -1099,6 +1099,31 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 	},
 	{
+		// A2.2 (issue #91): knip-dead-code and dead-code-baseline-growth
+		// above prove the tree never has more debt than the baseline and
+		// that the baseline itself never grows unreviewed, but neither has
+		// a forcing function to make anyone ever revisit it once written --
+		// same gap eslint-suppression-expiry closes for
+		// eslint-suppressions.json (see that check's comment above). This is
+		// its structural twin for dead-code-baseline.json: keyed by the
+		// whole baseline rather than per-rule, since knip's baseline has no
+		// natural per-rule grouping the way ESLint's does.
+		ID:       "dead-code-baseline-expiry",
+		Desc:     "dead-code-baseline.json has a live (non-expired) dead-code-baseline.expiry.json entry when non-empty (A2.2)",
+		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-dead-code-baseline-expiry.sh"},
+		Fixture: &Fixture{
+			Dir:  "dead-code-baseline-expiry",
+			Want: []string{"EXPIRED"},
+		},
+		// Same reasoning as eslint-suppression-expiry's Paths: whenever
+		// frontend/packages/apps code, knip's config, or the baseline
+		// itself can change, the expiry gate is back in scope too, plus the
+		// check's own inputs (C2 class).
+		Paths: []string{"frontend/", "packages/", "apps/", "knip.json", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", "dead-code-baseline.json", "dead-code-baseline.expiry.json", "scripts/check-dead-code-baseline-expiry.sh"},
+		CIJob: "ci.yml:verify",
+	},
+	{
 		ID:       "css-tokens",
 		Desc:     "no new raw hex colors in module.css",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},

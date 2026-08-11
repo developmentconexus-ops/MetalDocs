@@ -1,0 +1,5 @@
+{
+  "expires": "2026-10-15",
+  "owner": "A2.2 (issue #91)",
+  "note": "Ratchet introduced 2026-08-11. Burn down high-change hotspots incrementally (see PR history); renew this date with a stated reason if debt remains, do not let it lapse silently."
+}
