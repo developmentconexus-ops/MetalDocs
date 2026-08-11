@@ -307,6 +307,25 @@ const canonicalRuntimeDevPassword = "metaldocs_runtime_dev"
 // password (there are none today) can still override via extraEnv.
 func runProvisionAgainst(t *testing.T, dsn string, extraEnv map[string]string) error {
 	t.Helper()
+
+	// Guard against clobbering a deliberately customized live metaldocs_runtime
+	// password (PR #110 review, CodeRabbit). Role names are cluster-global in
+	// Postgres, so the unconditional rotateRuntimePassword call inside run()
+	// (Stage 2.5 -- correct there, since main() is the real one-shot
+	// provisioning entrypoint) rotates the SAME role every other process on
+	// this cluster authenticates as, no matter which per-test database dsn
+	// names. If the ambient environment already has
+	// METALDOCS_RUNTIME_DB_PASSWORD set to something other than
+	// canonicalRuntimeDevPassword -- e.g. an operator hardened a shared dev
+	// cluster with a non-default credential -- forcing it back to the
+	// published dev default below would silently undo that the moment this
+	// suite runs, breaking every long-running service authenticating with the
+	// custom value. Skip rather than clobber; asserting cross-environment
+	// password policy is out of scope for this suite.
+	if outer := os.Getenv("METALDOCS_RUNTIME_DB_PASSWORD"); outer != "" && outer != canonicalRuntimeDevPassword {
+		t.Skip("METALDOCS_RUNTIME_DB_PASSWORD is set to a non-default value in this environment; skipping to avoid clobbering a live metaldocs_runtime password (role names are cluster-global)")
+	}
+
 	root := repoRoot()
 	t.Setenv("METALDOCS_DATABASE_URL", dsn)
 	t.Setenv("METALDOCS_SKIP_STARTUP_MIGRATIONS", "false")
