@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"time"
 
 	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/config"
@@ -9,11 +10,38 @@ import (
 	"metaldocs/internal/platform/observability"
 )
 
+// riverQueueReportInterval mirrors River's own internal, non-configurable
+// queue-report cadence (vendor/github.com/riverqueue/river/producer.go's
+// queueReportIntervalDefault = 10 * time.Minute). river.Config exposes no
+// field to override it, so this is the real, honestly-derived basis for the
+// jobsReadiness heartbeat threshold (see readiness.go) — not a magic
+// duration invented independently of it.
+const riverQueueReportInterval = 10 * time.Minute
+
+// jobsQueueNames returns the queue names this binary subscribes (whatever
+// jobsCfg.Queues carries — "maintenance" plus "temporal" by default) for the
+// F1 queue-report heartbeat: jobsReadiness.Check reads
+// river_queue.updated_at for each of these.
+func jobsQueueNames(jobsCfg config.JobsConfig) []string {
+	names := make([]string, 0, len(jobsCfg.Queues))
+	for name := range jobsCfg.Queues {
+		names = append(names, name)
+	}
+	return names
+}
+
 // buildInfraServer wires the A7.1 liveness/readiness/metrics server for
 // metaldocs-jobs: a dedicated infra-port listener (JOBS_METRICS_ADDR,
 // default :9092) built from the shared observability.NewInfraServer
 // mechanism (internal/platform/observability/infraserver.go) — the same one
 // metaldocs-worker uses.
+//
+// F5 (review round 2): JOBS_METRICS_ADDR is deliberately bare, not
+// METALDOCS_-prefixed — see apps/worker/cmd/metaldocs-worker/infraserver.go's
+// buildInfraServer doc comment for the full rationale (it mirrors
+// metaldocs-api's own bare APP_PORT/METRICS_ADDR convention for infra-port
+// listen addresses, a convention deliberately separate from METALDOCS_*
+// business config).
 //
 // readiness's Check method is wired as the ONE DependencyCheck that gates
 // GET /ready beyond the DB ping PostgresRuntimeStatusProvider already runs:
