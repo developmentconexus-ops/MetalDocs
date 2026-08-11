@@ -2,17 +2,25 @@ package analyzers
 
 import (
 	"go/ast"
+	"go/parser"
 	"go/token"
 	"strings"
 )
 
 // actorExtractionAllow is the inline directive to suppress a finding on the
-// offending line. A suppression must say WHY the site is exempt; the two rules
-// below both encode a fail-closed invariant, so an unexplained opt-out is the
-// defect this analyzer exists to catch.
+// offending line. A suppression must say WHY the site is exempt; the rules below
+// all encode a fail-closed invariant, so an unexplained opt-out is the defect
+// this analyzer exists to catch.
+//
+// The directive is only honoured when it is a REAL line comment that STARTS with
+// this token and is followed by a non-empty rationale. Both halves are load
+// bearing. A bare `//cilint:allow-actor-extraction` is the unexplained opt-out
+// the paragraph above forbids, and a scan that matched the raw line text would
+// also honour the token inside a string literal — a suppression mechanism that
+// can be triggered by data is not a suppression mechanism.
 const actorExtractionAllow = "//cilint:allow-actor-extraction"
 
-// The import paths that make up the two forbidden shapes. Both rules resolve by
+// The import paths that make up the forbidden shapes. Every rule resolves by
 // PATH, never by the local qualifier a file happens to bind them to: an author
 // who writes `import id "metaldocs/internal/modules/iam/domain"` and then calls
 // `id.UserIDFromContext(ctx)` has written the same call, and a guard keyed to
@@ -24,7 +32,7 @@ const (
 
 // actorAccessorName is the low-level identity-storage accessor. It returns only
 // a string, so absence is indistinguishable from a real actor at the call site
-// — which is exactly why runtime code must not call it.
+// — which is exactly why runtime code must not reach it.
 const actorAccessorName = "UserIDFromContext"
 
 // authnPresenceFuncs are the canonical accessors whose SECOND result carries
@@ -35,11 +43,11 @@ var authnPresenceFuncs = map[string]string{
 	"RequireUserID":     "error",
 }
 
-// actorExtractionPlumbing is the ONE runtime file allowed to call the low-level
-// iam/domain accessor: the canonical consumer API is implemented on top of it.
-// The seam is a single file rather than a package prefix so that widening it is
-// a visible, reviewable edit here instead of a new file quietly landing inside
-// an allowed directory.
+// actorExtractionPlumbing is the ONE runtime file allowed to reference the
+// low-level iam/domain accessor: the canonical consumer API is implemented on
+// top of it. The seam is a single file rather than a package prefix so that
+// widening it is a visible, reviewable edit here instead of a new file quietly
+// landing inside an allowed directory.
 const actorExtractionPlumbing = "internal/platform/authn/context.go"
 
 // ActorExtraction enforces the A3.3 property: absence of an authenticated actor
@@ -56,17 +64,31 @@ const actorExtractionPlumbing = "internal/platform/authn/context.go"
 //     Absence is a separate result the caller has to look at.
 //
 // Rule 1 (low-level consumer ban): outside actorExtractionPlumbing, runtime code
-// may not call the low-level accessor at all. Making the fail-open accessor
-// unreachable is stronger than asking every consumer to remember the check.
+// may not REFERENCE the low-level accessor at all. The ban is on the reference
+// and not on the call because `extract := iamdomain.UserIDFromContext` followed
+// by `extract(ctx)` is the same fail-open accessor reached one hop later, and a
+// rule that only matched the call site would treat a variable as a laundering
+// step. Making the fail-open accessor unreachable is stronger than asking every
+// consumer to remember the check.
 //
 // Rule 2 (ignored presence result): runtime code may not discard the canonical
 // accessor's second result. `actorID, _ := authn.UserIDFromContext(ctx)`
 // compiles, yields "" on absence, and reintroduces exactly the fail-open shape
-// Rule 1 removed — the ban would otherwise be one underscore wide.
+// Rule 1 removed — the ban would otherwise be one underscore wide. Both the
+// assignment form and the `var actorID, _ = ...` declaration form are matched;
+// they are different AST nodes for one indistinguishable defect.
+//
+// Rule 3 (dot-import ban): neither protected path may be dot-imported. A dot
+// import puts `UserIDFromContext` into file scope as a bare identifier, where
+// Rules 1 and 2 — which resolve a qualifier to an import path — cannot see it.
+// Refusing the ImportSpec is a smaller and stronger property than trying to
+// decide, without type information, whether an unqualified `UserIDFromContext`
+// in some file is the forbidden one: there is nothing to infer, the escape is
+// simply not available.
 //
 // The rules deliberately match syntax, not data flow: every discard in this
-// repository is a literal `_` in an assignment's second slot, and a general
-// dataflow analysis would buy nothing the source actually needs.
+// repository is a literal `_` in a two-name binding, and a general dataflow
+// analysis would buy nothing the source actually needs.
 //
 // Test files are outside the walker (collectGoFiles skips _test.go): a test that
 // CONSTRUCTS an auth context, or that asserts the storage primitive's own
@@ -89,31 +111,43 @@ func scanActorExtractionFile(fset *token.FileSet, path string) []Finding {
 	}
 	isPlumbing := strings.HasSuffix(slashed, actorExtractionPlumbing)
 
-	_, raw := parseFile(fset, path)
-	if raw == nil {
+	f := parseActorFile(fset, path)
+	if f == nil {
 		return nil
 	}
-	f := raw.(*ast.File)
-	src := readSource(path)
 	aliases := importAliases(f)
+	suppressed := actorSuppressedLines(fset, f)
 
 	var out []Finding
+	// Rule 3 runs off f.Imports rather than the walk: importAliases deliberately
+	// drops dot imports (they bind no qualifier), so by the time the walker sees
+	// anything the escape has already been made invisible to the other rules.
+	for _, spec := range f.Imports {
+		if msg, ok := dotImportViolation(spec); ok {
+			out = appendActorFinding(out, fset, suppressed, path, spec.Pos(), msg)
+		}
+	}
+
 	ast.Inspect(f, func(n ast.Node) bool {
 		switch node := n.(type) {
-		case *ast.CallExpr:
+		case *ast.SelectorExpr:
 			if isPlumbing {
 				return true
 			}
-			if isSelector(node.Fun, aliases, iamDomainImportPath, actorAccessorName) {
-				out = appendActorFinding(out, fset, src, path, node.Pos(),
-					"calls "+iamDomainImportPath+"."+actorAccessorName+", the low-level identity-storage "+
+			if isSelector(node, aliases, iamDomainImportPath, actorAccessorName) {
+				out = appendActorFinding(out, fset, suppressed, path, node.Pos(),
+					"references "+iamDomainImportPath+"."+actorAccessorName+", the low-level identity-storage "+
 						"accessor that returns \"\" for a missing actor (A3.3); runtime consumers must use "+
 						"authn.UserIDFromContext (presence-aware) or authn.RequireUserID (fails closed) so "+
 						"absence is an explicit decision instead of an empty string travelling downstream")
 			}
 		case *ast.AssignStmt:
-			if msg, pos, ok := ignoredPresenceViolation(node, aliases); ok {
-				out = appendActorFinding(out, fset, src, path, pos, msg)
+			if msg, pos, ok := ignoredPresenceViolation(node.Lhs, node.Rhs, node.Pos(), aliases); ok {
+				out = appendActorFinding(out, fset, suppressed, path, pos, msg)
+			}
+		case *ast.ValueSpec:
+			if msg, pos, ok := ignoredPresenceViolation(identsAsExprs(node.Names), node.Values, node.Pos(), aliases); ok {
+				out = appendActorFinding(out, fset, suppressed, path, pos, msg)
 			}
 		}
 		return true
@@ -121,18 +155,56 @@ func scanActorExtractionFile(fset *token.FileSet, path string) []Finding {
 	return out
 }
 
-// ignoredPresenceViolation matches `x, _ := authn.UserIDFromContext(ctx)` and
-// `x, _ = authn.RequireUserID(ctx)` — a two-value assignment from a single call
-// to a canonical accessor whose second slot is the blank identifier.
-func ignoredPresenceViolation(node *ast.AssignStmt, aliases map[string]string) (msg string, pos token.Pos, ok bool) {
-	if len(node.Lhs) != 2 || len(node.Rhs) != 1 {
+// parseActorFile parses with comments, which the shared parseFile does not. The
+// suppression rule has to distinguish a real directive from the same characters
+// inside a string literal, and only the scanner can tell them apart.
+func parseActorFile(fset *token.FileSet, path string) *ast.File {
+	f, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
+	if err != nil {
+		return nil
+	}
+	return f
+}
+
+// dotImportViolation reports a dot import of either protected path.
+func dotImportViolation(spec *ast.ImportSpec) (string, bool) {
+	if spec.Name == nil || spec.Name.Name != "." {
+		return "", false
+	}
+	path := strings.Trim(spec.Path.Value, `"`)
+	if path != iamDomainImportPath && path != authnImportPath {
+		return "", false
+	}
+	return "dot-imports " + path + " (A3.3); a dot import binds " + actorAccessorName + " as a bare " +
+		"identifier with no qualifier to resolve, which is precisely the shape the low-level-accessor ban " +
+		"and the ignored-presence ban cannot see — import it under a name so the actor rules apply", true
+}
+
+// identsAsExprs adapts a ValueSpec's names to the expression list the shared
+// discard matcher works on. `var actorID, _ = authn.UserIDFromContext(ctx)` is a
+// declaration, not an assignment, and reaches the walker as a different node
+// carrying the identical defect.
+func identsAsExprs(names []*ast.Ident) []ast.Expr {
+	out := make([]ast.Expr, 0, len(names))
+	for _, n := range names {
+		out = append(out, n)
+	}
+	return out
+}
+
+// ignoredPresenceViolation matches a two-name binding fed by one call to a
+// canonical accessor whose second slot is the blank identifier — covering both
+// `x, _ := authn.UserIDFromContext(ctx)` and
+// `var x, _ = authn.RequireUserID(ctx)`.
+func ignoredPresenceViolation(lhs, rhs []ast.Expr, pos token.Pos, aliases map[string]string) (msg string, out token.Pos, ok bool) {
+	if len(lhs) != 2 || len(rhs) != 1 {
 		return "", token.NoPos, false
 	}
-	blank, isIdent := node.Lhs[1].(*ast.Ident)
+	blank, isIdent := lhs[1].(*ast.Ident)
 	if !isIdent || blank.Name != "_" {
 		return "", token.NoPos, false
 	}
-	call, isCall := node.Rhs[0].(*ast.CallExpr)
+	call, isCall := rhs[0].(*ast.CallExpr)
 	if !isCall {
 		return "", token.NoPos, false
 	}
@@ -141,15 +213,43 @@ func ignoredPresenceViolation(node *ast.AssignStmt, aliases map[string]string) (
 			return "discards the " + result + " of authn." + name + " (A3.3); the actor is then \"\" whenever " +
 				"the request carries no authenticated principal, which is the fail-open shape the canonical " +
 				"accessor exists to prevent — read the second result and fail explicitly, or use " +
-				"authn.RequireUserID and propagate its error", node.Pos(), true
+				"authn.RequireUserID and propagate its error", pos, true
 		}
 	}
 	return "", token.NoPos, false
 }
 
-func appendActorFinding(out []Finding, fset *token.FileSet, src, path string, pos token.Pos, msg string) []Finding {
+// actorSuppressedLines collects the lines carrying a valid suppression: a real
+// line comment starting with the directive and followed by a non-empty
+// rationale. Reading f.Comments rather than the raw source is what makes the
+// directive undefeatable by a string literal that happens to contain it, and
+// what makes the rationale a requirement the analyzer can actually check.
+func actorSuppressedLines(fset *token.FileSet, f *ast.File) map[int]bool {
+	out := map[int]bool{}
+	for _, group := range f.Comments {
+		for _, c := range group.List {
+			if _, ok := actorAllowRationale(c.Text); ok {
+				out[fset.Position(c.Pos()).Line] = true
+			}
+		}
+	}
+	return out
+}
+
+// actorAllowRationale returns the rationale trailing a well-formed directive.
+// The comment must START with the directive: a sentence that merely mentions the
+// token in prose is discussing the mechanism, not invoking it.
+func actorAllowRationale(commentText string) (string, bool) {
+	if !strings.HasPrefix(commentText, actorExtractionAllow) {
+		return "", false
+	}
+	rationale := strings.TrimSpace(commentText[len(actorExtractionAllow):])
+	return rationale, rationale != ""
+}
+
+func appendActorFinding(out []Finding, fset *token.FileSet, suppressed map[int]bool, path string, pos token.Pos, msg string) []Finding {
 	p := fset.Position(pos)
-	if strings.Contains(getLine(src, p.Line), actorExtractionAllow) {
+	if suppressed[p.Line] {
 		return out
 	}
 	return append(out, Finding{

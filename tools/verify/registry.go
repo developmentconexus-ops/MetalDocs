@@ -296,6 +296,40 @@ var checks = []Check{
 				// either from the analyzer's table fails the fixture.
 				`discards the presence bool of authn.UserIDFromContext (A3.3)`,
 				`discards the error of authn.RequireUserID (A3.3)`,
+				// A3.3 enforcement round (#108 review 4902506890). Each line
+				// below is a shape the first implementation let through, and
+				// each is pinned by FILE because the messages are shared with
+				// the fixtures above — without the file name an analyzer that
+				// dropped the widening would still satisfy the message lines.
+				//
+				// E1: the accessor referenced without being called. A CallExpr-
+				// only rule reads `extract := iamdomain.UserIDFromContext` as an
+				// assignment and reports nothing, and the call one line later is
+				// then invisible to it.
+				`indirect_lowlevel_actor.go`,
+				// E2: dot imports of both protected paths. A dot import deletes
+				// the qualifier that Rules 1 and 2 resolve, so the ban has to be
+				// on the ImportSpec. Both paths are pinned: banning only the
+				// low-level one leaves the canonical one dot-importable, and the
+				// discarded underscore comes straight back.
+				`dot-imports metaldocs/internal/modules/iam/domain`,
+				`dot-imports metaldocs/internal/platform/authn`,
+				// E3: the discard written as a declaration. `var x, _ = f(ctx)`
+				// is a ValueSpec, not an AssignStmt — one binding, two node
+				// types, and a matcher written against the assignment form alone
+				// has a spelling that turns it off.
+				`declaration_discard.go`,
+				// E4: suppression has to be a real directive with a real reason.
+				// A bare directive is the invariant switched off with nothing for
+				// a reviewer to disagree with; the same characters inside a
+				// string literal are data that a raw-line scan cannot tell from
+				// code. Both files still carry a violation and both must still be
+				// reported. (That a WELL-FORMED directive does suppress is the
+				// complementary half, proven in
+				// tools/cilint/internal/analyzers/actorextraction_test.go — an
+				// absence is not assertable through Want.)
+				`bare_suppression.go`,
+				`string_literal_suppression.go`,
 			},
 		},
 	},

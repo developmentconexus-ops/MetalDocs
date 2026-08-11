@@ -1,0 +1,26 @@
+package application
+
+import (
+	"context"
+
+	iamdomain "metaldocs/internal/modules/iam/domain"
+)
+
+// A3.3 negative fixture (suppression, BARE directive): an opt-out with no reason
+// attached must not silence a fail-closed rule.
+//
+// The analyzer's own contract says a suppression has to say WHY the site is
+// exempt. A bare `//cilint:allow-actor-extraction` says nothing; it is not an
+// exception to the invariant, it is the invariant being switched off — and the
+// reviewer reading the diff is given no claim to disagree with. An escape hatch
+// that costs one token to use is not an escape hatch, it is the default.
+//
+// This file must therefore still be reported despite carrying the directive. The
+// tightened rule keeps the hatch and prices it: directive plus a non-empty
+// rationale, which is what the sibling guards already ask of their own
+// suppressions in this repository.
+//
+// See scripts/testdata/guard-fixtures/README.md.
+func chargeBareSuppressed(ctx context.Context) string {
+	return iamdomain.UserIDFromContext(ctx) //cilint:allow-actor-extraction
+}
