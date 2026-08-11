@@ -126,13 +126,17 @@ func run(ctx context.Context) error {
 	}
 
 	// ── Stage 2: identity roles + privilege grants (db/grants) ─────────────
-	// Still running as the bootstrap superuser: 0000_identity_roles.sql
-	// creates metaldocs_owner/metaldocs_runtime/metaldocs_ci (idempotent,
-	// skips cleanly if already present) and transfers schema + object
-	// ownership from the bootstrap superuser to metaldocs_owner via
-	// REASSIGN OWNED BY CURRENT_USER; 0001_role_grants.sql then grants DML
-	// privileges to metaldocs_runtime/metaldocs_ci. Both are idempotent and
-	// safe to re-run against an already-provisioned volume.
+	// Still running as the bootstrap superuser for BOTH files in this stage:
+	// 0000_identity_roles.sql creates metaldocs_owner/metaldocs_runtime/
+	// metaldocs_ci (idempotent, skips cleanly if already present) and
+	// transfers schema + object ownership from the bootstrap superuser to
+	// metaldocs_owner via a scoped per-object-kind ALTER ... OWNER TO loop
+	// (NOT a blanket REASSIGN OWNED BY CURRENT_USER -- that statement always
+	// fails for the literal bootstrap/initdb role; see that file's header for
+	// why); 0001_role_grants.sql then grants DML privileges to
+	// metaldocs_runtime/metaldocs_ci. Neither file runs under SET ROLE
+	// metaldocs_owner -- that only starts at Stage 3 below. Both grants files
+	// are idempotent and safe to re-run against an already-provisioned volume.
 	if err := migrate.ApplyGrants(ctx, db, migrationCfg.GrantsDir, slog.Default()); err != nil {
 		return fmt.Errorf("apply grants stage: %w", err)
 	}

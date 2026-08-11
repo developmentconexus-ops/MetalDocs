@@ -79,9 +79,13 @@ END
 $$;
 
 -- ── metaldocs_runtime: non-owner, non-bypass application role (A6.1) ───────
--- Role creation only (moved here from 0001_role_grants.sql, which now runs
--- with metaldocs_owner's privileges and therefore cannot itself CREATE ROLE
--- -- see that file's header). Grant surface stays in 0001.
+-- Role creation only (moved here from 0001_role_grants.sql). Both this file
+-- and 0001 run under the bootstrap superuser -- apps/dbprovision does not
+-- SET ROLE metaldocs_owner until its Stage 3, after the whole grants
+-- directory (0000 + 0001) has applied -- so the split is not about which
+-- role has CREATEROLE; it is about sequencing: 0001's grants name
+-- metaldocs_owner/metaldocs_runtime/metaldocs_ci as grantees, so those roles
+-- must already exist when 0001 runs. Grant surface stays in 0001.
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_runtime') THEN
@@ -98,8 +102,8 @@ END
 $$;
 
 -- ── metaldocs_ci: non-owner, non-bypass DML test role (from 0284) ──────────
--- Role creation only, moved here for the same reason as metaldocs_runtime
--- above. Grant surface stays in 0001.
+-- Role creation only, moved here for the same sequencing reason as
+-- metaldocs_runtime above. Grant surface stays in 0001.
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_ci') THEN
