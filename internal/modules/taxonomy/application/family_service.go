@@ -74,7 +74,14 @@ func (s *FamilyService) Create(ctx context.Context, f *domain.DocumentFamily) er
 		return fmt.Errorf("taxonomy: marshal family create governance payload: %w", err)
 	}
 	tenantID, _ := tenant.FromContext(ctx)
-	actorUserID, _ := authn.UserIDFromContext(ctx)
+	// A3.3: ActorUserID is the governance-event attribution for this mutation.
+	// A discarded presence bool would have written the audit row under "", so
+	// absence fails the whole tx instead. The only callers are the taxonomy HTTP
+	// routes, which already require a session.
+	actorUserID, err := authn.RequireUserID(ctx)
+	if err != nil {
+		return err
+	}
 	if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
 		TenantID:     tenantID,
 		EventType:    domain.GovernanceEventTypeFamilyCreated,
@@ -138,7 +145,14 @@ func (s *FamilyService) Update(ctx context.Context, f *domain.DocumentFamily) (*
 	if err != nil {
 		return nil, fmt.Errorf("taxonomy: marshal family update governance payload: %w", err)
 	}
-	actorUserID, _ := authn.UserIDFromContext(ctx)
+	// A3.3: ActorUserID is the governance-event attribution for this mutation.
+	// A discarded presence bool would have written the audit row under "", so
+	// absence fails the whole tx instead. The only callers are the taxonomy HTTP
+	// routes, which already require a session.
+	actorUserID, err := authn.RequireUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
 	if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
 		TenantID:     tenantID,
 		EventType:    domain.GovernanceEventTypeFamilyUpdated,
@@ -198,7 +212,14 @@ func (s *FamilyService) Deactivate(ctx context.Context, code domain.FamilyCode) 
 	if err != nil {
 		return fmt.Errorf("taxonomy: marshal family deactivate governance payload: %w", err)
 	}
-	actorUserID, _ := authn.UserIDFromContext(ctx)
+	// A3.3: ActorUserID is the governance-event attribution for this mutation.
+	// A discarded presence bool would have written the audit row under "", so
+	// absence fails the whole tx instead. The only callers are the taxonomy HTTP
+	// routes, which already require a session.
+	actorUserID, err := authn.RequireUserID(ctx)
+	if err != nil {
+		return err
+	}
 	if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
 		TenantID:     tenantID,
 		EventType:    domain.GovernanceEventTypeFamilyDeactivated,

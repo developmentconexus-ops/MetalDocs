@@ -239,7 +239,7 @@ var checks = []Check{
 		// actually invokes. It said five for as long as there were ten
 		// (pass13-guards.md §3) — a registry that describes the wrong product
 		// is the same class of untruth as a check that does not run.
-		Desc:     "custom Go analyzers (hgcrossmodule, nosqltxindomain, platformboundary, txownership, legacyvocab, outboxpair, postcommitaudit, deliveryauditsink, nodualmode, noresponsemap, problemwriter) against the recorded baseline",
+		Desc:     "custom Go analyzers (hgcrossmodule, nosqltxindomain, platformboundary, txownership, legacyvocab, outboxpair, postcommitaudit, deliveryauditsink, nodualmode, noresponsemap, problemwriter, actorextraction) against the recorded baseline",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "./tools/cilint", "./..."},
 		CIJob:    "ci.yml:verify",
@@ -276,6 +276,26 @@ var checks = []Check{
 				// fixture. That file names no media type, so the only rule that
 				// can report it is the signature rule resolving by import path.
 				`function writeAliasedProblem takes both an http.ResponseWriter and a *problem.Problem`,
+				// A3.3: the same sandbox carries the three actor-extraction
+				// fixtures. All three are pinned separately because each one
+				// alone leaves the fail-open shape reachable.
+				//
+				// (a) the low-level accessor called under its normal import.
+				`the low-level identity-storage accessor that returns "" for a missing actor (A3.3)`,
+				// (b) the SAME call under an import alias. Pinned by file name
+				// because the message is identical to (a)'s, so without naming
+				// the file an analyzer that went back to matching the
+				// identifier "iamdomain" would still satisfy the line above.
+				// Only a rule resolving by import PATH reports this file.
+				`aliased_lowlevel_actor.go`,
+				// (c) both discard forms of the CANONICAL accessor. Rule 1
+				// without Rule 2 is one underscore wide: banning the fail-open
+				// accessor accomplishes nothing if the fail-closed one can be
+				// called and its answer thrown away. The bool-returning and
+				// error-returning siblings are pinned separately so removing
+				// either from the analyzer's table fails the fixture.
+				`discards the presence bool of authn.UserIDFromContext (A3.3)`,
+				`discards the error of authn.RequireUserID (A3.3)`,
 			},
 		},
 	},

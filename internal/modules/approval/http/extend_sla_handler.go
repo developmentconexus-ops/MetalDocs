@@ -37,7 +37,11 @@ func (h *Handler) ExtendSLAHandler(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, r, err)
 		return
 	}
-	actorID := actorIDFromRequest(r)
+	actorID, err := actorIDFromRequest(r)
+	if err != nil {
+		WriteError(w, r, err)
+		return
+	}
 	instanceID := r.PathValue("instance_id")
 
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))

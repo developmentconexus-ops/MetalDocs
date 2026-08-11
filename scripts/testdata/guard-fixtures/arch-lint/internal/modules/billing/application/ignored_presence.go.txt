@@ -1,0 +1,35 @@
+package application
+
+import (
+	"context"
+
+	"metaldocs/internal/platform/authn"
+)
+
+// A3.3 negative fixture (Rule 2): the CANONICAL accessor, called correctly,
+// with its presence result thrown away.
+//
+// This is the failure mode that makes Rule 1 alone insufficient. Rule 1 removes
+// the fail-open accessor from the runtime; this file shows the fail-open shape
+// coming straight back through the fail-closed one, because the difference
+// between "absence is a decision" and "absence is an empty string" is one
+// underscore wide. `actorID, _ :=` compiles, reads like migrated code, and
+// yields exactly the "" that Rule 1 was written to eliminate.
+//
+// The second declaration pins the error-returning sibling: RequireUserID exists
+// so a consumer below the delivery layer can refuse WITHOUT importing net/http,
+// and discarding its error defeats that just as completely.
+//
+// Both are matched by import PATH, so aliasing internal/platform/authn does not
+// exempt them either.
+//
+// See scripts/testdata/guard-fixtures/README.md.
+func settleInvoice(ctx context.Context) string {
+	actorID, _ := authn.UserIDFromContext(ctx)
+	return actorID
+}
+
+func voidInvoice(ctx context.Context) string {
+	actorID, _ := authn.RequireUserID(ctx)
+	return actorID
+}

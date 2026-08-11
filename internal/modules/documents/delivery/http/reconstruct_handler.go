@@ -36,10 +36,18 @@ func (h *ReconstructHandler) HandleReconstruct(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// A3.3: GetReconstruction authorizes against this actor; absence must fail
+	// here, not arrive as "".
+	actor, err := actorID(r)
+	if err != nil {
+		writeReconstructError(r.Context(), w, r, tenantID, r.PathValue("id"), requestID(r), err)
+		return
+	}
+
 	entry, err := h.svc.GetReconstruction(
 		r.Context(),
 		tenantID,
-		actorID(r),
+		actor,
 		r.PathValue("id"),
 	)
 	if err != nil {

@@ -11,7 +11,6 @@ import (
 	"metaldocs/internal/modules/approval/application"
 	"metaldocs/internal/modules/approval/domain"
 	"metaldocs/internal/modules/approval/http/contracts"
-	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
 // InboxHandler returns the paginated list of approval instances awaiting the
@@ -23,7 +22,14 @@ func (h *Handler) InboxHandler(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, r, err)
 		return
 	}
-	actorID := iamdomain.UserIDFromContext(r.Context())
+	// A3.3: the worklist IS the actor's own queue — a blank actor would ask the
+	// repository "what is pending for nobody", which is a visibility question
+	// with no correct answer. Fail closed instead.
+	actorID, err := actorIDFromRequest(r)
+	if err != nil {
+		WriteError(w, r, err)
+		return
+	}
 	areaCode := strings.TrimSpace(r.URL.Query().Get("area_code"))
 
 	limit, err := parseInboxLimit(r.URL.Query().Get("limit"))

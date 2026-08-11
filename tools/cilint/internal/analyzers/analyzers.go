@@ -54,6 +54,7 @@ func RunAll(targets []string) []Finding {
 	out = append(out, NoResponseMap(files)...)
 	out = append(out, HGCrossModule(files)...)
 	out = append(out, ProblemWriter(files)...)
+	out = append(out, ActorExtraction(files)...)
 	return out
 }
 

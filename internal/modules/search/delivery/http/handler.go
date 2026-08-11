@@ -17,10 +17,10 @@ import (
 	"strings"
 	"time"
 
-	iamdomain "metaldocs/internal/modules/iam/domain"
 	searchapi "metaldocs/internal/modules/search/api"
 	searchdomain "metaldocs/internal/modules/search/domain"
 	"metaldocs/internal/platform/apibase"
+	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
@@ -98,7 +98,9 @@ func (h *Handler) SearchDocuments(w http.ResponseWriter, r *http.Request, _ sear
 }
 
 func (h *Handler) handleSearchDocuments(w http.ResponseWriter, r *http.Request) {
-	if strings.TrimSpace(iamdomain.UserIDFromContext(r.Context())) == "" {
+	// A3.3: same fail-closed decision, taken through the canonical accessor
+	// (which owns the TrimSpace) instead of a local "" comparison.
+	if _, ok := authn.UserIDFromContext(r.Context()); !ok {
 		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
 		return
 	}

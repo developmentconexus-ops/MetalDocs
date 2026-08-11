@@ -15,8 +15,8 @@ import (
 	v2domain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
-	iamdomain "metaldocs/internal/modules/iam/domain"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
@@ -105,9 +105,17 @@ func (h *FillInHandler) PutPlaceholderValue(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// A3.3: the placeholder write is attributed to this actor, so resolve it
+	// before the service call and refuse when absent.
+	actor, err := actorID(r)
+	if err != nil {
+		writeFillInError(w, r, requestID(r), err)
+		return
+	}
+
 	err = h.service.SetPlaceholderValue(r.Context(),
 		tenantID,
-		actorID(r),
+		actor,
 		r.PathValue("id"),
 		r.PathValue("pid"),
 		body.Value,
@@ -173,6 +181,11 @@ var (
 // condition ended up carrying different statuses in different modules.
 func mapFillInError(err error) problem.Code {
 	switch {
+	// A3.3: no authenticated principal in context. Ordered first so it can
+	// never be reclassified by a broader match below; the code registry binds
+	// it to 401, the same answer the authn middleware gives.
+	case errors.Is(err, authn.ErrMissingActor):
+		return problem.CodeAuthUnauthenticated
 	case errors.As(err, &authz.ErrCapDenied{}):
 		return codeFillCapabilityDenied
 	case errors.As(err, &notChoicePlaceholderError{}):
@@ -269,6 +282,11 @@ func tenantID(r *http.Request) (string, error) {
 	return tenant.FromContext(r.Context())
 }
 
-func actorID(r *http.Request) string {
-	return iamdomain.UserIDFromContext(r.Context())
+// actorID resolves the authenticated actor for the fill-in / reconstruct /
+// view handlers, all of which pass it straight into a capability-checked
+// service call. A3.3: it returns authn.ErrMissingActor rather than "" when
+// the principal is absent, so the service never receives a blank actor to
+// authorize against.
+func actorID(r *http.Request) (string, error) {
+	return authn.RequireUserID(r.Context())
 }

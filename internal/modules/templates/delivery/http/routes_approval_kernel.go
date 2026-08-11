@@ -27,6 +27,25 @@ func (h *Handler) nilApprovalKernel() bool {
 	return h.approvalSubmit == nil || h.approvalDecision == nil || h.approvalRead == nil || h.approvalRunner == nil
 }
 
+// kernelIdentityFromReq resolves the (tenant, actor) pair the approval-kernel
+// template routes attribute a governed act to, writing the contract-correct
+// problem response itself when either half is absent. A3.3: the actor half is
+// a precondition of the same kind as the tenant half, so the two resolve at one
+// call site rather than as two sequential err-blocks per handler.
+func kernelIdentityFromReq(w http.ResponseWriter, r *http.Request) (tenantID, actorID string, ok bool) {
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
+		return "", "", false
+	}
+	actorID, err = userIDFromReq(r)
+	if err != nil {
+		writeMappedErr(w, r, err)
+		return "", "", false
+	}
+	return tenantID, actorID, true
+}
+
 // SubmitTemplateVersionForApproval implements
 // templatesapi.ServerInterface.SubmitTemplateVersionForApproval: resolves
 // (id, n) -> template_version_id via the templates read side, then delegates
@@ -41,7 +60,11 @@ func (h *Handler) SubmitTemplateVersionForApproval(w http.ResponseWriter, r *htt
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "approval kernel not configured"))
 		return
 	}
-	actorID := userIDFromReq(r)
+	actorID, err := userIDFromReq(r)
+	if err != nil {
+		writeMappedErr(w, r, err)
+		return
+	}
 	templateID := id.String()
 
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateSubmit)); err != nil {
@@ -109,16 +132,14 @@ func (h *Handler) SubmitTemplateVersionForApproval(w http.ResponseWriter, r *htt
 // a template version's content is locked (not frozen) once under review, so
 // DecisionService reads the content hash itself via TemplateVersionReader.
 func (h *Handler) SignoffTemplateVersion(w http.ResponseWriter, r *http.Request, id uuid.UUID, n int, params templatesapi.SignoffTemplateVersionParams) {
-	tenantID, err := tenantIDFromReq(r)
-	if err != nil {
-		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
+	tenantID, actorID, ok := kernelIdentityFromReq(w, r)
+	if !ok {
 		return
 	}
 	if h.nilApprovalKernel() {
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "approval kernel not configured"))
 		return
 	}
-	actorID := userIDFromReq(r)
 	templateID := id.String()
 
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateApprove)); err != nil {

@@ -70,7 +70,11 @@ func (h *Handler) ReviewVerdictHandler(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, r, err)
 		return
 	}
-	actorID := actorIDFromRequest(r)
+	actorID, err := actorIDFromRequest(r)
+	if err != nil {
+		WriteError(w, r, err)
+		return
+	}
 	instanceID := r.PathValue("instance_id")
 	stageID := r.PathValue("stage_id")
 	idempKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))

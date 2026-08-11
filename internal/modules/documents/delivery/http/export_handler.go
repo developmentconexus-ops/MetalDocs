@@ -45,7 +45,11 @@ func (h *ExportHandler) exportPDF(w http.ResponseWriter, r *http.Request) {
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, problem.CodeInternalUnknown.String()))
 		return
 	}
-	userID := userIDFromReq(r)
+	userID, err := userIDFromReq(r)
+	if err != nil {
+		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		return
+	}
 
 	req := exportPDFReq{PaperSize: "A4"}
 	if r.ContentLength != 0 {
@@ -95,7 +99,11 @@ func (h *ExportHandler) exportDocxURL(w http.ResponseWriter, r *http.Request) {
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, problem.CodeInternalUnknown.String()))
 		return
 	}
-	userID := userIDFromReq(r)
+	userID, err := userIDFromReq(r)
+	if err != nil {
+		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		return
+	}
 
 	signedURL, err := h.svc.SignedDocxURL(r.Context(), tenantID, userID, docID)
 	if err != nil {

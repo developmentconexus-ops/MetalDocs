@@ -161,7 +161,11 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 		WriteError(w, r, err)
 		return
 	}
-	actorID := actorIDFromRequest(r)
+	actorID, err := actorIDFromRequest(r)
+	if err != nil {
+		WriteError(w, r, err)
+		return
+	}
 	docID := r.PathValue("id")
 	idempKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 
@@ -250,7 +254,11 @@ func (h *Handler) CancelByDocumentHandler(w http.ResponseWriter, r *http.Request
 		WriteError(w, r, err)
 		return
 	}
-	actorID := actorIDFromRequest(r)
+	actorID, err := actorIDFromRequest(r)
+	if err != nil {
+		WriteError(w, r, err)
+		return
+	}
 	docID := r.PathValue("id")
 
 	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))

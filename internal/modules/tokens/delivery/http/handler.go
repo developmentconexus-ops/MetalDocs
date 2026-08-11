@@ -132,7 +132,13 @@ func (h *Handler) CreateToken(w http.ResponseWriter, r *http.Request) {
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
-	actorID, _ := authn.UserIDFromContext(r.Context())
+	// A3.3: ActorID is the audit attribution for this mutation; a discarded
+	// presence bool would have written the event under "".
+	actorID, err := authn.RequireUserID(r.Context())
+	if err != nil {
+		h.writeTokenError(w, r, err)
+		return
+	}
 
 	entry, err := h.svc.Create(r.Context(), application.CreateCommand{
 		TenantID:    tenantID,
@@ -178,7 +184,13 @@ func (h *Handler) UpdateToken(w http.ResponseWriter, r *http.Request, id openapi
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
-	actorID, _ := authn.UserIDFromContext(r.Context())
+	// A3.3: ActorID is the audit attribution for this mutation; a discarded
+	// presence bool would have written the event under "".
+	actorID, err := authn.RequireUserID(r.Context())
+	if err != nil {
+		h.writeTokenError(w, r, err)
+		return
+	}
 
 	entry, err := h.svc.Update(r.Context(), application.UpdateCommand{
 		TenantID:    tenantID,
@@ -203,7 +215,13 @@ func (h *Handler) DeleteToken(w http.ResponseWriter, r *http.Request, id openapi
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 		return
 	}
-	actorID, _ := authn.UserIDFromContext(r.Context())
+	// A3.3: ActorID is the audit attribution for this mutation; a discarded
+	// presence bool would have written the event under "".
+	actorID, err := authn.RequireUserID(r.Context())
+	if err != nil {
+		h.writeTokenError(w, r, err)
+		return
+	}
 
 	if err := h.svc.Delete(r.Context(), tenantID, actorID, id.String()); err != nil {
 		h.writeTokenError(w, r, err)
@@ -218,6 +236,11 @@ func (h *Handler) writeTokenError(w http.ResponseWriter, r *http.Request, err er
 	var pgErr *pgconn.PgError
 	var valErr *domain.ValidationError
 	switch {
+	// A3.3: no authenticated principal in context. Every tokens route is
+	// session-required, so this is the platform's 401 + auth.unauthenticated,
+	// not a tokens dialect.
+	case errors.Is(err, authn.ErrMissingActor):
+		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
 	case errors.Is(err, domain.ErrNotFound):
 		problem.Respond(w, r, problem.New(http.StatusNotFound, CodeTokenNotFound, "token dictionary entry not found"))
 	case errors.Is(err, domain.ErrImmutableName):

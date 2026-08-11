@@ -21,6 +21,7 @@ import (
 	templatesapi "metaldocs/internal/modules/templates/api"
 	"metaldocs/internal/modules/templates/application"
 	"metaldocs/internal/platform/apibase"
+	"metaldocs/internal/platform/authn"
 	platformdb "metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/idempotency"
@@ -219,9 +220,13 @@ func (h *Handler) Mount(mux httprouter.Muxer) {
 
 func (h *Handler) idempotent(routeTemplate string, next http.Handler) http.Handler {
 	store := idempotency.New(h.db, routeTemplate)
-	return idempotency.Require(store, func(ctx context.Context) (string, string) {
+	return idempotency.Require(store, func(ctx context.Context) (string, string, error) {
 		tenantID, _ := tenant.FromContext(ctx)
-		return tenantID, iamdomain.UserIDFromContext(ctx)
+		actorID, err := authn.RequireUserID(ctx)
+		if err != nil {
+			return "", "", err
+		}
+		return tenantID, actorID, nil
 	})(next)
 }
 
@@ -249,8 +254,13 @@ func tenantIDFromReq(r *http.Request) (string, error) {
 	return tenant.FromContext(r.Context())
 }
 
-func userIDFromReq(r *http.Request) string {
-	return iamdomain.UserIDFromContext(r.Context())
+// userIDFromReq resolves the authenticated actor for the eleven templates
+// handlers that attribute a template mutation (create, autosave, schema edit,
+// lifecycle transition, approval-kernel submit/decision) to a person. A3.3: it
+// returns authn.ErrMissingActor rather than "" when the principal is absent, so
+// the caller rejects the request before the application service is invoked.
+func userIDFromReq(r *http.Request) (string, error) {
+	return authn.RequireUserID(r.Context())
 }
 
 var friendlyMsg = map[problem.Code]string{

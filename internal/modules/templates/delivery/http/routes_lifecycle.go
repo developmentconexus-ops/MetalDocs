@@ -15,7 +15,11 @@ func (h *Handler) archiveTemplate(w http.ResponseWriter, r *http.Request) {
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
-	actorID := userIDFromReq(r)
+	actorID, err := userIDFromReq(r)
+	if err != nil {
+		writeMappedErr(w, r, err)
+		return
+	}
 	templateID := r.PathValue("id")
 
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateArchive)); err != nil {

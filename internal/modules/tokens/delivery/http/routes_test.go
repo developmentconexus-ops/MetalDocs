@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	tokenshttp "metaldocs/internal/modules/tokens/delivery/http"
 	"metaldocs/internal/modules/tokens/domain"
 	"metaldocs/internal/platform/tenant"
@@ -57,6 +58,11 @@ func reqWithTenant(t *testing.T, method, target, body string) *http.Request {
 	r := httptest.NewRequest(method, target, buf)
 	r.Header.Set("Content-Type", "application/json")
 	ctx := tenant.WithTenantID(r.Context(), "11111111-1111-1111-1111-111111111111")
+	// A3.3: every tokens mutation route resolves the actor before it touches the
+	// service (ActorID is the audit attribution on the token entry), so a request
+	// with no auth context now stops at 401 and can no longer reach the case
+	// under test. The authn middleware always installs one in production.
+	ctx = iamdomain.WithAuthContext(ctx, "user-a", []iamdomain.Role{})
 	return r.WithContext(ctx)
 }
 

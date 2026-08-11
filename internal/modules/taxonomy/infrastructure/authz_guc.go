@@ -6,13 +6,9 @@ import (
 	"fmt"
 
 	"metaldocs/internal/modules/iam/authz"
-	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/tenant"
 )
-
-// NoActor is the sentinel empty actor ID used to detect a missing actor in
-// ctx before seeding the authz GUCs.
-const NoActor = ""
 
 // setAuthzGUC resolves the tenant/actor identity from ctx and seeds the
 // per-transaction authz GUCs via the canonical authz.SeedTxIdentity. taxonomy
@@ -24,9 +20,12 @@ func setAuthzGUC(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return fmt.Errorf("taxonomy: tenant context: %w", err)
 	}
-	actorID := iamdomain.UserIDFromContext(ctx)
-	if actorID == NoActor {
-		return fmt.Errorf("taxonomy: actor context missing")
+	// A3.3: the local NoActor == "" sentinel is gone — absence is now the
+	// canonical accessor's explicit failure (which also rejects a
+	// whitespace-only actor, which the "" comparison let through).
+	actorID, err := authn.RequireUserID(ctx)
+	if err != nil {
+		return fmt.Errorf("taxonomy: actor context missing: %w", err)
 	}
 	return authz.SeedTxIdentity(ctx, tx, tenantID, actorID)
 }

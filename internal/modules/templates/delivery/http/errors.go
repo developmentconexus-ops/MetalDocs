@@ -8,6 +8,7 @@ import (
 	approvaldomain "metaldocs/internal/modules/approval/domain"
 	iamauthz "metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/problem"
 )
 
@@ -116,6 +117,10 @@ func isErr(target error) func(error) bool {
 // classification table. Kept as data (not a switch) so MapErr itself stays a
 // single small dispatch loop — see gocyclo note below.
 var mapErrTable = []errMapping{
+	// A3.3: no authenticated principal in context. Every templates route is
+	// session-required, so this is the platform's 401 + auth.unauthenticated,
+	// not a templates dialect.
+	{isErr(authn.ErrMissingActor), http.StatusUnauthorized, problem.CodeAuthUnauthenticated},
 	{isErr(domain.ErrNotFound), http.StatusNotFound, codeTplNotFound},
 	{isErr(domain.ErrKeyConflict), http.StatusConflict, codeTplKeyConflict},
 	{isErr(domain.ErrInvalidStateTransition), http.StatusConflict, codeTplInvalidStateTransition},

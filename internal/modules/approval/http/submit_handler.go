@@ -9,7 +9,6 @@ import (
 
 	"metaldocs/internal/modules/approval/application"
 	"metaldocs/internal/modules/approval/http/contracts"
-	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/strictjson"
 )
@@ -19,12 +18,13 @@ import (
 // approval_instances.idempotency_key, F-D4) and a valid If-Match header (OCC precondition).
 func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 	documentID := r.PathValue("id")
-	tenantID, err := tenantIDFromReq(r)
-	if err != nil {
-		WriteError(w, r, err)
+	// A3.3: SubmittedBy is the accountability record for the whole approval
+	// instance. Resolve the actor here and refuse the request when there is
+	// none — the submit service is never reached with SubmittedBy == "".
+	tenantID, actorID, ok := requestIdentity(w, r)
+	if !ok {
 		return
 	}
-	actorID := iamdomain.UserIDFromContext(r.Context())
 
 	// The platform idempotency middleware (router.go) already validated presence
 	// and UUID shape; re-read the header to thread the client key into the service

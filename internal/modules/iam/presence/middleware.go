@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/authn"
 )
 
 // BumpMiddleware updates iam_users.last_seen_at for the authenticated
@@ -66,8 +66,13 @@ func (m *BumpMiddleware) WithDebounce(d time.Duration) *BumpMiddleware {
 // Wrap returns next wrapped with the bump behaviour.
 func (m *BumpMiddleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		userID := iamdomain.UserIDFromContext(r.Context())
-		if userID != "" {
+		// A3.3 class B (identity OPTIONAL by explicit policy): presence bumping
+		// is a best-effort last-seen UPDATE, not an authorization or attribution
+		// decision. An unauthenticated request has no presence row to bump, so
+		// the documented policy is "skip the bump, serve the request" — never a
+		// 401 (this middleware sits ahead of the routes' own gates) and never a
+		// bump of the "" user.
+		if userID, ok := authn.UserIDFromContext(r.Context()); ok {
 			m.maybeBump(r.Context(), userID)
 		}
 		next.ServeHTTP(w, r)

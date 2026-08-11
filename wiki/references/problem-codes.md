@@ -16,7 +16,7 @@ Families are **semantic, never module-named**. A module name on a public wire co
 | `auth.account_locked` | **403** — identity is proven; the account is administratively blocked, so re-authenticating cannot help | platform | `internal/platform/problem/codes.go:113` |
 | `auth.invalid_credentials` | 401 | platform | `internal/platform/problem/codes.go:104` |
 | `auth.password_change_required` | **403** — identity is proven; the session is refused until the mandatory password change completes | platform | `internal/platform/problem/codes.go:129` |
-| `auth.signature_invalid` | 401 | approval | `internal/modules/approval/http/errors.go:87` |
+| `auth.signature_invalid` | 401 | approval | `internal/modules/approval/http/errors.go:91` |
 | `auth.tenant_forbidden` | **403** — identity is proven; the caller may not act on the requested tenant | platform | `internal/platform/problem/codes.go:121` |
 | `auth.tenant_required` | **403** — identity is proven; the session carries no tenant claim for a tenant-scoped route | platform | `internal/platform/problem/codes.go:125` |
 | `auth.unauthenticated` | 401 | platform | `internal/platform/problem/codes.go:100` |
@@ -26,7 +26,7 @@ Families are **semantic, never module-named**. A module name on a public wire co
 | Code | Status | Module | Declared at |
 |---|---|---|---|
 | `conflict.already_exists` | 409 | platform | `internal/platform/problem/codes.go:252` |
-| `conflict.approval_route_duplicate_profile` | 409 | approval | `internal/modules/approval/http/errors.go:68` |
+| `conflict.approval_route_duplicate_profile` | 409 | approval | `internal/modules/approval/http/errors.go:72` |
 | `conflict.concurrent_modification` | 409 | platform | `internal/platform/problem/codes.go:256` |
 | `conflict.controlled_document_code_archived` | 409 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:532` |
 | `conflict.controlled_document_code_taken` | 409 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:531` |
@@ -35,44 +35,44 @@ Families are **semantic, never module-named**. A module name on a public wire co
 | `conflict.duplicate_submission` | 409 | shared | `internal/platform/problem/codes.go:276` |
 | `conflict.generic` | 409 | platform | `internal/platform/problem/codes.go:264` |
 | `conflict.idempotency_key_reused` | 409 | platform | `internal/platform/problem/codes.go:261` |
-| `conflict.mark_reviewed_stale_revision` | 409 | approval | `internal/modules/approval/http/errors.go:146` |
+| `conflict.mark_reviewed_stale_revision` | 409 | approval | `internal/modules/approval/http/errors.go:150` |
 | `conflict.membership_exists` | 409 | platform | `internal/platform/problem/codes.go:271` |
 | `conflict.process_area_exists` | 409 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:88` |
-| `conflict.signoff_duplicate` | 409 | approval | `internal/modules/approval/http/errors.go:54` |
+| `conflict.signoff_duplicate` | 409 | approval | `internal/modules/approval/http/errors.go:58` |
 | `conflict.stale_base` | 409 | platform | `internal/platform/problem/codes.go:268` |
-| `conflict.stale_revision` | 409 | approval | `internal/modules/approval/http/errors.go:43` |
+| `conflict.stale_revision` | 409 | approval | `internal/modules/approval/http/errors.go:47` |
 
 ## `internal` — default 500
 
 | Code | Status | Module | Declared at |
 |---|---|---|---|
 | `internal.creation_context_unconfigured` | 500 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:551` |
-| `internal.db_privilege_missing` | 500 | approval | `internal/modules/approval/http/errors.go:93` |
-| `internal.db_unknown` | 500 | approval | `internal/modules/approval/http/errors.go:94` |
+| `internal.db_privilege_missing` | 500 | approval | `internal/modules/approval/http/errors.go:97` |
+| `internal.db_unknown` | 500 | approval | `internal/modules/approval/http/errors.go:98` |
 | `internal.not_implemented` | **501** — 501 Not Implemented is the dedicated status for a wired-but-unimplemented surface (RFC 9110 §15.6.2) | platform | `internal/platform/problem/codes.go:356` |
-| `internal.signature_misconfigured` | 500 | approval | `internal/modules/approval/http/errors.go:95` |
+| `internal.signature_misconfigured` | 500 | approval | `internal/modules/approval/http/errors.go:99` |
 | `internal.template_artifact_invariant_unconfigured` | 500 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:550` |
 | `internal.unknown` | 500 | shared | `internal/platform/problem/codes.go:353` |
-| `internal.upstream_timeout` | **504** — 504 Gateway Timeout: the deadline was exceeded waiting on a dependency, which is a narrower server fault than the internal. family default of 500 | approval | `internal/modules/approval/http/errors.go:117` |
-| `internal.verdict_wrong_stage_kind` | 500 | approval | `internal/modules/approval/http/errors.go:169` |
+| `internal.upstream_timeout` | **504** — 504 Gateway Timeout: the deadline was exceeded waiting on a dependency, which is a narrower server fault than the internal. family default of 500 | approval | `internal/modules/approval/http/errors.go:121` |
+| `internal.verdict_wrong_stage_kind` | 500 | approval | `internal/modules/approval/http/errors.go:173` |
 
 ## `notfound` — default 404
 
 | Code | Status | Module | Declared at |
 |---|---|---|---|
 | `notfound.active_document_instance` | 404 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:527` |
-| `notfound.approval_instance` | 404 | approval | `internal/modules/approval/http/errors.go:44` |
-| `notfound.approval_instance_not_visible` | 404 | approval | `internal/modules/approval/http/errors.go:52` |
-| `notfound.approval_route` | 404 | approval | `internal/modules/approval/http/errors.go:114` |
+| `notfound.approval_instance` | 404 | approval | `internal/modules/approval/http/errors.go:48` |
+| `notfound.approval_instance_not_visible` | 404 | approval | `internal/modules/approval/http/errors.go:56` |
+| `notfound.approval_route` | 404 | approval | `internal/modules/approval/http/errors.go:118` |
 | `notfound.controlled_document` | 404 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:528` |
-| `notfound.delegation` | 404 | approval | `internal/modules/approval/http/errors.go:163` |
-| `notfound.document` | 404 | approval | `internal/modules/approval/http/errors.go:144` |
+| `notfound.delegation` | 404 | approval | `internal/modules/approval/http/errors.go:167` |
+| `notfound.document` | 404 | approval | `internal/modules/approval/http/errors.go:148` |
 | `notfound.document_family` | 404 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:93` |
 | `notfound.document_profile` | 404 | shared | `internal/platform/problem/codes.go:186` |
 | `notfound.membership` | 404 | platform | `internal/platform/problem/codes.go:182` |
 | `notfound.process_area` | 404 | shared | `internal/platform/problem/codes.go:189` |
 | `notfound.resource` | 404 | platform | `internal/platform/problem/codes.go:178` |
-| `notfound.revision` | 404 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:152` |
+| `notfound.revision` | 404 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:160` |
 
 ## `permission` — default 403
 
@@ -83,7 +83,7 @@ Families are **semantic, never module-named**. A module name on a public wire co
 | `permission.iso_segregation_violation` | 403 | platform | `internal/platform/problem/codes.go:154` |
 | `permission.origin_forbidden` | 403 | platform | `internal/platform/problem/codes.go:150` |
 | `permission.signoff_actor_not_eligible` | 403 | shared | `internal/platform/problem/codes.go:165` |
-| `permission.sod_cross_stage_duplicate` | 403 | approval | `internal/modules/approval/http/errors.go:71` |
+| `permission.sod_cross_stage_duplicate` | 403 | approval | `internal/modules/approval/http/errors.go:75` |
 | `permission.sod_submitter_cannot_sign` | 403 | shared | `internal/platform/problem/codes.go:168` |
 
 ## `precondition` — default 412
@@ -91,8 +91,8 @@ Families are **semantic, never module-named**. A module name on a public wire co
 | Code | Status | Module | Declared at |
 |---|---|---|---|
 | `precondition.content_hash_mismatch` | 412 | shared | `internal/platform/problem/codes.go:290` |
-| `precondition.if_match_required` | **428** — 428 Precondition Required (RFC 6585 §3): no precondition FAILED — the server refuses to act without one, which is the opposite of the 412 the precondition. family defaults to | approval | `internal/modules/approval/http/errors.go:74` |
-| `precondition.lock_version_stale` | 412 | templates | `internal/modules/templates/delivery/http/errors.go:31` |
+| `precondition.if_match_required` | **428** — 428 Precondition Required (RFC 6585 §3): no precondition FAILED — the server refuses to act without one, which is the opposite of the 412 the precondition. family defaults to | approval | `internal/modules/approval/http/errors.go:78` |
+| `precondition.lock_version_stale` | 412 | templates | `internal/modules/templates/delivery/http/errors.go:32` |
 
 ## `ratelimit` — default 429
 
@@ -109,47 +109,47 @@ Families are **semantic, never module-named**. A module name on a public wire co
 | `request.cursor_expired` | **410** — 410 Gone: the cursor addressed an item that has been permanently removed, so the caller must restart pagination rather than fix the request syntax | platform | `internal/platform/problem/codes.go:68` |
 | `request.cursor_invalid` | 400 | platform | `internal/platform/problem/codes.go:53` |
 | `request.empty_body` | 400 | shared | `internal/platform/problem/codes.go:84` |
-| `request.header_required` | 400 | approval | `internal/modules/approval/http/errors.go:103` |
+| `request.header_required` | 400 | approval | `internal/modules/approval/http/errors.go:107` |
 | `request.idempotency_key_invalid` | 400 | platform | `internal/platform/problem/codes.go:74` |
 | `request.idempotency_key_required` | 400 | platform | `internal/platform/problem/codes.go:77` |
-| `request.if_match_malformed` | 400 | approval | `internal/modules/approval/http/errors.go:78` |
+| `request.if_match_malformed` | 400 | approval | `internal/modules/approval/http/errors.go:82` |
 | `request.invalid` | 400 | platform | `internal/platform/problem/codes.go:50` |
 | `request.json_decode` | 400 | shared | `internal/platform/problem/codes.go:81` |
-| `request.json_type_error` | 400 | approval | `internal/modules/approval/http/errors.go:122` |
+| `request.json_type_error` | 400 | approval | `internal/modules/approval/http/errors.go:126` |
 | `request.method_not_allowed` | **405** — 405 is the dedicated status for an unsupported method on an existing target (RFC 9110 §15.5.6); the request is otherwise well-formed, so the request. family is right and 400 is not | platform | `internal/platform/problem/codes.go:57` |
-| `request.param_format` | 400 | approval | `internal/modules/approval/http/errors.go:100` |
-| `request.param_required` | 400 | approval | `internal/modules/approval/http/errors.go:102` |
-| `request.param_too_many_values` | 400 | approval | `internal/modules/approval/http/errors.go:104` |
-| `request.param_unmarshal` | 400 | approval | `internal/modules/approval/http/errors.go:101` |
+| `request.param_format` | 400 | approval | `internal/modules/approval/http/errors.go:104` |
+| `request.param_required` | 400 | approval | `internal/modules/approval/http/errors.go:106` |
+| `request.param_too_many_values` | 400 | approval | `internal/modules/approval/http/errors.go:108` |
+| `request.param_unmarshal` | 400 | approval | `internal/modules/approval/http/errors.go:105` |
 
 ## `state` — default 409
 
 | Code | Status | Module | Declared at |
 |---|---|---|---|
 | `state.active_revision_exists` | 409 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:530` |
-| `state.approval_blocked_unresolved_comments` | 409 | approval | `internal/modules/approval/http/errors.go:107` |
+| `state.approval_blocked_unresolved_comments` | 409 | approval | `internal/modules/approval/http/errors.go:111` |
 | `state.approval_instance_completed` | 409 | shared | `internal/platform/problem/codes.go:238` |
-| `state.approval_route_in_use` | 409 | approval | `internal/modules/approval/http/errors.go:67` |
-| `state.approval_route_inactive` | 409 | approval | `internal/modules/approval/http/errors.go:115` |
+| `state.approval_route_in_use` | 409 | approval | `internal/modules/approval/http/errors.go:71` |
+| `state.approval_route_inactive` | 409 | approval | `internal/modules/approval/http/errors.go:119` |
 | `state.approval_route_missing` | 409 | shared | `internal/platform/problem/codes.go:204` |
 | `state.approval_stage_not_active` | 409 | shared | `internal/platform/problem/codes.go:241` |
 | `state.controlled_document_not_active` | 409 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:529` |
 | `state.default_template_obsolete` | 409 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:553` |
 | `state.document_family_already_inactive` | 409 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:95` |
 | `state.document_family_has_profiles` | 409 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:96` |
-| `state.document_not_draft` | 409 | approval | `internal/modules/approval/http/errors.go:137` |
-| `state.document_not_published` | 409 | approval | `internal/modules/approval/http/errors.go:145` |
+| `state.document_not_draft` | 409 | approval | `internal/modules/approval/http/errors.go:141` |
+| `state.document_not_published` | 409 | approval | `internal/modules/approval/http/errors.go:149` |
 | `state.document_profile_archived` | 409 | shared | `internal/platform/problem/codes.go:223` |
-| `state.fast_forward_not_eligible` | 409 | approval | `internal/modules/approval/http/errors.go:173` |
-| `state.fast_forward_stage_not_completed` | 409 | approval | `internal/modules/approval/http/errors.go:172` |
+| `state.fast_forward_not_eligible` | 409 | approval | `internal/modules/approval/http/errors.go:177` |
+| `state.fast_forward_stage_not_completed` | 409 | approval | `internal/modules/approval/http/errors.go:176` |
 | `state.override_template_deleted` | 409 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:536` |
 | `state.override_template_not_published` | 409 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:537` |
-| `state.placeholder_not_author_editable` | 409 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:153` |
+| `state.placeholder_not_author_editable` | 409 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:161` |
 | `state.process_area_archived` | 409 | shared | `internal/platform/problem/codes.go:226` |
 | `state.profile_class_route_conflict` | 409 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:67` |
 | `state.profile_no_default_template` | 409 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:552` |
-| `state.revision_not_draft` | 409 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:154` |
-| `state.sla_extension_no_active_stage` | 409 | approval | `internal/modules/approval/http/errors.go:183` |
+| `state.revision_not_draft` | 409 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:162` |
+| `state.sla_extension_no_active_stage` | 409 | approval | `internal/modules/approval/http/errors.go:187` |
 | `state.system_template_immutable` | 409 | platform | `internal/platform/problem/codes.go:219` |
 | `state.template_artifact_missing` | 409 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:549` |
 | `state.template_not_published` | 409 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:43` |
@@ -161,15 +161,15 @@ Families are **semantic, never module-named**. A module name on a public wire co
 
 | Code | Status | Module | Declared at |
 |---|---|---|---|
-| `validation.approval_stage_required` | 422 | approval | `internal/modules/approval/http/errors.go:157` |
+| `validation.approval_stage_required` | 422 | approval | `internal/modules/approval/http/errors.go:161` |
 | `validation.area_code_immutable` | 422 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:86` |
 | `validation.area_parent_cycle` | 422 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:85` |
-| `validation.delegation_window_invalid` | 422 | approval | `internal/modules/approval/http/errors.go:162` |
+| `validation.delegation_window_invalid` | 422 | approval | `internal/modules/approval/http/errors.go:166` |
 | `validation.dictionary_token_missing` | 422 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:538` |
-| `validation.doc_type_code_required` | 422 | templates | `internal/modules/templates/delivery/http/errors.go:63` |
-| `validation.document_subject_key_mismatch` | 422 | approval | `internal/modules/approval/http/errors.go:135` |
-| `validation.effective_date_required` | 422 | approval | `internal/modules/approval/http/errors.go:72` |
-| `validation.effective_to_not_after_effective_from` | 422 | approval | `internal/modules/approval/http/errors.go:148` |
+| `validation.doc_type_code_required` | 422 | templates | `internal/modules/templates/delivery/http/errors.go:64` |
+| `validation.document_subject_key_mismatch` | 422 | approval | `internal/modules/approval/http/errors.go:139` |
+| `validation.effective_date_required` | 422 | approval | `internal/modules/approval/http/errors.go:76` |
+| `validation.effective_to_not_after_effective_from` | 422 | approval | `internal/modules/approval/http/errors.go:152` |
 | `validation.empty_eligible_pool` | 422 | shared | `internal/platform/problem/codes.go:324` |
 | `validation.failed` | 422 | shared | `internal/platform/problem/codes.go:308` |
 | `validation.family_unknown` | 422 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:65` |
@@ -177,27 +177,27 @@ Families are **semantic, never module-named**. A module name on a public wire co
 | `validation.manual_code_reason_required` | 422 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:533` |
 | `validation.name_reserved` | 422 | tokens | `internal/modules/tokens/delivery/http/handler.go:55` |
 | `validation.override_reason_required` | 422 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:534` |
-| `validation.placeholder_name_duplicate` | 422 | templates | `internal/modules/templates/delivery/http/errors.go:55` |
-| `validation.placeholder_name_invalid` | 422 | templates | `internal/modules/templates/delivery/http/errors.go:50` |
-| `validation.placeholder_not_choice` | 422 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:151` |
+| `validation.placeholder_name_duplicate` | 422 | templates | `internal/modules/templates/delivery/http/errors.go:56` |
+| `validation.placeholder_name_invalid` | 422 | templates | `internal/modules/templates/delivery/http/errors.go:51` |
+| `validation.placeholder_not_choice` | 422 | documents | `internal/modules/documents/delivery/http/fillin_handler.go:159` |
 | `validation.profile_code_immutable` | 422 | taxonomy | `internal/modules/taxonomy/delivery/http/routes_profiles.go:55` |
-| `validation.profile_not_configured` | 422 | approval | `internal/modules/approval/http/errors.go:141` |
-| `validation.profile_unknown` | 422 | approval | `internal/modules/approval/http/errors.go:131` |
-| `validation.reason_category_invalid` | 422 | approval | `internal/modules/approval/http/errors.go:133` |
-| `validation.reason_for_change_required` | 422 | approval | `internal/modules/approval/http/errors.go:132` |
-| `validation.reason_required` | 422 | approval | `internal/modules/approval/http/errors.go:112` |
-| `validation.review_due_before_effective` | 422 | approval | `internal/modules/approval/http/errors.go:147` |
-| `validation.revision_title_required` | 422 | approval | `internal/modules/approval/http/errors.go:134` |
+| `validation.profile_not_configured` | 422 | approval | `internal/modules/approval/http/errors.go:145` |
+| `validation.profile_unknown` | 422 | approval | `internal/modules/approval/http/errors.go:135` |
+| `validation.reason_category_invalid` | 422 | approval | `internal/modules/approval/http/errors.go:137` |
+| `validation.reason_for_change_required` | 422 | approval | `internal/modules/approval/http/errors.go:136` |
+| `validation.reason_required` | 422 | approval | `internal/modules/approval/http/errors.go:116` |
+| `validation.review_due_before_effective` | 422 | approval | `internal/modules/approval/http/errors.go:151` |
+| `validation.revision_title_required` | 422 | approval | `internal/modules/approval/http/errors.go:138` |
 | `validation.role_unknown` | 422 | platform | `internal/platform/problem/codes.go:301` |
-| `validation.route_stage_required` | 422 | approval | `internal/modules/approval/http/errors.go:158` |
-| `validation.route_stages_not_permitted` | 422 | approval | `internal/modules/approval/http/errors.go:156` |
-| `validation.self_delegation` | 422 | approval | `internal/modules/approval/http/errors.go:161` |
-| `validation.sla_extension_not_forward` | 422 | approval | `internal/modules/approval/http/errors.go:182` |
-| `validation.sla_extension_reason_required` | 422 | approval | `internal/modules/approval/http/errors.go:184` |
+| `validation.route_stage_required` | 422 | approval | `internal/modules/approval/http/errors.go:162` |
+| `validation.route_stages_not_permitted` | 422 | approval | `internal/modules/approval/http/errors.go:160` |
+| `validation.self_delegation` | 422 | approval | `internal/modules/approval/http/errors.go:165` |
+| `validation.sla_extension_not_forward` | 422 | approval | `internal/modules/approval/http/errors.go:186` |
+| `validation.sla_extension_reason_required` | 422 | approval | `internal/modules/approval/http/errors.go:188` |
 | `validation.submit_choice_constraint_violated` | 422 | shared | `internal/platform/problem/codes.go:330` |
 | `validation.submit_choice_required` | 422 | shared | `internal/platform/problem/codes.go:327` |
-| `validation.supersede_target_invalid` | 422 | approval | `internal/modules/approval/http/errors.go:58` |
+| `validation.supersede_target_invalid` | 422 | approval | `internal/modules/approval/http/errors.go:62` |
 | `validation.template_profile_mismatch` | 422 | shared | `internal/platform/problem/codes.go:315` |
-| `validation.template_subject_key_mismatch` | 422 | approval | `internal/modules/approval/http/errors.go:136` |
-| `validation.verdict_ready_on_approval_stage` | 422 | approval | `internal/modules/approval/http/errors.go:168` |
+| `validation.template_subject_key_mismatch` | 422 | approval | `internal/modules/approval/http/errors.go:140` |
+| `validation.verdict_ready_on_approval_stage` | 422 | approval | `internal/modules/approval/http/errors.go:172` |
 | `validation.visibility_scope_invalid` | 422 | controlleddocuments | `internal/modules/controlleddocuments/delivery/http/routes.go:535` |

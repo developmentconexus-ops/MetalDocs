@@ -37,9 +37,17 @@ func (h *ViewHandler) HandleView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A3.3: GetViewURL authorizes against this actor; absence must fail here,
+	// not arrive as "".
+	actor, err := actorID(r)
+	if err != nil {
+		writeViewError(r.Context(), w, r, tenantID, r.PathValue("id"), requestID(r), err)
+		return
+	}
+
 	result, err := h.svc.GetViewURL(r.Context(),
 		tenantID,
-		actorID(r),
+		actor,
 		r.PathValue("id"),
 	)
 	if err != nil {

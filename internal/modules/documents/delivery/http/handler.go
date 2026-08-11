@@ -21,6 +21,7 @@ import (
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/apibase"
+	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/pagination"
 	"metaldocs/internal/platform/problem"
@@ -210,7 +211,11 @@ func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request, params d
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, problem.CodeInternalUnknown.String()))
 		return
 	}
-	callerUserID := userIDFromReq(r)
+	callerUserID, err := userIDFromReq(r)
+	if err != nil {
+		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		return
+	}
 	isAdmin, err := h.isSystemAdmin(r.Context(), callerUserID, tenantID)
 	if err != nil {
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, problem.CodeInternalUnknown.String()))
@@ -264,7 +269,11 @@ func (h *Handler) documentStats(w http.ResponseWriter, r *http.Request, _ docume
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, problem.CodeInternalUnknown.String()))
 		return
 	}
-	callerUserID := userIDFromReq(r)
+	callerUserID, err := userIDFromReq(r)
+	if err != nil {
+		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		return
+	}
 	isAdmin, err := h.isSystemAdmin(r.Context(), callerUserID, tenantID)
 	if err != nil {
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, problem.CodeInternalUnknown.String()))
@@ -791,7 +800,11 @@ func (h *Handler) forceReleaseSession(w http.ResponseWriter, r *http.Request) {
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, problem.CodeInternalUnknown.String()))
 		return
 	}
-	adminID := userIDFromReq(r)
+	adminID, err := userIDFromReq(r)
+	if err != nil {
+		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		return
+	}
 
 	var req struct {
 		SessionID string `json:"session_id"`
@@ -1257,7 +1270,11 @@ func (h *Handler) authorizeDocumentScope(w http.ResponseWriter, r *http.Request,
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, problem.CodeInternalUnknown.String()))
 		return "", "", false
 	}
-	userID = userIDFromReq(r)
+	userID, err = userIDFromReq(r)
+	if err != nil {
+		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		return "", "", false
+	}
 	admin, err := h.isSystemAdmin(ctx, userID, tenantID)
 	if err != nil {
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, problem.CodeInternalUnknown.String()))
@@ -1281,8 +1298,14 @@ func (h *Handler) authorizeDocumentScope(w http.ResponseWriter, r *http.Request,
 // authorizeDocumentScope's isSystemAdmin shortcut and by the handler's
 // downstream service calls.
 func withAdminCtx(ctx context.Context, r *http.Request) context.Context {
-	userID := userIDFromReq(r)
-	if userID == "" {
+	// A3.3 class B (identity OPTIONAL by policy): this helper only ENRICHES a
+	// context that already carries auth. It performs no permission decision and
+	// writes nothing — the actor-required decision belongs to
+	// authorizeDocumentScope, which fails closed on its own. Absence therefore
+	// returns ctx unchanged rather than a blank actor; the presence result is
+	// read explicitly so "" can never be forwarded to WithAuthContext.
+	userID, ok := authn.UserIDFromContext(r.Context())
+	if !ok {
 		return ctx
 	}
 
@@ -1297,8 +1320,14 @@ func tenantIDFromReq(r *http.Request) (string, error) {
 	return tenant.FromContext(r.Context())
 }
 
-func userIDFromReq(r *http.Request) string {
-	return iamdomain.UserIDFromContext(r.Context())
+// userIDFromReq resolves the authenticated actor for the documents handlers
+// that attribute a read/mutation to a person — export, list/stats admin
+// shortcut, force-release, document scope authorization. A3.3: it returns
+// authn.ErrMissingActor rather than "" when the principal is absent, so a
+// blank actor can no longer reach isSystemAdmin, RequireDocumentView or an
+// export service call.
+func userIDFromReq(r *http.Request) (string, error) {
+	return authn.RequireUserID(r.Context())
 }
 
 func mapErr(err error) (int, problem.Code) {

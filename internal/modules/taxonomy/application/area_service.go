@@ -78,7 +78,14 @@ func (s *AreaService) Create(ctx context.Context, a *domain.ProcessArea) error {
 	if err != nil {
 		return fmt.Errorf("taxonomy: marshal area create governance payload: %w", err)
 	}
-	actorUserID, _ := authn.UserIDFromContext(ctx)
+	// A3.3: ActorUserID is the governance-event attribution for this mutation.
+	// A discarded presence bool would have written the audit row under "", so
+	// absence fails the whole tx instead. The only callers are the taxonomy HTTP
+	// routes, which already require a session.
+	actorUserID, err := authn.RequireUserID(ctx)
+	if err != nil {
+		return err
+	}
 	if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
 		TenantID:     newArea.TenantID,
 		EventType:    domain.GovernanceEventTypeAreaCreated,
@@ -137,7 +144,14 @@ func (s *AreaService) Update(ctx context.Context, a *domain.ProcessArea) error {
 	if err != nil {
 		return fmt.Errorf("taxonomy: marshal area update governance payload: %w", err)
 	}
-	actorUserID, _ := authn.UserIDFromContext(ctx)
+	// A3.3: ActorUserID is the governance-event attribution for this mutation.
+	// A discarded presence bool would have written the audit row under "", so
+	// absence fails the whole tx instead. The only callers are the taxonomy HTTP
+	// routes, which already require a session.
+	actorUserID, err := authn.RequireUserID(ctx)
+	if err != nil {
+		return err
+	}
 	if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
 		TenantID:     existing.TenantID,
 		EventType:    domain.GovernanceEventTypeAreaUpdated,

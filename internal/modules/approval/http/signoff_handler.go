@@ -25,12 +25,10 @@ var (
 // a stage. Requires both an Idempotency-Key header (replay-safe via idempStore)
 // and a valid If-Match header (OCC precondition).
 func (h *Handler) SignoffHandler(w http.ResponseWriter, r *http.Request) {
-	tenantID, err := tenantIDFromReq(r)
-	if err != nil {
-		WriteError(w, r, err)
+	tenantID, actorID, ok := requestIdentity(w, r)
+	if !ok {
 		return
 	}
-	actorID := actorIDFromRequest(r)
 	instanceID := r.PathValue("instance_id")
 	stageID := r.PathValue("stage_id")
 	idempKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))

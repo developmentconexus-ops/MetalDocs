@@ -118,10 +118,13 @@ func (h *Handler) Mount(mux httprouter.Muxer) {
 
 // actorFromCtx extracts (tenantID, actorID) for idempotency-key scoping,
 // matching the templates/approval/controlleddocuments sibling handlers.
-func actorFromCtx(ctx context.Context) (string, string) {
+func actorFromCtx(ctx context.Context) (string, string, error) {
 	tenantID, _ := tenant.FromContext(ctx)
-	actorID, _ := authn.UserIDFromContext(ctx)
-	return tenantID, actorID
+	actorID, err := authn.RequireUserID(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	return tenantID, actorID, nil
 }
 
 // NewHandler builds a Handler wired to the given profile/area/family

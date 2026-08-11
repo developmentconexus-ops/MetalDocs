@@ -20,7 +20,7 @@ func TestAreaServiceCreate_UsesDomainConstructorNormalizationAndValidation(t *te
 		TenantID: " tenant-a ",
 		Name:     " Finance ",
 	}
-	if err := service.Create(context.Background(), in); err != nil {
+	if err := service.Create(actorCtx(), in); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	got := repo.get("tenant-a", "AR-01")
@@ -174,7 +174,7 @@ func TestAreaServiceCreate_AtomicRollback_WhenLogTxFails(t *testing.T) {
 	logger := &fakeGovernanceLoggerWithError{err: govErr}
 
 	service := NewAreaService(repo, logger)
-	err := service.Create(context.Background(), &domain.ProcessArea{
+	err := service.Create(actorCtx(), &domain.ProcessArea{
 		Code:     "AR-ATOMIC",
 		TenantID: "tenant-a",
 		Name:     "Atomic Test",
