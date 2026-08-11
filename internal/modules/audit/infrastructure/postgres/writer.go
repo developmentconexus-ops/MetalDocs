@@ -51,18 +51,49 @@ type PayloadCrypto interface {
 	DecryptForTenant(ctx context.Context, tenantID string, envelope string) (plaintext []byte, err error)
 }
 
-// redactedPayload is what ListEvents substitutes for an envelope payload it
-// cannot decrypt because the tenant's key has been crypto-shredded (erasure).
-// Plaintext legacy rows and successfully-decrypted rows are never touched.
+// TenantErasureChecker is the audit module's own narrow port for learning
+// whether a tenant has been erased (DEC-8). Declared audit-side, mirroring
+// PayloadCrypto above, so this package never imports the iam module — the
+// composition root wires iam's published iamdomain.TenantErasureReader
+// implementation (internal/modules/iam/infrastructure/postgres) in here,
+// which already satisfies this interface structurally.
+//
+// This is the single gate ListEvents uses to decide whether to withhold
+// payload content, independent of whether the stored row is a crypto
+// envelope or legacy plaintext (openPayload's envelope-only redaction left a
+// gap: IsEnvelope returns false for a plaintext row, so an erased tenant's
+// pre-crypto or never-encrypted rows were served untouched — DEC-8).
+type TenantErasureChecker interface {
+	IsErased(ctx context.Context, tenantID string) (bool, error)
+}
+
+// redactedPayload is what openPayload substitutes for an envelope payload it
+// cannot decrypt because the tenant's key has been crypto-shredded. This is
+// the pre-existing (M7 F7.3) marker; it is now reached only when
+// TenantErasureChecker is unwired or when a specific row's key is destroyed
+// without the owning tenant being erased (defense in depth — decrypt failure
+// still redacts even if the erasure gate below did not already catch it).
 const redactedPayload = `{"redacted":"crypto-shredded"}`
+
+// redactedErasedTenantPayload is what ListEvents substitutes for ANY
+// payload — envelope or legacy plaintext — once TenantErasureChecker
+// confirms the owning tenant is erased. Deliberately a DIFFERENT marker from
+// redactedPayload: "crypto-shredded" asserts the underlying bytes are
+// cryptographically unrecoverable, which is true for a destroyed-DEK
+// envelope but NOT for a plaintext row — that row's bytes are still sitting
+// in cleartext at rest, merely withheld by this read-path gate. Reusing the
+// crypto-shredded wording for the plaintext case would overstate the erasure
+// guarantee to anyone reading the audit UI or an export.
+const redactedErasedTenantPayload = `{"redacted":"tenant-erased"}`
 
 // Writer is the postgres-backed implementation of domain.Writer/Reader/
 // Counter/IntegrityValidator against metaldocs.audit_events. Every insert
 // takes the audit-hash-chain advisory lock so the prev_hash/row_hash chain is
 // computed and appended without a race between concurrent writers.
 type Writer struct {
-	db     *sql.DB
-	crypto PayloadCrypto
+	db      *sql.DB
+	crypto  PayloadCrypto
+	erasure TenantErasureChecker
 }
 
 const auditHashChainLockID int64 = 90120260513004
@@ -83,6 +114,19 @@ func NewWriter(db *sql.DB) *Writer {
 // implementation.
 func (w *Writer) WithPayloadCrypto(crypto PayloadCrypto) *Writer {
 	w.crypto = crypto
+	return w
+}
+
+// WithTenantErasureCheck wires erasure into the Writer, returning it for
+// chaining. When wired, ListEvents withholds payload content — envelope or
+// legacy plaintext alike — for any tenant whose metaldocs.tenants.erased_at
+// is set (DEC-8). Nil (unwired) preserves the pre-fix behavior: ListEvents
+// falls through to openPayload's existing envelope-only path, which is only
+// safe for callers that do not serve erasable tenant data (tests, the
+// in-memory writer's callers). Every composition root that constructs a
+// postgres Writer against a real deployment must call this.
+func (w *Writer) WithTenantErasureCheck(erasure TenantErasureChecker) *Writer {
+	w.erasure = erasure
 	return w
 }
 
@@ -193,7 +237,16 @@ func (w *Writer) sealPayload(ctx context.Context, tx db.Tx, event domain.Event) 
 // the redacted marker instead of propagating an error — the intended,
 // permanent effect of erasure, not a bug. Plaintext rows (IsEnvelope false)
 // and the nil-crypto composition-root path pass through untouched.
-func (w *Writer) openPayload(ctx context.Context, tenantID, payloadJSON string) string {
+//
+// tenantErased is precomputed once per ListEvents call (see tenantErased
+// below) rather than re-checked per row: it gates unconditionally, before
+// the envelope check, so a plaintext row belonging to an erased tenant is
+// withheld exactly like an envelope row (DEC-8) instead of falling through
+// IsEnvelope's false branch untouched.
+func (w *Writer) openPayload(ctx context.Context, tenantID, payloadJSON string, tenantErased bool) string {
+	if tenantErased {
+		return redactedErasedTenantPayload
+	}
 	if w.crypto == nil || !platcrypto.IsEnvelope(payloadJSON) {
 		return payloadJSON
 	}
@@ -202,6 +255,18 @@ func (w *Writer) openPayload(ctx context.Context, tenantID, payloadJSON string) 
 		return redactedPayload
 	}
 	return string(plaintext)
+}
+
+// tenantErased reports whether tenantID has been erased, via the wired
+// TenantErasureChecker. Returns (false, nil) when unwired — see
+// WithTenantErasureCheck. A genuine lookup failure propagates as an error:
+// ListEvents must fail closed (refuse the read) rather than guess "not
+// erased" and risk serving payload content the system has attested is gone.
+func (w *Writer) tenantErased(ctx context.Context, tenantID string) (bool, error) {
+	if w.erasure == nil {
+		return false, nil
+	}
+	return w.erasure.IsErased(ctx, tenantID)
 }
 
 // ValidateIntegrity re-derives prev_hash/row_hash for the most recent
@@ -283,6 +348,15 @@ func (w *Writer) ListEvents(ctx context.Context, query domain.ListEventsQuery) (
 		limit = pagination.DefaultLimit
 	}
 
+	// Resolved once per call, not per row: every row in a ListEvents result
+	// shares query.TenantID (buildWhere always adds tenant_id = $1), so one
+	// lookup is enough. A lookup failure fails the whole call closed (DEC-8) —
+	// see tenantErased.
+	erased, err := w.tenantErased(ctx, query.TenantID)
+	if err != nil {
+		return nil, false, fmt.Errorf("list audit events: check tenant erasure: %w", err)
+	}
+
 	// +1 probe row to detect hasMore: a trailing row beyond the page means a
 	// further page exists. Trimmed below so the caller never sees the probe.
 	sqlText, args := buildListQuery(query, limit+1)
@@ -308,7 +382,7 @@ func (w *Writer) ListEvents(ctx context.Context, query domain.ListEventsQuery) (
 		); err != nil {
 			return nil, false, fmt.Errorf("scan audit event: %w", err)
 		}
-		event.PayloadJSON = w.openPayload(ctx, event.TenantID, event.PayloadJSON)
+		event.PayloadJSON = w.openPayload(ctx, event.TenantID, event.PayloadJSON, erased)
 		items = append(items, event)
 	}
 	if err := rows.Err(); err != nil {
