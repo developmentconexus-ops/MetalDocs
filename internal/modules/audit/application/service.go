@@ -190,6 +190,17 @@ func (s *Service) ExportEvents(ctx context.Context, actorID string, format domai
 		return domain.ExportJob{}, err
 	}
 
+	// EXPLICITLY TRANSITIONAL — deleted by ROADMAP unit 4.10, as part of that
+	// unit's definition-of-done, not as a follow-up.
+	//
+	// This re-check narrows the erasure race; it does not close it. A window
+	// remains between this IsErased round trip and the Save below. The reason
+	// it cannot be closed here is that the defect is not in this module:
+	// iam's runErase raises the erasure signal in its LAST phase, after the
+	// destructive phases have already run, so this gate is reading a signal
+	// that is absent for the entire interval it needs to cover. Unit 4.10
+	// moves that tombstone to its own transaction committed before phase 1,
+	// at which point this check has nothing left to narrow and goes away.
 	if err := s.refuseIfTenantErased(ctx, normalizedSizing.TenantID); err != nil {
 		return domain.ExportJob{}, err
 	}
@@ -251,6 +262,11 @@ func (s *Service) renderExportPayload(ctx context.Context, normalizedSizing doma
 // lookup error is treated the same as "erased" (ErrExportTenantErased either
 // way), because no caller downstream of this function can tell "confirmed
 // erased" apart from "could not tell" and safely choose to persist anyway.
+// EXPLICITLY TRANSITIONAL — this whole function is deleted by ROADMAP unit
+// 4.10 (erasure gate ordering). It exists only because the signal it consults
+// is currently raised too late to be trustworthy; once iam commits the
+// tombstone before the first destructive phase, the condition this guards
+// against is unrepresentable and the guard is dead weight.
 func (s *Service) refuseIfTenantErased(ctx context.Context, tenantID string) error {
 	erased, err := s.erasure.IsErased(ctx, tenantID)
 	if err != nil {

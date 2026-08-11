@@ -361,6 +361,13 @@ func (w *Writer) ListEvents(ctx context.Context, query domain.ListEventsQuery) (
 	// shares query.TenantID (buildWhere always adds tenant_id = $1), so one
 	// lookup is enough. A lookup failure fails the whole call closed (DEC-8) —
 	// see tenantErased.
+	//
+	// EXPLICITLY TRANSITIONAL in its *timing*, not in its existence: the read
+	// gate itself is the right structure, but it is check-then-read, so an
+	// erasure committing between this lookup and the query below still yields
+	// plaintext. ROADMAP unit 4.10 fixes the underlying cause — iam raising the
+	// erasure signal only in its last phase — and deletes this pre-read lookup
+	// in favour of a committed signal that is true for the whole erasure.
 	erased, err := w.tenantErased(ctx, query.TenantID)
 	if err != nil {
 		return nil, false, fmt.Errorf("list audit events: check tenant erasure: %w", err)
