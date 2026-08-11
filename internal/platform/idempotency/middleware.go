@@ -12,6 +12,7 @@ import (
 	"regexp"
 
 	"metaldocs/internal/platform/problem"
+	"metaldocs/internal/platform/tenant"
 )
 
 var uuidRE = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
@@ -146,8 +147,24 @@ func serveWithIdempotency(store *Store, actorFromCtx func(context.Context) (stri
 
 	tenantID, actorID, err := actorFromCtx(ctx)
 	if err != nil {
-		// A3.3: identity resolution failed, so the replay key cannot be scoped.
-		// Refuse before the request body is read or a claim is persisted — the
+		// A3.5a review (PR #122): a missing tenant is not the same fault class
+		// as a missing actor and must not share the actor branch's 401. Every
+		// other production consumer of tenant.FromContext in this tree maps
+		// ErrTenantMissing to 500 (internal/platform/tenant/context.go:15-17
+		// "Handlers MUST treat ErrTenantMissing as an internal-server-error
+		// invariant violation, not a 400" — see also
+		// controlleddocuments/delivery/http/handler.go's injectTenant). It
+		// means the auth middleware did not run or the session is corrupt, a
+		// server-side fault, not something the caller can fix by
+		// re-authenticating. Presenting it as 401 would mislabel a server bug
+		// as a client mistake.
+		if errors.Is(err, tenant.ErrTenantMissing) {
+			problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
+			return
+		}
+		// A3.3: any other identity-resolution failure (missing/blank actor)
+		// means the replay key cannot be scoped to a real caller. Refuse
+		// before the request body is read or a claim is persisted — the
 		// wrapped handler is never reached.
 		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
 		return
