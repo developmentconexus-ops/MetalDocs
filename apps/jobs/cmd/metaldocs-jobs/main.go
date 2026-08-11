@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -198,12 +199,48 @@ func run(ctx context.Context) error {
 	releaseCoordinator.WithLifecycleEnqueuer(approvaljobs.NewLifecycleEventEnqueuer(deps.River.Client))
 	slaNotifier.Bind(deps.River.Client)
 
-	slog.Info("MetalDocs Jobs running", "queues", "temporal")
+	// A7.1: liveness/readiness/metrics on a dedicated infra-port listener.
+	// Built and served before Client.Start so an orchestrator can observe
+	// this process during bootstrap too (readiness correctly reports NOT
+	// ready until Start succeeds below). A bind/serve failure here is
+	// logged, not fatal — it must not block this binary's actual job
+	// (executing periodic + temporal River jobs), matching the roadmap's
+	// "additive endpoints, no behavior change" acceptance bound for A7.1.
+	jobsReady := &jobsReadiness{}
+	// F1: wire the River queue-report heartbeat (see readiness.go's type doc
+	// comment for the full derivation and stated limitation) across every
+	// queue THIS binary subscribes — both "maintenance" (jobsCfg.Queues,
+	// added above) and whatever else jobsCfg.Queues carries ("temporal" by
+	// default, see config.LoadJobsConfig). staleAfter = 2x River's own fixed
+	// ~10-minute queue-report cadence + a 1-minute margin: a small multiple
+	// plus margin, derived from that cadence rather than an unrelated fixed
+	// value, the same discipline the worker binary applies to its own poll
+	// interval.
+	jobsReady.ConfigureHeartbeat(deps.River.Client, jobsQueueNames(jobsCfg), 2*riverQueueReportInterval+time.Minute, nil)
+	infraServer, err := buildInfraServer(deps, jobsReady)
+	if err != nil {
+		return fmt.Errorf("invalid jobs infra server config: %w", err)
+	}
+	go func() {
+		if err := infraServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("jobs infra server failed", "err", err)
+		}
+	}()
+
+	slog.Info("MetalDocs Jobs running", "queues", "temporal", "infra_addr", infraServer.Addr)
 	if err := deps.River.Client.Start(ctx); err != nil {
 		return fmt.Errorf("run jobs host: %w", err)
 	}
+	jobsReady.MarkStarted()
 
+	// F3 (review round 2): confirmed no equivalent gap exists here to the
+	// worker binary's batch-drain window — MarkStopped() below runs
+	// synchronously the instant ctx.Done() unblocks, BEFORE
+	// deps.River.Client.Stop's up-to-15s drain begins, so /ready already
+	// reports NOT ready for the entire duration of that drain. No goroutine
+	// restructuring is needed to close this finding for metaldocs-jobs.
 	<-ctx.Done()
+	jobsReady.MarkStopped()
 
 	// Intentional cancellation detach (WithoutCancel): ctx is already done at
 	// this point — the shutdown needs its own fresh 15 s deadline while still
@@ -213,6 +250,12 @@ func run(ctx context.Context) error {
 
 	if err := deps.River.Client.Stop(shutdownCtx); err != nil && !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
 		return fmt.Errorf("stop jobs host: %w", err)
+	}
+
+	infraShutdownCtx, infraCancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer infraCancel()
+	if err := infraServer.Shutdown(infraShutdownCtx); err != nil {
+		slog.Warn("jobs infra server shutdown incomplete", "err", err)
 	}
 
 	return nil

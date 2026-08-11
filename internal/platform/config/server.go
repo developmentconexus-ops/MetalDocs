@@ -46,6 +46,24 @@ func LoadServerConfig() (ServerConfig, error) {
 	return cfg, nil
 }
 
+// LoadListenAddr reads a generic "host:port" listen address from envVar,
+// defaulting to defaultAddr when unset. Shared by any binary that needs its
+// own dedicated infra-port listener beyond the api binary's own
+// APP_PORT/METRICS_ADDR pair (A7.1: metaldocs-worker's WORKER_METRICS_ADDR,
+// metaldocs-jobs' JOBS_METRICS_ADDR) — same validateListenAddr rule
+// LoadServerConfig already applies to METRICS_ADDR, factored out here so a
+// second and third binary do not each re-implement the parsing/validation.
+func LoadListenAddr(envVar, defaultAddr string) (string, error) {
+	addr := strings.TrimSpace(os.Getenv(envVar))
+	if addr == "" {
+		return defaultAddr, nil
+	}
+	if err := validateListenAddr(addr); err != nil {
+		return "", fmt.Errorf("invalid %s value: %w", envVar, err)
+	}
+	return addr, nil
+}
+
 // validateListenAddr accepts a Go listen address of the form ":port" or
 // "host:port" with the port in 1..65535.
 func validateListenAddr(addr string) error {

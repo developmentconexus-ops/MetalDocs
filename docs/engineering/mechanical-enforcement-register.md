@@ -53,6 +53,7 @@ defect this register exists to eliminate.
 | ME-13 an analysis that takes its subject as its own premise | [#86](https://github.com/leandrotcawork/MetalDocs/issues/86) |
 | ME-14 a tenant table with no RLS, and no control that could see it | _issue pending_ |
 | ME-15 the check registry is four hand-synced inventories, not one | _issue pending_ |
+| ME-16 compose healthcheck probes are a second, unforced reading of two worker/jobs runtime facts | [#115](https://github.com/developmentconexus-ops/MetalDocs/issues/115) |
 
 ## How to read an entry
 
@@ -593,6 +594,73 @@ re-export without this label would itself be the defect the rule exists to catch
 
 **Owner:** unrouted. Cheap to defer, expensive to forget — record here rather than let the next
 `--audit` false-confidence read stand unqualified.
+
+---
+
+## ME-16 — compose healthcheck probes are a second, unforced reading of two worker/jobs runtime facts
+
+**Found** 2026-08-11, round 5 of A7.1 (issue #95, PR #109), disposing of CodeRabbit review threads
+against `deploy/compose/docker-compose.yml`. Two independent instances of the same shape, both
+about the `worker`/`jobs` `healthcheck:` blocks encoding a runtime fact that a different part of the
+same file (or the same binary) is the actual source of truth for.
+
+**Surface A — the probed address.** `apps/worker/cmd/metaldocs-worker/infraserver.go:34` and
+`apps/jobs/cmd/metaldocs-jobs/infraserver.go:53` read `WORKER_METRICS_ADDR` / `JOBS_METRICS_ADDR`
+(via `config.LoadListenAddr`, defaulting to `:9091`/`:9092`) — the process's real, overridable
+listen address. `deploy/compose/docker-compose.yml:344` and `:392` hard-code
+`127.0.0.1:9091`/`:9092` in the healthcheck `test:` shell command, a second reading of the same
+fact. They agree today only because neither service's `environment:` block currently sets
+`WORKER_METRICS_ADDR`/`JOBS_METRICS_ADDR` (confirmed by reading both blocks in full,
+2026-08-11) — an absence of override, not a guarantee against one. The moment either variable is
+added to `environment:` without a matching edit to `healthcheck.test:`, `docker compose ps` starts
+reporting `unhealthy` for a correctly-running process.
+
+**Surface B — is `METALDOCS_WORKER_RUN_ONCE` a one-shot batch invocation, or a service `restart:
+unless-stopped` should keep alive?** `apps/worker/cmd/metaldocs-worker/main.go:184-188` (`runWorkerBatch`)
+calls `os.Exit` once the batch drains — by design, a single completed run, per the F7/F9 comments
+already on `docker-compose.yml:295-344`. But `deploy/compose/docker-compose.yml:249` sets
+`restart: unless-stopped` on that same `worker` service, and Compose's restart policy reacts to
+**process exit**, independent of and unrelated to healthcheck status (confirmed against
+`docs.docker.com/reference/compose-file/services` and `docs.docker.com/engine/containers/start-containers-automatically`:
+`unless-stopped` restarts on any exit code, success or failure, unless the container was manually
+stopped). The round-4 healthcheck case-guard at `docker-compose.yml:344` (`case "$$v" in
+[Tt][Rr][Uu][Ee]|1) exit 0 ;; esac`) only changes what the healthcheck *reports* during batch mode;
+it cannot and does not touch the restart decision, which Compose makes from the exit event alone.
+Run `docker compose up worker` with `METALDOCS_WORKER_RUN_ONCE=true` today and the batch reruns in
+a loop — the "one-shot" contract main.go documents and Surface A's neighbor comments assume is not
+actually held by this compose file.
+
+**Kept correct by** discipline plus, for Surface A, a coincidence (no override currently exists to
+expose the drift). Surface B is not even currently correct — it is a live behavior gap, not a
+latent one.
+
+**Firing mechanism** — both level 1 candidates, not yet built:
+- **A:** interpolate one compose variable (e.g. `${WORKER_METRICS_ADDR:-:9091}`) into both the
+  `environment:` entry and the `healthcheck.test:` command, so a compose-level override reaches
+  both readings by construction instead of by remembering to edit two lines.
+- **B:** a batch-specific compose service (or a `docker-compose.override.yml` invoked instead of
+  the base `worker` service for one-shot runs) carrying `restart: "no"`, so "is this a batch run"
+  is answered once, by which service definition is invoked, not by a shell guard reinterpreting an
+  env var the restart policy never reads.
+
+**Why this round didn't fix it:** both surfaces require editing `environment:` or `restart:` /
+service topology in `deploy/compose/docker-compose.yml`. PR #109's own diff on that file is fenced
+to `#` comments and `healthcheck:`/`test:`/`interval:`/`timeout:`/`retries:`/`start_period:` only,
+specifically so PR #110 (Lane C, same file, rebasing on top of PR #109) keeps a clean rebase.
+Widening the fence to fix this now would break that property for a concurrent, already-in-flight PR.
+
+**Subsumes a third instance found in round 4** (`docker-compose.yml:309-343`, F9): the healthcheck's
+shell `case` guard and `config.LoadWorkerConfig`'s Go truthy check are two independently-maintained
+readings of "is `METALDOCS_WORKER_RUN_ONCE` truthy," proven to agree value-by-value but not
+structurally identical. Landing Surface B's firing mechanism (a batch-specific service/override
+carrying `restart: "no"`) removes the shell guard's reason to exist at all — a batch-mode compose
+service invoked instead of the continuous one needs no `/live`-vs-RunOnce case split, so the second
+truthy reading is deleted as a side effect, not patched in place.
+
+**Owner:** unrouted. **Closes when:** a follow-up slice lands either firing mechanism above and
+deletes this entry; until then this is the named tracked item for the "TRANSITIONAL local maximum"
+label on `docker-compose.yml:339-343` and in
+`docs/runbooks/worker-jobs-liveness-healthchecks.md`'s "Deliberately deferred" section.
 
 ---
 

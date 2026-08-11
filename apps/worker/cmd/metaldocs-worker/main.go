@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -180,6 +182,9 @@ func runMain() int {
 	}
 
 	if workerCfg.RunOnce {
+		// A one-shot batch invocation exits within this call; there is no
+		// persistent process for an orchestrator to probe, so the A7.1
+		// infra server is deliberately not started here (see infraserver.go).
 		if err := runWorkerBatch(ctx, workerSvc, workerCfg.BatchSize); err != nil {
 			slog.Error("worker run failed", "err", err)
 			return 1
@@ -187,14 +192,45 @@ func runMain() int {
 		return 0
 	}
 
+	// A7.1: liveness/readiness/metrics on a dedicated infra-port listener.
+	// A bind/serve failure here is logged, not fatal — it must not block the
+	// worker's actual job (draining the outbox) from proceeding, matching
+	// the roadmap's "additive endpoints, no behavior change" acceptance
+	// bound for this slice.
+	readiness := &workerReadiness{}
+	// F1: the readiness heartbeat threshold is derived from the binary's own
+	// configured poll interval, not a fixed constant unrelated to
+	// configuration — a small multiple (3x) plus a fixed margin, so a single
+	// missed tick (a slightly slow batch) never flaps readiness, but a poll
+	// loop that has genuinely stalled (RunOnce hanging while Postgres stays
+	// reachable) is caught within a few multiples of the configured cadence.
+	readiness.ConfigureHeartbeat(3*time.Duration(workerCfg.PollIntervalSeconds)*time.Second+30*time.Second, nil)
+	infraServer, err := buildInfraServer(deps, readiness)
+	if err != nil {
+		slog.Error("invalid worker infra server config", "err", err)
+		return 1
+	}
+	go func() {
+		if err := infraServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("worker infra server failed", "err", err)
+		}
+	}()
+
 	ticker := time.NewTicker(time.Duration(workerCfg.PollIntervalSeconds) * time.Second)
 	defer ticker.Stop()
 	slog.Info("MetalDocs Worker running",
 		"poll_interval_s", workerCfg.PollIntervalSeconds, "batch_size", workerCfg.BatchSize,
 		"max_attempts", workerCfg.MaxAttempts, "retry_base_seconds", workerCfg.RetryBaseSeconds,
-		"retry_max_seconds", workerCfg.RetryMaxSeconds)
+		"retry_max_seconds", workerCfg.RetryMaxSeconds, "infra_addr", infraServer.Addr)
 
-	runWorkerLoop(ctx, workerSvc, workerCfg.BatchSize, ticker.C)
+	runWorkerLifecycle(ctx, readiness, workerSvc, workerCfg.BatchSize, ticker.C)
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer shutdownCancel()
+	if err := infraServer.Shutdown(shutdownCtx); err != nil {
+		slog.Warn("worker infra server shutdown incomplete", "err", err)
+	}
+
 	return 0
 }
 
@@ -322,12 +358,42 @@ func runWorkerBatch(ctx context.Context, runner workerBatchRunner, batchSize int
 	return nil
 }
 
+// runWorkerLifecycle wraps runWorkerLoop with the A7.1 readiness lifecycle:
+// MarkStarted before the loop begins, and MarkStopped both the instant the
+// shutdown signal fires AND after the loop actually returns.
+//
+// F3 (review round 1): readiness.MarkStopped() used to run only after
+// runWorkerLoop returned, which itself waits for any in-flight batch to
+// finish draining (up to 30 s) — during that whole window /ready still
+// reported 200 even though shutdown was already underway. The goroutine
+// below watches ctx.Done() directly and flips readiness the moment the
+// signal arrives, independent of how long the batch drain takes. The
+// post-loop MarkStopped() call is kept as an idempotent fallback (e.g. the
+// loop exiting for a reason other than ctx cancellation); MarkStopped is
+// safe to call from both goroutines and multiple times because it is a
+// single atomic.Bool.Store with no other state to race.
+func runWorkerLifecycle(ctx context.Context, readiness *workerReadiness, runner workerBatchRunner, batchSize int, ticks <-chan time.Time) {
+	readiness.MarkStarted()
+	go func() {
+		<-ctx.Done()
+		readiness.MarkStopped()
+	}()
+	runWorkerLoop(ctx, runner, batchSize, ticks, readiness)
+	readiness.MarkStopped()
+}
+
 // runWorkerLoop polls on ticks and runs a batch each iteration.
 // Graceful drain: when the signal arrives (ctx cancelled), any in-flight batch
 // is allowed to finish using a detached context with a 30 s deadline before the
 // loop exits. This prevents mid-batch abandonment while keeping the drain
 // bounded so the process does not hang indefinitely on a slow job.
-func runWorkerLoop(ctx context.Context, runner workerBatchRunner, batchSize int, ticks <-chan time.Time) {
+//
+// readiness.RecordProgress() is called ONLY when RunOnce returns nil — a
+// genuinely completed cycle — never unconditionally, so the F1 heartbeat
+// reflects real progress rather than the loop merely ticking. readiness may
+// be nil (main_test.go's pre-existing cancellation/failure tests do not
+// care about heartbeat behavior).
+func runWorkerLoop(ctx context.Context, runner workerBatchRunner, batchSize int, ticks <-chan time.Time, readiness *workerReadiness) {
 	for {
 		// Intentional cancellation detach (WithoutCancel): a signal arriving
 		// mid-batch must not abort it; the outer loop's post-batch select
@@ -339,6 +405,8 @@ func runWorkerLoop(ctx context.Context, runner workerBatchRunner, batchSize int,
 
 		if err != nil {
 			slog.Error("worker run failed", "err", err)
+		} else if readiness != nil {
+			readiness.RecordProgress()
 		}
 
 		select {
