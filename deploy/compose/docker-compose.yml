@@ -292,13 +292,25 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD}
       PGSSLMODE: disable
     healthcheck:
-      # A7.1 F2: probes /live (liveness), NOT /ready — /ready is for
-      # orchestration/gating (a dependency-degraded-but-alive process should
-      # not be killed), and a readiness-based container healthcheck combined
-      # with restart: unless-stopped above would restart-loop a worker that
-      # is merely waiting on a slow dependency. worker.Dockerfile's runtime
-      # stage is alpine:3.21 (same as api's, whose healthcheck already uses
-      # this exact wget pattern below), so a shell + busybox wget are present.
+      # A7.1 F2: probes /live (liveness), NOT /ready. Round-5 correction: a
+      # Docker Compose healthcheck only updates the container's reported
+      # health state (docker compose ps / docker inspect .State.Health,
+      # and — if anything downstream ever adds one — a depends_on:
+      # condition: service_healthy gate); it does NOT by itself cause
+      # `restart: unless-stopped` above to fire. Compose's restart policy is
+      # driven purely by the container's own process exiting, independent of
+      # and unrelated to healthcheck status (docs.docker.com/reference/
+      # compose-file/services, docs.docker.com/engine/containers/
+      # start-containers-automatically). The real reason to prefer /live
+      # here: /ready reports a dependency-degraded-but-alive process as
+      # unhealthy, which would misreport a worker that is merely waiting on
+      # a slow-but-recovering dependency (e.g. Postgres mid crash-recovery)
+      # as broken — /ready is for orchestration-level dependency gating (a
+      # human or a gateway deciding whether to route to or depend on it),
+      # not for this container-level liveness probe. worker.Dockerfile's
+      # runtime stage is alpine:3.21 (same as api's, whose healthcheck
+      # already uses this exact wget pattern below), so a shell + busybox
+      # wget are present.
       # NOT yet demonstrated live in this environment: the worker/jobs image
       # build is currently broken on trunk (go.mod requires go>=1.26.5, the
       # Dockerfiles hardcode golang:1.25-alpine — fix on
@@ -340,7 +352,26 @@ services:
       # global-maximum structure is a single source of truth for
       # batch-mode detection (e.g. the worker binary writing a sentinel the
       # shell probe reads, or the batch-mode listener above) that deletes
-      # this second reading entirely; closes when that lands.
+      # this second reading entirely. Tracked as ME-16
+      # (docs/engineering/mechanical-enforcement-register.md,
+      # https://github.com/developmentconexus-ops/MetalDocs/issues/115) —
+      # closes when that issue's Surface B firing mechanism (a batch-specific
+      # compose service/override) lands and removes this guard's reason to
+      # exist.
+      #
+      # Round-5 review (thread on this line): the 127.0.0.1:9091 probed here
+      # is a SECOND reading of infraserver.go:34's WORKER_METRICS_ADDR
+      # (default :9091, overridable) — they agree today only because this
+      # service's environment: block never sets WORKER_METRICS_ADDR. Fixing
+      # that for real means interpolating one compose variable into both
+      # environment: and this test:, which is out of this slice's fence (the
+      # PR #109/#110 fence on this file allows healthcheck:/test:/etc. edits
+      # but the correct fix threads through environment: too, since the
+      # value has to reach both the process and the probe from one place).
+      # TRANSITIONAL local maximum, tracked as ME-16 Surface A
+      # (docs/engineering/mechanical-enforcement-register.md,
+      # https://github.com/developmentconexus-ops/MetalDocs/issues/115) —
+      # closes when a compose variable drives both readings.
       test: ["CMD-SHELL", "v=\"$$METALDOCS_WORKER_RUN_ONCE\"; v=\"$${v#\"$${v%%[![:space:]]*}\"}\"; v=\"$${v%\"$${v##*[![:space:]]}\"}\"; case \"$$v\" in [Tt][Rr][Uu][Ee]|1) exit 0 ;; esac; wget -qO- http://127.0.0.1:9091/live >/dev/null || exit 1"]
       interval: 5s
       timeout: 5s
@@ -387,8 +418,16 @@ services:
       PGSSLMODE: disable
     healthcheck:
       # A7.1 F2: same reasoning as worker's healthcheck above — /live not
-      # /ready, jobs.Dockerfile shares worker/api's alpine:3.21 runtime base
-      # so wget is present.
+      # /ready, because a Compose healthcheck only reports status (it does
+      # not itself trigger restart: unless-stopped, which fires on process
+      # exit only) and /ready would misreport a dependency-degraded-but-alive
+      # process as unhealthy. jobs.Dockerfile shares worker/api's alpine:3.21
+      # runtime base so wget is present.
+      #
+      # Round-5 review: same ME-16 Surface A gap as worker's healthcheck
+      # above — 127.0.0.1:9092 here is a second, unforced reading of
+      # infraserver.go:53's JOBS_METRICS_ADDR (default :9092). See
+      # https://github.com/developmentconexus-ops/MetalDocs/issues/115.
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9092/live >/dev/null || exit 1"]
       interval: 5s
       timeout: 5s

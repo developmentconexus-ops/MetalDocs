@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/riverqueue/river/rivertype"
 
 	"metaldocs/internal/platform/observability"
@@ -114,10 +115,27 @@ func TestJobsReadiness_NotReadyAfterStop(t *testing.T) {
 // PostgresRuntimeStatusProvider -> NewInfraServer) exactly as main.go wires
 // it, over real HTTP via httptest: GET /ready must be drivable to 503 by
 // the same condition ("River client not started") the binary would hit on
-// a genuine bootstrap failure or mid-shutdown.
+// a genuine bootstrap failure or mid-shutdown, and back to 200 once River
+// has started.
+//
+// Round-5 review (PR #109): a nil *sql.DB is NOT used here, on purpose.
+// PostgresRuntimeStatusProvider.Ready fails closed with 503 whenever
+// p.db == nil (internal/platform/observability/runtime.go), independent of
+// any DependencyCheck — so a nil-DB version of this test would report 503
+// even if the River wiring were deleted entirely, proving nothing about the
+// River condition it claims to name. A healthy sqlmock *sql.DB (Ping is
+// unmonitored by sqlmock by default, so it succeeds without an
+// ExpectPing/expectation) isolates the DB leg as always-up, so the 503 -> 200
+// transition below can only be explained by jobsReadiness.Check itself.
 func TestJobsReadinessEndpoint_ReflectsRiverState(t *testing.T) {
+	db, _, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
 	r := &jobsReadiness{}
-	provider := observability.NewPostgresRuntimeStatusProvider(nil, "postgres", "n/a", false,
+	provider := observability.NewPostgresRuntimeStatusProvider(db, "postgres", "n/a", false,
 		observability.DependencyCheck{Name: "river_client", Check: r.Check})
 	server := observability.NewInfraServer(":0", provider, nil)
 
@@ -126,7 +144,17 @@ func TestJobsReadinessEndpoint_ReflectsRiverState(t *testing.T) {
 	server.Handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusServiceUnavailable {
-		t.Fatalf("GET /ready with nil DB and River not started = %d, want 503", rec.Code)
+		t.Fatalf("GET /ready with healthy DB and River not started = %d, want 503", rec.Code)
+	}
+
+	r.MarkStarted()
+
+	req2 := httptest.NewRequest(http.MethodGet, "/ready", nil)
+	rec2 := httptest.NewRecorder()
+	server.Handler.ServeHTTP(rec2, req2)
+
+	if rec2.Code != http.StatusOK {
+		t.Fatalf("GET /ready with healthy DB and River started = %d, want 200", rec2.Code)
 	}
 }
 
