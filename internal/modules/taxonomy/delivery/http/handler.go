@@ -18,10 +18,8 @@ import (
 	"metaldocs/internal/modules/taxonomy/application"
 	"metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/apibase"
-	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/problem"
-	"metaldocs/internal/platform/tenant"
 )
 
 type profileService interface {
@@ -95,7 +93,7 @@ func (h *Handler) Mount(mux httprouter.Muxer) {
 			// because the generated router registers method-qualified patterns —
 			// do NOT prepend r.Method again or the lookup silently misses.
 			if storeOf, ok := idempotentCreateRoutes[r.Pattern]; ok {
-				idempotency.Require(storeOf(h), actorFromCtx)(next).ServeHTTP(w, r)
+				idempotency.Require(storeOf(h), idempotency.TenantActorFromContext)(next).ServeHTTP(w, r)
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -114,25 +112,6 @@ func (h *Handler) Mount(mux httprouter.Muxer) {
 			writeError(w, r, http.StatusBadRequest, problem.CodeRequestInvalid, err.Error())
 		},
 	})
-}
-
-// actorFromCtx extracts (tenantID, actorID) for idempotency-key scoping,
-// matching the templates/approval/controlleddocuments sibling handlers.
-//
-// DEFER (#90/A3.5, idempotency contract cleanup): the tenant error is discarded
-// here, so an absent tenant claim scopes the idempotency key to "" instead of
-// refusing. That is a real defect and it is NOT actor extraction — the actor
-// half below already fails closed. Fixing it means deciding what an
-// idempotency key is scoped BY across all four implementations, which is
-// A3.5's subject; changing it inside the actor slice would be a one-handler
-// answer to a contract-wide question. Recorded rather than patched.
-func actorFromCtx(ctx context.Context) (string, string, error) {
-	tenantID, _ := tenant.FromContext(ctx)
-	actorID, err := authn.RequireUserID(ctx)
-	if err != nil {
-		return "", "", err
-	}
-	return tenantID, actorID, nil
 }
 
 // NewHandler builds a Handler wired to the given profile/area/family
