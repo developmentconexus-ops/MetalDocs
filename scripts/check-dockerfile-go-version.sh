@@ -37,8 +37,12 @@ if [[ -z "$mod_version" ]]; then
 fi
 
 # Every tracked Dockerfile, not a hand-kept list of "the ones that matter" --
-# see the comment above.
-mapfile -t dockerfiles < <(git ls-files -- '*.Dockerfile' '*Dockerfile*' | sort -u)
+# see the comment above. scripts/testdata/guard-fixtures/ is excluded: it
+# deliberately contains drifted-on-purpose fixture Dockerfiles (suffixed
+# .txt, but '*Dockerfile*' still matches the substring), and this check's
+# own negative fixture must never make a clean checkout of the real repo
+# fail against itself.
+mapfile -t dockerfiles < <(git ls-files -- '*.Dockerfile' '*Dockerfile*' ':!:scripts/testdata/guard-fixtures/**' | sort -u)
 
 # version_ge A B: true (exit 0) if dotted-numeric version A >= B, comparing
 # component-wise with a missing trailing component treated as 0 (so "1.26"
