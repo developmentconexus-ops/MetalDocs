@@ -34,8 +34,9 @@ func TestAssertSafeIdentity_RefusesAmbientUnsafeIdentity(t *testing.T) {
 }
 
 // TestAssertSafeIdentity_AcceptsDedicatedRuntimeRole is the GREEN proof: a
-// genuinely safe identity (metaldocs_runtime, provisioned by A6.1's
-// db/grants/0001_role_grants.sql addition) must pass.
+// genuinely safe identity (metaldocs_runtime, created by A6.1's
+// db/grants/0000_identity_roles.sql and granted privileges by
+// db/grants/0001_role_grants.sql) must pass.
 func TestAssertSafeIdentity_AcceptsDedicatedRuntimeRole(t *testing.T) {
 	_, dbName := testdb.Open(t)
 	db := testdb.OpenAsRuntimeRole(t, dbName)

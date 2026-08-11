@@ -823,8 +823,26 @@ func curatedBundlePaths(root string) ([]string, error) {
 		filepath.Join(root, "db", "prerequisites", "0001_extensions.sql"),
 		filepath.Join(root, "db", "baseline", "0001_current_schema.sql"),
 		filepath.Join(root, "db", "reference-data", "0001_product_reference_data.sql"),
-		filepath.Join(root, "db", "grants", "0001_role_grants.sql"),
 	}
+
+	// The grants stage is auto-discovered, not hand-listed: it mirrors
+	// internal/platform/migrate/migrate.go's ApplyGrants, which reads every
+	// *.sql file under db/grants via os.ReadDir and applies them in lexical
+	// order on every real boot. Hand-listing filenames here would recreate
+	// the exact hand-synced-enumeration defect this bundle's own doc comment
+	// warns against (curatedBundlePaths is supposed to be *the* source of
+	// truth) -- a new db/grants/000N_*.sql file must need zero edits to this
+	// function to be picked up by both the fingerprint and the bootstrap,
+	// same as it needs zero edits to ship to production. Lexical filename
+	// order encodes the dependency (0000_identity_roles.sql creates the
+	// roles that 0001_role_grants.sql then grants to; see the matching
+	// ordering comment in deploy/compose/docker-compose.yml).
+	grantFiles, err := listSQLFiles(filepath.Join(root, "db", "grants"))
+	if err != nil {
+		return nil, fmt.Errorf("list db grants: %w", err)
+	}
+	paths = append(paths, grantFiles...)
+
 	migrationFiles, err := listSQLFiles(filepath.Join(root, "db", "migrations"))
 	if err != nil {
 		return nil, fmt.Errorf("list db migrations: %w", err)
