@@ -1,6 +1,11 @@
 //go:build integration
 
-package migrate
+// package migrate_test (external), not migrate: this file uses no unexported
+// migrate symbols, and internal/platform/migrate's C6 fix (PR #110 review --
+// testdb.listSQLFiles now shares migrate.IsApplicableSQLFile instead of its
+// own copy) made testdb import migrate. An in-package (package migrate) test
+// file importing testdb would cycle: migrate(test) -> testdb -> migrate.
+package migrate_test
 
 import (
 	"context"

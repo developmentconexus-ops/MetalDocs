@@ -19,6 +19,20 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+// IsApplicableSQLFile reports whether name is a SQL file this package's
+// discovery functions (Apply, ApplyGrants) treat as applicable: a *.sql file
+// that is not a *_down.sql rollback script. Exported so
+// tests/integration/testdb's bootstrap-bundle discovery
+// (tests/integration/testdb/db.go's listSQLFiles) can share this exact
+// filter instead of maintaining an independently drifting copy -- PR #110
+// review finding: ApplyGrants and listSQLFiles used to disagree on
+// *_down.sql handling, so a future grants rollback file could run in
+// production while staying invisible to the test bootstrap and its schema
+// fingerprint.
+func IsApplicableSQLFile(name string) bool {
+	return strings.HasSuffix(name, ".sql") && !strings.HasSuffix(name, "_down.sql")
+}
+
 var versionRE = regexp.MustCompile(`^(\d{4})_`)
 var trailingTxnTokenRE = regexp.MustCompile(`(?is)\bcommit\b\s*;?\s*$`)
 
@@ -90,7 +104,7 @@ func collectMigrationFiles(dir string) ([]migrationFile, error) {
 	}
 	var files []migrationFile
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") {
+		if e.IsDir() || !IsApplicableSQLFile(e.Name()) {
 			continue
 		}
 		m := versionRE.FindStringSubmatch(e.Name())
@@ -150,7 +164,7 @@ func ApplyGrants(ctx context.Context, db *sql.DB, dir string, log *slog.Logger) 
 	}
 	var names []string
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") {
+		if e.IsDir() || !IsApplicableSQLFile(e.Name()) {
 			continue
 		}
 		names = append(names, e.Name())

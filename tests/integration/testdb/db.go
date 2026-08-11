@@ -26,6 +26,7 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 
 	"metaldocs/internal/platform/bootstrap"
+	"metaldocs/internal/platform/migrate"
 )
 
 // testNamespace is a fixed UUID v5 namespace for deterministic fixture IDs.
@@ -791,6 +792,12 @@ var metaldocsOwnedObjects = map[string]struct{}{
 	"role_capabilities":      {},
 }
 
+// listSQLFiles shares its filter with internal/platform/migrate's
+// ApplyGrants/Apply discovery (migrate.IsApplicableSQLFile) instead of
+// maintaining an independent copy -- the two used to disagree on *_down.sql
+// handling (PR #110 review finding), which let a hypothetical grants
+// rollback file run in production while staying invisible to this test
+// bootstrap and its schema fingerprint.
 func listSQLFiles(dir string) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -799,7 +806,7 @@ func listSQLFiles(dir string) ([]string, error) {
 
 	files := make([]string, 0, len(entries))
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") || strings.HasSuffix(e.Name(), "_down.sql") {
+		if e.IsDir() || !migrate.IsApplicableSQLFile(e.Name()) {
 			continue
 		}
 		files = append(files, filepath.Join(dir, e.Name()))
