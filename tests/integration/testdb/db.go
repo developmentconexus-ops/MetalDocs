@@ -784,6 +784,11 @@ func rotatePasswordIfUnset(ctx context.Context, db *sql.DB, role, defaultPasswor
 	if err := db.QueryRowContext(ctx,
 		"SELECT rolpassword IS NOT NULL FROM pg_authid WHERE rolname = $1", role,
 	).Scan(&hasPassword); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf(
+				"role %s does not exist after the grants stage: db/grants/0000_identity_roles.sql "+
+					"skips role creation with a NOTICE when the connected identity lacks CREATEROLE", role)
+		}
 		return fmt.Errorf("check %s password state: %w", role, err)
 	}
 	if hasPassword {
