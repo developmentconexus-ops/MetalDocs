@@ -564,6 +564,19 @@ var checks = []Check{
 				// numeric tag to compare, so this must surface as the
 				// existing loud "could not parse" failure, not silence.
 				"DOCKERFILE-GO-VERSION-DRIFT: deploy/docker/digest.Dockerfile:1: could not parse a numeric golang version from: FROM golang@sha256:8728bc8be765db56dd0dd650b1b31a0396b03cd4e46689dc0c3e2bc4de3ad587 AS builder",
+				// A legitimately-spelled lowercase filename, `legacy.dockerfile`:
+				// the OLD case-sensitive `git ls-files` pathspec (`*Dockerfile*`,
+				// capital D) never returned it at all -- not excluded, not
+				// skipped, simply absent from `dockerfiles`, so a stale golang:1.19
+				// pin here was completely unexamined and the run still exited 0
+				// (independent review on #114). Discovery is now basename-scoped
+				// AND case-insensitive (`:(glob,icase)**/*.Dockerfile`,
+				// `:(glob,icase)**/Dockerfile`); this proves the fix actually
+				// reaches a lowercase-named file -- see
+				// scripts/check-dockerfile-go-version.sh's header for the full
+				// account of why basename-scoping (not just case-insensitivity)
+				// was the actual fix.
+				"DOCKERFILE-GO-VERSION-DRIFT: deploy/docker/legacy.dockerfile pins golang:1.19 but go.mod requires go >= 1.26.5 (line 1)",
 			},
 			// The scope exclusion is a rule, and this is its firing mechanism.
 			// The fixture tree carries vendor/go.opentelemetry.io/otel/

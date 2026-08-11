@@ -57,15 +57,15 @@ set -euo pipefail
 # diagnostic; the alternative -- a narrower match -- costs a silent miss,
 # which is the one failure mode this check exists to close.
 #
-# TODO(#114 material 2, held pending operator decision): file discovery
-# (the `git ls-files` pathspec below) is still case-sensitive, so a
-# legitimately-spelled `worker.dockerfile` is invisible to this check. The
-# fix is `:(icase)` on the include patterns, but on this tree it also pulls
-# in four non-Dockerfile prose/doc files purely because "dockerfile" occurs
-# in their path case-insensitively (three of them only because their parent
-# directory is named `...-dockerfiles/`) -- see the worktree report for the
-# exact delta. Not shipped here without a ruling on whether that collateral
-# needs a scoping exclusion.
+# Discovery itself had the same shape of bug, one layer up (independent
+# review on #114): the `git ls-files` pathspec matched the string
+# "dockerfile" anywhere in a file's full path rather than testing whether
+# the file IS a Dockerfile, so a directory merely named `*-dockerfiles/`
+# swept in unrelated prose files, and this script's own filename matched
+# its own guard. Discovery is now basename-scoped at path-component
+# boundaries (`git ls-files -- ':(glob,icase)**/*.Dockerfile'
+# ':(glob,icase)**/Dockerfile' ...`) -- see the comment above the
+# `mapfile` call below for the full account.
 #
 # Static: parses go.mod and tracked Dockerfiles. No Docker daemon, no network.
 
@@ -93,20 +93,58 @@ if [[ -z "$mod_version" ]]; then
 fi
 
 # Every tracked Dockerfile, not a hand-kept list of "the ones that matter" --
-# see the comment above. scripts/testdata/guard-fixtures/ is excluded: it
-# deliberately contains drifted-on-purpose fixture Dockerfiles (suffixed
-# .txt, but '*Dockerfile*' still matches the substring), and this check's
-# own negative fixture must never make a clean checkout of the real repo
-# fail against itself.
+# see the comment above.
+#
+# Discovery is BASENAME-scoped, matched at path-component boundaries,
+# case-insensitively: `:(glob,icase)**/*.Dockerfile` and
+# `:(glob,icase)**/Dockerfile` -- this repo's two Dockerfile conventions,
+# bare `Dockerfile` and `<name>.Dockerfile`. The `glob` magic is load-bearing:
+# under it `*` stops matching `/`, so a wildcard can no longer span path
+# components, and a leading `**/` matches at any depth including the repo
+# root. This replaced a plain `'*Dockerfile*'` pathspec, which had TWO
+# stacked defects, found together on #114 (independent review):
+#   1. It was case-sensitive (confirmed even with core.ignorecase=true, and
+#      CI runs on Linux regardless), so a legitimately-spelled
+#      `worker.dockerfile` was never returned by `git ls-files` at all --
+#      not skipped, not excluded, simply invisible to this tool.
+#   2. Making it case-insensitive with `:(icase)` alone did not fix that --
+#      it widened a second, deeper defect instead. A no-slash glob pathspec
+#      matches the FULL PATH, not the basename, so `'*Dockerfile*'` had
+#      always meant "the string 'dockerfile' appears somewhere in this
+#      path", not "this file IS a Dockerfile". Case-insensitive, that
+#      predicate swept in doc/prose files whose PARENT DIRECTORY merely
+#      contained the word (e.g. a `*-dockerfiles/` folder pulled in every
+#      unrelated file inside it) and even this check's own script (its
+#      filename contains "dockerfile"). Scoping to the basename, at a `/`
+#      boundary, is the actual fix; matching on it case-insensitively is a
+#      separate, smaller correctness fix on top -- same lesson as the
+#      golang-stage split above, one layer up: match what the predicate
+#      claims to test, not a proxy for it.
+# This check already treats Dockerfile *instruction* syntax
+# case-insensitively (`grep -inE '^[[:space:]]*from'`); the *filenames* it
+# discovers get the same care now, correctly scoped.
+#
+# scripts/testdata/guard-fixtures/ is excluded: it deliberately contains
+# drifted-on-purpose fixture Dockerfiles. Every fixture file in that tree is
+# suffixed `.txt` on disk (the fixture harness's copyTree strips exactly one
+# trailing `.txt` when it stages the sandbox), so under basename-scoped
+# matching none of them are discovered by this pathspec in the first place
+# -- this exclusion is now defense in depth against a future fixture added
+# without that suffix, not load-bearing for the fixtures that exist today.
+# Kept anyway: the failure mode it guards is "this check's own negative
+# fixture makes a clean checkout of the real repo fail against itself",
+# which is cheap to keep excluded and expensive to debug if it ever regresses.
+#
 # vendor/ is excluded for the same reason check-gofmt.sh excludes it: it is
 # upstream code this repo does not author and cannot edit -- `go mod vendor`
 # overwrites any local change on the next dependency bump. Today
 # vendor/go.opentelemetry.io/otel/dependencies.Dockerfile matches the discovery
-# pattern and happens to pin no golang stage, so nothing fires; if upstream ever
-# adds one below our go.mod floor, this check would fail an unrelated PR with a
-# diagnostic nobody can act on. The fixture tree carries that file in the form
-# that WOULD fire, and the check's NotWant entry keeps this exclusion honest.
-mapfile -t dockerfiles < <(git ls-files -- '*.Dockerfile' '*Dockerfile*' ':!:scripts/testdata/guard-fixtures/**' ':!:vendor/**' | sort -u)
+# pattern (its basename IS a real `<name>.Dockerfile`) and happens to pin no
+# golang stage, so nothing fires; if upstream ever adds one below our go.mod
+# floor, this check would fail an unrelated PR with a diagnostic nobody can
+# act on. The fixture tree carries that file in the form that WOULD fire,
+# and the check's NotWant entry keeps this exclusion honest.
+mapfile -t dockerfiles < <(git ls-files -- ':(glob,icase)**/*.Dockerfile' ':(glob,icase)**/Dockerfile' ':!:scripts/testdata/guard-fixtures/**' ':!:vendor/**' | sort -u)
 
 # version_ge A B: true (exit 0) if dotted-numeric version A >= B, comparing
 # component-wise with a missing trailing component treated as 0 (so "1.26"
