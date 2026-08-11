@@ -74,9 +74,7 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		ExpectedContentHash string `json:"expected_content_hash"`
-	}
+	var req templatesapi.CommitTemplateAutosaveJSONRequestBody
 	if err := readStrictJSON(r, &req); err != nil {
 		problem.Respond(w, r, problem.New(http.StatusBadRequest, codeTplInvalidBody, err.Error()))
 		return
