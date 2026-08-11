@@ -131,15 +131,29 @@ guarded thing in the tree** — see ME-19.
 
 ME ids are allocated by hand, and concurrent branches allocate them blind. Found live 2026-08-11:
 `main` was at ME-16 while an open PR's branch already carried ME-17 and ME-18, so the next id
-readable from `main` was already taken. **Before adding an entry, scan every open branch**, not
-just `main`:
+readable from `main` was already taken. **Before adding an entry, scan every open PR's head**, not
+just `main`.
+
+Ask the host for the open heads and fetch each one — do not enumerate `git branch -r`. `-r` acts on
+remote-tracking refs that happen to be present locally, which is a different set: it silently omits
+heads that were never fetched, heads behind a restricted fetch refspec, and fork PRs (in a checkout
+with no configured remote it prints nothing at all, i.e. it fails open).
 
 ```bash
-for b in $(git branch -r --format='%(refname:short)'); do
-  git show "$b:docs/engineering/mechanical-enforcement-register.md" 2>/dev/null \
-    | grep -oE '^## ME-[0-9]+' | tail -1 | sed "s|^|$b |"
+gh pr list --state open --json number,headRefName,headRepositoryOwner \
+  --jq '.[] | [.number, .headRepositoryOwner.login, .headRefName] | @tsv' |
+while IFS=$'\t' read -r num owner ref; do
+  git fetch -q origin "refs/pull/$num/head" || continue   # covers forks too
+  last=$(git show "FETCH_HEAD:docs/engineering/mechanical-enforcement-register.md" 2>/dev/null \
+    | grep -oE '^## ME-[0-9]+' | tail -1)
+  printf '%s\t#%s %s:%s\n' "${last:-none}" "$num" "$owner" "$ref"
 done
 ```
+
+This is still advisory, not a mechanism: it is a level-5 procedure guarding a hand-synced
+enumeration, and it is only as fresh as the moment it ran. Two branches that run it concurrently
+still collide. The level-1 answer is to stop hand-allocating ids; until that exists, this scan is
+the honest floor and is labelled as such.
 
 Yes — this register's own ids are a hand-synced enumeration. It is recorded here rather than
 quietly worked around, because the alternative is the exact defect the register exists to name.
@@ -786,10 +800,15 @@ this wave's failures actually concentrated.
 | A fixture added to an already-failing tree | PR #114: three new negative fixtures (lowercase `from`, second builder stage, `FROM --platform=`) whose `Want` still listed only the original `worker.Dockerfile` line. `exit != 0` was carried by the first bad file; **measured** — pre-fix parser + all four fixtures => harness reports `ok`. |
 | An exclusion with no `NotWant` | PR #114 again, found by cold review: discovery legitimately skips `vendor/`, and nothing proved it kept skipping. `Want` cannot express silence. |
 | A `Want` loose enough to match an unrelated failure | PR #119: `Want: ["EXPIRED"]` — a bare substring an unrelated failure path can also produce, pinning the fixture to the wrong cause. |
-| A fixture never proven RED against pre-fix code | Wave-wide. A fixture authored alongside its fix has never been observed to fail; "the guard is blocking" and "the guard has been observed to fail" are separate claims (registry rule A7 names this for `pr`-profile checks). |
+| A fixture never proven RED against pre-fix code | Wave-wide. A fixture authored alongside its fix has never been observed to fail; "the guard is blocking" and "the guard has been observed to fail" are separate claims (registry rule A7 names this for every merge-blocking check). |
 
-**Kept correct by** — today: `tools/verify` registry rule **A7** (a `pr`-profile check must declare
-a fixture or a written waiver) plus reviewer attention. A7 forces a fixture to *exist*. Nothing
+**Kept correct by** — today: `tools/verify` registry rule **A7** (a merge-blocking check must declare
+a fixture or a written waiver) plus reviewer attention. A7's scope is the *required closure*, not the
+`pr` profile: `auditFixtureCoverage` computes `hasProfile(c, ProfilePR) || (c.CIJob != "" &&
+closure[c.CIJob])` (`tools/verify/audit.go:634`), locked by
+`TestAuditA7CoversRequiredClosureChecksOutsideThePRProfile`. A full-only check that a required job
+invokes is covered — treating closure-only blockers as fixture-exempt is wrong. A7 forces a fixture
+to *exist*. Nothing
 forces it to *assert*. Every shape in the table above satisfies A7.
 
 **The convergent-invention evidence.** `Fixture.NotWant` was invented **twice, independently, on the
@@ -805,6 +824,15 @@ that the mechanism was missing and that the rule alone was not carrying it.
   the fixed one. Mechanically: the check declares the commit or patch that restores the defect, and
   the harness runs the fixture against it and requires red. This is the one that would have caught
   all four shapes above.
+
+  **A red result is not the proof — a fixture-specific red is.** The runner contract
+  (`tools/verify/fixtures.go`) is explicit that a non-zero exit can come from an unrelated failure,
+  and that is exactly how the already-failing-tree shape survives: the pre-fix replay goes red on a
+  cause the fixture never asserted. A stale `Want` reproduces the same hole, matching the original
+  failure text rather than the one the fixture exists to catch. So the replay must run the fixture
+  **in isolation** (`--only=<id>`, one fixture per invocation), and the red must be attributed by
+  the fixture's own `Want` *and* `NotWant`, not by the harness's exit code. Never accept "the tree
+  was red before the fix" as evidence that this fixture caught the defect.
 - **A-fixture-specific:** reject a `Want` string that also appears in the guard's generic failure
   output — the "wrong cause" shape.
 - **A-exclusion-NotWant:** a guard declaring a scope exclusion (a skip list, an allowlist, a
@@ -847,9 +875,18 @@ adds a check that must be remembered at every future write site.
 
 **Level 1 is available and is a smaller change: raise the gate flag first.** Mark the tenant
 `erasing_at` (or set `erased_at`) in the transaction that *begins* erasure, before any destructive
-phase runs, and let `refuseIfTenantErased` read that. The window then cannot exist — not because
-something watches for it, but because there is no interval during which the tenant is being erased
-and does not say so. The gate already reads that signal; only the write order changes.
+phase runs, and let `refuseIfTenantErased` read that. The gate already reads that signal; only the
+write order changes.
+
+**The boundary is commit, not statement order.** Writing the flag first inside the same transaction
+as phase 1 does not close the window: concurrent writers on other connections cannot see an
+uncommitted row, so the window survives for the whole duration of that transaction and is *wider*
+than it looks, because it now spans the destructive work too. The requirement is therefore: the gate
+must be **persisted and committed in its own transaction, which completes before the first
+destructive phase begins**, and every write path must read that committed signal. Stated the weaker
+way — "raise the flag first" — the claim that the window cannot exist is an overclaim. Stated with
+the commit boundary, it holds: after that commit there is no instant at which a tenant is being
+erased and does not say so.
 
 Stated as doctrine: **the flag that gates access to a resource must be set by the first phase that
 makes the resource unsafe, never by the last phase that finishes making it unavailable.**
