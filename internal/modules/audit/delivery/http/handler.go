@@ -4,6 +4,7 @@
 package httpdelivery
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -213,31 +214,11 @@ func (h *Handler) handleExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var body auditapi.ExportAuditEventsJSONRequestBody
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64*1024)).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
-		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON body"))
+	body, ok := decodeExportRequestBody(w, r)
+	if !ok {
 		return
 	}
-
-	filter := domain.ListEventsQuery{
-		TenantID:     tenantID,
-		ActorID:      stringFromPtr(body.Filter.ActorId),
-		Action:       stringFromPtr(body.Filter.Action),
-		ResourceType: stringFromPtr(body.Filter.ResourceType),
-		ResourceID:   stringFromPtr(body.Filter.ResourceId),
-		Query:        stringFromPtr(body.Filter.Q),
-	}
-	// body.Filter.OccurredAfter/OccurredBefore are already parsed *time.Time —
-	// the generated type decodes the RFC3339 string at the JSON boundary, so a
-	// malformed timestamp fails the Decode above with a generic "Invalid JSON
-	// body" 400 (same status and problem code as the previous field-specific
-	// parseTime rejection, just a less specific message).
-	if body.Filter.OccurredAfter != nil {
-		filter.OccurredAfter = body.Filter.OccurredAfter.UTC()
-	}
-	if body.Filter.OccurredBefore != nil {
-		filter.OccurredBefore = body.Filter.OccurredBefore.UTC()
-	}
+	filter := buildExportFilter(tenantID, body)
 
 	format := domain.ExportFormat(strings.ToLower(strings.TrimSpace(string(body.Format))))
 	if !format.Valid() {
@@ -424,6 +405,109 @@ func stringFromPtr(p *string) string {
 		return ""
 	}
 	return *p
+}
+
+// sanitizeEmptyExportDates treats an explicit "" for filter.occurred_after /
+// filter.occurred_before the same as an absent key, before the body is
+// decoded into the generated request type.
+//
+// filter.occurred_after/occurred_before are `format: date-time`, generated as
+// *time.Time. The old hand-written binding decoded them as plain strings and
+// ran them through parseTime, which explicitly treated "" as "not provided"
+// (see parseTime below) -- a client that clears a date filter by sending ""
+// rather than omitting the key got a no-op, not an error. encoding/json's
+// time.Time.UnmarshalJSON has no such tolerance: "" is not a valid RFC3339
+// string, so it fails, and because both fields live on the SAME struct as
+// format/actor_id/etc, that one field failing aborts the decode of the WHOLE
+// body -- turning a client's harmless "clear this filter" into a 400 that
+// also discards a perfectly valid format/actor_id/action the same request
+// carried. Deleting the two keys here when they carry literally "" restores
+// the old leniency without reintroducing a hand-written filter struct for the
+// rest of the body (which stays on the generated type).
+//
+// Any object under it is a genuine wire-shape mismatch or malformed JSON, not
+// this function's concern, so failure at any step falls back to returning raw
+// unmodified: the generated-type decode downstream reports that failure on
+// its own, exactly as it would have without this pass.
+func sanitizeEmptyExportDates(raw []byte) []byte {
+	var top map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &top); err != nil {
+		return raw
+	}
+	filterRaw, ok := top["filter"]
+	if !ok {
+		return raw
+	}
+	var filter map[string]json.RawMessage
+	if err := json.Unmarshal(filterRaw, &filter); err != nil {
+		return raw
+	}
+	changed := false
+	for _, key := range []string{"occurred_after", "occurred_before"} {
+		if v, ok := filter[key]; ok && string(v) == `""` {
+			delete(filter, key)
+			changed = true
+		}
+	}
+	if !changed {
+		return raw
+	}
+	newFilter, err := json.Marshal(filter)
+	if err != nil {
+		return raw
+	}
+	top["filter"] = newFilter
+	out, err := json.Marshal(top)
+	if err != nil {
+		return raw
+	}
+	return out
+}
+
+// decodeExportRequestBody reads and decodes handleExport's request body,
+// responding and returning ok=false on any failure. Split out of
+// handleExport (gocyclo) rather than suppressed: the two failure branches
+// here (read error, decode error) are a single self-contained "get me a
+// valid body" step, not export-specific branching.
+func decodeExportRequestBody(w http.ResponseWriter, r *http.Request) (auditapi.ExportAuditEventsJSONRequestBody, bool) {
+	var body auditapi.ExportAuditEventsJSONRequestBody
+	bodyBytes, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 64*1024))
+	if err != nil {
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON body"))
+		return body, false
+	}
+	if err := json.NewDecoder(bytes.NewReader(sanitizeEmptyExportDates(bodyBytes))).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON body"))
+		return body, false
+	}
+	return body, true
+}
+
+// buildExportFilter maps the decoded export request onto the domain query.
+// body.Filter.OccurredAfter/OccurredBefore are already parsed *time.Time —
+// the generated type decodes the RFC3339 string at the JSON boundary, so a
+// malformed timestamp fails decodeExportRequestBody's Decode with a generic
+// "Invalid JSON body" 400 (same status and problem code as the previous
+// field-specific parseTime rejection, just a less specific message). An
+// explicit "" is handled before that decode (sanitizeEmptyExportDates), so
+// it keeps its pre-A3.4 meaning of "not provided" instead of aborting the
+// whole decode.
+func buildExportFilter(tenantID string, body auditapi.ExportAuditEventsJSONRequestBody) domain.ListEventsQuery {
+	filter := domain.ListEventsQuery{
+		TenantID:     tenantID,
+		ActorID:      stringFromPtr(body.Filter.ActorId),
+		Action:       stringFromPtr(body.Filter.Action),
+		ResourceType: stringFromPtr(body.Filter.ResourceType),
+		ResourceID:   stringFromPtr(body.Filter.ResourceId),
+		Query:        stringFromPtr(body.Filter.Q),
+	}
+	if body.Filter.OccurredAfter != nil {
+		filter.OccurredAfter = body.Filter.OccurredAfter.UTC()
+	}
+	if body.Filter.OccurredBefore != nil {
+		filter.OccurredBefore = body.Filter.OccurredBefore.UTC()
+	}
+	return filter
 }
 
 func parseTime(field, raw string) (time.Time, *problem.Problem) {

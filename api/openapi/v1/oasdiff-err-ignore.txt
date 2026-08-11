@@ -1,0 +1,46 @@
+# oasdiff --err-ignore file for the oasdiff-breaking gate
+# (tools/verify/registry.go, check id "oasdiff-breaking").
+#
+# This is the honest waiver channel for a DELIBERATE, disclosed breaking
+# change -- not a bypass. It has the same audit properties as
+# scripts/check-governance-waivers.txt: every line here is a permanent,
+# diff-reviewable record (this file sits under api/openapi/v1/, so any edit
+# to it is itself covered by the oasdiff-breaking check's own Paths and by
+# api-contract-openapi). A line here does not silence oasdiff's *detection*
+# of the change (it is real, and is documented in the PR's "Behaviour
+# preservation" section) -- it only tells the gate that this specific,
+# named change was reviewed and is intentional, so CI does not fail on a
+# finding a human already adjudicated.
+#
+# Matching is oasdiff's own (checker.ProcessIgnoredBackwardCompatibilityErrors,
+# case-insensitive): a line must contain both "<METHOD> <path>" and the
+# change's own text verbatim. Each line below is the exact text `oasdiff
+# breaking` prints for one of the four findings, copied from a real run
+# against base commit aaafe8bd -- not hand-written, so it cannot silently
+# drift from what the tool actually reports.
+#
+# A3.4 (PR #112), 2026-08-11: four routes gained a required request field
+# that was already de facto required -- the handler previously read the
+# field optimistically and, when it was absent/empty, either the
+# application layer or a downstream Postgres `uuid`-typed column rejected
+# it. That produced a 500 (`internal.unknown`) for a client mistake instead
+# of a 400 (`request.invalid`). Declaring the field required in the OpenAPI
+# spec moves that rejection into the contract-validation middleware, before
+# the handler runs, which turns a latent 500 into an honest 400. This is a
+# formally breaking change for a client that was previously omitting the
+# field and silently getting a 500 -- there is no such client that could
+# have been relying on success, since the old path never succeeded on an
+# absent field. New coverage proving the 400 path (through the real
+# middleware chain, not the bare handler mux) lives in
+# apps/api/cmd/metaldocs-api/validator_ingress_session_routes_test.go.
+#
+# This file becomes inert (matches nothing) the moment these four lines
+# merge to main, because every future PR's base spec will already have the
+# fields marked required -- oasdiff will have no "added required" diff left
+# to find here. Left in place rather than deleted post-merge, same as the
+# governance waivers file: it is the historical record of why the contract
+# changed shape on these four routes.
+PUT /documents/{id}/placeholders/{pid} added the new required request property `value`
+POST /documents/{id}/session/force-release added required request body
+POST /documents/{id}/session/heartbeat added required request body
+POST /documents/{id}/session/release added required request body

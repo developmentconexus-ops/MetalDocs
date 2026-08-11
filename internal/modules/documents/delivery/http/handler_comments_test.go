@@ -160,6 +160,75 @@ func TestCreateComment_RoundTrip(t *testing.T) {
 	mustJSONEqual(t, out[0].Content, content)
 }
 
+// A3.4 cold-review Finding 4: createComment/updateComment switched to the
+// generated request type, whose Content field is
+// []documentsapi.DocumentCommentContentNode — each node a
+// map[string]interface{}. Re-marshaling that value (as the pre-fix code
+// did, via json.Marshal(req.Content)) round-trips every JSON number through
+// float64, which cannot represent integers above 2^53 exactly. This test
+// proves the STORED bytes (svc.comments[id].ContentJSON — the write path
+// this PR touches) survive an integer beyond that boundary unchanged. It
+// deliberately does not assert on the GET response: the read path
+// (toCommentResponse/decodeCommentContent) was already lossy before A3.4
+// and is unchanged by this PR's diff, so asserting exactness there would
+// test something this fix round never touched.
+func TestCreateComment_LargeIntegerContentPreservedExactly(t *testing.T) {
+	svc := newCommentsStatefulSvc()
+	mux := newMuxWithCommentsSvc(t, svc)
+
+	// 2^53 + 1 = 9007199254740993, the smallest positive integer float64
+	// cannot represent exactly (it rounds to 9007199254740992). A hidden
+	// float64 hop anywhere in the write path corrupts this value.
+	const bigInt = "9007199254740993"
+	payload := []byte(`{"library_comment_id":4242,"author_display":"Alice","content":[{"type":"paragraph","external_id":` + bigInt + `}]}`)
+	postReq := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/comments", bytes.NewReader(payload))
+	withAuthHeaders(postReq, "editor")
+	postRR := httptest.NewRecorder()
+	mux.ServeHTTP(postRR, postReq)
+	if postRR.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d (body: %s)", postRR.Code, postRR.Body.String())
+	}
+
+	stored, ok := svc.comments[4242]
+	if !ok {
+		t.Fatal("comment was not stored under library_comment_id 4242")
+	}
+	if !bytes.Contains(stored.ContentJSON, []byte(bigInt)) {
+		t.Fatalf("stored ContentJSON lost integer precision: want it to contain %s, got %s", bigInt, string(stored.ContentJSON))
+	}
+}
+
+func TestUpdateComment_LargeIntegerContentPreservedExactly(t *testing.T) {
+	svc := newCommentsStatefulSvc()
+	mux := newMuxWithCommentsSvc(t, svc)
+
+	postReq := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/comments", bytes.NewReader([]byte(`{"library_comment_id":55,"author_display":"Alice","content":[{"type":"paragraph","children":[{"text":"orig"}]}]}`)))
+	withAuthHeaders(postReq, "editor")
+	postRR := httptest.NewRecorder()
+	mux.ServeHTTP(postRR, postReq)
+	if postRR.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d (body: %s)", postRR.Code, postRR.Body.String())
+	}
+
+	const bigInt = "9007199254740993"
+	patchPayload := []byte(`{"content":[{"type":"paragraph","external_id":` + bigInt + `}]}`)
+	patchReq := httptest.NewRequest(http.MethodPatch, "/api/v1/documents/11111111-1111-4111-8111-111111111111/comments/55", bytes.NewReader(patchPayload))
+	withAuthHeaders(patchReq, "editor")
+	patchRR := httptest.NewRecorder()
+	mux.ServeHTTP(patchRR, patchReq)
+	if patchRR.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (body: %s)", patchRR.Code, patchRR.Body.String())
+	}
+
+	stored, ok := svc.comments[55]
+	if !ok {
+		t.Fatal("comment 55 vanished after update")
+	}
+	if !bytes.Contains(stored.ContentJSON, []byte(bigInt)) {
+		t.Fatalf("stored ContentJSON lost integer precision after update: want it to contain %s, got %s", bigInt, string(stored.ContentJSON))
+	}
+}
+
 func TestResolveComment_DerivedDoneField(t *testing.T) {
 	svc := newCommentsStatefulSvc()
 	mux := newMuxWithCommentsSvc(t, svc)

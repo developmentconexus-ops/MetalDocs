@@ -1157,24 +1157,34 @@ func (h *Handler) createComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, problem.CodeRequestInvalid.String()))
+		return
+	}
 	var req documentsapi.CreateDocumentCommentJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.Unmarshal(bodyBytes, &req); err != nil {
 		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, problem.CodeRequestInvalid.String()))
 		return
 	}
 	// req.Content is a typed []DocumentCommentContentNode (each node a freeform
-	// map[string]interface{}), not the json.RawMessage the domain layer stores.
-	// Re-marshal to bytes for full-fidelity storage; an absent/null content key
-	// decodes to a nil slice, so forward nil (matching the prior raw-decode
-	// behavior of an absent body field) rather than a marshaled "null".
+	// map[string]interface{}). Re-marshaling THAT value would round-trip every
+	// JSON number through float64, silently corrupting any integer beyond 2^53
+	// (a library-comment id imported from an external system, say) before it
+	// is ever written to storage. The domain layer only wants the bytes the
+	// client sent, so probe the raw body for the "content" key directly —
+	// byte-for-byte passthrough, matching the pre-A3.4 json.RawMessage
+	// binding — and use the typed decode above only to learn whether the key
+	// was present with a real (non-null) array: an absent/null content key
+	// decodes to a nil slice on both paths, so forward nil (matching the
+	// prior raw-decode behavior of an absent body field) rather than bytes.
 	var contentJSON json.RawMessage
 	if req.Content != nil {
-		b, merr := json.Marshal(req.Content)
-		if merr != nil {
-			problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, problem.CodeInternalUnknown.String()))
-			return
+		var probe struct {
+			Content json.RawMessage `json:"content"`
 		}
-		contentJSON = b
+		_ = json.Unmarshal(bodyBytes, &probe) // bodyBytes already validated above
+		contentJSON = probe.Content
 	}
 
 	comment, err := h.svc.AddDocumentComment(ctx, tenantID, userID, req.AuthorDisplay, docID, domain.CommentCreateInput{
@@ -1204,22 +1214,30 @@ func (h *Handler) updateComment(w http.ResponseWriter, r *http.Request) {
 		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, problem.CodeRequestInvalid.String()))
 		return
 	}
-	var req documentsapi.UpdateDocumentCommentJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
 		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, problem.CodeRequestInvalid.String()))
 		return
 	}
-	// req.Content is *[]DocumentCommentContentNode; re-marshal to the
-	// *json.RawMessage the domain layer expects. A nil pointer (key absent)
-	// stays nil, preserving "leave content unchanged" semantics.
+	var req documentsapi.UpdateDocumentCommentJSONRequestBody
+	if err := json.Unmarshal(bodyBytes, &req); err != nil {
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, problem.CodeRequestInvalid.String()))
+		return
+	}
+	// req.Content is *[]DocumentCommentContentNode. Re-marshaling *req.Content
+	// would round-trip every JSON number through float64 (see createComment's
+	// identical comment on the precision this loses), so probe the raw body
+	// for the "content" key and forward those bytes untouched. A nil pointer
+	// (key absent or explicit null — encoding/json cannot tell those apart on
+	// a pointer-to-slice field) stays nil, preserving "leave content
+	// unchanged" semantics.
 	var contentJSON *json.RawMessage
 	if req.Content != nil {
-		b, merr := json.Marshal(*req.Content)
-		if merr != nil {
-			problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, problem.CodeInternalUnknown.String()))
-			return
+		var probe struct {
+			Content json.RawMessage `json:"content"`
 		}
-		raw := json.RawMessage(b)
+		_ = json.Unmarshal(bodyBytes, &probe) // bodyBytes already validated above
+		raw := probe.Content
 		contentJSON = &raw
 	}
 
