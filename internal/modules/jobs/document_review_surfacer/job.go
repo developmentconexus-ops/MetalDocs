@@ -19,6 +19,7 @@ import (
 
 	documentsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
+	platformdb "metaldocs/internal/platform/db"
 )
 
 // JobName identifies this job type to River and in logs.
@@ -45,17 +46,22 @@ func (DocumentReviewSurfacerArgs) Kind() string { return JobName }
 type DocumentReviewSurfacerWorker struct {
 	river.WorkerDefaults[DocumentReviewSurfacerArgs]
 
-	database *sql.DB
-	reader   documentsdomain.ReviewDueReader
-	writer   documentsdomain.ReviewSurfaceWriter
+	runner platformdb.TxRunner
+	reader documentsdomain.ReviewDueReader
+	writer documentsdomain.ReviewSurfaceWriter
 }
 
-// NewWorker constructs a DocumentReviewSurfacerWorker.
-func NewWorker(database *sql.DB, reader documentsdomain.ReviewDueReader, writer documentsdomain.ReviewSurfaceWriter) *DocumentReviewSurfacerWorker {
+// NewWorker constructs a DocumentReviewSurfacerWorker. runner replaces a raw
+// *sql.DB (A5.1, Lane E issue #92): this is a system-path TxRunner consumer —
+// ctx carries only authz.WithBackgroundBypass, never a platform/tenant
+// identity, so the TxRunner chokepoint's ctx-seed is a deliberate no-op here,
+// identical to the prior raw db.BeginTx(ctx, nil) behavior. The manual
+// authz.BypassSystem / authz.SeedTxTenant calls below are unchanged.
+func NewWorker(runner platformdb.TxRunner, reader documentsdomain.ReviewDueReader, writer documentsdomain.ReviewSurfaceWriter) *DocumentReviewSurfacerWorker {
 	return &DocumentReviewSurfacerWorker{
-		database: database,
-		reader:   reader,
-		writer:   writer,
+		runner: runner,
+		reader: reader,
+		writer: writer,
 	}
 }
 
@@ -63,7 +69,7 @@ func NewWorker(database *sql.DB, reader documentsdomain.ReviewDueReader, writer 
 // HTTP-request identity exists here).
 func (w *DocumentReviewSurfacerWorker) Work(ctx context.Context, job *river.Job[DocumentReviewSurfacerArgs]) error {
 	ctx = authz.WithBackgroundBypass(ctx)
-	return run(ctx, w.database, w.reader, w.writer, time.Now().UTC())
+	return run(ctx, w.runner, w.reader, w.writer, time.Now().UTC())
 }
 
 // run executes one review-due-surfacer tick in two phases, per
@@ -83,8 +89,8 @@ func (w *DocumentReviewSurfacerWorker) Work(ctx context.Context, job *river.Job[
 // Per validation-contract.md §4.1, every call goes through documents-owned
 // ports (ListTenantsWithDueReviews, ListDueForReview, MarkSurfaced); this
 // package holds no raw SQL against public.documents.
-func run(ctx context.Context, database *sql.DB, reader documentsdomain.ReviewDueReader, writer documentsdomain.ReviewSurfaceWriter, now time.Time) error {
-	tenantIDs, err := listTenantsWithDueReviews(ctx, database, reader, now)
+func run(ctx context.Context, runner platformdb.TxRunner, reader documentsdomain.ReviewDueReader, writer documentsdomain.ReviewSurfaceWriter, now time.Time) error {
+	tenantIDs, err := listTenantsWithDueReviews(ctx, runner, reader, now)
 	if err != nil {
 		slog.ErrorContext(ctx, "document_review_surfacer: list tenants with due reviews failed",
 			"job", JobName, "error", err)
@@ -95,7 +101,7 @@ func run(ctx context.Context, database *sql.DB, reader documentsdomain.ReviewDue
 	var runErr error
 
 	for _, tenantID := range tenantIDs {
-		due, surfaced, err := surfaceTenant(ctx, database, reader, writer, tenantID, now)
+		due, surfaced, err := surfaceTenant(ctx, runner, reader, writer, tenantID, now)
 		if err != nil {
 			slog.ErrorContext(ctx, "document_review_surfacer: surface tenant failed",
 				"job", JobName, "tenant_id", tenantID, "error", err)
@@ -118,23 +124,21 @@ func run(ctx context.Context, database *sql.DB, reader documentsdomain.ReviewDue
 // listTenantsWithDueReviews opens a single bypass tx (no tenant GUC seeded —
 // this is a system-level cross-tenant read, safe unseeded) and returns the
 // distinct tenant_ids with at least one review-due document.
-func listTenantsWithDueReviews(ctx context.Context, database *sql.DB, reader documentsdomain.ReviewDueReader, now time.Time) ([]string, error) {
-	tx, err := database.BeginTx(ctx, nil)
+func listTenantsWithDueReviews(ctx context.Context, runner platformdb.TxRunner, reader documentsdomain.ReviewDueReader, now time.Time) ([]string, error) {
+	var tenantIDs []string
+	err := runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := authz.BypassSystem(ctx, tx); err != nil {
+			return err
+		}
+
+		ids, err := reader.ListTenantsWithDueReviews(ctx, tx, now)
+		if err != nil {
+			return err
+		}
+		tenantIDs = ids
+		return nil
+	})
 	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if err := authz.BypassSystem(ctx, tx); err != nil {
-		return nil, err
-	}
-
-	tenantIDs, err := reader.ListTenantsWithDueReviews(ctx, tx, now)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return tenantIDs, nil
@@ -145,33 +149,31 @@ func listTenantsWithDueReviews(ctx context.Context, database *sql.DB, reader doc
 // the tenant's due documents (for the count/log) and marks them surfaced,
 // passing tenantID explicitly to both ports so scoping is correct-by-
 // construction; RLS on the seeded GUC backstops the write.
-func surfaceTenant(ctx context.Context, database *sql.DB, reader documentsdomain.ReviewDueReader, writer documentsdomain.ReviewSurfaceWriter, tenantID string, now time.Time) (dueCount int, surfacedCount int, err error) {
-	tx, err := database.BeginTx(ctx, nil)
+func surfaceTenant(ctx context.Context, runner platformdb.TxRunner, reader documentsdomain.ReviewDueReader, writer documentsdomain.ReviewSurfaceWriter, tenantID string, now time.Time) (dueCount int, surfacedCount int, err error) {
+	err = runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := authz.BypassSystem(ctx, tx); err != nil {
+			return err
+		}
+		if err := authz.SeedTxTenant(ctx, tx, tenantID); err != nil {
+			return err
+		}
+
+		due, err := reader.ListDueForReview(ctx, tx, tenantID, now, BatchSize)
+		if err != nil {
+			return err
+		}
+
+		surfaced, err := writer.MarkSurfaced(ctx, tx, tenantID, now)
+		if err != nil {
+			return err
+		}
+
+		dueCount = len(due)
+		surfacedCount = len(surfaced)
+		return nil
+	})
 	if err != nil {
 		return 0, 0, err
 	}
-	defer func() { _ = tx.Rollback() }()
-
-	if err := authz.BypassSystem(ctx, tx); err != nil {
-		return 0, 0, err
-	}
-	if err := authz.SeedTxTenant(ctx, tx, tenantID); err != nil {
-		return 0, 0, err
-	}
-
-	due, err := reader.ListDueForReview(ctx, tx, tenantID, now, BatchSize)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	surfaced, err := writer.MarkSurfaced(ctx, tx, tenantID, now)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return 0, 0, err
-	}
-
-	return len(due), len(surfaced), nil
+	return dueCount, surfacedCount, nil
 }

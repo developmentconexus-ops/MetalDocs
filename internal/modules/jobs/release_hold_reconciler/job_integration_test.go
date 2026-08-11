@@ -30,6 +30,7 @@ import (
 	"metaldocs/internal/modules/approval/application"
 	approvalrepo "metaldocs/internal/modules/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
+	platformdb "metaldocs/internal/platform/db"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -147,7 +148,7 @@ func TestIntegration_ReleaseHoldReconciler_AlertsOnlyStuckGenerations(t *testing
 
 	before := snapshotGeneration(t, db, stuckID)
 
-	if err := run(ctx, db, approvalrepo.NewReleaseHoldReaderPG(db), application.NewSQLEmitter(), time.Now().UTC()); err != nil {
+	if err := run(ctx, platformdb.NewTxRunner(db), approvalrepo.NewReleaseHoldReaderPG(db), application.NewSQLEmitter(), time.Now().UTC()); err != nil {
 		t.Fatalf("reconciler run: %v", err)
 	}
 
@@ -224,7 +225,7 @@ func TestIntegration_ReleaseHoldReconciler_SupersededGenerationSilent(t *testing
 		holdReason:       "materializing",
 	})
 
-	if err := run(ctx, db, approvalrepo.NewReleaseHoldReaderPG(db), application.NewSQLEmitter(), time.Now().UTC()); err != nil {
+	if err := run(ctx, platformdb.NewTxRunner(db), approvalrepo.NewReleaseHoldReaderPG(db), application.NewSQLEmitter(), time.Now().UTC()); err != nil {
 		t.Fatalf("reconciler run: %v", err)
 	}
 
@@ -250,7 +251,7 @@ func TestIntegration_ReleaseHoldReconciler_NonReleasableDocumentSilent(t *testin
 		holdReason:       "materializing",
 	})
 
-	if err := run(ctx, db, approvalrepo.NewReleaseHoldReaderPG(db), application.NewSQLEmitter(), time.Now().UTC()); err != nil {
+	if err := run(ctx, platformdb.NewTxRunner(db), approvalrepo.NewReleaseHoldReaderPG(db), application.NewSQLEmitter(), time.Now().UTC()); err != nil {
 		t.Fatalf("reconciler run: %v", err)
 	}
 

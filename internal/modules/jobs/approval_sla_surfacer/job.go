@@ -33,6 +33,7 @@ import (
 
 	approvaldomain "metaldocs/internal/modules/approval/domain"
 	"metaldocs/internal/modules/iam/authz"
+	platformdb "metaldocs/internal/platform/db"
 )
 
 // JobName identifies this job type to River and in logs.
@@ -59,16 +60,21 @@ func (ApprovalSLASurfacerArgs) Kind() string { return JobName }
 type ApprovalSLASurfacerWorker struct {
 	river.WorkerDefaults[ApprovalSLASurfacerArgs]
 
-	database *sql.DB
+	runner   platformdb.TxRunner
 	reader   approvaldomain.SLAOverdueReader
 	writer   approvaldomain.SLASurfaceWriter
 	notifier approvaldomain.ApprovalNotificationEnqueuer
 }
 
-// NewWorker constructs an ApprovalSLASurfacerWorker.
-func NewWorker(database *sql.DB, reader approvaldomain.SLAOverdueReader, writer approvaldomain.SLASurfaceWriter, notifier approvaldomain.ApprovalNotificationEnqueuer) *ApprovalSLASurfacerWorker {
+// NewWorker constructs an ApprovalSLASurfacerWorker. runner replaces a raw
+// *sql.DB (A5.1, Lane E issue #92): this is a system-path TxRunner consumer —
+// ctx carries only authz.WithBackgroundBypass, never a platform/tenant
+// identity, so the TxRunner chokepoint's ctx-seed is a deliberate no-op here,
+// identical to the prior raw db.BeginTx(ctx, nil) behavior. The manual
+// authz.BypassSystem / authz.SeedTxTenant calls below are unchanged.
+func NewWorker(runner platformdb.TxRunner, reader approvaldomain.SLAOverdueReader, writer approvaldomain.SLASurfaceWriter, notifier approvaldomain.ApprovalNotificationEnqueuer) *ApprovalSLASurfacerWorker {
 	return &ApprovalSLASurfacerWorker{
-		database: database,
+		runner:   runner,
 		reader:   reader,
 		writer:   writer,
 		notifier: notifier,
@@ -79,7 +85,7 @@ func NewWorker(database *sql.DB, reader approvaldomain.SLAOverdueReader, writer 
 // HTTP-request identity exists here).
 func (w *ApprovalSLASurfacerWorker) Work(ctx context.Context, job *river.Job[ApprovalSLASurfacerArgs]) error {
 	ctx = authz.WithBackgroundBypass(ctx)
-	return run(ctx, w.database, w.reader, w.writer, w.notifier, time.Now().UTC())
+	return run(ctx, w.runner, w.reader, w.writer, w.notifier, time.Now().UTC())
 }
 
 // run executes one SLA-surfacer tick in two phases, mirroring
@@ -92,8 +98,8 @@ func (w *ApprovalSLASurfacerWorker) Work(ctx context.Context, job *river.Job[App
 //     authz.SeedTxTenant(tenantID) before calling ListOverdueStages (for the
 //     count/log) and MarkStagesOverdueSurfaced (the idempotent side effect),
 //     passing that same tenantID explicitly to both.
-func run(ctx context.Context, database *sql.DB, reader approvaldomain.SLAOverdueReader, writer approvaldomain.SLASurfaceWriter, notifier approvaldomain.ApprovalNotificationEnqueuer, now time.Time) error {
-	tenantIDs, err := listTenantsWithOverdueStages(ctx, database, reader, now)
+func run(ctx context.Context, runner platformdb.TxRunner, reader approvaldomain.SLAOverdueReader, writer approvaldomain.SLASurfaceWriter, notifier approvaldomain.ApprovalNotificationEnqueuer, now time.Time) error {
+	tenantIDs, err := listTenantsWithOverdueStages(ctx, runner, reader, now)
 	if err != nil {
 		slog.ErrorContext(ctx, "approval_sla_surfacer: list tenants with overdue stages failed",
 			"job", JobName, "error", err)
@@ -104,7 +110,7 @@ func run(ctx context.Context, database *sql.DB, reader approvaldomain.SLAOverdue
 	var runErr error
 
 	for _, tenantID := range tenantIDs {
-		overdue, surfaced, err := surfaceTenant(ctx, database, reader, writer, notifier, tenantID, now)
+		overdue, surfaced, err := surfaceTenant(ctx, runner, reader, writer, notifier, tenantID, now)
 		if err != nil {
 			slog.ErrorContext(ctx, "approval_sla_surfacer: surface tenant failed",
 				"job", JobName, "tenant_id", tenantID, "error", err)
@@ -128,23 +134,21 @@ func run(ctx context.Context, database *sql.DB, reader approvaldomain.SLAOverdue
 // seeded — system-level cross-tenant read, safe unseeded) and returns the
 // distinct tenant_ids with at least one overdue, not-yet-surfaced active
 // stage instance.
-func listTenantsWithOverdueStages(ctx context.Context, database *sql.DB, reader approvaldomain.SLAOverdueReader, now time.Time) ([]string, error) {
-	tx, err := database.BeginTx(ctx, nil)
+func listTenantsWithOverdueStages(ctx context.Context, runner platformdb.TxRunner, reader approvaldomain.SLAOverdueReader, now time.Time) ([]string, error) {
+	var tenantIDs []string
+	err := runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := authz.BypassSystem(ctx, tx); err != nil {
+			return err
+		}
+
+		ids, err := reader.ListTenantsWithOverdueStages(ctx, tx, now)
+		if err != nil {
+			return err
+		}
+		tenantIDs = ids
+		return nil
+	})
 	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if err := authz.BypassSystem(ctx, tx); err != nil {
-		return nil, err
-	}
-
-	tenantIDs, err := reader.ListTenantsWithOverdueStages(ctx, tx, now)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return tenantIDs, nil
@@ -154,54 +158,52 @@ func listTenantsWithOverdueStages(ctx context.Context, database *sql.DB, reader 
 // (authz.BypassSystem then authz.SeedTxTenant(tenantID)) and, within it,
 // reads the tenant's overdue stages (for the count/log) and marks them
 // surfaced, passing tenantID explicitly to both ports.
-func surfaceTenant(ctx context.Context, database *sql.DB, reader approvaldomain.SLAOverdueReader, writer approvaldomain.SLASurfaceWriter, notifier approvaldomain.ApprovalNotificationEnqueuer, tenantID string, now time.Time) (overdueCount int, surfacedCount int, err error) {
-	tx, err := database.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, 0, err
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if err := authz.BypassSystem(ctx, tx); err != nil {
-		return 0, 0, err
-	}
-	if err := authz.SeedTxTenant(ctx, tx, tenantID); err != nil {
-		return 0, 0, err
-	}
-
-	overdue, err := reader.ListOverdueStages(ctx, tx, tenantID, now, BatchSize)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	surfaced, err := writer.MarkStagesOverdueSurfaced(ctx, tx, tenantID, now)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	// Same tx as the marker: the outbox discipline. If the enqueue fails, the
-	// marker rolls back too, so the next tick retries the whole thing rather
-	// than leaving a stage marked-but-unannounced.
-	for _, s := range surfaced {
-		if len(s.EligibleActorIDs) == 0 {
-			continue
+func surfaceTenant(ctx context.Context, runner platformdb.TxRunner, reader approvaldomain.SLAOverdueReader, writer approvaldomain.SLASurfaceWriter, notifier approvaldomain.ApprovalNotificationEnqueuer, tenantID string, now time.Time) (overdueCount int, surfacedCount int, err error) {
+	err = runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := authz.BypassSystem(ctx, tx); err != nil {
+			return err
 		}
-		if err := notifier.EnqueueApprovalNotificationTx(ctx, tx, approvaldomain.ApprovalNotificationArgs{
-			EventID:          uuid.New().String(),
-			TenantID:         s.TenantID,
-			EventType:        approvaldomain.EventTypeApprovalOverdue,
-			SubjectKind:      s.SubjectKind,
-			SubjectID:        s.SubjectID,
-			RecipientUserIDs: s.EligibleActorIDs,
-			// No ActorUserID: an SLA tick has no human cause.
-			OccurredAt: now,
-		}); err != nil {
-			return 0, 0, err
+		if err := authz.SeedTxTenant(ctx, tx, tenantID); err != nil {
+			return err
 		}
-	}
 
-	if err := tx.Commit(); err != nil {
+		overdue, err := reader.ListOverdueStages(ctx, tx, tenantID, now, BatchSize)
+		if err != nil {
+			return err
+		}
+
+		surfaced, err := writer.MarkStagesOverdueSurfaced(ctx, tx, tenantID, now)
+		if err != nil {
+			return err
+		}
+
+		// Same tx as the marker: the outbox discipline. If the enqueue fails, the
+		// marker rolls back too, so the next tick retries the whole thing rather
+		// than leaving a stage marked-but-unannounced.
+		for _, s := range surfaced {
+			if len(s.EligibleActorIDs) == 0 {
+				continue
+			}
+			if err := notifier.EnqueueApprovalNotificationTx(ctx, tx, approvaldomain.ApprovalNotificationArgs{
+				EventID:          uuid.New().String(),
+				TenantID:         s.TenantID,
+				EventType:        approvaldomain.EventTypeApprovalOverdue,
+				SubjectKind:      s.SubjectKind,
+				SubjectID:        s.SubjectID,
+				RecipientUserIDs: s.EligibleActorIDs,
+				// No ActorUserID: an SLA tick has no human cause.
+				OccurredAt: now,
+			}); err != nil {
+				return err
+			}
+		}
+
+		overdueCount = len(overdue)
+		surfacedCount = len(surfaced)
+		return nil
+	})
+	if err != nil {
 		return 0, 0, err
 	}
-
-	return len(overdue), len(surfaced), nil
+	return overdueCount, surfacedCount, nil
 }

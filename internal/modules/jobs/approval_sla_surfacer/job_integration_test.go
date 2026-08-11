@@ -27,7 +27,7 @@ import (
 	approvaldomain "metaldocs/internal/modules/approval/domain"
 	approvalrepo "metaldocs/internal/modules/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
-	"metaldocs/internal/platform/db"
+	platformdb "metaldocs/internal/platform/db"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -43,7 +43,7 @@ type recordingNotifier struct {
 	sent []approvaldomain.ApprovalNotificationArgs
 }
 
-func (r *recordingNotifier) EnqueueApprovalNotificationTx(_ context.Context, _ db.Tx, args approvaldomain.ApprovalNotificationArgs) error {
+func (r *recordingNotifier) EnqueueApprovalNotificationTx(_ context.Context, _ platformdb.Tx, args approvaldomain.ApprovalNotificationArgs) error {
 	r.sent = append(r.sent, args)
 	return nil
 }
@@ -218,7 +218,7 @@ func TestIntegration_SLASurfacer_FullTick_IteratesAllTenants(t *testing.T) {
 	writer := approvalrepo.NewSLASurfaceWriterPG(db)
 	ctx := authz.WithBackgroundBypass(context.Background())
 
-	if err := run(ctx, db, reader, writer, approvaldomain.NoopApprovalNotificationEnqueuer{}, now); err != nil {
+	if err := run(ctx, platformdb.NewTxRunner(db), reader, writer, approvaldomain.NoopApprovalNotificationEnqueuer{}, now); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 
@@ -300,7 +300,7 @@ func TestIntegration_SLASurfacer_Idempotent_SecondRunNoOp(t *testing.T) {
 	writer := approvalrepo.NewSLASurfaceWriterPG(db)
 	ctx := authz.WithBackgroundBypass(context.Background())
 
-	if err := run(ctx, db, reader, writer, approvaldomain.NoopApprovalNotificationEnqueuer{}, now); err != nil {
+	if err := run(ctx, platformdb.NewTxRunner(db), reader, writer, approvaldomain.NoopApprovalNotificationEnqueuer{}, now); err != nil {
 		t.Fatalf("first run: %v", err)
 	}
 	firstSurfacedAt := readSLASurfacedAt(t, db, stageID)
@@ -309,7 +309,7 @@ func TestIntegration_SLASurfacer_Idempotent_SecondRunNoOp(t *testing.T) {
 	}
 
 	secondNow := now.Add(10 * time.Minute)
-	if err := run(ctx, db, reader, writer, approvaldomain.NoopApprovalNotificationEnqueuer{}, secondNow); err != nil {
+	if err := run(ctx, platformdb.NewTxRunner(db), reader, writer, approvaldomain.NoopApprovalNotificationEnqueuer{}, secondNow); err != nil {
 		t.Fatalf("second run: %v", err)
 	}
 	secondSurfacedAt := readSLASurfacedAt(t, db, stageID)
@@ -337,7 +337,7 @@ func TestIntegration_SLASurfacer_AlertOnly_DoesNotMutateStatusOrDueAt(t *testing
 	writer := approvalrepo.NewSLASurfaceWriterPG(db)
 	ctx := authz.WithBackgroundBypass(context.Background())
 
-	if err := run(ctx, db, reader, writer, approvaldomain.NoopApprovalNotificationEnqueuer{}, now); err != nil {
+	if err := run(ctx, platformdb.NewTxRunner(db), reader, writer, approvaldomain.NoopApprovalNotificationEnqueuer{}, now); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 
@@ -370,7 +370,7 @@ func TestSurfacer_OverdueStage_EnqueuesApprovalOverdue(t *testing.T) {
 	notifier := &recordingNotifier{}
 	ctx := authz.WithBackgroundBypass(context.Background())
 
-	if err := run(ctx, db, reader, writer, notifier, now); err != nil {
+	if err := run(ctx, platformdb.NewTxRunner(db), reader, writer, notifier, now); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 
@@ -408,7 +408,7 @@ func TestSurfacer_TwoTicksSameDeadline_EnqueuesOnce(t *testing.T) {
 	ctx := authz.WithBackgroundBypass(context.Background())
 
 	for i := 0; i < 2; i++ {
-		if err := run(ctx, db, reader, writer, notifier, now); err != nil {
+		if err := run(ctx, platformdb.NewTxRunner(db), reader, writer, notifier, now); err != nil {
 			t.Fatalf("run %d: %v", i, err)
 		}
 	}
