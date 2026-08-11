@@ -544,6 +544,16 @@ var checks = []Check{
 				// fixture sorts early (`latest` < `lowercase`), so a regression
 				// that restores the abort drops every Want below it too.
 				"could not parse a numeric golang version from: FROM golang:latest",
+				// A continued FROM (backslash, default escape char): the
+				// golang: reference sits on the physical line AFTER `FROM`,
+				// invisible to a same-line match (CodeRabbit review on #114,
+				// scripts/check-dockerfile-go-version.sh:113) -- this must be
+				// refused, not silently skipped.
+				"this check cannot parse a continued FROM instruction (line ends with a line-continuation character)",
+				// A `# escape=` parser directive can swap the continuation
+				// character to a backtick, same bypass shape via a different
+				// escape char -- must also be refused, not silently skipped.
+				"found a '# escape=' parser directive",
 			},
 			// The scope exclusion is a rule, and this is its firing mechanism.
 			// The fixture tree carries vendor/go.opentelemetry.io/otel/
