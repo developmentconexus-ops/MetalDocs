@@ -28,16 +28,18 @@ services:
       # exactly once, on first init of an empty data volume, in filename order, BEFORE the
       # server accepts connections (so the api's service_healthy gate cannot race it). This
       # is the faithful compose translation of scripts/dev-bootstrap-baseline.ps1 steps
-      # 1-4 (prerequisites -> schema -> reference-data -> grants); the api container
-      # applies the post-baseline forward migrations itself at startup. That was a no-op
-      # right after the 2026-07-29 fold emptied db/migrations/; it is not one now — 0316
-      # (livre zero-stage route) and 0317 (template content_hash) land there, so a rebuilt
-      # api container is what applies them to an existing volume. See internal/platform/
-      # migrate/migrate.go: "the curated baseline bootstrap is owned by [the bootstrap]".
+      # 1-4 (prerequisites -> schema -> reference-data -> grants). Post-baseline forward
+      # migrations, and any grants-stage re-run needed on an EXISTING volume, are applied
+      # by the db-provision one-shot service below (A6.1 re-cut, issue #88) — not by the
+      # api container, which no longer has DDL rights. See apps/dbprovision/cmd/
+      # metaldocs-dbprovision and internal/platform/migrate/migrate.go.
       - ../../db/prerequisites/0001_extensions.sql:/docker-entrypoint-initdb.d/01_extensions.sql:ro
       - ../../db/baseline/0001_current_schema.sql:/docker-entrypoint-initdb.d/02_baseline.sql:ro
       - ../../db/reference-data/0001_product_reference_data.sql:/docker-entrypoint-initdb.d/03_reference_data.sql:ro
-      - ../../db/grants/0001_role_grants.sql:/docker-entrypoint-initdb.d/04_role_grants.sql:ro
+      # Filename order matters: 0000_identity_roles.sql must run BEFORE
+      # 0001_role_grants.sql (roles must exist before they can be granted to).
+      - ../../db/grants/0000_identity_roles.sql:/docker-entrypoint-initdb.d/04_identity_roles.sql:ro
+      - ../../db/grants/0001_role_grants.sql:/docker-entrypoint-initdb.d/05_role_grants.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -153,6 +155,36 @@ services:
       timeout: 3s
       retries: 3
 
+  # db-provision is the one-shot database provisioning step (A6.1 re-cut,
+  # issue #88): it is the ONLY service that connects as the bootstrap
+  # superuser (${POSTGRES_USER}) after cluster init. It creates
+  # metaldocs_owner/metaldocs_runtime/metaldocs_ci, transfers schema/object
+  # ownership to metaldocs_owner, re-applies db/grants (idempotent — closes
+  # F1: an existing volume that predates this change gets metaldocs_runtime
+  # created here, not left permanently missing), and runs db/migrations +
+  # River's schema under SET ROLE metaldocs_owner (closes F2: DDL never runs
+  # over the metaldocs_runtime connection api/worker/jobs use to serve
+  # traffic). `restart: "no"` + service_completed_successfully below make
+  # api/worker/jobs wait for this to exit 0 before they start; it is safe to
+  # re-run on every `compose up` (every stage is idempotent by construction).
+  db-provision:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/dbprovision.Dockerfile
+    container_name: metaldocs-db-provision
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      METALDOCS_JOBS_RIVER_SCHEMA: ${METALDOCS_JOBS_RIVER_SCHEMA:-}
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: ${POSTGRES_DB}
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGSSLMODE: disable
+
   api:
     build:
       context: ../..
@@ -165,6 +197,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      db-provision:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       minio:
@@ -224,8 +258,12 @@ services:
       PGHOST: postgres
       PGPORT: 5432
       PGDATABASE: ${POSTGRES_DB}
-      PGUSER: ${POSTGRES_USER}
-      PGPASSWORD: ${POSTGRES_PASSWORD}
+      # A6.1 re-cut (issue #88): api connects as metaldocs_runtime, NOT the
+      # bootstrap superuser — internal/platform/db/postgres.AssertSafeIdentity
+      # boot-fatals otherwise. metaldocs_runtime is provisioned by the
+      # db-provision service above (depends_on: service_completed_successfully).
+      PGUSER: metaldocs_runtime
+      PGPASSWORD: ${METALDOCS_RUNTIME_DB_PASSWORD:-metaldocs_runtime_dev}
       PGSSLMODE: disable
       # Rate limiting: shared Redis store so limits stay correct when api scales to N
       # replicas (per-replica in-memory counting would multiply limits ×N — ADR 0071).
@@ -250,6 +288,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      db-provision:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       minio:
@@ -288,8 +328,9 @@ services:
       PGHOST: postgres
       PGPORT: 5432
       PGDATABASE: ${POSTGRES_DB}
-      PGUSER: ${POSTGRES_USER}
-      PGPASSWORD: ${POSTGRES_PASSWORD}
+      # A6.1 re-cut (issue #88): see the matching comment on the api service.
+      PGUSER: metaldocs_runtime
+      PGPASSWORD: ${METALDOCS_RUNTIME_DB_PASSWORD:-metaldocs_runtime_dev}
       PGSSLMODE: disable
     healthcheck:
       # A7.1 F2: probes /live (liveness), NOT /ready. Round-5 correction: a
@@ -387,6 +428,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      db-provision:
+        condition: service_completed_successfully
       api:
         condition: service_healthy
     environment:
@@ -413,8 +456,9 @@ services:
       PGHOST: postgres
       PGPORT: 5432
       PGDATABASE: ${POSTGRES_DB}
-      PGUSER: ${POSTGRES_USER}
-      PGPASSWORD: ${POSTGRES_PASSWORD}
+      # A6.1 re-cut (issue #88): see the matching comment on the api service.
+      PGUSER: metaldocs_runtime
+      PGPASSWORD: ${METALDOCS_RUNTIME_DB_PASSWORD:-metaldocs_runtime_dev}
       PGSSLMODE: disable
     healthcheck:
       # A7.1 F2: same reasoning as worker's healthcheck above — /live not
