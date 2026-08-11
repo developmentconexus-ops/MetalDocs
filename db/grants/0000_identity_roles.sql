@@ -86,6 +86,23 @@ $$;
 -- role has CREATEROLE; it is about sequencing: 0001's grants name
 -- metaldocs_owner/metaldocs_runtime/metaldocs_ci as grantees, so those roles
 -- must already exist when 0001 runs. Grant surface stays in 0001.
+--
+-- Deliberately created with NO PASSWORD clause (PR #110 review, thread #5).
+-- Three callers apply this file -- apps/dbprovision, scripts/dev-bootstrap-
+-- baseline.ps1, tests/integration/testdb.ApplyCuratedBootstrap -- and only
+-- one of the three treated creation and password-assignment as two mandatory
+-- steps. A hardcoded `PASSWORD 'metaldocs_runtime_dev'` here was therefore
+-- load-bearing for the other two, in a public repo: it was a committed,
+-- readable credential for the DML identity every service authenticates as.
+-- Omitting PASSWORD leaves rolpassword NULL, so the role cannot complete
+-- password-based auth (scram-sha-256 in every environment this runs in) until
+-- a caller explicitly rotates it. Each of the three callers now does that
+-- rotation itself, immediately after this file applies -- see
+-- rotateRuntimePassword (apps/dbprovision), the ALTER ROLE step in
+-- dev-bootstrap-baseline.ps1, and ApplyCuratedBootstrap's conditional
+-- rotation in tests/integration/testdb/db.go. A run that skips all three
+-- rotation steps leaves metaldocs_runtime unable to log in -- fail closed,
+-- not a silently-reachable default.
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_runtime') THEN
@@ -96,7 +113,7 @@ BEGIN
       RAISE NOTICE 'metaldocs_runtime is absent and % lacks CREATEROLE -- skipping runtime role provisioning', current_user;
       RETURN;
     END IF;
-    EXECUTE 'CREATE ROLE metaldocs_runtime NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT LOGIN PASSWORD ''metaldocs_runtime_dev''';
+    EXECUTE 'CREATE ROLE metaldocs_runtime NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT LOGIN';
   END IF;
 END
 $$;
@@ -104,6 +121,18 @@ $$;
 -- ── metaldocs_ci: non-owner, non-bypass DML test role (from 0284) ──────────
 -- Role creation only, moved here for the same sequencing reason as
 -- metaldocs_runtime above. Grant surface stays in 0001.
+--
+-- Same no-committed-password treatment as metaldocs_runtime above, and for
+-- the same reason: this is a public repo, and a hardcoded literal here is
+-- readable by anyone. Its risk profile is lower -- metaldocs_ci is test-only,
+-- never receives production traffic, and only ever authenticates against
+-- ephemeral per-test databases -- but an asymmetric fix would leave the next
+-- reader unable to tell whether that was a deliberate call or an oversight.
+-- Fixing both makes the rule legible: no role this file creates keeps a
+-- committed password. Every caller that creates metaldocs_ci rotates it the
+-- same way it rotates metaldocs_runtime, immediately after this file
+-- applies -- see the corresponding rotation step for each caller listed
+-- above.
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_ci') THEN
@@ -114,7 +143,7 @@ BEGIN
       RAISE NOTICE 'metaldocs_ci is absent and % lacks CREATEROLE -- skipping CI role provisioning', current_user;
       RETURN;
     END IF;
-    EXECUTE 'CREATE ROLE metaldocs_ci NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT LOGIN PASSWORD ''metaldocs_ci_dev''';
+    EXECUTE 'CREATE ROLE metaldocs_ci NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT LOGIN';
   END IF;
 END
 $$;
