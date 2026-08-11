@@ -67,6 +67,34 @@ set -euo pipefail
 # ':(glob,icase)**/Dockerfile' ...`) -- see the comment above the
 # `mapfile` call below for the full account.
 #
+# Two more silent-skip holes were found the same way, in a second independent
+# review on #114, both fixed the same way -- fail loud instead of a bare
+# `continue`:
+#   1. A discovered path that is not a readable regular file (a submodule
+#      gitlink, a symlink with a missing target) used to vanish with no
+#      diagnostic at the very top of the per-file loop, before any content
+#      was even read. See the comment above the `[[ ! -f "$df" ]]` check
+#      further down for the reproduction and why the fixture proving it uses
+#      a gitlink, not a symlink.
+#   2. `FROM $VAR` / `FROM ${VAR}` -- a build variable standing in for the
+#      WHOLE image reference, not just its tag -- resolved to a literal
+#      `$BASE_IMAGE`-shaped token that never matches the golang repo-component
+#      test, so a stage like `ARG BASE_IMAGE=golang:1.10` + `FROM $BASE_IMAGE`
+#      passed with zero diagnostic and no `checked` effect. See the comment
+#      above the whole-reference-indirection check further down for the
+#      contrast with `FROM golang:${GO_VERSION}` (a variable TAG, still
+#      caught correctly) and why this matters now: three of this repo's five
+#      Dockerfiles carry comments describing a planned consolidation onto
+#      exactly the `ARG BASE_IMAGE` / `FROM $BASE_IMAGE` shape.
+#
+# `checked` counts golang builder STAGES (and stage-shaped positions this
+# check refused to evaluate and therefore failed closed), not files -- a
+# single multi-stage Dockerfile with two `FROM golang:` lines increments it
+# twice. The final success message used to say "N Dockerfile(s) checked",
+# which reads as a file count and is wrong whenever a file has more than one
+# golang stage; it now says "N golang builder stage(s) checked" so the number
+# means what it says.
+#
 # Static: parses go.mod and tracked Dockerfiles. No Docker daemon, no network.
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -168,7 +196,25 @@ version_ge() {
 fail=0
 checked=0
 for df in "${dockerfiles[@]}"; do
-  [[ -f "$df" ]] || continue
+  # `git ls-files` returns a tracked PATH, not a promise that the checkout
+  # holds a readable regular file at it -- a submodule gitlink (mode 160000)
+  # or a symlink whose target is missing both satisfy the discovery pathspec
+  # while leaving nothing this check can open. A bare `continue` here used to
+  # drop such a path with no diagnostic and no `checked` effect: the same
+  # silent-skip shape as the digest-pinned and case-sensitivity bugs above,
+  # one layer earlier, in discovery itself rather than in parsing (found
+  # live, 2026-08-11, independent review on #114, proved with a gitlink
+  # entry -- a real dangling symlink could not be constructed to prove this
+  # on every checkout this check runs on, since a Windows checkout with
+  # `core.symlinks=false` never materializes one; the gitlink reproduces the
+  # identical failure at the `[[ -f ]]` test, platform-independently, and is
+  # the fixture below). Fail loud instead of skipping.
+  if [[ ! -f "$df" ]]; then
+    echo "DOCKERFILE-GO-VERSION-DRIFT: $df: git tracks this path but it is not a readable regular file in this checkout (a submodule gitlink, a symlink with a missing target, or another non-regular entry) -- this check cannot read it to look for a golang builder stage, and treats \"cannot read\" as \"must not silently pass\"" >&2
+    fail=1
+    checked=$((checked + 1))
+    continue
+  fi
 
   # A `# escape=` parser directive is only ever honoured by Docker in the
   # preamble before the first instruction -- anything found after that is
@@ -251,6 +297,35 @@ for df in "${dockerfiles[@]}"; do
     fi
     [[ -z "$image_ref" ]] && continue
 
+    # Whole-reference indirection: `FROM $VAR` or `FROM ${VAR}` is a build
+    # variable standing in for the ENTIRE image reference, not just its tag
+    # or digest. Resolving it would mean evaluating the ARG's default (or
+    # whatever `--build-arg` overrides it at build time) -- i.e. writing a
+    # Dockerfile/build interpreter, which this check has already refused to
+    # become (see the escape-directive and continued-FROM refusals above).
+    # Contrast: `FROM golang:${GO_VERSION}` substitutes only the TAG
+    # position -- the repository component is still the literal string
+    # `golang`, so the ordinary match two blocks down catches it correctly
+    # (and then, since the tag itself is non-numeric text, the existing
+    # "could not parse a numeric golang version" failure below fires -- no
+    # special-case needed for that shape). Only a substitution of the WHOLE
+    # reference is invisible to the repo-component check, because no literal
+    # `golang` is left anywhere on the line to match against (found live,
+    # 2026-08-11, independent review on #114: `ARG BASE_IMAGE=golang:1.10` +
+    # `FROM $BASE_IMAGE` reproduced silently -- zero diagnostic, `checked`
+    # untouched, exit 0 -- in a tree where deploy/docker/*.Dockerfile's own
+    # comments describe a planned consolidation onto exactly this pattern,
+    # A7.4/A7.5, threading GO_VERSION from go.mod through an ARG BASE_IMAGE).
+    # Fail loud: this check cannot resolve ARG values, so it cannot tell
+    # whether the image behind the indirection is golang at all, and treats
+    # "cannot tell" as "must not silently pass" rather than skipping.
+    if [[ "$image_ref" =~ ^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$ ]]; then
+      echo "DOCKERFILE-GO-VERSION-DRIFT: $df:$lineno: FROM's image reference is a build variable standing in for the WHOLE image ($image_ref), not just a tag -- this check cannot resolve ARG values to tell whether the resolved image is golang, so it cannot safely skip this stage; pin the golang version literally, or keep the repository name literal and vary only the tag (FROM golang:\${GO_VERSION} is fine and already checked) -- offending line: $from_line" >&2
+      fail=1
+      checked=$((checked + 1))
+      continue
+    fi
+
     # Repository component: the LAST `/`-separated path segment FIRST --
     # otherwise a registry host with a port (`registry:5000/golang@sha256:x`)
     # would have its `:5000` mistaken for a tag separator -- THEN strip an
@@ -301,4 +376,4 @@ if (( fail == 1 )); then
   exit 1
 fi
 
-echo "check-dockerfile-go-version: $checked Dockerfile(s) checked against go.mod's go $mod_version -- all OK"
+echo "check-dockerfile-go-version: $checked golang builder stage(s) checked against go.mod's go $mod_version -- all OK"

@@ -577,6 +577,25 @@ var checks = []Check{
 				// account of why basename-scoping (not just case-insensitivity)
 				// was the actual fix.
 				"DOCKERFILE-GO-VERSION-DRIFT: deploy/docker/legacy.dockerfile pins golang:1.19 but go.mod requires go >= 1.26.5 (line 1)",
+				// FROM $VAR / FROM ${VAR}: a build variable standing in for the
+				// WHOLE image reference, not just its tag. The OLD repo-component
+				// match saw no literal `golang` anywhere on the line -- the token
+				// IS the variable reference -- so it fell through the golang-stage
+				// test and was skipped with a bare `continue`, no diagnostic,
+				// `checked` never incremented (independent review on #114, second
+				// round): `ARG BASE_IMAGE=golang:1.10` + `FROM $BASE_IMAGE` reported
+				// "all OK" and exited 0. Contrast with a variable TAG
+				// (`FROM golang:${GO_VERSION}`), which this check already catches
+				// correctly and is deliberately absent from this fixture tree --
+				// adding one that passed would prove nothing, since nothing here
+				// claims that shape is a defect.
+				"DOCKERFILE-GO-VERSION-DRIFT: deploy/docker/argvar.Dockerfile:2: FROM's image reference is a build variable standing in for the WHOLE image ($BASE_IMAGE), not just a tag",
+				// The gitlink itself (see the Gitlinks field above): a path
+				// `git ls-files` returns that is not a readable regular file on
+				// disk used to hit a bare `[[ -f "$df" ]] || continue` with no
+				// diagnostic at all, before the per-file loop ever opened the
+				// path (independent review on #114, second round).
+				"DOCKERFILE-GO-VERSION-DRIFT: deploy/docker/phantom.Dockerfile: git tracks this path but it is not a readable regular file in this checkout",
 			},
 			// The scope exclusion is a rule, and this is its firing mechanism.
 			// The fixture tree carries vendor/go.opentelemetry.io/otel/
@@ -589,6 +608,17 @@ var checks = []Check{
 			NotWant: []string{
 				"vendor/go.opentelemetry.io/otel/dependencies.Dockerfile",
 			},
+			// A discovered path that is git-tracked but not a readable
+			// regular file (a submodule gitlink; a dangling symlink was not
+			// constructible on the Windows checkout this fixture was authored
+			// on -- core.symlinks=false there never materializes a real
+			// symlink node, so it cannot prove this defect on every checkout
+			// this harness runs on; a gitlink hits the identical `[[ -f ]]`
+			// failure platform-independently, see the Gitlinks field
+			// doc-comment in tools/verify/fixtures.go) used to vanish with no
+			// diagnostic at the top of the per-file loop, before any content
+			// was read (independent review on #114, second round).
+			Gitlinks: []string{"deploy/docker/phantom.Dockerfile"},
 		},
 	},
 	{

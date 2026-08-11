@@ -110,6 +110,28 @@ type Fixture struct {
 	// excluded thing in the fixture tree in a form that WOULD fire, and name it
 	// here; then deleting the exclusion turns the harness red.
 	NotWant []string
+
+	// Gitlinks lists sandbox-relative paths to register as raw git gitlink
+	// (submodule, mode 160000) tree entries, committed in their OWN commit
+	// after the fixture tree's normal commit (see commitGitlinks — folding
+	// this into the fixture tree's own `git add -A` does not work, proved
+	// empirically). `git ls-files` returns a gitlink path like any other, but
+	// nothing on disk backs it — no real submodule is ever added or
+	// initialized — so it reproduces "a path git discovers that is not a
+	// readable regular file" without needing a real OS symlink.
+	//
+	// Added 2026-08-11 for dockerfile-go-version-drift's `[[ -f "$df" ]]`
+	// discovery guard: the defect under test is also reproducible with a
+	// dangling symlink, but a symlink is not constructible on every checkout
+	// this harness runs on — a Windows checkout with `core.symlinks=false`
+	// (as confirmed on the checkout this fixture was authored on) never
+	// materializes a real symlink node, it falls back to a plain-content copy
+	// for a live target and fails outright for a dangling one, so `[[ -f ]]`
+	// would see a true, ordinary file and the fixture would silently prove
+	// nothing. A gitlink hits the identical `[[ -f ]]` failure and is
+	// platform-independent: `git update-index --cacheinfo 160000` needs no
+	// filesystem symlink support at all.
+	Gitlinks []string
 }
 
 // fixtureResult is one fixture's outcome.
@@ -295,7 +317,10 @@ func materializeFixture(ctx context.Context, root, sandbox string, c Check) erro
 		if err := copyTree(src, sandbox); err != nil {
 			return err
 		}
-		return gitCommit(ctx, sandbox, "fixture")
+		if err := gitCommit(ctx, sandbox, "fixture"); err != nil {
+			return err
+		}
+		return commitGitlinks(ctx, sandbox, c.Fixture.Gitlinks)
 	}
 
 	if err := copyTree(filepath.Join(src, "base"), sandbox); err != nil {
@@ -404,6 +429,37 @@ func gitCommit(ctx context.Context, dir, msg string) error {
 		"-c", "user.name=verify-fixture",
 		"-c", "user.email=verify-fixture@invalid",
 		"commit", "-q", "--allow-empty", "-m", msg,
+	)
+}
+
+// commitGitlinks stages each path as a raw gitlink (submodule, mode 160000)
+// tree entry pointing at a fixed, arbitrary commit SHA — no real submodule is
+// ever added or cloned — and commits them in a SEPARATE commit, AFTER the
+// fixture tree's own commit.
+//
+// That ordering is load-bearing, proved empirically, not a style choice:
+// folding this into gitCommit's `git add -A` does not work. A gitlink has
+// nothing backing it in the working tree, and without a .gitmodules entry
+// marking it as a real submodule, `git add -A` reads "index entry, nothing
+// on disk" as a deletion and stages the gitlink right back out — the commit
+// that results never contains it, and `git ls-files` afterward silently
+// omits it, defeating the entire fixture. Committing it separately, with a
+// plain `git commit` that touches only what `update-index --cacheinfo`
+// staged, leaves it alone.
+func commitGitlinks(ctx context.Context, sandbox string, paths []string) error {
+	if len(paths) == 0 {
+		return nil
+	}
+	for _, p := range paths {
+		spec := "160000,0000000000000000000000000000000000000001," + filepath.ToSlash(p)
+		if err := gitRun(ctx, sandbox, "update-index", "--add", "--cacheinfo", spec); err != nil {
+			return fmt.Errorf("gitlink %s: %w", p, err)
+		}
+	}
+	return gitRun(ctx, sandbox,
+		"-c", "user.name=verify-fixture",
+		"-c", "user.email=verify-fixture@invalid",
+		"commit", "-q", "-m", "gitlinks",
 	)
 }
 
