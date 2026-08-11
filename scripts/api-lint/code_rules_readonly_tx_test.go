@@ -3,6 +3,7 @@ package main
 import (
 	"go/token"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -57,6 +58,54 @@ func TestNoReadOnlyTxOptions_AliasedImportFlagged(t *testing.T) {
 	}
 }
 
+// TestNoReadOnlyTxOptions_QualifiedAliasFlagged proves the guard follows the
+// composite literal's canonical type through an alias exported by another
+// package. The package p spelling is deliberately not TxOptions.
+func TestNoReadOnlyTxOptions_QualifiedAliasFlagged(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "go.mod", "module fixture\n\ngo 1.26.5\n")
+	writeFile(t, dir, filepath.Join("internal/modules/p", "options.go"),
+		"package p\nimport \"database/sql\"\ntype Opts = sql.TxOptions\n")
+	writeFile(t, dir, filepath.Join("internal/modules/x", "repository.go"),
+		"package x\nimport p \"fixture/internal/modules/p\"\nfunc f() { _ = &p.Opts{ReadOnly: true} }\n")
+
+	got, err := checkNoReadOnlyTxOptions(dir, token.NewFileSet())
+	if err != nil {
+		t.Fatalf("checkNoReadOnlyTxOptions: %v", err)
+	}
+	if n := countRule(got, "no-readonly-tx-options"); n != 1 {
+		t.Fatalf("qualified alias: want exactly 1 violation, got %d\nfull got=%+v", n, got)
+	}
+}
+
+// TestNoReadOnlyTxOptions_LocalAliasFlagged proves the same canonical-type
+// match for a local alias whose source name comes from a dot import.
+func TestNoReadOnlyTxOptions_LocalAliasFlagged(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "internal/modules/x/repository.go",
+		"package x\nimport . \"database/sql\"\ntype Opts = TxOptions\nvar _ = &Opts{ReadOnly: true}\n")
+
+	got, err := checkNoReadOnlyTxOptions(dir, token.NewFileSet())
+	if err != nil {
+		t.Fatalf("checkNoReadOnlyTxOptions: %v", err)
+	}
+	if n := countRule(got, "no-readonly-tx-options"); n != 1 {
+		t.Fatalf("local alias: want exactly 1 violation, got %d\nfull got=%+v", n, got)
+	}
+}
+
+func TestNoReadOnlyTxOptions_UnresolvableFileFailsClosed(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "internal/modules/x/repository.go")
+	writeFile(t, dir, filepath.Join("internal/modules/x", "repository.go"),
+		"package x\nimport missing \"example.invalid/missing\"\nvar _ = missing.Opts{ReadOnly: true}\n")
+
+	_, err := checkNoReadOnlyTxOptions(dir, token.NewFileSet())
+	if err == nil || !strings.Contains(err.Error(), path) {
+		t.Fatalf("unresolvable candidate: want an error naming %s, got %v", path, err)
+	}
+}
+
 // TestNoReadOnlyTxOptions_DotImportedDatabaseSQLFlagged names the bare
 // TxOptions{ReadOnly: true} AST shape produced by a dot import. The test file
 // is intentionally the production-shaped offender; the sibling _test.go
@@ -71,7 +120,7 @@ func TestNoReadOnlyTxOptions_DotImportedDatabaseSQLFlagged(t *testing.T) {
 	writeFile(t, dir, excluded,
 		"package x\nimport . \"database/sql\"\nvar opts = TxOptions{ReadOnly: true}\n")
 	writeFile(t, dir, shadowed,
-		"package x\nimport . \"database/sql\"\nfunc g() { type TxOptions struct { ReadOnly bool }; _ = TxOptions{ReadOnly: true} }\n")
+		"package x\nimport . \"database/sql\"\nvar _ = LevelDefault\nfunc g() { type TxOptions struct { ReadOnly bool }; _ = TxOptions{ReadOnly: true} }\n")
 
 	got, err := checkNoReadOnlyTxOptions(dir, token.NewFileSet())
 	if err != nil {

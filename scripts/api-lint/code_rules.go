@@ -3,13 +3,17 @@ package main
 // Code-side lints are intentionally single-file scans; they do not build a call graph.
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"go/ast"
 	"go/importer"
 	"go/parser"
 	"go/token"
 	"go/types"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -250,12 +254,16 @@ func checkPaginationCodec(modulesRoot string, fset *token.FileSet) ([]Violation,
 // database/sql to another name (import dbsql "database/sql"), and a
 // hard-coded "sql" comparison would let &dbsql.TxOptions{ReadOnly: true}
 // pass silently, reopening exactly the gap this rule exists to close.
-// Blank (_) imports do not expose a usable TxOptions identifier. Dot (.)
-// imports are resolved with go/types so a bare TxOptions{...} composite lit
-// is flagged only when its identifier resolves to database/sql.TxOptions in
-// the file's lexical scope; an unrelated or shadowing TxOptions is left alone.
+// Every file that imports database/sql, plus every file with a qualified
+// composite-literal type, is type-checked before its composite literals are
+// inspected. Blank (_) imports do not expose a usable TxOptions identifier,
+// but they remain candidates and still have to resolve cleanly. Dot (.)
+// imports, qualified imports, and aliases exported by local packages are all
+// resolved from the composite literal's semantic type; an unrelated or
+// shadowing type is left alone.
 func checkNoReadOnlyTxOptions(modulesRoot string, fset *token.FileSet) ([]Violation, error) {
 	out := []Violation{}
+	resolver := newTxOptionsTypeResolver(modulesRoot)
 	walkErr := filepath.WalkDir(modulesRoot, func(path string, d os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -275,45 +283,49 @@ func checkNoReadOnlyTxOptions(modulesRoot string, fset *token.FileSet) ([]Violat
 		if err != nil {
 			return err
 		}
-		sqlIdents := map[string]bool{}
-		dotImportedSQL := false
+		candidate := false
 		for _, imp := range file.Imports {
 			importPath, unquoteErr := strconv.Unquote(imp.Path.Value)
 			if unquoteErr != nil || importPath != "database/sql" {
 				continue
 			}
-			switch {
-			case imp.Name == nil:
-				sqlIdents["sql"] = true
-			case imp.Name.Name == "_" || imp.Name.Name == ".":
-				if imp.Name.Name == "." {
-					dotImportedSQL = true
+			candidate = true
+			break
+		}
+		if !candidate {
+			ast.Inspect(file, func(n ast.Node) bool {
+				lit, ok := n.(*ast.CompositeLit)
+				if !ok || lit.Type == nil {
+					return true
 				}
-			default:
-				sqlIdents[imp.Name.Name] = true
-			}
+				ast.Inspect(lit.Type, func(n ast.Node) bool {
+					if _, ok := n.(*ast.SelectorExpr); ok {
+						candidate = true
+						return false
+					}
+					return true
+				})
+				return !candidate
+			})
 		}
-		var typeInfo *types.Info
-		if dotImportedSQL {
-			typeInfo = resolveFileTypes(file, fset)
+		if !candidate {
+			return nil
 		}
-		ast.Inspect(file, func(n ast.Node) bool {
+		resolved, err := resolver.resolve(path, file, fset)
+		if err != nil {
+			return err
+		}
+		ast.Inspect(resolved.file, func(n ast.Node) bool {
 			lit, ok := n.(*ast.CompositeLit)
 			if !ok {
 				return true
 			}
-			isTxOptions := false
-			switch typ := lit.Type.(type) {
-			case *ast.SelectorExpr:
-				if typ.Sel.Name != "TxOptions" {
-					return true
-				}
-				x, ok := typ.X.(*ast.Ident)
-				isTxOptions = ok && sqlIdents[x.Name]
-			case *ast.Ident:
-				isTxOptions = typ.Name == "TxOptions" && isDatabaseSQLTxOptions(typ, typeInfo)
+			resolvedType := resolvedCompositeType(resolved.info, lit)
+			if resolvedType == nil {
+				resolver.err = fmt.Errorf("api-lint: cannot resolve composite literal type in %s", path)
+				return false
 			}
-			if !isTxOptions {
+			if !isDatabaseSQLTxOptions(resolvedType) {
 				return true
 			}
 			for _, elt := range lit.Elts {
@@ -331,13 +343,16 @@ func checkNoReadOnlyTxOptions(modulesRoot string, fset *token.FileSet) ([]Violat
 				}
 				out = append(out, Violation{
 					File:    path,
-					Line:    fset.Position(lit.Pos()).Line,
+					Line:    resolved.fset.Position(lit.Pos()).Line,
 					Rule:    "no-readonly-tx-options",
 					Message: "sql.TxOptions{ReadOnly: true} is banned outside test code — TxRunner has no read-only variant (DoReadOnly deleted A5.2, issue #92); a raw read-only tx rejects authz.Require's F8 bypass audit INSERT (ADR 0022 Phase 11, H-PRE-1). Open the tx with TxRunner.Do instead.",
 				})
 			}
 			return true
 		})
+		if resolver.err != nil {
+			return resolver.err
+		}
 		return nil
 	})
 	if walkErr != nil {
@@ -346,27 +361,231 @@ func checkNoReadOnlyTxOptions(modulesRoot string, fset *token.FileSet) ([]Violat
 	return out, nil
 }
 
-// resolveFileTypes resolves just enough of a file's lexical scope to
-// distinguish a dot-imported database/sql.TxOptions from a local or unrelated
-// TxOptions. Type-checking errors are intentionally ignored: this rule is a
-// source scan, and an unresolved identifier must fail closed rather than turn
-// an ambiguous bare composite literal into a false positive.
-func resolveFileTypes(file *ast.File, fset *token.FileSet) *types.Info {
-	info := &types.Info{Uses: make(map[*ast.Ident]types.Object)}
-	conf := types.Config{
-		Importer: importer.Default(),
-		Error:    func(error) {},
-	}
-	_, _ = conf.Check(file.Name.Name, fset, []*ast.File{file}, info)
-	return info
+type resolvedTxOptionsFile struct {
+	file *ast.File
+	fset *token.FileSet
+	info *types.Info
 }
 
-func isDatabaseSQLTxOptions(ident *ast.Ident, info *types.Info) bool {
-	if info == nil {
+type txOptionsPackage struct {
+	dir         string
+	importPath  string
+	goFiles     []string
+	cgoFiles    []string
+	packageErr  string
+	checkedFile map[string]resolvedTxOptionsFile
+	err         error
+}
+
+type txOptionsTypeResolver struct {
+	root       string
+	moduleMode bool
+	byFile     map[string]*txOptionsPackage
+	exports    map[string]string
+	loadedTags map[string]bool
+	err        error
+}
+
+func newTxOptionsTypeResolver(root string) *txOptionsTypeResolver {
+	r := &txOptionsTypeResolver{root: root, byFile: map[string]*txOptionsPackage{}, exports: map[string]string{}, loadedTags: map[string]bool{}}
+	if _, err := os.Stat(filepath.Join(root, "go.mod")); err == nil {
+		r.moduleMode = true
+	}
+	return r
+}
+
+func (r *txOptionsTypeResolver) resolve(path string, file *ast.File, fset *token.FileSet) (resolvedTxOptionsFile, error) {
+	if r.err != nil {
+		return resolvedTxOptionsFile{}, r.err
+	}
+	if !r.moduleMode {
+		return r.resolveSingleFile(path, file, fset)
+	}
+	if !r.loadedTags[""] {
+		if err := r.loadPackages(path, ""); err != nil {
+			r.err = err
+			return resolvedTxOptionsFile{}, err
+		}
+	}
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return resolvedTxOptionsFile{}, fmt.Errorf("api-lint: cannot resolve types for %s: %w", path, err)
+	}
+	pkg := r.byFile[filepath.Clean(absPath)]
+	if pkg == nil {
+		for _, tags := range []string{"integration", "production"} {
+			if r.loadedTags[tags] {
+				continue
+			}
+			if err := r.loadPackages(path, tags); err != nil {
+				return resolvedTxOptionsFile{}, err
+			}
+			pkg = r.byFile[filepath.Clean(absPath)]
+			if pkg != nil {
+				break
+			}
+		}
+		if pkg == nil {
+			return resolvedTxOptionsFile{}, fmt.Errorf("api-lint: cannot resolve types for %s: go list did not include the candidate file", path)
+		}
+	}
+	if pkg.err != nil {
+		return resolvedTxOptionsFile{}, fmt.Errorf("api-lint: cannot resolve types for %s: %w", path, pkg.err)
+	}
+	if resolved, ok := pkg.checkedFile[filepath.Clean(absPath)]; ok {
+		return resolved, nil
+	}
+	if err := r.checkPackage(pkg, path); err != nil {
+		pkg.err = err
+		return resolvedTxOptionsFile{}, err
+	}
+	return pkg.checkedFile[filepath.Clean(absPath)], nil
+}
+
+func (r *txOptionsTypeResolver) resolveSingleFile(path string, file *ast.File, fset *token.FileSet) (resolvedTxOptionsFile, error) {
+	var typeErr error
+	info := &types.Info{Types: make(map[ast.Expr]types.TypeAndValue), Uses: make(map[*ast.Ident]types.Object), Defs: make(map[*ast.Ident]types.Object)}
+	conf := types.Config{Importer: importer.Default(), Error: func(err error) {
+		if typeErr == nil {
+			typeErr = err
+		}
+	}}
+	_, checkErr := conf.Check(file.Name.Name, fset, []*ast.File{file}, info)
+	if typeErr == nil {
+		typeErr = checkErr
+	}
+	if typeErr != nil {
+		return resolvedTxOptionsFile{}, fmt.Errorf("api-lint: cannot resolve types for %s: %v", path, typeErr)
+	}
+	return resolvedTxOptionsFile{file: file, fset: fset, info: info}, nil
+}
+
+type goListPackage struct {
+	Dir        string
+	ImportPath string
+	GoFiles    []string
+	CgoFiles   []string
+	Export     string
+	Error      *struct {
+		Err string `json:"Err"`
+	} `json:"Error"`
+}
+
+func (r *txOptionsTypeResolver) loadPackages(candidate, tags string) error {
+	args := []string{"list", "-json", "-e", "-export", "-deps"}
+	if tags != "" {
+		args = append(args, "-tags", tags)
+	}
+	args = append(args, "./...")
+	cmd := exec.Command("go", args...)
+	cmd.Dir = r.root
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	raw, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("api-lint: cannot resolve types for %s: go list failed: %v: %s", candidate, err, strings.TrimSpace(stderr.String()))
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	for {
+		var listed goListPackage
+		err := decoder.Decode(&listed)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("api-lint: cannot resolve types for %s: decode go list output: %w", candidate, err)
+		}
+		if listed.Dir == "" || listed.ImportPath == "" {
+			continue
+		}
+		pkg := &txOptionsPackage{dir: listed.Dir, importPath: listed.ImportPath, goFiles: listed.GoFiles, cgoFiles: listed.CgoFiles, checkedFile: map[string]resolvedTxOptionsFile{}}
+		if listed.Error != nil {
+			pkg.packageErr = listed.Error.Err
+			pkg.err = fmt.Errorf("go list package error: %s", listed.Error.Err)
+		}
+		for _, name := range append(append([]string{}, listed.GoFiles...), listed.CgoFiles...) {
+			r.byFile[filepath.Clean(filepath.Join(listed.Dir, name))] = pkg
+		}
+		if listed.Export != "" {
+			r.exports[listed.ImportPath] = listed.Export
+		}
+	}
+	r.loadedTags[tags] = true
+	return nil
+}
+
+func (r *txOptionsTypeResolver) checkPackage(pkg *txOptionsPackage, candidate string) error {
+	if pkg.packageErr != "" {
+		return fmt.Errorf("api-lint: cannot resolve types for %s: %s", candidate, pkg.packageErr)
+	}
+	fset := token.NewFileSet()
+	files := make([]*ast.File, 0, len(pkg.goFiles)+len(pkg.cgoFiles))
+	for _, name := range append(append([]string{}, pkg.goFiles...), pkg.cgoFiles...) {
+		path := filepath.Join(pkg.dir, name)
+		file, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
+		if err != nil {
+			return fmt.Errorf("api-lint: cannot resolve types for %s: parse %s: %w", candidate, path, err)
+		}
+		files = append(files, file)
+	}
+	var typeErr error
+	info := &types.Info{Types: make(map[ast.Expr]types.TypeAndValue), Uses: make(map[*ast.Ident]types.Object), Defs: make(map[*ast.Ident]types.Object)}
+	lookup := func(importPath string) (io.ReadCloser, error) {
+		export := r.exports[importPath]
+		if export == "" {
+			return nil, fmt.Errorf("no export data for %s", importPath)
+		}
+		return os.Open(export)
+	}
+	conf := types.Config{Importer: importer.For("gc", lookup), Error: func(err error) {
+		if typeErr == nil {
+			typeErr = err
+		}
+	}}
+	_, checkErr := conf.Check(pkg.importPath, fset, files, info)
+	if typeErr == nil {
+		typeErr = checkErr
+	}
+	if typeErr != nil {
+		return fmt.Errorf("api-lint: cannot resolve types for %s: %v", candidate, typeErr)
+	}
+	for _, file := range files {
+		path := filepath.Clean(fset.Position(file.Pos()).Filename)
+		pkg.checkedFile[path] = resolvedTxOptionsFile{file: file, fset: fset, info: info}
+	}
+	return nil
+}
+
+func isDatabaseSQLTxOptions(typ types.Type) bool {
+	named, ok := types.Unalias(typ).(*types.Named)
+	if !ok {
 		return false
 	}
-	obj, ok := info.Uses[ident].(*types.TypeName)
-	return ok && obj.Pkg() != nil && obj.Pkg().Path() == "database/sql" && obj.Name() == "TxOptions"
+	obj := named.Obj()
+	return obj != nil && obj.Pkg() != nil && obj.Pkg().Path() == "database/sql" && obj.Name() == "TxOptions"
+}
+
+func resolvedCompositeType(info *types.Info, lit *ast.CompositeLit) types.Type {
+	if lit.Type == nil {
+		if typeAndValue, ok := info.Types[lit]; ok && typeAndValue.Type != nil {
+			return typeAndValue.Type
+		}
+		return nil
+	}
+	if typeAndValue, ok := info.Types[lit.Type]; ok && typeAndValue.Type != nil {
+		return typeAndValue.Type
+	}
+	switch expr := lit.Type.(type) {
+	case *ast.Ident:
+		if obj, ok := info.Uses[expr].(*types.TypeName); ok {
+			return obj.Type()
+		}
+	case *ast.SelectorExpr:
+		if obj, ok := info.Uses[expr.Sel].(*types.TypeName); ok {
+			return obj.Type()
+		}
+	}
+	return nil
 }
 
 // checkTripwirePairing flags repository functions that run mutating SQL without
