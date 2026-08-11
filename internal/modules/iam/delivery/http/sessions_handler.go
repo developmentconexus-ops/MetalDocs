@@ -295,11 +295,12 @@ func parseRevokeSessionReason(r *http.Request) string {
 	if len(raw) == 0 {
 		return ""
 	}
-	var body struct {
-		Reason string `json:"reason"`
-	}
+	var body iamapi.RevokeSessionJSONRequestBody
 	_ = json.Unmarshal(raw, &body)
-	return strings.TrimSpace(body.Reason)
+	if body.Reason == nil {
+		return ""
+	}
+	return strings.TrimSpace(*body.Reason)
 }
 
 // revokeSession dispatches to SessionService (atomic revoke + audit in one
