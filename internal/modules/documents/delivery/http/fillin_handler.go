@@ -92,9 +92,7 @@ func (h *FillInHandler) ListPlaceholderValues(w http.ResponseWriter, r *http.Req
 
 // PutPlaceholderValue sets a single placeholder's value on a document's draft revision.
 func (h *FillInHandler) PutPlaceholderValue(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Value string `json:"value"`
-	}
+	var body documentsapi.PutDocumentPlaceholderValueJSONRequestBody
 	if err := decodeJSON(r, &body); err != nil {
 		writeFillInError(w, r, requestID(r), err)
 		return

@@ -166,7 +166,10 @@ func TestRegisterRoutesWithRateLimit_WrapperForwardingStillWorks(t *testing.T) {
 	})
 	mod.Mount(mux)
 
-	reqBody := strings.NewReader(`{"session_id":"sess_1","base_revision_id":"rev_1","content_hash":"abc"}`)
+	// session_id/base_revision_id are UUID-formatted per the contract
+	// (PresignDocumentAutosaveJSONRequestBody types them as openapi_types.UUID);
+	// the generated request type now enforces that at decode time.
+	reqBody := strings.NewReader(`{"session_id":"cccccccc-cccc-4ccc-8ccc-000000000099","base_revision_id":"eeeeeeee-eeee-4eee-8eee-000000000099","content_hash":"abc"}`)
 	req := withModuleAuth(httptest.NewRequest(http.MethodPost, "/api/v1/documents/"+docID+"/autosave/presign", reqBody), "editor")
 	rr := httptest.NewRecorder()
 	mux.ServeHTTP(rr, req)

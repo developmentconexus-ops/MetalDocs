@@ -483,7 +483,7 @@ func TestAcquireSession_Forbidden(t *testing.T) {
 func TestCommitAutosave_IdempotentReplay_Returns200(t *testing.T) {
 	mux := newMux(t, &fakeSvc{commitResult: &application.CommitResult{RevisionID: "bbbbbbbb-bbbb-4bbb-8bbb-000000000001", RevisionNum: 2, AlreadyConsumed: true}})
 
-	body := []byte(`{"session_id":"sess_1","pending_upload_id":"pending_1","form_data_snapshot":{"a":1}}`)
+	body := []byte(`{"session_id":"cccccccc-cccc-4ccc-8ccc-000000000099","pending_upload_id":"dddddddd-dddd-4ddd-8ddd-000000000099","form_data_snapshot":{"a":1}}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/autosave/commit", bytes.NewReader(body))
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
@@ -515,7 +515,7 @@ func TestCommitAutosave_AcceptsPageCountAndReturnsArtifactMetadata(t *testing.T)
 	}}
 	mux := newMux(t, svc)
 
-	body := []byte(`{"session_id":"sess_1","pending_upload_id":"pending_1","form_data_snapshot":{"a":1},"page_count":3}`)
+	body := []byte(`{"session_id":"cccccccc-cccc-4ccc-8ccc-000000000099","pending_upload_id":"dddddddd-dddd-4ddd-8ddd-000000000099","form_data_snapshot":{"a":1},"page_count":3}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/autosave/commit", bytes.NewReader(body))
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
@@ -546,7 +546,7 @@ func TestCommitAutosave_AcceptsPageCountAndReturnsArtifactMetadata(t *testing.T)
 func TestCommitAutosave_InvalidPageCountUsesProblemEnvelope(t *testing.T) {
 	mux := newMux(t, &fakeSvc{commitErr: domain.ErrInvalidPageCount})
 
-	body := []byte(`{"session_id":"sess_1","pending_upload_id":"pending_1","page_count":0}`)
+	body := []byte(`{"session_id":"cccccccc-cccc-4ccc-8ccc-000000000099","pending_upload_id":"dddddddd-dddd-4ddd-8ddd-000000000099","page_count":0}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/autosave/commit", bytes.NewReader(body))
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
@@ -571,7 +571,7 @@ func TestCommitAutosave_AbsentFormDataSnapshotForwardsNil(t *testing.T) {
 	svc := &fakeSvc{commitResult: &application.CommitResult{RevisionID: "bbbbbbbb-bbbb-4bbb-8bbb-000000000001", RevisionNum: 2}}
 	mux := newMux(t, svc)
 
-	body := []byte(`{"session_id":"sess_1","pending_upload_id":"pending_1"}`)
+	body := []byte(`{"session_id":"cccccccc-cccc-4ccc-8ccc-000000000099","pending_upload_id":"dddddddd-dddd-4ddd-8ddd-000000000099"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/autosave/commit", bytes.NewReader(body))
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
@@ -594,9 +594,9 @@ func TestCommitAutosave_NonObjectFormDataSnapshotRejected(t *testing.T) {
 		name string
 		body string
 	}{
-		{name: "null", body: `{"session_id":"sess_1","pending_upload_id":"pending_1","form_data_snapshot":null}`},
-		{name: "scalar", body: `{"session_id":"sess_1","pending_upload_id":"pending_1","form_data_snapshot":5}`},
-		{name: "array", body: `{"session_id":"sess_1","pending_upload_id":"pending_1","form_data_snapshot":[]}`},
+		{name: "null", body: `{"session_id":"cccccccc-cccc-4ccc-8ccc-000000000099","pending_upload_id":"dddddddd-dddd-4ddd-8ddd-000000000099","form_data_snapshot":null}`},
+		{name: "scalar", body: `{"session_id":"cccccccc-cccc-4ccc-8ccc-000000000099","pending_upload_id":"dddddddd-dddd-4ddd-8ddd-000000000099","form_data_snapshot":5}`},
+		{name: "array", body: `{"session_id":"cccccccc-cccc-4ccc-8ccc-000000000099","pending_upload_id":"dddddddd-dddd-4ddd-8ddd-000000000099","form_data_snapshot":[]}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			svc := &fakeSvc{}

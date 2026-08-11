@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"metaldocs/internal/platform/httprouter"
 	"net/http"
@@ -612,9 +613,7 @@ func (h *Handler) renameDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		Name string `json:"name"`
-	}
+	var req documentsapi.RenameDocumentJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, problem.CodeRequestInvalid.String()))
 		return
@@ -752,15 +751,13 @@ func (h *Handler) heartbeatSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		SessionID string `json:"session_id"`
-	}
+	var req documentsapi.HeartbeatDocumentSessionJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, problem.CodeRequestInvalid.String()))
 		return
 	}
 
-	if err := h.svc.HeartbeatSession(ctx, req.SessionID, userID); err != nil {
+	if err := h.svc.HeartbeatSession(ctx, req.SessionId, userID); err != nil {
 		status, msg := mapErr(err)
 		problem.Respond(w, r, problem.New(status, msg, msg.String()))
 		return
@@ -776,15 +773,13 @@ func (h *Handler) releaseSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		SessionID string `json:"session_id"`
-	}
+	var req documentsapi.ReleaseDocumentSessionJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, problem.CodeRequestInvalid.String()))
 		return
 	}
 
-	if err := h.svc.ReleaseSession(ctx, tenantID, req.SessionID, userID, docID); err != nil {
+	if err := h.svc.ReleaseSession(ctx, tenantID, req.SessionId, userID, docID); err != nil {
 		status, msg := mapErr(err)
 		problem.Respond(w, r, problem.New(status, msg, msg.String()))
 		return
@@ -806,15 +801,13 @@ func (h *Handler) forceReleaseSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		SessionID string `json:"session_id"`
-	}
+	var req documentsapi.ForceReleaseDocumentSessionJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, problem.CodeRequestInvalid.String()))
 		return
 	}
 
-	if err := h.svc.ForceReleaseSession(ctx, tenantID, adminID, req.SessionID, docID); err != nil {
+	if err := h.svc.ForceReleaseSession(ctx, tenantID, adminID, req.SessionId, docID); err != nil {
 		status, msg := mapErr(err)
 		problem.Respond(w, r, problem.New(status, msg, msg.String()))
 		return
@@ -830,11 +823,7 @@ func (h *Handler) presignAutosave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		SessionID      string `json:"session_id"`
-		BaseRevisionID string `json:"base_revision_id"`
-		ContentHash    string `json:"content_hash"`
-	}
+	var req documentsapi.PresignDocumentAutosaveJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, problem.CodeRequestInvalid.String()))
 		return
@@ -844,8 +833,8 @@ func (h *Handler) presignAutosave(w http.ResponseWriter, r *http.Request) {
 		TenantID:       tenantID,
 		ActorUserID:    userID,
 		DocumentID:     docID,
-		SessionID:      req.SessionID,
-		BaseRevisionID: req.BaseRevisionID,
+		SessionID:      req.SessionId.String(),
+		BaseRevisionID: req.BaseRevisionId.String(),
 		ContentHash:    req.ContentHash,
 	})
 	if err != nil {
@@ -873,38 +862,52 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		SessionID        string          `json:"session_id"`
-		PendingUploadID  string          `json:"pending_upload_id"`
-		FormDataSnapshot json.RawMessage `json:"form_data_snapshot"`
-		PageCount        *int            `json:"page_count"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
 		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, problem.CodeRequestInvalid.String()))
 		return
 	}
-	// form_data_snapshot is optional — absent means "this autosave carries no
-	// form-data change" and the write path preserves the stored form data. When
-	// it IS present the contract types it as an object, so reject null/scalars/
-	// arrays here: persisting one would make every later read of the document
+
+	var req documentsapi.CommitDocumentAutosaveJSONRequestBody
+	if err := json.Unmarshal(bodyBytes, &req); err != nil {
+		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, problem.CodeRequestInvalid.String()))
+		return
+	}
+
+	// The generated form_data_snapshot field is *map[string]interface{} (an
+	// "object, additionalProperties: true" schema), which cannot distinguish an
+	// absent key from an explicit JSON null — both decode to a nil pointer. The
+	// contract still needs that distinction: absent means "this autosave
+	// carries no form-data change" (write path preserves the stored form
+	// data), while a present-but-non-object value (null/scalar/array) must be
+	// rejected — persisting one would make every later read of the document
 	// fail to decode form_data_json into the contract's object type (one bad
-	// write poisoning a read path with 500s).
-	if len(req.FormDataSnapshot) > 0 && !isJSONObject(req.FormDataSnapshot) {
-		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, problem.CodeRequestInvalid.String()))
-		return
+	// write poisoning a read path with 500s). Re-inspect the raw body to
+	// preserve that distinction exactly as before.
+	var snapshotPresence struct {
+		FormDataSnapshot json.RawMessage `json:"form_data_snapshot"`
+	}
+	_ = json.Unmarshal(bodyBytes, &snapshotPresence) // bodyBytes already validated above
+	var formDataSnapshot json.RawMessage
+	if len(snapshotPresence.FormDataSnapshot) > 0 {
+		if !isJSONObject(snapshotPresence.FormDataSnapshot) {
+			problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, problem.CodeRequestInvalid.String()))
+			return
+		}
+		formDataSnapshot = snapshotPresence.FormDataSnapshot
 	}
 
 	res, err := h.svc.CommitAutosave(ctx, application.CommitAutosaveCmd{
 		TenantID:         tenantID,
 		ActorUserID:      userID,
 		DocumentID:       docID,
-		SessionID:        req.SessionID,
-		PendingUploadID:  req.PendingUploadID,
-		FormDataSnapshot: req.FormDataSnapshot,
+		SessionID:        req.SessionId.String(),
+		PendingUploadID:  req.PendingUploadId.String(),
+		FormDataSnapshot: formDataSnapshot,
 		PageCount:        req.PageCount,
 	})
 	if err != nil {
-		slog.Error("documents.commit_autosave failed", "doc_id", docID, "tenant_id", tenantID, "actor_id", userID, "session_id", redactID(req.SessionID), "pending_upload_id", redactID(req.PendingUploadID), "err", err) //nolint:gosec // G706: slog default is JSONHandler (set at process start) — control chars are JSON-escaped, log-line injection not possible
+		slog.Error("documents.commit_autosave failed", "doc_id", docID, "tenant_id", tenantID, "actor_id", userID, "session_id", redactID(req.SessionId.String()), "pending_upload_id", redactID(req.PendingUploadId.String()), "err", err) //nolint:gosec // G706: slog default is JSONHandler (set at process start) — control chars are JSON-escaped, log-line injection not possible
 		status, msg := mapErr(err)
 		problem.Respond(w, r, problem.New(status, msg, msg.String()))
 		return
@@ -1042,19 +1045,24 @@ func (h *Handler) createCheckpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		Label string `json:"label"`
-	}
+	var req documentsapi.CreateDocumentCheckpointJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, problem.CodeRequestInvalid.String()))
 		return
 	}
-	if !isValidBoundedText(req.Label, 255) {
+	// label is optional in the contract (*string); an absent key must still
+	// fail the same bounded-text check a hand-decoded absent string would
+	// have failed against, so default it to "" before validating.
+	var label string
+	if req.Label != nil {
+		label = *req.Label
+	}
+	if !isValidBoundedText(label, 255) {
 		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, problem.CodeRequestInvalid.String()))
 		return
 	}
 
-	cp, err := h.svc.CreateCheckpoint(ctx, tenantID, docID, userID, req.Label)
+	cp, err := h.svc.CreateCheckpoint(ctx, tenantID, docID, userID, label)
 	if err != nil {
 		status, msg := mapErr(err)
 		problem.Respond(w, r, problem.New(status, msg, msg.String()))
@@ -1149,22 +1157,31 @@ func (h *Handler) createComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		LibraryCommentID int             `json:"library_comment_id"`
-		ParentLibraryID  *int            `json:"parent_library_id"`
-		AuthorDisplay    string          `json:"author_display"`
-		Content          json.RawMessage `json:"content"`
-	}
+	var req documentsapi.CreateDocumentCommentJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, problem.CodeRequestInvalid.String()))
 		return
 	}
+	// req.Content is a typed []DocumentCommentContentNode (each node a freeform
+	// map[string]interface{}), not the json.RawMessage the domain layer stores.
+	// Re-marshal to bytes for full-fidelity storage; an absent/null content key
+	// decodes to a nil slice, so forward nil (matching the prior raw-decode
+	// behavior of an absent body field) rather than a marshaled "null".
+	var contentJSON json.RawMessage
+	if req.Content != nil {
+		b, merr := json.Marshal(req.Content)
+		if merr != nil {
+			problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, problem.CodeInternalUnknown.String()))
+			return
+		}
+		contentJSON = b
+	}
 
 	comment, err := h.svc.AddDocumentComment(ctx, tenantID, userID, req.AuthorDisplay, docID, domain.CommentCreateInput{
-		LibraryCommentID: req.LibraryCommentID,
-		ParentLibraryID:  req.ParentLibraryID,
+		LibraryCommentID: req.LibraryCommentId,
+		ParentLibraryID:  req.ParentLibraryId,
 		AuthorDisplay:    req.AuthorDisplay,
-		ContentJSON:      req.Content,
+		ContentJSON:      contentJSON,
 	})
 	if err != nil {
 		status, msg := mapErr(err)
@@ -1187,17 +1204,27 @@ func (h *Handler) updateComment(w http.ResponseWriter, r *http.Request) {
 		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, problem.CodeRequestInvalid.String()))
 		return
 	}
-	var req struct {
-		Content *json.RawMessage `json:"content"`
-		Done    *bool            `json:"done"`
-	}
+	var req documentsapi.UpdateDocumentCommentJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, problem.CodeRequestInvalid.String()))
 		return
 	}
+	// req.Content is *[]DocumentCommentContentNode; re-marshal to the
+	// *json.RawMessage the domain layer expects. A nil pointer (key absent)
+	// stays nil, preserving "leave content unchanged" semantics.
+	var contentJSON *json.RawMessage
+	if req.Content != nil {
+		b, merr := json.Marshal(*req.Content)
+		if merr != nil {
+			problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, problem.CodeInternalUnknown.String()))
+			return
+		}
+		raw := json.RawMessage(b)
+		contentJSON = &raw
+	}
 
 	comment, err := h.svc.UpdateDocumentComment(ctx, tenantID, userID, docID, libraryID, domain.CommentUpdateInput{
-		ContentJSON: req.Content,
+		ContentJSON: contentJSON,
 		Done:        req.Done,
 	})
 	if err != nil {
