@@ -51,6 +51,12 @@ func (f failingAuditWriter) RecordTx(context.Context, db.Tx, auditdomain.Event) 
 	return errors.New("boom")
 }
 
+// IsErased satisfies auditdomain.Writer's embedded ErasureChecker. This
+// fixture never simulates an erased tenant.
+func (f failingAuditWriter) IsErased(context.Context, string) (bool, error) {
+	return false, nil
+}
+
 type captureAuditWriter struct {
 	event auditdomain.Event
 }
@@ -62,6 +68,12 @@ func (c *captureAuditWriter) Record(_ context.Context, event auditdomain.Event) 
 
 func (c *captureAuditWriter) RecordTx(context.Context, db.Tx, auditdomain.Event) error {
 	return nil
+}
+
+// IsErased satisfies auditdomain.Writer's embedded ErasureChecker. This
+// fixture never simulates an erased tenant.
+func (c *captureAuditWriter) IsErased(context.Context, string) (bool, error) {
+	return false, nil
 }
 
 func TestRecordAudit_AuditFailureDoesNotPanic(t *testing.T) {
