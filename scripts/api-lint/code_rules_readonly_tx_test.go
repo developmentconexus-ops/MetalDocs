@@ -2,6 +2,7 @@ package main
 
 import (
 	"go/token"
+	"path/filepath"
 	"testing"
 )
 
@@ -53,6 +54,42 @@ func TestNoReadOnlyTxOptions_AliasedImportFlagged(t *testing.T) {
 	}
 	if n := countRule(got, "no-readonly-tx-options"); n != 1 {
 		t.Fatalf("no-readonly-tx-options: want exactly 1 violation for aliased import, got %d\nfull got=%+v", n, got)
+	}
+}
+
+// TestNoReadOnlyTxOptions_DotImportedDatabaseSQLFlagged names the bare
+// TxOptions{ReadOnly: true} AST shape produced by a dot import. The test file
+// is intentionally the production-shaped offender; the sibling _test.go
+// fixture proves the existing test-file scope exclusion stays silent.
+func TestNoReadOnlyTxOptions_DotImportedDatabaseSQLFlagged(t *testing.T) {
+	dir := t.TempDir()
+	offender := filepath.Join("internal/modules/x", "repository.go")
+	excluded := filepath.Join("internal/modules/x", "repository_test.go")
+	shadowed := filepath.Join("internal/modules/x", "repository_shadow.go")
+	writeFile(t, dir, offender,
+		"package x\nimport . \"database/sql\"\nfunc f(db *DB) { _, _ = db.Begin() ; _ = TxOptions{ReadOnly: true} }\n")
+	writeFile(t, dir, excluded,
+		"package x\nimport . \"database/sql\"\nvar opts = TxOptions{ReadOnly: true}\n")
+	writeFile(t, dir, shadowed,
+		"package x\nimport . \"database/sql\"\nfunc g() { type TxOptions struct { ReadOnly bool }; _ = TxOptions{ReadOnly: true} }\n")
+
+	got, err := checkNoReadOnlyTxOptions(dir, token.NewFileSet())
+	if err != nil {
+		t.Fatalf("checkNoReadOnlyTxOptions: %v", err)
+	}
+	if n := countRule(got, "no-readonly-tx-options"); n != 1 {
+		t.Fatalf("dot-imported TxOptions: want exactly 1 violation for %s, got %d\nfull got=%+v", offender, n, got)
+	}
+	if got[0].File != filepath.Join(dir, offender) {
+		t.Fatalf("dot-imported TxOptions: want violation for %s, got %+v", offender, got)
+	}
+	for _, violation := range got {
+		if violation.File == filepath.Join(dir, excluded) {
+			t.Fatalf("dot-imported TxOptions: NotWant a violation for excluded fixture %s, got %+v", excluded, violation)
+		}
+		if violation.File == filepath.Join(dir, shadowed) {
+			t.Fatalf("dot-imported TxOptions: NotWant a violation for shadowed fixture %s, got %+v", shadowed, violation)
+		}
 	}
 }
 

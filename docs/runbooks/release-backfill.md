@@ -94,26 +94,26 @@ identification step is out of scope for this document.
 
 ## Procedure
 
-Dry-run is the default and always the first step. It is guaranteed to write
-nothing by construction, not by discipline — every dry-run code path ends in
-a deliberate transaction rollback (`errDryRunRollback`), not a conditional
-skip of the write calls.
+Dry-run is the default and always the first step. Once `RunDocument` has passed
+dependency validation, UUID parsing, and `lookupTenant`, and `deps.Runner.Do`
+has opened the transaction, every dry-run path ends in a deliberate rollback
+(`errDryRunRollback`) rather than a conditional skip of the write calls.
 
-```
+```bash
 go run ./scripts/release-backfill -docs <uuid>[,<uuid>...]
 ```
 
 Read the printed plan line per document (`outcome=planned ...`) before
 applying anything. Then apply:
 
-```
+```bash
 go run ./scripts/release-backfill -docs <uuid>[,<uuid>...] -dry-run=false
 ```
 
 For the repair-only pass (invalid frozen artifacts only — never touches
 approval history):
 
-```
+```bash
 go run ./scripts/release-backfill -docs <uuid> -repair-only -dry-run=false
 ```
 
@@ -130,7 +130,9 @@ generation=<id> <detail>`. Outcomes: `backfilled`, `already-backfilled`,
 `repaired`, `planned` (dry-run), `failed`.
 
 **Why this section exists.** A live run of this tool once printed `repaired`,
-its River job completed, and it rendered nothing. The cause was a three-layer
+its River job completed, and it rendered nothing (the incident is recorded in
+the source comment at `scripts/release-backfill/backfill/backfill.go:47`). The
+cause was a three-layer
 dedupe "swallow stack": the staging outbox tables and the delivery
 `outbox_events` table both use `ON CONFLICT DO NOTHING`, so a leftover row on
 the same dedupe key makes a re-dispatch report success while doing no work —
@@ -181,9 +183,12 @@ one under pressure — escalate instead.
 
 What the transactional design does give you:
 
-- **Before commit:** every failure path (a rejected precondition, a write
-  error, or dry-run) rolls back the WHOLE per-document transaction. A
-  document that fails or is only planned leaves nothing partial behind.
+- **After the transaction opens, before commit:** every failure path inside
+  `deps.Runner.Do` (a rejected precondition, a write error, or dry-run) rolls
+  back the WHOLE per-document transaction. `RunDocument` validates
+  dependencies, parses the UUID, and calls `lookupTenant` before
+  `deps.Runner.Do`, so those failures return without opening a transaction and
+  never reach `errDryRunRollback`.
 - **After commit, default backfill mode:** there is no delete/undo path in
   this codebase for a `RecordApprovalFactTx` written in error. Treat a
   committed default-backfill write as a fact that happened, the same way a

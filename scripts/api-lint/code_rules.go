@@ -5,8 +5,10 @@ package main
 import (
 	"fmt"
 	"go/ast"
+	"go/importer"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"os"
 	"path/filepath"
 	"sort"
@@ -248,11 +250,10 @@ func checkPaginationCodec(modulesRoot string, fset *token.FileSet) ([]Violation,
 // database/sql to another name (import dbsql "database/sql"), and a
 // hard-coded "sql" comparison would let &dbsql.TxOptions{ReadOnly: true}
 // pass silently, reopening exactly the gap this rule exists to close.
-// Blank (_) and dot (.) imports of database/sql are not resolved here — a
-// dot import turns the literal into a bare TxOptions{...} composite lit
-// with no SelectorExpr at all, which is a different AST shape this
-// selector-based check does not attempt to match; that is a known,
-// narrower gap than the one this fix closes, not a regression from it.
+// Blank (_) imports do not expose a usable TxOptions identifier. Dot (.)
+// imports are resolved with go/types so a bare TxOptions{...} composite lit
+// is flagged only when its identifier resolves to database/sql.TxOptions in
+// the file's lexical scope; an unrelated or shadowing TxOptions is left alone.
 func checkNoReadOnlyTxOptions(modulesRoot string, fset *token.FileSet) ([]Violation, error) {
 	out := []Violation{}
 	walkErr := filepath.WalkDir(modulesRoot, func(path string, d os.DirEntry, walkErr error) error {
@@ -275,6 +276,7 @@ func checkNoReadOnlyTxOptions(modulesRoot string, fset *token.FileSet) ([]Violat
 			return err
 		}
 		sqlIdents := map[string]bool{}
+		dotImportedSQL := false
 		for _, imp := range file.Imports {
 			importPath, unquoteErr := strconv.Unquote(imp.Path.Value)
 			if unquoteErr != nil || importPath != "database/sql" {
@@ -284,21 +286,34 @@ func checkNoReadOnlyTxOptions(modulesRoot string, fset *token.FileSet) ([]Violat
 			case imp.Name == nil:
 				sqlIdents["sql"] = true
 			case imp.Name.Name == "_" || imp.Name.Name == ".":
-				// Not a selector-qualified reference; see doc comment above.
+				if imp.Name.Name == "." {
+					dotImportedSQL = true
+				}
 			default:
 				sqlIdents[imp.Name.Name] = true
 			}
+		}
+		var typeInfo *types.Info
+		if dotImportedSQL {
+			typeInfo = resolveFileTypes(file, fset)
 		}
 		ast.Inspect(file, func(n ast.Node) bool {
 			lit, ok := n.(*ast.CompositeLit)
 			if !ok {
 				return true
 			}
-			sel, ok := lit.Type.(*ast.SelectorExpr)
-			if !ok || sel.Sel.Name != "TxOptions" {
-				return true
+			isTxOptions := false
+			switch typ := lit.Type.(type) {
+			case *ast.SelectorExpr:
+				if typ.Sel.Name != "TxOptions" {
+					return true
+				}
+				x, ok := typ.X.(*ast.Ident)
+				isTxOptions = ok && sqlIdents[x.Name]
+			case *ast.Ident:
+				isTxOptions = typ.Name == "TxOptions" && isDatabaseSQLTxOptions(typ, typeInfo)
 			}
-			if x, ok := sel.X.(*ast.Ident); !ok || !sqlIdents[x.Name] {
+			if !isTxOptions {
 				return true
 			}
 			for _, elt := range lit.Elts {
@@ -329,6 +344,29 @@ func checkNoReadOnlyTxOptions(modulesRoot string, fset *token.FileSet) ([]Violat
 		return nil, walkErr
 	}
 	return out, nil
+}
+
+// resolveFileTypes resolves just enough of a file's lexical scope to
+// distinguish a dot-imported database/sql.TxOptions from a local or unrelated
+// TxOptions. Type-checking errors are intentionally ignored: this rule is a
+// source scan, and an unresolved identifier must fail closed rather than turn
+// an ambiguous bare composite literal into a false positive.
+func resolveFileTypes(file *ast.File, fset *token.FileSet) *types.Info {
+	info := &types.Info{Uses: make(map[*ast.Ident]types.Object)}
+	conf := types.Config{
+		Importer: importer.Default(),
+		Error:    func(error) {},
+	}
+	_, _ = conf.Check(file.Name.Name, fset, []*ast.File{file}, info)
+	return info
+}
+
+func isDatabaseSQLTxOptions(ident *ast.Ident, info *types.Info) bool {
+	if info == nil {
+		return false
+	}
+	obj, ok := info.Uses[ident].(*types.TypeName)
+	return ok && obj.Pkg() != nil && obj.Pkg().Path() == "database/sql" && obj.Name() == "TxOptions"
 }
 
 // checkTripwirePairing flags repository functions that run mutating SQL without
