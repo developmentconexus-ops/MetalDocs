@@ -1,6 +1,6 @@
 # docx-renderer — TypeScript DOCX Substitution Service
 
-> **Last verified:** 2026-06-23
+> **Last verified:** 2026-08-11 (A2.2 dead-code burn-down: removed the `test/fixtures.ts` row — `test/fixtures.ts` deleted, zero live consumer, PR #119)
 > **Scope:** `apps/docx-renderer/` — the TypeScript/Node.js sidecar binary that owns DOCX token substitution and composition-block injection. This page covers the service as a deployed binary: entrypoint, HTTP API, security, eigenpal integration, MinIO I/O, build, and Dockerfile. How the Go worker calls it and where it fits in the full pipeline is in [../flows/render-pipeline.md](../flows/render-pipeline.md).
 > **Key files:**
 > - `apps/docx-renderer/src/index.ts`
@@ -177,7 +177,6 @@ esbuild single-file bundle script. Produces a bundled CommonJS artifact from `sr
 | Fanout HTTP route unit tests | `src/routes/__tests__/fanout.test.ts` |
 | Health smoke test | `test/health.test.ts` |
 | S3 integration smoke test | `test/s3.smoke.test.ts` |
-| Shared fixtures | `test/fixtures.ts` |
 
 Test runner: Vitest (`vitest.config.ts`).
 

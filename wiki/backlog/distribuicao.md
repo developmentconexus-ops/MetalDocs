@@ -60,4 +60,4 @@ Donut + timeline visuals were previously hand-rolled SVG against mock data. When
 
 ## Pagination
 
-Recipient table will reuse the library pagination primitive (`features/documents/components/Pagination.tsx`) once `GET /distribution/recipients` returns `X-Total-Count` + `Link` headers.
+Recipient table will need a pagination primitive once `GET /distribution/recipients` returns `X-Total-Count` + `Link` headers. The library's prior `features/documents/components/Pagination.tsx` (+ `.module.css`) was deleted as dead code (zero importers) in the A2.2 burn-down (PR #119) — it will need to be rebuilt or a shared primitive extracted at implementation time, not reused as-is.
