@@ -40,6 +40,14 @@ func BuildWorkerDependencies(ctx context.Context, workerCfg config.WorkerConfig)
 	if err != nil {
 		return WorkerDependencies{}, fmt.Errorf("open postgres: %w", err)
 	}
+	// A6.1 boot-fatal gate -- see the identical call in BuildAPIDependencies
+	// (bootstrap/api.go) for why: a SUPERUSER/BYPASSRLS connection makes RLS
+	// and REVOKE-based hardening inert, so the worker must refuse to process
+	// any outbox event under one.
+	if err := pgdb.AssertSafeIdentity(ctx, db); err != nil {
+		_ = closeDB(db)
+		return WorkerDependencies{}, err
+	}
 
 	pdfConverter, err := buildWorkerPDFConverter()
 	if err != nil {

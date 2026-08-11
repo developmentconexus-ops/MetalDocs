@@ -39,6 +39,14 @@ func BuildJobsDependencies(ctx context.Context, cfg config.JobsConfig, workerFac
 	if err != nil {
 		return JobsDependencies{}, fmt.Errorf("open postgres: %w", err)
 	}
+	// A6.1 boot-fatal gate -- see the identical call in BuildAPIDependencies
+	// (bootstrap/api.go) for why: a SUPERUSER/BYPASSRLS connection makes RLS
+	// and REVOKE-based hardening inert, so metaldocs-jobs must refuse to run
+	// any periodic job (including the audit-integrity validator) under one.
+	if err := pgdb.AssertSafeIdentity(ctx, db); err != nil {
+		_ = closeDB(db)
+		return JobsDependencies{}, err
+	}
 
 	// River schema migration is owned by the API binary alone (F-19,
 	// REQ-ASYNC-4): metaldocs-api runs MigrateRiverSchema at startup, and
