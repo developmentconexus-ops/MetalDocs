@@ -104,6 +104,58 @@ func UserIDFromContext(ctx context.Context) (string, bool) {
 	}
 }
 
+// ─── #108 review round 1, finding 3: alias of the CANONICAL accessor ─────────
+
+// E1 taught Rule 1 to follow a reference through a local alias of the
+// low-level accessor. This is the same hole on Rule 2, on the OTHER accessor:
+// `extract := authn.RequireUserID` binds the fail-closed function to a local,
+// and `actor, _ := extract(ctx)` discards its error exactly as
+// `actor, _ := authn.RequireUserID(ctx)` would. ignoredPresenceViolation
+// resolves call.Fun with isSelector, which requires a *ast.SelectorExpr —
+// `extract(ctx)` has call.Fun as a bare *ast.Ident, so the direct-call check
+// never fires and the discard ships clean. A guard that only matches
+// `authn.RequireUserID(ctx)` verbatim is a guard a one-line local assignment
+// turns off.
+func TestActorExtraction_Positive_IndirectCanonicalAccessorDiscard_Error(t *testing.T) {
+	src := `package application
+
+import (
+	"context"
+
+	"metaldocs/internal/platform/authn"
+)
+
+func chargeViaAliasedAccessor(ctx context.Context) string {
+	extract := authn.RequireUserID
+	actor, _ := extract(ctx)
+	return actor
+}
+`
+	findings := actorFindings(t, "internal/modules/billing/application/svc.go", src)
+	requireActorFinding(t, findings, "discards the error of authn.RequireUserID")
+}
+
+// The bool-returning sibling is the same shape one accessor over: aliasing
+// UserIDFromContext and discarding its presence bool through the alias.
+func TestActorExtraction_Positive_IndirectCanonicalAccessorDiscard_PresenceBool(t *testing.T) {
+	src := `package application
+
+import (
+	"context"
+
+	"metaldocs/internal/platform/authn"
+)
+
+func settleViaAliasedAccessor(ctx context.Context) string {
+	probe := authn.UserIDFromContext
+	actor, _ := probe(ctx)
+	return actor
+}
+`
+	findings := actorFindings(t, "internal/modules/billing/application/svc.go", src)
+	requireActorFinding(t, findings, "discards the presence bool of authn.UserIDFromContext")
+}
+
 // ─── E2: dot imports ─────────────────────────────────────────────────────────
 
 // A dot import puts UserIDFromContext into file scope with no qualifier to

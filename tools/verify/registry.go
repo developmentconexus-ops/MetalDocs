@@ -330,6 +330,18 @@ var checks = []Check{
 				// absence is not assertable through Want.)
 				`bare_suppression.go`,
 				`string_literal_suppression.go`,
+				// #108 review round 1, finding 3: the fresh gap AFTER the E1 alias
+				// fix, on the OTHER accessor. E1 taught Rule 1 to follow a reference
+				// to the low-level accessor through a local alias; this file proves
+				// Rule 2 has the identical hole on the canonical, fail-closed
+				// accessor: `extract := authn.RequireUserID` binds it to a local, and
+				// `actor, _ := extract(ctx)` discards its error with call.Fun as a
+				// bare *ast.Ident that isSelector cannot resolve. Pinned by FILE name
+				// because the message text is shared with ignored_presence.go's
+				// direct-call fixture — without the file name, an analyzer that
+				// regressed to matching only `authn.RequireUserID(ctx)` verbatim would
+				// still satisfy the message lines above.
+				`indirect_presence_discard.go`,
 			},
 		},
 	},

@@ -117,6 +117,16 @@ func scanActorExtractionFile(fset *token.FileSet, path string) []Finding {
 	}
 	aliases := importAliases(f)
 	suppressed := actorSuppressedLines(fset, f)
+	// #108 review round 1, finding 3: `extract := authn.RequireUserID` binds
+	// a canonical accessor to a local, undetected by the reference rule below
+	// (which only watches the low-level accessor) because the bind itself is
+	// not the violation — the presence-aware function is the RIGHT one to
+	// call. The violation is one hop later, when the alias is called and its
+	// second result discarded: `actor, _ := extract(ctx)` has call.Fun as a
+	// bare *ast.Ident, invisible to isSelector. Collecting these aliases
+	// first lets ignoredPresenceViolation recognise a call through the alias
+	// as a call through the qualified accessor it stands for.
+	funcAliases := authnAccessorAliases(f, aliases)
 
 	var out []Finding
 	// Rule 3 runs off f.Imports rather than the walk: importAliases deliberately
@@ -142,11 +152,11 @@ func scanActorExtractionFile(fset *token.FileSet, path string) []Finding {
 						"absence is an explicit decision instead of an empty string travelling downstream")
 			}
 		case *ast.AssignStmt:
-			if msg, pos, ok := ignoredPresenceViolation(node.Lhs, node.Rhs, node.Pos(), aliases); ok {
+			if msg, pos, ok := ignoredPresenceViolation(node.Lhs, node.Rhs, node.Pos(), aliases, funcAliases); ok {
 				out = appendActorFinding(out, fset, suppressed, path, pos, msg)
 			}
 		case *ast.ValueSpec:
-			if msg, pos, ok := ignoredPresenceViolation(identsAsExprs(node.Names), node.Values, node.Pos(), aliases); ok {
+			if msg, pos, ok := ignoredPresenceViolation(identsAsExprs(node.Names), node.Values, node.Pos(), aliases, funcAliases); ok {
 				out = appendActorFinding(out, fset, suppressed, path, pos, msg)
 			}
 		}
@@ -195,8 +205,11 @@ func identsAsExprs(names []*ast.Ident) []ast.Expr {
 // ignoredPresenceViolation matches a two-name binding fed by one call to a
 // canonical accessor whose second slot is the blank identifier — covering both
 // `x, _ := authn.UserIDFromContext(ctx)` and
-// `var x, _ = authn.RequireUserID(ctx)`.
-func ignoredPresenceViolation(lhs, rhs []ast.Expr, pos token.Pos, aliases map[string]string) (msg string, out token.Pos, ok bool) {
+// `var x, _ = authn.RequireUserID(ctx)`. funcAliases resolves the same
+// violation one hop later, when the call runs through a local that was bound
+// to the bare accessor first (`extract := authn.RequireUserID; x, _ :=
+// extract(ctx)`) — see authnAccessorAliases.
+func ignoredPresenceViolation(lhs, rhs []ast.Expr, pos token.Pos, aliases, funcAliases map[string]string) (msg string, out token.Pos, ok bool) {
 	if len(lhs) != 2 || len(rhs) != 1 {
 		return "", token.NoPos, false
 	}
@@ -208,15 +221,81 @@ func ignoredPresenceViolation(lhs, rhs []ast.Expr, pos token.Pos, aliases map[st
 	if !isCall {
 		return "", token.NoPos, false
 	}
-	for name, result := range authnPresenceFuncs {
-		if isSelector(call.Fun, aliases, authnImportPath, name) {
-			return "discards the " + result + " of authn." + name + " (A3.3); the actor is then \"\" whenever " +
-				"the request carries no authenticated principal, which is the fail-open shape the canonical " +
-				"accessor exists to prevent — read the second result and fail explicitly, or use " +
-				"authn.RequireUserID and propagate its error", pos, true
+	name, matched := resolvePresenceFuncName(call.Fun, aliases, funcAliases)
+	if !matched {
+		return "", token.NoPos, false
+	}
+	result := authnPresenceFuncs[name]
+	return "discards the " + result + " of authn." + name + " (A3.3); the actor is then \"\" whenever " +
+		"the request carries no authenticated principal, which is the fail-open shape the canonical " +
+		"accessor exists to prevent — read the second result and fail explicitly, or use " +
+		"authn.RequireUserID and propagate its error", pos, true
+}
+
+// resolvePresenceFuncName identifies which canonical presence-aware accessor
+// fun calls, directly (`authn.RequireUserID(ctx)`, resolved by import path via
+// isSelector) or through a local alias of the bare function
+// (`extract(ctx)` where `extract := authn.RequireUserID` elsewhere in the
+// file, resolved via funcAliases). Both shapes name the identical function; a
+// rule that recognised only the first is a rule one assignment statement
+// turns off.
+func resolvePresenceFuncName(fun ast.Expr, aliases, funcAliases map[string]string) (string, bool) {
+	for name := range authnPresenceFuncs {
+		if isSelector(fun, aliases, authnImportPath, name) {
+			return name, true
 		}
 	}
-	return "", token.NoPos, false
+	if ident, ok := fun.(*ast.Ident); ok {
+		if name, ok := funcAliases[ident.Name]; ok {
+			return name, true
+		}
+	}
+	return "", false
+}
+
+// authnAccessorAliases scans f for local bindings whose right-hand side is a
+// BARE reference to one of the canonical presence-aware accessors — not a
+// call, the function value itself, e.g. `extract := authn.RequireUserID` —
+// and returns a map from the local identifier to the accessor's canonical
+// name ("RequireUserID" / "UserIDFromContext"). It runs as a first pass over
+// the whole file, before the discard check, so the alias is known regardless
+// of where in the file it was declared relative to its use.
+func authnAccessorAliases(f *ast.File, aliases map[string]string) map[string]string {
+	out := map[string]string{}
+	ast.Inspect(f, func(n ast.Node) bool {
+		switch node := n.(type) {
+		case *ast.AssignStmt:
+			collectAuthnAccessorAlias(node.Lhs, node.Rhs, aliases, out)
+		case *ast.ValueSpec:
+			collectAuthnAccessorAlias(identsAsExprs(node.Names), node.Values, aliases, out)
+		}
+		return true
+	})
+	return out
+}
+
+// collectAuthnAccessorAlias records lhs[0] -> canonical name when the binding
+// is exactly one name fed by one bare SelectorExpr naming a canonical
+// accessor (no call involved — `extract := authn.RequireUserID`, not
+// `id := authn.RequireUserID(ctx)`).
+func collectAuthnAccessorAlias(lhs, rhs []ast.Expr, aliases map[string]string, out map[string]string) {
+	if len(lhs) != 1 || len(rhs) != 1 {
+		return
+	}
+	ident, isIdent := lhs[0].(*ast.Ident)
+	if !isIdent || ident.Name == "_" {
+		return
+	}
+	sel, isSel := rhs[0].(*ast.SelectorExpr)
+	if !isSel {
+		return
+	}
+	for name := range authnPresenceFuncs {
+		if isSelector(sel, aliases, authnImportPath, name) {
+			out[ident.Name] = name
+			return
+		}
+	}
 }
 
 // actorSuppressedLines collects the lines carrying a valid suppression: a real

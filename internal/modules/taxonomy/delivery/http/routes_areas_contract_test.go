@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,6 +11,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/taxonomy/domain"
+	"metaldocs/internal/platform/authn"
+	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -71,5 +74,33 @@ func TestAreasHandler_UpdateReturns404WhenAreaMissing(t *testing.T) {
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+}
+
+// TestAreasHandler_UpdateMissingActorReturns401 is the PR #108 review-round-1
+// remediation for FINDING 1: AreaService.Update (A3.3/T1) resolves the actor
+// before any mutation work and returns authn.ErrMissingActor when it is absent,
+// but writeAreaError had no case for that sentinel and fell through to the
+// default 500 internal.unknown arm — the documented contract is 401
+// auth.unauthenticated.
+func TestAreasHandler_UpdateMissingActorReturns401(t *testing.T) {
+	handler := &Handler{areas: fakeAreaService{updateErr: authn.ErrMissingActor}}
+	mux := http.NewServeMux()
+	handler.Mount(mux)
+
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/taxonomy/areas/A1", strings.NewReader(`{"name":"Area"}`))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d (body=%s)", rec.Code, http.StatusUnauthorized, rec.Body.String())
+	}
+	var prob problem.Problem
+	if err := json.Unmarshal(rec.Body.Bytes(), &prob); err != nil {
+		t.Fatalf("decode problem body: %v (body=%s)", err, rec.Body.String())
+	}
+	if prob.Code != problem.CodeAuthUnauthenticated {
+		t.Fatalf("problem code = %q, want %q", prob.Code, problem.CodeAuthUnauthenticated)
 	}
 }

@@ -107,8 +107,13 @@ func (h *Handler) ListTokens(w http.ResponseWriter, r *http.Request) {
 
 	items, err := h.svc.List(r.Context(), tenantID)
 	if err != nil {
-		slog.Error("tokens: list", "err", err)
-		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
+		// A3.3 (review round 1, finding 2): Service.List can return
+		// authn.ErrMissingActor now that it fails closed on an absent actor.
+		// Every other tokens route already routes its service error through
+		// writeTokenError, which has a case for that sentinel (401
+		// auth.unauthenticated); this one mapped everything straight to 500
+		// and never gave the sentinel a chance to be seen.
+		h.writeTokenError(w, r, err)
 		return
 	}
 

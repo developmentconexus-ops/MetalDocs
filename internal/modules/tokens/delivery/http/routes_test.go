@@ -14,6 +14,8 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	tokenshttp "metaldocs/internal/modules/tokens/delivery/http"
 	"metaldocs/internal/modules/tokens/domain"
+	"metaldocs/internal/platform/authn"
+	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -21,6 +23,7 @@ import (
 type fakeService struct {
 	createErr error
 	getErr    error
+	listErr   error
 	entry     *domain.Entry
 }
 
@@ -36,6 +39,9 @@ func (f *fakeService) Get(ctx context.Context, tenantID, id string) (*domain.Ent
 }
 
 func (f *fakeService) List(ctx context.Context, tenantID string) ([]domain.Entry, error) {
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
 	return nil, nil
 }
 
@@ -108,6 +114,26 @@ func TestCreate_ValidationReturns422(t *testing.T) {
 	h.CreateToken(rr, reqWithTenant(t, http.MethodPost, "/api/v1/tokens", `{"name":"bad name","value":"v","label":"l"}`))
 	if rr.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, want 422 (body=%s)", rr.Code, rr.Body.String())
+	}
+}
+
+// TestList_MissingActorReturns401 is the PR #108 review-round-1 remediation for
+// FINDING 2: Service.List (A3.3) returns authn.ErrMissingActor when the request
+// context carries no authenticated actor, but ListTokens mapped every
+// Service.List error straight to 500 internal.unknown instead of routing it
+// through writeTokenError, which already has a case for this sentinel and every
+// other tokens route uses it correctly (see TestUpdate_ImmutableNameReturns422
+// and TestCreate_ValidationReturns422 above, both driven through
+// writeTokenError).
+func TestList_MissingActorReturns401(t *testing.T) {
+	h := tokenshttp.NewHandler(&fakeService{listErr: authn.ErrMissingActor})
+	rr := httptest.NewRecorder()
+	h.ListTokens(rr, reqWithTenant(t, http.MethodGet, "/api/v1/tokens", ``))
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d (body=%s)", rr.Code, http.StatusUnauthorized, rr.Body.String())
+	}
+	if c := decodeCode(t, rr.Body.Bytes()); c != problem.CodeAuthUnauthenticated.String() {
+		t.Fatalf("code = %q, want %q", c, problem.CodeAuthUnauthenticated)
 	}
 }
 

@@ -387,6 +387,12 @@ func editableByRoleMessage() string {
 func (h *Handler) writeProfileError(w http.ResponseWriter, r *http.Request, err error) {
 	var pgErr *pgconn.PgError
 	switch {
+	// A3.3 (review round 1, finding 1): ProfileService's mutating methods
+	// resolve the actor before any mutation work (T1) and return
+	// authn.ErrMissingActor when the request context carries none. That is
+	// the platform's 401 + auth.unauthenticated, not a taxonomy dialect.
+	case errors.Is(err, authn.ErrMissingActor):
+		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
 	case errors.Is(err, domain.ErrProfileNotFound):
 		problem.Respond(w, r, problem.New(http.StatusNotFound, codeTaxProfileNotFound, "profile not found"))
 	case errors.Is(err, domain.ErrProfileArchived):
