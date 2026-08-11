@@ -306,7 +306,20 @@ services:
       # endpoint itself was live-verified via the compiled binary directly
       # (PR #109 thread replies); this block will get its own docker compose
       # ps healthy proof once that fix merges.
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9091/live >/dev/null || exit 1"]
+      # F7 (review round 3): METALDOCS_WORKER_RUN_ONCE=true is a supported
+      # mode of THIS SAME service block (see the environment stanza above) —
+      # a one-shot batch invocation that deliberately never starts the infra
+      # server (apps/worker/cmd/metaldocs-worker/main.go: "there is no
+      # persistent process for an orchestrator to probe, so the A7.1 infra
+      # server is deliberately not started here"). A plain wget probe is
+      # structurally unsatisfiable for that mode's entire lifetime, which
+      # would misreport a correctly-behaving batch worker as unhealthy
+      # rather than reporting neither. The case guard below makes RunOnce a
+      # deliberate no-op pass (matches config.LoadWorkerConfig's own
+      # truthy check: EqualFold("true") or "1") instead of a false failure;
+      # continuous-mode (the default, empty/false) still gets the real
+      # /live probe unchanged.
+      test: ["CMD-SHELL", "case \"$$METALDOCS_WORKER_RUN_ONCE\" in [Tt][Rr][Uu][Ee]|1) exit 0 ;; esac; wget -qO- http://127.0.0.1:9091/live >/dev/null || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 20
