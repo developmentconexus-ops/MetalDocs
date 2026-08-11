@@ -47,6 +47,13 @@
 #      can fire. Go requires imports before any declaration, so resolving
 #      this once, on first sight, before function-scanning starts, is sound
 #      for every valid Go file — there is no second import line to miss.
+#      Both the grouped-block form (the import path alone on its own line
+#      inside `import (...)`) and the ungrouped single-line form
+#      (`import "metaldocs/.../tenant"`, `import x "..."`, `import . "..."`,
+#      `import _ "..."`) resolve to the same alias/dot/blank classification —
+#      the leading "import" keyword the ungrouped form leaves behind is
+#      stripped before classifying the token, specifically so the two forms
+#      cannot diverge.
 #   2. A file with no tenant import at all short-circuits to the next file
 #      immediately (no header/body scan cost).
 #   3. Header scan: a function or closure signature — named (`func NAME(ctx
@@ -147,6 +154,18 @@ FNR == 1 {
     sub(/[ 	]*"[^"]*"[ 	]*(\/\/.*)?$/, "", tok)
     gsub(/^[ 	]+/, "", tok)
     gsub(/[ 	]+$/, "", tok)
+    # An ungrouped single-line import statement (`import "path"`, no
+    # enclosing `import (...)` block) leaves the "import" keyword itself in
+    # tok, since the keyword sits before the alias/dot/blank token on the
+    # same line — a grouped block's member line never has it. Stripping a
+    # leading "import" here makes the two forms resolve identically:
+    # `import "tenant"` -> alias "tenant" (same as the grouped default),
+    # `import x "tenant"` -> alias "x", `import . "tenant"` -> dot import,
+    # `import _ "tenant"` -> blank import. Without this, tok was literally
+    # the string "import", which fell into the else branch below and set
+    # alias="import" — silently blind to every call this file exists to
+    # catch (found by review on PR #122, chatgpt-codex-connector).
+    sub(/^import([ 	]+|$)/, "", tok)
     resolved = 1
     if (tok == "_") {
       usable = 0                 # blank import: no callable symbol
