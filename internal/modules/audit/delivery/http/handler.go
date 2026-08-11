@@ -213,18 +213,7 @@ func (h *Handler) handleExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var body struct {
-		Format string `json:"format"`
-		Filter struct {
-			ActorID        string `json:"actor_id"`
-			Action         string `json:"action"`
-			ResourceType   string `json:"resource_type"`
-			ResourceID     string `json:"resource_id"`
-			OccurredAfter  string `json:"occurred_after"`
-			OccurredBefore string `json:"occurred_before"`
-			Q              string `json:"q"`
-		} `json:"filter"`
-	}
+	var body auditapi.ExportAuditEventsJSONRequestBody
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64*1024)).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
 		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "Invalid JSON body"))
 		return
@@ -232,26 +221,25 @@ func (h *Handler) handleExport(w http.ResponseWriter, r *http.Request) {
 
 	filter := domain.ListEventsQuery{
 		TenantID:     tenantID,
-		ActorID:      body.Filter.ActorID,
-		Action:       body.Filter.Action,
-		ResourceType: body.Filter.ResourceType,
-		ResourceID:   body.Filter.ResourceID,
-		Query:        body.Filter.Q,
+		ActorID:      stringFromPtr(body.Filter.ActorId),
+		Action:       stringFromPtr(body.Filter.Action),
+		ResourceType: stringFromPtr(body.Filter.ResourceType),
+		ResourceID:   stringFromPtr(body.Filter.ResourceId),
+		Query:        stringFromPtr(body.Filter.Q),
 	}
-	if ts, perr := parseTime("occurredAfter", body.Filter.OccurredAfter); perr != nil {
-		problem.Respond(w, r, perr)
-		return
-	} else {
-		filter.OccurredAfter = ts
+	// body.Filter.OccurredAfter/OccurredBefore are already parsed *time.Time —
+	// the generated type decodes the RFC3339 string at the JSON boundary, so a
+	// malformed timestamp fails the Decode above with a generic "Invalid JSON
+	// body" 400 (same status and problem code as the previous field-specific
+	// parseTime rejection, just a less specific message).
+	if body.Filter.OccurredAfter != nil {
+		filter.OccurredAfter = body.Filter.OccurredAfter.UTC()
 	}
-	if ts, perr := parseTime("occurredBefore", body.Filter.OccurredBefore); perr != nil {
-		problem.Respond(w, r, perr)
-		return
-	} else {
-		filter.OccurredBefore = ts
+	if body.Filter.OccurredBefore != nil {
+		filter.OccurredBefore = body.Filter.OccurredBefore.UTC()
 	}
 
-	format := domain.ExportFormat(strings.ToLower(strings.TrimSpace(body.Format)))
+	format := domain.ExportFormat(strings.ToLower(strings.TrimSpace(string(body.Format))))
 	if !format.Valid() {
 		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "format must be csv or jsonl"))
 		return
@@ -426,6 +414,16 @@ func parseListQuery(r *http.Request, tenantID string) (domain.ListEventsQuery, *
 		Cursor:         cursor,
 		Limit:          limit,
 	}, nil
+}
+
+// stringFromPtr returns the empty string for an absent (nil) generated
+// optional field, matching the zero value a hand-decoded string field would
+// have carried when its JSON key was omitted.
+func stringFromPtr(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
 }
 
 func parseTime(field, raw string) (time.Time, *problem.Problem) {
