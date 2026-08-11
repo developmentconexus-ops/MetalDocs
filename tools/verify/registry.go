@@ -488,6 +488,140 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 	},
 	{
+		ID:   "dockerfile-go-version-drift",
+		Desc: "every Dockerfile's golang builder stage is >= go.mod's go directive",
+		// Trunk-health blocker (2026-08-11): deploy/docker/*.Dockerfile hardcoded
+		// `FROM golang:1.25-alpine` while go.mod's `go` directive had moved to
+		// 1.26.5 (GO-2026-5856), and nothing forced the two to agree — no CI job
+		// builds container images, so `go mod download` was the first thing to
+		// notice, inside the image build itself. Same shape as
+		// problem-codes-drift/codegen-drift-*: a value restated instead of
+		// derived (docs/engineering/defect-class-catalog.md Class 2,
+		// Hand-Synced Enumerations). Derivation is not available here — a
+		// Dockerfile FROM line cannot read go.mod — so this check is the
+		// prevention rung instead (rung 3: regenerate-and-diff's sibling for a
+		// value that can only be compared, not generated).
+		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-dockerfile-go-version.sh"},
+		// scripts/check-dockerfile-go-version.sh is the check's own definition
+		// (whole-branch review C2 class); go.mod is its source of truth; the
+		// Dockerfiles are its subject, discovered by `git ls-files` rather than
+		// hand-listed. No Paths, deliberately: a hand-maintained prefix list is
+		// a selection hole waiting to happen — a stale Dockerfile added at a
+		// path the list didn't anticipate would never select this check under
+		// `changed`, even though the check's own git-ls-files discovery would
+		// have caught it once it ran (found live, 2026-08-11 review on #114:
+		// frontend/apps/web/Dockerfile.scratch-proof matched none of the old
+		// Paths prefixes and the check silently skipped). Same reasoning as
+		// governance-diff-rules below, which reads git diff itself for the
+		// same reason. Repo-scoped is the safe direction (see matchesPaths).
+		CIJob: "ci.yml:verify",
+		Fixture: &Fixture{
+			Dir: "dockerfile-go-version-drift",
+			// One property per line, and every parser shape the check claims to
+			// handle gets its own. Exit-code-only would be vacuous here: the
+			// first fixture alone already fails the run, so three fixtures
+			// covering lowercase/second-stage/--platform could be added, the
+			// parser fix reverted, and the harness would still report "ok"
+			// (measured 2026-08-11 on #114 — the pre-fix guard passed with all
+			// four fixtures present). Line numbers are deliberately excluded
+			// from the match: they pin the fixture's layout, not the rule.
+			Want: []string{
+				"DOCKERFILE-GO-VERSION-DRIFT: deploy/docker/worker.Dockerfile pins golang:1.25 but go.mod requires go >= 1.26.5",
+				// lowercase `from` — Dockerfile instructions are not case-sensitive.
+				"DOCKERFILE-GO-VERSION-DRIFT: deploy/docker/lowercase.Dockerfile pins golang:1.20 but go.mod requires go >= 1.26.5",
+				// a SECOND builder stage, indented, below a compliant first one:
+				// the defect the old head-1 parser could not see at all.
+				"DOCKERFILE-GO-VERSION-DRIFT: deploy/docker/multistage.Dockerfile pins golang:1.24 but go.mod requires go >= 1.26.5",
+				// `FROM --platform=<p> golang:...` — the flag sits between the
+				// instruction and the image reference.
+				"DOCKERFILE-GO-VERSION-DRIFT: deploy/docker/platform.Dockerfile pins golang:1.22 but go.mod requires go >= 1.26.5",
+				// A non-numeric tag must be REPORTED, not merely fatal. Under
+				// `set -euo pipefail` the version-extracting pipeline exits 1
+				// when it matches nothing, which aborted the script before its
+				// own error message could run -- a silent non-zero exit with no
+				// output, which in CI is a red check nobody can diagnose. This
+				// fixture sorts early (`latest` < `lowercase`), so a regression
+				// that restores the abort drops every Want below it too.
+				"could not parse a numeric golang version from: FROM golang:latest",
+				// A continued FROM (backslash, default escape char): the
+				// golang: reference sits on the physical line AFTER `FROM`,
+				// invisible to a same-line match (CodeRabbit review on #114,
+				// scripts/check-dockerfile-go-version.sh:113) -- this must be
+				// refused, not silently skipped.
+				"this check cannot parse a continued FROM instruction (line ends with a line-continuation character)",
+				// A `# escape=` parser directive can swap the continuation
+				// character to a backtick, same bypass shape via a different
+				// escape char -- must also be refused, not silently skipped.
+				"found a '# escape=' parser directive",
+				// A digest-pinned golang stage (`FROM golang@sha256:<hex>`):
+				// normal supply-chain practice, and the OLD `grep -qiE
+				// 'golang:'` gate never saw it -- no `golang:` substring in a
+				// digest reference -- so it was skipped with a bare
+				// `continue`, no diagnostic, `checked` never incremented
+				// (independent review on #114). The image-reference/tag split
+				// now recognises the stage first and only then finds no
+				// numeric tag to compare, so this must surface as the
+				// existing loud "could not parse" failure, not silence.
+				"DOCKERFILE-GO-VERSION-DRIFT: deploy/docker/digest.Dockerfile:1: could not parse a numeric golang version from: FROM golang@sha256:8728bc8be765db56dd0dd650b1b31a0396b03cd4e46689dc0c3e2bc4de3ad587 AS builder",
+				// A legitimately-spelled lowercase filename, `legacy.dockerfile`:
+				// the OLD case-sensitive `git ls-files` pathspec (`*Dockerfile*`,
+				// capital D) never returned it at all -- not excluded, not
+				// skipped, simply absent from `dockerfiles`, so a stale golang:1.19
+				// pin here was completely unexamined and the run still exited 0
+				// (independent review on #114). Discovery is now basename-scoped
+				// AND case-insensitive (`:(glob,icase)**/*.Dockerfile`,
+				// `:(glob,icase)**/Dockerfile`); this proves the fix actually
+				// reaches a lowercase-named file -- see
+				// scripts/check-dockerfile-go-version.sh's header for the full
+				// account of why basename-scoping (not just case-insensitivity)
+				// was the actual fix.
+				"DOCKERFILE-GO-VERSION-DRIFT: deploy/docker/legacy.dockerfile pins golang:1.19 but go.mod requires go >= 1.26.5 (line 1)",
+				// FROM $VAR / FROM ${VAR}: a build variable standing in for the
+				// WHOLE image reference, not just its tag. The OLD repo-component
+				// match saw no literal `golang` anywhere on the line -- the token
+				// IS the variable reference -- so it fell through the golang-stage
+				// test and was skipped with a bare `continue`, no diagnostic,
+				// `checked` never incremented (independent review on #114, second
+				// round): `ARG BASE_IMAGE=golang:1.10` + `FROM $BASE_IMAGE` reported
+				// "all OK" and exited 0. Contrast with a variable TAG
+				// (`FROM golang:${GO_VERSION}`), which this check already catches
+				// correctly and is deliberately absent from this fixture tree --
+				// adding one that passed would prove nothing, since nothing here
+				// claims that shape is a defect.
+				"DOCKERFILE-GO-VERSION-DRIFT: deploy/docker/argvar.Dockerfile:2: FROM's image reference is a build variable standing in for the WHOLE image ($BASE_IMAGE), not just a tag",
+				// The gitlink itself (see the Gitlinks field above): a path
+				// `git ls-files` returns that is not a readable regular file on
+				// disk used to hit a bare `[[ -f "$df" ]] || continue` with no
+				// diagnostic at all, before the per-file loop ever opened the
+				// path (independent review on #114, second round).
+				"DOCKERFILE-GO-VERSION-DRIFT: deploy/docker/phantom.Dockerfile: git tracks this path but it is not a readable regular file in this checkout",
+			},
+			// The scope exclusion is a rule, and this is its firing mechanism.
+			// The fixture tree carries vendor/go.opentelemetry.io/otel/
+			// dependencies.Dockerfile pinning golang:1.19 -- drifted on purpose,
+			// so it WOULD be reported if discovery stopped excluding vendor/.
+			// Want cannot express this: dropping the exclusion adds a line to
+			// the output, and every existing Want still matches, so the harness
+			// would report ok on a check that had started failing PRs over
+			// upstream code nobody here can edit (`go mod vendor` overwrites it).
+			NotWant: []string{
+				"vendor/go.opentelemetry.io/otel/dependencies.Dockerfile",
+			},
+			// A discovered path that is git-tracked but not a readable
+			// regular file (a submodule gitlink; a dangling symlink was not
+			// constructible on the Windows checkout this fixture was authored
+			// on -- core.symlinks=false there never materializes a real
+			// symlink node, so it cannot prove this defect on every checkout
+			// this harness runs on; a gitlink hits the identical `[[ -f ]]`
+			// failure platform-independently, see the Gitlinks field
+			// doc-comment in tools/verify/fixtures.go) used to vanish with no
+			// diagnostic at the top of the per-file loop, before any content
+			// was read (independent review on #114, second round).
+			Gitlinks: []string{"deploy/docker/phantom.Dockerfile"},
+		},
+	},
+	{
 		ID:            "openapi-lint-v1",
 		FixtureWaiver: &Waiver{Kind: WaiverThirdParty, Why: "third-party tool (@redocly/cli, pinned); a fixture here would test Redocly's rule engine, not this repo."},
 		Desc:          "redocly lint on the v1 spec",

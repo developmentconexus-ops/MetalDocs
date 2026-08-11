@@ -469,10 +469,10 @@ sequenceDiagram
 
 ### Flow 3: Docker image build (CI/production)
 
-1. `deploy/docker/api.Dockerfile` uses `golang:1.25-alpine` as builder stage.
-2. `go build -o /out/metaldocs-api ./apps/api/cmd/metaldocs-api` produces a static binary (`api.Dockerfile:6`).
-3. Final image is `alpine:3.21` + `ca-certificates`; `db/migrations/` is copied into `/app/db/migrations/` so the binary can run migrations at container start (`api.Dockerfile:10-14`).
-4. Worker Dockerfile follows the same pattern but without copying migrations (`worker.Dockerfile:1-11`).
+1. `deploy/docker/api.Dockerfile` uses `golang:1.26.5-alpine` as builder stage — matching `go.mod`'s `go` directive, enforced by `tools/verify` check `dockerfile-go-version-drift` (`scripts/check-dockerfile-go-version.sh`); the version is a TRANSITIONAL restated literal (a Dockerfile `FROM` line cannot read `go.mod`), preceded by a 12-line comment explaining why (`api.Dockerfile:1-12`). *(Corrected 2026-08-11: earlier revision said `golang:1.25-alpine`, from before the go.mod bump for GO-2026-5856; see `docs/runbooks/dockerfile-go-version-pin.md`.)*
+2. `go build -o /out/metaldocs-api ./apps/api/cmd/metaldocs-api` produces a static binary (`api.Dockerfile:18`).
+3. Final image is `alpine:3.21` + `ca-certificates`; `db/migrations/` is copied into `/app/db/migrations/` so the binary can run migrations at container start (`api.Dockerfile:20-25`).
+4. Worker Dockerfile follows the same pattern but without copying migrations (`worker.Dockerfile:13-26`, preceded by the same guard comment block as api.Dockerfile at `worker.Dockerfile:1-12`).
 
 ### Flow 4: CI gate sequence on a PR
 
