@@ -36,9 +36,10 @@ var profileOrder = []string{ProfileFast, ProfileChanged, ProfilePR, ProfileFull,
 // a deliberate line in this map, which is reviewable; forgetting to opt IN is
 // silent, and silence is how coverage rots.
 var releaseExcluded = map[string]string{
-	"oasdiff-breaking":      "diffs the PR head spec against a base-branch spec materialized by a PR-only workflow step; on a tag the file does not exist",
-	"governance-diff-rules": "rules about what a PR's diff must contain (contract change ships a spec update, etc.); a tag has no diff to rule on",
-	"migration-gapless":     "\"no historical migration edited after merge\" is a property of a diff against origin/main",
+	"oasdiff-breaking":                   "diffs the PR head spec against a base-branch spec materialized by a PR-only workflow step; on a tag the file does not exist",
+	"governance-diff-rules":              "rules about what a PR's diff must contain (contract change ships a spec update, etc.); a tag has no diff to rule on",
+	"migration-gapless":                  "\"no historical migration edited after merge\" is a property of a diff against origin/main",
+	"eslint-suppression-baseline-growth": "compares eslint-suppressions.json against the merge base with origin/main; release.yml's checkout has no \"fetch base ref\" step (there is no PR base on a tag) so origin/main is not guaranteed to resolve, and even when it does, \"did this PR's diff grow the baseline\" is not a question a tag build can ask",
 }
 
 // Infra requirements. A check declaring any of these is skipped (loudly, with
@@ -939,6 +940,49 @@ var checks = []Check{
 		// change, the suppression baseline and its expiry dates are back in
 		// scope too. Plus the check's own inputs (C2 class).
 		Paths: []string{"frontend/", "packages/", "apps/", "eslint.config.mjs", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", "eslint-suppressions.json", "eslint-suppressions.expiry.json", "scripts/check-eslint-suppression-expiry.sh"},
+		CIJob: "ci.yml:verify",
+	},
+	{
+		// A2.1 review round 2 (R1): eslint-suppression-expiry above closes
+		// the "does the baseline ever get revisited" half of the ratchet,
+		// but nothing stopped the baseline from GROWING in the meantime —
+		// `eslint . --suppressions-location eslint-suppressions.json
+		// --suppress-all` silently absorbs a brand-new violation into the
+		// file and exits 0, and a subsequent plain `pnpm run lint` then
+		// passes clean (proven live in the cold review of this PR, and
+		// reproduced by scripts/check-eslint-suppression-baseline-growth.sh's
+		// own guard fixture below). A baseline that can grow with no gate
+		// noticing is a baseline, not a ratchet — this check is the
+		// missing monotonicity half.
+		//
+		// Comparison point is the merge base with origin/main, computed
+		// live by `git merge-base` inside the script — never a second
+		// checked-in copy of eslint-suppressions.json. A duplicate baseline
+		// file is exactly the hand-synced-enumeration defect class this
+		// repo keeps hitting (see the dynamically-derived rule list in
+		// check-eslint-suppression-expiry.sh's own comment). Shrinking or
+		// disappearing (file, rule) entries always pass — burn-down must
+		// never be blocked, only growth is gated.
+		//
+		// needsGitDepth + --require-infra (ci.yml:verify sets it) means a
+		// shallow clone FAILS this check rather than silently skipping it;
+		// the script itself also fails closed if origin/main cannot be
+		// resolved or `git merge-base` errors, for the same reason. See
+		// the script's own header for the full edge-case inventory
+		// (first-file-introduction, renames, waiver escape).
+		ID:       "eslint-suppression-baseline-growth",
+		Desc:     "eslint-suppressions.json never grows a (file, rule) count relative to the merge base with origin/main (A2.1 review round 2, R1)",
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-eslint-suppression-baseline-growth.sh"},
+		Needs:    []string{needsGitDepth},
+		Fixture: &Fixture{
+			Dir:  "eslint-suppression-baseline-growth",
+			Want: []string{"GREW"},
+		},
+		// eslint-suppressions.json is the check's actual subject; the
+		// script and the waiver file are its own inputs (C2 class, same
+		// reasoning as every other script-named-in-Paths entry above).
+		Paths: []string{"eslint-suppressions.json", "scripts/check-eslint-suppression-baseline-growth.sh", "scripts/check-governance-waivers.txt"},
 		CIJob: "ci.yml:verify",
 	},
 	{
