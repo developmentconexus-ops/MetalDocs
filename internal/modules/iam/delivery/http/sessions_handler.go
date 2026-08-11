@@ -287,6 +287,15 @@ func (h *SessionsHandler) handleSessionByID(w http.ResponseWriter, r *http.Reque
 // request body. An absent, empty, or malformed body yields "" rather than
 // failing the revoke — rejecting the common empty-body UI path would be a
 // regression, and the reason is recorded in the audit payload only.
+//
+// This decodes into a private struct, not a generated request-body type:
+// revokeSession's operation in openapi.yaml deliberately declares no
+// requestBody schema (cold-review, PR #112 round 3), because giving
+// contract_validation ANY schema for this body — even a non-required one —
+// makes it reject malformed/wrong-typed JSON before this function, and
+// therefore this whole best-effort contract, ever runs. There is no
+// generated type to reuse as a result; RevokeSessionRequest in
+// components.schemas exists purely as documentation.
 func parseRevokeSessionReason(r *http.Request) string {
 	if r.Body == nil {
 		return ""
@@ -295,7 +304,9 @@ func parseRevokeSessionReason(r *http.Request) string {
 	if len(raw) == 0 {
 		return ""
 	}
-	var body iamapi.RevokeSessionJSONRequestBody
+	var body struct {
+		Reason *string `json:"reason"`
+	}
 	_ = json.Unmarshal(raw, &body)
 	if body.Reason == nil {
 		return ""

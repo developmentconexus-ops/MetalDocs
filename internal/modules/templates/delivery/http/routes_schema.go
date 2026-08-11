@@ -1,6 +1,7 @@
 package http
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -46,7 +47,7 @@ func (h *Handler) updateSchemas(w http.ResponseWriter, r *http.Request) {
 		problem.Respond(w, r, perr)
 		return
 	}
-	metadataSchema, placeholderSchema, perr := remarshalSchemas(req)
+	metadataSchema, placeholderSchema, perr := remarshalSchemas(bodyBytes)
 	if perr != nil {
 		problem.Respond(w, r, perr)
 		return
@@ -103,26 +104,47 @@ func decodeUpdateSchemasBody(bodyBytes []byte) (templatesapi.UpdateTemplateSchem
 	return req, nil
 }
 
-// remarshalSchemas converts the generated MetadataSchema/PlaceholderSchema
-// freeform map[string]interface{} shapes (the spec models them as open
-// objects) into the domain's typed shapes, whose JSON tags match the wire
-// field names exactly (internal/modules/templates/domain/schemas.go).
-func remarshalSchemas(req templatesapi.UpdateTemplateSchemaJSONRequestBody) (domain.MetadataSchema, []domain.Placeholder, *problem.Problem) {
+// remarshalSchemas decodes the metadata_schema/placeholder_schema JSON
+// sub-documents straight out of the raw request body into the domain's typed
+// shapes (internal/modules/templates/domain/schemas.go), instead of going
+// through the generated request type's freeform
+// map[string]interface{}/[]map[string]interface{} representation of those
+// fields (UpdateTemplateSchemaJSONBody).
+//
+// That freeform hop matters: decoding JSON into interface{} always collapses
+// numbers to float64 (the same class of bug fixed for comment content in
+// documents/delivery/http/handler.go's createComment/updateComment), and
+// domain.Placeholder.Default is itself a freeform `any` — a placeholder's
+// default value carrying a large external numeric id would silently lose
+// precision above 2^53 the moment decodeUpdateSchemasBody's initial decode
+// touched it. Reading directly off bodyBytes with UseNumber() keeps such
+// values as json.Number, whose exact digit string round-trips through
+// json.Marshal unchanged.
+func remarshalSchemas(bodyBytes []byte) (domain.MetadataSchema, []domain.Placeholder, *problem.Problem) {
+	var probe struct {
+		MetadataSchema    json.RawMessage `json:"metadata_schema"`
+		PlaceholderSchema json.RawMessage `json:"placeholder_schema"`
+	}
+	if err := json.Unmarshal(bodyBytes, &probe); err != nil {
+		return domain.MetadataSchema{}, nil, problem.New(http.StatusBadRequest, codeTplInvalidBody, err.Error())
+	}
+
 	var metadataSchema domain.MetadataSchema
-	mb, err := json.Marshal(req.MetadataSchema)
-	if err != nil {
-		return metadataSchema, nil, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error")
+	if len(probe.MetadataSchema) > 0 {
+		dec := json.NewDecoder(bytes.NewReader(probe.MetadataSchema))
+		dec.UseNumber()
+		if err := dec.Decode(&metadataSchema); err != nil {
+			return metadataSchema, nil, problem.New(http.StatusBadRequest, codeTplInvalidBody, err.Error())
+		}
 	}
-	if err := json.Unmarshal(mb, &metadataSchema); err != nil {
-		return metadataSchema, nil, problem.New(http.StatusBadRequest, codeTplInvalidBody, err.Error())
-	}
+
 	var placeholderSchema []domain.Placeholder
-	pb, err := json.Marshal(req.PlaceholderSchema)
-	if err != nil {
-		return metadataSchema, nil, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error")
-	}
-	if err := json.Unmarshal(pb, &placeholderSchema); err != nil {
-		return metadataSchema, nil, problem.New(http.StatusBadRequest, codeTplInvalidBody, err.Error())
+	if len(probe.PlaceholderSchema) > 0 {
+		dec := json.NewDecoder(bytes.NewReader(probe.PlaceholderSchema))
+		dec.UseNumber()
+		if err := dec.Decode(&placeholderSchema); err != nil {
+			return metadataSchema, nil, problem.New(http.StatusBadRequest, codeTplInvalidBody, err.Error())
+		}
 	}
 	return metadataSchema, placeholderSchema, nil
 }

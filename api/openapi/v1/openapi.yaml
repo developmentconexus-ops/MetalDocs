@@ -809,6 +809,19 @@ paths:
   /auth/sessions/{session_id}:
     delete:
       summary: Revoke (force-logout) a specific session. Gate CapSessionManage.
+      description: >-
+        Accepts an optional JSON body shaped like RevokeSessionRequest
+        (`{"reason": "..."}`) purely as a best-effort, audit-only hint: an
+        absent, empty, or malformed body never fails the revoke. This
+        operation deliberately declares no requestBody schema — OpenAPI's
+        validation semantics have no "validate if present, else ignore" mode,
+        so any content schema here (even non-required) would make
+        contract_validation reject a malformed or wrong-typed body before the
+        handler's own best-effort decode ever ran, contradicting this
+        contract (cold-review, PR #112 round 3: this route briefly carried a
+        requestBody with exactly that self-contradiction — see the RevokeSessionRequest
+        schema's own history in components.schemas — removed here, not
+        loosened elsewhere).
       tags: [iam]
       operationId: revokeSession
       x-authz-capability: session.manage
@@ -817,12 +830,6 @@ paths:
           in: path
           required: true
           schema: { type: string }
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RevokeSessionRequest'
       responses:
         '204':
           description: Sessao revogada
@@ -5557,6 +5564,7 @@ components:
       properties:
         session_id:
           type: string
+          format: uuid
     DocumentAutosavePresignResponse:
       type: object
       required: [upload_url, pending_upload_id, expires_at]
@@ -6217,6 +6225,9 @@ components:
         Optional best-effort reason for the revoke, recorded in the audit
         payload only. An absent, empty, or malformed body is accepted — the
         revoke proceeds with an empty reason rather than failing the request.
+        Kept here as a documentation-only type (used by the handler's own
+        manual decode); intentionally NOT wired as revokeSession's
+        requestBody — see that operation's description for why.
       properties:
         reason:
           type: string

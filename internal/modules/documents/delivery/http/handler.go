@@ -757,7 +757,7 @@ func (h *Handler) heartbeatSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.HeartbeatSession(ctx, req.SessionId, userID); err != nil {
+	if err := h.svc.HeartbeatSession(ctx, req.SessionId.String(), userID); err != nil {
 		status, msg := mapErr(err)
 		problem.Respond(w, r, problem.New(status, msg, msg.String()))
 		return
@@ -779,7 +779,7 @@ func (h *Handler) releaseSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.ReleaseSession(ctx, tenantID, req.SessionId, userID, docID); err != nil {
+	if err := h.svc.ReleaseSession(ctx, tenantID, req.SessionId.String(), userID, docID); err != nil {
 		status, msg := mapErr(err)
 		problem.Respond(w, r, problem.New(status, msg, msg.String()))
 		return
@@ -807,7 +807,7 @@ func (h *Handler) forceReleaseSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.ForceReleaseSession(ctx, tenantID, adminID, req.SessionId, docID); err != nil {
+	if err := h.svc.ForceReleaseSession(ctx, tenantID, adminID, req.SessionId.String(), docID); err != nil {
 		status, msg := mapErr(err)
 		problem.Respond(w, r, problem.New(status, msg, msg.String()))
 		return

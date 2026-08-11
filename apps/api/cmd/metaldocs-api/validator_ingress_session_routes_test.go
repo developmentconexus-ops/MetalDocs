@@ -20,17 +20,32 @@ import (
 //
 // A3.4 declared `session_id` required on DocumentSessionIdRequest (used by
 // heartbeat/release/force-release) and `value` required on
-// PutPlaceholderValueRequest. Before that, the handler read the field
-// optimistically: an absent/empty session_id reached the application layer
-// and then a Postgres `uuid`-typed column (editor_sessions.id), which
-// rejects an empty string at the driver/server level — not the friendly
-// domain error `mapErr`'s dispatch table knows how to translate, so it fell
-// through to the `default:` case (500 `internal.unknown`). Declaring the
-// field required moves that rejection into contract_validation, before the
-// handler runs: 500 becomes 400 `request.invalid`. This file proves the new
-// 400-before-handler behaviour for all four routes, plus the control case
-// (a present field still reaches the handler) so the rejection assertions
-// cannot be satisfied by a chain that rejects everything.
+// PutPlaceholderValueRequest. This file proves the new 400-before-handler
+// behaviour for all four routes, plus the control case (a present field
+// still reaches the handler) so the rejection assertions cannot be
+// satisfied by a chain that rejects everything.
+//
+// The pre-existing mechanism differs by route — see
+// api/openapi/v1/oasdiff-err-ignore.txt for the full, route-accurate
+// breakdown (cold-review correction, PR #112 round 3: an earlier version of
+// this comment wrongly generalized the session-route story to the
+// placeholder route too). Short form: for the three session routes, the
+// handler read `session_id` optimistically and an absent/empty value
+// reached a Postgres `uuid`-typed column (editor_sessions.id), which
+// rejects it at the driver/server level — not a case `mapErr`'s dispatch
+// table knew how to translate, so it fell through to `default:` (500
+// `internal.unknown`). For the placeholder route there is no uuid column in
+// this path at all: `FillInService.SetPlaceholderValue` only rejected an
+// absent `value` when the TARGET PLACEHOLDER's own `Required` flag
+// (templatesdomain.Placeholder.Required) was true, so omitting `value` on
+// an ordinary non-required placeholder used to succeed (200, empty string
+// persisted) — declaring `value` required at the contract layer is a real
+// narrowing for that specific shape, not a 500-to-400 reclassification.
+// Declaring the field required moves the session routes' rejection into
+// contract_validation, before the handler runs, turning that latent 500
+// into an honest 400 `request.invalid`; for the placeholder route it turns
+// a prior 200 into a 400 for the non-required-placeholder-omitting-value
+// case specifically.
 
 func buildSessionRoutesIngress(t *testing.T) (http.Handler, *specSpy) {
 	t.Helper()
@@ -93,17 +108,32 @@ func TestIngress_SessionRoutes_MissingSessionID_RejectedBeforeHandler(t *testing
 }
 
 func TestIngress_SessionRoutes_EmptyStringSessionID_StillReachesHandler_KnownGap(t *testing.T) {
-	// This is NOT the fix — it documents what A3.4 did not close. `required:
+	// This documents a real, narrower residual gap at THIS layer only
+	// (contract_validation) — it is no longer the whole story. `required:
 	// [session_id]` on DocumentSessionIdRequest only demands the key be
-	// present; `session_id` is `type: string` with no `minLength`, so an
-	// explicit "" still satisfies the schema and reaches the handler exactly
-	// as it did before this PR. The Postgres uuid-cast 500 this finding's
-	// analysis describes is therefore only fixed for the ABSENT-key case
-	// (see the RejectedBeforeHandler test above), not for an explicit "".
-	// Closing this too would mean adding `minLength: 1` to session_id in
-	// openapi.yaml — a real, scoped follow-up, deliberately left out of this
-	// fix round rather than folded in silently (CLAUDE.md: keep changes
-	// scoped to the request).
+	// present; `session_id` is `type: string` with `format: uuid`, but
+	// kin-openapi does not validate "uuid" as a string format unless a
+	// validator is explicitly registered for it (this repo never does —
+	// see internal/platform/openapivalidate: it auto-registers only "byte",
+	// "date", "date-time", "int32", "int64"). So an explicit "" still
+	// satisfies the schema at THIS ingress layer and reaches whatever is
+	// mounted next — which, against the stub `spy` this file uses, means
+	// "reaches the handler" in the narrow sense proven below.
+	//
+	// Against the REAL documents handler, this is no longer the last word:
+	// PR #112 round 3 (cold-review, CodeRabbit) closed the Postgres
+	// uuid-cast 500 for the empty/malformed case one layer downstream —
+	// DocumentSessionIdRequest.session_id is now oapi-codegen's
+	// openapi_types.UUID, so the real handler's own json.Decode rejects ""
+	// (and any non-UUID token) with 400 request.invalid before the service
+	// or the database is ever reached. See
+	// internal/modules/documents/delivery/http/handler_test.go's
+	// TestSessionRoutes_MalformedSessionID_RejectedByHandler for that proof.
+	// This test intentionally stays as-is: it is still true and still worth
+	// asserting that contract_validation itself has no minLength — a spec
+	// tightening there remains a real, separately-scoped follow-up (adding
+	// minLength: 1) if this ingress layer is ever meant to reject it too,
+	// independent of what the handler now does.
 	for _, route := range []string{
 		"/api/v1/documents/doc-1/session/heartbeat",
 		"/api/v1/documents/doc-1/session/release",

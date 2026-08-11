@@ -624,10 +624,17 @@ func TestCommitAutosave_NonObjectFormDataSnapshotRejected(t *testing.T) {
 // _RequiresAdmin test. The handler no longer enforces a role gate here —
 // authorization is now the tier-1 CapMembershipManage rule (proven in
 // permissions_test.go). The handler simply forwards and returns 204.
+//
+// session_id is a real UUID here (cold-review Finding, PR #112 round 3):
+// DocumentSessionIdRequest.session_id gained `format: uuid` in openapi.yaml,
+// which oapi-codegen types as openapi_types.UUID — a non-UUID string like the
+// former "sess_1" now fails json.Decode before the handler ever calls the
+// service, so this control-case test needs a decodable id to keep proving
+// the happy path.
 func TestForceReleaseSession_HandlerNoLongerRoleGates(t *testing.T) {
 	mux := newMux(t, &fakeSvc{}) // fakeCaps{admin:false} — handler does not gate
 
-	body := []byte(`{"session_id":"sess_1"}`)
+	body := []byte(`{"session_id":"cccccccc-cccc-4ccc-8ccc-000000000001"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/session/force-release", bytes.NewReader(body))
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
@@ -635,6 +642,51 @@ func TestForceReleaseSession_HandlerNoLongerRoleGates(t *testing.T) {
 	mux.ServeHTTP(rr, req)
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("expected 204, got %d body=%s", rr.Code, rr.Body.String())
+	}
+}
+
+// TestSessionRoutes_MalformedSessionID_RejectedByHandler proves the actual
+// fix for cold-review Finding threads on PR #112 round 3 (CodeRabbit: "session_id
+// should be format: uuid, else an invalid id reaches the database and
+// produces an internal error"; CodeRabbit separately: "an empty session_id
+// currently reaches the handler and 500s"). DocumentSessionIdRequest.session_id
+// is now openapi_types.UUID; any string that fails uuid.Parse — including ""
+// and a non-UUID token — fails json.Decode in the handler itself and returns
+// 400 request.invalid before the service (and therefore the database) is ever
+// called. This closes the empty-string gap that
+// apps/api/cmd/metaldocs-api/validator_ingress_session_routes_test.go's
+// TestIngress_SessionRoutes_EmptyStringSessionID_StillReachesHandler_KnownGap
+// documents at the contract_validation layer (that layer still has no
+// minLength and is unchanged by this fix — the rejection now happens one
+// layer downstream, in the real handler's own decode, which is what actually
+// stood between the client and the Postgres uuid-column 500 the finding
+// described).
+func TestSessionRoutes_MalformedSessionID_RejectedByHandler(t *testing.T) {
+	routes := []string{
+		"/api/v1/documents/11111111-1111-4111-8111-111111111111/session/heartbeat",
+		"/api/v1/documents/11111111-1111-4111-8111-111111111111/session/release",
+		"/api/v1/documents/11111111-1111-4111-8111-111111111111/session/force-release",
+	}
+	bodies := map[string]string{
+		"empty string":    `{"session_id":""}`,
+		"non-uuid string": `{"session_id":"sess_1"}`,
+	}
+	for _, route := range routes {
+		for name, body := range bodies {
+			t.Run(route+"/"+name, func(t *testing.T) {
+				svc := &fakeSvc{}
+				mux := newMux(t, svc)
+				req := httptest.NewRequest(http.MethodPost, route, bytes.NewReader([]byte(body)))
+				req.SetPathValue("id", "11111111-1111-4111-8111-111111111111")
+				withAuthHeaders(req, "editor")
+				rr := httptest.NewRecorder()
+
+				mux.ServeHTTP(rr, req)
+				if rr.Code != http.StatusBadRequest {
+					t.Fatalf("expected 400, got %d body=%s", rr.Code, rr.Body.String())
+				}
+			})
+		}
 	}
 }
 
