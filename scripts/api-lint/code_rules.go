@@ -61,14 +61,24 @@ func RunCodeRules(specPath, modulesRoot string, strict bool) ([]Violation, error
 	}
 	out = append(out, codec...)
 
-	// ADR 0022 — authz.Require must run in a read-WRITE tx (the F8 bypass audit
-	// INSERTs). This was previously enforced by checkAuthzRequireRWTx, an
-	// AST guard that flagged a DoReadOnly closure calling authz.Require.
-	// DoReadOnly was DELETED in A5.2 (Lane E, issue #92) — TxRunner now has
-	// only Do, so the call shape the guard detected can no longer be
-	// written. The rule is retired alongside it (unrepresentable beats
-	// merely-checked); see internal/platform/db/runner.go's TxRunner doc for
-	// the full reasoning record.
+	// ADR 0022 / H-PRE-1 — NO-READONLY-TX-OPTIONS: sql.TxOptions{ReadOnly:
+	// true} is banned outright outside test code. Replaces
+	// checkAuthzRequireRWTx (retired alongside DoReadOnly in A5.2, Lane E
+	// issue #92): that guard flagged one *consequence* of a read-only tx
+	// (a DoReadOnly closure invoking authz.Require, whose F8 bypass audit
+	// INSERT a read-only tx rejects — ADR 0022 Phase 11). TxRunner has no
+	// read-only variant anymore, so the remaining risk is a caller reaching
+	// past TxRunner for a raw db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true}).
+	// Banning the construct itself, not one call shape built from it, is
+	// strictly stronger (unrepresentable beats merely-checked) and stays
+	// honest for the whole window until A5.1's later ban on raw .BeginTx(
+	// outside internal/platform/db/ makes tx-opening itself unrepresentable.
+	// See checkNoReadOnlyTxOptions's doc below for the full reasoning record.
+	noReadOnlyTx, err := checkNoReadOnlyTxOptions(modulesRoot, fset)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, noReadOnlyTx...)
 
 	// M2 F2.1 (validation-contract.md §1.5) — TRIPWIRE-ARM-PARITY: TripwireArms
 	// caps must be registry-real and RenderMigration() must byte-equal the
@@ -208,6 +218,83 @@ func checkPaginationCodec(modulesRoot string, fset *token.FileSet) ([]Violation,
 				Rule:    "pagination-codec",
 				Message: "base64.StdEncoding outside internal/platform/pagination/cursor.go — keyset cursors must use the shared URL-safe codec (pagination.EncodeCursor/DecodeCursor); StdEncoding is query-string-fragile (Family 2 · B2)",
 			})
+			return true
+		})
+		return nil
+	})
+	if walkErr != nil {
+		return nil, walkErr
+	}
+	return out, nil
+}
+
+// checkNoReadOnlyTxOptions flags any sql.TxOptions{ReadOnly: true} composite
+// literal outside test code — addressed (&sql.TxOptions{...}) or not, field
+// order irrelevant. TxRunner.Do (internal/platform/db/runner.go) is the sole
+// production tx-opening chokepoint and has no read-only variant since
+// DoReadOnly was deleted (A5.2, Lane E issue #92); a hand-rolled read-only tx
+// bypasses that chokepoint AND reintroduces the exact failure mode DoReadOnly
+// used to enable: authz.Require's system_admin/BypassSystem short-circuit
+// audits the bypass in-tx with an INSERT (ADR 0022 Phase 11, H-PRE-1), which
+// Postgres rejects inside a READ ONLY transaction. Banning the literal
+// construct is unconditional — it does not need to trace a call graph to
+// authz.Require the way the retired checkAuthzRequireRWTx did, so it also
+// catches a future read-only tx that never touches authz.Require but still
+// bypasses the chokepoint. Fix is always TxRunner.Do (or, until A5.1's
+// BeginTx-outside-runner.go ban lands, BeginTx(ctx, nil)).
+func checkNoReadOnlyTxOptions(modulesRoot string, fset *token.FileSet) ([]Violation, error) {
+	out := []Violation{}
+	walkErr := filepath.WalkDir(modulesRoot, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			switch d.Name() {
+			case ".git", ".claude", "node_modules", "vendor", "testdata":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		lower := strings.ToLower(path)
+		if !strings.HasSuffix(lower, ".go") || strings.HasSuffix(lower, "_test.go") || strings.HasSuffix(lower, ".gen.go") {
+			return nil
+		}
+		file, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
+		if err != nil {
+			return err
+		}
+		ast.Inspect(file, func(n ast.Node) bool {
+			lit, ok := n.(*ast.CompositeLit)
+			if !ok {
+				return true
+			}
+			sel, ok := lit.Type.(*ast.SelectorExpr)
+			if !ok || sel.Sel.Name != "TxOptions" {
+				return true
+			}
+			if x, ok := sel.X.(*ast.Ident); !ok || x.Name != "sql" {
+				return true
+			}
+			for _, elt := range lit.Elts {
+				kv, ok := elt.(*ast.KeyValueExpr)
+				if !ok {
+					continue
+				}
+				key, ok := kv.Key.(*ast.Ident)
+				if !ok || key.Name != "ReadOnly" {
+					continue
+				}
+				val, ok := kv.Value.(*ast.Ident)
+				if !ok || val.Name != "true" {
+					continue
+				}
+				out = append(out, Violation{
+					File:    path,
+					Line:    fset.Position(lit.Pos()).Line,
+					Rule:    "no-readonly-tx-options",
+					Message: "sql.TxOptions{ReadOnly: true} is banned outside test code — TxRunner has no read-only variant (DoReadOnly deleted A5.2, issue #92); a raw read-only tx rejects authz.Require's F8 bypass audit INSERT (ADR 0022 Phase 11, H-PRE-1). Open the tx with TxRunner.Do instead.",
+				})
+			}
 			return true
 		})
 		return nil
