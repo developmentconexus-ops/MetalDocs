@@ -20,8 +20,10 @@ import (
 // canonical CapDocumentEdit — identical grant set, same area-grade enforcement.
 func requireDocEditDraft(ctx context.Context, runner db.TxRunner, cdRead controlleddocumentsdomain.CDFieldReader, tenantID, actorID, docID string) error {
 	// Read-write tx is the canonical contract for any authz.Require path: the
-	// F8 bypass audit may INSERT (ADR 0022 Phase 11), so DoReadOnly is forbidden
-	// here — see the Require INVARIANT note in iam/authz/authz.go.
+	// F8 bypass audit may INSERT (ADR 0022 Phase 11), so this runs via Do —
+	// TxRunner no longer offers a read-only variant to reach for by mistake
+	// (DoReadOnly deleted, A5.2 / Lane E issue #92) — see the Require
+	// INVARIANT note in iam/authz/authz.go.
 	ctx = authz.WithCapCache(ctx)
 	return runner.Do(ctx, func(tx *sql.Tx) error {
 		// document.edit is area-grade: pass the resolved area as-is. A missing document

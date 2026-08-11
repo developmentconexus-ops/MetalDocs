@@ -12,7 +12,7 @@ import (
 // AuthzCtx builds a context carrying the tenant+actor identity the TxRunner
 // chokepoint (internal/platform/db/runner.go seedTxIdentityFromContext)
 // auto-seeds into the metaldocs.tenant_id / metaldocs.actor_id GUCs on every
-// Do/DoReadOnly. Integration tests that drive a service-under-test through a
+// Do call. Integration tests that drive a service-under-test through a
 // TxRunner-backed call MUST pass a context built with this helper (or an
 // equivalent seeded ctx) — an unseeded context.Background() or a context
 // carrying the wrong key pair (e.g. iamdomain.WithAuthContext) leaves the

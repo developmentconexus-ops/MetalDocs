@@ -20,17 +20,20 @@ import (
 // is the application layer's dependency on the *sql.DB pool and its ownership of
 // commit/rollback — those now live in infrastructure, and a service can no
 // longer leak a transaction or forget to commit.
+//
+// DoReadOnly (a READ ONLY *sql.Tx variant for pure-read paths) was deleted in
+// A5.2 (Lane E, issue #92): every production call site either needed the
+// read-write path already (authz.Require's F8 bypass audit INSERTs reject a
+// READ ONLY tx — ADR 0022 Phase 11, H-PRE-1) or gained nothing from the
+// write-guard. G1 (commit 817abd59) had already migrated every caller that
+// mixed DoReadOnly with authz.Require onto Do; this makes that class of bug
+// unrepresentable instead of merely lint-guarded (scripts/api-lint's
+// checkAuthzRequireRWTx guard is deleted alongside it — the call it detected
+// can no longer be written). If a genuine pure-read, non-authz path wants a
+// write-guard again, reintroduce it deliberately with the same MUST-NOT-mix
+// docs, not by reverting this comment.
 type TxRunner interface {
 	Do(ctx context.Context, fn func(tx *sql.Tx) error) error
-	// DoReadOnly begins a READ ONLY transaction for pure read paths. The flag is
-	// a write-guard that documents intent and prevents accidental DML.
-	//
-	// MUST NOT be used for any path that calls authz.Require: the F8 bypass audit
-	// INSERTs on the system_admin/bypass short-circuit (ADR 0022 Phase 11), which
-	// a READ ONLY tx rejects. authz.Require enforces this with a read-only-tx
-	// guard (authz.ErrReadOnlyTx). SeedTxIdentity's SET LOCAL GUCs are RO-safe,
-	// but the Require grant path is not — use Do for authz-gated reads.
-	DoReadOnly(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
 // sqlTxRunner is the production TxRunner backed by *sql.DB.
@@ -47,8 +50,12 @@ func NewTxRunner(database *sql.DB) TxRunner {
 	return &sqlTxRunner{db: database}
 }
 
-// do is the shared implementation for Do and DoReadOnly. opts is passed directly
-// to BeginTx; nil opts produce a default (read-write) transaction.
+// do is the shared implementation behind Do. opts is passed directly to
+// BeginTx; today Do always passes nil (default read-write transaction). The
+// opts parameter stays (rather than being inlined away) because it is the
+// seam a future genuine read-only path would reuse — see the TxRunner
+// interface doc for why DoReadOnly itself was deleted, not just its callers
+// migrated.
 func (r *sqlTxRunner) do(ctx context.Context, opts *sql.TxOptions, fn func(tx *sql.Tx) error) (err error) {
 	tx, beginErr := r.db.BeginTx(ctx, opts)
 	if beginErr != nil {
@@ -129,9 +136,3 @@ func (r *sqlTxRunner) Do(ctx context.Context, fn func(tx *sql.Tx) error) error {
 	return r.do(ctx, nil, fn)
 }
 
-// DoReadOnly begins a READ ONLY transaction, runs fn, and finalizes it. A non-nil
-// fn error rolls back and is returned unwrapped so callers retain errors.Is/As on
-// domain sentinels. A panic inside fn rolls back and re-panics.
-func (r *sqlTxRunner) DoReadOnly(ctx context.Context, fn func(tx *sql.Tx) error) error {
-	return r.do(ctx, &sql.TxOptions{ReadOnly: true}, fn)
-}

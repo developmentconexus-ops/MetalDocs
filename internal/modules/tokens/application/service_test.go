@@ -14,8 +14,7 @@ import (
 
 type fakeRunner struct{}
 
-func (fakeRunner) Do(ctx context.Context, fn func(tx *sql.Tx) error) error         { return fn(nil) }
-func (fakeRunner) DoReadOnly(ctx context.Context, fn func(tx *sql.Tx) error) error { return fn(nil) }
+func (fakeRunner) Do(ctx context.Context, fn func(tx *sql.Tx) error) error { return fn(nil) }
 
 type fakeAudit struct{ called bool }
 

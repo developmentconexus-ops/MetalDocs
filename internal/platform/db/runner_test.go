@@ -43,7 +43,6 @@ type runnerFakeConn struct {
 	commitErr  error
 	committed  bool
 	rolledBack bool
-	readOnly   bool
 	execs      []recordedExec
 	execResult driver.Result
 	execErr    error
@@ -73,14 +72,11 @@ func (c *runnerFakeConn) ExecContext(_ context.Context, query string, args []dri
 }
 
 // BeginTx satisfies driver.ConnBeginTx so database/sql routes BeginTx calls
-// through here rather than falling back to Begin. This allows DoReadOnly's
-// ReadOnly flag to be observed and prevents the "driver does not support
-// read-only transactions" error that would otherwise occur.
+// through here rather than falling back to Begin.
 func (c *runnerFakeConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
 	if c.beginErr != nil {
 		return nil, c.beginErr
 	}
-	c.readOnly = opts.ReadOnly
 	return &runnerFakeTx{conn: c}, nil
 }
 
@@ -167,27 +163,6 @@ func TestDoRePanicsAndRollsBack(t *testing.T) {
 	_ = runner.Do(context.Background(), func(*sql.Tx) error { panic("boom") })
 }
 
-func TestDoReadOnlyRePanicsAndRollsBack(t *testing.T) {
-	conn := &runnerFakeConn{}
-	runner := db.NewTxRunner(openRunnerFakeDB(t, conn))
-
-	defer func() {
-		if recover() == nil {
-			t.Fatal("expected re-panic")
-		}
-		if !conn.rolledBack {
-			t.Fatal("expected rollback on panic")
-		}
-		if conn.committed {
-			t.Fatal("unexpected commit on panic")
-		}
-		if !conn.readOnly {
-			t.Fatal("expected read-only begin")
-		}
-	}()
-	_ = runner.DoReadOnly(context.Background(), func(*sql.Tx) error { panic("boom") })
-}
-
 func TestDoWrapsBeginError(t *testing.T) {
 	beginErr := errors.New("begin failed")
 	conn := &runnerFakeConn{beginErr: beginErr}
@@ -220,47 +195,11 @@ func TestDoWrapsCommitError(t *testing.T) {
 	}
 }
 
-func TestDoReadOnlyCommitsOnSuccessAndSetsReadOnly(t *testing.T) {
-	conn := &runnerFakeConn{}
-	runner := db.NewTxRunner(openRunnerFakeDB(t, conn))
-
-	err := runner.DoReadOnly(context.Background(), func(*sql.Tx) error { return nil })
-	if err != nil {
-		t.Fatalf("DoReadOnly returned error: %v", err)
-	}
-	if !conn.committed {
-		t.Fatal("expected commit")
-	}
-	if conn.rolledBack {
-		t.Fatal("unexpected rollback on success")
-	}
-	if !conn.readOnly {
-		t.Fatal("expected ReadOnly=true on the transaction options")
-	}
-}
-
-func TestDoReadOnlyRollsBackAndReturnsErrUnwrapped(t *testing.T) {
-	conn := &runnerFakeConn{}
-	runner := db.NewTxRunner(openRunnerFakeDB(t, conn))
-
-	sentinel := errors.New("read-only domain failure")
-	err := runner.DoReadOnly(context.Background(), func(*sql.Tx) error { return sentinel })
-	if !errors.Is(err, sentinel) {
-		t.Fatalf("expected sentinel returned unwrapped, got %v", err)
-	}
-	if !conn.rolledBack {
-		t.Fatal("expected rollback on fn error")
-	}
-	if conn.committed {
-		t.Fatal("unexpected commit on fn error")
-	}
-}
-
 // ---------------------------------------------------------------------------
 // F3.1 T3 — PG-1 positive behavior proof: the chokepoint auto-seeds
 // metaldocs.tenant_id + metaldocs.actor_id (tx-local set_config) when BOTH
 // are present in ctx, and is a no-op (no seed statement) when either is
-// absent. Applies to both Do and DoReadOnly.
+// absent.
 // ---------------------------------------------------------------------------
 
 func identityCtx(tenantID, actorID string) context.Context {
@@ -323,20 +262,6 @@ func TestDo_SeedsIdentity_WhenBothTenantAndActorPresent(t *testing.T) {
 	}
 }
 
-func TestDoReadOnly_SeedsIdentity_WhenBothTenantAndActorPresent(t *testing.T) {
-	conn := &runnerFakeConn{}
-	runner := db.NewTxRunner(openRunnerFakeDB(t, conn))
-
-	ctx := identityCtx("tenant-ro", "actor-ro")
-	err := runner.DoReadOnly(ctx, func(*sql.Tx) error { return nil })
-	if err != nil {
-		t.Fatalf("DoReadOnly returned error: %v", err)
-	}
-	if got := seedExecCount(conn); got != 1 {
-		t.Fatalf("expected exactly 1 seed exec on DoReadOnly, got %d (execs=%+v)", got, conn.execs)
-	}
-}
-
 func TestDo_NoSeed_WhenIdentityAbsent(t *testing.T) {
 	conn := &runnerFakeConn{}
 	runner := db.NewTxRunner(openRunnerFakeDB(t, conn))
@@ -375,18 +300,5 @@ func TestDo_NoSeed_WhenOnlyActorPresent(t *testing.T) {
 	}
 	if got := seedExecCount(conn); got != 0 {
 		t.Fatalf("expected no seed exec when tenant absent, got %d", got)
-	}
-}
-
-func TestDoReadOnly_NoSeed_WhenIdentityAbsent(t *testing.T) {
-	conn := &runnerFakeConn{}
-	runner := db.NewTxRunner(openRunnerFakeDB(t, conn))
-
-	err := runner.DoReadOnly(context.Background(), func(*sql.Tx) error { return nil })
-	if err != nil {
-		t.Fatalf("DoReadOnly returned error: %v", err)
-	}
-	if got := seedExecCount(conn); got != 0 {
-		t.Fatalf("expected no seed exec for identity-less ctx on DoReadOnly, got %d", got)
 	}
 }

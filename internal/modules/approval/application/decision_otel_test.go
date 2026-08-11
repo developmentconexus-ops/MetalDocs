@@ -140,9 +140,6 @@ type stubDecisionTxRunner struct{}
 func (stubDecisionTxRunner) Do(ctx context.Context, fn func(tx *sql.Tx) error) error {
 	return fn(nil)
 }
-func (stubDecisionTxRunner) DoReadOnly(ctx context.Context, fn func(tx *sql.Tx) error) error {
-	return fn(nil)
-}
 
 // stubEventEmitter satisfies application.EventEmitter.
 type stubEventEmitter struct{}
