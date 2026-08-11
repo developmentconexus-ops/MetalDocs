@@ -213,14 +213,7 @@ func requestIdentity(w http.ResponseWriter, r *http.Request) (tenantID, actorID 
 // live on *Handler, so an explicit name keeps the two call paths unambiguous).
 func (h *Handler) idempotentHandler(routeTemplate string, next http.Handler) http.Handler {
 	store := idempotency.New(h.db, routeTemplate)
-	return idempotency.Require(store, func(ctx context.Context) (string, string, error) {
-		tenantID, _ := tenant.FromContext(ctx)
-		actorID, err := authn.RequireUserID(ctx)
-		if err != nil {
-			return "", "", err
-		}
-		return tenantID, actorID, nil
-	})(next)
+	return idempotency.Require(store, idempotency.TenantActorFromContext)(next)
 }
 
 // parseIfMatch parses the If-Match OCC precondition for handlers acting on an

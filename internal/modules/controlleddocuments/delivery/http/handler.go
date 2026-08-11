@@ -18,13 +18,10 @@ import (
 	"metaldocs/internal/modules/controlleddocuments/application"
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/platform/apibase"
-	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
-
-type tenantContextKey struct{}
 
 type controlledDocumentService interface {
 	Create(ctx context.Context, cmd application.CreateControlledDocumentCmd) (*application.CreateResult, error)
@@ -43,7 +40,6 @@ type controlledDocumentService interface {
 // controlleddocumentsapi response types.
 type Handler struct {
 	svc            controlledDocumentService
-	db             *sql.DB
 	idempCreate    *idempotency.Store
 	idempRevision  *idempotency.Store
 	idempObsolete  *idempotency.Store
@@ -52,11 +48,15 @@ type Handler struct {
 
 // NewHandler builds a Handler backed by svc, with dedicated idempotency
 // stores for each mutating route (each keyed by its own route string, so a
-// replay of one route can never collide with another).
+// replay of one route can never collide with another). db is used only to
+// construct those four stores (#90/A3.5 drive-by: the Handler used to also
+// keep db on the struct, unread after construction — dead weight predating
+// this change, deleted here rather than left for a future audit to
+// rediscover) — TenantActorFromContext (identity.go) resolves tenant/actor
+// from context, not from a handle threaded through Handler.
 func NewHandler(svc *application.ControlledDocumentService, db *sql.DB) *Handler {
 	return &Handler{
 		svc:            svc,
-		db:             db,
 		idempCreate:    idempotency.New(db, "POST /api/v1/controlled-documents"),
 		idempRevision:  idempotency.New(db, "POST /api/v1/controlled-documents/{id}/revisions"),
 		idempObsolete:  idempotency.New(db, "PUT /api/v1/controlled-documents/{id}/obsolete"),
@@ -64,26 +64,23 @@ func NewHandler(svc *application.ControlledDocumentService, db *sql.DB) *Handler
 	}
 }
 
-// injectTenant is a thin middleware that reads the tenant from context (set by
-// auth middleware) and re-stores it under a local key so the idempotency actor
-// closure can access it without a reference to the *http.Request.
+// injectTenant is a thin middleware that fails closed (500) if the tenant
+// claim is absent from context before any mutating route runs. It used to
+// also re-store the tenant under a local context key so the (now-deleted)
+// idempotencyActor closure could read it without a *http.Request — that
+// indirection is gone (#90/A3.5): idempotency.TenantActorFromContext reads
+// tenant.FromContext(ctx) directly, and the context this middleware passes
+// through is unmodified, so it sees the same claim injectTenant already
+// validated. injectTenant itself stays, unchanged in behavior, as the
+// pre-existing fail-closed guard for this module's four mutating routes.
 func injectTenant(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tid, err := tenant.FromContext(r.Context())
-		if err != nil {
+		if _, err := tenant.FromContext(r.Context()); err != nil {
 			problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
 			return
 		}
-		ctx := context.WithValue(r.Context(), tenantContextKey{}, tid)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		next.ServeHTTP(w, r)
 	})
-}
-
-func tenantIDFromContext(ctx context.Context) string {
-	if v, ok := ctx.Value(tenantContextKey{}).(string); ok && v != "" {
-		return v
-	}
-	return tenant.DevTenantID
 }
 
 // Name identifies this publisher in boot assertion messages.
@@ -107,26 +104,6 @@ func matchesControlledDocumentSubPath(path, suffix string) bool {
 		path[len(path)-len(suffix):] == suffix
 }
 
-// idempotencyActor resolves the (tenant, actor) pair the platform idempotency
-// middleware scopes a replay record by.
-//
-// A3.3: "broader-but-still-safe" was wrong — a blank actor is a key SHARED by
-// every unauthenticated caller, not a wider one, so the replay slot was
-// cross-caller. Absence now fails the middleware before a claim is written; the
-// mutation handler's own fail-closed check (writeDomainError) stays as the
-// second line.
-//
-// It lives at package scope rather than inside Mount so the fail-closed branch
-// does not count against Mount's cognitive complexity, which already sits at
-// the ceiling from the route dispatch below.
-func idempotencyActor(ctx context.Context) (string, string, error) {
-	userID, err := authn.RequireUserID(ctx)
-	if err != nil {
-		return "", "", err
-	}
-	return tenantIDFromContext(ctx), userID, nil
-}
-
 // Mount mounts the generated controlled-documents API surface
 // onto mux under /api/v1, wrapping the two mutating POST routes with
 // Idempotency-Key enforcement.
@@ -134,11 +111,11 @@ func (h *Handler) Mount(mux httprouter.Muxer) {
 	middleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPost && r.URL.Path == "/api/v1/controlled-documents" {
-				injectTenant(idempotency.Require(h.idempCreate, idempotencyActor)(next)).ServeHTTP(w, r)
+				injectTenant(idempotency.Require(h.idempCreate, idempotency.TenantActorFromContext)(next)).ServeHTTP(w, r)
 				return
 			}
 			if r.Method == http.MethodPost && matchesControlledDocumentSubPath(r.URL.Path, "/revisions") {
-				injectTenant(idempotency.Require(h.idempRevision, idempotencyActor)(next)).ServeHTTP(w, r)
+				injectTenant(idempotency.Require(h.idempRevision, idempotency.TenantActorFromContext)(next)).ServeHTTP(w, r)
 				return
 			}
 			// CON-06(b): obsolete/supersede are PUT lifecycle routes whose
@@ -148,11 +125,11 @@ func (h *Handler) Mount(mux httprouter.Muxer) {
 			// succeeded request must replay the original 204, not surface that
 			// 409 as if the retry itself were invalid.
 			if r.Method == http.MethodPut && matchesControlledDocumentSubPath(r.URL.Path, "/obsolete") {
-				injectTenant(idempotency.Require(h.idempObsolete, idempotencyActor)(next)).ServeHTTP(w, r)
+				injectTenant(idempotency.Require(h.idempObsolete, idempotency.TenantActorFromContext)(next)).ServeHTTP(w, r)
 				return
 			}
 			if r.Method == http.MethodPut && matchesControlledDocumentSubPath(r.URL.Path, "/supersede") {
-				injectTenant(idempotency.Require(h.idempSupersede, idempotencyActor)(next)).ServeHTTP(w, r)
+				injectTenant(idempotency.Require(h.idempSupersede, idempotency.TenantActorFromContext)(next)).ServeHTTP(w, r)
 				return
 			}
 			next.ServeHTTP(w, r)
