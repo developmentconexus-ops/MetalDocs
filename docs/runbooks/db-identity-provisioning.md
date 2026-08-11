@@ -112,12 +112,22 @@ launching `metaldocs-api.exe`, temporarily swapping `PGUSER`/`PGPASSWORD` to
 the bootstrap superuser (`POSTGRES_USER`/`POSTGRES_PASSWORD`) for that one
 step only, then restoring the runtime credentials for the app binary itself.
 
-Manual/ad-hoc invocation (e.g. an environment without compose):
+Manual/ad-hoc invocation (e.g. an environment without compose): restore the
+runtime credentials afterward, the same way `scripts/start-api.ps1` does.
+`$env:` assignments in PowerShell are process-scoped, not block-scoped, so
+skipping the restore leaves the bootstrap superuser's credentials active in
+the current shell — if an application binary is then started in that same
+shell, `AssertSafeIdentity` rejects the bootstrap role and the service does
+not start.
 
-```
+```powershell
+$prevPGUser = $env:PGUSER
+$prevPGPassword = $env:PGPASSWORD
 $env:PGUSER = $env:POSTGRES_USER
 $env:PGPASSWORD = $env:POSTGRES_PASSWORD
 ./metaldocs-dbprovision.exe
+$env:PGUSER = $prevPGUser
+$env:PGPASSWORD = $prevPGPassword
 ```
 
 ## Verification
@@ -126,13 +136,23 @@ Role attributes and ownership are the load-bearing facts — confirm them with
 plain SQL against the target database:
 
 ```sql
-SELECT rolname, rolsuper, rolbypassrls, rolcreaterole, rolcreatedb, rolcanlogin
+SELECT rolname, rolsuper, rolbypassrls, rolcreaterole, rolcreatedb, rolcanlogin, rolinherit
 FROM pg_roles WHERE rolname IN ('metaldocs_owner', 'metaldocs_runtime');
--- metaldocs_owner:   f, f, f, f, f (NOLOGIN)
--- metaldocs_runtime: f, f, f, f, t
+-- metaldocs_owner:   f, f, f, f, f (NOLOGIN), f (NOINHERIT)
+-- metaldocs_runtime: f, f, f, f, t,           f (NOINHERIT)
 
-SELECT tableowner, count(*) FROM pg_tables WHERE schemaname = 'metaldocs' GROUP BY tableowner;
+-- Check every schema this deployment actually uses, not just metaldocs:
+-- public and metaldocs always; also whatever METALDOCS_JOBS_RIVER_SCHEMA
+-- names, if it is set to something other than "" / "public".
+SELECT tableowner, count(*)
+FROM pg_tables WHERE schemaname IN ('metaldocs', 'public')
+GROUP BY tableowner;
 -- must show metaldocs_owner only; metaldocs_runtime must never appear here
+
+SELECT nspname, nspowner::regrole
+FROM pg_namespace WHERE nspname IN ('metaldocs', 'public');
+-- both owned by metaldocs_owner; add the configured River schema name to the
+-- IN (...) list above if METALDOCS_JOBS_RIVER_SCHEMA names a custom schema
 ```
 
 Boot logs: `metaldocs-dbprovision` logs each grants-stage file and each
