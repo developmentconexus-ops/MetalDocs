@@ -3,7 +3,9 @@
 **Files:** `deploy/compose/docker-compose.yml` (`worker`/`jobs` service
 `healthcheck:` blocks), `apps/worker/cmd/metaldocs-worker/infraserver.go`,
 `apps/jobs/cmd/metaldocs-jobs/infraserver.go`,
-`internal/platform/observability/infraserver.go`
+`internal/platform/observability/infraserver.go`,
+`internal/platform/config/worker.go` (the second, independently-maintained
+reading of "is `METALDOCS_WORKER_RUN_ONCE` truthy" — see the caveat below)
 **Owner:** on-call (whoever is triaging `docker compose ps` showing
 `worker`/`jobs` as `unhealthy`, or a deploy tool stuck waiting on their
 health state)
@@ -33,15 +35,37 @@ The `worker` service's healthcheck (`docker-compose.yml`, `worker.healthcheck.
 test`) special-cases `METALDOCS_WORKER_RUN_ONCE` (same env var already wired
 into the service's `environment:` block, read at container-runtime by the
 healthcheck's shell command — no compose-level `depends_on`/ordering
-changes): when it's `true`/`1` (matching `config.LoadWorkerConfig`'s own
-truthy check), the healthcheck is a deliberate no-op pass instead of probing
-`/live`. Reason: `apps/worker/cmd/metaldocs-worker/main.go` never starts the
-infra-port listener in `RunOnce` mode at all — "a one-shot batch invocation
-exits within this call; there is no persistent process for an orchestrator
-to probe" — so a plain `/live` probe would be structurally unsatisfiable for
-that mode's entire container lifetime and misreport a correctly-behaving
-batch worker as unhealthy. Continuous mode (the default — `false`/unset) is
-unaffected and still gets the real probe.
+changes): when it's truthy, the healthcheck is a deliberate no-op pass
+instead of probing `/live`. Reason: `apps/worker/cmd/metaldocs-worker/main.go`
+never starts the infra-port listener in `RunOnce` mode at all — "a one-shot
+batch invocation exits within this call; there is no persistent process for
+an orchestrator to probe" — so a plain `/live` probe would be structurally
+unsatisfiable for that mode's entire container lifetime and misreport a
+correctly-behaving batch worker as unhealthy. Continuous mode (the default —
+`false`/unset) is unaffected and still gets the real probe.
+
+**"Truthy" is defined twice, and the two definitions are only proven to
+agree, not structurally identical (F9, review round 4).** The shell `case`
+guard in the healthcheck and `config.LoadWorkerConfig`'s Go truthy check
+(`internal/platform/config/worker.go`) are independently-maintained readings
+of the same rule — a hand-synced enumeration. They have been cross-checked
+value-by-value (Go's `TrimSpace`+`EqualFold("true")`/`"1"` vs. the shell's
+POSIX trim + `case [Tt][Rr][Uu][Ee]|1`, the shell side run under both `dash`
+and busybox `ash` — the actual interpreter Docker's `CMD-SHELL` invokes —
+not just `bash`) and agree on every value tested, including
+leading/trailing-whitespace-padded ones (`" true"`, `"true "`, `" true "`,
+`"1 "`, `" 1"`, tab-padded, `"TRUE1"`, `"1true"`, empty, and all-case
+variants of `true`/`false`). Before the F9 fix the shell guard did not trim,
+so it silently disagreed with Go on padded input — the failure direction was
+safe (falls through to the real `/live` probe, which fails closed as
+"unhealthy" rather than false-reporting "healthy" for a batch-mode container
+Go itself considers correctly configured), but it was a real divergence, not
+a merely theoretical one. Do not re-introduce that gap by editing one side
+without re-running the parity check against the other — the compose comment
+above the `test:` line explains why deletion (removing this second reading
+entirely) was investigated and rejected for this slice: the worker's
+infra-port listener isn't started in batch mode at all, so there's no
+process for the shell to ask instead of parsing the env var itself.
 
 If you are running the `worker` service in batch mode and want an actual
 per-run success/failure signal, use the container's own exit code (`0` =
