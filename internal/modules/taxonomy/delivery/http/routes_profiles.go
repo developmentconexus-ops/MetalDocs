@@ -384,37 +384,92 @@ func editableByRoleMessage() string {
 	return "editable_by_role must be one of: " + strings.Join(codes, ", ")
 }
 
-func (h *Handler) writeProfileError(w http.ResponseWriter, r *http.Request, err error) {
-	var pgErr *pgconn.PgError
-	switch {
+// profileErrorMapping is one entry of profileErrorMappings: a predicate over
+// err plus the response it writes when matched. Same ordered-dispatch-table
+// shape as approval/http/errors.go's errorMapping (that module hit the same
+// gocyclo ceiling first) — an ordered slice, evaluated top to bottom, first
+// match wins. Unlike approval's table this one carries a `respond` closure
+// instead of a bare (status, code) pair, because writeProfileError's cases
+// each construct their problem body differently (distinct messages, and one
+// entry uses problem.NewFor instead of problem.New) rather than sharing one
+// title-formatting call site.
+type profileErrorMapping struct {
+	match   func(err error) bool
+	respond func(w http.ResponseWriter, r *http.Request)
+}
+
+// matchIs reports errors.Is(err, target) — the single-sentinel counterpart of
+// a `case errors.Is(err, X):` clause.
+func matchIs(target error) func(error) bool {
+	return func(err error) bool {
+		return errors.Is(err, target)
+	}
+}
+
+// profileErrorMappings is the ordered dispatch table writeProfileError
+// evaluates top to bottom, taking the first match. Entries are transcribed in
+// their original case-clause order and must not be reordered. The three
+// pgconn.PgError-code cases that followed this chain in the original switch
+// are NOT plain errors.Is predicates (each is errors.As plus an extra
+// pgErr.Code == "..." condition), so per the same convention used elsewhere
+// in this repo for non-sentinel cases, they stay as an explicit if-chain in
+// writeProfileError below, positioned immediately after this table so
+// first-match-wins order is unchanged from the original switch.
+var profileErrorMappings = []profileErrorMapping{
 	// A3.3 (review round 1, finding 1): ProfileService's mutating methods
 	// resolve the actor before any mutation work (T1) and return
 	// authn.ErrMissingActor when the request context carries none. That is
 	// the platform's 401 + auth.unauthenticated, not a taxonomy dialect.
-	case errors.Is(err, authn.ErrMissingActor):
+	{matchIs(authn.ErrMissingActor), func(w http.ResponseWriter, r *http.Request) {
 		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
-	case errors.Is(err, domain.ErrProfileNotFound):
+	}},
+	{matchIs(domain.ErrProfileNotFound), func(w http.ResponseWriter, r *http.Request) {
 		problem.Respond(w, r, problem.New(http.StatusNotFound, codeTaxProfileNotFound, "profile not found"))
-	case errors.Is(err, domain.ErrProfileArchived):
+	}},
+	{matchIs(domain.ErrProfileArchived), func(w http.ResponseWriter, r *http.Request) {
 		problem.Respond(w, r, problem.New(http.StatusConflict, codeTaxProfileArchived, "profile is archived"))
-	case errors.Is(err, domain.ErrTemplateNotPublished):
+	}},
+	{matchIs(domain.ErrTemplateNotPublished), func(w http.ResponseWriter, r *http.Request) {
 		problem.Respond(w, r, problem.New(http.StatusConflict, codeTaxTemplateNotPublished, "template version is not published"))
-	case errors.Is(err, domain.ErrTemplateProfileMismatch):
-		// R-22: 409 -> 422, bound to validation.template_profile_mismatch.
+	}},
+	// R-22: 409 -> 422, bound to validation.template_profile_mismatch.
+	{matchIs(domain.ErrTemplateProfileMismatch), func(w http.ResponseWriter, r *http.Request) {
 		problem.Respond(w, r, problem.New(http.StatusUnprocessableEntity, codeTaxTemplateProfileMismatch, "template version belongs to different profile"))
-	case errors.Is(err, domain.ErrProfileCodeImmutable):
-		// R-20: 400 -> 422, bound to validation.profile_code_immutable.
+	}},
+	// R-20: 400 -> 422, bound to validation.profile_code_immutable.
+	{matchIs(domain.ErrProfileCodeImmutable), func(w http.ResponseWriter, r *http.Request) {
 		problem.Respond(w, r, problem.New(http.StatusUnprocessableEntity, codeTaxProfileCodeImmutable, "profile code is immutable"))
-	case errors.Is(err, domain.ErrInvalidGovernanceClass):
+	}},
+	{matchIs(domain.ErrInvalidGovernanceClass), func(w http.ResponseWriter, r *http.Request) {
 		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "governance_class must be one of: controlado, simples, livre"))
-	case errors.Is(err, domain.ErrInvalidEditableByRole):
-		// annex R-6: this site answered 422 while carrying request.invalid, whose
-		// registered default is 400 — a code/status contradiction. The generic 422
-		// is validation.failed (annex row #121); the status now comes from the
-		// registration via NewFor instead of being restated here.
+	}},
+	// annex R-6: this site answered 422 while carrying request.invalid, whose
+	// registered default is 400 — a code/status contradiction. The generic 422
+	// is validation.failed (annex row #121); the status now comes from the
+	// registration via NewFor instead of being restated here.
+	{matchIs(domain.ErrInvalidEditableByRole), func(w http.ResponseWriter, r *http.Request) {
 		problem.Respond(w, r, problem.NewFor(problem.CodeValidationFailed, editableByRoleMessage()))
-	case errors.Is(err, domain.ErrClassChangeRouteConflict):
+	}},
+	{matchIs(domain.ErrClassChangeRouteConflict), func(w http.ResponseWriter, r *http.Request) {
 		problem.Respond(w, r, problem.New(http.StatusConflict, codeTaxProfileClassRouteConflict, "reclassification conflicts with an active approval route"))
+	}},
+}
+
+func (h *Handler) writeProfileError(w http.ResponseWriter, r *http.Request, err error) {
+	for _, m := range profileErrorMappings {
+		if m.match(err) {
+			m.respond(w, r)
+			return
+		}
+	}
+
+	// Non-sentinel cases: pgconn.PgError with a specific SQLSTATE code. Kept
+	// as an explicit if-chain (not table entries) because each condition is
+	// errors.As PLUS an extra pgErr.Code equality check, not a plain
+	// errors.Is match. Order preserved from the original switch — these three
+	// arms came immediately before default there too.
+	var pgErr *pgconn.PgError
+	switch {
 	case errors.As(err, &pgErr) && pgErr.Code == "23514":
 		problem.Respond(w, r, problem.New(http.StatusBadRequest, problem.CodeRequestInvalid, "request violates data constraints"))
 	case errors.As(err, &pgErr) && pgErr.Code == "23505":
