@@ -47,8 +47,8 @@ var (
 	ErrExportsDisabled = errors.New("audit: export pipeline not configured")
 	// ErrExportTenantErased is returned when ExportEvents re-checks erasure
 	// status immediately before persisting the export job (see
-	// WithErasureCheck) and finds the tenant has been erased — or the check
-	// itself failed — since the export began. Fail-closed: "could not tell"
+	// refuseIfTenantErased) and finds the tenant has been erased — or the
+	// check itself failed — since the export began. Fail-closed: "could not tell"
 	// is treated the same as "erased". The accumulated payload is discarded
 	// and no audit_export_jobs row is written (PR #121 review round 1, P1 —
 	// export-persistence half).
@@ -92,6 +92,12 @@ func NewService(reader domain.Reader) *Service {
 
 // WithExports wires the export pipeline. All four dependencies are required;
 // passing nil for any of them panics.
+// writer's embedded domain.ErasureChecker doubles as ExportEvents' pre-persist
+// erasure re-check (see refuseIfTenantErased): since domain.Writer requires
+// IsErased, wiring exports can never leave the erasure gate unset — there is
+// no separate optional dependency for a composition root or test harness to
+// omit (PR #121 review round 1, P1 — fail-open remediation superseding the
+// prior WithErasureCheck setter, which this replaces).
 func (s *Service) WithExports(counter domain.Counter, repo domain.ExportJobRepository, writer domain.Writer, urlBuilder SignedURLBuilder) *Service {
 	if counter == nil || repo == nil || writer == nil || urlBuilder == nil {
 		panic("audit.WithExports: all export dependencies are required")
@@ -99,18 +105,8 @@ func (s *Service) WithExports(counter domain.Counter, repo domain.ExportJobRepos
 	s.counter = counter
 	s.exportRepo = repo
 	s.writer = writer
+	s.erasure = writer
 	s.signedURL = urlBuilder
-	return s
-}
-
-// WithErasureCheck wires an optional post-fetch, pre-persist erasure
-// re-check into ExportEvents (see refuseIfTenantErased). Without it (nil, or
-// simply never called), ExportEvents behaves exactly as before — this is
-// additive hardening for the export-persistence race, not a required
-// dependency, so existing callers and the in-memory test harness keep
-// working unmodified.
-func (s *Service) WithErasureCheck(erasure domain.ErasureChecker) *Service {
-	s.erasure = erasure
 	return s
 }
 
@@ -248,15 +244,14 @@ func (s *Service) renderExportPayload(ctx context.Context, normalizedSizing doma
 // every row via a separate, earlier read; if the tenant's erasure commits in
 // the interval between that fetch and this call, the accumulated payload is
 // stale plaintext that must never reach durable storage (PR #121 review
-// round 1, P1). No-ops when WithErasureCheck was never called — existing
-// callers keep their prior behavior. Fails closed: a lookup error is treated
-// the same as "erased" (ErrExportTenantErased either way), because no caller
-// downstream of this function can tell "confirmed erased" apart from "could
-// not tell" and safely choose to persist anyway.
+// round 1, P1). s.erasure is guaranteed non-nil here: WithExports sets it
+// (from the same writer it requires) together with s.writer, and ExportEvents
+// already returned ErrExportsDisabled above if s.writer were nil — there is
+// no reachable path into this function with a nil checker. Fails closed: a
+// lookup error is treated the same as "erased" (ErrExportTenantErased either
+// way), because no caller downstream of this function can tell "confirmed
+// erased" apart from "could not tell" and safely choose to persist anyway.
 func (s *Service) refuseIfTenantErased(ctx context.Context, tenantID string) error {
-	if s.erasure == nil {
-		return nil
-	}
 	erased, err := s.erasure.IsErased(ctx, tenantID)
 	if err != nil {
 		return fmt.Errorf("%w: erasure check failed: %w", ErrExportTenantErased, err)

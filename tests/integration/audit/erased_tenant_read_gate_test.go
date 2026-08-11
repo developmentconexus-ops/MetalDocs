@@ -176,8 +176,10 @@ func TestErasedTenantReadGate_ActiveTenant_ReadsNormally_RealDB(t *testing.T) {
 // eraseAfterFirstRead simulates the race by tombstoning the tenant as a side
 // effect of the first (and, for this small fixture, only) ListEvents page
 // fetchAll performs, then lets ExportEvents run its real, unmodified
-// pre-persist erasure re-check (application.Service.WithErasureCheck)
-// against the now-genuinely-erased row.
+// pre-persist erasure re-check (application.Service.refuseIfTenantErased,
+// wired automatically by WithExports from writer's embedded
+// domain.ErasureChecker — no separate setter call) against the
+// now-genuinely-erased row.
 func TestErasedTenantReadGate_ExportPersistence_MidExportErasure_LeavesZeroRows_RealDB(t *testing.T) {
 	sqlDB, _ := testdb.Open(t)
 	tenant := testdb.NewTenant(t, sqlDB)
@@ -191,8 +193,7 @@ func TestErasedTenantReadGate_ExportPersistence_MidExportErasure_LeavesZeroRows_
 	exportRepo := auditpg.NewExportJobRepository(sqlDB)
 	reader := &eraseAfterFirstRead{Reader: writer, sqlDB: sqlDB, tenantID: tenant.ID}
 	svc := auditapp.NewService(reader).
-		WithExports(writer, exportRepo, writer, func(auditdomain.ExportJob) string { return "" }).
-		WithErasureCheck(writer)
+		WithExports(writer, exportRepo, writer, func(auditdomain.ExportJob) string { return "" })
 
 	_, err := svc.ExportEvents(context.Background(), "test-actor", auditdomain.ExportFormatCSV, auditdomain.ListEventsQuery{TenantID: tenant.ID})
 	if err == nil {
