@@ -279,11 +279,32 @@ func randomSuffix(t *testing.T) string {
 	return fmt.Sprintf("%x", b)
 }
 
+// canonicalRuntimeDevPassword MUST match db/grants/0000_identity_roles.sql's
+// own CREATE ROLE default, deploy/compose/docker-compose.yml's
+// METALDOCS_RUNTIME_DB_PASSWORD default, and
+// tests/integration/testdb.runtimeRoleDevPassword -- see runProvisionAgainst's
+// comment for why this cannot be a random per-test value.
+const canonicalRuntimeDevPassword = "metaldocs_runtime_dev"
+
 // runProvisionAgainst points run()'s env-sourced config at dsn (the exact
 // same env vars config.LoadPostgresConfig/LoadMigrationConfig/
 // LoadRuntimeIdentityConfig/LoadJobsConfig read at real boot) and invokes it
 // directly -- this is the actual production entrypoint, not a reimplementation
 // of it, so a passing test proves run() itself, not a stand-in.
+//
+// METALDOCS_RUNTIME_DB_PASSWORD defaults to canonicalRuntimeDevPassword, NOT
+// a random per-call value: metaldocs_runtime is a role, and roles are
+// cluster-global in Postgres -- CREATE ROLE/ALTER ROLE ... PASSWORD affects
+// the whole cluster regardless of which (isolated, per-test) database dsn
+// points at. A random password here was found live (2026-08-11) to rotate
+// the SAME shared metaldocs_runtime role every other integration test
+// package and every other lane's session authenticate against, breaking
+// them with SASL auth failures the moment this suite ran concurrently with
+// anything else. Only TestProvision_RuntimePasswordRotation_OldFailsNewSucceeds
+// needs a differing password, and it proves rotation against a
+// testdb.CreateThrowawayRole role instead of calling run() at all -- see
+// that test's own comment. Callers that legitimately want a non-default
+// password (there are none today) can still override via extraEnv.
 func runProvisionAgainst(t *testing.T, dsn string, extraEnv map[string]string) error {
 	t.Helper()
 	root := repoRoot()
@@ -292,7 +313,7 @@ func runProvisionAgainst(t *testing.T, dsn string, extraEnv map[string]string) e
 	t.Setenv("METALDOCS_PREREQUISITES_DIR", filepath.Join(root, "db", "prerequisites"))
 	t.Setenv("METALDOCS_GRANTS_DIR", filepath.Join(root, "db", "grants"))
 	t.Setenv("METALDOCS_MIGRATIONS_DIR", filepath.Join(root, "db", "migrations"))
-	t.Setenv("METALDOCS_RUNTIME_DB_PASSWORD", "provtest_runtime_pw_"+randomSuffix(t))
+	t.Setenv("METALDOCS_RUNTIME_DB_PASSWORD", canonicalRuntimeDevPassword)
 	t.Setenv("METALDOCS_JOBS_RIVER_SCHEMA", "")
 	for k, v := range extraEnv {
 		t.Setenv(k, v)
