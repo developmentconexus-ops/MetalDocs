@@ -26,7 +26,11 @@ func (h *Handler) ObsoleteHandler(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, r, err)
 		return
 	}
-	actorID := actorIDFromRequest(r)
+	actorID, err := actorIDFromRequest(r)
+	if err != nil {
+		WriteError(w, r, err)
+		return
+	}
 	documentID := r.PathValue("id")
 
 	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))

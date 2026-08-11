@@ -106,7 +106,14 @@ func WithStreamingOptOut(matcher func(*http.Request) bool) Option {
 // wrapped writer panics with a clear directive to use WithStreamingOptOut.
 // This fails closed rather than silently buffering or panicking with an
 // opaque interface-conversion error.
-func Require(store *Store, actorFromCtx func(context.Context) (string, string), opts ...Option) func(http.Handler) http.Handler {
+//
+// actorFromCtx resolves the (tenant, actor) pair the replay record is scoped
+// to. A3.3: it returns an error rather than a bare pair, because a blank actor
+// is not a narrower key — it is a SHARED one. Every caller who failed to
+// authenticate would land in the same (tenant, "", key) slot, so one
+// unauthenticated request could replay another's stored response. Absence is
+// therefore refused here, before BeginReplay persists anything.
+func Require(store *Store, actorFromCtx func(context.Context) (string, string, error), opts ...Option) func(http.Handler) http.Handler {
 	cfg := config{}
 	for _, opt := range opts {
 		opt(&cfg)
@@ -125,7 +132,7 @@ func Require(store *Store, actorFromCtx func(context.Context) (string, string), 
 // serveWithIdempotency runs the two-phase BeginReplay / CompleteReplay /
 // FailReplay protocol described on Require, once streaming opt-out has
 // already been ruled out by the caller.
-func serveWithIdempotency(store *Store, actorFromCtx func(context.Context) (string, string), next http.Handler, w http.ResponseWriter, r *http.Request) {
+func serveWithIdempotency(store *Store, actorFromCtx func(context.Context) (string, string, error), next http.Handler, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	key := r.Header.Get("Idempotency-Key")
 	switch err := ValidateKey(key); {
@@ -137,7 +144,14 @@ func serveWithIdempotency(store *Store, actorFromCtx func(context.Context) (stri
 		return
 	}
 
-	tenantID, actorID := actorFromCtx(ctx)
+	tenantID, actorID, err := actorFromCtx(ctx)
+	if err != nil {
+		// A3.3: identity resolution failed, so the replay key cannot be scoped.
+		// Refuse before the request body is read or a claim is persisted — the
+		// wrapped handler is never reached.
+		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		return
+	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, maxIdempotencyRequestBodyBytes)
 	hash, err := RequestHash(r)

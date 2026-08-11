@@ -200,7 +200,11 @@ func (h *Handler) handleExport(w http.ResponseWriter, r *http.Request) {
 		problem.Respond(w, r, problem.New(http.StatusMethodNotAllowed, problem.CodeRequestMethodNotAllowed, "Method not allowed"))
 		return
 	}
-	tenantID, ok := auditTenantFromRequest(w, r)
+	// A3.3: the export job is OWNED by this actor (GetExportStatus scopes reads
+	// by it), so a discarded presence bool would have created a job owned by ""
+	// that any other unauthenticated caller could then read. The identity
+	// resolver already refuses an actorless request with 401 before this point.
+	tenantID, actorID, ok := auditIdentityFromRequest(w, r)
 	if !ok {
 		return
 	}
@@ -208,7 +212,6 @@ func (h *Handler) handleExport(w http.ResponseWriter, r *http.Request) {
 		problem.Respond(w, r, problem.New(http.StatusNotImplemented, problem.CodeInternalNotImplemented, "Audit export not configured"))
 		return
 	}
-	actorID, _ := authn.UserIDFromContext(r.Context())
 
 	var body struct {
 		Format string `json:"format"`
@@ -494,15 +497,27 @@ func buildEventResponses(items []domain.Event) ([]auditapi.AuditEventItem, error
 	return responseItems, nil
 }
 
-func auditTenantFromRequest(w http.ResponseWriter, r *http.Request) (string, bool) {
-	if _, ok := authn.UserIDFromContext(r.Context()); !ok {
+// auditIdentityFromRequest resolves the (tenant, actor) pair the audit routes
+// gate on, writing the contract-correct problem response itself when either
+// half is absent. A3.3: the actor half is the same 401 the routes already
+// answered with — it is returned rather than discarded so callers that need to
+// attribute a record (handleExport) read it here instead of repeating the
+// presence check.
+func auditIdentityFromRequest(w http.ResponseWriter, r *http.Request) (tenantID, actorID string, ok bool) {
+	actorID, present := authn.UserIDFromContext(r.Context())
+	if !present {
 		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
-		return "", false
+		return "", "", false
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
 		problem.Respond(w, r, problem.New(http.StatusForbidden, problem.CodePermissionDenied, "Tenant claim required"))
-		return "", false
+		return "", "", false
 	}
-	return tenantID, true
+	return tenantID, actorID, true
+}
+
+func auditTenantFromRequest(w http.ResponseWriter, r *http.Request) (string, bool) {
+	tenantID, _, ok := auditIdentityFromRequest(w, r)
+	return tenantID, ok
 }

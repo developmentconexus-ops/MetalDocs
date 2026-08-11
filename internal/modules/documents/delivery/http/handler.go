@@ -21,6 +21,7 @@ import (
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/apibase"
+	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/pagination"
 	"metaldocs/internal/platform/problem"
@@ -210,7 +211,11 @@ func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request, params d
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, problem.CodeInternalUnknown.String()))
 		return
 	}
-	callerUserID := userIDFromReq(r)
+	callerUserID, err := userIDFromReq(r)
+	if err != nil {
+		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		return
+	}
 	isAdmin, err := h.isSystemAdmin(r.Context(), callerUserID, tenantID)
 	if err != nil {
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, problem.CodeInternalUnknown.String()))
@@ -264,7 +269,11 @@ func (h *Handler) documentStats(w http.ResponseWriter, r *http.Request, _ docume
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, problem.CodeInternalUnknown.String()))
 		return
 	}
-	callerUserID := userIDFromReq(r)
+	callerUserID, err := userIDFromReq(r)
+	if err != nil {
+		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		return
+	}
 	isAdmin, err := h.isSystemAdmin(r.Context(), callerUserID, tenantID)
 	if err != nil {
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, problem.CodeInternalUnknown.String()))
@@ -791,7 +800,11 @@ func (h *Handler) forceReleaseSession(w http.ResponseWriter, r *http.Request) {
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, problem.CodeInternalUnknown.String()))
 		return
 	}
-	adminID := userIDFromReq(r)
+	adminID, err := userIDFromReq(r)
+	if err != nil {
+		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		return
+	}
 
 	var req struct {
 		SessionID string `json:"session_id"`
@@ -1257,7 +1270,11 @@ func (h *Handler) authorizeDocumentScope(w http.ResponseWriter, r *http.Request,
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, problem.CodeInternalUnknown.String()))
 		return "", "", false
 	}
-	userID = userIDFromReq(r)
+	userID, err = userIDFromReq(r)
+	if err != nil {
+		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
+		return "", "", false
+	}
 	admin, err := h.isSystemAdmin(ctx, userID, tenantID)
 	if err != nil {
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, problem.CodeInternalUnknown.String()))
@@ -1281,8 +1298,14 @@ func (h *Handler) authorizeDocumentScope(w http.ResponseWriter, r *http.Request,
 // authorizeDocumentScope's isSystemAdmin shortcut and by the handler's
 // downstream service calls.
 func withAdminCtx(ctx context.Context, r *http.Request) context.Context {
-	userID := userIDFromReq(r)
-	if userID == "" {
+	// A3.3 class B (identity OPTIONAL by policy): this helper only ENRICHES a
+	// context that already carries auth. It performs no permission decision and
+	// writes nothing — the actor-required decision belongs to
+	// authorizeDocumentScope, which fails closed on its own. Absence therefore
+	// returns ctx unchanged rather than a blank actor; the presence result is
+	// read explicitly so "" can never be forwarded to WithAuthContext.
+	userID, ok := authn.UserIDFromContext(r.Context())
+	if !ok {
 		return ctx
 	}
 
@@ -1297,63 +1320,115 @@ func tenantIDFromReq(r *http.Request) (string, error) {
 	return tenant.FromContext(r.Context())
 }
 
-func userIDFromReq(r *http.Request) string {
-	return iamdomain.UserIDFromContext(r.Context())
+// userIDFromReq resolves the authenticated actor for the documents handlers
+// that attribute a read/mutation to a person — export, list/stats admin
+// shortcut, force-release, document scope authorization. A3.3: it returns
+// authn.ErrMissingActor rather than "" when the principal is absent, so a
+// blank actor can no longer reach isSystemAdmin, RequireDocumentView or an
+// export service call.
+func userIDFromReq(r *http.Request) (string, error) {
+	return authn.RequireUserID(r.Context())
 }
 
-func mapErr(err error) (int, problem.Code) {
-	var capDenied authz.ErrCapDenied
-	switch {
-	case err == nil:
-		return http.StatusOK, problem.Code{}
-	case errors.Is(err, domain.ErrForbidden), errors.Is(err, domain.ErrDocumentNotOwner):
-		return http.StatusForbidden, problem.CodePermissionDenied
-	case errors.Is(err, domain.ErrPendingNotFound),
-		errors.Is(err, domain.ErrCheckpointNotFound),
-		errors.Is(err, domain.ErrCommentNotFound),
-		errors.Is(err, domain.ErrNotFound),
-		errors.Is(err, controlleddocumentsdomain.ErrCDNotFound):
-		return http.StatusNotFound, problem.CodeNotFoundResource
-	case errors.Is(err, domain.ErrInvalidName),
-		errors.Is(err, domain.ErrInvalidPageCount),
-		errors.Is(err, application.ErrControlledDocumentRequired),
-		errors.Is(err, approvalapp.ErrRevisionTitleRequired),
-		errors.Is(err, domain.ErrCommentInvalid):
-		return http.StatusBadRequest, problem.CodeRequestInvalid
+// errorMapping is one entry of documentsErrorMappings: a predicate over err
+// plus the HTTP status and problem.Code to use when it matches. Same
+// ordered-dispatch-table shape as approval/http/errors.go's errorMapping
+// (that module hit the same gocyclo ceiling first, for the identical
+// authn.ErrMissingActor addition) — an ordered slice, evaluated top to
+// bottom, first match wins, exactly reproducing the switch statement this
+// table replaced.
+type errorMapping struct {
+	match  func(err error) bool
+	status int
+	code   problem.Code
+}
+
+// matchIs reports errors.Is(err, target) for any target in targets — an
+// error matches the mapping if it matches ANY of them (mirrors a switch case
+// with multiple comma-separated conditions sharing one body).
+func matchIs(targets ...error) func(error) bool {
+	return func(err error) bool {
+		for _, target := range targets {
+			if errors.Is(err, target) {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+// matchAs reports errors.As(err, &target) for a fresh zero-value T — the
+// generic counterpart of a `var x T; errors.As(err, &x)` case clause.
+func matchAs[T error]() func(error) bool {
+	return func(err error) bool {
+		var target T
+		return errors.As(err, &target)
+	}
+}
+
+// documentsErrorMappings is the ordered dispatch table mapErr evaluates top
+// to bottom, taking the status/code of the first match. Entries are
+// transcribed in their original switch-case order and must not be reordered.
+var documentsErrorMappings = []errorMapping{
+	// A3.3 / #108 review round 1: no authenticated principal in context.
+	// Every documents route is session-required, so this is the platform's
+	// 401 + auth.unauthenticated, not a documents dialect — the same case
+	// approval/http (errors.go) and templates/delivery/http (errors.go)
+	// already carry for the identical sentinel.
+	{matchIs(authn.ErrMissingActor), http.StatusUnauthorized, problem.CodeAuthUnauthenticated},
+	{matchIs(domain.ErrForbidden, domain.ErrDocumentNotOwner), http.StatusForbidden, problem.CodePermissionDenied},
+	{matchIs(
+		domain.ErrPendingNotFound,
+		domain.ErrCheckpointNotFound,
+		domain.ErrCommentNotFound,
+		domain.ErrNotFound,
+		controlleddocumentsdomain.ErrCDNotFound,
+	), http.StatusNotFound, problem.CodeNotFoundResource},
+	{matchIs(
+		domain.ErrInvalidName,
+		domain.ErrInvalidPageCount,
+		application.ErrControlledDocumentRequired,
+		approvalapp.ErrRevisionTitleRequired,
+		domain.ErrCommentInvalid,
+	), http.StatusBadRequest, problem.CodeRequestInvalid},
 	// Both tier-1 (iamapp.ErrCapabilityDenied) and tier-2 (authz.ErrCapDenied)
 	// denials are the same semantic — "you lack this capability" — so they must
 	// surface the same problem code to clients regardless of which PDP tier denied.
-	case errors.Is(err, iamapp.ErrCapabilityDenied):
-		return http.StatusForbidden, problem.CodePermissionCapabilityDenied
-	case errors.As(err, &capDenied):
-		return http.StatusForbidden, problem.CodePermissionCapabilityDenied
-	case errors.Is(err, domain.ErrExpiredUpload):
-		return http.StatusGone, problem.CodeStateUploadExpired
-	case errors.Is(err, domain.ErrUploadMissing):
-		// 409, not the pre-ADR-0089 410: the upload never happened, so 410 Gone
-		// (which asserts the resource existed and was removed) is false. The
-		// status is bound to state.upload_missing at registration (annex R-1).
-		return http.StatusConflict, problem.CodeStateUploadMissing
-	case errors.Is(err, domain.ErrUploadTooLarge):
-		return http.StatusRequestEntityTooLarge, problem.CodeRequestBodyTooLarge
-	case errors.Is(err, domain.ErrContentHashMismatch):
-		return http.StatusUnprocessableEntity, problem.CodeRequestInvalid
-	case errors.Is(err, domain.ErrSessionTaken),
-		errors.Is(err, domain.ErrSessionInactive),
-		errors.Is(err, domain.ErrSessionNotHolder),
-		errors.Is(err, domain.ErrMisbound),
-		errors.Is(err, controlleddocumentsdomain.ErrProfileHasNoDefaultTemplate):
-		return http.StatusConflict, problem.CodeConflictGeneric
-	case errors.Is(err, domain.ErrStaleBase):
-		return http.StatusConflict, problem.CodeConflictConcurrentModification
-	case errors.Is(err, domain.ErrInvalidStateTransition),
-		errors.Is(err, controlleddocumentsdomain.ErrCDNotActive):
-		return http.StatusConflict, problem.CodeStateTransitionInvalid
-	case strings.HasPrefix(err.Error(), "form_data_invalid"):
-		return http.StatusUnprocessableEntity, problem.CodeRequestInvalid
-	default:
-		return http.StatusInternalServerError, problem.CodeInternalUnknown
+	{matchIs(iamapp.ErrCapabilityDenied), http.StatusForbidden, problem.CodePermissionCapabilityDenied},
+	{matchAs[authz.ErrCapDenied](), http.StatusForbidden, problem.CodePermissionCapabilityDenied},
+	{matchIs(domain.ErrExpiredUpload), http.StatusGone, problem.CodeStateUploadExpired},
+	// 409, not the pre-ADR-0089 410: the upload never happened, so 410 Gone
+	// (which asserts the resource existed and was removed) is false. The
+	// status is bound to state.upload_missing at registration (annex R-1).
+	{matchIs(domain.ErrUploadMissing), http.StatusConflict, problem.CodeStateUploadMissing},
+	{matchIs(domain.ErrUploadTooLarge), http.StatusRequestEntityTooLarge, problem.CodeRequestBodyTooLarge},
+	{matchIs(domain.ErrContentHashMismatch), http.StatusUnprocessableEntity, problem.CodeRequestInvalid},
+	{matchIs(
+		domain.ErrSessionTaken,
+		domain.ErrSessionInactive,
+		domain.ErrSessionNotHolder,
+		domain.ErrMisbound,
+		controlleddocumentsdomain.ErrProfileHasNoDefaultTemplate,
+	), http.StatusConflict, problem.CodeConflictGeneric},
+	{matchIs(domain.ErrStaleBase), http.StatusConflict, problem.CodeConflictConcurrentModification},
+	{matchIs(domain.ErrInvalidStateTransition, controlleddocumentsdomain.ErrCDNotActive), http.StatusConflict, problem.CodeStateTransitionInvalid},
+	// Not a sentinel: a string-prefix predicate on err.Error(), same as the
+	// original `case strings.HasPrefix(...)` clause. Kept as an inline
+	// predicate func rather than pulled out of the table, mirroring
+	// approval/http/errors.go's identical `json: unknown field` prefix entry.
+	{func(err error) bool { return err != nil && strings.HasPrefix(err.Error(), "form_data_invalid") }, http.StatusUnprocessableEntity, problem.CodeRequestInvalid},
+}
+
+func mapErr(err error) (int, problem.Code) {
+	if err == nil {
+		return http.StatusOK, problem.Code{}
 	}
+	for _, m := range documentsErrorMappings {
+		if m.match(err) {
+			return m.status, m.code
+		}
+	}
+	return http.StatusInternalServerError, problem.CodeInternalUnknown
 }
 
 func isKnownDocumentStatus(status string) bool {

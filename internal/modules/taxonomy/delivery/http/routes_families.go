@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"metaldocs/internal/modules/taxonomy/domain"
+	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/problem"
 )
 
@@ -125,6 +126,14 @@ func (h *Handler) deactivateFamily(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) writeFamilyError(w http.ResponseWriter, r *http.Request, err error) {
 	var pgErr *pgconn.PgError
 	switch {
+	// A3.3 (review round 1, finding 1): FamilyService's mutating methods
+	// resolve the actor before any mutation work (T1) and return
+	// authn.ErrMissingActor when the request context carries none. That is
+	// the platform's 401 + auth.unauthenticated, not a tokens/taxonomy
+	// dialect — see internal/modules/tokens/delivery/http/handler.go's
+	// writeTokenError, which answers the same sentinel the same way.
+	case errors.Is(err, authn.ErrMissingActor):
+		writeError(w, r, http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required")
 	case errors.Is(err, domain.ErrFamilyNotFound):
 		writeError(w, r, http.StatusNotFound, codeTaxFamilyNotFound, "family not found")
 	case errors.Is(err, domain.ErrFamilyAlreadyInactive):

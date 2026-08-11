@@ -22,12 +22,10 @@ import (
 // header (OCC precondition); ceremony fields (password_token, content_hash)
 // map into the signoff leg exactly as SignoffHandler maps them.
 func (h *Handler) FastForwardHandler(w http.ResponseWriter, r *http.Request) {
-	tenantID, err := tenantIDFromReq(r)
-	if err != nil {
-		WriteError(w, r, err)
+	tenantID, actorID, ok := requestIdentity(w, r)
+	if !ok {
 		return
 	}
-	actorID := actorIDFromRequest(r)
 	instanceID := r.PathValue("instance_id")
 	stageID := r.PathValue("stage_id")
 	idempKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))

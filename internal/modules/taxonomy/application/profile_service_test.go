@@ -22,7 +22,7 @@ func TestProfileServiceCreate_UsesDomainConstructorNormalizationAndValidation(t 
 		Name:           " Procedure ",
 		EditableByRole: "editor",
 	}
-	if err := service.Create(context.Background(), in); err != nil {
+	if err := service.Create(actorCtx(), in); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	got := repo.get("tenant-a", "PO-01")

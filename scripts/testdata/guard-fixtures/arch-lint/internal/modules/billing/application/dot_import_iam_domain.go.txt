@@ -1,0 +1,25 @@
+package application
+
+import (
+	"context"
+
+	. "metaldocs/internal/modules/iam/domain"
+)
+
+// A3.3 negative fixture (Rule 3, dot import of the LOW-LEVEL package): the
+// escape hatch that makes the other two rules blind.
+//
+// Rules 1 and 2 both ask the same question — "which import path is behind this
+// qualifier?" A dot import removes the qualifier. `UserIDFromContext(ctx)` below
+// is the banned accessor, but syntactically it is a bare identifier that could
+// name anything in file scope, and deciding otherwise would take type
+// information the guard deliberately does not build.
+//
+// So the ImportSpec is refused instead. That is the smaller property and the
+// stronger one: there is nothing to infer, because the shape the inference would
+// have to reason about cannot be written in the first place.
+//
+// See scripts/testdata/guard-fixtures/README.md.
+func chargeDotted(ctx context.Context) string {
+	return UserIDFromContext(ctx)
+}

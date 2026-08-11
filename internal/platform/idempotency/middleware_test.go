@@ -9,8 +9,10 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/idempotency"
 	"metaldocs/tests/integration/testdb"
 )
@@ -40,8 +42,18 @@ func withIDs(tenant, actor string) func(http.Handler) http.Handler {
 	}
 }
 
-func actorFromCtx(ctx context.Context) (string, string) {
-	return ctx.Value(tenantCtxKey).(string), ctx.Value(actorCtxKey).(string)
+// actorFromCtx is the test double for the resolver every mounted route passes
+// to Require. A3.3 changed that contract to return an error: a blank actor is a
+// SHARED replay key, not a narrower one, so the middleware must refuse rather
+// than persist a record keyed on "". The double mirrors the real resolver
+// (authn.RequireUserID) so the tests exercise the production shape.
+func actorFromCtx(ctx context.Context) (string, string, error) {
+	tenantID, _ := ctx.Value(tenantCtxKey).(string)
+	actorID, _ := ctx.Value(actorCtxKey).(string)
+	if strings.TrimSpace(actorID) == "" {
+		return "", "", authn.ErrMissingActor
+	}
+	return tenantID, actorID, nil
 }
 
 func handler201(body string) http.Handler {

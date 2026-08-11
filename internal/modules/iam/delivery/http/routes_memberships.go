@@ -356,14 +356,17 @@ func tenantIDFromRequest(r *http.Request) (string, error) {
 // grantMembership to block self-escalation: a CapMembershipManage holder
 // (typically area_admin) must not be able to hand themselves additional roles.
 func isSelf(ctx context.Context, targetUserID string) bool {
-	actor := strings.TrimSpace(authenticatedActorFromContext(ctx))
-	if actor == "" {
+	// A3.3 class B (identity OPTIONAL by explicit policy): this is a PREDICATE,
+	// not a gate — "is the actor the same person as the target?". With no actor
+	// the honest answer is false (nobody is the target), and answering false
+	// does NOT open the route: the actor-required decision on this path is the
+	// `grantedBy, ok := authn.UserIDFromContext(...)` check in grantMembership
+	// / revokeMembership, which 401s before isSelf can matter. The presence
+	// result is therefore read explicitly and consumed here rather than
+	// discarded into a "" that would compare equal to a blank target.
+	actor, ok := authn.UserIDFromContext(ctx)
+	if !ok {
 		return false
 	}
 	return strings.EqualFold(actor, strings.TrimSpace(targetUserID))
-}
-
-func authenticatedActorFromContext(ctx context.Context) string {
-	userID, _ := authn.UserIDFromContext(ctx)
-	return userID
 }

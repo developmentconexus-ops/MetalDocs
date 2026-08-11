@@ -16,6 +16,7 @@ import (
 	approvalsignature "metaldocs/internal/modules/approval/infrastructure/signature"
 	v2dom "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
+	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/strictjson"
@@ -39,7 +40,10 @@ const internalErrorMessage = "internal error"
 // twice, and a module may not import another module's delivery package, so the
 // platform catalog is their single legal declaration site.
 var (
-	approvalCodeInternalUnknown       = problem.CodeInternalUnknown
+	approvalCodeInternalUnknown = problem.CodeInternalUnknown
+	// A3.3: shared platform wire code (collision class C-1) — a missing
+	// authenticated principal is not an approval-specific condition.
+	approvalCodeAuthUnauthenticated   = problem.CodeAuthUnauthenticated
 	approvalCodeConflictStaleRevision = problem.Register("approval", "conflict.stale_revision", 409)
 	approvalCodeNotFoundInstance      = problem.Register("approval", "notfound.approval_instance", 404)
 	// approvalCodeNotFoundInstanceNotVisible (F8, spec.md §6.3) is the
@@ -240,6 +244,11 @@ func matchAs[T error]() func(error) bool {
 // entries are transcribed in their original evaluation order and must not be
 // reordered.
 var approvalErrorMappings = []errorMapping{
+	// A3.3: the request reached a handler with no authenticated principal in
+	// context. Every approval route is session-required, so this is the same
+	// condition the authn middleware answers with — one 401 +
+	// auth.unauthenticated, not an approval dialect.
+	{matchIs(authn.ErrMissingActor), http.StatusUnauthorized, approvalCodeAuthUnauthenticated},
 	{matchIs(infrastructure.ErrStaleRevision), http.StatusConflict, approvalCodeConflictStaleRevision},
 	{matchIs(infrastructure.ErrNoActiveInstance), http.StatusNotFound, approvalCodeNotFoundInstance},
 	// F8, spec.md §6.3: cross-boundary = not-found. Same 404 status as

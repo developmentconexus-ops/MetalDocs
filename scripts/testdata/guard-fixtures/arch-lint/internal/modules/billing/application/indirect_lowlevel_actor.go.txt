@@ -1,0 +1,31 @@
+package application
+
+import (
+	"context"
+
+	ident "metaldocs/internal/modules/iam/domain"
+)
+
+// A3.3 negative fixture (Rule 1, INDIRECT reference through an alias): the same
+// forbidden accessor, never named at a call site.
+//
+// `extract := ident.UserIDFromContext` is not a call. A guard that matched only
+// CallExpr sees a variable being assigned, reports nothing, and then watches
+// `extract(ctx)` return the same "" to the same consumer one line later. The
+// binding is not a mitigation — it is a laundering step, and it costs an author
+// exactly one extra line to perform.
+//
+// That is why the rule refuses the REFERENCE. Runtime code outside
+// internal/platform/authn/context.go may not name the low-level accessor at all,
+// in any position: call, assignment, argument, struct field, map value. There is
+// no shape left in which "" can be obtained without saying so.
+//
+// The import is aliased on purpose, so this file also pins that the reference
+// rule resolves by import PATH. A rule that regressed to matching the identifier
+// "iamdomain" would report nothing here, and the fixture would fail.
+//
+// See scripts/testdata/guard-fixtures/README.md.
+func chargeIndirect(ctx context.Context) string {
+	extract := ident.UserIDFromContext
+	return extract(ctx)
+}

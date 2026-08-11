@@ -933,15 +933,25 @@ func currentUserIDFromRequest(r *http.Request) string {
 }
 
 // resolveRateLimitIdentity resolves the global envelope limiter's identity
-// key: authenticated user → IAM user ID → "" (fail-closed to the shared
-// anonymous bucket). Runs after authn + iamMiddleware in the chain, so both
-// are available. Mirrors the retired security.RateLimiter.requestIdentity
-// without importing domain packages.
+// key: authenticated user → IAM user ID → "". Returning "" is not itself a
+// bucket: ratelimit.Middleware.bucketKey treats it as "no user key" and falls
+// back to the trusted-proxy-resolved client IP, and if that cannot be resolved
+// either it fails closed (the request is rejected, not admitted unlimited).
+// Runs after authn + iamMiddleware in the chain, so both are available.
+// Mirrors the retired security.RateLimiter.requestIdentity without importing
+// domain packages.
 func resolveRateLimitIdentity(r *http.Request) string {
 	if currentUser, ok := authdomain.CurrentUserFromContext(r.Context()); ok && strings.TrimSpace(currentUser.UserID) != "" {
 		return strings.TrimSpace(currentUser.UserID)
 	}
-	if userID := strings.TrimSpace(iamdomain.UserIDFromContext(r.Context())); userID != "" {
+	// A3.3 class B (identity OPTIONAL by explicit policy): the rate limiter has
+	// a defined anonymous strategy — an unauthenticated request is keyed by
+	// client IP instead of by user, which is a real bucket and not an exemption,
+	// so absence is safe here and must not 401: the limiter runs before any
+	// authorization decision and gates nothing but throughput. The presence
+	// result is read explicitly so "" is a chosen branch, never a silent
+	// fall-through.
+	if userID, ok := authn.UserIDFromContext(r.Context()); ok {
 		return userID
 	}
 	return ""
@@ -1554,7 +1564,13 @@ func buildTemplatesModule(deps bootstrap.APIDependencies, capabilityService *iam
 		WithRunner(db.NewTxRunner(deps.SQLDB)).
 		WithRouteReadinessReader(approvalrepo.NewRouteReadinessReaderPG(deps.SQLDB))
 	templatesAuthzFn := func(r *http.Request, tenantID, _ string, action string) error {
-		userID := iamdomain.UserIDFromContext(r.Context())
+		// A3.3: a blank actor is not a principal with no capabilities — it is no
+		// principal at all. Refuse before CanDo, so the authorization decision is
+		// never taken on behalf of "".
+		userID, err := authn.RequireUserID(r.Context())
+		if err != nil {
+			return err
+		}
 		return capabilityService.CanDo(r.Context(), userID, tenantID, action)
 	}
 	// FE-08: resolve TemplateDTO.created_by_display_name via the iam-owned

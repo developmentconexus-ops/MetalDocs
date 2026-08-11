@@ -24,7 +24,11 @@ func (h *Handler) CreateApprovalDelegation(w http.ResponseWriter, r *http.Reques
 		WriteError(w, r, err)
 		return
 	}
-	actorID := actorIDFromRequest(r)
+	actorID, err := actorIDFromRequest(r)
+	if err != nil {
+		WriteError(w, r, err)
+		return
+	}
 
 	// F-QA4-6: the spec now declares Idempotency-Key as format: uuid, so the
 	// generated wrapper binds it as a UUID and has already rejected a malformed
@@ -80,7 +84,11 @@ func (h *Handler) RevokeApprovalDelegation(w http.ResponseWriter, r *http.Reques
 		WriteError(w, r, err)
 		return
 	}
-	actorID := actorIDFromRequest(r)
+	actorID, err := actorIDFromRequest(r)
+	if err != nil {
+		WriteError(w, r, err)
+		return
+	}
 
 	if h.services == nil || h.services.Delegation == nil {
 		WriteError(w, r, errors.New("delegation service not configured"))

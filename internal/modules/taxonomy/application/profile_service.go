@@ -131,6 +131,16 @@ func (s *ProfileService) Create(ctx context.Context, p *domain.DocumentProfile) 
 	if err != nil {
 		return fmt.Errorf("taxonomy: validate profile create: %w", err)
 	}
+	// A3.3 (T1): ActorUserID is the governance-event attribution for this
+	// mutation, so an absent actor is a precondition failure, not a late one.
+	// It resolves here — after the purely local validation above, before
+	// BeginTx — so a request with no principal opens no transaction and calls
+	// no repository method at all. "Rolled back" is a weaker property than
+	// "never started".
+	actorUserID, err := authn.RequireUserID(ctx)
+	if err != nil {
+		return err
+	}
 	tx, err := s.profiles.BeginTx(ctx)
 	if err != nil {
 		return fmt.Errorf("taxonomy: begin profile create tx: %w", err)
@@ -151,7 +161,6 @@ func (s *ProfileService) Create(ctx context.Context, p *domain.DocumentProfile) 
 	if err != nil {
 		return fmt.Errorf("taxonomy: marshal profile create governance payload: %w", err)
 	}
-	actorUserID, _ := authn.UserIDFromContext(ctx)
 	if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
 		TenantID:     newProfile.TenantID,
 		EventType:    domain.GovernanceEventTypeProfileCreated,
@@ -180,6 +189,12 @@ func (s *ProfileService) Update(ctx context.Context, p *domain.DocumentProfile) 
 	if err := domain.ValidateEditableByRole(p.EditableByRole); err != nil {
 		return fmt.Errorf("taxonomy: validate profile update: %w", err)
 	}
+	// A3.3 (T1): resolved before BeginTx / UpdateTx, so an actorless request
+	// reaches no repository mutation. See Create.
+	actorUserID, err := authn.RequireUserID(ctx)
+	if err != nil {
+		return err
+	}
 	tx, err := s.profiles.BeginTx(ctx)
 	if err != nil {
 		return fmt.Errorf("taxonomy: begin profile update tx: %w", err)
@@ -200,7 +215,6 @@ func (s *ProfileService) Update(ctx context.Context, p *domain.DocumentProfile) 
 	if err != nil {
 		return fmt.Errorf("taxonomy: marshal profile update governance payload: %w", err)
 	}
-	actorUserID, _ := authn.UserIDFromContext(ctx)
 	if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
 		TenantID:     p.TenantID,
 		EventType:    domain.GovernanceEventTypeProfileUpdated,

@@ -118,10 +118,21 @@ func (h *Handler) Mount(mux httprouter.Muxer) {
 
 // actorFromCtx extracts (tenantID, actorID) for idempotency-key scoping,
 // matching the templates/approval/controlleddocuments sibling handlers.
-func actorFromCtx(ctx context.Context) (string, string) {
+//
+// DEFER (#90/A3.5, idempotency contract cleanup): the tenant error is discarded
+// here, so an absent tenant claim scopes the idempotency key to "" instead of
+// refusing. That is a real defect and it is NOT actor extraction — the actor
+// half below already fails closed. Fixing it means deciding what an
+// idempotency key is scoped BY across all four implementations, which is
+// A3.5's subject; changing it inside the actor slice would be a one-handler
+// answer to a contract-wide question. Recorded rather than patched.
+func actorFromCtx(ctx context.Context) (string, string, error) {
 	tenantID, _ := tenant.FromContext(ctx)
-	actorID, _ := authn.UserIDFromContext(ctx)
-	return tenantID, actorID
+	actorID, err := authn.RequireUserID(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	return tenantID, actorID, nil
 }
 
 // NewHandler builds a Handler wired to the given profile/area/family

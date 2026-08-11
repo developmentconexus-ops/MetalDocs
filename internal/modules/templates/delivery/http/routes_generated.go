@@ -33,7 +33,11 @@ func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request, _ templ
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
-	actorID := userIDFromReq(r)
+	actorID, err := userIDFromReq(r)
+	if err != nil {
+		writeMappedErr(w, r, err)
+		return
+	}
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateCreate)); err != nil {
 		writeMappedErr(w, r, err)
 		return
@@ -148,7 +152,11 @@ func (h *Handler) PresignTemplateSchemaUploadUrl(w http.ResponseWriter, r *http.
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
-	actorID := userIDFromReq(r)
+	actorID, err := userIDFromReq(r)
+	if err != nil {
+		writeMappedErr(w, r, err)
+		return
+	}
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateEdit)); err != nil {
 		writeMappedErr(w, r, err)
 		return
@@ -178,7 +186,11 @@ func (h *Handler) presignTemplateUpload(w http.ResponseWriter, r *http.Request, 
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return "", "", false
 	}
-	actorID := userIDFromReq(r)
+	actorID, err := userIDFromReq(r)
+	if err != nil {
+		writeMappedErr(w, r, err)
+		return "", "", false
+	}
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateEdit)); err != nil {
 		writeMappedErr(w, r, err)
 		return "", "", false
@@ -207,7 +219,11 @@ func (h *Handler) PublishTemplateVersion(w http.ResponseWriter, r *http.Request,
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
-	actorID := userIDFromReq(r)
+	actorID, err := userIDFromReq(r)
+	if err != nil {
+		writeMappedErr(w, r, err)
+		return
+	}
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplatePublish)); err != nil {
 		writeMappedErr(w, r, err)
 		return

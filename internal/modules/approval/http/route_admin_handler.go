@@ -22,7 +22,11 @@ func (h *Handler) CreateRouteHandler(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, r, err)
 		return
 	}
-	actorID := actorIDFromRequest(r)
+	actorID, err := actorIDFromRequest(r)
+	if err != nil {
+		WriteError(w, r, err)
+		return
+	}
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	// F-QA4-6: shared Idempotency-Key wire rule (UUID everywhere).
 	if err := idempotency.ValidateKey(idempotencyKey); err != nil {
@@ -124,7 +128,11 @@ func (h *Handler) UpdateRouteHandler(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, r, err)
 		return
 	}
-	actorID := actorIDFromRequest(r)
+	actorID, err := actorIDFromRequest(r)
+	if err != nil {
+		WriteError(w, r, err)
+		return
+	}
 	routeID := r.PathValue("id")
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	// F-QA4-6: shared Idempotency-Key wire rule (UUID everywhere).
@@ -183,7 +191,11 @@ func (h *Handler) DeactivateRouteHandler(w http.ResponseWriter, r *http.Request)
 		WriteError(w, r, err)
 		return
 	}
-	actorID := actorIDFromRequest(r)
+	actorID, err := actorIDFromRequest(r)
+	if err != nil {
+		WriteError(w, r, err)
+		return
+	}
 	routeID := r.PathValue("id")
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	// F-QA4-6: shared Idempotency-Key wire rule (UUID everywhere).
@@ -239,7 +251,11 @@ func (h *Handler) ListRoutesHandler(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, r, err)
 		return
 	}
-	actorID := actorIDFromRequest(r)
+	actorID, err := actorIDFromRequest(r)
+	if err != nil {
+		WriteError(w, r, err)
+		return
+	}
 
 	routeAdminSvc := h.routeAdmin
 	if routeAdminSvc == nil {

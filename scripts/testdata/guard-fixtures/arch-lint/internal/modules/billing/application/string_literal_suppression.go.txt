@@ -1,0 +1,28 @@
+package application
+
+import (
+	"context"
+
+	iamdomain "metaldocs/internal/modules/iam/domain"
+)
+
+// A3.3 negative fixture (suppression, STRING LITERAL): the directive's
+// characters appearing in data must not act as a directive.
+//
+// A suppression implemented by scanning the raw source line cannot tell code
+// from data. Under that implementation the string below — an error message, a
+// doc snippet, a log line, anything that happens to quote the guard's own
+// vocabulary — silences the rule on the very line that violates it. Worse, it
+// does so invisibly: nothing in the file looks like an opt-out.
+//
+// Reading the parsed comments instead makes the distinction structural. The
+// scanner already knows which bytes are a comment and which are a literal, so
+// the analyzer does not have to guess, and a suppression can only be written
+// where a human reviewer would recognize one.
+//
+// This file must still be reported.
+//
+// See scripts/testdata/guard-fixtures/README.md.
+func chargeStringSuppressed(ctx context.Context) string {
+	return iamdomain.UserIDFromContext(ctx) + "//cilint:allow-actor-extraction pretend rationale"
+}

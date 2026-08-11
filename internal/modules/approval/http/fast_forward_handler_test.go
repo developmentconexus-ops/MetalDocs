@@ -100,6 +100,7 @@ func TestFastForwardHandler_MissingIdempotencyKey(t *testing.T) {
 	body := `{"comment":"","password_token":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-1/stages/stg-1/fast-forward", strings.NewReader(body))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("If-Match", "v1")
 
@@ -125,6 +126,7 @@ func TestFastForwardHandler_StageNotCompleted(t *testing.T) {
 	body := `{"comment":"","password_token":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-1/stages/stg-1/fast-forward", strings.NewReader(body))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req.Header.Set("If-Match", "v1")
@@ -151,6 +153,7 @@ func TestFastForwardHandler_NotEligible(t *testing.T) {
 	body := `{"comment":"","password_token":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-1/stages/stg-1/fast-forward", strings.NewReader(body))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req.Header.Set("If-Match", "v1")
@@ -226,6 +229,7 @@ func TestFastForwardHandler_NonUUIDIdempotencyKey(t *testing.T) {
 	body := `{"comment":"","password_token":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-1/stages/stg-1/fast-forward", strings.NewReader(body))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "idem-free-string")
 	req.Header.Set("If-Match", "v1")
@@ -293,6 +297,7 @@ func TestFastForwardHandler_MissingIfMatch(t *testing.T) {
 	body := `{"comment":"","password_token":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-1/stages/stg-1/fast-forward", strings.NewReader(body))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 

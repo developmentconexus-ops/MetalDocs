@@ -17,6 +17,7 @@ import (
 	"metaldocs/internal/modules/approval/domain"
 	approvalidempinfra "metaldocs/internal/modules/approval/infrastructure/idempotency"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/tenant"
@@ -167,12 +168,40 @@ func instanceETag(revisionVersion int) string {
 	return "\"v" + strconv.Itoa(revisionVersion) + "\""
 }
 
-func actorIDFromRequest(r *http.Request) string {
-	return iamdomain.UserIDFromContext(r.Context())
+// actorIDFromRequest resolves the authenticated actor for the fifteen approval
+// handlers that attribute a governed act to a person — submit, signoff,
+// decision, cancel, obsolete, delegation, route admin. A3.3: it returns
+// authn.ErrMissingActor rather than "" when the principal is absent, so the
+// caller's existing `WriteError` line rejects the request (401
+// auth.unauthenticated) BEFORE any service, repository, or audit write sees a
+// blank actor. The previous string-only shape made "no actor" indistinguishable
+// from "actor is the empty user" at every one of those call sites.
+func actorIDFromRequest(r *http.Request) (string, error) {
+	return authn.RequireUserID(r.Context())
 }
 
 func tenantIDFromReq(r *http.Request) (string, error) {
 	return tenant.FromContext(r.Context())
+}
+
+// requestIdentity resolves the (tenant, actor) pair every mutating approval
+// handler needs before it may touch a service, and writes the contract-correct
+// problem response itself when either half is absent. Both halves are
+// preconditions of the same kind — "this request has no principal to attribute
+// the act to" — so they resolve together at one call site instead of two
+// sequential err-blocks per handler.
+func requestIdentity(w http.ResponseWriter, r *http.Request) (tenantID, actorID string, ok bool) {
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		WriteError(w, r, err)
+		return "", "", false
+	}
+	actorID, err = actorIDFromRequest(r)
+	if err != nil {
+		WriteError(w, r, err)
+		return "", "", false
+	}
+	return tenantID, actorID, true
 }
 
 // idempotentHandler wraps next with the platform idempotency middleware, keyed
@@ -184,9 +213,13 @@ func tenantIDFromReq(r *http.Request) (string, error) {
 // live on *Handler, so an explicit name keeps the two call paths unambiguous).
 func (h *Handler) idempotentHandler(routeTemplate string, next http.Handler) http.Handler {
 	store := idempotency.New(h.db, routeTemplate)
-	return idempotency.Require(store, func(ctx context.Context) (string, string) {
+	return idempotency.Require(store, func(ctx context.Context) (string, string, error) {
 		tenantID, _ := tenant.FromContext(ctx)
-		return tenantID, iamdomain.UserIDFromContext(ctx)
+		actorID, err := authn.RequireUserID(ctx)
+		if err != nil {
+			return "", "", err
+		}
+		return tenantID, actorID, nil
 	})(next)
 }
 

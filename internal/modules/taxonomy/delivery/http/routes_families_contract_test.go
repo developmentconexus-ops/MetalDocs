@@ -11,11 +11,14 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/taxonomy/domain"
+	"metaldocs/internal/platform/authn"
+	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
 
 type fakeFamilyService struct {
 	createErr error
+	updateErr error
 }
 
 func (f fakeFamilyService) List(_ context.Context, tenantID string, includeInactive bool) ([]domain.DocumentFamily, error) {
@@ -28,9 +31,42 @@ func (f fakeFamilyService) Create(_ context.Context, fam *domain.DocumentFamily)
 	return f.createErr
 }
 func (f fakeFamilyService) Update(_ context.Context, fam *domain.DocumentFamily) (*domain.DocumentFamily, error) {
+	if f.updateErr != nil {
+		return nil, f.updateErr
+	}
 	return fam, nil
 }
 func (f fakeFamilyService) Deactivate(_ context.Context, code domain.FamilyCode) error { return nil }
+
+// TestFamiliesHandler_UpdateMissingActorReturns401 is the PR #108 review-round-1
+// remediation for FINDING 1: FamilyService.Update (A3.3/T1) resolves the actor
+// before any mutation work and returns authn.ErrMissingActor when it is absent,
+// but writeFamilyError had no case for that sentinel and fell through to the
+// default 500 internal.unknown arm — the documented contract is 401
+// auth.unauthenticated, the same code every other actor-gated route answers
+// with (see internal/platform/authn/context.go and
+// internal/modules/tokens/delivery/http/handler.go's writeTokenError).
+func TestFamiliesHandler_UpdateMissingActorReturns401(t *testing.T) {
+	handler := &Handler{families: fakeFamilyService{updateErr: authn.ErrMissingActor}}
+	mux := http.NewServeMux()
+	handler.Mount(mux)
+
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/taxonomy/families/F1", strings.NewReader(`{"name":"Family"}`))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d (body=%s)", rec.Code, http.StatusUnauthorized, rec.Body.String())
+	}
+	var prob problem.Problem
+	if err := json.Unmarshal(rec.Body.Bytes(), &prob); err != nil {
+		t.Fatalf("decode problem body: %v (body=%s)", err, rec.Body.String())
+	}
+	if prob.Code != problem.CodeAuthUnauthenticated {
+		t.Fatalf("problem code = %q, want %q", prob.Code, problem.CodeAuthUnauthenticated)
+	}
+}
 
 func TestFamiliesHandler_GetMissing_Returns404(t *testing.T) {
 	handler := &Handler{families: fakeFamilyService{}}

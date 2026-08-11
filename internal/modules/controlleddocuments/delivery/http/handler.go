@@ -107,26 +107,38 @@ func matchesControlledDocumentSubPath(path, suffix string) bool {
 		path[len(path)-len(suffix):] == suffix
 }
 
+// idempotencyActor resolves the (tenant, actor) pair the platform idempotency
+// middleware scopes a replay record by.
+//
+// A3.3: "broader-but-still-safe" was wrong — a blank actor is a key SHARED by
+// every unauthenticated caller, not a wider one, so the replay slot was
+// cross-caller. Absence now fails the middleware before a claim is written; the
+// mutation handler's own fail-closed check (writeDomainError) stays as the
+// second line.
+//
+// It lives at package scope rather than inside Mount so the fail-closed branch
+// does not count against Mount's cognitive complexity, which already sits at
+// the ceiling from the route dispatch below.
+func idempotencyActor(ctx context.Context) (string, string, error) {
+	userID, err := authn.RequireUserID(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	return tenantIDFromContext(ctx), userID, nil
+}
+
 // Mount mounts the generated controlled-documents API surface
 // onto mux under /api/v1, wrapping the two mutating POST routes with
 // Idempotency-Key enforcement.
 func (h *Handler) Mount(mux httprouter.Muxer) {
-	actorOf := func(ctx context.Context) (string, string) {
-		// Idempotency scoping is best-effort here: a missing actor
-		// produces a broader-but-still-safe key. The mutation handler
-		// itself fail-closes on missing actor (see writeDomainError).
-		userID, _ := authn.UserIDFromContext(ctx)
-		return tenantIDFromContext(ctx), userID
-	}
-
 	middleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPost && r.URL.Path == "/api/v1/controlled-documents" {
-				injectTenant(idempotency.Require(h.idempCreate, actorOf)(next)).ServeHTTP(w, r)
+				injectTenant(idempotency.Require(h.idempCreate, idempotencyActor)(next)).ServeHTTP(w, r)
 				return
 			}
 			if r.Method == http.MethodPost && matchesControlledDocumentSubPath(r.URL.Path, "/revisions") {
-				injectTenant(idempotency.Require(h.idempRevision, actorOf)(next)).ServeHTTP(w, r)
+				injectTenant(idempotency.Require(h.idempRevision, idempotencyActor)(next)).ServeHTTP(w, r)
 				return
 			}
 			// CON-06(b): obsolete/supersede are PUT lifecycle routes whose
@@ -136,11 +148,11 @@ func (h *Handler) Mount(mux httprouter.Muxer) {
 			// succeeded request must replay the original 204, not surface that
 			// 409 as if the retry itself were invalid.
 			if r.Method == http.MethodPut && matchesControlledDocumentSubPath(r.URL.Path, "/obsolete") {
-				injectTenant(idempotency.Require(h.idempObsolete, actorOf)(next)).ServeHTTP(w, r)
+				injectTenant(idempotency.Require(h.idempObsolete, idempotencyActor)(next)).ServeHTTP(w, r)
 				return
 			}
 			if r.Method == http.MethodPut && matchesControlledDocumentSubPath(r.URL.Path, "/supersede") {
-				injectTenant(idempotency.Require(h.idempSupersede, actorOf)(next)).ServeHTTP(w, r)
+				injectTenant(idempotency.Require(h.idempSupersede, idempotencyActor)(next)).ServeHTTP(w, r)
 				return
 			}
 			next.ServeHTTP(w, r)

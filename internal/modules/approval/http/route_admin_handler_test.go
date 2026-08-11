@@ -166,6 +166,7 @@ func TestCreateRoute_CapDenied(t *testing.T) {
 			body := `{"profile_code":"ops","name":"Ops Route","stages":[{"order":1,"name":"Review","required_capability":"document.signoff","quorum":"any_1_of","drift_policy":"reduce_quorum","selectors":[{"kind":"role_in_fixed_area","role":"approver","area_code":"ops"}]}]}`
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/routes", strings.NewReader(body))
 			req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
+			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 
@@ -195,6 +196,7 @@ func TestCreateRoute_DuplicateProfile(t *testing.T) {
 			body := `{"profile_code":"ops","name":"Ops Route","stages":[{"order":1,"name":"Review","required_capability":"document.signoff","quorum":"any_1_of","drift_policy":"reduce_quorum","selectors":[{"kind":"role_in_fixed_area","role":"approver","area_code":"ops"}]}]}`
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/routes", strings.NewReader(body))
 			req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
+			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 
@@ -745,6 +747,7 @@ func TestUpdateRoute_RouteInUse(t *testing.T) {
 			body := `{"name":"Ops Route v2","stages":[{"order":1,"name":"Review","required_capability":"document.signoff","quorum":"all_of","drift_policy":"fail_stage","selectors":[{"kind":"role_in_fixed_area","role":"approver","area_code":"ops"}]}]}`
 			req := httptest.NewRequest(http.MethodPut, "/api/v1/approval/routes/route-1", strings.NewReader(body))
 			req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
+			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 			req.Header.Set("If-Match", "\"v4\"")
@@ -950,6 +953,7 @@ func TestUpdateRoute_RequiresIfMatch(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 
 	rr := httptest.NewRecorder()
 	mux.ServeHTTP(rr, req)
@@ -966,6 +970,7 @@ func TestDeactivateRoute_RequiresIfMatch(t *testing.T) {
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/approval/routes/route-1", nil)
 	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 
 	rr := httptest.NewRecorder()
 	mux.ServeHTTP(rr, req)
@@ -984,6 +989,7 @@ func TestUpdateRoute_RejectsIfMatchV0(t *testing.T) {
 	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	req.Header.Set("If-Match", "v0")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 
 	rr := httptest.NewRecorder()
 	mux.ServeHTTP(rr, req)

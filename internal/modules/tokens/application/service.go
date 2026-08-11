@@ -13,6 +13,7 @@ import (
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/tokens/domain"
+	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/requesttrace"
 )
@@ -179,7 +180,13 @@ func (s *Service) Delete(ctx context.Context, tenantID, actorID, id string) erro
 func (s *Service) Get(ctx context.Context, tenantID, id string) (*domain.Entry, error) {
 	var out *domain.Entry
 	err := s.runner.Do(ctx, func(tx *sql.Tx) error {
-		actorID := iamdomain.UserIDFromContext(ctx)
+		// A3.3: actorID seeds the authz GUC the tier-2 capability check reads.
+		// A blank actor is not an unprivileged principal, it is NO principal, so
+		// refuse before seeding rather than letting "" reach the PDP.
+		actorID, err := authn.RequireUserID(ctx)
+		if err != nil {
+			return err
+		}
 		if err := s.seed(ctx, tx, tenantID, actorID); err != nil {
 			return err
 		}
@@ -204,7 +211,13 @@ func (s *Service) Get(ctx context.Context, tenantID, id string) (*domain.Entry, 
 func (s *Service) GetByName(ctx context.Context, tenantID, name string) (*domain.Entry, error) {
 	var out *domain.Entry
 	err := s.runner.Do(ctx, func(tx *sql.Tx) error {
-		actorID := iamdomain.UserIDFromContext(ctx)
+		// A3.3: actorID seeds the authz GUC the tier-2 capability check reads.
+		// A blank actor is not an unprivileged principal, it is NO principal, so
+		// refuse before seeding rather than letting "" reach the PDP.
+		actorID, err := authn.RequireUserID(ctx)
+		if err != nil {
+			return err
+		}
 		if err := s.seed(ctx, tx, tenantID, actorID); err != nil {
 			return err
 		}
@@ -229,7 +242,13 @@ func (s *Service) GetByName(ctx context.Context, tenantID, name string) (*domain
 func (s *Service) List(ctx context.Context, tenantID string) ([]domain.Entry, error) {
 	var out []domain.Entry
 	err := s.runner.Do(ctx, func(tx *sql.Tx) error {
-		actorID := iamdomain.UserIDFromContext(ctx)
+		// A3.3: actorID seeds the authz GUC the tier-2 capability check reads.
+		// A blank actor is not an unprivileged principal, it is NO principal, so
+		// refuse before seeding rather than letting "" reach the PDP.
+		actorID, err := authn.RequireUserID(ctx)
+		if err != nil {
+			return err
+		}
 		if err := s.seed(ctx, tx, tenantID, actorID); err != nil {
 			return err
 		}

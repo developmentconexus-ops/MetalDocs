@@ -239,7 +239,7 @@ var checks = []Check{
 		// actually invokes. It said five for as long as there were ten
 		// (pass13-guards.md §3) — a registry that describes the wrong product
 		// is the same class of untruth as a check that does not run.
-		Desc:     "custom Go analyzers (hgcrossmodule, nosqltxindomain, platformboundary, txownership, legacyvocab, outboxpair, postcommitaudit, deliveryauditsink, nodualmode, noresponsemap, problemwriter) against the recorded baseline",
+		Desc:     "custom Go analyzers (hgcrossmodule, nosqltxindomain, platformboundary, txownership, legacyvocab, outboxpair, postcommitaudit, deliveryauditsink, nodualmode, noresponsemap, problemwriter, actorextraction) against the recorded baseline",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"go", "run", "./tools/cilint", "./..."},
 		CIJob:    "ci.yml:verify",
@@ -276,6 +276,72 @@ var checks = []Check{
 				// fixture. That file names no media type, so the only rule that
 				// can report it is the signature rule resolving by import path.
 				`function writeAliasedProblem takes both an http.ResponseWriter and a *problem.Problem`,
+				// A3.3: the same sandbox carries the three actor-extraction
+				// fixtures. All three are pinned separately because each one
+				// alone leaves the fail-open shape reachable.
+				//
+				// (a) the low-level accessor called under its normal import.
+				`the low-level identity-storage accessor that returns "" for a missing actor (A3.3)`,
+				// (b) the SAME call under an import alias. Pinned by file name
+				// because the message is identical to (a)'s, so without naming
+				// the file an analyzer that went back to matching the
+				// identifier "iamdomain" would still satisfy the line above.
+				// Only a rule resolving by import PATH reports this file.
+				`aliased_lowlevel_actor.go`,
+				// (c) both discard forms of the CANONICAL accessor. Rule 1
+				// without Rule 2 is one underscore wide: banning the fail-open
+				// accessor accomplishes nothing if the fail-closed one can be
+				// called and its answer thrown away. The bool-returning and
+				// error-returning siblings are pinned separately so removing
+				// either from the analyzer's table fails the fixture.
+				`discards the presence bool of authn.UserIDFromContext (A3.3)`,
+				`discards the error of authn.RequireUserID (A3.3)`,
+				// A3.3 enforcement round (#108 review 4902506890). Each line
+				// below is a shape the first implementation let through, and
+				// each is pinned by FILE because the messages are shared with
+				// the fixtures above — without the file name an analyzer that
+				// dropped the widening would still satisfy the message lines.
+				//
+				// E1: the accessor referenced without being called. A CallExpr-
+				// only rule reads `extract := iamdomain.UserIDFromContext` as an
+				// assignment and reports nothing, and the call one line later is
+				// then invisible to it.
+				`indirect_lowlevel_actor.go`,
+				// E2: dot imports of both protected paths. A dot import deletes
+				// the qualifier that Rules 1 and 2 resolve, so the ban has to be
+				// on the ImportSpec. Both paths are pinned: banning only the
+				// low-level one leaves the canonical one dot-importable, and the
+				// discarded underscore comes straight back.
+				`dot-imports metaldocs/internal/modules/iam/domain`,
+				`dot-imports metaldocs/internal/platform/authn`,
+				// E3: the discard written as a declaration. `var x, _ = f(ctx)`
+				// is a ValueSpec, not an AssignStmt — one binding, two node
+				// types, and a matcher written against the assignment form alone
+				// has a spelling that turns it off.
+				`declaration_discard.go`,
+				// E4: suppression has to be a real directive with a real reason.
+				// A bare directive is the invariant switched off with nothing for
+				// a reviewer to disagree with; the same characters inside a
+				// string literal are data that a raw-line scan cannot tell from
+				// code. Both files still carry a violation and both must still be
+				// reported. (That a WELL-FORMED directive does suppress is the
+				// complementary half, proven in
+				// tools/cilint/internal/analyzers/actorextraction_test.go — an
+				// absence is not assertable through Want.)
+				`bare_suppression.go`,
+				`string_literal_suppression.go`,
+				// #108 review round 1, finding 3: the fresh gap AFTER the E1 alias
+				// fix, on the OTHER accessor. E1 taught Rule 1 to follow a reference
+				// to the low-level accessor through a local alias; this file proves
+				// Rule 2 has the identical hole on the canonical, fail-closed
+				// accessor: `extract := authn.RequireUserID` binds it to a local, and
+				// `actor, _ := extract(ctx)` discards its error with call.Fun as a
+				// bare *ast.Ident that isSelector cannot resolve. Pinned by FILE name
+				// because the message text is shared with ignored_presence.go's
+				// direct-call fixture — without the file name, an analyzer that
+				// regressed to matching only `authn.RequireUserID(ctx)` verbatim would
+				// still satisfy the message lines above.
+				`indirect_presence_discard.go`,
 			},
 		},
 	},

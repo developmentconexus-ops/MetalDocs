@@ -9,6 +9,7 @@ import (
 	authdomain "metaldocs/internal/modules/auth/domain"
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/authn"
 	httpresponse "metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
@@ -168,8 +169,12 @@ func (m *Middleware) resolveVisibilityCapability(w http.ResponseWriter, r *http.
 // context only (C1/C7 — never client-supplied headers). Writes the 401
 // problem response itself and returns ok=false when either is missing.
 func (m *Middleware) sessionIdentity(w http.ResponseWriter, r *http.Request) (userID, tenantID string, ok bool) {
-	userID = iamdomain.UserIDFromContext(r.Context())
-	if userID == "" {
+	// A3.3: presence is read explicitly through the canonical accessor (which
+	// also rejects a whitespace-only actor) instead of comparing the low-level
+	// "" sentinel.
+	var ok2 bool
+	userID, ok2 = authn.UserIDFromContext(r.Context())
+	if !ok2 {
 		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
 		return "", "", false
 	}

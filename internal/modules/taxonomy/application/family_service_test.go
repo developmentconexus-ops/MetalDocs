@@ -106,7 +106,7 @@ func TestFamilyService_Create(t *testing.T) {
 	svc := NewFamilyService(repo, &fakeGovernanceLogger{})
 
 	f := &domain.DocumentFamily{Code: "policy", TenantID: "tenant-a", Name: "Policy"}
-	if err := svc.Create(context.Background(), f); err != nil {
+	if err := svc.Create(actorCtx(), f); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	got, err := svc.Get(context.Background(), "tenant-a", "policy")
@@ -165,7 +165,9 @@ func TestFamilyService_Deactivate_BlockedByProfiles(t *testing.T) {
 	repo.activeProfiles["policy"] = true
 	svc := NewFamilyService(repo, &fakeGovernanceLogger{})
 
-	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
+	// A3.3 T1: the actor is resolved before the transaction, so a context with
+	// only a tenant no longer reaches the HasActiveProfilesTx check under test.
+	ctx := tenant.WithTenantID(actorCtx(), "tenant-a")
 	if err := svc.Deactivate(ctx, "policy"); !errors.Is(err, domain.ErrFamilyHasProfiles) {
 		t.Fatalf("want ErrFamilyHasProfiles, got %v", err)
 	}
@@ -179,7 +181,7 @@ func TestFamilyService_Deactivate_OK(t *testing.T) {
 	repo.families[familyKey("tenant-a", "orphan")] = &domain.DocumentFamily{Code: "orphan", TenantID: "tenant-a", IsActive: true}
 	svc := NewFamilyService(repo, &fakeGovernanceLogger{})
 
-	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
+	ctx := tenant.WithTenantID(actorCtx(), "tenant-a")
 	if err := svc.Deactivate(ctx, "orphan"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -194,7 +196,7 @@ func TestFamilyService_Update_PreservesIsActive(t *testing.T) {
 	repo.families[familyKey("tenant-a", "policy")] = &domain.DocumentFamily{Code: "policy", TenantID: "tenant-a", Name: "Old", IsActive: false}
 	svc := NewFamilyService(repo, &fakeGovernanceLogger{})
 
-	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
+	ctx := tenant.WithTenantID(actorCtx(), "tenant-a")
 	if _, err := svc.Update(ctx, &domain.DocumentFamily{Code: "policy", Name: "New"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -210,7 +212,8 @@ func TestFamilyService_Update_PreservesIsActive(t *testing.T) {
 func TestFamilyService_Update_NotFound(t *testing.T) {
 	repo := newFakeFamilyRepo()
 	svc := NewFamilyService(repo, &fakeGovernanceLogger{})
-	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
+	// A3.3 T1: see TestFamilyService_Deactivate_BlockedByProfiles.
+	ctx := tenant.WithTenantID(actorCtx(), "tenant-a")
 	_, err := svc.Update(ctx, &domain.DocumentFamily{Code: "missing", Name: "X"})
 	if !errors.Is(err, domain.ErrFamilyNotFound) {
 		t.Fatalf("want ErrFamilyNotFound, got %v", err)

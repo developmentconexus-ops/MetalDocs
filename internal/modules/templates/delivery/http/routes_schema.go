@@ -17,7 +17,11 @@ func (h *Handler) updateSchemas(w http.ResponseWriter, r *http.Request) {
 		problem.Respond(w, r, problem.New(http.StatusInternalServerError, codeTplInternalError, "internal server error"))
 		return
 	}
-	actorID := userIDFromReq(r)
+	actorID, err := userIDFromReq(r)
+	if err != nil {
+		writeMappedErr(w, r, err)
+		return
+	}
 	templateID := r.PathValue("id")
 	versionNum, err := strconv.Atoi(r.PathValue("n"))
 	if err != nil {
