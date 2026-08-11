@@ -77,6 +77,20 @@ type Fixture struct {
 	// because that walks each commit's diff against its own parent —
 	// migration-gapless's PR #113 false positive was exactly this shape.
 	// "base/" alone is unaffected if "head2/" is absent.
+	//
+	// Optional divergent base-side commit: if the tree ALSO contains a
+	// "base2/" directory, it is committed as a SIBLING of "head/" — a
+	// second child of "base/"'s commit, NOT an ancestor of HEAD — and
+	// refs/remotes/origin/main is advanced to point at it. This models
+	// origin/$BASE moving forward, after the branch forked, with its own
+	// commit — the checked-out HEAD and working tree are untouched; only
+	// origin/main's ref moves. This exists for the sibling false-positive
+	// CodeRabbit found on PR #123: a SYMMETRIC `origin/$BASE...HEAD` range
+	// walks commits reachable from origin/$BASE alone too, so a
+	// post-fork main commit editing a migration that exists at the merge
+	// base gets misread as a branch violation, identically to the
+	// branch-only "head2/" shape but on the other lineage. "head/" and
+	// "head2/" are unaffected if "base2/" is absent.
 	Dir string
 
 	// ArgvOverride replaces the check's Argv, and runs from the REPO ROOT
@@ -367,13 +381,97 @@ func materializeLayeredFixture(ctx context.Context, src, sandbox string) error {
 	if fi, statErr := os.Stat(filepath.Join(src, "head2")); statErr == nil && fi.IsDir() {
 		head2 = true
 	}
-	if !head2 {
+	if head2 {
+		if err := copyTree(filepath.Join(src, "head2"), sandbox); err != nil {
+			return err
+		}
+		if err := gitCommit(ctx, sandbox, "head2"); err != nil {
+			return err
+		}
+	}
+
+	// Optional divergent base-side commit — see the Dir field's doc
+	// comment. Runs regardless of head2, since it branches off "base",
+	// not off whatever HEAD currently is.
+	return advanceOriginMain(ctx, src, sandbox)
+}
+
+// advanceOriginMain models origin/$BASE moving forward, after the branch
+// forked, with its own commit — see the Dir field's doc comment for "base2/"
+// and why this exists (the CodeRabbit-found sibling of the head2 false
+// positive: PR #123 review, symmetric range walks origin/$BASE-only commits
+// too).
+//
+// The new commit must be a SIBLING of "head/"'s commit (both children of
+// "base/"'s commit), not a descendant of it — HEAD and the sandbox's real
+// working tree must stay exactly as materializeLayeredFixture already left
+// them. Building it with `git commit`/`git checkout` would move HEAD and
+// overwrite the working tree with the wrong content, so this uses plumbing
+// instead: a scratch GIT_WORK_TREE and GIT_INDEX_FILE pointed at the same
+// GIT_DIR, so the new commit lands in the same object database and
+// refs/remotes/origin/main can be pointed at it, without the primary
+// checkout ever being touched.
+func advanceOriginMain(ctx context.Context, src, sandbox string) error {
+	base2Src := filepath.Join(src, "base2")
+	fi, statErr := os.Stat(base2Src)
+	if statErr != nil || !fi.IsDir() {
 		return nil
 	}
-	if err := copyTree(filepath.Join(src, "head2"), sandbox); err != nil {
+
+	baseOut, err := gitOutput(ctx, sandbox, "rev-parse", "refs/remotes/origin/main")
+	if err != nil {
 		return err
 	}
-	return gitCommit(ctx, sandbox, "head2")
+	baseSHA := strings.TrimSpace(baseOut)
+
+	scratch, err := os.MkdirTemp("", "verify-fixture-base2-")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.RemoveAll(scratch) }()
+
+	gitDir := filepath.Join(sandbox, ".git")
+	idx := filepath.Join(scratch, ".index")
+	plumb := func(args ...string) (string, error) {
+		full := append([]string{"--git-dir=" + gitDir, "--work-tree=" + scratch}, args...)
+		cmd := command(ctx, scratch, append([]string{"git"}, full...))
+		cmd.Env = append(fixtureEnv(), "GIT_INDEX_FILE="+idx)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("git %s: %w\n%s", strings.Join(args, " "), err, out)
+		}
+		return string(out), nil
+	}
+
+	if _, err := plumb("read-tree", baseSHA); err != nil {
+		return err
+	}
+	if _, err := plumb("checkout-index", "-a"); err != nil {
+		return err
+	}
+	if err := copyTree(base2Src, scratch); err != nil {
+		return err
+	}
+	if _, err := plumb("add", "-A"); err != nil {
+		return err
+	}
+	treeOut, err := plumb("write-tree")
+	if err != nil {
+		return err
+	}
+	tree := strings.TrimSpace(treeOut)
+
+	commitOut, err := plumb(
+		"-c", "user.name=verify-fixture",
+		"-c", "user.email=verify-fixture@invalid",
+		"commit-tree", tree, "-p", baseSHA, "-m", "base2",
+	)
+	if err != nil {
+		return err
+	}
+	newSHA := strings.TrimSpace(commitOut)
+
+	return gitRun(ctx, sandbox, "update-ref", "refs/remotes/origin/main", newSHA)
 }
 
 // fixtureArgv resolves what to run and from where.
@@ -447,12 +545,21 @@ func scriptsInArgv(argv []string) []string {
 }
 
 func gitRun(ctx context.Context, dir string, args ...string) error {
+	_, err := gitOutput(ctx, dir, args...)
+	return err
+}
+
+// gitOutput is gitRun, but returns stdout+stderr on success too — for
+// callers that need what git printed (rev-parse, write-tree, commit-tree),
+// not just whether it succeeded.
+func gitOutput(ctx context.Context, dir string, args ...string) (string, error) {
 	cmd := command(ctx, dir, append([]string{"git"}, args...))
 	cmd.Env = fixtureEnv()
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git %s: %w\n%s", strings.Join(args, " "), err, out)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("git %s: %w\n%s", strings.Join(args, " "), err, out)
 	}
-	return nil
+	return string(out), nil
 }
 
 // gitCommit stages everything and commits with an identity supplied on the
