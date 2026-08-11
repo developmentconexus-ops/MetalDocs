@@ -266,3 +266,147 @@ func TestRLSTruth_NonOwnerRoleEnforcesIsolation(t *testing.T) {
 		}
 	}()
 }
+
+// TestRLSTruth_CapabilityBindingsEnforcesIsolation is capability_bindings'
+// (issue #89/A8.1, ADR 0092 D1, migration 0318) instance of the same
+// non-owner metaldocs_ci proof as TestRLSTruth_NonOwnerRoleEnforcesIsolation
+// above -- a fresh grant table gets its own RLS proof rather than assuming
+// "it uses the same policy idiom" is enough on faith.
+func TestRLSTruth_CapabilityBindingsEnforcesIsolation(t *testing.T) {
+	db, dbName := testdb.OpenFreshDatabase(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	tenantA := testdb.NewTenant(t, db)
+	tenantB := testdb.NewTenant(t, db)
+	userA := testdb.NewUser(t, db, testdb.WithTenant(tenantA.ID))
+	userB := testdb.NewUser(t, db, testdb.WithTenant(tenantB.ID))
+
+	seedBinding := func(tenantID, userID string) {
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatalf("seed binding: begin tx: %v", err)
+		}
+		defer func() { _ = tx.Rollback() }()
+
+		testdb.SetCapsOnTx(t, tx, `[{"cap":"user.manage"}]`)
+		if _, err := tx.ExecContext(ctx,
+			`SELECT set_config('metaldocs.tenant_id', $1, true)`, tenantID,
+		); err != nil {
+			t.Fatalf("seed binding: set tenant GUC: %v", err)
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO metaldocs.capability_bindings
+				(tenant_id, subject_kind, subject_user_id, role_code, scope_kind)
+			 VALUES ($1::uuid, 'user', $2, 'viewer', 'tenant')`,
+			tenantID, userID,
+		); err != nil {
+			t.Fatalf("seed binding: insert: %v", err)
+		}
+		if err := tx.Commit(); err != nil {
+			t.Fatalf("seed binding: commit: %v", err)
+		}
+	}
+	seedBinding(tenantA.ID, userA.ID)
+	seedBinding(tenantB.ID, userB.ID)
+
+	// FORCE RLS status + policy catalog check (owner conn, catalog read only).
+	var forceRLS bool
+	if err := db.QueryRowContext(ctx,
+		`SELECT relforcerowsecurity FROM pg_class WHERE relname = 'capability_bindings'`,
+	).Scan(&forceRLS); err != nil {
+		t.Fatalf("read relforcerowsecurity for capability_bindings: %v", err)
+	}
+	if !forceRLS {
+		t.Fatalf("capability_bindings relforcerowsecurity = false, want true")
+	}
+
+	var policyCount int
+	if err := db.QueryRowContext(ctx,
+		`SELECT count(*) FROM pg_policy p
+		   JOIN pg_class c ON p.polrelid = c.oid
+		  WHERE c.relname = 'capability_bindings' AND p.polname = 'tenant_isolation'`,
+	).Scan(&policyCount); err != nil {
+		t.Fatalf("count tenant_isolation policy on capability_bindings: %v", err)
+	}
+	if policyCount != 1 {
+		t.Fatalf("capability_bindings tenant_isolation policy count = %d, want 1", policyCount)
+	}
+
+	ci := testdb.OpenAsCIRole(t, dbName)
+
+	// POSITIVE + NEGATIVE: GUC = tenant A -> A's row visible, B's is not.
+	func() {
+		tx, err := ci.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatalf("(cb-a) begin tx: %v", err)
+		}
+		defer tx.Rollback()
+
+		if _, err := tx.ExecContext(ctx, `SET LOCAL metaldocs.tenant_id = '`+tenantA.ID+`'`); err != nil {
+			t.Fatalf("(cb-a) SET LOCAL tenant_id=A: %v", err)
+		}
+
+		var aVisible, bVisible int
+		if err := tx.QueryRowContext(ctx,
+			`SELECT count(*) FROM metaldocs.capability_bindings WHERE subject_user_id = $1`, userA.ID,
+		).Scan(&aVisible); err != nil {
+			t.Fatalf("(cb-a) count A's binding under tenant A GUC: %v", err)
+		}
+		if aVisible != 1 {
+			t.Fatalf("(cb-a) A's binding visible under tenant A GUC = %d, want 1", aVisible)
+		}
+		if err := tx.QueryRowContext(ctx,
+			`SELECT count(*) FROM metaldocs.capability_bindings WHERE subject_user_id = $1`, userB.ID,
+		).Scan(&bVisible); err != nil {
+			t.Fatalf("(cb-a) count B's binding under tenant A GUC: %v", err)
+		}
+		if bVisible != 0 {
+			t.Fatalf("(cb-a) B's binding visible under tenant A GUC = %d rows, want 0 (cross-tenant leak)", bVisible)
+		}
+	}()
+
+	// REVERSED: GUC = tenant B -> A's row is invisible.
+	func() {
+		tx, err := ci.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatalf("(cb-b) begin tx: %v", err)
+		}
+		defer tx.Rollback()
+
+		if _, err := tx.ExecContext(ctx, `SET LOCAL metaldocs.tenant_id = '`+tenantB.ID+`'`); err != nil {
+			t.Fatalf("(cb-b) SET LOCAL tenant_id=B: %v", err)
+		}
+
+		var aVisible int
+		if err := tx.QueryRowContext(ctx,
+			`SELECT count(*) FROM metaldocs.capability_bindings WHERE subject_user_id = $1`, userA.ID,
+		).Scan(&aVisible); err != nil {
+			t.Fatalf("(cb-b) count A's binding under tenant B GUC: %v", err)
+		}
+		if aVisible != 0 {
+			t.Fatalf("(cb-b) A's binding visible under tenant B GUC = %d rows, want 0 -- RLS did NOT block cross-tenant read under the non-owner role", aVisible)
+		}
+	}()
+
+	// NULL-GUC ESCAPE HATCH PIN: no GUC set -> both bindings visible.
+	func() {
+		tx, err := ci.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatalf("(cb-d) begin tx: %v", err)
+		}
+		defer tx.Rollback()
+
+		var total int
+		if err := tx.QueryRowContext(ctx,
+			`SELECT count(*) FROM metaldocs.capability_bindings WHERE subject_user_id IN ($1, $2)`,
+			userA.ID, userB.ID,
+		).Scan(&total); err != nil {
+			t.Fatalf("(cb-d) count both bindings with no GUC set: %v", err)
+		}
+		if total != 2 {
+			t.Fatalf("(cb-d) visible count with no GUC set = %d, want 2 (null-GUC escape hatch, not a leak)", total)
+		}
+	}()
+}
