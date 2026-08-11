@@ -42,14 +42,20 @@ func QueryIdentityStatus(ctx context.Context, db *sql.DB) (IdentityStatus, error
 
 // AssertSafeIdentity is the A6.1 boot-fatal gate: it queries pg_roles for
 // db's connected identity and returns a non-nil error when that identity is
-// SUPERUSER or BYPASSRLS. Every composition root that opens the runtime
-// database connection (metaldocs-api, metaldocs-worker, metaldocs-jobs; see
-// internal/platform/bootstrap/{api,worker,jobs}.go) calls this immediately
-// after Open and treats a non-nil error as fatal -- the process must never
-// reach a state where it can serve or process work under an identity that
-// makes RLS and REVOKE-based hardening inert. It is deliberately NOT folded
-// into Open() itself: Open is also used by internal tooling (e.g.
-// scripts/release-backfill) that legitimately runs as the bootstrap owner.
+// SUPERUSER or BYPASSRLS. The process must never reach a state where it can
+// serve or process work under an identity that makes RLS and REVOKE-based
+// hardening inert.
+//
+// Every composition root that opens the runtime database connection
+// (metaldocs-api, metaldocs-worker, metaldocs-jobs; see
+// internal/platform/bootstrap/{api,worker,jobs}.go) gets this enforced by
+// calling OpenServing instead of Open -- OpenServing calls AssertSafeIdentity
+// internally, so the gate is structural, not a second call a composition
+// root can forget. AssertSafeIdentity itself stays exported because
+// DBIdentityHealthCheck (bootstrap/api.go) and its tests re-run the same
+// check post-boot, on a connection OpenServing already validated once, to
+// catch a role attribute changed live (e.g. ALTER ROLE ... SUPERUSER) after
+// the process started.
 func AssertSafeIdentity(ctx context.Context, db *sql.DB) error {
 	status, err := QueryIdentityStatus(ctx, db)
 	if err != nil {

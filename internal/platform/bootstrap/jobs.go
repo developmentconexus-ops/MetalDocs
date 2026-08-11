@@ -35,16 +35,13 @@ func BuildJobsDependencies(ctx context.Context, cfg config.JobsConfig, workerFac
 		return JobsDependencies{}, fmt.Errorf("load postgres config: %w", err)
 	}
 
-	db, err := pgdb.Open(ctx, pgCfg.DSN)
-	if err != nil {
-		return JobsDependencies{}, fmt.Errorf("open postgres: %w", err)
-	}
 	// A6.1 boot-fatal gate -- see the identical call in BuildAPIDependencies
-	// (bootstrap/api.go) for why: a SUPERUSER/BYPASSRLS connection makes RLS
-	// and REVOKE-based hardening inert, so metaldocs-jobs must refuse to run
-	// any periodic job (including the audit-integrity validator) under one.
-	if err := pgdb.AssertSafeIdentity(ctx, db); err != nil {
-		_ = closeDB(db)
+	// (bootstrap/api.go) for why: OpenServing refuses a SUPERUSER/BYPASSRLS
+	// connection, since RLS and REVOKE-based hardening are inert under one
+	// and metaldocs-jobs must refuse to run any periodic job (including the
+	// audit-integrity validator) under it.
+	db, err := pgdb.OpenServing(ctx, pgCfg.DSN)
+	if err != nil {
 		return JobsDependencies{}, err
 	}
 

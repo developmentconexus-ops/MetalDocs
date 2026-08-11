@@ -78,18 +78,14 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 		if err != nil {
 			return APIDependencies{}, fmt.Errorf("load postgres config: %w", err)
 		}
-		db, err := pgdb.Open(ctx, pgCfg.DSN)
-		if err != nil {
-			return APIDependencies{}, fmt.Errorf("open postgres: %w", err)
-		}
-		// A6.1 boot-fatal gate: refuse to construct dependencies -- and by
-		// extension refuse to ever call ListenAndServe -- when the connected
-		// identity is SUPERUSER or BYPASSRLS. See
+		// A6.1 boot-fatal gate: OpenServing refuses to hand back a connection
+		// -- and by extension refuses to ever let ListenAndServe start --
+		// when the connected identity is SUPERUSER or BYPASSRLS. See
 		// internal/platform/db/postgres.AssertSafeIdentity for why: both
 		// attributes make RLS and the REVOKE-based audit_events hardening
 		// inert for this connection.
-		if err := pgdb.AssertSafeIdentity(ctx, db); err != nil {
-			_ = closeDB(db)
+		db, err := pgdb.OpenServing(ctx, pgCfg.DSN)
+		if err != nil {
 			return APIDependencies{}, err
 		}
 		authRepo := authpg.NewRepository(db, iampg.NewUserTenantRepository(db))
