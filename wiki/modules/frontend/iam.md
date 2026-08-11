@@ -1,6 +1,6 @@
 # Frontend module: iam
 
-> **Last verified:** 2026-06-03 (PR-12 full rebuild — 6-tab Admin Center IA)
+> **Last verified:** 2026-08-11 (A2.2 dead-code burn-down: removed `useOverviewQuery.ts` — deleted, zero live consumer of `GET /api/v1/admin/iam/overview`, PR #119)
 > **Scope:** Admin Center (Overview, People, Roles & Capabilities, Audit, Sessions & Security, Usage) and tenant area-membership administration. Frontend slice of the backend [`iam`](../iam.md) and [`audit`](../audit.md) modules.
 > **Owner:** unassigned | **Backend counterpart:** [`wiki/modules/iam.md`](../iam.md)
 
@@ -22,7 +22,7 @@ Tenant operator UI for IAM. Surfaces user lifecycle, role/capability matrix, aud
   - [`tabs/SessionsTab.route.tsx`](../../../frontend/apps/web/src/features/iam/tabs/SessionsTab.route.tsx) → [`SessionsTab.tsx`](../../../frontend/apps/web/src/features/iam/tabs/SessionsTab.tsx)
   - [`tabs/UsageTab.route.tsx`](../../../frontend/apps/web/src/features/iam/tabs/UsageTab.route.tsx) → [`UsageTab.tsx`](../../../frontend/apps/web/src/features/iam/tabs/UsageTab.tsx)
 - Components: [`components/KpiStrip.tsx`](../../../frontend/apps/web/src/features/iam/components/KpiStrip.tsx), [`ActivityPanel.tsx`](../../../frontend/apps/web/src/features/iam/components/ActivityPanel.tsx), [`SessionsTable.tsx`](../../../frontend/apps/web/src/features/iam/components/SessionsTable.tsx), [`UserSessionsTable.tsx`](../../../frontend/apps/web/src/features/iam/components/UserSessionsTable.tsx), [`LockoutsTable.tsx`](../../../frontend/apps/web/src/features/iam/components/LockoutsTable.tsx), [`MfaCoverageCard.tsx`](../../../frontend/apps/web/src/features/iam/components/MfaCoverageCard.tsx), [`SecuritySignalsList.tsx`](../../../frontend/apps/web/src/features/iam/components/SecuritySignalsList.tsx), [`PresenceBadge.tsx`](../../../frontend/apps/web/src/features/iam/components/PresenceBadge.tsx).
-- Queries (openapi-fetch + TanStack Query): everything under [`features/iam/queries/`](../../../frontend/apps/web/src/features/iam/queries/) (`useOverviewQuery`, `useKpiQuery`, `useUsersQuery`, `useUserDetailQuery`, `useRolesQuery`, `useCapabilitiesQuery`, `useRoleCapabilitiesQuery`, `useAuditEventsQuery`, `useSessionsQuery`, `useMfaCoverageQuery`, `useLockoutsQuery`, `useSecuritySignalsQuery`, `useUsageQuery`, `useUserMembershipsQuery`, `usePresenceStream`).
+- Queries (openapi-fetch + TanStack Query): everything under [`features/iam/queries/`](../../../frontend/apps/web/src/features/iam/queries/) (`useKpiQuery`, `useUsersQuery`, `useUserDetailQuery`, `useRolesQuery`, `useCapabilitiesQuery`, `useRoleCapabilitiesQuery`, `useAuditEventsQuery`, `useSessionsQuery`, `useMfaCoverageQuery`, `useLockoutsQuery`, `useSecuritySignalsQuery`, `useUsageQuery`, `useUserMembershipsQuery`, `usePresenceStream`).
 - Mutations: [`features/iam/mutations/`](../../../frontend/apps/web/src/features/iam/mutations/) (`useInviteUserMutation`, `usePatchUserMutation`, `useBulkUsersMutation`, `useResetPasswordMutation`, `useRevokeSessionMutation`, `useUnlockUserMutation`, `useExportAuditMutation`).
 - Legacy compat (membership area admin only): [`membershipApi.ts`](../../../frontend/apps/web/src/features/iam/membershipApi.ts) — still uses `apiFetch` for `/api/v1/admin/users/{userId}/memberships`.
 
@@ -58,7 +58,6 @@ Presence is a WebSocket subscription (`usePresenceStream`) that writes into a de
 
 | FE call | Backend route |
 |---|---|
-| `useOverviewQuery` | `GET /api/v1/admin/iam/overview` |
 | `useKpiQuery` | `GET /api/v1/admin/iam/kpi` |
 | `useUsersQuery` / `useUserDetailQuery` | `GET /api/v1/admin/iam/users[?cursor=…]`, `GET /api/v1/admin/iam/users/{userId}` |
 | `useInviteUserMutation` | `POST /api/v1/admin/iam/users` |

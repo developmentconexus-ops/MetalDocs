@@ -1,6 +1,6 @@
 # Frontend module: auth
 
-> **Last verified:** 2026-06-01 (P2 consolidation: added Failure modes section)
+> **Last verified:** 2026-08-11 (A2.2 dead-code burn-down: removed the unmounted `/auth` route + `AuthRoutePage.tsx` — deleted, zero importers, PR #119)
 > **Scope:** Login, logout, change-password, session bootstrap, 401 → login redirect bus. Frontend slice of the backend [`auth`](../auth.md) module.
 > **Owner:** unassigned | **Backend counterpart:** [`wiki/modules/auth.md`](../auth.md)
 
@@ -10,9 +10,7 @@ Owns the only public route in the SPA (`/login`) plus the session lifecycle help
 
 ## 2. Key files
 
-- [`frontend/apps/web/src/features/auth/routes.tsx:1`](../../../frontend/apps/web/src/features/auth/routes.tsx) — `/auth` placeholder (the public `/login` route is declared at the root in [`AppRouter.tsx:15`](../../../frontend/apps/web/src/app/AppRouter.tsx)).
-- [`frontend/apps/web/src/features/auth/pages/LoginPage.tsx:137`](../../../frontend/apps/web/src/features/auth/pages/LoginPage.tsx) — login form, returnTo-aware `<Navigate>` post-success.
-- [`frontend/apps/web/src/features/auth/pages/AuthRoutePage.tsx:3`](../../../frontend/apps/web/src/features/auth/pages/AuthRoutePage.tsx).
+- [`frontend/apps/web/src/features/auth/pages/LoginPage.tsx:137`](../../../frontend/apps/web/src/features/auth/pages/LoginPage.tsx) — login form, returnTo-aware `<Navigate>` post-success. (The public `/login` route is declared at the root in [`AppRouter.tsx:15`](../../../frontend/apps/web/src/app/AppRouter.tsx).)
 - [`frontend/apps/web/src/features/auth/api/auth.ts:34`](../../../frontend/apps/web/src/features/auth/api/auth.ts) — `login` (34), `logout` (42), `me` (46), `changePassword` (50).
 - [`frontend/apps/web/src/features/auth/useAuthSession.ts:11`](../../../frontend/apps/web/src/features/auth/useAuthSession.ts) — `handleLogin`, `handleLogout` (clears `queryClient`), `handleChangePassword`.
 - [`frontend/apps/web/src/features/shell/pages/AppRoot.tsx:28`](../../../frontend/apps/web/src/features/shell/pages/AppRoot.tsx) — guarded bootstrap; calls `me()` on mount.
@@ -24,7 +22,6 @@ Owns the only public route in the SPA (`/login`) plus the session lifecycle help
 | Path | Component | Notes |
 |---|---|---|
 | `/login` | `LoginPage` (declared in `AppRouter.tsx:15`) | Public — outside `AppRoot` guard. No Rail, no Toolbar. |
-| `/auth` | `AuthRoutePage` | Protected helper page. |
 
 ## 4. TanStack Query
 

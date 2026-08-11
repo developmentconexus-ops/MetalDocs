@@ -31,7 +31,6 @@ ALLOWLIST=(
   "src/features/approval/pages/route-admin/RouteAdmin.module.css"
   "src/features/documents/pages/DocumentDetailRoute.module.css"
   "src/features/documents/pages/styles/DocumentEditorPage.module.css"
-  "src/features/documents/runtime/DynamicEditor.module.css"
   "src/features/iam/components/AuditEventsTable.module.css"
   "src/features/shared/components/editor-chrome/EditorChrome.module.css"
   "src/features/shared/components/editor-chrome/parts/VersionBadge.module.css"

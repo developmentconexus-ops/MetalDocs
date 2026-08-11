@@ -1,0 +1,6 @@
+{
+  "files": ["frontend/apps/web/src/features/example/OldDeadFile.tsx"],
+  "exports": [
+    {"file": "frontend/apps/web/src/features/example/utils.ts", "name": "oldUnusedHelper"}
+  ]
+}

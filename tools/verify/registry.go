@@ -40,6 +40,7 @@ var releaseExcluded = map[string]string{
 	"governance-diff-rules":              "rules about what a PR's diff must contain (contract change ships a spec update, etc.); a tag has no diff to rule on",
 	"migration-gapless":                  "\"no historical migration edited after merge\" is a property of a diff against origin/main",
 	"eslint-suppression-baseline-growth": "compares eslint-suppressions.json against the merge base with origin/main; release.yml's checkout has no \"fetch base ref\" step (there is no PR base on a tag) so origin/main is not guaranteed to resolve, and even when it does, \"did this PR's diff grow the baseline\" is not a question a tag build can ask",
+	"dead-code-baseline-growth":          "compares dead-code-baseline.json against the merge base with origin/main; same tag-has-no-PR-base reasoning as eslint-suppression-baseline-growth immediately above",
 }
 
 // Infra requirements. A check declaring any of these is skipped (loudly, with
@@ -1235,6 +1236,104 @@ var checks = []Check{
 		// script and the waiver file are its own inputs (C2 class, same
 		// reasoning as every other script-named-in-Paths entry above).
 		Paths: []string{"eslint-suppressions.json", "scripts/check-eslint-suppression-baseline-growth.sh", "scripts/check-governance-waivers.txt"},
+		CIJob: "ci.yml:verify",
+	},
+	{
+		// A2.2 (issue #91): knip has no built-in baseline/suppression
+		// mechanism the way ESLint 10's --suppressions-location does (see
+		// the "eslint" check above and its two ratchets), so this script IS
+		// the baseline: it runs knip scoped to exactly `files` (dead files)
+		// and `exports` (unused exports) — A2.2's owned slice, not clones,
+		// not component size, not unused dependencies/types — and compares
+		// against dead-code-baseline.json, failing only on entries knip
+		// reports now that the baseline does not already record.
+		//
+		// knip.json's own "ignore" (design-source/**, scripts/perf/**,
+		// tools/perfbench/**) keeps design mockups and standalone
+		// k6/bench scripts — neither reachable from any package's entry
+		// graph — out of the count; everything else, including every
+		// workspace's src/ (the issue's 29-and-growing dead-file count and
+		// its abandoned documents/canvas/ subtree) stays in scope.
+		ID:       "knip-dead-code",
+		Desc:     "knip reports no dead src/ file or unused export beyond dead-code-baseline.json (A2.2)",
+		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-dead-code.sh"},
+		Fixture: &Fixture{
+			Dir:          "knip-dead-code",
+			ArgvOverride: []string{"bash", "scripts/check-dead-code.sh", "--baseline", "{{fixture}}/baseline.json", "--current-json", "{{fixture}}/current.json"},
+			Want:         []string{"NEW DEAD FILE", "NEW UNUSED EXPORT"},
+		},
+		// dead-code-baseline.json is this check's own baseline input
+		// (A2.1 review's bot-caught bug: "a check whose baseline could
+		// change without the check re-running" — same reasoning as
+		// eslint-suppressions.json in the "eslint" check's Paths above).
+		// knip.json and the check script are the check's own definition.
+		Paths: []string{"frontend/", "packages/", "apps/", "knip.json", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", "dead-code-baseline.json", "scripts/check-dead-code.sh"},
+		CIJob: "ci.yml:verify",
+	},
+	{
+		// A2.2 review-precedent guard (issue #91): knip-dead-code above
+		// proves the working tree never has MORE debt than
+		// dead-code-baseline.json. It proves nothing about the baseline
+		// FILE itself — nothing stops a PR from hand-editing new entries
+		// straight into the "accepted" list, which knip-dead-code would
+		// then treat as clean. This is the same monotonicity gap A2.1
+		// closed for eslint-suppressions.json with
+		// eslint-suppression-baseline-growth (see that check's comment
+		// above); this check is its structural twin for
+		// dead-code-baseline.json. Comparison point is `git merge-base`
+		// computed live, never a second checked-in copy of the baseline.
+		ID:       "dead-code-baseline-growth",
+		Desc:     "dead-code-baseline.json never grows a dead file or (file, export) pair relative to the merge base with origin/main (A2.2)",
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-dead-code-baseline-growth.sh"},
+		Needs:    []string{needsGitDepth},
+		Fixture: &Fixture{
+			Dir:  "dead-code-baseline-growth",
+			Want: []string{"GREW"},
+		},
+		// dead-code-baseline.json is the check's actual subject; the
+		// script and the waiver file are its own inputs (C2 class, same
+		// reasoning as eslint-suppression-baseline-growth's Paths above).
+		Paths: []string{"dead-code-baseline.json", "scripts/check-dead-code-baseline-growth.sh", "scripts/check-governance-waivers.txt"},
+		CIJob: "ci.yml:verify",
+	},
+	{
+		// A2.2 (issue #91): knip-dead-code and dead-code-baseline-growth
+		// above prove the tree never has more debt than the baseline and
+		// that the baseline itself never grows unreviewed, but neither has
+		// a forcing function to make anyone ever revisit it once written --
+		// same gap eslint-suppression-expiry closes for
+		// eslint-suppressions.json (see that check's comment above). This is
+		// its structural twin for dead-code-baseline.json: keyed by the
+		// whole baseline rather than per-rule, since knip's baseline has no
+		// natural per-rule grouping the way ESLint's does.
+		ID:       "dead-code-baseline-expiry",
+		Desc:     "dead-code-baseline.json has a live (non-expired) dead-code-baseline.expiry.json entry when non-empty (A2.2)",
+		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-dead-code-baseline-expiry.sh"},
+		Fixture: &Fixture{
+			Dir: "dead-code-baseline-expiry",
+			// A bare "EXPIRED" substring would match any of the script's
+			// five distinct failure branches (missing expiry file,
+			// malformed expiry JSON, missing "expires" field, malformed
+			// date format, invalid calendar date, or an actually-past
+			// date) — it would not prove THIS fixture (a non-empty
+			// baseline plus a fixed, always-past expires: "2020-01-01")
+			// fails for the reason under test rather than by accident of
+			// one of the other four. Pinned to the exact stable message
+			// text emitted by the real script for this fixture's input
+			// (verified live: `bash scripts/check-dead-code-baseline-expiry.sh`
+			// against the fixture's two files prints this line, minus the
+			// "(today: ...)" suffix which is excluded here because it is
+			// not stable across days — review finding on PR #119).
+			Want: []string{"EXPIRED — baseline expired on 2020-01-01"},
+		},
+		// Same reasoning as eslint-suppression-expiry's Paths: whenever
+		// frontend/packages/apps code, knip's config, or the baseline
+		// itself can change, the expiry gate is back in scope too, plus the
+		// check's own inputs (C2 class).
+		Paths: []string{"frontend/", "packages/", "apps/", "knip.json", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", "dead-code-baseline.json", "dead-code-baseline.expiry.json", "scripts/check-dead-code-baseline-expiry.sh"},
 		CIJob: "ci.yml:verify",
 	},
 	{
