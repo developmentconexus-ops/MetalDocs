@@ -1,0 +1,33 @@
+package idempotency
+
+import (
+	"context"
+
+	"metaldocs/internal/platform/authn"
+	"metaldocs/internal/platform/tenant"
+)
+
+// TenantActorFromContext mirrors the real internal/platform/idempotency/identity.go
+// closely enough to matter for this fixture: it has the actorFromCtx shape
+// (ctx context.Context) (string, string, error) and it calls
+// tenant.FromContext(ctx) in its body — the exact form that WOULD fire this
+// guard if the check's identity.go exclusion were ever removed.
+//
+// This file exists at scripts/testdata/guard-fixtures/idempotency-identity-scope-guard/
+// internal/platform/idempotency/identity.go.txt, which copyTree materialises
+// at exactly internal/platform/idempotency/identity.go inside the fixture
+// sandbox — the one path the check excludes. Fixture.NotWant names this
+// path: the check must stay silent about it while the exclusion holds, and
+// go red the moment the exclusion is deleted (see the RED proof in the
+// commit that added this fixture).
+func TenantActorFromContext(ctx context.Context) (string, string, error) {
+	tenantID, err := tenant.FromContext(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	actorID, err := authn.RequireUserID(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	return tenantID, actorID, nil
+}

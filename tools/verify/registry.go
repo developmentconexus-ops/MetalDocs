@@ -750,6 +750,32 @@ var checks = []Check{
 			Want: []string{"internal/fixture/bypass_test.go"},
 		},
 	},
+	{
+		ID:       "idempotency-identity-scope-guard",
+		Desc:     "no actorFromCtx-shaped closure (func(context.Context)(string,string,error)) outside internal/platform/idempotency/identity.go calls tenant.FromContext directly (#90/A3.5 adoption guard)",
+		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-idempotency-identity-scope.sh"},
+		// Deliberately no Paths, same reasoning as testdb-bypass-guard above:
+		// the script's own scan is `git ls-files '*.go'` repo-wide, not scoped
+		// to internal/. A hand-rolled actorFromCtx-shaped resolver could be
+		// added under apps/ or tests/ just as easily as under internal/, and
+		// the whole point of this guard is that it does not trust a caller to
+		// know where the next violation will land.
+		CIJob: "ci.yml:verify",
+		Fixture: &Fixture{
+			Dir:  "idempotency-identity-scope-guard",
+			Want: []string{"internal/modules/fixture/bad_handler.go"},
+			// NotWant proves the identity.go exclusion itself is guarded, not
+			// merely conventional: the fixture tree plants, at exactly
+			// internal/platform/idempotency/identity.go, a copy of the real
+			// function shape (actorFromCtx signature, calls tenant.FromContext)
+			// that WOULD fire this guard everywhere else in the tree. If the
+			// script's exclusion of that one path is ever deleted, the check's
+			// output starts naming this path — NotWant catches that the moment
+			// it happens, rather than relying on nobody removing the `grep -v`.
+			NotWant: []string{"internal/platform/idempotency/identity.go"},
+		},
+	},
 
 	// ---- Governance -------------------------------------------------------
 	{
