@@ -49,11 +49,6 @@
       "count": 1
     }
   },
-  "frontend/apps/web/src/features/documents/components/CheckpointsPanel.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
   "frontend/apps/web/src/features/documents/components/wizard/steps/StepAreaCodeVisibility/ExternalSubcontrols.tsx": {
     "@typescript-eslint/no-unused-vars": {
       "count": 1

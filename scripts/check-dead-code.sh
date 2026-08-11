@@ -137,6 +137,30 @@ if [[ "$(jq -r 'if type == "object" and (.issues | type) == "array" then "ok" el
   exit 1
 fi
 
+# Per-issue shape guard: the array-level check above only proves .issues IS an
+# array, not that each element in it is a well-formed knip issue. Without
+# this, a malformed entry (missing/null .file, or a non-array .files/.exports
+# — e.g. {"issues":[{}]}) silently extracts to nothing via the `// []`
+# fallbacks below and is compared as "0 files, 0 exports found" — a knip
+# report that is broken in a new way would then read as a clean tree instead
+# of a failure. Reject before comparison, per the no-fallback principle:
+# integrity-critical reads fail closed, they do not substitute an empty
+# value (review finding on PR #119).
+ISSUE_SHAPE_BAD=$(jq -r '
+  [.issues[] | select(
+      (type != "object")
+      or (.file | type) != "string"
+      or (.file | length) == 0
+      or ((.files // []) | type) != "array"
+      or ((.exports // []) | type) != "array"
+      or (((.files // []) | length) == 0 and ((.exports // []) | length) == 0)
+    )] | length
+' "$CURRENT_JSON")
+if [[ "$ISSUE_SHAPE_BAD" != "0" ]]; then
+  echo "check-dead-code: FAIL — $ISSUE_SHAPE_BAD knip issue entry(ies) in $CURRENT_JSON are malformed (missing/empty .file, non-array .files/.exports, or neither field populated). A malformed issue is a failure, never a silent pass."
+  exit 1
+fi
+
 CURRENT_FILES="$WORKDIR/current-files.txt"
 CURRENT_EXPORTS="$WORKDIR/current-exports.txt"
 jq -r '[.issues[] | select((.files // []) | length > 0) | .file] | sort | .[]' "$CURRENT_JSON" >"$CURRENT_FILES"

@@ -1113,8 +1113,21 @@ var checks = []Check{
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-dead-code-baseline-expiry.sh"},
 		Fixture: &Fixture{
-			Dir:  "dead-code-baseline-expiry",
-			Want: []string{"EXPIRED"},
+			Dir: "dead-code-baseline-expiry",
+			// A bare "EXPIRED" substring would match any of the script's
+			// five distinct failure branches (missing expiry file,
+			// malformed expiry JSON, missing "expires" field, malformed
+			// date format, invalid calendar date, or an actually-past
+			// date) — it would not prove THIS fixture (a non-empty
+			// baseline plus a fixed, always-past expires: "2020-01-01")
+			// fails for the reason under test rather than by accident of
+			// one of the other four. Pinned to the exact stable message
+			// text emitted by the real script for this fixture's input
+			// (verified live: `bash scripts/check-dead-code-baseline-expiry.sh`
+			// against the fixture's two files prints this line, minus the
+			// "(today: ...)" suffix which is excluded here because it is
+			// not stable across days — review finding on PR #119).
+			Want: []string{"EXPIRED — baseline expired on 2020-01-01"},
 		},
 		// Same reasoning as eslint-suppression-expiry's Paths: whenever
 		// frontend/packages/apps code, knip's config, or the baseline

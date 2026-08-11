@@ -161,7 +161,7 @@ if (( violations == 0 )); then
   exit 0
 fi
 
-waived_lines=$(git diff -w "$MERGE_BASE" -- "$WAIVERS" 2>/dev/null \
+waived_lines=$(git diff -w "$MERGE_BASE" HEAD -- "$WAIVERS" 2>/dev/null \
   | grep -E '^\+[^+]' \
   | sed 's/^\+//' \
   | grep -E "^[[:space:]]*${RULE_ID}[[:space:]]*\|" || true)
