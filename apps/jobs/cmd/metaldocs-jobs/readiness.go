@@ -148,22 +148,44 @@ func (r *jobsReadiness) Check(ctx context.Context) (observability.DependencyChec
 		staleAfter = jobsHeartbeatFallbackStaleAfter
 	}
 
-	var newest time.Time
+	// F6 (review round 3): must be the OLDEST UpdatedAt across queues, not
+	// the newest. Readiness here means "every subscribed queue's producer
+	// is alive", per this type's own doc comment above ("the freshness of
+	// River's own queue-report heartbeat across every queue this binary
+	// subscribes") — taking the newest lets one live queue mask another
+	// that has stopped reporting entirely, which is exactly the
+	// "readiness tied to process existence, not progress" failure this
+	// slice exists to eliminate, just one level down (per-queue instead of
+	// per-process). A QueueGet returning a nil queue (no error — River's
+	// public API returns this for a name that was never created/
+	// subscribed) fails closed explicitly rather than being silently
+	// skipped, which would reintroduce the same masking bug for a queue
+	// this binary declares it subscribes but River has no row for.
+	var (
+		oldest    time.Time
+		oldestSet bool
+		staleName string
+	)
 	for _, name := range queues {
 		q, err := source.QueueGet(ctx, name)
 		if err != nil {
 			return observability.DependencyCheckResult{}, fmt.Errorf("river queue %q: %w", name, err)
 		}
-		if q != nil && q.UpdatedAt.After(newest) {
-			newest = q.UpdatedAt
+		if q == nil {
+			return observability.DependencyCheckResult{}, fmt.Errorf("river queue %q: QueueGet returned no queue (not created/subscribed?)", name)
+		}
+		if !oldestSet || q.UpdatedAt.Before(oldest) {
+			oldest = q.UpdatedAt
+			oldestSet = true
+			staleName = name
 		}
 	}
 
-	age := r.clockFunc()().Sub(newest)
+	age := r.clockFunc()().Sub(oldest)
 	if age > staleAfter {
 		return observability.DependencyCheckResult{}, fmt.Errorf(
-			"river queue report heartbeat stale: last report %s ago across queues %v (threshold %s)",
-			age.Round(time.Second), queues, staleAfter,
+			"river queue report heartbeat stale: queue %q last reported %s ago across queues %v (threshold %s)",
+			staleName, age.Round(time.Second), queues, staleAfter,
 		)
 	}
 	return observability.DependencyCheckResult{Status: "up"}, nil

@@ -39,9 +39,10 @@ func (c *fakeJobsClock) Advance(d time.Duration) {
 // Postgres or River schema, just a map of queue name -> UpdatedAt the test
 // controls directly.
 type fakeQueueSource struct {
-	mu   sync.Mutex
-	rows map[string]time.Time
-	err  error
+	mu    sync.Mutex
+	rows  map[string]time.Time
+	err   error
+	asNil map[string]bool // names that QueueGet should return (nil, nil) for
 }
 
 func (f *fakeQueueSource) QueueGet(_ context.Context, name string) (*rivertype.Queue, error) {
@@ -49,6 +50,9 @@ func (f *fakeQueueSource) QueueGet(_ context.Context, name string) (*rivertype.Q
 	defer f.mu.Unlock()
 	if f.err != nil {
 		return nil, f.err
+	}
+	if f.asNil[name] {
+		return nil, nil
 	}
 	return &rivertype.Queue{Name: name, UpdatedAt: f.rows[name]}, nil
 }
@@ -189,5 +193,73 @@ func TestJobsReadiness_QueueGetErrorFailsReadiness(t *testing.T) {
 
 	if _, err := r.Check(context.Background()); err == nil {
 		t.Fatal("Check() with a failing QueueGet = nil error, want an error")
+	}
+}
+
+// TestJobsReadiness_OneStaleQueueAmongManyFlipsNotReady is the F6 (review
+// round 3) RED-first proof: a live "maintenance" queue must NOT mask a dead
+// "temporal" queue. Per-queue freshness is the contract this binary's own
+// type doc promises ("every subscribed queue"); aggregating across queues
+// by taking the MOST recent UpdatedAt (the pre-fix "newest" logic) lets one
+// healthy queue paper over another that has stopped reporting entirely —
+// exactly the "readiness tied to process existence, not progress" failure
+// A7.1 exists to eliminate, just moved one level down (per-process ->
+// per-queue).
+//
+// Non-vacuous by construction: "maintenance" is kept fresh on every tick
+// (never goes stale on its own) while "temporal" is stamped once and then
+// left to rot past the threshold. A test that advanced every queue together
+// (see TestJobsReadiness_StaleQueueHeartbeatFlipsNotReady above) cannot
+// distinguish newest-across-queues from oldest-across-queues — it passes
+// either way. This one can: under the old "newest" aggregation it FAILS
+// (reports ready, because "maintenance" is always recent), and only passes
+// once the fix lands (oldest-across-queues correctly flags "temporal" as
+// stale).
+func TestJobsReadiness_OneStaleQueueAmongManyFlipsNotReady(t *testing.T) {
+	clock := &fakeJobsClock{t: time.Unix(1_700_000_000, 0)}
+	src := &fakeQueueSource{rows: map[string]time.Time{
+		"maintenance": clock.Now(),
+		"temporal":    clock.Now(),
+	}}
+	r := &jobsReadiness{}
+	r.ConfigureHeartbeat(src, []string{"maintenance", "temporal"}, 5*time.Minute, clock.Now)
+	r.MarkStarted()
+
+	// "temporal" never reports again from here on; "maintenance" keeps
+	// reporting right up to the threshold, so a newest-across-queues
+	// aggregation would see it as fresh forever.
+	for i := 0; i < 3; i++ {
+		clock.Advance(4 * time.Minute)
+		src.setUpdatedAt("maintenance", clock.Now())
+	}
+	// 12 minutes since "temporal" last reported (threshold 5 min);
+	// "maintenance" reported 0 minutes ago.
+
+	_, err := r.Check(context.Background())
+	if err == nil {
+		t.Fatal("Check() with \"temporal\" stale 12m past threshold (\"maintenance\" fresh) = nil error, want an error — a live queue must not mask a dead one")
+	}
+}
+
+// TestJobsReadiness_NilQueueFailsReadiness proves QueueGet returning a nil
+// *rivertype.Queue (no error — the shape River's public API allows for a
+// queue name that was never created/subscribed, distinct from a QueueGet
+// error) fails closed explicitly, rather than being silently skipped from
+// the aggregation. Skipping is the same failure shape as F6: paired here
+// with a "maintenance" queue that keeps reporting fresh, a skip-on-nil
+// implementation would let "maintenance" mask "temporal" never having a
+// queue row at all — this must still flip readiness to not-ready.
+func TestJobsReadiness_NilQueueFailsReadiness(t *testing.T) {
+	clock := &fakeJobsClock{t: time.Unix(1_700_000_000, 0)}
+	src := &fakeQueueSource{
+		rows:  map[string]time.Time{"maintenance": clock.Now()},
+		asNil: map[string]bool{"temporal": true},
+	}
+	r := &jobsReadiness{}
+	r.ConfigureHeartbeat(src, []string{"maintenance", "temporal"}, 5*time.Minute, clock.Now)
+	r.MarkStarted()
+
+	if _, err := r.Check(context.Background()); err == nil {
+		t.Fatal("Check() with QueueGet returning a nil queue for \"temporal\" (\"maintenance\" fresh) = nil error, want an error")
 	}
 }
