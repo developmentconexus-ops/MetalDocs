@@ -55,6 +55,23 @@ const actorExtractionPlumbing = "internal/platform/authn/context.go"
 // authorization, audit attribution, rate limiting, an application service, a
 // domain mutation, or persistence.
 //
+// SCOPE, STATED PLAINLY: this analyzer blocks the direct-call and single-hop
+// discard shapes; it does NOT follow aliases across bindings, struct fields,
+// function parameters, files, or wrapper functions — those remain
+// review-caught until the typed-actor follow-up (an `authn.Actor` minted only
+// by middleware and threaded to services as an explicit parameter) makes the
+// fail-open shape unrepresentable rather than merely unmatched. Concretely,
+// none of the following trip a finding today, and none of them are meant to:
+// a chained alias (`a := authn.RequireUserID; b := a; actor, _ := b(ctx)`), a
+// struct-field alias (`e := Extractor{Fn: authn.RequireUserID}`), an accessor
+// threaded through a function parameter, a cross-file alias in the same
+// package (the alias table below is built per *ast.File, not per package),
+// or a local wrapper function that calls the accessor and returns its
+// result untouched. See actorextraction_test.go's KnownGap tests for the
+// five confirmed cases. This is a syntax-matching guard, not a dataflow
+// analysis, and it is not being hardened into one — see #108 review round 1
+// disposition for why.
+//
 // Two competing accessors exist, and that is the whole problem:
 //
 //   - iamdomain.UserIDFromContext(ctx) string        — low-level context

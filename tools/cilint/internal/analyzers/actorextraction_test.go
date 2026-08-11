@@ -364,3 +364,193 @@ func settle(ctx context.Context) string {
 		t.Fatalf("a directive with a rationale must suppress the discard rule too, got %+v", findings)
 	}
 }
+
+// ─── KNOWN GAPS (#108 review round 1): documented, not desired ───────────────
+//
+// A cold reviewer broke Rule 2 with five bypasses, all producing zero
+// findings. The ruling on that finding was explicit: do NOT strengthen the
+// analyzer to chase them — Rule 2 defends a dataflow property with syntax
+// matching, and hardening it re-implements reachability analysis in a
+// bespoke tool while entrenching the exact guard the typed-actor follow-up
+// (an `authn.Actor` minted only by middleware and threaded to services as an
+// explicit parameter) is meant to delete.
+//
+// These five tests exist so the boundary is executable rather than prose:
+// anyone tightening Rule 2 later sees exactly where the line sits today, and
+// this file fails loudly the moment a change makes one of these shapes fire
+// — at which point it stops being a known gap and becomes a real finding to
+// report, not silently drop.
+//
+// Each case asserts ZERO findings. None of these fixtures may ever be added
+// to scripts/testdata/guard-fixtures/arch-lint/: that directory is the
+// negative-fixture spine consumed by `go run ./tools/verify -guard-fixtures
+// -only arch-lint`, which requires every fixture there to produce a
+// non-zero exit. A zero-finding fixture placed there breaks the harness.
+
+// actorFixtureMulti writes multiple source files into ONE temp directory —
+// i.e. one package on disk — and returns their full paths. Needed only by
+// the cross-file KnownGap below, where the whole point is that the two
+// files must coexist in the same package for the gap to be observable.
+func actorFixtureMulti(t *testing.T, files map[string]string) []string {
+	t.Helper()
+	dir := t.TempDir()
+	paths := make([]string, 0, len(files))
+	for relPath, src := range files {
+		full := filepath.Join(dir, filepath.FromSlash(relPath))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatalf("mkdir: %v", err)
+		}
+		if err := os.WriteFile(full, []byte(src), 0o644); err != nil {
+			t.Fatalf("write fixture: %v", err)
+		}
+		paths = append(paths, full)
+	}
+	return paths
+}
+
+// KnownGap 1: a chained alias. authnAccessorAliases only records a local
+// bound DIRECTLY to a bare SelectorExpr (`a := authn.RequireUserID`); `b :=
+// a` binds b to an *ast.Ident, not a SelectorExpr, so collectAuthnAccessorAlias
+// never records "b". `b(ctx)` then resolves through neither isSelector (b is
+// not a qualified reference) nor funcAliases (b was never added). Closed by
+// the typed-actor follow-up, not by teaching this rule to chase transitive
+// aliases.
+func TestActorExtraction_KnownGap_ChainedAlias(t *testing.T) {
+	src := `package application
+
+import (
+	"context"
+
+	"metaldocs/internal/platform/authn"
+)
+
+func settle(ctx context.Context) string {
+	a := authn.RequireUserID
+	b := a
+	actor, _ := b(ctx)
+	return actor
+}
+`
+	findings := actorFindings(t, "internal/modules/billing/application/svc.go", src)
+	if len(findings) != 0 {
+		t.Fatalf("documented known gap regressed to a real finding (report this, do not just update the assertion): %+v", findings)
+	}
+}
+
+// KnownGap 2: a struct-field alias. `e.Fn(ctx)` reaches isSelector as a
+// SelectorExpr, but sel.Sel.Name is "Fn", not "RequireUserID"/
+// "UserIDFromContext" — isSelector never gets past the name check, and
+// funcAliases only ever indexes bare identifiers, never struct fields.
+func TestActorExtraction_KnownGap_StructFieldAlias(t *testing.T) {
+	src := `package application
+
+import (
+	"context"
+
+	"metaldocs/internal/platform/authn"
+)
+
+type Extractor struct {
+	Fn func(context.Context) (string, error)
+}
+
+func settle(ctx context.Context) string {
+	e := Extractor{Fn: authn.RequireUserID}
+	actor, _ := e.Fn(ctx)
+	return actor
+}
+`
+	findings := actorFindings(t, "internal/modules/billing/application/svc.go", src)
+	if len(findings) != 0 {
+		t.Fatalf("documented known gap regressed to a real finding (report this, do not just update the assertion): %+v", findings)
+	}
+}
+
+// KnownGap 3: function-parameter indirection. The accessor is passed as a
+// `func(context.Context) (string, error)` argument and called through the
+// parameter name inside the callee. funcAliases is built per-file from
+// AssignStmt/ValueSpec bindings only; a function parameter is neither, so
+// the callee's `get(ctx)` never resolves to a canonical accessor no matter
+// what was passed at the call site.
+func TestActorExtraction_KnownGap_FunctionParameterIndirection(t *testing.T) {
+	src := `package application
+
+import (
+	"context"
+
+	"metaldocs/internal/platform/authn"
+)
+
+func callAccessor(ctx context.Context, get func(context.Context) (string, error)) string {
+	actor, _ := get(ctx)
+	return actor
+}
+
+func settle(ctx context.Context) string {
+	return callAccessor(ctx, authn.RequireUserID)
+}
+`
+	findings := actorFindings(t, "internal/modules/billing/application/svc.go", src)
+	if len(findings) != 0 {
+		t.Fatalf("documented known gap regressed to a real finding (report this, do not just update the assertion): %+v", findings)
+	}
+}
+
+// KnownGap 4: cross-file, same package. authnAccessorAliases runs once per
+// *ast.File inside scanActorExtractionFile; ActorExtraction calls it
+// separately for every path in the file list, so an alias table built while
+// scanning one file is never consulted while scanning a sibling file in the
+// same package — even though Go itself resolves the reference package-wide.
+func TestActorExtraction_KnownGap_CrossFileAlias(t *testing.T) {
+	paths := actorFixtureMulti(t, map[string]string{
+		"internal/modules/billing/application/alias.go": `package application
+
+import "metaldocs/internal/platform/authn"
+
+var Extract = authn.RequireUserID
+`,
+		"internal/modules/billing/application/svc.go": `package application
+
+import "context"
+
+func settle(ctx context.Context) string {
+	actor, _ := Extract(ctx)
+	return actor
+}
+`,
+	})
+	findings := analyzers.ActorExtraction(paths)
+	if len(findings) != 0 {
+		t.Fatalf("documented known gap regressed to a real finding (report this, do not just update the assertion): %+v", findings)
+	}
+}
+
+// KnownGap 5: a local wrapper function. `wrap` calls the canonical accessor
+// and returns its result untouched, but the FuncDecl itself is never fed
+// into authnAccessorAliases (which only watches AssignStmt/ValueSpec), so
+// `wrap` is not in funcAliases and `actor, _ := wrap(ctx)` resolves to
+// nothing the rule recognises — the discard inside wrap's own body is fine
+// (it returns both values), and the discard at the call site is invisible.
+func TestActorExtraction_KnownGap_LocalWrapperFunction(t *testing.T) {
+	src := `package application
+
+import (
+	"context"
+
+	"metaldocs/internal/platform/authn"
+)
+
+func wrap(ctx context.Context) (string, error) {
+	return authn.RequireUserID(ctx)
+}
+
+func settle(ctx context.Context) string {
+	actor, _ := wrap(ctx)
+	return actor
+}
+`
+	findings := actorFindings(t, "internal/modules/billing/application/svc.go", src)
+	if len(findings) != 0 {
+		t.Fatalf("documented known gap regressed to a real finding (report this, do not just update the assertion): %+v", findings)
+	}
+}

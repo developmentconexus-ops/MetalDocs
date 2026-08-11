@@ -1335,6 +1335,13 @@ func mapErr(err error) (int, problem.Code) {
 	switch {
 	case err == nil:
 		return http.StatusOK, problem.Code{}
+	// A3.3 / #108 review round 1: no authenticated principal in context.
+	// Every documents route is session-required, so this is the platform's
+	// 401 + auth.unauthenticated, not a documents dialect — the same case
+	// approval/http (errors.go) and templates/delivery/http (errors.go)
+	// already carry for the identical sentinel.
+	case errors.Is(err, authn.ErrMissingActor):
+		return http.StatusUnauthorized, problem.CodeAuthUnauthenticated
 	case errors.Is(err, domain.ErrForbidden), errors.Is(err, domain.ErrDocumentNotOwner):
 		return http.StatusForbidden, problem.CodePermissionDenied
 	case errors.Is(err, domain.ErrPendingNotFound),
