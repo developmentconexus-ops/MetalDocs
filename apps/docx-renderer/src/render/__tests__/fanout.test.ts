@@ -37,6 +37,56 @@ async function extractDocumentXml(docx: Uint8Array): Promise<string> {
   return file.async('string');
 }
 
+/** Every entry's stored ZIP date, keyed by path — used to assert the
+ * normalized timestamp directly rather than only its downstream hash. */
+async function zipEntryDates(docx: Uint8Array): Promise<Record<string, string>> {
+  const zip = await JSZip.loadAsync(docx);
+  const out: Record<string, string> = {};
+  zip.forEach((relativePath, entry) => {
+    out[relativePath] = entry.date.toISOString();
+  });
+  return out;
+}
+
+/**
+ * Freezes `new Date()` (zero-arg construction) and `Date.now()` to a fixed
+ * instant until the returned restore function is called, without touching
+ * setTimeout/setInterval
+ * or any other timer. This targets exactly the wall-clock call sites this
+ * suite needs to control — docxtemplater/PizZip's and jszip's own
+ * `o.date = o.date || new Date()` fallback (see index.ts's
+ * normalizeZipTimestamps doc comment for the full chain) — while leaving
+ * `new Date(explicitArgs)` untouched.
+ *
+ * A vitest `vi.useFakeTimers()` was deliberately NOT used here: jszip's
+ * internal stream scheduling calls `setImmediate` (utils.js), which fake
+ * timers intercept too, and would hang loadAsync/generateAsync mid-test
+ * unless manually advanced. Freezing only the Date global sidesteps that
+ * entirely.
+ */
+function freezeDate(iso: string): () => void {
+  const RealDate = globalThis.Date;
+  const frozenMs = new RealDate(iso).getTime();
+  const handler: ProxyHandler<DateConstructor> = {
+    construct(target, args) {
+      if (args.length === 0) {
+        return new target(frozenMs);
+      }
+      return Reflect.construct(target, args);
+    },
+    get(target, prop, receiver) {
+      if (prop === 'now') {
+        return () => frozenMs;
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  };
+  globalThis.Date = new Proxy(RealDate, handler) as DateConstructor;
+  return () => {
+    globalThis.Date = RealDate;
+  };
+}
+
 describe('fanout', () => {
   test('returns buffer with stable sha256 contentHash', async () => {
     const body = `<w:p><w:r><w:t>Doc code: {doc_code}</w:t></w:r></w:p>`;
@@ -88,7 +138,7 @@ describe('fanout', () => {
     expect(result.buffer.byteLength).toBeGreaterThan(0);
   });
 
-  test('same inputs produce identical contentHash', async () => {
+  test('renders byte-identical ZIPs across clock instants with normalized entry dates', async () => {
     const body = `<w:p><w:r><w:t>{doc_code}</w:t></w:r></w:p>`;
     const tpl = await buildTemplateDocx(body);
     const input = {
@@ -103,8 +153,25 @@ describe('fanout', () => {
       resolvedValues: {},
     };
 
-    const r1 = await fanout(input);
-    const r2 = await fanout(input);
-    expect(r1.contentHash).toBe(r2.contentHash);
+    const renderAt = async (iso: string) => {
+      const restoreDate = freezeDate(iso);
+      try {
+        return await fanout(input);
+      } finally {
+        restoreDate();
+      }
+    };
+
+    const first = await renderAt('2026-01-01T00:00:00.000Z');
+    const second = await renderAt('2026-01-01T00:00:04.000Z');
+
+    expect(Array.from(first.buffer)).toEqual(Array.from(second.buffer));
+    expect(first.contentHash).toBe(second.contentHash);
+
+    const normalizedDate = '1980-01-01T00:00:00.000Z';
+    for (const dates of [await zipEntryDates(first.buffer), await zipEntryDates(second.buffer)]) {
+      expect(Object.values(dates)).not.toHaveLength(0);
+      expect(Object.values(dates).every((date) => date === normalizedDate)).toBe(true);
+    }
   });
 });

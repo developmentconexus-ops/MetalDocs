@@ -52,7 +52,7 @@ export async function fanout(input: FanoutInput): Promise<FanoutResult> {
     __footer_composition__: footerOoxml,
   };
 
-  const result = eigenpalTemplateProcessor.processTemplate(
+  const result = await eigenpalTemplateProcessor.processTemplate(
     input.bodyDocx.buffer.slice(
       input.bodyDocx.byteOffset,
       input.bodyDocx.byteOffset + input.bodyDocx.byteLength,
