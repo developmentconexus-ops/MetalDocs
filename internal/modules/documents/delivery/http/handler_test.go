@@ -55,6 +55,15 @@ type fakeSvc struct {
 	// distinct so a future content-write test can exercise notOwner in isolation.
 	notOwner   bool
 	viewDenied bool
+
+	// heartbeatCalled/releaseCalled/forceReleaseCalled prove absence, not just
+	// presence: a malformed session_id must be rejected by the handler's own
+	// json.Decode before any of these ever run (cold-review, PR #112 round 3
+	// thread @690) — a 400 alone does not prove that, since a future bug could
+	// call the service AND still return 400.
+	heartbeatCalled    bool
+	releaseCalled      bool
+	forceReleaseCalled bool
 }
 
 var _ httphandler.Service = (*fakeSvc)(nil)
@@ -139,11 +148,20 @@ func (f *fakeSvc) AcquireSession(_ context.Context, _, _, _ string) (*domain.Ses
 	return f.acquireSession, f.acquireRO, nil
 }
 
-func (f *fakeSvc) HeartbeatSession(_ context.Context, _, _ string) error { return nil }
+func (f *fakeSvc) HeartbeatSession(_ context.Context, _, _ string) error {
+	f.heartbeatCalled = true
+	return nil
+}
 
-func (f *fakeSvc) ReleaseSession(_ context.Context, _, _, _, _ string) error { return nil }
+func (f *fakeSvc) ReleaseSession(_ context.Context, _, _, _, _ string) error {
+	f.releaseCalled = true
+	return nil
+}
 
-func (f *fakeSvc) ForceReleaseSession(_ context.Context, _, _, _, _ string) error { return nil }
+func (f *fakeSvc) ForceReleaseSession(_ context.Context, _, _, _, _ string) error {
+	f.forceReleaseCalled = true
+	return nil
+}
 
 func (f *fakeSvc) PresignAutosave(_ context.Context, _ application.PresignAutosaveCmd) (*application.PresignAutosaveResult, error) {
 	return &application.PresignAutosaveResult{UploadURL: "https://example/upload", PendingUploadID: "cccccccc-cccc-4ccc-8ccc-000000000001", ExpiresAt: time.Now().Add(time.Minute)}, nil
@@ -620,10 +638,15 @@ func TestCommitAutosave_NonObjectFormDataSnapshotRejected(t *testing.T) {
 	}
 }
 
-// TestForceReleaseSession_HandlerNoLongerRoleGates replaces the former
-// _RequiresAdmin test. The handler no longer enforces a role gate here —
-// authorization is now the tier-1 CapMembershipManage rule (proven in
-// permissions_test.go). The handler simply forwards and returns 204.
+// TestForceReleaseSession_HandlerLeavesCapabilityGateToMiddleware replaces
+// the former _RequiresAdmin test. AuthZ in this codebase is capabilities,
+// never roles (ADR 0022) — this handler performs no authorization decision
+// of its own; the tier-1 CapMembershipManage rule gates the route before the
+// handler runs, and permissions_test.go is what proves that gate. This test
+// only proves the handler forwards and returns 204 once past it — it uses
+// fakeCaps{admin:false} deliberately, to show the outcome is independent of
+// that flag, since the handler never consults it (cold-review, PR #112
+// round 3 thread @637: reworded off "role" language for the same reason).
 //
 // session_id is a real UUID here (cold-review Finding, PR #112 round 3):
 // DocumentSessionIdRequest.session_id gained `format: uuid` in openapi.yaml,
@@ -631,8 +654,8 @@ func TestCommitAutosave_NonObjectFormDataSnapshotRejected(t *testing.T) {
 // former "sess_1" now fails json.Decode before the handler ever calls the
 // service, so this control-case test needs a decodable id to keep proving
 // the happy path.
-func TestForceReleaseSession_HandlerNoLongerRoleGates(t *testing.T) {
-	mux := newMux(t, &fakeSvc{}) // fakeCaps{admin:false} — handler does not gate
+func TestForceReleaseSession_HandlerLeavesCapabilityGateToMiddleware(t *testing.T) {
+	mux := newMux(t, &fakeSvc{}) // fakeCaps{admin:false} — irrelevant here: the handler never consults it
 
 	body := []byte(`{"session_id":"cccccccc-cccc-4ccc-8ccc-000000000001"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/session/force-release", bytes.NewReader(body))
@@ -684,6 +707,17 @@ func TestSessionRoutes_MalformedSessionID_RejectedByHandler(t *testing.T) {
 				mux.ServeHTTP(rr, req)
 				if rr.Code != http.StatusBadRequest {
 					t.Fatalf("expected 400, got %d body=%s", rr.Code, rr.Body.String())
+				}
+				// A 400 alone does not prove the rejection happened before the DB
+				// was touched — a future handler bug could call the service AND
+				// still return 400, and this test would pass silently. The whole
+				// point of typing session_id as openapi_types.UUID is that
+				// json.Decode fails inside the handler before the service (and
+				// therefore Postgres) is ever reached, so assert absence directly
+				// (cold-review, PR #112 round 3 thread @690).
+				if svc.heartbeatCalled || svc.releaseCalled || svc.forceReleaseCalled {
+					t.Fatalf("service must not be called for a malformed session_id: heartbeat=%v release=%v forceRelease=%v",
+						svc.heartbeatCalled, svc.releaseCalled, svc.forceReleaseCalled)
 				}
 			})
 		}
