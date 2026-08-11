@@ -124,7 +124,10 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("load postgres config: %w", err)
 	}
-	runtimeCfg := config.LoadRuntimeIdentityConfig()
+	runtimeCfg, err := config.LoadRuntimeIdentityConfig()
+	if err != nil {
+		return fmt.Errorf("load runtime identity config: %w", err)
+	}
 	jobsCfg, err := config.LoadJobsConfig()
 	if err != nil {
 		return fmt.Errorf("load jobs config: %w", err)
