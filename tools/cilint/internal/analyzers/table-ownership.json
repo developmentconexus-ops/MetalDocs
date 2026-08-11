@@ -159,6 +159,11 @@
       "owner": "taxonomy"
     },
     {
+      "table": "capability_bindings",
+      "class": "module",
+      "owner": "iam"
+    },
+    {
       "table": "iam_group_members",
       "class": "module",
       "owner": "iam"
@@ -185,6 +190,11 @@
     },
     {
       "table": "role_capabilities",
+      "class": "module",
+      "owner": "iam"
+    },
+    {
+      "table": "roles",
       "class": "module",
       "owner": "iam"
     },

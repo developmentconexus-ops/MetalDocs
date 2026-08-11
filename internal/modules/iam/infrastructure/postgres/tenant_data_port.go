@@ -24,12 +24,19 @@ import (
 //  1. iam_group_members (FK -> iam_groups)
 //  2. iam_user_roles (FK -> iam_users)
 //  3. user_process_areas (FK -> iam_users via tenant_id+granted_by/revoked_by)
-//  4. tenant_lifecycle_jobs — NOT deleted: it is the lifecycle ledger (the
+//  4. capability_bindings (ADR 0092 D1 / A8.1) — FK -> iam_users
+//     (subject_user_id), iam_groups (subject_group_id), and
+//     document_process_areas (scope_ref); must erase before both iam_groups
+//     and iam_users below, and before taxonomy's own port runs (registry.go's
+//     AllTenantDataPorts lists iam before taxonomyinfra, so this table is
+//     gone before document_process_areas is). metaldocs.roles (the FK target
+//     of role_code) is a global, non-tenant-scoped catalog, never erased.
+//  5. tenant_lifecycle_jobs — NOT deleted: it is the lifecycle ledger (the
 //     running erase job's own row lives here); rows are retained with
 //     requested_by scrubbed to 'erased' (see EraseTenantData)
-//  5. iam_groups (FK -> tenants)
-//  6. iam_users
-//  7. tenant_plans (independent, PK = tenant_id)
+//  6. iam_groups (FK -> tenants)
+//  7. iam_users
+//  8. tenant_plans (independent, PK = tenant_id)
 //
 // public.user_process_areas is hard-DELETEd per contract §3.2 — an
 // UPDATE-revoke alternative was rejected in review because retained rows FK
@@ -75,6 +82,7 @@ func (p *TenantDataPort) Tables() []string {
 		"metaldocs.iam_group_members",
 		"metaldocs.tenant_plans",
 		"public.user_process_areas",
+		"metaldocs.capability_bindings",
 	}
 	if p.hasTenantLifecycleJobs {
 		tables = append(tables, "metaldocs.tenant_lifecycle_jobs")
@@ -122,6 +130,18 @@ func (p *TenantDataPort) EraseTenantData(ctx context.Context, tx *sql.Tx, tenant
 		return nil, err
 	}
 	counts["public.user_process_areas"] = n
+
+	// metaldocs.capability_bindings (ADR 0092 D1 / A8.1): FKs to iam_users,
+	// iam_groups, and document_process_areas all require this delete to run
+	// before iam_groups/iam_users below and before taxonomy's port (see the
+	// type doc's erase-order note and registry.go's port ordering).
+	// role_code's FK target, metaldocs.roles, is a global catalog table with
+	// no tenant_id — it is never erased, only referenced.
+	n, err = tenantdata.EraseTable(ctx, tx, "metaldocs.capability_bindings", "tenant_id", tenantID)
+	if err != nil {
+		return nil, err
+	}
+	counts["metaldocs.capability_bindings"] = n
 
 	if p.hasTenantLifecycleJobs {
 		// tenant_lifecycle_jobs is the lifecycle LEDGER — deleting it would

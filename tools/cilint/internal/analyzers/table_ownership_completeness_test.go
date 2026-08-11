@@ -65,6 +65,27 @@ func governedSchemaFiles(t *testing.T, root string) []string {
 	return out
 }
 
+// stripWholeLineSQLComments removes every line whose first non-whitespace
+// characters are "--", so a migration's rollback runbook -- documented as
+// literal, copy-pasteable SQL inside a comment block, exactly the "Rollback:"
+// pattern migrations use to hand an operator a DROP TABLE they'd run by hand
+// -- is never mistaken for an executed statement. createTableRe/dropTableRe
+// scan raw text with no SQL tokenizer behind them; a real DROP TABLE never
+// appears as a whole-line comment (it would not execute), so this cannot hide
+// a genuine drop. Trailing inline comments after real SQL are left alone:
+// only entire commented-out lines are dropped.
+func stripWholeLineSQLComments(sql string) string {
+	lines := strings.Split(sql, "\n")
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if strings.HasPrefix(strings.TrimSpace(line), "--") {
+			continue
+		}
+		out = append(out, line)
+	}
+	return strings.Join(out, "\n")
+}
+
 // liveBaseTables applies CREATE/DROP TABLE in file order and returns what is
 // left standing: the authoritative base-table universe.
 func liveBaseTables(t *testing.T, root string) map[string]bool {
@@ -75,7 +96,7 @@ func liveBaseTables(t *testing.T, root string) map[string]bool {
 		if err != nil {
 			t.Fatalf("read %s: %v", path, err)
 		}
-		sql := string(raw)
+		sql := stripWholeLineSQLComments(string(raw))
 		for _, m := range createTableRe.FindAllStringSubmatch(sql, -1) {
 			live[strings.ToLower(m[1])] = true
 		}

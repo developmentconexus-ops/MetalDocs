@@ -1,6 +1,6 @@
 # ADR 0092 — AuthZ Grant-Model Unification: one binding relation, scope on the binding
 
-> **Status:** Accepted (operator-ratified 2026-08-06). **Not implemented — no code or schema change is authorized by this ADR alone.** Materialized as a filed ADR on 2026-08-09 (Phase G governance reconciliation); this filing **records** the 2026-08-06 ruling, it does not reopen it.
+> **Status:** Accepted (operator-ratified 2026-08-06); D1 schema partially implemented 2026-08-11 (A8.1 — see Status history below). Remaining scope (A8.2+ query-builder repoint, D2–D4) is not implemented — no further code/schema change is authorized by this ADR alone. Filed 2026-08-09 (Phase G governance reconciliation); records the 2026-08-06 ruling, does not reopen it.
 > **Decision source:** `docs/superpowers/analysis/2026-08-06-authz-grant-unification-decisions.md` (operator-ratified decision record, D1–D4 + red-lane ruling) and `docs/superpowers/analysis/2026-08-06-authz-grant-unification-system-impact.md` (system-impact gate output). Those documents are the original analysis; this file is the numbered ADR 0092 decision artifact that ADR 0093 and issue #89 forward-reference.
 > **Scope:** The grant/assignment side of authorization — which tables record who holds which role at which scope, and which single source both PDP tiers read.
 > **Out of scope:** The capability model itself (roles → capability bundles via `role_capabilities` stays — ADR 0022); the two-tier PDP *shape* (two enforcement points stay — ADR 0007's tiers as defense-in-depth); tier-1's data source for route→capability mapping (ADR 0090); bounded-context boundaries (ADR 0093).
@@ -63,3 +63,34 @@ Group = **who** (a subject). Area = **where** (a scope). Under D1 they are diffe
 
 - **2026-08-06** — decisions D1–D4 + red-lane ruling ratified by the operator (`2026-08-06-authz-grant-unification-decisions.md`); ADR number 0092 reserved, file not yet created.
 - **2026-08-09** — materialized as this filed ADR during Phase G governance reconciliation (architecture audit #100 / PR #101). Recording only; no alternative reopened, no implementation authorized.
+- **2026-08-11** — A8.1 amendment: D1's schema shipped (migrations 0318/0319) with a named deviation from the literal column list below. See "Amendment 2026-08-11 (A8.1 shipped shape)" below in this document for the full text.
+
+## Amendment 2026-08-11 (A8.1 shipped shape)
+
+> **Last verified (amendment):** 2026-08-11. Does not reopen or alter D1's decision (one binding relation,
+> scope on the binding) — it documents that the physical schema issue #89/A8.1 shipped is not a literal
+> column-for-column match of D1's prose, and records why.
+> Source: `db/migrations/0318_capability_bindings_schema_backfill.sql` (see its "NAMED DEVIATION FROM THE
+> ADR'S LITERAL COLUMN LIST" section) and `wiki/database/tables/capability_bindings.md`.
+
+D1 (above) names a single logical column: `(subject_kind, subject_id, role_code, scope_kind, scope_ref)`.
+`metaldocs.capability_bindings`, as created by migration 0318, does **not** have a `subject_id` column.
+Postgres cannot express one FK column that conditionally targets two different tables of two different
+types (`iam_users.user_id` is `text`; `iam_groups.id` is `uuid`), so `subject_id` is physically split into
+two nullable columns, discriminated by `subject_kind`:
+
+- `subject_user_id text` — FK → `metaldocs.iam_users(tenant_id, user_id)`, `NOT NULL` iff `subject_kind = 'user'`
+- `subject_group_id uuid` — FK → `metaldocs.iam_groups(tenant_id, id)`, `NOT NULL` iff `subject_kind = 'group'`
+- `CONSTRAINT chk_capability_bindings_subject_shape` — enforces exactly one of the two is set, matching `subject_kind`
+
+This is read as a **stronger** implementation of D1's own intent than a single polymorphic `subject_id`
+column could deliver: a dangling subject reference is a FOREIGN KEY VIOLATION at the database line, not
+merely an application-validated invariant — "unrepresentable by construction" is more literally true of the
+shipped shape than of the ADR's own prose. The same reasoning gave `scope_ref` a matching
+`chk_capability_bindings_scope_shape` CHECK (tenant-scope binding cannot name an area; area-scope binding
+must). D1's logical relation — one binding, subject × role × scope on one row — is unchanged; only its
+physical column list differs from the ADR text above.
+
+A future reader diffing this ADR against the live schema should treat this Amendment, not line 31's column
+list, as the decision of record for the physical shape. D2–D4 and the query-builder repoint (A8.2+) remain
+undecided-in-schema and out of scope for this amendment.
