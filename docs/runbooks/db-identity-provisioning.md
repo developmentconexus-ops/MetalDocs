@@ -31,11 +31,25 @@ Provisioning is now a separate one-shot binary, `metaldocs-dbprovision`, that:
 2. Applies `db/prerequisites/*.sql` and `db/grants/*.sql` (idempotent,
    guarded — see the header comments in `db/grants/0000_identity_roles.sql`
    and `db/grants/0001_role_grants.sql`), which creates/repairs the three
-   identities described below.
-3. `SET ROLE metaldocs_owner` and applies forward migrations
+   identities described below; rotates `metaldocs_runtime`'s password to
+   `METALDOCS_RUNTIME_DB_PASSWORD` (same var api/worker/jobs authenticate
+   with — see `.env.example`); and, if `METALDOCS_JOBS_RIVER_SCHEMA` names a
+   schema other than `public`, creates/re-owns that schema for
+   `metaldocs_owner` (the two `db/grants` files only ever cover
+   `public`/`metaldocs`, since a schema named only by a runtime env var can't
+   be baked into hand-authored SQL).
+3. Opens a SEPARATE connection pool pinned to `metaldocs_owner`
+   (`postgres.OpenAsRole` — every physical connection it hands out issues
+   `SET ROLE metaldocs_owner` before it is usable, and re-asserts that on
+   every pooled reuse) and applies forward migrations
    (`internal/platform/migrate.Apply`) plus the River queue schema migration
-   under that role — DDL never runs over the identity that later serves
-   requests.
+   over that pool — DDL never runs over the identity that later serves
+   requests, and never risks silently falling back to the bootstrap
+   superuser across a pool reconnect (see `postgres.OpenAsRole`'s doc
+   comment for why a single shared `*sql.DB` plus one `SET ROLE` statement
+   does not actually guarantee that). For a custom River schema, grants
+   `metaldocs_runtime` DML access on it once River's migrator has created
+   its tables.
 4. Exits. It does not open a long-lived pool and is not itself subject to
    `AssertSafeIdentity`.
 
@@ -58,9 +72,23 @@ the DDL-capable identity out of reach of anything driven by request traffic.
 `metaldocs_runtime` never owns a table. Postgres RLS does not apply to a
 table's owner unless `FORCE ROW LEVEL SECURITY` is set; since the serving
 identity must always be RLS-subject, it must never be an owner. Ownership
-lives entirely with `metaldocs_owner`, established by `REASSIGN OWNED BY
-CURRENT_USER TO metaldocs_owner` and `ALTER SCHEMA ... OWNER TO
-metaldocs_owner` in `db/grants/0000_identity_roles.sql`.
+lives entirely with `metaldocs_owner`, established in
+`db/grants/0000_identity_roles.sql` by `ALTER SCHEMA ... OWNER TO
+metaldocs_owner` plus a scoped, per-object-kind `ALTER TABLE/SEQUENCE/
+FUNCTION/PROCEDURE/TYPE ... OWNER TO metaldocs_owner` loop over
+`pg_class`/`pg_proc`/`pg_type` — **not** a blanket `REASSIGN OWNED BY
+CURRENT_USER`. That statement was tried and reverted: `CURRENT_USER`, under
+the bootstrap superuser this file requires, is the actual cluster `initdb`
+role, which also structurally "owns" `pg_catalog`/`information_schema`.
+`REASSIGN OWNED BY` has no per-schema filter, so it always tries to move
+those two system schemas too and always fails with `SQLSTATE 2BP01`
+("cannot reassign ownership of objects owned by role ... because they are
+required by the database system"), rolling back the entire transaction —
+including the `CREATE ROLE` statements — on every run. The scoped loop only
+ever touches `public`/`metaldocs` (plus, as of the custom-River-schema fix
+above, whatever `METALDOCS_JOBS_RIVER_SCHEMA` names), so it never hits
+`pg_catalog`/`information_schema` and cannot hit `2BP01`. See that file's own
+header comment for the full empirical account.
 
 ## When to run
 
