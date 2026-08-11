@@ -30,7 +30,13 @@ fi
 
 # The `go` directive line is exactly "go X.Y" or "go X.Y.Z" -- see the
 # comment in go.mod: deliberately not `toolchain`.
-mod_version="$(grep -E '^go [0-9]+\.[0-9]+(\.[0-9]+)?$' "$gomod" | head -1 | awk '{print $2}')"
+# `|| true` is load-bearing under `set -euo pipefail`: a grep that matches
+# nothing exits 1, pipefail propagates that through the pipeline, and the
+# failing command substitution would abort the script right here -- making
+# the emptiness check below unreachable and turning a diagnosable parse
+# failure into a silent non-zero exit with no output at all. Rescue the
+# pipeline so the message below is the thing that actually reports.
+mod_version="$(grep -E '^go [0-9]+\.[0-9]+(\.[0-9]+)?$' "$gomod" | head -1 | awk '{print $2}' || true)"
 if [[ -z "$mod_version" ]]; then
   echo "check-dockerfile-go-version: could not find a 'go' directive in $gomod" >&2
   exit 1
@@ -81,7 +87,12 @@ for df in "${dockerfiles[@]}"; do
     lineno="${matched%%:*}"
     from_line="${matched#*:}"
     checked=$((checked + 1))
-    df_version="$(printf '%s\n' "$from_line" | grep -oiE 'golang:[0-9]+(\.[0-9]+){0,2}' | head -1 | cut -d: -f2)"
+    # `|| true` for the same reason as mod_version above: `FROM golang:latest`
+    # (or any non-numeric tag) matches the outer discovery grep but not this
+    # one, and without the rescue the script would abort mid-loop instead of
+    # reporting the unparseable line -- silently, and before checking any
+    # remaining stage or Dockerfile.
+    df_version="$(printf '%s\n' "$from_line" | grep -oiE 'golang:[0-9]+(\.[0-9]+){0,2}' | head -1 | cut -d: -f2 || true)"
     if [[ -z "$df_version" ]]; then
       echo "DOCKERFILE-GO-VERSION-DRIFT: $df:$lineno: could not parse a numeric golang version from: $from_line" >&2
       fail=1

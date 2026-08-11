@@ -536,6 +536,14 @@ var checks = []Check{
 				// `FROM --platform=<p> golang:...` — the flag sits between the
 				// instruction and the image reference.
 				"DOCKERFILE-GO-VERSION-DRIFT: deploy/docker/platform.Dockerfile pins golang:1.22 but go.mod requires go >= 1.26.5",
+				// A non-numeric tag must be REPORTED, not merely fatal. Under
+				// `set -euo pipefail` the version-extracting pipeline exits 1
+				// when it matches nothing, which aborted the script before its
+				// own error message could run -- a silent non-zero exit with no
+				// output, which in CI is a red check nobody can diagnose. This
+				// fixture sorts early (`latest` < `lowercase`), so a regression
+				// that restores the abort drops every Want below it too.
+				"could not parse a numeric golang version from: FROM golang:latest",
 			},
 		},
 	},
