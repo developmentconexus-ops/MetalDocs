@@ -92,7 +92,7 @@ importers:
         version: 5.4.5
       vitest:
         specifier: ^3.2.7
-        version: 3.2.7(@types/node@20.12.12)(jsdom@25.0.1)(supports-color@10.2.2)(tsx@4.22.4)
+        version: 3.2.7(@types/node@20.12.12)(jsdom@25.0.1)(tsx@4.22.4)
 
   frontend/apps/web:
     dependencies:
@@ -294,7 +294,7 @@ importers:
         version: 5.2.0(vite@6.4.3(@types/node@25.9.4)(tsx@4.22.4))
       jsdom:
         specifier: ^24.0.0
-        version: 24.1.3
+        version: 24.1.3(supports-color@10.2.2)
       react:
         specifier: 18.2.0
         version: 18.2.0
@@ -306,7 +306,7 @@ importers:
         version: 5.4.5
       vitest:
         specifier: ^3.2.7
-        version: 3.2.7(@types/node@25.9.4)(jsdom@24.1.3)(tsx@4.22.4)
+        version: 3.2.7(@types/node@25.9.4)(jsdom@24.1.3(supports-color@10.2.2))(supports-color@10.2.2)(tsx@4.22.4)
 
   packages/eigenpal-adapter:
     dependencies:
@@ -316,6 +316,9 @@ importers:
       '@eigenpal/docx-editor-react':
         specifier: 1.9.0
         version: 1.9.0(@types/react-dom@18.3.7(@types/react@18.2.79))(@types/react@18.2.79)(prosemirror-commands@1.7.1)(prosemirror-dropcursor@1.8.2)(prosemirror-history@1.5.0)(prosemirror-keymap@1.2.3)(prosemirror-model@1.25.9)(prosemirror-state@1.4.4)(prosemirror-tables@1.8.5)(prosemirror-transform@1.12.0)(prosemirror-view@1.41.9)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      jszip:
+        specifier: 3.10.1
+        version: 3.10.1
       react-dom:
         specifier: 18.2.0
         version: 18.2.0(react@18.2.0)
@@ -368,7 +371,7 @@ importers:
         version: 5.2.0(vite@6.4.3(@types/node@25.9.4)(tsx@4.22.4))
       jsdom:
         specifier: ^24.0.0
-        version: 24.1.3
+        version: 24.1.3(supports-color@10.2.2)
       react:
         specifier: 18.2.0
         version: 18.2.0
@@ -380,7 +383,7 @@ importers:
         version: 5.4.5
       vitest:
         specifier: ^3.2.7
-        version: 3.2.7(@types/node@25.9.4)(jsdom@24.1.3)(tsx@4.22.4)
+        version: 3.2.7(@types/node@25.9.4)(jsdom@24.1.3(supports-color@10.2.2))(supports-color@10.2.2)(tsx@4.22.4)
 
   packages/shared-tokens:
     dependencies:
@@ -399,7 +402,7 @@ importers:
         version: 5.4.5
       vitest:
         specifier: ^3.2.7
-        version: 3.2.7(@types/node@20.12.12)(jsdom@25.0.1)(supports-color@10.2.2)(tsx@4.22.4)
+        version: 3.2.7(@types/node@20.12.12)(jsdom@25.0.1)(tsx@4.22.4)
 
   packages/shared-types:
     devDependencies:
@@ -7300,7 +7303,7 @@ snapshots:
 
   html-escaper@2.0.2: {}
 
-  http-proxy-agent@7.0.2:
+  http-proxy-agent@7.0.2(supports-color@10.2.2):
     dependencies:
       agent-base: 7.1.4
       debug: 4.4.3(supports-color@10.2.2)
@@ -7482,14 +7485,14 @@ snapshots:
     dependencies:
       argparse: 2.0.1
 
-  jsdom@24.1.3:
+  jsdom@24.1.3(supports-color@10.2.2):
     dependencies:
       cssstyle: 4.6.0
       data-urls: 5.0.0
       decimal.js: 10.6.0
       form-data: 4.0.6
       html-encoding-sniffer: 4.0.0
-      http-proxy-agent: 7.0.2
+      http-proxy-agent: 7.0.2(supports-color@10.2.2)
       https-proxy-agent: 7.0.6(supports-color@10.2.2)
       is-potential-custom-element-name: 1.0.1
       nwsapi: 2.2.24
@@ -7517,7 +7520,7 @@ snapshots:
       decimal.js: 10.6.0
       form-data: 4.0.6
       html-encoding-sniffer: 4.0.0
-      http-proxy-agent: 7.0.2
+      http-proxy-agent: 7.0.2(supports-color@10.2.2)
       https-proxy-agent: 7.0.6(supports-color@10.2.2)
       is-potential-custom-element-name: 1.0.1
       nwsapi: 2.2.24
@@ -8678,7 +8681,7 @@ snapshots:
 
   validate.io-number@1.0.3: {}
 
-  vite-node@3.2.4(@types/node@20.12.12)(supports-color@10.2.2)(tsx@4.22.4):
+  vite-node@3.2.4(@types/node@20.12.12)(tsx@4.22.4):
     dependencies:
       cac: 6.7.14
       debug: 4.4.3(supports-color@10.2.2)
@@ -8720,7 +8723,7 @@ snapshots:
       - tsx
       - yaml
 
-  vite-node@3.2.4(@types/node@25.9.4)(tsx@4.22.4):
+  vite-node@3.2.4(@types/node@25.9.4)(supports-color@10.2.2)(tsx@4.22.4):
     dependencies:
       cac: 6.7.14
       debug: 4.4.3(supports-color@10.2.2)
@@ -8780,7 +8783,7 @@ snapshots:
       fsevents: 2.3.3
       tsx: 4.22.4
 
-  vitest@3.2.7(@types/node@20.12.12)(jsdom@25.0.1)(supports-color@10.2.2)(tsx@4.22.4):
+  vitest@3.2.7(@types/node@20.12.12)(jsdom@25.0.1)(tsx@4.22.4):
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/expect': 3.2.7
@@ -8803,7 +8806,7 @@ snapshots:
       tinypool: 1.1.1
       tinyrainbow: 2.0.0
       vite: 6.4.3(@types/node@20.12.12)(tsx@4.22.4)
-      vite-node: 3.2.4(@types/node@20.12.12)(supports-color@10.2.2)(tsx@4.22.4)
+      vite-node: 3.2.4(@types/node@20.12.12)(tsx@4.22.4)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 20.12.12
@@ -8864,7 +8867,7 @@ snapshots:
       - tsx
       - yaml
 
-  vitest@3.2.7(@types/node@25.9.4)(jsdom@24.1.3)(tsx@4.22.4):
+  vitest@3.2.7(@types/node@25.9.4)(jsdom@24.1.3(supports-color@10.2.2))(supports-color@10.2.2)(tsx@4.22.4):
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/expect': 3.2.7
@@ -8887,11 +8890,11 @@ snapshots:
       tinypool: 1.1.1
       tinyrainbow: 2.0.0
       vite: 6.4.3(@types/node@25.9.4)(tsx@4.22.4)
-      vite-node: 3.2.4(@types/node@25.9.4)(tsx@4.22.4)
+      vite-node: 3.2.4(@types/node@25.9.4)(supports-color@10.2.2)(tsx@4.22.4)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 25.9.4
-      jsdom: 24.1.3
+      jsdom: 24.1.3(supports-color@10.2.2)
     transitivePeerDependencies:
       - jiti
       - less
@@ -8929,7 +8932,7 @@ snapshots:
       tinypool: 1.1.1
       tinyrainbow: 2.0.0
       vite: 6.4.3(@types/node@25.9.4)(tsx@4.22.4)
-      vite-node: 3.2.4(@types/node@25.9.4)(tsx@4.22.4)
+      vite-node: 3.2.4(@types/node@25.9.4)(supports-color@10.2.2)(tsx@4.22.4)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 25.9.4

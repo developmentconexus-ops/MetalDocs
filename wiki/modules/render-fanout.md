@@ -1,6 +1,6 @@
 # Module: render-fanout
 
-> **Last verified:** 2026-07-02 (StagingOutboxWorker consolidation: per-table outbox worker/repo files replaced by generic `staging_outbox_worker.go`/`staging_outbox.go`; APP-01 `pdf_dispatcher.go`/`pdf_dispatch_adapter.go` deleted — key files + failure matrix updated) | **Prior:** 2026-06-29 (ADR 0050 — new `render/domain` package with `ComputedCatalog()` single source of truth; bidirectional parity guard; `approval_date` resolver now returns sentinel pre-approval; prior: 2026-06-12 Wave F — `Enqueue` now fails loud on nil tx; prior: 2026-06-01 P2 consolidation)
+> **Last verified:** 2026-08-11 (ZIP-timestamp normalization seam — `normalizeZipTimestamps` in `packages/eigenpal-adapter/src/index.ts:160` makes `content_hash` reproducible forward-only; new pipeline step 1b + its own section; bounded against ROADMAP unit 4.11) | **Prior:** 2026-07-02 (StagingOutboxWorker consolidation: per-table outbox worker/repo files replaced by generic `staging_outbox_worker.go`/`staging_outbox.go`; APP-01 `pdf_dispatcher.go`/`pdf_dispatch_adapter.go` deleted — key files + failure matrix updated) | **Prior:** 2026-06-29 (ADR 0050 — new `render/domain` package with `ComputedCatalog()` single source of truth; bidirectional parity guard; `approval_date` resolver now returns sentinel pre-approval; prior: 2026-06-12 Wave F — `Enqueue` now fails loud on nil tx; prior: 2026-06-01 P2 consolidation)
 > **Status:** active (pipeline module)
 > **Maturity:** L2
 > **Scope:** DOCX → PDF rendering pipeline, token substitution engine, outbox-driven dispatch.
@@ -66,10 +66,50 @@ a template without the resolver erroring on unpublished documents.
 ## Pipeline (high-level)
 
 1. Freeze service substitutes the 8 fixed tokens in the DOCX (eigenpal-native format).
+1b. **The produced ZIP's entry timestamps are normalized before it is hashed** — see the section below. `content_hash` is a SHA-256 over the post-normalization bytes.
 2. Frozen DOCX uploaded to MinIO.
 3. `DecisionService` enqueues a `pdf_dispatch_outbox` row inside the approval transaction; `StagingOutboxWorker` polls it and publishes the `docgen_v2_pdf` event with `messaging.PDFConvertPayload` (APP-01 2026-07-01: the old post-commit `PDFDispatcher`/`PDFDispatchAdapter` path was deleted — outbox is the only dispatch path).
 4. PDFJobRunner picks up the typed payload, calls Gotenberg via docx-renderer.
 5. Resulting PDF stored alongside the DOCX in MinIO.
+
+## ZIP-timestamp normalization — why `content_hash` is reproducible at all
+
+A DOCX is a ZIP, and every ZIP entry carries a DOS timestamp. The template engine
+wrote each entry with the wall clock at write time, so two renders of byte-identical
+content produced different archives whenever they straddled a DOS-timestamp tick
+(DOS time has 2-second granularity). `content_hash` is a SHA-256 over the produced
+buffer (`apps/docx-renderer/src/render/fanout.ts:65`), so it inherited that
+non-determinism directly: the same inputs could hash differently for no reason
+attributable to the document.
+
+**The seam.** `normalizeZipTimestamps` in `packages/eigenpal-adapter/src/index.ts:160`
+re-opens the archive the engine produced, re-adds every entry with
+`date: NORMALIZED_ZIP_DATE` (`1980-01-01T00:00:00.000Z`, the DOS floor) and
+`createFolders: false`, and re-serializes DEFLATE at level 6 — the same settings the
+engine used. `processTemplate` became `async` to accommodate it. Entry order, entry
+paths, directory records and permissions are copied through unchanged, and archive-level
+and per-entry ZIP comments are preserved explicitly (dropping them would be silent
+metadata loss in the frozen artifact, even though determinism would hold without it).
+
+The claim this buys is narrow and worth stating precisely: decompressed content alone
+does not determine ZIP bytes — entry paths, entry order, directory entries, permissions
+and serialization settings all do. What the seam removes is the **clock**, the one input
+that varied between two renders of the same document. Given the same normalized archive
+structure and content, the bytes and therefore the hash are identical.
+
+**The guard.** `apps/docx-renderer/src/render/__tests__/fanout.test.ts` —
+`renders byte-identical ZIPs across clock instants with normalized entry dates` renders
+twice at different clock instants and asserts full buffer equality, hash equality, and
+that every entry date equals the normalized date. The RED failure lands on the
+byte-equality assertion, so the proof is attributable to the defect and not to the
+date assertion incidentally passing.
+
+**Bound this claim.** Reproducibility holds **forward only**, for renditions produced
+after this seam landed. It says nothing about revisions pinned before it, and it does
+not make the forensic reconstruction endpoint work — that endpoint has never run
+end-to-end and its defects are ordered such that the obvious partial fix is dangerous
+(ROADMAP unit 4.11). Historical policy for already-pinned revisions is an open operator
+decision. Nothing here backfills or mutates `matches_original`.
 
 ## Failure modes
 
