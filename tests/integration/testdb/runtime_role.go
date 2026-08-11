@@ -6,6 +6,7 @@ package testdb
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"net/url"
 	"os"
 	"testing"
@@ -43,17 +44,29 @@ const runtimeRoleDevPassword = "metaldocs_runtime_dev"
 // fixture password from db/grants/0001_role_grants.sql.
 func OpenAsRuntimeRole(t *testing.T, dbName string) *sql.DB {
 	t.Helper()
+	pw := os.Getenv("METALDOCS_RUNTIME_DB_PASSWORD")
+	if pw == "" {
+		pw = runtimeRoleDevPassword
+	}
+	return OpenAsRole(t, dbName, runtimeRoleName, pw)
+}
+
+// OpenAsRole returns a *sql.DB connected to an already-created per-test
+// database (dbName, from Open()) AS an arbitrary role/password pair. It is
+// the general form OpenAsRuntimeRole is built on; tests that need a role
+// OTHER than metaldocs_runtime -- e.g. a throwaway role created via
+// CreateThrowawayRole, so a test can mutate role ATTRIBUTES without touching
+// a cluster-global fixture role every other test package also depends on --
+// call this directly.
+func OpenAsRole(t *testing.T, dbName, role, password string) *sql.DB {
+	t.Helper()
 
 	cfg, err := pgx.ParseConfig(DSN(t))
 	if err != nil {
-		t.Fatalf("parse base DSN for runtime role: %v", err)
+		t.Fatalf("parse base DSN for role %s: %v", role, err)
 	}
-	cfg.User = runtimeRoleName
-	if pw := os.Getenv("METALDOCS_RUNTIME_DB_PASSWORD"); pw != "" {
-		cfg.Password = pw
-	} else {
-		cfg.Password = runtimeRoleDevPassword
-	}
+	cfg.User = role
+	cfg.Password = password
 	cfg.Database = dbName
 
 	db := stdlib.OpenDB(*cfg)
@@ -63,9 +76,42 @@ func OpenAsRuntimeRole(t *testing.T, dbName string) *sql.DB {
 	defer cancel()
 	if err := db.PingContext(ctx); err != nil {
 		_ = db.Close()
-		t.Fatalf("ping test db %s as %s: %v", dbName, runtimeRoleName, err)
+		t.Fatalf("ping test db %s as %s: %v", dbName, role, err)
 	}
 	return db
+}
+
+// CreateThrowawayRole creates a uniquely named, LOGIN role for tests that
+// need to mutate role ATTRIBUTES (e.g. flip SUPERUSER live) without touching
+// a cluster-global fixture role like metaldocs_runtime. Roles are
+// cluster-global, not per-database: mutating metaldocs_runtime directly races
+// every other test PACKAGE that asserts it is safe (Go runs test packages in
+// parallel by default), and if the process dies between the mutation and its
+// t.Cleanup revert, the shared fixture stays permanently unsafe for every
+// later run. A throwaway role makes both failure modes structurally
+// impossible -- nothing else in the cluster depends on its attributes.
+//
+// The role and its password are dropped via t.Cleanup.
+func CreateThrowawayRole(t *testing.T, adminDB *sql.DB) (roleName, password string) {
+	t.Helper()
+
+	roleName = "metaldocs_throwaway_" + randomSuffix(t)
+	password = randomSuffix(t)
+
+	createStmt := fmt.Sprintf(
+		"CREATE ROLE %s NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT LOGIN PASSWORD %s",
+		quoteIdent(roleName), quoteLiteral(password),
+	)
+	if _, err := adminDB.ExecContext(context.Background(), createStmt); err != nil {
+		t.Fatalf("create throwaway role %s: %v", roleName, err)
+	}
+	t.Cleanup(func() {
+		dropStmt := fmt.Sprintf("DROP ROLE IF EXISTS %s", quoteIdent(roleName))
+		if _, err := adminDB.ExecContext(context.Background(), dropStmt); err != nil {
+			t.Errorf("cleanup: drop throwaway role %s: %v", roleName, err)
+		}
+	})
+	return roleName, password
 }
 
 // RuntimeRoleDSN returns the ambient test DSN (DSN(t)) rewritten to connect

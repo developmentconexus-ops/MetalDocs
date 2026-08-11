@@ -4,8 +4,11 @@ package bootstrap_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"testing"
+
+	"github.com/jackc/pgx/v5"
 
 	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/config"
@@ -98,25 +101,27 @@ func TestDBIdentityHealthCheck_ReadyUnderSafeRuntimeRole(t *testing.T) {
 // invocation, since nothing else about the check or its inputs changed.
 func TestDBIdentityHealthCheck_ReadinessFlipsLiveOnRoleAttributeChange(t *testing.T) {
 	adminDB, dbName := testdb.Open(t)
-	runtimeDB := testdb.OpenAsRuntimeRole(t, dbName)
 
-	// Cluster-global: roles are not per-database, so this MUST be reverted
-	// even though runtimeDB/adminDB themselves are per-test-database handles
-	// -- otherwise this flip would leak into every other test (in this
-	// package or any other) that opens a connection as metaldocs_runtime
-	// after this one runs, silently making AssertSafeIdentity's "safe
-	// identity" fixture unsafe cluster-wide.
-	t.Cleanup(func() {
-		if _, err := adminDB.ExecContext(context.Background(), "ALTER ROLE metaldocs_runtime NOSUPERUSER"); err != nil {
-			t.Errorf("cleanup: revert metaldocs_runtime to NOSUPERUSER: %v", err)
-		}
-	})
+	// A dedicated, uniquely named, throwaway role -- NOT metaldocs_runtime.
+	// Roles are cluster-global, not per-database: flipping metaldocs_runtime
+	// itself would race every other test PACKAGE that asserts it is safe (Go
+	// runs test packages in parallel by default), and a process death
+	// between the flip below and its revert would leave that shared fixture
+	// permanently unsafe for every later run. The property this test proves
+	// -- DBIdentityHealthCheck re-queries pg_roles on every Ready() call,
+	// instead of caching -- does not require the flipped role to be
+	// metaldocs_runtime; a throwaway role proves it exactly as well, with a
+	// t.Cleanup DROP ROLE (not a revert-in-place) closing both failure modes
+	// structurally.
+	roleName, password := testdb.CreateThrowawayRole(t, adminDB)
+	runtimeDB := testdb.OpenAsRole(t, dbName, roleName, password)
 
 	provider := observability.NewPostgresRuntimeStatusProvider(runtimeDB, config.RepositoryPostgres, string(config.StorageProviderMemory), false, bootstrap.DBIdentityHealthCheck(runtimeDB))
 
-	// Baseline: metaldocs_runtime starts safe, so readiness must be green
-	// before the flip -- otherwise a later "not ready" assertion would prove
-	// nothing about live re-querying (it could just always report unready).
+	// Baseline: the throwaway role starts safe (CreateThrowawayRole never sets
+	// SUPERUSER/BYPASSRLS), so readiness must be green before the flip --
+	// otherwise a later "not ready" assertion would prove nothing about live
+	// re-querying (it could just always report unready).
 	code, payload := provider.Ready(context.Background())
 	if code != http.StatusOK {
 		t.Fatalf("Ready() before flip = %d, want 200 (baseline safe identity): %#v", code, payload)
@@ -128,8 +133,9 @@ func TestDBIdentityHealthCheck_ReadinessFlipsLiveOnRoleAttributeChange(t *testin
 	// Live mid-test attribute change -- the exact scenario DBIdentityHealthCheck's
 	// doc comment names: "a role attribute changed (e.g. ALTER ROLE ...
 	// SUPERUSER) while the process kept running".
-	if _, err := adminDB.ExecContext(context.Background(), "ALTER ROLE metaldocs_runtime SUPERUSER"); err != nil {
-		t.Fatalf("ALTER ROLE metaldocs_runtime SUPERUSER: %v", err)
+	alterSQL := fmt.Sprintf("ALTER ROLE %s SUPERUSER", pgx.Identifier{roleName}.Sanitize())
+	if _, err := adminDB.ExecContext(context.Background(), alterSQL); err != nil {
+		t.Fatalf("%s: %v", alterSQL, err)
 	}
 
 	code, payload = provider.Ready(context.Background())
