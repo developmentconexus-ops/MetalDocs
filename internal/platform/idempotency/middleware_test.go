@@ -14,6 +14,7 @@ import (
 
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/idempotency"
+	"metaldocs/internal/platform/tenant"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -88,6 +89,47 @@ func TestMiddleware_InvalidUUID_Returns400(t *testing.T) {
 	h.ServeHTTP(rec, req)
 	if rec.Code != 400 {
 		t.Fatalf("status: got %d want 400", rec.Code)
+	}
+}
+
+// TestMiddleware_MissingActor_Returns401 pins the client-fault branch: a
+// blank actor is something the caller can fix by re-authenticating, so it
+// stays 401 (A3.3). This is the branch that must NOT change when the
+// tenant-missing branch below is split out to 500.
+func TestMiddleware_MissingActor_Returns401(t *testing.T) {
+	db, _ := testdb.Open(t)
+	tenantRow := testdb.NewTenant(t, db)
+	store := idempotency.New(db, "POST /test")
+	h := withIDs(tenantRow.ID, "")(idempotency.Require(store, actorFromCtx)(handler201(`{}`)))
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/test", bytes.NewReader([]byte(`{"x":1}`)))
+	req.Header.Set("Idempotency-Key", "44444444-4444-4444-8444-444444444444")
+	h.ServeHTTP(rec, req)
+	if rec.Code != 401 {
+		t.Fatalf("status: got %d want 401", rec.Code)
+	}
+}
+
+// TestMiddleware_MissingTenant_Returns500 pins the server-fault branch found
+// by PR #122 review (chatgpt-codex-connector, identity.go:40): a missing
+// tenant means the auth middleware did not run or the session is corrupt —
+// internal/platform/tenant/context.go:15-17 requires this be surfaced as a
+// 500 invariant violation, matching every other production consumer of
+// tenant.FromContext (e.g. controlleddocuments' injectTenant), not folded
+// into the same 401 branch as a missing actor.
+func TestMiddleware_MissingTenant_Returns500(t *testing.T) {
+	db, _ := testdb.Open(t)
+	store := idempotency.New(db, "POST /test")
+	missingTenant := func(context.Context) (string, string, error) {
+		return "", "", tenant.ErrTenantMissing
+	}
+	h := idempotency.Require(store, missingTenant)(handler201(`{}`))
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/test", bytes.NewReader([]byte(`{"x":1}`)))
+	req.Header.Set("Idempotency-Key", "55555555-5555-4555-8555-555555555555")
+	h.ServeHTTP(rec, req)
+	if rec.Code != 500 {
+		t.Fatalf("status: got %d want 500", rec.Code)
 	}
 }
 
