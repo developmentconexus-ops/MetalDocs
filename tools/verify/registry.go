@@ -919,6 +919,29 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 	},
 	{
+		// A2.1 (issue #91): eslint's own "lint" script now runs with
+		// --pass-on-unpruned-suppressions (see package.json), so eslint
+		// itself never fails just because a baselined finding got fixed. That
+		// means the suppressions file can otherwise sit forever with no
+		// forcing function to revisit it — this check is that forcing
+		// function, repo-authored (not third-party), hence a real Fixture
+		// below rather than a waiver.
+		ID:       "eslint-suppression-expiry",
+		Desc:     "every eslint-suppressions.json baseline has a live (non-expired) eslint-suppressions.expiry.json entry (A2.1)",
+		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-eslint-suppression-expiry.sh"},
+		Fixture: &Fixture{
+			Dir:  "eslint-suppression-expiry",
+			Want: []string{"EXPIRED"},
+		},
+		// Same Paths as "eslint" above: whenever frontend/packages/apps code
+		// or the eslint config that decides which rules are ratcheted can
+		// change, the suppression baseline and its expiry dates are back in
+		// scope too. Plus the check's own inputs (C2 class).
+		Paths: []string{"frontend/", "packages/", "apps/", "eslint.config.mjs", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", "eslint-suppressions.json", "eslint-suppressions.expiry.json", "scripts/check-eslint-suppression-expiry.sh"},
+		CIJob: "ci.yml:verify",
+	},
+	{
 		ID:       "css-tokens",
 		Desc:     "no new raw hex colors in module.css",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},

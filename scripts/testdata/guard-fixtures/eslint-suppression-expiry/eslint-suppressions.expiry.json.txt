@@ -1,0 +1,7 @@
+{
+  "@typescript-eslint/no-unused-vars": {
+    "expires": "2020-01-01",
+    "owner": "fixture",
+    "note": "deliberately expired — guard-fixture negative test for eslint-suppression-expiry"
+  }
+}
