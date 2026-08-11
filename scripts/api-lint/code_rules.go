@@ -242,6 +242,17 @@ func checkPaginationCodec(modulesRoot string, fset *token.FileSet) ([]Violation,
 // catches a future read-only tx that never touches authz.Require but still
 // bypasses the chokepoint. Fix is always TxRunner.Do (or, until A5.1's
 // BeginTx-outside-runner.go ban lands, BeginTx(ctx, nil)).
+//
+// The selector qualifier is resolved per file from that file's own imports,
+// not hard-coded to the literal identifier "sql": Go lets any file alias
+// database/sql to another name (import dbsql "database/sql"), and a
+// hard-coded "sql" comparison would let &dbsql.TxOptions{ReadOnly: true}
+// pass silently, reopening exactly the gap this rule exists to close.
+// Blank (_) and dot (.) imports of database/sql are not resolved here — a
+// dot import turns the literal into a bare TxOptions{...} composite lit
+// with no SelectorExpr at all, which is a different AST shape this
+// selector-based check does not attempt to match; that is a known,
+// narrower gap than the one this fix closes, not a regression from it.
 func checkNoReadOnlyTxOptions(modulesRoot string, fset *token.FileSet) ([]Violation, error) {
 	out := []Violation{}
 	walkErr := filepath.WalkDir(modulesRoot, func(path string, d os.DirEntry, walkErr error) error {
@@ -263,6 +274,21 @@ func checkNoReadOnlyTxOptions(modulesRoot string, fset *token.FileSet) ([]Violat
 		if err != nil {
 			return err
 		}
+		sqlIdents := map[string]bool{}
+		for _, imp := range file.Imports {
+			importPath, unquoteErr := strconv.Unquote(imp.Path.Value)
+			if unquoteErr != nil || importPath != "database/sql" {
+				continue
+			}
+			switch {
+			case imp.Name == nil:
+				sqlIdents["sql"] = true
+			case imp.Name.Name == "_" || imp.Name.Name == ".":
+				// Not a selector-qualified reference; see doc comment above.
+			default:
+				sqlIdents[imp.Name.Name] = true
+			}
+		}
 		ast.Inspect(file, func(n ast.Node) bool {
 			lit, ok := n.(*ast.CompositeLit)
 			if !ok {
@@ -272,7 +298,7 @@ func checkNoReadOnlyTxOptions(modulesRoot string, fset *token.FileSet) ([]Violat
 			if !ok || sel.Sel.Name != "TxOptions" {
 				return true
 			}
-			if x, ok := sel.X.(*ast.Ident); !ok || x.Name != "sql" {
+			if x, ok := sel.X.(*ast.Ident); !ok || !sqlIdents[x.Name] {
 				return true
 			}
 			for _, elt := range lit.Elts {

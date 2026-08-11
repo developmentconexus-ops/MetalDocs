@@ -36,6 +36,26 @@ func TestNoReadOnlyTxOptions_FlagsReadOnlyLiteral(t *testing.T) {
 	}
 }
 
+// TestNoReadOnlyTxOptions_AliasedImportFlagged proves the guard resolves the
+// file's own import alias for database/sql instead of hard-coding the
+// identifier "sql" — a CodeRabbit/Codex finding on PR #120 (2026-08-11):
+// import dbsql "database/sql"; &dbsql.TxOptions{ReadOnly: true} silently
+// passed the pre-fix guard, reopening the exact read-only-tx gap this rule
+// exists to close for any file that aliases the import.
+func TestNoReadOnlyTxOptions_AliasedImportFlagged(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "internal/modules/x/repository.go",
+		"package x\nimport dbsql \"database/sql\"\nfunc f(db *dbsql.DB) { _, _ = db.Begin() ; _ = &dbsql.TxOptions{ReadOnly: true} }\n")
+
+	got, err := checkNoReadOnlyTxOptions(dir, token.NewFileSet())
+	if err != nil {
+		t.Fatalf("checkNoReadOnlyTxOptions: %v", err)
+	}
+	if n := countRule(got, "no-readonly-tx-options"); n != 1 {
+		t.Fatalf("no-readonly-tx-options: want exactly 1 violation for aliased import, got %d\nfull got=%+v", n, got)
+	}
+}
+
 // TestNoReadOnlyTxOptions_TestFileExempt proves _test.go fixtures (e.g. a
 // future unit test for a hypothetical read-only helper) are not flagged —
 // mirrors every other single-file AST rule's test exemption in this package.
