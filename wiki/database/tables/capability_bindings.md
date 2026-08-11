@@ -20,6 +20,20 @@ the live path until A8.2 (query builder: `Granted`/`GrantedAnyScope`) lands. Do 
 a reader against this table without first reading ADR 0092 and confirming A8.2 has
 shipped.
 
+**NOT AUTHORITATIVE (TRANSITIONAL — write cutover not landed):** the corollary of "nothing
+reads this table" is that nothing writes it either, past the one-time backfill.
+`role_admin_repository.go`, `user_area_repository.go`, and `onboard_tenant_service.go` —
+every current grant write site — still write exclusively to `iam_user_roles`,
+`user_process_areas`, and `iam_group_roles`; none dual-writes into
+`capability_bindings`. From the moment 0318 merges, every grant issued afterwards is
+invisible here and this table drifts stale by construction. Harmless today because no
+read path consults it (above); becomes a live correctness hole the instant one does. Do
+not treat row counts or contents here as ground truth, and do not add a reader, until a
+write cutover (dual-write or repoint of the three sites above) lands — that cutover is
+not yet owned by any slice in the canonical A8.1–A8.4 decomposition and is tracked
+separately. Until then `iam_user_roles`, `user_process_areas`, and `iam_group_roles`
+remain the sole grant source of record.
+
 `iam_group_members` (group *membership* — who is in a group) is explicitly **not** one
 of the source relations folded in here; ADR 0092 D4 keeps membership and grants
 orthogonal.

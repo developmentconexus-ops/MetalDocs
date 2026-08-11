@@ -89,6 +89,20 @@ type Port interface {
 // EraseTable is a plain tenant-scoped DELETE, not idempotent against an
 // already-empty table in a way that would be wrong, but would misreport row
 // counts) — Tables() still lists it, EraseTenantData must not.
+//
+// TRANSITIONAL, labelled per CLAUDE.md's Global Maximum rule: a second,
+// opt-in, hand-declared erase phase is itself a hand-written mechanism (the
+// same class of gap ME-18 catalogs, docs/engineering/mechanical-enforcement-
+// register.md, issue #117) — nothing forces a module that adds a genuine
+// cross-module-later FK to also implement this interface; a missed
+// declaration is a live 23503 in production, not a build failure.
+// Global-maximum structure: a derived, schema-driven erasure PLAN computed
+// from the live FK graph (pg_constraint) plus a generated per-tenant-table
+// manifest (owner, tenant key, erase behaviour, erase phase, FK
+// dependencies) — resolving true two-way dependencies via strongly-connected-
+// component (SCC) detection over that graph, not a hand-authored EARLY/LATE
+// split per module. No milestone is scheduled yet; ME-18/#117 is the tracked
+// follow-up until one is.
 type EarlyEraser interface {
 	// EraseEarly deletes tenantID's rows from whichever subset of this
 	// port's Tables() must be gone before the main eraseOrder fan-out runs,

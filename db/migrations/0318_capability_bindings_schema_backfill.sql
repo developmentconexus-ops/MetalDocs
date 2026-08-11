@@ -45,6 +45,28 @@
 --   the TRIPWIRE-ARM-PARITY golden-generation contract).
 --
 -- ============================================================================
+-- NOT AUTHORITATIVE (TRANSITIONAL -- read this before trusting this table)
+-- ============================================================================
+--   metaldocs.capability_bindings is populated ONLY by this one-time
+--   backfill. Every write site that issues a grant today --
+--   role_admin_repository.go, user_area_repository.go,
+--   onboard_tenant_service.go -- still writes iam_user_roles,
+--   user_process_areas, and iam_group_roles EXCLUSIVELY; none of them
+--   dual-write into capability_bindings. That means from the moment this
+--   migration merges, capability_bindings starts drifting stale: any grant
+--   issued after the backfill runs is invisible here. This is harmless
+--   today only because NO read path -- tier-1, tier-2, or otherwise --
+--   consults capability_bindings yet (see "Deliberately NOT in this
+--   migration" above). It becomes a correctness hole the instant any read
+--   path is repointed at it. capability_bindings MUST NOT be treated as
+--   authoritative, and no read path may consult it, until the write
+--   cutover (dual-write or repoint of the three sites above) lands --
+--   that cutover is a separate, not-yet-assigned slice of issue #89/A8
+--   (tracked outside the canonical A8.1-A8.4 decomposition as of this
+--   writing); until then, iam_user_roles, user_process_areas, and
+--   iam_group_roles remain the sole grant source of record.
+--
+-- ============================================================================
 -- NAMED DEVIATION FROM THE ADR'S LITERAL COLUMN LIST
 -- ============================================================================
 --   ADR 0092 D1 names a single logical `subject_id`. Postgres cannot express
@@ -119,7 +141,18 @@
 --       IF NOT EXISTS form in Postgres, so each is wrapped in a DO block that
 --       checks pg_constraint by (conname, conrelid) first;
 --     - both CREATE TABLE statements use IF NOT EXISTS;
---     - the roles seed INSERT uses ON CONFLICT (code) DO NOTHING;
+--     - the roles seed INSERT ... SELECT is guarded by
+--       WHERE NOT EXISTS (SELECT 1 FROM metaldocs.roles) -- once any row
+--       exists, the SELECT yields zero candidate rows and the INSERT is a
+--       true no-op. NOT `ON CONFLICT (code) DO NOTHING`: this table is
+--       gated by migration 0319's BEFORE INSERT FOR EACH ROW tripwire, which
+--       evaluates every candidate row before ON CONFLICT resolution runs --
+--       an ON-CONFLICT-guarded replay after 0319 has attached would still
+--       fire the trigger for all 8 rows with no capability asserted (B1, PR
+--       #113 bot review; proof: TestMigration0318_ReplaySafeAfterTripwireAttached
+--       in tests/integration/migrations/migration_0318_test.go). The
+--       zero-candidate-rows shape is required here for the same reason the
+--       three backfill INSERTs below already use it, not merely preferred;
 --     - all three CREATE INDEX statements use IF NOT EXISTS;
 --     - ENABLE/FORCE ROW LEVEL SECURITY are already idempotent in Postgres
 --       (no error re-enabling/re-forcing what is already on) -- no guard
@@ -148,6 +181,11 @@
 --   Proof this holds: tests/integration/migrations/migration_0318_test.go
 --   runs this file's statements twice against the same database and asserts
 --   the second run succeeds with capability_bindings row counts unchanged.
+--   TestMigration0318_ReplaySafeAfterTripwireAttached additionally replays
+--   this file with NO capability bypass or assertion set at all, against a
+--   database where 0319's tripwire is already attached (B1) -- proving every
+--   guarded statement, including the roles seed, produces zero candidate
+--   rows on replay and never fires the trigger.
 --
 -- ============================================================================
 
@@ -202,7 +240,22 @@ CREATE TABLE IF NOT EXISTS metaldocs.roles (
 -- the user_process_areas CHECK (7), the iam_user_roles CHECK (5)). A8.3
 -- repoints this seed at a Go-registry-driven generator; until then this INSERT
 -- is the single hand-maintained catalog source.
-INSERT INTO metaldocs.roles (code, description) VALUES
+--
+-- REPLAY GUARD (B1, PR #113 bot review): NOT `ON CONFLICT (code) DO NOTHING`.
+-- Migration 0319 attaches a BEFORE INSERT ... FOR EACH ROW tripwire
+-- (trg_require_cap_asserted) to this table; that trigger fires for every
+-- CANDIDATE row BEFORE Postgres ever evaluates ON CONFLICT's resolution, so
+-- an ON-CONFLICT-guarded INSERT would still fire the trigger for all 8 rows
+-- on a replay executed after 0319 has run -- and a bare migration replay
+-- asserts no metaldocs.asserted_caps GUC, so that trigger firing is exactly
+-- ErrCapabilityNotAsserted. Guarding the whole statement to zero candidate
+-- rows once any seed row exists -- the same idiom the three backfill
+-- INSERTs below already use -- means the trigger never evaluates a single
+-- row on replay, so no capability assertion is needed for this statement at
+-- all, matching every other guarded statement in this file.
+INSERT INTO metaldocs.roles (code, description)
+SELECT v.code, v.description
+FROM (VALUES
     ('system_admin', 'Tenant-wide administrator; every capability (ADR 0092 D2 target -- not yet an ordinary grant in A8.1)'),
     ('approver',     'Tenant-scoped approver role'),
     ('author',       'Tenant-scoped author role'),
@@ -211,7 +264,8 @@ INSERT INTO metaldocs.roles (code, description) VALUES
     ('signer',       'Area-scoped signer role'),
     ('area_admin',   'Area-scoped administrator role'),
     ('qms_admin',    'Area-scoped QMS administrator role')
-ON CONFLICT (code) DO NOTHING;
+) AS v(code, description)
+WHERE NOT EXISTS (SELECT 1 FROM metaldocs.roles);
 
 -- ── metaldocs.capability_bindings: ADR 0092 D1 relation ────────────────────
 

@@ -5,6 +5,7 @@ package migrations_test
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -75,6 +76,12 @@ func TestMigration0318_SchemaLanded(t *testing.T) {
 func TestMigration0318_ReplaySafe(t *testing.T) {
 	ctx := context.Background()
 	db, _ := testdb.OpenFreshDatabase(t)
+	// Sequential-only usage in this test; pinning the pool to one physical
+	// connection makes execWithSchedulerBypass's pinned-conn SET/RESET and
+	// assertBypassNotInherited's leak check deterministic (same idiom
+	// testdb.SetCapsOnDB documents: "Safe only for isolated per-test
+	// databases (MaxOpenConns=1 ...)").
+	db.SetMaxOpenConns(1)
 
 	// testdb.OpenFreshDatabase's bootstrap already runs 0318 once, but
 	// against an otherwise-empty database (no dev-seed grants), so all
@@ -121,18 +128,23 @@ func TestMigration0318_ReplaySafe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read migration 0318 file: %v", err)
 	}
+	sqlText := string(sqlBytes)
+
 	// By the time this test runs, bootstrap has already applied 0319, which
 	// ATTACHES trg_require_cap_asserted to metaldocs.roles and
 	// metaldocs.capability_bindings (arms #21/#22). Re-executing 0318's raw
 	// SQL now -- outside any request/service context that would assert a
-	// capability -- hits that now-live trigger on its own roles-seed INSERT
-	// and its own backfill INSERTs, which a real 0318-only replay (before
-	// 0319 has run) would not. The scheduler bypass is the same escape
-	// hatch background/administrative SQL uses elsewhere (see
-	// metaldocs.bypass_authz='scheduler' in the tenant-erasure path); it
-	// does not weaken what this test proves, since the guards under test
-	// are the migration's own idempotency guards, not the tripwire.
-	replaySQL := "SET metaldocs.bypass_authz = 'scheduler';\n" + string(sqlBytes)
+	// capability -- hits that now-live trigger on its own backfill INSERTs,
+	// which a real 0318-only run (before 0319 has run) would not. The
+	// scheduler bypass is the same escape hatch background/administrative
+	// SQL uses elsewhere (see metaldocs.bypass_authz='scheduler' in the
+	// tenant-erasure path). execWithSchedulerBypass sets and resets it on a
+	// single pinned *sql.Conn (B2, PR #113 bot review) -- SET is
+	// session-scoped, so leaving it set on a connection returned to db's
+	// pool would hand a later caller on this same *sql.DB an unintended
+	// tripwire bypass. SET LOCAL is not usable here: this runs outside an
+	// explicit Go-managed transaction (0318's own top-level BEGIN/COMMIT is
+	// inside sqlText itself).
 
 	// First pass: bootstrap's own 0318 run already happened over an empty
 	// database, so the backfill guards were never blocked and never had
@@ -140,24 +152,155 @@ func TestMigration0318_ReplaySafe(t *testing.T) {
 	// time capability_bindings' per-source guard markers are absent AND
 	// the sources are non-empty -- is the real backfill this migration is
 	// meant to perform in production; it is not yet the replay under test.
-	if _, err := db.ExecContext(ctx, replaySQL); err != nil {
+	// These are genuine new-row inserts into capability_bindings (three
+	// source rows), so they DO need a capability assertion -- unlike the
+	// true replay pass below, this is not a B1 scenario.
+	if err := execWithSchedulerBypass(ctx, t, db, sqlText); err != nil {
 		t.Fatalf("running migration 0318 against freshly-seeded source rows failed: %v", err)
 	}
+	assertBypassNotInherited(t, ctx, db)
 
 	before := snapshot()
 	if before.total == 0 {
 		t.Fatal("precondition failed: capability_bindings is empty after the seeded backfill pass, replay would prove nothing")
 	}
 
-	// Second pass: the actual replay under test (P1-2) -- every guard must
-	// now see its own markers and refuse to duplicate anything.
-	if _, err := db.ExecContext(ctx, replaySQL); err != nil {
+	// Second pass: the actual replay under test (P1-2/B1) -- every guard,
+	// including the roles seed (B1 fix), must now see zero candidate rows
+	// and never fire the tripwire trigger at all. Deliberately NO scheduler
+	// bypass and NO asserted_caps here: a true replay against an
+	// already-fully-migrated database needs neither.
+	if _, err := db.ExecContext(ctx, sqlText); err != nil {
 		t.Fatalf("replaying migration 0318 against an already-migrated database failed (not replay-safe): %v", err)
 	}
 
 	after := snapshot()
 	if after != before {
 		t.Fatalf("migration 0318 replay changed row counts (backfill duplicated rows): before=%+v after=%+v", before, after)
+	}
+}
+
+// TestMigration0318_ReplaySafeAfterTripwireAttached proves migration 0318 is
+// safe to replay AFTER migration 0319 has attached trg_require_cap_asserted
+// to metaldocs.roles and metaldocs.capability_bindings, WITH NO capability
+// bypass or assertion at all -- the exact "apply 0318, apply 0319, replay
+// 0318" sequence PR #113 bot review found broken (B1, finding on
+// db/migrations/0318_capability_bindings_schema_backfill.sql:214).
+//
+// RED before the fix: the roles seed used `ON CONFLICT (code) DO NOTHING`,
+// which still evaluates trg_require_cap_asserted for every candidate row
+// BEFORE Postgres resolves the conflict -- so a bare replay (no
+// bypass_authz, no asserted_caps) hit ErrCapabilityNotAsserted on all 8 seed
+// rows. GREEN after the fix: the seed now uses the same
+// `WHERE NOT EXISTS (SELECT 1 FROM metaldocs.roles)` guard shape as the
+// three backfill INSERTs, so a replay's candidate row count is zero and the
+// trigger never fires -- no capability assertion is needed for a true
+// replay, matching every other guarded statement in this file.
+//
+// Deliberately decoupled from TestMigration0318_ReplaySafe's real-backfill
+// scenario (which legitimately needs a capability bypass for its first,
+// genuine-write pass): this test starts from bootstrap's own state --
+// nothing seeded into any of the three source tables -- so both passes here
+// are true, zero-candidate-row replays.
+func TestMigration0318_ReplaySafeAfterTripwireAttached(t *testing.T) {
+	ctx := context.Background()
+	db, _ := testdb.OpenFreshDatabase(t)
+
+	// testdb.OpenFreshDatabase's bootstrap has already applied every
+	// migration through the current head over an empty database -- 0318
+	// (roles seeded, capability_bindings created with nothing to backfill)
+	// and 0319 (trg_require_cap_asserted attached to both new tables).
+	before := roleAndBindingCounts(t, ctx, db)
+	if before.roles != 8 {
+		t.Fatalf("precondition failed: expected 8 roles after bootstrap, got %d", before.roles)
+	}
+
+	sqlBytes, err := os.ReadFile(migration0318Path(t))
+	if err != nil {
+		t.Fatalf("read migration 0318 file: %v", err)
+	}
+
+	// Deliberately NO SET metaldocs.bypass_authz and NO
+	// metaldocs.asserted_caps -- this is the crux of B1: a true replay
+	// against an already-fully-migrated database must need neither, because
+	// every guarded statement must produce zero candidate rows and never
+	// fire trg_require_cap_asserted at all.
+	if _, err := db.ExecContext(ctx, string(sqlBytes)); err != nil {
+		t.Fatalf("replaying migration 0318 after 0319 attached the tripwire failed with no capability bypass or assertion set (B1 regression): %v", err)
+	}
+
+	after := roleAndBindingCounts(t, ctx, db)
+	if after != before {
+		t.Fatalf("migration 0318 replay after 0319 changed row counts: before=%+v after=%+v", before, after)
+	}
+}
+
+// roleAndBindingCounts snapshots metaldocs.roles and metaldocs.capability_bindings
+// row counts, for TestMigration0318_ReplaySafeAfterTripwireAttached's
+// before/after comparison.
+func roleAndBindingCounts(t *testing.T, ctx context.Context, db *sql.DB) (counts struct{ roles, bindings int }) {
+	t.Helper()
+	if err := db.QueryRowContext(ctx, `SELECT count(*) FROM metaldocs.roles`).Scan(&counts.roles); err != nil {
+		t.Fatalf("count metaldocs.roles: %v", err)
+	}
+	if err := db.QueryRowContext(ctx, `SELECT count(*) FROM metaldocs.capability_bindings`).Scan(&counts.bindings); err != nil {
+		t.Fatalf("count metaldocs.capability_bindings: %v", err)
+	}
+	return counts
+}
+
+// execWithSchedulerBypass runs sqlText against a single pinned *sql.Conn with
+// metaldocs.bypass_authz='scheduler' set for its duration, then RESETs the
+// GUC on that SAME connection before returning it to db's pool (B2, PR #113
+// bot review). SET (not SET LOCAL) is session-scoped: leaving it set on a
+// connection handed back to the pool would give a later caller on this same
+// *sql.DB an unintended capability-tripwire bypass. SET LOCAL is not usable
+// here because this runs outside an explicit Go-managed transaction --
+// sqlText carries its own top-level BEGIN/COMMIT.
+func execWithSchedulerBypass(ctx context.Context, t *testing.T, db *sql.DB, sqlText string) error {
+	t.Helper()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("acquire pinned connection: %w", err)
+	}
+	defer func() {
+		if _, resetErr := conn.ExecContext(ctx, "RESET metaldocs.bypass_authz"); resetErr != nil {
+			t.Errorf("reset scheduler bypass on pinned connection: %v", resetErr)
+		}
+		if closeErr := conn.Close(); closeErr != nil {
+			t.Errorf("close pinned connection: %v", closeErr)
+		}
+	}()
+
+	if _, err := conn.ExecContext(ctx, "SET metaldocs.bypass_authz = 'scheduler'"); err != nil {
+		return fmt.Errorf("set scheduler bypass: %w", err)
+	}
+	if _, err := conn.ExecContext(ctx, sqlText); err != nil {
+		return err
+	}
+	return nil
+}
+
+// assertBypassNotInherited proves a connection acquired from db's pool AFTER
+// execWithSchedulerBypass returned does not see the scheduler bypass -- the
+// B2 regression this guards against. db must have SetMaxOpenConns(1) so this
+// deterministically observes the same physical connection
+// execWithSchedulerBypass just released, not a fresh one that would trivially
+// show no GUC set regardless of whether RESET ran.
+func assertBypassNotInherited(t *testing.T, ctx context.Context, db *sql.DB) {
+	t.Helper()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		t.Fatalf("acquire connection to check bypass leak: %v", err)
+	}
+	defer conn.Close()
+
+	var bypass sql.NullString
+	if err := conn.QueryRowContext(ctx, `SELECT current_setting('metaldocs.bypass_authz', true)`).Scan(&bypass); err != nil {
+		t.Fatalf("read metaldocs.bypass_authz on the next pooled connection: %v", err)
+	}
+	if bypass.Valid && bypass.String != "" {
+		t.Fatalf("metaldocs.bypass_authz leaked onto a later connection from this pool: %q", bypass.String)
 	}
 }
 

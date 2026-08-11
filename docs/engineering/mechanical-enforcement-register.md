@@ -732,9 +732,14 @@ is either declared in that port's `EraseEarly` or is ranked at/after the referen
 `eraseOrder`.
 
 Level 1 is reachable only by unifying #2/#3/#4 into one generated per-tenant-table manifest
-(module owner, reset/exclusion class, erase phase) — the same "generated manifest" shape ME-15
-names for the CI-check registry, one layer down. Named here so the level-3 fixes are understood
-as a step, not a destination.
+(module owner, reset/exclusion class, erase phase, FK dependencies) — the same "generated
+manifest" shape ME-15 names for the CI-check registry, one layer down — derived from the live
+`pg_constraint` FK graph, with strongly-connected-component (SCC) detection over that graph to
+resolve genuine two-way dependencies (what #4's hand-authored EARLY/LATE split does by hand
+today for exactly one instance: `user_process_areas`/`capability_bindings` vs.
+`document_process_areas`). Named here so the level-3 fixes are understood as a step, not a
+destination; `internal/platform/tenantdata/port.go`'s `EarlyEraser` doc carries the same
+TRANSITIONAL label pointing back to this entry.
 
 **Verified** 2026-08-11, first-hand (all five surfaces read against the current schema and this
 PR's own fixes). **Owner:** unrouted. Cheapest first step is #2.

@@ -94,3 +94,27 @@ physical column list differs from the ADR text above.
 A future reader diffing this ADR against the live schema should treat this Amendment, not line 31's column
 list, as the decision of record for the physical shape. D2–D4 and the query-builder repoint (A8.2+) remain
 undecided-in-schema and out of scope for this amendment.
+
+**A8.1's boundary, stated explicitly (do not infer from "D1's schema shipped" above):** A8.1 implements the
+binding-table **shape** (`metaldocs.capability_bindings`, `metaldocs.roles`) and a **grant backfill only** —
+`iam_user_roles`, `user_process_areas`, and `iam_group_roles` rows are copied into the new relation, with
+`source_relation` provenance, for future reads to consume. D1 also names `iam_group_members` as one of the
+four relations D1's binding collapses; A8.1 does **not** touch it. `iam_group_members` (group *membership* —
+who is in a group) remains the sole membership authority through A8.1; no group-membership row is
+represented in `capability_bindings`, and nothing reads `capability_bindings` for membership. "D1's logical
+relation … is unchanged" above describes the *shape* of the binding relation `capability_bindings` was built
+to hold, not a claim that every source D1 names has been migrated into it. A later slice, not A8.1, decides
+whether/how group membership joins this relation.
+
+**`capability_bindings` is NOT AUTHORITATIVE through A8.1 (TRANSITIONAL — read before trusting this table):**
+the relation is populated only by 0318's one-time backfill. The three write sites that issue grants today
+(`role_admin_repository.go`, `user_area_repository.go`, `onboard_tenant_service.go`) still write exclusively
+to `iam_user_roles`, `user_process_areas`, and `iam_group_roles` — none dual-writes into
+`capability_bindings`. Every grant issued after the backfill runs is therefore invisible in
+`capability_bindings`, and the relation starts drifting stale from the moment A8.1 merges. This is harmless
+only because A8.1 ships no read path against it (see the amendment above). It becomes a correctness hole the
+moment any read path is repointed at it — no read path may consult `capability_bindings`, and it must not be
+treated as authoritative, until a write cutover (dual-write or repoint of the three sites above) lands. That
+cutover is not owned by any slice in the canonical A8.1–A8.4 decomposition as of this writing; it is tracked
+separately. Until it lands, `iam_user_roles`, `user_process_areas`, and `iam_group_roles` remain the sole
+grant source of record.

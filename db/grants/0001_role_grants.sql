@@ -84,38 +84,6 @@ BEGIN
     EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE metaldocs_app IN SCHEMA metaldocs GRANT USAGE, SELECT ON SEQUENCES TO metaldocs_ci';
     EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE metaldocs_app IN SCHEMA public   GRANT USAGE, SELECT ON SEQUENCES TO metaldocs_ci';
   END IF;
-
-  -- Future objects created by WHICHEVER ROLE IS RUNNING THIS FILE, keyed
-  -- dynamically via current_user rather than the literal name 'metaldocs_app'
-  -- above. This closes a real gap, not a hypothetical one: A8.1 (migration
-  -- 0318) creates metaldocs.capability_bindings and metaldocs.roles, and both
-  -- db/grants/0001_role_grants.sql (this file) and internal/platform/migrate.
-  -- ApplyGrants's own doc comment establish that the grants stage ALWAYS runs
-  -- BEFORE db/migrations, every single bootstrap/startup, with no second pass
-  -- in between -- so the blanket "ON ALL TABLES" grant above can never see a
-  -- table a migration is about to create moments later in the same run. The
-  -- metaldocs_app block above is the intended forward-declaring fix for
-  -- exactly that ordering gap (ALTER DEFAULT PRIVILEGES applies to objects
-  -- created AFTER it runs, by the named role, regardless of order-of-existence),
-  -- but it is keyed to the LITERAL role name 'metaldocs_app' -- correct for a
-  -- real deployment (.env.example: POSTGRES_USER=metaldocs_app), wrong for
-  -- CI's throwaway Postgres service, which names its connecting/bootstrapping/
-  -- migration-running role "metaldocs" (POSTGRES_USER in
-  -- .github/workflows/ci.yml) and never creates a role literally named
-  -- metaldocs_app at all -- so the IF EXISTS guard above is false and the
-  -- whole block is skipped there. That mismatch is what let
-  -- TestRLSTruth_CapabilityBindingsEnforcesIsolation pass against a local dev
-  -- DB (role genuinely named metaldocs_app) while failing 42501 permission
-  -- denied for table capability_bindings against a fresh CI database (role
-  -- named metaldocs). current_user is always exactly the role connected right
-  -- now -- the same one that will run the migrations directly after this file,
-  -- in every environment -- so this statement needs no name-existence guard
-  -- and no environment-specific branching: altering your OWN default
-  -- privileges is always permitted.
-  EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA metaldocs GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO metaldocs_ci', current_user);
-  EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO metaldocs_ci', current_user);
-  EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA metaldocs GRANT USAGE, SELECT ON SEQUENCES TO metaldocs_ci', current_user);
-  EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public   GRANT USAGE, SELECT ON SEQUENCES TO metaldocs_ci', current_user);
 END
 $$;
 

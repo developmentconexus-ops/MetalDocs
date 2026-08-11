@@ -16,9 +16,9 @@ This table's seed is **hand-maintained**, not generated. ADR 0092's Context name
 role-declaration surfaces** already drifting from each other (`iamtypes.validRoles`,
 `iamtypes.areaRoles`, OpenAPI `UserRole`, OpenAPI `AreaRole`, the `user_process_areas`
 CHECK of 7, the `iam_user_roles` CHECK of 5) plus `iam_group_roles` with no CHECK at
-all. Hand-seeding a *seventh* surface here does not fix that — it is a deliberate,
-labelled local maximum: this table exists so `capability_bindings` has an FK target at
-all in A8.1.
+all — seven surfaces total. Hand-seeding an *eighth* surface here does not fix that — it
+is a deliberate, labelled local maximum: this table exists so `capability_bindings` has
+an FK target at all in A8.1.
 
 **Global-maximum structure:** a single Go-registry-driven role catalog, generated the
 same way `TripwireArms` generates the tripwire (see
