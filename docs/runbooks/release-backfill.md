@@ -197,12 +197,29 @@ What the transactional design does give you:
   transaction (per the package doc's stated write set), so that part is not
   history-destructive by design — but `frozen_revision_id` DOES change, and
   no prior value is recorded to revert to.
-- **Replay safety (not a rollback, but relevant):** re-running the tool with
-  the same `-docs` list is safe and does not duplicate work — both modes are
-  designed so a document already in the target state reports
-  `already-backfilled`, and repair-only's dedupe keys prevent a second,
-  redundant dispatch. This is the closest thing to a safety net the tool
-  provides; it is forward idempotency, not rollback.
+- **Replay safety (not a rollback, but relevant, and NOT the same for both
+  modes — corrected 2026-08-11 after review against the code; the original
+  text here overstated repair-only's behavior):**
+  - **Default backfill** re-running with the same `-docs` list IS a no-op:
+    preflight checks for an existing `release_generations` row
+    (`pre.existingGenerationID`) and, if found, reports
+    `outcome=already-backfilled` without writing anything else.
+  - **`-repair-only` re-running is NOT a no-op and does NOT report
+    `already-backfilled`.** There is no equivalent short-circuit in
+    `runRepairOnly`/`repairPreflight`. Once the prior dispatch/delivery rows
+    reach a TERMINAL status, `repairPreflight` classifies them as stale,
+    `runRepairOnly` purges them, and `RepairMaterialization` is called again
+    — producing another `outcome=repaired` and another re-dispatch, every
+    time it's re-run against a document in that state. The dedupe keys are
+    not a guard against this: purging the rows that hold those keys is
+    exactly what makes the next dispatch possible, not what prevents it.
+    The only thing `repairPreflight` refuses outright is re-running while a
+    prior dispatch/delivery row is still IN-FLIGHT (non-terminal) — that is
+    a safety check against concurrent overlap, not against repeated,
+    sequential re-application. An operator who re-runs `-repair-only`
+    against the same document more than once should expect to delete and
+    re-render delivery artifacts each time, not expect the second run to
+    detect "already repaired" and skip.
 
 If a committed write needs to be undone, that requires a manually written,
 reviewed remediation against the specific rows this tool wrote — identifiable
