@@ -4,10 +4,31 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
+	"time"
 
 	"metaldocs/internal/platform/observability"
 )
+
+// fakeWorkerClock is an injectable, manually-advanced clock so heartbeat
+// staleness tests drive time deterministically instead of sleeping.
+type fakeWorkerClock struct {
+	mu sync.Mutex
+	t  time.Time
+}
+
+func (c *fakeWorkerClock) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.t
+}
+
+func (c *fakeWorkerClock) Advance(d time.Duration) {
+	c.mu.Lock()
+	c.t = c.t.Add(d)
+	c.mu.Unlock()
+}
 
 // TestWorkerReadiness_NotReadyBeforeLoopStarts is the A7.1 RED-first proof
 // for metaldocs-worker: readiness must report NOT ready while the outbox
@@ -76,5 +97,55 @@ func TestWorkerReadinessEndpoint_ReflectsLoopState(t *testing.T) {
 
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("GET /ready with nil DB and loop not started = %d, want 503", rec.Code)
+	}
+}
+
+// TestWorkerReadiness_StaleHeartbeatFlipsNotReady is the F1 review round 2
+// RED-first proof: a poll loop that started successfully but has stopped
+// making progress (RunOnce hanging, or never being reached again) must flip
+// readiness back to NOT ready once the configured heartbeat threshold is
+// exceeded — a one-shot start latch alone cannot detect this. The clock is
+// injected and advanced manually; the test never sleeps.
+func TestWorkerReadiness_StaleHeartbeatFlipsNotReady(t *testing.T) {
+	clock := &fakeWorkerClock{t: time.Unix(1_700_000_000, 0)}
+	r := &workerReadiness{}
+	r.ConfigureHeartbeat(30*time.Second, clock.Now)
+	r.MarkStarted() // seeds the heartbeat at clock.Now() (startup grace)
+
+	if _, err := r.Check(context.Background()); err != nil {
+		t.Fatalf("Check() immediately after MarkStarted() = %v, want nil error (grace period)", err)
+	}
+
+	clock.Advance(31 * time.Second)
+
+	_, err := r.Check(context.Background())
+	if err == nil {
+		t.Fatal("Check() after the heartbeat went stale = nil error, want an error")
+	}
+}
+
+// TestWorkerReadiness_RecordProgressResetsHeartbeat proves the other half:
+// a genuinely completed poll cycle (RecordProgress) resets the staleness
+// clock, so a live loop that is ticking on schedule never flips to NOT
+// ready.
+func TestWorkerReadiness_RecordProgressResetsHeartbeat(t *testing.T) {
+	clock := &fakeWorkerClock{t: time.Unix(1_700_000_000, 0)}
+	r := &workerReadiness{}
+	r.ConfigureHeartbeat(30*time.Second, clock.Now)
+	r.MarkStarted()
+
+	clock.Advance(25 * time.Second)
+	r.RecordProgress() // a real cycle completed just before the threshold
+
+	clock.Advance(25 * time.Second) // 25s since RecordProgress, still < 30s
+
+	if _, err := r.Check(context.Background()); err != nil {
+		t.Fatalf("Check() 25s after RecordProgress (threshold 30s) = %v, want nil error", err)
+	}
+
+	clock.Advance(6 * time.Second) // now 31s since RecordProgress
+
+	if _, err := r.Check(context.Background()); err == nil {
+		t.Fatal("Check() 31s after the last RecordProgress (threshold 30s) = nil error, want an error")
 	}
 }
