@@ -31,6 +31,21 @@
 -- guarded/idempotent form, so a fresh bootstrap reproduces the exact posture
 -- of a fully-migrated database.
 --
+-- metaldocs_runtime (added for issue #88 / axis A6.1): today
+-- deploy/compose/docker-compose.yml passes ${POSTGRES_USER} -- the Postgres
+-- image's bootstrap superuser (also BYPASSRLS by construction) -- as PGUSER
+-- to metaldocs-api/worker/jobs, so the boot-fatal identity assertion added by
+-- A6.1 (internal/platform/db/postgres.AssertSafeIdentity) refuses to boot
+-- against the dev compose's current PGUSER. This block provisions a
+-- dedicated, non-superuser, non-bypassrls role that CAN satisfy that
+-- assertion, so the assertion mechanism itself is provably correct and
+-- testable. It is NOT yet wired into any compose/env default -- pointing
+-- PGUSER at it, and resolving how schema migrations (which need DDL rights
+-- this role deliberately does not have) run under a least-privilege identity,
+-- is issue #88's A6.2 ("app role provisioning in compose"), out of A6.1's
+-- scope. Until A6.2 lands, this role sits provisioned-but-unused, exactly
+-- like metaldocs_ci sat between 0284 and its first consumer.
+--
 -- Everything here is idempotent and safe to re-run.
 
 BEGIN;
@@ -87,19 +102,72 @@ BEGIN
 END
 $$;
 
+-- ── metaldocs_runtime: non-owner, non-bypass application role (A6.1) ────────
+-- Same guarded/idempotent shape as the metaldocs_ci block above: the CREATE
+-- only runs when the role is absent (re-running this file never resets an
+-- already-rotated password), and the whole block skips cleanly with a NOTICE
+-- when the executing role lacks CREATEROLE, instead of turning startup into a
+-- hard failure over a role no compose/env currently connects as.
+--
+-- Grant surface mirrors metaldocs_ci's DML posture (SELECT/INSERT/UPDATE/
+-- DELETE on every existing and future table in both schemas, USAGE/SELECT on
+-- sequences) but, unlike metaldocs_ci, also inherits the audit_events and
+-- outbox_events hardening below -- metaldocs_runtime is meant to eventually
+-- stand in for metaldocs_app on the request-serving path (A6.2), where the
+-- audit-immutability guarantee must hold; metaldocs_ci is a test role that
+-- deliberately keeps full audit_events DML for audit-chain test assertions.
+-- Deliberately NOCREATEDB NOCREATEROLE and granted no DDL: this role cannot
+-- run schema migrations. Which identity runs migrate.Apply/ApplyGrants once
+-- compose stops connecting as the superuser owner is an open question left to
+-- A6.2, not decided here.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_runtime') THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_roles
+       WHERE rolname = current_user AND (rolcreaterole OR rolsuper)
+    ) THEN
+      RAISE NOTICE 'metaldocs_runtime is absent and % lacks CREATEROLE -- skipping runtime role provisioning', current_user;
+      RETURN;
+    END IF;
+    EXECUTE 'CREATE ROLE metaldocs_runtime NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT LOGIN PASSWORD ''metaldocs_runtime_dev''';
+  END IF;
+
+  EXECUTE 'GRANT USAGE ON SCHEMA metaldocs TO metaldocs_runtime';
+  EXECUTE 'GRANT USAGE ON SCHEMA public   TO metaldocs_runtime';
+
+  EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA metaldocs TO metaldocs_runtime';
+  EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public   TO metaldocs_runtime';
+
+  EXECUTE 'GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA metaldocs TO metaldocs_runtime';
+  EXECUTE 'GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public   TO metaldocs_runtime';
+
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_app') THEN
+    EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE metaldocs_app IN SCHEMA metaldocs GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO metaldocs_runtime';
+    EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE metaldocs_app IN SCHEMA public   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO metaldocs_runtime';
+    EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE metaldocs_app IN SCHEMA metaldocs GRANT USAGE, SELECT ON SEQUENCES TO metaldocs_runtime';
+    EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE metaldocs_app IN SCHEMA public   GRANT USAGE, SELECT ON SEQUENCES TO metaldocs_runtime';
+  END IF;
+END
+$$;
+
 -- ── audit_events insert/select-only hardening (from 0266 part a) ────────────
 -- Ordering constraint for this whole file: it must run AFTER the baseline (and
 -- reference data), because every GRANT/REVOKE below names tables that must
 -- already exist. Ordering WITHIN the file is free -- the blanket
--- "GRANT ... ON ALL TABLES" above targets metaldocs_ci, while this REVOKE
--- targets metaldocs_app, so the two never touch the same (grantee, object)
--- pair and neither can undo the other. metaldocs_ci deliberately keeps DML on
--- audit_events (it is a test role and audit-chain tests need it); the app role
--- must never mutate or truncate the hash chain.
+-- "GRANT ... ON ALL TABLES" above targets metaldocs_ci/metaldocs_runtime,
+-- while this REVOKE targets metaldocs_app/metaldocs_runtime, so they never
+-- touch the same (grantee, object) pair and neither can undo the other.
+-- metaldocs_ci deliberately keeps DML on audit_events (it is a test role and
+-- audit-chain tests need it); metaldocs_app and metaldocs_runtime must never
+-- mutate or truncate the hash chain.
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_app') THEN
     EXECUTE 'REVOKE UPDATE, DELETE, TRUNCATE ON TABLE metaldocs.audit_events FROM metaldocs_app';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_runtime') THEN
+    EXECUTE 'REVOKE UPDATE, DELETE, TRUNCATE ON TABLE metaldocs.audit_events FROM metaldocs_runtime';
   END IF;
 END
 $$;
@@ -109,10 +177,15 @@ $$;
 -- executed by metaldocs-jobs per ADR 0067) DELETEs terminal rows. Prior grants
 -- on the table were INSERT (0008) and SELECT, UPDATE (0019) only; without
 -- DELETE the purge fails closed wherever metaldocs_app is not the table owner.
+-- metaldocs_runtime gets the same grant so it can eventually stand in for
+-- metaldocs_app on the jobs binary too (A6.2).
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_app') THEN
     EXECUTE 'GRANT DELETE ON TABLE metaldocs.outbox_events TO metaldocs_app';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_runtime') THEN
+    EXECUTE 'GRANT DELETE ON TABLE metaldocs.outbox_events TO metaldocs_runtime';
   END IF;
 END
 $$;
