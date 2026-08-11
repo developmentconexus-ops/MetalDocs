@@ -16,6 +16,7 @@ package audit_test
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"testing"
 
 	auditapp "metaldocs/internal/modules/audit/application"
@@ -196,8 +197,13 @@ func TestErasedTenantReadGate_ExportPersistence_MidExportErasure_LeavesZeroRows_
 		WithExports(writer, exportRepo, writer, func(auditdomain.ExportJob) string { return "" })
 
 	_, err := svc.ExportEvents(context.Background(), "test-actor", auditdomain.ExportFormatCSV, auditdomain.ListEventsQuery{TenantID: tenant.ID})
-	if err == nil {
-		t.Fatal("ExportEvents() error = nil, want ErrExportTenantErased (tenant was erased mid-export)")
+	// Pin the specific error, not just any error (CodeRabbit, PR #121): a
+	// render failure, a UUID parse failure, or a transient DB error would
+	// also make err non-nil and countExportJobs still read 0, so a bare
+	// err == nil check would keep passing even if the pre-persist erasure
+	// gate itself were removed.
+	if !errors.Is(err, auditapp.ErrExportTenantErased) {
+		t.Fatalf("ExportEvents() error = %v, want ErrExportTenantErased (tenant was erased mid-export)", err)
 	}
 
 	got := countExportJobs(t, sqlDB, tenant.ID)
