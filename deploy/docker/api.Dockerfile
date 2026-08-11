@@ -22,11 +22,11 @@ RUN apk add --no-cache ca-certificates
 RUN addgroup -g 10001 -S metaldocs && adduser -u 10001 -S -G metaldocs -H -s /sbin/nologin metaldocs
 WORKDIR /app
 COPY --from=builder --chown=metaldocs:metaldocs /out/metaldocs-api /app/metaldocs-api
-COPY --chown=metaldocs:metaldocs db/migrations /app/db/migrations
-# db/grants is the ledger-less privilege/role stage metaldocs-api re-applies on
-# every start (internal/platform/migrate.ApplyGrants) — a missing directory is
-# a fatal startup error, so it must ship in the image alongside db/migrations.
-COPY --chown=metaldocs:metaldocs db/grants /app/db/grants
+# db/migrations and db/grants no longer ship in this image (A6.1 re-cut,
+# issue #88): DDL and the privilege/role stage now run once, before this
+# container starts, via apps/dbprovision/cmd/metaldocs-dbprovision (see
+# deploy/docker/dbprovision.Dockerfile) — metaldocs-api's own connection
+# (metaldocs_runtime) holds no DDL rights and never applies these files.
 EXPOSE 8081
 USER metaldocs
 ENTRYPOINT ["/app/metaldocs-api"]

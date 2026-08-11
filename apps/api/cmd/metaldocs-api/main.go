@@ -79,7 +79,6 @@ import (
 	"metaldocs/internal/platform/httprouter"
 	riverjobs "metaldocs/internal/platform/jobs/river"
 	platformmw "metaldocs/internal/platform/middleware"
-	"metaldocs/internal/platform/migrate"
 	"metaldocs/internal/platform/objectstore"
 	"metaldocs/internal/platform/observability"
 	"metaldocs/internal/platform/openapivalidate"
@@ -201,10 +200,6 @@ func run() int {
 		return 1
 	}
 	defer deps.Cleanup()
-
-	if err := applyStartupMigrations(ctx, deps); err != nil {
-		return 1
-	}
 
 	authService, err := buildAuthService(ctx, deps, authCfg)
 	if err != nil {
@@ -730,34 +725,6 @@ func loadBootConfig() (repoMode string, corsCfg config.CORSConfig, attachmentsCf
 	return
 }
 
-// applyStartupMigrations applies the db/grants stage followed by the
-// migration ledger, when a database connection is configured and migrations
-// are not skipped. The grants stage runs BEFORE migrations and
-// unconditionally (no ledger): db/grants carries the privilege/role posture
-// pg_dump --no-privileges cannot put in the baseline, and it was previously
-// applied only at fresh bootstrap — so an existing volume never saw an edit.
-// Every file is idempotent by construction; a missing/empty dir is fatal.
-// See internal/platform/migrate.ApplyGrants.
-func applyStartupMigrations(ctx context.Context, deps bootstrap.APIDependencies) error {
-	migrationCfg, err := config.LoadMigrationConfig()
-	if err != nil {
-		slog.Error("invalid migration config", "err", err)
-		return err
-	}
-	if deps.SQLDB == nil || migrationCfg.Skip {
-		return nil
-	}
-	if err := migrate.ApplyGrants(ctx, deps.SQLDB, migrationCfg.GrantsDir, slog.Default()); err != nil {
-		slog.Error("apply grants stage", "err", err)
-		return err
-	}
-	if err := migrate.Apply(ctx, deps.SQLDB, migrationCfg.Dir, slog.Default()); err != nil {
-		slog.Error("apply startup migrations", "err", err)
-		return err
-	}
-	return nil
-}
-
 // buildAuthService constructs the auth application service and runs its
 // local-admin bootstrap.
 func buildAuthService(ctx context.Context, deps bootstrap.APIDependencies, authCfg authapp.Config) (*authapp.Service, error) {
@@ -1138,10 +1105,13 @@ func wireApprovalJobRuntime(
 	}
 	var riverBundle *riverjobs.ClientBundle
 	if deps.SQLDB != nil {
-		if err := bootstrap.MigrateRiverSchema(ctx, deps.SQLDB, jobsCfg.RiverSchema); err != nil {
-			slog.Error("migrate river schema", "err", err)
-			return err
-		}
+		// River schema migration no longer runs here: it is DDL, and
+		// metaldocs-api's connection (metaldocs_runtime, A6.1) holds no DDL
+		// rights by design. apps/dbprovision/cmd/metaldocs-dbprovision runs
+		// it, under SET ROLE metaldocs_owner, before this binary starts
+		// (compose depends_on: service_completed_successfully; equivalent
+		// step in scripts/start-api.ps1). See
+		// internal/platform/bootstrap.MigrateRiverSchema's doc comment.
 		riverBundle, err = riverjobs.NewClientBundle(deps.SQLDB, riverjobs.Config{
 			Queues: jobsCfg.Queues,
 			// PeriodicJobs is defined here too (not just in metaldocs-jobs) because
