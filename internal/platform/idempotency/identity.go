@@ -21,13 +21,19 @@ import (
 // for actor — one shared "" slot every failed-identity caller collides
 // into), so neither may be silently substituted with a zero value.
 //
-// This is the ONLY place that decision should be made. Grep
-// `idempotency.TenantActorFromContext` for every call site that has adopted
-// it; a hand-rolled `tenant.FromContext(ctx)` + discarded-error closure
-// living outside this file, anywhere in the tree, is the exact class of bug
-// this function exists to make structurally unrepresentable — the fix is to
-// delete that closure and call this function, not to patch its error
-// handling in place.
+// This is the ONLY place that decision should be made. A hand-rolled
+// actorFromCtx-shaped closure (func(context.Context) (string, string,
+// error)) living outside this file, anywhere in the tree, that calls
+// tenant.FromContext directly is the exact class of bug this function exists
+// to replace — and it is enforced, not just conventional: the
+// idempotency-identity-scope-guard check (scripts/check-idempotency-identity-scope.sh,
+// registered in tools/verify/registry.go, runs in ci.yml:verify) fails CI on
+// any such closure outside this file. That check is a text/regex scan with
+// documented gaps (method receivers, named result lists — see its header),
+// not a compiler-enforced guarantee, so "structurally unrepresentable" would
+// overstate what it does; read its header for exactly what it can and
+// cannot catch. The fix for a flagged closure is still to delete it and
+// call this function, not to patch its error handling in place.
 func TenantActorFromContext(ctx context.Context) (string, string, error) {
 	tenantID, err := tenant.FromContext(ctx)
 	if err != nil {
