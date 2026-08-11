@@ -26,10 +26,15 @@ import (
 // it. It is not yet wired into any compose/env default.
 const runtimeRoleName = "metaldocs_runtime"
 
-// runtimeRoleDevPassword mirrors the non-secret dev/CI fixture password baked
-// into db/grants/0001_role_grants.sql. Overridable so a prod-like run can
-// point at a role whose password was rotated via `ALTER ROLE metaldocs_runtime
-// PASSWORD`.
+// runtimeRoleDevPassword is the shared non-secret dev/CI fixture password
+// convention (matching deploy/compose/docker-compose.yml's and
+// apps/dbprovision's provision_integration_test.go's
+// canonicalRuntimeDevPassword). db/grants/0000_identity_roles.sql's CREATE
+// ROLE statement does NOT bake this in -- it deliberately leaves
+// rolpassword NULL (fail-closed) -- so this value only becomes the role's
+// actual login password after rotatePasswordIfUnset below applies it.
+// Overridable so a prod-like run can point at a role whose password was
+// rotated via `ALTER ROLE metaldocs_runtime PASSWORD` to something else.
 const runtimeRoleDevPassword = "metaldocs_runtime_dev"
 
 // OpenAsRuntimeRole returns a *sql.DB connected to an already-created

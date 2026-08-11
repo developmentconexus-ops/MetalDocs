@@ -13,6 +13,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -25,6 +26,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
 
+	"metaldocs/internal/platform/migrate"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -279,11 +281,15 @@ func randomSuffix(t *testing.T) string {
 	return fmt.Sprintf("%x", b)
 }
 
-// canonicalRuntimeDevPassword MUST match db/grants/0000_identity_roles.sql's
-// own CREATE ROLE default, deploy/compose/docker-compose.yml's
-// METALDOCS_RUNTIME_DB_PASSWORD default, and
-// tests/integration/testdb.runtimeRoleDevPassword -- see runProvisionAgainst's
-// comment for why this cannot be a random per-test value.
+// canonicalRuntimeDevPassword is the shared non-secret dev/CI fixture
+// password convention. db/grants/0000_identity_roles.sql's CREATE ROLE
+// statement does NOT bake this in -- it deliberately leaves rolpassword NULL
+// (fail-closed; see TestProvision_RolesHaveNoPasswordBeforeRotation) -- so
+// this value only becomes metaldocs_runtime's actual login password once
+// runProvisionAgainst sets METALDOCS_RUNTIME_DB_PASSWORD and run() rotates
+// it. MUST match tests/integration/testdb.runtimeRoleDevPassword; see
+// runProvisionAgainst's comment for why this cannot be a random per-test
+// value.
 const canonicalRuntimeDevPassword = "metaldocs_runtime_dev"
 
 // runProvisionAgainst points run()'s env-sourced config at dsn (the exact
@@ -531,6 +537,62 @@ func TestProvision_CustomRiverSchemaOwnershipAndGrants(t *testing.T) {
 	}
 	if !hasAccess {
 		t.Errorf("metaldocs_runtime lacks DML access on %s.river_job", schema)
+	}
+}
+
+// TestProvision_RolesHaveNoPasswordBeforeRotation is the regression test the
+// PR #110 cold review demanded: it asserts pg_authid.rolpassword IS NULL for
+// metaldocs_owner and metaldocs_runtime immediately after db/grants applies
+// (Stage 1+2, main.go's own prerequisites/grants ApplyGrants calls,
+// reproduced directly here) and BEFORE any rotation stage runs -- the one
+// assertion runProvisionAgainst's callers cannot make, because
+// runProvisionAgainst always sets METALDOCS_RUNTIME_DB_PASSWORD and run()
+// always rotates inside the same call before any test gets to observe the
+// pre-rotation state.
+//
+// This is the test that goes RED if db/grants/0000_identity_roles.sql is
+// ever reverted to bake a literal into CREATE ROLE ... PASSWORD directly --
+// the cold reviewer proved live that nothing else does (build/vet/lint/
+// existing tests/gitleaks all stay green on that revert). Without this test,
+// the NULL-password fail-closed property has no firing mechanism -- only a
+// header comment.
+func TestProvision_RolesHaveNoPasswordBeforeRotation(t *testing.T) {
+	dsn := bareProvisionableDatabase(t)
+
+	db, err := openAsDBUser(dsn, "")
+	if err != nil {
+		t.Fatalf("open bare database as bootstrap superuser: %v", err)
+	}
+	defer db.Close()
+
+	root := repoRoot()
+	ctx := context.Background()
+
+	// Reproduces main.go's run() Stage 1 (prerequisites) + Stage 2 (identity
+	// roles + grants) exactly -- same ApplyGrants calls, same directories,
+	// same bootstrap-superuser connection -- but stops there: no Stage 2.5
+	// rotateRuntimePassword call, so whatever password state
+	// 0000_identity_roles.sql's CREATE ROLE statements themselves leave
+	// behind is what gets asserted below.
+	if err := migrate.ApplyGrants(ctx, db, filepath.Join(root, "db", "prerequisites"), slog.Default()); err != nil {
+		t.Fatalf("apply prerequisites stage: %v", err)
+	}
+	if err := migrate.ApplyGrants(ctx, db, filepath.Join(root, "db", "grants"), slog.Default()); err != nil {
+		t.Fatalf("apply grants stage: %v", err)
+	}
+
+	for _, role := range []string{"metaldocs_owner", "metaldocs_runtime"} {
+		var hasPassword bool
+		if err := db.QueryRowContext(ctx,
+			`SELECT rolpassword IS NOT NULL FROM pg_authid WHERE rolname = $1`, role,
+		).Scan(&hasPassword); err != nil {
+			t.Fatalf("query pg_authid.rolpassword for %s: %v", role, err)
+		}
+		if hasPassword {
+			t.Errorf("role %s has a password set immediately after db/grants applies, before any rotation stage ran -- "+
+				"db/grants/0000_identity_roles.sql's CREATE ROLE statement must never bake a literal password in "+
+				"(PR #110 cold review)", role)
+		}
 	}
 }
 

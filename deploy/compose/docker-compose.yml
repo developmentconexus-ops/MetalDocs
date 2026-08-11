@@ -178,13 +178,19 @@ services:
         condition: service_healthy
     environment:
       METALDOCS_JOBS_RIVER_SCHEMA: ${METALDOCS_JOBS_RIVER_SCHEMA:-}
-      # The single credential source for metaldocs_runtime (PR #110 review
-      # finding): db-provision sets the role's password to this value, and
-      # api/worker/jobs below read the SAME var as their own PGPASSWORD, so
-      # provisioning and authentication can never name two different
-      # passwords. Defaults to the db/grants/0000_identity_roles.sql
-      # dev-fixture password, matching api/worker/jobs' own default.
-      METALDOCS_RUNTIME_DB_PASSWORD: ${METALDOCS_RUNTIME_DB_PASSWORD:-metaldocs_runtime_dev}
+      # The single credential source for metaldocs_runtime (PR #110 review):
+      # db-provision sets the role's actual login password to this value,
+      # and api/worker/jobs below read the SAME var as their own PGPASSWORD,
+      # so provisioning and authentication can never name two different
+      # passwords. REQUIRED, not defaulted (PR #110 review, cold reviewer
+      # finding): a ${VAR:-default} here would substitute a literal
+      # published in .env.example and in this file -- in a repo public
+      # since 2026-08-07 -- every time the deploy .env forgets to set it,
+      # and db-provision would rotate the live role's password to that
+      # published value and exit 0. Same fail-closed idiom already used by
+      # DOCX_RENDERER_SERVICE_TOKEN above; `docker compose up`/`config`
+      # aborts instead of substituting when this is unset.
+      METALDOCS_RUNTIME_DB_PASSWORD: ${METALDOCS_RUNTIME_DB_PASSWORD:?METALDOCS_RUNTIME_DB_PASSWORD required}
       PGHOST: postgres
       PGPORT: 5432
       PGDATABASE: ${POSTGRES_DB}
@@ -270,7 +276,7 @@ services:
       # boot-fatals otherwise. metaldocs_runtime is provisioned by the
       # db-provision service above (depends_on: service_completed_successfully).
       PGUSER: metaldocs_runtime
-      PGPASSWORD: ${METALDOCS_RUNTIME_DB_PASSWORD:-metaldocs_runtime_dev}
+      PGPASSWORD: ${METALDOCS_RUNTIME_DB_PASSWORD:?METALDOCS_RUNTIME_DB_PASSWORD required}
       PGSSLMODE: disable
       # Rate limiting: shared Redis store so limits stay correct when api scales to N
       # replicas (per-replica in-memory counting would multiply limits ×N — ADR 0071).
@@ -337,7 +343,7 @@ services:
       PGDATABASE: ${POSTGRES_DB}
       # A6.1 re-cut (issue #88): see the matching comment on the api service.
       PGUSER: metaldocs_runtime
-      PGPASSWORD: ${METALDOCS_RUNTIME_DB_PASSWORD:-metaldocs_runtime_dev}
+      PGPASSWORD: ${METALDOCS_RUNTIME_DB_PASSWORD:?METALDOCS_RUNTIME_DB_PASSWORD required}
       PGSSLMODE: disable
     healthcheck:
       # A7.1 F2: probes /live (liveness), NOT /ready. Round-5 correction: a
@@ -465,7 +471,7 @@ services:
       PGDATABASE: ${POSTGRES_DB}
       # A6.1 re-cut (issue #88): see the matching comment on the api service.
       PGUSER: metaldocs_runtime
-      PGPASSWORD: ${METALDOCS_RUNTIME_DB_PASSWORD:-metaldocs_runtime_dev}
+      PGPASSWORD: ${METALDOCS_RUNTIME_DB_PASSWORD:?METALDOCS_RUNTIME_DB_PASSWORD required}
       PGSSLMODE: disable
     healthcheck:
       # A7.1 F2: same reasoning as worker's healthcheck above — /live not

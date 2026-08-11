@@ -149,6 +149,39 @@ non-container dev flow (`scripts/dev-api.ps1`), not compose.
    metaldocs_ci` instead; the grants stage will recreate it only if the app's DB user holds
    `CREATEROLE`, and skips cleanly with a `NOTICE` otherwise.
 
+2. **Set `METALDOCS_RUNTIME_DB_PASSWORD` to a real per-environment secret — required on every
+   non-dev environment, and required at all to bring the stack up.** Unlike `metaldocs_ci`
+   above, `db/grants/0000_identity_roles.sql`'s `CREATE ROLE metaldocs_runtime` bakes in **no**
+   password at all (`rolpassword` is `NULL`, fail-closed) — the role cannot authenticate until
+   `db-provision` rotates it, which it does unconditionally on every run, using whatever
+   `METALDOCS_RUNTIME_DB_PASSWORD` resolves to. `deploy/compose/docker-compose.yml` requires this
+   variable (`${METALDOCS_RUNTIME_DB_PASSWORD:?...}`) — `docker compose up`/`config` aborts
+   rather than substituting a default if it is unset — but that only proves the variable is
+   *set*, not that it is *safe*. `.env.example` ships `METALDOCS_RUNTIME_DB_PASSWORD=
+   metaldocs_runtime_dev`, a literal published in this repository (public since 2026-08-07). On
+   any environment that is not a throwaway dev box, the deploy `.env` MUST set this to a real
+   secret **before the first `docker compose up`** — do not copy the `.env.example` default.
+
+   If the stack was ever brought up with this variable unset-or-defaulted to the published
+   literal (check the deploy `.env` and deploy history — this is knowable without touching the
+   live database), treat it as a credential rotation event, not a one-line fix:
+
+   ```bash
+   # 1. Rotate the LIVE password first, while api/worker/jobs still hold the old one.
+   docker compose -f deploy/compose/docker-compose.yml exec postgres \
+     psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+     -c "ALTER ROLE metaldocs_runtime PASSWORD '<deployment-secret>'"
+
+   # 2. Update METALDOCS_RUNTIME_DB_PASSWORD (and PGPASSWORD, and DATABASE_URL if you use
+   #    it — see .env.example's comments on why all three are independent literals) in the
+   #    deploy .env to the SAME <deployment-secret>.
+
+   # 3. Restart api/worker/jobs so they pick up the new value. Restarting before step 1
+   #    would authenticate with a password the role does not have yet; restarting api/worker/
+   #    jobs is what actually invalidates the old, now-rotated-away credential.
+   docker compose -f deploy/compose/docker-compose.yml up -d api worker jobs
+   ```
+
 ---
 
 ## Observability — metrics listener isolation (F-R1, Dim-9)
