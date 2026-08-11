@@ -910,12 +910,44 @@ var checks = []Check{
 		FixtureWaiver: &Waiver{Kind: WaiverThirdParty, Why: "eslint, a pinned third-party engine; a fixture here would assert that eslint reports a rule violation. The one repo-authored rule in that config, the eigenpal import boundary, has its own registry check (eigenpal-selector-pin) and its own fixture."},
 		Desc:          "eslint across the workspace, including the eigenpal import boundary",
 		Profiles:      []string{ProfileFast, ProfilePR, ProfileFull},
-		Argv:          []string{"pnpm", "run", "lint"},
-		// package.json (root) is where the "lint" script this check invokes
-		// is defined — without it here, a PR rewriting "lint" to a no-op
-		// while touching no frontend/, packages/, apps/, or config file
-		// disarms eslint and selects nothing that would notice (whole-branch
-		// review C2 class).
+		// A2.1 review round 3 (Finding 1, CRITICAL): this used to be
+		// []string{"pnpm", "run", "lint"} — indirection through package.json's
+		// "lint" script. Nothing pinned or content-checked what that script
+		// actually ran, so a one-line, easily-overlooked package.json diff
+		// appending "--suppress-all" made ESLint itself silently absorb any
+		// new violation into eslint-suppressions.json on disk and exit 0 —
+		// defeating this check's entire purpose while it kept reporting PASS.
+		// Reproduced live in the cold review of this PR.
+		//
+		// The fix is to stop trusting package.json's script body at all: this
+		// Argv is the exact, reviewed invocation, run directly via `pnpm
+		// exec` (still resolving the pinned local eslint from
+		// node_modules/.bin the same way `pnpm run` would) rather than
+		// through a script name whose body lives in a file this check does
+		// not otherwise inspect. There is no longer a "lint" script value to
+		// tamper with — the flags are Go source in this registry, reviewed
+		// like any other code change. This is the "prefer unrepresentable
+		// over guarded" fix (CLAUDE.md): the attack is no longer expressible
+		// through package.json, not merely harder to land unnoticed.
+		//
+		// package.json's "lint"/"lint:prune" scripts still exist for
+		// developer convenience (documented in
+		// scripts/check-eslint-suppression-expiry.sh) and MUST stay
+		// byte-identical in substance to the flags below; they are no longer
+		// what CI runs. Residual gap: package.json's devDependencies (and
+		// pnpm-lock.yaml) still govern which eslint binary `pnpm exec`
+		// resolves, so a supply-chain swap there (e.g. a pnpm override
+		// redirecting the "eslint" package to a shim) is still a trust
+		// boundary this check does not close — but that is the same
+		// pinned-third-party-engine boundary already named in this check's
+		// FixtureWaiver above, not a gap this fix introduces.
+		Argv: []string{"pnpm", "exec", "eslint", ".", "--suppressions-location", "eslint-suppressions.json", "--pass-on-unpruned-suppressions"},
+		// package.json (root) stays in Paths: it still pins the eslint
+		// version/plugins this check runs (devDependencies) even though its
+		// "lint" script body is no longer what gets executed. Without it
+		// here, a PR bumping/swapping an eslint devDependency while touching
+		// no frontend/, packages/, apps/, or config file would still be
+		// invisible to `changed` (whole-branch review C2 class).
 		Paths: []string{"frontend/", "packages/", "apps/", "eslint.config.mjs", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc"},
 		CIJob: "ci.yml:verify",
 	},

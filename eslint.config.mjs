@@ -241,6 +241,31 @@ const featureBoundaryConfigs = FEATURE_NAMES.map((featureName) => {
 //    function is eslint-suppressions.expiry.json's expiry date (checked by
 //    tools/verify's "eslint-suppression-expiry") — a rule's baseline cannot
 //    sit stale past its expiry regardless of pruning.
+//
+// A2.1 review round 3 (Finding 2): a THIRD limit existed here, unlabelled,
+// until this round — CLAUDE.md's "Global Maximum, Not Local Maximum" treats
+// an unlabelled local maximum as its own defect, separate from the underlying
+// bug. tools/verify's "eslint" check used to run `pnpm run lint` — the flags
+// actually executed lived in package.json's "lint" script body, which
+// nothing in the check pinned or content-checked. A one-line package.json
+// diff appending "--suppress-all" made that script silently absorb any new
+// violation into eslint-suppressions.json and exit 0, defeating every rule
+// activated below while still reporting PASS (reproduced live in this
+// round's cold review — see tools/verify/registry.go's "eslint" check and
+// scripts/check-eslint-suppression-baseline-growth.sh's header for the full
+// writeup). This is now closed, not merely documented: the "eslint" check
+// runs a pinned Argv directly (no package.json script indirection to edit),
+// and the growth check compares committed content at HEAD instead of the
+// working tree, so an in-run mutation is structurally invisible to it rather
+// than just harder to time. Residual gap, named rather than left implicit:
+// package.json's devDependencies (plus pnpm-lock.yaml) still govern which
+// eslint binary the pinned Argv resolves via `pnpm exec` — a supply-chain
+// substitution there (e.g. a pnpm override redirecting the "eslint" package)
+// is not something either check closes. That is the same pinned-third-party
+// trust boundary already named in the "eslint" check's FixtureWaiver, not
+// new debt introduced by this fix; closing it fully would mean verifying the
+// resolved eslint binary's integrity (e.g. a checksum/provenance check on
+// node_modules/.bin/eslint), which is out of scope for this slice.
 const RATCHETED_TS_RULES = {
   '@typescript-eslint/no-unused-vars': 'error',
   '@typescript-eslint/no-explicit-any': 'error',

@@ -15,9 +15,36 @@
 # eslint-suppressions.json is exactly the defect class this repo keeps
 # hitting (see the rule-list comment in check-eslint-suppression-expiry.sh).
 #
-# Rule: for every (file, rule) pair present in the CURRENT eslint-suppressions.json,
-# its count must be <= the count that same pair had at the merge base (0 if the
-# pair did not exist there). A pair that shrinks, or disappears entirely, always
+# A2.1 review round 3 (Finding 1, CRITICAL): "CURRENT" below used to mean the
+# WORKING TREE (`cat eslint-suppressions.json`), on the theory that reading
+# the working tree would also catch a local, uncommitted `--suppress-all` run
+# before it was even committed. The cold review of this PR reproduced,
+# repeatedly and reliably (not a flake), that this is racy the other way: when
+# `tools/verify` ran the `eslint` check (`pnpm run lint`, ~6.7-14.1s with
+# `--suppress-all` baked into package.json) and this check (pure git/jq,
+# ~1.3-1.9s) concurrently — verify's default mode — this check's read
+# consistently finished BEFORE ESLint's disk mutation completed, every time.
+# Both checks reported PASS while eslint-suppressions.json was mutated on disk
+# mid-run. "CURRENT" is now the COMMITTED content at HEAD (`git show
+# HEAD:...`), not the working tree. An in-run, uncommitted mutation is
+# invisible to a git-sourced read categorically — no execution order can make
+# committed history contain uncommitted changes — so this is no longer a race
+# that happened to resolve the safe way most of the time; the unsafe outcome
+# is unrepresentable. Genuinely committed growth (the actual subject of this
+# check, per its Desc) is unaffected: HEAD still differs from the merge base
+# exactly when a PR's diff added debt.
+#
+# This closes half of Finding 1; the other half is tools/verify/registry.go's
+# "eslint" check, which used to shell through package.json's "lint" script
+# (an unpinned, uninspected script body — the actual thing "--suppress-all"
+# was smuggled into) and now runs a pinned Argv directly instead. See that
+# check's comment for the full write-up. Together: package.json can no longer
+# inject `--suppress-all` into what CI runs, and even if some other mutation
+# path ever touched this file mid-run, this check would not observe it.
+#
+# Rule: for every (file, rule) pair present in the COMMITTED eslint-suppressions.json
+# at HEAD, its count must be <= the count that same pair had at the merge base (0 if
+# the pair did not exist there). A pair that shrinks, or disappears entirely, always
 # passes — burn-down must never be blocked.
 #
 # Two known, accepted gaps (not bugs — see eslint.config.mjs's R2 comment
@@ -52,8 +79,10 @@ WAIVERS="scripts/check-governance-waivers.txt"
 RULE_ID="eslint-suppression-baseline-growth"
 NAME="eslint-suppression-baseline-growth"
 
-if [[ ! -f "$SUPPRESSIONS" ]]; then
-  echo "$NAME: no $SUPPRESSIONS — nothing baselined, clean."
+# HEAD, not the working tree — same reasoning as the "New state" read below:
+# this check's subject is what's committed, not transient disk state.
+if ! git cat-file -e "HEAD:$SUPPRESSIONS" 2>/dev/null; then
+  echo "$NAME: no $SUPPRESSIONS at HEAD — nothing baselined, clean."
   exit 0
 fi
 
@@ -88,12 +117,11 @@ if ! git cat-file -e "$MERGE_BASE:$SUPPRESSIONS" 2>/dev/null; then
 fi
 OLD_JSON=$(git show "$MERGE_BASE:$SUPPRESSIONS")
 
-# New state: the working tree's current content, not a second `git show
-# HEAD:...` read. In CI (a clean post-checkout tree) the two are identical;
-# reading the working tree also means a local, uncommitted `--suppress-all`
-# run is caught before it is even committed.
-if ! NEW_JSON=$(cat "$SUPPRESSIONS"); then
-  echo "$NAME: could not read $SUPPRESSIONS"
+# New state: the COMMITTED content at HEAD (`git show HEAD:...`), never the
+# working tree — see the round-3 header comment above for why. The top-of-file
+# guard already proved this path exists at HEAD.
+if ! NEW_JSON=$(git show "HEAD:$SUPPRESSIONS"); then
+  echo "$NAME: could not read HEAD:$SUPPRESSIONS"
   exit 1
 fi
 
