@@ -790,8 +790,16 @@ var checks = []Check{
 		// know where the next violation will land.
 		CIJob: "ci.yml:verify",
 		Fixture: &Fixture{
-			Dir:  "idempotency-identity-scope-guard",
-			Want: []string{"internal/modules/fixture/bad_handler.go"},
+			Dir: "idempotency-identity-scope-guard",
+			Want: []string{
+				"internal/modules/fixture/bad_handler.go",
+				// Locks the PR #122 review fix (chatgpt-codex-connector,
+				// script line 149): an ungrouped `import "path"` line used to
+				// resolve to alias "import" instead of "tenant", making the
+				// scanner blind to this exact shape. See the fixture file's
+				// own header for the reproduction.
+				"internal/modules/fixture/bad_handler_ungrouped_import.go",
+			},
 			// NotWant proves the identity.go exclusion itself is guarded, not
 			// merely conventional: the fixture tree plants, at exactly
 			// internal/platform/idempotency/identity.go, a copy of the real
