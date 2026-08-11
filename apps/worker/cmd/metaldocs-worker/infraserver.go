@@ -16,6 +16,15 @@ import (
 // metaldocs-jobs uses, so the mux/handler bootstrap is written once, not
 // duplicated per binary.
 //
+// F5 (review round 2): WORKER_METRICS_ADDR is deliberately NOT
+// METALDOCS_-prefixed. That prefix is reserved for METALDOCS_* business/
+// domain config; infra-port listen-address settings already have an
+// established, separate, bare-name convention — metaldocs-api's own
+// APP_PORT and METRICS_ADDR (config.LoadServerConfig) — which
+// WORKER_METRICS_ADDR/JOBS_METRICS_ADDR follow exactly (binary-scoped
+// prefix + "_METRICS_ADDR", same as api's bare METRICS_ADDR). Renaming to
+// METALDOCS_WORKER_METRICS_ADDR would be the actual drift, not a fix.
+//
 // readiness's Check method is wired as the ONE DependencyCheck that gates
 // GET /ready beyond the DB ping PostgresRuntimeStatusProvider already runs:
 // it reports the outbox consumer poll loop's actual run state (see

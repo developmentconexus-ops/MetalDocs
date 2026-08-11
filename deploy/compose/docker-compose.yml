@@ -291,6 +291,26 @@ services:
       PGUSER: ${POSTGRES_USER}
       PGPASSWORD: ${POSTGRES_PASSWORD}
       PGSSLMODE: disable
+    healthcheck:
+      # A7.1 F2: probes /live (liveness), NOT /ready — /ready is for
+      # orchestration/gating (a dependency-degraded-but-alive process should
+      # not be killed), and a readiness-based container healthcheck combined
+      # with restart: unless-stopped above would restart-loop a worker that
+      # is merely waiting on a slow dependency. worker.Dockerfile's runtime
+      # stage is alpine:3.21 (same as api's, whose healthcheck already uses
+      # this exact wget pattern below), so a shell + busybox wget are present.
+      # NOT yet demonstrated live in this environment: the worker/jobs image
+      # build is currently broken on trunk (go.mod requires go>=1.26.5, the
+      # Dockerfiles hardcode golang:1.25-alpine — fix on
+      # fix/dockerfile-go-version, out of this slice's fence). The /live
+      # endpoint itself was live-verified via the compiled binary directly
+      # (PR #109 thread replies); this block will get its own docker compose
+      # ps healthy proof once that fix merges.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9091/live >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
 
   jobs:
     build:
@@ -330,6 +350,15 @@ services:
       PGUSER: ${POSTGRES_USER}
       PGPASSWORD: ${POSTGRES_PASSWORD}
       PGSSLMODE: disable
+    healthcheck:
+      # A7.1 F2: same reasoning as worker's healthcheck above — /live not
+      # /ready, jobs.Dockerfile shares worker/api's alpine:3.21 runtime base
+      # so wget is present.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9092/live >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
 
   web:
     build:
