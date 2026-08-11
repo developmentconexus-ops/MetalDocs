@@ -27,10 +27,13 @@
 #   not grow relative to the merge base with origin/main" rule
 #   (scripts/check-eslint-suppression-baseline-growth.sh /
 #   tools/verify check "eslint-suppression-baseline-growth", A2.1 review
-#   round 2). Waive only for a genuinely reviewed, deliberate debt increase —
-#   burn-down and file renames never need one (shrinking/disappearing pairs
-#   always pass; a rename can be waived if it trips the check, since the
-#   script has no move detection).
+#   round 2). Waive only for a genuinely reviewed, deliberate debt increase.
+#   Burn-down never needs one: shrinking/disappearing pairs always pass. A
+#   file rename CAN need one: the script has no move detection, so a rename
+#   looks like "old pair disappeared (passes) + new pair appeared (fails)"
+#   and trips the check exactly like real new debt would
+#   (scripts/check-eslint-suppression-baseline-growth.sh, "Two known,
+#   accepted gaps" comment).
 #
 api-contract-openapi | 2026-08-09 | ci/golangci-burndown PR #99 | golangci-lint whole-tree burn-down touched 22 delivery/http files (ST1005 error-string lowercasing, identifier renames, function decomposition). No route/status/shape change; contract verified green by codegen-drift-backend, codegen-drift-frontend, contract-sync, oasdiff breaking and openapi-lint. Only wire-visible change is problem+json detail text, whose truth artifact wiki/references/problem-codes.md was regenerated and is gated by problem-codes-drift.
 domain-tests | 2026-08-09 | ci/golangci-burndown PR #99 | Mechanical lint burn-down across internal/modules (error-string case, renames, decomposition, errcheck wraps) — no behaviour change to test. Existing behaviour stays pinned by the unchanged unit + integration suites, which ran green (test-integration job + touched-package ladder); adding a tests/ edit here would be artificial.

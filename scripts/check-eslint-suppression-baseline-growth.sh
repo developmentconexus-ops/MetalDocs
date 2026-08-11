@@ -81,6 +81,18 @@ NAME="eslint-suppression-baseline-growth"
 
 # HEAD, not the working tree — same reasoning as the "New state" read below:
 # this check's subject is what's committed, not transient disk state.
+#
+# Resolve HEAD explicitly BEFORE asking whether $SUPPRESSIONS exists there.
+# `git cat-file -e "HEAD:$SUPPRESSIONS"` alone fails identically whether the
+# file is genuinely absent from a resolvable HEAD (legitimate — first
+# introduction of the ratchet) or HEAD itself cannot be resolved (unborn
+# branch, detached-and-broken, corrupt repo) — a broken environment must not
+# be indistinguishable from "nothing baselined, clean."
+if ! git rev-parse --verify -q 'HEAD^{commit}' >/dev/null 2>&1; then
+  echo "$NAME: could not resolve HEAD to a commit — FAIL-CLOSED (broken or unborn checkout, not a legitimate empty-baseline case)."
+  exit 1
+fi
+
 if ! git cat-file -e "HEAD:$SUPPRESSIONS" 2>/dev/null; then
   echo "$NAME: no $SUPPRESSIONS at HEAD — nothing baselined, clean."
   exit 0

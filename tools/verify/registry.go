@@ -948,7 +948,18 @@ var checks = []Check{
 		// here, a PR bumping/swapping an eslint devDependency while touching
 		// no frontend/, packages/, apps/, or config file would still be
 		// invisible to `changed` (whole-branch review C2 class).
-		Paths: []string{"frontend/", "packages/", "apps/", "eslint.config.mjs", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc"},
+		//
+		// eslint-suppressions.json is this Argv's own --suppressions-location
+		// input (round 3 finding, both reviewers): without it here, a PR that
+		// edits ONLY the suppression baseline (e.g. lowers a count by hand, or
+		// via `--prune-suppressions`) selects eslint-suppression-expiry and
+		// eslint-suppression-baseline-growth under `changed` but not this
+		// check — so ESLint itself never re-runs against the new baseline,
+		// which is exactly the scenario the baseline exists to govern.
+		// eslint-suppressions.expiry.json is NOT added here: it is read only
+		// by check-eslint-suppression-expiry.sh, not by this Argv, so it has
+		// no bearing on whether eslint itself needs to re-run.
+		Paths: []string{"frontend/", "packages/", "apps/", "eslint.config.mjs", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", "eslint-suppressions.json"},
 		CIJob: "ci.yml:verify",
 	},
 	{

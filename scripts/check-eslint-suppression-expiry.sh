@@ -55,6 +55,26 @@ for rule in "${RULES[@]}"; do
     violations=$((violations + 1))
     continue
   fi
+  # Fail closed on malformed expiry values instead of comparing them as
+  # strings. A lexicographic compare treats any value that merely SORTS
+  # after today (e.g. "9999-99-99", or an unpadded "2026-8-01" which sorts
+  # before an actual same-day value) as "not yet expired" without it being a
+  # real date at all — a permanent-suppression bypass anyone could type. Both
+  # gates below are required: the regex pins the exact zero-padded
+  # YYYY-MM-DD shape (GNU date -d alone still parses "2026-8-01"), and
+  # `date -d` rejects shapes that match the regex but aren't real calendar
+  # dates (e.g. "2026-02-30", "2026-13-01") without silently rolling them
+  # over to a neighboring date.
+  if [[ ! "$expires" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+    echo "eslint-suppression-expiry: EXPIRED — rule '$rule' has a malformed expiry '$expires' in $EXPIRY (must be exact zero-padded YYYY-MM-DD)."
+    violations=$((violations + 1))
+    continue
+  fi
+  if ! date -u -d "$expires" +%F >/dev/null 2>&1; then
+    echo "eslint-suppression-expiry: EXPIRED — rule '$rule' has an invalid calendar date '$expires' in $EXPIRY."
+    violations=$((violations + 1))
+    continue
+  fi
   if [[ "$expires" < "$today" ]]; then
     echo "eslint-suppression-expiry: EXPIRED — rule '$rule' baseline expired on $expires (today: $today). Burn it down or renew the date with a reviewed edit to $EXPIRY."
     violations=$((violations + 1))
