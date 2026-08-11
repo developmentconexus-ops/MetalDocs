@@ -545,6 +545,17 @@ var checks = []Check{
 				// that restores the abort drops every Want below it too.
 				"could not parse a numeric golang version from: FROM golang:latest",
 			},
+			// The scope exclusion is a rule, and this is its firing mechanism.
+			// The fixture tree carries vendor/go.opentelemetry.io/otel/
+			// dependencies.Dockerfile pinning golang:1.19 -- drifted on purpose,
+			// so it WOULD be reported if discovery stopped excluding vendor/.
+			// Want cannot express this: dropping the exclusion adds a line to
+			// the output, and every existing Want still matches, so the harness
+			// would report ok on a check that had started failing PRs over
+			// upstream code nobody here can edit (`go mod vendor` overwrites it).
+			NotWant: []string{
+				"vendor/go.opentelemetry.io/otel/dependencies.Dockerfile",
+			},
 		},
 	},
 	{

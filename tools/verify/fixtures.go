@@ -94,6 +94,22 @@ type Fixture struct {
 	// writes that same table (#87/A1 review B5) — two rules, one sandbox, and
 	// neither may be silently dropped by an edit to the other.
 	Want []string
+
+	// NotWant, when set, must NOT appear in the failing run's output.
+	//
+	// Want can only assert that a guard FIRES. It cannot assert that a guard
+	// stays SILENT about something, and every scope exclusion a guard carries
+	// is exactly that shape: "discovery skips vendor/", "the fixture tree is
+	// not checked against itself". Those exclusions are rules too, and a rule
+	// with no firing mechanism is unguarded — drop the exclusion and every
+	// Want still matches, so the harness reports ok.
+	//
+	// Added 2026-08-11 for dockerfile-go-version-drift, whose discovery pattern
+	// matched vendor/go.opentelemetry.io/otel/dependencies.Dockerfile: upstream
+	// code this repo cannot edit, since `go mod vendor` overwrites it. Put the
+	// excluded thing in the fixture tree in a form that WOULD fire, and name it
+	// here; then deleting the exclusion turns the harness red.
+	NotWant []string
 }
 
 // fixtureResult is one fixture's outcome.
@@ -233,6 +249,15 @@ func runOneFixture(ctx context.Context, root string, c Check) fixtureResult {
 			return fixtureResult{
 				id:     c.ID,
 				reason: fmt.Sprintf("failed, but not for the reason under test: output does not contain %q", want),
+				output: out,
+			}
+		}
+	}
+	for _, notWant := range c.Fixture.NotWant {
+		if strings.Contains(out, notWant) {
+			return fixtureResult{
+				id:     c.ID,
+				reason: fmt.Sprintf("failed for the right reason, but also reported something it must stay silent about: output contains %q", notWant),
 				output: out,
 			}
 		}

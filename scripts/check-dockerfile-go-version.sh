@@ -48,7 +48,15 @@ fi
 # .txt, but '*Dockerfile*' still matches the substring), and this check's
 # own negative fixture must never make a clean checkout of the real repo
 # fail against itself.
-mapfile -t dockerfiles < <(git ls-files -- '*.Dockerfile' '*Dockerfile*' ':!:scripts/testdata/guard-fixtures/**' | sort -u)
+# vendor/ is excluded for the same reason check-gofmt.sh excludes it: it is
+# upstream code this repo does not author and cannot edit -- `go mod vendor`
+# overwrites any local change on the next dependency bump. Today
+# vendor/go.opentelemetry.io/otel/dependencies.Dockerfile matches the discovery
+# pattern and happens to pin no golang stage, so nothing fires; if upstream ever
+# adds one below our go.mod floor, this check would fail an unrelated PR with a
+# diagnostic nobody can act on. The fixture tree carries that file in the form
+# that WOULD fire, and the check's NotWant entry keeps this exclusion honest.
+mapfile -t dockerfiles < <(git ls-files -- '*.Dockerfile' '*Dockerfile*' ':!:scripts/testdata/guard-fixtures/**' ':!:vendor/**' | sort -u)
 
 # version_ge A B: true (exit 0) if dotted-numeric version A >= B, comparing
 # component-wise with a missing trailing component treated as 0 (so "1.26"
