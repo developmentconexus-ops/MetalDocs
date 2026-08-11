@@ -56,6 +56,16 @@ func (s *FamilyService) Create(ctx context.Context, f *domain.DocumentFamily) er
 	if err != nil {
 		return fmt.Errorf("taxonomy: validate family create: %w", err)
 	}
+	// A3.3 (T1): ActorUserID is the governance-event attribution for this
+	// mutation, so an absent actor is a precondition failure, not a late one.
+	// It resolves here — after the purely local validation above, before
+	// BeginTx — so a request with no principal opens no transaction and calls
+	// no repository method at all. "Rolled back" is a weaker property than
+	// "never started".
+	actorUserID, err := authn.RequireUserID(ctx)
+	if err != nil {
+		return err
+	}
 	tx, err := s.families.BeginTx(ctx)
 	if err != nil {
 		return fmt.Errorf("taxonomy: begin family create tx: %w", err)
@@ -74,14 +84,6 @@ func (s *FamilyService) Create(ctx context.Context, f *domain.DocumentFamily) er
 		return fmt.Errorf("taxonomy: marshal family create governance payload: %w", err)
 	}
 	tenantID, _ := tenant.FromContext(ctx)
-	// A3.3: ActorUserID is the governance-event attribution for this mutation.
-	// A discarded presence bool would have written the audit row under "", so
-	// absence fails the whole tx instead. The only callers are the taxonomy HTTP
-	// routes, which already require a session.
-	actorUserID, err := authn.RequireUserID(ctx)
-	if err != nil {
-		return err
-	}
 	if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
 		TenantID:     tenantID,
 		EventType:    domain.GovernanceEventTypeFamilyCreated,
@@ -107,6 +109,12 @@ func (s *FamilyService) Create(ctx context.Context, f *domain.DocumentFamily) er
 func (s *FamilyService) Update(ctx context.Context, f *domain.DocumentFamily) (*domain.DocumentFamily, error) {
 	if strings.TrimSpace(f.Name) == "" {
 		return nil, domain.ErrFamilyNameRequired
+	}
+	// A3.3 (T1): resolved before BeginTx / GetByCodeForUpdate, so an actorless
+	// request never takes the FOR UPDATE row lock. See Create.
+	actorUserID, err := authn.RequireUserID(ctx)
+	if err != nil {
+		return nil, err
 	}
 	tx, err := s.families.BeginTx(ctx)
 	if err != nil {
@@ -145,14 +153,6 @@ func (s *FamilyService) Update(ctx context.Context, f *domain.DocumentFamily) (*
 	if err != nil {
 		return nil, fmt.Errorf("taxonomy: marshal family update governance payload: %w", err)
 	}
-	// A3.3: ActorUserID is the governance-event attribution for this mutation.
-	// A discarded presence bool would have written the audit row under "", so
-	// absence fails the whole tx instead. The only callers are the taxonomy HTTP
-	// routes, which already require a session.
-	actorUserID, err := authn.RequireUserID(ctx)
-	if err != nil {
-		return nil, err
-	}
 	if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
 		TenantID:     tenantID,
 		EventType:    domain.GovernanceEventTypeFamilyUpdated,
@@ -176,6 +176,15 @@ func (s *FamilyService) Update(ctx context.Context, f *domain.DocumentFamily) (*
 // family.deactivated governance event — all inside one transaction
 // (T-007: closes the TOCTOU window between the check and the write).
 func (s *FamilyService) Deactivate(ctx context.Context, code domain.FamilyCode) error {
+	// A3.3 (T1): this method has no local input validation to run first, so the
+	// actor is the very first thing resolved. Before this it was read after the
+	// row lock, the HasActiveProfilesTx check and f.Deactivate() — an actorless
+	// request could reach a domain mutation before anyone asked who was making
+	// it. Now it opens no transaction at all.
+	actorUserID, err := authn.RequireUserID(ctx)
+	if err != nil {
+		return err
+	}
 	tx, err := s.families.BeginTx(ctx)
 	if err != nil {
 		return fmt.Errorf("taxonomy: begin deactivate family tx: %w", err)
@@ -211,14 +220,6 @@ func (s *FamilyService) Deactivate(ctx context.Context, code domain.FamilyCode) 
 	payload, err := marshalGovernancePayload(map[string]string{"code": string(code)})
 	if err != nil {
 		return fmt.Errorf("taxonomy: marshal family deactivate governance payload: %w", err)
-	}
-	// A3.3: ActorUserID is the governance-event attribution for this mutation.
-	// A discarded presence bool would have written the audit row under "", so
-	// absence fails the whole tx instead. The only callers are the taxonomy HTTP
-	// routes, which already require a session.
-	actorUserID, err := authn.RequireUserID(ctx)
-	if err != nil {
-		return err
 	}
 	if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
 		TenantID:     tenantID,

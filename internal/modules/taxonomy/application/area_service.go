@@ -59,6 +59,17 @@ func (s *AreaService) Create(ctx context.Context, a *domain.ProcessArea) error {
 	if err != nil {
 		return fmt.Errorf("taxonomy: validate area create: %w", err)
 	}
+	// A3.3 (T1): ActorUserID is the governance-event attribution for this
+	// mutation, so an absent actor is a precondition failure, not a late one.
+	// It resolves here — after the purely local validation above, before
+	// BeginTx — so a request with no principal opens no transaction, takes no
+	// row lock and calls no repository method at all. Resolving it next to the
+	// GovernanceEvent below was still fail-closed (the tx rolled back), but
+	// "rolled back" is a weaker property than "never started".
+	actorUserID, err := authn.RequireUserID(ctx)
+	if err != nil {
+		return err
+	}
 	tx, err := s.areas.BeginTx(ctx)
 	if err != nil {
 		return fmt.Errorf("taxonomy: begin area create tx: %w", err)
@@ -77,14 +88,6 @@ func (s *AreaService) Create(ctx context.Context, a *domain.ProcessArea) error {
 	})
 	if err != nil {
 		return fmt.Errorf("taxonomy: marshal area create governance payload: %w", err)
-	}
-	// A3.3: ActorUserID is the governance-event attribution for this mutation.
-	// A discarded presence bool would have written the audit row under "", so
-	// absence fails the whole tx instead. The only callers are the taxonomy HTTP
-	// routes, which already require a session.
-	actorUserID, err := authn.RequireUserID(ctx)
-	if err != nil {
-		return err
 	}
 	if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
 		TenantID:     newArea.TenantID,
@@ -115,6 +118,12 @@ func (s *AreaService) Update(ctx context.Context, a *domain.ProcessArea) error {
 	if err != nil {
 		return fmt.Errorf("taxonomy: validate area update: %w", err)
 	}
+	// A3.3 (T1): resolved before BeginTx / GetByCodeForUpdate, so an actorless
+	// request never takes the FOR UPDATE row lock. See Create.
+	actorUserID, err := authn.RequireUserID(ctx)
+	if err != nil {
+		return err
+	}
 	tx, err := s.areas.BeginTx(ctx)
 	if err != nil {
 		return fmt.Errorf("taxonomy: begin area update tx: %w", err)
@@ -143,14 +152,6 @@ func (s *AreaService) Update(ctx context.Context, a *domain.ProcessArea) error {
 	})
 	if err != nil {
 		return fmt.Errorf("taxonomy: marshal area update governance payload: %w", err)
-	}
-	// A3.3: ActorUserID is the governance-event attribution for this mutation.
-	// A discarded presence bool would have written the audit row under "", so
-	// absence fails the whole tx instead. The only callers are the taxonomy HTTP
-	// routes, which already require a session.
-	actorUserID, err := authn.RequireUserID(ctx)
-	if err != nil {
-		return err
 	}
 	if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
 		TenantID:     existing.TenantID,

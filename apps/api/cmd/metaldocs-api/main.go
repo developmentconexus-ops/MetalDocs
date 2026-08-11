@@ -933,21 +933,24 @@ func currentUserIDFromRequest(r *http.Request) string {
 }
 
 // resolveRateLimitIdentity resolves the global envelope limiter's identity
-// key: authenticated user → IAM user ID → "" (fail-closed to the shared
-// anonymous bucket). Runs after authn + iamMiddleware in the chain, so both
-// are available. Mirrors the retired security.RateLimiter.requestIdentity
-// without importing domain packages.
+// key: authenticated user → IAM user ID → "". Returning "" is not itself a
+// bucket: ratelimit.Middleware.bucketKey treats it as "no user key" and falls
+// back to the trusted-proxy-resolved client IP, and if that cannot be resolved
+// either it fails closed (the request is rejected, not admitted unlimited).
+// Runs after authn + iamMiddleware in the chain, so both are available.
+// Mirrors the retired security.RateLimiter.requestIdentity without importing
+// domain packages.
 func resolveRateLimitIdentity(r *http.Request) string {
 	if currentUser, ok := authdomain.CurrentUserFromContext(r.Context()); ok && strings.TrimSpace(currentUser.UserID) != "" {
 		return strings.TrimSpace(currentUser.UserID)
 	}
 	// A3.3 class B (identity OPTIONAL by explicit policy): the rate limiter has
-	// a defined anonymous strategy — an unauthenticated request is bucketed by
-	// the shared "" key, which is NARROWER than per-user (everyone anonymous
-	// shares one budget), so absence is safe here and must not 401: the limiter
-	// runs before any authorization decision and gates nothing but throughput.
-	// The presence result is read explicitly so "" is a chosen branch, never a
-	// silent fall-through.
+	// a defined anonymous strategy — an unauthenticated request is keyed by
+	// client IP instead of by user, which is a real bucket and not an exemption,
+	// so absence is safe here and must not 401: the limiter runs before any
+	// authorization decision and gates nothing but throughput. The presence
+	// result is read explicitly so "" is a chosen branch, never a silent
+	// fall-through.
 	if userID, ok := authn.UserIDFromContext(r.Context()); ok {
 		return userID
 	}
