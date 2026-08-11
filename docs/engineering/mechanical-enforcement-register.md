@@ -54,6 +54,8 @@ defect this register exists to eliminate.
 | ME-14 a tenant table with no RLS, and no control that could see it | _issue pending_ |
 | ME-15 the check registry is four hand-synced inventories, not one | _issue pending_ |
 | ME-16 compose healthcheck probes are a second, unforced reading of two worker/jobs runtime facts | [#115](https://github.com/developmentconexus-ops/MetalDocs/issues/115) |
+| ME-17 `metaldocs.roles` hand-seed is an untracked TRANSITIONAL label (A8.3) | [#116](https://github.com/developmentconexus-ops/MetalDocs/issues/116) |
+| ME-18 the tenant-table registry is five hand-synced inventories, only one is forced | [#117](https://github.com/developmentconexus-ops/MetalDocs/issues/117) |
 
 ## How to read an entry
 
@@ -661,6 +663,83 @@ truthy reading is deleted as a side effect, not patched in place.
 deletes this entry; until then this is the named tracked item for the "TRANSITIONAL local maximum"
 label on `docker-compose.yml:339-343` and in
 `docs/runbooks/worker-jobs-liveness-healthchecks.md`'s "Deliberately deferred" section.
+
+---
+
+## ME-17 — `metaldocs.roles` hand-seed is an untracked TRANSITIONAL label (A8.3)
+
+**Found** 2026-08-11, cold review of PR #113 (issue #89/A8.1, ADR 0092 D1).
+
+**Surface** — `db/migrations/0318_capability_bindings_schema_backfill.sql:29-33` labels the
+8-row hand-written `metaldocs.roles` seed (`:205-214`) TRANSITIONAL under CLAUDE.md's
+Global-Maximum rule and names the milestone that deletes it ("A8.3 generated role catalogs +
+tripwire repoint"). The label was correct in shape — names the structure, names the milestone
+— but lived only in a migration comment, with no issue, no ROADMAP row, and no register entry.
+A labelled-but-untracked local maximum degrades to an unlabelled one the moment the comment
+stops being read, which is this register's founding failure mode applied to a governance
+label instead of a data structure.
+
+**Related, not duplicate.** ME-01 already covers "role vocabulary declared on six/seven
+surfaces." `metaldocs.roles` (arm #22, `internal/platform/tripwire/arms.go:302-308`) is an
+eighth surface, and ME-01's level-1 fix — one `role_catalog` table, everything else generated
+from it — is very likely the same mechanism that discharges A8.3: once `metaldocs.roles` is
+the upstream and the Go/OpenAPI role sets are generated from it, this hand-seed becomes
+generator output, exactly A8.3's stated scope.
+
+**Firing mechanism** — level 1, shared with ME-01. Until ME-01 lands, level 5 (a comment) —
+this entry plus its issue are what keep the label alive in the meantime, deliberately not
+claimed as a red build.
+
+**Verified** 2026-08-11, first-hand (migration file + arms.go). **Owner:** the authz
+grant-unification program, same owner as ME-01.
+
+**Filed:** [#116](https://github.com/developmentconexus-ops/MetalDocs/issues/116).
+
+**Numbering note:** the next free slot after ME-15 was already claimed as ME-16 by a
+concurrent lane's issue (#115, not present in this branch's copy of the register at the time
+this entry was written) — skipped to ME-17 to avoid colliding with that lane's entry when the
+two branches merge. Whoever merges first should check for a genuine duplicate ordinal.
+
+---
+
+## ME-18 — the tenant-table registry is five hand-synced inventories, only one is forced
+
+**Found** 2026-08-11, coordinator-requested registry enumeration during the PR #113 (issue
+#89/A8.1) fix round, after that round's own BLOCKING finding (GDPR erase-order) turned out to
+be the fifth live instance of the class this register exists to catalog.
+
+Same shape as ME-15, one layer down: not "does every registered CI check actually gate a
+merge" but **"every place a brand-new tenant-scoped table must be registered before it is
+safe."** Landing `metaldocs.capability_bindings` forced walking all five surfaces by hand;
+only #1 is walked mechanically today.
+
+**Surfaces**
+
+| # | Surface | Forced today? |
+|---|---|---|
+| 1 | `tools/cilint/internal/analyzers/table-ownership.json` (module ownership) | **Yes** — `table_ownership_completeness_test.go`, bidirectional against `db/baseline` + `db/migrations` |
+| 2 | `internal/composition/tenantdata/registry/registry.go` `AllTenantDataPorts()` (which modules have export/erase reachability at all) | Partially — `TenantDataPortCoverage` catches a table missing from an *already-registered* port's `Tables()`, not a whole module never registered |
+| 3 | `tests/integration/testdb/lease_pool.go` `resetExclusions`/`baselineSnapshotTables` (leased-DB reuse safety) | No — PR #113 P1-1, `metaldocs.roles` omitted, fixed by hand |
+| 4 | `tenant_lifecycle_service.go` `eraseOrder`/`orderedPorts()` (cross-module GDPR erase order) | No — PR #113 BLOCKING finding, fixed via a new opt-in `tenantdata.EarlyEraser`; the mechanism is safe once declared, nothing forces the declaration |
+| 5 | `scripts/api-lint/async-tenant-tables.txt` vs the baseline's FORCE-RLS set | Already tracked — this is ME-14, not duplicated here |
+
+**Firing mechanism** — level 3 for #2 (a module-level completeness test, direct structural
+analog of #1) and #3 (cross-check `table-ownership.json`'s census against
+`resetExclusions`/`baselineSnapshotTables` membership). #4 is harder to make precise (needs
+FK-direction reasoning, not just presence) but a schema-driven partial version is buildable:
+assert every table an `EarlyEraser`-eligible port's `Tables()` FKs into outside its own module
+is either declared in that port's `EraseEarly` or is ranked at/after the referencing module in
+`eraseOrder`.
+
+Level 1 is reachable only by unifying #2/#3/#4 into one generated per-tenant-table manifest
+(module owner, reset/exclusion class, erase phase) — the same "generated manifest" shape ME-15
+names for the CI-check registry, one layer down. Named here so the level-3 fixes are understood
+as a step, not a destination.
+
+**Verified** 2026-08-11, first-hand (all five surfaces read against the current schema and this
+PR's own fixes). **Owner:** unrouted. Cheapest first step is #2.
+
+**Filed:** [#117](https://github.com/developmentconexus-ops/MetalDocs/issues/117).
 
 ---
 

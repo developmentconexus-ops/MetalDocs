@@ -586,6 +586,26 @@ func (s *TenantLifecycleService) eraseTenantRowsTx(bgCtx context.Context, job Te
 			return fmt.Errorf("seed erasure lifecycle context: %w", err)
 		}
 
+		// Early phase (tenantdata.EarlyEraser, optional): runs BEFORE any
+		// ordered port below, for the narrow set of tables that hold an
+		// outbound FK into a module ranked LATER than their own owning
+		// module in eraseOrder — a two-way cross-module dependency a flat
+		// order cannot express in one direction alone. iam implements this
+		// today for user_process_areas and capability_bindings, both FK'd
+		// into taxonomy's document_process_areas (taxonomy is ranked before
+		// iam) — see tenantdata.EarlyEraser's doc and the iam TenantDataPort
+		// type doc for the full mechanism and the live-reproduced bug this
+		// closes.
+		for _, port := range s.ports {
+			early, ok := port.(tenantdata.EarlyEraser)
+			if !ok {
+				continue
+			}
+			if _, err := early.EraseEarly(bgCtx, tx, job.TenantID); err != nil {
+				return fmt.Errorf("erase tenant data early (%s): %w", port.Module(), err)
+			}
+		}
+
 		for _, port := range orderedPorts(s.ports) {
 			if _, err := port.EraseTenantData(bgCtx, tx, job.TenantID); err != nil {
 				return fmt.Errorf("erase tenant data (%s): %w", port.Module(), err)
@@ -593,11 +613,12 @@ func (s *TenantLifecycleService) eraseTenantRowsTx(bgCtx context.Context, job Te
 		}
 		// Final governance sweep: enforce_capability_asserted's scheduler-bypass
 		// branch INSERTs an 'authz.bypass_used' governance_events row for every
-		// armed-table DELETE in this tx, and modules after audit in eraseOrder
-		// (iam's user_process_areas, notably) fire it AFTER the audit port has
-		// already deleted governance_events — leaving fresh rows for the erased
-		// tenant. governance_events itself carries no tripwire trigger, so this
-		// sweep cannot self-feed.
+		// armed-table DELETE in this tx, including the early phase above and
+		// every ordered port's own DELETEs (modules after audit in eraseOrder,
+		// notably) — both fire AFTER the audit port has already deleted
+		// governance_events, leaving fresh rows for the erased tenant.
+		// governance_events itself carries no tripwire trigger, so this sweep
+		// (running after both phases) cannot self-feed.
 		if _, err := tx.ExecContext(bgCtx, `DELETE FROM public.governance_events WHERE tenant_id = $1::uuid`, job.TenantID); err != nil {
 			return fmt.Errorf("final governance_events sweep: %w", err)
 		}

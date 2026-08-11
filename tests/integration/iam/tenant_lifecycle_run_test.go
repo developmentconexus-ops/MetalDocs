@@ -452,6 +452,104 @@ func TestTenantErasure_DoesNotTouchOtherTenant(t *testing.T) {
 	}
 }
 
+// TestTenantErasure_AreaScopedGrantsSurvive is the regression test for the
+// PR #113 cold-review BLOCKING finding (2026-08-11): GDPR tenant erasure
+// used to fail with a live SQLSTATE 23503 foreign-key violation
+// (fk_capability_bindings_scope_area, and the identical pre-existing
+// user_process_areas_tenant_id_area_code_fkey) for ANY tenant holding an
+// area-scoped grant — not a corner case, the ordinary shape of an
+// area-scoped role. Root cause: user_process_areas and
+// capability_bindings both hold an outbound FK into taxonomy's
+// document_process_areas, but the flat per-module eraseOrder ran taxonomy
+// (rank 6) before iam (rank 11, last), so taxonomy deleted
+// document_process_areas rows while these two iam-owned tables still
+// referenced them. Fixed via tenantdata.EarlyEraser
+// (iam TenantDataPort.EraseEarly, internal/modules/iam/infrastructure/postgres/tenant_data_port.go),
+// which now erases both tables before ANY ordered port — including
+// taxonomy's — runs. This test seeds one area-scoped row in EACH table (the
+// new capability_bindings one AND the pre-existing user_process_areas one,
+// since both share the exact fix) and asserts a full RunJob(erase) both
+// succeeds and actually removed all three tenant-scoped tables involved —
+// not merely "didn't error."
+func TestTenantErasure_AreaScopedGrantsSurvive(t *testing.T) {
+	sqlDB := openDB(t)
+	svc, cryptoSvc := newRunSideTenantLifecycleService(t, sqlDB)
+
+	tenant, extraUserID, adminUserID := seedTenantWithSpread(t, sqlDB, cryptoSvc, "erase-area-scoped")
+	areaCode := "fx" + uuid.NewString()[:8]
+
+	if err := withBypassErr(sqlDB, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(context.Background(),
+			`INSERT INTO metaldocs.document_process_areas (tenant_id, code, name) VALUES ($1::uuid, $2, $2)`,
+			tenant.ID, areaCode)
+		return err
+	}); err != nil {
+		t.Fatalf("seed document_process_areas: %v", err)
+	}
+
+	// The pre-existing hazard: an area-scoped public.user_process_areas row.
+	if err := withBypassErr(sqlDB, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(context.Background(),
+			`INSERT INTO public.user_process_areas
+			   (user_id, tenant_id, area_code, role, effective_from, effective_to, granted_by, revoked_by)
+			 VALUES ($1, $2::uuid, $3, 'author', now(), NULL, $4, NULL)`,
+			extraUserID, tenant.ID, areaCode, adminUserID)
+		return err
+	}); err != nil {
+		t.Fatalf("seed user_process_areas grant: %v", err)
+	}
+
+	// The new hazard (ADR 0092 D1 / A8.1): an area-scoped
+	// metaldocs.capability_bindings row.
+	if err := withBypassErr(sqlDB, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(context.Background(),
+			`INSERT INTO metaldocs.capability_bindings
+			   (tenant_id, subject_kind, subject_user_id, role_code, scope_kind, scope_ref)
+			 VALUES ($1::uuid, 'user', $2, 'signer', 'area', $3)`,
+			tenant.ID, extraUserID, areaCode)
+		return err
+	}); err != nil {
+		t.Fatalf("seed capability_bindings area-scoped grant: %v", err)
+	}
+
+	jobID := insertPendingLifecycleJob(t, sqlDB, tenant.ID, "erase", adminUserID)
+
+	if err := svc.RunJob(context.Background(), jobID); err != nil {
+		t.Fatalf("RunJob(erase) with an area-scoped grant present error = %v — GDPR erasure must not fail for a tenant using area-scoped roles (PR #113 cold-review BLOCKING finding)", err)
+	}
+
+	assertJobReady(t, sqlDB, jobID)
+	assertTenantTombstoned(t, sqlDB, tenant.ID)
+
+	var upaCount, cbCount, dpaCount int
+	if err := sqlDB.QueryRowContext(context.Background(),
+		`SELECT count(*) FROM public.user_process_areas WHERE tenant_id = $1::uuid`, tenant.ID,
+	).Scan(&upaCount); err != nil {
+		t.Fatalf("count user_process_areas post-erase: %v", err)
+	}
+	if upaCount != 0 {
+		t.Errorf("user_process_areas rows surviving erasure for tenant %s = %d, want 0", tenant.ID, upaCount)
+	}
+
+	if err := sqlDB.QueryRowContext(context.Background(),
+		`SELECT count(*) FROM metaldocs.capability_bindings WHERE tenant_id = $1::uuid`, tenant.ID,
+	).Scan(&cbCount); err != nil {
+		t.Fatalf("count capability_bindings post-erase: %v", err)
+	}
+	if cbCount != 0 {
+		t.Errorf("capability_bindings rows surviving erasure for tenant %s = %d, want 0", tenant.ID, cbCount)
+	}
+
+	if err := sqlDB.QueryRowContext(context.Background(),
+		`SELECT count(*) FROM metaldocs.document_process_areas WHERE tenant_id = $1::uuid`, tenant.ID,
+	).Scan(&dpaCount); err != nil {
+		t.Fatalf("count document_process_areas post-erase: %v", err)
+	}
+	if dpaCount != 0 {
+		t.Errorf("document_process_areas rows surviving erasure for tenant %s = %d, want 0", tenant.ID, dpaCount)
+	}
+}
+
 // ── Shared assertion/count helpers ──────────────────────────────────────────
 
 func assertJobReady(t *testing.T, sqlDB *sql.DB, jobID string) {

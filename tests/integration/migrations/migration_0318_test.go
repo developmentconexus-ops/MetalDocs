@@ -5,6 +5,9 @@ package migrations_test
 import (
 	"context"
 	"database/sql"
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/google/uuid"
@@ -43,6 +46,235 @@ func TestMigration0318_SchemaLanded(t *testing.T) {
 	}
 	if roleCount != 8 {
 		t.Fatalf("expected 8 hand-seeded roles, got %d", roleCount)
+	}
+}
+
+// TestMigration0318_ReplaySafe proves migration 0318 is safe to execute a
+// second time against a database where it already succeeded (partial
+// restore / operator replay -- P1-2 from the PR #113 bot review). This is
+// the negative case the DDL/backfill guards in 0318 exist to prevent: a
+// naive (unguarded) version of this migration fails the DDL outright with
+// duplicate_object on the second CREATE TABLE/CREATE POLICY, or -- worse,
+// silently -- doubles every capability_bindings row on the second backfill
+// INSERT (capability_bindings carries no uniqueness constraint at all over
+// historical/revoked rows, only over the active slice). The test seeds real
+// source rows, runs the file once to backfill them for real, snapshots, runs
+// it again as the replay under test, and asserts the row counts are
+// byte-identical before and after that replay -- what would catch a guard
+// regression; asserting only "no error" would not have caught the
+// silent-duplication failure mode.
+//
+// This single fixture also discharges the duplicate-iam_group_roles-seeding
+// regression deferred from the PR #113 fix round's Finding 5: a duplicate
+// (group_id, role) row is unrepresentable at the source (iam_group_roles has
+// a composite PRIMARY KEY on (group_id, role) -- see the corrected comment
+// on the Source 3 backfill in the migration itself), so a fixture that seeds
+// one cannot be built; replay safety is the only remaining edge this
+// migration's guards need to prove, and it is the same DISTINCT/backfill
+// code path.
+func TestMigration0318_ReplaySafe(t *testing.T) {
+	ctx := context.Background()
+	db, _ := testdb.OpenFreshDatabase(t)
+
+	// testdb.OpenFreshDatabase's bootstrap already runs 0318 once, but
+	// against an otherwise-empty database (no dev-seed grants), so all
+	// three backfill sources are empty and capability_bindings ends up
+	// empty too -- a replay of "0 rows before, 0 rows after" would pass
+	// even with the backfill guards deleted entirely, proving nothing.
+	// Seed one row into each source first, matching a production
+	// deployment where 0318 lands against a live DB that already has
+	// grants to carry forward.
+	seedReplaySafeSourceRows(t, ctx, db)
+
+	type counts struct {
+		total          int
+		fromUserRoles  int
+		fromAreaGrants int
+		fromGroupRoles int
+		roles          int
+	}
+	snapshot := func() counts {
+		t.Helper()
+		var c counts
+		if err := db.QueryRowContext(ctx, `SELECT count(*) FROM metaldocs.capability_bindings`).Scan(&c.total); err != nil {
+			t.Fatalf("count capability_bindings: %v", err)
+		}
+		if err := db.QueryRowContext(ctx,
+			`SELECT count(*) FROM metaldocs.capability_bindings WHERE source_relation = 'iam_user_roles'`).Scan(&c.fromUserRoles); err != nil {
+			t.Fatalf("count capability_bindings (iam_user_roles): %v", err)
+		}
+		if err := db.QueryRowContext(ctx,
+			`SELECT count(*) FROM metaldocs.capability_bindings WHERE source_relation = 'user_process_areas'`).Scan(&c.fromAreaGrants); err != nil {
+			t.Fatalf("count capability_bindings (user_process_areas): %v", err)
+		}
+		if err := db.QueryRowContext(ctx,
+			`SELECT count(*) FROM metaldocs.capability_bindings WHERE source_relation = 'iam_group_roles'`).Scan(&c.fromGroupRoles); err != nil {
+			t.Fatalf("count capability_bindings (iam_group_roles): %v", err)
+		}
+		if err := db.QueryRowContext(ctx, `SELECT count(*) FROM metaldocs.roles`).Scan(&c.roles); err != nil {
+			t.Fatalf("count metaldocs.roles: %v", err)
+		}
+		return c
+	}
+
+	sqlBytes, err := os.ReadFile(migration0318Path(t))
+	if err != nil {
+		t.Fatalf("read migration 0318 file: %v", err)
+	}
+	// By the time this test runs, bootstrap has already applied 0319, which
+	// ATTACHES trg_require_cap_asserted to metaldocs.roles and
+	// metaldocs.capability_bindings (arms #21/#22). Re-executing 0318's raw
+	// SQL now -- outside any request/service context that would assert a
+	// capability -- hits that now-live trigger on its own roles-seed INSERT
+	// and its own backfill INSERTs, which a real 0318-only replay (before
+	// 0319 has run) would not. The scheduler bypass is the same escape
+	// hatch background/administrative SQL uses elsewhere (see
+	// metaldocs.bypass_authz='scheduler' in the tenant-erasure path); it
+	// does not weaken what this test proves, since the guards under test
+	// are the migration's own idempotency guards, not the tripwire.
+	replaySQL := "SET metaldocs.bypass_authz = 'scheduler';\n" + string(sqlBytes)
+
+	// First pass: bootstrap's own 0318 run already happened over an empty
+	// database, so the backfill guards were never blocked and never had
+	// anything to insert either. Running the file again now -- the first
+	// time capability_bindings' per-source guard markers are absent AND
+	// the sources are non-empty -- is the real backfill this migration is
+	// meant to perform in production; it is not yet the replay under test.
+	if _, err := db.ExecContext(ctx, replaySQL); err != nil {
+		t.Fatalf("running migration 0318 against freshly-seeded source rows failed: %v", err)
+	}
+
+	before := snapshot()
+	if before.total == 0 {
+		t.Fatal("precondition failed: capability_bindings is empty after the seeded backfill pass, replay would prove nothing")
+	}
+
+	// Second pass: the actual replay under test (P1-2) -- every guard must
+	// now see its own markers and refuse to duplicate anything.
+	if _, err := db.ExecContext(ctx, replaySQL); err != nil {
+		t.Fatalf("replaying migration 0318 against an already-migrated database failed (not replay-safe): %v", err)
+	}
+
+	after := snapshot()
+	if after != before {
+		t.Fatalf("migration 0318 replay changed row counts (backfill duplicated rows): before=%+v after=%+v", before, after)
+	}
+}
+
+// seedReplaySafeSourceRows seeds exactly one row into each of 0318's three
+// backfill sources (iam_user_roles, user_process_areas, iam_group_roles) so
+// TestMigration0318_ReplaySafe has real, non-empty source data to carry
+// across a replay -- see that test's own comment for why an empty-to-empty
+// replay would not exercise the guards at all.
+func seedReplaySafeSourceRows(t *testing.T, ctx context.Context, db *sql.DB) {
+	t.Helper()
+	tenantID := tenant.DevTenantID
+	userID := seedUser(t, ctx, db, tenantID)
+	area := seedArea(t, ctx, db, tenantID)
+
+	// Source 1: iam_user_roles (arm #3, user.manage).
+	func() {
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatalf("seed iam_user_roles: begin tx: %v", err)
+		}
+		defer func() { _ = tx.Rollback() }()
+
+		testdb.SetCapsOnTx(t, tx, `[{"cap":"user.manage"}]`)
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO metaldocs.iam_user_roles (user_id, role_code, tenant_id, assigned_by)
+			 VALUES ($1, 'viewer', $2::uuid, $1)`,
+			userID, tenantID); err != nil {
+			t.Fatalf("seed iam_user_roles: %v", err)
+		}
+		if err := tx.Commit(); err != nil {
+			t.Fatalf("commit seed iam_user_roles: %v", err)
+		}
+	}()
+
+	// Source 2: public.user_process_areas (arm #4, membership.manage).
+	func() {
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatalf("seed user_process_areas: begin tx: %v", err)
+		}
+		defer func() { _ = tx.Rollback() }()
+
+		testdb.SetCapsOnTx(t, tx, `[{"cap":"membership.manage"}]`)
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO public.user_process_areas
+			    (user_id, tenant_id, area_code, role, effective_from, effective_to, granted_by, revoked_by)
+			 VALUES ($1, $2::uuid, $3, 'author', now(), NULL, $1, NULL)`,
+			userID, tenantID, area); err != nil {
+			t.Fatalf("seed user_process_areas: %v", err)
+		}
+		if err := tx.Commit(); err != nil {
+			t.Fatalf("commit seed user_process_areas: %v", err)
+		}
+	}()
+
+	// Source 3: metaldocs.iam_group_roles (arm #18, user.manage) — needs a
+	// group first (arm #16, also user.manage).
+	groupID := uuid.NewString()
+	func() {
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatalf("seed iam_groups: begin tx: %v", err)
+		}
+		defer func() { _ = tx.Rollback() }()
+
+		testdb.SetCapsOnTx(t, tx, `[{"cap":"user.manage"}]`)
+		if _, err := tx.ExecContext(ctx,
+			`SELECT set_config('metaldocs.tenant_id', $1, true)`, tenantID); err != nil {
+			t.Fatalf("seed iam_groups: set tenant GUC: %v", err)
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO metaldocs.iam_groups (id, tenant_id, name) VALUES ($1::uuid, $2::uuid, $3)`,
+			groupID, tenantID, "fixture-group-"+groupID[:8]); err != nil {
+			t.Fatalf("seed iam_groups: %v", err)
+		}
+		if err := tx.Commit(); err != nil {
+			t.Fatalf("commit seed iam_groups: %v", err)
+		}
+	}()
+	func() {
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatalf("seed iam_group_roles: begin tx: %v", err)
+		}
+		defer func() { _ = tx.Rollback() }()
+
+		testdb.SetCapsOnTx(t, tx, `[{"cap":"user.manage"}]`)
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO metaldocs.iam_group_roles (group_id, role) VALUES ($1::uuid, 'viewer')`,
+			groupID); err != nil {
+			t.Fatalf("seed iam_group_roles: %v", err)
+		}
+		if err := tx.Commit(); err != nil {
+			t.Fatalf("commit seed iam_group_roles: %v", err)
+		}
+	}()
+}
+
+// migration0318Path resolves db/migrations/0318_capability_bindings_schema_backfill.sql
+// by walking up from this test file to the repo root (identified by go.mod),
+// mirroring the same walk testdb.ApplyCuratedBootstrap uses internally.
+func migration0318Path(t *testing.T) string {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed to resolve this test file's own path")
+	}
+	dir := filepath.Dir(file)
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return filepath.Join(dir, "db", "migrations", "0318_capability_bindings_schema_backfill.sql")
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Fatal("could not find repo root walking up from migration_0318_test.go")
+		}
+		dir = parent
 	}
 }
 

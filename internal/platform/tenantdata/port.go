@@ -71,3 +71,28 @@ type Port interface {
 	// one port's.
 	EraseTenantData(ctx context.Context, tx *sql.Tx, tenantID string) (map[string]int64, error)
 }
+
+// EarlyEraser is an OPTIONAL extra a Port may implement (type-asserted by the
+// orchestrator; most ports do not need it) when one of its own tables holds
+// an outbound FK into a table owned by a module ranked LATER in
+// tenant_lifecycle_service.go's eraseOrder. The flat, per-module eraseOrder
+// can express "module A's rows must be gone before module B's" in only one
+// direction; it cannot express a genuine two-way dependency where module A
+// also needs module B's rows to still exist for a DIFFERENT one of A's own
+// tables (e.g. an actor/user FK back into iam). EraseEarly runs, for every
+// port that implements it, before the main per-module eraseOrder fan-out —
+// i.e. before ANY ordered port's EraseTenantData — so its deletes are safe
+// against a target table another (later-ranked-relative-to-it-doesn't-matter,
+// because this runs first) module is about to delete. A table erased here
+// must NOT also be erased again in the same port's ordinary EraseTenantData
+// (that would double-count rows and delete nothing on the second pass, since
+// EraseTable is a plain tenant-scoped DELETE, not idempotent against an
+// already-empty table in a way that would be wrong, but would misreport row
+// counts) — Tables() still lists it, EraseTenantData must not.
+type EarlyEraser interface {
+	// EraseEarly deletes tenantID's rows from whichever subset of this
+	// port's Tables() must be gone before the main eraseOrder fan-out runs,
+	// inside the caller-supplied tx. Returns rows-deleted-per-table, same
+	// contract as EraseTenantData.
+	EraseEarly(ctx context.Context, tx *sql.Tx, tenantID string) (map[string]int64, error)
+}

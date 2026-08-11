@@ -552,23 +552,41 @@ func leaseBaselineIsComplete(ctx context.Context, baseDSN, dbName string) (bool,
 // filters to those two) cannot see — and therefore cannot delete — it.
 const leaseBaselineSchema = "metaldocs_testkit"
 
-// Exactly 6 tables in the template carry seed rows (verified by scanning every
-// table in the template for rows): role_capabilities 112, schema_migrations
+// The template's seed-row tables (verified by scanning every table in the
+// template for rows): role_capabilities 112, roles 8 (A8.1, migration 0318 —
+// hand-maintained catalog, see the migration's own header comment), schema_migrations
 // 101, river_migration 6, tenants 1, templates_template 1,
 // templates_template_version 1. EVERY other table in public + metaldocs is
-// empty in the template — including the counter tables. So deleting the other
-// 59 to empty is exactly what a fresh clone gives, and no per-table seed
-// logic is needed for anything outside these 6.
+// empty in the template — including the counter tables. So deleting the rest
+// to empty is exactly what a fresh clone gives, and no per-table seed logic
+// is needed for anything outside this set.
 //
-// resetExclusions are the 3 STATIC ones: seeded by the curated bootstrap and
+// resetExclusions are the STATIC ones: seeded by the curated bootstrap and
 // never written by any test, so there is no reason to churn them.
 //
 // Contrast baselineSnapshotTables below — the distinction is not cosmetic.
 // Excluding a table that tests DO write lets a leased database drift from
 // clone-equivalence with every reuse: the audit package's invariant assert
 // caught this at 2 tenant rows, and a lease left unguarded reached 51.
+//
+// metaldocs.roles (added here, not to baselineSnapshotTables): it is a fixed,
+// hand-maintained 8-row role catalog (migration 0318; A8.3 repoints the seed
+// at a Go-registry-driven generator, but until then this is it), and no test
+// or application code path writes to it (verified: the only reference outside
+// this migration is migration_0318_test.go's own read-only row-count assert).
+// Omitting it here was a real defect, not a hypothetical one: without this
+// entry, deleteTargets (below) treats metaldocs.roles as an ordinary
+// ephemeral table — ok for the FIRST lease of a template clone (pristine,
+// carries all 8 rows), but resetLeasedDatabase deletes it on every REUSE and
+// nothing restores it (it is not in baselineSnapshotTables either), so a
+// reused lease's metaldocs.roles is permanently empty and any ordinary test's
+// attempt to insert a metaldocs.capability_bindings row fails FK validation
+// against role_code — not because the test did anything wrong, but because
+// the leased database no longer represents the curated bootstrap state it is
+// supposed to model.
 var resetExclusions = map[string]struct{}{
 	"metaldocs.role_capabilities": {},
+	"metaldocs.roles":             {},
 	"public.schema_migrations":    {},
 	"public.river_migration":      {},
 }

@@ -108,6 +108,48 @@
 --   still are the live read path -- exactly the A8.1 end state.
 --
 -- ============================================================================
+-- REPLAY SAFETY (this migration must be safe to execute a second time against
+-- a database where it already succeeded -- partial restore / operator replay,
+-- independent of whether public.schema_migrations' own ledger row would have
+-- skipped a framework-driven re-run)
+-- ============================================================================
+--   Every DDL statement below is guarded so a second execution is a no-op,
+--   not a duplicate_object error:
+--     - the two ALTER TABLE ... ADD CONSTRAINT promotions have no native
+--       IF NOT EXISTS form in Postgres, so each is wrapped in a DO block that
+--       checks pg_constraint by (conname, conrelid) first;
+--     - both CREATE TABLE statements use IF NOT EXISTS;
+--     - the roles seed INSERT uses ON CONFLICT (code) DO NOTHING;
+--     - all three CREATE INDEX statements use IF NOT EXISTS;
+--     - ENABLE/FORCE ROW LEVEL SECURITY are already idempotent in Postgres
+--       (no error re-enabling/re-forcing what is already on) -- no guard
+--       needed;
+--     - CREATE POLICY has no IF NOT EXISTS form, so it is preceded by
+--       DROP POLICY IF EXISTS on the same name.
+--
+--   The three backfill INSERT ... SELECT statements are the one place a
+--   naive guard would be wrong: capability_bindings has no uniqueness
+--   constraint over historical (effective_to IS NOT NULL) rows at all --
+--   ux_capability_bindings_active_identity only covers the active slice --
+--   so replaying the bare INSERTs would silently duplicate revoked history,
+--   not raise an error a replay operator could see. Each is instead guarded
+--   by `WHERE NOT EXISTS (... WHERE source_relation = '<this source>')`:
+--   once any row has been stamped with a given source_relation, that
+--   source's SELECT produces zero rows on every subsequent run. This is
+--   coarse (all-or-nothing per source, not per-row) but correct for this
+--   migration's actual write pattern -- each source is backfilled in one
+--   all-or-nothing statement, so "some rows already exist for this source"
+--   and "this source is fully backfilled" are the same state in practice.
+--   It also self-heals a partial failure: if source 2 fails after source 1
+--   committed within the same migration transaction this is moot (the whole
+--   BEGIN/COMMIT rolls back together), but it keeps the statements correct
+--   in isolation if this file is ever run outside that wrapping transaction.
+--
+--   Proof this holds: tests/integration/migrations/migration_0318_test.go
+--   runs this file's statements twice against the same database and asserts
+--   the second run succeeds with capability_bindings row counts unchanged.
+--
+-- ============================================================================
 
 BEGIN;
 
@@ -115,17 +157,39 @@ BEGIN;
 
 -- ux_iam_users_tenant_user is a unique INDEX, not a unique CONSTRAINT; a bare
 -- unique index cannot be an FK target. Promote it in place (no rebuild).
-ALTER TABLE metaldocs.iam_users
-  ADD CONSTRAINT iam_users_tenant_user_uk UNIQUE USING INDEX ux_iam_users_tenant_user;
+-- Postgres has no `ADD CONSTRAINT IF NOT EXISTS`, so replay safety is a
+-- manual pg_constraint existence check (see REPLAY SAFETY header note).
+DO $guard$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'iam_users_tenant_user_uk'
+          AND conrelid = 'metaldocs.iam_users'::regclass
+    ) THEN
+        ALTER TABLE metaldocs.iam_users
+          ADD CONSTRAINT iam_users_tenant_user_uk UNIQUE USING INDEX ux_iam_users_tenant_user;
+    END IF;
+END;
+$guard$;
 
 -- No prior uniqueness on (tenant_id, id) exists for iam_groups at all
 -- (id alone is already PK-unique); cheap fresh add.
-ALTER TABLE metaldocs.iam_groups
-  ADD CONSTRAINT iam_groups_tenant_id_id_uk UNIQUE (tenant_id, id);
+DO $guard$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'iam_groups_tenant_id_id_uk'
+          AND conrelid = 'metaldocs.iam_groups'::regclass
+    ) THEN
+        ALTER TABLE metaldocs.iam_groups
+          ADD CONSTRAINT iam_groups_tenant_id_id_uk UNIQUE (tenant_id, id);
+    END IF;
+END;
+$guard$;
 
 -- ── metaldocs.roles: hand-seeded catalog (TRANSITIONAL, see header) ────────
 
-CREATE TABLE metaldocs.roles (
+CREATE TABLE IF NOT EXISTS metaldocs.roles (
     code text NOT NULL,
     description text DEFAULT ''::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
@@ -146,11 +210,12 @@ INSERT INTO metaldocs.roles (code, description) VALUES
     ('viewer',       'Tenant-scoped viewer role'),
     ('signer',       'Area-scoped signer role'),
     ('area_admin',   'Area-scoped administrator role'),
-    ('qms_admin',    'Area-scoped QMS administrator role');
+    ('qms_admin',    'Area-scoped QMS administrator role')
+ON CONFLICT (code) DO NOTHING;
 
 -- ── metaldocs.capability_bindings: ADR 0092 D1 relation ────────────────────
 
-CREATE TABLE metaldocs.capability_bindings (
+CREATE TABLE IF NOT EXISTS metaldocs.capability_bindings (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     tenant_id uuid DEFAULT 'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid NOT NULL,
     subject_kind text NOT NULL,
@@ -218,7 +283,7 @@ CREATE TABLE metaldocs.capability_bindings (
 -- (tenant, subject, role, scope). COALESCE is required because Postgres
 -- unique indexes treat NULL as distinct-from-itself, which would otherwise
 -- defeat dedup across the discriminated-union subject/scope columns.
-CREATE UNIQUE INDEX ux_capability_bindings_active_identity ON metaldocs.capability_bindings (
+CREATE UNIQUE INDEX IF NOT EXISTS ux_capability_bindings_active_identity ON metaldocs.capability_bindings (
     tenant_id,
     subject_kind,
     COALESCE(subject_user_id, ''::text),
@@ -228,11 +293,11 @@ CREATE UNIQUE INDEX ux_capability_bindings_active_identity ON metaldocs.capabili
     COALESCE(scope_ref, ''::text)
 ) WHERE (effective_to IS NULL);
 
-CREATE INDEX ix_capability_bindings_subject_active ON metaldocs.capability_bindings (
+CREATE INDEX IF NOT EXISTS ix_capability_bindings_subject_active ON metaldocs.capability_bindings (
     tenant_id, subject_kind, subject_user_id, subject_group_id
 ) WHERE (effective_to IS NULL);
 
-CREATE INDEX ix_capability_bindings_tenant_role_active ON metaldocs.capability_bindings (
+CREATE INDEX IF NOT EXISTS ix_capability_bindings_tenant_role_active ON metaldocs.capability_bindings (
     tenant_id, role_code, scope_kind, scope_ref
 ) WHERE (effective_to IS NULL);
 
@@ -243,6 +308,12 @@ CREATE INDEX ix_capability_bindings_tenant_role_active ON metaldocs.capability_b
 -- baseline).
 ALTER TABLE metaldocs.capability_bindings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ONLY metaldocs.capability_bindings FORCE ROW LEVEL SECURITY;
+
+-- ENABLE/FORCE above are already idempotent (no error re-asserting what is
+-- already on). CREATE POLICY is not -- Postgres has no
+-- `CREATE POLICY IF NOT EXISTS` -- so replay safety is DROP IF EXISTS then
+-- recreate, same idiom as the guarded ADD CONSTRAINT statements above.
+DROP POLICY IF EXISTS tenant_isolation ON metaldocs.capability_bindings;
 
 CREATE POLICY tenant_isolation ON metaldocs.capability_bindings USING (
     ((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL)
@@ -279,43 +350,59 @@ END;
 $migration$;
 
 -- Source 1: iam_user_roles -- tenant-scoped user grants.
+-- Replay guard: capability_bindings has no uniqueness constraint over
+-- historical (effective_to IS NOT NULL) rows, so a bare replay of this
+-- INSERT would silently duplicate history rather than error. Once any row
+-- is stamped source_relation = 'iam_user_roles', this source is considered
+-- fully backfilled and the SELECT yields nothing on every later run (see
+-- REPLAY SAFETY header note).
 INSERT INTO metaldocs.capability_bindings
     (tenant_id, subject_kind, subject_user_id, subject_group_id, role_code,
      scope_kind, scope_ref, effective_from, effective_to, granted_by, revoked_by, source_relation)
 SELECT
     tenant_id, 'user', user_id, NULL, role_code,
     'tenant', NULL, assigned_at, NULL, assigned_by, NULL, 'iam_user_roles'
-FROM metaldocs.iam_user_roles;
+FROM metaldocs.iam_user_roles
+WHERE NOT EXISTS (
+    SELECT 1 FROM metaldocs.capability_bindings WHERE source_relation = 'iam_user_roles'
+);
 
 -- Source 2: user_process_areas -- area-scoped user grants. ALL rows,
 -- active and already-revoked, to preserve full grant history (backfill must
--- not flatten or lose provenance).
+-- not flatten or lose provenance). Same replay guard as Source 1.
 INSERT INTO metaldocs.capability_bindings
     (tenant_id, subject_kind, subject_user_id, subject_group_id, role_code,
      scope_kind, scope_ref, effective_from, effective_to, granted_by, revoked_by, source_relation)
 SELECT
     tenant_id, 'user', user_id, NULL, role,
     'area', area_code, effective_from, effective_to, granted_by, revoked_by, 'user_process_areas'
-FROM public.user_process_areas;
+FROM public.user_process_areas
+WHERE NOT EXISTS (
+    SELECT 1 FROM metaldocs.capability_bindings WHERE source_relation = 'user_process_areas'
+);
 
 -- Source 3: iam_group_roles -- tenant-scoped group grants. This table has no
 -- timestamp/provenance columns of its own; effective_from anchors on the
 -- owning group's created_at (the best available provenance) and granted_by
 -- is honestly NULL rather than fabricated.
 --
--- DISTINCT is load-bearing, not defensive styling. Unlike iam_user_roles
--- (PRIMARY KEY (tenant_id, user_id), a de-facto single-active-role-per-user
--- constraint) and user_process_areas (its own effective-interval CHECKs
--- mirror ux_capability_bindings_active_identity's shape exactly), the table
--- definition of metaldocs.iam_group_roles (db/baseline/0001_current_schema.sql)
--- carries NO primary key and NO unique constraint at all on (group_id, role)
--- -- nothing in the schema has ever stopped a duplicate (group_id, role) row
--- from existing. Every column this SELECT emits for a given (group_id, role)
--- pair is either a literal constant or a deterministic function of group_id
--- (g.tenant_id, g.created_at via the join), so two duplicate source rows
--- produce byte-identical output rows here; two DISTINCT active bindings would
--- otherwise collide on ux_capability_bindings_active_identity and abort this
--- migration outright on production-shaped data carrying such a duplicate.
+-- CORRECTED (this migration's original comment here was wrong and is
+-- replaced, not merely amended, per the mechanism actually verified):
+-- metaldocs.iam_group_roles DOES carry a composite PRIMARY KEY
+-- (group_id, role) -- iam_group_roles_pkey, added via a separate
+-- ALTER TABLE ... ADD CONSTRAINT in db/baseline/0001_current_schema.sql
+-- (the CREATE TABLE's own column list does not show it, which is what the
+-- original comment missed: pg_dump-style baselines add primary keys as a
+-- later ALTER TABLE, not inline). That PK already makes a duplicate
+-- (group_id, role) source row impossible, so this SELECT DISTINCT can never
+-- actually collapse anything through this join: two source rows can only
+-- differ by group_id or role, and every column this SELECT emits for a
+-- given (group_id, role) pair is a deterministic function of group_id
+-- (g.tenant_id, g.created_at) or a literal, so it cannot produce two
+-- distinct output rows that further collapse either. DISTINCT is kept as
+-- defense-in-depth against a future migration weakening or dropping that
+-- PK, not because a real duplicate hazard exists today -- if that ever
+-- changes, this comment (not a guess) is the reason the safety net is here.
 INSERT INTO metaldocs.capability_bindings
     (tenant_id, subject_kind, subject_user_id, subject_group_id, role_code,
      scope_kind, scope_ref, effective_from, effective_to, granted_by, revoked_by, source_relation)
@@ -323,7 +410,10 @@ SELECT DISTINCT
     g.tenant_id, 'group', NULL::text, gr.group_id, gr.role,
     'tenant', NULL::text, g.created_at, NULL::timestamptz, NULL::text, NULL::text, 'iam_group_roles'
 FROM metaldocs.iam_group_roles gr
-JOIN metaldocs.iam_groups g ON g.id = gr.group_id;
+JOIN metaldocs.iam_groups g ON g.id = gr.group_id
+WHERE NOT EXISTS (
+    SELECT 1 FROM metaldocs.capability_bindings WHERE source_relation = 'iam_group_roles'
+);
 
 -- ── schema_migrations ledger ────────────────────────────────────────────
 
