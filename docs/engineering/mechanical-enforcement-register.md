@@ -54,6 +54,14 @@ defect this register exists to eliminate.
 | ME-14 a tenant table with no RLS, and no control that could see it | _issue pending_ |
 | ME-15 the check registry is four hand-synced inventories, not one | _issue pending_ |
 | ME-16 compose healthcheck probes are a second, unforced reading of two worker/jobs runtime facts | [#115](https://github.com/developmentconexus-ops/MetalDocs/issues/115) |
+| ME-19 the negative fixture is the guard's guard, and nothing guards it | _issue pending_ |
+| ME-20 a gate signal written by a later phase than the destructive one | _issue pending_ |
+
+> **ME-17 and ME-18 are intentionally absent from this table on `main`.** They exist on the open
+> `feat/a8-1-capability-bindings` branch (PR #113) and land with it. ME-19/ME-20 were allocated
+> above that branch's high-water mark rather than reusing the next id readable from `main`, which
+> was already taken — see "Note on allocating an entry id" below. The gap is a live claim about
+> another branch, not a numbering error; do not "fix" it by renumbering.
 
 ## How to read an entry
 
@@ -76,6 +84,65 @@ Preference order for firing mechanisms, strongest first. This ordering is doctri
 | **Kept correct by** | What holds it together *today* — usually "discipline". |
 | **Firing mechanism** | What should hold it, per the order above. |
 | **Verified** | Whether the claim was read first-hand, and when. |
+
+---
+
+## How to build a level-3 guard
+
+The ordering above says *which* firing mechanism to prefer. It does not say how to build the one
+you settle for. Level 3 is where most entries land in practice, and the 2026-08-11 remediation wave
+is the evidence for why that needs its own bar: eight-plus confirmed instances of "the mechanism is
+absent and nothing says so" were closed by writing guards, and then **the guards were found
+defective in the same way, four times in one wave** — a Dockerfile guard blind to `FROM $VAR`, an
+import guard blind to a single-line `import`, the same guard blind to an aliased import, and the
+same guard again blind to a dot-import. ME-12 already named this as the wrong-noun failure and
+called it "the default outcome" rather than a mistake to learn from. The wave confirmed that
+prediction under authors who had read ME-12.
+
+A guard is code, and it is code that nothing else guards. Three requirements, each earned live:
+
+1. **Fail closed on what it cannot parse.** Most blind spots are not wrong answers; they are
+   "could not see it, therefore passed". Ruled on PR #114: when the Dockerfile guard could not
+   parse a multi-line `FROM` continuation, the correct fix was *not* to build a line-joiner in
+   bash — more code than the check, its own untested edges, and it starts guessing. The fix is an
+   explicit unparseable branch that exits non-zero and says which shape it refused. A guard with no
+   "I do not know" branch answers "no violation" to every question it cannot understand.
+
+2. **Ask semantics, not syntax, wherever a resolver exists.** The four blind spots above are one
+   defect: a *syntactic* guard answering a *semantic* question. PR #120 is the template for the fix
+   — the read-only-transaction rule stopped matching AST shapes and started resolving identifiers
+   through `go/types`, asking whether a name *is* `database/sql.TxOptions` rather than whether it is
+   spelled like one. That form is simultaneously blind to nothing (qualified, aliased, and
+   dot-imported all resolve identically) and free of false positives (a locally shadowed
+   `TxOptions` resolves to the local type and is correctly ignored) — which a syntactic guard cannot
+   be at the same time. Where the artifact is buildable, prefer asking the built artifact over
+   reading its source.
+
+3. **Every exclusion needs `NotWant`.** A guard's scope exclusion is itself a rule, and `Want`
+   cannot assert it: `Want` proves a guard FIRES, never that it stays SILENT. Delete an exclusion
+   and the output only *gains* a line — every `Want` still matches and the harness reports ok. Put
+   the excluded thing in the fixture tree in a form that WOULD fire, and name it in
+   `Fixture.NotWant` (`tools/verify/fixtures.go`), so deleting the exclusion turns the harness red.
+
+And the layer under all three: **the negative fixture is the guard's guard, and it is the least
+guarded thing in the tree** — see ME-19.
+
+### Note on allocating an entry id
+
+ME ids are allocated by hand, and concurrent branches allocate them blind. Found live 2026-08-11:
+`main` was at ME-16 while an open PR's branch already carried ME-17 and ME-18, so the next id
+readable from `main` was already taken. **Before adding an entry, scan every open branch**, not
+just `main`:
+
+```bash
+for b in $(git branch -r --format='%(refname:short)'); do
+  git show "$b:docs/engineering/mechanical-enforcement-register.md" 2>/dev/null \
+    | grep -oE '^## ME-[0-9]+' | tail -1 | sed "s|^|$b |"
+done
+```
+
+Yes — this register's own ids are a hand-synced enumeration. It is recorded here rather than
+quietly worked around, because the alternative is the exact defect the register exists to name.
 
 ---
 
@@ -699,3 +766,100 @@ Level 3, and 18 files depend on it. Two properties worth copying:
    DD-6 kept the role vocabulary closed partly because opening it degrades `UserRole` to `string` and
    this proof silently evaluates to nothing. Knowing what a mechanism buys is what makes trading it
    away a decision rather than an accident.
+
+---
+
+## ME-19 — the negative fixture is the guard's guard, and nothing guards it
+
+**Found** 2026-08-11 across four PRs of the engineering-remediation wave (#114, #120, #122, #123),
+recorded because the same shape was hit by four independent authors in one day.
+
+Level-3 enforcement is a two-layer stack: the guard asserts the rule, and a **negative fixture**
+asserts the guard. The register's preference order treats "red build" as one rung, but a red build
+is only as trustworthy as the fixture that proves the build can go red. That second layer is where
+this wave's failures actually concentrated.
+
+**Surfaces — four distinct ways a fixture asserts nothing, all observed live:**
+
+| Shape | Instance |
+|---|---|
+| A fixture added to an already-failing tree | PR #114: three new negative fixtures (lowercase `from`, second builder stage, `FROM --platform=`) whose `Want` still listed only the original `worker.Dockerfile` line. `exit != 0` was carried by the first bad file; **measured** — pre-fix parser + all four fixtures => harness reports `ok`. |
+| An exclusion with no `NotWant` | PR #114 again, found by cold review: discovery legitimately skips `vendor/`, and nothing proved it kept skipping. `Want` cannot express silence. |
+| A `Want` loose enough to match an unrelated failure | PR #119: `Want: ["EXPIRED"]` — a bare substring an unrelated failure path can also produce, pinning the fixture to the wrong cause. |
+| A fixture never proven RED against pre-fix code | Wave-wide. A fixture authored alongside its fix has never been observed to fail; "the guard is blocking" and "the guard has been observed to fail" are separate claims (registry rule A7 names this for `pr`-profile checks). |
+
+**Kept correct by** — today: `tools/verify` registry rule **A7** (a `pr`-profile check must declare
+a fixture or a written waiver) plus reviewer attention. A7 forces a fixture to *exist*. Nothing
+forces it to *assert*. Every shape in the table above satisfies A7.
+
+**The convergent-invention evidence.** `Fixture.NotWant` was invented **twice, independently, on the
+same day**: PR #114 added it (`tools/verify/fixtures.go`), and PR #123 added a byte-identical
+implementation on a branch forked from the same commit, because both lanes were briefed from the
+same written rule. `git merge-tree` reported it as a content conflict; it was a duplicate. Two
+authors reaching for the same missing mechanism within hours is the strongest available evidence
+that the mechanism was missing and that the rule alone was not carrying it.
+
+**Firing mechanism** — level 3, extending the existing A-rules, in ascending order of value:
+
+- **A-fixture-RED:** a fixture's assertions must be proven against the *pre-fix* guard, not only
+  the fixed one. Mechanically: the check declares the commit or patch that restores the defect, and
+  the harness runs the fixture against it and requires red. This is the one that would have caught
+  all four shapes above.
+- **A-fixture-specific:** reject a `Want` string that also appears in the guard's generic failure
+  output — the "wrong cause" shape.
+- **A-exclusion-NotWant:** a guard declaring a scope exclusion (a skip list, an allowlist, a
+  `_test.go` carve-out) must declare a corresponding `NotWant`. Derivable: the exclusion is already
+  data in the guard.
+
+**Verified** 2026-08-11, first-hand: the #114 measurement is recorded in that PR's Control Tower
+takeover note; the #114/#123 `NotWant` implementations were diffed directly and are byte-identical.
+
+**Owner:** unassigned; belongs to whoever next touches `tools/verify`'s registry rules.
+
+---
+
+## ME-20 — a gate signal written by a later phase than the destructive one
+
+**Found** 2026-08-11 on PR #121 (erased-tenant audit read-path gate), disposing of a Codex TOCTOU
+finding. Recorded as its own entry because the fix that was initially accepted is a level-4 patch of
+a level-1 defect, and the difference is the whole point of this register.
+
+**Surface.** `internal/modules/iam/application/tenant_lifecycle_service.go:540-563` — tenant erasure
+runs in phases. Phase 1 (`eraseTenantRowsTx`) deletes `audit_export_jobs` **and commits**. Phase 3
+(`cryptoShredAndTombstoneTx`) sets `tenants.erased_at`, which is the **only** signal
+`refuseIfTenantErased` reads. Between them sits Phase 2's blob-deletion network I/O, so the window
+is not a few milliseconds — it is as wide as an object-store sweep.
+
+An export landing in that window writes a new plaintext `audit_export_jobs` row *after* the cleanup
+that was supposed to remove them, and nothing ever sweeps it again. No DB trigger backstops it.
+Durable, compliance-relevant, and invisible: every phase reports success.
+
+**Kept correct by** — nothing. The ordering is incidental.
+
+**The generalization, which is why this is an entry and not a bug report:** the destructive phase
+runs *before* the phase that publishes "this thing is being destroyed". Any multi-phase lifecycle
+that raises its gate flag at the end has a window whose width is whatever work sits in between, and
+that window is invisible to every phase's own success check.
+
+**Firing mechanism** — the accepted disposition on #121 was *re-check erasure immediately before
+persisting, fail closed*. That is level 4: it narrows the TOCTOU window, it does not close it, and it
+adds a check that must be remembered at every future write site.
+
+**Level 1 is available and is a smaller change: raise the gate flag first.** Mark the tenant
+`erasing_at` (or set `erased_at`) in the transaction that *begins* erasure, before any destructive
+phase runs, and let `refuseIfTenantErased` read that. The window then cannot exist — not because
+something watches for it, but because there is no interval during which the tenant is being erased
+and does not say so. The gate already reads that signal; only the write order changes.
+
+Stated as doctrine: **the flag that gates access to a resource must be set by the first phase that
+makes the resource unsafe, never by the last phase that finishes making it unavailable.**
+
+**Boundary.** Out of PR #121's scope — that PR is `audit` module read-path enforcement; this is
+`iam` module lifecycle phase ordering. #121's Codex thread at
+`internal/modules/audit/infrastructure/postgres/writer.go:364` is **relocated, not undisposed**:
+the finding is real and the relocation is the disposition.
+
+**Verified** 2026-08-11, first-hand: phase ordering read directly in
+`tenant_lifecycle_service.go`; `refuseIfTenantErased`'s single-signal dependency confirmed.
+
+**Owner:** own unit in the `iam` module, not yet scheduled.
