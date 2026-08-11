@@ -178,6 +178,13 @@ services:
         condition: service_healthy
     environment:
       METALDOCS_JOBS_RIVER_SCHEMA: ${METALDOCS_JOBS_RIVER_SCHEMA:-}
+      # The single credential source for metaldocs_runtime (PR #110 review
+      # finding): db-provision sets the role's password to this value, and
+      # api/worker/jobs below read the SAME var as their own PGPASSWORD, so
+      # provisioning and authentication can never name two different
+      # passwords. Defaults to the db/grants/0000_identity_roles.sql
+      # dev-fixture password, matching api/worker/jobs' own default.
+      METALDOCS_RUNTIME_DB_PASSWORD: ${METALDOCS_RUNTIME_DB_PASSWORD:-metaldocs_runtime_dev}
       PGHOST: postgres
       PGPORT: 5432
       PGDATABASE: ${POSTGRES_DB}
