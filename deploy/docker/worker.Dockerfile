@@ -4,7 +4,8 @@
 # literal or an ARG supplied via --build-arg -- it cannot read go.mod, so
 # this version cannot be derived here, only guarded. Guarded by tools/verify
 # check "dockerfile-go-version-drift" (scripts/check-dockerfile-go-version.sh),
-# which fails CI whenever this line and go.mod's `go` directive disagree.
+# which fails CI when this line's Go version is below go.mod's `go` directive
+# (a higher builder version is allowed).
 # Global maximum: one parameterized multi-stage Dockerfile shared by
 # api/jobs/worker with GO_VERSION threaded from go.mod through the compose
 # build stanza (planned A7.4/A7.5) deletes this restatement outright; that

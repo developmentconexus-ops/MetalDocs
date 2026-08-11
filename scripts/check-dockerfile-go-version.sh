@@ -67,19 +67,31 @@ fail=0
 checked=0
 for df in "${dockerfiles[@]}"; do
   [[ -f "$df" ]] || continue
-  from_line="$(grep -E '^FROM[[:space:]]+golang:' "$df" | head -1 || true)"
-  [[ -z "$from_line" ]] && continue
-  checked=$((checked + 1))
-  df_version="$(printf '%s\n' "$from_line" | sed -E 's/^FROM[[:space:]]+golang:([0-9]+(\.[0-9]+){0,2}).*/\1/')"
-  if [[ -z "$df_version" || "$df_version" == "$from_line" ]]; then
-    echo "DOCKERFILE-GO-VERSION-DRIFT: $df: could not parse a numeric golang version from: $from_line" >&2
-    fail=1
-    continue
-  fi
-  if ! version_ge "$df_version" "$mod_version"; then
-    echo "DOCKERFILE-GO-VERSION-DRIFT: $df pins golang:$df_version but go.mod requires go >= $mod_version" >&2
-    fail=1
-  fi
+  # Every Go builder stage matters, not just the first: a multi-stage
+  # Dockerfile can carry more than one `FROM golang:` line (e.g. a stale
+  # intermediate builder left behind a refactor), and a stage checked only
+  # once at the top of the file would let a later one drift undetected.
+  # Match case-insensitively (Docker's own instructions are not
+  # case-sensitive -- `from`/`From`/`FROM` are all valid), allow leading and
+  # intervening whitespace, and allow a `--platform=...` flag between `FROM`
+  # and the image reference (`FROM [--platform=<platform>] <image>`, per the
+  # Dockerfile reference).
+  while IFS= read -r matched; do
+    [[ -z "$matched" ]] && continue
+    lineno="${matched%%:*}"
+    from_line="${matched#*:}"
+    checked=$((checked + 1))
+    df_version="$(printf '%s\n' "$from_line" | grep -oiE 'golang:[0-9]+(\.[0-9]+){0,2}' | head -1 | cut -d: -f2)"
+    if [[ -z "$df_version" ]]; then
+      echo "DOCKERFILE-GO-VERSION-DRIFT: $df:$lineno: could not parse a numeric golang version from: $from_line" >&2
+      fail=1
+      continue
+    fi
+    if ! version_ge "$df_version" "$mod_version"; then
+      echo "DOCKERFILE-GO-VERSION-DRIFT: $df pins golang:$df_version but go.mod requires go >= $mod_version (line $lineno)" >&2
+      fail=1
+    fi
+  done < <(grep -inE '^[[:space:]]*from[[:space:]]+(--platform=[^[:space:]]+[[:space:]]+)?golang:' "$df" || true)
 done
 
 if (( checked == 0 )); then

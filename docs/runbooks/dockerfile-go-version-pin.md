@@ -75,7 +75,7 @@ This check is static and does not build anything. To prove the real defect
 this runbook exists for is gone, build one of the affected images from repo
 root:
 
-```
+```sh
 docker compose -f deploy/compose/docker-compose.yml --env-file .env build worker jobs
 ```
 
