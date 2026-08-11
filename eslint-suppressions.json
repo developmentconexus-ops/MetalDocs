@@ -1,0 +1,177 @@
+{
+  "apps/docx-renderer/src/routes/__tests__/fanout.test.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 3
+    }
+  },
+  "frontend/apps/web/e2e/fixtures/isolation.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "frontend/apps/web/e2e/flows/a11y_smoke.spec.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    }
+  },
+  "frontend/apps/web/e2e/flows/quorum_m_of_n.spec.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    }
+  },
+  "frontend/apps/web/e2e/flows/route_admin.spec.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 3
+    }
+  },
+  "frontend/apps/web/e2e/helpers/pixel-diff.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "frontend/apps/web/src/features/approval/api/mutationClient.test.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "frontend/apps/web/src/features/approval/components/sidebar/IntegrityDisclosure.tsx": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "frontend/apps/web/src/features/approval/pages/InboxPage.tsx": {
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    }
+  },
+  "frontend/apps/web/src/features/documents/adapters/useDocumentArtifact.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "frontend/apps/web/src/features/documents/components/CheckpointsPanel.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "frontend/apps/web/src/features/documents/components/wizard/steps/StepAreaCodeVisibility/ExternalSubcontrols.tsx": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "frontend/apps/web/src/features/documents/components/wizard/steps/StepAreaCodeVisibility/PeopleSubcontrols.tsx": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    }
+  },
+  "frontend/apps/web/src/features/documents/hooks/editor/useDocumentAutosave.test.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "frontend/apps/web/src/features/documents/hooks/editor/useDocumentAutosave.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "frontend/apps/web/src/features/documents/hooks/editor/useDocumentSession.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx": {
+    "react-hooks/exhaustive-deps": {
+      "count": 2
+    }
+  },
+  "frontend/apps/web/src/features/documents/routes.test.tsx": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "frontend/apps/web/src/features/featureFlags.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "frontend/apps/web/src/features/iam/components/RoleCapabilityMatrix.tsx": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "frontend/apps/web/src/features/iam/components/SessionsTable.tsx": {
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    }
+  },
+  "frontend/apps/web/src/features/iam/tabs/MembershipsTab.test.tsx": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "frontend/apps/web/src/features/iam/tabs/PeopleTab.tsx": {
+    "react-hooks/exhaustive-deps": {
+      "count": 2
+    }
+  },
+  "frontend/apps/web/src/features/iam/tabs/RolesCapsTab.tsx": {
+    "react-hooks/exhaustive-deps": {
+      "count": 3
+    }
+  },
+  "frontend/apps/web/src/features/shell/components/AppShell.test.tsx": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "frontend/apps/web/src/features/templates/hooks/useTemplateAutosave.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "frontend/apps/web/src/features/templates/pages/TemplateApprovalRoute.tsx": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "frontend/apps/web/src/lib/api/problem.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "frontend/apps/web/vitest.config.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "packages/editor-ui/src/MetalDocsEditor.tsx": {
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    }
+  },
+  "packages/editor-ui/src/trackChanges.test.tsx": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 9
+    }
+  },
+  "packages/editor-ui/test/templatePlugin.wiring.test.tsx": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    }
+  },
+  "packages/shared-tokens/src/diff.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/shared-tokens/test/parser.split-runs.test.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  }
+}

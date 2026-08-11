@@ -1,14 +1,19 @@
 // ESLint flat config — Eigenpal Anti-Corruption Layer boundary guard (ADR 0046).
 //
-// This config is intentionally narrow: it enforces ONE invariant — the vendor
-// `@eigenpal/*` may be imported only inside the two ACL walls
-// (packages/eigenpal-adapter = server `.` door, packages/editor-ui = browser
-// React wall). It is NOT a full lint regime.
+// This config was originally narrow — ONE invariant, the vendor `@eigenpal/*`
+// may be imported only inside the two ACL walls (packages/eigenpal-adapter =
+// server `.` door, packages/editor-ui = browser React wall) — plus the F1.4
+// feature-boundary guard below. It is still not a full lint regime.
 //
-// The @typescript-eslint and react-hooks plugins are registered with their
-// rules OFF solely so that pre-existing inline `eslint-disable` directives that
-// name those rules resolve (otherwise ESLint errors "rule definition not
-// found"). Turning those rules on is a separate, deliberate future decision.
+// The @typescript-eslint and react-hooks plugins were registered with every
+// rule OFF solely so that pre-existing inline `eslint-disable` directives
+// that name those rules resolve (otherwise ESLint errors "rule definition
+// not found"). #91/A2.1 starts turning individual rules on, one at a time,
+// each ratcheted via ESLint's own built-in suppressions mechanism (see
+// `RATCHETED_RULES` below and `eslint-suppressions.json` /
+// `eslint-suppressions.expiry.json` at the repo root) so the build goes red
+// on *new* violations of a newly-enabled rule while pre-existing debt is
+// baselined with an expiry date, not silently grandfathered forever.
 import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 
@@ -157,6 +162,61 @@ const featureBoundaryConfigs = FEATURE_NAMES.map((featureName) => {
   };
 });
 
+// ---------------------------------------------------------------------------
+// A2.1 — frontend lint rule activation with ratchets (issue #91).
+//
+// Mechanism: ESLint 10's native "Suppressions" feature (`eslint --help` →
+// "Suppressing Violations"), NOT a bespoke parallel baseline system. A
+// suppressions file records a per-file, per-rule VIOLATION COUNT captured at
+// baseline time; on every later run, a file/rule pair is allowed up to its
+// recorded count, and only the delta above that count is reported as a real
+// error. Fixing a baselined violation does not fail the build (the repo's
+// `lint` script passes `--pass-on-unpruned-suppressions` for exactly this
+// reason — see root package.json); adding a NEW one for an already-baselined
+// file/rule pair does. A brand-new file/rule pair with zero baseline entries
+// has zero tolerance from the moment the rule is enabled.
+//
+// A suppressions file has no expiry of its own, so `eslint-suppression-expiry`
+// (tools/verify/registry.go, scripts/check-eslint-suppression-expiry.sh) is a
+// second, repo-authored gate: every rule that appears anywhere in
+// eslint-suppressions.json must have a live (non-expired) entry in
+// eslint-suppressions.expiry.json, or the build goes red. That is the "not
+// silently" half of the acceptance criterion — a baseline can persist past
+// its date only via a reviewed edit that renews it.
+//
+// Rules enabled this slice (measured baseline at 32f88247, see the A2.1 PR
+// description for the full per-rule count table):
+//   - react-hooks/rules-of-hooks       0 findings — enabled clean, no baseline
+//   - @typescript-eslint/no-unused-vars   38 findings — baselined, expiry recorded
+//   - @typescript-eslint/no-explicit-any  13 findings — baselined, expiry recorded
+//   - react-hooks/exhaustive-deps         10 findings — baselined, expiry recorded
+// react-hooks/rules-of-hooks and react-hooks/exhaustive-deps are scoped to
+// actual React application code (frontend/apps/web/src, packages/editor-ui/src)
+// rather than every *.ts/*.tsx ESLint otherwise lints: Playwright's fixture
+// callback signature (`async ({ page }, use, testInfo) => ...`) has a
+// parameter literally named `use`, which rules-of-hooks' name heuristic
+// mistakes for the React `use()` hook outside src/ (frontend/apps/web/e2e/).
+// That is a real false positive, not debt to baseline — scoping the rule
+// away from non-React code is the correct fix, not a suppression.
+//
+// Not enabled this slice, and why: the rest of `typescript-eslint`'s and
+// `react-hooks`' recommended sets were measured (0 additional
+// @typescript-eslint findings beyond the four above; react-hooks' newer
+// React-Compiler-oriented diagnostics — set-state-in-effect 23,
+// refs 5, preserve-manual-memoization 4, purity 3 findings — are a distinct,
+// larger judgment call about React Compiler readiness this repo hasn't made
+// yet). Enabling those is deliberately deferred to a future A2.1 follow-up,
+// not silently dropped.
+const RATCHETED_TS_RULES = {
+  '@typescript-eslint/no-unused-vars': 'error',
+  '@typescript-eslint/no-explicit-any': 'error',
+};
+
+const RATCHETED_REACT_HOOKS_RULES = {
+  'react-hooks/rules-of-hooks': 'error',
+  'react-hooks/exhaustive-deps': 'error',
+};
+
 export default tseslint.config(
   {
     ignores: [
@@ -191,4 +251,23 @@ export default tseslint.config(
     rules: { 'no-restricted-imports': 'off' },
   },
   ...featureBoundaryConfigs,
+  {
+    // A2.1: general TS hygiene, repo-wide (same scope the base config already
+    // lints) — no false-positive risk from non-React code, unlike the
+    // react-hooks rules below.
+    files: ['**/*.ts', '**/*.tsx'],
+    rules: RATCHETED_TS_RULES,
+  },
+  {
+    // A2.1: react-hooks rules scoped to actual React application source —
+    // see the comment above RATCHETED_REACT_HOOKS_RULES for why this is
+    // narrower than the base config's **/*.ts,**/*.tsx.
+    files: [
+      'frontend/apps/web/src/**/*.ts',
+      'frontend/apps/web/src/**/*.tsx',
+      'packages/editor-ui/src/**/*.ts',
+      'packages/editor-ui/src/**/*.tsx',
+    ],
+    rules: RATCHETED_REACT_HOOKS_RULES,
+  },
 );
