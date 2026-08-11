@@ -488,6 +488,37 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 	},
 	{
+		ID:   "dockerfile-go-version-drift",
+		Desc: "every Dockerfile's golang builder stage is >= go.mod's go directive",
+		// Trunk-health blocker (2026-08-11): deploy/docker/*.Dockerfile hardcoded
+		// `FROM golang:1.25-alpine` while go.mod's `go` directive had moved to
+		// 1.26.5 (GO-2026-5856), and nothing forced the two to agree — no CI job
+		// builds container images, so `go mod download` was the first thing to
+		// notice, inside the image build itself. Same shape as
+		// problem-codes-drift/codegen-drift-*: a value restated instead of
+		// derived (docs/engineering/defect-class-catalog.md Class 2,
+		// Hand-Synced Enumerations). Derivation is not available here — a
+		// Dockerfile FROM line cannot read go.mod — so this check is the
+		// prevention rung instead (rung 3: regenerate-and-diff's sibling for a
+		// value that can only be compared, not generated).
+		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-dockerfile-go-version.sh"},
+		// scripts/check-dockerfile-go-version.sh is the check's own definition
+		// (whole-branch review C2 class); go.mod is its source of truth; the
+		// three Dockerfiles are its subject, discovered by `git ls-files`
+		// rather than hand-listed inside the script itself (Paths still needs
+		// them named, so a PR that edits only one Dockerfile still selects
+		// this check under `changed`).
+		Paths: []string{"go.mod", "deploy/docker/", "apps/docx-renderer/Dockerfile", "scripts/check-dockerfile-go-version.sh"},
+		CIJob: "ci.yml:verify",
+		Fixture: &Fixture{
+			Dir: "dockerfile-go-version-drift",
+			Want: []string{
+				"DOCKERFILE-GO-VERSION-DRIFT: deploy/docker/worker.Dockerfile pins golang:1.25 but go.mod requires go >= 1.26.5",
+			},
+		},
+	},
+	{
 		ID:            "openapi-lint-v1",
 		FixtureWaiver: &Waiver{Kind: WaiverThirdParty, Why: "third-party tool (@redocly/cli, pinned); a fixture here would test Redocly's rule engine, not this repo."},
 		Desc:          "redocly lint on the v1 spec",
