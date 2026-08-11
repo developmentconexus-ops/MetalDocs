@@ -36,9 +36,10 @@ var profileOrder = []string{ProfileFast, ProfileChanged, ProfilePR, ProfileFull,
 // a deliberate line in this map, which is reviewable; forgetting to opt IN is
 // silent, and silence is how coverage rots.
 var releaseExcluded = map[string]string{
-	"oasdiff-breaking":      "diffs the PR head spec against a base-branch spec materialized by a PR-only workflow step; on a tag the file does not exist",
-	"governance-diff-rules": "rules about what a PR's diff must contain (contract change ships a spec update, etc.); a tag has no diff to rule on",
-	"migration-gapless":     "\"no historical migration edited after merge\" is a property of a diff against origin/main",
+	"oasdiff-breaking":                   "diffs the PR head spec against a base-branch spec materialized by a PR-only workflow step; on a tag the file does not exist",
+	"governance-diff-rules":              "rules about what a PR's diff must contain (contract change ships a spec update, etc.); a tag has no diff to rule on",
+	"migration-gapless":                  "\"no historical migration edited after merge\" is a property of a diff against origin/main",
+	"eslint-suppression-baseline-growth": "compares eslint-suppressions.json against the merge base with origin/main; release.yml's checkout has no \"fetch base ref\" step (there is no PR base on a tag) so origin/main is not guaranteed to resolve, and even when it does, \"did this PR's diff grow the baseline\" is not a question a tag build can ask",
 }
 
 // Infra requirements. A check declaring any of these is skipped (loudly, with
@@ -909,13 +910,122 @@ var checks = []Check{
 		FixtureWaiver: &Waiver{Kind: WaiverThirdParty, Why: "eslint, a pinned third-party engine; a fixture here would assert that eslint reports a rule violation. The one repo-authored rule in that config, the eigenpal import boundary, has its own registry check (eigenpal-selector-pin) and its own fixture."},
 		Desc:          "eslint across the workspace, including the eigenpal import boundary",
 		Profiles:      []string{ProfileFast, ProfilePR, ProfileFull},
-		Argv:          []string{"pnpm", "run", "lint"},
-		// package.json (root) is where the "lint" script this check invokes
-		// is defined — without it here, a PR rewriting "lint" to a no-op
-		// while touching no frontend/, packages/, apps/, or config file
-		// disarms eslint and selects nothing that would notice (whole-branch
-		// review C2 class).
-		Paths: []string{"frontend/", "packages/", "apps/", "eslint.config.mjs", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc"},
+		// A2.1 review round 3 (Finding 1, CRITICAL): this used to be
+		// []string{"pnpm", "run", "lint"} — indirection through package.json's
+		// "lint" script. Nothing pinned or content-checked what that script
+		// actually ran, so a one-line, easily-overlooked package.json diff
+		// appending "--suppress-all" made ESLint itself silently absorb any
+		// new violation into eslint-suppressions.json on disk and exit 0 —
+		// defeating this check's entire purpose while it kept reporting PASS.
+		// Reproduced live in the cold review of this PR.
+		//
+		// The fix is to stop trusting package.json's script body at all: this
+		// Argv is the exact, reviewed invocation, run directly via `pnpm
+		// exec` (still resolving the pinned local eslint from
+		// node_modules/.bin the same way `pnpm run` would) rather than
+		// through a script name whose body lives in a file this check does
+		// not otherwise inspect. There is no longer a "lint" script value to
+		// tamper with — the flags are Go source in this registry, reviewed
+		// like any other code change. This is the "prefer unrepresentable
+		// over guarded" fix (CLAUDE.md): the attack is no longer expressible
+		// through package.json, not merely harder to land unnoticed.
+		//
+		// package.json's "lint"/"lint:prune" scripts still exist for
+		// developer convenience (documented in
+		// scripts/check-eslint-suppression-expiry.sh) and MUST stay
+		// byte-identical in substance to the flags below; they are no longer
+		// what CI runs. Residual gap: package.json's devDependencies (and
+		// pnpm-lock.yaml) still govern which eslint binary `pnpm exec`
+		// resolves, so a supply-chain swap there (e.g. a pnpm override
+		// redirecting the "eslint" package to a shim) is still a trust
+		// boundary this check does not close — but that is the same
+		// pinned-third-party-engine boundary already named in this check's
+		// FixtureWaiver above, not a gap this fix introduces.
+		Argv: []string{"pnpm", "exec", "eslint", ".", "--suppressions-location", "eslint-suppressions.json", "--pass-on-unpruned-suppressions"},
+		// package.json (root) stays in Paths: it still pins the eslint
+		// version/plugins this check runs (devDependencies) even though its
+		// "lint" script body is no longer what gets executed. Without it
+		// here, a PR bumping/swapping an eslint devDependency while touching
+		// no frontend/, packages/, apps/, or config file would still be
+		// invisible to `changed` (whole-branch review C2 class).
+		//
+		// eslint-suppressions.json is this Argv's own --suppressions-location
+		// input (round 3 finding, both reviewers): without it here, a PR that
+		// edits ONLY the suppression baseline (e.g. lowers a count by hand, or
+		// via `--prune-suppressions`) selects eslint-suppression-expiry and
+		// eslint-suppression-baseline-growth under `changed` but not this
+		// check — so ESLint itself never re-runs against the new baseline,
+		// which is exactly the scenario the baseline exists to govern.
+		// eslint-suppressions.expiry.json is NOT added here: it is read only
+		// by check-eslint-suppression-expiry.sh, not by this Argv, so it has
+		// no bearing on whether eslint itself needs to re-run.
+		Paths: []string{"frontend/", "packages/", "apps/", "eslint.config.mjs", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", "eslint-suppressions.json"},
+		CIJob: "ci.yml:verify",
+	},
+	{
+		// A2.1 (issue #91): eslint's own "lint" script now runs with
+		// --pass-on-unpruned-suppressions (see package.json), so eslint
+		// itself never fails just because a baselined finding got fixed. That
+		// means the suppressions file can otherwise sit forever with no
+		// forcing function to revisit it — this check is that forcing
+		// function, repo-authored (not third-party), hence a real Fixture
+		// below rather than a waiver.
+		ID:       "eslint-suppression-expiry",
+		Desc:     "every eslint-suppressions.json baseline has a live (non-expired) eslint-suppressions.expiry.json entry (A2.1)",
+		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-eslint-suppression-expiry.sh"},
+		Fixture: &Fixture{
+			Dir:  "eslint-suppression-expiry",
+			Want: []string{"EXPIRED"},
+		},
+		// Same Paths as "eslint" above: whenever frontend/packages/apps code
+		// or the eslint config that decides which rules are ratcheted can
+		// change, the suppression baseline and its expiry dates are back in
+		// scope too. Plus the check's own inputs (C2 class).
+		Paths: []string{"frontend/", "packages/", "apps/", "eslint.config.mjs", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", "eslint-suppressions.json", "eslint-suppressions.expiry.json", "scripts/check-eslint-suppression-expiry.sh"},
+		CIJob: "ci.yml:verify",
+	},
+	{
+		// A2.1 review round 2 (R1): eslint-suppression-expiry above closes
+		// the "does the baseline ever get revisited" half of the ratchet,
+		// but nothing stopped the baseline from GROWING in the meantime —
+		// `eslint . --suppressions-location eslint-suppressions.json
+		// --suppress-all` silently absorbs a brand-new violation into the
+		// file and exits 0, and a subsequent plain `pnpm run lint` then
+		// passes clean (proven live in the cold review of this PR, and
+		// reproduced by scripts/check-eslint-suppression-baseline-growth.sh's
+		// own guard fixture below). A baseline that can grow with no gate
+		// noticing is a baseline, not a ratchet — this check is the
+		// missing monotonicity half.
+		//
+		// Comparison point is the merge base with origin/main, computed
+		// live by `git merge-base` inside the script — never a second
+		// checked-in copy of eslint-suppressions.json. A duplicate baseline
+		// file is exactly the hand-synced-enumeration defect class this
+		// repo keeps hitting (see the dynamically-derived rule list in
+		// check-eslint-suppression-expiry.sh's own comment). Shrinking or
+		// disappearing (file, rule) entries always pass — burn-down must
+		// never be blocked, only growth is gated.
+		//
+		// needsGitDepth + --require-infra (ci.yml:verify sets it) means a
+		// shallow clone FAILS this check rather than silently skipping it;
+		// the script itself also fails closed if origin/main cannot be
+		// resolved or `git merge-base` errors, for the same reason. See
+		// the script's own header for the full edge-case inventory
+		// (first-file-introduction, renames, waiver escape).
+		ID:       "eslint-suppression-baseline-growth",
+		Desc:     "eslint-suppressions.json never grows a (file, rule) count relative to the merge base with origin/main (A2.1 review round 2, R1)",
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv:     []string{"bash", "scripts/check-eslint-suppression-baseline-growth.sh"},
+		Needs:    []string{needsGitDepth},
+		Fixture: &Fixture{
+			Dir:  "eslint-suppression-baseline-growth",
+			Want: []string{"GREW"},
+		},
+		// eslint-suppressions.json is the check's actual subject; the
+		// script and the waiver file are its own inputs (C2 class, same
+		// reasoning as every other script-named-in-Paths entry above).
+		Paths: []string{"eslint-suppressions.json", "scripts/check-eslint-suppression-baseline-growth.sh", "scripts/check-governance-waivers.txt"},
 		CIJob: "ci.yml:verify",
 	},
 	{

@@ -1,22 +1,39 @@
-# Governance rule waivers — the auditable human-adjudication channel for the
-# heuristic rules in scripts/check-governance.ps1 (input data for that check,
-# same category as the api-lint allowlists).
+# Governance rule waivers — the auditable human-adjudication channel, shared
+# by every registry check whose rule asks a human-judgment question rather
+# than a mechanical one (input data for those checks, same category as the
+# api-lint allowlists). Originally scoped to scripts/check-governance.ps1's
+# heuristics; A2.1 review round 2 (R1) reused the same file and the same
+# diff-based mechanism for tools/verify's "eslint-suppression-baseline-growth"
+# check rather than inventing a second waiver channel or a bypass flag.
 #
 # VALIDITY IS DIFF-BASED: a waiver applies ONLY to the PR whose diff ADDS its
-# line. The gate inspects `git diff base...HEAD` of this file, never its merged
-# contents. Merged entries below are permanent audit records — they waive
-# nothing for later PRs. Every PR that needs a waiver adds its own line, which
-# the PR reviewer sees in the diff and can contest.
+# line. Each check inspects `git diff base...HEAD` (or the equivalent
+# merge-base diff) of this file, never its merged contents. Merged entries
+# below are permanent audit records — they waive nothing for later PRs. Every
+# PR that needs a waiver adds its own line, which the PR reviewer sees in the
+# diff and can contest.
 #
 # Format (one entry per line):
 #   <rule-id> | <date> | <branch / PR> | <justification>
 #
 # Rule ids:
 #   api-contract-openapi — the "delivery/http change requires openapi.yaml
-#   edit" rule. TRANSITIONAL: rule and this file are deleted when the
-#   generated boundary covers all 15 modules (see the rule's comment).
+#   edit" rule (check-governance.ps1). TRANSITIONAL: rule and this file are
+#   deleted when the generated boundary covers all 15 modules (see the rule's
+#   comment).
 #   domain-tests — the "internal/modules change requires tests/ edit" rule
-#   (same judgment-question class, same channel).
+#   (check-governance.ps1, same judgment-question class, same channel).
+#   eslint-suppression-baseline-growth — the "eslint-suppressions.json must
+#   not grow relative to the merge base with origin/main" rule
+#   (scripts/check-eslint-suppression-baseline-growth.sh /
+#   tools/verify check "eslint-suppression-baseline-growth", A2.1 review
+#   round 2). Waive only for a genuinely reviewed, deliberate debt increase.
+#   Burn-down never needs one: shrinking/disappearing pairs always pass. A
+#   file rename CAN need one: the script has no move detection, so a rename
+#   looks like "old pair disappeared (passes) + new pair appeared (fails)"
+#   and trips the check exactly like real new debt would
+#   (scripts/check-eslint-suppression-baseline-growth.sh, "Two known,
+#   accepted gaps" comment).
 #
 api-contract-openapi | 2026-08-09 | ci/golangci-burndown PR #99 | golangci-lint whole-tree burn-down touched 22 delivery/http files (ST1005 error-string lowercasing, identifier renames, function decomposition). No route/status/shape change; contract verified green by codegen-drift-backend, codegen-drift-frontend, contract-sync, oasdiff breaking and openapi-lint. Only wire-visible change is problem+json detail text, whose truth artifact wiki/references/problem-codes.md was regenerated and is gated by problem-codes-drift.
 domain-tests | 2026-08-09 | ci/golangci-burndown PR #99 | Mechanical lint burn-down across internal/modules (error-string case, renames, decomposition, errcheck wraps) — no behaviour change to test. Existing behaviour stays pinned by the unchanged unit + integration suites, which ran green (test-integration job + touched-package ladder); adding a tests/ edit here would be artificial.

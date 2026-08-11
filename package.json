@@ -7,7 +7,8 @@
     "build:docx-v2": "pnpm --filter \"./packages/**\" --filter \"./apps/**\" run build",
     "test:docx-v2": "pnpm --filter \"./packages/**\" --filter \"./apps/**\" run test",
     "typecheck:docx-v2": "pnpm --filter \"./packages/**\" --filter \"./apps/**\" run typecheck",
-    "lint": "eslint ."
+    "lint": "eslint . --suppressions-location eslint-suppressions.json --pass-on-unpruned-suppressions",
+    "lint:prune": "eslint . --suppressions-location eslint-suppressions.json --prune-suppressions"
   },
   "engines": {
     "node": ">=22.13.0"
