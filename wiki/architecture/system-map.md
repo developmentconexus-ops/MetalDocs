@@ -5,7 +5,7 @@
 
 ## When in doubt, read these four
 
-1. [`docs/engineering/root-cause-global-maximum-method.md`](../../docs/engineering/root-cause-global-maximum-method.md) — required method for non-trivial engineering decisions.
+1. [`wiki/standards/root-cause-global-maximum-method.md`](../standards/root-cause-global-maximum-method.md) — required method for non-trivial engineering decisions.
 2. [`wiki/diagrams/c4-container-backend.md`](../diagrams/c4-container-backend.md) — the moving parts.
 3. [`wiki/architecture/system-overview.md`](system-overview.md) — ports, services, topology.
 4. The relevant `wiki/modules/<name>.md` for the boundary you're touching.
