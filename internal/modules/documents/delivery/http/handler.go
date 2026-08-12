@@ -1178,6 +1178,21 @@ func (h *Handler) createComment(w http.ResponseWriter, r *http.Request) {
 	// was present with a real (non-null) array: an absent/null content key
 	// decodes to a nil slice on both paths, so forward nil (matching the
 	// prior raw-decode behavior of an absent body field) rather than bytes.
+	//
+	// Disclosed Go-level behavior change (cold review, PR #112): pre-A3.4 this
+	// field bound directly to a json.RawMessage, so a literal `"content":
+	// null` survived decode as the 4 bytes `null` (len 4, non-empty) and
+	// reached the service's len(ContentJSON)==0 check as "present". Post-A3.4
+	// it unmarshals through the typed []DocumentCommentContentNode above,
+	// where JSON null and an absent key are indistinguishable on a slice
+	// field — both leave req.Content nil, so contentJSON stays nil (len 0,
+	// "absent") here too. This is unreachable today: api/openapi/v1/
+	// openapi.yaml:5875-5889 declares content required/array/non-nullable,
+	// and openapivalidate sits ahead of this handler in the chain, so a
+	// literal null 400s at the contract-validation layer before either
+	// version of this code ever runs. If content is ever relaxed to
+	// nullable, this collapse becomes live — re-derive presence from the
+	// raw body probe below, not from req.Content itself.
 	var contentJSON json.RawMessage
 	if req.Content != nil {
 		var probe struct {
@@ -1231,6 +1246,15 @@ func (h *Handler) updateComment(w http.ResponseWriter, r *http.Request) {
 	// (key absent or explicit null — encoding/json cannot tell those apart on
 	// a pointer-to-slice field) stays nil, preserving "leave content
 	// unchanged" semantics.
+	//
+	// Disclosed Go-level behavior change (cold review, PR #112, see
+	// createComment's identical note above): pre-A3.4 a literal `"content":
+	// null` bound to json.RawMessage as the 4 bytes `null`, distinguishable
+	// from an absent key at the len(ContentJSON)==0 check. Post-A3.4 both
+	// collapse to nil here. Unreachable today — content is required/array/
+	// non-nullable in openapi.yaml:5875-5889 and openapivalidate runs ahead
+	// of this handler — but re-derive presence from the raw body probe, not
+	// req.Content, if that contract constraint is ever relaxed.
 	var contentJSON *json.RawMessage
 	if req.Content != nil {
 		var probe struct {

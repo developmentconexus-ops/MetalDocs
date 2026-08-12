@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // ErrConflict is returned when the same idempotency key is reused with a
@@ -56,8 +57,6 @@ type Store struct {
 	routeTemplate string
 }
 
-// TODO(phase11): add a tenant_id FK in the idempotency_keys schema once the DB migration is scheduled; current tenant isolation is enforced by application scoping and the composite PK.
-
 // New returns a Store for the given route template.
 func New(db *sql.DB, routeTemplate string) *Store {
 	return &Store{db: db, routeTemplate: routeTemplate}
@@ -79,6 +78,17 @@ func New(db *sql.DB, routeTemplate string) *Store {
 func (s *Store) BeginReplay(ctx context.Context, tenantID, actorID, key, payloadHash string) (*ReplayHandle, *Replay, error) {
 	if actorID == "" {
 		return nil, nil, errors.New("idempotency: actorID must not be empty")
+	}
+	// Symmetric with the actorID guard above (#90/A3.5): a blank tenantID is
+	// not a narrower key, it is a SHARED one every tenant-less caller would
+	// collide into (same reasoning idempotency.Require's own docstring
+	// already applies to actor absence). This is the persistence-boundary
+	// half of the fix — the middleware's package-owned identity boundary is
+	// the application-boundary half. Both must hold: this guard exists so a
+	// future caller that bypasses the shared resolver still fails closed
+	// here, not because the resolver is expected to be bypassed.
+	if strings.TrimSpace(tenantID) == "" {
+		return nil, nil, errors.New("idempotency: tenantID must not be empty")
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

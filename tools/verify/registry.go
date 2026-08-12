@@ -777,7 +777,8 @@ var checks = []Check{
 			Want: []string{"internal/fixture/bypass_test.go"},
 		},
 	},
-
+	// idempotency identity resolution is structurally owned by Require; there
+	// is no caller-supplied resolver to adopt or drift.
 	// ---- Governance -------------------------------------------------------
 	{
 		ID:       "adr-status",
