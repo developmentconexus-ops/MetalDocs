@@ -185,11 +185,13 @@ jobs:
 	if !got["go-vet"] {
 		t.Errorf("expected --profile=changed to resolve to the pr set including go-vet; got %v", jobs[0].OnlyIDs)
 	}
-	// go-test-integration is `full`-only, never `pr`, so `changed` must not
-	// claim it — that would let a check with no PR-time coverage read as
-	// audited when it is not.
-	if got["go-test-integration"] {
-		t.Errorf("--profile=changed must not resolve to full-only checks; got %v", jobs[0].OnlyIDs)
+	// The PR integration variant is in `pr`; its race variant is full-only and
+	// belongs to nightly/release. The two IDs must not collapse into one mode.
+	if !got["go-test-integration"] {
+		t.Errorf("--profile=changed must resolve the non-race integration check; got %v", jobs[0].OnlyIDs)
+	}
+	if got["go-test-integration-race"] {
+		t.Errorf("--profile=changed must not resolve the full-only race check; got %v", jobs[0].OnlyIDs)
 	}
 }
 
@@ -480,9 +482,9 @@ func TestDockerRunImageOfSkipsFlagValues(t *testing.T) {
 	}
 }
 
-// A7's scope is "blocks a merge", not "is in the pr profile". go-test-integration
-// is the live instance: full-only, but run by ci.yml:test-integration, which is
-// inside ci.yml:required's closure.
+// A7's scope is "blocks a merge", not "is in the pr profile". The live shape
+// this protects is a check explicitly run by a job inside ci.yml:required's
+// closure, even if that check is not in the profile selected elsewhere.
 func TestAuditA7CoversRequiredClosureChecksOutsideThePRProfile(t *testing.T) {
 	jobs := closureJobs(workflowJob{})
 	regs := []Check{{

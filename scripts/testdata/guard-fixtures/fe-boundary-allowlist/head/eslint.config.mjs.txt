@@ -1,0 +1,4 @@
+const ALLOWLIST = [
+  { from: 'approval', to: 'auth' },
+  { from: 'approval', to: 'documents' },
+];

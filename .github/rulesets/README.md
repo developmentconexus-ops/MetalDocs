@@ -43,17 +43,26 @@ required:
 ```
 
 `verify` is itself an aggregate: `go run ./tools/verify --profile=changed`
-(and `--profile=full` for `test-integration`, `security`) runs every check
-registered in `tools/verify/registry.go` whose declared `Paths` the diff
-touches — gofmt, go vet, arch-lint, module-imports, test-conventions, the
-contract/codegen/openapi lints, eslint, css-tokens, fe-typecheck, fe-test,
-docx-typecheck/build/test, adr-status, wiki-debt-tally, db-docs-coverage,
-migration-gapless, governance-diff-rules, invariant-coverage-map, and the
-registry's own self-tests, among others. A check with no declared `Paths`
+runs every owned check registered in `tools/verify/registry.go` whose declared
+`Paths` the diff touches; the four PR integration shards invoke the explicit
+non-race check, and `security` invokes the complete PR security selection.
+Together they cover — gofmt, go vet, arch-lint, module-imports, test-conventions, the
+contract/codegen/openapi lints, eslint, the frontend boundary ratchet,
+frontend production build, css-tokens, fe-typecheck, fe-test,
+affected production Docker builds, docx-typecheck/build/test, migration-gapless,
+governance-diff-rules,
+invariant-coverage-map, and the registry's own self-tests, among others. A
+check with no declared `Paths`
 always runs (`matchesPaths`' fail-closed default). Renaming, adding, or
 removing one of those checks is a `tools/verify/registry.go` + `ci.yml`
 `--only=`/`Paths` change; the ruleset itself never needs to know a check's
 name and cannot deadlock on one changing.
+
+`adr-status`, `wiki-debt-tally`, and `db-docs-coverage` are documentation
+hygiene rather than merge correctness. They remain in the local fast profile,
+the full/release profile, and the explicit `nightly.yml:governance-hygiene`
+job; they are intentionally outside `ci.yml:required` so documentation debt
+cannot be confused with a broken contract, test, security control, or build.
 
 The membership set is not just eyeballed against `ci.yml`: `required`'s own
 step evaluates `scripts/required-gate.jq` against `toJSON(needs)`, which
@@ -65,14 +74,16 @@ pins that predicate itself down with fixtures for the accept/reject cases, so
 a PR that quietly loosens the jq expression is caught the same way a PR that
 quietly narrows the `needs:` list is.
 
-## Why some checks stay outside `required`'s membership
+## Security checks inside the required closure
 
-`gosec` and `govulncheck` (`nightly.yml:security-scan`) are `full`-only,
-advisory, and gated behind `needsNetwork` — they are real, they pass clean
-today, but promoting them into the `required` job's `needs:` closure is a
-closure-safety decision (does the network dependency make `required` flaky on
-a bad day), not a re-triage decision. See their entries in
-`tools/verify/registry.go` for the promoting milestone.
+`gosec` and `govulncheck` are PR-blocking registry checks owned by
+`ci.yml:security`, and that job is itself a dependency of `ci.yml:required`.
+Therefore both checks are inside the required closure and can block a merge.
+They are not direct GitHub ruleset contexts: the live ruleset still requires
+only the single `required` context. The same scanners are repeated by
+`nightly.yml:security-scan` against the live vulnerability database so new
+disclosures after merge are caught without changing the merge-gate topology.
+See their entries in `tools/verify/registry.go` for pins and scope.
 
 ## If a job inside `required`'s `needs:` closure is renamed
 

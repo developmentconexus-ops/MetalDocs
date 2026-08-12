@@ -3,6 +3,12 @@ on:
   schedule:
     - cron: '0 5 * * *'
   workflow_dispatch:
+    inputs:
+      run_deferred:
+        description: 'Run deferred perf/e2e repro jobs (known-red until prerequisites land)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -10,8 +16,13 @@ permissions:
 # Nothing here blocks a PR. These jobs are advisory today; pretending
 # otherwise is the lie this restructure was chartered to remove.
 jobs:
+  # These two jobs remain available for an intentional manual repro only when
+  # run_deferred=true, but are not part of the automatic nightly signal until
+  # their prerequisites are real. A skipped deferred job cannot make the
+  # scheduled or default manual run red.
   perf:
     name: perf
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_deferred == true }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -21,12 +32,11 @@ jobs:
     steps:
       # perf.yml's perf-full job, moved verbatim (its pull_request-gated
       # perf-reduced sibling has no successor here: nightly has no
-      # pull_request trigger to reduce for). KNOWN RED still applies —
-      # moving off `pull_request` removes the corrosive "red on every PR"
-      # signal, but does not fix the underlying gap: no `services: postgres`,
-      # no migrations, and secrets.PERF_DATABASE_URL is still undefined in
-      # this repository. This job will keep failing nightly until that
-      # infra lands; see the named risk in the Task 9 report.
+      # pull_request trigger to reduce for). MANUAL-ONLY defer: no
+      # `services: postgres`, no migrations, and secrets.PERF_DATABASE_URL is
+      # still undefined in this repository. The automatic schedule must not
+      # report this known-red experiment as the nightly CI signal; reactivation
+      # requirements are recorded in the Solo-Strong CI report.
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
         with:
@@ -41,11 +51,7 @@ jobs:
           # and are not one. A benchmark that cannot detect an absent target is
           # not a benchmark. Fail at the cause instead.
           #
-          # KNOWN RED: this job cannot pass today. It has no `services: postgres`,
-          # runs no migrations, and reads DATABASE_URL from secrets.PERF_DATABASE_URL,
-          # which this repository does not define. Standing up that stack is the
-          # perf axis's work; A1's job is to stop the failure from masquerading as
-          # a passing measurement. Tracked in the A1 ledger as a recorded defer.
+          # This job is intentionally manual-only until the stack above is real.
           set -euo pipefail
           go run ./apps/api/cmd/metaldocs-api &
           for i in $(seq 1 30); do
@@ -125,6 +131,7 @@ jobs:
 
   e2e:
     name: e2e
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_deferred == true }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -133,6 +140,11 @@ jobs:
       METALDOCS_E2E: '1'
       DATABASE_URL: ${{ secrets.E2E_DATABASE_URL }}
     steps:
+      # MANUAL-ONLY defer: the current job has no provisioned E2E database or
+      # attachment-signing secret, so it is not an honest scheduled signal.
+      # Re-enable the automatic path only after the report's prerequisites are
+      # demonstrated by a green manual run.
+      #
       # e2e-coverage-gate.yml's e2e-smoke job, moved here with the coverage-map-check
       # dependency dropped (that job's real half — the invariant→spec-ID grep — already
       # moved to ci.yml:governance; its checkbox half was deleted per spec §4.5). The
@@ -342,6 +354,55 @@ jobs:
               labels: ['nightly-failure', 'axe'],
               body: `The \`axe\` job in \`nightly.yml\` failed. See run: ${runUrl}`
             });
+
+  governance-hygiene:
+    name: governance-hygiene
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version-file: go.mod
+          cache: true
+      # Documentation hygiene is useful on a schedule and at release, but it
+      # must not masquerade as merge correctness. The registry keeps this
+      # selection explicit and outside ci.yml:required.
+      - name: Run governance hygiene checks
+        run: go run ./tools/verify --require-infra --only=adr-status,wiki-debt-tally,db-docs-coverage
+
+  integration-race:
+    name: integration-race
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        # Digest-pinned, not `postgres:16` (#87/A1 review B2). Keep this
+        # identical to the PR integration service and release profile.
+        image: postgres@sha256:95206741a5b214807675e14165369d05b93a9cf692223b616d07cca227e74b0b
+        env:
+          POSTGRES_USER: metaldocs
+          POSTGRES_PASSWORD: metaldocs
+          POSTGRES_DB: metaldocs
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Run full integration suite with race detector
+        env:
+          METALDOCS_DATABASE_URL: postgres://metaldocs:metaldocs@localhost:5432/metaldocs?sslmode=disable
+        run: go run ./tools/verify -v --require-infra --only=go-test-integration-race
+        timeout-minutes: 30
 
   stress:
     name: stress

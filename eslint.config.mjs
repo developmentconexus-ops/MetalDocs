@@ -14,6 +14,9 @@
 // `eslint-suppressions.expiry.json` at the repo root) so the build goes red
 // on *new* violations of a newly-enabled rule while pre-existing debt is
 // baselined with an expiry date, not silently grandfathered forever.
+import { readdirSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 
@@ -61,24 +64,14 @@ const restrictEigenpal = {
 // get refactored to shared modules), never added.
 const FEATURES_DIR = 'frontend/apps/web/src/features';
 
-// Every feature directory under frontend/apps/web/src/features today.
-// (Loose files directly in features/, e.g. featureFlags.ts, are not a
-// feature dir and are not scoped by these blocks.)
-const FEATURE_NAMES = [
-  'approval',
-  'auth',
-  'controlled-documents',
-  'dashboard',
-  'documents',
-  'feature-flags',
-  'iam',
-  'notifications',
-  'password-change',
-  'shell',
-  'taxonomy',
-  'templates',
-  'tokens',
-];
+// The filesystem is the feature registry. Loose files directly in features/,
+// e.g. featureFlags.ts, are not feature roots and are not scoped by these
+// blocks. `shared/` is the deliberate cross-cutting root under features/.
+const repoRoot = path.dirname(fileURLToPath(import.meta.url));
+const featureNames = readdirSync(path.join(repoRoot, FEATURES_DIR), { withFileTypes: true })
+  .filter((entry) => entry.isDirectory() && entry.name !== 'shared')
+  .map((entry) => entry.name)
+  .sort();
 
 // Shrink-only allowlist of pre-existing cross-feature edges (owner: Leandro;
 // trigger: incremental de-coupling — entries are removed as edges are
@@ -108,6 +101,18 @@ const ALLOWLIST = [
   { from: 'tokens', to: 'templates' },
 ];
 
+const knownFeatureNames = new Set(featureNames);
+const unknownAllowlistTargets = ALLOWLIST.filter(
+  ({ from, to }) => !knownFeatureNames.has(from) || !knownFeatureNames.has(to),
+);
+if (unknownAllowlistTargets.length > 0) {
+  throw new Error(
+    `F1.4: ALLOWLIST references unknown feature directories: ${unknownAllowlistTargets
+      .map(({ from, to }) => `${from} -> ${to}`)
+      .join(', ')}`,
+  );
+}
+
 function allowedTargets(featureName) {
   return ALLOWLIST.filter((e) => e.from === featureName).map((e) => e.to);
 }
@@ -129,8 +134,8 @@ function otherFeatureRegex(other) {
 
 // One no-restricted-imports config block per feature, forbidding every OTHER
 // feature except the ones this feature is explicitly allowlisted to import.
-const featureBoundaryConfigs = FEATURE_NAMES.map((featureName) => {
-  const forbiddenFeatures = FEATURE_NAMES.filter(
+const featureBoundaryConfigs = featureNames.map((featureName) => {
+  const forbiddenFeatures = featureNames.filter(
     (other) => other !== featureName && !allowedTargets(featureName).includes(other),
   );
 
