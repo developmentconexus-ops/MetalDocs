@@ -3,7 +3,8 @@
 **Date:** 2026-08-12  
 **Base:** `main` at `8f4c7ac64d4a34eb5b7331cbe19ef4c0609a00a6`  
 **Approved design:** `docs/superpowers/specs/2026-08-12-root-cause-global-maximum-method-design.md`  
-**Canonical method:** `docs/engineering/root-cause-global-maximum-method.md`
+**Implementation plan:** `docs/superpowers/plans/2026-08-12-root-cause-global-maximum-method.md`  
+**Canonical method:** `wiki/standards/root-cause-global-maximum-method.md`
 
 ## Engineering Decision Record
 
@@ -21,11 +22,12 @@ One canonical engineering doctrine defines root cause, local/global maximum, YAG
 
 ### Authority and boundary
 
-- Generic engineering doctrine: `docs/engineering/root-cause-global-maximum-method.md`.
+- Durable generic engineering doctrine: `wiki/standards/root-cause-global-maximum-method.md`.
 - Model-agnostic routing: `AGENTS.md`.
 - MetalDocs invariants: `CLAUDE.md` and governed architecture/wiki.
 - New-work workflow: `.claude/skills/developing-new-work/SKILL.md`.
 - Review workflow: `.claude/skills/adversarial-review/SKILL.md`.
+- `docs/superpowers/specs/**`, plans and reports remain staging/history, not durable canonical truth.
 
 ### Local-maximum candidate
 
@@ -33,11 +35,11 @@ Copy the new rules into `AGENTS.md`, `CLAUDE.md`, and each skill independently o
 
 ### Global-maximum candidate
 
-One canonical method plus thin contextual bridges. Do not restore removed workflow trees.
+One durable canonical standard in the governed wiki plus thin contextual bridges. Do not restore removed workflow trees.
 
 ### Decision
 
-**Restructure now.** Canonicalize doctrine and correct live routing.
+**Restructure now.** Canonicalize doctrine in `wiki/standards/` and correct live routing.
 
 ### Enforcement
 
@@ -45,26 +47,41 @@ Documentation/agent-routing is the appropriate layer for an agent decision metho
 
 ### Proof
 
-- GitHub compare confirms the branch modifies only agent/docs/method surfaces.
+- `wiki/standards/documentation-governance.md` explicitly assigns durable maintained truth to `wiki/` and cross-cutting standards to `wiki/standards/`.
+- GitHub compare confirms the branch changes only agent/docs/wiki/method surfaces.
 - Every new primary skill path was checked against repository truth.
 - Pre-v1 removal history was verified: `c7f06f2e` removed `.agents/skills/`; `02ed1c24` removed retired `.claude/skills/metaldocs-*` trees.
-- GitHub PR CI is the executable repository-level acceptance authority for the final head.
+- GitHub PR CI on the final head is the executable repository-level acceptance authority.
 
 ### Transitional exit
 
 N/A. Future promotion of the project-neutral core to MNFS/harness is deliberate future work, not required for MetalDocs correctness.
 
-## Implementation notes
+## Implementation findings
 
-During execution, two planned routing assumptions were disproved by repository truth:
+### F1 — deleted skill routing
 
-1. `.claude/agents/wiki-curator.md` does not exist; documentation routing therefore points directly to `wiki/standards/documentation-governance.md`.
-2. `.claude/skills/gitnexus/SKILL.md` does not exist; the current impact-analysis skill is `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md`.
+`.agents/skills/` and the retired `metaldocs-*` skill trees were deliberately removed during the pre-v1 re-baseline. The fix is truthful routing, not restoration of dead trees.
 
-The live `frontend-screen-reviewer` agent also depended on retired screen/frontend skills and a removed template. It was simplified to depend on the canonical method, `AGENTS.md`, `CLAUDE.md`, frontend architecture, design audit, and actual preview tooling while preserving its read-only visual/numerical review role.
+### F2 — planned bridge assumptions were stale
+
+Two implementation-plan assumptions were disproved by repository truth:
+
+1. `.claude/agents/wiki-curator.md` does not exist; documentation routing points directly to `wiki/standards/documentation-governance.md`.
+2. `.claude/skills/gitnexus/SKILL.md` does not exist; impact analysis lives at `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md`.
+
+### F3 — canonical path violated documentation ownership
+
+The approved design/initial implementation target placed the method under `docs/engineering/`. PR #129 review found this conflicts with the repository's ownership rule: `wiki/` is durable truth and `docs/` is staging/draft material.
+
+The finding was verified against `wiki/standards/documentation-governance.md`. The durable method was moved to `wiki/standards/root-cause-global-maximum-method.md`; the `docs/engineering/` copy is removed. The design spec and implementation plan remain in `docs/superpowers/` as the historical staging artifacts that led to the final ownership ruling.
+
+### F4 — live screen reviewer depended on retired workflows
+
+The live `frontend-screen-reviewer` depended on retired frontend/screen skills and a removed template. It was simplified to use the canonical standard, `AGENTS.md`, `CLAUDE.md`, frontend architecture, design audit, module docs, and actual preview tooling while preserving its read-only visual/numerical review role.
 
 ## Deliberate scope boundary
 
 Historical plans, milestone evidence, and frozen sync artifacts retain old paths as historical evidence. This change does not rewrite history merely to make a repository-wide grep zero.
 
-`wiki/architecture/frontend-structure.md` still contains legacy prose referring to the retired frontend/TanStack skills. The authoritative routing now lives in `AGENTS.md`, onboarding, system map, and the live reviewer agent. Rewriting that large architecture page solely for routing text was not required to establish the single engineering-method authority and was intentionally left outside this surgical change.
+`wiki/architecture/frontend-structure.md` still contains legacy prose referring to retired frontend/TanStack skills. Authoritative routing is now `AGENTS.md`, onboarding, system map, and live workflow files. Rewriting that large architecture page solely for those routing mentions is intentionally outside this surgical change unless a material reviewer finding demonstrates that those references remain an active correctness hazard.
