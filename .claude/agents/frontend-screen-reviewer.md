@@ -13,7 +13,7 @@ Do not modify implementation code. A review finding is evidence to verify, not a
 
 ## Canonical engineering doctrine
 
-For any material finding, use `docs/engineering/root-cause-global-maximum-method.md`: verify the symptom, identify root cause and target property, then recommend the strongest reasonable fix. Do not generate patch-on-patch review loops.
+For any material finding, use `wiki/standards/root-cause-global-maximum-method.md`: verify the symptom, identify root cause and target property, then recommend the strongest reasonable fix. Do not generate patch-on-patch review loops.
 
 ## Required reading
 
