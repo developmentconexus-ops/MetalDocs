@@ -22,7 +22,24 @@ type Request struct {
 	BodyDocxS3Key     string            `json:"body_docx_s3_key"`
 	PlaceholderValues map[string]string `json:"placeholder_values"`
 	Composition       json.RawMessage   `json:"composition_config"`
-	ResolvedValues    map[string]any    `json:"resolved_values"`
+
+	// DANGER — do not "fix" this field in isolation. See ROADMAP unit 4.11.
+	//
+	// ReadForReconstruction never populates ResolvedValues, so the reconstruct
+	// path marshals `resolved_values: null` into the renderer's non-optional
+	// `z.record(z.unknown())` and gets a 400. That looks like a one-line bug.
+	// It is currently the only reason reconstruction is SAFE.
+	//
+	// docx-renderer derives its output key as
+	// `tenants/{tenant}/revisions/{revision}/frozen.docx` unconditionally
+	// (apps/docx-renderer/src/routes/fanout.ts:73) and PUTs to it. Reconstruction
+	// sends the same ids, so the moment this request starts succeeding, a
+	// reconstruction OVERWRITES the frozen original it exists to verify — the
+	// forensic endpoint destroys its own evidence.
+	//
+	// Populating this field is therefore only correct together with (or after)
+	// separating rendering from authoritative persistence. Unit 4.11 owns both.
+	ResolvedValues map[string]any `json:"resolved_values"`
 }
 
 // Response is docx-renderer's successful /render/fanout result: the
