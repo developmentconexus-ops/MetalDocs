@@ -1,0 +1,4 @@
+const FEATURE_NAMES = ['approval', 'auth'];
+const ALLOWLIST = [
+  { from: 'approval', to: 'auth' },
+];

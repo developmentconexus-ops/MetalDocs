@@ -18,8 +18,8 @@ jobs:
     name: verify (release profile)
     runs-on: ubuntu-latest
     # Same service definition as ci.yml:test-integration — the release profile
-    # includes go-test-integration, and --require-infra below turns a missing
-    # database into a failure rather than a silent SKIP.
+    # includes go-test-integration-race, and --require-infra below turns a
+    # missing database into a failure rather than a silent SKIP.
     services:
       postgres:
         # Digest-pinned, not `postgres:16` (#87/A1 review B2) — a service

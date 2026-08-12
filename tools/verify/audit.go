@@ -624,13 +624,11 @@ func auditFixtureCoverage(regs []Check, jobs []workflowJob) []string {
 	closure := requiredClosure(jobs)
 	var out []string
 	for _, c := range regs {
-		// "Blocking" is not the same as "in the pr profile". go-test-integration
-		// is full-only, yet ci.yml:test-integration runs it with
-		// --only=go-test-integration and that job is inside ci.yml:required's
-		// closure — so it blocks a merge while sitting outside the rule's
-		// original scope, and it did: it was the one check in the registry with
-		// neither a fixture nor a waiver. Membership in the required closure is
-		// the honest definition of blocking, and it is the same closure A10 uses.
+		// "Blocking" is not the same as "in the pr profile". A check selected
+		// explicitly by a job inside ci.yml:required's closure also blocks a
+		// merge, even if it is a full/nightly variant. Membership in the required
+		// closure is the honest definition of blocking, and it is the same
+		// closure A10 uses.
 		blocksMerge := hasProfile(c, ProfilePR) || (c.CIJob != "" && closure[c.CIJob])
 		if !blocksMerge {
 			continue

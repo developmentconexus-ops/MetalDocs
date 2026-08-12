@@ -43,6 +43,14 @@ var releaseExcluded = map[string]string{
 	"dead-code-baseline-growth":          "compares dead-code-baseline.json against the merge base with origin/main; same tag-has-no-PR-base reasoning as eslint-suppression-baseline-growth immediately above",
 }
 
+// The PR and full integration checks intentionally share one computed package
+// universe. Only the race flag and the profile/CI owner differ; roots and tags
+// must not drift into two silently different suites.
+var integrationPartition = &Partition{
+	Roots: []string{"./tests/...", "./internal/...", "./apps/..."},
+	Tags:  "integration",
+}
+
 // Infra requirements. A check declaring any of these is skipped (loudly, with
 // its reason) when the requirement is absent, and is never silently dropped.
 const (
@@ -489,6 +497,25 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 	},
 	{
+		ID:            "docker-build",
+		FixtureWaiver: &Waiver{Kind: WaiverBuildStep, Why: "a production image build; it fails when the affected Dockerfile cannot build, and there is no rule to feed bad input to."},
+		Desc:          "affected production Dockerfiles build without pushing images",
+		Profiles:      []string{ProfilePR, ProfileFull},
+		Argv:          []string{"bash", "scripts/check-docker-build.sh"},
+		Needs:         []string{needsDocker, needsNetwork},
+		// The script owns artifact selection from the diff; this broad subject
+		// list makes changes to the selector, Docker inputs, or the verifier
+		// itself select the check rather than allowing its own definition to
+		// change without exercising it.
+		Paths: []string{
+			"deploy/docker/", "frontend/apps/web/", "apps/docx-renderer/", "packages/",
+			"apps/api/", "apps/worker/", "apps/jobs/", "internal/", "db/",
+			"go.mod", "go.sum", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc",
+			".dockerignore", "scripts/check-docker-build.sh", "tools/verify/",
+		},
+		CIJob: "ci.yml:verify",
+	},
+	{
 		ID:   "dockerfile-go-version-drift",
 		Desc: "every Dockerfile's golang builder stage is >= go.mod's go directive",
 		// Trunk-health blocker (2026-08-11): deploy/docker/*.Dockerfile hardcoded
@@ -755,12 +782,12 @@ var checks = []Check{
 	{
 		ID:       "adr-status",
 		Desc:     "no ADR status block exceeds its line/char budget",
-		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
+		Profiles: []string{ProfileFast, ProfileFull},
 		Argv:     []string{"bash", "scripts/check-adr-status.sh"},
 		// scripts/check-adr-status.sh is the check's own definition
 		// (whole-branch review C2 class).
 		Paths: []string{"wiki/decisions/", "scripts/check-adr-status.sh"},
-		CIJob: "ci.yml:verify",
+		CIJob: "nightly.yml:governance-hygiene",
 		Fixture: &Fixture{
 			Dir:  "adr-status",
 			Want: []string{"ADR status-field budget exceeded"},
@@ -769,23 +796,23 @@ var checks = []Check{
 	{
 		ID:       "wiki-debt-tally",
 		Desc:     "every module doc's severity tally matches its tech-debt register",
-		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
+		Profiles: []string{ProfileFast, ProfileFull},
 		Argv:     []string{"pwsh", "-NoProfile", "-File", "./scripts/wiki-tally-check.ps1", "-All"},
 		// scripts/wiki-tally-check.ps1 is the check's own definition
 		// (whole-branch review C2 class).
 		Paths:   []string{"wiki/modules/", "scripts/wiki-tally-check.ps1"},
-		CIJob:   "ci.yml:verify",
+		CIJob:   "nightly.yml:governance-hygiene",
 		Fixture: &Fixture{Dir: "wiki-debt-tally", Want: []string{"SWEEP FAIL (1/1): fixture"}},
 	},
 	{
 		ID:       "db-docs-coverage",
 		Desc:     "every baseline table has a wiki dictionary page",
-		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
+		Profiles: []string{ProfileFast, ProfileFull},
 		Argv:     []string{"pwsh", "-NoProfile", "-File", "./scripts/check-db-dictionary-coverage.ps1"},
 		// scripts/check-db-dictionary-coverage.ps1 is the check's own
 		// definition (whole-branch review C2 class).
 		Paths:   []string{"db/baseline/", "wiki/database/tables/", "scripts/check-db-dictionary-coverage.ps1"},
-		CIJob:   "ci.yml:verify",
+		CIJob:   "nightly.yml:governance-hygiene",
 		Fixture: &Fixture{Dir: "db-docs-coverage", Want: []string{"Missing dictionary pages"}},
 	},
 	{
@@ -1364,6 +1391,29 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 	},
 	{
+		ID:       "fe-boundary-integrity",
+		Desc:     "frontend feature directories are enumerated and the cross-feature ALLOWLIST is shrink-only",
+		Profiles: []string{ProfilePR, ProfileFull},
+		Argv:     []string{"node", "scripts/check-fe-boundary-integrity.mjs"},
+		Needs:    []string{needsGitDepth},
+		Fixture: &Fixture{
+			Dir:          "fe-boundary-integrity",
+			CopyFromRepo: []string{"scripts/check-fe-boundary-integrity.mjs"},
+			Want:         []string{"frontend boundary ALLOWLIST grew"},
+		},
+		Paths: []string{"frontend/apps/web/src/features/", "eslint.config.mjs", "scripts/check-fe-boundary-integrity.mjs"},
+		CIJob: "ci.yml:verify",
+	},
+	{
+		ID:            "fe-build",
+		FixtureWaiver: &Waiver{Kind: WaiverBuildStep, Why: "a production frontend build; it fails when TypeScript or Vite cannot produce the deployable bundle, and there is no rule to feed bad input to."},
+		Desc:          "production build of @metaldocs/web",
+		Profiles:      []string{ProfilePR, ProfileFull},
+		Argv:          []string{"pnpm", "--filter", "@metaldocs/web", "run", "build"},
+		Paths:         []string{"frontend/apps/web/", "packages/", "api/openapi/", "pnpm-lock.yaml", "package.json", "pnpm-workspace.yaml", ".nvmrc"},
+		CIJob:         "ci.yml:verify",
+	},
+	{
 		ID:            "fe-typecheck",
 		FixtureWaiver: &Waiver{Kind: WaiverThirdParty, Why: "third-party tool (tsc); a fixture would prove TypeScript rejects bad types."},
 		Desc:          "tsc over @metaldocs/web",
@@ -1457,33 +1507,19 @@ var checks = []Check{
 		CIJob:         "ci.yml:verify",
 	},
 	{
-		ID: "go-test-integration",
-		// Same waiver as go-test-unit, and it should have carried one from the
-		// start. A7 originally scoped itself to the `pr` profile, and this check
-		// is `full`-only — so the one check in the registry with no fixture and
-		// no waiver was also a check that blocks a merge, via
-		// ci.yml:test-integration --only=go-test-integration. A7 now scopes on
-		// ci.yml:required's closure instead, which is why this line exists.
+		ID:            "go-test-integration",
 		FixtureWaiver: &Waiver{Kind: WaiverTestSuite, Why: "a test suite, not a guard: it fails when a test fails, which is the property, and every test in it is its own fixture."},
-		Desc:          "the full integration suite with -race",
-		// A1 item 4: this is why `full` exists. It is push-only in CI today,
-		// which makes it a post-mortem rather than a gate.
-		Profiles: []string{ProfileFull},
+		Desc:          "the integration suite without -race (PR fast path)",
+		Profiles:      []string{ProfilePR},
 		// The package list is not written here. It is `go list` over the roots
 		// the Partition below names, resolved on the commit under test, so a
 		// new test package joins this suite by existing rather than by being
 		// added to a second list. That is also what makes ci.yml's four-shard
 		// matrix safe: the shards partition a set neither this file nor that
 		// one enumerates. See partition.go.
-		Argv: []string{"go", "test", "-tags", "integration", "-count=1", "-race", "-timeout", "900s", packagesPlaceholder},
-		Partition: &Partition{
-			Roots: []string{"./tests/...", "./internal/...", "./apps/..."},
-			// Must equal the -tags above: integration tests are behind a build
-			// tag, and listing without it returns a universe that does not
-			// include a single one of them.
-			Tags: "integration",
-		},
-		Needs: []string{needsPostgres},
+		Argv:      []string{"go", "test", "-tags", "integration", "-count=1", "-timeout", "900s", packagesPlaceholder},
+		Partition: integrationPartition,
+		Needs:     []string{needsPostgres},
 		// Declared honestly wide (R3, ci.yml:test-integration --changed). The
 		// Argv above only names tests/, internal/, apps/, but anything that can
 		// change what those packages build against or run against can break
@@ -1509,6 +1545,17 @@ var checks = []Check{
 		// touched by any one past incident.
 		Paths: []string{"go.mod", "go.sum", "db/", "internal/", "apps/", "tests/", "tools/verify/"},
 		CIJob: "ci.yml:test-integration",
+	},
+	{
+		ID:            "go-test-integration-race",
+		FixtureWaiver: &Waiver{Kind: WaiverTestSuite, Why: "a test suite, not a guard: it fails when a test fails, which is the property, and every test in it is its own fixture."},
+		Desc:          "the full integration suite with -race (nightly and release)",
+		Profiles:      []string{ProfileFull},
+		Argv:          []string{"go", "test", "-tags", "integration", "-count=1", "-race", "-timeout", "900s", packagesPlaceholder},
+		Partition:     integrationPartition,
+		Needs:         []string{needsPostgres},
+		Paths:         []string{"go.mod", "go.sum", "db/", "internal/", "apps/", "tests/", "tools/verify/"},
+		CIJob:         "nightly.yml:integration-race",
 	},
 
 	// ---- Traceability -----------------------------------------------------

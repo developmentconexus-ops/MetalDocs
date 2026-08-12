@@ -81,11 +81,13 @@ jobs:
       # Every registry check whose declared Paths the diff touches — gofmt,
       # go vet, arch-lint, module-imports, test-conventions,
       # contract sync/codegen/oasdiff/openapi lint, eslint,
-      # css-tokens, eigenpal-selector-pin, fe-typecheck, fe-test,
+      # css-tokens, eigenpal-selector-pin, frontend boundary integrity,
+      # fe-build, fe-test, fe-typecheck,
+      # affected production Docker builds,
       # docx-build/test, go-test-unit, adr-status, wiki-debt-tally,
       # db-docs-coverage, migration-gapless, governance-diff-rules,
       # invariant-coverage-map, gosec, govulncheck (both promoted into this
-      # job by A1.4 — a nightly-only scanner blocks no merge),
+      # job by A1.4; nightly repeats them against the live vulnerability DB),
       # guard-fixtures (every blocking guard fed bad input, must exit
       # non-zero), req-trace(-selftest), required-gate-selftest,
       # verify-audit (registry.go's "Anti-drift" section — runs `verify
@@ -199,10 +201,15 @@ jobs:
       # --require-infra is what makes this job's green mean anything: without
       # it, an unset METALDOCS_DATABASE_URL yields SKIP and the job exits 0
       # over zero executed integration tests. --changed diff-scopes the
-      # 20-minute suite to PRs that actually touch go-test-integration's
+      # 20-minute non-race suite to PRs that actually touch go-test-integration's
       # declared Paths (go.mod, go.sum, db/, internal/, apps/, tests/) — a
       # docs-only PR still runs this job, it just selects zero checks and
       # exits 0 saying so.
+      #
+      # PR deliberately uses the registry's non-race integration variant. The
+      # same computed package universe is registered separately as
+      # go-test-integration-race for nightly/release, so `-race` is not silently
+      # coupled to this PR wall-clock path.
       #
       # -v streams the passing check's output, which for a non-verbose `go
       # test` is exactly one "ok <package> <seconds>" line per package. That
