@@ -26,6 +26,7 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 
 	"metaldocs/internal/platform/bootstrap"
+	"metaldocs/internal/platform/migrate"
 )
 
 // testNamespace is a fixed UUID v5 namespace for deterministic fixture IDs.
@@ -762,6 +763,49 @@ func quoteLiteral(v string) string {
 	return "'" + strings.ReplaceAll(v, "'", "''") + "'"
 }
 
+// rotatePasswordIfUnset sets role's login password on db (expected to be the
+// ambient superuser/admin connection ApplyCuratedBootstrap runs on) to
+// whatever fallbackEnv names in the environment, or defaultPassword if that
+// env var is unset -- the exact precedence OpenAsRuntimeRole/OpenAsCIRole use
+// when they later connect as the role, so a rotation performed here never
+// disagrees with what those helpers will authenticate with.
+//
+// Only acts when the role currently has no password (pg_authid.rolpassword
+// IS NULL): role names are cluster-global, so an unconditional rotation would
+// race any other process already depending on a previously-rotated password
+// on a cluster this bootstrap shares (see the call site comment in
+// ApplyCuratedBootstrap). Reading pg_authid.rolpassword requires the
+// querying role to be a superuser or reading its own row; the ambient
+// connection is the bootstrap superuser in every environment this runs in.
+//
+// Never logs the password value or the rendered ALTER ROLE statement.
+func rotatePasswordIfUnset(ctx context.Context, db *sql.DB, role, defaultPassword, fallbackEnv string) error {
+	var hasPassword bool
+	if err := db.QueryRowContext(ctx,
+		"SELECT rolpassword IS NOT NULL FROM pg_authid WHERE rolname = $1", role,
+	).Scan(&hasPassword); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf(
+				"role %s does not exist after the grants stage: db/grants/0000_identity_roles.sql "+
+					"skips role creation with a NOTICE when the connected identity lacks CREATEROLE", role)
+		}
+		return fmt.Errorf("check %s password state: %w", role, err)
+	}
+	if hasPassword {
+		return nil
+	}
+
+	password := os.Getenv(fallbackEnv)
+	if password == "" {
+		password = defaultPassword
+	}
+	stmt := fmt.Sprintf("ALTER ROLE %s PASSWORD %s", quoteIdent(role), quoteLiteral(password))
+	if _, err := db.ExecContext(ctx, stmt); err != nil {
+		return fmt.Errorf("rotate %s password: %w", role, err)
+	}
+	return nil
+}
+
 // repoRoot finds the repo root by walking up from this file.
 func repoRoot() string {
 	_, file, _, _ := runtime.Caller(0)
@@ -791,6 +835,12 @@ var metaldocsOwnedObjects = map[string]struct{}{
 	"role_capabilities":      {},
 }
 
+// listSQLFiles shares its filter with internal/platform/migrate's
+// ApplyGrants/Apply discovery (migrate.IsApplicableSQLFile) instead of
+// maintaining an independent copy -- the two used to disagree on *_down.sql
+// handling (PR #110 review finding), which let a hypothetical grants
+// rollback file run in production while staying invisible to this test
+// bootstrap and its schema fingerprint.
 func listSQLFiles(dir string) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -799,7 +849,7 @@ func listSQLFiles(dir string) ([]string, error) {
 
 	files := make([]string, 0, len(entries))
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") || strings.HasSuffix(e.Name(), "_down.sql") {
+		if e.IsDir() || !migrate.IsApplicableSQLFile(e.Name()) {
 			continue
 		}
 		files = append(files, filepath.Join(dir, e.Name()))
@@ -823,8 +873,26 @@ func curatedBundlePaths(root string) ([]string, error) {
 		filepath.Join(root, "db", "prerequisites", "0001_extensions.sql"),
 		filepath.Join(root, "db", "baseline", "0001_current_schema.sql"),
 		filepath.Join(root, "db", "reference-data", "0001_product_reference_data.sql"),
-		filepath.Join(root, "db", "grants", "0001_role_grants.sql"),
 	}
+
+	// The grants stage is auto-discovered, not hand-listed: it mirrors
+	// internal/platform/migrate/migrate.go's ApplyGrants, which reads every
+	// *.sql file under db/grants via os.ReadDir and applies them in lexical
+	// order on every real boot. Hand-listing filenames here would recreate
+	// the exact hand-synced-enumeration defect this bundle's own doc comment
+	// warns against (curatedBundlePaths is supposed to be *the* source of
+	// truth) -- a new db/grants/000N_*.sql file must need zero edits to this
+	// function to be picked up by both the fingerprint and the bootstrap,
+	// same as it needs zero edits to ship to production. Lexical filename
+	// order encodes the dependency (0000_identity_roles.sql creates the
+	// roles that 0001_role_grants.sql then grants to; see the matching
+	// ordering comment in deploy/compose/docker-compose.yml).
+	grantFiles, err := listSQLFiles(filepath.Join(root, "db", "grants"))
+	if err != nil {
+		return nil, fmt.Errorf("list db grants: %w", err)
+	}
+	paths = append(paths, grantFiles...)
+
 	migrationFiles, err := listSQLFiles(filepath.Join(root, "db", "migrations"))
 	if err != nil {
 		return nil, fmt.Errorf("list db migrations: %w", err)
@@ -848,6 +916,28 @@ func ApplyCuratedBootstrap(ctx context.Context, db *sql.DB) error {
 		if _, err := db.ExecContext(ctx, string(sqlBytes)); err != nil {
 			return fmt.Errorf("apply sql bundle %s: %w", filepath.Base(path), err)
 		}
+	}
+
+	// Rotate metaldocs_runtime / metaldocs_ci off the passwordless state
+	// db/grants/0000_identity_roles.sql now leaves them in (PR #110 review,
+	// thread #5 -- a hardcoded CREATE-time password was a committed
+	// credential in a public repo). Conditional on the role having no
+	// password yet, unlike scripts/dev-bootstrap-baseline.ps1's unconditional
+	// rotation: this bootstrap can run against an already-provisioned,
+	// already-serving shared Postgres. On this machine both
+	// scripts/test-integration.ps1 and the compose stack default to
+	// 127.0.0.1:5433, i.e. the SAME cluster apps/dbprovision's Stage 2.5 (or
+	// a prior curated-bootstrap run) already rotated -- an unconditional
+	// ALTER ROLE here would silently invalidate the api/worker/jobs
+	// containers' live credential the moment an integration test run shared
+	// that cluster. A role with no password set gets the fixture password; a
+	// role someone already rotated is left alone. Do not simplify this back
+	// to unconditional.
+	if err := rotatePasswordIfUnset(ctx, db, runtimeRoleName, runtimeRoleDevPassword, "METALDOCS_RUNTIME_DB_PASSWORD"); err != nil {
+		return err
+	}
+	if err := rotatePasswordIfUnset(ctx, db, ciRoleName, ciRoleDevPassword, "METALDOCS_CI_DB_PASSWORD"); err != nil {
+		return err
 	}
 
 	// F5.7 T1: production provisions River's own schema (river_job,

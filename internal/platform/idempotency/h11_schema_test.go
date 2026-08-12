@@ -29,6 +29,37 @@ func TestBeginReplay_EmptyActorReturnsError(t *testing.T) {
 	}
 }
 
+// TestBeginReplay_EmptyTenantReturnsError proves the Go-layer guard rejects
+// an empty tenantID before any DB round-trip, symmetric with
+// TestBeginReplay_EmptyActorReturnsError above (#90/A3.5). This is the
+// persistence-boundary half of the fix for the A3.3-deferred defect
+// (PR #108 review thread, commit 66cfb664): even a future caller that bypasses
+// the middleware's identity boundary cannot smuggle an empty tenant past this
+// store.
+func TestBeginReplay_EmptyTenantReturnsError(t *testing.T) {
+	s := idempotency.New(nil, "POST /h11/{id}") // nil db — guard fires before tx open
+	_, _, err := s.BeginReplay(context.Background(), "", "actor-h11", uniqueKey("empty-tenant"), "hash-a")
+	if err == nil {
+		t.Fatal("expected error for empty tenantID, got nil")
+	}
+	if !strings.Contains(err.Error(), "tenantID") {
+		t.Fatalf("error should mention tenantID, got: %v", err)
+	}
+}
+
+// TestBeginReplay_WhitespaceTenantReturnsError proves whitespace-only tenant
+// input cannot create the same shared collision slot as an empty tenant.
+func TestBeginReplay_WhitespaceTenantReturnsError(t *testing.T) {
+	s := idempotency.New(nil, "POST /h11/{id}") // nil db — guard fires before tx open
+	_, _, err := s.BeginReplay(context.Background(), strings.Repeat(" ", 3), h11Actor, uniqueKey("whitespace-tenant"), "hash-a")
+	if err == nil {
+		t.Fatal("expected error for whitespace-only tenantID, got nil")
+	}
+	if !strings.Contains(err.Error(), "tenantID") {
+		t.Fatalf("error should mention tenantID, got: %v", err)
+	}
+}
+
 // TestCompleteReplay_OversizedBodyReturnsError proves that a body larger than
 // maxBodyBytes (64 KiB) is rejected before the DB UPDATE is attempted.
 func TestCompleteReplay_OversizedBodyReturnsError(t *testing.T) {

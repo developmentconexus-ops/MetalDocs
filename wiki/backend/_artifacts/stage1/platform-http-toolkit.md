@@ -106,7 +106,7 @@ No HTTP routes are registered by any of these packages directly. All are pure li
    `middleware.go:87`
 2. Extract `Idempotency-Key` header; validate non-empty and UUID shape via `IsValidKey`.  
    `middleware.go:91–98`
-3. Extract `tenantID, actorID` from context via caller-supplied `actorFromCtx`.  
+3. Extract `tenantID, actorID` from context through the package-owned identity boundary.
    `middleware.go:101`
 4. Wrap `r.Body` in `http.MaxBytesReader(1 MiB)`; call `RequestHash` which reads body, rewinds with `NopCloser`, and returns SHA-256(`method\npath?query\nbody`).  
    `middleware.go:103–113`, `middleware.go:28–45`

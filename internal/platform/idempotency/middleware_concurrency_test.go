@@ -35,7 +35,7 @@ func TestMiddleware_ConcurrentSameKey_HandlerExecutesOnce(t *testing.T) {
 		_, _ = w.Write([]byte(`{"id":"one"}`))
 	})
 	chain := withIDs(tenant.ID, testActorMW)(
-		idempotency.Require(store, actorFromCtx)(handler),
+		idempotency.Require(store)(handler),
 	)
 
 	key := "44444444-4444-4444-8444-444444444" + uniqSuffix()
@@ -85,7 +85,7 @@ func TestMiddleware_HandlerPanic_FreesSlot(t *testing.T) {
 		panic("simulated handler crash")
 	})
 	chain := withIDs(tenant.ID, testActorMW)(
-		idempotency.Require(store, actorFromCtx)(panicHandler),
+		idempotency.Require(store)(panicHandler),
 	)
 
 	key := "55555555-5555-4555-8555-555555555" + uniqSuffix()
@@ -116,7 +116,7 @@ func TestMiddleware_HandlerPanic_FreesSlot(t *testing.T) {
 		w.WriteHeader(200)
 	})
 	retryChain := withIDs(tenant.ID, testActorMW)(
-		idempotency.Require(store, actorFromCtx)(retryHandler),
+		idempotency.Require(store)(retryHandler),
 	)
 	req2 := httptest.NewRequest("POST", "/mwp", bytes.NewReader([]byte(`{}`)))
 	req2.Header.Set("Idempotency-Key", key)
@@ -150,7 +150,7 @@ func TestMiddleware_NonSuccess_DoesNotCacheResponse(t *testing.T) {
 		_, _ = w.Write([]byte("ok"))
 	})
 	chain := withIDs(tenant.ID, testActorMW)(
-		idempotency.Require(store, actorFromCtx)(flakyHandler),
+		idempotency.Require(store)(flakyHandler),
 	)
 	key := "66666666-6666-4666-8666-666666666" + uniqSuffix()
 
