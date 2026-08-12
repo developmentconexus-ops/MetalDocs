@@ -1,5 +1,7 @@
 {
-  "files": [],
+  "files": [
+    "scripts/check-fe-boundary-allowlist.mjs"
+  ],
   "exports": [
     {
       "file": "frontend/apps/web/e2e/helpers/pixel-diff.ts",

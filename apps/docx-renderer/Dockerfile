@@ -3,7 +3,7 @@
 # apps/docx-renderer/vendor. The repo has since migrated to pnpm workspaces and
 # @eigenpal/* resolves from the registry via pnpm-lock.yaml — no vendor dir exists.
 FROM node:26.3.0-alpine AS build
-RUN corepack enable
+RUN npm install --global pnpm@11.8.0
 WORKDIR /repo
 
 # Manifests first for layer caching.
