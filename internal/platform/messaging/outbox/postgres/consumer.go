@@ -73,49 +73,9 @@ ORDER BY occurred_at ASC
 		defer func() { _ = rows.Close() }()
 
 		for rows.Next() {
-			var event messaging.Event
-			var occurredAt time.Time
-			var payloadJSON []byte
-			var eventID string
-			var eventType string
-			var aggregateType string
-			var aggregateID string
-			var idempotencyKey string
-			var traceID string
-			if err := rows.Scan(
-				&eventID,
-				&eventType,
-				&aggregateType,
-				&aggregateID,
-				&occurredAt,
-				&event.Version,
-				&event.AttemptCount,
-				&idempotencyKey,
-				&event.Producer,
-				&traceID,
-				&payloadJSON,
-			); err != nil {
-				return fmt.Errorf("scan outbox event: %w", err)
-			}
-			event.EventID = messaging.EventID(eventID)
-			event.EventType = messaging.EventType(eventType)
-			event.AggregateType = messaging.AggregateType(aggregateType)
-			event.AggregateID = messaging.AggregateID(aggregateID)
-			event.IdempotencyKey = messaging.IdempotencyKey(idempotencyKey)
-			event.TraceID = messaging.TraceID(traceID)
-			event.OccurredAtRFC3339 = occurredAt.UTC().Format(time.RFC3339)
-			if len(payloadJSON) > 0 {
-				payload, err := messaging.DecodePayload(event.EventType, payloadJSON)
-				if err != nil {
-					return fmt.Errorf("unmarshal outbox payload: %w", err)
-				}
-				event.Payload = payload
-			} else {
-				payload, err := messaging.DecodePayload(event.EventType, []byte("{}"))
-				if err != nil {
-					return fmt.Errorf("unmarshal outbox payload: %w", err)
-				}
-				event.Payload = payload
+			event, err := scanUnpublishedEvent(rows)
+			if err != nil {
+				return err
 			}
 			events = append(events, event)
 		}
@@ -128,6 +88,54 @@ ORDER BY occurred_at ASC
 		return nil, fmt.Errorf("claim unpublished outbox events: %w", err)
 	}
 	return events, nil
+}
+
+func scanUnpublishedEvent(rows *sql.Rows) (messaging.Event, error) {
+	var event messaging.Event
+	var occurredAt time.Time
+	var payloadJSON []byte
+	var eventID string
+	var eventType string
+	var aggregateType string
+	var aggregateID string
+	var idempotencyKey string
+	var traceID string
+	if err := rows.Scan(
+		&eventID,
+		&eventType,
+		&aggregateType,
+		&aggregateID,
+		&occurredAt,
+		&event.Version,
+		&event.AttemptCount,
+		&idempotencyKey,
+		&event.Producer,
+		&traceID,
+		&payloadJSON,
+	); err != nil {
+		return messaging.Event{}, fmt.Errorf("scan outbox event: %w", err)
+	}
+	event.EventID = messaging.EventID(eventID)
+	event.EventType = messaging.EventType(eventType)
+	event.AggregateType = messaging.AggregateType(aggregateType)
+	event.AggregateID = messaging.AggregateID(aggregateID)
+	event.IdempotencyKey = messaging.IdempotencyKey(idempotencyKey)
+	event.TraceID = messaging.TraceID(traceID)
+	event.OccurredAtRFC3339 = occurredAt.UTC().Format(time.RFC3339)
+
+	payload, err := decodeUnpublishedPayload(event.EventType, payloadJSON)
+	if err != nil {
+		return messaging.Event{}, fmt.Errorf("unmarshal outbox payload: %w", err)
+	}
+	event.Payload = payload
+	return event, nil
+}
+
+func decodeUnpublishedPayload(eventType messaging.EventType, payloadJSON []byte) (messaging.Payload, error) {
+	if len(payloadJSON) == 0 {
+		payloadJSON = []byte("{}")
+	}
+	return messaging.DecodePayload(eventType, payloadJSON)
 }
 
 // MarkPublished marks the given outbox events as published, clearing their
