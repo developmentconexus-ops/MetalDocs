@@ -30,7 +30,7 @@ Use the smallest current source set that matches the task. Repository truth and 
 - Module or wiki documentation -> `wiki/standards/documentation-governance.md` plus the owning module docs.
 - New feature/module pre-design -> `.claude/skills/developing-new-work/SKILL.md`.
 - Adversarial design/plan/diff review -> `.claude/skills/adversarial-review/SKILL.md`.
-- Code relationship / impact tracing when needed -> `.claude/skills/gitnexus/SKILL.md`.
+- Code relationship / impact tracing when needed -> `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md`.
 - Harness coordination when needed -> `.claude/skills/harness-hub/SKILL.md`.
 - QA / close-out -> `wiki/quality/qa-operating-system.md` and the relevant `wiki/quality/*-checklist.md`.
 
