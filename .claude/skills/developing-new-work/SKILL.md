@@ -10,7 +10,7 @@ description: >-
 
 ## Canonical engineering doctrine
 
-Before judging foundation or design direction, read `docs/engineering/root-cause-global-maximum-method.md`.
+Before judging foundation or design direction, read `wiki/standards/root-cause-global-maximum-method.md`.
 
 That document is the authority for root cause, local/global maximum, YAGNI, enforcement hierarchy, transitional design, legal outcomes, and the Engineering Decision Record. This skill only applies those definitions to MetalDocs pre-design work.
 
@@ -24,7 +24,7 @@ On **Green/Yellow**, pass the system-impact analysis into design as locked const
 
 ## Workflow
 
-1. **Canonical method.** Start the Engineering Decision Record from `docs/engineering/root-cause-global-maximum-method.md`.
+1. **Canonical method.** Start the Engineering Decision Record from `wiki/standards/root-cause-global-maximum-method.md`.
 2. **Orient.** Classify module vs feature. Name owning module(s), modules that do not own it, and cross-module edge direction. Read the owning module wiki. Ambiguous ownership -> **AS-3**.
 3. **Foundation.** Record target property, authority/boundary, local-maximum candidate, global-maximum candidate, proposed outcome, enforcement, and proof. Building inside a known patch/local maximum -> **AS-2**.
 4. **Invariants.** Walk `references/invariant-checklist.md`. For every touched invariant, state how the design preserves it and which existing primitive/boundary it reuses. Unresolved violation -> **AS-1**.
