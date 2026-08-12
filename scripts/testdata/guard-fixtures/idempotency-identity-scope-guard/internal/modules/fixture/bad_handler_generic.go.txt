@@ -1,0 +1,16 @@
+package fixture
+
+import (
+	"context"
+
+	"metaldocs/internal/platform/tenant"
+)
+
+// A generic resolver can be instantiated and passed where actorFromCtx is
+// expected; its type parameters must not make the direct extraction invisible.
+func badActorFromCtxGeneric[T any](ctx context.Context) (string, string, error) {
+	_, err := tenant.FromContext(ctx)
+	var zero T
+	_ = zero
+	return "", "", err
+}

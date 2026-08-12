@@ -1,0 +1,16 @@
+package fixture
+
+import (
+	"context"
+
+	"metaldocs/internal/platform/tenant"
+)
+
+type definedTenantID string
+
+// Defined result types are not identical to the predeclared string result
+// types expected by actorFromCtx.
+func notAnActorFromCtxDefinedResult(ctx context.Context) (definedTenantID, definedTenantID, error) {
+	id, err := tenant.FromContext(ctx)
+	return definedTenantID(id), definedTenantID(id), err
+}

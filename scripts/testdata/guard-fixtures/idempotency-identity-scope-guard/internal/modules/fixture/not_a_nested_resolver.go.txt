@@ -1,0 +1,18 @@
+package fixture
+
+import (
+	"context"
+
+	"metaldocs/internal/platform/tenant"
+)
+
+// The incompatible nested closure is not the actorFromCtx resolver and must
+// not be attributed to its compatible outer function.
+func notAnActorFromCtxWithNestedCall(ctx context.Context) (string, string, error) {
+	inner := func(context.Context) (int, int, error) {
+		_, err := tenant.FromContext(ctx)
+		return 0, 0, err
+	}
+	_ = inner
+	return "", "", nil
+}

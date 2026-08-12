@@ -752,9 +752,9 @@ var checks = []Check{
 	},
 	{
 		ID:       "idempotency-identity-scope-guard",
-		Desc:     "no actorFromCtx-shaped closure (func(context.Context)(string,string,error)) outside internal/platform/idempotency/identity.go calls tenant.FromContext directly (#90/A3.5 adoption guard)",
+		Desc:     "no actorFromCtx-shaped function outside internal/platform/idempotency/identity.go resolves tenant identity directly through tenant.FromContext (#90/A3.5 adoption guard)",
 		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
-		Argv:     []string{"bash", "scripts/check-idempotency-identity-scope.sh"},
+		Argv:     []string{"go", "run", "./scripts/check-idempotency-identity-scope.go"},
 		// Deliberately no Paths, same reasoning as testdb-bypass-guard above:
 		// the script's own scan is `git ls-files '*.go'` repo-wide, not scoped
 		// to internal/. A hand-rolled actorFromCtx-shaped resolver could be
@@ -766,12 +766,20 @@ var checks = []Check{
 			Dir: "idempotency-identity-scope-guard",
 			Want: []string{
 				"internal/modules/fixture/bad_handler.go",
-				// Locks the PR #122 review fix (chatgpt-codex-connector,
-				// script line 149): an ungrouped `import "path"` line used to
-				// resolve to alias "import" instead of "tenant", making the
-				// scanner blind to this exact shape. See the fixture file's
-				// own header for the reproduction.
+				// Locks the PR #122 review regression: an ungrouped
+				// `import "path"` form must resolve to the actual tenant package,
+				// not a source-spelling heuristic. The fixture remains even though
+				// the type-aware scanner now resolves the import object semantically.
 				"internal/modules/fixture/bad_handler_ungrouped_import.go",
+				"internal/modules/fixture/bad_handler_named_results.go",
+				"internal/modules/fixture/bad_handler_aliased_context.go",
+				"internal/modules/fixture/bad_handler_dot_import.go",
+				"internal/modules/fixture/bad_handler_method.go",
+				"internal/modules/fixture/bad_handler_type_aliases.go",
+				"internal/modules/fixture/bad_handler_func_literal.go",
+				"internal/modules/fixture/bad_handler_multiline.go",
+				"internal/modules/fixture/bad_handler_generic.go",
+				"internal/modules/fixture/bad_handler_integration_variant.go",
 			},
 			// NotWant proves the identity.go exclusion itself is guarded, not
 			// merely conventional: the fixture tree plants, at exactly
@@ -781,7 +789,12 @@ var checks = []Check{
 			// script's exclusion of that one path is ever deleted, the check's
 			// output starts naming this path — NotWant catches that the moment
 			// it happens, rather than relying on nobody removing the `grep -v`.
-			NotWant: []string{"internal/platform/idempotency/identity.go"},
+			NotWant: []string{
+				"internal/platform/idempotency/identity.go",
+				"internal/modules/fixture/not_a_tenant_package_call.go",
+				"internal/modules/fixture/not_a_defined_result.go",
+				"internal/modules/fixture/not_a_nested_resolver.go",
+			},
 		},
 	},
 

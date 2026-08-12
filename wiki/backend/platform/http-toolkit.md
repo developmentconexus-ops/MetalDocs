@@ -1,6 +1,6 @@
 # Platform — HTTP Toolkit
 
-> **Last verified:** 2026-08-04 (ADR 0089 pass: §2.1 rewritten for the closed `Code` type + registry; `codes_catalog_guard_test.go` references removed — file deleted; Flags 1 and 3 marked RESOLVED; `problem.go` panic anchor re-pinned) | **Prior:** 2026-07-06 (F9.4 doc-truth pass)
+> **Last verified:** 2026-08-12 (A3 identity-scope guard: documented `TenantActorFromContext` as the single fail-closed resolver used by `idempotency.Require`; the adoption guard is now a Go type/symbol scan via `go/packages`, with CI registry fixtures covering aliases, named results, methods, closures, multiline signatures, and shadowing) | **Prior:** 2026-08-04 (ADR 0089 pass: §2.1 rewritten for the closed `Code` type + registry; `codes_catalog_guard_test.go` references removed — file deleted; Flags 1 and 3 marked RESOLVED; `problem.go` panic anchor re-pinned) | **Prior:** 2026-07-06 (F9.4 doc-truth pass)
 > **Scope:** The eight shared packages under `internal/platform/` that constitute the API design system's runtime enforcement surface: `httpresponse`, `problem`, `pagination`, `idempotency`, `requesttrace`, `useragent`, `httpclient`, and `formval`. Covers what each package provides, its public surface, the logic flows it implements, which domain modules consume it, and all flags identified in Stage-1 audit.
 > **Out of scope:** The higher-level observability and security platform packages (`platform/observability`, `platform/ratelimit`, `platform/security`). Those are adjacent to this layer but warrant their own docs.
 > **Key files:**
@@ -10,7 +10,10 @@
 > - `internal/platform/problem/codes.go`
 > - `internal/platform/pagination/cursor.go`
 > - `internal/platform/idempotency/middleware.go`
+> - `internal/platform/idempotency/identity.go:37` — canonical fail-closed tenant/actor resolver for `Require`
 > - `internal/platform/idempotency/postgres_store.go`
+> - `scripts/check-idempotency-identity-scope.go:48` — type-aware adoption guard
+> - `tools/verify/registry.go:754` — guard registration and negative-fixture contract
 > - `internal/platform/requesttrace/context.go`
 > - `internal/platform/useragent/parse.go`
 > - `internal/platform/httpclient/internal_client.go`
@@ -112,12 +115,15 @@ Every name must be `<family>.<snake_case>` in one of the ten closed semantic fam
 **What it provides.** A complete idempotency protocol — middleware factory (`Require`) + Postgres store (`Store`/`ReplayHandle`/`Replay`) — for mutating endpoints that must survive client retries without duplicating side effects (REQ-API-5).
 
 The middleware:
+- Resolves replay-slot tenancy and actor identity through the production callback `TenantActorFromContext` (`identity.go:37–46`), which propagates both missing-tenant and missing-actor errors instead of allowing either identity to collapse into a shared empty-string slot.
 - Validates `Idempotency-Key` header (UUID format, `IsValidKey`).
 - Hashes the request body via SHA-256 to detect payload changes: `RequestHash` reads body, rewinds with `io.NopCloser`, and returns `SHA-256(method\npath?query\nbody)` (`middleware.go:28–45`).
 - Wraps the response writer in a `responseRecorder` to capture status + body.
 - Commits the captured response on 2xx; releases the slot on non-2xx or panic.
 - Replays a completed response directly to the client with `Idempotent-Replay: true` header when a replay hit is detected (`middleware.go:127–132`).
 - Is fail-closed: `Flush()` on the recorder panics with a directive rather than silently buffering streaming responses (`middleware.go:206–210`); `WithStreamingOptOut` allows opt-out for genuinely streaming routes.
+
+The repo-wide adoption rule is executable, not conventional. `scripts/check-idempotency-identity-scope.go` loads tracked non-vendor Go packages under the default and `integration` build tags, resolves actual Go types and symbols, and rejects any function or closure outside `identity.go` whose type is `func(context.Context) (string, string, error)` and whose own body calls the real `tenant.FromContext` symbol. The check therefore handles aliases, named results, methods, closures, generic functions, multiline signatures, build-tag variants, and local shadowing by language semantics rather than source spelling (`check-idempotency-identity-scope.go:48–331`). It is registered in the fast/PR/full verification profiles with positive and negative fixtures (`tools/verify/registry.go:754–800`). The shell file remains only as an operator-compatible entrypoint.
 
 The store uses a two-phase Postgres protocol on `metaldocs.idempotency_keys`:
 - `BeginReplay`: `INSERT … ON CONFLICT DO NOTHING RETURNING`; if the INSERT wins, the caller proceeds. If the INSERT loses, the loser executes `SELECT … FOR UPDATE`, which blocks until the winner's transaction resolves (`postgres_store.go:114–122`).
@@ -128,6 +134,8 @@ The store uses a two-phase Postgres protocol on `metaldocs.idempotency_keys`:
 
 | File | Role |
 |---|---|
+| `identity.go` | `TenantActorFromContext`, the sole sanctioned fail-closed `Require` identity callback |
+| `identity_test.go` | Missing-tenant, missing-actor, and both-present identity contract |
 | `middleware.go` | `Require` factory, `IsValidKey`, `RequestHash`, `WithStreamingOptOut`, `responseRecorder`, `writeErrJSON` |
 | `postgres_store.go` | `Store`, `ReplayHandle`, `Replay`, `BeginReplay`, `CompleteReplay`, `FailReplay`, `ErrConflict`; `maxBodyBytes = 64 KiB` |
 | `middleware_test.go` | Integration: missing header, invalid UUID, first-call record, conflict 422, different-path 422 |

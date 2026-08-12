@@ -1,0 +1,18 @@
+package fixture
+
+import (
+	"context"
+
+	"metaldocs/internal/platform/tenant"
+)
+
+func badActorFromCtxMultiline(
+	ctx context.Context,
+) (
+	string,
+	string,
+	error,
+) {
+	_, err := tenant.FromContext(ctx)
+	return "", "", err
+}
