@@ -16,6 +16,7 @@ register_production_dockerfile() {
     deploy/docker/api.Dockerfile) dockerfiles[api]="$path" ;;
     deploy/docker/worker.Dockerfile) dockerfiles[worker]="$path" ;;
     deploy/docker/jobs.Dockerfile) dockerfiles[jobs]="$path" ;;
+    deploy/docker/dbprovision.Dockerfile) dockerfiles[dbprovision]="$path" ;;
     frontend/apps/web/Dockerfile) dockerfiles[web]="$path" ;;
     apps/docx-renderer/Dockerfile) dockerfiles[docx]="$path" ;;
     vendor/*) ;;
@@ -42,6 +43,7 @@ mark_go_images() {
   mark api
   mark worker
   mark jobs
+  mark dbprovision
 }
 
 mark_node_images() {
@@ -59,6 +61,7 @@ while IFS= read -r changed_path; do
     deploy/docker/api.Dockerfile|apps/api/*|api/openapi/*) mark api ;;
     deploy/docker/worker.Dockerfile|apps/worker/*) mark worker ;;
     deploy/docker/jobs.Dockerfile|apps/jobs/*) mark jobs ;;
+    deploy/docker/dbprovision.Dockerfile|apps/dbprovision/*) mark dbprovision ;;
     frontend/apps/web/*) mark web ;;
     apps/docx-renderer/*) mark docx ;;
     internal/*|db/*|go.mod|go.sum) mark_go_images ;;
@@ -73,7 +76,7 @@ if [[ ${#affected[@]} -eq 0 ]]; then
 fi
 
 tag="${GITHUB_SHA:-local}"
-for artifact in api worker jobs web docx; do
+for artifact in api worker jobs dbprovision web docx; do
   if [[ -z "${affected[$artifact]+set}" ]]; then
     continue
   fi

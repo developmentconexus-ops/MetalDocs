@@ -130,16 +130,17 @@ non-container dev flow (`scripts/dev-api.ps1`), not compose.
 ### Post-bootstrap checklist (first bring-up of a new database volume)
 
 1. **Rotate the `metaldocs_ci` password — required on every non-dev environment.**
-   `db/grants/0001_role_grants.sql` creates the non-owner, `NOSUPERUSER` + `NOBYPASSRLS`
-   `metaldocs_ci` role with the **non-secret dev fixture password** `metaldocs_ci_dev`, so a
-   fresh bootstrap always has a known-password login role in the cluster. It is DML-only and
-   RLS-bound, but a published password is still a published password. On any environment that
-   is not a throwaway dev box, rotate it immediately after the first bootstrap:
+   `db/grants/0000_identity_roles.sql` creates the non-owner, `NOSUPERUSER` + `NOBYPASSRLS`
+   `metaldocs_ci` role with **no password**, so it cannot authenticate until an explicit
+   rotation. It is DML-only and RLS-bound; on any environment that is not a throwaway dev box,
+   rotate it immediately after the first bootstrap:
 
    ```bash
-   docker compose -f deploy/compose/docker-compose.yml exec postgres \
-     psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-     -c "ALTER ROLE metaldocs_ci PASSWORD '<deployment-secret>'"
+   # Keep the secret out of shell history and process arguments: psql will prompt for it.
+   docker compose -f deploy/compose/docker-compose.yml exec -it postgres \
+     psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+   # At the psql prompt:
+   #   \password metaldocs_ci
    ```
 
    Then point the integration suite at the rotated secret via `METALDOCS_CI_DB_PASSWORD`
@@ -168,9 +169,11 @@ non-container dev flow (`scripts/dev-api.ps1`), not compose.
 
    ```bash
    # 1. Rotate the LIVE password first, while api/worker/jobs still hold the old one.
-   docker compose -f deploy/compose/docker-compose.yml exec postgres \
-     psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-     -c "ALTER ROLE metaldocs_runtime PASSWORD '<deployment-secret>'"
+   #    Keep the secret out of shell history and process arguments: psql will prompt for it.
+   docker compose -f deploy/compose/docker-compose.yml exec -it postgres \
+     psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+   # At the psql prompt:
+   #   \password metaldocs_runtime
 
    # 2. Update METALDOCS_RUNTIME_DB_PASSWORD (and PGPASSWORD, and DATABASE_URL if you use
    #    it — see .env.example's comments on why all three are independent literals) in the
