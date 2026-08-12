@@ -13,12 +13,11 @@ architecture contradictions instead of patching around them.
 - Evidence before closure: report commands, outcomes, QA/review disposition, and bounded defers before saying done.
 - Commits are allowed after verified work; never push without explicit permission.
 
-## Global Maximum, Not Local Maximum
-Before improving/fixing/extending anything, judge the foundation first.
-- If the current implementation is legacy, a patch, or a workaround, do NOT optimize inside it — that locks in a local maximum. Improving on a bad base is a defect, not progress.
-- Step back to the whole problem: what would a senior engineer or a proven existing system do here? Propose the global-maximum structure (name it — e.g. a kernel/framework boundary, not a one-off tweak) and state the trade-off.
-- When the better answer crosses the current task boundary, stop and surface it instead of patching around it (ties to the "stop on architecture contradictions" rule above).
-- A local maximum may be shipped only if it is **labelled as transitional**, names the global-maximum structure, and names the milestone that deletes it. An unlabelled local maximum is a defect. Operationalized by the `adversarial-review` skill §2.
+## Root Cause / Global Maximum
+
+Canonical method: `docs/engineering/root-cause-global-maximum-method.md`.
+
+Before non-trivial work, identify the root cause and target invariant before choosing a patch. Do not optimize inside a known workaround or local maximum. MetalDocs-specific invariants below remain binding constraints on every candidate solution.
 
 ## Commands
 - Start API: `.\scripts\start-api.ps1`
@@ -44,12 +43,13 @@ Non-negotiable invariants (violating these is a defect, not a design choice):
 
 Governing target spec (source of truth when this list drifts): `wiki/architecture/backend-target-architecture.md` (REQ IDs; reviews cite them).
 
-**Orientation rule:** before planning any new feature or improvement, state (a) which module(s) own it, (b) which invariants above it must satisfy, (c) read the owning `wiki/modules/<name>.md`. Plan against the whole system, not the code immediately around the change. Operationalized by the `developing-new-work` skill — run it before brainstorming any new module or feature; it emits a written system-impact analysis + Green/Yellow/Red verdict (Red hard-blocks design).
+**Orientation rule:** before planning any new feature or improvement, state (a) which module(s) own it, (b) which invariants above it must satisfy, and (c) read the owning `wiki/modules/<name>.md`. Plan against the whole system, not only the code immediately around the change. For new modules/features, use `.claude/skills/developing-new-work/SKILL.md` before brainstorming; it emits a system-impact analysis plus Green/Yellow/Red verdict.
 
 ## Context Map
 | Task | Read |
 |---|---|
 | General orientation | `wiki/index.md`, then `wiki/architecture/system-map.md` |
+| Canonical engineering method | `docs/engineering/root-cause-global-maximum-method.md` |
 | Local startup/runtime | `wiki/references/local-dev-startup.md` |
 | Backend/API route or contract | `wiki/architecture/backend-api-structure.md`, `wiki/architecture/api-contract.md`, `wiki/architecture/api-design-system.md` |
 | Frontend under `frontend/apps/web` | `wiki/architecture/frontend-structure.md` |
@@ -57,14 +57,15 @@ Governing target spec (source of truth when this list drifts): `wiki/architectur
 | Database/migration/bootstrap | `wiki/database/index.md` and relevant database docs |
 | QA/close-out | `wiki/quality/qa-operating-system.md` and relevant `wiki/quality/*-checklist.md` |
 | Test framework discipline | `wiki/quality/test-discipline.md`, ADR `wiki/decisions/0034-integration-test-fixture-framework.md` |
-| Starting any new module or feature | `developing-new-work` skill (pre-design system-impact gate; run before brainstorming) |
-| Reviewing a design/plan/diff with Codex | `adversarial-review` skill (root cause before patch, local-vs-global, exposure standard, architecture checklist, convergence); `harness:codex-dispatch` for the launch |
+| Starting any new module or feature | `.claude/skills/developing-new-work/SKILL.md` |
+| Reviewing a design/plan/diff | `.claude/skills/adversarial-review/SKILL.md` |
+| Code relationship / impact tracing | `.claude/skills/gitnexus/SKILL.md` when needed |
 | What AI gets wrong in design work | `docs/engineering/defect-class-catalog.md` Part II + Appendix C |
-| Program/milestone work | HARNESS-CORE (mnfs-harness plugin, method) + `docs/HARNESS-PROFILE.md` (repo bindings — binding pair since 2026-07-16) + `docs/superpowers/ROADMAP.md` (ordered queue); MNFS workflow skills (`mnfs-workflow:*`) for mission/milestone mechanics |
-| Docs governance/wiki sync | `wiki/standards/documentation-governance.md`, `.claude/agents/wiki-curator.md` |
+| Program/milestone work | HARNESS-CORE + `docs/HARNESS-PROFILE.md` + `docs/superpowers/ROADMAP.md` |
+| Docs governance/wiki sync | `wiki/standards/documentation-governance.md` |
 
 ## Workflow
 - Load only the docs needed for the task boundary.
-- Prefer the wiki domain indexes over global file dumps.
+- Prefer wiki domain indexes over global file dumps.
 - Use Context7 for current library/framework/API docs.
 - For prerequisite failures in startup, auth/session, target route, or contract/generated alignment, stop local feature work and repair the prerequisite first.
