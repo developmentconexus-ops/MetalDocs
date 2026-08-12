@@ -45,7 +45,8 @@ The latest observed nightly run before this change was
 [31580496114](https://github.com/developmentconexus-ops/MetalDocs/actions/runs/31580496114).
 `perf` and `e2e` were red because their database/bootstrap and secret
 prerequisites were not provisioned. They are retained for deliberate
-`workflow_dispatch` repros but excluded from the automatic schedule.
+`workflow_dispatch` repros behind the explicit `run_deferred=true` input, but
+excluded from both the automatic schedule and a default manual dispatch.
 
 Reactivation requires, at minimum:
 
@@ -71,7 +72,7 @@ demonstrated and the failure-issue path is verified again.
 | Frontend production build gate | no | `fe-build` |
 | Affected production Docker build gate | no | `docker-build` |
 | DOCX checks duplicated in PR | 3 | 0 |
-| Known-red jobs on automatic nightly schedule | 2 | 0; manual-only |
+| Known-red jobs on automatic/default nightly execution | 2 | 0; explicit opt-in only |
 | Documentation hygiene in PR required closure | yes | no; nightly/full/release |
 | Required ruleset contexts | 1 (`required`) | 1 (`required`) |
 | Final PR makespan | pending baseline PR evidence above | record from final head CI run |

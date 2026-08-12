@@ -3,6 +3,12 @@ on:
   schedule:
     - cron: '0 5 * * *'
   workflow_dispatch:
+    inputs:
+      run_deferred:
+        description: 'Run deferred perf/e2e repro jobs (known-red until prerequisites land)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -10,12 +16,13 @@ permissions:
 # Nothing here blocks a PR. These jobs are advisory today; pretending
 # otherwise is the lie this restructure was chartered to remove.
 jobs:
-  # These two jobs remain available for an intentional manual repro, but are
-  # not part of the automatic nightly signal until their prerequisites are
-  # real. A skipped manual-only job cannot make the scheduled run red.
+  # These two jobs remain available for an intentional manual repro only when
+  # run_deferred=true, but are not part of the automatic nightly signal until
+  # their prerequisites are real. A skipped deferred job cannot make the
+  # scheduled or default manual run red.
   perf:
     name: perf
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_deferred == true }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -124,7 +131,7 @@ jobs:
 
   e2e:
     name: e2e
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_deferred == true }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
