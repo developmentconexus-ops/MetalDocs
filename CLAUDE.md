@@ -59,7 +59,7 @@ Governing target spec (source of truth when this list drifts): `wiki/architectur
 | Test framework discipline | `wiki/quality/test-discipline.md`, ADR `wiki/decisions/0034-integration-test-fixture-framework.md` |
 | Starting any new module or feature | `.claude/skills/developing-new-work/SKILL.md` |
 | Reviewing a design/plan/diff | `.claude/skills/adversarial-review/SKILL.md` |
-| Code relationship / impact tracing | `.claude/skills/gitnexus/SKILL.md` when needed |
+| Code relationship / impact tracing | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` when needed |
 | What AI gets wrong in design work | `docs/engineering/defect-class-catalog.md` Part II + Appendix C |
 | Program/milestone work | HARNESS-CORE + `docs/HARNESS-PROFILE.md` + `docs/superpowers/ROADMAP.md` |
 | Docs governance/wiki sync | `wiki/standards/documentation-governance.md` |
