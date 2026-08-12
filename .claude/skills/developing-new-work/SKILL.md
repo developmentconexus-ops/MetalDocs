@@ -1,132 +1,68 @@
 ---
 name: developing-new-work
 description: >-
-  Run BEFORE brainstorming or designing any new MetalDocs backend module or feature — the
-  pre-design system-impact orientation gate. Walks a static, pre-baked checklist of the whole
-  system (the 15 bounded-context modules, the 6 non-negotiable invariants, capability and module
-  wiring touchpoints, reusable platform frameworks, contract + DB conventions, test/QA gates, and
-  docs/ADR governance), judges whether the work fits the architecture and whether the foundation is
-  sound, then emits a written system-impact analysis plus a Green / Yellow / Red verdict. Red is a
-  hard block on design. Use whenever the operator says "new module", "new feature", "add X",
-  "build Y", "implement Z", "should we build…", "does this fit our architecture / our system", or
-  kicks off an SP-/increment of a program — even when they never say "orientation" or "impact".
-  This is architecture orientation BEFORE design, distinct from code blast-radius
-  (gitnexus-impact-analysis) and from mission/milestone program planning.
+  Run before brainstorming or designing a new MetalDocs module or feature. This is the pre-design
+  system-impact gate: establish ownership, invariants, foundation quality, reusable boundaries,
+  proof strategy, and a Green/Yellow/Red verdict before design begins.
 ---
 
 # Developing New Work — system-impact orientation
 
-CLAUDE.md carries two meta-rules that are easy to nod at and skip: the **Orientation rule**
-(before planning new work, state owning module, invariants, read the owning wiki doc) and
-**Global Maximum, Not Local Maximum** (judge the foundation first; never optimize inside a patch).
-This skill turns both into a binding gate that runs *before* design and leaves an auditable record.
+## Canonical engineering doctrine
 
-Given a one-line intent ("add a tenant token dictionary"), you walk a **static, pre-baked map** of
-the system, judge fit and foundation, and write a **system-impact analysis** with a verdict. On
-Green/Yellow you hand the analysis to `superpowers:brainstorming` as the rails it designs within.
-On Red you stop — design cannot begin until the named redesign gate clears.
+Before judging foundation or design direction, read `docs/engineering/root-cause-global-maximum-method.md`.
 
-## The engine: a static checklist, not a rescan
+That document is the authority for root cause, local/global maximum, YAGNI, enforcement hierarchy, transitional design, legal outcomes, and the Engineering Decision Record. This skill only applies those definitions to MetalDocs pre-design work.
 
-**Do not re-analyze the codebase on every run.** The MetalDocs backend base is mature and frozen
-(Grade-A, signed off 2026-06-21; module boundaries A). The 15 modules, the middleware chain, the
-invariants, and the wiring touchpoints are settled contracts. Re-deriving them per run buys nothing
-and burns thousands of tokens.
+MetalDocs-specific invariants remain governed by `CLAUDE.md` and the target architecture/wiki.
 
-Everything you need is **inline in the `references/` files** — read them, not the code. Each item
-carries a `file:line` or wiki-REQ anchor for one reason: so that when (and only when) a single item
-is genuinely uncertain, you can verify *that one anchor* — never re-map the system. The references
-mirror guards the repo already trusts (`TestCapabilityRegistrySize`, `TestEveryCapabilityClassified`,
-`module-boundaries.yml`, `check-test-discipline.sh`), so they are agent-facing copies of machine
-checklists, not a second source of truth.
+## Purpose
 
-When the checklist and the code disagree, **the code wins** (CLAUDE.md runtime-truth rule) — and the
-disagreement is a signal to refresh the checklist (bump its `Last verified` stamp), not to patch
-around it. CI guards are the backstop for anything a stale item missed.
+Catch wrong ownership, violated invariants, local-maximum foundations, and duplicated platform primitives before design and implementation make them expensive.
+
+On **Green/Yellow**, pass the system-impact analysis into design as locked constraints. On **Red**, stop until the named prerequisite or redesign gate clears.
 
 ## Workflow
 
-Create a TodoWrite item per phase and work them in order.
+1. **Canonical method.** Start the Engineering Decision Record from `docs/engineering/root-cause-global-maximum-method.md`.
+2. **Orient.** Classify module vs feature. Name owning module(s), modules that do not own it, and cross-module edge direction. Read the owning module wiki. Ambiguous ownership -> **AS-3**.
+3. **Foundation.** Record target property, authority/boundary, local-maximum candidate, global-maximum candidate, proposed outcome, enforcement, and proof. Building inside a known patch/local maximum -> **AS-2**.
+4. **Invariants.** Walk `references/invariant-checklist.md`. For every touched invariant, state how the design preserves it and which existing primitive/boundary it reuses. Unresolved violation -> **AS-1**.
+5. **Wiring.** Read `references/capability-wiring.md` for capability work and `references/module-wiring.md` for a new module.
+6. **Frameworks.** Walk `references/frameworks-catalog.md`. Do not create a parallel transaction, problem, outbox, authorization, test, or other platform path when an established authority already owns it. Any proposed new guard/framework must satisfy the canonical method.
+7. **Test/QA + docs.** Walk `references/test-qa-gates.md` and `references/docs-adr-governance.md`. Define proof, QA, documentation, and ADR needs before implementation.
+8. **Targeted verify.** Read source only where a material premise is uncertain. Repository/runtime truth wins over stale reference text. If new evidence changes root cause or target structure, update the decision record.
+9. **Verdict + handoff.** Fill `templates/system-impact-analysis.md` at `docs/superpowers/analysis/YYYY-MM-DD-<slug>-system-impact.md` and include the canonical Engineering Decision Record fields.
+   - **Green / Yellow** -> proceed to design.
+   - **Red** -> stop and surface the prerequisite/redesign.
 
-1. **Orient.** Classify the work: **module** or **feature**. Name the owning module(s), the modules
-   that explicitly do *not* own it, and the cross-module edges (with direction — who depends on
-   whom). Read `references/` checklist files for the branch you're on. **No code reads here.**
-   If the owning module is ambiguous → **AS-3**.
-
-2. **Foundation.** Judge the base you'd build on. Is it sound, or is it legacy / a patch / a
-   workaround? If you'd be optimizing inside a patch, name the global-maximum structure and its
-   trade-off — or **AS-2**. (This is the Global-Maximum rule made concrete.)
-
-3. **Invariants.** Walk `references/invariant-checklist.md` — the 6 non-negotiables. For each:
-   touched? how satisfied? which helper to reuse? Any violation → **AS-1**.
-
-4. **Wiring.** Walk `references/capability-wiring.md` if the work adds a capability, and/or
-   `references/module-wiring.md` if it births a module. Skip the branch that doesn't apply.
-
-5. **Frameworks.** Walk `references/frameworks-catalog.md` — reuse the platform primitives, do not
-   reinvent them. Every hand-rolled equivalent of `TxRunner`, `problem.Write`, the outbox repo, or
-   the `testdb` factory is a defect, not a choice.
-
-6. **Test/QA + Docs/ADR.** Walk `references/test-qa-gates.md` and `references/docs-adr-governance.md`.
-   Decide the canonical test framework, which QA gates apply, the evidence shape, the wiki docs to
-   touch, and whether an ADR is required (a MUST-deviation or a policy change ⇒ yes).
-
-7. **Targeted verify.** For any item the run cannot answer with confidence, read its *single* anchor
-   (1–2 files maximum). This is the only code you read. If you find yourself opening a third file,
-   stop — you're rescanning, not verifying.
-
-8. **Verdict + handoff.** Fill `templates/system-impact-analysis.md`, write it to
-   `docs/superpowers/analysis/YYYY-MM-DD-<slug>-system-impact.md`, and commit it.
-   - **Green / Yellow** → invoke `superpowers:brainstorming`, passing the analysis path as the
-     locked constraints it designs within.
-   - **Red** → stop. Surface the redesign gate. Do not invoke brainstorming.
-
-## Module vs feature
-
-The artifact has the **same ten sections** either way. A **feature** marks module-only rows
-(section 5, and the module-birth parts of 4 and 9) **N/A** with a one-line reason, and is mostly
-invariants + frameworks + test/QA + verdict. A **new module** fills everything. Don't drop sections —
-mark them N/A so the record shows the question was asked and answered.
-
-## Hard-stops
-
-A hard-stop means: stop the run, record the reason in the artifact, and resolve it before design.
-Any unresolved hard-stop forces a **Red** verdict, which blocks the brainstorming handoff.
+## Hard stops
 
 | ID | Trigger | Action |
-|----|---------|--------|
-| AS-1 | A non-negotiable invariant (§3) would be violated | STOP. Record the violation. Require an ADR or a redesign before any design. |
-| AS-2 | The foundation is a patch/legacy and the work would optimize *inside* it | STOP. Propose the global-maximum structure + trade-off. The operator decides. |
-| AS-3 | The owning module is ambiguous | STOP. Resolve the boundary (targeted-verify the candidate anchors) before continuing. |
+|---|---|---|
+| AS-1 | A non-negotiable MetalDocs invariant would be violated | STOP. Redesign or obtain the governing decision before design. |
+| AS-2 | Work would optimize inside a patch/local maximum | STOP. Apply the canonical local-vs-global decision flow; operator chooses the legal outcome. |
+| AS-3 | Owning module/boundary is ambiguous | STOP. Resolve ownership before design. |
 
-These exist because the cheapest place to catch an architecture mistake is before a line of design
-is written. A wrong owning module or a violated invariant discovered during implementation costs a
-rewrite; discovered here it costs a sentence.
+## Verdicts
 
-## Verdict semantics
+- **Green** — fits cleanly; proceed.
+- **Yellow** — proceed with a named bounded risk/decision carried into design.
+- **Red** — unresolved hard stop; design blocked.
 
-- **Green** — fits cleanly; proceed to brainstorming.
-- **Yellow** — proceed, but a named risk or an ADR is flagged and carried into the design as a locked
-  constraint (e.g. "new capability ⇒ bump `TestCapabilityRegistrySize`", "supersedes ADR 0008").
-- **Red** — a hard-stop is unresolved. Design is blocked until the redesign gate clears.
+## References
 
-## Reference files
+Read only what applies:
 
-Read the ones relevant to the branch; don't bulk-load all six.
+- `references/invariant-checklist.md` — always.
+- `references/frameworks-catalog.md` — always.
+- `references/test-qa-gates.md` — always.
+- `references/docs-adr-governance.md` — always.
+- `references/capability-wiring.md` — capability work.
+- `references/module-wiring.md` — new module.
 
-| File | Read when |
-|------|-----------|
-| `references/invariant-checklist.md` | Always — the 6 non-negotiables + the helper to reuse for each. |
-| `references/capability-wiring.md` | The work adds or changes an IAM capability (10 ordered touchpoints). |
-| `references/module-wiring.md` | The work births a new module (ordered birth checklist). |
-| `references/frameworks-catalog.md` | Always — the reuse-don't-reinvent table. |
-| `references/test-qa-gates.md` | Always — canonical test framework, R1–R4, the 6 QA gates, evidence shape. |
-| `references/docs-adr-governance.md` | Always — wiki doc structure, REQ-ID citation, when an ADR is required. |
+If a reference is stale, repair governed memory rather than compensating with a local patch.
 
-Each reference carries a `Last verified` stamp. If you targeted-verify an anchor and find it moved,
-fix the anchor and bump the stamp — the references are living, governed the same way the wiki is.
+## Output
 
-## Output template
-
-`templates/system-impact-analysis.md` is the exact ten-section shape to fill. Don't improvise the
-structure — the fixed shape is what makes the record auditable and what brainstorming reads back.
+Use `templates/system-impact-analysis.md`. Do not invent another root-cause/global-maximum vocabulary inside the analysis; use the canonical Engineering Decision Record fields.
