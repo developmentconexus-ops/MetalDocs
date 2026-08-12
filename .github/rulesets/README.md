@@ -74,14 +74,16 @@ pins that predicate itself down with fixtures for the accept/reject cases, so
 a PR that quietly loosens the jq expression is caught the same way a PR that
 quietly narrows the `needs:` list is.
 
-## Why some checks stay outside `required`'s membership
+## Security checks inside the required closure
 
-`gosec` and `govulncheck` are PR-blocking registry checks in
-`ci.yml:security`, gated behind `needsNetwork`, and are repeated by
-`nightly.yml:security-scan` against the live vulnerability database. The
-nightly run is not the merge gate; it catches disclosures that occur after a
-branch has merged. See their entries in `tools/verify/registry.go` for the
-pins and scope.
+`gosec` and `govulncheck` are PR-blocking registry checks owned by
+`ci.yml:security`, and that job is itself a dependency of `ci.yml:required`.
+Therefore both checks are inside the required closure and can block a merge.
+They are not direct GitHub ruleset contexts: the live ruleset still requires
+only the single `required` context. The same scanners are repeated by
+`nightly.yml:security-scan` against the live vulnerability database so new
+disclosures after merge are caught without changing the merge-gate topology.
+See their entries in `tools/verify/registry.go` for pins and scope.
 
 ## If a job inside `required`'s `needs:` closure is renamed
 
