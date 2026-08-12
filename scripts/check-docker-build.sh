@@ -49,6 +49,11 @@ mark_node_images() {
   mark docx
 }
 
+mark_all_images() {
+  mark_go_images
+  mark_node_images
+}
+
 while IFS= read -r changed_path; do
   case "$changed_path" in
     deploy/docker/api.Dockerfile|apps/api/*|api/openapi/*) mark api ;;
@@ -56,7 +61,8 @@ while IFS= read -r changed_path; do
     deploy/docker/jobs.Dockerfile|apps/jobs/*) mark jobs ;;
     frontend/apps/web/*) mark web ;;
     apps/docx-renderer/*) mark docx ;;
-    internal/*|db/*|go.mod|go.sum|.dockerignore) mark_go_images ;;
+    internal/*|db/*|go.mod|go.sum) mark_go_images ;;
+    .dockerignore|scripts/check-docker-build.sh) mark_all_images ;;
     packages/*|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|.nvmrc) mark_node_images ;;
   esac
 done < <(git diff --name-only --diff-filter=ACDMRTUXB "${base_ref}...HEAD")
