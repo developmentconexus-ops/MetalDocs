@@ -2,8 +2,8 @@
 # Pre-pnpm history: this file once npm-installed a vendored eigenpal tarball from
 # apps/docx-renderer/vendor. The repo has since migrated to pnpm workspaces and
 # @eigenpal/* resolves from the registry via pnpm-lock.yaml — no vendor dir exists.
-FROM node:26.3.0-alpine AS build
-RUN npm install --global pnpm@11.8.0
+FROM node:22-alpine AS build
+RUN corepack enable
 WORKDIR /repo
 
 # Manifests first for layer caching.
@@ -31,7 +31,7 @@ RUN pnpm --filter @metaldocs/docx-renderer run build \
  && pnpm --filter @metaldocs/docx-renderer --prod deploy --legacy /out \
  && cp -r apps/docx-renderer/dist /out/dist
 
-FROM node:26.3.0-alpine AS runtime
+FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /out ./

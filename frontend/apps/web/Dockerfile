@@ -3,8 +3,8 @@
 # @metaldocs/web depends on workspace packages (editor-ui, shared-tokens), so the
 # install MUST run through pnpm at the workspace root — npm ci cannot resolve
 # workspace:* and there is no package-lock.json.
-FROM node:26.3.0-alpine AS builder
-RUN npm install --global pnpm@11.8.0
+FROM node:22-alpine AS builder
+RUN corepack enable
 WORKDIR /repo
 
 # Manifests first for layer caching: lockfile + workspace config + every package.json.

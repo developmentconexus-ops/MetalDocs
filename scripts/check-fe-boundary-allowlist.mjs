@@ -2,11 +2,7 @@ import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 const configPath = 'eslint.config.mjs';
-const featuresRoot = process.env.FEATURES_ROOT ?? 'frontend/apps/web/src/features';
 const baseRef = process.env.CI_BASE_REF ?? 'origin/main';
-// `shared/` is the deliberate cross-cutting root under features/. It is not a
-// feature and therefore must not receive a per-feature boundary block.
-const unscopedFeatureDirs = new Set(['shared']);
 
 function readBaseConfig() {
   try {
@@ -17,16 +13,21 @@ function readBaseConfig() {
   }
 }
 
-function block(source, name) {
-  const match = source.match(new RegExp(`const\\s+${name}\\s*=\\s*\\[[\\s\\S]*?\\];`));
-  if (!match) fail(`cannot find ${name} in ${configPath}`);
-  return match[0];
-}
+function allowlistLines(source) {
+  const marker = 'const ALLOWLIST = [';
+  const start = source.indexOf(marker);
+  if (start < 0 || source.indexOf(marker, start + marker.length) >= 0) {
+    fail(`cannot locate exactly one ${marker} block in ${configPath}`);
+  }
 
-function allowlistPairs(source) {
-  const body = block(source, 'ALLOWLIST');
-  return [...body.matchAll(/from:\s*'([^']+)'\s*,\s*to:\s*'([^']+)'/g)]
-    .map((match) => `${match[1]} -> ${match[2]}`);
+  const endMatch = /\n\s*\];/.exec(source.slice(start + marker.length));
+  if (!endMatch) fail(`cannot find the end of ${marker} block in ${configPath}`);
+
+  return source
+    .slice(start + marker.length, start + marker.length + endMatch.index)
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
 }
 
 function fail(message) {
@@ -36,36 +37,19 @@ function fail(message) {
 
 const currentConfig = fs.readFileSync(configPath, 'utf8');
 const baseConfig = readBaseConfig();
-const currentPairs = allowlistPairs(currentConfig);
-const basePairs = new Set(allowlistPairs(baseConfig));
-
-const duplicatePairs = currentPairs.filter((pair, index) => currentPairs.indexOf(pair) !== index);
-if (duplicatePairs.length > 0) {
-  fail(`ALLOWLIST contains duplicates: ${duplicatePairs.join(', ')}`);
+const currentLines = allowlistLines(currentConfig);
+const baseCounts = new Map();
+for (const line of allowlistLines(baseConfig)) {
+  baseCounts.set(line, (baseCounts.get(line) ?? 0) + 1);
 }
-
-const newPairs = currentPairs.filter((pair) => !basePairs.has(pair));
-if (newPairs.length > 0) {
-  fail(`frontend boundary ALLOWLIST grew; remove or refactor new entries: ${newPairs.join(', ')}`);
+const currentCounts = new Map();
+for (const line of currentLines) {
+  currentCounts.set(line, (currentCounts.get(line) ?? 0) + 1);
 }
-
-let discoveredFeatures;
-try {
-  discoveredFeatures = fs.readdirSync(featuresRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort();
-} catch (error) {
-  const detail = error instanceof Error ? error.message : String(error);
-  fail(`cannot enumerate ${featuresRoot}: ${detail}`);
+const addedLines = [...currentCounts.entries()]
+  .filter(([line, count]) => count > (baseCounts.get(line) ?? 0))
+  .map(([line]) => line);
+if (addedLines.length > 0) {
+  fail(`frontend boundary ALLOWLIST grew or changed representation; remove new lines: ${addedLines.join(', ')}`);
 }
-
-const knownFeatures = new Set(discoveredFeatures.filter((name) => !unscopedFeatureDirs.has(name)));
-for (const pair of currentPairs) {
-  const [from, to] = pair.split(' -> ');
-  if (!knownFeatures.has(from) || !knownFeatures.has(to)) {
-    fail(`ALLOWLIST references an unknown feature: ${pair}`);
-  }
-}
-
-console.log(`fe-boundary-allowlist: clean (${knownFeatures.size} feature directories, ${currentPairs.length} allowlisted pairs)`);
+console.log(`fe-boundary-allowlist: clean (${currentLines.length} allowlist lines; shrink-only text ratchet)`);

@@ -51,7 +51,7 @@ mark_node_images() {
 
 while IFS= read -r changed_path; do
   case "$changed_path" in
-    deploy/docker/api.Dockerfile|apps/api/*) mark api ;;
+    deploy/docker/api.Dockerfile|apps/api/*|api/openapi/*) mark api ;;
     deploy/docker/worker.Dockerfile|apps/worker/*) mark worker ;;
     deploy/docker/jobs.Dockerfile|apps/jobs/*) mark jobs ;;
     frontend/apps/web/*) mark web ;;

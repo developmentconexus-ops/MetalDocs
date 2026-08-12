@@ -60,9 +60,10 @@ precondition is missing is an inert control, and a hole that scrolled off the
 top of the output is a hole nobody sees.
 
 **Toolchain versions are preflighted against `go.mod` and `.nvmrc`.** This
-repo standardizes Node 26.3.0 in development and CI; Go remains pinned by
-`go.mod` and CI's setup. A run on the wrong toolchain is not a verification of
-what CI will do, and verify says so before it starts.
+repo's dev machines run Go 1.26 and Node 26 against CI's 1.25 and 22.13; that
+split produced both a false "unformatted Go in main" alarm and a real test
+failure this axis had to diagnose. A run on the wrong toolchain is not a
+verification of what CI will do, and verify now says so before it starts.
 
 Measured: `--profile=fast` is 15 checks in ~51s wall clock.
 
