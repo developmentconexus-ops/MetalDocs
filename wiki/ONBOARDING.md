@@ -13,7 +13,7 @@ If live guidance is wrong, fix it. Runtime/repository truth wins over remembered
 | [`README.md`](../README.md) | Product overview + canonical commands |
 | [`AGENTS.md`](../AGENTS.md) | Model-agnostic routing, truth hierarchy, task boundaries |
 | [`CLAUDE.md`](../CLAUDE.md) | MetalDocs system facts and non-negotiable invariants |
-| [`docs/engineering/root-cause-global-maximum-method.md`](../docs/engineering/root-cause-global-maximum-method.md) | Required method for non-trivial engineering decisions |
+| [`wiki/standards/root-cause-global-maximum-method.md`](standards/root-cause-global-maximum-method.md) | Required method for non-trivial engineering decisions |
 | [`wiki/diagrams/c4-context.md`](diagrams/c4-context.md) | System boundary and actors |
 
 MetalDocs is a multi-tenant SaaS for controlled documents: templates -> drafts -> approval -> frozen artifact -> PDF. Backend is Go, frontend is React, persistence is Postgres/MinIO, and `docx-renderer` is the internal Node rendering service.
@@ -118,7 +118,7 @@ For ordinary backend/frontend/database work, the wiki architecture/module docs p
 
 ## 5. Conventions
 
-- **Root cause before patch.** For non-trivial work, follow `docs/engineering/root-cause-global-maximum-method.md`.
+- **Root cause before patch.** For non-trivial work, follow `wiki/standards/root-cause-global-maximum-method.md`.
 - **Runtime truth wins.** Stale docs are repaired; they are not treated as stronger than runnable/source evidence.
 - **Contract-first API.** OpenAPI -> generated backend/frontend surfaces -> handlers/consumers.
 - **Authorization uses capabilities, never role reasoning.** See ADR 0022 and `CLAUDE.md`.
