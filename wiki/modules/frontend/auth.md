@@ -1,6 +1,6 @@
 # Frontend module: auth
 
-> **Last verified:** 2026-08-11 (A2.2 dead-code burn-down: removed the unmounted `/auth` route + `AuthRoutePage.tsx` — deleted, zero importers, PR #119)
+> **Last verified:** 2026-08-12 (workflow-routing refresh; prior A2.2 dead-code burn-down remains unchanged)
 > **Scope:** Login, logout, change-password, session bootstrap, 401 → login redirect bus. Frontend slice of the backend [`auth`](../auth.md) module.
 > **Owner:** unassigned | **Backend counterpart:** [`wiki/modules/auth.md`](../auth.md)
 
@@ -71,4 +71,4 @@ No domain queries. Auth state lives in `store/auth.store.ts`. On logout / 401, `
 
 - Backend module: [`wiki/modules/auth.md`](../auth.md)
 - Concept: [`wiki/concepts/error-ux.md`](../../concepts/error-ux.md) — apiFetch / authBus contract.
-- Skill: [`metaldocs-frontend`](../../../.agents/skills/metaldocs-frontend/SKILL.md)
+- Workflow: [`AGENTS.md`](../../../AGENTS.md) + [`wiki/architecture/frontend-structure.md`](../../architecture/frontend-structure.md); use the canonical engineering method for non-trivial changes.
