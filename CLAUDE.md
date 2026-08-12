@@ -15,7 +15,7 @@ architecture contradictions instead of patching around them.
 
 ## Root Cause / Global Maximum
 
-Canonical method: `docs/engineering/root-cause-global-maximum-method.md`.
+Canonical method: `wiki/standards/root-cause-global-maximum-method.md`.
 
 Before non-trivial work, identify the root cause and target invariant before choosing a patch. Do not optimize inside a known workaround or local maximum. MetalDocs-specific invariants below remain binding constraints on every candidate solution.
 
@@ -49,7 +49,7 @@ Governing target spec (source of truth when this list drifts): `wiki/architectur
 | Task | Read |
 |---|---|
 | General orientation | `wiki/index.md`, then `wiki/architecture/system-map.md` |
-| Canonical engineering method | `docs/engineering/root-cause-global-maximum-method.md` |
+| Canonical engineering method | `wiki/standards/root-cause-global-maximum-method.md` |
 | Local startup/runtime | `wiki/references/local-dev-startup.md` |
 | Backend/API route or contract | `wiki/architecture/backend-api-structure.md`, `wiki/architecture/api-contract.md`, `wiki/architecture/api-design-system.md` |
 | Frontend under `frontend/apps/web` | `wiki/architecture/frontend-structure.md` |
