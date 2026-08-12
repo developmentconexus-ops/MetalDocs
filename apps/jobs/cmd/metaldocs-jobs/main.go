@@ -122,6 +122,11 @@ func run(ctx context.Context) error {
 		repo := approvalrepo.NewPostgresApprovalRepository(db, displayNameRepo)
 		approvalEmitter := approvalapp.NewSQLEmitter()
 		workers := river.NewWorkers()
+		// A5.1 (Lane E, issue #92): the periodic maintenance workers below take a
+		// TxRunner, not a raw *sql.DB — see each worker's NewWorker doc comment
+		// for why the TxRunner ctx-seed chokepoint is a deliberate no-op on this
+		// background-bypass-only path.
+		runner := platformdb.NewTxRunner(db)
 		// ADR 0085 release coordinator: the single writer of the released
 		// state. Every trigger (approval fact, artifact fact, effective-date
 		// timer) funnels into its idempotent Evaluate through this worker.
@@ -129,19 +134,19 @@ func run(ctx context.Context) error {
 			WithEvaluationEnqueuer(releaseEnqueuer).
 			WithProfileReviewIntervalReader(approvalrepo.NewProfileReviewIntervalReader(taxonomyrepo.NewProfileRepository(db)))
 		river.AddWorker(workers, approvaljobs.NewReleaseEvaluateWorker(releaseCoordinator, db))
-		river.AddWorker(workers, notificationsinfra.NewNotificationsFanoutWorker(db))
-		river.AddWorker(workers, notificationsinfra.NewApprovalNotifyWorker(db))
-		river.AddWorker(workers, stuck_instance_watchdog.NewWorker(db, approvalEmitter))
+		river.AddWorker(workers, notificationsinfra.NewNotificationsFanoutWorker(runner))
+		river.AddWorker(workers, notificationsinfra.NewApprovalNotifyWorker(runner))
+		river.AddWorker(workers, stuck_instance_watchdog.NewWorker(runner, approvalEmitter))
 		river.AddWorker(workers, idempotency_janitor.NewWorker(db))
 		river.AddWorker(workers, audit_integrity_validator.NewWorker(auditpg.NewWriter(db)))
-		river.AddWorker(workers, document_review_surfacer.NewWorker(db,
+		river.AddWorker(workers, document_review_surfacer.NewWorker(runner,
 			documentsrepo.NewReviewDueReaderPG(db),
 			documentsrepo.NewReviewSurfaceWriterPG(db)))
 		// F8 (approval-kernel-backend): approval stage SLA surfacer — a
 		// genuine sibling to document_review_surfacer, not an extension of
 		// it (distinct per-stage due_at clock vs per-document
 		// review_due_at cadence; see approval_sla_surfacer package docs).
-		river.AddWorker(workers, approval_sla_surfacer.NewWorker(db,
+		river.AddWorker(workers, approval_sla_surfacer.NewWorker(runner,
 			approvalrepo.NewSLAOverdueReaderPG(db),
 			approvalrepo.NewSLASurfaceWriterPG(db),
 			slaNotifier))
@@ -150,7 +155,7 @@ func run(ctx context.Context) error {
 		// timer). Alert-only (ADR 0068) — it reads through the approval
 		// module's ReleaseHoldReader port and emits governance alerts; it never
 		// mutates a generation and never re-enqueues an evaluation.
-		river.AddWorker(workers, release_hold_reconciler.NewWorker(db,
+		river.AddWorker(workers, release_hold_reconciler.NewWorker(runner,
 			approvalrepo.NewReleaseHoldReaderPG(db),
 			approvalEmitter))
 

@@ -35,7 +35,7 @@ import (
 	"metaldocs/internal/modules/approval/application"
 	approvaldomain "metaldocs/internal/modules/approval/domain"
 	"metaldocs/internal/modules/iam/authz"
-	"metaldocs/internal/platform/db"
+	platformdb "metaldocs/internal/platform/db"
 )
 
 const (
@@ -76,7 +76,7 @@ const (
 // module's EventEmitter). Declared locally so the job depends on a method set,
 // not on a concrete emitter — mirrors stuck_instance_watchdog.
 type governanceEmitter interface {
-	Emit(ctx context.Context, tx db.Tx, e application.GovernanceEvent) error
+	Emit(ctx context.Context, tx platformdb.Tx, e application.GovernanceEvent) error
 }
 
 // ReleaseHoldReconcilerArgs is the (empty) River job payload for the
@@ -94,17 +94,22 @@ func (ReleaseHoldReconcilerArgs) Kind() string { return JobName }
 type ReleaseHoldReconcilerWorker struct {
 	river.WorkerDefaults[ReleaseHoldReconcilerArgs]
 
-	database *sql.DB
-	reader   approvaldomain.ReleaseHoldReader
-	emitter  governanceEmitter
+	runner  platformdb.TxRunner
+	reader  approvaldomain.ReleaseHoldReader
+	emitter governanceEmitter
 }
 
-// NewWorker constructs a ReleaseHoldReconcilerWorker.
-func NewWorker(database *sql.DB, reader approvaldomain.ReleaseHoldReader, emitter governanceEmitter) *ReleaseHoldReconcilerWorker {
+// NewWorker constructs a ReleaseHoldReconcilerWorker. runner replaces a raw
+// *sql.DB (A5.1, Lane E issue #92): this is a system-path TxRunner consumer —
+// ctx carries only authz.WithBackgroundBypass, never a platform/tenant
+// identity, so the TxRunner chokepoint's ctx-seed is a deliberate no-op here,
+// identical to the prior raw db.BeginTx(ctx, nil) behavior. The manual
+// authz.BypassSystem / authz.SeedTxTenant calls below are unchanged.
+func NewWorker(runner platformdb.TxRunner, reader approvaldomain.ReleaseHoldReader, emitter governanceEmitter) *ReleaseHoldReconcilerWorker {
 	return &ReleaseHoldReconcilerWorker{
-		database: database,
-		reader:   reader,
-		emitter:  emitter,
+		runner:  runner,
+		reader:  reader,
+		emitter: emitter,
 	}
 }
 
@@ -112,7 +117,7 @@ func NewWorker(database *sql.DB, reader approvaldomain.ReleaseHoldReader, emitte
 // (no HTTP-request identity exists here — ADR 0022 Phase 7).
 func (w *ReleaseHoldReconcilerWorker) Work(ctx context.Context, job *river.Job[ReleaseHoldReconcilerArgs]) error {
 	ctx = authz.WithBackgroundBypass(ctx)
-	return run(ctx, w.database, w.reader, w.emitter, time.Now().UTC())
+	return run(ctx, w.runner, w.reader, w.emitter, time.Now().UTC())
 }
 
 // run executes one reconciliation tick in two phases, mirroring
@@ -128,8 +133,8 @@ func (w *ReleaseHoldReconcilerWorker) Work(ctx context.Context, job *river.Job[R
 //
 // A tenant whose alerts fail does not abort the sweep: the error is joined and
 // the remaining tenants are still reported.
-func run(ctx context.Context, database *sql.DB, reader approvaldomain.ReleaseHoldReader, emitter governanceEmitter, now time.Time) error {
-	tenantIDs, err := listTenantsWithStuckHolds(ctx, database, reader, now)
+func run(ctx context.Context, runner platformdb.TxRunner, reader approvaldomain.ReleaseHoldReader, emitter governanceEmitter, now time.Time) error {
+	tenantIDs, err := listTenantsWithStuckHolds(ctx, runner, reader, now)
 	if err != nil {
 		slog.ErrorContext(ctx, "release_hold_reconciler: list tenants with stuck holds failed",
 			"job", JobName, "error", err)
@@ -141,7 +146,7 @@ func run(ctx context.Context, database *sql.DB, reader approvaldomain.ReleaseHol
 	var runErr error
 
 	for _, tenantID := range tenantIDs {
-		detected, emitted, err := reconcileTenant(ctx, database, reader, emitter, tenantID, now)
+		detected, emitted, err := reconcileTenant(ctx, runner, reader, emitter, tenantID, now)
 		if err != nil {
 			slog.ErrorContext(ctx, "release_hold_reconciler: reconcile tenant failed",
 				"job", JobName, "tenant_id", tenantID, "error", err)
@@ -164,23 +169,21 @@ func run(ctx context.Context, database *sql.DB, reader approvaldomain.ReleaseHol
 // listTenantsWithStuckHolds opens a single bypass tx (no tenant GUC seeded —
 // system-level cross-tenant read, safe unseeded) and returns the distinct
 // tenant_ids that currently hold at least one stuck generation.
-func listTenantsWithStuckHolds(ctx context.Context, database *sql.DB, reader approvaldomain.ReleaseHoldReader, now time.Time) ([]string, error) {
-	tx, err := database.BeginTx(ctx, nil)
+func listTenantsWithStuckHolds(ctx context.Context, runner platformdb.TxRunner, reader approvaldomain.ReleaseHoldReader, now time.Time) ([]string, error) {
+	var tenantIDs []string
+	err := runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := authz.BypassSystem(ctx, tx); err != nil {
+			return err
+		}
+
+		ids, err := reader.ListTenantsWithStuckHolds(ctx, tx, now, HoldStuckAfter)
+		if err != nil {
+			return err
+		}
+		tenantIDs = ids
+		return nil
+	})
 	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if err := authz.BypassSystem(ctx, tx); err != nil {
-		return nil, err
-	}
-
-	tenantIDs, err := reader.ListTenantsWithStuckHolds(ctx, tx, now, HoldStuckAfter)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return tenantIDs, nil
@@ -190,39 +193,38 @@ func listTenantsWithStuckHolds(ctx context.Context, database *sql.DB, reader app
 // (authz.BypassSystem then authz.SeedTxTenant(tenantID)) and, within it, reads
 // that tenant's stuck holds and emits one alert per generation. Read and alerts
 // share the tx so the alerts are a consistent snapshot of what the sweep saw.
-func reconcileTenant(ctx context.Context, database *sql.DB, reader approvaldomain.ReleaseHoldReader, emitter governanceEmitter, tenantID string, now time.Time) (detected int, emitted int, err error) {
-	tx, err := database.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, 0, err
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if err := authz.BypassSystem(ctx, tx); err != nil {
-		return 0, 0, err
-	}
-	// Carrier-less reconciler ctx → the TxRunner chokepoint never runs here
-	// (this is a raw db.BeginTx). Seed the tenant so FORCE RLS backstops both
-	// the release_generations read and the governance_events write.
-	if err := authz.SeedTxTenant(ctx, tx, tenantID); err != nil {
-		return 0, 0, err
-	}
-
-	stuck, err := reader.ListStuckHolds(ctx, tx, tenantID, now, HoldStuckAfter, BatchSize)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	for _, hold := range stuck {
-		if err := alertStuckHold(ctx, tx, emitter, hold, now); err != nil {
-			return 0, 0, err
+func reconcileTenant(ctx context.Context, runner platformdb.TxRunner, reader approvaldomain.ReleaseHoldReader, emitter governanceEmitter, tenantID string, now time.Time) (detected int, emitted int, err error) {
+	err = runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := authz.BypassSystem(ctx, tx); err != nil {
+			return err
 		}
-		emitted++
-	}
+		// Carrier-less reconciler ctx → the TxRunner chokepoint's ctx-seed is a
+		// deliberate no-op here (see NewWorker doc). Seed the tenant so FORCE RLS
+		// backstops both the release_generations read and the governance_events
+		// write.
+		if err := authz.SeedTxTenant(ctx, tx, tenantID); err != nil {
+			return err
+		}
 
-	if err := tx.Commit(); err != nil {
+		stuck, err := reader.ListStuckHolds(ctx, tx, tenantID, now, HoldStuckAfter, BatchSize)
+		if err != nil {
+			return err
+		}
+
+		for _, hold := range stuck {
+			if err := alertStuckHold(ctx, tx, emitter, hold, now); err != nil {
+				return err
+			}
+			emitted++
+		}
+
+		detected = len(stuck)
+		return nil
+	})
+	if err != nil {
 		return 0, 0, err
 	}
-	return len(stuck), emitted, nil
+	return detected, emitted, nil
 }
 
 // alertStuckHold is the whole action of this job: a structured warning plus one

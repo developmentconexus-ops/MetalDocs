@@ -9,6 +9,7 @@ import (
 	"github.com/riverqueue/river"
 
 	documentsdomain "metaldocs/internal/modules/documents/domain"
+	platformdb "metaldocs/internal/platform/db"
 )
 
 // M3 F3.2 PG-2 (validation-contract.md §2.2 site 4) — the notifications-fanout
@@ -23,7 +24,7 @@ func TestNotificationsFanoutWorker_Work_SeedsTenantBeforeReaderInsert(t *testing
 	}
 	defer func() { _ = db.Close() }()
 
-	worker := NewNotificationsFanoutWorker(db)
+	worker := NewNotificationsFanoutWorker(platformdb.NewTxRunner(db))
 
 	mock.MatchExpectationsInOrder(true)
 	mock.ExpectBegin()
@@ -61,7 +62,7 @@ func TestNotificationsFanoutWorker_Work_SeedsTenantBeforeAuthorInsert(t *testing
 	}
 	defer func() { _ = db.Close() }()
 
-	worker := NewNotificationsFanoutWorker(db)
+	worker := NewNotificationsFanoutWorker(platformdb.NewTxRunner(db))
 
 	mock.MatchExpectationsInOrder(true)
 	mock.ExpectBegin()
@@ -104,7 +105,7 @@ func TestNotificationsFanoutWorker_Work_MultipleReaders_AllInserted(t *testing.T
 	}
 	defer func() { _ = db.Close() }()
 
-	worker := NewNotificationsFanoutWorker(db)
+	worker := NewNotificationsFanoutWorker(platformdb.NewTxRunner(db))
 
 	mock.MatchExpectationsInOrder(true)
 	mock.ExpectBegin()
@@ -148,7 +149,7 @@ func TestNotificationsFanoutWorker_Work_UnhandledEventType_Errors(t *testing.T) 
 	}
 	defer func() { _ = db.Close() }()
 
-	worker := NewNotificationsFanoutWorker(db)
+	worker := NewNotificationsFanoutWorker(platformdb.NewTxRunner(db))
 
 	job := &river.Job[documentsdomain.LifecycleEventArgs]{Args: documentsdomain.LifecycleEventArgs{
 		EventID:    "evt-3",

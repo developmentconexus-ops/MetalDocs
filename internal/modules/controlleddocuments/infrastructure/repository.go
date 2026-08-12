@@ -34,7 +34,8 @@ import (
 // metaldocs.controlled_documents table plus its visibility grant side
 // tables.
 type PostgresControlledDocumentRepository struct {
-	db *sql.DB
+	db     *sql.DB
+	runner db.TxRunner
 	// activeInstance is the documents-owned read-port for the active-instance
 	// projection (M2/F2.2, ADR-0039 D3(b)). CD no longer reads documents/
 	// document_revisions/approval_instances directly.
@@ -44,11 +45,11 @@ type PostgresControlledDocumentRepository struct {
 // NewPostgresControlledDocumentRepository builds a
 // PostgresControlledDocumentRepository backed by db. activeInstance
 // defaults to documentsdomain.NoopActiveInstanceReader when nil.
-func NewPostgresControlledDocumentRepository(db *sql.DB, activeInstance documentsdomain.ActiveInstanceReader) *PostgresControlledDocumentRepository {
+func NewPostgresControlledDocumentRepository(database *sql.DB, activeInstance documentsdomain.ActiveInstanceReader) *PostgresControlledDocumentRepository {
 	if activeInstance == nil {
 		activeInstance = documentsdomain.NoopActiveInstanceReader{}
 	}
-	return &PostgresControlledDocumentRepository{db: db, activeInstance: activeInstance}
+	return &PostgresControlledDocumentRepository{db: database, runner: db.NewTxRunner(database), activeInstance: activeInstance}
 }
 
 // GetByID returns the controlled document by (tenantID, id), hydrating
@@ -382,21 +383,17 @@ ORDER BY controlled_document_id, user_id`, tenantID, pgtype.FlatArray[string](id
 // ErrCDArchivedCodeReuse when the conflicting row is non-active) on a
 // unique-code violation.
 func (r *PostgresControlledDocumentRepository) Create(ctx context.Context, doc *controlleddocumentsdomain.ControlledDocument) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin create CD tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	// ADR 0022 Phase 7: authorize CD create against its target process area.
-	if err := authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), doc.ProcessAreaCode); err != nil {
-		return fmt.Errorf("registry: authz check Create: %w", err)
-	}
-	if err := r.createWithQueryer(ctx, tx, doc); err != nil {
-		return fmt.Errorf("create controlled document with queryer: %w", err)
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit controlled document create tx: %w", err)
+	if err := r.runner.Do(ctx, func(tx *sql.Tx) error {
+		// ADR 0022 Phase 7: authorize CD create against its target process area.
+		if err := authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), doc.ProcessAreaCode); err != nil {
+			return fmt.Errorf("registry: authz check Create: %w", err)
+		}
+		if err := r.createWithQueryer(ctx, tx, doc); err != nil {
+			return fmt.Errorf("create controlled document with queryer: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("create controlled document tx: %w", err)
 	}
 	return nil
 }

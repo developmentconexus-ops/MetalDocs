@@ -1,6 +1,6 @@
 # Module: notifications
 
-> **Last verified:** 2026-08-05 (approval accountability loop, Tasks 4-7 — this doc's first pass. `notifications` was named in `CLAUDE.md`'s 15-module list and in [ADR 0043](../decisions/0043-notifications-module-and-lifecycle-bundle.md) but had no `wiki/modules/` page until now; the doc below is written and verified directly against the current tree, not against ADR 0043's single-worker design (which this module has since outgrown — see §Drift below).)
+> **Last verified:** 2026-08-12 (A5 TxRunner adoption: both River workers now receive the jobs binary's shared `platform/db.TxRunner`; each `Work` owns one `runner.Do` transaction and seeds its event tenant before reads/writes. Transaction semantics, recipient resolution, idempotency, and River kinds are unchanged; worker/main anchors refreshed.) | **Prior:** 2026-08-05 (approval accountability loop, Tasks 4-7 — this doc's first pass. `notifications` was named in `CLAUDE.md`'s 15-module list and in [ADR 0043](../decisions/0043-notifications-module-and-lifecycle-bundle.md) but had no `wiki/modules/` page until now; the doc below is written and verified directly against the current tree, not against ADR 0043's single-worker design (which this module has since outgrown — see §Drift below).)
 > **Status:** active
 > **Maturity:** L1 — first documented pass, not yet a full Arc42/C4 promotion
 > **Scope:** `internal/modules/notifications/` — the per-recipient notification inbox (3 HTTP read/write endpoints, self-scoped) and its TWO River consumer workers.
@@ -11,7 +11,7 @@
 > - `internal/modules/notifications/domain/types.go` — `NotificationRow`, `NotificationsPage`
 > - `internal/modules/notifications/delivery/http/handler.go`, `routes.go` — `GET /notifications`, `GET /notifications/unread-count`, `POST /notifications/{id}/read`, `POST /notifications/read-all`
 > - `internal/modules/iam/domain/model.go` — `CapNotificationRead = "notification.read"` (self-scope cap, deferred — not seeded to any role by default)
-> - `apps/jobs/cmd/metaldocs-jobs/main.go:131-132` — both workers are registered ONLY in the `metaldocs-jobs` binary
+> - `apps/jobs/cmd/metaldocs-jobs/main.go:129,137-138` — shared `TxRunner` construction and both worker registrations, ONLY in the `metaldocs-jobs` binary
 
 ---
 
@@ -27,19 +27,19 @@ ADR 0043 designed one worker (`NotificationsFanoutWorker`) for the document-life
 
 | Worker | Consumes | River kind | Recipient source | Notes |
 |---|---|---|---|---|
-| `NotificationsFanoutWorker` (`fanout_worker.go:28`) | `documentsdomain.LifecycleEventArgs` | `"notification_fanout"` (via the `documents` module's `LifecycleEventArgs.Kind()`) | Reader-targeted events (`document_published`/`superseded`/`obsoleted`) resolve via the published view `metaldocs.v_cd_obligated_readers`, queried in-worker with an explicit `tenant_id`/`controlled_document_id` predicate; author-targeted events (`document_approved`/`document_rejected`) use `args.SubmittedBy` carried in the envelope | This is the one cross-module-adjacent read in the module — a published `v_*` view, per ADR 0039, never a raw base table |
-| `ApprovalNotifyWorker` (`approval_notify_worker.go:41`) | `approvaldomain.ApprovalNotificationArgs` | `"approval_notification"` | The envelope's own `RecipientUserIDs` — a list the `approval` module already resolved and snapshotted (the stage's `eligible_actor_ids`) before enqueueing | Contains **no approval SQL** and knows nothing about stages, routes, or eligibility — the doc comment on the type is explicit about this being the load-bearing boundary decision (invariant 6, [ADR 0082](../decisions/0082-approval-kernel-extraction.md)) |
+| `NotificationsFanoutWorker` (`fanout_worker.go:29`) | `documentsdomain.LifecycleEventArgs` | `"notification_fanout"` (via the `documents` module's `LifecycleEventArgs.Kind()`) | Reader-targeted events (`document_published`/`superseded`/`obsoleted`) resolve via the published view `metaldocs.v_cd_obligated_readers`, queried in-worker with an explicit `tenant_id`/`controlled_document_id` predicate; author-targeted events (`document_approved`/`document_rejected`) use `args.SubmittedBy` carried in the envelope | This is the one cross-module-adjacent read in the module — a published `v_*` view, per ADR 0039, never a raw base table |
+| `ApprovalNotifyWorker` (`approval_notify_worker.go:42`) | `approvaldomain.ApprovalNotificationArgs` | `"approval_notification"` | The envelope's own `RecipientUserIDs` — a list the `approval` module already resolved and snapshotted (the stage's `eligible_actor_ids`) before enqueueing | Contains **no approval SQL** and knows nothing about stages, routes, or eligibility — the doc comment on the type is explicit about this being the load-bearing boundary decision (invariant 6, [ADR 0082](../decisions/0082-approval-kernel-extraction.md)) |
 
-Both workers run inside a single tenant-seeded transaction (`authz.SeedTxTenant`, a `SET LOCAL` config write, not an authz-recording read — H-PRE-1 safe, no lock held) and insert via the same `ON CONFLICT (recipient_user_id, source_event_id) WHERE source_event_id IS NOT NULL DO NOTHING` idempotency shape, so a redelivered job is a no-op rather than a duplicate row.
+The jobs composition root constructs one shared `platform/db.TxRunner` (`main.go:129`) and injects it into both workers (`main.go:137-138`). Each `Work` executes its whole read/write unit through `runner.Do` and calls `authz.SeedTxTenant` first inside the callback (`fanout_worker.go:65-79`; `approval_notify_worker.go:83-107`). `SeedTxTenant` is a `SET LOCAL` config write, not an authz-recording read, so this remains H-PRE-1 safe. Both workers insert via the same `ON CONFLICT (recipient_user_id, source_event_id) WHERE source_event_id IS NOT NULL DO NOTHING` idempotency shape, so a redelivered job is a no-op rather than a duplicate row.
 
 ## 3. Unknown event type: error and dead-letter, never a silent drop
 
 Both workers reject any event type they do not recognize by returning a `fmt.Errorf`, not `nil`:
 
-- `fanout_worker.go:56-61` — the `default` branch of the `switch args.EventType` in `Work` returns `fmt.Errorf("fanout_worker: unknown event type %q", args.EventType)`. The comment on that branch is explicit about why: "returning nil dropped the event with no error and no dead-letter, so the divergence was invisible."
-- `approval_notify_worker.go:60-66` — the same shape: an event type absent from `approvalMessages` returns an error before any DB work happens.
+- `fanout_worker.go:57-62` — the `default` branch of the `switch args.EventType` in `Work` returns `fmt.Errorf("fanout_worker: unknown event type %q", args.EventType)`. The comment on that branch is explicit about why: "returning nil dropped the event with no error and no dead-letter, so the divergence was invisible."
+- `approval_notify_worker.go:61-66` — the same shape: an event type absent from `approvalMessages` returns an error before any DB work happens.
 
-River's retry policy then applies and the job eventually dead-letters, which is the intended failure mode: a producer/consumer type divergence is a bug that must be visible, not a quietly dropped notification. `ApprovalNotifyWorker` treats an EMPTY recipient list differently from an unknown type, though — a livre (zero-stage) route has no eligible actors and that is legitimate, not a divergence, so `len(args.RecipientUserIDs) == 0` returns `nil` (checked before the subject-kind lookup, `approval_notify_worker.go:73-75`).
+River's retry policy then applies and the job eventually dead-letters, which is the intended failure mode: a producer/consumer type divergence is a bug that must be visible, not a quietly dropped notification. `ApprovalNotifyWorker` treats an EMPTY recipient list differently from an unknown type, though — a stage-free (zero-stage) route has no eligible actors and that is legitimate, not a divergence, so `len(args.RecipientUserIDs) == 0` returns `nil` (checked before the subject-kind lookup, `approval_notify_worker.go:69-75`).
 
 ## 4. HTTP surface — self-scope, not module-boundary
 
@@ -55,11 +55,13 @@ ADR 0043 scoped this module to one worker and five document-lifecycle event type
 
 - [`wiki/modules/approval.md`](approval.md) — producer of `ApprovalNotificationArgs`; the accountability-loop changelog entry there is the authoritative source for why the envelope carries a resolved recipient list.
 - [`wiki/modules/documents.md`](documents.md) — producer of `LifecycleEventArgs`.
-- [`wiki/modules/jobs.md`](jobs.md) — the `metaldocs-jobs` binary that hosts both workers; `apps/jobs/cmd/metaldocs-jobs/main.go:131-132`.
+- [`wiki/modules/jobs.md`](jobs.md) — the `metaldocs-jobs` binary that hosts both workers; `apps/jobs/cmd/metaldocs-jobs/main.go:129,137-138`.
 - [ADR 0039](../decisions/0039-cross-module-base-table-read-boundary.md) — published-view read boundary (`v_cd_obligated_readers`).
-- [ADR 0043](../decisions/0043-notifications-module-and-lifecycle-bundle.md) — original module + document-lifecycle bundle decision; superseded in scope (not in force) by the approval accountability loop's second worker, see §5 above.
+- [ADR 0043](../decisions/0043-notifications-module-and-lifecycle-bundle.md) — original module + document-lifecycle bundle decision; still governs the original document-lifecycle worker, while the approval accountability loop adds a second worker beyond its original scope, see §5 above.
 - [ADR 0082](../decisions/0082-approval-kernel-extraction.md) — invariant 6 (module-boundary) that `ApprovalNotifyWorker`'s delivery-only design exists to preserve.
 
 ## Changelog (this doc)
 
+- 2026-08-12 - A5 review sync: clarified that an empty-recipient approval route is a legitimate stage-free (zero-stage) route.
+- 2026-08-12 - A5 TxRunner adoption: documented the shared composition-root runner, `runner.Do` ownership, unchanged tenant seed/idempotency semantics, and refreshed worker/main anchors.
 - 2026-08-05 - First pass. Written and verified against the current tree (both workers, the HTTP surface, the idempotency shape, the unknown-event-type error/dead-letter behavior) rather than transcribed from ADR 0043, which predates the second worker. Created as part of the approval accountability loop's Task 11 doc pass.

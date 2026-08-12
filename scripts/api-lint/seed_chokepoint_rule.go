@@ -6,7 +6,7 @@ package main
 //
 // The TxRunner chokepoint (internal/platform/db/runner.go) now auto-seeds
 // metaldocs.tenant_id + metaldocs.actor_id from the ctx-carried platform
-// identity on every Do/DoReadOnly. Any remaining manual
+// identity on every Do call. Any remaining manual
 // authz.SeedTxIdentity(...) call site outside the chokepoint file, outside
 // the authz package's own definition file, outside _test.go, and outside the
 // declared allowlist is census drift: either it should have been collapsed
@@ -165,7 +165,7 @@ func checkSeedChokepoint(root string, strict bool) ([]Violation, error) {
 				Line: line,
 				Rule: "SEED-CHOKEPOINT",
 				Message: fmt.Sprintf(
-					"manual authz.SeedTxIdentity call at %s outside the TxRunner chokepoint (internal/platform/db/runner.go) and outside scripts/api-lint/seed-chokepoint-allowlist.txt — the chokepoint now auto-seeds tenant+actor from ctx for every Do/DoReadOnly; remove this call if the seeded identity is provably the ctx identity, or add it to the allowlist (category A/B) with a recorded reason if it is a genuine distinct-identity exception (M3 F3.1 validation-contract.md §1.3/§1.4)",
+					"manual authz.SeedTxIdentity call at %s outside the TxRunner chokepoint (internal/platform/db/runner.go) and outside scripts/api-lint/seed-chokepoint-allowlist.txt — the chokepoint now auto-seeds tenant+actor from ctx for every Do call; remove this call if the seeded identity is provably the ctx identity, or add it to the allowlist (category A/B) with a recorded reason if it is a genuine distinct-identity exception (M3 F3.1 validation-contract.md §1.3/§1.4)",
 					key,
 				),
 			})

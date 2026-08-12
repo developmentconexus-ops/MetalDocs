@@ -175,8 +175,9 @@ func (s *Service) Delete(ctx context.Context, tenantID, actorID, id string) erro
 
 // Get fetches a single entry by ID. No business audit event is written, but the
 // authz.Require call may audit a system_admin bypass (ADR 0022 F8) — which
-// INSERTs — so this runs read-write (Do, not DoReadOnly). See the Require
-// INVARIANT note in iam/authz/authz.go.
+// INSERTs — so this runs read-write via Do (TxRunner has no read-only
+// variant to reach for by mistake — DoReadOnly deleted, A5.2 / Lane E issue
+// #92). See the Require INVARIANT note in iam/authz/authz.go.
 func (s *Service) Get(ctx context.Context, tenantID, id string) (*domain.Entry, error) {
 	var out *domain.Entry
 	err := s.runner.Do(ctx, func(tx *sql.Tx) error {

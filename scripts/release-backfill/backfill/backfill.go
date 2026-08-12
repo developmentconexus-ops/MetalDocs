@@ -924,15 +924,18 @@ func describeEventPurge(stale []deliveryEventRow, verb string) string {
 
 // lookupTenant resolves the owning tenant of documentID.
 //
-// It runs in its own short read-only transaction, BEFORE the work transaction,
-// because SeedTxTenant needs the tenant id it is about to seed. The read is
+// It runs in its own short transaction, BEFORE the work transaction, because
+// SeedTxTenant needs the tenant id it is about to seed. The read is
 // legitimate unseeded: the tenant RLS policies are NULL-GUC permissive, which
 // is the same posture every cross-tenant system sweep relies on. Keeping it
-// outside the work transaction also keeps the work transaction seeded from its
-// very first statement.
+// outside the work transaction also keeps the work transaction seeded from
+// its very first statement. Uses Do (not the now-deleted DoReadOnly — A5.2,
+// Lane E issue #92): the pure-read intent was previously documented by a
+// READ ONLY tx flag, but TxRunner no longer offers one, so the guard is now
+// just this comment plus the query itself doing no writes.
 func lookupTenant(ctx context.Context, runner db.TxRunner, documentID string) (string, error) {
 	var tenantID string
-	err := runner.DoReadOnly(ctx, func(tx *sql.Tx) error {
+	err := runner.Do(ctx, func(tx *sql.Tx) error {
 		return tx.QueryRowContext(ctx, `
 			SELECT tenant_id::text FROM documents WHERE id = $1::uuid`,
 			documentID,

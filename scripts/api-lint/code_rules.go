@@ -3,11 +3,17 @@ package main
 // Code-side lints are intentionally single-file scans; they do not build a call graph.
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"go/ast"
+	"go/importer"
 	"go/parser"
 	"go/token"
+	"go/types"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -61,13 +67,24 @@ func RunCodeRules(specPath, modulesRoot string, strict bool) ([]Violation, error
 	}
 	out = append(out, codec...)
 
-	// ADR 0022 — authz.Require must run in a read-WRITE tx (the F8 bypass audit
-	// INSERTs). No DoReadOnly closure may invoke a tier-2 require.
-	rwTx, err := checkAuthzRequireRWTx(modulesRoot, fset)
+	// ADR 0022 / H-PRE-1 — NO-READONLY-TX-OPTIONS: sql.TxOptions{ReadOnly:
+	// true} is banned outright outside test code. Replaces
+	// checkAuthzRequireRWTx (retired alongside DoReadOnly in A5.2, Lane E
+	// issue #92): that guard flagged one *consequence* of a read-only tx
+	// (a DoReadOnly closure invoking authz.Require, whose F8 bypass audit
+	// INSERT a read-only tx rejects — ADR 0022 Phase 11). TxRunner has no
+	// read-only variant anymore, so the remaining risk is a caller reaching
+	// past TxRunner for a raw db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true}).
+	// Banning the construct itself, not one call shape built from it, is
+	// strictly stronger (unrepresentable beats merely-checked) and stays
+	// honest for the whole window until A5.1's later ban on raw .BeginTx(
+	// outside internal/platform/db/ makes tx-opening itself unrepresentable.
+	// See checkNoReadOnlyTxOptions's doc below for the full reasoning record.
+	noReadOnlyTx, err := checkNoReadOnlyTxOptions(modulesRoot, fset)
 	if err != nil {
 		return nil, err
 	}
-	out = append(out, rwTx...)
+	out = append(out, noReadOnlyTx...)
 
 	// M2 F2.1 (validation-contract.md §1.5) — TRIPWIRE-ARM-PARITY: TripwireArms
 	// caps must be registry-real and RenderMigration() must byte-equal the
@@ -138,102 +155,6 @@ func RunCodeRules(specPath, modulesRoot string, strict bool) ([]Violation, error
 	out = append(out, wire...)
 
 	return out, nil
-}
-
-// requireSelectors are the tier-2 enforcement call names a DoReadOnly closure
-// must never contain. "Require"/"RequireAll" cover direct authz.Require calls;
-// the lowercase "require" covers the application-service seam field
-// (authzRequireFunc, e.g. tokens.Service.require) that delegates to authz.Require
-// without naming the package — name-based AST scans would otherwise miss it.
-var requireSelectors = map[string]struct{}{
-	"Require":    {},
-	"RequireAll": {},
-	"require":    {},
-}
-
-// checkAuthzRequireRWTx flags any DoReadOnly(...) call whose closure body invokes
-// a tier-2 require (authz.Require / the require seam). authz.Require's
-// system_admin & BypassSystem short-circuits audit the bypass in-tx with an
-// INSERT (ADR 0022 Phase 11 F8, fail-closed); a Postgres READ ONLY transaction
-// rejects that INSERT, so the path 500s the moment the actor is an admin while
-// staying latent for everyone else. DoReadOnly is the single read-only-tx
-// chokepoint in the tree, so this static guard fully covers the regression
-// surface with zero runtime cost. The fix is always DoReadOnly → Do (or
-// BeginTx(ctx, nil)). Single-file AST scan, matching the other code rules.
-func checkAuthzRequireRWTx(modulesRoot string, fset *token.FileSet) ([]Violation, error) {
-	out := []Violation{}
-	walkErr := filepath.WalkDir(modulesRoot, func(path string, d os.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if d.IsDir() {
-			switch d.Name() {
-			case ".git", ".claude", "node_modules", "vendor", "testdata":
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		lower := strings.ToLower(path)
-		if !strings.HasSuffix(lower, ".go") || strings.HasSuffix(lower, "_test.go") || strings.HasSuffix(lower, ".gen.go") {
-			return nil
-		}
-		file, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
-		if err != nil {
-			return err
-		}
-		ast.Inspect(file, func(n ast.Node) bool {
-			call, ok := n.(*ast.CallExpr)
-			if !ok {
-				return true
-			}
-			sel, ok := call.Fun.(*ast.SelectorExpr)
-			if !ok || sel.Sel.Name != "DoReadOnly" {
-				return true
-			}
-			for _, arg := range call.Args {
-				lit, ok := arg.(*ast.FuncLit)
-				if !ok || lit.Body == nil {
-					continue
-				}
-				if closureCallsRequire(lit.Body) {
-					out = append(out, Violation{
-						File:    path,
-						Line:    fset.Position(call.Pos()).Line,
-						Rule:    "authz-require-rw-tx",
-						Message: "authz.Require invoked inside a DoReadOnly closure — the F8 bypass audit INSERTs and a READ ONLY tx rejects it (ADR 0022 Phase 11). Open the tx with Do or BeginTx(ctx, nil), not DoReadOnly.",
-					})
-				}
-			}
-			return true
-		})
-		return nil
-	})
-	if walkErr != nil {
-		return nil, walkErr
-	}
-	return out, nil
-}
-
-// closureCallsRequire reports whether a function body contains a tier-2 require
-// call (see requireSelectors).
-func closureCallsRequire(body *ast.BlockStmt) bool {
-	found := false
-	ast.Inspect(body, func(n ast.Node) bool {
-		call, ok := n.(*ast.CallExpr)
-		if !ok {
-			return true
-		}
-		sel, ok := call.Fun.(*ast.SelectorExpr)
-		if !ok {
-			return true
-		}
-		if _, hit := requireSelectors[sel.Sel.Name]; hit {
-			found = true
-			return false
-		}
-		return true
-	})
-	return found
 }
 
 // paginationCodecExemptFiles are the ONLY files allowed to name
@@ -311,6 +232,403 @@ func checkPaginationCodec(modulesRoot string, fset *token.FileSet) ([]Violation,
 		return nil, walkErr
 	}
 	return out, nil
+}
+
+// checkNoReadOnlyTxOptions flags any sql.TxOptions{ReadOnly: true} composite
+// literal outside test code — addressed (&sql.TxOptions{...}) or not, field
+// order irrelevant. TxRunner.Do (internal/platform/db/runner.go) is the sole
+// production tx-opening chokepoint and has no read-only variant since
+// DoReadOnly was deleted (A5.2, Lane E issue #92); a hand-rolled read-only tx
+// bypasses that chokepoint AND reintroduces the exact failure mode DoReadOnly
+// used to enable: authz.Require's system_admin/BypassSystem short-circuit
+// audits the bypass in-tx with an INSERT (ADR 0022 Phase 11, H-PRE-1), which
+// Postgres rejects inside a READ ONLY transaction. Banning the literal
+// construct is unconditional — it does not need to trace a call graph to
+// authz.Require the way the retired checkAuthzRequireRWTx did, so it also
+// catches a future read-only tx that never touches authz.Require but still
+// bypasses the chokepoint. Fix is always TxRunner.Do (or, until A5.1's
+// BeginTx-outside-runner.go ban lands, BeginTx(ctx, nil)).
+//
+// The selector qualifier is resolved per file from that file's own imports,
+// not hard-coded to the literal identifier "sql": Go lets any file alias
+// database/sql to another name (import dbsql "database/sql"), and a
+// hard-coded "sql" comparison would let &dbsql.TxOptions{ReadOnly: true}
+// pass silently, reopening exactly the gap this rule exists to close.
+// Every file that imports database/sql, plus every file with a qualified
+// composite-literal type, is type-checked before its composite literals are
+// inspected. Blank (_) imports do not expose a usable TxOptions identifier,
+// but they remain candidates and still have to resolve cleanly. Dot (.)
+// imports, qualified imports, and aliases exported by local packages are all
+// resolved from the composite literal's semantic type; an unrelated or
+// shadowing type is left alone.
+func checkNoReadOnlyTxOptions(modulesRoot string, fset *token.FileSet) ([]Violation, error) {
+	out := []Violation{}
+	resolver := newTxOptionsTypeResolver(modulesRoot)
+	walkErr := filepath.WalkDir(modulesRoot, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			switch d.Name() {
+			case ".git", ".claude", "node_modules", "vendor", "testdata":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		lower := strings.ToLower(path)
+		if !strings.HasSuffix(lower, ".go") || strings.HasSuffix(lower, "_test.go") || strings.HasSuffix(lower, ".gen.go") {
+			return nil
+		}
+		file, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
+		if err != nil {
+			return err
+		}
+		candidate := false
+		for _, imp := range file.Imports {
+			importPath, unquoteErr := strconv.Unquote(imp.Path.Value)
+			if unquoteErr != nil || importPath != "database/sql" {
+				continue
+			}
+			candidate = true
+			break
+		}
+		if !candidate {
+			ast.Inspect(file, func(n ast.Node) bool {
+				lit, ok := n.(*ast.CompositeLit)
+				if !ok || lit.Type == nil {
+					return true
+				}
+				ast.Inspect(lit.Type, func(n ast.Node) bool {
+					if _, ok := n.(*ast.SelectorExpr); ok {
+						candidate = true
+						return false
+					}
+					return true
+				})
+				if !candidate {
+					// A positional TxOptions literal has no ReadOnly key in
+					// the AST. A true element is a narrow prefilter; the
+					// type-aware reporting pass below decides whether it is
+					// actually the canonical database/sql field.
+					for _, elt := range lit.Elts {
+						if value, ok := elt.(*ast.Ident); ok && value.Name == "true" {
+							candidate = true
+							break
+						}
+						kv, ok := elt.(*ast.KeyValueExpr)
+						if !ok {
+							continue
+						}
+						key, ok := kv.Key.(*ast.Ident)
+						value, valueOK := kv.Value.(*ast.Ident)
+						if ok && key.Name == "ReadOnly" && valueOK && value.Name == "true" {
+							candidate = true
+							break
+						}
+					}
+				}
+				return !candidate
+			})
+		}
+		if !candidate {
+			return nil
+		}
+		resolved, err := resolver.resolve(path, file, fset)
+		if err != nil {
+			return err
+		}
+		ast.Inspect(resolved.file, func(n ast.Node) bool {
+			lit, ok := n.(*ast.CompositeLit)
+			if !ok {
+				return true
+			}
+			resolvedType := resolvedCompositeType(resolved.info, lit)
+			if resolvedType == nil {
+				resolver.err = fmt.Errorf("api-lint: cannot resolve composite literal type in %s", path)
+				return false
+			}
+			readOnlyIndex, ok := databaseSQLReadOnlyFieldIndex(resolvedType)
+			if !ok {
+				return true
+			}
+			for index, elt := range lit.Elts {
+				kv, ok := elt.(*ast.KeyValueExpr)
+				if ok {
+					key, keyOK := kv.Key.(*ast.Ident)
+					val, valueOK := kv.Value.(*ast.Ident)
+					if !keyOK || key.Name != "ReadOnly" || !valueOK || val.Name != "true" {
+						continue
+					}
+				} else if index != readOnlyIndex || !isTrueIdent(elt) {
+					continue
+				}
+				out = append(out, Violation{
+					File:    path,
+					Line:    resolved.fset.Position(lit.Pos()).Line,
+					Rule:    "no-readonly-tx-options",
+					Message: "sql.TxOptions{ReadOnly: true} is banned outside test code — TxRunner has no read-only variant (DoReadOnly deleted A5.2, issue #92); a raw read-only tx rejects authz.Require's F8 bypass audit INSERT (ADR 0022 Phase 11, H-PRE-1). Open the tx with TxRunner.Do instead.",
+				})
+			}
+			return true
+		})
+		if resolver.err != nil {
+			return resolver.err
+		}
+		return nil
+	})
+	if walkErr != nil {
+		return nil, walkErr
+	}
+	return out, nil
+}
+
+type resolvedTxOptionsFile struct {
+	file *ast.File
+	fset *token.FileSet
+	info *types.Info
+}
+
+type txOptionsPackage struct {
+	dir         string
+	importPath  string
+	goFiles     []string
+	cgoFiles    []string
+	packageErr  string
+	checkedFile map[string]resolvedTxOptionsFile
+	err         error
+}
+
+type txOptionsTypeResolver struct {
+	root       string
+	moduleMode bool
+	byFile     map[string]*txOptionsPackage
+	exports    map[string]string
+	loadedTags map[string]bool
+	err        error
+}
+
+func newTxOptionsTypeResolver(root string) *txOptionsTypeResolver {
+	r := &txOptionsTypeResolver{root: root, byFile: map[string]*txOptionsPackage{}, exports: map[string]string{}, loadedTags: map[string]bool{}}
+	if _, err := os.Stat(filepath.Join(root, "go.mod")); err == nil {
+		r.moduleMode = true
+	}
+	return r
+}
+
+func (r *txOptionsTypeResolver) resolve(path string, file *ast.File, fset *token.FileSet) (resolvedTxOptionsFile, error) {
+	if r.err != nil {
+		return resolvedTxOptionsFile{}, r.err
+	}
+	if !r.moduleMode {
+		return r.resolveSingleFile(path, file, fset)
+	}
+	if !r.loadedTags[""] {
+		if err := r.loadPackages(path, ""); err != nil {
+			r.err = err
+			return resolvedTxOptionsFile{}, err
+		}
+	}
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return resolvedTxOptionsFile{}, fmt.Errorf("api-lint: cannot resolve types for %s: %w", path, err)
+	}
+	pkg := r.byFile[filepath.Clean(absPath)]
+	if pkg == nil {
+		for _, tags := range []string{"integration", "production"} {
+			if r.loadedTags[tags] {
+				continue
+			}
+			if err := r.loadPackages(path, tags); err != nil {
+				return resolvedTxOptionsFile{}, err
+			}
+			pkg = r.byFile[filepath.Clean(absPath)]
+			if pkg != nil {
+				break
+			}
+		}
+		if pkg == nil {
+			return resolvedTxOptionsFile{}, fmt.Errorf("api-lint: cannot resolve types for %s: go list did not include the candidate file", path)
+		}
+	}
+	if pkg.err != nil {
+		return resolvedTxOptionsFile{}, fmt.Errorf("api-lint: cannot resolve types for %s: %w", path, pkg.err)
+	}
+	if resolved, ok := pkg.checkedFile[filepath.Clean(absPath)]; ok {
+		return resolved, nil
+	}
+	if err := r.checkPackage(pkg, path); err != nil {
+		pkg.err = err
+		return resolvedTxOptionsFile{}, err
+	}
+	return pkg.checkedFile[filepath.Clean(absPath)], nil
+}
+
+func (r *txOptionsTypeResolver) resolveSingleFile(path string, file *ast.File, fset *token.FileSet) (resolvedTxOptionsFile, error) {
+	var typeErr error
+	info := &types.Info{Types: make(map[ast.Expr]types.TypeAndValue), Uses: make(map[*ast.Ident]types.Object), Defs: make(map[*ast.Ident]types.Object)}
+	conf := types.Config{Importer: importer.Default(), Error: func(err error) {
+		if typeErr == nil {
+			typeErr = err
+		}
+	}}
+	_, checkErr := conf.Check(file.Name.Name, fset, []*ast.File{file}, info)
+	if typeErr == nil {
+		typeErr = checkErr
+	}
+	if typeErr != nil {
+		return resolvedTxOptionsFile{}, fmt.Errorf("api-lint: cannot resolve types for %s: %v", path, typeErr)
+	}
+	return resolvedTxOptionsFile{file: file, fset: fset, info: info}, nil
+}
+
+type goListPackage struct {
+	Dir        string
+	ImportPath string
+	GoFiles    []string
+	CgoFiles   []string
+	Export     string
+	Error      *struct {
+		Err string `json:"Err"`
+	} `json:"Error"`
+}
+
+func (r *txOptionsTypeResolver) loadPackages(candidate, tags string) error {
+	args := []string{"list", "-json", "-e", "-export", "-deps"}
+	if tags != "" {
+		args = append(args, "-tags", tags)
+	}
+	args = append(args, "./...")
+	cmd := exec.Command("go", args...)
+	cmd.Dir = r.root
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	raw, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("api-lint: cannot resolve types for %s: go list failed: %v: %s", candidate, err, strings.TrimSpace(stderr.String()))
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	for {
+		var listed goListPackage
+		err := decoder.Decode(&listed)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("api-lint: cannot resolve types for %s: decode go list output: %w", candidate, err)
+		}
+		if listed.Dir == "" || listed.ImportPath == "" {
+			continue
+		}
+		pkg := &txOptionsPackage{dir: listed.Dir, importPath: listed.ImportPath, goFiles: listed.GoFiles, cgoFiles: listed.CgoFiles, checkedFile: map[string]resolvedTxOptionsFile{}}
+		if listed.Error != nil {
+			pkg.packageErr = listed.Error.Err
+			pkg.err = fmt.Errorf("go list package error: %s", listed.Error.Err)
+		}
+		for _, name := range append(append([]string{}, listed.GoFiles...), listed.CgoFiles...) {
+			r.byFile[filepath.Clean(filepath.Join(listed.Dir, name))] = pkg
+		}
+		if listed.Export != "" {
+			r.exports[listed.ImportPath] = listed.Export
+		}
+	}
+	r.loadedTags[tags] = true
+	return nil
+}
+
+func (r *txOptionsTypeResolver) checkPackage(pkg *txOptionsPackage, candidate string) error {
+	if pkg.packageErr != "" {
+		return fmt.Errorf("api-lint: cannot resolve types for %s: %s", candidate, pkg.packageErr)
+	}
+	fset := token.NewFileSet()
+	files := make([]*ast.File, 0, len(pkg.goFiles)+len(pkg.cgoFiles))
+	for _, name := range append(append([]string{}, pkg.goFiles...), pkg.cgoFiles...) {
+		path := filepath.Join(pkg.dir, name)
+		file, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
+		if err != nil {
+			return fmt.Errorf("api-lint: cannot resolve types for %s: parse %s: %w", candidate, path, err)
+		}
+		files = append(files, file)
+	}
+	var typeErr error
+	info := &types.Info{Types: make(map[ast.Expr]types.TypeAndValue), Uses: make(map[*ast.Ident]types.Object), Defs: make(map[*ast.Ident]types.Object)}
+	lookup := func(importPath string) (io.ReadCloser, error) {
+		export := r.exports[importPath]
+		if export == "" {
+			return nil, fmt.Errorf("no export data for %s", importPath)
+		}
+		return os.Open(export) // #nosec G304 -- export is emitted by go list -export for this module/dependency graph; it is not caller-controlled input.
+	}
+	conf := types.Config{Importer: importer.For("gc", lookup), Error: func(err error) {
+		if typeErr == nil {
+			typeErr = err
+		}
+	}}
+	_, checkErr := conf.Check(pkg.importPath, fset, files, info)
+	if typeErr == nil {
+		typeErr = checkErr
+	}
+	if typeErr != nil {
+		return fmt.Errorf("api-lint: cannot resolve types for %s: %v", candidate, typeErr)
+	}
+	for _, file := range files {
+		path := filepath.Clean(fset.Position(file.Pos()).Filename)
+		pkg.checkedFile[path] = resolvedTxOptionsFile{file: file, fset: fset, info: info}
+	}
+	return nil
+}
+
+func isDatabaseSQLTxOptions(typ types.Type) bool {
+	named, ok := types.Unalias(typ).(*types.Named)
+	if !ok {
+		return false
+	}
+	obj := named.Obj()
+	return obj != nil && obj.Pkg() != nil && obj.Pkg().Path() == "database/sql" && obj.Name() == "TxOptions"
+}
+
+func databaseSQLReadOnlyFieldIndex(typ types.Type) (int, bool) {
+	named, ok := types.Unalias(typ).(*types.Named)
+	if !ok || !isDatabaseSQLTxOptions(named) {
+		return 0, false
+	}
+	fields, ok := named.Underlying().(*types.Struct)
+	if !ok {
+		return 0, false
+	}
+	for index := 0; index < fields.NumFields(); index++ {
+		if fields.Field(index).Name() == "ReadOnly" {
+			return index, true
+		}
+	}
+	return 0, false
+}
+
+func isTrueIdent(expr ast.Expr) bool {
+	ident, ok := expr.(*ast.Ident)
+	return ok && ident.Name == "true"
+}
+
+func resolvedCompositeType(info *types.Info, lit *ast.CompositeLit) types.Type {
+	if lit.Type == nil {
+		if typeAndValue, ok := info.Types[lit]; ok && typeAndValue.Type != nil {
+			return typeAndValue.Type
+		}
+		return nil
+	}
+	if typeAndValue, ok := info.Types[lit.Type]; ok && typeAndValue.Type != nil {
+		return typeAndValue.Type
+	}
+	switch expr := lit.Type.(type) {
+	case *ast.Ident:
+		if obj, ok := info.Uses[expr].(*types.TypeName); ok {
+			return obj.Type()
+		}
+	case *ast.SelectorExpr:
+		if obj, ok := info.Uses[expr.Sel].(*types.TypeName); ok {
+			return obj.Type()
+		}
+	}
+	return nil
 }
 
 // checkTripwirePairing flags repository functions that run mutating SQL without

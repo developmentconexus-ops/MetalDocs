@@ -17,9 +17,6 @@ type runnerThatFails struct{}
 func (runnerThatFails) Do(_ context.Context, _ func(*sql.Tx) error) error {
 	return errors.New("tx must not open")
 }
-func (runnerThatFails) DoReadOnly(_ context.Context, _ func(*sql.Tx) error) error {
-	return errors.New("tx must not open")
-}
 
 // staticReserved is a simple in-memory ReservedNames implementation for tests.
 type staticReserved map[string]struct{}

@@ -78,9 +78,6 @@ func (f *fakeApprovalRead) LoadActiveInstanceBySubjectForMutation(_ context.Cont
 type stubTxRunner struct{}
 
 func (stubTxRunner) Do(_ context.Context, fn func(tx *sql.Tx) error) error { return fn(nil) }
-func (stubTxRunner) DoReadOnly(_ context.Context, fn func(tx *sql.Tx) error) error {
-	return fn(nil)
-}
 
 // newMuxWithApprovalKernelOnly builds a templates Handler wired the same way
 // newMux/newMuxWithPresigner do (routes_create_test.go), plus

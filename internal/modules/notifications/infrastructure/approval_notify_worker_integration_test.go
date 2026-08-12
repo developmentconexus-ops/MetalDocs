@@ -13,6 +13,7 @@ import (
 
 	approvaldomain "metaldocs/internal/modules/approval/domain"
 	notificationsinfra "metaldocs/internal/modules/notifications/infrastructure"
+	platformdb "metaldocs/internal/platform/db"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -63,7 +64,7 @@ func TestApprovalNotifyWorker_InsertsOnePerRecipient_TenantScoped(t *testing.T) 
 	userA2 := testdb.NewUser(t, db, testdb.WithTenant(tenantA.ID))
 	_ = testdb.NewUser(t, db, testdb.WithTenant(tenantB.ID))
 
-	w := notificationsinfra.NewApprovalNotifyWorker(db)
+	w := notificationsinfra.NewApprovalNotifyWorker(platformdb.NewTxRunner(db))
 	args := approvaldomain.ApprovalNotificationArgs{
 		EventID:          uuid.NewString(),
 		TenantID:         tenantA.ID,
@@ -95,7 +96,7 @@ func TestApprovalNotifyWorker_SameEventTwice_InsertsOnce(t *testing.T) {
 	tenant := testdb.NewTenant(t, db)
 	user := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID))
 
-	w := notificationsinfra.NewApprovalNotifyWorker(db)
+	w := notificationsinfra.NewApprovalNotifyWorker(platformdb.NewTxRunner(db))
 	args := approvaldomain.ApprovalNotificationArgs{
 		EventID:          uuid.NewString(),
 		TenantID:         tenant.ID,
@@ -124,7 +125,7 @@ func TestApprovalNotifyWorker_NoRecipients_IsNoOp(t *testing.T) {
 	ci := testdb.OpenAsCIRole(t, dbName)
 	tenant := testdb.NewTenant(t, db)
 
-	w := notificationsinfra.NewApprovalNotifyWorker(db)
+	w := notificationsinfra.NewApprovalNotifyWorker(platformdb.NewTxRunner(db))
 	job := &river.Job[approvaldomain.ApprovalNotificationArgs]{Args: approvaldomain.ApprovalNotificationArgs{
 		EventID:   uuid.NewString(),
 		TenantID:  tenant.ID,
@@ -145,7 +146,7 @@ func TestApprovalNotifyWorker_UnknownEventType_Errors(t *testing.T) {
 	tenant := testdb.NewTenant(t, db)
 	user := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID))
 
-	w := notificationsinfra.NewApprovalNotifyWorker(db)
+	w := notificationsinfra.NewApprovalNotifyWorker(platformdb.NewTxRunner(db))
 	job := &river.Job[approvaldomain.ApprovalNotificationArgs]{Args: approvaldomain.ApprovalNotificationArgs{
 		EventID:          uuid.NewString(),
 		TenantID:         tenant.ID,

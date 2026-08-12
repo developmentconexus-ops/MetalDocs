@@ -18,8 +18,8 @@
 # functions, which this rule's function-local scan cannot see across; Work's
 # own sqlmock tests (fanout_worker_test.go) pin the real seed-before-write
 # ordering at the call-site level.
-internal/modules/notifications/infrastructure/fanout_worker.go:102  # (E) fanoutToReaders — seeded by Work (same file) before dispatch; ordering pinned by fanout_worker_test.go
-internal/modules/notifications/infrastructure/fanout_worker.go:128  # (E) insertRow — seeded by Work (same file) before dispatch; ordering pinned by fanout_worker_test.go
+internal/modules/notifications/infrastructure/fanout_worker.go:92  # (E) fanoutToReaders — seeded by Work (same file) before dispatch; ordering pinned by fanout_worker_test.go
+internal/modules/notifications/infrastructure/fanout_worker.go:118  # (E) insertRow — seeded by Work (same file) before dispatch; ordering pinned by fanout_worker_test.go
 
 # --- (A)/(B)/(C)/(D) — documented for auditability, NOT machine-parsed lines ---
 # None of the sites below are live ASYNC-TENANT-SEED AST matches (their write

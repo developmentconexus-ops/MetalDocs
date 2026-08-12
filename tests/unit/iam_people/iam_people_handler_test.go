@@ -227,10 +227,6 @@ func (fakeTxRunner) Do(_ context.Context, fn func(tx *sql.Tx) error) error {
 	return fn(nil)
 }
 
-func (fakeTxRunner) DoReadOnly(_ context.Context, fn func(tx *sql.Tx) error) error {
-	return fn(nil)
-}
-
 // fakeUserUpdaterTx satisfies the userUpdaterTx port (unexported in iamapp)
 // by delegating to fakeAuthService.UpdateUser (ignores the nil *sql.Tx).
 type fakeUserUpdaterTx struct {

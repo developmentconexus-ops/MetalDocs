@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context/Container) Mermaid diagrams. Supersedes the 2026-05-07 stub.
 
-**Last verified:** 2026-08-09 (Phase G — cross-link added: ADR 0093 (Accepted design ruling, not implemented) rules that this module, `documents`, and `templates` will merge into a single **Controlled Information** bounded context; no code/schema change authorized yet; execution owned by #94/A9. Content below otherwise re-verified 2026-06-15) | **Prior:** 2026-06-15 (M4/F4.2 — port ADR 0030 cross-link: `PostgresTemplateVersionChecker` deleted; CD now consumes templates-owned `TemplateVersionPort.GetTemplateVersionState` — `status := "published"` hardcode removed) | **Prior:** 2026-06-12 (Wave 2.12 sync — db==nil authz-bypass class-B branch in Create DELETED (authz now unconditional); DBTX local interface replaced with db.Tx; sequence.go no longer imports database/sql; nosqltxindomain CI guard. Prior Wave 2 sync: GetActiveInstance service+repo extraction, ActiveDocumentInstance domain type, ErrNoActiveInstance, govLogger.LogTx in changeStatus, AuditWriter nil-panic guard in module.go, RLS migration 0234) | **Owner:** leandro | **Status:** active | **Maturity:** L2
+**Last verified:** 2026-08-12 (A5 transaction lifecycle: `PostgresControlledDocumentRepository` now owns a `platform/db.TxRunner`; standalone `Create` uses `runner.Do`, while `CreateTx` remains the explicit caller-owned `db.Tx` seam) | **Prior:** 2026-08-09 (Phase G — cross-link added: ADR 0093 (Accepted design ruling, not implemented) rules that this module, `documents`, and `templates` will merge into a single **Controlled Information** bounded context; no code/schema change authorized yet; execution owned by #94/A9. Content below otherwise re-verified 2026-06-15) | **Prior:** 2026-06-15 (M4/F4.2 — port ADR 0030 cross-link: `PostgresTemplateVersionChecker` deleted; CD now consumes templates-owned `TemplateVersionPort.GetTemplateVersionState` — `status := "published"` hardcode removed) | **Prior:** 2026-06-12 (Wave 2.12 sync — db==nil authz-bypass class-B branch in Create DELETED (authz now unconditional); DBTX local interface replaced with db.Tx; sequence.go no longer imports database/sql; nosqltxindomain CI guard. Prior Wave 2 sync: GetActiveInstance service+repo extraction, ActiveDocumentInstance domain type, ErrNoActiveInstance, govLogger.LogTx in changeStatus, AuditWriter nil-panic guard in module.go, RLS migration 0234) | **Owner:** leandro | **Status:** active | **Maturity:** L2
 
 > **Key files:**
 > - `internal/modules/controlleddocuments/module.go:27` - module wiring (`New`, dependencies)
@@ -11,14 +11,16 @@
 > - `internal/modules/controlleddocuments/delivery/http/handler.go:49` - `injectTenant` middleware (reads tenant via `tenant.FromContext`)
 > - `internal/modules/controlleddocuments/delivery/http/handler.go:61` - `tenantIDFromContext` (local context accessor)
 > - `internal/modules/controlleddocuments/delivery/http/routes.go:70` - `AtomicCreateControlledDocument` handler
-> - `internal/modules/controlleddocuments/delivery/http/routes.go:266` - `GetActiveDocument` handler (delegates to service — delivery layer is now SQL-free for this path; Wave 2)
-> - `internal/modules/controlleddocuments/application/service.go:497` - `GetActiveInstance` (new service method — Wave 2; authz read-check then delegates to repo)
-> - `internal/modules/controlleddocuments/infrastructure/repository.go:517` - `GetActiveInstance` (new repo method — Wave 2; extracted FULL OUTER JOIN query from delivery layer)
+> - `internal/modules/controlleddocuments/delivery/http/routes.go:334` - `GetActiveDocument` handler (delegates to service — delivery layer is now SQL-free for this path; SEC-03/T-006)
+> - `internal/modules/controlleddocuments/application/service.go:844` - `GetActiveInstance` (visibility check plus in-tx `authz.Require(CapDocumentView, "tenant")`, then repository delegation)
+> - `internal/modules/controlleddocuments/infrastructure/repository.go:36,48` - Postgres repository and constructor; the constructor wires `platform/db.TxRunner`
+> - `internal/modules/controlleddocuments/infrastructure/repository.go:385,405` - standalone `Create` via `runner.Do` and caller-owned `CreateTx` seam
+> - `internal/modules/controlleddocuments/infrastructure/repository.go:582` - `GetActiveInstance` (new repo method — Wave 2; extracted FULL OUTER JOIN query from delivery layer)
 > - `internal/modules/controlleddocuments/domain/port.go:8` - `ActiveDocumentInstance` domain type (Wave 2); `GetActiveInstance` on `ControlledDocumentRepository` interface at `:37`
 > - `internal/modules/controlleddocuments/domain/controlled_document.go:37` - `ErrNoActiveInstance` sentinel (Wave 2)
 > - `internal/modules/controlleddocuments/delivery/http/routes.go:595` - `tenantIDFromRequest` -> `tenant.FromContext`
 > - `internal/modules/controlleddocuments/domain/document_initializer.go:61` - `DocumentInitializer` port (consumed by documents)
-> - `internal/modules/controlleddocuments/infrastructure/repository.go:432` - `UpdateStatus` (lifecycle mutation)
+> - `internal/modules/controlleddocuments/infrastructure/repository.go:484` - `UpdateStatus` (lifecycle mutation)
 > - `db/baseline/0001_current_schema.sql` - consolidated schema baseline (includes initial controlled-documents and per-area sequence tables; replaces legacy `migrations/0124…0183` series)
 > - `db/migrations/0210_controlled_documents_capability_namespace.sql` - capability namespace rename (post-baseline)
 
@@ -124,7 +126,7 @@ C4Container
     title Container View — Controlled Documents (module-internal packages)
     Container(http, "HTTP Handlers", "Go (net/http + oapi-codegen)", "8 routes under /api/v1/controlled-documents")
     Container(svc, "ControlledDocumentsService", "Go", "Create / CreateRevision / Obsolete / Supersede / List / Get / PreviewCode")
-    Container(repo, "PostgresControlledDocumentRepository", "Go + database/sql", "CRUD on controlled_documents")
+    Container(repo, "PostgresControlledDocumentRepository", "Go + database/sql", "CRUD; standalone Create via platform/db.TxRunner; CreateTx accepts caller tx")
     Container(seq, "PostgresSequenceAllocator", "Go + database/sql", "EnsureCounter / NextAndIncrement / Peek")
     Container(tpl, "PostgresTemplateVersionChecker", "Go + database/sql", "Validates override template state")
     Container(taxRead, "TaxonomyProfileReader / AreaReader", "Go + database/sql", "Tenant-scoped FK validation")
@@ -166,10 +168,12 @@ Full list in `_artifacts/01-surface.md` (92 exported symbols). Anchors below:
 | `domain/document_initializer.go:51` | `DocumentRef` | struct | Handle returned by the documents port after a successful atomic create |
 | `domain/sequence.go:13` | `SequenceAllocator` | iface | Counter port |
 | `domain/resolution.go:30` | `Resolve` | func | Template-version resolution (default vs override) |
-| `infrastructure/repository.go:353` | `CreateTx` | method | Insert in caller-owned tx |
-| `infrastructure/repository.go:432` | `UpdateStatus` | method | Lifecycle UPDATE |
-| `infrastructure/repository.go:517` | `GetActiveInstance` | method | FULL OUTER JOIN active+published doc query (Wave 2 — extracted from delivery) |
-| `infrastructure/repository.go:559` | `NextAndIncrement` | method | Sequence allocation |
+| `infrastructure/repository.go:36,48` | `PostgresControlledDocumentRepository`, `NewPostgresControlledDocumentRepository` | type + ctor | Holds the SQL pool and a `platform/db.TxRunner` |
+| `infrastructure/repository.go:385` | `Create` | method | Standalone insert in a repository-owned `runner.Do` transaction, including tier-2 authz |
+| `infrastructure/repository.go:405` | `CreateTx` | method | Insert in caller-owned `db.Tx`; authz remains the service's mandatory precondition |
+| `infrastructure/repository.go:484` | `UpdateStatus` | method | Lifecycle UPDATE |
+| `infrastructure/repository.go:582` | `GetActiveInstance` | method | Active+published document projection via the documents-owned read port |
+| `infrastructure/repository.go:661` | `NextAndIncrement` | method | Sequence allocation |
 | `domain/port.go:8` | `ActiveDocumentInstance` | struct | Active+published document result type (Wave 2) |
 | `domain/controlled_document.go:37` | `ErrNoActiveInstance` | sentinel | No active document instance (Wave 2) |
 | `application/service.go:497` | `GetActiveInstance` | method | Read-check + repo delegate (Wave 2) |
@@ -280,7 +284,7 @@ sequenceDiagram
     participant DB as Postgres
     C->>H: GET /controlled-documents/{id}/active-document  (tenant from context via injectTenant)
     H->>S: GetActiveInstance(tenantID, id)
-    S->>S: authz read-check (CanDo / actor context)
+    S->>S: in-tx authz.Require(CapDocumentView, "tenant")
     S->>R: GetActiveInstance(ctx, tenantID, id)
     R->>DB: FULL OUTER JOIN (documents active LEFT JOIN documents published) + approval lookup
     DB-->>R: ActiveDocumentInstance or nil
@@ -293,11 +297,11 @@ sequenceDiagram
     end
 ```
 
-Wave 2 note: delivery layer is now SQL-free for this path — the inline FULL OUTER JOIN that lived in `routes.go:266` was extracted to `PostgresControlledDocumentRepository.GetActiveInstance` (`infrastructure/repository.go:517`) and orchestrated via the new `ControlledDocumentService.GetActiveInstance` (`application/service.go:497`). The new domain type `ActiveDocumentInstance` (`domain/port.go:8`) and sentinel `ErrNoActiveInstance` (`domain/controlled_document.go:37`) complete the extraction.
+Wave 2 / SEC-03 note: delivery layer is SQL-free for this path — `GetActiveDocument` (`delivery/http/routes.go:334`) delegates to `ControlledDocumentService.GetActiveInstance` (`application/service.go:844`). The service first applies the visibility check, then runs `authz.Require(CapDocumentView, "tenant")` inside `runner.Do` before delegating the active-instance projection to `PostgresControlledDocumentRepository.GetActiveInstance` (`infrastructure/repository.go:582`). The domain type `ActiveDocumentInstance` (`domain/port.go:8`) and sentinel `ErrNoActiveInstance` (`domain/controlled_document.go:37`) complete the extraction.
 
 State transitions: none (read).
 
-Tripwire pairing: VIOLATION          no `authz.Require`, no `metaldocs.assert_caps`, no GUC; tenant is now sourced from `tenant.FromContext` (via `injectTenant` middleware) rather than `X-Tenant-ID` header (Plan 3 fix). Authz gap on this read path persists          see T-006.
+Tripwire pairing: ALIGNED (SEC-03 / T-006 closed 2026-07-01): tenant is sourced from `tenant.FromContext` via `injectTenant`; `ControlledDocumentService.GetActiveInstance` (`application/service.go:844`) applies `authz.Require(CapDocumentView, "tenant")` inside `runner.Do` before delegating to `PostgresControlledDocumentRepository.GetActiveInstance` (`infrastructure/repository.go:582`). The handler remains SQL-free and delegates at `delivery/http/routes.go:334`; the former read-path capability gap is closed.
 
 Detail: `_artifacts/02-flow-get-active.md`.
 
@@ -360,7 +364,7 @@ Detail: `_artifacts/02-flow-obsolete.md`.
 ### 8.1 Authentication & Authorization
 
 - Tier 1 (HTTP edge): IAM `CapabilityService` resolves create capability (legacy literal constant; see Historical Literal Key Notes) for POST routes (`apps/api/cmd/metaldocs-api/permissions.go:185-186`; reseeded in `migrations/0165_role_capabilities_reseed.sql` for `editor`, `author`, `system_admin`).
-- Tier 2 (in-tx `authz.Require`): applied in `Create`/`CreateTx` (create capability) and `changeStatus` (obsolete/supersede capabilities). Plan 5 (T-001/T-004 closed).
+- Tier 2 (in-tx `authz.Require`): standalone repository `Create` checks the create capability inside its `runner.Do` transaction (`repository.go:385-396`). The normal service-owned paths check once before calling `CreateTx` (`service.go:480-494,559-664`); `CreateTx` deliberately does not duplicate that query. `changeStatus` checks obsolete/supersede capabilities. Plan 5 (T-001/T-004 closed).
 - Tier 3 (Postgres `enforce_capability_asserted` tripwire): `db/baseline/0001_current_schema.sql:3783-3786` (consolidated; migration 0188 no longer exists as a standalone file) attaches `trg_require_cap_asserted` to `controlled_documents` (INSERT + UPDATE with OR-logic) and `cd_sequence_counters` (`0001_current_schema.sql:3776-3779`).
 - See [wiki/concepts/authz-tiers.md](concepts/authz-tiers.md) and [wiki/decisions/0007-two-tier-authz.md](decisions/0007-two-tier-authz.md).
 
@@ -382,7 +386,7 @@ Create path emits governance events post-commit via `s.govLogger.Log(...)` (`ser
 
 ### 8.6 Concurrency / Transactions
 
-The controlled-documents service owns the transaction (`Create` on the module service struct; legacy literal identifier noted in Historical Literal Key Notes). Sequence allocator and repository transaction-oriented methods accept the module-level `domain.DBTX` abstraction (`ExecContext` / `QueryContext` / `QueryRowContext`) while runtime authz still asserts against the concrete caller-owned `*sql.Tx`. Cross-module `DocumentInitializer.CloneTemplate` runs inside the same tx          atomic CD + first revision per ADR 0011.
+The standard application flow is service-owned: `ControlledDocumentService` uses `platform/db.TxRunner.Do` and passes the resulting `*sql.Tx` through `CreateTx`, sequence allocation, and `DocumentInitializer.CloneTemplate`, preserving the atomic CD + first-revision guarantee from ADR 0011. The repository also exposes standalone `Create`; its constructor now creates a `TxRunner`, and `Create` uses `runner.Do` for begin/commit/rollback plus request-identity seeding. `CreateTx(ctx, db.Tx, doc)` remains the explicit caller-owned seam and performs storage only after the service's mandatory in-tx authz gate.
 
 ### 8.7 Tenant scoping
 
@@ -408,8 +412,8 @@ Tenant is sourced from `tenant.FromContext` via the `injectTenant` thin middlewa
 | Which CD lifecycle events emit audit | tech-debt: missing-ADR (T-002) |
 | Capability granularity (separate create / obsolete / supersede capabilities) | implemented Plan 5 (migration 0187 + dedicated lifecycle capability constants in `domain/model.go`); missing standalone ADR          ADR-TODO per Plan 13 |
 | RFC 9457 envelope adoption | **CLOSED Plan 7** (T-003 + T-007) |
-| GUC-based tenant scoping vs query-arg only | tech-debt: missing-ADR (T-005) |
-| Read-path authz contract (e.g. `GetActiveDocument` tenant source) | tech-debt: missing-ADR (T-006) |
+| GUC-based tenant scoping vs query-arg only | implemented by RLS backstop; T-005 closed 2026-07-01 |
+| Read-path authz contract (`GetActiveDocument` tenant source and `document.view` capability) | implemented by SEC-03; T-006 closed 2026-07-01 |
 | Where controlled-documents audit sink should live (own logger vs shared taxonomy sink) | implementation debt closed in tech-debt (T-008); standalone ADR still missing |
 | Documents DI cycle resolution (`WithDocumentInitializer` setter) | tech-debt: missing-ADR (T-010) |
 | `PostgresTemplateVersionChecker` deleted; CD now consumes templates-owned `TemplateVersionPort.GetTemplateVersionState` port (consumer; `status := "published"` hardcode removed — M4/F4.2) | [`wiki/decisions/0030-template-version-state-port.md`](../decisions/0030-template-version-state-port.md) |
@@ -437,16 +441,16 @@ Tenant is sourced from `tenant.FromContext` via the `injectTenant` thin middlewa
 
 Detail in [wiki/modules/controlled-documents-tech-debt.md](modules/controlled-documents-tech-debt.md). Severity rubric: see top of that file (concrete triggers; do not invent local definitions).
 
-- Critical: 2
-- Major: 7
-- Minor: 5
+- Critical: 2 registered (all closed)
+- Major: 7 registered (all closed)
+- Minor: 5 registered (4 open; 1 closed drift)
 
-Top 3 (by severity, then blast-radius):
+Top 3 current open items (by severity, then blast-radius):
 
-1. T-006          `GetActiveDocument` has no authz check for the read path; residual gap after Plan 3 header-trust fix.
-2. T-005          Tenant scoping relies on query-arg only; no GUC + RLS backstop on controlled-documents-owned tables.
-3. T-009          DI cycle resolved via post-construction setter; latent order-of-construction contract remains.
-(T-001 closed Plan 5: lifecycle authz wired. T-002 closed Plan 6a: obsolete/supersede audit gap closed. T-004 closed Plan 5: tripwire attached to `controlled_documents` + `cd_sequence_counters`. T-008 closed Plan 6a per tech-debt register.)
+1. T-009          DI cycle resolved via post-construction setter; latent order-of-construction contract remains.
+2. T-010          Orphan `documents.subject_code` column and index remain after the subject table removal.
+3. T-011          OpenAPI partial lives under `v1/` while the public HTTP path uses `/api/v1/`.
+(T-005 closed 2026-07-01: tenant-isolation RLS backstop verified. T-006 closed 2026-07-01 / SEC-03: `GetActiveDocument` read-path capability authz wired. T-001/T-002/T-004/T-007/T-008 and TST-09 are also closed; T-012 remains an open minor documentation item.)
 
 ### Coverage stats
 
@@ -476,7 +480,7 @@ Top 3 (by severity, then blast-radius):
 | Failure | Symptom | Detection | Response |
 |---|---|---|---|
 | Postgres unavailable mid atomic-create | Tx aborts; no CD row, no first revision — caller sees 500 | `application/service.go:146` `Create` rolls back the whole tx | Per ADR 0011: atomic guarantee — no orphan slots possible by design |
-| Sequence counter collision (concurrent create on same `(tenant, profile, area)`) | One side wins via `NextAndIncrement`; loser retries | `infrastructure/repository.go:559` uses `SELECT … FOR UPDATE` or `UPDATE … RETURNING` | Caller retries with fresh `Idempotency-Key`; race is bounded |
+| Sequence counter collision (concurrent create on same `(tenant, profile, area)`) | One side wins via `NextAndIncrement`; loser retries | `infrastructure/repository.go:661` uses `SELECT … FOR UPDATE` plus `UPDATE … RETURNING` in the caller tx | Caller retries with fresh `Idempotency-Key`; race is bounded |
 | Idempotency replay (`Idempotency-Key` header reused) | 201 with stored response; no duplicate CD/document | `platform/idempotency.Require` middleware | Expected; safe network-retry path |
 | Body-hash mismatch on replay | 409 from idempotency middleware | Idempotency store detects payload change | Caller must use a fresh key for a different payload |
 | FK validation: profile / area unknown | 4xx from `TaxonomyProfileReader` / `AreaReader` | `taxRead.GetByCode` returns not-found | Confirm taxonomy data; backfill missing rows |
@@ -503,6 +507,7 @@ Top 3 (by severity, then blast-radius):
 
 ## Changelog
 
+- 2026-08-12 - SEC-03/T-006 sync: `GetActiveInstance` now documented at `application/service.go:844` with its in-transaction `authz.Require(CapDocumentView, "tenant")` check; the handler anchor is `routes.go:334`; stale T-005/T-006 risk and decision references were removed from the live architecture view.
 - 2026-06-12 - Wave 2 module sync: `GetActiveDocument` delivery handler extracted — inline SQL moved to `PostgresControlledDocumentRepository.GetActiveInstance` (`infrastructure/repository.go:517`) and `ControlledDocumentService.GetActiveInstance` (`application/service.go:497`); new domain type `ActiveDocumentInstance` (`domain/port.go:8`) and sentinel `ErrNoActiveInstance` (`domain/controlled_document.go:37`); delivery layer now SQL-free for this path. `changeStatus` now calls `govLogger.LogTx(ctx, tx, event)` before commit (`service.go:583`) — governance write is in-tx for lifecycle transitions. `module.go:27` now panics when `AuditWriter` is nil (`DBGovernanceLogger` nil-fallback removed; `taxonomydomain` import dropped from module.go). Migration 0234: ENABLE + FORCE RLS + NULL-permissive `tenant_isolation` policy on `public.controlled_documents` (ADR 0027 Tier 1). §5.2 public surface, §6.2 flow, §6.3 flow, §7 deployment, §8.5 governance, §8.7 tenant scoping, key files all updated.
 - 2026-05-29 - Frontend surface removed: legacy `/controlled-documents` list/detail/explorer pages and Rail "Registro" nav entry deleted. CD identity and lifecycle (create / revise / publish / obsolete / supersede) are now driven exclusively through the Documents flow (`/documents`, `/documents/new`, `/documents/:id`). Backend module (routes, contract, authz, repositories) is unchanged; FE still consumes `features/controlled-documents/api`, `queries/`, and `types.ts` from the Documents flow.
 - 2026-05-25 - Backend quality-bar sync: repository transaction ports now use the module-level `domain.DBTX` interface instead of exposing `*sql.Tx` in repository contracts; clone-template/document-ref constructors validate invalid zero-value port payloads; application/repository error paths wrap underlying errors with operation context and governance warnings use `slog.WarnContext` with tenant/actor fields.
@@ -518,5 +523,3 @@ Top 3 (by severity, then blast-radius):
 
 - 2026-05-11 - Plan 3 sweep: all `X-Tenant-ID` header reads replaced with `tenant.FromContext`; `injectTenant` middleware documented; section 5.3 T-006 note updated; section 6.2 sequence + tripwire note updated; section 8.7 tenant-scoping paragraph added; Key files updated.
 - 2026-05-11 - initial Arc42 + C4 publish; supersedes 2026-05-07 stub.
-
-

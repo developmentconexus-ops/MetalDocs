@@ -43,7 +43,7 @@ func (f *fakeViewPresigner) AssertedPresignGet(_ context.Context, _, _ string, _
 
 // viewAuthzCtx builds a context carrying the tenant+actor identity the
 // TxRunner chokepoint (internal/platform/db/runner.go, M3 F3.1) auto-seeds
-// from ctx on every Do/DoReadOnly, matching the identity expectViewAuthz's
+// from ctx on every Do call, matching the identity expectViewAuthz's
 // mocked set_config exec expects.
 func viewAuthzCtx(tenantID, actorID string) context.Context {
 	ctx := platformtenant.WithTenantID(context.Background(), tenantID)

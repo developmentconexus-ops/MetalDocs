@@ -17,6 +17,7 @@ import (
 
 	"metaldocs/internal/modules/approval/application"
 	"metaldocs/internal/modules/iam/authz"
+	platformdb "metaldocs/internal/platform/db"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -57,7 +58,7 @@ func TestIntegration_Watchdog_P1_AlertOnly(t *testing.T) {
 
 	emitter := application.NewSQLEmitter()
 
-	if err := run(ctx, db, emitter); err != nil {
+	if err := run(ctx, platformdb.NewTxRunner(db), emitter); err != nil {
 		t.Fatalf("watchdog run: %v", err)
 	}
 
@@ -111,7 +112,7 @@ func TestIntegration_Watchdog_P1_AlertOnly_AnyDriftPolicy(t *testing.T) {
 
 	emitter := application.NewSQLEmitter()
 
-	if err := run(ctx, db, emitter); err != nil {
+	if err := run(ctx, platformdb.NewTxRunner(db), emitter); err != nil {
 		t.Fatalf("watchdog run: %v", err)
 	}
 

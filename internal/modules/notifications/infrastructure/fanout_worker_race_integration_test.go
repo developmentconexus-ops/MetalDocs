@@ -15,6 +15,7 @@ import (
 
 	documentsdomain "metaldocs/internal/modules/documents/domain"
 	notificationsinfra "metaldocs/internal/modules/notifications/infrastructure"
+	platformdb "metaldocs/internal/platform/db"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -40,7 +41,7 @@ type notificationRow struct {
 func TestNotificationsFanoutWorker_ConcurrentRaceCommutativity(t *testing.T) {
 	db, _ := testdb.Open(t)
 	ctx := context.Background()
-	worker := notificationsinfra.NewNotificationsFanoutWorker(db)
+	worker := notificationsinfra.NewNotificationsFanoutWorker(platformdb.NewTxRunner(db))
 
 	seedUserGrant := func(t *testing.T, tenantID, cdID, userID string) {
 		t.Helper()

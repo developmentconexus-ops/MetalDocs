@@ -1,6 +1,6 @@
 # MetalDocs Wiki
 
-> **Last verified:** 2026-05-27
+> **Last verified:** 2026-08-12
 > **Purpose:** Compatibility entrypoint for agents and humans that still open `wiki/README.md` first.
 
 The canonical wiki landing page is [index.md](index.md).

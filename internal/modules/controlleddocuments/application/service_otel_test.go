@@ -26,10 +26,6 @@ func (stubTxRunner) Do(_ context.Context, _ func(tx *sql.Tx) error) error {
 	return errors.New("stub runner")
 }
 
-func (stubTxRunner) DoReadOnly(_ context.Context, _ func(tx *sql.Tx) error) error {
-	return errors.New("stub runner")
-}
-
 // stubCDRepo satisfies cddomain.ControlledDocumentRepository.
 type stubCDRepo struct{}
 

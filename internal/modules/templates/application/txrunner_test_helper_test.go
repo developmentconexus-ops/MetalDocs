@@ -12,7 +12,7 @@ func newTxRunner(database *sql.DB) db.TxRunner { return db.NewTxRunner(database)
 
 // authzCtx builds a context carrying the tenant+actor identity the TxRunner
 // chokepoint (internal/platform/db/runner.go, M3 F3.1) auto-seeds from ctx on
-// every Do/DoReadOnly. Tests that assert against a mocked set_config exec
+// every Do call. Tests that assert against a mocked set_config exec
 // (matching the chokepoint's SQL) must drive the call through a context
 // carrying the same tenant/actor the mock expects — this is the ctx a real
 // authenticated request carries via the auth middleware in production.

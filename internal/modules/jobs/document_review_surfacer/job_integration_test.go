@@ -26,6 +26,7 @@ import (
 
 	documentsrepo "metaldocs/internal/modules/documents/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
+	platformdb "metaldocs/internal/platform/db"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -123,7 +124,7 @@ func TestIntegration_Surfacer_FullTick_IteratesAllTenants(t *testing.T) {
 	writer := documentsrepo.NewReviewSurfaceWriterPG(db)
 	ctx := authz.WithBackgroundBypass(context.Background())
 
-	if err := run(ctx, db, reader, writer, now); err != nil {
+	if err := run(ctx, platformdb.NewTxRunner(db), reader, writer, now); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 
@@ -221,7 +222,7 @@ func TestIntegration_Surfacer_Idempotent_SecondRunNoOp(t *testing.T) {
 	writer := documentsrepo.NewReviewSurfaceWriterPG(db)
 	ctx := authz.WithBackgroundBypass(context.Background())
 
-	if err := run(ctx, db, reader, writer, now); err != nil {
+	if err := run(ctx, platformdb.NewTxRunner(db), reader, writer, now); err != nil {
 		t.Fatalf("first run: %v", err)
 	}
 	firstSurfacedAt := readReviewSurfacedAt(t, db, docID)
@@ -233,7 +234,7 @@ func TestIntegration_Surfacer_Idempotent_SecondRunNoOp(t *testing.T) {
 	// idempotent it would overwrite review_surfaced_at with the new `now`,
 	// which this assertion would catch.
 	secondNow := now.Add(10 * time.Minute)
-	if err := run(ctx, db, reader, writer, secondNow); err != nil {
+	if err := run(ctx, platformdb.NewTxRunner(db), reader, writer, secondNow); err != nil {
 		t.Fatalf("second run: %v", err)
 	}
 	secondSurfacedAt := readReviewSurfacedAt(t, db, docID)
@@ -262,7 +263,7 @@ func TestIntegration_Surfacer_ReSurfacesAfterReviewDueAdvances(t *testing.T) {
 	writer := documentsrepo.NewReviewSurfaceWriterPG(db)
 	ctx := authz.WithBackgroundBypass(context.Background())
 
-	if err := run(ctx, db, reader, writer, now); err != nil {
+	if err := run(ctx, platformdb.NewTxRunner(db), reader, writer, now); err != nil {
 		t.Fatalf("first run: %v", err)
 	}
 	firstSurfacedAt := readReviewSurfacedAt(t, db, docID)
@@ -278,7 +279,7 @@ func TestIntegration_Surfacer_ReSurfacesAfterReviewDueAdvances(t *testing.T) {
 	setReviewDueAt(t, db, docID, newDue)
 
 	secondNow := now.Add(10 * time.Minute)
-	if err := run(ctx, db, reader, writer, secondNow); err != nil {
+	if err := run(ctx, platformdb.NewTxRunner(db), reader, writer, secondNow); err != nil {
 		t.Fatalf("second run: %v", err)
 	}
 	secondSurfacedAt := readReviewSurfacedAt(t, db, docID)

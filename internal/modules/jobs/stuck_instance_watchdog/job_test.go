@@ -161,7 +161,7 @@ func TestWatchdog_NoStuck(t *testing.T) {
 	db := newWatchdogDB(t, state)
 	emitter := &recordingEmitter{}
 
-	if err := run(authz.WithBackgroundBypass(context.Background()), db, emitter); err != nil {
+	if err := run(authz.WithBackgroundBypass(context.Background()), platformdb.NewTxRunner(db), emitter); err != nil {
 		t.Fatalf("job returned error: %v", err)
 	}
 
@@ -201,7 +201,7 @@ func TestWatchdog_AlertOnly(t *testing.T) {
 	db := newWatchdogDB(t, state)
 	emitter := &recordingEmitter{}
 
-	if err := run(authz.WithBackgroundBypass(context.Background()), db, emitter); err != nil {
+	if err := run(authz.WithBackgroundBypass(context.Background()), platformdb.NewTxRunner(db), emitter); err != nil {
 		t.Fatalf("job returned error: %v", err)
 	}
 
@@ -236,7 +236,7 @@ func TestWatchdog_AlertOnly_MultipleInstances(t *testing.T) {
 	db := newWatchdogDB(t, state)
 	emitter := &recordingEmitter{}
 
-	if err := run(authz.WithBackgroundBypass(context.Background()), db, emitter); err != nil {
+	if err := run(authz.WithBackgroundBypass(context.Background()), platformdb.NewTxRunner(db), emitter); err != nil {
 		t.Fatalf("job returned error: %v", err)
 	}
 

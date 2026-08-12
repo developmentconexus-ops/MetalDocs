@@ -6,6 +6,7 @@
 > single-runner lock. Corrected in place throughout; **H-PRE-1 stays LIVE**. See §H-PRE-1. Ratification
 > carried to M5 HS-1.
 
+> **Last verified:** 2026-08-12 (A5 TxRunner adoption in both notifications workers; fanout anchors refreshed, ordering/idempotency decision unchanged)
 > **Status:** Accepted
 > **Date:** 2026-07-04
 > **Program:** global-maximum-remediation · **Milestone:** M5 (async consolidation onto River), feature F5.1
@@ -49,7 +50,7 @@ primitive.
 
 Two correctness debts ride along (review dimension 5 DEBT): the staging outbox tables are **never
 purged** (`MarkDispatched` only flips status — unbounded growth: `staging_outbox.go:112-131`), and the
-lifecycle fanout has **no ordering guarantee** between River jobs (`fanout_worker.go:47-138`).
+lifecycle fanout has **no ordering guarantee** between River jobs (`fanout_worker.go:48-131`).
 
 ## Decision
 
@@ -98,7 +99,7 @@ before every tenant-scoped write **stays** so FORCE-RLS backstops the async path
 Strict cross-job ordering is **not** imposed. The fanout is **order-independent by construction**: each
 lifecycle event fans out to **additive, per-recipient-per-event notification rows**
 (`INSERT ... ON CONFLICT (recipient_user_id, source_event_id) WHERE source_event_id IS NOT NULL DO
-NOTHING`, `fanout_worker.go:123-136`). There is **no shared mutable "current status" row** a later event
+NOTHING`, `fanout_worker.go:92-99,118-123`). There is **no shared mutable "current status" row** a later event
 could clobber — a `published` fanout and a `superseded` fanout write **distinct** rows keyed by their own
 `source_event_id`. Therefore:
 
@@ -189,6 +190,6 @@ retirement proof. If it fails, the lock removal is unsafe and reverts (HS-2 boun
 - River v0.37.1 native capabilities (periodic jobs, `river_leader` elector, retention, `InsertTx`) — River docs, verified 2026-07-04
 - Retired: lease scheduler `internal/modules/jobs/scheduler/scheduler.go`; `db/baseline/0001_current_schema.sql:59-99,1354-1361`
 - Staging: `internal/modules/render/fanout/staging_outbox_worker.go`, `staging_outbox.go`
-- Fanout idempotency: `internal/modules/notifications/infrastructure/fanout_worker.go:123-136`
+- Fanout idempotency: `internal/modules/notifications/infrastructure/fanout_worker.go:92-99,118-123`
 - Async requirements: `wiki/architecture/backend-target-architecture.md:250-254` — **REQ-ASYNC-1** (transactional outbox), **REQ-ASYNC-2** (idempotent consumer), **REQ-ASYNC-3** (backoff+jitter+cap → inspectable DLQ), **REQ-ASYNC-4** (watchdog for stuck work + queue-depth/oldest-item metric), **REQ-ASYNC-5** (retry ownership declared once per pipeline), **REQ-ASYNC-6** (background jobs use the fail-closed bypass bridge, never a synthetic HTTP principal) — all preserved by this consolidation
 - H-PRE-1 origin: `wiki/decisions/` advisory-lock constraint; memory `advisory-lock-deadlock-constraint`; `invariant-checklist.md:58`

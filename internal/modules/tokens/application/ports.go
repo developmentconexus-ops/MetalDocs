@@ -12,7 +12,6 @@ import (
 // depends on the behaviour it needs, not the whole platform package surface.
 type txRunner interface {
 	Do(ctx context.Context, fn func(tx *sql.Tx) error) error
-	DoReadOnly(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
 // auditRecorder records a state change inside the business tx. tx is typed
