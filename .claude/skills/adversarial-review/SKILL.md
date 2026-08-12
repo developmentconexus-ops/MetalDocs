@@ -11,7 +11,7 @@ description: >-
 
 ## Canonical engineering doctrine
 
-`docs/engineering/root-cause-global-maximum-method.md` owns root-cause, local/global maximum, YAGNI, enforcement, transitional-solution semantics, and the legal engineering outcomes.
+`wiki/standards/root-cause-global-maximum-method.md` owns root-cause, local/global maximum, YAGNI, enforcement, transitional-solution semantics, and the legal engineering outcomes.
 
 This skill does **not** redefine those concepts. It applies them during adversarial review and adds review-specific mechanics: disposition, attack targets, architectural checks, convergence, and stop conditions.
 
