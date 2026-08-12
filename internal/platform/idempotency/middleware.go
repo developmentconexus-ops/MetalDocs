@@ -132,7 +132,7 @@ func Require(store *Store, actorFromCtx func(context.Context) (string, string, e
 
 // serveWithIdempotency runs the two-phase BeginReplay / CompleteReplay /
 // FailReplay protocol described on Require, once streaming opt-out has
-// already been ruled out by the caller.
+// serveWithIdempotency validates the idempotency key, scopes it to the current tenant and actor, and coordinates replay handling before invoking the next handler. It returns client or server errors for invalid identity, request, storage, or replay conditions and buffers newly claimed responses for replay.
 func serveWithIdempotency(store *Store, actorFromCtx func(context.Context) (string, string, error), next http.Handler, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	key := r.Header.Get("Idempotency-Key")

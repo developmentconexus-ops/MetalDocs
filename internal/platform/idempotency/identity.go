@@ -33,7 +33,8 @@ import (
 // aliases, named results, methods, closures, multiline signatures, and local
 // shadowing are handled by language semantics rather than source spelling.
 // The fix for a flagged function is still to delete it and call this function,
-// not to patch its error handling in place.
+// TenantActorFromContext extracts the tenant ID and authenticated actor ID from ctx.
+// It returns empty identifiers and the encountered error if either lookup fails.
 func TenantActorFromContext(ctx context.Context) (string, string, error) {
 	tenantID, err := tenant.FromContext(ctx)
 	if err != nil {

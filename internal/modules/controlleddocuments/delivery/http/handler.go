@@ -53,7 +53,7 @@ type Handler struct {
 // keep db on the struct, unread after construction — dead weight predating
 // this change, deleted here rather than left for a future audit to
 // rediscover) — TenantActorFromContext (identity.go) resolves tenant/actor
-// from context, not from a handle threaded through Handler.
+// NewHandler constructs a controlled-document HTTP handler with idempotency tracking for mutating operations.
 func NewHandler(svc *application.ControlledDocumentService, db *sql.DB) *Handler {
 	return &Handler{
 		svc:            svc,
@@ -72,7 +72,7 @@ func NewHandler(svc *application.ControlledDocumentService, db *sql.DB) *Handler
 // tenant.FromContext(ctx) directly, and the context this middleware passes
 // through is unmodified, so it sees the same claim injectTenant already
 // validated. injectTenant itself stays, unchanged in behavior, as the
-// pre-existing fail-closed guard for this module's four mutating routes.
+// injectTenant verifies that tenant information is present in the request context before serving the request.
 func injectTenant(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, err := tenant.FromContext(r.Context()); err != nil {
@@ -95,7 +95,7 @@ func (h *Handler) Tag() string { return "controlled-documents" }
 // index-based comparison the revisions/obsolete/supersede route matches in
 // Mount used inline before extraction (not strings.HasPrefix/HasSuffix, to
 // keep the match behavior byte-identical) — factored out once so Mount's own
-// body stops repeating it three times.
+// matchesControlledDocumentSubPath reports whether path begins with the controlled-document route prefix and ends with suffix.
 func matchesControlledDocumentSubPath(path, suffix string) bool {
 	const prefix = "/api/v1/controlled-documents/"
 	return len(path) > len(prefix) &&

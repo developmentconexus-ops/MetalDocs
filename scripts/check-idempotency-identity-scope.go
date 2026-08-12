@@ -45,6 +45,9 @@ func main() {
 	}
 }
 
+// run performs the repository-wide identity reimplementation guard and reports any violations.
+// It returns an error if repository discovery, candidate loading, or scanning fails, or if
+// unauthorized actor identity resolution is found.
 func run() error {
 	root, err := repoRoot()
 	if err != nil {
@@ -99,6 +102,7 @@ func run() error {
 	return nil
 }
 
+// repoRoot returns the absolute, cleaned path to the repository root reported by Git.
 func repoRoot() (string, error) {
 	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
 	out, err := cmd.Output()
@@ -112,6 +116,7 @@ func repoRoot() (string, error) {
 	return filepath.Clean(root), nil
 }
 
+// discoverCandidates identifies tracked, non-vendored Go files that import the tenant package and verifies that the canonical identity implementation is tracked. It returns an error if Git listing, path resolution, parsing, or canonical-file checks fail.
 func discoverCandidates(root string) ([]candidate, error) {
 	cmd := exec.Command("git", "ls-files", "-z", "--", "*.go")
 	cmd.Dir = root
@@ -149,6 +154,7 @@ func discoverCandidates(root string) ([]candidate, error) {
 	return candidates, nil
 }
 
+// hasUsableTenantImport reports whether file imports the tenant package for use.
 func hasUsableTenantImport(file *ast.File) bool {
 	for _, spec := range file.Imports {
 		path, err := strconv.Unquote(spec.Path.Value)
@@ -159,6 +165,9 @@ func hasUsableTenantImport(file *ast.File) bool {
 	return false
 }
 
+// loadCandidates loads tracked candidate Go files with syntax and type information under
+// the default and integration build configurations. It returns the loaded files grouped
+// by normalized path, or an error if package loading or type checking fails.
 func loadCandidates(root string, candidates []candidate) (map[string][]loadedFile, error) {
 	patterns := make([]string, 0, len(candidates))
 	seenDirs := map[string]bool{}
@@ -207,6 +216,7 @@ func loadCandidates(root string, candidates []candidate) (map[string][]loadedFil
 	return loaded, nil
 }
 
+// isCandidatePath reports whether key identifies one of the candidate paths.
 func isCandidatePath(key string, candidates []candidate) bool {
 	for _, candidate := range candidates {
 		if pathKey(candidate.abs) == key {
@@ -216,6 +226,8 @@ func isCandidatePath(key string, candidates []candidate) bool {
 	return false
 }
 
+// scanLoadedFile finds direct tenant.FromContext calls within actor-from-context functions
+// and returns their source locations.
 func scanLoadedFile(rel string, loaded loadedFile) []finding {
 	info := loaded.pkg.TypesInfo
 	var findings []finding
@@ -263,6 +275,7 @@ func scanLoadedFile(rel string, loaded loadedFile) []finding {
 	return findings
 }
 
+// isActorFromContextSignature reports whether t is a non-variadic function signature that accepts a context.Context and returns two strings and an error.
 func isActorFromContextSignature(t types.Type) bool {
 	sig, ok := types.Unalias(t).(*types.Signature)
 	if !ok || sig.Variadic() || sig.Params().Len() != 1 || sig.Results().Len() != 3 {
@@ -274,6 +287,7 @@ func isActorFromContextSignature(t types.Type) bool {
 		isErrorType(sig.Results().At(2).Type())
 }
 
+// isContextType reports whether t is the context.Context type.
 func isContextType(t types.Type) bool {
 	named, ok := types.Unalias(t).(*types.Named)
 	if !ok || named.Obj().Pkg() == nil {
@@ -282,14 +296,17 @@ func isContextType(t types.Type) bool {
 	return named.Obj().Pkg().Path() == "context" && named.Obj().Name() == "Context"
 }
 
+// isIdenticalPredeclared reports whether t resolves to the specified predeclared basic type.
 func isIdenticalPredeclared(t types.Type, kind types.BasicKind) bool {
 	return types.Identical(types.Unalias(t), types.Typ[kind])
 }
 
+// isErrorType reports whether t is identical to the built-in error interface type.
 func isErrorType(t types.Type) bool {
 	return types.Identical(types.Unalias(t), types.Unalias(types.Universe.Lookup("error").Type()))
 }
 
+// isTenantFromContext reports whether call directly invokes the non-method tenant.FromContext function.
 func isTenantFromContext(call *ast.CallExpr, info *types.Info) bool {
 	ident := terminalCalleeIdent(call.Fun)
 	if ident == nil {
@@ -303,6 +320,7 @@ func isTenantFromContext(call *ast.CallExpr, info *types.Info) bool {
 	return ok && signature.Recv() == nil
 }
 
+// terminalCalleeIdent returns the identifier at the end of a parenthesized or selector expression.
 func terminalCalleeIdent(expr ast.Expr) *ast.Ident {
 	for {
 		switch current := expr.(type) {
@@ -318,6 +336,7 @@ func terminalCalleeIdent(expr ast.Expr) *ast.Ident {
 	}
 }
 
+// pathKey returns a normalized path suitable for platform-independent comparison. On Windows, the result is lowercased.
 func pathKey(path string) string {
 	abs, err := filepath.Abs(path)
 	if err == nil {
