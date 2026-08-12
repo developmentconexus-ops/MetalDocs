@@ -777,55 +777,8 @@ var checks = []Check{
 			Want: []string{"internal/fixture/bypass_test.go"},
 		},
 	},
-	{
-		ID:       "idempotency-identity-scope-guard",
-		Desc:     "no actorFromCtx-shaped function outside internal/platform/idempotency/identity.go resolves tenant identity directly through tenant.FromContext (#90/A3.5 adoption guard)",
-		Profiles: []string{ProfileFast, ProfilePR, ProfileFull},
-		Argv:     []string{"go", "run", "./scripts/check-idempotency-identity-scope.go"},
-		// Deliberately no Paths, same reasoning as testdb-bypass-guard above:
-		// the script's own scan is `git ls-files '*.go'` repo-wide, not scoped
-		// to internal/. A hand-rolled actorFromCtx-shaped resolver could be
-		// added under apps/ or tests/ just as easily as under internal/, and
-		// the whole point of this guard is that it does not trust a caller to
-		// know where the next violation will land.
-		CIJob: "ci.yml:verify",
-		Fixture: &Fixture{
-			Dir: "idempotency-identity-scope-guard",
-			Want: []string{
-				"internal/modules/fixture/bad_handler.go",
-				// Locks the PR #122 review regression: an ungrouped
-				// `import "path"` form must resolve to the actual tenant package,
-				// not a source-spelling heuristic. The fixture remains even though
-				// the type-aware scanner now resolves the import object semantically.
-				"internal/modules/fixture/bad_handler_ungrouped_import.go",
-				"internal/modules/fixture/bad_handler_named_results.go",
-				"internal/modules/fixture/bad_handler_aliased_context.go",
-				"internal/modules/fixture/bad_handler_dot_import.go",
-				"internal/modules/fixture/bad_handler_method.go",
-				"internal/modules/fixture/bad_handler_type_aliases.go",
-				"internal/modules/fixture/bad_handler_func_literal.go",
-				"internal/modules/fixture/bad_handler_multiline.go",
-				"internal/modules/fixture/bad_handler_generic.go",
-				"internal/modules/fixture/bad_handler_integration_variant.go",
-				"internal/modules/fixture/bad_handler_function_alias.go",
-			},
-			// NotWant proves the identity.go exclusion itself is guarded, not
-			// merely conventional: the fixture tree plants, at exactly
-			// internal/platform/idempotency/identity.go, a copy of the real
-			// function shape (actorFromCtx signature, calls tenant.FromContext)
-			// that WOULD fire this guard everywhere else in the tree. If the
-			// script's exclusion of that one path is ever deleted, the check's
-			// output starts naming this path — NotWant catches that the moment
-			// it happens, rather than relying on nobody removing the `grep -v`.
-			NotWant: []string{
-				"internal/platform/idempotency/identity.go",
-				"internal/modules/fixture/not_a_tenant_package_call.go",
-				"internal/modules/fixture/not_a_defined_result.go",
-				"internal/modules/fixture/not_a_nested_resolver.go",
-			},
-		},
-	},
-
+	// idempotency identity resolution is structurally owned by Require; there
+	// is no caller-supplied resolver to adopt or drift.
 	// ---- Governance -------------------------------------------------------
 	{
 		ID:       "adr-status",

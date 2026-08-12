@@ -83,8 +83,8 @@ func (s *Store) BeginReplay(ctx context.Context, tenantID, actorID, key, payload
 	// not a narrower key, it is a SHARED one every tenant-less caller would
 	// collide into (same reasoning idempotency.Require's own docstring
 	// already applies to actor absence). This is the persistence-boundary
-	// half of the fix — TenantActorFromContext (identity.go) is the
-	// application-boundary half. Both must hold: this guard exists so a
+	// half of the fix — the middleware's package-owned identity boundary is
+	// the application-boundary half. Both must hold: this guard exists so a
 	// future caller that bypasses the shared resolver still fails closed
 	// here, not because the resolver is expected to be bypassed.
 	if strings.TrimSpace(tenantID) == "" {

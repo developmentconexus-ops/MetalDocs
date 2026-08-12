@@ -43,7 +43,7 @@ func TestMiddleware_StreamingHandler_WithoutOptOut_FailsClosed(t *testing.T) {
 	tenant := testdb.NewTenant(t, db)
 	store := idempotency.New(db, "POST /stream")
 	h := withIDs(tenant.ID, testActorMW)(
-		idempotency.Require(store, actorFromCtx)(streamingHandler()),
+		idempotency.Require(store)(streamingHandler()),
 	)
 	req := httptest.NewRequest("POST", "/stream", bytes.NewReader([]byte(`{}`)))
 	req.Header.Set("Idempotency-Key", "55555555-5555-4555-8555-555555555555")
@@ -81,7 +81,7 @@ func TestMiddleware_StreamingHandler_WithOptOut_PassesThroughUnwrapped(t *testin
 		return r.URL.Path == "/stream"
 	}
 	h := withIDs(tenant.ID, testActorMW)(
-		idempotency.Require(store, actorFromCtx, idempotency.WithStreamingOptOut(optOut))(streamingHandler()),
+		idempotency.Require(store, idempotency.WithStreamingOptOut(optOut))(streamingHandler()),
 	)
 
 	req := httptest.NewRequest("POST", "/stream", bytes.NewReader([]byte(`{}`)))
@@ -110,7 +110,7 @@ func TestMiddleware_OptOutFalse_StillEnforcesIdempotency(t *testing.T) {
 	store := idempotency.New(db, "POST /test")
 	neverOptOut := func(*http.Request) bool { return false }
 	h := withIDs(tenant.ID, testActorMW)(
-		idempotency.Require(store, actorFromCtx, idempotency.WithStreamingOptOut(neverOptOut))(handler201(`{}`)),
+		idempotency.Require(store, idempotency.WithStreamingOptOut(neverOptOut))(handler201(`{}`)),
 	)
 	req := httptest.NewRequest("POST", "/test", bytes.NewReader([]byte(`{}`)))
 	rec := httptest.NewRecorder()

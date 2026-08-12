@@ -93,7 +93,7 @@ func (h *Handler) Mount(mux httprouter.Muxer) {
 			// because the generated router registers method-qualified patterns —
 			// do NOT prepend r.Method again or the lookup silently misses.
 			if storeOf, ok := idempotentCreateRoutes[r.Pattern]; ok {
-				idempotency.Require(storeOf(h), idempotency.TenantActorFromContext)(next).ServeHTTP(w, r)
+				idempotency.Require(storeOf(h))(next).ServeHTTP(w, r)
 				return
 			}
 			next.ServeHTTP(w, r)

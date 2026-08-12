@@ -52,8 +52,8 @@ type Handler struct {
 // construct those four stores (#90/A3.5 drive-by: the Handler used to also
 // keep db on the struct, unread after construction — dead weight predating
 // this change, deleted here rather than left for a future audit to
-// rediscover) — TenantActorFromContext (identity.go) resolves tenant/actor
-// from context, not from a handle threaded through Handler.
+// rediscover) — the idempotency middleware resolves tenant/actor through its
+// package-owned identity boundary, not from a handle threaded through Handler.
 func NewHandler(svc *application.ControlledDocumentService, db *sql.DB) *Handler {
 	return &Handler{
 		svc:            svc,
@@ -68,10 +68,10 @@ func NewHandler(svc *application.ControlledDocumentService, db *sql.DB) *Handler
 // claim is absent from context before any mutating route runs. It used to
 // also re-store the tenant under a local context key so the (now-deleted)
 // idempotencyActor closure could read it without a *http.Request — that
-// indirection is gone (#90/A3.5): idempotency.TenantActorFromContext reads
-// tenant.FromContext(ctx) directly, and the context this middleware passes
-// through is unmodified, so it sees the same claim injectTenant already
-// validated. injectTenant itself stays, unchanged in behavior, as the
+// indirection is gone (#90/A3.5): Require reads tenant.FromContext(ctx)
+// through its package-owned identity boundary, and the context this
+// middleware passes through is unmodified, so it sees the same claim
+// injectTenant already validated. injectTenant itself stays, unchanged in behavior, as the
 // pre-existing fail-closed guard for this module's four mutating routes.
 func injectTenant(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -111,11 +111,11 @@ func (h *Handler) Mount(mux httprouter.Muxer) {
 	middleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPost && r.URL.Path == "/api/v1/controlled-documents" {
-				injectTenant(idempotency.Require(h.idempCreate, idempotency.TenantActorFromContext)(next)).ServeHTTP(w, r)
+				injectTenant(idempotency.Require(h.idempCreate)(next)).ServeHTTP(w, r)
 				return
 			}
 			if r.Method == http.MethodPost && matchesControlledDocumentSubPath(r.URL.Path, "/revisions") {
-				injectTenant(idempotency.Require(h.idempRevision, idempotency.TenantActorFromContext)(next)).ServeHTTP(w, r)
+				injectTenant(idempotency.Require(h.idempRevision)(next)).ServeHTTP(w, r)
 				return
 			}
 			// CON-06(b): obsolete/supersede are PUT lifecycle routes whose
@@ -125,11 +125,11 @@ func (h *Handler) Mount(mux httprouter.Muxer) {
 			// succeeded request must replay the original 204, not surface that
 			// 409 as if the retry itself were invalid.
 			if r.Method == http.MethodPut && matchesControlledDocumentSubPath(r.URL.Path, "/obsolete") {
-				injectTenant(idempotency.Require(h.idempObsolete, idempotency.TenantActorFromContext)(next)).ServeHTTP(w, r)
+				injectTenant(idempotency.Require(h.idempObsolete)(next)).ServeHTTP(w, r)
 				return
 			}
 			if r.Method == http.MethodPut && matchesControlledDocumentSubPath(r.URL.Path, "/supersede") {
-				injectTenant(idempotency.Require(h.idempSupersede, idempotency.TenantActorFromContext)(next)).ServeHTTP(w, r)
+				injectTenant(idempotency.Require(h.idempSupersede)(next)).ServeHTTP(w, r)
 				return
 			}
 			next.ServeHTTP(w, r)

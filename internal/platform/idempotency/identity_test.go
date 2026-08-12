@@ -1,4 +1,4 @@
-package idempotency_test
+package idempotency
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	iamdomain "metaldocs/internal/modules/iam/domain"
-	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -26,7 +25,7 @@ func TestTenantActorFromContext_MissingTenant_ReturnsError(t *testing.T) {
 	// Deliberately do NOT call tenant.WithTenantID — this is the "authenticated
 	// actor, absent tenant claim" shape the A3.3-deferred defect exercised.
 
-	gotTenant, gotActor, err := idempotency.TenantActorFromContext(ctx)
+	gotTenant, gotActor, err := tenantActorFromContext(ctx)
 
 	if err == nil {
 		t.Fatal("expected an error for a missing tenant claim, got nil")
@@ -47,7 +46,7 @@ func TestTenantActorFromContext_MissingActor_ReturnsError(t *testing.T) {
 	ctx := tenant.WithTenantID(context.Background(), "11111111-1111-4111-8111-111111111111")
 	// Deliberately do NOT call iamdomain.WithAuthContext.
 
-	gotTenant, gotActor, err := idempotency.TenantActorFromContext(ctx)
+	gotTenant, gotActor, err := tenantActorFromContext(ctx)
 
 	if err == nil {
 		t.Fatal("expected an error for a missing actor claim, got nil")
@@ -66,7 +65,7 @@ func TestTenantActorFromContext_BothPresent_ReturnsBoth(t *testing.T) {
 	ctx := tenant.WithTenantID(context.Background(), wantTenant)
 	ctx = iamdomain.WithAuthContext(ctx, wantActor, nil)
 
-	gotTenant, gotActor, err := idempotency.TenantActorFromContext(ctx)
+	gotTenant, gotActor, err := tenantActorFromContext(ctx)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
