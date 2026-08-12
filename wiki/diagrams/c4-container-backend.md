@@ -1,6 +1,6 @@
 # C4 Level 2 — Container View (Backend)
 
-> **Last verified:** 2026-06-01 (async freeze refactor — ADR 0015)
+> **Last verified:** 2026-08-12 (Node standard aligned to 26.3.0)
 > **Scope:** All runtime processes + their immediate dependencies.
 > **Source of truth for:** [`wiki/architecture/system-overview.md`](../architecture/system-overview.md).
 > **Code anchors:**
@@ -19,7 +19,7 @@ C4Container
         Container(web, "metaldocs-web", "React 18 + Vite + TanStack Query", "SPA. Renders editor (eigenpal), inbox, admin. Talks to API via HTTPS + cookie session. Uploads/downloads docx directly to MinIO via presigned URLs.")
         Container(api, "metaldocs-api", "Go 1.22 (net/http)", "Authoritative business logic. REST API on :8081. Modules: auth, iam, templates, documents, approval, controlleddocuments, taxonomy, render/fanout, search, audit.")
         Container(worker, "metaldocs-worker", "Go", "Async job runner. Consumes the outbox; handles PDF conversion, docx materialization (ADR 0015), scheduled publish, review reminders.")
-        Container(docgen, "docx-renderer", "Node 20 + Fastify + @eigenpal/docx-editor-core/headless", "Server-side docx render. Routes: /render/fanout (reconstructs frozen docx), /health.")
+        Container(docgen, "docx-renderer", "Node 26.3.0 + Fastify + @eigenpal/docx-editor-core/headless", "Server-side docx render. Routes: /render/fanout (reconstructs frozen docx), /health.")
         ContainerDb(pg, "postgres", "Postgres 16", "Primary datastore: tenants, users, roles, templates, documents, revisions, approval_instances, approval_signoffs, governance_events, outbox tables, audit_log.")
         ContainerDb(minio, "minio", "S3-compatible object store", "Bucket holds: template body docx, document revisions, frozen final docx, generated PDFs. Browser uploads/downloads via presigned URLs.")
         Container(redis, "redis", "Redis 7", "Authz cache (TTL) + rate-limit counters.")

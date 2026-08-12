@@ -23,11 +23,6 @@ function block(source, name) {
   return match[0];
 }
 
-function featureNames(source) {
-  const body = block(source, 'FEATURE_NAMES');
-  return [...body.matchAll(/'([^']+)'/g)].map((match) => match[1]);
-}
-
 function allowlistPairs(source) {
   const body = block(source, 'ALLOWLIST');
   return [...body.matchAll(/from:\s*'([^']+)'\s*,\s*to:\s*'([^']+)'/g)]
@@ -35,20 +30,14 @@ function allowlistPairs(source) {
 }
 
 function fail(message) {
-  console.error(`FE-BOUNDARY-INTEGRITY: ${message}`);
+  console.error(`FE-BOUNDARY-ALLOWLIST: ${message}`);
   process.exit(1);
 }
 
 const currentConfig = fs.readFileSync(configPath, 'utf8');
 const baseConfig = readBaseConfig();
-const currentFeatures = featureNames(currentConfig);
 const currentPairs = allowlistPairs(currentConfig);
 const basePairs = new Set(allowlistPairs(baseConfig));
-
-const duplicateFeatures = currentFeatures.filter((name, index) => currentFeatures.indexOf(name) !== index);
-if (duplicateFeatures.length > 0) {
-  fail(`FEATURE_NAMES contains duplicates: ${duplicateFeatures.join(', ')}`);
-}
 
 const duplicatePairs = currentPairs.filter((pair, index) => currentPairs.indexOf(pair) !== index);
 if (duplicatePairs.length > 0) {
@@ -71,23 +60,7 @@ try {
   fail(`cannot enumerate ${featuresRoot}: ${detail}`);
 }
 
-const declaredFeatures = [...new Set(currentFeatures)].sort();
-const scopedDiscoveredFeatures = discoveredFeatures.filter((name) => !unscopedFeatureDirs.has(name));
-const missingDeclarations = scopedDiscoveredFeatures.filter((name) => !declaredFeatures.includes(name));
-const unexpectedUnscopedDirs = discoveredFeatures.filter(
-  (name) => !declaredFeatures.includes(name) && !unscopedFeatureDirs.has(name),
-);
-const staleDeclarations = declaredFeatures.filter((name) => !scopedDiscoveredFeatures.includes(name));
-if (missingDeclarations.length > 0 || unexpectedUnscopedDirs.length > 0 || staleDeclarations.length > 0) {
-  fail([
-    'FEATURE_NAMES does not match the feature directories',
-    missingDeclarations.length > 0 ? `missing declarations: ${missingDeclarations.join(', ')}` : '',
-    unexpectedUnscopedDirs.length > 0 ? `unexpected unscoped directories: ${unexpectedUnscopedDirs.join(', ')}` : '',
-    staleDeclarations.length > 0 ? `stale declarations: ${staleDeclarations.join(', ')}` : '',
-  ].filter(Boolean).join('; '));
-}
-
-const knownFeatures = new Set(declaredFeatures);
+const knownFeatures = new Set(discoveredFeatures.filter((name) => !unscopedFeatureDirs.has(name)));
 for (const pair of currentPairs) {
   const [from, to] = pair.split(' -> ');
   if (!knownFeatures.has(from) || !knownFeatures.has(to)) {
@@ -95,4 +68,4 @@ for (const pair of currentPairs) {
   }
 }
 
-console.log(`fe-boundary-integrity: clean (${discoveredFeatures.length} feature directories, ${currentPairs.length} allowlisted pairs)`);
+console.log(`fe-boundary-allowlist: clean (${knownFeatures.size} feature directories, ${currentPairs.length} allowlisted pairs)`);

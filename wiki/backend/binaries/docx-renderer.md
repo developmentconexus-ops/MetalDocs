@@ -1,6 +1,6 @@
 # docx-renderer — TypeScript DOCX Substitution Service
 
-> **Last verified:** 2026-08-11 (A2.2 dead-code burn-down: removed the `test/fixtures.ts` row — `test/fixtures.ts` deleted, zero live consumer, PR #119)
+> **Last verified:** 2026-08-12 (Node standard aligned to 26.3.0)
 > **Scope:** `apps/docx-renderer/` — the TypeScript/Node.js sidecar binary that owns DOCX token substitution and composition-block injection. This page covers the service as a deployed binary: entrypoint, HTTP API, security, eigenpal integration, MinIO I/O, build, and Dockerfile. How the Go worker calls it and where it fits in the full pipeline is in [../flows/render-pipeline.md](../flows/render-pipeline.md).
 > **Key files:**
 > - `apps/docx-renderer/src/index.ts`
@@ -184,8 +184,8 @@ Test runner: Vitest (`vitest.config.ts`).
 
 Multi-stage build:
 
-1. **Builder stage** (`node:20.11-alpine`): installs dependencies from `package.json`, runs the esbuild bundle.
-2. **Runtime stage** (`node:20.11-alpine`): copies bundled output only; no dev dependencies.
+1. **Builder stage** (`node:26.3.0-alpine`): installs dependencies from `package.json`, runs the esbuild bundle.
+2. **Runtime stage** (`node:26.3.0-alpine`): copies bundled output only; no dev dependencies.
 3. Exposes port `3100`; healthcheck on `GET /health`; process runs as `node` user (non-root).
 
 ### eigenpal dependency

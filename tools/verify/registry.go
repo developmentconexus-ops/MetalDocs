@@ -1391,17 +1391,17 @@ var checks = []Check{
 		CIJob: "ci.yml:verify",
 	},
 	{
-		ID:       "fe-boundary-integrity",
-		Desc:     "frontend feature directories are enumerated and the cross-feature ALLOWLIST is shrink-only",
+		ID:       "fe-boundary-allowlist",
+		Desc:     "the cross-feature ALLOWLIST is shrink-only and references existing feature directories",
 		Profiles: []string{ProfilePR, ProfileFull},
-		Argv:     []string{"node", "scripts/check-fe-boundary-integrity.mjs"},
+		Argv:     []string{"node", "scripts/check-fe-boundary-allowlist.mjs"},
 		Needs:    []string{needsGitDepth},
 		Fixture: &Fixture{
-			Dir:          "fe-boundary-integrity",
-			CopyFromRepo: []string{"scripts/check-fe-boundary-integrity.mjs"},
+			Dir:          "fe-boundary-allowlist",
+			CopyFromRepo: []string{"scripts/check-fe-boundary-allowlist.mjs"},
 			Want:         []string{"frontend boundary ALLOWLIST grew"},
 		},
-		Paths: []string{"frontend/apps/web/src/features/", "eslint.config.mjs", "scripts/check-fe-boundary-integrity.mjs"},
+		Paths: []string{"frontend/apps/web/src/features/", "eslint.config.mjs", "scripts/check-fe-boundary-allowlist.mjs"},
 		CIJob: "ci.yml:verify",
 	},
 	{

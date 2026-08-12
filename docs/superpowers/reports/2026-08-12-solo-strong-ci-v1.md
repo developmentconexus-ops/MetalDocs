@@ -31,8 +31,9 @@ not a claim about this PR's final run.
 - `docker-build` discovers tracked production Dockerfiles, rejects an
   unclassified production Dockerfile, builds only affected images, and never
   pushes them.
-- `fe-boundary-integrity` rejects frontend feature-directory enumeration drift
-  and growth of the shrink-only cross-feature allowlist.
+- `fe-boundary-allowlist` rejects growth of the shrink-only cross-feature
+  allowlist or references to unknown feature directories; `eslint.config.mjs`
+  discovers feature roots directly from the filesystem.
 - `adr-status`, `wiki-debt-tally`, and `db-docs-coverage` are classified as
   documentation hygiene: they remain in fast/full/release and run in the
   explicit nightly `governance-hygiene` job, outside the PR `required` closure.
@@ -82,7 +83,7 @@ GitHub Actions run in the PR; no estimate is a closure state. The final green
 PR run at the implementation head was [31611387106](https://github.com/developmentconexus-ops/MetalDocs/actions/runs/31611387106),
 with a measured 4m39s wall-clock duration (15:16:22Z–15:21:01Z). It passed
 `verify`, all four integration shards, `security`, `lint-go`, and `required`.
-The diff-scoped log selected `fe-boundary-integrity` and `docker-build`; no
+The diff-scoped log selected `fe-boundary-allowlist` and `docker-build`; no
 frontend production source/toolchain change or production image artifact was
 in this PR, so `fe-build` and actual Docker image compilation were correctly
 not selected.

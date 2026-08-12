@@ -450,10 +450,9 @@ func changedFiles(base string) ([]string, error) {
 // preflight compares the running toolchain against the versions CI pins. It
 // returns human-readable warnings; it does not abort. Aborting would make
 // verify unusable on a machine that is merely ahead, but staying silent is
-// how "passes locally, fails in CI" became normal here: a local Go 1.26 and
-// CI's 1.25 disagree about gofmt output, and a local Node 26 and CI's 22
-// disagree about cross-realm ArrayBuffer identity. Both produced real
-// confusion in this repo.
+// how "passes locally, fails in CI" became normal here: local and CI
+// toolchains have disagreed about gofmt output and cross-realm ArrayBuffer
+// identity. Both produced real confusion in this repo.
 func preflight() []string {
 	var warns []string
 

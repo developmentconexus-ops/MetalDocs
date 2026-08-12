@@ -11,7 +11,7 @@
     "lint:prune": "eslint . --suppressions-location eslint-suppressions.json --prune-suppressions"
   },
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=26.3.0"
   },
   "devDependencies": {
     "eslint": "^10.5.0",
