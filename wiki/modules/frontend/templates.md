@@ -1,6 +1,6 @@
 # Frontend module: templates
 
-> **Last verified:** 2026-07-01 (ADR 0052 — manual versioning: `approveVersion`/`publishVersion` no longer return `next_draft*`; `CreateNextVersion` — "Criar nova versão" — is the sole revision path)
+> **Last verified:** 2026-08-12 (routing-only refresh; domain content last verified 2026-07-01 — ADR 0052 manual versioning)
 > **Scope:** Template list, create-new wizard, eigenpal-based template editor with draft/review/approve lifecycle. Frontend slice of the backend [`templates`](../templates.md) module.
 > **Owner:** unassigned | **Backend counterpart:** [`wiki/modules/templates.md`](../templates.md)
 
@@ -93,4 +93,4 @@ Backend routes under `/api/v1/templates` and `/api/v1/templates/{id}/versions`. 
 - Backend module: [`wiki/modules/templates.md`](../templates.md)
 - Editor ACL: [`wiki/modules/editor-ui-eigenpal.md`](../editor-ui-eigenpal.md), [`wiki/modules/editor-chrome.md`](../editor-chrome.md)
 - Concept: [`wiki/concepts/placeholders.md`](../../concepts/placeholders.md)
-- Skill: [`metaldocs-frontend`](../../../.agents/skills/metaldocs-frontend/SKILL.md)
+- Workflow: [`AGENTS.md`](../../../AGENTS.md) + [`wiki/architecture/frontend-structure.md`](../../architecture/frontend-structure.md); use generated API types and the canonical engineering method for non-trivial changes.
