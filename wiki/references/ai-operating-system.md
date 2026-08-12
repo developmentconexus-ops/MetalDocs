@@ -6,7 +6,7 @@
 
 ## Canonical sources
 
-- Engineering doctrine: `docs/engineering/root-cause-global-maximum-method.md`
+- Engineering doctrine: `wiki/standards/root-cause-global-maximum-method.md`
 - Agent routing: `AGENTS.md`
 - MetalDocs invariants/system facts: `CLAUDE.md`
 - QA/close-out: `wiki/quality/qa-operating-system.md`
@@ -45,7 +45,7 @@ The retired repository-local `metaldocs-*` and `.agents/skills/*` trees are not 
 
 Use:
 
-- **Canonical engineering method** -> `docs/engineering/root-cause-global-maximum-method.md`
+- **Canonical engineering method** -> `wiki/standards/root-cause-global-maximum-method.md`
 - **New feature/module pre-design** -> `.claude/skills/developing-new-work/SKILL.md`
 - **Adversarial design/plan/diff review** -> `.claude/skills/adversarial-review/SKILL.md`
 - **Code impact tracing when needed** -> `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md`
