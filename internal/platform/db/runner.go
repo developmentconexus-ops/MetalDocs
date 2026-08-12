@@ -50,14 +50,11 @@ func NewTxRunner(database *sql.DB) TxRunner {
 	return &sqlTxRunner{db: database}
 }
 
-// do is the shared implementation behind Do. opts is passed directly to
-// BeginTx; today Do always passes nil (default read-write transaction). The
-// opts parameter stays (rather than being inlined away) because it is the
-// seam a future genuine read-only path would reuse — see the TxRunner
-// interface doc for why DoReadOnly itself was deleted, not just its callers
-// migrated.
-func (r *sqlTxRunner) do(ctx context.Context, opts *sql.TxOptions, fn func(tx *sql.Tx) error) (err error) {
-	tx, beginErr := r.db.BeginTx(ctx, opts)
+// do is the shared implementation behind Do. Transaction options are not
+// exposed here: the lifecycle owner opens the sole supported transaction
+// shape, the default read-write transaction.
+func (r *sqlTxRunner) do(ctx context.Context, fn func(tx *sql.Tx) error) (err error) {
+	tx, beginErr := r.db.BeginTx(ctx, nil)
 	if beginErr != nil {
 		return fmt.Errorf("db: begin tx: %w", beginErr)
 	}
@@ -133,5 +130,5 @@ func ctxIdentity(ctx context.Context) (tenantID, actorID string, ok bool) {
 // back and is returned unwrapped so callers retain errors.Is/As on domain
 // sentinels. A panic inside fn rolls back and re-panics.
 func (r *sqlTxRunner) Do(ctx context.Context, fn func(tx *sql.Tx) error) error {
-	return r.do(ctx, nil, fn)
+	return r.do(ctx, fn)
 }
