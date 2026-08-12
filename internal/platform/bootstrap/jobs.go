@@ -35,16 +35,27 @@ func BuildJobsDependencies(ctx context.Context, cfg config.JobsConfig, workerFac
 		return JobsDependencies{}, fmt.Errorf("load postgres config: %w", err)
 	}
 
-	db, err := pgdb.Open(ctx, pgCfg.DSN)
+	// A6.1 boot-fatal gate -- see the identical call in BuildAPIDependencies
+	// (bootstrap/api.go) for why: OpenServing refuses a SUPERUSER/BYPASSRLS
+	// connection, since RLS and REVOKE-based hardening are inert under one
+	// and metaldocs-jobs must refuse to run any periodic job (including the
+	// audit-integrity validator) under it.
+	db, err := pgdb.OpenServing(ctx, pgCfg.DSN)
 	if err != nil {
-		return JobsDependencies{}, fmt.Errorf("open postgres: %w", err)
+		return JobsDependencies{}, err
 	}
 
-	// River schema migration is owned by the API binary alone (F-19,
-	// REQ-ASYNC-4): metaldocs-api runs MigrateRiverSchema at startup, and
-	// the jobs compose service has depends_on: api (healthy), so the schema
-	// exists before this binary starts. Running it here too gave the schema
-	// two owners with no declared order.
+	// River schema migration is owned by the one-shot provisioning binary
+	// (apps/dbprovision/cmd/metaldocs-dbprovision), not by any long-running
+	// app process (A6.1 re-cut, issue #88; supersedes F-19/REQ-ASYNC-4's
+	// "API binary alone" ruling -- that assignment predates the identity
+	// split and put DDL on metaldocs-api's serving connection, which no
+	// longer has DDL rights under metaldocs_runtime). Compose's db-provision
+	// service runs to completion, migrating River's schema under
+	// SET ROLE metaldocs_owner, before api/worker/jobs start
+	// (depends_on: service_completed_successfully), so the schema exists
+	// before this binary starts either way. Running it here too would still
+	// give the schema two owners with no declared order.
 
 	var workers *river.Workers
 	var periodicJobs []*river.PeriodicJob
@@ -87,7 +98,10 @@ func BuildJobsDependencies(ctx context.Context, cfg config.JobsConfig, workerFac
 }
 
 // MigrateRiverSchema runs River's schema migrations up against the given
-// schema. Owned exclusively by the API binary at startup (F-19, REQ-ASYNC-4).
+// schema. Owned exclusively by the metaldocs-dbprovision one-shot binary
+// (A6.1 re-cut, issue #88; supersedes F-19/REQ-ASYNC-4's "API binary alone"
+// ruling). Exported so apps/dbprovision can call it directly without
+// duplicating the rivermigrate wiring.
 func MigrateRiverSchema(ctx context.Context, db *sql.DB, schema string) error {
 	migrator, err := rivermigrate.New(riverdatabasesql.New(db), &rivermigrate.Config{Schema: schema})
 	if err != nil {

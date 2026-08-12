@@ -15,9 +15,17 @@ import (
 
 // buildTestDeps is a helper that calls BuildAPIDependencies with a real postgres
 // test DB (skipped when DATABASE_URL is not set). Memory mode was removed in 2.13.
+//
+// BuildAPIDependencies now boot-fatals under an unsafe DB identity (A6.1,
+// postgres.AssertSafeIdentity) and the ambient DSN these tests would
+// otherwise inherit is superuser + BYPASSRLS in dev -- exactly the posture
+// the gate exists to refuse. Point it at the dedicated metaldocs_runtime
+// role instead so these tests keep exercising Gotenberg-check wiring rather
+// than the identity gate itself (that gate has its own coverage in
+// db_identity_test.go).
 func buildTestDeps(t *testing.T, attachmentsCfg config.AttachmentsConfig) bootstrap.APIDependencies {
 	t.Helper()
-	testdb.DSN(t) // skip if no DB configured; BuildAPIDependencies reads its own env vars
+	t.Setenv("METALDOCS_DATABASE_URL", testdb.RuntimeRoleDSN(t))
 	deps, err := bootstrap.BuildAPIDependencies(context.Background(), config.RepositoryPostgres, attachmentsCfg)
 	if err != nil {
 		t.Fatalf("BuildAPIDependencies() error = %v", err)

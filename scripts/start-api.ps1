@@ -33,6 +33,13 @@ $jobsCriticalPaths = @(
     'scripts/start-jobs.ps1'
 )
 
+$dbProvisionCriticalPaths = @(
+    'apps/dbprovision/cmd/metaldocs-dbprovision',
+    'internal/platform',
+    'db',
+    'scripts/start-api.ps1'
+)
+
 function Get-LatestWriteTimeUtc {
     param(
         [string[]]$RelativePaths
@@ -239,6 +246,57 @@ Get-Content ".env" | ForEach-Object {
 }
 
 [System.Environment]::SetEnvironmentVariable('APP_PORT', '8081', 'Process')
+
+# ── Database provisioning (A6.1 re-cut, issue #88) ──────────────────────────
+# metaldocs-api/worker/jobs connect as metaldocs_runtime (PGUSER/PGPASSWORD
+# from .env, above) and boot-fatal under any other identity
+# (internal/platform/db/postgres.AssertSafeIdentity). That role — plus
+# metaldocs_owner and the privilege/migration state they depend on — is
+# provisioned by the metaldocs-dbprovision one-shot binary, which must run
+# BEFORE any of them start, connected as the bootstrap superuser
+# (POSTGRES_USER/POSTGRES_PASSWORD), never as metaldocs_runtime. This is the
+# scripts/start-api.ps1-side equivalent of the compose db-provision service
+# (deploy/compose/docker-compose.yml) — one binary, two invocation paths.
+# Idempotent: safe to run on every start-api.ps1 invocation, not just the
+# first.
+$dbProvisionBinary = Join-Path $root "metaldocs-dbprovision.exe"
+Ensure-GoBinary `
+    -Name "MetalDocs DB Provisioning" `
+    -BinaryPath $dbProvisionBinary `
+    -OutputName "metaldocs-dbprovision.exe" `
+    -PackagePattern "./apps/dbprovision/cmd/metaldocs-dbprovision/..." `
+    -CriticalPaths $dbProvisionCriticalPaths `
+    -ForceBuild:$Build
+
+$runtimePGUser = $env:PGUSER
+$runtimePGPassword = $env:PGPASSWORD
+$runtimeDatabaseURL = $env:METALDOCS_DATABASE_URL
+$runtimeDatabaseURLFallback = $env:DATABASE_URL
+try {
+    # Override to the bootstrap superuser for this one invocation only.
+    # METALDOCS_DATABASE_URL/DATABASE_URL take precedence over discrete PG*
+    # vars in config.LoadPostgresConfig, so both are cleared here too —
+    # otherwise a .env that sets either would silently point provisioning at
+    # the serving identity instead, defeating the whole point.
+    $env:PGUSER = $env:POSTGRES_USER
+    $env:PGPASSWORD = $env:POSTGRES_PASSWORD
+    $env:METALDOCS_DATABASE_URL = $null
+    $env:DATABASE_URL = $null
+
+    Write-Host "Running database provisioning (identity roles, grants, migrations) as the bootstrap superuser..."
+    & $dbProvisionBinary
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Database provisioning failed (exit $LASTEXITCODE)"
+        exit 1
+    }
+} finally {
+    # Restore the serving identity for api/worker/jobs below, whether
+    # provisioning succeeded or not (the exit 1 above still runs this).
+    $env:PGUSER = $runtimePGUser
+    $env:PGPASSWORD = $runtimePGPassword
+    $env:METALDOCS_DATABASE_URL = $runtimeDatabaseURL
+    $env:DATABASE_URL = $runtimeDatabaseURLFallback
+}
 
 $binary = Join-Path $root "metaldocs-api.exe"
 $workerBinary = Join-Path $root "metaldocs-worker.exe"

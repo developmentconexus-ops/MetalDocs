@@ -36,9 +36,13 @@ func BuildWorkerDependencies(ctx context.Context, workerCfg config.WorkerConfig)
 	if err != nil {
 		return WorkerDependencies{}, fmt.Errorf("load postgres config: %w", err)
 	}
-	db, err := pgdb.Open(ctx, pgCfg.DSN)
+	// A6.1 boot-fatal gate -- see the identical call in BuildAPIDependencies
+	// (bootstrap/api.go) for why: OpenServing refuses a SUPERUSER/BYPASSRLS
+	// connection, since RLS and REVOKE-based hardening are inert under one
+	// and the worker must refuse to process any outbox event under it.
+	db, err := pgdb.OpenServing(ctx, pgCfg.DSN)
 	if err != nil {
-		return WorkerDependencies{}, fmt.Errorf("open postgres: %w", err)
+		return WorkerDependencies{}, err
 	}
 
 	pdfConverter, err := buildWorkerPDFConverter()

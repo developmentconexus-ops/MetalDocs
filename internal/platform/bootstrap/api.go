@@ -78,9 +78,15 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 		if err != nil {
 			return APIDependencies{}, fmt.Errorf("load postgres config: %w", err)
 		}
-		db, err := pgdb.Open(ctx, pgCfg.DSN)
+		// A6.1 boot-fatal gate: OpenServing refuses to hand back a connection
+		// -- and by extension refuses to ever let ListenAndServe start --
+		// when the connected identity is SUPERUSER or BYPASSRLS. See
+		// internal/platform/db/postgres.AssertSafeIdentity for why: both
+		// attributes make RLS and the REVOKE-based audit_events hardening
+		// inert for this connection.
+		db, err := pgdb.OpenServing(ctx, pgCfg.DSN)
 		if err != nil {
-			return APIDependencies{}, fmt.Errorf("open postgres: %w", err)
+			return APIDependencies{}, err
 		}
 		authRepo := authpg.NewRepository(db, iampg.NewUserTenantRepository(db))
 		var minioClient *miniogo.Client
@@ -117,7 +123,7 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 			AuditValidator:    auditStore,
 			Publisher:         outboxpg.NewPublisher(db),
 			GotenbergClient:   gotenbergClient,
-			StatusProvider:    observability.NewPostgresRuntimeStatusProvider(db, repoMode, string(attachmentsCfg.Provider), authn.Enabled(), gotenbergHealthCheck(gotenbergCfg)),
+			StatusProvider:    observability.NewPostgresRuntimeStatusProvider(db, repoMode, string(attachmentsCfg.Provider), authn.Enabled(), gotenbergHealthCheck(gotenbergCfg), DBIdentityHealthCheck(db)),
 			SQLDB:             db,
 			PDFConverter:      pdfConverter,
 			MinioClient:       minioClient,
@@ -163,6 +169,37 @@ func closeDB(db *sql.DB) error {
 		return nil
 	}
 	return db.Close()
+}
+
+// DBIdentityHealthCheck wires the same pg_roles posture AssertSafeIdentity
+// enforces boot-fatal (above) into the /health/ready DependencyCheck ladder
+// as defense-in-depth: BuildAPIDependencies already refuses to construct deps
+// at all under an unsafe identity, so this check exists for the case that
+// matters after boot -- a role attribute changed (e.g. ALTER ROLE ...
+// SUPERUSER) while the process kept running. A6.1's acceptance bar is
+// "readiness impossible on an unsafe DB identity", not merely "cannot boot",
+// so Ready() must fail closed (503, never "ready") on this too, never just
+// degrade while continuing to serve other routes. Exported so
+// db_identity_test.go can drive it directly against both an unsafe and a
+// safe identity without going through the (now identity-gated)
+// BuildAPIDependencies constructor.
+func DBIdentityHealthCheck(db *sql.DB) observability.DependencyCheck {
+	return observability.DependencyCheck{
+		Name: "db_identity",
+		Check: func(ctx context.Context) (observability.DependencyCheckResult, error) {
+			status, err := pgdb.QueryIdentityStatus(ctx, db)
+			if err != nil {
+				return observability.DependencyCheckResult{}, err
+			}
+			if status.Unsafe() {
+				return observability.DependencyCheckResult{}, fmt.Errorf(
+					"db identity %q is unsafe (rolsuper=%t rolbypassrls=%t)",
+					status.RoleName, status.Superuser, status.BypassRLS,
+				)
+			}
+			return observability.DependencyCheckResult{Status: "up", Detail: status.RoleName}, nil
+		},
+	}
 }
 
 func gotenbergHealthCheck(cfg config.GotenbergConfig) observability.DependencyCheck {

@@ -38,3 +38,35 @@ func TestLoadMigrationConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadMigrationConfig_GrantsAndPrerequisitesDirDefaults(t *testing.T) {
+	t.Setenv("METALDOCS_GRANTS_DIR", "")
+	t.Setenv("METALDOCS_PREREQUISITES_DIR", "")
+
+	cfg, err := LoadMigrationConfig()
+	if err != nil {
+		t.Fatalf("LoadMigrationConfig() unexpected error: %v", err)
+	}
+	if cfg.GrantsDir != "db/grants" {
+		t.Errorf("GrantsDir = %q, want %q", cfg.GrantsDir, "db/grants")
+	}
+	if cfg.PrerequisitesDir != "db/prerequisites" {
+		t.Errorf("PrerequisitesDir = %q, want %q", cfg.PrerequisitesDir, "db/prerequisites")
+	}
+}
+
+func TestLoadMigrationConfig_GrantsAndPrerequisitesDirOverride(t *testing.T) {
+	t.Setenv("METALDOCS_GRANTS_DIR", "custom/grants")
+	t.Setenv("METALDOCS_PREREQUISITES_DIR", "custom/prereqs")
+
+	cfg, err := LoadMigrationConfig()
+	if err != nil {
+		t.Fatalf("LoadMigrationConfig() unexpected error: %v", err)
+	}
+	if cfg.GrantsDir != "custom/grants" {
+		t.Errorf("GrantsDir = %q, want %q", cfg.GrantsDir, "custom/grants")
+	}
+	if cfg.PrerequisitesDir != "custom/prereqs" {
+		t.Errorf("PrerequisitesDir = %q, want %q", cfg.PrerequisitesDir, "custom/prereqs")
+	}
+}
