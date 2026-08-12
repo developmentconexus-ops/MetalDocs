@@ -18,7 +18,7 @@ Each page above links to its backend counterpart under [`wiki/modules/<name>.md`
 
 ## Current workflow routing
 
-For non-trivial changes, start with [`AGENTS.md`](../../../AGENTS.md) and the canonical engineering method at [`wiki/standards/root-cause-global-maximum-method.md`](../../standards/root-cause-global-maximum-method.md). Frontend architecture and server-state rules are defined in the wiki and generated API types; the retired `.agents/skills/metaldocs-*` paths are not live workflow entrypoints.
+For non-trivial changes, start with [`AGENTS.md`](../../../AGENTS.md) and the canonical engineering method at [`wiki/standards/root-cause-global-maximum-method.md`](../../standards/root-cause-global-maximum-method.md). Frontend architecture and server-state rules are defined in the wiki and generated API types. The retired `.agents/skills/*` tree and retired `metaldocs-*` skill names are not live workflow entrypoints.
 
 Use `.claude/skills/developing-new-work/SKILL.md` only for new feature/module pre-design and `.claude/skills/adversarial-review/SKILL.md` for adversarial review.
 
