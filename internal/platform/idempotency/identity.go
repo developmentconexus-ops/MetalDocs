@@ -26,14 +26,14 @@ import (
 // error)) living outside this file, anywhere in the tree, that calls
 // tenant.FromContext directly is the exact class of bug this function exists
 // to replace — and it is enforced, not just conventional: the
-// idempotency-identity-scope-guard check (scripts/check-idempotency-identity-scope.sh,
-// registered in tools/verify/registry.go, runs in ci.yml:verify) fails CI on
-// any such closure outside this file. That check is a text/regex scan with
-// documented gaps (method receivers, named result lists — see its header),
-// not a compiler-enforced guarantee, so "structurally unrepresentable" would
-// overstate what it does; read its header for exactly what it can and
-// cannot catch. The fix for a flagged closure is still to delete it and
-// call this function, not to patch its error handling in place.
+// idempotency-identity-scope-guard check (scripts/check-idempotency-identity-scope.go,
+// with the shell entrypoint retained for operators, registered in
+// tools/verify/registry.go, and run in ci.yml:verify) fails CI on any such
+// function outside this file. The guard resolves Go types and symbols, so
+// aliases, named results, methods, closures, multiline signatures, and local
+// shadowing are handled by language semantics rather than source spelling.
+// The fix for a flagged function is still to delete it and call this function,
+// not to patch its error handling in place.
 func TenantActorFromContext(ctx context.Context) (string, string, error) {
 	tenantID, err := tenant.FromContext(ctx)
 	if err != nil {

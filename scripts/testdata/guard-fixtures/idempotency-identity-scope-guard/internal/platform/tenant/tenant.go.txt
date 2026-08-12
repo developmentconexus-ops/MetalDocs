@@ -1,0 +1,5 @@
+package tenant
+
+import "context"
+
+func FromContext(context.Context) (string, error) { return "", nil }

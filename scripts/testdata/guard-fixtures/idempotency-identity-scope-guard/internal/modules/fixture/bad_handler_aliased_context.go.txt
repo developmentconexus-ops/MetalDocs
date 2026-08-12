@@ -1,0 +1,13 @@
+package fixture
+
+import (
+	stdcontext "context"
+	t "metaldocs/internal/platform/tenant"
+)
+
+// Import aliases must be resolved by import path, not by the source spelling
+// of the package name.
+func badActorFromCtxAliased(ctx stdcontext.Context) (string, string, error) {
+	_, _ = t.FromContext(ctx)
+	return "", "", nil
+}

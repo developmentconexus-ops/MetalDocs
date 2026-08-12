@@ -1,0 +1,12 @@
+package fixture
+
+import (
+	"context"
+	. "metaldocs/internal/platform/tenant"
+)
+
+// Dot imports expose the same package object without a selector.
+func badActorFromCtxDotImport(ctx context.Context) (string, string, error) {
+	_, _ = FromContext(ctx)
+	return "", "", nil
+}

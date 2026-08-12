@@ -1,0 +1,21 @@
+package fixture
+
+import (
+	"context"
+
+	"metaldocs/internal/platform/tenant"
+)
+
+type localTenant struct{}
+
+func (localTenant) FromContext(context.Context) (string, error) { return "", nil }
+
+var _ = tenant.FromContext
+
+// A block-local value named tenant must not be confused with the imported
+// package. This is a non-violation even though the source selector matches.
+func notATenantPackageCall(ctx context.Context) (string, string, error) {
+	tenant := localTenant{}
+	_, err := tenant.FromContext(ctx)
+	return "", "", err
+}

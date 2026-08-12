@@ -1,0 +1,5 @@
+package authn
+
+import "context"
+
+func RequireUserID(context.Context) (string, error) { return "", nil }
