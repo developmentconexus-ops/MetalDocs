@@ -79,10 +79,15 @@ demonstrated and the failure-issue path is verified again.
 
 The final makespan and check-level timings must be copied from the completed
 GitHub Actions run in the PR; no estimate is a closure state. The final green
-PR run was [31607739177](https://github.com/developmentconexus-ops/MetalDocs/actions/runs/31607739177),
-with a measured 4m38s wall-clock duration (14:36:47Z–14:41:25Z). It passed
+PR run at the implementation head was [31608913389](https://github.com/developmentconexus-ops/MetalDocs/actions/runs/31608913389),
+with a measured 4m57s wall-clock duration (14:49:27Z–14:54:24Z). It passed
 `verify`, all four integration shards, `security`, `lint-go`, and `required`.
 The diff-scoped log selected `fe-boundary-integrity` and `docker-build`; no
 frontend production source/toolchain change or production image artifact was
 in this PR, so `fe-build` and actual Docker image compilation were correctly
 not selected.
+
+The default manual nightly validation was [31609453086](https://github.com/developmentconexus-ops/MetalDocs/actions/runs/31609453086),
+green from 14:55:18Z to 15:07:51Z. `integration-race`, `stress`,
+`security-scan`, `governance-hygiene`, and `axe` passed; `perf` and `e2e` were
+skipped by the explicit deferred-job gate.
