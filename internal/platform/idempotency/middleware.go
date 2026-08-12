@@ -12,6 +12,7 @@ import (
 	"regexp"
 
 	"metaldocs/internal/platform/problem"
+	"metaldocs/internal/platform/tenant"
 )
 
 var uuidRE = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
@@ -107,13 +108,14 @@ func WithStreamingOptOut(matcher func(*http.Request) bool) Option {
 // This fails closed rather than silently buffering or panicking with an
 // opaque interface-conversion error.
 //
-// actorFromCtx resolves the (tenant, actor) pair the replay record is scoped
-// to. A3.3: it returns an error rather than a bare pair, because a blank actor
+// The middleware resolves the (tenant, actor) pair the replay record is
+// scoped to through the package-owned tenantActorFromContext boundary.
+// A3.3: it returns an error rather than a bare pair, because a blank actor
 // is not a narrower key — it is a SHARED one. Every caller who failed to
 // authenticate would land in the same (tenant, "", key) slot, so one
 // unauthenticated request could replay another's stored response. Absence is
 // therefore refused here, before BeginReplay persists anything.
-func Require(store *Store, actorFromCtx func(context.Context) (string, string, error), opts ...Option) func(http.Handler) http.Handler {
+func Require(store *Store, opts ...Option) func(http.Handler) http.Handler {
 	cfg := config{}
 	for _, opt := range opts {
 		opt(&cfg)
@@ -124,7 +126,7 @@ func Require(store *Store, actorFromCtx func(context.Context) (string, string, e
 				next.ServeHTTP(w, r)
 				return
 			}
-			serveWithIdempotency(store, actorFromCtx, next, w, r)
+			serveWithIdempotency(store, next, w, r)
 		})
 	}
 }
@@ -132,7 +134,7 @@ func Require(store *Store, actorFromCtx func(context.Context) (string, string, e
 // serveWithIdempotency runs the two-phase BeginReplay / CompleteReplay /
 // FailReplay protocol described on Require, once streaming opt-out has
 // already been ruled out by the caller.
-func serveWithIdempotency(store *Store, actorFromCtx func(context.Context) (string, string, error), next http.Handler, w http.ResponseWriter, r *http.Request) {
+func serveWithIdempotency(store *Store, next http.Handler, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	key := r.Header.Get("Idempotency-Key")
 	switch err := ValidateKey(key); {
@@ -144,10 +146,26 @@ func serveWithIdempotency(store *Store, actorFromCtx func(context.Context) (stri
 		return
 	}
 
-	tenantID, actorID, err := actorFromCtx(ctx)
+	tenantID, actorID, err := tenantActorFromContext(ctx)
 	if err != nil {
-		// A3.3: identity resolution failed, so the replay key cannot be scoped.
-		// Refuse before the request body is read or a claim is persisted — the
+		// A3.5a review (PR #122): a missing tenant is not the same fault class
+		// as a missing actor and must not share the actor branch's 401. Every
+		// other production consumer of tenant.FromContext in this tree maps
+		// ErrTenantMissing to 500 (internal/platform/tenant/context.go:15-17
+		// "Handlers MUST treat ErrTenantMissing as an internal-server-error
+		// invariant violation, not a 400" — see also
+		// controlleddocuments/delivery/http/handler.go's injectTenant). It
+		// means the auth middleware did not run or the session is corrupt, a
+		// server-side fault, not something the caller can fix by
+		// re-authenticating. Presenting it as 401 would mislabel a server bug
+		// as a client mistake.
+		if errors.Is(err, tenant.ErrTenantMissing) {
+			problem.Respond(w, r, problem.New(http.StatusInternalServerError, problem.CodeInternalUnknown, "internal server error"))
+			return
+		}
+		// A3.3: any other identity-resolution failure (missing/blank actor)
+		// means the replay key cannot be scoped to a real caller. Refuse
+		// before the request body is read or a claim is persisted — the
 		// wrapped handler is never reached.
 		problem.Respond(w, r, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthenticated, "Authentication required"))
 		return

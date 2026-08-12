@@ -220,14 +220,7 @@ func (h *Handler) Mount(mux httprouter.Muxer) {
 
 func (h *Handler) idempotent(routeTemplate string, next http.Handler) http.Handler {
 	store := idempotency.New(h.db, routeTemplate)
-	return idempotency.Require(store, func(ctx context.Context) (string, string, error) {
-		tenantID, _ := tenant.FromContext(ctx)
-		actorID, err := authn.RequireUserID(ctx)
-		if err != nil {
-			return "", "", err
-		}
-		return tenantID, actorID, nil
-	})(next)
+	return idempotency.Require(store)(next)
 }
 
 var (
