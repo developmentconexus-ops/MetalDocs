@@ -306,17 +306,22 @@ func checkNoReadOnlyTxOptions(modulesRoot string, fset *token.FileSet) ([]Violat
 					return true
 				})
 				if !candidate {
+					// A positional TxOptions literal has no ReadOnly key in
+					// the AST. A true element is a narrow prefilter; the
+					// type-aware reporting pass below decides whether it is
+					// actually the canonical database/sql field.
 					for _, elt := range lit.Elts {
+						if value, ok := elt.(*ast.Ident); ok && value.Name == "true" {
+							candidate = true
+							break
+						}
 						kv, ok := elt.(*ast.KeyValueExpr)
 						if !ok {
 							continue
 						}
 						key, ok := kv.Key.(*ast.Ident)
-						if !ok || key.Name != "ReadOnly" {
-							continue
-						}
-						value, ok := kv.Value.(*ast.Ident)
-						if ok && value.Name == "true" {
+						value, valueOK := kv.Value.(*ast.Ident)
+						if ok && key.Name == "ReadOnly" && valueOK && value.Name == "true" {
 							candidate = true
 							break
 						}
@@ -342,20 +347,19 @@ func checkNoReadOnlyTxOptions(modulesRoot string, fset *token.FileSet) ([]Violat
 				resolver.err = fmt.Errorf("api-lint: cannot resolve composite literal type in %s", path)
 				return false
 			}
-			if !isDatabaseSQLTxOptions(resolvedType) {
+			readOnlyIndex, ok := databaseSQLReadOnlyFieldIndex(resolvedType)
+			if !ok {
 				return true
 			}
-			for _, elt := range lit.Elts {
+			for index, elt := range lit.Elts {
 				kv, ok := elt.(*ast.KeyValueExpr)
-				if !ok {
-					continue
-				}
-				key, ok := kv.Key.(*ast.Ident)
-				if !ok || key.Name != "ReadOnly" {
-					continue
-				}
-				val, ok := kv.Value.(*ast.Ident)
-				if !ok || val.Name != "true" {
+				if ok {
+					key, keyOK := kv.Key.(*ast.Ident)
+					val, valueOK := kv.Value.(*ast.Ident)
+					if !keyOK || key.Name != "ReadOnly" || !valueOK || val.Name != "true" {
+						continue
+					}
+				} else if index != readOnlyIndex || !isTrueIdent(elt) {
 					continue
 				}
 				out = append(out, Violation{
@@ -580,6 +584,28 @@ func isDatabaseSQLTxOptions(typ types.Type) bool {
 	}
 	obj := named.Obj()
 	return obj != nil && obj.Pkg() != nil && obj.Pkg().Path() == "database/sql" && obj.Name() == "TxOptions"
+}
+
+func databaseSQLReadOnlyFieldIndex(typ types.Type) (int, bool) {
+	named, ok := types.Unalias(typ).(*types.Named)
+	if !ok || !isDatabaseSQLTxOptions(named) {
+		return 0, false
+	}
+	fields, ok := named.Underlying().(*types.Struct)
+	if !ok {
+		return 0, false
+	}
+	for index := 0; index < fields.NumFields(); index++ {
+		if fields.Field(index).Name() == "ReadOnly" {
+			return index, true
+		}
+	}
+	return 0, false
+}
+
+func isTrueIdent(expr ast.Expr) bool {
+	ident, ok := expr.(*ast.Ident)
+	return ok && ident.Name == "true"
 }
 
 func resolvedCompositeType(info *types.Info, lit *ast.CompositeLit) types.Type {

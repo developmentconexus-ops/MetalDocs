@@ -58,6 +58,22 @@ func TestNoReadOnlyTxOptions_AliasedImportFlagged(t *testing.T) {
 	}
 }
 
+// TestNoReadOnlyTxOptions_PositionalLiteralFlagged proves the guard resolves
+// the canonical ReadOnly field index instead of relying on keyed literals.
+func TestNoReadOnlyTxOptions_PositionalLiteralFlagged(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "internal/modules/x/repository.go",
+		"package x\nimport \"database/sql\"\nfunc f() { _ = &sql.TxOptions{sql.LevelDefault, true} }\n")
+
+	got, err := checkNoReadOnlyTxOptions(dir, token.NewFileSet())
+	if err != nil {
+		t.Fatalf("checkNoReadOnlyTxOptions: %v", err)
+	}
+	if n := countRule(got, "no-readonly-tx-options"); n != 1 {
+		t.Fatalf("no-readonly-tx-options: want exactly 1 positional violation, got %d\nfull got=%+v", n, got)
+	}
+}
+
 // TestNoReadOnlyTxOptions_QualifiedAliasFlagged proves the guard follows the
 // composite literal's canonical type through an alias exported by another
 // package. The package p spelling is deliberately not TxOptions.

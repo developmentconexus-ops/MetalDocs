@@ -57,7 +57,7 @@ ADR 0043 scoped this module to one worker and five document-lifecycle event type
 - [`wiki/modules/documents.md`](documents.md) — producer of `LifecycleEventArgs`.
 - [`wiki/modules/jobs.md`](jobs.md) — the `metaldocs-jobs` binary that hosts both workers; `apps/jobs/cmd/metaldocs-jobs/main.go:129,137-138`.
 - [ADR 0039](../decisions/0039-cross-module-base-table-read-boundary.md) — published-view read boundary (`v_cd_obligated_readers`).
-- [ADR 0043](../decisions/0043-notifications-module-and-lifecycle-bundle.md) — original module + document-lifecycle bundle decision; superseded in scope (not in force) by the approval accountability loop's second worker, see §5 above.
+- [ADR 0043](../decisions/0043-notifications-module-and-lifecycle-bundle.md) — original module + document-lifecycle bundle decision; still governs the original document-lifecycle worker, while the approval accountability loop adds a second worker beyond its original scope, see §5 above.
 - [ADR 0082](../decisions/0082-approval-kernel-extraction.md) — invariant 6 (module-boundary) that `ApprovalNotifyWorker`'s delivery-only design exists to preserve.
 
 ## Changelog (this doc)
