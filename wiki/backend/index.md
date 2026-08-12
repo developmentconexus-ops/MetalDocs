@@ -1,6 +1,6 @@
 # MetalDocs Backend Atlas
 
-> **Last verified:** 2026-08-12 (A5 data-layer index sync: domain/application packages directly consume the shared `platform/db` transaction ports and `TxRunner`; pool construction remains bootstrap-owned) | **Prior:** 2026-07-28 (ADR 0085 Stage B — §5 runtime topology diagram: `ScheduledPublishWorker`/`scheduled_publish_cutover` node renamed to `ReleaseEvaluateWorker`/`release_evaluate`, the deleted job's replacement; see [`wiki/modules/approval.md`](../modules/approval.md)) | prior: 2026-07-02 (StagingOutboxWorker consolidation: outbox relay references updated — `PDFOutboxWorker`/`MaterializeOutboxWorker` are now two instances of generic `fanout.StagingOutboxWorker`) | **Prior:** 2026-06-12 (Wave F coherence pass)
+> **Last verified:** 2026-08-12 (A5 data-layer matrix sync: the broad wildcard row is replaced by the 10 documented domain-module consumers verified to import shared `platform/db` contracts; pool construction remains bootstrap-owned) | **Prior:** 2026-07-28 (ADR 0085 Stage B — §5 runtime topology diagram: `ScheduledPublishWorker`/`scheduled_publish_cutover` node renamed to `ReleaseEvaluateWorker`/`release_evaluate`, the deleted job's replacement; see [`wiki/modules/approval.md`](../modules/approval.md)) | prior: 2026-07-02 (StagingOutboxWorker consolidation: outbox relay references updated — `PDFOutboxWorker`/`MaterializeOutboxWorker` are now two instances of generic `fanout.StagingOutboxWorker`) | **Prior:** 2026-06-12 (Wave F coherence pass)
 > **Scope:** Atlas entrypoint for the MetalDocs backend Stage-1 truth map. Covers every binary, domain module, platform package, contract surface, and cross-cutting concern. Every behavioral claim carries a `file:line` anchor derived from Stage-1 audit artifacts. Runtime-only behavior tagged `[runtime-unverified]`.
 > **Key files:**
 > - `apps/api/cmd/metaldocs-api/main.go` — composition root (all wiring)
@@ -154,7 +154,7 @@ Domain application/infrastructure packages directly import the shared `platform/
 
 | Consumer | `db` ports/runner | `db/postgres` | `migrate` | `bootstrap` | `objectstore` | `storage/minio` | `messaging` |
 |---|---|---|---|---|---|---|---|
-| Any domain module | Y | - | - | - | - | - | - |
+| Verified domain modules (10 of the 12 listed in §1.2: `iam`, `audit`, `taxonomy`, `controlleddocuments`, `documents (core)`, `documents/approval`, `templates`, `security`, `render/fanout + render/resolvers`, `jobs`) | Y | - | - | - | - | - | - |
 | `apps/api` | Y | - | Y (via main) | Y | Y | - | - |
 | `apps/worker` | Y | - | - | Y | - | Y (via bootstrap) | Y |
 | `apps/jobs` | Y | - | - | Y | - | - | - |

@@ -1,6 +1,6 @@
 # Binary: metaldocs-jobs
 
-> **Last verified:** 2026-08-12 (A5 TxRunner adoption: the composition root now constructs one shared `platform/db.TxRunner` and injects it into both notifications workers; worker set and queue topology are unchanged.) | **Prior:** 2026-07-29 (ADR 0085 Stage C — the shared maintenance periodic jobs registered in this binary gained a 6th job, `release_hold_reconciler` (15-min alert-only reconciliation sweep over stuck release holds; full detail in [`wiki/modules/jobs.md`](../../modules/jobs.md)); Scope line's job list corrected — it was missing `approval-sla-surfacer` (F8) too.) | prior: 2026-07-28 (ADR 0085 Stage B — `scheduled_publish_cutover` is DELETED; the binary now executes the release coordinator's `release_evaluate` job kind, plus the shared maintenance periodic jobs and the other `temporal`-queue workers registered in `apps/jobs/cmd/metaldocs-jobs/main.go`. §3 rewritten below; see [`wiki/modules/approval.md`](../../modules/approval.md) and [ADR 0085](../../decisions/0085-release-coordinator-approval-driven-publication.md).) | prior: 2026-06-11
+> **Last verified:** 2026-08-12 (A5 queue-topology sync: the jobs binary subscribes to `temporal` (default max 10) and `maintenance` (max 2); `maintenance` is registered in `apps/jobs/cmd/metaldocs-jobs/main.go:102-105` and both queues are included in startup readiness.) | **Prior:** 2026-07-29 (ADR 0085 Stage C — the shared maintenance periodic jobs registered in this binary gained a 6th job, `release_hold_reconciler` (15-min alert-only reconciliation sweep over stuck release holds; full detail in [`wiki/modules/jobs.md`](../../modules/jobs.md)); Scope line's job list corrected — it was missing `approval-sla-surfacer` (F8) too.) | prior: 2026-07-28 (ADR 0085 Stage B — `scheduled_publish_cutover` is DELETED; the binary now executes the release coordinator's `release_evaluate` job kind, plus the shared maintenance periodic jobs and the other `temporal`-queue workers registered in `apps/jobs/cmd/metaldocs-jobs/main.go`. §3 rewritten below; see [`wiki/modules/approval.md`](../../modules/approval.md) and [ADR 0085](../../decisions/0085-release-coordinator-approval-driven-publication.md).) | prior: 2026-06-11
 > **Scope:** The `apps/jobs` binary — its River-based scheduling model, the business jobs it executes (dominated by the ADR 0085 release coordinator's `release_evaluate` job), configuration, lifecycle, and deployment status. This document also covers the River client factory package and the approval module's River job definitions. It also hosts the 6 shared maintenance periodic jobs (stuck-instance watchdog, idempotency janitor, audit-integrity validator, document-review-surfacer, approval-sla-surfacer, release-hold-reconciler) documented in [`wiki/modules/jobs.md`](../../modules/jobs.md) — not repeated in full here.
 > **Key files:**
 > - `apps/jobs/cmd/metaldocs-jobs/main.go` — binary entrypoint
@@ -24,12 +24,12 @@ The jobs binary is entirely independent of the outbox/worker pipeline. It shares
 
 ## 2. Scheduling model
 
-The jobs binary uses `github.com/riverqueue/river` with a single named queue: `temporal`.
+The jobs binary uses `github.com/riverqueue/river` with two named queues: `temporal` and `maintenance`. `temporal` is the default business-job queue; the jobs binary adds `maintenance` at startup for the shared periodic maintenance workers.
 
 | Aspect | Value | Source |
 |--------|-------|--------|
-| Queue name | `temporal` | `internal/platform/config/jobs.go:24` |
-| Max workers | 10 (default) | `METALDOCS_JOBS_TEMPORAL_MAX_WORKERS` |
+| Queues | `temporal` (default) and `maintenance` | `internal/platform/config/jobs.go:21-28`; `apps/jobs/cmd/metaldocs-jobs/main.go:102-105` |
+| Max workers | `temporal`: 10 (default); `maintenance`: 2 | `internal/platform/config/jobs.go:26-40`; `apps/jobs/cmd/metaldocs-jobs/main.go:105` |
 | Job schema | Configurable (default: River's default schema) | `METALDOCS_JOBS_RIVER_SCHEMA` |
 | Scheduling model | River-internal scheduler fires jobs at `ScheduledAt` | River client internals |
 | Delivery semantics | At-least-once (River retries on failure) | River framework |
@@ -40,7 +40,7 @@ River's internal scheduler is embedded in the client process — there is no sep
 
 ## 3. What it processes
 
-The binary registers many River workers on the shared `temporal` queue (release evaluation, notifications fanout, staging PDF/materialize dispatch, tenant lifecycle) plus the `maintenance`-queue periodic jobs (`apps/jobs/cmd/metaldocs-jobs/main.go:111-198`; the periodic-job set is documented in [`wiki/modules/jobs.md`](../../modules/jobs.md), not repeated here). The composition root constructs one shared `platform/db.TxRunner` (`main.go:129`) and injects it into both notifications workers (`main.go:137-138`), centralizing their transaction lifecycle without changing their River registration or queue. The dominant business job — and the one that used to be `scheduled_publish_cutover` — is the ADR 0085 release coordinator's `release_evaluate`.
+The binary registers many River workers on the shared `temporal` queue (release evaluation, notifications fanout, staging PDF/materialize dispatch, tenant lifecycle) plus the `maintenance`-queue periodic jobs (`apps/jobs/cmd/metaldocs-jobs/main.go:111-198`; the periodic-job set is documented in [`wiki/modules/jobs.md`](../../modules/jobs.md), not repeated here). The composition root adds `maintenance` with `MaxWorkers: 2` (`main.go:102-105`) and returns the periodic definitions alongside the worker registry (`main.go:196-197`). It also constructs one shared `platform/db.TxRunner` (`main.go:129`) and injects it into both notifications workers (`main.go:137-138`), centralizing their transaction lifecycle without changing their River registration or queue. The dominant business job — and the one that used to be `scheduled_publish_cutover` — is the ADR 0085 release coordinator's `release_evaluate`.
 
 ### Release evaluation (`release_evaluate`, ADR 0085 — supersedes `scheduled_publish_cutover`)
 
@@ -73,6 +73,7 @@ Loaded from `internal/platform/config/jobs.go` via `config.LoadJobsConfig`.
 | `METALDOCS_JOBS_ENABLED` | `true` | If `false`, binary logs and exits immediately |
 | `METALDOCS_JOBS_RIVER_SCHEMA` | `""` | River table schema (empty = River's default) |
 | `METALDOCS_JOBS_TEMPORAL_MAX_WORKERS` | `10` | Concurrency cap for the `temporal` queue |
+| `maintenance` queue | `2` | Fixed composition-root concurrency cap; registered by `metaldocs-jobs` at `apps/jobs/cmd/metaldocs-jobs/main.go:102-105` (no environment override) |
 | `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`, `PGSSLMODE` | — | Postgres connection |
 
 ---
@@ -87,8 +88,8 @@ Loaded from `internal/platform/config/jobs.go` via `config.LoadJobsConfig`.
    b. Calls `MigrateRiverSchema` — runs River's `IF NOT EXISTS` schema migration. Note: `apps/api/cmd/metaldocs-api/main.go:439` also calls `MigrateRiverSchema` at startup, so both binaries attempt this migration; River migrations are idempotent.
    c. Invokes the caller-supplied worker-factory closure (`apps/jobs/cmd/metaldocs-jobs/main.go:111-168`) to build a `*river.Workers` registry — `ReleaseEvaluateWorker` (ADR 0085), plus notifications fanout, staging PDF/materialize dispatch, tenant-lifecycle, and the shared maintenance periodic jobs.
    d. Returns `JobsDependencies{River, SQLDB, Cleanup}`.
-3. Starts the River client on the `temporal` queue: `deps.River.Client.Start(ctx)`.
-4. Logs `MetalDocs Jobs running (queues=temporal)`.
+3. Starts the River client with both configured queues (`temporal` and `maintenance`): `deps.River.Client.Start(ctx)`.
+4. Logs `MetalDocs Jobs running` with `queues=temporal` (`main.go:235`); the current log field names the default queue even though `maintenance` is also configured and subscribed. Readiness heartbeat coverage includes both queues (`main.go:217-224`).
 5. Blocks on `<-ctx.Done()`.
 
 ### Shutdown

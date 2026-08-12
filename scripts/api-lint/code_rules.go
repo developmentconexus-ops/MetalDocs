@@ -305,6 +305,23 @@ func checkNoReadOnlyTxOptions(modulesRoot string, fset *token.FileSet) ([]Violat
 					}
 					return true
 				})
+				if !candidate {
+					for _, elt := range lit.Elts {
+						kv, ok := elt.(*ast.KeyValueExpr)
+						if !ok {
+							continue
+						}
+						key, ok := kv.Key.(*ast.Ident)
+						if !ok || key.Name != "ReadOnly" {
+							continue
+						}
+						value, ok := kv.Value.(*ast.Ident)
+						if ok && value.Name == "true" {
+							candidate = true
+							break
+						}
+					}
+				}
 				return !candidate
 			})
 		}

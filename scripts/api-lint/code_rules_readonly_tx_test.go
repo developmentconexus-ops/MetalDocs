@@ -94,6 +94,27 @@ func TestNoReadOnlyTxOptions_LocalAliasFlagged(t *testing.T) {
 	}
 }
 
+// TestNoReadOnlyTxOptions_LocalAliasChainFlagged proves the prefilter does not
+// require a selector in the composite literal type. A local alias can hide a
+// database/sql.TxOptions alias behind more than one package boundary, so the
+// ReadOnly field must be enough to send the literal through go/types.
+func TestNoReadOnlyTxOptions_LocalAliasChainFlagged(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "go.mod", "module fixture\n\ngo 1.26.5\n")
+	writeFile(t, dir, filepath.Join("internal/modules/p", "options.go"),
+		"package p\nimport \"database/sql\"\ntype Opts = sql.TxOptions\n")
+	writeFile(t, dir, filepath.Join("internal/modules/x", "repository.go"),
+		"package x\nimport p \"fixture/internal/modules/p\"\ntype LocalOpts = p.Opts\nvar _ = &LocalOpts{ReadOnly: true}\n")
+
+	got, err := checkNoReadOnlyTxOptions(dir, token.NewFileSet())
+	if err != nil {
+		t.Fatalf("checkNoReadOnlyTxOptions: %v", err)
+	}
+	if n := countRule(got, "no-readonly-tx-options"); n != 1 {
+		t.Fatalf("local alias chain: want exactly 1 violation, got %d\nfull got=%+v", n, got)
+	}
+}
+
 func TestNoReadOnlyTxOptions_UnresolvableFileFailsClosed(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "internal/modules/x/repository.go")

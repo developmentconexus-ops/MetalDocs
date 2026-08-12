@@ -39,7 +39,7 @@ Both workers reject any event type they do not recognize by returning a `fmt.Err
 - `fanout_worker.go:57-62` — the `default` branch of the `switch args.EventType` in `Work` returns `fmt.Errorf("fanout_worker: unknown event type %q", args.EventType)`. The comment on that branch is explicit about why: "returning nil dropped the event with no error and no dead-letter, so the divergence was invisible."
 - `approval_notify_worker.go:61-66` — the same shape: an event type absent from `approvalMessages` returns an error before any DB work happens.
 
-River's retry policy then applies and the job eventually dead-letters, which is the intended failure mode: a producer/consumer type divergence is a bug that must be visible, not a quietly dropped notification. `ApprovalNotifyWorker` treats an EMPTY recipient list differently from an unknown type, though — a livre (zero-stage) route has no eligible actors and that is legitimate, not a divergence, so `len(args.RecipientUserIDs) == 0` returns `nil` (checked before the subject-kind lookup, `approval_notify_worker.go:69-75`).
+River's retry policy then applies and the job eventually dead-letters, which is the intended failure mode: a producer/consumer type divergence is a bug that must be visible, not a quietly dropped notification. `ApprovalNotifyWorker` treats an EMPTY recipient list differently from an unknown type, though — a stage-free (zero-stage) route has no eligible actors and that is legitimate, not a divergence, so `len(args.RecipientUserIDs) == 0` returns `nil` (checked before the subject-kind lookup, `approval_notify_worker.go:69-75`).
 
 ## 4. HTTP surface — self-scope, not module-boundary
 
@@ -62,5 +62,6 @@ ADR 0043 scoped this module to one worker and five document-lifecycle event type
 
 ## Changelog (this doc)
 
+- 2026-08-12 - A5 review sync: clarified that an empty-recipient approval route is a legitimate stage-free (zero-stage) route.
 - 2026-08-12 - A5 TxRunner adoption: documented the shared composition-root runner, `runner.Do` ownership, unchanged tenant seed/idempotency semantics, and refreshed worker/main anchors.
 - 2026-08-05 - First pass. Written and verified against the current tree (both workers, the HTTP surface, the idempotency shape, the unknown-event-type error/dead-letter behavior) rather than transcribed from ADR 0043, which predates the second worker. Created as part of the approval accountability loop's Task 11 doc pass.
