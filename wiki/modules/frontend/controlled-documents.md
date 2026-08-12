@@ -1,6 +1,6 @@
 # Frontend module: controlled-documents
 
-> **Last verified:** 2026-07-02 (FE-10: consolidated duplicate active-document fetch into this module; approval's forked copy deleted)
+> **Last verified:** 2026-08-12 (routing-only refresh; FE-10 domain content last verified 2026-07-02)
 > **Scope:** Read-side query/API surface for controlled documents (the regulated wrapper around a document family). No standalone pages — consumed by `documents` and `approval` slices.
 > **Owner:** unassigned | **Backend counterpart:** [`wiki/modules/controlled-documents.md`](../controlled-documents.md)
 
@@ -87,4 +87,4 @@ invalidates `QK.controlledDocuments.all` on success.
 
 - Backend module: [`wiki/modules/controlled-documents.md`](../controlled-documents.md)
 - Decision: [`wiki/decisions/`](../../decisions/) — atomic CD create ADR.
-- Skill: [`metaldocs-frontend`](../../../.agents/skills/metaldocs-frontend/SKILL.md), [`metaldocs-tanstack-query`](../../../.agents/skills/metaldocs-tanstack-query/SKILL.md)
+- Workflow: [`AGENTS.md`](../../../AGENTS.md) + [`wiki/architecture/frontend-structure.md`](../../architecture/frontend-structure.md); use generated API types and the canonical engineering method for non-trivial changes.
