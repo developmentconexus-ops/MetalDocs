@@ -2,7 +2,7 @@
 
 **Last verified:** 2026-08-12 (routing-only refresh)
 
-> **In the implementation workflow:** this audit remains a pre-implementation gate for designed screens, but the retired `metaldocs-screen-implementation` / `.agents/skills/` path is no longer a live workflow entrypoint. Use `AGENTS.md`, `wiki/architecture/frontend-structure.md`, and the owning module/workflow docs. Record Keep/Cut/Defer decisions in `frontend/apps/web/design-source/<slug>/IMPLEMENTATION.md` or the screen's governed notes before TSX is treated as final.
+> **In the implementation workflow:** this audit remains a pre-implementation gate for designed screens, but the retired `metaldocs-screen-implementation` / `.agents/skills/` path is no longer a live workflow entrypoint. Use `AGENTS.md`, `wiki/architecture/frontend-structure.md`, and the owning module/workflow docs. Record Keep/Cut/Defer decisions during orientation in `frontend/apps/web/design-source/<slug>/IMPLEMENTATION.md` or the screen's governed notes **before writing any TSX**.
 
 When implementing any screen sourced from `frontend/apps/web/design-source/<slug>/` (the Claude-Design-generated mockups powering the screen-redesign initiative), you MUST audit the design against the real MetalDocs workflow before writing TSX.
 
@@ -46,7 +46,7 @@ Each screen has `frontend/apps/web/design-source/<slug>/NOTES.md`. Add an **Audi
 
 ## When to run
 
-Run during orientation before coding, after reading the design-source files and before placing/finalizing new UI. Start from:
+Run during orientation before coding, after reading the design-source files and before writing new UI. Start from:
 
 - [`AGENTS.md`](../../AGENTS.md) — engineering/routing rules
 - [`wiki/architecture/frontend-structure.md`](../architecture/frontend-structure.md) — frontend architecture
