@@ -48,7 +48,7 @@ Use:
 - **Canonical engineering method** -> `docs/engineering/root-cause-global-maximum-method.md`
 - **New feature/module pre-design** -> `.claude/skills/developing-new-work/SKILL.md`
 - **Adversarial design/plan/diff review** -> `.claude/skills/adversarial-review/SKILL.md`
-- **Code impact tracing when needed** -> `.claude/skills/gitnexus/SKILL.md`
+- **Code impact tracing when needed** -> `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md`
 - **Harness coordination when needed** -> `.claude/skills/harness-hub/SKILL.md`
 - **Backend/API rules** -> `wiki/architecture/backend-api-structure.md`, `wiki/architecture/api-contract.md`, `wiki/architecture/api-design-system.md`
 - **Frontend rules** -> `wiki/architecture/frontend-structure.md`
