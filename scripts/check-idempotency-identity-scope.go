@@ -87,11 +87,11 @@ func run() error {
 	}
 
 	for _, item := range findings {
-		fmt.Printf("%s:%d:%d: actorFromCtx-shaped function calls tenant.FromContext directly — outside identity.go this re-implements idempotency.TenantActorFromContext instead of calling it\n", item.path, item.line, item.col)
+		fmt.Printf("%s:%d:%d: actorFromCtx-shaped function references tenant.FromContext — outside identity.go this re-implements idempotency.TenantActorFromContext instead of calling it\n", item.path, item.line, item.col)
 	}
 	if len(findings) > 0 {
 		fmt.Printf("idempotency-identity-scope-guard: %d violation(s) found — a second actorFromCtx-shaped resolver is calling tenant.FromContext outside identity.go\n", len(findings))
-		fmt.Println("Fix: delete the hand-rolled closure and call idempotency.TenantActorFromContext instead.")
+		fmt.Println("Fix: delete the hand-rolled resolver and call idempotency.TenantActorFromContext instead.")
 		return fmt.Errorf("guard rejected actor identity reimplementation")
 	}
 
@@ -246,11 +246,11 @@ func scanLoadedFile(rel string, loaded loadedFile) []finding {
 					return false
 				}
 			}
-			call, ok := child.(*ast.CallExpr)
-			if !ok || !isTenantFromContext(call, info) {
+			ident, ok := child.(*ast.Ident)
+			if !ok || !isTenantFromContextReference(ident, info) {
 				return true
 			}
-			position := loaded.pkg.Fset.PositionFor(call.Pos(), false)
+			position := loaded.pkg.Fset.PositionFor(ident.Pos(), false)
 			key := fmt.Sprintf("%s:%d:%d", rel, position.Line, position.Column)
 			if !seen[key] {
 				seen[key] = true
@@ -290,32 +290,13 @@ func isErrorType(t types.Type) bool {
 	return types.Identical(types.Unalias(t), types.Unalias(types.Universe.Lookup("error").Type()))
 }
 
-func isTenantFromContext(call *ast.CallExpr, info *types.Info) bool {
-	ident := terminalCalleeIdent(call.Fun)
-	if ident == nil {
-		return false
-	}
+func isTenantFromContextReference(ident *ast.Ident, info *types.Info) bool {
 	obj, ok := info.ObjectOf(ident).(*types.Func)
 	if !ok || obj.Name() != "FromContext" || obj.Pkg() == nil || obj.Pkg().Path() != tenantImportPath {
 		return false
 	}
 	signature, ok := obj.Type().(*types.Signature)
 	return ok && signature.Recv() == nil
-}
-
-func terminalCalleeIdent(expr ast.Expr) *ast.Ident {
-	for {
-		switch current := expr.(type) {
-		case *ast.ParenExpr:
-			expr = current.X
-		case *ast.SelectorExpr:
-			return current.Sel
-		case *ast.Ident:
-			return current
-		default:
-			return nil
-		}
-	}
 }
 
 func pathKey(path string) string {

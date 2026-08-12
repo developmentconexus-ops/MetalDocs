@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // ErrConflict is returned when the same idempotency key is reused with a
@@ -86,7 +87,7 @@ func (s *Store) BeginReplay(ctx context.Context, tenantID, actorID, key, payload
 	// application-boundary half. Both must hold: this guard exists so a
 	// future caller that bypasses the shared resolver still fails closed
 	// here, not because the resolver is expected to be bypassed.
-	if tenantID == "" {
+	if strings.TrimSpace(tenantID) == "" {
 		return nil, nil, errors.New("idempotency: tenantID must not be empty")
 	}
 	tx, err := s.db.BeginTx(ctx, nil)

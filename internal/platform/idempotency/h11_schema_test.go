@@ -47,6 +47,19 @@ func TestBeginReplay_EmptyTenantReturnsError(t *testing.T) {
 	}
 }
 
+// TestBeginReplay_WhitespaceTenantReturnsError proves whitespace-only tenant
+// input cannot create the same shared collision slot as an empty tenant.
+func TestBeginReplay_WhitespaceTenantReturnsError(t *testing.T) {
+	s := idempotency.New(nil, "POST /h11/{id}") // nil db — guard fires before tx open
+	_, _, err := s.BeginReplay(context.Background(), strings.Repeat(" ", 3), h11Actor, uniqueKey("whitespace-tenant"), "hash-a")
+	if err == nil {
+		t.Fatal("expected error for whitespace-only tenantID, got nil")
+	}
+	if !strings.Contains(err.Error(), "tenantID") {
+		t.Fatalf("error should mention tenantID, got: %v", err)
+	}
+}
+
 // TestCompleteReplay_OversizedBodyReturnsError proves that a body larger than
 // maxBodyBytes (64 KiB) is rejected before the DB UPDATE is attempted.
 func TestCompleteReplay_OversizedBodyReturnsError(t *testing.T) {

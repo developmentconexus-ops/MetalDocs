@@ -807,6 +807,7 @@ var checks = []Check{
 				"internal/modules/fixture/bad_handler_multiline.go",
 				"internal/modules/fixture/bad_handler_generic.go",
 				"internal/modules/fixture/bad_handler_integration_variant.go",
+				"internal/modules/fixture/bad_handler_function_alias.go",
 			},
 			// NotWant proves the identity.go exclusion itself is guarded, not
 			// merely conventional: the fixture tree plants, at exactly
