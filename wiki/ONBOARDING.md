@@ -110,7 +110,7 @@ Current repository workflows:
 
 - New module/feature pre-design -> [`.claude/skills/developing-new-work/SKILL.md`](../.claude/skills/developing-new-work/SKILL.md)
 - Adversarial design/plan/diff review -> [`.claude/skills/adversarial-review/SKILL.md`](../.claude/skills/adversarial-review/SKILL.md)
-- Code relationship/impact tracing -> [`.claude/skills/gitnexus/SKILL.md`](../.claude/skills/gitnexus/SKILL.md) when needed
+- Code relationship/impact tracing -> [`.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md`](../.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md) when needed
 - Harness coordination -> [`.claude/skills/harness-hub/SKILL.md`](../.claude/skills/harness-hub/SKILL.md) when needed
 - Documentation governance -> [`wiki/standards/documentation-governance.md`](standards/documentation-governance.md)
 
