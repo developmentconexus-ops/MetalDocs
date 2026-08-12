@@ -2,7 +2,7 @@
 
 ## Root-Cause / Global-Maximum Engineering Gate
 
-For every non-trivial bug fix, refactor, architecture change, remediation, simplification, new abstraction, new guard, repeated review finding, or cross-boundary change, read `docs/engineering/root-cause-global-maximum-method.md` before implementation.
+For every non-trivial bug fix, refactor, architecture change, remediation, simplification, new abstraction, new guard, repeated review finding, or cross-boundary change, read `wiki/standards/root-cause-global-maximum-method.md` before implementation.
 
 Before implementation, record at least:
 
@@ -42,7 +42,7 @@ Use the MetalDocs operating model for all non-trivial work.
 
 Canonical references:
 
-- Engineering doctrine: `docs/engineering/root-cause-global-maximum-method.md`.
+- Engineering doctrine: `wiki/standards/root-cause-global-maximum-method.md`.
 - QA/close-out policy: `wiki/quality/qa-operating-system.md`.
 - Path-stable operating bridge: `wiki/references/ai-operating-system.md`.
 - Target architecture: `wiki/architecture/backend-target-architecture.md`.
@@ -77,7 +77,7 @@ Critical contradiction stop rule: stop when contradictions affect route ownershi
 
 ## Default Workflow
 
-1. Read `docs/engineering/root-cause-global-maximum-method.md` when the engineering gate applies.
+1. Read `wiki/standards/root-cause-global-maximum-method.md` when the engineering gate applies.
 2. Read only the wiki/architecture docs required for the task boundary.
 3. Name the owning module(s), target invariant, authority, and boundary.
 4. Pass the relevant prerequisite gate before implementation.
