@@ -1,8 +1,8 @@
 # Design-vs-Workflow Audit
 
-**Last verified:** 2026-05-06
+**Last verified:** 2026-08-12 (routing-only refresh)
 
-> **In the implementation workflow:** this audit is now **Phase 0** of the `metaldocs-screen-implementation` skill (`.agents/skills/metaldocs-screen-implementation/SKILL.md`). The Keep/Cut/Defer decisions land in `frontend/apps/web/design-source/<slug>/IMPLEMENTATION.md` §0.1 and require user confirmation before any TSX is written.
+> **In the implementation workflow:** this audit remains a pre-implementation gate for designed screens, but the retired `metaldocs-screen-implementation` / `.agents/skills/` path is no longer a live workflow entrypoint. Use `AGENTS.md`, `wiki/architecture/frontend-structure.md`, and the owning module/workflow docs. Record Keep/Cut/Defer decisions during orientation in `frontend/apps/web/design-source/<slug>/IMPLEMENTATION.md` or the screen's governed notes **before writing any TSX**.
 
 When implementing any screen sourced from `frontend/apps/web/design-source/<slug>/` (the Claude-Design-generated mockups powering the screen-redesign initiative), you MUST audit the design against the real MetalDocs workflow before writing TSX.
 
@@ -46,11 +46,15 @@ Each screen has `frontend/apps/web/design-source/<slug>/NOTES.md`. Add an **Audi
 
 ## When to run
 
-Run during the "Orient before coding" step of the `metaldocs-frontend` skill, after reading the design-source files and before placing any new file. Cross-reference:
+Run during orientation before coding, after reading the design-source files and before writing new UI. Start from:
 
+- [`AGENTS.md`](../../AGENTS.md) — engineering/routing rules
+- [`wiki/architecture/frontend-structure.md`](../architecture/frontend-structure.md) — frontend architecture
 - [wiki/concepts/controlled-documents.md](controlled-documents.md) — document model + states
-- [wiki/concepts/authz-tiers.md](authz-tiers.md) — RBAC tiers
+- [wiki/concepts/authz-tiers.md](authz-tiers.md) — authorization tiers
 - [wiki/architecture/data-model.md](../architecture/data-model.md) — what fields actually exist
+
+For a genuinely new feature/module boundary, also use `.claude/skills/developing-new-work/SKILL.md` before design.
 
 ## Example: Library screen (2026-05-06)
 

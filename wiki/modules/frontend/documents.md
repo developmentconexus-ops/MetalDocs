@@ -1,6 +1,6 @@
 # Frontend module: documents
 
-> **Last verified:** 2026-07-02 (anchor refresh: PDF-status detection anchor now `StagingOutboxRepository.ReadState` after StagingOutboxWorker consolidation) | **Prior:** 2026-06-01 (P2 consolidation: added Failure modes section)
+> **Last verified:** 2026-08-12 (workflow-routing refresh; prior PDF-status and A2.2 content unchanged)
 > **Scope:** Library, document detail, eigenpal-based editor, distribution, new-document wizard. Frontend slice of the backend [`documents`](../documents.md) module.
 > **Owner:** unassigned | **Backend counterpart:** [`wiki/modules/documents.md`](../documents.md)
 
@@ -95,4 +95,4 @@ Owns the document lifecycle UI: discoverability (Library), authored revision (Ed
 - Backend module: [`wiki/modules/documents.md`](../documents.md)
 - Sequences: [`create-document`](../../diagrams/sequence-create-document.md), [`edit-autosave`](../../diagrams/sequence-edit-autosave.md), [`pdf-export`](../../diagrams/sequence-pdf-export.md)
 - Editor ACL: [`wiki/modules/editor-ui-eigenpal.md`](../editor-ui-eigenpal.md)
-- Skill: [`metaldocs-frontend`](../../../.agents/skills/metaldocs-frontend/SKILL.md), [`metaldocs-tanstack-query`](../../../.agents/skills/metaldocs-tanstack-query/SKILL.md)
+- Workflow: [`AGENTS.md`](../../../AGENTS.md) + [`wiki/architecture/frontend-structure.md`](../../architecture/frontend-structure.md); use generated API types and the canonical engineering method for non-trivial changes.
