@@ -102,4 +102,4 @@ Backend owner: `internal/modules/approval/http/router.go` (now the top-level 15t
 - Backend module: [`wiki/modules/approval.md`](../approval.md)
 - Sequence: [`wiki/diagrams/sequence-signoff-freeze.md`](../../diagrams/sequence-signoff-freeze.md)
 - Concept: [`wiki/concepts/authz-tiers.md`](../../concepts/authz-tiers.md), [`wiki/concepts/error-ux.md`](../../concepts/error-ux.md)
-- Workflow: [`AGENTS.md`](../../../AGENTS.md) + [`wiki/architecture/frontend-structure.md`](../../architecture/frontend-structure.md); use generated API types and the canonical engineering method for non-trivial changes.
+- Workflow: [`AGENTS.md`](../../../AGENTS.md) + [`wiki/architecture/frontend-structure.md`](../../architecture/frontend-structure.md); use generated API types for routes covered by OpenAPI. Preserve the documented hand-rolled types for signoff/cancel until those routes are added to OpenAPI and regenerated. Apply the canonical engineering method for non-trivial changes.
