@@ -1,6 +1,6 @@
 # Frontend module: iam
 
-> **Last verified:** 2026-08-11 (A2.2 dead-code burn-down: removed `useOverviewQuery.ts` — deleted, zero live consumer of `GET /api/v1/admin/iam/overview`, PR #119)
+> **Last verified:** 2026-08-12 (routing-only refresh; A2.2 domain content last verified 2026-08-11)
 > **Scope:** Admin Center (Overview, People, Roles & Capabilities, Audit, Sessions & Security, Usage) and tenant area-membership administration. Frontend slice of the backend [`iam`](../iam.md) and [`audit`](../audit.md) modules.
 > **Owner:** unassigned | **Backend counterpart:** [`wiki/modules/iam.md`](../iam.md)
 
@@ -114,5 +114,5 @@ Presence is a WebSocket subscription (`usePresenceStream`) that writes into a de
 - Backend module: [`wiki/modules/iam.md`](../iam.md), [`wiki/modules/audit.md`](../audit.md)
 - Concept: [`wiki/concepts/authz-tiers.md`](../../concepts/authz-tiers.md)
 - ADRs: [`0019-cap-audit-read-and-session-manage.md`](../../decisions/0019-cap-audit-read-and-session-manage.md), [`0020-admin-center-six-tab-ia.md`](../../decisions/0020-admin-center-six-tab-ia.md), [`0021-tenant-vs-platform-admin-separation.md`](../../decisions/0021-tenant-vs-platform-admin-separation.md), [`0028-audit-events-cursor-shape.md`](../../decisions/0028-audit-events-cursor-shape.md)
-- Skill: [`metaldocs-frontend`](../../../.agents/skills/metaldocs-frontend/SKILL.md)
+- Workflow: [`AGENTS.md`](../../../AGENTS.md) + [`wiki/architecture/frontend-structure.md`](../../architecture/frontend-structure.md); use the canonical engineering method for non-trivial changes.
 - QA evidence: `QA-evidence-admin-center-rebuild.md` (removed at the v1 re-baseline, commit `c7f06f2e`)
