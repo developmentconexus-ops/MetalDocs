@@ -1,6 +1,6 @@
 # MetalDocs Backend Atlas
 
-> **Last verified:** 2026-07-28 (ADR 0085 Stage B — §5 runtime topology diagram: `ScheduledPublishWorker`/`scheduled_publish_cutover` node renamed to `ReleaseEvaluateWorker`/`release_evaluate`, the deleted job's replacement; see [`wiki/modules/approval.md`](../modules/approval.md)) | prior: 2026-07-02 (StagingOutboxWorker consolidation: outbox relay references updated — `PDFOutboxWorker`/`MaterializeOutboxWorker` are now two instances of generic `fanout.StagingOutboxWorker`) | **Prior:** 2026-06-12 (Wave F coherence pass)
+> **Last verified:** 2026-08-12 (A5 data-layer index sync: domain/application packages directly consume the shared `platform/db` transaction ports and `TxRunner`; pool construction remains bootstrap-owned) | **Prior:** 2026-07-28 (ADR 0085 Stage B — §5 runtime topology diagram: `ScheduledPublishWorker`/`scheduled_publish_cutover` node renamed to `ReleaseEvaluateWorker`/`release_evaluate`, the deleted job's replacement; see [`wiki/modules/approval.md`](../modules/approval.md)) | prior: 2026-07-02 (StagingOutboxWorker consolidation: outbox relay references updated — `PDFOutboxWorker`/`MaterializeOutboxWorker` are now two instances of generic `fanout.StagingOutboxWorker`) | **Prior:** 2026-06-12 (Wave F coherence pass)
 > **Scope:** Atlas entrypoint for the MetalDocs backend Stage-1 truth map. Covers every binary, domain module, platform package, contract surface, and cross-cutting concern. Every behavioral claim carries a `file:line` anchor derived from Stage-1 audit artifacts. Runtime-only behavior tagged `[runtime-unverified]`.
 > **Key files:**
 > - `apps/api/cmd/metaldocs-api/main.go` — composition root (all wiring)
@@ -150,14 +150,14 @@ Notes:
 
 ### 2.3 Data Layer
 
-Domain modules do NOT import data-layer platform packages directly. All Postgres and MinIO wiring flows through `bootstrap`, imported only by the three binary `main` packages (`platform-data-layer.md §5`).
+Domain application/infrastructure packages directly import the shared `platform/db` contracts (`DB`, `Tx`, `TxRunner`) but do not construct Postgres pools. Pool and MinIO construction still flows through `bootstrap`; concrete module wiring is performed at the composition roots (see `platform/data-layer.md §5`).
 
-| Consumer | `db/postgres` | `migrate` | `bootstrap` | `objectstore` | `storage/minio` | `messaging` |
-|---|---|---|---|---|---|---|
-| Any domain module | - | - | - | - | - | - |
-| `apps/api` | - | Y (via main) | Y | Y | - | - |
-| `apps/worker` | - | - | Y | - | Y (via bootstrap) | Y |
-| `apps/jobs` | - | - | Y | - | - | - |
+| Consumer | `db` ports/runner | `db/postgres` | `migrate` | `bootstrap` | `objectstore` | `storage/minio` | `messaging` |
+|---|---|---|---|---|---|---|---|
+| Any domain module | Y | - | - | - | - | - | - |
+| `apps/api` | Y | - | Y (via main) | Y | Y | - | - |
+| `apps/worker` | Y | - | - | Y | - | Y (via bootstrap) | Y |
+| `apps/jobs` | Y | - | - | Y | - | - | - |
 
 ### 2.4 Async / Messaging
 

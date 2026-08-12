@@ -134,8 +134,8 @@ func run(ctx context.Context) error {
 			WithEvaluationEnqueuer(releaseEnqueuer).
 			WithProfileReviewIntervalReader(approvalrepo.NewProfileReviewIntervalReader(taxonomyrepo.NewProfileRepository(db)))
 		river.AddWorker(workers, approvaljobs.NewReleaseEvaluateWorker(releaseCoordinator, db))
-		river.AddWorker(workers, notificationsinfra.NewNotificationsFanoutWorker(db))
-		river.AddWorker(workers, notificationsinfra.NewApprovalNotifyWorker(db))
+		river.AddWorker(workers, notificationsinfra.NewNotificationsFanoutWorker(runner))
+		river.AddWorker(workers, notificationsinfra.NewApprovalNotifyWorker(runner))
 		river.AddWorker(workers, stuck_instance_watchdog.NewWorker(runner, approvalEmitter))
 		river.AddWorker(workers, idempotency_janitor.NewWorker(db))
 		river.AddWorker(workers, audit_integrity_validator.NewWorker(auditpg.NewWriter(db)))

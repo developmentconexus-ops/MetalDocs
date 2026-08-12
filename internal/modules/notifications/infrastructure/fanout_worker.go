@@ -9,6 +9,7 @@ import (
 
 	documentsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
+	platformdb "metaldocs/internal/platform/db"
 )
 
 var ptBRMessages = map[string][2]string{
@@ -27,15 +28,15 @@ var ptBRMessages = map[string][2]string{
 // Idempotent via partial unique index on (recipient_user_id, source_event_id).
 type NotificationsFanoutWorker struct {
 	river.WorkerDefaults[documentsdomain.LifecycleEventArgs]
-	db *sql.DB
+	runner platformdb.TxRunner
 }
 
-// NewNotificationsFanoutWorker builds a ready worker. db is required.
-func NewNotificationsFanoutWorker(db *sql.DB) *NotificationsFanoutWorker {
-	if db == nil {
+// NewNotificationsFanoutWorker builds a ready worker. runner is required.
+func NewNotificationsFanoutWorker(runner platformdb.TxRunner) *NotificationsFanoutWorker {
+	if runner == nil {
 		panic("notifications_fanout_worker: db is required")
 	}
-	return &NotificationsFanoutWorker{db: db}
+	return &NotificationsFanoutWorker{runner: runner}
 }
 
 // Work runs the whole fanout for one delivered event inside a single
@@ -61,32 +62,21 @@ func (w *NotificationsFanoutWorker) Work(ctx context.Context, job *river.Job[doc
 		return fmt.Errorf("fanout_worker: unknown event type %q", args.EventType)
 	}
 
-	tx, err := w.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("fanout_worker: begin tx: %w", err)
-	}
-	if err := authz.SeedTxTenant(ctx, tx, args.TenantID); err != nil {
-		_ = tx.Rollback()
-		return fmt.Errorf("fanout_worker: seed tenant: %w", err)
-	}
-
-	switch args.EventType {
-	case documentsdomain.EventTypeDocumentPublished,
-		documentsdomain.EventTypeDocumentSuperseded,
-		documentsdomain.EventTypeDocumentObsoleted:
-		err = w.fanoutToReaders(ctx, tx, args)
-	case documentsdomain.EventTypeDocumentApproved,
-		documentsdomain.EventTypeDocumentRejected:
-		err = w.fanoutToAuthor(ctx, tx, args)
-	}
-	if err != nil {
-		_ = tx.Rollback()
-		return err
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("fanout_worker: commit: %w", err)
-	}
-	return nil
+	return w.runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := authz.SeedTxTenant(ctx, tx, args.TenantID); err != nil {
+			return fmt.Errorf("fanout_worker: seed tenant: %w", err)
+		}
+		switch args.EventType {
+		case documentsdomain.EventTypeDocumentPublished,
+			documentsdomain.EventTypeDocumentSuperseded,
+			documentsdomain.EventTypeDocumentObsoleted:
+			return w.fanoutToReaders(ctx, tx, args)
+		case documentsdomain.EventTypeDocumentApproved,
+			documentsdomain.EventTypeDocumentRejected:
+			return w.fanoutToAuthor(ctx, tx, args)
+		}
+		return nil
+	})
 }
 
 // fanoutToReaders inserts one notification per obligated reader with a single

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	platformdb "metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/messaging"
 )
 
@@ -14,6 +15,7 @@ import (
 // transactional outbox table.
 type Consumer struct {
 	db         *sql.DB
+	runner     platformdb.TxRunner
 	claimLease time.Duration
 }
 
@@ -24,7 +26,7 @@ func NewConsumer(db *sql.DB, claimLease time.Duration) *Consumer {
 	if claimLease <= 0 {
 		claimLease = 30 * time.Second
 	}
-	return &Consumer{db: db, claimLease: claimLease}
+	return &Consumer{db: db, runner: platformdb.NewTxRunner(db), claimLease: claimLease}
 }
 
 // ClaimUnpublished claims up to limit unpublished outbox events for
@@ -33,12 +35,6 @@ func (c *Consumer) ClaimUnpublished(ctx context.Context, limit int) ([]messaging
 	if limit <= 0 {
 		limit = 20
 	}
-
-	tx, err := c.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("begin claim outbox tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
 
 	const q = `
 -- TODO(phase11): heartbeat_lease is mirrored here as claimLease; make the DB interval configurable in the follow-up migration/worker sweep.
@@ -68,66 +64,68 @@ SELECT event_id, event_type, aggregate_type, aggregate_id, occurred_at, version,
 FROM claimed
 ORDER BY occurred_at ASC
 `
-	rows, err := tx.QueryContext(ctx, q, limit, durationToPostgresInterval(c.claimLease))
+	var events []messaging.Event
+	err := c.runner.Do(ctx, func(tx *sql.Tx) error {
+		rows, err := tx.QueryContext(ctx, q, limit, durationToPostgresInterval(c.claimLease))
+		if err != nil {
+			return fmt.Errorf("query unpublished outbox events: %w", err)
+		}
+		defer func() { _ = rows.Close() }()
+
+		for rows.Next() {
+			var event messaging.Event
+			var occurredAt time.Time
+			var payloadJSON []byte
+			var eventID string
+			var eventType string
+			var aggregateType string
+			var aggregateID string
+			var idempotencyKey string
+			var traceID string
+			if err := rows.Scan(
+				&eventID,
+				&eventType,
+				&aggregateType,
+				&aggregateID,
+				&occurredAt,
+				&event.Version,
+				&event.AttemptCount,
+				&idempotencyKey,
+				&event.Producer,
+				&traceID,
+				&payloadJSON,
+			); err != nil {
+				return fmt.Errorf("scan outbox event: %w", err)
+			}
+			event.EventID = messaging.EventID(eventID)
+			event.EventType = messaging.EventType(eventType)
+			event.AggregateType = messaging.AggregateType(aggregateType)
+			event.AggregateID = messaging.AggregateID(aggregateID)
+			event.IdempotencyKey = messaging.IdempotencyKey(idempotencyKey)
+			event.TraceID = messaging.TraceID(traceID)
+			event.OccurredAtRFC3339 = occurredAt.UTC().Format(time.RFC3339)
+			if len(payloadJSON) > 0 {
+				payload, err := messaging.DecodePayload(event.EventType, payloadJSON)
+				if err != nil {
+					return fmt.Errorf("unmarshal outbox payload: %w", err)
+				}
+				event.Payload = payload
+			} else {
+				payload, err := messaging.DecodePayload(event.EventType, []byte("{}"))
+				if err != nil {
+					return fmt.Errorf("unmarshal outbox payload: %w", err)
+				}
+				event.Payload = payload
+			}
+			events = append(events, event)
+		}
+		if err := rows.Err(); err != nil {
+			return fmt.Errorf("iterate outbox rows: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, fmt.Errorf("claim unpublished outbox events: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	var events []messaging.Event
-	for rows.Next() {
-		var event messaging.Event
-		var occurredAt time.Time
-		var payloadJSON []byte
-		var eventID string
-		var eventType string
-		var aggregateType string
-		var aggregateID string
-		var idempotencyKey string
-		var traceID string
-		if err := rows.Scan(
-			&eventID,
-			&eventType,
-			&aggregateType,
-			&aggregateID,
-			&occurredAt,
-			&event.Version,
-			&event.AttemptCount,
-			&idempotencyKey,
-			&event.Producer,
-			&traceID,
-			&payloadJSON,
-		); err != nil {
-			return nil, fmt.Errorf("scan outbox event: %w", err)
-		}
-		event.EventID = messaging.EventID(eventID)
-		event.EventType = messaging.EventType(eventType)
-		event.AggregateType = messaging.AggregateType(aggregateType)
-		event.AggregateID = messaging.AggregateID(aggregateID)
-		event.IdempotencyKey = messaging.IdempotencyKey(idempotencyKey)
-		event.TraceID = messaging.TraceID(traceID)
-		event.OccurredAtRFC3339 = occurredAt.UTC().Format(time.RFC3339)
-		if len(payloadJSON) > 0 {
-			payload, err := messaging.DecodePayload(event.EventType, payloadJSON)
-			if err != nil {
-				return nil, fmt.Errorf("unmarshal outbox payload: %w", err)
-			}
-			event.Payload = payload
-		} else {
-			payload, err := messaging.DecodePayload(event.EventType, []byte("{}"))
-			if err != nil {
-				return nil, fmt.Errorf("unmarshal outbox payload: %w", err)
-			}
-			event.Payload = payload
-		}
-		events = append(events, event)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate outbox rows: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("commit claim outbox tx: %w", err)
 	}
 	return events, nil
 }

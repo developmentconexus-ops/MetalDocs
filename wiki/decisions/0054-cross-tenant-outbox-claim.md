@@ -1,7 +1,7 @@
 # ADR 0054 — Cross-tenant claim is sanctioned for background outbox consumers
 
 - **Status:** Accepted
-- **Last verified:** 2026-07-02
+- **Last verified:** 2026-08-12 (A5 TxRunner adoption in the platform consumer; claim SQL and this decision's compensating rules are unchanged) | **Prior:** 2026-07-02
 - **Date:** 2026-07-02
 - **Scope:** Sanctions the tenant-unscoped `FOR UPDATE SKIP LOCKED` claim step used by background outbox consumers (`metaldocs.outbox_events` platform consumer and the render staging outboxes `metaldocs.pdf_dispatch_outbox` / `metaldocs.materialize_dispatch_outbox`), and defines the compensating rules that keep the pooled multi-tenant invariant intact. Closes grade-A finding SEC-13.
 - **Depends on:** the transactional-outbox invariant (async = outbox, consumers idempotent) and the pooled multi-tenant invariant (every tenant table carries `tenant_id`; tx-local GUCs only).
@@ -12,7 +12,7 @@
 
 SEC-13 flagged `StagingOutboxRepository.ClaimPending` (`internal/modules/render/fanout/staging_outbox.go`): the claim query selects `status = 'pending'` rows across **all tenants** with no `tenant_id` predicate, under a self-documented `TODO(render): thread tenant scope through the worker claim path`. Read in isolation, that looks like a pooled-tenancy violation — every request-path invariant in MetalDocs scopes reads by tenant.
 
-Investigation shows this is not an outlier but the platform's own canonical shape: the platform outbox consumer (`internal/platform/messaging/outbox/postgres/consumer.go:36-63`) claims from `metaldocs.outbox_events` with the same tenant-unscoped `FOR UPDATE SKIP LOCKED` pattern. Both consumers run inside trusted binaries (`metaldocs-worker`, and the render fanout loop), never in a request path, and never act on behalf of a caller.
+Investigation shows this is not an outlier but the platform's own canonical shape: the platform outbox consumer (`internal/platform/messaging/outbox/postgres/consumer.go:42-65`) claims from `metaldocs.outbox_events` with the same tenant-unscoped `FOR UPDATE SKIP LOCKED` pattern. A5 moved that claim's transaction lifecycle from hand-written `BeginTx`/`Commit`/`Rollback` to `platform/db.TxRunner.Do` (`consumer.go:68-126`) without changing the query or its cross-tenant boundary. Both consumers run inside trusted binaries (`metaldocs-worker`, and the render fanout loop), never in a request path, and never act on behalf of a caller.
 
 The alternative — per-tenant claim loops — would require enumerating tenants on every poll, multiply queries by tenant count, introduce fairness/starvation machinery (a busy tenant's backlog must not starve others, so a scheduler would be needed), and diverge the staging outboxes from the platform consumer they deliberately mirror. That is redesign cost with no security payoff: the worker holds a single privileged DB connection either way; a tenant predicate in the claim CTE does not reduce its authority.
 

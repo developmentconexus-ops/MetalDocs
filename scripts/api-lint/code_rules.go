@@ -535,7 +535,7 @@ func (r *txOptionsTypeResolver) checkPackage(pkg *txOptionsPackage, candidate st
 		if export == "" {
 			return nil, fmt.Errorf("no export data for %s", importPath)
 		}
-		return os.Open(export)
+		return os.Open(export) // #nosec G304 -- export is emitted by go list -export for this module/dependency graph; it is not caller-controlled input.
 	}
 	conf := types.Config{Importer: importer.For("gc", lookup), Error: func(err error) {
 		if typeErr == nil {

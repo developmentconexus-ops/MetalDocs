@@ -13,13 +13,14 @@ import (
 
 	documentsdomain "metaldocs/internal/modules/documents/domain"
 	notificationsinfra "metaldocs/internal/modules/notifications/infrastructure"
+	platformdb "metaldocs/internal/platform/db"
 	"metaldocs/tests/integration/testdb"
 )
 
 func TestNotificationsFanoutWorker(t *testing.T) {
 	db, _ := testdb.Open(t)
 	ctx := context.Background()
-	worker := notificationsinfra.NewNotificationsFanoutWorker(db)
+	worker := notificationsinfra.NewNotificationsFanoutWorker(platformdb.NewTxRunner(db))
 
 	makeJob := func(args documentsdomain.LifecycleEventArgs) *river.Job[documentsdomain.LifecycleEventArgs] {
 		return &river.Job[documentsdomain.LifecycleEventArgs]{Args: args}

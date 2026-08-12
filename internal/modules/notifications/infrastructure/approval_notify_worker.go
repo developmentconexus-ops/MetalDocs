@@ -10,6 +10,7 @@ import (
 
 	approvaldomain "metaldocs/internal/modules/approval/domain"
 	"metaldocs/internal/modules/iam/authz"
+	platformdb "metaldocs/internal/platform/db"
 )
 
 // approvalMessages is this worker's own pt-BR catalogue, keyed by event type and
@@ -40,15 +41,15 @@ var approvalMessages = map[string]map[string][2]string{
 // authz-recording read).
 type ApprovalNotifyWorker struct {
 	river.WorkerDefaults[approvaldomain.ApprovalNotificationArgs]
-	db *sql.DB
+	runner platformdb.TxRunner
 }
 
-// NewApprovalNotifyWorker builds a ready worker. db is required.
-func NewApprovalNotifyWorker(db *sql.DB) *ApprovalNotifyWorker {
-	if db == nil {
+// NewApprovalNotifyWorker builds a ready worker. runner is required.
+func NewApprovalNotifyWorker(runner platformdb.TxRunner) *ApprovalNotifyWorker {
+	if runner == nil {
 		panic("approval_notify_worker: db is required")
 	}
-	return &ApprovalNotifyWorker{db: db}
+	return &ApprovalNotifyWorker{runner: runner}
 }
 
 // Work delivers one event to every recipient inside a single tenant-seeded
@@ -79,37 +80,29 @@ func (w *ApprovalNotifyWorker) Work(ctx context.Context, job *river.Job[approval
 		return fmt.Errorf("approval_notify_worker: unknown subject kind %q for event %s", args.SubjectKind, args.EventType)
 	}
 
-	tx, err := w.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("approval_notify_worker: begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
+	return w.runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := authz.SeedTxTenant(ctx, tx, args.TenantID); err != nil {
+			return fmt.Errorf("approval_notify_worker: seed tenant: %w", err)
+		}
 
-	if err := authz.SeedTxTenant(ctx, tx, args.TenantID); err != nil {
-		return fmt.Errorf("approval_notify_worker: seed tenant: %w", err)
-	}
-
-	// One set-based insert over the recipient array — no per-recipient round
-	// trips, and idempotent on redelivery via the same partial unique index the
-	// lifecycle fanout uses. pq.Array is the repo's existing text[]/uuid[]
-	// binding helper (see internal/modules/approval/infrastructure/postgres_approval_repository.go
-	// and internal/modules/documents/infrastructure/repository.go) — no new
-	// driver dependency added.
-	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO metaldocs.notifications
-		   (tenant_id, recipient_user_id, event_type, resource_type, resource_id, title, message, source_event_id)
-		 SELECT $1::uuid, r, $2, $3, $4, $5, $6, $7::uuid
-		   FROM unnest($8::text[]) AS r
-		 ON CONFLICT (recipient_user_id, source_event_id) WHERE source_event_id IS NOT NULL
-		 DO NOTHING`,
-		args.TenantID, args.EventType, args.SubjectKind, args.SubjectID,
-		msgs[0], msgs[1], args.EventID, pq.Array(args.RecipientUserIDs),
-	); err != nil {
-		return fmt.Errorf("approval_notify_worker: insert notifications for %s: %w", args.SubjectID, err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("approval_notify_worker: commit: %w", err)
-	}
-	return nil
+		// One set-based insert over the recipient array — no per-recipient round
+		// trips, and idempotent on redelivery via the same partial unique index the
+		// lifecycle fanout uses. pq.Array is the repo's existing text[]/uuid[]
+		// binding helper (see internal/modules/approval/infrastructure/postgres_approval_repository.go
+		// and internal/modules/documents/infrastructure/repository.go) — no new
+		// driver dependency added.
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO metaldocs.notifications
+			   (tenant_id, recipient_user_id, event_type, resource_type, resource_id, title, message, source_event_id)
+			 SELECT $1::uuid, r, $2, $3, $4, $5, $6, $7::uuid
+			   FROM unnest($8::text[]) AS r
+			 ON CONFLICT (recipient_user_id, source_event_id) WHERE source_event_id IS NOT NULL
+			 DO NOTHING`,
+			args.TenantID, args.EventType, args.SubjectKind, args.SubjectID,
+			msgs[0], msgs[1], args.EventID, pq.Array(args.RecipientUserIDs),
+		); err != nil {
+			return fmt.Errorf("approval_notify_worker: insert notifications for %s: %w", args.SubjectID, err)
+		}
+		return nil
+	})
 }

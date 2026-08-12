@@ -1,8 +1,10 @@
 # Platform Data Layer
 
-> **Last verified:** 2026-08-03 (DB baseline fold f1910ac1/557a6af4: `migrate.go` gained `ApplyGrants` for the new `db/grants/` bootstrap stage; `db/migrations/` forward tail is now empty post-fold) | **Prior:** 2026-06-11 (Wave 1: `platform/cache` deleted F-08; River migration single-owner F-19)
-> **Scope:** Packages `internal/platform/db`, `internal/platform/migrate`, `internal/platform/bootstrap`, `internal/platform/objectstore`, `internal/platform/storage`. Covers Postgres connectivity, schema migration, DI bootstrap factories, MinIO presigning, and raw blob storage. `platform/cache` was deleted in Wave 1 (F-08/REQ-TOP-3 — was a `.gitkeep`-only empty scaffold).
+> **Last verified:** 2026-08-12 (A5 `platform/db` truth refresh: documented `DB`/`Tx` ports and `TxRunner`; Controlled Documents repository `Create` now adopts the runner while preserving `CreateTx`) | **Prior:** 2026-08-03 (DB baseline fold f1910ac1/557a6af4: `migrate.go` gained `ApplyGrants` for the new `db/grants/` bootstrap stage; `db/migrations/` forward tail is now empty post-fold) | **Prior:** 2026-06-11 (Wave 1: `platform/cache` deleted F-08; River migration single-owner F-19)
+> **Scope:** Packages `internal/platform/db`, `internal/platform/migrate`, `internal/platform/bootstrap`, `internal/platform/objectstore`, `internal/platform/storage`. Covers transaction ports/lifecycle and request-identity seeding, Postgres connectivity, schema migration, DI bootstrap factories, MinIO presigning, and raw blob storage. `platform/cache` was deleted in Wave 1 (F-08/REQ-TOP-3 — was a `.gitkeep`-only empty scaffold).
 > **Key files:**
+> - `internal/platform/db/tx.go` — narrow `DB` and transaction-only `Tx` SQL ports
+> - `internal/platform/db/runner.go` — canonical begin/commit/rollback lifecycle and request-identity GUC seeding
 > - `internal/platform/db/postgres/connect.go` — sole Postgres connection factory
 > - `internal/platform/migrate/migrate.go` — forward-only SQL migration runner
 > - `internal/platform/bootstrap/api.go` — API dependency bundle + MinIO client wiring
@@ -17,15 +19,16 @@
 
 ## 1. Identity and purpose
 
-The platform data layer is the set of cross-cutting packages that establish database connectivity, run schema migrations at startup, wire all module-level dependencies into a single dependency bundle passed to the composition root, manage blob-storage presigning and download for documents and templates, and provide the raw MinIO object-store adapter consumed by the PDF conversion pipeline.
+The platform data layer is the set of cross-cutting packages that define narrow SQL ports, centralize transaction lifecycle and request-identity seeding, establish database connectivity, run schema migrations at startup, wire module dependencies, manage blob-storage presigning and download for documents and templates, and provide the raw MinIO object-store adapter consumed by the PDF conversion pipeline.
 
-The layer owns five distinct concerns:
+The layer owns six distinct concerns:
 
-1. A thin Postgres connection factory (`db/postgres`) that opens a `database/sql` pool backed by the pgx stdlib driver.
-2. A forward-only SQL migration runner keyed on `public.schema_migrations` (`migrate`).
-3. Three dependency-injection bootstrap factories — for the API server, the outbox worker, and the River jobs worker — that assemble every concrete infrastructure adapter and return it as a typed struct (`bootstrap`).
-4. Two MinIO presigner value objects for tenant-namespaced presigned PUT/GET URLs, plus helper functions for canonical object-key construction (`objectstore`).
-5. A raw MinIO blob-store adapter that satisfies the `pdfObjectStore` interface consumed by `platform/servicebus.GotenbergPDFClient` (`storage/minio`).
+1. Narrow SQL execution ports plus the canonical transaction runner (`db`): `TxRunner.Do` owns begin/commit/rollback and seeds tenant/actor GUCs when both identities exist in the request context.
+2. A thin Postgres connection factory (`db/postgres`) that opens a `database/sql` pool backed by the pgx stdlib driver.
+3. A forward-only SQL migration runner keyed on `public.schema_migrations` (`migrate`).
+4. Three dependency-injection bootstrap factories — for the API server, the outbox worker, and the River jobs worker — that assemble every concrete infrastructure adapter and return it as a typed struct (`bootstrap`).
+5. Two MinIO presigner value objects for tenant-namespaced presigned PUT/GET URLs, plus helper functions for canonical object-key construction (`objectstore`).
+6. A raw MinIO blob-store adapter that satisfies the `pdfObjectStore` interface consumed by `platform/servicebus.GotenbergPDFClient` (`storage/minio`).
 
 ~~`platform/cache`~~ — **DELETED Wave 1 (F-08/REQ-TOP-3).** Was a `.gitkeep`-only empty scaffold with no Go code.
 
@@ -37,8 +40,12 @@ The layer owns five distinct concerns:
 
 | File | Role |
 |---|---|
-| `internal/platform/db/.gitkeep` | Empty directory marker; no Go package declared here |
-| `internal/platform/db/postgres/connect.go` | Package `postgres`. Exports `Open(ctx, dsn) (*sql.DB, error)` — the sole connection factory. Hard-codes pool settings: 25 max open, 25 max idle, 30-minute lifetime, 5-minute idle timeout. |
+| `internal/platform/db/tx.go` | Package `db`. Declares the narrow `DB` and `Tx` SQL execution interfaces; `*sql.DB` satisfies `DB`, while `*sql.Tx` is the production `Tx`. |
+| `internal/platform/db/runner.go` | Declares `TxRunner` and `NewTxRunner`. `Do` owns begin/commit/rollback, rolls back on callback error or panic, and seeds request tenant/actor as transaction-local GUCs before invoking the callback. |
+| `internal/platform/db/tx_test.go` | Compile-time coverage for the narrow SQL interfaces. |
+| `internal/platform/db/runner_test.go` | Lifecycle and identity-seeding tests: commit, rollback, panic, begin/commit errors, complete/partial/absent identity. |
+| `internal/platform/db/postgres/connect.go` | Package `postgres`. Exports the connection factories backed by pgx stdlib; pool limits are set in `openDB`. |
+| `internal/platform/db/postgres/pool_stats.go` | Maps `sql.DBStats` into the observability-facing pool-stat shape. |
 
 ### `internal/platform/migrate`
 
@@ -84,6 +91,21 @@ Directory and its `.gitkeep` file removed. Was an empty placeholder with no Go s
 ---
 
 ## 3. Public surface
+
+### `internal/platform/db`
+
+```go
+type DB interface { ... }
+type Tx interface { ... }
+
+type TxRunner interface {
+    Do(ctx context.Context, fn func(tx *sql.Tx) error) error
+}
+
+func NewTxRunner(database *sql.DB) TxRunner
+```
+
+`TxRunner.Do` returns callback errors unwrapped so domain sentinels retain `errors.Is`/`errors.As` behavior. It seeds `metaldocs.tenant_id` and `metaldocs.actor_id` only when both identities are present; identity-less system/janitor contexts deliberately remain GUC-unset.
 
 ### `internal/platform/db/postgres`
 
@@ -251,6 +273,10 @@ References: `internal/platform/servicebus/gotenberg_pdf.go:70-108`, `internal/pl
 
 ### Outbound imports
 
+**`internal/platform/db`**
+- `context`, `database/sql`, `fmt`
+- `metaldocs/internal/platform/tenant` (request identity consumed by the transaction-seeding chokepoint)
+
 **`internal/platform/db/postgres`**
 - `database/sql` (stdlib)
 - `github.com/jackc/pgx/v5/stdlib` (blank-import side-effect: registers the `pgx` driver)
@@ -284,6 +310,7 @@ References: `internal/platform/servicebus/gotenberg_pdf.go:70-108`, `internal/pl
 
 | Package | Imported by |
 |---|---|
+| `platform/db` | Application/infrastructure code that needs the shared `DB`, `Tx`, or `TxRunner` contracts. The A5 slice includes Controlled Documents (`application/service.go`, `infrastructure/repository.go`), notifications workers, and the platform outbox consumer. |
 | `platform/db/postgres` | `bootstrap/api.go`, `bootstrap/jobs.go`, `bootstrap/worker.go`, `apps/api/cmd/metaldocs-e2e-seed/main.go` |
 | `platform/migrate` | `apps/api/cmd/metaldocs-api/main.go` (only consumer) |
 | `platform/bootstrap` | `apps/api/cmd/metaldocs-api/main.go`, `apps/worker/cmd/metaldocs-worker/main.go`, `apps/jobs/cmd/metaldocs-jobs/main.go` |
@@ -309,7 +336,7 @@ Migration files are in `db/migrations/` — **currently empty except `README.md`
 
 ### Other packages
 
-`objectstore`, `storage/minio`, `db/postgres`, `cache` — no direct table access. `storage/minio` and `objectstore` interact with MinIO only via the `*minio.Client` instances created at bootstrap time.
+`objectstore`, `storage/minio`, and `db/postgres` have no direct table access. `platform/db.TxRunner` issues transaction-local `set_config` calls for tenant/actor identity but does not read or write product tables. `storage/minio` and `objectstore` interact with MinIO only via the `*minio.Client` instances created at bootstrap time.
 
 ---
 
@@ -384,6 +411,8 @@ Pool settings are hard-coded in `internal/platform/db/postgres/connect.go:17-21`
 
 ## 8. Concurrency and async behavior
 
+**`db.TxRunner`** — `Do` begins one read-write `*sql.Tx`, seeds request identity before the callback, commits on nil, rolls back best-effort on callback error, and rolls back then re-panics on panic (`runner.go:59-81,101-114,135-136`). The runner is safe to share because it retains only the concurrency-safe `*sql.DB` pool. Callers that must join a wider unit of work continue to accept the narrow `db.Tx` seam instead of nesting a runner transaction; Controlled Documents `CreateTx` is one such seam.
+
 **`migrate.Apply`** — single-threaded execution under a Postgres advisory lock. No goroutines. The lock guarantees at-most-one runner across all API instances during startup (`migrate.go:37-48`).
 
 **`db/postgres/connect.go`** — `*sql.DB` is safe for concurrent use. The single pool returned by `Open` is shared by all goroutines in the process.
@@ -399,6 +428,8 @@ No goroutines, channels, outbox writes, or timers are present in any file in thi
 ---
 
 ## 9. Error handling and observability
+
+**`db.TxRunner`** — begin, identity-seed, and commit failures are wrapped with `db:` operation context. Callback errors are returned unwrapped; rollback is best-effort so the original callback error or panic remains authoritative (`runner.go:59-81`).
 
 **`migrate.Apply`** — all errors wrapped with `fmt.Errorf("migrate: ...: %w", err)`. The advisory lock release uses `context.Background()` to survive parent cancellation, and only overwrites `retErr` when the unlock fails and no prior error is in flight (`migrate.go:44-48`).
 
@@ -419,7 +450,6 @@ No goroutines, channels, outbox writes, or timers are present in any file in thi
 | Flag | Location | RF / REQ |
 |---|---|---|
 | ~~`platform/cache` empty placeholder~~ | **CLOSED Wave 1 (F-08):** directory + `.gitkeep` deleted. | RF-7 partial (closed), REQ-TOP-3 |
-| `internal/platform/db` declares no Go package; real package is `internal/platform/db/postgres` | `internal/platform/db/.gitkeep` + `internal/platform/db/postgres/connect.go:1` — one driver, one file; extra nesting adds path depth without namespace value | RF-7, REQ-TOP-3 |
 | `document_presigner_export.go` splits `DocumentPresigner` methods across two files | `internal/platform/objectstore/document_presigner_export.go:1-38` — `_export` suffix conventionally signals test-helper export files in Go (`export_test.go`); the split is maintenance friction | — |
 | `log.Printf` instead of `slog` in `objectstore` | `internal/platform/objectstore/document_presigner.go:10, 80` — inconsistent with the canonical observability pattern; loses request context | — |
 | `DocumentPresigner` and `TemplatesPresigner` duplicate the dual-client MinIO pattern | `document_presigner.go:99-136` vs `templates_presigner.go:47-80` — both embed streaming hash logic; extraction is blocked by different `domain.ErrUploadMissing` types from two module domains | — |
@@ -441,7 +471,6 @@ For the registry of all open flags, see [../legacy-register.md](../legacy-regist
 - **[runtime-unverified]** Whether `METALDOCS_MINIO_AUTO_CREATE_BUCKET` is safe to enable in production. `EnsureBucket` in `storage/minio/store.go:37-52` creates the bucket when the flag is true and the bucket is missing. The flag default is `false`, which is the safe default.
 - ~~**`MigrateRiverSchema` dual-caller race**~~ — **RESOLVED Wave 1 (F-19):** single caller now; not applicable.
 - **[runtime-unverified]** Edge case in `HashObject`/`HeadContentHash`: the `io.LimitReader(obj, limit+1)` reads up to `limit+1` bytes; at exactly `limit` bytes the `n > limit` check passes, at `limit+1` it fails. Correct but untested at the boundary.
-- Whether `internal/platform/db/.gitkeep` is permanent drift or intended to eventually hold a package-level file distinct from `db/postgres`.
 
 ---
 
