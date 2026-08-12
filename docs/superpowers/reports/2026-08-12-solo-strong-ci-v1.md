@@ -75,12 +75,12 @@ demonstrated and the failure-issue path is verified again.
 | Known-red jobs on automatic/default nightly execution | 2 | 0; explicit opt-in only |
 | Documentation hygiene in PR required closure | yes | no; nightly/full/release |
 | Required ruleset contexts | 1 (`required`) | 1 (`required`) |
-| Final PR makespan | 17m17s pre-sharding PR (`31402055141`) | 5m12s (`31610786870`) |
+| Final PR makespan | 17m17s pre-sharding PR (`31402055141`) | 4m39s (`31611387106`) |
 
 The final makespan and check-level timings must be copied from the completed
 GitHub Actions run in the PR; no estimate is a closure state. The final green
-PR run at the implementation head was [31610786870](https://github.com/developmentconexus-ops/MetalDocs/actions/runs/31610786870),
-with a measured 5m12s wall-clock duration (15:09:50Z–15:15:02Z). It passed
+PR run at the implementation head was [31611387106](https://github.com/developmentconexus-ops/MetalDocs/actions/runs/31611387106),
+with a measured 4m39s wall-clock duration (15:16:22Z–15:21:01Z). It passed
 `verify`, all four integration shards, `security`, `lint-go`, and `required`.
 The diff-scoped log selected `fe-boundary-integrity` and `docker-build`; no
 frontend production source/toolchain change or production image artifact was
