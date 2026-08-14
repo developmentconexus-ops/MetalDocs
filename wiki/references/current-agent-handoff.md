@@ -13,111 +13,78 @@
 4. `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md`
 5. this file
 
-Do not restore/resume historical roadmaps, milestones, specs, deleted `docs/superpowers` material or stale implementation PRs by inertia.
+Do not restore/resume historical roadmaps/specs/ADRs or current runtime concepts by inertia.
 
-## Current checkpoint
+## Where we are
 
-The product/domain redesign is closed enough to descend into technical architecture. Locked business model:
+R3–R9 closed the principal controlled-information/governance model: Document/REV/Submission, specialized Approval, Periodic Review, Release, Distribution/Acknowledgement, Audit/Notifications/Search, tenant lifecycle/security and the final 29-Permission/five-role authorization model.
 
-- local AuthN V1 behind a future external-IdP/assurance seam;
-- Organization = Tenant / Area / User / flat Group / GroupMembership;
-- five tenant roles only: `tenant_owner`, `area_manager`, `author`, `approver`, `viewer`;
-- RoleAssignment subject User|Group, typed TenantScope|AreaScope; additive/default-deny; no tenant-owner bypass;
-- final tenant Permission Catalog = 29 semantic permissions; old 8-role/38-capability registry is not target;
-- authorization = Permission + required resource/case relationship + Domain Constraints;
-- PlatformOperator/SystemPrincipal are outside tenant RBAC and gain no implicit tenant-content access;
-- Approval V1 = versioned sequential policies, ANY/ALL, NamedUser/Group/RoleInArea, accept/return-for-changes, audited reassignment, optional fresh-auth, strict SoD;
-- same user cannot accept two different Steps of one ApprovalInstance; author/submitter cannot accept their own Submission;
-- stable Controlled Information core = `Document` + business `DocumentRevision`; official labels `REV001`, `REV002`, ...;
-- Revision states: DRAFT / SUBMITTED / EFFECTIVE / SUPERSEDED / OBSOLETE / CANCELLED;
-- `RevisionSubmission` is immutable first-class attempt identity; Approval/Rendition/Release always bind exact Submission/digest;
-- `DocumentProfile`→`DocumentType`; Family→classification-only category; GovernanceClass deleted;
-- Template = role of governed Document; no parallel TemplateVersion lifecycle; TemplateUse M:N; source effective REV resolved once at creation and pinned forever;
-- Document code tenant-wide unique/immutable; numbering belongs to DocumentType and uses only literals + `{TYPE}/{AREA}/{SEQ}` with TYPE or TYPE_AREA sequence scope;
-- TemplateSpec owns authoring/fill contract only; no generic metadata/policy bundle; mutable dictionary values snapshot at new REV creation;
-- Periodic Review belongs to Controlled Information; overdue does not invalidate EFFECTIVE; append-only review evidence against exact REV;
-- Rendition is immutable derived artifact of one Submission; only OFFICIAL_PDF mandatory for Release V1;
-- Release is automatic/system-owned and idempotent; no publish button; actual `effective_at = released_at`; atomic candidate EFFECTIVE/prior SUPERSEDED/pointer swap/ReleaseRecord;
-- Distribution = concrete per-user obligation/acknowledgement over released REV; group membership snapshots at release; Notification READ/view/download never equals acknowledgement;
-- Audit Trail is append-only/tamper-evident transversal evidence, never source of business state; critical governed mutations require durable audit intent in commit boundary;
-- Notifications = projection/delivery; Search = rebuildable/evenually-consistent projection with canonical AuthZ recheck;
-- Tenant lifecycle = ACTIVE / SUSPENDED / ERASED; deletion request separate with grace/cancel; onboarding uses activation credential, not operator-chosen password;
-- tenant erasure removes live tenant data/blobs, destroys Tenant DEK, preserves allowed non-PII audit/platform skeleton and terminal erasure tombstone;
-- current MFA coverage is fake/stub and not target; real MFA/passkeys/SSO/SAML triggers re-evaluation of Keycloak/external IdP.
+A whole-product review then surfaced material missing requirements before technical architecture: storage/repositories, format-agnostic content, external-file authoring, EigenPal/editor semantics, business documentary context, retention and migration.
 
-## Final R9 authorization anchors
-
-### Tenant permissions (29)
+Therefore:
 
 ```text
-tenant.settings.manage
-organization.manage
-access.manage
-document_type.manage
-approval_policy.manage
-template_use.manage
-dictionary.manage
-
-document.read_effective
-document.read_history
-document.read_working
-document.create
-document.edit
-document.comment
-document.submit
-document.cancel_revision
-document.obsolete
-document.review_periodic
-document.owner.manage
-
-approval.act
-approval.oversee
-approval.reassign
-approval.cancel
-
-distribution.manage
-distribution.oversee
-
-audit.read
-audit.export
-session.manage
-tenant.export
-tenant.deletion.request
+R3–R9   LOCKED principal domain/governance
+R9.5    ACTIVE whole-product completion
+R10-A   PAUSED / previous topology proposal NOT approved
+R10+    BLOCKED until R9.5 freeze
 ```
 
-### Role bundles
+## Newly locked R9.5 north star
 
-- `viewer`: `document.read_effective`.
-- `author`: viewer + history/working/create/edit/comment/submit/periodic-review qualification.
-- `approver`: viewer + `approval.act`; no blanket draft access.
-- `area_manager`: author + revision cancel/obsolete/owner management + approval act/oversee/reassign/cancel + distribution manage/oversee in Area.
-- `tenant_owner`: all 29 Permissions via normal Authorizer; still obeys relationships, SoD, lifecycle, fresh-auth and tenant-operability constraints.
+> MetalDocs is the system of record for **identity, governance, revision, evidence and documentary context**. Physical storage, editors/viewers and upstream ERP/PLM/repositories are replaceable capabilities/providers around that kernel.
 
-Narrow case/self access is relation-driven rather than fake permissions: Approval participant exact Submission, Distribution assignee exact effective REV/acknowledgement, submitter withdrawal, own notifications/sessions/password, system release/rendition/erasure.
+Key decisions:
 
-RLS is tenant-isolation defense-in-depth only. DB constraints enforce structural invariants. Current `system_admin` bypass, magic `"tenant"` area sentinel and asserted-capability GUC authorization model have no target entitlement.
+- do not replace MetalDocs with M-Files/Nuxeo/Alfresco and do not build a generic ECM/M-Files clone;
+- `Document` is format-agnostic, not synonymous with DOCX;
+- governed sources may be DOCX/PDF/XLSX/SVG/PNG/CAD/XML/etc. subject to type/content policy;
+- V1 direction = one primary source content Artifact per DocumentRevision;
+- Artifact is immutable technical content identity (hash/media type/size/provenance), never a user-facing business object;
+- **NO ORPHAN CONTENT:** no generic upload bucket or “upload then classify later” flow;
+- Document flow: create semantic Document/REV first, then author/upload its primary Artifact;
+- Evidence flow: create a typed Evidence record first, then capture/upload its Artifact;
+- examples of Evidence types: Nota Fiscal, XML NF-e, Comprovante de Entrega, Foto de Inspeção, Certificado de Teste, Documento enviado pelo cliente;
+- Evidence is conceptually captured business/process evidence, not automatically a `REVxxx` change-controlled Document;
+- if information itself requires stable official revision/lifecycle, use Document;
+- `Dossier` is a deliberately small future-facing documentary context for things such as Venda, Produto, Projeto, Equipamento, Customer/Case; it may relate Documents/Evidence and external references;
+- Dossier does not replace ERP/PLM. BOM/where-used/EBOM/MBOM/CAD dependency/ECR/ECO etc. are explicit PLM-integration boundary triggers;
+- EigenPal is an authoring provider for DOCX, never Document identity/domain;
+- storage distinguishes Managed Artifact Store (MinIO/AWS S3) from External Repository Connector (SharePoint/OneDrive/etc.); SharePoint Embedded may be a future Microsoft enterprise profile rather than an S3-shaped provider;
+- external repository edits never silently mutate an EFFECTIVE MetalDocs Revision; adoption/import produces an explicit new DRAFT REV;
+- storage-version IDs never equal business `REVxxx`;
+- retention/Legal Hold belongs to MetalDocs governance semantics; provider WORM/Purview are physical enforcement when used;
+- future ideas reopen the kernel only when they create a material identity/historical-truth/invariant counterexample.
 
-## Exact next step — R10
+## Material reconsiderations
 
-**Design only — no product implementation.**
+The universal R6 requirement `OFFICIAL_PDF mandatory for every Release` is **reopened**, not silently discarded. XLSX/SVG/CAD/native-PDF examples prove PDF is not universally the official semantic representation.
 
-Create the integrated technical architecture from approved semantics, not current packages:
+R9.5-1 must replace it with a format/type-aware rule: every Submission freezes exact primary source Artifact; required official/viewable Renditions depend on content/document policy.
 
-1. bounded contexts/modules and final names;
-2. dependency DAG / legal imports / published ports;
-3. aggregate ownership + application coordinators;
-4. target table ownership and DB constraints;
-5. transaction boundaries for governed mutations;
-6. durable audit-intent + outbox/domain-event catalogue;
-7. jobs/timers/reconciliation ownership;
-8. object-storage artifact ownership/key strategy;
-9. final build-vs-buy choices;
-10. current module `KEEP / MOVE / REWRITE / DELETE` map;
-11. current table `KEEP / TRANSFORM / DROP` map;
-12. migration ordering/expand-contract/compatibility policy.
+TemplateSpec is also refined as optional structured-authoring state for applicable formats, not the universal definition of Revision content.
 
-After R10: R11 API/frontend journeys; R12 proof matrix + final ADR/spec promotion/adversarial review; R13 implementation specification/plan. Implementation stays blocked until explicit integrated-design approval.
+Tenant erasure still stands, but R9.5 Retention/Legal Hold must refine what may legally be deleted vs retained/anonymized.
+
+## Exact next step — R9.5-1 Content Model
+
+Design only. Close:
+
+1. exact semantics/lifecycle of `Artifact`, `DocumentRevision`, `Evidence` and `EvidenceType`;
+2. no-orphan creation-before-upload invariant;
+3. allowed media/content policy ownership;
+4. one-primary-source rule and any justified exception;
+5. Evidence lifecycle — immutable capture vs replace-before-finalization vs narrow version semantics;
+6. provenance/external references;
+7. native source vs required official/viewable Renditions by format/type;
+8. format-independent RevisionContent + submission digest;
+9. source/view/download implications;
+10. conditional TemplateSpec/structured authoring relationship.
+
+Then: R9.5-2 Storage/Repositories → R9.5-3 Authoring/EigenPal → R9.5-4 Dossier/Context → R9.5-5 Retention/Legal Hold → R9.5-6 Import/Migration/Export → R9.5-7 Attestation/Content Security → R9.5-8 whole-product adversarial freeze.
+
+Only after R9.5-8 resumes R10 technical architecture/filesystem/data model.
 
 ## Documentation rule
 
-The working tree contains active truth, not an archive. Git history is the archive. The active ledger is the single detailed WIP authority.
+The active ledger is the single detailed WIP authority. Git history is the archive. No product implementation is authorized.
