@@ -32,11 +32,20 @@ Locked so far:
 - human outcomes are `accept` / `return_for_changes`; edited content creates a new approval attempt;
 - `documents` + `controlleddocuments` + `templates` do not survive as three target bounded contexts;
 - target Controlled Information core is `Document` + `DocumentRevision`;
-- template is a designation/role of an exact governed revision, not a parallel lifecycle; changing placeholder/schema/layout/resolver semantics means a new DocumentRevision;
-- derived documents remain bound to the exact template revision/hash used to seed them;
+- `DocumentProfile` is replaced by tenant-scoped `DocumentType` with immutable code, ACTIVE/INACTIVE lifecycle and no independent versioning;
+- a Document's type is immutable after creation in V1;
+- `DocumentFamily` becomes optional classification-only `DocumentTypeCategory`; no inherited policies/hierarchy in V1;
+- `GovernanceClass {controlado, simples, livre}` is deleted; each authority owns explicit configuration instead;
+- Approval configuration explicitly distinguishes `NoHumanApproval` from `UsePolicy(...)`;
+- Area belongs to Organization, not taxonomy;
+- template is a role of a governed Document, not a parallel lifecycle;
+- TemplateUse is M:N between template Documents and DocumentTypes, with at most one default per type; default is UX only;
+- blank creation remains allowed in V1; no `template_required` rule without a real requirement;
+- creation resolves the template Document's current effective revision and permanently pins source document + exact revision + content hash;
+- newer template revisions apply only to future creations; existing documents never rebind;
+- changing template placeholder/schema/layout/resolver semantics means a new ordinary DocumentRevision;
+- official human/audit revision labels are `REV001`, `REV002`, `REV003`, ... — never user-facing `v7`; technical row/schema/policy versions remain separate namespaces;
 - freeze/approval/rendition must always bind the exact revision/hash the human reviewed;
-- `DocumentProfile` is converging toward `DocumentType`;
-- Area moves out of taxonomy into Organization;
 - Release Coordinator/effectivity remains downstream from human approval.
 
 ## Important product evidence
@@ -47,9 +56,9 @@ A real browser QA run proved the old content model was structurally contradictor
 
 Before code we still have to close, explicitly:
 
-- DocumentType / Family / GovernanceClass / TemplateDesignation;
-- Document + Revision lifecycle and submission snapshots;
+- **NEXT:** Document + DocumentRevision lifecycle, REV allocation and immutable submission evidence;
 - numbering/NumberSeries;
+- TemplateSpec exact revision payload and source-provenance placement;
 - periodic review/reason-for-change;
 - renditions/rendering/reconstruction evidence;
 - release/effectivity/supersession;
@@ -65,19 +74,23 @@ Before code we still have to close, explicitly:
 
 ## Exact next step
 
-Continue the design discussion with:
+Continue **R4 — Document + DocumentRevision lifecycle + immutable submission evidence**:
 
 ```text
-DocumentType
-+ DocumentFamily
-+ GovernanceClass
-+ TemplateDesignation/default policy
+Document lifecycle
++ DocumentRevision lifecycle
++ REVxxx allocation semantics
++ mutable working content vs immutable submission identity
++ whether SubmissionSnapshot is a first-class concept
++ return-for-changes/resubmission
++ effective/superseded/obsolete relationships
++ template-source provenance placement
 ```
 
-For each, determine whether it has independent business meaning or is only historical encoding of another authority. Do not implement.
+Every transition must have exactly one authority and a clear immutable fact/evidence proving what content the transition applies to. Do not implement.
 
 ## Documentation reset
 
 `docs/superpowers` was intentionally collapsed on 2026-08-14 to only the active redesign staging material. Old plans/specs/milestones/reports/analyses remain in Git history and are not forward authority.
 
-Core wiki module pages and old roadmap/backlog surfaces are being marked LEGACY/HISTORICAL and redirected to the cohesive redesign authority so a fresh agent cannot accidentally continue the old architecture.
+Core wiki module pages and old roadmap/backlog surfaces are marked LEGACY/HISTORICAL and redirected to the cohesive redesign authority so a fresh agent cannot accidentally continue the old architecture.
