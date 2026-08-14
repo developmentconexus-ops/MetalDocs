@@ -83,8 +83,8 @@ The current repository contains 15 `internal/modules` directories. The redesign 
 | `render` | materialization/PDF dispatch, renderer seam, computed resolvers | **Retain as supporting rendering/rendition infrastructure**, aligned to Revision truth |
 | `search` | cross-entity query/projection | **Retain as read model/projection consumer** |
 | `security` | security signals/MFA coverage/lockouts/tenant-key security | **Retain/re-evaluate** after AuthN/Organization/Tenant lifecycle target settles |
-| `taxonomy` | areas, document profiles/types, families, governance class | **Dismantle as current context**: Area → Organization; Profile → DocumentType candidate; Family/classification re-evaluated |
-| `templates` | template upload/schema/placeholders/versioning/lifecycle | **Retire parallel lifecycle**; template becomes a role/designation of an exact DocumentRevision |
+| `taxonomy` | areas, document profiles/types, families, governance class | **Dismantle as current context**: Area → Organization; Profile → DocumentType; Family → classification-only category; GovernanceClass deleted |
+| `templates` | template upload/schema/placeholders/versioning/lifecycle | **Retire parallel lifecycle**; template becomes a role/designation of a governed Document whose effective DocumentRevision seeds new documents |
 | `tokens` | tenant dictionary values + published read port | **Retain as supporting configuration/value provider**, later reconcile with Controlled Information snapshot semantics |
 
 Additional product responsibilities that are not reducible to those module names and must be covered before implementation:
@@ -301,6 +301,8 @@ ApprovalPolicy
 
 A new version applies to new submissions. An in-flight/historical ApprovalInstance remains bound to the version from which it was created.
 
+`ApprovalPolicy.version` belongs to the Approval configuration namespace. It is not a document revision label and must never be presented as `REVxxx`.
+
 ## APPR-03 — ApprovalStep is the human task
 
 No `Phase → HumanTask` hierarchy in V1.
@@ -393,7 +395,7 @@ actor
 when
 ApprovalPolicy + version
 StepInstance + purpose
-Document / Revision / immutable submission
+Document / DocumentRevision / immutable submission
 content digest/hash
 outcome
 comment/reason
@@ -427,13 +429,39 @@ The current public/domain noun `ControlledDocument` is targeted for retirement a
 
 `DocumentRevision` is the content candidate/issuance. A draft may be mutable through authoring infrastructure, but submission freezes an immutable content identity/hash. Effective/released revisions are immutable; changes require a new revision.
 
+### Official revision label
+
+Human-facing, audit-facing and official document revision identity uses the format:
+
+```text
+REV001
+REV002
+REV003
+...
+```
+
+This is the professional business revision label for both ordinary governed documents and documents used as templates.
+
+Do **not** expose technical forms such as `v7` as the document revision. Internal identifiers/counters may exist for persistence or concurrency but are separate namespaces, for example:
+
+```text
+DocumentRevision.id      → technical immutable identifier
+DocumentRevision.number  → 1, 2, 3... if useful internally
+DocumentRevision.label   → REV001, REV002, REV003... official/display
+row_version / lock_version → technical OCC only
+schema_version             → technical schema compatibility only
+ApprovalPolicy.version     → Approval definition version only
+```
+
+None of those technical versions may compete with or replace the official `REVxxx` document revision label.
+
 The editor/autosave implementation may use working state, but “AuthoringWorkspace” is not automatically promoted to a large business aggregate. Preserve the technical property (high-frequency working writes do not contend on effectivity) without inventing a new noun unless the domain proves it.
 
-## CI-04 — Template is a role/designation of an exact DocumentRevision
+## CI-04 — Template is a role of a governed Document; revision remains exact
 
 Template does **not** have a parallel lifecycle/version counter.
 
-A template is an exact governed revision designated as usable to seed new documents.
+A governed `Document` may be designated for template use. When that template document changes materially, it receives a new ordinary `DocumentRevision` (`REVxxx`) through the same lifecycle as any other governed content.
 
 Changing any governed template content means a new DocumentRevision, including:
 
@@ -446,53 +474,184 @@ Changing any governed template content means a new DocumentRevision, including:
 - resolver binding/contract;
 - any other material authoring rule embedded in that template revision.
 
-This is operator-approved and eliminates the “TemplateVersion vs DocumentRevision” double-versioning problem.
+This eliminates the “TemplateVersion vs DocumentRevision” double-versioning problem.
 
-## CI-05 — Template seeds; Revision becomes content truth
+## CI-05 — Template seeds; new DocumentRevision becomes content truth
 
-Creating a document from a template binds provenance to the exact source revision/hash. The source template may seed initial editor content and schema, but after creation the new document's own Revision is the truth being edited/reviewed/approved.
+Creating a document from a template resolves the template Document's **current effective DocumentRevision at creation time** and permanently pins provenance to that exact source revision/hash.
+
+The source template may seed initial editor content and schema, but after creation the new document's own DocumentRevision is the truth being edited/reviewed/approved.
 
 A later template revision never silently rebinds existing documents.
 
 ## CI-06 — Freeze/approval/rendition bind the reviewed revision
 
-The only legal source for immutable submission evidence, Approval and official Rendition is the exact revision/content digest the human reviewed.
+The only legal source for immutable submission evidence, Approval and official Rendition is the exact DocumentRevision/content digest the human reviewed.
 
 The historical QA failure where the editor revision was reviewed but a blank template snapshot was frozen must become structurally unrepresentable.
 
-## CI-07 — Profile → DocumentType is the current approved direction
+## CI-07 — `DocumentProfile` is replaced by `DocumentType`
 
-The current `DocumentProfile` already acts as a tenant document type but mixes classification, authorization, review, template and governance settings.
+**LOCKED R3.** `DocumentProfile` does not survive the target model.
 
-Target noun: `DocumentType` (examples IT, PO, RG, PL).
-
-A DocumentType references policies/configuration owned by the appropriate authority rather than reimplementing them.
-
-Example direction:
+`DocumentType` is a tenant-scoped business classification such as:
 
 ```text
-DocumentType IT
-  numbering policy
-  approval policy?
-  periodic-review policy?
-  template designation/default?
+IT — Instrução de Trabalho
+PO — Procedimento Operacional
+PL — Política
+RG — Registro
 ```
 
-`editable_by_role`-style configuration does not survive; Authorization owns authority.
+Minimum semantic responsibility:
+
+```text
+DocumentType
+  id
+  tenant_id
+  code            // immutable
+  name
+  description?
+  category_id?    // classification only
+  status          // ACTIVE | INACTIVE
+```
+
+Rules:
+
+- `code` is immutable.
+- DocumentType itself is **not versioned** in V1.
+- Lifecycle is only `ACTIVE` / `INACTIVE`.
+- `INACTIVE` prevents selection for new Documents but does not invalidate existing Documents.
+- a Document's `type_id` is immutable after creation in V1; type reclassification is deferred until a concrete recurring requirement proves the need.
+- DocumentType may reference/configure policies owned by other authorities; it does not reimplement those authorities.
+- historical `editable_by_role` is deleted; Authorization owns edit authority.
+
+Conceptual configuration:
+
+```text
+DocumentType
+  ├── Numbering configuration/policy
+  ├── Approval configuration
+  ├── Periodic Review configuration/policy
+  └── TemplateUse[]
+```
+
+Exact persistence/ownership of each policy remains for later technical design.
 
 ## CI-08 — Area leaves taxonomy
 
 Area belongs to Organization and is referenced by Document, RoleAssignment and Approval actor resolution.
 
-## CI-09 — Family and GovernanceClass remain OPEN for independent-value testing
+## CI-09 — `DocumentFamily` becomes classification-only `DocumentTypeCategory`
 
-`DocumentFamily` may survive as a cheap classification/navigation grouping if users genuinely need it. It must not become a second behavior authority without proof.
+**LOCKED R3.** The useful business need is cheap grouping/navigation, not another policy hierarchy.
 
-`GovernanceClass {controlado, simples, livre}` survives only if it has independent business meaning beyond deriving Approval shape — for example if it drives retention, distribution, training, periodic review, reporting or other coherent policy. If it merely duplicates ApprovalPolicy configuration, delete it.
+Target noun:
 
-## CI-10 — TemplateDesignation cardinality remains OPEN
+```text
+DocumentTypeCategory
+```
 
-The current likely direction is a relationship between an effective template Revision and one or more DocumentTypes rather than a permanent `is_template` subtype, but exact cardinality/default/eligibility semantics still need to be closed.
+Examples:
+
+```text
+Normativos
+  ├── PL
+  ├── PO
+  └── IT
+
+Registros
+  └── RG
+```
+
+Rules:
+
+- tenant-scoped;
+- optional on DocumentType;
+- simple active/inactive lifecycle if needed for administration;
+- classification/navigation/filter/reporting only;
+- no inherited ApprovalPolicy;
+- no inherited numbering;
+- no inherited metadata;
+- no independent permissions;
+- no deep `Type → Subtype → Classification` hierarchy in V1.
+
+This retains the useful Family requirement without importing Veeva-style hierarchy/inheritance complexity.
+
+## CI-10 — `GovernanceClass {controlado, simples, livre}` is deleted
+
+**LOCKED R3.** GovernanceClass does not have enough independent business meaning to justify becoming a cross-domain authority.
+
+The current implementation largely uses it to derive Approval route shape, creating a second authority over Approval. That target is rejected.
+
+Instead, each governing concern expresses its own explicit configuration when that concern exists:
+
+```text
+ApprovalConfiguration
+PeriodicReviewPolicy
+DistributionPolicy     // only if/when this domain is approved
+RetentionPolicy        // only if/when requirement exists
+TrainingPolicy         // only if/when requirement exists
+```
+
+Do not create all those policies preemptively. The rule is only that one catch-all enum must not silently govern unrelated domains.
+
+Approval requirement is explicit and typed conceptually as:
+
+```text
+ApprovalConfiguration =
+    NoHumanApproval
+  | UsePolicy(ApprovalPolicyID)
+```
+
+This prevents `NULL` from ambiguously meaning either “deliberately no approval” or “forgot to configure”. Exact DB representation is deferred.
+
+Historical `livre → active zero-stage route` semantics are explicitly superseded for the target.
+
+## CI-11 — Template use is an M:N relationship over template Documents
+
+**LOCKED R3.** A template is not a subtype and TemplateUse does not pin one particular revision forever.
+
+Conceptually:
+
+```text
+TemplateUse
+  template_document_id
+  target_document_type_id
+  is_default
+```
+
+Rules:
+
+- one template Document may be eligible for multiple DocumentTypes;
+- one DocumentType may offer multiple template Documents;
+- each DocumentType has at most one default template;
+- default is a UX convenience/preselection, not a governance prohibition;
+- `template_required` is not a V1 requirement; blank creation remains possible until a concrete business requirement says otherwise;
+- when creating a Document, TemplateUse resolves the template Document's current **effective** DocumentRevision and pins exact provenance on the created Document/initial revision;
+- when a newer template revision becomes effective, it is used only for future creations; existing derived Documents never rebind automatically.
+
+Creation semantics:
+
+```text
+DocumentType
+   + selected TemplateUse
+         ↓
+Template Document
+         ↓ resolve at creation time
+current EFFECTIVE DocumentRevision (e.g. REV004)
+         ↓ pin immutable provenance
+source_template_document_id
+source_template_revision_id
+source_template_revision_label = REV004
+source_template_content_hash
+         ↓
+new Document + its own DocumentRevision
+         ↓
+new DocumentRevision becomes content truth
+```
+
+The exact source-provenance field placement (Document vs first Revision vs explicit provenance value object) remains for R4/data-model design; the semantic requirement is locked.
 
 ---
 
@@ -540,6 +699,9 @@ Current concepts that have **no entitlement to survive**:
 
 - three target contexts `documents` / `controlleddocuments` / `templates`;
 - public/domain `ControlledDocument` as a separate identity beside Document;
+- `DocumentProfile` as the target type/configuration object;
+- behavioral `DocumentFamily` hierarchy; retained need is classification-only `DocumentTypeCategory`;
+- `GovernanceClass {controlado, simples, livre}` and its Approval-route derivation;
 - independent Template lifecycle/versioning parallel to DocumentRevision;
 - old built-in roles `system_admin`, `editor`, `signer`, `qms_admin`, `area_admin`;
 - role-based authorization branches/bypasses;
@@ -554,9 +716,9 @@ Current concepts that have **no entitlement to survive**:
 - `M-of-N` as V1 requirement;
 - generic workflow phases/branching/BPMN/CEL;
 - `editable_by_role` on document type/profile;
-- GovernanceClass as an Approval-shape duplicate if no independent domain meaning survives;
 - Approval code that writes Controlled Information tables directly;
 - any freeze path that can select content other than the submitted/reviewed Revision;
+- user-visible document revision formats such as `v7` that compete with official `REVxxx`;
 - old roadmap/milestone/spec documents as live authority.
 
 Deletion is preferred to compatibility shims where no deployed/contractual compatibility requirement proves a shim necessary.
@@ -567,24 +729,37 @@ Deletion is preferred to compatibility shims where no deployed/contractual compa
 
 AuthZ + Approval + Documents are not sufficient to claim a whole-platform design. The following sections must be explicitly ruled before the implementation gate opens.
 
-## DESIGN QUEUE A — Controlled Information configuration
+## DESIGN QUEUE A — Controlled Information configuration — **R3 CLOSED 2026-08-14**
 
-1. `DocumentType` exact responsibility and lifecycle.
-2. `DocumentFamily`: retain as classification vs delete/simplify.
-3. `GovernanceClass`: independent policy value vs delete.
-4. template designation/default/eligibility and cardinality.
-5. metadata model and which facts snapshot on revision/submission.
+Locked:
 
-## DESIGN QUEUE B — Document / Revision lifecycle
+1. `DocumentProfile` → `DocumentType`.
+2. `DocumentType` tenant-scoped, immutable code, ACTIVE/INACTIVE, no own versioning.
+3. Document type immutable after Document creation in V1.
+4. `DocumentFamily` → optional classification-only `DocumentTypeCategory`.
+5. `GovernanceClass` deleted; explicit per-authority configuration replaces it.
+6. Approval configuration explicitly distinguishes `NoHumanApproval` from `UsePolicy(...)`.
+7. Template is a role of a governed Document.
+8. TemplateUse is M:N across template Documents and DocumentTypes.
+9. At most one default template per DocumentType; default is UX only.
+10. no `template_required` in V1 without a proven requirement.
+11. template creation resolves the current effective source DocumentRevision and pins exact revision/hash provenance.
+12. official document/template revision labels use `REV001`, `REV002`, ...; technical version counters are separate namespaces.
+
+Remaining metadata questions move to R4/R5 rather than reopening R3.
+
+## DESIGN QUEUE B — Document / Revision lifecycle — **NEXT**
 
 1. exact Document lifecycle states;
 2. exact DocumentRevision lifecycle states;
-3. when a new revision number/label is allocated;
+3. when a new `REVxxx` revision number/label is allocated;
 4. draft/working-content persistence vs immutable submission snapshot;
 5. comment/checkpoint/editor-session ownership;
 6. reason-for-change semantics;
 7. withdrawal/cancel/obsolete/supersede relationships;
-8. one-effective-revision invariant and atomic boundary.
+8. one-effective-revision invariant and atomic boundary;
+9. source-template provenance placement and immutability;
+10. whether SubmissionSnapshot is a first-class entity/value/evidence record or derivable from Revision + immutable content identity.
 
 ## DESIGN QUEUE C — Numbering
 
@@ -710,8 +885,9 @@ Do not resurrect deleted documents by copying them from Git history into the liv
 Implementation begins only after all of the following are true:
 
 - [ ] whole-product domain map closed;
-- [ ] Controlled Information configuration/lifecycle closed;
-- [ ] Template-as-revision-role semantics closed;
+- [x] Controlled Information configuration R3 closed;
+- [ ] Controlled Information lifecycle closed;
+- [ ] Template-as-revision-role semantics closed at payload/lifecycle detail;
 - [ ] Approval V1 integrated with the final document lifecycle;
 - [ ] Organization/AuthZ integrated with every real product operation;
 - [ ] Release/effectivity/rendition model closed;
@@ -735,18 +911,19 @@ Until then: **design/documentation only.**
 
 # 13. Exact next design step
 
-Continue with **Controlled Information configuration** before touching code:
+R3 Controlled Information configuration is operator-approved.
+
+Continue with **R4 — Document + DocumentRevision lifecycle + immutable submission evidence** before touching code:
 
 ```text
-DocumentType
-+ DocumentFamily
-+ GovernanceClass
-+ Area ownership (already Organization)
-+ TemplateDesignation/default policy
+Document lifecycle
++ DocumentRevision lifecycle
++ REVxxx allocation semantics
++ working draft vs immutable submission identity
++ SubmissionSnapshot necessity/shape
++ return-for-changes/resubmission
++ effective/superseded/obsolete relationships
++ template-source provenance placement
 ```
 
-For each concept apply the same test:
-
-> Does this noun/policy represent independent business meaning in the target product, or is it only a historical way the current implementation encoded another authority?
-
-Only after this section is operator-approved proceed to the Document/Revision lifecycle section.
+For every state transition, identify exactly which authority owns it and what immutable fact/evidence proves it. Only after R4 is approved proceed to Numbering/TemplateSpec detail.
