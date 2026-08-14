@@ -19,65 +19,57 @@ Do not resume old roadmaps/milestones/specs, deleted `docs/superpowers` material
 
 MetalDocs is being redesigned as one cohesive controlled-information platform before the next implementation wave.
 
-### Locked platform core
+### Locked core
 
-- current AuthN retained for V1 behind a future external-IdP seam;
+- local AuthN stays for V1 behind a future external-IdP seam;
 - Organization = Tenant / Area / User / flat Group / GroupMembership;
-- scoped RoleAssignments for User or Group;
-- roles: `tenant_owner`, `area_manager`, `author`, `approver`, `viewer`;
-- scoped RBAC + Groups sufficient V1; no OpenFGA/SpiceDB now;
-- Approval V1 = versioned sequential policy, ordered Steps, NamedUser/Group/RoleInArea participants, ANY/ALL, `accept` / `return_for_changes`, audited reassignment and optional reauth;
-- no BPMN/CEL/M-of-N/generic delegation engine V1;
-- Controlled Information core = stable `Document` + business `DocumentRevision`; `controlleddocuments` and parallel `templates` lifecycle retire;
-- `DocumentProfile` → `DocumentType`; `DocumentFamily` → classification-only `DocumentTypeCategory`; `GovernanceClass` deleted;
-- official Revisions are `REV001`, `REV002`, ...; autosaves/checkpoints are technical history;
-- one effective + at most one open Revision per Document; states: DRAFT / SUBMITTED / EFFECTIVE / SUPERSEDED / OBSOLETE / CANCELLED;
-- `RevisionSubmission` = immutable first-class attempt identity; Approval/Rendition/Release always bind exact Submission/digest;
-- return-for-changes/allowed withdrawal returns the same REV to DRAFT; resubmission creates a new Submission;
-- Document code is immutable tenant-wide identity; type/area/code immutable V1;
-- numbering belongs to DocumentType: literals + `{TYPE}` / `{AREA}` / `{SEQ}`, scope TYPE or TYPE_AREA, padding width only;
-- Template is a role of governed Document; TemplateUse M:N; exact effective source REV is resolved only at creation and provenance pinned forever;
-- TemplateSpec owns authoring/fill contract only; value type is separate from source (`user_input/system/dictionary`); typed constraints + limited `visible_if`; DOCX/schema parity required;
-- `RevisionContent` is the logical governed content identity; Submission digest covers all governed content/metadata needed to attest the attempt;
-- `title` is Revision metadata; responsible owner is operational Document metadata and grants no authorization;
-- no generic tenant custom-metadata engine V1.
+- tenant roles = `tenant_owner`, `area_manager`, `author`, `approver`, `viewer` through scoped User/Group RoleAssignments;
+- Approval V1 is sequential/versioned, ANY/ALL only, exact immutable Submission attempts, `accept | return_for_changes`, audited reassignment and optional reauth; no BPM engine;
+- Controlled Information core = stable Document + business DocumentRevision;
+- `DocumentProfile` → DocumentType; Family → classification-only category; GovernanceClass deleted;
+- official Revisions = `REV001`, `REV002`, ...; autosaves are technical history;
+- Revision states = DRAFT / SUBMITTED / EFFECTIVE / SUPERSEDED / OBSOLETE / CANCELLED;
+- RevisionSubmission = immutable attempt identity; Approval/Rendition/Release bind exact Submission/digest;
+- code/type/area identity is stable; numbering is small DocumentType config using `{TYPE}/{AREA}/{SEQ}` only;
+- template is role of governed Document; TemplateUse M:N; exact effective source REV is pinned at creation; TemplateSpec only owns authoring contract;
+- RevisionContent is composite governed truth; title is Revision metadata; no generic tenant custom-metadata engine V1;
+- Periodic Review belongs to Controlled Information and records exact effective-REV review evidence;
+- Rendition is immutable derived artifact; only OFFICIAL_PDF mandatory for Release V1;
+- Release is automatic/system-owned/idempotent over `submission_id`; no publish button, no ReleaseGeneration domain noun, no SCHEDULED Revision state;
+- release atomically flips candidate EFFECTIVE, prior REV SUPERSEDED, Document pointers, ReleaseRecord and lifecycle events.
 
-### Locked review / rendition / release
+### Locked R7 supporting services
 
-- Periodic Review belongs to Controlled Information: `Disabled | Every(n months)` on DocumentType;
-- cadence starts at Effectivity and restarts after completed review; overdue does not automatically invalidate EFFECTIVE content;
-- append-only `PeriodicReviewRecord` against exact effective REV with `confirmed_current | change_required`; change-required does not auto-create a REV;
-- `Rendition` = immutable derived artifact of exact RevisionSubmission with output hash + renderer/build provenance;
-- only `OFFICIAL_PDF` mandatory for Release V1; final DOCX optional/non-blocking;
-- Approval approves Submission, not PDF bytes; official PDF may manifest Approval evidence;
-- Release is automatic/system-owned; no human publish button;
-- `RevisionSubmission` replaces `ReleaseGeneration` as required domain candidate identity;
-- optional `ReleasePlan.not_before`; no SCHEDULED Revision state;
-- actual `effective_at = released_at`; no silent retroactive Effectivity;
-- winning release atomically makes candidate EFFECTIVE, prior REV SUPERSEDED, swaps pointers, records immutable `ReleaseRecord` and emits lifecycle events;
-- candidate may be CANCELLED after Approval but before Release; evidence remains historical;
-- legacy `effective_date` TemplateField is removed V1 because actual Effectivity is born after the mandatory pre-release PDF.
+- Distribution = explicit obligation/acknowledgement, not RBAC or Training;
+- release expands User/Group targets into concrete per-user assignments; membership changes never rewrite history;
+- acknowledgement is explicit immutable evidence; notification/view/download is not acknowledgement;
+- System Value Catalog is product-owned; tenant Dictionary is mutable source whose values snapshot when a new REV is created;
+- domain evidence stays domain authority; Audit Trail is transversal append-only/tamper-evident/exportable timeline only;
+- critical governed mutations require durable audit intent in same commit boundary; usage telemetry may be async;
+- Notifications are projection/delivery only; notification READ means notification read;
+- Search is rebuildable/eventually-consistent projection; Official Library = effective REV, optional Working Search = authorized open REV; stale result never grants access.
 
-### Locked R7 — supporting services
+### Locked R8 tenant/security boundary
 
-- Distribution = controlled obligation/read acknowledgement, not Authorization and not Training/LMS;
-- DistributionConfiguration lives on Document and targets `User | Group`; no Area target without a real UserAreaMembership concept;
-- Release expands Groups to concrete per-user `DistributionAssignment`s; later group membership changes never rewrite history;
-- post-release assignment to current effective REV is explicit/audited; one obligation per user/release; pending old-REV assignments become `superseded` when a new REV is effective;
-- opening notification/viewing/downloading does not complete obligation; explicit immutable `AcknowledgementRecord` does; optional fresh reauth reuses AuthN assurance seam;
-- Distribution never edits RoleAssignments; task-specific visibility is finalized in R9;
-- System values are product-owned closed contracts; tenant Dictionary is mutable tenant-owned source data;
-- System keys V1: `document_code`, `revision_label`, `revision_title`, `document_type_code`, `document_area_code`, `document_area_name`, `revision_created_by_name`;
-- `approval_date`/approvers move to Approval manifestation in official PDF; actual `effective_date` stays outside TemplateSpec V1;
-- mutable Dictionary/external values resolve and snapshot when a new REV is created; same-REV return/resubmit does not silently re-resolve;
-- domain evidence (`ApprovalDecision`, `ReleaseRecord`, `AcknowledgementRecord`, etc.) remains authority; Audit Trail never substitutes for it;
-- critical governed mutations require durable audit intent in the same commit boundary; exact same-tx vs transactional-outbox implementation is R10;
-- Audit Trail remains append-only, tamper-evident, exportable, with User/System actors; view/download telemetry may be async and never equals acknowledgement;
-- Notifications are projection/delivery only; notification `READ` means the notification was read; “Minhas Pendências” comes from business authorities, not unread notifications;
-- Search is rebuildable/eventually-consistent projection: Official Library = effective REV, optional Working Search = open REV under current AuthZ; historical superseded/obsolete Revisions not in global search by default;
-- stale Search result never grants access; canonical endpoint rechecks current AuthZ; no Elasticsearch/OpenSearch requirement yet.
+- `PlatformOperator` and `SystemPrincipal` are platform identities outside tenant RoleAssignment; they are not extra tenant roles;
+- PlatformOperator may create/suspend/resume tenants but has no implicit access to tenant business content;
+- Tenant states V1: ACTIVE / SUSPENDED / ERASED;
+- `TenantDeletionRequest` is separate PENDING/CANCELLED/EXECUTED process with grace period; tenant may remain ACTIVE until execution;
+- onboarding creates Tenant + initial User + `tenant_owner @ Tenant` + single-use/time-limited activation credential; platform operator does not choose the owner's password and no `system_admin` is created;
+- suspension revokes tenant sessions, blocks login/business mutations, preserves data; business jobs respect suspension; lifecycle/security jobs may continue;
+- user deactivation revokes sessions but preserves identity/history; pending responsibilities require explicit reassignment/attention;
+- tenant owner can export own tenant and request/cancel own deletion; export/deletion request require fresh authentication;
+- terminal erasure: suspend/revoke sessions → delete live tenant rows → delete tenant blobs → destroy tenant DEK → preserve allowed non-PII audit/platform skeleton → ERASED + platform TenantErasureRecord;
+- target Audit Trail is not deleted during tenant erasure; retained skeleton uses opaque IDs/non-PII, sensitive payload is encrypted/erasable and may become unreadable through tenant-key destruction;
+- backup/restore must reapply erasure tombstones before restored service is available;
+- V1 crypto remains small: platform KEK wraps per-tenant DEK; no per-document key hierarchy/rotation product;
+- current local AuthN exposes/derives auth time/method/assurance/fresh-auth evidence;
+- stub MFA coverage is not a real V1 control and is targeted for deletion;
+- real MFA/passkeys/SSO/SAML/per-tenant federation are formal triggers to re-evaluate Keycloak/external IdP before rebuilding IdP features internally;
+- future `(issuer, subject) -> internal User` mapping changes authentication only; MetalDocs remains authority for Organization/AuthZ/workflow;
+- current `security` catch-all is conceptually split: sessions/lockouts → AuthN; tenant crypto → Platform Security; heuristic Security Signals are optional/deferred projection, not V1 foundation.
 
-## Critical invariant
+## Critical content invariant
 
 ```text
 RevisionSubmission
@@ -86,34 +78,34 @@ RevisionSubmission
     └── Release
 ```
 
-All three refer to the same immutable submission identity/digest. Notifications/Search/Audit never become a competing source of these facts.
+All three refer to the same immutable submission identity/digest. Audit/Notifications/Search never compete with those facts.
 
-## Exact next step — R8
+## Exact next step — R9
 
-Design only:
+Design only: **Final Authorization Matrix**.
 
-```text
-Tenant Lifecycle
-+ Platform Operator boundary
-+ Security / MFA / crypto / external IdP seam
-```
+Now that product operations are known, close:
 
-Close:
+- final semantic Permission Catalog;
+- exact legal scopes for every permission;
+- five built-in tenant-role bundles;
+- Organization admin: Users/Groups/Memberships/Areas/RoleAssignments;
+- DocumentType/category/ApprovalPolicy/Dictionary/template designation configuration permissions;
+- Document/Revision authoring, submit, withdraw, cancel, obsolete and periodic-review operations;
+- Approval act/oversee/cancel/reassign relationships;
+- Distribution configure/assign/acknowledge/oversee and task-specific read access;
+- Audit/export/session/security-admin reads/actions;
+- tenant export/deletion-request/cancel operations;
+- effective vs working vs case-specific visibility/filter semantics;
+- relationships: Approval participant, Distribution assignee, responsible owner, submitter;
+- Domain Constraints/SoD/fresh-auth/tenant-operability checks;
+- RLS/DB constraints/tripwire backstops;
+- positive/negative Golden Matrix for every sensitive operation.
 
-- Tenant authority after Organization split;
-- tenant owner vs MetalDocs/platform operator;
-- tenant creation/bootstrap/onboarding;
-- suspension/deactivation and effects on sessions/users/jobs;
-- tenant export;
-- deletion request, grace period, cancellation, terminal erasure/crypto-shred/anonymization;
-- which audit/business evidence survives vs becomes unreadable;
-- credential/session/reset/security-signal ownership;
-- whether V1 needs tenant-wide MFA policy vs only fresh reauth for sensitive actions;
-- encryption/key ownership + rotation level actually required;
-- exact trigger and identity-mapping seam for future Keycloak/external IdP.
+PlatformOperator/System authority remains separate from the tenant Permission Catalog.
 
-After R8: R9 final Permission Catalog + Role Matrix + Domain Constraint/visibility Golden Matrix; then R10+ technical architecture/data/API/frontend/migration specifications and implementation plan.
+After R9: whole-product domain map can be considered closed subject to adversarial review, then R10+ technical architecture/data/event/API/frontend/migration specifications and implementation plan.
 
 ## Documentation rule
 
-The working tree contains active truth, not an archive. Historical staging remains in Git history. The active detailed ledger is the sole current WIP decision source.
+The working tree contains active truth, not an archive. Historical staging remains in Git history. The active detailed ledger is the sole current WIP decision source. Do not restore deleted historical plans into the live tree.
