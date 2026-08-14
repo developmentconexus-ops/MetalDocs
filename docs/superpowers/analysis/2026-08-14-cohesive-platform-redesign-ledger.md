@@ -36,7 +36,8 @@ Core invariants:
 4. no generic BPM/ReBAC/low-code/object-platform engine without proven need;
 5. no confirmed binary content without semantic ownership by a governed business object;
 6. editor/browser state is never the authoritative persisted DRAFT truth;
-7. Dossier is documentary context, never a hidden ERP/PLM/custom-object platform.
+7. Dossier is documentary context, never a hidden ERP/PLM/custom-object platform;
+8. retention expiry never means automatic deletion; disposition requires eligibility + no active hold + explicit authorization + verified physical deletion.
 
 ---
 
@@ -142,7 +143,7 @@ Approval SoD V1:
 
 Last active tenant owner cannot be revoked/deactivated. Responsible owner of review-governed Documents must be reassigned before deactivation.
 
-**R9.5 delta rule:** new Evidence/Dossier operations receive Permissions only after all R9.5 operations close; operations first, authorization delta second.
+**R9.5 delta rule:** Evidence/Dossier/Retention operations receive their bounded authorization delta only after all R9.5 operations close; operations first, permissions second.
 
 ---
 
@@ -181,9 +182,7 @@ NoHumanApproval
 or UsePolicy(ApprovalPolicyID)
 ```
 
-`Document` is stable governed identity. At most one EFFECTIVE + one open Revision V1.
-
-Official business labels: `REV001`, `REV002`, ...
+`Document` is stable governed identity. At most one EFFECTIVE + one open Revision V1. Official labels are `REV001`, `REV002`, ...
 
 Revision states:
 
@@ -259,11 +258,11 @@ Notifications are delivery projection only. Search is rebuildable/eventually-con
 
 ---
 
-# 6. LOCKED — Tenant lifecycle / Platform Security (R8)
+# 6. LOCKED — Tenant lifecycle / Platform Security (R8 refined by R9.5-5)
 
 `PlatformOperator` / `SystemPrincipal` are outside tenant RBAC and gain no implicit tenant-content access.
 
-Tenant lifecycle:
+Tenant lifecycle remains exactly:
 
 ```text
 ACTIVE
@@ -275,20 +274,23 @@ Deletion request is a separate grace/cancel process. Onboarding creates Tenant +
 
 Suspension revokes sessions, blocks login/business mutations and is reversible. Tenant export/deletion request require fresh-auth.
 
-Erasure direction:
+Terminal erasure is now explicitly retention-aware:
 
 ```text
-request due
-→ suspend
-→ revoke sessions
+deletion request reaches execute_after
+→ evaluate RetentionBindings / active LegalHolds
+→ if blockers exist: request remains pending/blocked; Tenant is NOT ERASED
+→ if no blockers: suspend/revoke sessions
 → erase eligible live tenant rows/blobs
-→ destroy Tenant DEK
+→ destroy Tenant DEK that is no longer needed
 → preserve allowed non-PII audit/platform skeleton
-→ ERASED
+→ Tenant ERASED
 → TenantErasureRecord
 ```
 
-Audit Trail itself is not deleted. Platform KEK wraps per-tenant DEK; no per-document key hierarchy/rotation/HSM product V1. R9.5-5 Retention must refine legal-retention/hold interaction before erasure mechanics freeze.
+No new tenant state is introduced for retention. Suspension remains independent. Audit Trail itself is not deleted. Platform KEK wraps per-tenant DEK; no per-document key hierarchy/rotation/HSM product V1.
+
+A DEK required to keep legally retained content intelligible is never destroyed while that obligation remains. Backup/restore must reapply erasure tombstones and restore/reconcile retention/hold facts before cleanup/service resumes.
 
 ---
 
@@ -388,9 +390,9 @@ Managed keys are opaque, immutable and tenant-namespaced. Business/canonical fil
 
 Temporary staging/direct-presigned upload is allowed. Provider success alone does not confirm Artifact; confirmation requires integrity + content + semantic validation. Existing Artifact keys are never overwritten.
 
-Object-store versioning is defense-in-depth, never `REVxxx`. Object Lock/WORM/legal-hold support is optional physical enforcement consumed by future MetalDocs Retention governance, never business authority.
+Object-store versioning is defense-in-depth, never `REVxxx`. Object Lock/WORM/legal-hold support is optional physical enforcement consumed by MetalDocs Retention governance, never business authority.
 
-Production baseline = encrypted transport + provider encryption at rest. Do not encrypt every Artifact with Tenant DEK V1; application Artifact crypto-shred is introduced only if Retention/Erasure proves a concrete need.
+Production baseline = encrypted transport + provider encryption at rest. Do not encrypt every Artifact with Tenant DEK V1; application Artifact crypto-shred is introduced only if Retention/Erasure later proves a concrete need.
 
 Normal SharePoint/OneDrive/etc. are External Repository Connectors, not ManagedArtifactStore providers. Governed primary content V1 requires an exact MetalDocs-managed copy. Connector directions begin with `IMPORT_COPY` / `PUBLISH_COPY`.
 
@@ -434,24 +436,9 @@ Preserve one MetalDocs EigenPal anti-corruption/provider adapter. Pin exact edit
 
 # 11. LOCKED — R9.5-4 Dossier / Context
 
-## DS-01 — Dossier meaning
+`Dossier` is a stable documentary context for an identifiable business subject, not the ERP/PLM object itself and not a physical folder.
 
-`Dossier` is a **stable documentary context for an identifiable business subject**, not the ERP/PLM object itself and not a physical folder.
-
-Examples:
-
-```text
-Venda 889949
-Produto MTR-400
-Projeto Hotel Alpha
-Equipamento COL-0042
-```
-
-It groups documentary relationships while Document/Evidence retain independent identities/lifecycles.
-
-## DS-02 — DossierType is deliberately small
-
-Tenant-scoped `DossierType` V1:
+Tenant-scoped `DossierType` V1 is deliberately small:
 
 ```text
 code
@@ -462,122 +449,173 @@ eligible DocumentTypes
 eligible EvidenceTypes
 ```
 
-No custom fields, form builder, formulas, workflow, custom ACL, custom lifecycle or generic relation schema.
+No custom fields, forms, formulas, workflow, custom ACL/lifecycle or generic relation schema. Eligibility is real validation; no required-evidence/completeness checklist V1.
 
-Eligibility is real validation, not just UX ranking. No required-evidence/completeness checklist V1.
+Dossier has stable human/business `key`, unique within `(tenant, DossierType)`. Title may change; key does not. `{DOSSIER}` resolves the stable key. No generic Dossier numbering engine V1; creator/integration supplies key.
 
-## DS-03 — Stable key
+Creation provenance is separate from zero..N ExternalReferences. `ExternalReference = connection + entity_kind + external_id + optional display reference`; same external identity cannot silently point to two Dossiers. No heuristic auto-merge; ambiguity fails closed.
 
-Dossier has a stable human/business `key`, unique within `(tenant, DossierType)`. `title` may change; `key` does not V1.
+External master/status fields remain source-system projections, not canonical Dossier state. Source disappearance never deletes documentary history.
 
-`{DOSSIER}` in Evidence naming resolves this stable key, never mutable title.
+Dossier↔Document is M:N over stable Document identity. The relation never copies content, changes Document type/Area/lifecycle/AuthZ or grants access. Exact-REV usage evidence is a distinct future/explicit concept.
 
-V1 does not add a generic Dossier numbering engine. User/integration supplies the key. Add local numbering only when a proven recurring requirement appears.
+Every CAPTURED Evidence has exactly one immutable `primary_dossier`; DRAFT may correct it. Evidence may relate secondarily to other Dossiers without duplication. Primary Dossier supplies Evidence naming/context/scope.
 
-## DS-04 — Creation provenance vs external identity
+Dossier uses exactly one `TenantScope | AreaScope`; Evidence reuses primary Dossier scope V1. No multi-area ACL. Dossier type/key/scope are stable V1.
 
-Do not model `origin = LOCAL | EXTERNAL` because a local Dossier may later acquire external identities.
-
-Preserve creation provenance separately and allow zero..N `ExternalReference`s.
-
-Conceptually:
-
-```text
-ExternalReference
-  connection
-  entity_kind
-  external_id
-  display_reference?
-```
-
-The same external identity is unique within tenant/connection/entity kind and cannot silently point to two Dossiers.
-
-An integration may attach an external reference to an existing local Dossier when correlation is known. No heuristic auto-merge based on name/date/value similarity; ambiguity fails closed and requires explicit resolution.
-
-## DS-05 — External master data stays external
-
-External source status/fields never become canonical Dossier lifecycle automatically.
-
-ERP/PLM/CRM fields may appear through read projections/cache, but Dossier canonical metadata stays small:
-
-```text
-type
-key
-title
-scope
-creation provenance
-external references
-relationships
-```
-
-If the external source becomes unavailable/deletes its object, Dossier/Documents/Evidence survive; reference/projection becomes stale/unavailable rather than deleting history.
-
-## DS-06 — Document relationships
-
-Dossier relates stable `Document` identity, not one specific Revision by default.
-
-`Dossier ↔ Document` is M:N. One Document may serve multiple Dossiers without copying content.
-
-A relation never changes Document type/Area/lifecycle/AuthZ and never grants access. Authorizer still filters each related item; inaccessible items need not be revealed.
-
-Exact-REV usage evidence is a different future/explicit concept and is not overloaded into the normal Dossier→Document link.
-
-## DS-07 — Evidence primary context
-
-Every CAPTURED Evidence has exactly one immutable `primary_dossier`; while Evidence is DRAFT the primary context may be corrected.
-
-Primary Dossier provides Evidence's naming/context/scope authority. Evidence may also have secondary relationships to other Dossiers without duplicating Evidence or Artifact.
-
-Changing the primary Dossier after capture would rewrite historical context; correct by voiding/recreating Evidence instead.
-
-## DS-08 — Scope
-
-Dossier uses exactly one typed scope V1:
-
-```text
-TenantScope
-or AreaScope
-```
-
-No multi-area ACL/scope list. Evidence reuses primary Dossier scope V1. Dossier type/key/scope are stable V1.
-
-Dossier relationship never grants Document access and does not edit RoleAssignments.
-
-## DS-09 — Lifecycle
-
-Dossier lifecycle is intentionally tiny:
+Lifecycle is only:
 
 ```text
 ACTIVE ↔ ARCHIVED
 ```
 
-ARCHIVED is reversible MetalDocs organization/navigation state, not Sale/Product/Project/Equipment business status.
+ARCHIVED is reversible MetalDocs navigation state, not external business status. Archiving never deletes/obsoletes related content or mutates external systems.
 
-Archiving does not delete Evidence, obsolete Documents or mutate external systems.
+Document/Evidence links preserve link/unlink history. No Dossier-to-Dossier hierarchy/graph V1. Search/timeline are projections.
 
-## DS-10 — Relationship history
-
-Document/Evidence linkage/unlinkage must preserve historical/audit facts (`linked_at/by`, later unlink/reason as appropriate). Unlink never means the relationship never existed.
-
-Dossier-to-Dossier hierarchy/graph relationships do **not** enter V1. Future repeated needs may justify a bounded relation model later.
-
-## DS-11 — Search / timeline
-
-Dossier is a first-class discovery object. Search and activity timeline are projections over canonical Dossier/Document/Evidence/external-reference facts and events; they are never authorities.
-
-## DS-12 — Explicit product boundaries
-
-ERP/CRM boundary: sale/order/customer calculations, financial/fiscal/stock/business-process state stay in ERP/CRM; MetalDocs owns documentary context, governed Documents/Evidence and optional projections.
-
-PLM boundary: product documentation fits Dossier; BOM/part structure/where-used/EBOM/MBOM/CAD dependencies/ECR/ECO/ECN are PLM integration territory.
-
-Project-management boundary: documents/evidence fit Dossier; Gantt/resource planning/critical path/budget/timesheets belong project-management systems.
-
-EAM/CMMS boundary: equipment documents/evidence fit Dossier; work orders/preventive scheduling/spares/MTBF/downtime belong EAM/CMMS.
+Boundaries are explicit: transaction calculations/workflows stay ERP/CRM; BOM/part/CAD/change management stays PLM; schedules/resources stay PM; work orders/assets operations stay EAM/CMMS. MetalDocs owns documentary context.
 
 ---
 
-# 12. Build-vs-buy rulings
+# 12. LOCKED — R9.5-5 Retention / Records / Legal Hold
+
+## RT-01 — No duplicate Record identity
+
+Do not create a generic `Record` entity/lifecycle. Existing governed subjects become retention subjects automatically:
+
+- CAPTURED Evidence creates a `RetentionBinding`;
+- DocumentRevision creates a `RetentionBinding` at its first `RevisionSubmission`;
+- a DRAFT Revision never submitted remains recovery/working data rather than records-retention data.
+
+The DocumentRevision retention unit includes the governed Revision history necessary to prove it: immutable Submissions, Approval evidence, relevant Renditions, Release/PeriodicReview evidence and referenced Artifacts. WorkingSnapshots/staging/abandoned drafts remain under recovery/GC policy, not records retention.
+
+## RT-02 — Small explicit retention configuration
+
+DocumentType and EvidenceType each choose an explicit rule:
+
+```text
+NoMinimum
+KeepFor(value, DAYS | MONTHS | YEARS)
+Indefinite
+```
+
+No NULL-as-policy, hardcoded statutory periods, generic FilePlan/cutoff expression language, formula/script rules or Dossier-level retention inheritance V1.
+
+MetalDocs supplies the mechanism; tenant compliance/legal/business owners supply the actual periods applicable to their obligations.
+
+## RT-03 — Retention anchors
+
+A DocumentRevision retention clock does **not** run while the Revision is EFFECTIVE. The anchor is determined by the approved lifecycle:
+
+```text
+SUPERSEDED → superseded_at
+OBSOLETE   → obsoleted_at
+CANCELLED after at least one Submission → cancelled_at
+```
+
+A cancelled never-submitted DRAFT does not become a records-retention subject.
+
+EvidenceType chooses only:
+
+```text
+CAPTURED_AT
+OCCURRED_AT
+```
+
+as V1 anchors. `OCCURRED_AT` makes `Evidence.occurred_at` mandatory before capture, including historical imports.
+
+Dossier archive/status never starts retention; Dossier is not retention authority.
+
+## RT-04 — Policy snapshot and extensions
+
+Retention policy is snapshotted into `RetentionBinding`; later type-policy changes do not silently recalculate existing records.
+
+An explicit audited `RetentionExtension` may only lengthen an existing retain-until date with reason/authority/evidence. Generic retroactive shortening is not a V1 operation; if ever required, it needs a separately designed high-risk correction flow.
+
+## RT-05 — Expiry means eligibility, not deletion
+
+Retention expiry derives only:
+
+```text
+EligibleForDisposition
+```
+
+Current EFFECTIVE revisions are never disposition-eligible regardless of date.
+
+V1 has **no automatic deletion cron**. Physical disposition requires explicit authorized review/decision and is complete only after substantive DB payload + managed Artifacts are verifiably removed. Completion creates immutable `DispositionRecord` evidence. If provider deletion is blocked/fails, disposition remains incomplete.
+
+## RT-06 — Legal Hold is independent
+
+`LegalHold` is separate from retention duration and records explicit apply/release facts, actor/time, reason and optional case reference.
+
+V1 legal-hold scopes:
+
+```text
+Evidence
+stable Document
+Dossier
+```
+
+Never Artifact directly.
+
+Document and Dossier holds materialize concrete governed subjects in `LegalHoldItems`. New governed subjects entering that scope while the hold remains active are also materialized. Later unlink/lifecycle changes never release an already-held item implicitly.
+
+Disposition rule:
+
+```text
+retention requirement ended
+AND zero active LegalHolds
+AND subject lifecycle permits destruction
+AND explicit disposition authorized
+= may attempt physical deletion
+```
+
+Hold blocks destruction, **not** normal business lifecycle: a Document may supersede, Evidence may be VOIDED for wrong capture, Dossier may archive, while held facts remain preserved.
+
+Legal Hold V1 covers confirmed governed records, not transient autosaves/staging. Full eDiscovery/ESI preservation is a future separate capability.
+
+## RT-07 — Artifact follows its retention subjects
+
+Artifact has no independent business retention policy. Its preservation/deletion follows all retention subjects referencing it. No semantic/cross-tenant dedup makes this tractable.
+
+Provider Object Lock/WORM/Purview is enforcement only. MetalDocs remains semantic authority:
+
+- if MetalDocs requires preservation, absence of provider lock never permits deletion;
+- if MetalDocs allows disposition but provider still locks, physical disposition is blocked/incomplete.
+
+Deployment may choose an enforcement posture such as DB-only, WORM-governance or WORM-compliance. Provider-specific mode names do not appear in DocumentType/EvidenceType business configuration.
+
+If physical WORM is mandatory for a deployment, creation of a retained record cannot report final success while required enforcement failed; exact choreography is R10.
+
+## RT-08 — Dossier, Audit and external copies
+
+DossierType has no RetentionPolicy. Dossier may scope a LegalHold, while each related record keeps its own retention schedule.
+
+Audit Trail remains under a separate retention regime defined by R7/R8; Document/Evidence policies do not govern Audit. Retention/hold/disposition operations themselves emit Audit evidence.
+
+`PUBLISH_COPY` to a normal external repository never replaces canonical MetalDocs retention. A future SharePoint Embedded profile may map MetalDocs retention/hold semantics to Purview enforcement while preserving MetalDocs as the semantic authority.
+
+## RT-09 — Tenant erasure interaction
+
+Terminal tenant erasure evaluates all retention/hold blockers before `ERASED`.
+
+While protected subjects remain:
+
+```text
+TenantDeletionRequest remains pending/blocked
+Tenant != ERASED
+required DEK material is not destroyed
+```
+
+No `RETENTION_PENDING` tenant state is added. Suspension remains independent.
+
+R10 should minimize the retained surface during long blocked periods, but V1 does not invent a post-termination Retention Vault/custody subsystem without concrete economic/regulatory need.
+
+Backup/restore must restore/reconcile `RetentionBinding`, `LegalHold`, hold items and disposition facts before cleanup; tenant-erasure tombstones retain precedence.
+
+---
+
+# 13. Build-vs-buy rulings
 
 | Technology/class | Ruling | Revisit trigger |
 |---|---|---|
@@ -597,10 +635,11 @@ EAM/CMMS boundary: equipment documents/evidence fit Dossier; work orders/prevent
 | SharePoint normal | External Repository Connector | customer integration requirement |
 | SharePoint Embedded | future Microsoft enterprise content profile | Microsoft-native storage/coauthoring/Purview strategy |
 | PLM | integrate, do not build | BOM/CAD/configuration/change-management requirements |
+| full eDiscovery/records platform | do not build V1 | ESI preservation, legal discovery workflows or transfer/file-plan requirements become explicit |
 
 ---
 
-# 13. Explicit target deletions / non-goals
+# 14. Explicit target deletions / non-goals
 
 No target entitlement to survive:
 
@@ -635,41 +674,50 @@ No target entitlement to survive:
 - SharePoint normal as S3 replacement;
 - silent external repository sync;
 - application-layer encryption of every Artifact without proven need;
+- duplicate generic `Record` identity;
+- hardcoded statutory retention periods;
+- generic FilePlan/cutoff rules engine;
+- retention expiry auto-delete;
+- Dossier retention inheritance;
+- generic query-based legal hold / full eDiscovery V1;
+- provider WORM/Purview as business retention authority;
 - previous R10-A topology as approved truth.
 
 ---
 
-# 14. Remaining whole-product completion before technical architecture
+# 15. Remaining whole-product completion before technical architecture
 
 - [x] R9.5-1 Content Model
 - [x] R9.5-2 Storage / Repository Strategy
 - [x] R9.5-3 Authoring / EigenPal
 - [x] R9.5-4 Dossier / Context
-- [ ] **R9.5-5 Retention / Records / Legal Hold — NEXT**
-- [ ] R9.5-6 Import / Migration / Export
+- [x] R9.5-5 Retention / Records / Legal Hold
+- [ ] **R9.5-6 Import / Migration / Export — NEXT**
 - [ ] R9.5-7 Attestation + Content Security
 - [ ] R9.5-8 Whole-product adversarial freeze
 
-## R9.5-5 must close
+## R9.5-6 must close
 
-1. whether retention applies to Document, Revision/Release, Evidence, Dossier, Audit and/or Artifact;
-2. retention policy ownership/configuration and inheritance/snapshot rules;
-3. retention start trigger (release, capture, archival, external event, explicit date) without generic rules engine;
-4. disposition semantics after retention expiry: eligible-for-disposition vs automatic deletion;
-5. legal hold scope, apply/release authority and auditability;
-6. interaction with Document SUPERSEDED/OBSOLETE and Evidence VOIDED;
-7. interaction with tenant deletion/erasure and backups;
-8. provider enforcement mapping to S3 Object Lock / MinIO WORM / Purview without making provider authoritative;
-9. immutable retention evidence and deletion/disposition records;
-10. whether V1 needs formal record declaration or whether released Documents + CAPTURED Evidence already serve as governed records;
-11. whether retention is tenant-wide/type-based/context-based and how to avoid a generic records-management engine;
-12. exact data allowed to survive tenant erasure when legal hold/retention requires survival.
+1. how existing external/legacy Documents enter MetalDocs without pretending their history originated here;
+2. preservation of legacy codes and revision labels (`REV07`, `7`, arbitrary legacy labels) versus normalization to target `REVxxx`;
+3. whether migration can import current state only, full historical revisions, or both;
+4. how externally approved/released records are represented without fabricating MetalDocs ApprovalDecision/ReleaseRecord;
+5. import provenance, source-system identifiers and exact artifact hashes;
+6. Evidence and Dossier import, including historical `occurred_at` and retention anchors;
+7. duplicate/conflict detection and idempotent replay of large migrations;
+8. migration validation, dry-run, reconciliation and rollback/abort boundaries;
+9. generic user-facing import versus privileged migration/import paths;
+10. export scope: one Document/Dossier versus tenant-wide export;
+11. export package content, manifests, hashes, relationships and provenance so another system can verify what was exported;
+12. whether export is backup, interoperability package or evidentiary package — these purposes must not be conflated;
+13. external repository import/publish interaction with ordinary migration/export;
+14. retention/legal-hold constraints on export and disposition-related exports.
 
-Then R9.5-6 Import / Migration / Export.
+Then R9.5-7 Attestation + Content Security.
 
 ---
 
-# 15. Technical-design queue after R9.5
+# 16. Technical-design queue after R9.5
 
 R10: bounded contexts/dependency DAG/aggregate ownership/data model/table ownership/constraints/transactions/events/jobs/storage implementation/current-module & current-table migration map.
 
@@ -683,19 +731,19 @@ Until all remaining gates close: **NO PRODUCT IMPLEMENTATION.**
 
 ---
 
-# 16. Exact next step
+# 17. Exact next step
 
-Continue **R9.5-5 — Retention / Records / Legal Hold**.
+Continue **R9.5-6 — Import / Migration / Export**.
 
 Preserve:
 
 ```text
-business retention authority stays in MetalDocs
-provider WORM/Purview = enforcement only
-Document/Evidence keep their approved lifecycles
-Dossier is context, not record container lifecycle
-Tenant erasure cannot silently violate a legal hold/retention obligation
-no generic records-management rules engine without proven need
+legacy/external history may be preserved but never impersonated as native MetalDocs history
+Artifact hash/provenance remains exact and provider-independent
+Document/Evidence/Dossier identities remain semantic
+retention anchors must respect actual historical facts, not migration date
+imports must be replay-safe/reconcilable
+export must be verifiable and purpose-specific
 ```
 
-Design the smallest retention/hold model that works for controlled Documents and captured Evidence, survives storage-provider changes, and reconciles legally required preservation with terminal tenant erasure.
+Design the smallest import/export model that can onboard real companies and integrate repositories/ERP/PLM without turning migration into a second mutable authority.
