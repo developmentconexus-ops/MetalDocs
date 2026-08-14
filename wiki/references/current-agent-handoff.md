@@ -13,167 +13,67 @@
 4. `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md`
 5. this file
 
-Do not restore/resume historical roadmaps/specs/ADRs or current runtime concepts by inertia.
+Git history is archive. Do not revive historical specs/ADRs/runtime concepts by inertia.
 
 ## Current checkpoint
 
-R3–R9 principal governance is locked. R9.5 whole-product completion is active before any bounded-context/filesystem/data-model architecture.
+R3–R9 principal governance is locked: format-independent Document/REV/Submission lifecycle, specialized Approval + SoD, Periodic Review, automatic Release, Distribution/Acknowledgement, Audit/Notifications/Search, tenant lifecycle/security and the R9 five-role/29-Permission model.
 
-```text
-R3–R9      LOCKED principal domain/governance
-R9.5-1     CLOSED — Content Model
-R9.5-2     NEXT — Storage / Repository Strategy
-R10-A      PAUSED / prior topology proposal NOT approved
-R10+       BLOCKED until R9.5-8 freeze
-```
+R9.5 is the whole-product completion pass added before technical architecture. Previous R10-A topology remains **not approved**.
 
-## Locked whole-product north star
+### R9.5 north star
 
-> MetalDocs is the system of record for **identity, governance, revision, evidence and documentary context**. Physical storage, editors/viewers and upstream ERP/PLM/repositories are replaceable capabilities/providers around that kernel.
+MetalDocs is system of record for **identity, governance, revision, evidence and documentary context**. Physical storage, editors/viewers and upstream ERP/PLM/repositories are providers/connectors around the kernel.
 
-- do not replace MetalDocs with M-Files/Nuxeo/Alfresco;
-- do not build a generic ECM/M-Files/PLM/low-code clone;
-- Document is format-agnostic, not synonymous with DOCX;
-- Dossier is documentary context for Venda/Produto/Projeto/Equipamento/etc., not ERP/PLM replacement;
-- EigenPal is a DOCX authoring provider, never Document identity;
-- Managed Artifact Store and External Repository Connector are distinct concepts;
-- external repository edits never silently mutate an EFFECTIVE MetalDocs Revision;
-- provider storage versions never equal `REVxxx`;
-- retention semantics belong to MetalDocs governance when MetalDocs owns the record;
-- a future idea reopens the kernel only if it materially breaks identity, historical truth or a locked invariant.
+### Locked R9.5-1 Content Model
 
-## LOCKED R9.5-1 Content Model
+- `Document` is format-agnostic; DOCX is only one source format.
+- `Artifact` = immutable exact bytes + canonical SHA-256; never user-facing business object and never provider/location identity.
+- confirmed Artifact always belongs to a DocumentRevision or Evidence;
+- staging upload may precede Evidence classification inside a Dossier, but staging is temporary/non-business;
+- tenant-scoped `EvidenceType` defines semantic evidence type, allowed formats and small naming policy;
+- MetalDocs generates canonical filenames; original upload filename is provenance only;
+- naming tokens V1: `{TYPE}`, `{DOSSIER}`, `{REF}`, `{SEQ}`;
+- Evidence lifecycle: `DRAFT → CAPTURED → VOIDED` only for invalid MetalDocs capture; CAPTURED content immutable;
+- Evidence does not use REV/Approval/Release by default; revision-governed information should be Document;
+- exactly one primary Artifact per DocumentRevision and per Evidence V1;
+- product-owned `ContentFormat` catalog; DocumentType/EvidenceType choose allowed formats;
+- format-independent `RevisionContent = primary_artifact + governed_metadata + optional structured_authoring`;
+- Submission digest binds canonical business/content state and exact Artifact hash, never storage location;
+- `OfficialRepresentationPolicy = SourceOnly | RequireRendition(ContentFormat)`, max one required rendition V1; universal mandatory PDF is retired.
 
-### Artifact
+### Locked R9.5-2 Storage / Repository
 
-`Artifact` = immutable technical identity of exact bytes/content. It is not user-facing business information.
+- one active Managed Artifact Store per deployment V1;
+- first-class adapters: Local(dev/test), MinIO, AWS S3; other S3-compatible providers require conformance validation;
+- provider migration = copy exact bytes + verify canonical hash + cutover; no new Artifact/REV and no permanent dual-write;
+- physical object keys are opaque, immutable and tenant-namespaced; business filename never determines key/path;
+- Artifact ID != content hash; no content-addressed/cross-tenant dedup V1;
+- direct/presigned staging upload allowed; provider success does not confirm Artifact until integrity/content/semantic validation succeeds;
+- canonical content hash = SHA-256; provider ETag/version/checksum is supporting evidence only;
+- object versioning and Object Lock/WORM are defense/enforcement capabilities, never business revision/retention authority;
+- production baseline = TLS + provider encryption at rest; Tenant DEK does not encrypt every Artifact V1;
+- normal SharePoint/OneDrive/etc. are External Repository Connectors, not S3 providers;
+- governed primary content V1 requires exact MetalDocs-managed copy; connector directions start with `IMPORT_COPY` / `PUBLISH_COPY`;
+- external edits never mutate existing MetalDocs history; future adoption creates a new Artifact/new DRAFT REV where applicable;
+- SharePoint Embedded is reserved as a future Microsoft-enterprise content-backend profile, not forced into S3 semantics;
+- valid restore = Artifact DB fact + exact bytes + matching SHA-256; staging/incomplete uploads are garbage-collectable.
 
-- any byte change creates a new Artifact;
-- provider/location identifiers never define Artifact or Submission identity;
-- moving MinIO→S3 does not create a new REV;
-- confirmed Artifact must belong to exactly a semantic content owner (`DocumentRevision` or `Evidence` in current model).
-
-### Upload staging + no orphan confirmed content
-
-A user may begin by dropping a file inside a known Dossier. Correct flow:
-
-```text
-upload to temporary staging
-→ detect ContentFormat
-→ choose/confirm compatible EvidenceType
-→ capture optional Evidence.reference
-→ MetalDocs allocates canonical evidence filename
-→ create Evidence + confirm Artifact
-→ relate Evidence to Dossier
-```
-
-Staging bytes are temporary/non-business and may be garbage-collected. There is no generic confirmed “upload now, classify later” file bucket.
-
-### EvidenceType + naming
-
-Tenant-scoped `EvidenceType` V1 owns semantic classification, active/inactive state, allowed formats and a deliberately small naming policy.
-
-Examples: Nota Fiscal, XML NF-e, Comprovante Entrega, Foto Inspeção, Certificado Teste, Documento Cliente.
-
-Canonical filenames are generated by MetalDocs. User filename is provenance only.
-
-Naming tokens V1:
-
-```text
-{TYPE}
-{DOSSIER}
-{REF}
-{SEQ}
-```
-
-`Evidence.reference?` is an optional narrow business reference such as invoice/certificate/romaneio number, not generic custom metadata.
-
-Example:
-
-```text
-original:  "nota senhor osvaldo final.pdf"
-canonical: "NF-1001-889949-001.pdf"
-```
-
-File format may narrow possible EvidenceTypes; human classification remains explicit unless a trusted integration supplies semantic type by contract. Future AI may suggest, not silently classify.
-
-### Evidence lifecycle
-
-No `REVxxx` for Evidence:
-
-```text
-DRAFT → CAPTURED → VOIDED
-```
-
-- DRAFT content may be replaced;
-- CAPTURED governed content/metadata immutable;
-- wrong capture is VOIDED with reason and replaced by a new Evidence;
-- VOIDED means the MetalDocs capture was invalid, not that the external-world fact was later cancelled;
-- Evidence does not run Document Approval/Release by default; if information itself needs revision/approval lifecycle, use Document;
-- User and System/Integration provenance supported.
-
-### One primary Artifact V1
-
-Exactly one primary Artifact per DocumentRevision and one per Evidence.
-
-No arbitrary attachment bags. Independent governed items are separate Documents/Evidence related through Dossier. True indivisible multi-file packages are a future explicit trigger for ArtifactPackage or PLM/PDM integration.
-
-### ContentFormat + RevisionContent
-
-MetalDocs owns a closed product ContentFormat catalog; DocumentType/EvidenceType choose allowed formats. Never trust filename extension alone.
-
-Format-independent RevisionContent:
-
-```text
-RevisionContent
-  primary_artifact
-  governed_metadata
-  structured_authoring?   // optional
-```
-
-TemplateSpec/field-values exist only when structured authoring applies.
-
-Submission digest includes primary Artifact content hash + governed state/provenance, never storage key/provider URL/version.
-
-### Official representation
-
-R6 universal mandatory PDF is retired by material format-agnostic counterexample.
-
-Locked V1 rule:
-
-```text
-OfficialRepresentationPolicy =
-    SourceOnly
-  | RequireRendition(ContentFormat)
-```
-
-At most one required derived rendition V1. Required rendition always derives from exact Submission.
-
-Examples: DOCX may require PDF; native PDF/XLSX/SVG may be SourceOnly; CAD can require a viewable format only if DocumentType policy says so.
-
-## Authorization follow-up
-
-R9's 29 permissions remain authority for R3–R9 operations. Evidence/Dossier operations are new and will receive a bounded permission/Golden-Matrix delta only after their lifecycles close. Operations first, permissions second.
-
-## Exact next step — R9.5-2 Storage / Repository Strategy
+## Exact next step — R9.5-3 Authoring / EigenPal
 
 Design only. Close:
 
-1. exact Managed Artifact Store contract;
-2. portable MinIO/AWS S3 semantics;
-3. Artifact physical-location/migration/replication model;
-4. immutable key/reference and deduplication stance;
-5. staging/commit/GC semantics;
-6. provider capability model: versioning, Object Lock/WORM, legal hold, checksums, presigned access;
-7. encryption-at-rest and Tenant DEK responsibility;
-8. External Repository Connector contract;
-9. `IMPORT_COPY | PUBLISH_COPY | REFERENCE` semantics;
-10. external drift/adoption without silent EFFECTIVE mutation;
-11. SharePoint Embedded/M365 optional enterprise-profile boundary;
-12. backup/restore and erasure implications.
+1. authoritative working state of a DRAFT Revision;
+2. working snapshots vs confirmed Artifacts;
+3. in-app editing vs download/edit/upload replacement;
+4. autosave and optimistic concurrency;
+5. one-writer vs concurrent vs real-time collaboration V1;
+6. EditorSession/presence semantics;
+7. tracked changes and whether they are governed source content or review overlay;
+8. comments/annotations vs Approval rationale;
+9. return-for-changes/reviewer suggestions;
+10. crash/offline recovery;
+11. EigenPal anti-corruption/provider seam + upstream version strategy;
+12. future editor providers without changing Document/REV/Submission truth.
 
-Then R9.5-3 Authoring/EigenPal → Dossier → Retention → Import/Migration → Attestation/Content Security → whole-product adversarial freeze. R10 remains blocked until then.
-
-## Documentation rule
-
-The active ledger is the single detailed WIP authority. Git history is the archive. No product implementation is authorized.
+Then R9.5-4 Dossier/Context → Retention → Import/Migration/Export → Attestation/Content Security → adversarial whole-product freeze. Only then resume R10 technical architecture.
