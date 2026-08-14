@@ -1,45 +1,39 @@
 # Target Users
 
-> **Last verified:** 2026-05-01
-> **Status:** Stub. Expand with concrete personas + research findings when available.
-> **Scope:** Who uses MetalDocs and what they need.
+> **Last verified:** 2026-08-14
+> **Status:** Active persona intent; exact permission bundles remain under Cohesive Platform Redesign.
 
 ## Primary personas
 
-### 1. Quality Engineer / Document Controller
+### 1. Tenant Owner / Product Administrator
 
-- Owns the controlled-document catalog.
-- Bootstraps taxonomy (areas, profiles, template-to-profile bindings).
-- Approves templates. Often part of approval routes for documents.
-- Cares about: traceability, ISO compliance evidence, no silent mutations.
+Owns MetalDocs configuration for one company/tenant: people/groups/access assignments, document-type/policy configuration and tenant-level administration. This is **not** a platform-global superadmin and never bypasses domain invariants.
 
-### 2. Process / Procedure Author
+### 2. Area Manager
 
-- Subject-matter expert. Writes the actual content of a controlled document.
-- Picks a controlled-document slot, fills the editor, submits for approval.
-- Cares about: fast editing, reusable templates, knowing when their doc is approved.
+Operational manager for a business Area. Oversees working information and approval activity in that Area, can perform explicit administrative workflow operations where allowed, and manages document lifecycle operations such as obsolete/supersede when policy permits. It is not RBAC administration.
 
-### 3. Approver / Manager
+### 3. Author
 
-- Reviews submitted documents in the approval inbox.
-- Signs off (with password confirmation) or rejects.
-- Cannot approve their own submissions (ISO segregation).
-- Cares about: clear inbox, full content visibility, audit trail of their decisions.
+Subject-matter expert who creates/edits eligible working revisions, collaborates/comments and submits governed information for approval. `created_by` is evidence, not exclusive edit ownership.
 
-### 4. Operator / End consumer
+### 4. Approver
 
-- Reads the published PDF to execute the procedure.
-- Does not log into MetalDocs (typically).
-- Receives PDFs via distribution channels.
+A qualified participant who receives concrete approval/review work through an Approval Step. Being an approver in an Area does not grant blanket access to every draft in that Area; authority to act requires both base qualification and participation in that case.
 
-## Org context
+### 5. Viewer / Reader
 
-- ISO-bound: 9001, 14001, 45001, 27001 typically.
-- Industry: manufacturing, healthcare, finance, regulated services.
-- Sizes from 50–5000 employees with 100–10000 controlled documents.
+Consumes released/effective official information in permitted scopes. Future distribution policies may additionally require read/acknowledgement evidence for specific released revisions.
+
+## Organization model
+
+Users may receive access directly or through flat Groups such as `Vendedores`, with RoleAssignments scoped to the Tenant or an Area such as `COMERCIAL`, `QUALIDADE`, `LOGISTICA`, `FINANCEIRO` or `RH`.
+
+## Target organizations
+
+Organizations that require disciplined operational-information control, including quality/safety/security-regulated or audit-sensitive environments. Product design should serve normal commercial organizations without importing pharmaceutical-level ceremony into every workflow; stronger reauthentication/signature/evidence rules are applied where the configured governance actually requires them.
 
 ## See also
 
-- [vision/product-vision.md](product-vision.md)
-- [modules/iam.md](../modules/iam.md) — capabilities that gate each role
-- [concepts/iso-segregation.md](../concepts/iso-segregation.md) — segregation of duties enforcement
+- [product-vision.md](product-vision.md)
+- [../architecture/cohesive-platform-redesign.md](../architecture/cohesive-platform-redesign.md)
