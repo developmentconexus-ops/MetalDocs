@@ -1,47 +1,58 @@
 # Product Vision
 
-> **Last verified:** 2026-05-01
-> **Status:** Stub. Expand when product brief is finalized.
-> **Scope:** What MetalDocs is, the problem it solves, why it exists.
+> **Last verified:** 2026-08-14
+> **Status:** Active product intent; domain details still being finalized by the Cohesive Platform Redesign.
 
 ## One-liner
 
-MetalDocs is an ISO-bound controlled-document platform for organizations that need versioned, signed, immutable operational documents (procedures, job descriptions, policies) with full audit trail and PDF distribution.
+MetalDocs is a governed operational-information platform for organizations that need controlled, versioned, reviewable and auditable procedures, policies, instructions, forms and records with trustworthy publication/distribution evidence.
 
 ## Problem
 
-ISO 9001 / 14001 / 45001 / 27001-bound organizations must:
+Organizations operating under quality, safety, information-security or other controlled-process regimes need to know and prove:
 
-- Maintain controlled versions of every operational document.
-- Enforce review + approval workflows with segregation of duties.
-- Freeze approved versions so they cannot be silently mutated.
-- Distribute the canonical PDF to operators who execute the procedure.
-- Prove compliance during audits (who approved what, when, with what content).
+- what the current official information is;
+- who authored/reviewed/approved it;
+- exactly which content those decisions referred to;
+- what changed between revisions and why;
+- which revision is effective;
+- which template/revision a derived document came from;
+- who is allowed to create/edit/approve/administer each class of information;
+- whether required readers received/read/acknowledged released information where policy requires it;
+- that historical evidence cannot be silently rewritten.
 
-Generic editors (Word + SharePoint, Google Docs) lack:
+Generic editors/file shares can store documents but do not by themselves provide a coherent governed lifecycle, business numbering, approval evidence, effectivity, immutable provenance and organization-scoped authority.
 
-- Built-in revision counters tied to controlled-document codes.
-- Approval routes with quorum and ISO segregation enforcement.
-- Cryptographic freeze (hashes prove the artifact is the one approved).
-- Token substitution (`{doc_code}`, `{author}`, `{effective_date}`) auto-resolved at freeze.
+## Product direction
 
-## What MetalDocs does
+The active redesign is converging on:
 
-- Templates with the 7 fixed tokens; templates are versioned, approved, published.
-- Document profiles (Tipos Documentais) bind a category to a template.
-- Controlled documents get auto-generated codes per (profile, area) sequence.
-- Documents go through `draft → under_review → approved → frozen` with signoffs.
-- Freeze resolves tokens, computes content/values/schema hashes, stores immutable DOCX.
-- Async fanout converts to PDF for distribution.
+- `Document` as stable governed identity;
+- `DocumentRevision` as versioned governed content;
+- templates as an **exact released revision designated to seed other documents**, not a parallel lifecycle;
+- `DocumentType` as the document-classification/configuration anchor (exact policy shape still being finalized);
+- Organization with Tenant/Area/User/Group;
+- scoped role/permission authorization;
+- a small versioned human Approval engine specialized for governed information;
+- immutable submission/decision evidence tied to exact revision/content hashes;
+- a Release/effectivity boundary that makes the official revision unambiguous;
+- supporting audit, rendering/renditions, periodic review, distribution/read-ack, notifications, search and token/value services consuming the same canonical truths.
 
-## What MetalDocs is NOT
+## Critical content-truth rule
 
-- A general-purpose word processor (eigenpal handles editing; we layer governance).
-- A DMS / file-share replacement.
-- A workflow-engine-for-everything (approval routes are scoped to controlled docs).
+A human approval, freeze and official rendition must always refer to the **same exact revision/content digest**. MetalDocs must never allow an approver to review one piece of content while the system signs/releases another derived source.
 
-## See also
+## What MetalDocs is not
 
-- [vision/target-users.md](target-users.md)
-- [workflows/user-onboarding.md](../workflows/user-onboarding.md) — how users actually experience this
-- [decisions/0008-placeholder-fixed-catalog.md](../decisions/0008-placeholder-fixed-catalog.md) — why fixed 7-token catalog
+- Not a general-purpose word processor; the editor is an authoring surface inside a governed lifecycle.
+- Not merely a file share/DMS folder tree.
+- Not a generic BPM/workflow engine for arbitrary business processes.
+- Not an IAM platform; identity/authorization exist to serve MetalDocs product operations.
+- Not an architecture showcase: infrastructure such as Keycloak, OpenFGA, BPMN engines or policy languages is introduced only when a real requirement justifies it.
+
+## Active design authority
+
+For domain/architecture details read:
+
+- [../architecture/cohesive-platform-redesign.md](../architecture/cohesive-platform-redesign.md)
+- `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md`
