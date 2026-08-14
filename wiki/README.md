@@ -1,20 +1,24 @@
 # MetalDocs Wiki
 
-> **Last verified:** 2026-08-12
-> **Purpose:** Compatibility entrypoint for agents and humans that still open `wiki/README.md` first.
+> **Last verified:** 2026-08-14
+> **Purpose:** Compatibility entrypoint for anyone who still opens `wiki/README.md` first.
 
-The canonical wiki landing page is [index.md](index.md).
+The canonical landing page is [index.md](index.md).
 
-Use this file as the handoff point, not as the full catalog.
+## Active architecture reset
 
-## Read order
+Before any product/domain work, read:
 
-1. Open [index.md](index.md) for the domain-based wiki map.
-2. Read [standards/documentation-governance.md](standards/documentation-governance.md) for `wiki/` vs `docs/` ownership rules and migration rules.
-3. Drill into the relevant domain index such as [architecture/index.md](architecture/index.md), [modules/index.md](modules/index.md), or [quality/index.md](quality/index.md).
+1. [../AGENTS.md](../AGENTS.md)
+2. [standards/root-cause-global-maximum-method.md](standards/root-cause-global-maximum-method.md)
+3. **[architecture/cohesive-platform-redesign.md](architecture/cohesive-platform-redesign.md)**
+4. `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md`
+5. [references/current-agent-handoff.md](references/current-agent-handoff.md)
 
-## Why this file still exists
+No product implementation is authorized by the redesign yet.
 
-- Existing skills, prompts, and handoff docs reference `wiki/README.md`.
-- Keeping the path stable avoids unnecessary link churn during the restructure.
-- The wiki now uses [index.md](index.md) at root plus folder-level `index.md` files instead of a single catch-all catalog here.
+The old `docs/superpowers` roadmap/milestone/spec/plan/report accumulation was removed from the live tree on 2026-08-14; Git history is its archive.
+
+## General navigation
+
+Use [index.md](index.md) for domain-based navigation. Pages marked LEGACY/HISTORICAL/CURRENT-STATE are implementation evidence, not target architecture.
