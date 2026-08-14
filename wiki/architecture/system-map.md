@@ -1,98 +1,99 @@
 # System Map — what to read when
 
-> **Last verified:** 2026-08-12  
-> **Use this when:** you've finished [`ONBOARDING.md`](../ONBOARDING.md) and need a task-oriented reading path.
+> **Last verified:** 2026-08-14
+> **Active program:** Cohesive Platform Redesign
 
-## When in doubt, read these four
+## When in doubt
 
-1. [`wiki/standards/root-cause-global-maximum-method.md`](../standards/root-cause-global-maximum-method.md) — required method for non-trivial engineering decisions.
-2. [`wiki/diagrams/c4-container-backend.md`](../diagrams/c4-container-backend.md) — the moving parts.
-3. [`wiki/architecture/system-overview.md`](system-overview.md) — ports, services, topology.
-4. The relevant `wiki/modules/<name>.md` for the boundary you're touching.
+Read these first:
 
-## "I'm adding / changing a backend HTTP route"
+1. [`../standards/root-cause-global-maximum-method.md`](../standards/root-cause-global-maximum-method.md)
+2. **[`cohesive-platform-redesign.md`](cohesive-platform-redesign.md)**
+3. `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md`
+4. [`../references/current-agent-handoff.md`](../references/current-agent-handoff.md)
 
-1. [`backend-api-structure.md`](backend-api-structure.md).
-2. [`api-contract.md`](api-contract.md) + [`api-design-system.md`](api-design-system.md).
-3. [`concepts/authz-tiers.md`](../concepts/authz-tiers.md).
-4. The owning `wiki/modules/<area>.md` route truth table.
-5. Follow `AGENTS.md` for the root-cause gate, contract-first rule, verification, and QA routing.
+If the task changes product/domain semantics, stop at the design gate. No product implementation is authorized yet.
 
-## "I'm building / changing a screen"
+## "I'm working on Organization / AuthZ / Approval / Documents / Templates / Taxonomy / Release"
 
-1. [`frontend-structure.md`](frontend-structure.md).
-2. [`modules/frontend/index.md`](../modules/frontend/index.md).
-3. The load-bearing sequence diagram in [`diagrams/`](../diagrams/) for the workflow.
-4. [`modules/editor-ui-eigenpal.md`](../modules/editor-ui-eigenpal.md) only when touching the editor boundary.
-5. Generated frontend API types for any server-state work.
-6. Follow `AGENTS.md` and the relevant QA checklist.
+Use the active redesign stack above. Current module docs are LEGACY/current-state evidence only.
 
-## "I'm wiring a new query / mutation"
+Do not follow the old module topology, old role/capability vocabulary, approval-route model or template lifecycle by inertia.
 
-1. [`frontend-structure.md` §8](frontend-structure.md).
-2. [`frontend/apps/web/src/lib/queryKeys.ts`](../../frontend/apps/web/src/lib/queryKeys.ts).
-3. The owning [`modules/frontend/<slice>.md`](../modules/frontend/).
-4. Generated API types are the contract authority; do not create a parallel handwritten contract.
+## "I'm inspecting current runtime/API behavior"
 
-## "I'm changing a DB table / writing a migration"
+1. [`backend-api-structure.md`](backend-api-structure.md)
+2. [`api-contract.md`](api-contract.md) + [`api-design-system.md`](api-design-system.md)
+3. current OpenAPI/generated types/code
+4. relevant current-state module page from [`../modules/index.md`](../modules/index.md)
 
-1. [`database/index.md`](../database/index.md) and the relevant database pages.
-2. [`database/relationships.md`](../database/relationships.md).
-3. [`concepts/authz-tiers.md`](../concepts/authz-tiers.md) when authorization/tripwires are involved.
-4. The owning module page and migration/ownership guidance.
-5. Apply the canonical engineering method before introducing new schema enforcement or tooling.
+Current contract/code answers what runs today, not what must survive the redesign.
 
-## "I'm debugging the approval freeze path"
+## "I'm inspecting the current database"
 
-1. [`diagrams/sequence-signoff-freeze.md`](../diagrams/sequence-signoff-freeze.md).
-2. [`modules/approval.md`](../modules/approval.md).
-3. [`modules/approval-tech-debt.md`](../modules/approval-tech-debt.md).
-4. Relevant approval ADRs.
-5. [`modules/frontend/approval.md`](../modules/frontend/approval.md) when the frontend surface is involved.
+1. [`../database/index.md`](../database/index.md)
+2. current baseline/migrations/relationships
+3. [`data-model.md`](data-model.md) only as a LEGACY current-state reference
 
-## "I'm debugging PDF export"
+Do not design migrations until the target domain/data model is closed.
 
-1. [`diagrams/sequence-pdf-export.md`](../diagrams/sequence-pdf-export.md).
-2. [`modules/render-fanout.md`](../modules/render-fanout.md).
-3. `internal/platform/servicebus/gotenberg_pdf.go` for the Go -> Gotenberg path.
+## "I'm inspecting frontend journeys"
 
-## "I'm debugging local startup"
+1. [`frontend-structure.md`](frontend-structure.md)
+2. [`../modules/frontend/index.md`](../modules/frontend/index.md)
+3. generated API types
+4. relevant QA evidence
 
-1. [`references/local-dev-startup.md`](../references/local-dev-startup.md).
-2. [`references/local-dev-credentials.md`](../references/local-dev-credentials.md).
-3. If runtime truth is unreliable, stop feature work, repair the startup/contract prerequisite, and rerun the failed checkpoint before resuming.
+Frontend behavior is evidence about user needs; it does not own lifecycle or authorization semantics.
+
+## "I'm investigating the old approval/freeze/PDF defect"
+
+Start from the active redesign's content-truth invariant. Historical sequence diagrams/module docs may be inspected only as evidence.
+
+The known architecture failure was: editor-authored content was reviewed, while freeze rendered a different blank template snapshot. The target must make it impossible for Approval, freeze and Rendition to bind different content identities.
+
+Useful current-support evidence:
+
+- [`../modules/render-fanout.md`](../modules/render-fanout.md)
+- current `documents`/`approval`/renderer code
+- Git history for historical QA reports if a specific fact must be recovered
+
+## "I'm working on supporting audit/render/search/notifications/distribution/tokens/security"
+
+First read the active redesign's whole-product checklist. Then inspect the relevant supporting module page.
+
+Do not rewrite a supporting component just because the core is changing. Preserve healthy seams and revalidate only the contracts that depend on newly-settled core truths.
 
 ## "I'm starting a new module / feature"
 
-1. Read `.claude/skills/developing-new-work/SKILL.md`.
-2. Produce the system-impact analysis and canonical Engineering Decision Record.
-3. Proceed to design only on Green/Yellow.
+If the request falls inside a boundary already owned by the Cohesive Platform Redesign, continue the **single active redesign ledger** instead of creating another design authority.
 
-## "I'm reviewing a design / plan / diff"
+For genuinely independent future work, use `.claude/skills/developing-new-work/SKILL.md` after confirming it does not overlap the active reset.
 
-1. Read `.claude/skills/adversarial-review/SKILL.md`.
-2. Verify source anchors first.
-3. Require root-cause and local/global-maximum disposition for material findings.
-4. Stop the review loop when the target property is settled and findings have converged.
+## "I'm using the harness / dispatch hub"
 
-## "I'm onboarding a contributor"
+Read `.claude/skills/harness-hub/SKILL.md`.
 
-1. [`README.md`](../../README.md), [`AGENTS.md`](../../AGENTS.md), and [`CLAUDE.md`](../../CLAUDE.md).
-2. [`ONBOARDING.md`](../ONBOARDING.md).
-3. [`diagrams/c4-context.md`](../diagrams/c4-context.md) -> [`c4-container-backend.md`](../diagrams/c4-container-backend.md).
-4. [`system-overview.md`](system-overview.md).
-5. The role-based deep dives in onboarding.
+During the redesign gate, the harness is design-only: read-only research/census/review may be parallelized; product implementation may not.
+
+## "I'm reviewing a design"
+
+Use `.claude/skills/adversarial-review/SKILL.md`, verify claims against source, and require root-cause/local-vs-global-max disposition. Do not reopen settled decisions without a material new finding or changed constraint.
+
+## "I'm onboarding"
+
+1. [`../../AGENTS.md`](../../AGENTS.md)
+2. [`../../CLAUDE.md`](../../CLAUDE.md) when applicable
+3. [`../ONBOARDING.md`](../ONBOARDING.md)
+4. active redesign authority + ledger + handoff
 
 ## "I'm closing out work"
 
-1. [`quality/qa-operating-system.md`](../quality/qa-operating-system.md).
-2. The relevant checklist in [`quality/`](../quality/).
-3. `AGENTS.md` evidence and root-cause close-out rules.
+Current redesign decisions close by being recorded in the active ledger after operator approval. Product implementation close-out/QA only resumes after the implementation gate opens.
 
 ## See also
 
-- [`wiki/index.md`](../index.md)
-- [`wiki/README.md`](../README.md)
-- [`wiki/modules/index.md`](../modules/index.md)
-- [`wiki/modules/frontend/index.md`](../modules/frontend/index.md)
-- [`wiki/decisions/`](../decisions/)
+- [`../index.md`](../index.md)
+- [`index.md`](index.md)
+- [`../modules/index.md`](../modules/index.md)
+- [`../decisions/index.md`](../decisions/index.md)
