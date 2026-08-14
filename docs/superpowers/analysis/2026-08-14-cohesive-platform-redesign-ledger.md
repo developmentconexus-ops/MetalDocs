@@ -8,7 +8,7 @@
 > **Program authority:** `wiki/architecture/cohesive-platform-redesign.md`
 > **Implementation gate:** **CLOSED — design/documentation only.**
 
-Git history is the archive for prior verbose ledger forms and superseded runtime/ADR assumptions. Current code/schema/OpenAPI are migration evidence, not target-design authority.
+Git history is the archive. Current code/schema/OpenAPI are migration evidence, not target authority.
 
 Global maximum = **the smallest professional architecture that correctly models the domain, preserves invariants and exposes clean extension seams.**
 
@@ -35,13 +35,14 @@ Core invariants:
 3. Approval, Rendition and Release bind the same exact immutable RevisionSubmission/digest;
 4. no generic BPM/ReBAC/low-code/object-platform engine without proven need;
 5. no confirmed binary content without semantic ownership by a governed business object;
-6. editor/browser state is never the authoritative persisted DRAFT truth.
+6. editor/browser state is never the authoritative persisted DRAFT truth;
+7. Dossier is documentary context, never a hidden ERP/PLM/custom-object platform.
 
 ---
 
 # 1. LOCKED — Authentication / Organization / Authorization (R1–R2, R9)
 
-Authentication owns local V1 credentials, activation, opaque sessions, lockout/revocation and fresh-auth assurance behind a future external-IdP seam. Real MFA/passkeys/SSO/SAML/federation trigger re-evaluation of Keycloak/external IdP before rebuilding IdP capabilities internally. Current stub MFA has no target entitlement.
+Authentication owns local V1 credentials, activation, opaque sessions, lockout/revocation and fresh-auth assurance behind a future external-IdP seam. Real MFA/passkeys/SSO/SAML/federation trigger re-evaluation of Keycloak/external IdP. Current stub MFA has no target entitlement.
 
 Organization:
 
@@ -87,7 +88,7 @@ Permission
 = ALLOW
 ```
 
-RLS = tenant-isolation defense-in-depth only. DB constraints = structural invariants. Current `system_admin` short-circuit / asserted-capability-GUC model is not target architecture.
+RLS = tenant-isolation defense-in-depth only. DB constraints = structural invariants. Current `system_admin` short-circuit/asserted-capability-GUC model is not target architecture.
 
 Final R9 tenant Permission Catalog for the R3–R9 operation set:
 
@@ -128,22 +129,20 @@ tenant.deletion.request
 ```
 
 Role bundles:
-
-- `viewer`: `document.read_effective`.
-- `author`: viewer + history/working/create/edit/comment/submit/periodic-review qualification.
-- `approver`: viewer + `approval.act`; no blanket draft access.
-- `area_manager`: author + revision cancel/obsolete/owner manage + approval act/oversee/reassign/cancel + distribution manage/oversee in Area.
+- `viewer`: `document.read_effective`;
+- `author`: viewer + history/working/create/edit/comment/submit/periodic-review qualification;
+- `approver`: viewer + `approval.act`, no blanket draft access;
+- `area_manager`: author + revision cancel/obsolete/owner manage + approval act/oversee/reassign/cancel + distribution manage/oversee in Area;
 - `tenant_owner`: all 29 through normal Authorizer; still obeys relationships, SoD, lifecycle, fresh-auth and tenant-operability constraints.
 
 Approval SoD V1:
-
 1. actor cannot accept if Revision creator or Submission submitter;
 2. same user cannot accept two distinct Steps of one ApprovalInstance;
 3. reassignment target must remain active/qualified and satisfy SoD.
 
 Last active tenant owner cannot be revoked/deactivated. Responsible owner of review-governed Documents must be reassigned before deactivation.
 
-**R9.5 delta rule:** new Evidence/Dossier operations receive Permissions only after their lifecycles close; operations first, authorization delta second.
+**R9.5 delta rule:** new Evidence/Dossier operations receive Permissions only after all R9.5 operations close; operations first, authorization delta second.
 
 ---
 
@@ -184,14 +183,7 @@ or UsePolicy(ApprovalPolicyID)
 
 `Document` is stable governed identity. At most one EFFECTIVE + one open Revision V1.
 
-Official business labels:
-
-```text
-REV001
-REV002
-REV003
-...
-```
+Official business labels: `REV001`, `REV002`, ...
 
 Revision states:
 
@@ -208,7 +200,7 @@ REV is a business change cycle; autosaves/checkpoints are technical working hist
 
 `RevisionSubmission` is immutable exact attempt identity and exists even under NoHumanApproval. Approval/Rendition/Release bind exact Submission/digest.
 
-Document code is tenant-wide unique/immutable. Document type/Area/code are immutable V1. Numbering language is deliberately small:
+Document code is tenant-wide unique/immutable. Document type/Area/code are immutable V1. Numbering language:
 
 ```text
 literals + {TYPE} + {AREA} + {SEQ}
@@ -220,20 +212,13 @@ No year/month/custom metadata/formulas/scripts/resets. Normal Create has no manu
 
 Template is a role of an ordinary governed Document; no parallel TemplateVersion lifecycle. `TemplateUse` is M:N and exact source effective REV is pinned at derived-document creation.
 
-TemplateSpec owns structured authoring/fill contract only. It is optional structured-authoring state for applicable content, **not** the universal definition of Revision content.
+TemplateSpec owns structured authoring/fill contract only and is optional structured-authoring state for applicable content, **not** the universal definition of Revision content.
 
 ---
 
 # 4. LOCKED — Periodic Review / Rendition / Release (R6 refined by R9.5-1)
 
-Periodic Review belongs Controlled Information:
-
-```text
-Disabled
-or Every(n months)
-```
-
-Cadence starts from actual Effectivity; overdue does not invalidate content. Immutable `PeriodicReviewRecord` binds exact effective REV with `confirmed_current | change_required`. Completion requires responsible-owner relation + permission + exact REV still current.
+Periodic Review belongs Controlled Information: `Disabled | Every(n months)`. Cadence starts from actual Effectivity; overdue does not invalidate content. Immutable `PeriodicReviewRecord` binds exact effective REV with `confirmed_current | change_required`. Completion requires responsible-owner relation + permission + exact REV still current.
 
 Rendition = immutable derived representation of exact Submission with output hash + generator/build provenance. Approval approves Submission, never renderer output bytes.
 
@@ -250,7 +235,7 @@ ReleaseRecord
 outbox/events
 ```
 
-The prior universal mandatory OFFICIAL_PDF rule is retired. Locked V1 replacement:
+Universal mandatory OFFICIAL_PDF is retired. Locked V1 replacement:
 
 ```text
 OfficialRepresentationPolicy =
@@ -303,7 +288,7 @@ request due
 → TenantErasureRecord
 ```
 
-Audit Trail itself is not deleted. Platform KEK wraps per-tenant DEK; no per-document key hierarchy/rotation/HSM product V1. R9.5 Retention must refine legal-retention/hold interaction before erasure mechanics freeze.
+Audit Trail itself is not deleted. Platform KEK wraps per-tenant DEK; no per-document key hierarchy/rotation/HSM product V1. R9.5-5 Retention must refine legal-retention/hold interaction before erasure mechanics freeze.
 
 ---
 
@@ -315,12 +300,11 @@ R9.5 exists because storage, editor, non-DOCX content and enterprise-context use
 
 Do not replace MetalDocs with M-Files/Nuxeo/Alfresco and do not build a generic ECM/M-Files clone.
 
-A governed Document is format-agnostic. `Dossier` is a deliberately small documentary context for Venda/Produto/Projeto/Equipamento/Case etc.; it may relate Documents/Evidence and external references but never becomes ERP/PLM. BOM/where-used/EBOM/MBOM/CAD dependency/ECR/ECO are explicit PLM integration triggers.
+A governed Document is format-agnostic. `Dossier` is a deliberately small documentary context; BOM/where-used/EBOM/MBOM/CAD dependency/ECR/ECO are explicit PLM integration triggers.
 
 EigenPal is a DOCX authoring provider, never Document identity.
 
 Storage classes:
-
 1. Managed Artifact Store — MetalDocs logically owns exact bytes.
 2. External Repository Connector — SharePoint/OneDrive/etc. imports/publishes copies explicitly.
 3. Future enterprise content profile — e.g. SharePoint Embedded/M365, designed explicitly rather than forced into S3 semantics.
@@ -346,7 +330,7 @@ CONFIRMED Artifact
     or Evidence
 ```
 
-Tenant-scoped `EvidenceType` V1 has stable code/name/description/status, allowed formats and small naming policy. It is not a custom schema/workflow engine.
+Tenant-scoped `EvidenceType` V1 has stable code/name/description/status, allowed formats and a small naming policy. It is not a custom schema/workflow engine.
 
 Evidence canonical filename is generated by MetalDocs; original filename is provenance only. Naming tokens V1:
 
@@ -363,17 +347,15 @@ Evidence lifecycle:
 
 ```text
 DRAFT
-  ↓ capture
-CAPTURED
-  ↓ invalid-capture administration
-VOIDED
+→ CAPTURED
+→ VOIDED   // only invalid MetalDocs capture
 ```
 
 DRAFT content may be replaced. CAPTURED content/metadata is immutable. Wrong capture is VOIDED with reason and replaced by new Evidence; external-world cancellation is a separate fact. Evidence does not use REV/Approval/Release by default; information needing revision governance should be Document.
 
 Exactly one primary Artifact per DocumentRevision and per Evidence V1. True indivisible multi-file packages are future `ArtifactPackage`/PLM triggers.
 
-MetalDocs owns a closed `ContentFormat` catalog. DocumentType/EvidenceType select allowed formats. `RevisionContent` is format-independent:
+MetalDocs owns a closed `ContentFormat` catalog. DocumentType/EvidenceType select allowed formats.
 
 ```text
 RevisionContent
@@ -410,12 +392,7 @@ Object-store versioning is defense-in-depth, never `REVxxx`. Object Lock/WORM/le
 
 Production baseline = encrypted transport + provider encryption at rest. Do not encrypt every Artifact with Tenant DEK V1; application Artifact crypto-shred is introduced only if Retention/Erasure proves a concrete need.
 
-Normal SharePoint/OneDrive/etc. are External Repository Connectors, not ManagedArtifactStore providers. Governed primary content V1 requires an exact MetalDocs-managed copy. Connector directions begin with:
-
-```text
-IMPORT_COPY
-PUBLISH_COPY
-```
+Normal SharePoint/OneDrive/etc. are External Repository Connectors, not ManagedArtifactStore providers. Governed primary content V1 requires an exact MetalDocs-managed copy. Connector directions begin with `IMPORT_COPY` / `PUBLISH_COPY`.
 
 External edits never mutate existing EFFECTIVE REV/CAPTURED Evidence. Future adoption imports exact new bytes and creates new governed state/new DRAFT REV where applicable.
 
@@ -427,99 +404,180 @@ Valid restore = Artifact DB fact + exact bytes + matching SHA-256. Tenant erasur
 
 # 10. LOCKED — R9.5-3 Authoring / EigenPal
 
-## AU-01 — Persisted working truth
+Editor/browser state is never business authority. While a Revision is DRAFT, latest **persisted WorkingContent** is recoverable server truth.
 
-Editor/browser state is never business authority. While a Revision is DRAFT, the latest **persisted WorkingContent** is the recoverable server truth.
+DRAFT carries a monotonic technical `working_version`; `WorkingSnapshot` is an immutable technical snapshot and never a business REV. Old technical snapshots may be GC'd under recovery policy unless current or needed by later immutable evidence.
 
-DRAFT carries a monotonic technical `working_version`. It is not a REV or user-visible business version.
+Any governed DRAFT change — primary bytes, structured values or governed Revision metadata — participates in the same working concurrency version. Editorial discussion that is not submitted content does not advance content version merely because comment state changed.
 
-`WorkingSnapshot` is an immutable technical snapshot of logical RevisionContent at a working_version. Autosaves/checkpoints do not create REVxxx. Old technical snapshots may be garbage-collected according to recovery policy unless still current or needed by later immutable evidence.
+Every save/replacement requires `expected_working_version`; mismatch fails closed. No last-write-wins.
 
-Any governed DRAFT change — primary bytes, structured values or governed Revision metadata — participates in the same working concurrency version. Editorial discussion that is not part of submitted content does not advance content version merely because comment state changed.
+V1 uses one active in-app writer per DRAFT Revision **plus OCC**. `EditorSession` is a narrow heartbeat/staleness authoring lease, not generic distributed lock.
 
-## AU-02 — OCC; no last-write-wins
+External download/edit/upload holds no long checkout. Replacement is based on known working_version and fails on stale base. No automatic binary DOCX merge V1.
 
-Every server save/replacement requires `expected_working_version`. Mismatch fails closed. No stale callback/tab/external upload silently overwrites newer persisted work.
+In-app editing and external-file replacement modify the same DRAFT REV; authoring provider is not business identity. External replacement must satisfy content policy and structured-authoring parity.
 
-V1 uses one active in-app writer per DRAFT Revision **plus OCC as the correctness backstop**. Other authorized users may inspect latest persisted working state.
+Submit requires/follows final successful flush, validates OCC and freezes exact persisted logical state into immutable `RevisionSubmission`. After SUBMITTED, stale autosaves/replacements are rejected.
 
-`EditorSession` is a narrow authoring lease/presence record with heartbeat/staleness, not a generic distributed-lock engine.
+Approval UI is read-only over exact Submission. Current runtime `review → suggesting + autosave` has no target entitlement. Approval rationale/return reason is Approval evidence, not editor state.
 
-## AU-03 — External editing
+`EditorialComment` is MetalDocs DRAFT collaboration state, not vendor DOCX-comment authority. V1 requires editorial comments resolved before submit. Tracked changes are optional provider markup; if enabled, unresolved tracked changes block submission. They are not mandatory V1 kernel requirements.
 
-Download/edit/upload does not hold a long checkout lock. Download/replacement is based on a known working_version; stale-base replacement fails with conflict. No automatic binary DOCX merge V1.
+Browser/local recovery may supplement server snapshots but never overwrite a newer working_version silently.
 
-In-app editing and external-file replacement modify the same DRAFT business REV. Authoring method/provider is not persisted business identity.
+Realtime Yjs/coauthoring is deferred V1. Future collaboration state remains authoring infrastructure and exports exact WorkingSnapshots; it never becomes REV/Submission identity.
 
-External replacement must satisfy DocumentType content policy and may not silently destroy TemplateSpec/structured-authoring parity.
-
-## AU-04 — Submission boundary
-
-Submit requires/follows a final successful flush, validates the expected working_version and freezes the exact persisted logical state into immutable `RevisionSubmission`.
-
-After REV becomes SUBMITTED, any later autosave/stale editor callback is rejected. Submission candidate bytes never mutate.
-
-Return-for-changes closes the old Approval attempt and reopens the same REV DRAFT for new WorkingContent; the prior Submission remains immutable forever.
-
-## AU-05 — Approval is read-only content review
-
-Approval UI renders the exact Submission source/preview read-only. Current runtime behavior that maps review to vendor `suggesting` mode with autosave has **no target entitlement**.
-
-Approval rationale/return reason belongs to Approval evidence, not editor comments or source bytes.
-
-Future inline approver suggestions, if proven, must be separate `ReviewSuggestion`/annotation state against exact Submission and must never mutate it.
-
-## AU-06 — Editorial comments / tracked changes
-
-`EditorialComment` is MetalDocs collaboration state attached to DRAFT Revision/working context, not vendor DOCX-comment authority. This keeps `document.comment` product-owned and format-independent.
-
-V1 requires editorial comments resolved before submission so the submitted candidate is clean and unambiguous.
-
-Tracked changes are optional authoring-provider markup, not a MetalDocs lifecycle primitive. If enabled, unresolved tracked changes block submission V1. They are not mandatory V1 requirements; vendor licensing/capability remains explicit build-vs-buy choice.
-
-## AU-07 — Recovery
-
-Browser/local recovery may supplement server snapshots but never silently overwrite a newer server working_version. If local recovery base is stale, surface conflict/export/reconciliation rather than applying automatically.
-
-## AU-08 — Real-time collaboration deferred
-
-Realtime coauthoring/Yjs is deferred V1. The seam remains deliberate: future collaboration state is authoring infrastructure and periodically/at-submit exports exact WorkingSnapshots; it never becomes REV/Submission identity.
-
-Future collaborative submit must quiesce/freeze provider state, export exact source bytes, persist final WorkingSnapshot and only then create immutable Submission.
-
-## AU-09 — EigenPal/provider boundary
-
-Preserve one MetalDocs anti-corruption/provider adapter around EigenPal. No direct vendor API imports across product surfaces.
-
-Pin exact editor dependency/version and require a MetalDocs fidelity/conformance corpus before upgrades. Upstream guarantees are supporting evidence, not MetalDocs proof.
-
-Future AuthoringProviders such as Office/ONLYOFFICE may add/replace capabilities without changing Document/REV/Submission semantics.
-
-V1 authoring north star:
-
-```text
-REV004 DRAFT
-    ↓
-WorkingContent (working_version N)
-    ↓
-EigenPal OR external edit
-    ↓
-Save/Replace(expected=N)
-    ↓
-validated immutable Artifact + governed state
-    ↓
-WorkingSnapshot N+1
-    ↓
-final flush/OCC
-    ↓
-RevisionSubmission #k
-    ↓
-IMMUTABLE
-```
+Preserve one MetalDocs EigenPal anti-corruption/provider adapter. Pin exact editor version and require a MetalDocs fidelity/conformance corpus before upgrades. Future Office/ONLYOFFICE providers must not change Document/REV/Submission semantics.
 
 ---
 
-# 11. Build-vs-buy rulings
+# 11. LOCKED — R9.5-4 Dossier / Context
+
+## DS-01 — Dossier meaning
+
+`Dossier` is a **stable documentary context for an identifiable business subject**, not the ERP/PLM object itself and not a physical folder.
+
+Examples:
+
+```text
+Venda 889949
+Produto MTR-400
+Projeto Hotel Alpha
+Equipamento COL-0042
+```
+
+It groups documentary relationships while Document/Evidence retain independent identities/lifecycles.
+
+## DS-02 — DossierType is deliberately small
+
+Tenant-scoped `DossierType` V1:
+
+```text
+code
+name
+description?
+status: ACTIVE | INACTIVE
+eligible DocumentTypes
+eligible EvidenceTypes
+```
+
+No custom fields, form builder, formulas, workflow, custom ACL, custom lifecycle or generic relation schema.
+
+Eligibility is real validation, not just UX ranking. No required-evidence/completeness checklist V1.
+
+## DS-03 — Stable key
+
+Dossier has a stable human/business `key`, unique within `(tenant, DossierType)`. `title` may change; `key` does not V1.
+
+`{DOSSIER}` in Evidence naming resolves this stable key, never mutable title.
+
+V1 does not add a generic Dossier numbering engine. User/integration supplies the key. Add local numbering only when a proven recurring requirement appears.
+
+## DS-04 — Creation provenance vs external identity
+
+Do not model `origin = LOCAL | EXTERNAL` because a local Dossier may later acquire external identities.
+
+Preserve creation provenance separately and allow zero..N `ExternalReference`s.
+
+Conceptually:
+
+```text
+ExternalReference
+  connection
+  entity_kind
+  external_id
+  display_reference?
+```
+
+The same external identity is unique within tenant/connection/entity kind and cannot silently point to two Dossiers.
+
+An integration may attach an external reference to an existing local Dossier when correlation is known. No heuristic auto-merge based on name/date/value similarity; ambiguity fails closed and requires explicit resolution.
+
+## DS-05 — External master data stays external
+
+External source status/fields never become canonical Dossier lifecycle automatically.
+
+ERP/PLM/CRM fields may appear through read projections/cache, but Dossier canonical metadata stays small:
+
+```text
+type
+key
+title
+scope
+creation provenance
+external references
+relationships
+```
+
+If the external source becomes unavailable/deletes its object, Dossier/Documents/Evidence survive; reference/projection becomes stale/unavailable rather than deleting history.
+
+## DS-06 — Document relationships
+
+Dossier relates stable `Document` identity, not one specific Revision by default.
+
+`Dossier ↔ Document` is M:N. One Document may serve multiple Dossiers without copying content.
+
+A relation never changes Document type/Area/lifecycle/AuthZ and never grants access. Authorizer still filters each related item; inaccessible items need not be revealed.
+
+Exact-REV usage evidence is a different future/explicit concept and is not overloaded into the normal Dossier→Document link.
+
+## DS-07 — Evidence primary context
+
+Every CAPTURED Evidence has exactly one immutable `primary_dossier`; while Evidence is DRAFT the primary context may be corrected.
+
+Primary Dossier provides Evidence's naming/context/scope authority. Evidence may also have secondary relationships to other Dossiers without duplicating Evidence or Artifact.
+
+Changing the primary Dossier after capture would rewrite historical context; correct by voiding/recreating Evidence instead.
+
+## DS-08 — Scope
+
+Dossier uses exactly one typed scope V1:
+
+```text
+TenantScope
+or AreaScope
+```
+
+No multi-area ACL/scope list. Evidence reuses primary Dossier scope V1. Dossier type/key/scope are stable V1.
+
+Dossier relationship never grants Document access and does not edit RoleAssignments.
+
+## DS-09 — Lifecycle
+
+Dossier lifecycle is intentionally tiny:
+
+```text
+ACTIVE ↔ ARCHIVED
+```
+
+ARCHIVED is reversible MetalDocs organization/navigation state, not Sale/Product/Project/Equipment business status.
+
+Archiving does not delete Evidence, obsolete Documents or mutate external systems.
+
+## DS-10 — Relationship history
+
+Document/Evidence linkage/unlinkage must preserve historical/audit facts (`linked_at/by`, later unlink/reason as appropriate). Unlink never means the relationship never existed.
+
+Dossier-to-Dossier hierarchy/graph relationships do **not** enter V1. Future repeated needs may justify a bounded relation model later.
+
+## DS-11 — Search / timeline
+
+Dossier is a first-class discovery object. Search and activity timeline are projections over canonical Dossier/Document/Evidence/external-reference facts and events; they are never authorities.
+
+## DS-12 — Explicit product boundaries
+
+ERP/CRM boundary: sale/order/customer calculations, financial/fiscal/stock/business-process state stay in ERP/CRM; MetalDocs owns documentary context, governed Documents/Evidence and optional projections.
+
+PLM boundary: product documentation fits Dossier; BOM/part structure/where-used/EBOM/MBOM/CAD dependencies/ECR/ECO/ECN are PLM integration territory.
+
+Project-management boundary: documents/evidence fit Dossier; Gantt/resource planning/critical path/budget/timesheets belong project-management systems.
+
+EAM/CMMS boundary: equipment documents/evidence fit Dossier; work orders/preventive scheduling/spares/MTBF/downtime belong EAM/CMMS.
+
+---
+
+# 12. Build-vs-buy rulings
 
 | Technology/class | Ruling | Revisit trigger |
 |---|---|---|
@@ -542,7 +600,7 @@ IMMUTABLE
 
 ---
 
-# 12. Explicit target deletions / non-goals
+# 13. Explicit target deletions / non-goals
 
 No target entitlement to survive:
 
@@ -556,7 +614,6 @@ No target entitlement to survive:
 - automatic binary DOCX merge V1;
 - vendor editor identity persisted as Document/Revision truth;
 - approver editing/autosaving submitted bytes;
-- vendor DOCX comments as sole product collaboration authority;
 - mandatory realtime collaboration/CRDT V1;
 - BPMN/CEL/M-of-N/generic delegation/terminal reject;
 - Approval ownership of document state/release/review;
@@ -567,6 +624,9 @@ No target entitlement to survive:
 - user filename as canonical naming;
 - “every file is Document” / “every Document is DOCX”;
 - generic ECM/M-Files clone / low-code object engine;
+- Dossier custom-field/form/workflow/ACL engine;
+- Dossier-to-Dossier graph/hierarchy V1;
+- Dossier status mirroring ERP/PLM business lifecycle;
 - PLM/BOM/CAD dependency/change-management kernel;
 - arbitrary multi-file Revision/Evidence payload V1;
 - provider version = REV;
@@ -579,39 +639,37 @@ No target entitlement to survive:
 
 ---
 
-# 13. Remaining whole-product completion before technical architecture
+# 14. Remaining whole-product completion before technical architecture
 
 - [x] R9.5-1 Content Model
 - [x] R9.5-2 Storage / Repository Strategy
 - [x] R9.5-3 Authoring / EigenPal
-- [ ] **R9.5-4 Dossier / Context — NEXT**
-- [ ] R9.5-5 Retention / Records / Legal Hold
+- [x] R9.5-4 Dossier / Context
+- [ ] **R9.5-5 Retention / Records / Legal Hold — NEXT**
 - [ ] R9.5-6 Import / Migration / Export
 - [ ] R9.5-7 Attestation + Content Security
 - [ ] R9.5-8 Whole-product adversarial freeze
 
-## R9.5-4 must close
+## R9.5-5 must close
 
-1. exact semantic role of Dossier versus Document/Evidence and versus ERP/PLM entity;
-2. DossierType configurability without becoming custom-object platform;
-3. local-created versus externally-originated Dossier identity;
-4. stable display/business key and canonical naming implications;
-5. external references and source-system identity mapping;
-6. Document/Evidence membership/relationship cardinality;
-7. whether one Document/Evidence may relate to multiple Dossiers;
-8. Dossier-to-Dossier relations and whether V1 needs any;
-9. lifecycle/close/archive semantics and whether external source status is mirrored or merely projected;
-10. what metadata belongs on Dossier versus remains external projection;
-11. allowed/recommended EvidenceTypes/DocumentTypes by DossierType;
-12. search/navigation/activity timeline semantics;
-13. ERP/PLM synchronization boundary and conflict/source-of-truth rules;
-14. precise triggers where requirements stop being Dossier and become ERP/CRM/PLM domain.
+1. whether retention applies to Document, Revision/Release, Evidence, Dossier, Audit and/or Artifact;
+2. retention policy ownership/configuration and inheritance/snapshot rules;
+3. retention start trigger (release, capture, archival, external event, explicit date) without generic rules engine;
+4. disposition semantics after retention expiry: eligible-for-disposition vs automatic deletion;
+5. legal hold scope, apply/release authority and auditability;
+6. interaction with Document SUPERSEDED/OBSOLETE and Evidence VOIDED;
+7. interaction with tenant deletion/erasure and backups;
+8. provider enforcement mapping to S3 Object Lock / MinIO WORM / Purview without making provider authoritative;
+9. immutable retention evidence and deletion/disposition records;
+10. whether V1 needs formal record declaration or whether released Documents + CAPTURED Evidence already serve as governed records;
+11. whether retention is tenant-wide/type-based/context-based and how to avoid a generic records-management engine;
+12. exact data allowed to survive tenant erasure when legal hold/retention requires survival.
 
-Then R9.5-5 Retention / Records / Legal Hold.
+Then R9.5-6 Import / Migration / Export.
 
 ---
 
-# 14. Technical-design queue after R9.5
+# 15. Technical-design queue after R9.5
 
 R10: bounded contexts/dependency DAG/aggregate ownership/data model/table ownership/constraints/transactions/events/jobs/storage implementation/current-module & current-table migration map.
 
@@ -625,18 +683,19 @@ Until all remaining gates close: **NO PRODUCT IMPLEMENTATION.**
 
 ---
 
-# 15. Exact next step
+# 16. Exact next step
 
-Continue **R9.5-4 — Dossier / Context**.
+Continue **R9.5-5 — Retention / Records / Legal Hold**.
 
 Preserve:
 
 ```text
-Dossier = documentary context, not source ERP/PLM object
-Document/Evidence keep independent identities/lifecycles
-Artifact stays technical only
-external systems may supply references/projections but cannot rewrite MetalDocs governed truth
-no generic custom-object platform V1
+business retention authority stays in MetalDocs
+provider WORM/Purview = enforcement only
+Document/Evidence keep their approved lifecycles
+Dossier is context, not record container lifecycle
+Tenant erasure cannot silently violate a legal hold/retention obligation
+no generic records-management rules engine without proven need
 ```
 
-Use Venda, Produto, Projeto and Equipamento as adversarial examples and keep the minimum common model that supports all four without reproducing ERP/PLM.
+Design the smallest retention/hold model that works for controlled Documents and captured Evidence, survives storage-provider changes, and reconciles legally required preservation with terminal tenant erasure.
