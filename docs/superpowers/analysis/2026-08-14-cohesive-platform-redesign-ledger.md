@@ -40,7 +40,7 @@ product/domain semantics
 → code
 ```
 
-The target is the smallest professional architecture that makes important invalid states unrepresentable and leaves explicit extension triggers instead of speculative engines.
+Goal: the smallest professional architecture that makes important invalid states unrepresentable and leaves explicit extension triggers instead of speculative engines.
 
 ---
 
@@ -48,13 +48,9 @@ The target is the smallest professional architecture that makes important invali
 
 The redesign began with authorization drift, expanded into Approval, and then proved that `documents`, `controlleddocuments`, `templates`, taxonomy, IAM, Approval, rendering and release contain overlapping authorities.
 
-The strongest product counterexample came from browser QA: a human reviewed edited content while freeze rendered a blank template snapshot. The final PDF and its signed hash did not represent what the human reviewed.
+Strongest counterexample: browser QA let a human review edited content while freeze rendered a blank template snapshot. The final PDF/hash therefore did not represent what the human reviewed.
 
-**Root cause:** MetalDocs evolved as locally reasonable modules/features instead of one coherent controlled-information model.
-
-**Target property:** every business fact has one authority; supporting concerns consume it rather than reinterpret or mutate it independently.
-
-Current code/schema/API are migration evidence, not target-design authority.
+**Target property:** every business fact has one authority; supporting concerns consume it instead of reinterpreting or mutating it independently. Current code/schema/API are migration evidence, not target-design authority.
 
 ---
 
@@ -64,17 +60,17 @@ Current code/schema/API are migration evidence, not target-design authority.
 |---|---|
 | `auth` | retain V1 authentication/session implementation behind stable AuthN boundary |
 | `iam` | conceptually split into **Organization** + **Authorization** |
-| `approval` | small specialized Approval V1; never owner of release/effectivity or periodic review |
-| `documents` | becomes core of **Controlled Information** after cleanup |
-| `controlleddocuments` | retire as target context; stable identity/numbering move to Document/configuration |
+| `approval` | small specialized Approval V1; never owns release/effectivity or periodic review |
+| `documents` | becomes core of **Controlled Information** |
+| `controlleddocuments` | retire as target context; identity/numbering move to Document/configuration |
 | `templates` | retire parallel lifecycle; template becomes role of governed Document/Revision |
 | `taxonomy` | dismantle: Area → Organization; Profile → DocumentType; Family → category; GovernanceClass deleted |
 | `render` | supporting rendition infrastructure bound to exact RevisionSubmission |
-| `audit` | distinct evidence/integrity authority; exact seam still open |
-| `distribution` | supporting released-revision concern; R7 |
-| `notifications` | event consumer, never workflow authority |
+| `distribution` | real obligation/acknowledgement domain over released Revisions |
+| `tokens` | conceptually split into product System Value Catalog + tenant Dictionary |
+| `audit` | append-only/tamper-evident cross-domain audit trail; never business-state authority |
+| `notifications` | event consumer/inbox/delivery projection only |
 | `search` | rebuildable projection/read model |
-| `tokens` | supporting value provider; R7 snapshot semantics |
 | `security` | R8 after tenant/AuthN seam closes |
 | `jobs` | orchestration infrastructure, not business bounded context |
 
@@ -149,7 +145,7 @@ Additive grants + default deny. No deny engine, nested groups or temporal grant 
 
 ## AUTHZ-04 — Candidate permissions
 
-Current candidate set, still not final until R7-R9 close:
+Current candidate set; final freeze happens in R9:
 
 ```text
 document.read_published
@@ -167,7 +163,9 @@ approval.cancel
 approval.reassign
 approval_policy.manage
 
-organization/access-administration permissions — later
+organization/access-administration permissions — R9
+
+distribution/acknowledgement permissions — R9
 ```
 
 `document.supersede` is not presumed necessary: same-Document Revision supersession is mechanical release behavior.
@@ -247,7 +245,7 @@ ApprovalInstance binds one immutable `RevisionSubmission`.
 
 `return_for_changes` terminates that attempt and returns the same DocumentRevision to DRAFT. Resubmission creates a new RevisionSubmission and, when approval is required, a new ApprovalInstance.
 
-Audited reassignment covers unavailable actors. Optional per-Step reauthentication survives. Approval evidence always pins actor, policy/version, Step, Submission/digest, outcome, reason/comment and reauth evidence when required.
+Audited reassignment covers unavailable actors. Optional per-Step reauthentication survives. Approval evidence pins actor, policy/version, Step, Submission/digest, outcome, reason/comment and reauth evidence when required.
 
 ---
 
@@ -281,7 +279,7 @@ No own versioning V1. Inactive prevents new use but does not invalidate existing
 
 ## CI-03 — DocumentTypeCategory
 
-Replaces behavioral Family as optional classification/navigation only. No inherited Approval, numbering, metadata or permissions.
+Optional classification/navigation only. No inherited Approval, numbering, metadata or permissions.
 
 ## CI-04 — GovernanceClass deleted
 
@@ -352,9 +350,7 @@ No `APPROVED`, `SCHEDULED` or `PUBLISHED` Revision state. Those are Approval/Rel
 
 ## REV-05 — REV allocation
 
-Allocate next REV when change cycle starts. Never reuse a REV label even if cancelled.
-
-`REV002+` requires `reason_for_change` before submission.
+Allocate next REV when change cycle starts. Never reuse a REV label even if cancelled. `REV002+` requires `reason_for_change` before submission.
 
 ## REV-06 — RevisionSubmission is first-class immutable evidence
 
@@ -364,9 +360,7 @@ REV002
   └── Submission #2 → digest B → released
 ```
 
-Exists even for `NoHumanApproval` because release still needs exact immutable candidate identity.
-
-Approval, Rendition and Release bind Submission, not mutable Document/Revision state.
+Exists even for `NoHumanApproval`. Approval, Rendition and Release bind Submission, not mutable Document/Revision state.
 
 ## REV-07 — Editing boundary
 
@@ -411,14 +405,7 @@ Allowed V1 tokens:
 {SEQ}
 ```
 
-Sequence scopes:
-
-```text
-TYPE
-TYPE_AREA
-```
-
-`sequence_width` is minimum zero-padding. No year/month/custom fields/formulas/scripts/resets V1.
+Sequence scopes: `TYPE | TYPE_AREA`. `sequence_width` is minimum zero-padding. No year/month/custom fields/formulas/scripts/resets V1.
 
 Normal Create has no manual-code override. Legacy code preservation belongs to explicit import/migration/bootstrap authority.
 
@@ -427,8 +414,6 @@ Normal Create has no manual-code override. Legacy code preservation belongs to e
 Delete template `MetadataSchema` as authority for numbering/retention/distribution/generic metadata.
 
 A template Revision contains ordinary governed source content (e.g. DOCX) + `TemplateSpec`.
-
-No separate TemplateVersion lifecycle and no `CompositionJSON` V1 without independent need.
 
 ## TPL-02 — TemplateField
 
@@ -445,15 +430,13 @@ TemplateField
   visible_if?
 ```
 
-`computed`/`dictionary` are sources, not types.
-
-Typed constraints survive; invalid cross-type combinations fail closed. `visible_if` uses a closed operator set such as `eq/ne/gt/gte/lt/lte`, not a generic expression language.
+`computed`/`dictionary` are sources, not types. Typed constraints survive; invalid cross-type combinations fail closed. `visible_if` uses a closed operator set such as `eq/ne/gt/gte/lt/lte`, not a generic expression language.
 
 ## TPL-03 — Parity and provenance
 
 Before template submission, source content anchors/tokens and TemplateSpec must agree.
 
-Creating from template copies/pins the exact effective source Revision content + applicable TemplateSpec into the derived REV001 and records immutable `DocumentOrigin`:
+Creating from template copies/pins the exact effective source Revision content + applicable TemplateSpec into derived REV001 and records immutable `DocumentOrigin`:
 
 ```text
 Blank
@@ -469,8 +452,6 @@ Template {
 Derived Documents never silently rebind to newer template Revisions.
 
 ## TPL-04 — RevisionContent + submission digest
-
-For structured templates, governed content is one logical identity:
 
 ```text
 RevisionContent
@@ -490,10 +471,6 @@ RevisionContent
 
 ## REVIEW-01 — Periodic Review belongs to Controlled Information
 
-Periodic Review answers whether the currently EFFECTIVE Revision is still suitable. It is not Approval and does not use the Approval workflow engine.
-
-DocumentType configuration:
-
 ```text
 PeriodicReviewPolicy =
     Disabled
@@ -502,21 +479,9 @@ PeriodicReviewPolicy =
 
 No cron/expression/rules engine V1.
 
-## REVIEW-02 — Cadence and legal status
+Cadence starts at actual Effectivity and restarts after completed review. Due/overdue does not invalidate EFFECTIVE content. Expiration is separate future policy.
 
-Cadence starts at actual Effectivity and restarts after a completed periodic review.
-
-```text
-next_review_due_on = base_date + policy interval
-```
-
-Due/overdue is a review obligation/projection. It does **not** automatically change Revision state or invalidate EFFECTIVE content.
-
-Expiration is a separate future policy and is not part of V1.
-
-Changing the DocumentType review policy does not silently rewrite existing schedules. New policy applies at the next explicit calculation point (new Effectivity or completed review) unless a future audited bulk-recalculation operation is deliberately introduced.
-
-## REVIEW-03 — Append-only review evidence
+## REVIEW-02 — Append-only review evidence
 
 ```text
 PeriodicReviewRecord
@@ -524,41 +489,23 @@ PeriodicReviewRecord
   reviewed_revision_id
   reviewed_by
   reviewed_at
-  outcome
+  outcome: confirmed_current | change_required
   comment?
   previous_due_on
   next_due_on
   policy_snapshot
 ```
 
-Outcomes V1:
+`confirmed_current` keeps same REV EFFECTIVE. `change_required` records finding but does not auto-create a new REV. Completion fails closed if the reviewed REV is no longer effective.
 
-```text
-confirmed_current
-change_required
-```
+A Document subject to periodic review requires responsible owner relationship + relevant authorization. Owner grants responsibility, not access.
 
-`confirmed_current` leaves the same REV EFFECTIVE and schedules the next review.
+## REND-01 — Rendition
 
-`change_required` records the finding but does not auto-create a new REV. An authorized Author starts the change cycle.
-
-Before completion, the system verifies that the reviewed Revision is still `Document.effective_revision_id`; stale review attempts fail closed.
-
-## REVIEW-04 — Responsible owner
-
-A Document with Periodic Review enabled requires a valid `responsible_owner` relationship.
-
-Owner is operational responsibility, **not authorization**. Review completion requires the relevant relationship/assignment plus `document.review_periodic` and current-Revision checks. Area Manager may reassign the owner with audit evidence.
-
-## REND-01 — Source and Rendition are different concepts
-
-`RevisionContent`/`RevisionSubmission` are governed source truth. A Rendition is an immutable derived representation of one exact Submission.
-
-Conceptually:
+A Rendition is an immutable derived representation of one exact Submission with output hash and source provenance.
 
 ```text
 Rendition
-  id
   submission_id
   kind
   storage_ref
@@ -568,155 +515,229 @@ Rendition
   generated_at
   generator_component
   generator_version_or_build_digest
-  derived_metadata?
 ```
 
-Rendition always has its own output hash and explicit source Submission provenance.
+Only `OFFICIAL_PDF` is mandatory for Release V1. `FINAL_DOCX` may exist but does not block Effectivity.
 
-## REND-02 — Mandatory artifact set V1
+Approval preview is not official Rendition but must derive from the same Submission/digest.
 
-Only:
+## REND-02 — Approval approves Submission, not PDF bytes
 
-```text
-OFFICIAL_PDF
-```
+Official PDF is an attested derivation of the approved Submission and may manifest Approval/signature evidence. Persist official bytes + hash + source digest + renderer/build identity; no promise of future byte-identical rerender.
 
-is a mandatory derived artifact for Release V1.
+Render failure is operational state/projection, never Revision lifecycle state.
 
-A `FINAL_DOCX` rendition may exist for download/export but does not block Effectivity unless a later concrete regulatory/business requirement says otherwise.
+## RELEASE-01 — RevisionSubmission is the release candidate identity
 
-Approval preview is not an official Rendition, but any preview shown to an approver must be derived from the same `submission_id/submission_digest` being decided.
+`ReleaseGeneration` is no longer a required domain noun. Release Coordinator evaluates `submission_id`.
 
-## REND-03 — Approval approves Submission, not PDF bytes
+## RELEASE-02 — Automatic centralized release
 
-Human Approval binds `RevisionSubmission.submission_digest`.
+No human publish button. Approval completion, rendition readiness, timer and reconciliation all invoke idempotent `EvaluateRelease(submission_id)`.
 
-The official PDF is generated afterward as an attested derivation:
+Release checks candidate/open Revision, active Submission, Approval requirement, mandatory OFFICIAL_PDF provenance, optional `ReleasePlan.not_before`, and one-effective-revision invariants.
 
-```text
-Submission digest A
-  ↓ renderer
-Official PDF hash B
-```
+## RELEASE-03 — Actual Effectivity
 
-The PDF may manifest signer/approval data for human readability, but ApprovalDecision remains the authority.
-
-## REND-04 — Attestation, not eternal bit-reproducibility
-
-Persist the official artifact bytes, artifact hash, source Submission digest and renderer/build identity.
-
-V1 does not promise that a renderer changed years later can reproduce byte-identical PDF output. The stored official artifact + provenance is the durable evidence.
-
-Render failure is operational state/projection, never a DocumentRevision lifecycle state.
-
-## RELEASE-01 — RevisionSubmission replaces ReleaseGeneration as domain identity
-
-The old `release_generation` concept existed to bundle Document + revision + approval instance + revision version + frozen hash. The new immutable `RevisionSubmission` already provides the exact candidate identity.
-
-Release Coordinator evaluates by `submission_id`.
-
-A separate persistence record may still exist for attempts/facts if the later data model proves it useful, but **`ReleaseGeneration` is not a required business/domain noun**.
-
-## RELEASE-02 — Release is automatic and centralized
-
-There is no human `publish` button V1.
-
-Triggers such as approval completion, rendition readiness, timer firing or reconciliation all invoke the same idempotent conceptual operation:
-
-```text
-EvaluateRelease(submission_id)
-```
-
-Release checks at least:
-
-- candidate Revision is still SUBMITTED;
-- Submission is still the active candidate for the open Revision;
-- Approval requirement is satisfied (`NoHumanApproval` or completed Approval evidence);
-- mandatory OFFICIAL_PDF exists and attests this exact Submission;
-- optional `release_not_before` gate has been reached;
-- Document still points to this open Revision;
-- one-effective-revision/supersession invariants hold.
-
-## RELEASE-03 — Planned time vs actual Effectivity
-
-A small operational plan may carry:
-
-```text
-ReleasePlan.not_before?
-```
-
-`null` = release as soon as all gates are satisfied.
-
-A future timestamp means “not before this instant”. It does not create a `SCHEDULED` Revision state.
-
-Actual business fact:
+`ReleasePlan.not_before?` is a gate, not a `SCHEDULED` state.
 
 ```text
 effective_at = released_at
 ```
 
-in the winning transaction V1.
+in the winning transaction. No silent retroactive effectivity.
 
-No silent retroactive Effectivity when artifacts or other gates are late.
+## RELEASE-04 — Winning transaction + evidence
 
-## RELEASE-04 — Atomic winning transaction
-
-Conceptually:
+Atomically:
 
 ```text
-BEGIN
-lock Document + candidate Revision
-revalidate Submission/gates
 candidate REV -> EFFECTIVE
-prior effective REV -> SUPERSEDED (if any)
+prior effective REV -> SUPERSEDED
 Document.effective_revision_id -> candidate
 Document.open_revision_id -> NULL
 insert immutable ReleaseRecord
 emit/enqueue lifecycle events
-COMMIT
 ```
 
-Exactly one winner. Retries/reconciliation are idempotent.
+`ReleaseRecord` binds Document, Revision, Submission, OFFICIAL_PDF, previous Revision and actual release/effective timestamps with system actor.
 
-## RELEASE-05 — ReleaseRecord
+Candidate may be CANCELLED after Approval but before Release; Approval/Rendition evidence remains historical.
 
-Immutable evidence of the automatic act:
+## RELEASE-05 — effective_date token removed from pre-release TemplateSpec V1
 
-```text
-ReleaseRecord
-  document_id
-  revision_id
-  submission_id
-  official_pdf_rendition_id
-  previous_effective_revision_id?
-  released_at
-  effective_at
-  actor = system
-```
-
-It links/reaches Approval evidence or the explicit `NoHumanApproval` configuration rather than copying all human decisions.
-
-## RELEASE-06 — Cancellation and races
-
-A candidate may be CANCELLED after Approval completion but before Release. Approval/Rendition evidence remains historical; Release then no-ops because the predicate no longer holds.
-
-Release-vs-cancel races resolve through the same locked transaction boundary: whichever valid transition wins first makes the other predicate fail.
-
-## RELEASE-07 — Effective-date token re-opened for R7
-
-A pre-release mandatory PDF cannot depend on a fact (`effective_at`) that only exists after the Release transaction.
-
-Therefore the historical `effective_date` computed-token semantics are **not carried forward by inertia**. R7 must explicitly decide whether that token is removed from pre-release content, uses planned semantics, is manifested after release, or becomes viewer metadata.
-
-## RELEASE-08 — Infrastructure class remains modest
-
-The domain requires durable events/timers/retries/idempotent evaluation, but nothing here proves a need for Temporal/Camunda/BPMN. The existing outbox + job class remains conceptually sufficient pending later technical architecture.
-
-Cross-Document replacement stays outside V1 until a concrete requirement appears.
+Actual `effective_at` is born at Release, after the mandatory pre-release PDF must exist. Therefore legacy `effective_date` cannot survive as a mandatory pre-release system field by inertia.
 
 ---
 
-# 9. Build-vs-buy rulings to date
+# 9. LOCKED — Distribution + Values + Audit + Notifications + Search (R7)
+
+## DIST-01 — Distribution = obligation/acknowledgement, not AuthZ or Training
+
+Authorization answers who **may** read; Distribution answers who **must** take explicit notice of an EFFECTIVE Revision.
+
+No quiz, assessment, learning path, training-plan or LMS engine V1. If competency/training becomes a real requirement, create a separate Training context later.
+
+Distribution never edits RoleAssignments to manufacture access. Exact task-specific visibility interaction is finalized in R9.
+
+## DIST-02 — Configuration on Document
+
+Conceptually:
+
+```text
+DistributionConfiguration =
+    None
+  | ReadAcknowledgement {
+      targets: User | Group
+      due_in_days?
+      requires_reauthentication
+    }
+```
+
+No Area target V1 because Organization has no independent UserAreaMembership concept; use explicit Groups instead.
+
+Changing configuration affects future releases by default. Applying to the currently effective Revision is an explicit audited assignment operation, never silent retroactivity.
+
+## DIST-03 — Release snapshots concrete users
+
+At Release, User targets and Group memberships are resolved into concrete per-user `DistributionAssignment`s.
+
+Group membership changes later never rewrite historical assignments. Post-release onboarding/reassignment uses explicit assignment against the current effective Revision.
+
+One obligation per user per release/Revision; multiple source targets are provenance, not duplicate assignments.
+
+## DIST-04 — Assignment states and revision rollover
+
+```text
+pending
+acknowledged
+cancelled
+superseded
+```
+
+Overdue is derived from `pending + due_at`, not another persisted state.
+
+When a newer REV becomes EFFECTIVE, pending obligations for the prior REV become `superseded`; acknowledged history stays immutable. New assignments are materialized for the new release using current configuration.
+
+## DIST-05 — Explicit acknowledgement
+
+Opening a notification, viewing a document or downloading a PDF does **not** complete a distribution obligation.
+
+Explicit action creates immutable:
+
+```text
+AcknowledgementRecord
+  assignment_id
+  actor_user_id
+  acknowledged_at
+  meaning = read_and_acknowledge
+  reauth_evidence?    // when configured
+```
+
+Fresh reauth reuses the same AuthN assurance seam used by Approval; no separate signature engine.
+
+## VALUE-01 — System Value Catalog vs tenant Dictionary
+
+System/computed values are product-owned closed contracts. Tenant Dictionary is tenant-owned mutable name/value configuration.
+
+System keys V1:
+
+```text
+document_code
+revision_label
+revision_title
+document_type_code
+document_area_code
+document_area_name
+revision_created_by_name
+```
+
+Legacy mapping/disposition:
+
+```text
+doc_code            -> document_code
+doc_title           -> revision_title
+revision_number     -> revision_label      // e.g. REV004
+author              -> revision_created_by_name
+controlled_by_area  -> document_area_code / document_area_name
+approval_date       -> not a TemplateField; Approval manifestation in official PDF
+author/approvers    -> no live approval-list TemplateField
+effective_date      -> not a pre-release TemplateField V1
+```
+
+System keys do not become tenant-provided SQL/scripts/custom resolvers.
+
+## VALUE-02 — Mutable external values are snapshotted at REV creation
+
+Dictionary and other mutable external values referenced by authoring schema are resolved when a new DocumentRevision is created and copied into its RevisionContent/provenance.
+
+Return-for-changes/resubmission on the same REV does **not** silently re-resolve them. A new REV resolves current values again.
+
+Historical Revision never depends on live Dictionary state. Provenance retains key/id, resolved value and resolution context sufficient to explain the historical result.
+
+System key meaning is a stable contract; incompatible semantic change uses a new key or explicit migration rather than a hidden resolver-version engine.
+
+## AUDIT-01 — Domain evidence vs global Audit Trail
+
+Business authorities remain their own records:
+
+```text
+RevisionSubmission
+ApprovalDecision
+PeriodicReviewRecord
+ReleaseRecord
+DistributionAssignment
+AcknowledgementRecord
+RoleAssignment history
+...
+```
+
+`AuditEvent` is a transversal compliance/investigation timeline and never substitutes for these records. Business logic must not query Audit Trail to discover whether Approval, acknowledgement or release happened.
+
+## AUDIT-02 — Durable audit intent for governed mutations
+
+A critical governed mutation must not report success unless an audit intent/event is durably persisted in the same commit boundary (direct same-transaction append or transactional outbox; exact mechanism R10).
+
+Examples include role grant/revoke, submit, approval decision, return/cancel, release, obsoletion, acknowledgement, periodic review, responsible-owner change, distribution config change and policy administration.
+
+Usage telemetry such as view/download/search/notification-read may be asynchronous and must not block the user-facing read path merely because analytics delivery is temporarily unavailable.
+
+## AUDIT-03 — Integrity/export/system actors
+
+Preserve the property: Audit Trail is append-only, tamper-evident and exportable. Current hash-chain implementation is evidence of a valid mechanism but final technical shape is R10.
+
+Actors may be User or explicit System principal (for example release coordinator). Never attribute automatic release to the last approver.
+
+## NOTIF-01 — Notifications are projection/delivery only
+
+Notifications consume canonical domain events and create in-app/e-mail delivery artifacts. Notification state never becomes workflow/distribution/review authority.
+
+`Notification.READ` means the **notification** was read, not the document and not an acknowledgement.
+
+“Minhas Pendências” must query actual authorities (active Approval participation, pending DistributionAssignments, due Periodic Review work), not unread notifications.
+
+Reminders derive from business due facts; notifications only deliver them.
+
+## SEARCH-01 — Search is rebuildable projection
+
+Search is discovery, never canonical Document state or authorization truth. It may be eventually consistent and must be replay/rebuild capable.
+
+Two conceptual surfaces:
+
+```text
+Official Library -> current EFFECTIVE Revision
+Working Search   -> open Revision only for users with working-content access
+```
+
+Historical SUPERSEDED/OBSOLETE Revisions stay out of global search by default and remain accessible through version history/audit-specific surfaces.
+
+Search results are filtered against current AuthZ; stale result never grants access. Canonical resource endpoint always rechecks authorization.
+
+No Elasticsearch/OpenSearch requirement is assumed. R10 chooses PostgreSQL FTS vs dedicated engine from measured query/scale requirements.
+
+---
+
+# 10. Build-vs-buy rulings to date
 
 | Technology/class | V1 ruling | Revisit trigger |
 |---|---|---|
@@ -725,26 +746,27 @@ Cross-Document replacement stays outside V1 until a concrete requirement appears
 | Camunda / Flowable / BPMN | do not use for document Approval V1 | product genuinely becomes generic business-process engine |
 | Temporal as Approval/Release engine | do not use | durable orchestration requirement current outbox/jobs cannot economically serve |
 | CEL / expression language | do not use now | real conditional product/workflow policies cannot be represented cleanly by typed configuration |
+| Elasticsearch/OpenSearch | no requirement yet | measured search scale/query needs exceed economical PostgreSQL projection |
 
 Libraries/frameworks are selected only after exact responsibility closure.
 
 ---
 
-# 10. Explicit target deletions/replacements
+# 11. Explicit target deletions/replacements
 
 No entitlement to survive:
 
 - target split `documents` / `controlleddocuments` / `templates`;
-- separate public/domain `ControlledDocument` identity;
+- separate `ControlledDocument` identity;
 - `DocumentProfile`;
 - behavioral `DocumentFamily` hierarchy;
-- `GovernanceClass {controlado, simples, livre}`;
+- `GovernanceClass`;
 - parallel TemplateVersion lifecycle/version counter;
 - template `MetadataSchema` as numbering/retention/distribution authority;
 - duplicate template `DocCodePattern`;
 - normal-create manual code override;
 - `CompositionJSON` without independent requirement;
-- user-visible `v7`-style document revisions;
+- user-visible `v7` document revisions;
 - autosaves as official DocumentRevisions;
 - Document lifecycle carrying revision/workflow states;
 - `StageKind`, configurable stage capability, M-of-N, drift policies, generic delegation engine;
@@ -755,66 +777,39 @@ No entitlement to survive:
 - `editable_by_role`;
 - Approval owning periodic review or release/effectivity;
 - Approval mutating Controlled Information tables directly;
-- `ReleaseGeneration` as a required business/domain identity;
+- `ReleaseGeneration` as required business identity;
 - mandatory final-DOCX gate V1;
-- any freeze/render path that can choose bytes other than the exact Submission;
-- `SCHEDULED` as Revision state;
+- any render/freeze path choosing bytes other than exact Submission;
+- `SCHEDULED` Revision state;
 - automatic expiration merely because periodic review is overdue;
+- live Group-membership derivation as historical distribution denominator;
+- notification-read as document-read/ack evidence;
+- live Dictionary references from historical released Revisions;
+- Audit Trail as a business-state database;
+- Search projection as authorization/business-state authority;
 - old roadmap/milestone/spec documents as live authority.
 
 Prefer deletion over compatibility shims when no deployed/contractual compatibility requirement proves a shim necessary.
 
 ---
 
-# 11. Remaining design queue before implementation
+# 12. Remaining design queue before implementation
 
-## R7 — Distribution / Read/Acknowledgement + Tokens/Computed Values + Audit/Evidence + Notifications + Search — **NEXT**
+## R8 — Tenant lifecycle + security — **NEXT**
 
-Close as one supporting-services pass because they all consume the canonical released/submitted identities rather than owning lifecycle.
+Close:
 
-### Distribution / read / acknowledgement
-
-- who/what defines distribution obligations;
-- User/Group/Area targeting semantics;
-- snapshot denominator at release vs live derivation;
-- read event vs explicit acknowledgement;
-- whether acknowledgement ever requires reauth/signature;
-- reminders/deadlines/export;
-- what happens when Group membership changes after release;
-- permissions and historical evidence.
-
-### Tokens / computed / dictionary values
-
-- exact system-token catalogue after R3-R6 redesign;
-- resolve/freeze timing per value meaning;
-- dictionary-value pinning semantics;
-- resolver identity/version/provenance;
-- collision rules;
-- explicit decision for `effective_date`, `approval_date`, `approvers`, `revision_number`, `doc_title`, `controlled_by_area` and legacy names.
-
-### Audit / evidence
-
-- distinction between domain evidence records and global audit trail;
-- which mutations require same-transaction audit/outbox evidence;
-- hash-chain/integrity/export boundaries;
-- actor/system-principal semantics;
-- tenant deletion/erasure behavior.
-
-### Notifications / Search
-
-- domain event catalogue emitted by canonical authorities;
-- notifications as replaceable consumer/projection, not business state;
-- search as rebuildable projection;
-- working vs effective visibility;
-- eventual-consistency expectations and rebuild strategy.
-
-## R8 — Tenant lifecycle + security
-
-- Tenant authority after Organization split;
-- tenant owner vs platform operator;
-- deletion request/grace/system erasure;
-- MFA/security signals/crypto key ownership;
-- external IdP migration trigger/seam.
+- Tenant as Organization authority after IAM split;
+- tenant owner vs platform/system operator;
+- tenant creation/bootstrap/onboarding;
+- tenant suspension/deactivation semantics;
+- export and deletion request/grace/cancel/erasure lifecycle;
+- legal/audit preservation vs crypto-shred/anonymization boundaries;
+- session/user effects during suspension/erasure;
+- password/reset/session/security-signal ownership;
+- MFA/reauth assurance model and whether V1 needs tenant MFA policy;
+- tenant encryption/key ownership and rotation requirements;
+- exact trigger/seam for future external IdP/Keycloak migration.
 
 ## R9 — Final Authorization Matrix
 
@@ -823,8 +818,9 @@ After every product operation exists:
 - final Permission Catalog;
 - five role bundles;
 - Organization/admin operations;
+- Distribution and Periodic Review operations;
 - collection filtering/visibility;
-- workflow/domain relationship checks;
+- Approval/Distribution/domain relationship checks;
 - Domain Constraint matrix;
 - RLS/DB tripwire backstops;
 - positive/negative Golden Matrix.
@@ -848,7 +844,7 @@ After every product operation exists:
 
 ---
 
-# 12. Documentation authority
+# 13. Documentation authority
 
 - `wiki/architecture/cohesive-platform-redesign.md` is the current-program entrypoint.
 - this ledger is the only active detailed WIP decision source under `docs/superpowers`.
@@ -859,7 +855,7 @@ After every product operation exists:
 
 ---
 
-# 13. Implementation gate
+# 14. Implementation gate
 
 Implementation starts only when all are true:
 
@@ -870,8 +866,8 @@ Implementation starts only when all are true:
 - [x] R4 Document/Revision/Submission lifecycle closed;
 - [x] R5 Numbering/TemplateSpec/metadata boundaries closed;
 - [x] R6 Periodic Review/Rendition/Release closed;
-- [ ] R7 distribution/tokens/audit/notifications/search closed;
-- [ ] R8 tenant lifecycle/security closed;
+- [x] R7 Distribution/Values/Audit/Notifications/Search closed;
+- [ ] R8 Tenant lifecycle/Security closed;
 - [ ] R9 final Permission + Role matrix closed;
 - [ ] build-vs-buy final for each responsibility;
 - [ ] bounded contexts/data model/table + transaction ownership closed;
@@ -886,15 +882,15 @@ Until then: **design/documentation only.**
 
 ---
 
-# 14. Exact next step
+# 15. Exact next step
 
-Continue **R7 — Distribution + Read/Acknowledgement + Tokens/Computed Values + Audit/Evidence + Notifications + Search**.
+Continue **R8 — Tenant Lifecycle + Security**.
 
-Do not implement. For every supporting concern answer:
+Do not implement. For every lifecycle/security proposal answer:
 
-1. which canonical authority emits/owns the source fact;
-2. what is immutable evidence vs rebuildable projection;
-3. what exact Document/REV/Submission/Release identity it refers to;
-4. what must be snapshotted to preserve historical truth;
-5. what can remain derived/eventually consistent;
-6. whether any new engine/framework is actually justified.
+1. who is the authority — tenant actor vs platform operator vs system;
+2. whether the action is reversible, grace-period based or terminal;
+3. what must survive for compliance/audit and what must become unreadable/erased;
+4. what happens to sessions, users, jobs and object storage;
+5. whether a feature belongs in current AuthN or is a trigger for an external IdP/security product;
+6. what is the minimum V1 mechanism that preserves the future seam.
