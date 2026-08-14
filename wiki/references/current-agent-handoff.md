@@ -15,82 +15,115 @@ A fresh session MUST read:
 4. `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md`
 5. this file
 
-Do not resume any old roadmap, milestone, spec, plan, deleted `docs/superpowers` artifact, or PR #113 implementation by inertia.
+Do not resume old roadmaps/milestones/specs, deleted `docs/superpowers` material, PR #113 or historical implementation shapes by inertia.
 
 ## Where we are
 
-MetalDocs is being redesigned as a cohesive platform before the next implementation wave. The redesign expanded from AuthZ → Approval → Controlled Information after proving that the current module split contains overlapping authorities and contradictory content/lifecycle models.
+MetalDocs is being redesigned as one cohesive controlled-information platform before the next implementation wave.
 
 Locked so far:
 
-- current AuthN can remain for V1; Keycloak/external IdP is deferred behind a future enterprise-identity seam;
-- Organization owns Tenant/Area/User/Group; Groups are flat and receive ordinary RoleAssignments;
-- built-in roles are `tenant_owner`, `area_manager`, `author`, `approver`, `viewer`;
+### Authentication / Organization / Authorization
+
+- current MetalDocs AuthN remains sufficient for V1; Keycloak/external IdP is future-triggered;
+- Organization owns Tenant/Area/User/Group/GroupMembership;
+- Groups are flat and receive ordinary RoleAssignments;
+- built-in roles: `tenant_owner`, `area_manager`, `author`, `approver`, `viewer`;
 - scoped RBAC + Groups is enough for V1; no OpenFGA/SpiceDB now;
-- Approval V1 is a versioned sequential governed-document approval engine, not BPM;
-- Approval steps use named user / group / role-in-area participant rules and ANY/ALL completion;
-- human outcomes are `accept` / `return_for_changes`; edited content creates a new approval attempt;
-- `documents` + `controlleddocuments` + `templates` do not survive as three target bounded contexts;
-- target Controlled Information core is `Document` + `DocumentRevision`;
-- `DocumentProfile` is replaced by tenant-scoped `DocumentType` with immutable code, ACTIVE/INACTIVE lifecycle and no independent versioning;
-- a Document's type is immutable after creation in V1;
-- `DocumentFamily` becomes optional classification-only `DocumentTypeCategory`; no inherited policies/hierarchy in V1;
-- `GovernanceClass {controlado, simples, livre}` is deleted; each authority owns explicit configuration instead;
+- tenant owner is never an authorization/domain-governance bypass.
+
+### Approval V1
+
+- specialized sequential ApprovalPolicy, not BPM;
+- ApprovalSteps use NamedUser / Group / RoleInArea and ANY/ALL completion;
+- human outcomes `accept` / `return_for_changes`;
+- reassignment is explicit/audited; generic delegation/escalation/M-of-N/CEL/BPMN are deferred;
+- ApprovalInstance binds one immutable RevisionSubmission;
+- changed bytes/resubmission create a new RevisionSubmission and new ApprovalInstance.
+
+### Controlled Information configuration (R3)
+
+- `documents + controlleddocuments + templates` do not survive as three target business contexts;
+- core nouns are `Document`, `DocumentRevision`, `RevisionSubmission`;
+- `ControlledDocument` is retired as separate identity;
+- `DocumentProfile` → tenant-scoped `DocumentType`, immutable code, ACTIVE/INACTIVE, no own versioning;
+- Document type is immutable after creation in V1;
+- `DocumentFamily` → optional classification-only `DocumentTypeCategory`;
+- `GovernanceClass {controlado, simples, livre}` is deleted;
 - Approval configuration explicitly distinguishes `NoHumanApproval` from `UsePolicy(...)`;
-- Area belongs to Organization, not taxonomy;
+- Area belongs to Organization;
 - template is a role of a governed Document, not a parallel lifecycle;
-- TemplateUse is M:N between template Documents and DocumentTypes, with at most one default per type; default is UX only;
-- blank creation remains allowed in V1; no `template_required` rule without a real requirement;
-- creation resolves the template Document's current effective revision and permanently pins source document + exact revision + content hash;
-- newer template revisions apply only to future creations; existing documents never rebind;
-- changing template placeholder/schema/layout/resolver semantics means a new ordinary DocumentRevision;
-- official human/audit revision labels are `REV001`, `REV002`, `REV003`, ... — never user-facing `v7`; technical row/schema/policy versions remain separate namespaces;
-- freeze/approval/rendition must always bind the exact revision/hash the human reviewed;
-- Release Coordinator/effectivity remains downstream from human approval.
+- TemplateUse is M:N across template Documents and DocumentTypes; at most one default per type; default is UX only;
+- blank creation remains allowed until a real `template_required` requirement exists;
+- template creation resolves current effective source REV and permanently pins source Document + REV + digest;
+- newer template revisions affect future creations only; existing Documents never rebind;
+- changing template layout/placeholders/schema/constraints/visibility/resolver semantics means a new ordinary REV.
+
+### Document / Revision / Submission lifecycle (R4)
+
+- official business revisions are `REV001`, `REV002`, `REV003`, ... — never user-facing `v7`;
+- technical row/OCC/schema/policy versions are separate namespaces;
+- `Document` is stable identity, not `draft/approved/published` workflow state;
+- one Document may have one effective REV and at most one open REV;
+- `DocumentRevision` is the business change cycle, not an autosave/check-in;
+- REV states: `DRAFT`, `SUBMITTED`, `EFFECTIVE`, `SUPERSEDED`, `OBSOLETE`, `CANCELLED`;
+- a new REV is allocated when the change cycle begins and labels are never reused;
+- return-for-changes/withdraw returns the **same REV** to DRAFT;
+- each submit/resubmit creates an immutable `RevisionSubmission` attempt;
+- `RevisionSubmission` exists even with `NoHumanApproval`;
+- Approval, official Rendition and Release must bind the same exact Submission;
+- no fake zero-stage ApprovalInstance for no-human-approval;
+- reason-for-change belongs to the REV and each Submission snapshots the reason accompanying its bytes;
+- autosaves/checkpoints/edit history are technical authoring history inside the open REV;
+- EditorSession edits the open DRAFT REV and cannot mutate it after SUBMITTED;
+- prior effective REV becomes SUPERSEDED mechanically when the new REV becomes EFFECTIVE;
+- OBSOLETE = retire the Document without a successor; retired Document is terminal in V1;
+- cross-Document replacement is a separate future design question, not ordinary revision supersession.
+
+### Release
+
+Human approval does not directly effectivate. Release Coordinator remains downstream and will later close approval/rendition/effective-date/supersession gates atomically.
 
 ## Important product evidence
 
-A real browser QA run proved the old content model was structurally contradictory: the user edited and the approver reviewed one revision, while freeze rendered the blank template snapshot. The final signed PDF was blank and the signed hash did not represent the reviewed content. The redesign must make that state impossible, not patch one renderer call.
+A real browser QA run proved the old model could show one editor-authored body to the approver while freeze rendered a blank template snapshot. The final signed PDF/hash did not represent what was reviewed. The target therefore requires Approval, Rendition and Release to share one immutable RevisionSubmission identity.
 
-## Whole-product coverage still required
+## Remaining whole-product coverage
 
-Before code we still have to close, explicitly:
+Before code we still must close:
 
-- **NEXT:** Document + DocumentRevision lifecycle, REV allocation and immutable submission evidence;
-- numbering/NumberSeries;
-- TemplateSpec exact revision payload and source-provenance placement;
-- periodic review/reason-for-change;
-- renditions/rendering/reconstruction evidence;
-- release/effectivity/supersession;
+- **NEXT R5:** numbering/NumberSeries + TemplateSpec exact revision payload + metadata ownership;
+- periodic review/reason-for-change operational policy;
+- rendition/rendering/reconstruction evidence;
+- release/effectivity + possible cross-Document replacement;
 - distribution/read/acknowledgement;
-- token/computed-value snapshot semantics;
+- token/computed-value snapshot timing;
 - audit/evidence boundary;
-- notifications and search projections;
+- notifications/search projections;
 - tenant lifecycle/security/external IdP trigger;
 - final Permission catalog + role bundles;
-- bounded contexts, table/transaction ownership, events, data model, APIs, frontend journeys;
-- delete/migrate/rename map from current implementation;
+- bounded contexts, table/transaction ownership, event contracts, data model, OpenAPI and frontend journeys;
+- explicit migration/delete/rename map;
 - final ADR/spec set and implementation plan.
 
 ## Exact next step
 
-Continue **R4 — Document + DocumentRevision lifecycle + immutable submission evidence**:
+Continue **R5 — Numbering + Template authoring payload + metadata placement**:
 
 ```text
-Document lifecycle
-+ DocumentRevision lifecycle
-+ REVxxx allocation semantics
-+ mutable working content vs immutable submission identity
-+ whether SubmissionSnapshot is a first-class concept
-+ return-for-changes/resubmission
-+ effective/superseded/obsolete relationships
-+ template-source provenance placement
+Document business code / NumberSeries
++ DocumentType/Area relationship to numbering
++ allocation timing and code immutability
++ manual-override question
++ TemplateSpec exact governed payload
++ DOCX/body + placeholder/schema representation
++ template provenance storage boundary
++ newer-template availability without rebinding
++ which metadata belongs to Document vs REV vs Submission
 ```
 
-Every transition must have exactly one authority and a clear immutable fact/evidence proving what content the transition applies to. Do not implement.
+Apply Global Maximum/YAGNI and compare with mature DMS/eQMS products where useful. Do not implement.
 
 ## Documentation reset
 
-`docs/superpowers` was intentionally collapsed on 2026-08-14 to only the active redesign staging material. Old plans/specs/milestones/reports/analyses remain in Git history and are not forward authority.
-
-Core wiki module pages and old roadmap/backlog surfaces are marked LEGACY/HISTORICAL and redirected to the cohesive redesign authority so a fresh agent cannot accidentally continue the old architecture.
+`docs/superpowers` is intentionally limited to active redesign staging material. Git history is the archive for previous plans/specs/milestones/reports. Legacy wiki/module pages are current-state evidence only and cannot override the active redesign.
