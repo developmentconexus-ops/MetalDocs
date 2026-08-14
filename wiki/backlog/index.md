@@ -1,41 +1,46 @@
 # Backlog
 
-> **Last verified:** 2026-06-21 (verify-and-archive sweep — see [`_cleanup-2026-06-21.md`](_cleanup-2026-06-21.md))
-> **Scope:** Governed deferred work, refactor queues, and screen-specific follow-ups.
+> **Last verified:** 2026-08-14
+> **Status:** FROZEN / HISTORICAL INPUT during Cohesive Platform Redesign
 
-> **2026-06-21 hygiene sweep:** all refactor/screen backlogs were re-verified against HEAD `d477e9f0`
-> (post Grade-A). Solved rows were pruned, `documents-refactor.md` was fully archived, and the
-> Distribuição fanout/read-tracking domain was parked as a designed mission
-> ([`document-distribution-mission.md`](document-distribution-mission.md)). Full audit trail:
-> [`_cleanup-2026-06-21.md`](_cleanup-2026-06-21.md).
+The previous backlog accumulated work against module and workflow shapes that are now under redesign. It is **not a forward execution queue**.
 
-> **Forward roadmap:** the single canonical progression surface is [`wiki/roadmap.md`](../roadmap.md).
-> The refactor roadmap below is **historical** (superseded); plan from `wiki/roadmap.md`.
+Current forward authority:
 
-## Program-level backlog (active)
+- [../architecture/cohesive-platform-redesign.md](../architecture/cohesive-platform-redesign.md)
+- [../roadmap.md](../roadmap.md)
+- active staging ledger: `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md`
 
-- [planned-endpoints.md](planned-endpoints.md) - spec-ready sketches for endpoints removed from the live contract in Phase C but planned for future build (notifications, workflow transitions/approvals)
+## Rule
 
-## Parked missions (designed, not started)
+Do not execute a backlog item merely because it is still present in this folder.
 
-- [document-distribution-mission.md](document-distribution-mission.md) — **DESIGN-ONLY.** The full document distribution / read-tracking / fanout domain (read+ack evidence write-path, reader-side acknowledge surface, snapshot-vs-derive decision, reminders/export/fanout worker). Scoped out of frontend-screen-completion M2 (which builds only the derive-on-read coverage-*scope* subset). **Execute only after the frontend-screen-completion mission completes;** do not run `/mission` until then.
+A historical backlog requirement may return only when the active redesign:
 
-> Forward program progression lives in [`wiki/roadmap.md`](../roadmap.md). The refactor
-> roadmap below is historical (superseded — see F0.3).
+1. confirms the underlying user/business requirement still exists;
+2. places it in the new domain model;
+3. names its authority/boundary;
+4. redefines acceptance against the new architecture.
 
-### Closed / superseded (archived under [`wiki/_archive/`](../_archive/README.md))
+Old issue wording, old module ownership and old capability names are not automatically carried forward.
 
-- [api-contract-hardening.md](../_archive/backlog/api-contract-hardening.md) - **CLOSED** completed program (Phase F shipped; closing re-audit 0 CRITICAL/0 HIGH). Archived at `wiki/_archive/backlog/`.
-- [contract-first-followups.md](../_archive/backlog/contract-first-followups.md) - **superseded** — folded into api-contract-hardening Phase C/E. Archived at `wiki/_archive/backlog/`.
-- [roadmap.md](roadmap.md) - ordered refactor roadmap (**historical** — superseded by [`wiki/roadmap.md`](../roadmap.md); its open Plan 12 carried forward)
+## Known requirements already carried into the redesign
 
-## Module and platform refactors
+The redesign explicitly remembers and will re-adjudicate legitimate product needs including:
 
-- `approval`, `audit`, `auth`, `controlled-documents`, `iam`, `taxonomy`, `templates` (`documents` fully closed → archived `wiki/_archive/backlog/documents-refactor.md`)
-- supporting frontend and infrastructure refactors such as `editor-chrome`, `editor-ui-eigenpal`, `frontend-primitives`, `render-fanout`, `search`
+- controlled-document distribution obligations;
+- reader read/acknowledgement evidence;
+- reminders/export/fanout;
+- periodic review and reason-for-change;
+- notifications;
+- document rendering/rendition evidence;
+- template authoring/schema semantics;
+- token/computed-value substitution;
+- search/projections;
+- tenant lifecycle/security.
 
-## Screen and workflow follow-ups
+Their **old designs are not binding**.
 
-- library, template editor, novo-documento, novo-template-wizard, caixa-aprovacao, documento-publicado, distribuicao, editor
+## Historical files
 
-Backlog items stay in `wiki/` because they are governed active memory, not disposable planning notes.
+Files that remain under `wiki/backlog/` are evidence/reference only unless the active redesign explicitly promotes them. Git history remains the archive for removed planning material.
