@@ -46,7 +46,7 @@ Goal: the smallest professional architecture that makes important invalid states
 
 # 1. Whole-platform reset
 
-The redesign began with authorization drift, expanded into Approval, and then proved that `documents`, `controlleddocuments`, `templates`, taxonomy, IAM, Approval, rendering and release contain overlapping authorities.
+The redesign began with authorization drift, expanded into Approval, and then proved that `documents`, `controlleddocuments`, `templates`, taxonomy, IAM, Approval, rendering and release contained overlapping authorities.
 
 Strongest counterexample: browser QA let a human review edited content while freeze rendered a blank template snapshot. The final PDF/hash therefore did not represent what the human reviewed.
 
@@ -58,8 +58,8 @@ Strongest counterexample: browser QA let a human review edited content while fre
 
 | Current concern/module | Target disposition |
 |---|---|
-| `auth` | retain V1 authentication/session implementation behind stable AuthN boundary |
-| `iam` | conceptually split into **Organization** + **Authorization** |
+| `auth` | retain local V1 AuthN/session implementation behind stable identity/assurance boundary |
+| `iam` | split conceptually into **Organization** + **Authorization**; tenant lifecycle leaves this catch-all |
 | `approval` | small specialized Approval V1; never owns release/effectivity or periodic review |
 | `documents` | becomes core of **Controlled Information** |
 | `controlleddocuments` | retire as target context; identity/numbering move to Document/configuration |
@@ -71,12 +71,13 @@ Strongest counterexample: browser QA let a human review edited content while fre
 | `audit` | append-only/tamper-evident cross-domain audit trail; never business-state authority |
 | `notifications` | event consumer/inbox/delivery projection only |
 | `search` | rebuildable projection/read model |
-| `security` | R8 after tenant/AuthN seam closes |
+| `security` | split conceptually: sessions/lockouts → AuthN; tenant crypto → Platform Security; heuristic signals deferred/optional |
 | `jobs` | orchestration infrastructure, not business bounded context |
+| tenant lifecycle | platform/tenant administration concern with explicit PlatformOperator/System boundary |
 
 ---
 
-# 3. LOCKED — Authentication + Organization + Authorization
+# 3. LOCKED — Authentication + Organization + Authorization north star
 
 ## AUTHN-01 — Separate authorities
 
@@ -89,7 +90,7 @@ None substitutes for another.
 
 ## AUTHN-02 — No Keycloak now
 
-Current MetalDocs AuthN is sufficient for V1. Preserve a stable authenticated-principal seam for future OIDC/SAML/enterprise IdP/MFA/passkeys when a real requirement appears.
+Current MetalDocs AuthN is sufficient for V1. Preserve a stable authenticated-principal / assurance seam for future OIDC/SAML/enterprise IdP/MFA/passkeys when a real requirement appears.
 
 ## ORG-01 — Organization
 
@@ -110,7 +111,7 @@ Area is organizational truth reused by Document ownership, RoleAssignment scope 
 - Group receives RoleAssignments, never raw permissions.
 - Group is not structurally forced into one Area.
 
-## AUTHZ-01 — Five roles
+## AUTHZ-01 — Five tenant roles
 
 ```text
 tenant_owner
@@ -143,34 +144,7 @@ Additive grants + default deny. No deny engine, nested groups or temporal grant 
 - `area_manager`: operational manager in Area; not RBAC administrator.
 - `tenant_owner`: tenant product administrator through normal Permission grants; never bypasses Domain Governance.
 
-## AUTHZ-04 — Candidate permissions
-
-Current candidate set; final freeze happens in R9:
-
-```text
-document.read_published
-document.read_working
-document.create
-document.edit
-document.comment
-document.submit
-document.obsolete
-document.review_periodic
-
-approval.act
-approval.oversee
-approval.cancel
-approval.reassign
-approval_policy.manage
-
-organization/access-administration permissions — R9
-
-distribution/acknowledgement permissions — R9
-```
-
-`document.supersede` is not presumed necessary: same-Document Revision supersession is mechanical release behavior.
-
-## AUTHZ-05 — Decision composition
+## AUTHZ-04 — Decision composition
 
 ```text
 current permission/qualification
@@ -180,6 +154,8 @@ current permission/qualification
 ```
 
 No tenant-owner bypass. No OpenFGA/SpiceDB V1; revisit only for material arbitrary resource-sharing graphs.
+
+Final Permission Catalog and role bundles are intentionally deferred to **R9**, now that the product operations are known.
 
 ---
 
@@ -295,7 +271,7 @@ UsePolicy(ApprovalPolicyID)
 
 No fake zero-stage route.
 
-## CI-05 — Template is a role of a governed Document
+## CI-05 — Template is a role of governed Document
 
 Template has no parallel lifecycle/version counter. Template changes use normal DocumentRevisions and official `REVxxx` labels.
 
@@ -352,7 +328,7 @@ No `APPROVED`, `SCHEDULED` or `PUBLISHED` Revision state. Those are Approval/Rel
 
 Allocate next REV when change cycle starts. Never reuse a REV label even if cancelled. `REV002+` requires `reason_for_change` before submission.
 
-## REV-06 — RevisionSubmission is first-class immutable evidence
+## REV-06 — RevisionSubmission is immutable first-class evidence
 
 ```text
 REV002
@@ -477,8 +453,6 @@ PeriodicReviewPolicy =
   | Every(n months)
 ```
 
-No cron/expression/rules engine V1.
-
 Cadence starts at actual Effectivity and restarts after completed review. Due/overdue does not invalidate EFFECTIVE content. Expiration is separate future policy.
 
 ## REVIEW-02 — Append-only review evidence
@@ -527,7 +501,7 @@ Official PDF is an attested derivation of the approved Submission and may manife
 
 Render failure is operational state/projection, never Revision lifecycle state.
 
-## RELEASE-01 — RevisionSubmission is the release candidate identity
+## RELEASE-01 — Submission is release candidate identity
 
 `ReleaseGeneration` is no longer a required domain noun. Release Coordinator evaluates `submission_id`.
 
@@ -535,19 +509,9 @@ Render failure is operational state/projection, never Revision lifecycle state.
 
 No human publish button. Approval completion, rendition readiness, timer and reconciliation all invoke idempotent `EvaluateRelease(submission_id)`.
 
-Release checks candidate/open Revision, active Submission, Approval requirement, mandatory OFFICIAL_PDF provenance, optional `ReleasePlan.not_before`, and one-effective-revision invariants.
+`ReleasePlan.not_before?` is a gate, not a Revision state. Actual fact is `effective_at = released_at` in the winning transaction; no silent retroactive effectivity.
 
-## RELEASE-03 — Actual Effectivity
-
-`ReleasePlan.not_before?` is a gate, not a `SCHEDULED` state.
-
-```text
-effective_at = released_at
-```
-
-in the winning transaction. No silent retroactive effectivity.
-
-## RELEASE-04 — Winning transaction + evidence
+## RELEASE-03 — Winning transaction + evidence
 
 Atomically:
 
@@ -560,13 +524,9 @@ insert immutable ReleaseRecord
 emit/enqueue lifecycle events
 ```
 
-`ReleaseRecord` binds Document, Revision, Submission, OFFICIAL_PDF, previous Revision and actual release/effective timestamps with system actor.
+Candidate may be CANCELLED after Approval but before Release; historical Approval/Rendition evidence remains.
 
-Candidate may be CANCELLED after Approval but before Release; Approval/Rendition evidence remains historical.
-
-## RELEASE-05 — effective_date token removed from pre-release TemplateSpec V1
-
-Actual `effective_at` is born at Release, after the mandatory pre-release PDF must exist. Therefore legacy `effective_date` cannot survive as a mandatory pre-release system field by inertia.
+Legacy `effective_date` is not a pre-release TemplateField V1 because actual Effectivity is born after the mandatory pre-release PDF.
 
 ---
 
@@ -574,15 +534,9 @@ Actual `effective_at` is born at Release, after the mandatory pre-release PDF mu
 
 ## DIST-01 — Distribution = obligation/acknowledgement, not AuthZ or Training
 
-Authorization answers who **may** read; Distribution answers who **must** take explicit notice of an EFFECTIVE Revision.
-
-No quiz, assessment, learning path, training-plan or LMS engine V1. If competency/training becomes a real requirement, create a separate Training context later.
-
-Distribution never edits RoleAssignments to manufacture access. Exact task-specific visibility interaction is finalized in R9.
+Distribution answers who **must** take explicit notice of an EFFECTIVE Revision. It does not grant RBAC access and does not become an LMS/training engine.
 
 ## DIST-02 — Configuration on Document
-
-Conceptually:
 
 ```text
 DistributionConfiguration =
@@ -594,19 +548,15 @@ DistributionConfiguration =
     }
 ```
 
-No Area target V1 because Organization has no independent UserAreaMembership concept; use explicit Groups instead.
-
-Changing configuration affects future releases by default. Applying to the currently effective Revision is an explicit audited assignment operation, never silent retroactivity.
+No Area target V1 without a real UserAreaMembership concept. Changing configuration affects future releases by default; current-REV assignment is explicit/audited.
 
 ## DIST-03 — Release snapshots concrete users
 
-At Release, User targets and Group memberships are resolved into concrete per-user `DistributionAssignment`s.
+Release resolves User targets and Group memberships into concrete per-user `DistributionAssignment`s. Later Group membership changes never rewrite history. Post-release onboarding uses explicit assignment against the current effective REV.
 
-Group membership changes later never rewrite historical assignments. Post-release onboarding/reassignment uses explicit assignment against the current effective Revision.
+One obligation per user/release; multiple source targets are provenance.
 
-One obligation per user per release/Revision; multiple source targets are provenance, not duplicate assignments.
-
-## DIST-04 — Assignment states and revision rollover
+## DIST-04 — Assignment + acknowledgement
 
 ```text
 pending
@@ -615,30 +565,13 @@ cancelled
 superseded
 ```
 
-Overdue is derived from `pending + due_at`, not another persisted state.
+Overdue is derived. A newer effective REV supersedes pending old-REV obligations and creates a fresh cohort.
 
-When a newer REV becomes EFFECTIVE, pending obligations for the prior REV become `superseded`; acknowledged history stays immutable. New assignments are materialized for the new release using current configuration.
+Opening a notification, viewing or downloading does **not** complete the obligation. Explicit immutable `AcknowledgementRecord` does; optional fresh reauth reuses AuthN assurance.
 
-## DIST-05 — Explicit acknowledgement
+Distribution never edits RoleAssignments. Task-specific visibility is finalized in R9.
 
-Opening a notification, viewing a document or downloading a PDF does **not** complete a distribution obligation.
-
-Explicit action creates immutable:
-
-```text
-AcknowledgementRecord
-  assignment_id
-  actor_user_id
-  acknowledged_at
-  meaning = read_and_acknowledge
-  reauth_evidence?    // when configured
-```
-
-Fresh reauth reuses the same AuthN assurance seam used by Approval; no separate signature engine.
-
-## VALUE-01 — System Value Catalog vs tenant Dictionary
-
-System/computed values are product-owned closed contracts. Tenant Dictionary is tenant-owned mutable name/value configuration.
+## VALUE-01 — Product System Value Catalog vs tenant Dictionary
 
 System keys V1:
 
@@ -652,107 +585,206 @@ document_area_name
 revision_created_by_name
 ```
 
-Legacy mapping/disposition:
+Legacy `approval_date`/approvers move to Approval manifestation in official PDF; actual `effective_date` stays outside TemplateSpec V1.
 
-```text
-doc_code            -> document_code
-doc_title           -> revision_title
-revision_number     -> revision_label      // e.g. REV004
-author              -> revision_created_by_name
-controlled_by_area  -> document_area_code / document_area_name
-approval_date       -> not a TemplateField; Approval manifestation in official PDF
-author/approvers    -> no live approval-list TemplateField
-effective_date      -> not a pre-release TemplateField V1
-```
+## VALUE-02 — Mutable external values snapshot at new REV creation
 
-System keys do not become tenant-provided SQL/scripts/custom resolvers.
+Dictionary/external mutable values referenced by authoring schema resolve when a new DocumentRevision is created and are copied into RevisionContent/provenance. Same-REV return/resubmit does not silently re-resolve. Historical released content never depends on live Dictionary state.
 
-## VALUE-02 — Mutable external values are snapshotted at REV creation
+## AUDIT-01 — Domain evidence vs Audit Trail
 
-Dictionary and other mutable external values referenced by authoring schema are resolved when a new DocumentRevision is created and copied into its RevisionContent/provenance.
+Business authorities stay their own records (`RevisionSubmission`, `ApprovalDecision`, `PeriodicReviewRecord`, `ReleaseRecord`, `DistributionAssignment`, `AcknowledgementRecord`, RoleAssignment history, etc.). `AuditEvent` is transversal compliance/investigation evidence and never substitutes for these authorities.
 
-Return-for-changes/resubmission on the same REV does **not** silently re-resolve them. A new REV resolves current values again.
+## AUDIT-02 — Durable audit intent
 
-Historical Revision never depends on live Dictionary state. Provenance retains key/id, resolved value and resolution context sufficient to explain the historical result.
-
-System key meaning is a stable contract; incompatible semantic change uses a new key or explicit migration rather than a hidden resolver-version engine.
-
-## AUDIT-01 — Domain evidence vs global Audit Trail
-
-Business authorities remain their own records:
-
-```text
-RevisionSubmission
-ApprovalDecision
-PeriodicReviewRecord
-ReleaseRecord
-DistributionAssignment
-AcknowledgementRecord
-RoleAssignment history
-...
-```
-
-`AuditEvent` is a transversal compliance/investigation timeline and never substitutes for these records. Business logic must not query Audit Trail to discover whether Approval, acknowledgement or release happened.
-
-## AUDIT-02 — Durable audit intent for governed mutations
-
-A critical governed mutation must not report success unless an audit intent/event is durably persisted in the same commit boundary (direct same-transaction append or transactional outbox; exact mechanism R10).
-
-Examples include role grant/revoke, submit, approval decision, return/cancel, release, obsoletion, acknowledgement, periodic review, responsible-owner change, distribution config change and policy administration.
-
-Usage telemetry such as view/download/search/notification-read may be asynchronous and must not block the user-facing read path merely because analytics delivery is temporarily unavailable.
+Critical governed mutation must not report success unless an audit intent/event is durably persisted in the same commit boundary (direct append or transactional outbox; exact mechanism R10). Usage telemetry such as view/download/search/notification-read may be asynchronous.
 
 ## AUDIT-03 — Integrity/export/system actors
 
-Preserve the property: Audit Trail is append-only, tamper-evident and exportable. Current hash-chain implementation is evidence of a valid mechanism but final technical shape is R10.
-
-Actors may be User or explicit System principal (for example release coordinator). Never attribute automatic release to the last approver.
+Preserve Audit Trail as append-only, tamper-evident and exportable. User and explicit System actors are distinct; automatic release is attributed to System, not the last approver.
 
 ## NOTIF-01 — Notifications are projection/delivery only
 
-Notifications consume canonical domain events and create in-app/e-mail delivery artifacts. Notification state never becomes workflow/distribution/review authority.
-
-`Notification.READ` means the **notification** was read, not the document and not an acknowledgement.
-
-“Minhas Pendências” must query actual authorities (active Approval participation, pending DistributionAssignments, due Periodic Review work), not unread notifications.
-
-Reminders derive from business due facts; notifications only deliver them.
+Notification `READ` means the notification was read, never the document or an acknowledgement. “Minhas Pendências” queries business authorities, not unread notifications. Reminders derive from business due facts.
 
 ## SEARCH-01 — Search is rebuildable projection
 
-Search is discovery, never canonical Document state or authorization truth. It may be eventually consistent and must be replay/rebuild capable.
+Official Library indexes current EFFECTIVE Revision. Working Search may index open REV under current working-content authorization. Historical superseded/obsolete Revisions stay out of global search by default. Search is eventually consistent and never grants access; canonical endpoint rechecks current AuthZ.
 
-Two conceptual surfaces:
-
-```text
-Official Library -> current EFFECTIVE Revision
-Working Search   -> open Revision only for users with working-content access
-```
-
-Historical SUPERSEDED/OBSOLETE Revisions stay out of global search by default and remain accessible through version history/audit-specific surfaces.
-
-Search results are filtered against current AuthZ; stale result never grants access. Canonical resource endpoint always rechecks authorization.
-
-No Elasticsearch/OpenSearch requirement is assumed. R10 chooses PostgreSQL FTS vs dedicated engine from measured query/scale requirements.
+No Elasticsearch/OpenSearch requirement yet.
 
 ---
 
-# 10. Build-vs-buy rulings to date
+# 10. LOCKED — Tenant lifecycle + Platform Security (R8)
+
+## TENANT-01 — Platform authority is outside tenant RBAC
+
+`PlatformOperator` and `SystemPrincipal` are platform identities, not a sixth/seventh tenant Role and not RoleAssignment subjects.
+
+PlatformOperator may create/suspend/resume tenants and inspect lifecycle operations, but has **no implicit right to read/edit/approve tenant business content**. Support/break-glass access is outside V1 and would require explicit, time-bounded, audited design if ever added.
+
+## TENANT-02 — Tenant lifecycle
+
+```text
+ACTIVE
+SUSPENDED
+ERASED
+```
+
+- `ACTIVE`: normal operation.
+- `SUSPENDED`: reversible service stop; data remains intact.
+- `ERASED`: terminal tombstone state; tenant is not usable/reactivatable V1.
+
+Deletion request is a separate object/process, not another Tenant state:
+
+```text
+TenantDeletionRequest
+  status: PENDING | CANCELLED | EXECUTED
+  requested_by
+  requested_at
+  execute_after
+```
+
+Grace period is simple product/deployment policy. Tenant remains ACTIVE while request is pending and may cancel before execution.
+
+## TENANT-03 — Tenant vs platform operations
+
+- PlatformOperator: create tenant, suspend, resume.
+- tenant_owner: manage own tenant, request own export, request/cancel own deletion.
+- SystemPrincipal: execute async lifecycle jobs, including terminal erasure after grace.
+
+Tenant owner never manages other tenants. PlatformOperator does not become tenant data owner.
+
+## TENANT-04 — Onboarding
+
+Onboarding creates:
+
+```text
+Tenant
++ initial User
++ tenant_owner @ Tenant
++ single-use time-limited activation credential
+```
+
+Do not create historical `system_admin` in the new tenant and do not ask a PlatformOperator to choose/know the tenant owner's password.
+
+The same activation primitive may later serve ordinary new-user activation; no invitation platform is required now.
+
+## TENANT-05 — Suspension and deactivation
+
+Tenant suspension:
+
+- revokes tenant sessions;
+- denies new login and normal business mutations;
+- preserves data;
+- normal business jobs respect suspension;
+- lifecycle/security jobs may continue where required.
+
+User deactivation is independent from tenant suspension. It revokes that user's sessions and denies login while preserving immutable identity/history. Pending Approval/owner/responsibility relationships require explicit reassignment/attention; they never disappear silently.
+
+## TENANT-06 — Export and deletion request require fresh auth
+
+`tenant.export` and `tenant.deletion.request` are sensitive same-tenant operations for tenant_owner and require fresh authentication through the common AuthN assurance seam.
+
+Platform operators do not receive implicit access to export artifacts.
+
+## TENANT-07 — Erasure pipeline
+
+Conceptually:
+
+```text
+DeletionRequest reaches execute_after
+→ System suspends tenant
+→ revoke sessions
+→ erase live tenant-owned rows
+→ delete tenant object-store blobs
+→ destroy tenant DEK
+→ preserve allowed non-PII audit/platform skeleton
+→ Tenant -> ERASED
+→ persist platform TenantErasureRecord
+```
+
+Each phase must be idempotent/reconcilable; exact job/transaction mechanics come in R10.
+
+## TENANT-08 — Audit survives erasure as non-PII skeleton
+
+Target rejects deletion of the Audit Trail itself.
+
+Audit remains append-only/tamper-evident. Post-erasure retained skeleton may contain only opaque internal IDs and non-PII structural facts (event id, internal tenant/actor/resource IDs, action, timestamps, hash-chain fields, etc.). Sensitive payload/display data must be erasable/unreadable.
+
+Tenant-scoped Audit payload is encrypted behind the tenant DEK when retention requires the skeleton to survive; destroying that DEK makes the payload unreadable while preserving structural evidence.
+
+Do not claim cryptographic erasure for data that was never actually protected by the destroyed key. R10 migration must census legacy plaintext/PII surfaces honestly.
+
+## TENANT-09 — Tenant erasure tombstone survives outside erased data
+
+Platform-level `TenantErasureRecord` keeps only minimal non-PII facts such as opaque tenant id, request id and erasure timestamp/system execution fact.
+
+Backup/restore procedure must reapply erasure tombstones before restored service can become available, preventing resurrection from an older backup.
+
+## SECURITY-01 — Small tenant crypto primitive
+
+V1 preserves the useful mechanism:
+
+```text
+Platform KEK
+  ↓ wraps
+Tenant DEK
+```
+
+No per-document key tree, tenant key-rotation engine, HSM workflow or key-escrow product without a concrete requirement. Exact KEK storage/KMS choice is R10 infrastructure.
+
+## SECURITY-02 — AuthN assurance seam
+
+Current local AuthN remains V1. Conceptually expose:
+
+```text
+AuthenticatedPrincipal
+  user_id
+  tenant_id
+  authenticated_at
+  auth_method
+  assurance / fresh-auth evidence
+```
+
+Approval, acknowledgement, export and deletion request can demand fresh authentication without knowing whether the mechanism is password today or external MFA/IdP later.
+
+## SECURITY-03 — Remove fake MFA from target V1
+
+Current `mfa_enabled` / `mfa_enrolled_at` coverage is a stub without actual TOTP/WebAuthn enrollment. Stub fields/cards are **not** a V1 security control and have no entitlement to survive.
+
+Real MFA/passkeys/SSO/SAML/per-tenant federation are formal triggers to re-evaluate Keycloak/external IdP **before** building more identity-provider capabilities inside MetalDocs.
+
+Future federation maps `(issuer, subject) -> internal User`; MetalDocs remains authority for Organization, Roles, Permissions and workflow relationships.
+
+## SECURITY-04 — Split current security catch-all
+
+- sessions / credential lifecycle / lockouts / fresh-auth → AuthN;
+- tenant envelope crypto → Platform Security;
+- Active Sessions + Lockouts survive as useful tenant admin views/actions;
+- current heuristic `Security Signals` (off-hours, new-device, spikes, etc.) are optional/deferred observability projections, not architectural V1 requirements.
+
+Session absolute TTL, idle timeout and fresh-auth window are product/deployment policies V1, not a per-tenant policy engine.
+
+---
+
+# 11. Build-vs-buy rulings to date
 
 | Technology/class | V1 ruling | Revisit trigger |
 |---|---|---|
-| Keycloak / external IdP | do not deploy now | enterprise SSO/federation/MFA/passkeys or credential externalization |
+| Keycloak / external IdP | do not deploy now | enterprise SSO/federation, real MFA/passkeys, tenant-specific IdP or credential externalization |
 | OpenFGA / SpiceDB | do not deploy now | arbitrary resource sharing / large relationship graph / service split |
 | Camunda / Flowable / BPMN | do not use for document Approval V1 | product genuinely becomes generic business-process engine |
 | Temporal as Approval/Release engine | do not use | durable orchestration requirement current outbox/jobs cannot economically serve |
 | CEL / expression language | do not use now | real conditional product/workflow policies cannot be represented cleanly by typed configuration |
 | Elasticsearch/OpenSearch | no requirement yet | measured search scale/query needs exceed economical PostgreSQL projection |
+| dedicated LMS/training engine | no requirement | competency/assessment/training-plan requirements appear |
 
 Libraries/frameworks are selected only after exact responsibility closure.
 
 ---
 
-# 11. Explicit target deletions/replacements
+# 12. Explicit target deletions/replacements
 
 No entitlement to survive:
 
@@ -779,51 +811,48 @@ No entitlement to survive:
 - Approval mutating Controlled Information tables directly;
 - `ReleaseGeneration` as required business identity;
 - mandatory final-DOCX gate V1;
-- any render/freeze path choosing bytes other than exact Submission;
+- render/freeze path choosing bytes other than exact Submission;
 - `SCHEDULED` Revision state;
 - automatic expiration merely because periodic review is overdue;
 - live Group-membership derivation as historical distribution denominator;
 - notification-read as document-read/ack evidence;
-- live Dictionary references from historical released Revisions;
-- Audit Trail as a business-state database;
+- live Dictionary references from historical Revisions;
+- Audit Trail as business-state database;
 - Search projection as authorization/business-state authority;
+- `system_admin` as tenant/platform super-role;
+- PlatformOperator implemented as tenant RoleAssignment;
+- tenant admin chosen initial passwords;
+- fake/stub MFA coverage as if MFA existed;
+- tenant erasure deleting the target Audit Trail itself;
+- current heuristic Security Signals as mandatory V1 foundation;
 - old roadmap/milestone/spec documents as live authority.
 
 Prefer deletion over compatibility shims when no deployed/contractual compatibility requirement proves a shim necessary.
 
 ---
 
-# 12. Remaining design queue before implementation
+# 13. Remaining design queue before implementation
 
-## R8 — Tenant lifecycle + security — **NEXT**
+## R9 — Final Authorization Matrix — **NEXT**
 
-Close:
+Now that product operations are known, freeze:
 
-- Tenant as Organization authority after IAM split;
-- tenant owner vs platform/system operator;
-- tenant creation/bootstrap/onboarding;
-- tenant suspension/deactivation semantics;
-- export and deletion request/grace/cancel/erasure lifecycle;
-- legal/audit preservation vs crypto-shred/anonymization boundaries;
-- session/user effects during suspension/erasure;
-- password/reset/session/security-signal ownership;
-- MFA/reauth assurance model and whether V1 needs tenant MFA policy;
-- tenant encryption/key ownership and rotation requirements;
-- exact trigger/seam for future external IdP/Keycloak migration.
-
-## R9 — Final Authorization Matrix
-
-After every product operation exists:
-
-- final Permission Catalog;
-- five role bundles;
-- Organization/admin operations;
-- Distribution and Periodic Review operations;
-- collection filtering/visibility;
-- Approval/Distribution/domain relationship checks;
-- Domain Constraint matrix;
-- RLS/DB tripwire backstops;
-- positive/negative Golden Matrix.
+1. final semantic Permission Catalog;
+2. five tenant-role bundles;
+3. PlatformOperator/System permissions remain a separate authority namespace;
+4. Organization administration: users, groups, memberships, roles, Areas;
+5. DocumentType/category/policy/dictionary/template administration;
+6. Document/Revision operations by scope/state;
+7. Approval act/oversee/cancel/reassign/policy management;
+8. Periodic Review ownership/override/reassignment;
+9. Distribution configure/assign/acknowledge/oversee;
+10. Audit/export/security/session operations;
+11. tenant export/deletion request/cancel;
+12. collection filtering and effective/working/case-specific visibility;
+13. relationship checks (Approval participant, Distribution assignee, responsible owner, submitter);
+14. Domain Constraint/SoD matrix;
+15. RLS/DB-constraint/tripwire backstops;
+16. positive/negative Golden Matrix covering every role and sensitive operation.
 
 ## R10+ — Technical architecture to code-ready contract
 
@@ -844,7 +873,7 @@ After every product operation exists:
 
 ---
 
-# 13. Documentation authority
+# 14. Documentation authority
 
 - `wiki/architecture/cohesive-platform-redesign.md` is the current-program entrypoint.
 - this ledger is the only active detailed WIP decision source under `docs/superpowers`.
@@ -855,7 +884,7 @@ After every product operation exists:
 
 ---
 
-# 14. Implementation gate
+# 15. Implementation gate
 
 Implementation starts only when all are true:
 
@@ -867,8 +896,9 @@ Implementation starts only when all are true:
 - [x] R5 Numbering/TemplateSpec/metadata boundaries closed;
 - [x] R6 Periodic Review/Rendition/Release closed;
 - [x] R7 Distribution/Values/Audit/Notifications/Search closed;
-- [ ] R8 Tenant lifecycle/Security closed;
-- [ ] R9 final Permission + Role matrix closed;
+- [x] R8 Tenant lifecycle/Security closed;
+- [ ] R9 final Permission + Role + Constraint matrix closed;
+- [ ] whole-product domain map promoted as closed after R9 adversarial pass;
 - [ ] build-vs-buy final for each responsibility;
 - [ ] bounded contexts/data model/table + transaction ownership closed;
 - [ ] event/API/frontend contracts closed;
@@ -882,15 +912,20 @@ Until then: **design/documentation only.**
 
 ---
 
-# 15. Exact next step
+# 16. Exact next step
 
-Continue **R8 — Tenant Lifecycle + Security**.
+Continue **R9 — Final Authorization Matrix**.
 
-Do not implement. For every lifecycle/security proposal answer:
+Do not implement. For every operation determine independently:
 
-1. who is the authority — tenant actor vs platform operator vs system;
-2. whether the action is reversible, grace-period based or terminal;
-3. what must survive for compliance/audit and what must become unreadable/erased;
-4. what happens to sessions, users, jobs and object storage;
-5. whether a feature belongs in current AuthN or is a trigger for an external IdP/security product;
-6. what is the minimum V1 mechanism that preserves the future seam.
+1. semantic Permission required, if any;
+2. legal scope (Tenant / Area / case-specific relationship);
+3. which built-in roles bundle that Permission;
+4. whether a workflow/domain relationship is additionally mandatory;
+5. lifecycle/state preconditions;
+6. SoD/fresh-auth/tenant-operability constraints;
+7. collection/filter visibility;
+8. DB/RLS/constraint backstop;
+9. at least one positive and one negative Golden Matrix case.
+
+Do not create a Permission merely because a current capability exists. Do not omit a Permission merely to minimize count. Permission boundaries follow independently delegable business authority.
