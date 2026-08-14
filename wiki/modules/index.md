@@ -1,39 +1,47 @@
 # Modules
 
-> **Last verified:** 2026-08-09 (Phase G governance reconciliation — added `distribution.md` stub and linked the previously-unlinked `security` docs; index now covers all 15 code modules, PASS 14 finding D5)
-> **Scope:** Durable per-module knowledge, tech-debt registers, and maturity state.
+> **Last verified:** 2026-08-14
+> **Status:** Current-runtime evidence index during Cohesive Platform Redesign
 
-## Core product modules
+The current `internal/modules/*` directories are **not assumed to be the target bounded contexts**. For target architecture, read [../architecture/cohesive-platform-redesign.md](../architecture/cohesive-platform-redesign.md).
 
-- [approval.md](approval.md), [approval-tech-debt.md](approval-tech-debt.md)
-- [audit.md](audit.md), [audit-tech-debt.md](audit-tech-debt.md)
-- [auth.md](auth.md), [auth-tech-debt.md](auth-tech-debt.md)
-- [controlled-documents.md](controlled-documents.md), [controlled-documents-tech-debt.md](controlled-documents-tech-debt.md)
-- [documents.md](documents.md), [documents-tech-debt.md](documents-tech-debt.md)
-- [iam.md](iam.md), [iam-tech-debt.md](iam-tech-debt.md)
-- [taxonomy.md](taxonomy.md), [taxonomy-tech-debt.md](taxonomy-tech-debt.md)
-- [templates.md](templates.md), [templates-tech-debt.md](templates-tech-debt.md)
-- [tokens.md](tokens.md), [tokens-tech-debt.md](tokens-tech-debt.md) — SP-1 per-tenant author-defined `name → value` dictionary; capabilities `token.view` + `token_dictionary.manage`; published `DictionaryReader` port for SP-2 render substitution
+## LEGACY / boundary-under-redesign
 
-## Frontend-focused modules
+These module pages describe runtime/history only. Their old detailed living docs and tech-debt narratives have been collapsed because their nouns/boundaries are being replaced rather than incrementally perfected.
 
-- [editor-chrome.md](editor-chrome.md), [editor-chrome-tech-debt.md](editor-chrome-tech-debt.md)
-- [editor-ui-eigenpal.md](editor-ui-eigenpal.md), [editor-ui-eigenpal-tech-debt.md](editor-ui-eigenpal-tech-debt.md)
-- [frontend-primitives.md](frontend-primitives.md), [frontend-primitives-tech-debt.md](frontend-primitives-tech-debt.md)
-- [novo-documento-wizard.md](novo-documento-wizard.md), [novo-documento-wizard-tech-debt.md](novo-documento-wizard-tech-debt.md)
-- [frontend/index.md](frontend/index.md) — per-feature frontend module pages (approval, auth, controlled-documents, documents, iam, templates)
+- [approval.md](approval.md) — **LEGACY current-state**; target is Approval V1.
+- [auth.md](auth.md) — **CURRENT-STATE / boundary under redesign**; V1 AuthN retained, seams simplified.
+- [iam.md](iam.md) — **LEGACY boundary**; target concepts are Organization + Authorization.
+- [controlled-documents.md](controlled-documents.md) — **LEGACY target concept**; separate context/object is being retired.
+- [documents.md](documents.md) — **LEGACY current-state module**; responsibilities are being re-homed into Controlled Information.
+- [taxonomy.md](taxonomy.md) — **LEGACY boundary**; Area moves to Organization, Profile→DocumentType direction, remaining classification re-evaluated.
+- [templates.md](templates.md) — **LEGACY parallel lifecycle**; template becomes a role/designation of an exact DocumentRevision.
+- [jobs.md](jobs.md) — **LEGACY module classification**; periodic jobs are orchestration/composition, not a business bounded context.
 
-## Supporting modules
+Associated `*-tech-debt.md` documents for these boundaries are historical implementation evidence only and must not be treated as target work queues.
 
-- [distribution.md](distribution.md) — distribution/read-acknowledgement surface (Stage-1 stub, created 2026-08-09)
-- [jobs.md](jobs.md) — background-job / async worker module (Stage-1 draft)
-- [notifications.md](notifications.md) — per-recipient notification inbox; two delivery-only River workers
-- [render-fanout.md](render-fanout.md), [render-fanout-tech-debt.md](render-fanout-tech-debt.md)
-- [search.md](search.md), [search-tech-debt.md](search-tech-debt.md)
-- [security.md](security.md), [security-tech-debt.md](security-tech-debt.md), [security-signals.md](security-signals.md) — MFA coverage, security settings (docs existed but were unlinked until 2026-08-09)
+## Supporting modules currently retained/re-evaluated
 
-## Governance
+These responsibilities remain real and several already exhibit healthy seams. Do not rewrite them merely because the core is changing; revalidate them against the final domain/event model.
 
-- [maturity-audit-2026-05-13.md](maturity-audit-2026-05-13.md) - module maturity baseline
+- [audit.md](audit.md), [audit-tech-debt.md](audit-tech-debt.md) — regulatory evidence authority.
+- [distribution.md](distribution.md) — released-document distribution/coverage read surface; future read/ack semantics still open.
+- [notifications.md](notifications.md) — delivery/inbox consumer; must not own workflow semantics.
+- [render-fanout.md](render-fanout.md), [render-fanout-tech-debt.md](render-fanout-tech-debt.md) — rendering/rendition infrastructure; must bind the canonical Revision truth.
+- [search.md](search.md), [search-tech-debt.md](search-tech-debt.md) — read-model/projection consumer.
+- [security.md](security.md), [security-tech-debt.md](security-tech-debt.md), [security-signals.md](security-signals.md) — security signals/tenant-key concerns; final boundary follows Organization/AuthN/Tenant-lifecycle design.
+- [tokens.md](tokens.md), [tokens-tech-debt.md](tokens-tech-debt.md) — tenant dictionary/value provider; snapshot timing/provenance will be revalidated.
 
-Module research artifacts remain beside the owning module and are supporting evidence, not first-stop canonical summaries.
+## Frontend/current UI evidence
+
+Frontend pages remain useful evidence about user journeys but do not own product semantics:
+
+- [frontend/index.md](frontend/index.md)
+- [editor-chrome.md](editor-chrome.md)
+- [editor-ui-eigenpal.md](editor-ui-eigenpal.md)
+- [frontend-primitives.md](frontend-primitives.md)
+- [novo-documento-wizard.md](novo-documento-wizard.md)
+
+## Rule
+
+When a current module page conflicts with the active redesign on a noun, lifecycle, role, permission, workflow or owner, the redesign wins for the target. Use Git history when detailed legacy implementation archaeology is needed.
