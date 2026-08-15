@@ -1,6 +1,6 @@
 # Current Agent Handoff
 
-> **Last verified:** 2026-08-14
+> **Last verified:** 2026-08-15
 > **Status:** ACTIVE — Cohesive Platform Redesign
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
 > **Implementation:** **BLOCKED — design/documentation only**
@@ -17,95 +17,47 @@ Git history is archive. Do not revive historical specs/ADRs/runtime concepts by 
 
 ## Current checkpoint
 
-R3–R9 principal governance is locked: format-independent Document/REV/Submission, specialized Approval + SoD, Periodic Review, automatic Release, Distribution/Acknowledgement, Audit/Notifications/Search, tenant lifecycle/security and the five-role/29-Permission model.
+R3–R9 principal governance is locked. R9.5 whole-product completion has now locked:
 
-R9.5 is the whole-product completion pass. Previous R10-A topology remains **not approved** until R9.5 closes.
+1. **Content Model** — format-agnostic Document; immutable Artifact; semantic Evidence/EvidenceType; one primary Artifact; canonical naming; format-aware official representation.
+2. **Storage/Repositories** — one Managed Artifact Store/deployment; Local/MinIO/AWS S3 adapters; provider-independent hashes/keys; external repositories use explicit import/publish copies; SharePoint Embedded future profile.
+3. **Authoring/EigenPal** — persisted WorkingContent + technical working_version/OCC; one writer V1; external editing without long checkout; immutable Submission boundary; Approval read-only; realtime collaboration deferred behind seam.
+4. **Dossier/Context** — stable context key/scope; small DossierType; M:N Document links; CAPTURED Evidence has immutable primary Dossier; ExternalReferences; explicit ERP/PLM/PM/CMMS boundaries.
+5. **Retention/Records/Legal Hold** — RetentionBinding on CAPTURED Evidence / first submitted Revision; type-scoped policy snapshots; explicit disposition; LegalHold over Evidence/Document/Dossier; WORM/Purview enforcement only; tenant erasure blocked while obligations survive.
+6. **Import/Migration/Export** — ordinary import distinguished from privileged Historical Migration; external history never fabricated as native MetalDocs events; current-state/full-history modes; deterministic revision/code mapping; MigrationBatch dry-run/idempotency/reconciliation; tenant portability and governed-subject packages are provider-independent manifests with exact hashes and no secrets/runtime internals.
 
-### Locked R9.5-1 — Content Model
+Previous R10-A topology remains **not approved** and blocked until R9.5 closes.
 
-- Document is format-agnostic; Artifact = immutable exact bytes + canonical SHA-256 and never user-facing business identity.
-- confirmed Artifact always belongs to DocumentRevision or Evidence; staging is temporary/non-business.
-- EvidenceType defines semantic type, allowed formats and small canonical naming policy; user filename is provenance only.
-- Evidence lifecycle `DRAFT → CAPTURED → VOIDED` for wrong capture only; CAPTURED content immutable.
-- one primary Artifact per DocumentRevision/Evidence V1.
-- `RevisionContent = primary_artifact + governed_metadata + optional structured_authoring`.
-- `OfficialRepresentationPolicy = SourceOnly | RequireRendition(ContentFormat)`, max one required rendition V1.
+## Key migration/export truths
 
-### Locked R9.5-2 — Storage / Repository
+- Every migrated object carries explicit source provenance.
+- Imported approval/effectivity facts are imported-governance evidence, never synthetic native ApprovalDecision/ReleaseRecord.
+- Unknown historical dates stay unknown; `adopted_as_current_at` is a separate true fact.
+- Target DocumentRevision requires exact source bytes; missing legacy bytes never produce fake Revision rows.
+- Numeric source ordinals may preserve continuity (`7 → REV007`); arbitrary source labels map deterministically while preserving original label.
+- No silent format normalization/transformation.
+- Historical source actors remain source snapshots; migration execution actor is Migration/System principal.
+- Migration never replays past notifications/jobs/distribution side effects.
+- Retention on imported content uses trustworthy historical anchors when known; migration never auto-disposes expired records.
+- Backup ≠ Tenant Portability Export ≠ Governed Subject Export ≠ PUBLISH_COPY.
+- Portability exports business/governance authorities + exact Artifacts/current DRAFT state, excludes secrets/staging/jobs/outbox/rebuildable projections.
+- Export packages use versioned provider-independent manifest + SHA-256 inventory. Package signature/encryption is R9.5-7.
 
-- one active Managed Artifact Store per deployment V1;
-- Local(dev/test), MinIO and AWS S3 first-class; other S3-compatible providers require conformance validation;
-- provider migration copies/verifies bytes and cuts over without new Artifact/REV;
-- object keys opaque/immutable/tenant-namespaced; no content-addressed/cross-tenant dedup V1;
-- direct/presigned staging upload allowed; provider success does not confirm Artifact before integrity/content/semantic validation;
-- object versioning/Object Lock are defense/enforcement only, never REV/retention authority;
-- production TLS + provider encryption at rest; Tenant DEK does not encrypt every Artifact V1;
-- normal SharePoint/OneDrive/etc. are External Repository Connectors using `IMPORT_COPY` / `PUBLISH_COPY`;
-- governed primary content requires exact MetalDocs-managed copy; external edits never mutate existing MetalDocs history;
-- SharePoint Embedded reserved as future Microsoft-enterprise content profile;
-- valid restore requires Artifact DB fact + exact bytes + matching SHA-256.
-
-### Locked R9.5-3 — Authoring / EigenPal
-
-- latest persisted `WorkingContent` is recoverable DRAFT truth; browser/editor never authority;
-- technical monotonic `working_version` + immutable WorkingSnapshots; never REVxxx;
-- governed saves use OCC with `expected_working_version`; no last-write-wins;
-- one active in-app writer per DRAFT + OCC V1; external edit/download/upload uses stale-base conflict, no long checkout/automerge;
-- editor/provider is not business identity;
-- submission freezes exact final persisted state and rejects stale autosaves after SUBMITTED;
-- Approval view is read-only over exact Submission;
-- EditorialComment is product-owned DRAFT state, separate from Approval rationale;
-- unresolved comments/tracked changes block submit when those capabilities are enabled;
-- realtime Yjs deferred; preserve provider seam;
-- EigenPal stays behind one anti-corruption adapter + pinned version + MetalDocs fidelity corpus.
-
-### Locked R9.5-4 — Dossier / Context
-
-- Dossier = stable documentary context for Venda/Produto/Projeto/Equipamento/etc., not folder or ERP/PLM object.
-- DossierType = small tenant config with code/name/status + eligible DocumentTypes/EvidenceTypes; no custom-object engine.
-- stable key unique tenant+type; title mutable; `{DOSSIER}` uses key; no generic numbering engine V1.
-- creation provenance separate from zero..N unique ExternalReferences; no heuristic auto-merge.
-- external master/status data remains source-system projection; source disappearance never deletes documentary history.
-- Dossier↔Document is M:N over stable Document identity and never grants/changes Document access/lifecycle.
-- every CAPTURED Evidence has one immutable primary Dossier; secondary Dossier relationships allowed without duplication.
-- scope = one TenantScope|AreaScope; Evidence reuses primary Dossier scope; no multi-area ACL.
-- lifecycle only `ACTIVE ↔ ARCHIVED`; archive is navigation state and never deletes content.
-- link/unlink history is preserved; no Dossier graph/hierarchy V1.
-- ERP/CRM/PLM/PM/CMMS operational domains remain external.
-
-### Locked R9.5-5 — Retention / Records / Legal Hold
-
-- no duplicate generic Record entity; CAPTURED Evidence and first-submitted DocumentRevision become retention subjects through `RetentionBinding`.
-- working snapshots/staging/unsubmitted drafts stay under GC/recovery, not records retention.
-- DocumentType/EvidenceType explicitly choose `NoMinimum | KeepFor(value, DAYS|MONTHS|YEARS) | Indefinite`; no hardcoded legal periods or rules engine.
-- Document retention clock does not run while EFFECTIVE; anchors are SUPERSEDED/OBSOLETE/CANCELLED(after submission). Evidence anchor = CAPTURED_AT or OCCURRED_AT.
-- policy is snapshotted; future config changes do not silently recalc old records. `RetentionExtension` may lengthen, not generically shorten, existing obligations.
-- expiry means only eligible-for-disposition. Current EFFECTIVE content is never eligible and there is no automatic delete cron V1.
-- disposition requires explicit authorization/review + zero active holds + successful verified removal of substantive payload/Artifacts; completion creates immutable DispositionRecord.
-- LegalHold is independent of retention duration and may scope Evidence, stable Document or Dossier. Document/Dossier holds materialize concrete held subjects; unlink/lifecycle change never releases held history.
-- hold blocks destruction, not normal business lifecycle. Full eDiscovery/transient-autosave preservation is outside V1.
-- Artifact has no independent business retention policy; provider WORM/Object Lock/Purview is enforcement only.
-- DossierType has no retention inheritance; Audit remains separate regime.
-- tenant terminal erasure is blocked while retained/held subjects remain; no new tenant state is added and required DEK material is not destroyed prematurely.
-- backup/restore must restore/reconcile retention/hold/disposition facts before cleanup; erasure tombstones retain precedence.
-
-## Exact next step — R9.5-6 Import / Migration / Export
+## Exact next step — R9.5-7 Attestation + Content Security
 
 Design only. Close:
 
-1. how legacy/external Documents enter without fabricating native MetalDocs history;
-2. legacy code/revision-label preservation vs target REVxxx normalization;
-3. current-state-only versus full-history import;
-4. externally approved/released history and how to represent it without fake ApprovalDecision/ReleaseRecord;
-5. import provenance/source identifiers/exact Artifact hashes;
-6. Evidence/Dossier import and historical occurred_at/retention anchors;
-7. duplicate/conflict detection and replay-safe/idempotent migration;
-8. dry-run, validation, reconciliation and abort/rollback boundary;
-9. privileged migration/import path versus normal user operations;
-10. export scope and package semantics;
-11. manifests/hashes/relationships/provenance needed for verifiable export;
-12. separation of backup vs interoperability export vs evidentiary package;
-13. interaction with external repository IMPORT_COPY/PUBLISH_COPY;
-14. retention/legal-hold constraints on export and disposition evidence.
+1. exact semantic statement/evidence created by Approval `accept` and `return_for_changes`;
+2. application attestation vs formal electronic/digital signature boundary;
+3. immutable ApprovalReceipt/Decision evidence binding actor identity + assurance/fresh-auth + Submission digest;
+4. how approval/effectivity manifests in human-readable official renditions without altering approved source truth;
+5. portability/export package signature/integrity/encryption boundary;
+6. upload quarantine/staging versus Document/Evidence lifecycle;
+7. real content-type detection, allowed-format validation, size/complexity limits and parser hardening;
+8. malware scanning and fail-closed behavior when scanner unavailable;
+9. Office macros/external relationships, PDF active content, archive bombs and other risky content features;
+10. safe preview/view/download headers and policy;
+11. rendering/conversion sandbox and outbound-network policy for untrusted content;
+12. security evidence/audit facts without making scanner telemetry business authority.
 
-Then: R9.5-7 Attestation/Content Security → R9.5-8 adversarial whole-product freeze. Only after that resume R10 technical architecture/filesystem/data model.
+After R9.5-7: **R9.5-8 whole-product adversarial freeze + bounded authorization delta**. Only after explicit approval does R10 technical architecture/filesystem/data model resume.
