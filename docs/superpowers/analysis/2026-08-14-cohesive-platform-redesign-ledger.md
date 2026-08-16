@@ -1,7 +1,7 @@
 # MetalDocs Cohesive Platform Redesign — Active Decision Ledger
 
 > **Status:** ACTIVE WIP — operator-approved decisions below are binding; unresolved items are explicit.
-> **Date:** 2026-08-15
+> **Date:** 2026-08-16
 > **Repository:** `developmentconexus-ops/MetalDocs`
 > **Design branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
 > **Method:** `wiki/standards/root-cause-global-maximum-method.md`
@@ -38,7 +38,8 @@ Core invariants:
 6. editor/browser state is never the authoritative persisted DRAFT truth;
 7. Dossier is documentary context, never a hidden ERP/PLM/custom-object platform;
 8. retention expiry never means automatic deletion;
-9. imported historical truth is never rewritten as if it were native MetalDocs history.
+9. imported historical truth is never rewritten as if it were native MetalDocs history;
+10. launch scope favors simple invariant-preserving controls over speculative compliance/security platforms.
 
 ---
 
@@ -56,7 +57,7 @@ Group
 GroupMembership
 ```
 
-Groups are flat V1; Area is the organizational truth reused by Document ownership, scoped authorization and Approval actor resolution.
+Groups are flat V1. Area is the organizational truth reused by Document ownership, scoped authorization and Approval actor resolution.
 
 Five tenant roles only:
 
@@ -91,7 +92,7 @@ Permission
 
 RLS = tenant-isolation defense-in-depth only. DB constraints = structural invariants. Current `system_admin` short-circuit/asserted-capability-GUC model is not target architecture.
 
-Final R9 Permission Catalog for the R3–R9 operation set remains 29 permissions:
+R9's 29-permission catalog remains authority for the R3–R9 operation set:
 
 ```text
 tenant.settings.manage
@@ -129,15 +130,15 @@ tenant.export
 tenant.deletion.request
 ```
 
-Role bundles remain viewer / author / approver / area_manager / tenant_owner as previously locked. Strict Approval SoD remains: author/submitter cannot accept own Submission; same user cannot accept two Steps in one ApprovalInstance; reassignment must remain qualified and SoD-valid.
+Role bundles remain viewer / author / approver / area_manager / tenant_owner. Strict Approval SoD remains: creator/submitter cannot accept own Submission; same user cannot accept two Steps of one ApprovalInstance; reassignment must remain qualified and SoD-valid.
 
-**R9.5 delta rule:** Evidence, Dossier, Retention, Import/Export and related operations receive one bounded authorization-catalog delta only after R9.5 operations close; operations first, permissions second.
+**R9.5 delta rule:** Evidence, Dossier, Retention, migration/export and any remaining operations receive one bounded authorization delta only after R9.5 operations close; operations first, permissions second.
 
 ---
 
 # 2. LOCKED — Approval V1
 
-Specialized sequential human workflow, not BPM:
+Approval is a specialized sequential human workflow, not BPM:
 
 ```text
 ApprovalPolicy(version)
@@ -163,9 +164,7 @@ ApprovalInstance binds exactly one immutable `RevisionSubmission`. Return/withdr
 
 Approval config is explicit: `NoHumanApproval | UsePolicy(ApprovalPolicyID)`.
 
-`Document` = stable governed identity. At most one EFFECTIVE + one open Revision V1.
-
-Official labels: `REV001`, `REV002`, ...
+`Document` = stable governed identity. At most one EFFECTIVE + one open Revision V1. Official labels are `REV001`, `REV002`, ...
 
 Revision states:
 
@@ -182,7 +181,7 @@ REV is a business change cycle; autosaves/checkpoints are technical history and 
 
 `RevisionSubmission` is immutable exact attempt identity, including under NoHumanApproval. Approval/Rendition/Release bind exact Submission/digest.
 
-Document code/type/Area are stable V1. DocumentType numbering language remains literals + `{TYPE}/{AREA}/{SEQ}`, scope TYPE or TYPE_AREA, minimum sequence padding. No generic formula/reset/custom-metadata numbering.
+Document code/type/Area are stable V1. DocumentType numbering remains literals + `{TYPE}/{AREA}/{SEQ}`, TYPE or TYPE_AREA scope, minimum padding. No generic formula/reset/custom-metadata numbering.
 
 Template is a role of an ordinary governed Document; no parallel TemplateVersion lifecycle. `TemplateUse` is M:N and exact source effective REV is pinned at derived-document creation.
 
@@ -196,9 +195,7 @@ Periodic Review belongs Controlled Information: `Disabled | Every(n months)`. Du
 
 Rendition = immutable derived representation of exact Submission with output hash + generator/build provenance. Approval approves Submission, never renderer output bytes.
 
-Release is automatic/system-owned; no publish button. Optional `ReleasePlan.not_before`; actual `effective_at = released_at`.
-
-Winning release transaction atomically makes candidate EFFECTIVE, prior REV SUPERSEDED, swaps Document pointer, clears open pointer, writes ReleaseRecord and durable events.
+Release is automatic/system-owned; no publish button. Optional `ReleasePlan.not_before`; actual `effective_at = released_at`. Winning release atomically makes candidate EFFECTIVE, prior REV SUPERSEDED, swaps pointers, writes ReleaseRecord and durable events.
 
 Universal mandatory PDF is retired. Locked V1 policy:
 
@@ -234,7 +231,7 @@ SUSPENDED
 ERASED
 ```
 
-Deletion request is a separate grace/cancel process. Terminal erasure is retention-aware:
+Deletion request is separate. Terminal erasure is retention-aware:
 
 ```text
 request reaches execute_after
@@ -248,7 +245,7 @@ request reaches execute_after
 → TenantErasureRecord
 ```
 
-No new tenant state for retention. A DEK needed to preserve legally retained intelligible content is never destroyed while that obligation remains. Backup/restore must reapply erasure tombstones and reconcile retention/hold facts before cleanup/service resumes.
+No new tenant state for retention. A DEK needed to preserve legally retained intelligible content is not destroyed while that obligation remains. Backup/restore must reapply erasure tombstones and reconcile retention/hold facts before cleanup/service resumes.
 
 ---
 
@@ -258,7 +255,7 @@ No new tenant state for retention. A DEK needed to preserve legally retained int
 
 Do not replace MetalDocs with M-Files/Nuxeo/Alfresco and do not build a generic ECM clone.
 
-A governed Document is format-agnostic. Dossier is a deliberately small documentary context, not ERP/PLM. EigenPal is a DOCX authoring provider, never Document identity.
+A governed Document is format-agnostic. Dossier is deliberately small documentary context, not ERP/PLM. EigenPal is a DOCX authoring provider, never Document identity.
 
 Storage classes:
 1. Managed Artifact Store — exact MetalDocs-owned bytes.
@@ -307,7 +304,7 @@ Provider migration = copy exact bytes + verify canonical hash + cutover; no new 
 
 Managed keys are opaque, immutable and tenant-namespaced. Business filename never determines path. Artifact ID != content hash; no content-addressed/cross-tenant dedup V1.
 
-Temporary/direct-presigned upload is allowed. Provider success does not confirm Artifact before integrity/content/semantic validation. Existing Artifact keys are never overwritten.
+Temporary/direct-presigned upload is allowed. Provider success does not confirm Artifact before basic integrity/content/semantic validation. Existing Artifact keys are never overwritten.
 
 Object-store versioning and Object Lock/WORM are defense/enforcement only, never REV/retention authority. Production baseline = encrypted transport + provider encryption at rest. Tenant DEK does not encrypt every Artifact V1.
 
@@ -375,82 +372,41 @@ Indefinite
 
 No hardcoded legal periods and no NULL-as-policy.
 
-Document retention clock does not run while REV is EFFECTIVE. Anchor = superseded_at / obsoleted_at / cancelled_at for a submitted-but-never-released REV.
+Document retention clock does not run while REV is EFFECTIVE. Anchor = superseded_at / obsoleted_at / cancelled_at for a submitted-but-never-released REV. EvidenceType chooses `CAPTURED_AT | OCCURRED_AT`; Dossier archive never starts retention.
 
-EvidenceType chooses `CAPTURED_AT | OCCURRED_AT`; OCCURRED_AT makes Evidence.occurred_at mandatory before capture. Dossier archive never starts retention.
+Policy is snapshotted in RetentionBinding; later type changes do not silently recalculate existing records. `RetentionExtension` may only lengthen retention V1. Generic retroactive shortening is excluded.
 
-Policy is snapshotted in RetentionBinding; later type changes do not silently recalculate existing records. `RetentionExtension` may only lengthen retention V1 with reason/authority. Generic retroactive shortening is excluded.
+Expiry only makes a subject eligible for disposition. No automatic delete. Current EFFECTIVE REV is never disposition-eligible. Physical disposition requires explicit authorized review, no active hold, and verified removal before immutable DispositionRecord says disposal completed.
 
-Expiry only makes a subject eligible for disposition. No automatic delete. Current EFFECTIVE REV is never disposition-eligible.
+LegalHold is independent of retention. V1 hold scopes: Evidence, stable Document, Dossier. Document/Dossier holds materialize concrete held subjects; unlink/lifecycle changes cannot make previously held content escape preservation. Holds block disposal, not normal business lifecycle.
 
-Physical disposition requires explicit authorized review, no active hold, and verified removal of substantive DB payload + managed Artifacts before immutable DispositionRecord says disposal completed.
+Hold V1 covers confirmed governed record content, not transient autosaves/staging/full eDiscovery ESI. Artifact has no independent retention policy; preservation derives from subjects referencing it.
 
-LegalHold is independent of retention and stores explicit apply/release facts, reason, actor/time and optional case reference. V1 hold scopes: Evidence, stable Document, Dossier. Document/Dossier holds materialize concrete held subjects; unlink/lifecycle changes cannot make previously held content escape preservation. Holds block disposal, not normal business lifecycle.
-
-Hold V1 covers confirmed governed record content, not transient autosaves/staging/full eDiscovery ESI.
-
-Artifact has no independent retention policy; preservation derives from retention subjects that reference it.
-
-Provider WORM/Object Lock/Purview is enforcement only. Deployment may require DB-only, WORM-governance or WORM-compliance posture; provider mode never leaks into DocumentType/EvidenceType. If required physical WORM cannot be established, record-finalization cannot falsely report compliant success.
-
-DossierType has no retention policy. Audit Trail remains a separate retention regime.
-
-Tenant terminal erasure is blocked until relevant RetentionBindings/Holds permit destruction. No new Tenant state. Do not build a post-termination Retention Vault until a real product/economic requirement proves it.
+Provider WORM/Object Lock/Purview is enforcement only. DossierType has no retention policy. Audit Trail remains a separate retention regime. Tenant terminal erasure is blocked until relevant RetentionBindings/Holds permit destruction. No post-termination Retention Vault without real requirement.
 
 ---
 
 # 13. LOCKED — R9.5-6 Import / Migration / Export
 
-## Import vs Historical Migration
-
 Ordinary `IMPORT_COPY` follows normal lifecycle. **Historical Migration** is a privileged path for pre-MetalDocs history and never fabricates native facts.
 
-Every migrated object carries explicit source provenance. Historical lifecycle/approval/effectivity facts are represented as imported governance evidence, **not** synthetic `ApprovalDecision`, `ApprovalInstance`, `ReleaseRecord` or fake internal-user actions.
+Every migrated object carries explicit source provenance. Historical lifecycle/approval/effectivity facts are imported governance evidence, not synthetic ApprovalDecision/ApprovalInstance/ReleaseRecord/internal-user actions.
 
-Imported EFFECTIVE/SUPERSEDED/OBSOLETE states require explicit imported proof. Native states continue to require native mechanisms.
+Imported EFFECTIVE/SUPERSEDED/OBSOLETE states require imported proof. If source effectivity date is unknown, preserve unknown and record explicit `adopted_as_current_at`; never invent a date.
 
-If source effectivity date is unknown, preserve unknown and record explicit `adopted_as_current_at`; never invent a historical date. Adoption time may be used as operational periodic-review basis only when historical effectivity is unavailable, while keeping the distinction visible.
+Reliable numeric legacy ordinals may map directly (`7 → REV007`); current-state-only import may begin at REV007 with gaps. Arbitrary labels map deterministically to REVxxx while preserving source label. Next native REV is always above highest imported ordinal.
 
-## Revision/code migration
+Privileged migration may preserve safe unique legacy Document codes. Otherwise mapping is explicit and source code remains provenance.
 
-Reliable numeric legacy ordinals may map directly (`7 → REV007`) and current-state-only import may legitimately begin at REV007 with gaps. Arbitrary legacy labels map deterministically to REVxxx order while preserving exact `source_revision_label`. Next native REV is always above highest imported target ordinal.
+Migration modes: `CURRENT_STATE | FULL_HISTORY`. A target DocumentRevision requires exact primary Artifact bytes. Missing historical content may remain imported-history evidence but does not create a fake Revision. No silent content-format conversion.
 
-Historical migration may preserve safe, unique legacy Document codes through its privileged path. If preservation is impossible, mapping is explicit and original source code remains provenance; never silently sanitize.
+Historical actors stay source snapshots/references; optional user correlation is provenance only. Migration writes are attributed to Migration/System principal.
 
-Migration modes:
+Dossier migration uses stable key + ExternalReference uniqueness. Historical Evidence separates occurred/captured facts from migration time. Imported retention uses trustworthy historical anchor when known; unknown anchor never silently becomes deletion-eligible. Migration never automatically disposes old content or replays old notifications/jobs/distribution side effects.
 
-```text
-CURRENT_STATE
-FULL_HISTORY
-```
+Historical Migration uses first-class batch/plan semantics with true dry-run, deterministic per-item outcomes and reconciliation report. Same source identity + same content → REUSE; conflicting content/state → fail closed. Atomicity is per semantic import unit; partial batch success is allowed/reconciled. No magical whole-migration rollback promise.
 
-A target DocumentRevision requires exact primary Artifact bytes. Missing historical content may be recorded as imported-history evidence but does not create a fake Revision. Historical bytes are preserved exactly; no silent DOC→DOCX/PDF→DOCX/CAD→PDF normalization. Any future transform preserves original + explicit derivation provenance.
-
-Historical actor/creator identity remains source snapshot/reference. Optional correlation to a current User is provenance only and never turns an external event into a native user action. Migration writes are attributed to Migration/System principal.
-
-## Dossier / Evidence / retention migration
-
-Dossier migration uses stable key + ExternalReference uniqueness and deterministic replay. Historical Evidence separates trustworthy occurred/captured facts from migration time.
-
-Imported RetentionBinding snapshots target policy at import but may use trustworthy historical anchor. Unknown anchor never silently makes content deletion-eligible. Migration never automatically disposes already-expired content.
-
-External hold/retention claims remain provenance unless explicitly adopted as active MetalDocs LegalHold; trusted MetalDocs→MetalDocs portability is the special case that may preserve native authorities.
-
-Migration never replays historical notifications, jobs, Distribution assignments or other old side effects. Current obligations require explicit post-import action.
-
-Legacy template content receives TemplateSpec/TemplateUse authority only after target structured-authoring validation succeeds.
-
-## Batch safety
-
-Historical Migration uses first-class batch/plan semantics with true dry-run, deterministic per-item outcomes and reconciliation report.
-
-Same source identity + same content → REUSE/ALREADY_IMPORTED. Same source identity + conflicting content/state → fail closed.
-
-Atomicity is per semantic import unit (e.g. one Document history or one Evidence), not one giant tenant transaction. Partial batch success is allowed and reconciled. No generic post-commit “rollback whole migration” promise; safety comes from dry-run, fail-closed apply, idempotent replay and explicit correction/expurgo when justified.
-
-## Export distinctions
-
-The following are separate contracts:
+Export contracts remain distinct:
 
 ```text
 Backup
@@ -459,40 +415,68 @@ Governed Subject Export
 External Repository PUBLISH_COPY
 ```
 
-`tenant.export` produces provider-independent tenant business/governance state + exact Artifacts, not raw deployment internals.
+`tenant.export` produces provider-independent tenant business/governance state + exact Artifacts, not deployment internals. It includes current DRAFT state needed to continue business but excludes staging, GC-able old WorkingSnapshots, projections, jobs/outbox and secrets.
 
-Portability includes current DRAFT WorkingContent required to continue business but excludes GC-able historical WorkingSnapshots, staging, Search/cache projections, jobs/outbox and provider delivery internals.
+Governed Subject Export may package Document/Evidence/Dossier independently. Every portability/governed package has a versioned provider-independent manifest with objects, relationships, provenance, canonical filenames, ContentFormats/sizes and SHA-256 values. Manifest never depends on provider keys/URLs/version IDs.
 
-Export excludes password/session/activation secrets, connector credentials, KMS/DEK/KEK material, presigned URLs and deployment secrets.
+Generated export bundle is temporary delivery output, not automatically Evidence. Retention/Hold does not forbid authorized export and export does not release hold/change retention/count as acknowledgement. Export completeness must be explicit and authorization-safe.
 
-Governed Subject Export may package a Document/Evidence/Dossier scope independently of backup/tenant-wide export.
-
-Every portability/governed package has a versioned provider-independent manifest describing export identity/time/scope, objects, relationships, provenance, canonical filenames, ContentFormats/sizes and exact SHA-256 values. Manifest never depends on MinIO/S3 keys, URLs or provider version IDs.
-
-Generated export bundle is a temporary delivery artifact, not automatically governed Evidence. Retention/Legal Hold blocks deletion, not authorized export. Export never releases a hold, changes retention or counts as acknowledgement.
-
-Export completeness must be explicit and authorization-safe; a subset cannot masquerade as a complete tenant/Dossier representation.
-
-Trusted compatible MetalDocs→MetalDocs portability may preserve native Approval/Release/Retention/Hold authorities with package/source-deployment provenance. All packages still undergo manifest/hash/schema/conflict validation. Package attestation/signature/encryption is deferred to R9.5-7.
+Compatible MetalDocs→MetalDocs portability may preserve native authorities when its source/package trust requirements are satisfied by the eventual implementation contract. V1 does **not** require cryptographically signed portability packages.
 
 ---
 
-# 14. Build-vs-buy / explicit non-goals
+# 14. LOCKED — R9.5-7 Launch Attestation + Basic Content Safety (YAGNI)
+
+The earlier broad proposal for antivirus/quarantine/PKI/signed packages/sandbox infrastructure was explicitly rejected as over-engineered for pre-launch V1. The approved launch scope is deliberately small.
+
+## Attestation
+
+1. `ApprovalDecision` always binds the exact `RevisionSubmission` and its digest. Changing the governed bytes/state creates different content and existing approval does not apply.
+2. Preserve actor, Step, ApprovalPolicy version, decision, trusted server timestamp and required AuthN assurance/fresh-auth evidence.
+3. `return_for_changes` requires a reason V1.
+4. MetalDocs V1 claims **authenticated application approval**, not ICP-Brasil/qualified digital signature or other legal-signature level it does not actually implement.
+5. Approval/effectivity may be manifested in a human-readable PDF/certificate Rendition, but source bytes approved by humans are never modified merely to stamp approval.
+6. NoHumanApproval never fabricates a human/System approver.
+
+## Basic content safety
+
+1. `DocumentType`/`EvidenceType` accept only explicitly supported `ContentFormat`s.
+2. Upload/import has basic size limits and coherent format validation; client filename is never authoritative and canonical naming remains MetalDocs-owned.
+3. MetalDocs does not intentionally execute user-uploaded content. Formats not supported for safe in-app preview are download-only or use an existing controlled viewer/rendition path.
+4. Macro-enabled Office formats (`DOCM/XLSM/PPTM`) are outside the normal V1 support set unless explicitly reconsidered later.
+5. Rendering remains a supporting service receiving content and returning a derived result; it receives no business authority. Advanced custom renderer-sandbox infrastructure is not a V1 product requirement.
+
+## Explicitly deferred — triggers, not hidden launch TODOs
+
+Do **not** build for V1 without a concrete customer/security/regulatory trigger:
+
+```text
+malware scanning / ClamAV
+quarantine lifecycle
+periodic malware rescan / ArtifactSecurityAssessment
+CDR / advanced active-content inspection
+ICP-Brasil / PKI / DocuSign / Adobe Sign
+RFC3161/TSA / HSM
+cryptographically signed export packages / signing-key lifecycle
+custom export encryption format
+macro-enabled Office support
+full custom renderer sandbox/egress platform
+eDiscovery / ESI preservation
+```
+
+The staging→validation→confirmation seam already leaves a natural place to add malware inspection later without redesigning Document/Evidence/Artifact/Submission.
+
+---
+
+# 15. Build-vs-buy / launch non-goals
 
 Current rulings remain: no external ECM kernel, no JCR kernel, no generic BPM/ReBAC/low-code engine, no mandatory realtime collaboration, no generic PLM/ERP/PM/CMMS features, no generic multi-cloud/BYOS/dedup/silent sync, no provider identity in domain, no universal PDF rule.
 
-Additional non-goals:
-
-- no fake native history during migration;
-- no generic migration transformation engine;
-- no giant tenant-wide migration transaction;
-- no retroactive side-effect replay;
-- no raw backup as portability contract;
-- no export of secrets/provider internals as customer business data.
+Additional launch non-goals include fake native migration history, generic migration transformation engine, retroactive side-effect replay, raw backup as portability contract, export of deployment secrets, antivirus platform, PKI/signature infrastructure, signed-package infrastructure and advanced content-security platform before a real requirement exists.
 
 ---
 
-# 15. Remaining whole-product completion before technical architecture
+# 16. Remaining whole-product completion before technical architecture
 
 - [x] R9.5-1 Content Model
 - [x] R9.5-2 Storage / Repository Strategy
@@ -500,28 +484,40 @@ Additional non-goals:
 - [x] R9.5-4 Dossier / Context
 - [x] R9.5-5 Retention / Records / Legal Hold
 - [x] R9.5-6 Import / Migration / Export
-- [ ] **R9.5-7 Attestation + Content Security — NEXT**
-- [ ] R9.5-8 Whole-product adversarial freeze
+- [x] R9.5-7 Launch Attestation + Basic Content Safety
+- [ ] **R9.5-8 Whole-product adversarial freeze — NEXT**
 
-R9.5-7 must close:
+R9.5-8 must not introduce speculative features. Its job is to:
 
-1. exact semantic statement/evidence created by Approval `accept` and `return_for_changes`;
-2. whether V1 attestation is an application-level authenticated approval or a formal digital/electronic signature;
-3. immutable ApprovalReceipt/decision evidence and how it binds actor + assurance + Submission digest;
-4. manifestation of approval/effectivity in official/readable renditions without mutating approved source truth;
-5. portability/export package integrity, signature and optional encryption boundary;
-6. upload/content quarantine lifecycle versus Document/Evidence business lifecycle;
-7. file-type detection, allowed-format validation, size/complexity limits and parser hardening;
-8. malware scanning and behavior when scanner is unavailable;
-9. risky format features such as Office macros/external relationships, PDF active content and archive bombs;
-10. safe preview/view/download policy and Content-Disposition/content-type controls;
-11. rendering/conversion sandbox/network policy for untrusted content;
-12. security evidence and audit facts without turning telemetry into business authority.
+1. adversarially test R3–R9.5 against representative end-to-end scenarios and failure cases;
+2. identify genuine contradictions/gaps only;
+3. run a final YAGNI/deletion pass and distinguish launch requirements from future seams;
+4. close the bounded authorization delta for new Evidence/Dossier/Retention/Import/Export operations;
+5. produce the final whole-product capability/domain freeze;
+6. determine whether any material issue still blocks descent into R10 technical architecture.
 
-Then R9.5-8 performs the final whole-product adversarial freeze and bounded R9 authorization delta before R10 technical architecture resumes.
+Representative adversarial cases must include at least:
+
+```text
+DOCX in-app controlled procedure
+external XLSX controlled document
+native PDF / SVG / CAD-style source
+Evidence upload inside Sale Dossier
+Product Dossier with mechanical/electrical/manual documents
+MinIO→S3 relocation
+SharePoint import/publish copy
+return-for-changes + resubmit
+stale external edit / stale autosave
+historical migration with incomplete history
+retention expiry + LegalHold
+tenant deletion blocked by retained content
+external-system disappearance
+cross-scope authorization / SoD
+provider/render/job failure without business-truth corruption
+```
 
 ---
 
-# 16. Implementation gate
+# 17. Implementation gate
 
 **NO PRODUCT IMPLEMENTATION.** R10 bounded contexts/filesystem/data model remains blocked until R9.5-8 is explicitly approved.
