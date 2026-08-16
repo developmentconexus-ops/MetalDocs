@@ -1,134 +1,81 @@
-# MetalDocs Agent Routing
+# MetalDocs Agent Bootstrap
 
-## ACTIVE ARCHITECTURE RESET — READ FIRST
+> **Scope:** repository-wide. This file is a routing/bootstrap document, not a methodology, status, roadmap, or architecture authority.
 
-MetalDocs is currently in a **design-only Cohesive Platform Redesign**. This is a hard stop before product implementation or continuation of historical plans.
+## Fresh-session read order
 
-For any work touching product/domain architecture, authentication, organization, authorization, areas, groups, roles, permissions, approval/workflow, documents, controlled documents, templates, taxonomy, release, rendering/renditions, periodic review, distribution, notifications, search, tokens, tenant lifecycle, or their data/API boundaries, read in this exact order:
+Start every fresh session here, then read:
 
-1. `wiki/standards/root-cause-global-maximum-method.md`
-2. `wiki/architecture/cohesive-platform-redesign.md`
-3. `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md`
-4. `wiki/references/current-agent-handoff.md`
+1. `docs/engineering/standards/root-cause-global-maximum-method.md` — local mirror of the organizational engineering method.
+2. `wiki/references/current-agent-handoff.md` — current status/router; never infer the current stage from this file.
+3. The current architecture/program authority named by the router. For the active cohesive redesign this is `wiki/architecture/cohesive-platform-redesign.md`.
+4. The active decision/stage artifact named by that authority. For the cohesive redesign this is `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md`.
+5. Only then read the owner documents for the task surface.
 
-### Design-only gate
+Do not use conversation memory, historical plans, current folder shape, or implementation existence as authority when a current owner document exists.
 
-**NO product code, schema, migration, OpenAPI or frontend implementation is authorized by the redesign yet.**
+## DevelopmentConexus Engineering Method
 
-Do not:
+Canonical authority: `developmentconexus-ops/conexus-methodology/METHOD.md`.
 
-- resume an old roadmap/milestone/spec/plan from Git history;
-- restore deleted `docs/superpowers` material into the live tree;
-- implement PR #113 / historical A8 shapes by inertia;
-- treat current module layout, table ownership, route topology or old ADR wording as proof that the same target boundary should survive;
-- patch `documents`, `controlleddocuments`, `templates`, `taxonomy`, `approval` or IAM locally when the active ledger classifies the issue as part of the redesign;
-- invent compatibility layers merely to preserve concepts that the target intends to delete.
+This repository currently consumes **version `1.0.0`** through the byte-for-byte local mirror at `docs/engineering/standards/root-cause-global-maximum-method.md`. The mirror exists only for agent availability/context; it is **not a fork or second authority**.
 
-Current runtime/schema/OpenAPI truth remains authoritative for **what runs today**. The cohesive redesign ledger is authoritative for **what the target is becoming**. Never use runtime existence as a premise that a target abstraction must survive.
+Updates are manual: when the organization deliberately adopts a newer Method, replace the local mirror with the chosen canonical bytes and update the consumed version here. Do not add automatic sync, submodules, packages, bots, CI synchronization, registries, or other distribution machinery without a demonstrated failure class.
 
-## Root-Cause / Global-Maximum Engineering Gate
+MetalDocs may specialize or operationalize the Method for its product/repository, but MUST NOT silently redefine or weaken it. Surface any conflict inside the Method's scope instead of locally reinterpreting it.
 
-For every non-trivial bug fix, refactor, architecture change, remediation, simplification, new abstraction, new guard, repeated review finding, or cross-boundary change, read `wiki/standards/root-cause-global-maximum-method.md` before implementation.
+## Authority and routing
 
-Before implementation, record at least:
+Use the owner for the question being answered:
 
-- symptom;
-- root cause;
-- target property;
-- authority and boundary;
-- local-maximum candidate;
-- global-maximum candidate;
-- chosen outcome;
-- enforcement layer;
-- proof strategy;
-- transitional exit when applicable.
+- **Current status / next step / implementation gate:** `wiki/references/current-agent-handoff.md`, routed to the active program/stage authority.
+- **Target architecture / active design decisions:** `wiki/architecture/cohesive-platform-redesign.md` + its active ledger while that program is active; durable decisions live under `wiki/decisions/` when promoted.
+- **What runs today:** runtime code, database/schema/migrations, OpenAPI/generated contracts; current-state wiki is supporting memory.
+- **Backend/API contracts:** `wiki/architecture/backend-api-structure.md`, `wiki/architecture/api-contract.md`, `wiki/architecture/api-design-system.md`.
+- **Database / tenant isolation:** `wiki/database/index.md` and owning database/ADR pages.
+- **Frontend:** `wiki/architecture/frontend-structure.md` and owning frontend pages.
+- **QA / feature close-out:** `wiki/quality/qa-operating-system.md`. This is a repo-specific QA specialization, not a second organizational engineering method.
+- **Documentation lifecycle/authority:** `wiki/standards/documentation-governance.md`.
+- **New feature/module pre-design:** `.claude/skills/developing-new-work/SKILL.md` when the active architecture program does not already own the boundary. This is a repo-specific specialization of the organizational Method.
+- **Impact tracing / adversarial review:** use the applicable skills under `.claude/skills/`; do not create parallel authority documents from their outputs.
 
-Do not optimize inside a known patch or workaround. Do not remove enforcement merely to reduce code. Do not add a guard when the invalid state can instead be made unrepresentable at a stronger reasonable boundary.
+If two active authorities materially contradict each other, stop and surface the conflict. Do not reconcile it silently in code or documentation.
 
-## Documentation Authority
+## Stable repo safety rails
 
-- `wiki/` is durable maintained truth.
-- `docs/` is staging only.
-- During the active redesign, `wiki/architecture/cohesive-platform-redesign.md` is the canonical program entrypoint.
-- The only active detailed staging artifact under `docs/superpowers/` is `analysis/2026-08-14-cohesive-platform-redesign-ledger.md`.
-- Deleted `docs/superpowers` plans/specs/milestones/reports remain available in Git history only and are **historical evidence, never forward authority**.
-- Wiki pages explicitly marked `LEGACY`, `HISTORICAL`, `SUPERSEDED`, or `CURRENT-STATE REFERENCE` may be consulted to understand the existing system but must not drive target design.
-- Durable final decisions from the redesign will be promoted into the owning wiki architecture/ADR pages only after operator approval.
+- Never read out, print, document, commit, or expose `.env` secrets or credentials.
+- Keep tenant isolation/RLS, generated-contract workflows, transaction boundaries, and other existing safety controls intact unless their owning authority explicitly changes them. Never weaken verification merely to make a check pass.
+- Treat generated outputs as generated; follow the owning contract/generator workflow instead of hand-maintaining parallel shapes.
+- Current implementation is evidence for current state, not automatic target-architecture entitlement.
+- Keep changes scoped. Do not revert unrelated user work, rewrite shared history, or restore superseded material from Git history by inertia.
+- Operator startup uses the repository PowerShell scripts; do not source `.env` into a shell as an ad-hoc startup path.
 
-## Truth Hierarchy
+## Git workflow
 
-Use the hierarchy appropriate to the question.
+- Work on a scoped branch/PR; do not push directly to `main`.
+- Commit only the verified task scope. Do not force-push/rewrite history unless the operator explicitly requests it and the branch is safe to rewrite.
+- Push only with explicit operator authorization.
 
-### What runs today
+## Verification
 
-1. Runtime/code/database truth.
-2. OpenAPI/generated contract truth.
-3. Current-state wiki documentation.
-4. Historical evidence.
+`tools/verify` is the repository verification authority; `.github/workflows/ci.yml` owns the required PR gate composition.
 
-### What should exist after the redesign
+Normal local PR gate:
 
-1. Operator-approved decisions in the active cohesive redesign ledger.
-2. `wiki/architecture/cohesive-platform-redesign.md`.
-3. Canonical cross-cutting standards.
-4. Final ADRs explicitly retained by the redesign.
-5. Runtime/schema/module/legacy docs as evidence only.
+```text
+go run ./tools/verify --profile=pr
+```
 
-When current implementation and target design disagree, do **not** “reconcile” the target back toward the current implementation. Record the current shape in the migration/deletion map later.
+Use targeted checks while iterating, but do not substitute a hand-picked subset for the required gate when claiming repository verification. For runtime/startup work also use the applicable PowerShell runnable checks (for example `./scripts/check-system-runnable.ps1` from PowerShell); for frontend-only targeted tests, `make test` runs Vitest from the correct app directory.
 
-## Boundary Routing
+Record the command and outcome; never claim green without evidence. If required infrastructure/tooling is unavailable, report that limitation instead of weakening or bypassing the gate.
 
-Use the smallest current source set that matches the task.
+## Documentation discipline
 
-- Backend HTTP / OpenAPI / codegen / handler work -> `wiki/architecture/backend-api-structure.md`, `wiki/architecture/api-contract.md`, `wiki/architecture/api-design-system.md`.
-- Database / migrations / bootstrap / grants / schema ownership -> `wiki/database/index.md` plus relevant database pages.
-- Frontend under `frontend/apps/web/` -> `wiki/architecture/frontend-structure.md` plus the owning frontend page.
-- Frontend API / TanStack Query / generated API types -> `wiki/architecture/frontend-structure.md` query/API sections plus generated API types.
-- Module or wiki documentation -> `wiki/standards/documentation-governance.md` plus the owning page.
-- New feature/module pre-design -> `.claude/skills/developing-new-work/SKILL.md`, **unless the active cohesive redesign already owns the boundary**, in which case continue the redesign ledger instead of opening a parallel design authority.
-- Adversarial design/plan/diff review -> `.claude/skills/adversarial-review/SKILL.md`.
-- Code relationship / impact tracing -> `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md`.
-- Harness coordination -> `.claude/skills/harness-hub/SKILL.md`.
-- QA / close-out -> `wiki/quality/qa-operating-system.md` and relevant checklists.
+Follow `wiki/standards/documentation-governance.md`:
 
-If startup, auth/session, route truth, migrations, runtime/spec/generated/frontend alignment or the redesign authority itself is contradictory, treat that as a prerequisite hard stop. Do not patch around a shared API redesign, cross-module auth/authz redesign, storage/provider redesign, workflow semantic redesign, or other boundary-changing prerequisite.
+- `wiki/` holds durable maintained product/repository truth;
+- `docs/` holds active staging/working material unless an owner explicitly says otherwise;
+- Git history is the archive.
 
-## Default Workflow
-
-### While Cohesive Platform Redesign gate is closed
-
-1. Read the active redesign stack.
-2. State the product/domain question being decided.
-3. Census current implementation only as evidence.
-4. Compare mature products/standards/libraries where useful.
-5. Apply Root-Cause / Global-Maximum + YAGNI.
-6. Present the smallest correct target and alternatives/trade-offs.
-7. Record operator-approved decision in the active ledger.
-8. Continue to the next design dependency.
-9. Do **not** implement.
-
-### After the redesign implementation gate is explicitly opened
-
-1. Read the final promoted ADR/spec set and implementation plan.
-2. Name owning bounded context, invariant and boundary.
-3. Implement only the planned slice.
-4. Run static + targeted verification.
-5. Perform code review and product QA.
-6. Fix root-cause families, not isolated symptoms.
-7. Sync durable wiki truth and deletion/migration evidence.
-8. Close only with explicit proof and bounded defers.
-
-## Engineering Behavior
-
-- Always simplify code; never simplify correctness.
-- Prefer one authority and one path over parallel implementations.
-- YAGNI removes speculative capability, not invariants or fail-closed behavior.
-- Existing code has no right to survive the architecture reset merely because migration is inconvenient.
-- Conversely, do not rewrite a healthy supporting component simply because the core is being redesigned; preserve boundaries that already match the target.
-- Delete obsolete compatibility paths once their successor is authoritative.
-- Do not create frameworks, policy languages, workflow engines, ReBAC engines or new services without a concrete requirement that simpler structure cannot serve.
-- `implemented`, `fixed`, `done`, `green`, and `looks good` are never sufficient closure evidence by themselves.
-
-## Context7
-
-Use Context7 MCP for current documentation when work depends on a library, framework, SDK, API, CLI tool, or cloud service. Prefer it over remembered syntax. Do not invoke it for ordinary repository-local reasoning that does not depend on external API behavior.
+Move/delegate authority instead of duplicating it. Do not embed current milestones, handoffs, volatile decision lists, or temporary task instructions in bootstrap files.
