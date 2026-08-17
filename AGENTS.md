@@ -25,6 +25,10 @@ Updates are manual: when the organization deliberately adopts a newer Method, re
 
 MetalDocs may specialize or operationalize the Method for its product/repository, but MUST NOT silently redefine or weaken it. Surface any conflict inside the Method's scope instead of locally reinterpreting it.
 
+For material independent review with Fable, follow the canonical **Standard Fable review workflow** in
+`developmentconexus-ops/conexus-methodology/README.md`.
+Repository authority remains local; Fable review is non-authoritative input until ratified.
+
 ## Authority and routing
 
 Use the owner for the question being answered:
