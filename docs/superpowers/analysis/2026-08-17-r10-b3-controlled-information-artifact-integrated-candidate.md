@@ -4,16 +4,16 @@
 > **Date:** 2026-08-17  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
-> **Input HEAD:** `111299f167f7bc959ab8d5ec9215474cc460e21c`  
+> **Input authority HEAD:** `111299f167f7bc959ab8d5ec9215474cc460e21c`  
 > **Method:** DevelopmentConexus Engineering Method v1.0.0  
 > **Implementation:** BLOCKED  
-> **Independent review:** deliberately deferred to Whole-R10 unless a material exception trigger appears.
+> **Independent review:** deferred to Whole-R10 unless a material exception trigger appears.
 
-This file is staging analysis. It does **not** alter the frozen product/domain ledger, `wiki/architecture/r10-technical-architecture.md`, current handoff, or any promoted authority. It is intended to be challenged by later R10 blocks and eventually by the Whole-R10 independent review.
+This file is staging analysis. It does **not** alter the frozen product/domain ledger, `wiki/architecture/r10-technical-architecture.md`, current handoff, or any promoted authority. If accepted by the operator, B3 becomes **ACCEPTED FOR R10 INTEGRATION / NON-FINAL**, not independently ratified. Later R10 blocks may reopen only the materially implicated part when a real counterexample appears.
 
 ---
 
-## 1. Authority and evidence boundary
+# 1. Authority and evidence boundary
 
 Authority used, in order:
 
@@ -26,17 +26,16 @@ Authority used, in order:
 
 Current code/schema/OpenAPI/module docs are current-state evidence only.
 
-External references are evidence/comparison only and never MetalDocs authority:
+External references are evidence/comparison only, never MetalDocs authority:
 
 - PostgreSQL conditional uniqueness / partial unique indexes: <https://www.postgresql.org/docs/current/ddl-constraints.html>
-- PostgreSQL row locking / READ COMMITTED considerations: <https://www.postgresql.org/docs/current/transaction-iso.html> and <https://www.postgresql.org/docs/current/explicit-locking.html>
+- PostgreSQL READ COMMITTED / row-lock semantics: <https://www.postgresql.org/docs/current/transaction-iso.html> and <https://www.postgresql.org/docs/current/explicit-locking.html>
 - RFC 8785 JSON Canonicalization Scheme: <https://www.rfc-editor.org/rfc/rfc8785.html>
-- M-Files templates as a role/property of ordinary documents: <https://userguide.m-files.com/user-guide/latest/eng/using_template.html>
-- M-Files immutable version-history posture (rollback creates a new version): <https://userguide.m-files.com/user-guide/latest/eng/object_history.html>
-- Veeva QualityDocs Periodic Review records bound to the steady-state document/version and stale-version safeguards: <https://quality.veevavault.help/en/lr/72024/>
-- SharePoint versioning/content-approval comparison: <https://learn.microsoft.com/en-us/sharepoint/governance/versioning-content-approval-and-check-out-planning>
+- M-Files document-template and version-history posture: <https://userguide.m-files.com/user-guide/latest/eng/using_template.html> and <https://userguide.m-files.com/user-guide/latest/eng/object_history.html>
+- Veeva QualityDocs Periodic Review comparison: <https://quality.veevavault.help/en/lr/72024/>
+- SharePoint versioning/content-approval/checkout comparison: <https://learn.microsoft.com/en-us/sharepoint/governance/versioning-content-approval-and-check-out-planning>
 
-The comparison result is narrow: mature systems reinforce version separation, document-role templates, explicit review records and concurrency/version guards, but MetalDocs keeps its already-frozen `DocumentRevision` / `WorkingContent` / `RevisionSubmission` semantics rather than copying another product's lifecycle or workflow engine.
+Comparison result: mature systems reinforce version separation, explicit review records, document-role templates and concurrency/version guards. MetalDocs does **not** copy their lifecycle/workflow engines; its frozen `DocumentRevision` / `WorkingContent` / `RevisionSubmission` semantics remain authority.
 
 ---
 
@@ -44,88 +43,90 @@ The comparison result is narrow: mature systems reinforce version separation, do
 
 ## 2.1 Known — frozen/promoted inputs
 
-The candidate must preserve:
+B3 must preserve:
 
-- `DocumentType` with immutable code, display fields, optional classification-only category and ACTIVE/INACTIVE lifecycle;
-- `Document` as stable governed identity with stable code / DocumentType / Area;
-- official business revisions `REV001`, `REV002`, ...; REV numbers never reuse;
-- `REV002+` reason-for-change before first SUBMIT;
-- revision states `DRAFT | SUBMITTED | EFFECTIVE | SUPERSEDED | OBSOLETE | CANCELLED`;
+- `DocumentType`: immutable code, display fields, optional classification-only category, ACTIVE/INACTIVE;
+- `Document`: stable governed identity with stable code / DocumentType / Area;
+- official business revisions `REV001`, `REV002`, ...; numbers never reuse;
+- `REV002+` requires reason-for-change before first SUBMIT;
+- Revision states `DRAFT | SUBMITTED | EFFECTIVE | SUPERSEDED | OBSOLETE | CANCELLED`;
 - at most one open Revision and at most one EFFECTIVE Revision per Document;
 - format-agnostic mutable `WorkingContent` protected by one monotonic `working_version` OCC generation;
 - whole-WorkingContent replacement semantics;
-- immutable `RevisionSubmission` for every attempt, including NoHumanApproval;
-- same-REV return/resubmit creates a new Submission rather than mutating an old attempt;
+- immutable `RevisionSubmission` for every submit attempt, including NoHumanApproval;
+- same-REV return/resubmit creates a new Submission, never mutates the prior attempt;
 - Submission digest binds exact source Artifact hash + governed state + decision-relevant structured/template provenance, never provider location;
-- Artifact as immutable exact-byte technical identity/facts, provider-neutral;
-- exactly one primary Artifact per DocumentRevision V1;
-- Template as a role of ordinary governed Document, not a parallel lifecycle;
-- `TemplateUse` M:N and exact source effective REV pinned at derived-document creation;
+- `Artifact`: immutable exact-byte identity/facts with SHA-256, size, ContentFormat/media type and technical provenance;
+- no confirmed orphan Artifact library;
+- one current primary Artifact for a Revision WorkingContent; immutable historical Submission attempts preserve their exact source Artifact;
+- Template is a role of ordinary governed Document, not a parallel lifecycle;
+- `TemplateUse` is M:N; derived creation pins exact source effective REV/content;
 - optional `TemplateSpec` only where structured authoring requires it;
-- `EditorialComment` as DRAFT collaboration state; unresolved comments block SUBMIT;
-- Periodic Review `Disabled | Every(n months)`; overdue never invalidates EFFECTIVE content; immutable record binds exact reviewed REV and outcome;
+- `EditorialComment` is DRAFT collaboration state; unresolved comments block SUBMIT;
+- Periodic Review = `Disabled | Every(n months)`; overdue does not invalidate EFFECTIVE; immutable record binds exact reviewed REV and outcome;
 - Tenant Dictionary values are pinned for a new REV and do not silently re-resolve on same-REV return/resubmit;
-- small product-owned System Value Catalog;
-- B1 substrate: one PostgreSQL product DB / `metaldocs` schema / UUID PKs / typed FKs / no universal tenant partition / READ COMMITTED / cross-owner RESTRICT-NO ACTION / one local transaction for frozen local atomicity;
-- B2 identity/access laws, User/Area lifecycle and lock ordering remain closed.
+- System Value Catalog remains small/product-owned;
+- B1: one PostgreSQL product DB / schema `metaldocs`, UUID PKs, typed FKs, no universal tenant partition, cross-owner RESTRICT/NO ACTION, READ COMMITTED, local same-commit atomicity;
+- B2 identity/access/User/Area/lock laws remain closed.
 
-## 2.2 Inferred — candidate technical choices
+## 2.2 Inferred — technical candidate choices
 
-The following are technical realizations, not new frozen product requirements:
+These are candidate realization choices, not product-authority rewrites:
 
-1. `revision_no` is the only persisted official REV ordinal; `REV%03d` is derived display.
-2. `Document` carries only stable identity and current stewardship; revision-varying governed metadata belongs to WorkingContent/Submission.
-3. `WorkingContent` is exactly one current row per business Revision and owns the one OCC generation.
-4. Submission uses a bounded versioned manifest rather than a growing set of provider-/format-specific snapshot columns.
-5. System Value Catalog remains static product code; no editable catalog table V1.
-6. Template role is a typed relational subtype (`TemplateDocument`) so `TemplateUse` can reference the role structurally without a Template aggregate.
-7. Periodic Review reuses `Document.responsible_user_id` as the canonical current responsible owner rather than creating a second owner authority.
-8. A confirmed `Artifact` row represents confirmed exact-byte facts; temporary staging state is a later R10-C mechanism, not a second semantic Artifact lifecycle.
-9. Artifact SHA-256 is not a global relational uniqueness key: two captures of identical bytes may carry different technical provenance later; physical deduplication remains provider/mechanism freedom.
+1. `revision_no` is the only persisted official REV ordinal; `REV%03d` is derived.
+2. Revision-varying governed metadata belongs to WorkingContent/Submission, not stable Document identity.
+3. `WorkingContent` is one current mutable row per open Revision and owns the sole OCC generation.
+4. Submission uses a bounded versioned manifest rather than format/provider-specific snapshot columns.
+5. The manifest canonical form is RFC 8785 JCS and its digest is SHA-256.
+6. System Value Catalog remains static product code; no editable catalog table V1.
+7. Template role uses a typed relational subtype (`TemplateDocument`) rather than a Template aggregate.
+8. Periodic Review uses `Document.responsible_user_id` as current responsibility authority and snapshots that User on the immutable review record.
+9. A confirmed `Artifact` row is provider-neutral semantic exact-byte state; temporary provider staging is R10-C mechanism state.
+10. SHA-256 is not a global Artifact-row uniqueness key; identical bytes may have distinct capture/provenance identities while physical deduplication remains mechanism freedom.
+11. Numbering configuration becomes immutable after its first committed allocation; versioned numbering policy is deferred until a real post-use change requirement exists.
 
-## 2.3 Unknown — explicitly bounded
+## 2.3 Unknown — bounded, not converted into defaults
 
-These do not block the relational candidate:
+- whether a future UX needs a canonical default TemplateUse per DocumentType;
+- whether a real future requirement needs numbering-policy mutation after first use;
+- whether Periodic Review needs a richer outcome vocabulary;
+- whether a future authoring model needs same-REV introduction of new Tenant Dictionary dependencies after Revision creation;
+- terminal cleanup timing for non-authoritative WorkingContent/EditorSession rows after a Revision can no longer return to DRAFT.
 
-- whether a future UX needs exactly one default TemplateUse per DocumentType;
-- whether a future product requirement needs numbering-policy changes after first allocation;
-- whether Periodic Review later needs more verdict detail than the minimal V1 outcome set below;
-- whether a future authoring model needs same-REV introduction of new Tenant Dictionary dependencies after revision creation.
+These Unknowns do not block B3. The candidate prepares seams, not dormant capabilities.
 
-Unknown remains unknown. The candidate prepares seams but does not add dormant machinery.
-
-## 2.4 Deferred by R10 stage ownership
+## 2.4 Deferred by stage ownership
 
 ```text
 ApprovalPolicy / ApprovalInstance / ApprovalDecision / fresh-auth → B4
 Rendition / Release / effectivity transaction                    → B4
 Distribution                                                     → B4
 Evidence / Dossier / Records Governance Artifact relations       → B5
-final Artifact ownership closure / disposition interaction       → B5
+final Artifact ownership/disposition closure                     → B5
 Audit final fields / Interchange / cross-owner matrix            → B6
 malware / physical storage / relocation / restore                → R10-C
 async execution / projections / external provider effects        → R10-D
 API / frontend / editor journeys                                 → R10-E
-historical migration / cutover / legacy deletion                 → R10-F
+historical migration / cutover / deletion                        → R10-F
 ```
 
 ---
 
 # 3. Root Cause
 
-The current-state model fragments one controlled-information truth across separate `controlled_documents`, multiple `documents` representations, technical `document_revisions`, provider/editor state and a parallel Template lifecycle. That structure permits different bytes/metadata/revision notions to become authoritative at different points.
+Current state fragments one controlled-information truth across separate `controlled_documents`, multiple `documents` representations, technical `document_revisions`, editor/provider state and a parallel Template lifecycle.
 
 The structural failure class is **split-brain governed identity**:
 
 ```text
-business document identity
-≠ business revision identity
-≠ editor/autosave generation
-≠ submitted immutable attempt
-≠ exact bytes
+business Document identity
+!= business Revision identity
+!= mutable editor/autosave generation
+!= immutable submitted attempt
+!= exact bytes
 ```
 
-These facts must be distinct, but each must have exactly one owner and explicit transitions between them. Reusing today's tables with renamed columns would be a local maximum because it preserves the conditions that allowed editor truth, freeze truth and approval truth to diverge.
+Those concepts are legitimately different, but each needs one authority and explicit transitions. Renaming/tightening the existing tables would preserve the condition that historically allowed editor truth, freeze truth and approval truth to diverge.
 
 ---
 
@@ -136,33 +137,50 @@ These facts must be distinct, but each must have exactly one owner and explicit 
 Corollaries:
 
 ```text
-Document          != bytes
-DocumentRevision  != autosave/checkpoint
-WorkingContent    != browser/editor session state
-RevisionSubmission!= DocumentRevision
-Artifact          != provider location/key/version
-Template          != parallel aggregate/lifecycle
-PeriodicReview    != mutable last-reviewed summary
-EditorialComment  != provider comment identity
+Document           != bytes
+DocumentRevision   != autosave/checkpoint
+WorkingContent     != browser/editor session
+RevisionSubmission != Revision
+Artifact           != provider location/key/version
+Template           != parallel aggregate/lifecycle
+PeriodicReview     != mutable last-reviewed summary
+EditorialComment   != provider comment identity
 ```
 
 ---
 
-# 5. Credible alternatives
+# 5. Constraints inherited from B1/B2
 
-## A. Evolve current tables in place
+- one MetalDocs PostgreSQL DB / `metaldocs` schema;
+- UUID technical identity;
+- no universal `tenant_id/company_id/deployment_id` partition column;
+- typed FKs only for business relations;
+- cross-owner FK actions `RESTRICT | NO ACTION` only;
+- frozen vocabulary `TEXT + CHECK` by default;
+- canonical SHA-256 `BYTEA` with 32-byte length check;
+- JSONB only for bounded owned whole snapshots/provenance, never an escape hatch;
+- ordinary product mutations under explicit local transactions;
+- default isolation `READ COMMITTED`; narrow locks/constraints/CAS before stronger isolation;
+- B2 User/Area eligibility and lock classes precede B3 locks when both are needed;
+- current code/schema inconvenience is not target authority.
 
-Keep `controlled_documents`, current `documents`, technical `document_revisions` and TemplateVersion, then tighten constraints.
+---
 
-**Rejected:** smallest migration delta, but preserves duplicate identities, provider/storage fields in business rows and parallel lifecycle paths. Local maximum.
+# 6. Credible alternatives
 
-## B. One fat DocumentRevision row
+## A — evolve legacy tables in place
 
-Put current content, metadata, hashes, template state, approval/rendition fields and periodic-review summaries onto one revision row.
+Keep `controlled_documents`, current `documents`, technical `document_revisions` and parallel TemplateVersion; tighten constraints.
 
-**Rejected:** lowers table count while mixing incompatible mutation laws. Mutable DRAFT and immutable review evidence become column-state conventions rather than structural boundaries.
+**Local Maximum / reject.** Small migration delta but preserves duplicate identities and incompatible mutation laws.
 
-## C. Small relational kernel with mutation-law separation — recommended
+## B — one fat DocumentRevision row
+
+Put mutable content, hashes, template data, approval/rendition fields and review summaries on one row.
+
+**Local Maximum / reject.** Fewer tables but mutable DRAFT and immutable review evidence become column conventions instead of structural boundaries.
+
+## C — small relational kernel separated by mutation law
 
 ```text
 Document
@@ -171,18 +189,18 @@ Document
 → immutable RevisionSubmission
 → exact Artifact
 
-+ small typed configuration/provenance/review adjuncts
++ small typed configuration / provenance / review adjuncts
 ```
 
-**Recommended Global Maximum:** it removes duplicate authority without introducing generic ECM/BPM/object-platform machinery.
+**Recommended Global Maximum.** Removes duplicate authority without creating generic ECM/BPM/object-platform machinery.
 
 ---
 
-# 6. Integrated relational candidate
+# 7. Integrated relational candidate
 
-Names below are semantic target names; exact SQL naming/casing is implementation-spec work.
+Names are semantic target names. Exact SQL naming is implementation-spec work.
 
-## 6.1 Artifact core — supporting semantic owner `Artifact`
+## 7.1 Artifact core — supporting semantic owner `Artifact`
 
 ```text
 Artifact
@@ -191,24 +209,28 @@ Artifact
   size_bytes BIGINT NOT NULL CHECK size_bytes >= 0
   content_format TEXT NOT NULL CHECK closed ContentFormat vocabulary
   media_type TEXT NOT NULL
+  technical_provenance JSONB NOT NULL CHECK jsonb_typeof(...)='object'
   confirmed_at TIMESTAMPTZ NOT NULL
 ```
 
 Mutation law:
 
-- row fields are immutable after insert;
-- provider bucket/key/version/URL are absent;
+- all semantic fields immutable after insert;
+- provider bucket/key/version/URL absent;
+- `technical_provenance` is bounded/provider-neutral provenance, not physical location authority;
 - no global `UNIQUE(sha256)` V1;
-- physical staging, scan evidence, storage location and relocation are R10-C;
-- deletion of an unsubmitted Artifact identity is permitted only through typed-owner closure; B5 completes the global owner/disposition law before Whole-R10 ratification.
+- staging, malware result, managed physical location, relocation and restore are R10-C;
+- no `owner_type/owner_id` generic business registry.
 
-**Confirmation seam:** temporary bytes may exist before classification, but a successful local confirmation transaction inserts the `Artifact` semantic row only together with its first typed governed owner relationship. A DB failure leaves only temporary provider staging, never a confirmed orphan Artifact row.
+### Confirmation seam
 
-No `owner_type/owner_id` generic registry is introduced.
+Temporary provider staging may precede classification. A successful **semantic confirmation** inserts the immutable Artifact row only in the same local DB transaction that establishes its first typed governed owner relation. DB rollback may leave temporary staging for later mechanism cleanup, but never a confirmed orphan semantic Artifact.
+
+B3 proves the Controlled Information side. B5 must close the final union when Evidence/Records relationships are designed.
 
 ---
 
-## 6.2 Controlled Information configuration
+## 7.2 Controlled Information configuration
 
 ### DocumentTypeCategory
 
@@ -221,8 +243,8 @@ DocumentTypeCategory
 ```
 
 - optional classification/navigation only;
-- `code` immutable;
-- no governance, workflow or AuthZ semantics;
+- code immutable;
+- no governance/workflow/AuthZ semantics;
 - delete RESTRICT while referenced.
 
 ### DocumentType
@@ -243,17 +265,20 @@ DocumentType
 Laws:
 
 - code immutable;
-- numbering grammar is only literals + `{TYPE}` / `{AREA}` / `{SEQ}`;
-- numbering policy is mutable only before first allocation; after first committed allocation, pattern/scope/padding become immutable V1;
-- no numbering-policy version family until a real requirement needs post-use changes;
-- INACTIVE blocks creation of new Documents but does not invalidate existing Documents/Revisions;
-- Approval and representation configuration stay out of B3.
+- numbering grammar = literals + `{TYPE}` / `{AREA}` / `{SEQ}` only;
+- `{SEQ}` appears exactly once;
+- `TYPE_AREA` requires `{AREA}` so independent per-Area sequences cannot produce structurally identical codes for equal sequence numbers;
+- final `Document.code UNIQUE` remains the global collision backstop;
+- numbering config mutable only before first committed allocation, then immutable V1;
+- no numbering-policy-version family until real post-use mutation is required;
+- INACTIVE blocks new Document creation but never invalidates existing Documents/Revisions;
+- Approval/representation config remains outside B3.
 
-The pattern parser is a closed domain parser with DB backstop/guard in the implementation spec, not a generic formula engine.
+A closed parser validates the pattern; it is not a formula/reset/custom-metadata engine.
 
 ### DocumentNumberSeries
 
-Durable mechanism owned by Controlled Information:
+Durable allocation mechanism owned by Controlled Information:
 
 ```text
 DocumentNumberSeries
@@ -272,11 +297,14 @@ UNIQUE(document_type_id, area_id) WHERE area_id IS NOT NULL
 
 Interpretation:
 
-- `TYPE` scope uses the NULL-area series;
-- `TYPE_AREA` scope uses the concrete Area series;
-- allocation is transactional; committed values never decrement/reuse;
-- final sequence and final rendered code are persisted on Document;
-- preview is advisory UI/API behavior and reserves nothing (R10-E).
+- `TYPE` → `area_id IS NULL`;
+- `TYPE_AREA` → concrete Area;
+- series is created on first allocation if absent;
+- first successful series/allocation commit is also the structural point after which DocumentType numbering config cannot change;
+- allocation monotonically advances `next_value`; committed sequence values never decrement/reuse;
+- preview is read-only/advisory and reserves nothing (R10-E).
+
+A DB invariant guard in the implementation spec must prove the series shape matches `DocumentType.numbering_scope`; application convention alone is insufficient.
 
 ### TenantDictionaryValue
 
@@ -289,18 +317,18 @@ TenantDictionaryValue
   description TEXT NULL
 ```
 
-- company-level current truth; no `tenant_id` partition column;
-- `name` immutable; value/display fields mutable;
+- company-level current truth; no tenant partition column;
+- name immutable; value/display mutable;
 - whole-company `dictionary.manage` target;
-- relevant values are frozen into each new Revision snapshot below.
+- relevant values freeze into each new Revision snapshot.
 
 ### System Value Catalog
 
-No editable persistence V1. It remains a small static product catalog. Only resolved values that materially enter the submitted candidate are frozen in governed state/manifest.
+No editable persistence V1. Small static product catalog. Resolved system values that materially affect the submitted candidate enter WorkingContent/Submission governed state; the catalog itself does not become mutable DB authority.
 
 ---
 
-## 6.3 Stable Document identity and responsibility
+## 7.3 Stable Document identity / numbering provenance / responsibility
 
 ```text
 Document
@@ -308,35 +336,46 @@ Document
   code TEXT NOT NULL UNIQUE
   document_type_id UUID NOT NULL FK DocumentType(id) RESTRICT
   area_id UUID NOT NULL FK Area(id) RESTRICT
+  number_series_id UUID NOT NULL FK DocumentNumberSeries(id) RESTRICT
   sequence_no BIGINT NOT NULL CHECK sequence_no >= 1
   responsible_user_id UUID NOT NULL FK User(id) RESTRICT
   created_at TIMESTAMPTZ NOT NULL
+
+  UNIQUE(number_series_id, sequence_no)
 ```
 
 Mutation law:
 
-- `id`, `code`, `document_type_id`, `area_id`, `sequence_no`, `created_at` immutable;
-- `responsible_user_id` mutable through explicit `document.owner.manage` operation;
-- no current/effective/open revision pointer duplicates authoritative Revision state;
+- `id`, code, type, Area, series, sequence and creation instant immutable;
+- `responsible_user_id` mutable only through explicit `document.owner.manage`;
+- no current/effective/open Revision pointer duplicates authoritative Revision state;
 - no provider/editor/storage identity;
-- revision-varying title/governed metadata is not stored as mutable Document identity.
+- revision-varying title/governed metadata lives in WorkingContent/Submission.
+
+Numbering consistency backstop:
+
+- `number_series_id` must reference this same `document_type_id`;
+- if DocumentType scope is TYPE, series Area must be NULL;
+- if scope is TYPE_AREA, series Area must equal `Document.area_id`.
+
+Because this invariant crosses rows, the implementation spec must use a database-enforced guard/constraint mechanism covering all write paths; a service-only check is insufficient.
 
 B2 coherence:
 
-- new Document requires ACTIVE DocumentType, non-retired Area and enabled responsible User;
-- existing Document remains valid after Area retirement or User offboarding; those lifecycle actions do not silently rewrite governed history;
-- assigning a new responsible User requires that User to be enabled at commit;
-- if future evidence requires “every live Document always has an enabled responsible User” across offboarding, that is a new cross-owner invariant and reopen trigger, not an implicit cascade.
+- new Document requires ACTIVE DocumentType, non-retired Area and enabled responsible User at commit;
+- existing Document remains valid after Area retirement/User offboarding; those lifecycle changes do not rewrite governed history;
+- new responsibility assignment requires enabled User;
+- if future evidence requires every live Document to always reference an enabled responsible User across offboarding, that is a new cross-owner invariant/reopen trigger, not an implicit cascade.
 
 AuthZ target classification:
 
 - DocumentType/category/numbering/dictionary/TemplateUse configuration = Tenant-wide;
-- Document content/revision/comment/periodic-review/owner operations = Area-targeted by immutable `Document.area_id` plus the applicable domain relationship/governance predicate;
+- Document content/revision/comment/periodic-review/owner operations = Area-targeted by immutable `Document.area_id` plus domain relationship/governance predicate;
 - Artifact has no end-user mechanism permission family.
 
 ---
 
-## 6.4 Business Revision
+## 7.4 Business DocumentRevision
 
 ```text
 DocumentRevision
@@ -346,40 +385,40 @@ DocumentRevision
   state TEXT NOT NULL CHECK DRAFT|SUBMITTED|EFFECTIVE|SUPERSEDED|OBSOLETE|CANCELLED
   created_by_user_id UUID NOT NULL FK User(id) RESTRICT
   created_at TIMESTAMPTZ NOT NULL
-  dictionary_snapshot JSONB NOT NULL
+  dictionary_snapshot JSONB NOT NULL CHECK jsonb_typeof(...)='object'
+
+  UNIQUE(document_id, revision_no)
 ```
 
-Constraints:
+Conditional uniqueness:
 
 ```text
-UNIQUE(document_id, revision_no)
 UNIQUE(document_id) WHERE state IN ('DRAFT','SUBMITTED')
 UNIQUE(document_id) WHERE state = 'EFFECTIVE'
 ```
 
-Interpretation:
+Laws:
 
-- `revision_no=1` renders `REV001`; no separate persisted revision label authority;
-- at-most-one open = one `DRAFT|SUBMITTED` row;
-- zero open is valid when no change cycle exists;
-- at-most-one EFFECTIVE is structural; B4 owns the winning Release transition that makes it effective;
-- new Revision allocation locks the Document and chooses `max(revision_no)+1`; cancelled/superseded ordinals never reuse;
-- `dictionary_snapshot` is an immutable bounded whole snapshot of the relevant Tenant Dictionary values resolved for that Revision at creation;
-- same-REV return/resubmit never re-resolves this snapshot;
-- if future authoring proves same-REV introduction of new dictionary dependencies is required, reopen this snapshot rule deliberately rather than silently consulting current dictionary values.
+- `revision_no=1` renders `REV001`; no second persisted label authority;
+- zero open is valid when no business change cycle exists;
+- new Revision creation locks Document, proves no open Revision, allocates `max(revision_no)+1`;
+- cancelled/superseded ordinals never reuse;
+- dictionary snapshot is an immutable bounded map of relevant values resolved for that Revision at creation;
+- same-REV return/resubmit never re-resolves it;
+- if same-REV introduction of new dictionary dependencies becomes a real requirement, this rule reopens deliberately rather than silently consulting current dictionary state.
 
-Mixed-row immutable columns require DB-enforced immutability in the implementation spec; application convention alone is insufficient.
+Immutable identity/snapshot columns need DB enforcement; state follows the explicit lifecycle state machine.
 
 ---
 
-## 6.5 WorkingContent — sole mutable DRAFT authority
+## 7.5 WorkingContent — sole mutable DRAFT authority
 
 ```text
 WorkingContent
   revision_id UUID PRIMARY KEY FK DocumentRevision(id) RESTRICT
   primary_artifact_id UUID NOT NULL FK Artifact(id) RESTRICT
-  governed_metadata JSONB NOT NULL
-  structured_authoring JSONB NULL
+  governed_metadata JSONB NOT NULL CHECK jsonb_typeof(...)='object'
+  structured_authoring JSONB NULL CHECK NULL OR jsonb_typeof(...)='object'
   reason_for_change TEXT NULL
   working_version BIGINT NOT NULL CHECK working_version >= 1
   updated_by_user_id UUID NOT NULL FK User(id) RESTRICT
@@ -399,20 +438,27 @@ WorkingContent
 
 Laws:
 
-- only mutable while owning Revision is DRAFT;
+- authoritative/mutable only while Revision = DRAFT;
+- persists through SUBMITTED when return-for-changes remains possible, but Submission is review authority during SUBMITTED;
 - every governed DRAFT mutation uses caller-observed `expected_working_version`;
-- successful mutation increments `working_version` exactly once;
-- provider/browser/editor state is never authoritative;
-- replacing primary Artifact is whole-WorkingContent replacement and atomically removes/invalidate representation-dependent structured state/provenance that no longer applies;
-- `REV002+` requires non-blank `reason_for_change` before first SUBMIT;
-- tracked-change state, when an enabled authoring model has it, is part of structured/governed state and the same OCC generation; no separate collaboration authority;
-- no business autosave/checkpoint revision family.
+- successful governed mutation increments `working_version` exactly once;
+- browser/editor/provider state never becomes authority;
+- replacing primary Artifact is **whole-WorkingContent replacement**;
+- representation-dependent structured-authoring state and TemplateSpec content that is no longer valid for the new representation must be atomically replaced/cleared in that same OCC mutation;
+- immutable historical `DocumentOrigin` is never cleared by replacement;
+- REV002+ requires nonblank reason-for-change before first SUBMIT;
+- tracked-change state, when supported, is governed state under the same OCC generation;
+- no business autosave/checkpoint Revision family.
 
-Technical `WorkingSnapshot` remains absent from the minimum candidate. It may be added as an explicitly technical recovery/checkpoint family only if a concrete recovery consumer proves the need; it can never consume `REVxxx` or become approval truth.
+Terminal retention/deletion of WorkingContent after a Revision can no longer return to DRAFT is deferred to B5/R10-F. No later consumer may treat terminal WorkingContent as official history; immutable Submission/Release facts own that history.
+
+### WorkingSnapshot
+
+Absent from minimum B3. It may be introduced only as technical recovery/checkpoint state when a concrete recovery consumer proves need; it never consumes REV numbers or becomes approval truth.
 
 ### EditorSession
 
-A narrow optional persisted lease is justified by the already-frozen “one active in-app writer + OCC” posture:
+Narrow mechanism justified by frozen one-active-in-app-writer posture:
 
 ```text
 EditorSession
@@ -424,34 +470,34 @@ EditorSession
   released_at TIMESTAMPTZ NULL
 ```
 
-At most one non-expired logical writer is enforced by the application/lease contract; correctness never depends on the lease. OCC remains the race arbiter. No long checkout.
+It is a lease/UX mechanism, never correctness authority. OCC remains the race arbiter. No long checkout.
 
 ---
 
-## 6.6 Immutable RevisionSubmission
+## 7.6 Immutable RevisionSubmission
 
 ```text
 RevisionSubmission
   id UUID PRIMARY KEY
   revision_id UUID NOT NULL FK DocumentRevision(id) RESTRICT
   source_artifact_id UUID NOT NULL FK Artifact(id) RESTRICT
-  accepted_working_version BIGINT NOT NULL
+  accepted_working_version BIGINT NOT NULL CHECK accepted_working_version >= 1
   manifest_schema TEXT NOT NULL
-  manifest_payload JSONB NOT NULL
+  manifest_payload JSONB NOT NULL CHECK jsonb_typeof(...)='object'
   submission_digest BYTEA NOT NULL CHECK octet_length(submission_digest)=32
   submitted_by_user_id UUID NOT NULL FK User(id) RESTRICT
   submitted_at TIMESTAMPTZ NOT NULL
 
-UNIQUE(revision_id, accepted_working_version)
+  UNIQUE(revision_id, accepted_working_version)
 ```
 
-Mutation law: immutable/append-only; serving product paths have no UPDATE/DELETE.
+Mutation law: immutable/append-only. Serving product path has no UPDATE/DELETE.
 
-No `UNIQUE(submission_digest)`: two legitimate attempts may submit the same governed candidate and remain distinct attempt identities.
+No `UNIQUE(submission_digest)`: separate legitimate attempts may submit the same governed candidate and remain different attempt identities.
 
 ### Manifest V1
 
-The manifest is a bounded product schema, not arbitrary metadata. Conceptual payload:
+Bounded product schema, conceptually:
 
 ```json
 {
@@ -475,15 +521,18 @@ The manifest is a bounded product schema, not arbitrary metadata. Conceptual pay
   "dictionary_snapshot": {},
   "structured_authoring": null,
   "reason_for_change": "...",
+  "template_spec": null,
   "template_provenance": null
 }
 ```
 
-Attempt metadata (`submitted_at`, submitter, Submission UUID), provider location/key/version, renderer output and future Approval evidence are deliberately excluded from the candidate digest.
+`template_spec` is populated only when the submitted Revision is a template Revision with applicable structured specification. `template_provenance` is populated for derived Documents where `DocumentOrigin` is relevant.
+
+Attempt metadata (Submission UUID, submitter, timestamp), provider location/key/version, renderer output and Approval evidence are excluded from the candidate digest.
 
 ### Canonical digest
 
-Recommended candidate algorithm:
+Candidate:
 
 ```text
 canonical_payload = RFC8785_JCS(manifest_payload)
@@ -494,19 +543,23 @@ submission_digest = SHA256(
 )
 ```
 
-Why this candidate beats alternatives:
+Why:
 
-- custom concatenation is fragile and format-coupled;
-- deterministic CBOR is credible but introduces an additional serialization/tooling stack without a demonstrated consumer;
-- JCS is a published deterministic JSON canonicalization scheme and matches MetalDocs' Go/TypeScript/JSON ecosystem.
+- custom field concatenation is fragile/format-coupled;
+- deterministic CBOR is credible but adds a second serialization stack without a demonstrated consumer;
+- JCS provides deterministic JSON canonicalization compatible with the Go/TypeScript/JSON boundary already present.
 
-Manifest inputs must satisfy I-JSON/JCS rules. Potentially >53-bit integral values use canonical decimal strings rather than depending on JavaScript numeric precision. High-precision domain numbers, if later admitted into governed metadata, must have a domain-defined canonical string form before inclusion.
+Manifest input obeys I-JSON/JCS constraints. Potentially unsafe large integers use canonical decimal strings; future high-precision domain numbers require a domain-defined canonical string before inclusion.
 
-Proof requires golden vectors across Go and TypeScript: same semantic manifest → byte-identical canonical form/digest; each included field mutation changes digest; provider/storage-location mutation does not.
+Proof requires cross-runtime golden vectors:
+
+- same semantic manifest → byte-identical canonical bytes/digest;
+- mutation of each included semantic field changes digest;
+- provider/storage relocation does not change digest.
 
 ---
 
-## 6.7 Template role / use / specification / origin
+## 7.7 Template role / use / specification / origin
 
 ### TemplateDocument
 
@@ -515,7 +568,7 @@ TemplateDocument
   document_id UUID PRIMARY KEY FK Document(id) RESTRICT
 ```
 
-Presence means an ordinary governed Document currently has Template role. There is no Template identity/version/lifecycle aggregate.
+Presence means an ordinary governed Document has Template role. No Template ID/version/lifecycle aggregate exists.
 
 ### TemplateUse
 
@@ -523,27 +576,29 @@ Presence means an ordinary governed Document currently has Template role. There 
 TemplateUse
   template_document_id UUID NOT NULL FK TemplateDocument(document_id) RESTRICT
   target_document_type_id UUID NOT NULL FK DocumentType(id) RESTRICT
+
   PRIMARY KEY(template_document_id, target_document_type_id)
 ```
 
 - current M:N eligibility/configuration;
 - whole-company `template_use.manage` target;
-- no `is_default` V1 because no promoted requirement currently proves a default-template fact;
-- if UX later proves a default is required, an `is_default` fact plus partial unique index can be added without changing Template identity.
+- no `is_default` V1 because no promoted requirement currently proves a canonical default-template fact;
+- if a real default consumer appears, the fact can be added with one partial unique invariant without changing Template identity.
 
 ### TemplateSpec
 
 ```text
 TemplateSpec
   revision_id UUID PRIMARY KEY FK DocumentRevision(id) RESTRICT
-  spec JSONB NOT NULL
+  spec JSONB NOT NULL CHECK jsonb_typeof(...)='object'
 ```
 
-- only applicable to a Revision whose Document has Template role;
-- bounded structured-authoring schema, never generic custom-object metadata;
+- valid only when owning Document has Template role;
+- bounded authoring schema, never generic custom-object metadata;
 - mutable only while that Revision is DRAFT and only in the same WorkingContent OCC mutation;
-- exact submitted spec is frozen in the RevisionSubmission manifest;
-- no TemplateSpec version counter independent from REV/Submission.
+- whole-WorkingContent Artifact replacement clears/replaces representation-dependent TemplateSpec state when no longer valid;
+- exact submitted spec is copied into Submission manifest;
+- no independent TemplateSpec version counter.
 
 DB/application enforcement must reject TemplateSpec on a non-template Document.
 
@@ -556,17 +611,17 @@ DocumentOrigin
   created_at TIMESTAMPTZ NOT NULL
 ```
 
-Mutation law: immutable.
+Immutable.
 
-This single source Submission pins the exact source template Revision and exact source Artifact without four parallel provenance pointers. The derived Document's own WorkingContent becomes content authority immediately after creation; later template revisions never silently rebind it.
+One source Submission pins exact source template Revision + exact source Artifact without four parallel provenance pointers. The derived Document's own WorkingContent is content authority immediately after creation; later template revisions never silently rebind it.
 
-**B4 successor obligation:** create-from-template must serialize with effectivity change and validate that `source_template_submission_id` is the winning source of the Template Document's current EFFECTIVE Revision at commit. B3 establishes the stale-source invariant; B4 supplies Release/effectivity mechanics.
+**B4 successor obligation:** create-from-template must serialize with template effectivity change and prove `source_template_submission_id` is the winning source of the Template Document's current EFFECTIVE Revision at commit. B3 establishes stale-source prevention; B4 supplies Release/effectivity mechanics.
 
 ---
 
-## 6.8 EditorialComment — material DRAFT collaboration state
+## 7.8 EditorialComment — material DRAFT state
 
-EditorialComment is retained because unresolved comments change SUBMIT eligibility.
+Retained because unresolved comments affect SUBMIT eligibility.
 
 ```text
 EditorialComment
@@ -581,20 +636,20 @@ EditorialComment
 
 Laws:
 
-- comment body/author/creation identity immutable;
-- resolution is a terminal product state change for that comment;
+- body/author/creation immutable;
+- resolution is terminal for that comment;
 - no provider/library comment ID as business identity;
-- no threads/edit/delete/generic annotation platform V1 without evidence;
-- create comment and resolve comment both require `expected_working_version` and atomically increment WorkingContent `working_version`, because they alter SUBMIT eligibility;
-- SUBMIT sees zero unresolved EditorialComments for that exact Revision under the same OCC/lock boundary.
+- no generic thread/edit/delete/annotation platform V1;
+- create and resolve both require `expected_working_version` and increment WorkingContent `working_version`, because they alter submit eligibility;
+- SUBMIT proves zero unresolved comments for that Revision under the same OCC/lock boundary.
 
-If a future editor needs location anchors, only a bounded provider-neutral anchor shape may enter this table; provider-native IDs remain adapter/support state.
+Future location anchors, if required, must be bounded/provider-neutral; provider-native IDs remain adapter/support state.
 
 ---
 
-## 6.9 Periodic Review
+## 7.9 Periodic Review
 
-### Policy
+### PeriodicReviewPolicy
 
 ```text
 PeriodicReviewPolicy
@@ -602,23 +657,21 @@ PeriodicReviewPolicy
   interval_months INTEGER NOT NULL CHECK interval_months > 0
 ```
 
-Interpretation:
+- absent row = Disabled;
+- present row = Every(n months);
+- no DocumentType inheritance/default engine V1;
+- `Document.responsible_user_id` remains current responsibility authority.
 
-- row absent = `Disabled`;
-- row present = `Every(n months)`;
-- no policy inheritance/default engine from DocumentType V1;
-- `Document.responsible_user_id` is the canonical current responsible owner; no duplicate review-owner field.
+### PeriodicReviewRecord
 
-### Record
-
-Minimal V1 candidate outcome set:
+Minimal candidate outcome vocabulary:
 
 ```text
 KEEP_EFFECTIVE
 CHANGE_REQUIRED
 ```
 
-This intentionally does not copy richer QMS workflow verdict sets. `CHANGE_REQUIRED` records the governance conclusion; creating a new Revision or obsoleting the Document remains an explicit later operation with its own authorization/lifecycle semantics.
+`CHANGE_REQUIRED` records a review conclusion only. Creating a new Revision or obsoleting a Document is a separate authorized lifecycle operation.
 
 ```text
 PeriodicReviewRecord
@@ -628,148 +681,156 @@ PeriodicReviewRecord
   responsible_user_id UUID NOT NULL FK User(id) RESTRICT
   outcome TEXT NOT NULL CHECK KEEP_EFFECTIVE|CHANGE_REQUIRED
   policy_interval_months INTEGER NOT NULL CHECK policy_interval_months > 0
+  due_at TIMESTAMPTZ NOT NULL
   reviewed_at TIMESTAMPTZ NOT NULL
 ```
 
-Mutation law: immutable/append-only; no UPDATE/DELETE serving path.
+Immutable/append-only.
 
-- `responsible_user_id` snapshots the canonical responsible owner at review time;
-- `policy_interval_months` snapshots the policy used for that review evidence;
-- record must bind the current EFFECTIVE Revision at commit;
-- overdue does not alter Revision state or access;
-- no mutable `last_reviewed_at` or `review_due_at` authority column is required.
+- record binds exact current EFFECTIVE Revision at commit;
+- `responsible_user_id` snapshots current responsible owner at review time;
+- `policy_interval_months` snapshots policy applied;
+- `due_at` snapshots the derived due boundary the review addressed, preserving historical interpretability if policy later changes;
+- overdue never mutates Revision state/access;
+- no mutable `last_reviewed_at` / `review_due_at` authority column is required.
 
-Candidate due function:
+Candidate due calculation:
 
 ```text
 anchor = max(
   current EFFECTIVE Revision effective_at,
   latest PeriodicReviewRecord.reviewed_at for that same EFFECTIVE Revision
 )
-next_due_at = anchor + PeriodicReviewPolicy.interval_months
+next_due_at = anchor + current PeriodicReviewPolicy.interval_months
 ```
 
-`effective_at` is B4 Release-owned state. R10-D may surface due/overdue projections/jobs but never owns this semantic calculation.
+No structural “exactly one review record per cycle” is invented: the frozen product semantics only require immutable records, not a prohibition on an explicitly authorized additional review. R10-E may apply idempotency to the request journey; the domain record remains truthful.
 
-**B4 successor obligation:** Periodic Review and winning Release must conflict on the same per-Document serialization point so a review cannot commit against a Revision that ceased to be current EFFECTIVE during the transaction.
+`effective_at` comes from B4 Release-owned state. R10-D may surface due/overdue projections/jobs but never owns calculation semantics.
 
-External comparison: Veeva QualityDocs similarly models a separate Periodic Review record around the steady-state document/version and offers guards against reviews when a later version exists. MetalDocs keeps a much smaller record rather than importing Veeva's configurable workflow/change-control platform.
+**B4 successor obligation:** Periodic Review and winning Release share the same per-Document serialization root so a review cannot commit against a Revision that ceased to be current EFFECTIVE during the transaction.
 
 ---
 
-# 7. Persistence class × mutation law
+# 8. Persistence class × mutation law
 
 | Family | Class | Mutation law |
 |---|---|---|
-| Artifact | supporting semantic authority | fields immutable; typed-owner-controlled deletion only when lawful |
+| Artifact | supporting semantic authority | semantic fields immutable; typed-owner-controlled lawful deletion only |
 | DocumentTypeCategory | semantic authority | code immutable; display mutable |
 | DocumentType | semantic authority | code immutable; numbering immutable after first allocation; display/category/status mutable |
-| DocumentNumberSeries | durable mechanism | mutable monotonic counter |
+| DocumentNumberSeries | durable mechanism | mutable monotonic allocation counter |
 | TenantDictionaryValue | semantic authority | name immutable; value/display mutable |
-| Document | semantic authority | identity/type/Area/sequence immutable; responsibility mutable |
-| DocumentRevision | semantic authority | identity/ordinal/snapshot immutable; explicit lifecycle state machine |
-| WorkingContent | semantic authority | mutable DRAFT only through OCC |
+| Document | semantic authority | identity/type/Area/series/sequence immutable; responsibility mutable |
+| DocumentRevision | semantic authority | identity/ordinal/snapshot immutable; explicit state machine |
+| WorkingContent | semantic authority while open | mutable DRAFT only through OCC; review source only through Submission |
 | EditorSession | ephemeral/attributed mechanism | lease lifecycle; never correctness authority |
 | RevisionSubmission | semantic authority | immutable/append-only |
-| TemplateDocument | semantic current role | add/remove only through typed constraints; no history authority |
-| TemplateUse | semantic current configuration | add/remove current relationship |
-| TemplateSpec | semantic DRAFT state | mutable DRAFT only through same OCC; Submission freezes exact state |
+| TemplateDocument | semantic current role | add/remove typed role; no parallel history authority |
+| TemplateUse | semantic current configuration | add/remove typed current relationship |
+| TemplateSpec | semantic DRAFT state | same OCC as WorkingContent; Submission freezes exact accepted state |
 | DocumentOrigin | semantic provenance | immutable |
 | EditorialComment | semantic DRAFT collaboration | append + terminal resolve |
 | PeriodicReviewPolicy | semantic current policy | mutable/disable by explicit operation |
 | PeriodicReviewRecord | semantic evidence | immutable/append-only |
 
-Immutable rows must be structurally non-updatable by the serving trust surface. Mixed mutable rows require DB-enforced immutable-column guards; “the service does not normally update this” is not proof.
+Immutable rows must be structurally non-updatable by serving trust. Mixed mutable rows require DB-enforced immutable-column guards. “The service normally does not update it” is not proof.
 
 ---
 
-# 8. Structural constraint envelope
+# 9. Structural constraint envelope
 
 ```text
-DocumentTypeCategory.code                 UNIQUE
-DocumentType.code                         UNIQUE
-TenantDictionaryValue.name                UNIQUE
-Document.code                             UNIQUE
+DocumentTypeCategory.code                   UNIQUE
+DocumentType.code                           UNIQUE
+TenantDictionaryValue.name                  UNIQUE
+Document.code                               UNIQUE
+Document(number_series_id, sequence_no)     UNIQUE
 
-DocumentRevision(document_id, revision_no) UNIQUE
-DocumentRevision one DRAFT|SUBMITTED       partial UNIQUE(document_id)
-DocumentRevision one EFFECTIVE             partial UNIQUE(document_id)
+DocumentRevision(document_id, revision_no)  UNIQUE
+DocumentRevision one DRAFT|SUBMITTED         partial UNIQUE(document_id)
+DocumentRevision one EFFECTIVE               partial UNIQUE(document_id)
 
-DocumentNumberSeries TYPE                  partial UNIQUE(document_type_id) WHERE area_id IS NULL
-DocumentNumberSeries TYPE_AREA             partial UNIQUE(document_type_id, area_id) WHERE area_id IS NOT NULL
+DocumentNumberSeries TYPE                    partial UNIQUE(document_type_id) WHERE area_id IS NULL
+DocumentNumberSeries TYPE_AREA               partial UNIQUE(document_type_id, area_id) WHERE area_id IS NOT NULL
 
-WorkingContent.revision_id                 exactly one row / PK
+WorkingContent.revision_id                   PK / one current working row
 RevisionSubmission(revision_id,
                    accepted_working_version) UNIQUE
 
-TemplateDocument.document_id               PK
+TemplateDocument.document_id                 PK
 TemplateUse(template_document_id,
-            target_document_type_id)        PK
-TemplateSpec.revision_id                    PK
-DocumentOrigin.derived_document_id          PK
-PeriodicReviewPolicy.document_id            PK
+            target_document_type_id)          PK
+TemplateSpec.revision_id                      PK
+DocumentOrigin.derived_document_id            PK
+PeriodicReviewPolicy.document_id              PK
 
-Artifact.sha256                             length = 32 bytes
-RevisionSubmission.submission_digest        length = 32 bytes
+Artifact.sha256                               exactly 32 bytes
+RevisionSubmission.submission_digest          exactly 32 bytes
+
+bounded JSONB families                        explicit object/shape checks
 ```
 
-PostgreSQL partial unique indexes are the intended structural mechanism for conditional uniqueness; no application-only “check then insert” is accepted for one-open / one-effective / NumberSeries uniqueness.
+PostgreSQL partial unique indexes are the structural mechanism for one-open, one-effective and nullable-scope series uniqueness. No application-only check-then-insert is accepted for those invariants.
 
-No cross-owner CASCADE/SET NULL is introduced.
+Cross-row NumberSeries/type/Area coherence and immutable-column enforcement require explicit DB guards in the implementation spec. No cross-owner CASCADE/SET NULL.
 
 ---
 
-# 9. Transaction contracts
+# 10. Transaction contracts
 
-## 9.1 Atomic Document + REV001 creation
+## 10.1 Atomic Document + REV001 creation
 
-Pre-transaction mechanism may stage/generate initial bytes. The authoritative local commit is:
+Provider/editor mechanism may prepare/stage initial bytes before local semantic commit. Authoritative transaction:
 
 ```text
 BEGIN
-  validate enabled responsible User under B2 lock law
+  validate enabled responsible User using B2 lock law
   validate non-retired Area
-  lock/read ACTIVE DocumentType + immutable numbering configuration
-  allocate one NumberSeries value
+  lock/read ACTIVE DocumentType
+  validate numbering grammar/config
+  get/create exact NumberSeries and allocate one sequence
   render final immutable Document.code
+  prove code uniqueness
 
   if template-derived:
     validate TemplateUse
     serialize/validate exact effective source template Submission
 
-  confirm/insert exact Artifact semantic row
-  insert Document
+  confirm/insert exact Artifact semantic row + bounded technical provenance
+  insert Document with exact number_series_id + sequence
   insert DocumentRevision REV001 / DRAFT + dictionary snapshot
   insert WorkingContent working_version=1
   insert optional TemplateSpec / DocumentOrigin
 
-  // B6 adds required Audit append; R10-D adds required durable intent where needed
+  // B6 later composes required Audit append
+  // R10-D later composes durable intent when an actual external/async effect exists
 COMMIT
 ```
 
-There is no successful “empty governed Document shell” without a coherent REV001 WorkingContent primary Artifact. Provider staging may fail independently before this transaction; provider cleanup is mechanism work.
+No successful empty governed Document shell: a successful creation produces coherent stable identity + REV001 + WorkingContent + primary Artifact.
 
-Allocation + code + Document + REV001 + WorkingContent either all commit or all roll back.
+Allocation/code/Document/REV001/WorkingContent either all commit or all roll back. Provider staging cleanup is mechanism work and cannot manufacture semantic success.
 
-## 9.2 New Revision creation
+## 10.2 New Revision creation
 
 ```text
 BEGIN
   lock Document FOR UPDATE
   prove no DRAFT|SUBMITTED Revision exists
-  allocate next revision_no = max+1
+  allocate revision_no = max(existing)+1
   resolve fresh relevant Tenant Dictionary snapshot
-  seed initial primary Artifact/content from the authorized source state
+  establish exact initial primary Artifact/content from authorized source state
   insert DocumentRevision DRAFT
-  insert WorkingContent with fresh working_version=1
+  insert WorkingContent working_version=1
 COMMIT
 ```
 
-No separate revision counter or parent graph V1.
+No separate revision counter/parent graph V1.
 
-## 9.3 DRAFT mutation CAS
+## 10.3 DRAFT mutation CAS
 
-Every content/metadata/spec/comment-eligibility mutation follows one contract:
+Every mutation that changes candidate content **or submit eligibility** follows one contract:
 
 ```text
 expected_working_version = N
@@ -777,33 +838,34 @@ expected_working_version = N
 BEGIN
   prove Revision = DRAFT
   CAS/lock WorkingContent at N
-  apply the complete governed mutation
-  atomically invalidate representation-dependent state when required
+  apply complete governed mutation
+  atomically clear/replace representation-dependent state when required
   working_version = N + 1
 COMMIT
 ```
 
-Exactly one of two concurrent callers with the same observed N may win.
+Two concurrent callers with the same observed N cannot both win.
 
-## 9.4 SUBMIT freeze
+## 10.4 SUBMIT freeze
 
 ```text
 BEGIN
   lock Document / target Revision / WorkingContent in canonical order
   prove Revision = DRAFT
   prove caller expected_working_version = N
-  prove final provider flush is already represented by WorkingContent N
-  prove primary Artifact is confirmed exact-byte state
+  prove final provider flush is represented by WorkingContent N
+  prove current primary Artifact is confirmed
   prove REV002+ reason-for-change
   prove zero unresolved EditorialComment
   prove no forbidden tracked-change state when applicable
 
-  build bounded manifest from one coherent state
-  canonicalize with manifest_schema + RFC8785 JCS
+  load exact TemplateSpec / DocumentOrigin facts relevant to N
+  build one bounded submission manifest from this coherent state
+  canonicalize manifest with RFC 8785 JCS
   compute SHA-256 submission_digest
 
   insert immutable RevisionSubmission(
-    revision,
+    Revision,
     source Artifact,
     accepted_working_version=N,
     manifest,
@@ -813,95 +875,104 @@ BEGIN
 
   transition Revision DRAFT -> SUBMITTED
   increment WorkingContent working_version N -> N+1
-  invalidate/release active EditorSession mechanism
+  release/invalidate active EditorSession mechanism
 COMMIT
 ```
 
-**The SUBMIT increment is mandatory.** It consumes the pre-submit OCC generation. A late autosave that observed N cannot later become valid merely because B4 returns the same Revision to DRAFT. Any return/reopen operation must preserve monotonicity and must never reset `working_version`.
+### Mandatory OCC generation consumption
 
-This closes the adversarial late-write-after-return counterexample without creating a second epoch/generation mechanism.
+SUBMIT **must** consume/increment the DRAFT generation.
+
+Without it:
+
+```text
+writer observes N
+→ SUBMIT freezes N
+→ B4 returns same REV to DRAFT
+→ stale pre-SUBMIT writer still carrying N could save
+```
+
+Advancing to N+1 closes that race without introducing a second epoch/generation mechanism. B4 return-for-changes may reopen the same Revision but never reset/decrement `working_version`.
 
 ---
 
-# 10. Lock / concurrency law
+# 11. Lock / concurrency law
 
-B1 remains READ COMMITTED. B2 lock classes remain authoritative and precede B3 locks when required.
+B1 stays READ COMMITTED. B2 lock classes remain authoritative and precede B3 where both apply.
 
-B3 canonical order after applicable B2 `User → Area` eligibility locks:
+After applicable B2 `User → Area` eligibility locks:
 
 ```text
 DocumentType
 → DocumentNumberSeries
-→ Document row(s), UUID order when more than one
+→ Document row(s), UUID order when >1
 → DocumentRevision
 → WorkingContent
-→ EditorialComment child set, UUID order when a set lock is necessary
+→ EditorialComment child set, deterministic order when set locking is needed
 → Artifact row only when existing-row coordination is required
 ```
 
-Classes may be skipped but never acquired backwards.
+Classes may be skipped, never revisited backwards.
 
-Lock strength rules:
+Rules:
 
-- User/Area eligibility checks use the B2 reader strength (`FOR SHARE`) where applicable;
-- DocumentType creation/allocation reads hold a lock compatible with concurrent readers but conflicting with numbering-policy mutation;
-- NumberSeries allocation updates/locks the exact series row;
-- lifecycle mutations on a target Document use `FOR UPDATE` on Document as the per-document serialization root;
-- source Template validation uses a lock that conflicts with B4 effectivity change on that same source Document;
-- Periodic Review uses the same target Document serialization root as B4 Release;
-- DRAFT saves that never acquire Document after WorkingContent may use the narrower CAS path; they must not later acquire an earlier lock class.
-
-No global SERIALIZABLE, advisory-lock framework, distributed lock or long checkout is justified.
+- B2 User/Area eligibility reads use promoted B2 reader lock strength;
+- NumberSeries allocation locks/updates the exact series row;
+- per-Document lifecycle transitions use `Document FOR UPDATE` as serialization root;
+- source Template validation locks the source Document in a way that conflicts with B4 effectivity change;
+- Periodic Review locks the target Document using the same root as B4 Release;
+- narrow DRAFT save may CAS WorkingContent without later acquiring an earlier lock class;
+- no global SERIALIZABLE, advisory-lock framework, distributed lock or long checkout.
 
 ---
 
-# 11. Authority / boundary
+# 12. Authority / boundary
 
 ```text
 Controlled Information owns
   DocumentType/category/numbering/dictionary semantics
-  stable Document identity and responsibility
+  stable Document identity/responsibility
   business Revision
   mutable WorkingContent/OCC
-  exact Submission
+  exact immutable Submission
   template role/use/spec/origin
   EditorialComment
   periodic-review semantics
 
 Artifact owns
   exact-byte immutable facts
-  confirmation contract
+  semantic confirmation contract
   later physical integrity/location mechanics
 
 Organization owns
-  User / Area identity and lifecycle
+  User / Area identity/lifecycle
 
 Authorization owns
-  live grant evaluation
+  live grants and canonical evaluation
 
 Approval later owns
   human decision over exact Submission
 
 Audit later owns
-  transversal timeline, never current Document state
+  transversal timeline, never current Document truth
 ```
 
-Artifact therefore has no product permission such as `artifact.read`, `artifact.replace`, `storage.migrate` or provider-specific operations. Access is authorized through the owning business object.
+Artifact gains no product mechanism permissions such as `artifact.read`, `artifact.replace` or `storage.migrate`; access is authorized through the owning business object.
 
 ---
 
-# 12. B1/B2 coherence
+# 13. B1/B2 coherence
 
 B3 introduces no:
 
-- universal `tenant_id/company_id/deployment_id` partition column;
+- universal tenant/company/deployment partition column;
 - Tenant/Area/role/Permission RLS policy engine;
 - cross-owner CASCADE/SET NULL;
 - provider role/group/claim authority;
 - custom role/permission family;
 - provider/editor/storage identity as business identity.
 
-B3 permission target classification:
+Permission target classification supplied to B2 successor contract:
 
 ```text
 Tenant-wide:
@@ -910,7 +981,9 @@ Tenant-wide:
   dictionary.manage
 
 Area-targeted by Document.area_id:
-  document.read_*
+  document.read_effective
+  document.read_history
+  document.read_working
   document.create
   document.edit
   document.comment
@@ -921,112 +994,136 @@ Area-targeted by Document.area_id:
   document.owner.manage
 ```
 
-This does not redefine role bundles; it only supplies the domain target classification B2 required successor stages to declare.
+This does not change bundles; it classifies the domain target for canonical evaluation.
 
 ---
 
-# 13. Proof obligations
+# 14. Enforcement strategy
+
+Strongest reasonable enforcement covering all reachable paths:
+
+- PK/FK/CHECK/partial UNIQUE for representable relational invariants;
+- database immutable-column guards where a row mixes mutable/immutable facts;
+- database cross-row guard for NumberSeries ↔ DocumentType ↔ Area coherence;
+- non-owner/NOSUPERUSER serving role; immutable evidence tables have no serving UPDATE/DELETE privilege;
+- application CAS using `expected_working_version` for caller-observed concurrency;
+- row locks for lifecycle serialization/cross-row eligibility where UNIQUE alone cannot express the claim;
+- bounded JSON schemas + DB coarse shape checks; JSON never bypasses owner validation;
+- tests must show each control firing; artifact/schema existence alone is not proof.
+
+---
+
+# 15. Proof obligations
 
 | Claim | Falsification/proof obligation |
 |---|---|
 | one open Revision | concurrent new-Revision attempts cannot commit two DRAFT/SUBMITTED rows |
-| one EFFECTIVE | competing B4 Releases hit structural one-effective backstop |
-| numbering uniqueness | concurrent same-series creates get distinct committed values/codes |
-| no sequence reuse | cancel/obsolete/rollback behavior never decrements a committed allocation |
-| OCC | two mutations using same expected N produce exactly one commit |
-| coherent SUBMIT | no committed SUBMITTED Revision exists without its exact immutable Submission and vice versa |
-| late-write exclusion | pre-SUBMIT autosave cannot mutate SUBMITTED or a later returned DRAFT after SUBMIT consumed N |
-| exact source | Submission.source_artifact equals WorkingContent primary Artifact at accepted generation |
-| digest determinism | cross-runtime golden vectors produce identical canonical bytes/digest |
-| digest sensitivity | mutating every included semantic input changes digest |
-| provider independence | moving provider/key/location does not change digest |
+| one EFFECTIVE | competing B4 Releases hit the partial unique backstop |
+| numbering | concurrent same-series creates receive distinct committed sequence/code |
+| series provenance | Document cannot pair a series with the wrong type/Area/scope |
+| no committed sequence reuse | cancellation/deletion/rollback never decrements a committed allocation |
+| OCC | two mutations using same expected N produce exactly one successful commit |
+| coherent SUBMIT | SUBMITTED and its immutable Submission cannot commit independently |
+| late-write exclusion | pre-SUBMIT write cannot mutate SUBMITTED or a later returned DRAFT after SUBMIT consumes N |
+| exact source | Submission.source_artifact equals WorkingContent primary Artifact at accepted N |
+| TemplateSpec coherence | submitted TemplateSpec belongs to same accepted WorkingContent generation |
+| digest determinism | Go/TypeScript golden vectors produce identical canonical bytes/digest |
+| digest sensitivity | mutation of each included semantic input changes digest |
+| provider independence | storage key/provider/location change leaves digest unchanged |
 | comment gate | SUBMIT concurrent with comment create/resolve cannot bypass unresolved-comment invariant |
-| Template origin | later template Revision never rewrites existing DocumentOrigin |
-| stale template defense | create-from-template cannot commit source that ceased to be current EFFECTIVE during transaction |
-| periodic-review staleness | review cannot commit against Revision that ceased to be current EFFECTIVE during transaction |
-| immutable evidence | serving paths cannot UPDATE/DELETE Submission, Origin or ReviewRecord |
-| Artifact no-orphan | confirmation always creates typed owner; replacement/disposition cannot leave confirmed unowned semantic row after B5 closure |
-| B2 lifecycle | disabled User/retired Area cannot become new responsibility/scope target where prohibited |
+| Template provenance | later Template Revision cannot rewrite existing DocumentOrigin |
+| stale Template defense | create-from-template cannot commit a source that ceased to be current EFFECTIVE |
+| stale periodic-review defense | review cannot commit against Revision that ceased to be current EFFECTIVE |
+| immutable evidence | serving path cannot UPDATE/DELETE Submission, Origin or ReviewRecord |
+| Artifact ownership | semantic confirmation has typed owner; B5 closes global owner/disposition union |
+| B2 lifecycle | disabled User/retired Area cannot become prohibited new responsibility/reference target |
 
-Architecture proof before implementation: counterexample analysis and B1/B2 coherence. Implementation proof later: real PostgreSQL concurrency tests, negative constraint tests, restart/retry tests, digest golden vectors and end-to-end exact-Submission identity checks.
+Architecture proof now: counterexample analysis + B1/B2 coherence. Implementation proof later: real PostgreSQL concurrency/negative constraint tests, privilege tests, restart/retry tests, digest golden vectors and exact-Submission E2E checks.
 
 ---
 
-# 14. Adversarial challenge
+# 16. Adversarial challenge
 
-## F1 — late autosave survives a return to DRAFT
+## F1 — late autosave survives return-to-DRAFT
 
-Counterexample if SUBMIT does not advance OCC:
+If SUBMIT does not advance OCC, a writer holding pre-submit N can become valid again after return.
 
-1. writer observes `working_version=N`;
-2. SUBMIT freezes N and marks SUBMITTED;
-3. B4 later returns the REV to DRAFT;
-4. stale writer with N saves successfully.
+**Closed in candidate:** SUBMIT consumes N → N+1; return never resets generation.
 
-**Candidate correction:** SUBMIT consumes N and advances to N+1. Return never resets generation.
+## F2 — Template source becomes stale during derived creation
 
-## F2 — Template source becomes stale during derived-document create
+Read current EFFECTIVE template, then concurrent Release supersedes it before derived creation commits.
 
-Reading “current effective template” and committing later without shared serialization can pin a source that was superseded meanwhile.
-
-**Candidate correction:** source Template Document is locked/validated against B4 effectivity at commit; DocumentOrigin stores exact source Submission.
+**B3 contract:** immutable Origin points exact Submission; source Document serialization must conflict with B4 effectivity change. B4 must satisfy the other half.
 
 ## F3 — Periodic Review records stale effective content
 
-Review reads current effective REV; Release switches it before review commit.
+Review reads current EFFECTIVE; concurrent Release switches it before review commit.
 
-**Candidate correction:** Periodic Review and B4 Release share the Document serialization root.
+**B3 contract:** review and Release share target Document serialization root. B4 must satisfy the other half.
 
-## F4 — Artifact replacement creates confirmed orphan bytes
+## F4 — Artifact replacement creates confirmed orphan state
 
-Swapping WorkingContent pointer without disposing/retaining the previous typed relation can leave semantic Artifact state with no governed owner.
+Changing WorkingContent pointer can strand the prior confirmed Artifact semantic row.
 
-**Candidate disposition:** B3 requires CI-local typed-owner closure on replacement; B5 must close the final union across DocumentRevision/Evidence/Records before Whole-R10 ratification. No generic owner registry is added pre-emptively.
+**B3 contract:** CI replacement closes its typed ownership transition in the same local mutation. **B5 is a hard Whole-R10 prerequisite** for final global owner/disposition closure. No generic owner registry is added prematurely.
 
-## F5 — JSONB becomes a hidden generic object platform
+## F5 — JSONB becomes hidden generic object platform
 
-`governed_metadata`, `structured_authoring`, manifest and TemplateSpec could become escape hatches.
+Governed metadata/structured authoring/manifest/spec can become arbitrary custom-object storage.
 
-**Candidate correction:** every JSONB field is a bounded owned whole snapshot/schema. No arbitrary field-definition/custom-object engine, and schema/version expansion is a material owner decision.
+**Closed:** each JSONB family is an owned bounded whole snapshot with coarse DB shape checks + explicit owner schema. New generic field-definition/custom-object semantics require a material decision.
 
-## F6 — hash uniqueness conflates provenance
+## F6 — SHA uniqueness collapses provenance
 
-Global `UNIQUE(sha256)` would make same bytes from distinct captures share one row and could silently collapse technical provenance.
+Global unique hash would conflate identical bytes captured through materially different provenance.
 
-**Candidate correction:** canonical SHA-256 proves exact bytes; UUID remains Artifact row identity; provider-level dedupe remains mechanism freedom.
+**Closed:** UUID is Artifact row identity; SHA proves bytes; provider dedupe remains mechanism freedom.
 
-## F7 — responsible owner offboarding causes hidden cascade
+## F7 — owner offboarding causes hidden cascade
 
-Automatically reassigning/cancelling Documents during User offboarding would create new cross-owner semantics not frozen in B2/B3.
+Automatic Document reassignment/cancellation during User offboarding would create new product semantics.
 
-**Candidate correction:** stable User UUID reference may remain; new responsibility assignment requires enabled User. A stronger always-enabled-owner invariant is a reopen trigger.
+**Closed:** stable User UUID reference may survive; new assignment requires enabled User. Stronger always-enabled-owner semantics is a reopen trigger.
 
 ## F8 — numbering config mutation reinterprets history
 
-If pattern/scope changes after allocations, reconstructing why codes/sequences exist requires policy history/versioning.
+Changing pattern/scope after allocations requires reconstructing which policy produced historical codes.
 
-**Candidate correction:** numbering policy freezes after first allocation V1. Future real need reopens into explicit policy versioning rather than adding it speculatively now.
+**Closed for V1:** numbering config freezes at first committed allocation. Real mutation need reopens into explicit policy versioning.
+
+## F9 — NumberSeries points at wrong scope/Area
+
+A TYPE_AREA document could accidentally consume a TYPE series or another Area's series, producing a unique-looking but semantically false code.
+
+**Closed structurally:** Document stores `number_series_id`; `(series,sequence)` is unique; DB cross-row guard must enforce type/scope/Area coherence for all write paths.
+
+## F10 — Submission claims TemplateSpec but digest omits it
+
+A separate TemplateSpec could affect governed authoring while not changing Submission identity.
+
+**Closed:** submitted `template_spec` is explicitly part of manifest/digest when applicable and must come from the same accepted OCC generation.
 
 ---
 
-# 15. Essential vs accidental complexity / YAGNI
+# 17. Essential vs accidental complexity / YAGNI
 
-## Essential — retained
+## Essential — retain
 
 - stable Document identity;
 - business Revision lineage;
-- transactional numbering;
-- exact bytes;
+- transactional numbering/provenance;
+- immutable exact bytes;
 - one mutable DRAFT authority;
-- OCC generation;
-- immutable Submission attempts;
-- template source provenance;
-- editorial submit gate;
-- periodic-review evidence;
-- typed Organization relationships;
+- one OCC generation;
+- immutable Submission attempts/digest;
+- Template source provenance;
+- EditorialComment submit gate;
+- Periodic Review evidence;
+- typed User/Area relationships;
 - structural conditional uniqueness.
 
-## Accidental — removed/deferred
+## Accidental — remove/defer
 
 - separate ControlledDocument aggregate;
 - Template/TemplateVersion lifecycle;
@@ -1037,21 +1134,33 @@ If pattern/scope changes after allocations, reconstructing why codes/sequences e
 - universal tenant partition/RLS substrate;
 - provider storage keys in business rows;
 - provider/editor revision IDs as business identity;
-- mandatory PDF/render fields in B3;
-- generic BPM/workflow for Periodic Review;
-- default-template machinery without a real consumer;
+- mandatory PDF/rendition fields in B3;
+- generic BPM for Periodic Review;
+- canonical default-template machinery without a consumer;
 - ArtifactPackage/multi-file PLM abstraction;
 - content-addressed dedupe as business authority.
 
-Prepare seams, not future capability.
+Prepare the seam, not the future capability.
 
 ---
 
-# 16. Decision — candidate only
+# 18. Local vs Global Maximum
 
-**Proposed outcome: `RESTRUCTURE NOW` at target-design level.**
+**Legacy-table adaptation** is the best answer inside current structure but preserves split-brain identity and parallel lifecycles: Local Maximum.
 
-Adopt the small relational kernel:
+**Generic ECM/BPM/content platform** solves hypothetical futures by adding authorities and mechanisms with no current consumer: overengineered non-maximum.
+
+**Small mutation-law-separated kernel** removes the root cause while keeping only evidenced seams: current Global Maximum candidate.
+
+---
+
+# 19. Decision — candidate only
+
+Proposed Method outcome at target-design level:
+
+> **RESTRUCTURE NOW** — converge Controlled Information on stable Document → business DocumentRevision → one OCC WorkingContent → immutable RevisionSubmission → exact Artifact, with small typed configuration/provenance/review adjuncts and three explicit transaction contracts: creation, DRAFT CAS mutation and coherent SUBMIT freeze.
+
+Candidate family set:
 
 ```text
 Artifact
@@ -1077,43 +1186,47 @@ PeriodicReviewPolicy
 PeriodicReviewRecord
 ```
 
-with three primary transaction contracts:
-
-```text
-atomic Document + REV001 creation
-one-CAS DRAFT mutation
-coherent SUBMIT freeze
-```
-
-and one per-Document lifecycle serialization root consumed by later B4 Release/PeriodicReview/source-template validation.
-
-This candidate is **not independently ratified**. If operator accepts it, the next state is:
+This is **not independently ratified**. On operator acceptance:
 
 ```text
 R10-B3 = ACCEPTED FOR R10 INTEGRATION / NON-FINAL
+implementation = BLOCKED
+next design block = R10-B4 candidate, which must challenge B3↔B4 coherence
 ```
 
-not `CLOSED / APPROVED` in the old micro-review sense. It remains challengeable by B4–F and the final Whole-R10 review.
-
-Implementation remains BLOCKED.
+No authority file is changed by this candidate alone.
 
 ---
 
-# 17. Reopen triggers
+# 20. Reopen triggers
 
 Reopen only on material evidence:
 
 - true indivisible multi-file governed content requiring ArtifactPackage;
 - legitimate multiple simultaneous open business Revisions per Document;
-- real post-use numbering-policy changes requiring versioned numbering policy;
-- category begins driving governance rather than classification/navigation;
-- a concrete default-template consumer requires canonical default semantics;
-- same-REV authoring must introduce/re-resolve new dictionary dependencies after Revision creation;
-- richer Periodic Review verdict/state semantics have a real consumer;
+- real post-use numbering-policy changes requiring versioned policy;
+- category starts driving governance rather than classification/navigation;
+- real canonical default-template consumer;
+- same-REV authoring must introduce/re-resolve new dictionary dependencies;
+- richer Periodic Review outcome/state semantics gains a real consumer;
 - responsibility must be Group-/role-based rather than one User;
-- real-time coauthoring/merge semantics invalidate one-writer+OCC;
-- provider/editor representation becomes incapable of final coherent flush before SUBMIT;
-- cryptographic/signature requirements demand a different canonical submission representation;
-- B4/B5 proves the proposed Document serialization root or typed Artifact closure cannot preserve its invariants without a structural change.
+- realtime coauthoring/merge invalidates one-writer+OCC;
+- provider/editor cannot guarantee final coherent flush before SUBMIT;
+- signature/cryptographic requirements demand a different canonical Submission representation;
+- B4/B5 proves the Document serialization root or typed Artifact closure cannot preserve frozen invariants;
+- implementation evidence demonstrates a DB control cannot cover all admitted write paths without disproportionate accidental complexity.
 
-Implementation inconvenience, current schema shape or a hypothetical future ECM feature is not a reopen trigger.
+Implementation inconvenience, current schema shape or hypothetical ECM features are not reopen triggers.
+
+---
+
+# 21. Whole-R10 review posture
+
+No Fable/microreview is requested for this B3 candidate under the newly accepted working mode.
+
+During B4–F:
+
+- this candidate remains challengeable by material counterexample;
+- later blocks must explicitly test their seams against B3 rather than assume B3 is final;
+- a truly exceptional trust-boundary/irreversible/cross-repository blocker may trigger early independent review;
+- otherwise independent cold review occurs on the integrated Whole-R10 design after Global Coherence Review and before final ratification.
