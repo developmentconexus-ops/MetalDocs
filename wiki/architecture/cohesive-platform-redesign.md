@@ -1,12 +1,13 @@
 # Cohesive Platform Redesign — Active Architecture Authority
 
-> **Status:** Active design authority — **R9.5 FROZEN / GCR-REFINED / SINGLE-COMPANY-REFINED; R10-A CLOSED / SINGLE-COMPANY-REFINED; R10-B1 CLOSED / SINGLE-COMPANY-RESTRUCTURED; R10-B2 NEXT / NO PRODUCT IMPLEMENTATION AUTHORIZED**
+> **Status:** Active design authority — **R9.5 FROZEN / GCR-REFINED / SINGLE-COMPANY-REFINED; R10-A CLOSED / SINGLE-COMPANY-REFINED; R10-B1 CLOSED / SINGLE-COMPANY-RESTRUCTURED; R10-B2 IN PROGRESS; R10-B2-1 CLOSED / APPROVED; R10-B2-2 NEXT / NO PRODUCT IMPLEMENTATION AUTHORIZED**
 > **Established:** 2026-08-14
 > **R9.5 freeze ratified:** 2026-08-17
 > **R10-A promotion ratified:** 2026-08-17
 > **R10-B1 promotion ratified:** 2026-08-17
 > **Global Coherence Review refinement ratified:** 2026-08-17
 > **Single-Company Deployment / Tenancy Rebaseline ratified:** 2026-08-17
+> **R10-B2-1 promotion ratified:** 2026-08-17
 > **Repository baseline inspected:** `main@7f5b8928cc5a13feb8ee3fa7c8ceb1c7d3655a18`
 > **Design branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
 > **Method:** [`../engineering/standards/root-cause-global-maximum-method.md`](../../docs/engineering/standards/root-cause-global-maximum-method.md)
@@ -36,6 +37,20 @@ prior findings closed     9/9
 new material contradiction NONE
 ```
 
+R10-B2-1 evidence chain:
+
+```text
+candidate                9cba3acd
+independent review       361f6c8b  APPROVE WITH MATERIAL FIXES
+corrected target          ee0a0ce0
+bounded delta review      6593c471  APPROVE
+BLOCKER                   0
+MAJOR                     0
+prior findings closed     8/8
+new material contradiction NONE
+new concurrency counterexample NONE
+```
+
 ## 3. North star / deployment model
 
 > **MetalDocs is the system of record for product/organizational identity, governance, revision, evidence and documentary context. Authentication credential and upstream identity-provider truth may be owned by a dedicated Authentication provider and are bound to MetalDocs organizational identity through a stable provider subject identity. Physical storage, authoring/editor technology, viewers and upstream ERP/PLM/repositories are replaceable providers/connectors around that kernel.**
@@ -51,6 +66,38 @@ V1 deployment invariant:
 ### Authentication
 
 Keycloak is V1 AuthN provider. MetalDocs Authentication owns provider-subject binding, opaque app Session, Session revocation/lifecycle, assurance/fresh-auth and anti-corruption contract. Stable provider identity = `issuer+subject`; provider roles/groups/organizations/permissions/arbitrary claims never become canonical AuthZ. Keycloak Organizations/company switching are not V1 requirements. No cross-provider DB atomicity.
+
+R10-B2-1 now fixes the concrete V1 Authentication state:
+
+```text
+ProviderSubjectBinding
+  id UUID
+  user_id UUID
+  issuer
+  subject
+  created_at
+  disabled_at?
+  UNIQUE(issuer,subject)
+  UNIQUE(user_id) WHERE disabled_at IS NULL
+
+ApplicationSession
+  id UUID
+  subject_binding_id UUID
+  credential_digest
+  created_at
+  expires_at
+  revoked_at?
+  latest_reauthenticated_at?
+  latest_provider_auth_time?
+  latest_acr?
+  latest_amr?
+```
+
+Binding mapping fields are immutable; `disabled_at` is reversible acceptance state. At most one enabled binding/User V1. One retained `(issuer,subject)` cannot be handed to another MetalDocs User without a material reopen. Binding creation requires intent-bound/provider-proven or explicit trusted-human correlation; email/username/display name never select identity.
+
+ApplicationSession is a local high-entropy opaque bearer with only a one-way verifier persisted, finite absolute expiry, server-side revocation and no Tenant/AuthZ/provider-token snapshot. Provider-only disable has bounded staleness no longer than the remaining local Session lifetime absent earlier reconciliation; MetalDocs User offboarding revokes local access independently of Keycloak availability.
+
+Fresh-auth Session fields are evidence inputs only. `requires_reauthentication` is never satisfied by bare non-NULL state: a consumer must use one-shot operation evidence or an explicitly bounded freshness rule owned by that consumer's policy authority. Forced reauth must prove the same `(issuer,subject)` and cannot revive a revoked/expired Session.
 
 ### Organization + Authorization
 
@@ -69,6 +116,8 @@ Artifact exact-byte identity/hash remains provider-independent. ManagedArtifactS
 ### Retention / privacy
 
 Tenant customer lifecycle/deletion is not V1 product state; deployment decommission is operations. User/data-subject privacy remains: offboarding/session revocation, erasable human-readable enrichment, PII-minimized/non-PII immutable Audit skeleton and restore non-resurrection proof. Retention/LegalHold/Disposition remain binding. No generic privacy workflow implied.
+
+Authentication Binding/Session rows are not governed-retention subjects. Lawful erasure may remove them after dependent Sessions are handled; erasing a Binding row also surrenders its structural no-recorrelation guarantee for that provider subject, so any later correlation is a new trusted decision.
 
 ### Migration / export
 
@@ -105,21 +154,50 @@ Shared/pooled tenancy re-enters only on measured evidence: unsustainable stamp e
 
 ## 8. Implementation gate
 
-**Closed.** R10-B2 through R10-F must close before implementation specification/plan/code.
+**Closed.** R10-B2-2 through R10-F must close before implementation specification/plan/code.
 
-## 9. Exact next step — R10-B2
+## 9. Exact next step — R10-B2-2 Organization
 
-Start **R10-B2 — Authentication / Organization / Authorization State** from the single-company substrate.
+R10-B2 is **IN PROGRESS**. R10-B2-1 is **CLOSED / APPROVED**. Start **R10-B2-2 — Organization singleton root / people / groups** from the promoted B2-1 Authentication contract and B1 single-company substrate.
 
-Use four packages:
+At minimum B2-2 must decide:
 
 ```text
-B2-1 Authentication binding / Session / assurance
-B2-2 Organization singleton root / people / groups
-B2-3 Authorization
-B2-4 coherence / constraints / transactions / privacy hooks
+Tenant singleton root
+  exact persistent representation
+  structural exactly-one enforcement
+  immutable Tenant.id
+  editable company identity/settings
+  expected_tenant_id startup/readiness consumer surface
+
+Area
+  identity/stable fields
+  real lifecycle if any
+  deployment-wide uniqueness
+
+User
+  technical identity
+  authentication-eligibility/offboarding semantics
+  erasable profile/enrichment boundary
+  Area relationship only if semantically required
+  no provider-state mirror
+
+Group
+  flat-group identity
+  deployment-wide uniqueness
+  real lifecycle if any
+
+GroupMembership
+  User↔Group relationship
+  mutation/evidence semantics
+  no nested groups
+
+B2-1 integration
+  ProviderSubjectBinding → User integrity
+  Session issuance consumes current User eligibility + accepted Binding
+  offboarding revokes ApplicationSessions race-safely
 ```
 
-The detailed authoritative checklist lives in `r10-technical-architecture.md` and must preserve: issuer+subject binding/cardinality, provider disable vs live Session, all six reconciliation cases, singleton-root structural proof, immutable Tenant.id, expected_tenant_id handshake, User offboarding/privacy separation, 43-permission AuthZ state, former per-tenant uniqueness re-derivation, persistence/mutation classification, typed FKs, concurrency and same-commit Audit/durable-intent points.
+B2-2 must not design Authorization grants/RoleAssignment (B2-3), final cross-owner transaction/locking matrix (B2-4), Keycloak retry/provisioning mechanics (R10-D), frontend/admin journeys (R10-E), or resurrect Tenant customer lifecycle/partitioning/RLS.
 
-B2 must not reintroduce local credential tables, universal company partition columns, customer RLS/routing/switching, customer lifecycle/tombstones/Portability, Tenant DEK/KEK or distributed transactions.
+Keep successor notes visible for B2-4/B6: binding re-enable participates in the same acceptance/Session-issuance serialization discipline; lawful Binding erasure surrenders the retained-row no-recorrelation guarantee; same-commit Audit/durable-intent points remain to close in B2-4.
