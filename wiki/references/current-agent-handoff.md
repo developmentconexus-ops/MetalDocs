@@ -1,7 +1,7 @@
 # Current Agent Handoff
 
 > **Last verified:** 2026-08-17
-> **Status:** ACTIVE — Cohesive Platform Redesign / **R9.5 FROZEN + GCR-REFINED + SINGLE-COMPANY-REFINED / R10-A CLOSED + SINGLE-COMPANY-REFINED / R10-B1 CLOSED + SINGLE-COMPANY-RESTRUCTURED / R10-B2 IN PROGRESS / R10-B2-1 CLOSED / R10-B2-2 NEXT**
+> **Status:** ACTIVE — Cohesive Platform Redesign / **R9.5 FROZEN + GCR-REFINED + SINGLE-COMPANY-REFINED / R10-A CLOSED + SINGLE-COMPANY-REFINED / R10-B1 CLOSED + SINGLE-COMPANY-RESTRUCTURED / R10-B2 CLOSED + APPROVED + INTEGRATED / R10-B3 NEXT**
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
 > **Implementation:** **BLOCKED — design/documentation only**
 
@@ -14,7 +14,7 @@ Start with `AGENTS.md` and follow its authority chain. For the current stage rea
 3. **this file** for current status / next step
 4. `wiki/architecture/cohesive-platform-redesign.md` — program authority / global coherence
 5. `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md` — frozen R3–R9.5 product/domain authority including promoted GCR + single-company refinements
-6. `wiki/architecture/r10-technical-architecture.md` — active R10 technical authority including B1 and promoted B2-1
+6. `wiki/architecture/r10-technical-architecture.md` — active R10 technical authority including promoted B1 and integrated B2
 7. review artifacts only when auditing how a promoted decision was challenged
 
 Git history is archive. Current code/schema/OpenAPI/module docs are current-state evidence only for target design.
@@ -43,12 +43,12 @@ Single-Company Rebaseline   = CLOSED / APPROVED
 R10-A    = CLOSED / APPROVED / GCR-REFINED / SINGLE-COMPANY-REFINED
 R10-B    = IN PROGRESS / DESIGN ONLY
 R10-B1   = CLOSED / APPROVED / SINGLE-COMPANY-RESTRUCTURED
-R10-B2   = IN PROGRESS / DESIGN ONLY
+R10-B2   = CLOSED / APPROVED / INTEGRATED
 R10-B2-1 = CLOSED / APPROVED
-R10-B2-2 = NEXT / DESIGN ONLY
-R10-B2-3 = NOT STARTED
-R10-B2-4 = NOT STARTED
-R10-B3   = NOT STARTED
+R10-B2-2 = CLOSED / APPROVED / INTEGRATED
+R10-B2-3 = CLOSED / APPROVED / INTEGRATED
+R10-B2-4 = CLOSED / APPROVED / INTEGRATED
+R10-B3   = NEXT / DESIGN ONLY
 R10-B4   = NOT STARTED
 R10-B5   = NOT STARTED
 R10-B6   = NOT STARTED
@@ -63,7 +63,7 @@ implementation = BLOCKED
 Promoted target authority:
 
 - R3–R9.5 product/domain semantics: `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md`
-- R10 technical architecture: `wiki/architecture/r10-technical-architecture.md`
+- R10 technical architecture including integrated B2: `wiki/architecture/r10-technical-architecture.md`
 - program/global-coherence mirror: `wiki/architecture/cohesive-platform-redesign.md`
 
 ---
@@ -97,174 +97,155 @@ Tenant customer lifecycle/deletion/tombstones and Tenant Portability Export are 
 
 ---
 
-## R10-B2-1 Authentication Binding / Session / Assurance — promoted outcome
+## R10-B2 Integrated Authentication / Organization / Authorization — promoted outcome
 
-R10-B2-1 closed after candidate → independent cold review → operator adjudication/corrected target → bounded delta review.
+B2 was closed as one batch around already-promoted B2-1 rather than through separate B2-2/B2-3/B2-4 microgates.
 
 Evidence chain:
 
 ```text
-candidate                9cba3acd
-independent review       361f6c8b  APPROVE WITH MATERIAL FIXES
-corrected target          ee0a0ce0
-bounded delta review      6593c471  APPROVE
-BLOCKER                   0
-MAJOR                     0
-prior findings closed     8/8
+candidate                  b814f672
+independent full review    34a567fd  APPROVE WITH MATERIAL FIXES
+corrected target           2908a884
+bounded delta review       507075a8  APPROVE
+BLOCKER                    0
+MAJOR                      0
+final LOW                  2 non-blocking notes
+prior material findings    CLOSED
+exact 5×43 bundles         MATCH
+A1 access administration   APPROVE tenant-owner-only
+deadlock under lock law    NONE
 new material contradiction NONE
-new concurrency counterexample NONE
-broad review required     NO
+B2-1 reopen                NO
+reopen outside B2          NO
+broad review required      NO
 ```
 
-### Authentication persistent state
+### Authentication
 
-Exactly two semantic persistent families:
+Exactly two semantic persistent families remain:
 
 ```text
 ProviderSubjectBinding
 ApplicationSession
 ```
 
-No provider-sync semantic FSM, provider account mirror, claims mirror, assurance-event history or provider-token authority.
+Stable provider identity is `(issuer,subject)`. Binding mapping fields are immutable; acceptance is reversible `disabled_at`; total provider-subject uniqueness and one-enabled-binding/User are structural. Subject selection must be causally tied to exact provisioning/correlation intent or explicit trusted-human correlation; email/username/display name never select identity.
 
-### ProviderSubjectBinding
+ApplicationSession is opaque/local/digest-only, finite, terminally revocable and carries no Tenant/AuthZ/provider-token snapshot. Fresh-auth Session fields are evidence only; consumer policy chooses one-shot or explicitly bounded freshness. Provider effects never join MetalDocs DB atomicity.
 
-```text
-id          UUID PK
-user_id     UUID FK → Organization.User
-issuer      TEXT
-subject     TEXT
-created_at  TIMESTAMPTZ
-disabled_at TIMESTAMPTZ NULL
-
-UNIQUE(issuer, subject)
-UNIQUE(user_id) WHERE disabled_at IS NULL
-```
-
-`issuer+subject` is stable provider identity. `user_id/issuer/subject` are immutable mapping fields. `disabled_at` is reversible MetalDocs acceptance state for the same mapping; Audit owns disable/re-enable history. At most one enabled binding/User V1.
-
-A retained `(issuer,subject)` cannot normally be handed to another MetalDocs User. Same-subject re-trust for the same User re-enables the same row. Handover/User merge/provider subject reuse is a material reopen. After lawful erasure of the row, a later correlation is a new trusted decision and the old DB structural no-recorrelation guarantee has intentionally been surrendered.
-
-Subject selection must be causally/verifiably tied to the exact provisioning/correlation intent or an explicit trusted-human correlation decision. Email, username, display name, similar name or provider "already exists" attribute matching never select a provider subject.
-
-### ApplicationSession
+### Organization
 
 ```text
-id                        UUID PK
-subject_binding_id        UUID FK
-credential_digest         BYTEA
-created_at                TIMESTAMPTZ
-expires_at                TIMESTAMPTZ
-revoked_at                TIMESTAMPTZ NULL
-latest_reauthenticated_at TIMESTAMPTZ NULL
-latest_provider_auth_time TIMESTAMPTZ NULL
-latest_acr                bounded nullable
-latest_amr                bounded nullable
+Tenant(id, display_name)
+Area(id, code UNIQUE immutable, name, disabled_at?)
+User(id, disabled_at?)
+UserProfile(user_id PK/FK, display_name, email?)
+Group(id, name UNIQUE)
+GroupMembership(user_id,group_id PK)
 ```
 
-Properties:
+Tenant structural at-most-one = constant-expression unique index; readiness supplies at-least-one and `expected_tenant_id` check. Area retirement is reversible, preserves existing refs/grants and blocks new use. User is minimal stable identity; human-readable PII lives in erasable UserProfile. No User.home_area, provider mirror or username/email identity. Groups are flat/company-wide; hard deletion fails while any live typed reference exists. Membership is current truth only; Audit owns transitions.
 
-- high-entropy opaque browser bearer;
-- database stores only one-way verifier/digest, never replayable raw bearer;
-- finite absolute expiry;
-- multiple Sessions/User allowed;
-- terminal revocation; reauth never revives revoked/expired Session;
-- no Tenant/company dimension;
-- no duplicated persisted `user_id`;
-- no roles/permissions/groups/AuthZ snapshot;
-- no normal provider access/refresh/ID-token authority;
-- no semantic IP/User-Agent/LastSeen/idle state.
+### Authorization
 
-Runtime authenticated context resolves `Session → Binding → User` and canonical Authorization reads current authority.
-
-### Fresh-auth
-
-Persisted Session `latest_*` fields are evidence inputs only. Bare non-NULL never satisfies `requires_reauthentication`.
-
-A consumer must apply an explicit bounded rule:
+Permissions/Roles are static product catalogs, not DB-editable configuration. Exact current bundles are pinned in the R10 authority:
 
 ```text
-one-shot operation-linked evidence
-OR
-explicit configured freshness window owned by that consumer's policy authority
+viewer       3
+author      15
+approver     4
+area_manager 25
+tenant_owner 43
 ```
 
-Initial login does not automatically satisfy later reauthentication. Forced reauth must prove the same `(issuer,subject)` and only updates a still-valid Session. Authentication may emit transient `FreshAuthEvidence`; Approval/B4 owns approval freshness policy and snapshots its consumed evidence.
+Only `tenant_owner` carries `access.manage`; V1 GroupMembership/RoleAssignment administration is therefore TenantScope tenant-owner-only. `area_manager` is operational, not RBAC administration.
 
-### Provider disable / offboarding / availability
+One persisted family:
 
 ```text
-provider-only disable/removal
-→ new login/reauth fail
-→ reconciliation may revoke earlier
-→ existing Session survives at most until local revoke or finite expiry
+RoleAssignment
+  id UUID PK
+  user_id XOR group_id
+  role_code
+  tenant_scope_id XOR area_scope_id
 ```
 
-Finite Session TTL is therefore the provider-only-disable staleness upper bound absent earlier reconciliation; R10-E/security configuration chooses the value later.
+DB CHECKs enforce role vocabulary and legal role↔scope matrix:
 
-Keycloak outage does not by itself invalidate established local Sessions; new login/reauth fail visibly and provider operations retry through R10-D.
+```text
+tenant_owner → TenantScope
+area_manager → AreaScope
+author/approver/viewer → TenantScope | AreaScope
+```
 
-MetalDocs User offboarding is authoritative for MetalDocs access and must revoke local Sessions without waiting for Keycloak. Role/group/grant mutation does not revoke Sessions because AuthZ is never cached in Session.
+Four partial unique indexes reject duplicate current grants. Current row = current grant; delete = revoke; Audit owns transition evidence. No effective-permission tables, Session AuthZ snapshot, provider mapping, RLS policy engine, custom-role platform, deny engine or generic ReBAC graph.
 
-### Binding mutations / reconciliation
+Canonical evaluation = live direct/group grants → static bundle → scope → domain relationship → governance → default-deny result.
 
-Disable binding → revoke all its Sessions in the same local DB transaction. Replacement to a proven new subject atomically disables old binding, enables/creates new binding, revokes old-bound Sessions and writes required Audit. Re-enable is also an acceptance mutation and never revives Sessions.
+### Offboarding / privacy / concurrency
 
-Six reconciliation outcomes remain authoritative: User/subject absent combinations, removed/disabled provider subject, duplicate issuer+subject, provider unavailable, uncertain provider response. Uncertain provider truth never fabricates binding truth; retry/attempt/error/pending-correlation state belongs R10-D mechanism persistence. No provider call participates in MetalDocs DB atomicity.
+Offboarding atomically disables User, revokes local Sessions, deletes memberships/direct grants, writes required Audit and durable provider-disable intent. Binding correlation remains. Re-enable restores only eligibility; old access/Sessions never silently return.
 
-### B2-4/B6 successor notes
+B2 lock law under READ COMMITTED:
 
-- B2-4 must serialize login/session issuance vs User offboarding (C1).
-- B2-4 must serialize Session issuance vs binding disable/re-enable/replacement (C3); re-enable is explicitly included.
-- reauth callback cannot overwrite revoked/expired Session (C2).
-- grant mutation vs Session is safe because Session has no AuthZ snapshot (C4).
-- lawful Binding erasure surrenders structural no-recorrelation for the erased subject; B2-4/B6 privacy classification must state this explicitly.
-- exact row-lock/transaction mechanics remain B2-4; B2-1 only fixes the invariants.
+```text
+User
+→ Binding(s) ordered
+→ Area
+→ ordered Session / Membership / RoleAssignment child sets
+```
+
+Lifecycle mutation uses `FOR UPDATE`; eligibility/acceptance reader uses `FOR SHARE`. Group deletion is isolated Group→memberships→group grants and does not later acquire User/Binding/Area. Delta review found no wait-for cycle.
+
+Offboarding is not privacy erasure. UserProfile/Auth state can be erased when lawful while governed history retains stable User UUID and a PII-minimized/non-PII Audit skeleton. Binding erasure surrenders structural no-recorrelation for the erased subject.
+
+### Successor obligations
+
+- B3–B5/R10-E permission checks declare Tenant-wide vs Area-targeted.
+- B4 owns typed live Group references for ApprovalPolicy/Distribution, retired-Area policy rejection, concrete-User snapshots and bounded fresh-auth policy.
+- B5 applies Group RESTRICT only if it proves a real Group reference.
+- B6 finalizes Audit privacy/forensic fields and cross-owner same-commit matrix.
+- R10-C proves restore non-resurrection.
+- R10-D executes provider durable intents.
+- R10-E chooses Session TTL/journeys/scope-use and optional last-admin UX.
+- R10-F specifies bootstrap/lockout recovery, legacy IAM cutover and static-catalog↔CHECK parity gate.
+
+Implementation remains blocked.
 
 ---
 
-## Exact next step — R10-B2-2 Organization
+## Exact next step — R10-B3 Controlled Information + Artifact relational core
 
-Open **R10-B2-2 — Organization singleton root / people / groups** in design-only mode. B2-1 is closed; do not rediscover its decisions.
+Open **R10-B3** in batch/design-only mode. Do not reopen B2 unless material evidence satisfies its reopen contract.
 
-B2-2 intake must cover:
+First deliverable = one integrated intake/decomposition and candidate relational system covering:
 
 ```text
-Tenant
-  exact singleton persistent shape
-  structural exactly-one enforcement
-  immutable Tenant.id
-  editable company identity/settings
-  expected_tenant_id startup/readiness consumer surface
-
-Area
-  identity/stable fields
-  actual lifecycle requirement if any
-  deployment-wide uniqueness
-
-User
-  technical identity
-  authentication eligibility/offboarding state
-  erasable profile/enrichment boundary
-  Area relationship only if semantically justified
-  no provider-state mirror
-
-Group
-  flat-group identity
-  deployment-wide uniqueness
-  actual lifecycle requirement if any
-
-GroupMembership
-  User↔Group relation
-  mutation/evidence semantics
-  no nested groups
-
-B2-1 integration
-  ProviderSubjectBinding FK/integrity to User
-  Session issuance consumes current User eligibility + accepted Binding
-  offboarding revokes ApplicationSessions race-safely
+Artifact core
+DocumentType / optional category / numbering
+Document + DocumentRevision
+WorkingContent + working_version OCC
+immutable RevisionSubmission + digest/source Artifact relation
+template Document role + TemplateUse + TemplateSpec + origin provenance
+EditorialComment where material
+PeriodicReview policy/record + responsible owner
+creation / draft mutation / submission-freeze transaction boundaries
+uniqueness / immutable identity / exactly-one-open/effective constraints
 ```
 
-Do not design RoleAssignment/grants (B2-3), final transaction/lock matrix (B2-4), provider retry mechanics (R10-D), admin/frontend journeys (R10-E), or resurrect customer Tenant lifecycle/partitioning/RLS.
+Separate clearly:
 
-Implementation remains **BLOCKED**.
+```text
+Approval/Rendition/Release/Distribution → B4
+Evidence/Dossier/Records + Artifact closure → B5
+Audit/Interchange/cross-owner matrix → B6
+physical storage/malware/restore → R10-C
+async/projections/provider effects → R10-D
+API/frontend → R10-E
+historical cutover/deletion → R10-F
+```
+
+Use one serious adversarial review of the B3 batch after the integrated candidate; do not return to microdecision review ceremony without a truly independent failure class.
+
+Current implementation is evidence only. Implementation remains **BLOCKED**.
