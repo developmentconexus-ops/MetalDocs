@@ -9,8 +9,9 @@ Start every fresh session here, then read:
 1. `docs/engineering/standards/root-cause-global-maximum-method.md` — local mirror of the organizational engineering method.
 2. `wiki/references/current-agent-handoff.md` — current status/router; never infer the current stage from this file.
 3. The current architecture/program authority named by the router. For the active cohesive redesign this is `wiki/architecture/cohesive-platform-redesign.md`.
-4. The active decision/stage artifact named by that authority. For the cohesive redesign this is `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md`.
-5. Only then read the owner documents for the task surface.
+4. The frozen product/domain decision artifact named by that authority when the current work derives from those decisions.
+5. The active stage authority named by the router/program authority for the current design stage.
+6. Only then read the owner documents for the task surface.
 
 Do not use conversation memory, historical plans, current folder shape, or implementation existence as authority when a current owner document exists.
 
@@ -29,7 +30,7 @@ MetalDocs may specialize or operationalize the Method for its product/repository
 Use the owner for the question being answered:
 
 - **Current status / next step / implementation gate:** `wiki/references/current-agent-handoff.md`, routed to the active program/stage authority.
-- **Target architecture / active design decisions:** `wiki/architecture/cohesive-platform-redesign.md` + its active ledger while that program is active; durable decisions live under `wiki/decisions/` when promoted.
+- **Target architecture / active design decisions:** `wiki/architecture/cohesive-platform-redesign.md` + the frozen product/domain decision artifact + the active stage authority named by the router while that program is active; durable decisions live under `wiki/` when promoted.
 - **What runs today:** runtime code, database/schema/migrations, OpenAPI/generated contracts; current-state wiki is supporting memory.
 - **Backend/API contracts:** `wiki/architecture/backend-api-structure.md`, `wiki/architecture/api-contract.md`, `wiki/architecture/api-design-system.md`.
 - **Database / tenant isolation:** `wiki/database/index.md` and owning database/ADR pages.

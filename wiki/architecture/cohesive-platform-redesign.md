@@ -1,12 +1,14 @@
 # Cohesive Platform Redesign — Active Architecture Authority
 
-> **Status:** Active design authority — **R9.5 FROZEN / R10 NEXT / NO PRODUCT IMPLEMENTATION AUTHORIZED**
+> **Status:** Active design authority — **R9.5 FROZEN / R10-A CLOSED / R10-B NEXT / NO PRODUCT IMPLEMENTATION AUTHORIZED**
 > **Established:** 2026-08-14
 > **R9.5 freeze ratified:** 2026-08-17
+> **R10-A promotion ratified:** 2026-08-17
 > **Repository baseline inspected:** `main@7f5b8928cc5a13feb8ee3fa7c8ceb1c7d3655a18`
 > **Design branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
 > **Method:** [`../engineering/standards/root-cause-global-maximum-method.md`](../../docs/engineering/standards/root-cause-global-maximum-method.md)
-> **Detailed active ledger:** [`../../docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md`](../../docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md)
+> **Frozen R3–R9.5 product/domain ledger:** [`../../docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md`](../../docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md)
+> **Active R10 technical authority:** [`r10-technical-architecture.md`](r10-technical-architecture.md)
 
 ## 1. Purpose
 
@@ -32,17 +34,22 @@ Any new session working on product/domain/technical architecture MUST start with
 2. [`../../docs/engineering/standards/root-cause-global-maximum-method.md`](../../docs/engineering/standards/root-cause-global-maximum-method.md)
 3. [`../references/current-agent-handoff.md`](../references/current-agent-handoff.md) — current status / exact next step
 4. **this file** — program authority / scope
-5. [`../../docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md`](../../docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md) — binding detailed decisions
-6. R9.5-8 review artifacts only when auditing the freeze.
+5. [`../../docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md`](../../docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md) — frozen R3–R9.5 product/domain decisions
+6. [`r10-technical-architecture.md`](r10-technical-architecture.md) — active R10 technical-stage authority
+7. review artifacts only when auditing a promoted gate
 
 Do not start an old roadmap unit, milestone, migration, implementation PR or historical plan by inertia.
+
+The R3–R9.5 ledger remains binding for frozen semantics. Its historical statements that `R10 = NEXT` are superseded only for current-stage routing by the active R10 authority and current handoff; they do not reopen or weaken any frozen decision.
 
 ## 3. Authority during the redesign
 
 For **target design** questions, authority is:
 
-1. operator-approved decisions in the active ledger;
-2. this page for program state/scope;
+1. operator-approved decisions in the owning active authority:
+   - R3–R9.5 product/domain semantics → frozen redesign ledger;
+   - R10 technical decisions → `wiki/architecture/r10-technical-architecture.md`;
+2. this page for program scope, authority routing and global coherence;
 3. canonical cross-cutting standards;
 4. final ADRs/specs explicitly retained or promoted by this program;
 5. runtime/schema/OpenAPI/module docs as evidence only;
@@ -50,12 +57,14 @@ For **target design** questions, authority is:
 
 For **what runs today**, runtime/code/database and OpenAPI remain authoritative.
 
-Review artifacts are evidence, not parallel target authority. R9.5-8 review evidence lives at:
+Review artifacts are evidence, not parallel target authority. They may justify a promoted decision but do not override it after adjudication.
+
+R9.5 review evidence:
 
 - `docs/superpowers/analysis/2026-08-17-r9.5-8-whole-product-adversarial-freeze.md`;
 - `docs/superpowers/analysis/2026-08-17-r9.5-8-independent-adversarial-challenge.md`.
 
-The independent challenge verdict `APPROVE / FREEZE R9.5` was operator-ratified and promoted into the active ledger on 2026-08-17.
+R10-A review evidence is enumerated by the active R10 authority.
 
 ## 4. Frozen north star
 
@@ -96,6 +105,8 @@ Groups                    Tenant / Area scopes
              Effective Revision
 ```
 
+This north-star diagram is product/domain-level. R10-A has now promoted the concrete ownership cut beneath it; `Domain Governance` and `Release Coordinator` are not separate target bounded contexts.
+
 Supporting concerns consume those authorities instead of redefining them:
 
 ```text
@@ -133,7 +144,7 @@ External Repository Connectors
 - Grants compose additively; default deny; no explicit deny engine V1.
 - `tenant_owner` is never a bypass.
 - OpenFGA/SpiceDB are not required for V1.
-- The frozen R9 + R9.5 catalogs contain 29 base + 16 bounded whole-product permissions; the exact catalog/bundles live in the active ledger.
+- The frozen R9 + R9.5 catalogs contain 29 base + 16 bounded whole-product permissions; the exact catalog/bundles live in the frozen ledger.
 
 ### Approval V1
 
@@ -195,13 +206,14 @@ External Repository Connectors
 
 - No generic Record declaration entity.
 - CAPTURED Evidence and first-submitted DocumentRevision become retention subjects automatically.
-- Policies are explicit and snapshotted; expiry = disposition eligibility, never automatic deletion.
+- Frozen retention rules are explicit values and are snapshotted into RetentionBinding; expiry = disposition eligibility, never automatic deletion.
 - Current EFFECTIVE Revision is never disposition-eligible.
 - Physical disposal requires authorized disposition, no active hold and verified removal before DispositionRecord completion.
 - LegalHold scopes: Evidence, stable Document, Dossier.
 - Active Document/Dossier holds materialize current and newly entering retention subjects while within their live scope; unlink/lifecycle cannot release already-held subjects.
 - Hold covers confirmed governed records, not never-submitted DRAFT/ESI; eDiscovery is future-triggered.
 - Tenant erasure remains blocked while retention/hold obligations survive; required decryption capability remains until preserved content may lawfully be destroyed.
+- R10-A does not introduce a standalone `RetentionPolicy` entity.
 
 ### Import / Historical Migration / Export
 
@@ -235,31 +247,84 @@ R9.5-6 Import / Migration / Export           LOCKED
 R9.5-7 Launch Attestation / Content Safety   LOCKED
 R9.5-8 Whole-Product Adversarial Freeze      CLOSED / APPROVED
 R9.5                                         FROZEN
+reopen set                                   EMPTY
 ```
 
-The independent review attacked all 15 mandatory end-to-end cases, the 16-permission delta and the final subtractive/YAGNI pass. Reopen set after disposition: **EMPTY**.
+The independent R9.5 review attacked all 15 mandatory end-to-end cases, the 16-permission delta and the final subtractive/YAGNI pass. Do not reopen frozen decisions for preference or hypothetical futures.
 
-Do not reopen frozen decisions for preference or hypothetical futures. Reopen only on material evidence under the DevelopmentConexus Engineering Method and only the minimal implicated decision set.
+## 7. R10-A promoted ownership topology
 
-## 7. Current module disposition
+R10-A is now **CLOSED / APPROVED**. Detailed authority lives in [`r10-technical-architecture.md`](r10-technical-architecture.md).
 
-Current module docs are current-state evidence, not target architecture.
+### Business bounded contexts — exactly 8
 
-High-level target disposition remains:
+```text
+Authentication
+Organization
+Authorization
+Controlled Information
+Approval
+Documentary Context
+Records Governance
+Distribution
+```
+
+### Supporting semantic owners — exactly 3
+
+```text
+Artifact
+Audit
+Interchange
+```
+
+### Attributed support / projection classification
+
+```text
+Notifications → internal/support/notifications
+Search        → internal/projections/search
+```
+
+Key promoted ownership rulings:
+
+- Organization owns Tenant/Area/User/Group/GroupMembership, Tenant settings/configuration, Tenant lifecycle, erasure tombstones and tenant key-custody lifecycle facts.
+- Authorization owns grants/evaluation/composition contract shape; domains own relationship predicate meaning.
+- Controlled Information owns the one Document/Revision/WorkingContent/Submission/Template/Rendition/Release lifecycle authority.
+- Document owner/responsibility meaning belongs to Controlled Information; R10-A does not prematurely fix participant type/cardinality/representation.
+- Tenant Dictionary + System Value Catalog live as distinct internal Controlled Information fact classes; no standalone Dictionary owner.
+- Approval owns policy/instance/participants/decisions/attestation/SoD, never Document effectivity.
+- Documentary Context owns Evidence/Dossier/ExternalReference/context relationships.
+- Records Governance owns retention-rule meaning, bindings, holds and disposition; no standalone V1 `RetentionPolicy` entity.
+- Artifact owns exact-byte/physical-content truth, not business lifecycle.
+- Audit owns the transversal timeline, not domain state.
+- Interchange owns transfer process truth, never imported target-object truth.
+- Composition coordinates concrete cross-owner use cases but owns no durable semantic fact.
+- Notifications owns attributed delivery/read state only; Search remains rebuildable projection only.
+
+R10-A closed after independent adversarial review, Method adjudication, cold delta/global coherence review, a full frozen-fact closure inventory and an independent mechanical permission/fact sweep. Final closure: zero blockers, zero remaining topology defects, zero duplicate owners, zero invented fact families, R9.5 reopen set empty.
+
+## 8. Current module disposition
+
+Current module docs are current-state evidence, not target architecture. R10-A fixes the final semantic disposition:
 
 - `approval` → Approval V1;
-- `auth` → retain V1 behind AuthN boundary;
-- `iam` → conceptually split Organization + Authorization;
-- `taxonomy` → dismantle: Area → Organization; legitimate type/classification meaning → Controlled Information;
-- `controlleddocuments` → absorb legitimate identity/numbering responsibilities into Controlled Information;
-- `documents` → Controlled Information core after responsibility cleanup;
-- `templates` → retire parallel lifecycle; template becomes revision role/designation;
-- `jobs` → orchestration/composition, not bounded context;
-- `audit`, `render`, `search`, `notifications`, `distribution`, `tokens`, `security` → supporting concerns/mechanisms, retained only where they own distinct semantics.
+- `audit` → Audit supporting semantic owner;
+- `auth` → Authentication;
+- `controlleddocuments` → delete target BC; responsibilities → Controlled Information;
+- `distribution` → Distribution;
+- `documents` → delete legacy BC; responsibilities → Controlled Information;
+- `iam` → split Organization + Authorization;
+- `jobs` → no BC; owner-attributed work + composition/platform async;
+- `notifications` → `support/notifications`;
+- `render` → dismantle; Rendition/value semantics → Controlled Information, providers → infrastructure;
+- `search` → `projections/search`;
+- `security` → delete BC; AuthN facts → Authentication, key-custody lifecycle → Organization, commodity security → platform;
+- `taxonomy` → dismantle: Area → Organization; DocumentType/classification → Controlled Information; GovernanceClass deleted;
+- `templates` → delete parallel lifecycle; template role/designation/use → Controlled Information;
+- `tokens` → delete standalone owner; Tenant Dictionary/System Value Catalog → Controlled Information.
 
-R10 owns the final bounded-context/package/table ownership and deletion/rename map.
+Exact table/API/frontend cutover mechanics remain later R10 work.
 
-## 8. Build-vs-buy posture
+## 9. Build-vs-buy posture
 
 Do not choose infrastructure before the frozen domain proves the requirement.
 
@@ -274,42 +339,57 @@ Current rulings:
 
 External libraries/frameworks may be evaluated in R10+ only for precise mechanisms after ownership/semantics are fixed.
 
-## 9. Documentation lifecycle
+## 10. Documentation lifecycle
 
 `wiki/` holds durable maintained product/repository truth; `docs/` holds active staging/working evidence unless an owner explicitly says otherwise. Git history is the archive.
 
-The active ledger remains the binding detailed redesign decision record while R10 is open. R9.5 review packets remain evidence of how the freeze was challenged and dispositioned; they do not become parallel authority.
+Authority is now delegated by stage:
 
-## 10. Implementation gate
+- `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md` remains the frozen binding detailed R3–R9.5 product/domain record;
+- `wiki/architecture/r10-technical-architecture.md` is the active durable R10 technical-stage authority;
+- R9.5 and R10 review packets remain evidence of how decisions were challenged and adjudicated; they are not parallel authority.
+
+Move future R10 decisions into the R10 stage authority or deliberately promoted subordinate specs/ADRs rather than editing review evidence.
+
+## 11. Implementation gate
 
 **Closed.** No product implementation yet.
 
-R10 and subsequent technical-design work must first complete bounded contexts/ownership, data model/constraints, transactions/events, API/frontend journeys, migration/delete map, durable target specs/ADRs and the required adversarial/operator gates. Only then may an implementation plan be authored from the accepted target.
+R10-B and subsequent technical-design work must complete data model/constraints, transactions/events, physical integrity, async/external effects, API/frontend journeys, migration/delete map, durable target specs/ADRs and required adversarial/operator gates. Only then may an implementation plan be authored from the accepted target.
 
-## 11. Exact next step — R10 Technical Architecture
+## 12. Exact next step — R10-B Transactional Domain State & DB Invariants
 
-Open **R10** in design-only mode.
+R10-A ownership is closed. Start **R10-B** in design-only mode from the promoted 8+3 topology.
 
-Start with an integrated technical decomposition before microdecisions. R10 must derive, not redefine, the frozen R3–R9.5 model and disposition at minimum:
+First perform a whole-block decomposition rather than one microdecision at a time. R10-B must derive at minimum:
 
 ```text
-bounded contexts / module owners / dependency DAG
-filesystem/package ownership + legacy deletion/rename map
-target data model + table ownership
-DB invariant constraints
-transaction boundaries
-durable events / outbox / async ownership
-Artifact staging/storage/relocation/restore mechanics
-WorkingContent OCC + coherent Submission atomicity
-Release idempotency / exactly-one-EFFECTIVE enforcement
-Retention / LegalHold / disposition mechanics
-tenant erasure / restore reconciliation
-canonical AuthZ on query/search/export surfaces
-Historical Migration transaction/idempotency contracts
-external publish/job effect truth
-API contracts
-frontend journeys
-final migration/delete map
+semantic owner → table/aggregate ownership
+identity/key/FK/reference rules across owners
+Document/Revision/WorkingContent/Submission persistent state
+Document owner/responsibility representation to the minimum frozen semantics
+one-open-Revision and exactly-one-EFFECTIVE DB invariant enforcement
+WorkingContent working_version OCC enforcement
+Submission coherent-state atomicity + immutability
+Approval policy/instance/participant-snapshot/decision constraints
+SoD invariant backstops
+Evidence/Dossier lifecycle + relationship constraints
+RetentionBinding/LegalHold/Disposition persistent state constraints
+Artifact no-confirmed-orphan structural backstop
+Tenant deletion/erasure/tombstone/key-custody durable state
+local cross-owner transaction boundaries
+same-commit Audit append requirement
+outbox-intent insertion points required by atomic business mutations
+historical-import representation that cannot fabricate native Approval/Release facts
 ```
 
-Technology/topology choices are subordinate to those ownership and invariant decisions. Current runtime/code/schema/OpenAPI are evidence, never target entitlement.
+Keep later failure classes deferred unless a minimal seam must be fixed now:
+
+```text
+R10-C → physical Artifact/storage/relocation/restore mechanics
+R10-D → durable async/projections/retry/external-effect execution
+R10-E → final API contracts/frontend journeys/canonical access surfaces
+R10-F → Historical Migration/cutover/final deletion map
+```
+
+Technology/topology choices are subordinate to ownership and invariants. Current runtime/code/schema/OpenAPI are evidence, never target entitlement.
