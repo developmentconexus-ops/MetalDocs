@@ -1,8 +1,9 @@
 # R10 Technical Architecture — Active Stage Authority
 
-> **Status:** ACTIVE — **R10-A CLOSED / APPROVED; R10-B1 CLOSED / APPROVED; R10-B2 NEXT / DESIGN ONLY**
+> **Status:** ACTIVE — **R10-A CLOSED / APPROVED / GCR-REFINED; R10-B1 CLOSED / APPROVED / GCR-CLARIFIED; R10-B2 NEXT / DESIGN ONLY**
 > **Promoted:** 2026-08-17
 > **R10-B1 promotion ratified:** 2026-08-17
+> **Global Coherence Review refinement ratified:** 2026-08-17
 > **Repository:** `developmentconexus-ops/MetalDocs`
 > **Design branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
 > **Method:** `docs/engineering/standards/root-cause-global-maximum-method.md` — DevelopmentConexus Engineering Method v1.0.0 mirror
@@ -10,7 +11,7 @@
 > **Program authority:** `wiki/architecture/cohesive-platform-redesign.md`
 > **Implementation gate:** **CLOSED — no product implementation authorized.**
 
-This page is the durable stage authority for R10. The R3–R9.5 ledger remains binding for frozen product/domain semantics. Its historical statements that `R10 = NEXT` are superseded for current-stage routing by this page and the current handoff; its frozen semantic decisions are not superseded.
+This page is the durable stage authority for R10. R10-A and R10-B1 remain closed; the 2026-08-17 Global Coherence Review made only the bounded amendments recorded below. The 8+3 ownership topology and all unaffected B1 substrate laws remain unchanged.
 
 ---
 
@@ -19,9 +20,9 @@ This page is the durable stage authority for R10. The R3–R9.5 ledger remains b
 R10 is one integrated technical-design stage decomposed by failure class:
 
 ```text
-R10-A  Ownership Topology & Dependency DAG              CLOSED / APPROVED
+R10-A  Ownership Topology & Dependency DAG              CLOSED / APPROVED / GCR-REFINED
 R10-B  Transactional Domain State & DB Invariants      IN PROGRESS
-  B1   Relational Substrate, Tenancy & Reference Law   CLOSED / APPROVED
+  B1   Relational Substrate, Tenancy & Reference Law   CLOSED / APPROVED / GCR-CLARIFIED
   B2   Authentication / Organization / Authorization   NEXT / DESIGN ONLY
   B3   Controlled Information + Artifact relational core NOT STARTED
   B4   Approval + CI-owned Rendition/Release + Distribution NOT STARTED
@@ -41,27 +42,61 @@ Closure order:
 R10-A → B1 → B2 → B3 → B4 → B5 → B6 → R10-C → R10-D → R10-E → R10-F
 ```
 
-R10-E analysis may begin only when useful after ownership is stable, but it cannot close before the invariants/mechanisms it exposes are decided. Product implementation remains blocked until the integrated technical design and its operator/adversarial gates are complete.
+Product implementation remains blocked until the integrated technical design and its operator/adversarial gates are complete.
 
 ---
 
-# 2. R10-A — promoted ownership topology
+# 2. R10-A — promoted ownership topology, GCR-refined
 
 ## 2.1 Business bounded contexts — exactly 8
 
 ### Authentication
 
-Owns local credential/session identity facts:
+Authentication owns product-facing authentication semantics:
 
 ```text
-credential / identity binding
-activation
-opaque session
-lockout / revocation
-fresh-auth / reauthentication assurance
+ProviderSubjectBinding
+opaque MetalDocs application Session
+application-session lifecycle / revocation
+authentication-assurance facts
+fresh-auth / reauthentication evidence
+provider anti-corruption contract
 ```
 
-External IdP remains an adapter seam. Authentication owns no grants, organization membership or Tenant lifecycle.
+Keycloak is the V1 Authentication provider and owns credential mechanisms:
+
+```text
+credential storage
+password policy
+provider account activation / enablement
+provider lockout / brute-force protection
+password recovery
+MFA / passkeys
+upstream OIDC / SAML / LDAP / AD federation
+provider authentication session
+provider-hosted authentication journeys
+```
+
+Stable provider identity is `issuer + subject`. Email, username and display name are attributes, not technical identity.
+
+The published Authentication/provider result is an enumerated anti-corruption contract. It may expose facts such as:
+
+```text
+issuer
+subject
+authenticated_at
+auth_time
+acr?
+amr?
+```
+
+It does **not** expose a generic claims map to Authorization/domain owners. Provider roles, realm/client roles, groups, organizations, permissions and arbitrary claim-to-permission mappings are forbidden as canonical MetalDocs Authorization inputs. There is no provider-role mapping table or claim-to-MetalDocs-permission bridge V1.
+
+Keycloak Organizations or equivalent provider organization machinery may later be used only as AuthN routing/federation projection of MetalDocs Tenant state; it is never Organization or Authorization authority.
+
+Candidate provider topology is one Keycloak realm per environment/application trust domain, not realm-per-Tenant. A real tenant-specific authentication-policy requirement that cannot be expressed within that topology is a reopen trigger.
+
+Authentication owns no Organization membership or product grants.
 
 ### Organization
 
@@ -78,12 +113,13 @@ Tenant lifecycle: ACTIVE | SUSPENDED | ERASED
 TenantDeletionRequest
 TenantErasureRecord
 erasure tombstone / erased-tenant reconciliation facts
-tenant key-custody lifecycle facts required for lawful DEK preservation/destruction
 ```
 
 `tenant.settings.manage` governs Tenant-family settings/configuration; no standalone `TenantSettings` bounded context or aggregate is implied by the permission.
 
-Key-custody ownership is lifecycle authority only. Cryptographic primitives, KEK integration, wrap/unwrap and secret-material handling remain platform mechanisms. Records Governance supplies retention/hold blocker facts; it does not own key state.
+There is **no mandatory Tenant DEK/key-custody fact family in V1**. If a later named application-layer Target Data family requires tenant-key lifecycle semantics, that decision re-enters through the GCR-R4 reopen trigger and must prove the protected data, erasure semantics and backup/restore posture before adding key-custody facts.
+
+Records Governance supplies retention/hold blocker facts; it does not own Tenant state.
 
 ### Authorization
 
@@ -100,7 +136,7 @@ canonical grant evaluation
 composable authorization/filter contract shape
 ```
 
-Authorization owns the composition/evaluation contract, not domain relationship meaning. Each semantic owner owns its resource/case predicates. No role bypass, generic ACL/ReBAC graph or provider permission engine V1.
+Authorization owns the composition/evaluation contract, not domain relationship meaning. Each semantic owner owns its resource/case predicates. No role bypass, generic ACL/ReBAC graph, provider permission engine, provider-role bridge or deny engine V1.
 
 Relationship-predicate ownership:
 
@@ -172,7 +208,7 @@ withdraw / cancel / reassign / oversight
 strict SoD
 ```
 
-Approval never owns Document effectivity. Human-readable manifestations of Approval facts are Controlled Information Renditions of Approval authority, not a second Approval record.
+Approval never owns Document effectivity. Human-readable manifestations of Approval facts are Controlled Information Renditions of Approval authority, not a second Approval record. Reauthentication consumes Authentication-owned assurance/fresh-auth facts; Approval never challenges local passwords itself.
 
 ### Documentary Context
 
@@ -255,6 +291,8 @@ Controlled Information owns the Revision/WorkingContent → primary Artifact rel
 
 No confirmed orphan Artifact exists. Storage providers remain replaceable mechanisms.
 
+Production confirmation adds one promoted GCR safety property: untrusted bytes cannot become `CONFIRMED Artifact` without successful malware inspection. Scanner selection and physical validation ordering belong R10-C; Artifact owns the staging/validation/confirmation fact, not the scanner mechanism.
+
 ### Audit
 
 Owns:
@@ -267,6 +305,8 @@ Audit Trail separate retention regime
 ```
 
 Critical governed mutation must be able to append durable Audit intent/event in the same local commit through a published transactionally composable seam. Exact transaction/storage mechanism belongs to R10-B/R10-D. Domain records remain the authority for their own facts.
+
+GCR-R4 adds a B6 proof obligation: the immutable Audit state permitted to survive Tenant erasure must be a PII-minimized/non-PII skeleton. Human-readable/user enrichment must resolve through separately erasable state or read/projection enrichment. If B6 proves a real immutable Target Data family must remain stored yet become unintelligible after lawful erasure, the DEK/key-custody decision reopens before crypto-erasure machinery is introduced.
 
 ### Interchange
 
@@ -317,7 +357,9 @@ Not semantic owners:
 jobs / schedulers
 outbox / queue / leases / DLQ
 workers
+Keycloak / IdP provider client and adapter
 storage provider clients
+malware scanner client / inspection mechanism
 rendering provider clients
 external repository adapters
 RLS
@@ -325,10 +367,11 @@ HTTP / OpenAPI / codegen
 cache
 rate limiting
 observability
-crypto primitives / KEK integration / wrap-unwrap
 backup image transport
 PlatformOperator / SystemPrincipal execution machinery
 ```
+
+No mandatory V1 KEK/wrap-unwrap/Tenant-DEK mechanism exists. Such machinery requires a named protected Target Data family and a reopened decision.
 
 PlatformOperator/SystemPrincipal remain outside tenant RBAC and gain no implicit tenant-content authority.
 
@@ -338,19 +381,20 @@ PlatformOperator/SystemPrincipal remain outside tenant RBAC and gain no implicit
 
 `internal/composition` is the outer application layer for concrete cross-owner use cases. Composition may coordinate owners; it owns no durable business meaning and no semantic owner imports it.
 
-R10-A requires transactionally composable published application seams wherever frozen semantics require one local atomic commit. R10-B decides the concrete UnitOfWork/Tx/schema mechanism.
+R10-A requires transactionally composable published application seams wherever frozen semantics require one local MetalDocs DB commit. R10-B decides the concrete UnitOfWork/Tx/schema mechanism.
 
 Material seams:
 
-1. **CI ↔ Approval** — exact Submission references and Approval reads are composition/read-contract mediated; no mutual package authority. Manifestation Renditions/system values may consume published Approval evidence without making CI a second Approval authority.
-2. **Local transactional composition** — published application seams must permit one local DB transaction across exactly the owners required by a frozen atomicity invariant.
+1. **CI ↔ Approval** — exact Submission references and Approval reads are composition/read-contract mediated; no mutual package authority.
+2. **Local transactional composition** — published application seams must permit one local MetalDocs DB transaction across exactly the owners required by a frozen atomicity invariant.
 3. **Audit append** — Audit publishes a transactionally composable append seam; producers never own Audit storage/meaning.
-4. **Artifact confirmation** — caller supplies an opaque semantic-owner reference; Artifact does not import CI/DC. R10-B supplies the structural no-orphan backstop.
+4. **Artifact confirmation** — caller supplies an opaque semantic-owner reference; Artifact does not import CI/DC. R10-B supplies the structural no-orphan backstop; R10-C supplies physical validation/inspection proof.
 5. **Records prospective hold materialization** — Records consumes published CI/DC subject facts/events/read seams; it does not acquire underlying lifecycle authority.
 6. **Historical Migration** — target owners expose narrow privileged migration-grade application seams; Interchange calls owners, never the reverse.
 7. **Notifications** — producers resolve recipients/business meaning before delivery intent; Notifications does not invent policy.
 8. **Authorization filtering** — Authorization composes owner-supplied predicates; Search/export/timeline/API consumers do not rederive visibility.
-9. **Tenant erasure/restore** — Organization owns Tenant/tombstone/key-custody lifecycle, Records Governance owns blockers, Authentication owns session revocation, Artifact owns byte truth; composition owns none of them.
+9. **Tenant erasure/restore** — Organization owns Tenant/tombstone lifecycle, Records Governance owns blockers, Authentication owns application-session revocation, Artifact owns byte truth, Audit owns the surviving permitted non-PII skeleton; composition owns none of them.
+10. **Authentication provider** — Keycloak/provider owns credential mechanics; MetalDocs owns User, provider binding, app Session and assurance facts. No operation assumes atomic commit across provider persistence and the MetalDocs product DB.
 
 The target package/import DAG must be acyclic. Semantic dependency does not require direct Go import; interface inversion, references, events and composition may preserve ownership while avoiding cycles.
 
@@ -391,21 +435,24 @@ Within a semantic owner, use `domain/`, `application/`, `infrastructure/`, `deli
 Provider placement:
 
 ```text
-Local / MinIO / AWS S3 adapters       → Artifact infrastructure
+Keycloak / IdP adapter                 → Authentication infrastructure
+Local / AWS S3 / compatible adapters   → Artifact infrastructure
+malware scanner adapter                → Artifact/platform validation mechanism
 EigenPal / rendering provider adapters → Controlled Information infrastructure/execution
 SharePoint / external repo adapters    → Interchange infrastructure
-crypto / KEK providers                 → platform mechanism behind Organization-owned key lifecycle
 ```
+
+The durable storage entitlement is `ManagedArtifactStore` port + conformance, not the provider list. No self-hosted production provider is frozen without a real deployment consumer.
 
 ---
 
-# 5. Legacy backend disposition fixed by R10-A
+# 5. Legacy backend disposition fixed by R10-A + GCR
 
 | Current module | Promoted target disposition |
 |---|---|
 | `approval` | converge to Approval V1 |
-| `audit` | retain Audit semantic owner; redesign durability later |
-| `auth` | converge/rename to Authentication |
+| `audit` | retain Audit semantic owner; redesign durable skeleton later |
+| `auth` | converge to Authentication provider-binding/app-session/assurance; local credential machinery becomes migration/deletion evidence |
 | `controlleddocuments` | delete as target BC; identity/numbering responsibilities → Controlled Information |
 | `distribution` | retain Distribution semantic owner |
 | `documents` | delete legacy BC; responsibilities → Controlled Information |
@@ -414,7 +461,7 @@ crypto / KEK providers                 → platform mechanism behind Organizatio
 | `notifications` | reclassify → `support/notifications` |
 | `render` | dismantle; Rendition/value semantics → Controlled Information, providers → infrastructure |
 | `search` | reclassify → `projections/search` |
-| `security` | delete as BC; key-custody lifecycle → Organization, AuthN facts → Authentication, commodity security → platform |
+| `security` | delete as BC; product-facing AuthN facts → Authentication, commodity security → platform; legacy DEK/KEK machinery has no V1 target entitlement |
 | `taxonomy` | dismantle; Area → Organization, DocumentType/classification → Controlled Information, GovernanceClass deleted |
 | `templates` | delete parallel lifecycle; template role/use → Controlled Information |
 | `tokens` | delete standalone owner; Tenant Dictionary/System Value Catalog → Controlled Information |
@@ -428,7 +475,7 @@ No current module survives merely by inertia. Exact table/API/frontend cutover m
 The single OpenAPI + generated-owner-surface structural pattern may survive, but target ownership is:
 
 ```text
-auth                         → Authentication
+auth                         → Authentication provider binding / app Session / assurance
 iam                          → Organization + Authorization
 documents / controlled-docs  → Controlled Information
 templates / tokens           → Controlled Information
@@ -439,7 +486,7 @@ distribution                 → Distribution
 audit                        → Audit
 search                       → Search projection
 notifications                → Notifications support
-security                     → retire/split across Authentication/Organization/platform
+security                     → retire/split across Authentication/platform
 documentary context          → new owner surface
 records governance           → new owner surface
 interchange                  → new owner surface
@@ -448,27 +495,15 @@ configuration/health/obs     → platform
 
 There is no generic `/artifacts` business API merely because Artifact is a semantic supporting owner; confirmed Artifact must be attached to a governed owner. Exact paths, operationIds, DTOs and frontend journeys are R10-E.
 
-Original R10-A candidate/review-packet surface classifications are historical evidence where they differ from this promoted topology.
+Keycloak-hosted/themed login/recovery/MFA journeys replace custom MetalDocs credential UX where appropriate; R10-E must not rebuild credential administration journeys through provider admin APIs.
 
 ---
 
-# 7. R10-A closure proof and review record
+# 7. R10-A closure proof, GCR amendment and reopen record
 
-R10-A was independently attacked and corrected before promotion.
+R10-A originally closed after independent topology review, Method adjudication, cold/global coherence review, final completeness correction and mechanical fact/permission sweep.
 
-Evidence chain:
-
-1. candidate/review request — `docs/superpowers/analysis/2026-08-17-r10-a-ownership-topology-fable-review-request.md` @ `f51f6bfa`;
-2. independent adversarial review — `docs/superpowers/analysis/2026-08-17-r10-a-independent-fable-review.md` @ `c0bde261`, verdict `APPROVE R10-A WITH MATERIAL FIXES`;
-3. adjudicated corrected target — `docs/superpowers/analysis/2026-08-17-r10-a-fable-adjudication-corrected-target.md` @ `74c1ba80`;
-4. cold delta/global coherence review — `docs/superpowers/analysis/2026-08-17-r10-a-cold-delta-fable-review.md` @ `b8c6f494`, verdict `APPROVE R10-A CORRECTED TARGET WITH MATERIAL FIXES`;
-5. final completeness correction — `docs/superpowers/analysis/2026-08-17-r10-a-final-completeness-correction.md` @ `5cb350d5`;
-6. independent mechanical completeness sweep — `docs/superpowers/analysis/2026-08-17-r10-a-final-completeness-fable-review.md` @ `ba351578`, verdict `APPROVE R10-A COMPLETENESS CLOSURE WITH MATERIAL FIXES`;
-7. operator adjudication accepted the two final mechanical closure fixes on 2026-08-17:
-   - `Document owner / responsibility relationship` belongs to Controlled Information, without inventing participant type/cardinality at R10-A;
-   - Tenant settings/configuration are subsumed by the Organization/Tenant fact family, without inventing a standalone owner.
-
-The final mechanical sweep found:
+Original final closure:
 
 ```text
 BLOCKER                    = 0
@@ -476,10 +511,28 @@ remaining topology defect = 0
 duplicate owners           = 0
 invented fact families     = 0
 RetentionPolicy entity     = ABSENT / PASS
-R9.5 reopen set            = EMPTY
 ```
 
-The review files remain evidence, not parallel authority. This page contains the promoted outcome.
+The later 2026-08-17 Global Coherence Review did **not** reopen topology. It produced a bounded amendment of Authentication/provider facts and removed the unsupported mandatory Organization key-custody fact family.
+
+GCR evidence chain:
+
+1. `docs/superpowers/analysis/2026-08-17-global-coherence-minimal-reopen-fable-review-request.md`;
+2. `docs/superpowers/analysis/2026-08-17-global-coherence-minimal-reopen-independent-fable-review.md`, verdict `APPROVE GCR MINIMAL REOPEN SET WITH MATERIAL FIXES`;
+3. `docs/superpowers/analysis/2026-08-17-global-coherence-minimal-reopen-adjudicated-corrected-target.md`;
+4. `docs/superpowers/analysis/2026-08-17-global-coherence-minimal-reopen-corrected-target-fable-delta-review.md`, verdict `APPROVE GCR ADJUDICATED CORRECTED TARGET`.
+
+Final GCR delta:
+
+```text
+BLOCKER = 0
+MAJOR   = 0
+prior findings closed = 11/11
+new material contradiction = NONE
+fifth material local maximum = NONE
+```
+
+R10-A topology remains exactly 8+3. Review artifacts remain evidence, not parallel authority; this page contains the promoted amended outcome.
 
 ---
 
@@ -495,7 +548,9 @@ Promoted invariants:
 6. canonical Authorization evaluation composes domain-owned relationship predicates rather than centralizing domain semantics;
 7. no standalone Dictionary or `RetentionPolicy` entity exists without a real independent consumer/lifecycle;
 8. Document owner/responsibility semantics belong to Controlled Information, while its concrete representation remains an R10-B question unless product semantics force a separate decision;
-9. Notifications owns attributed delivery/read state but no business truth; Search is rebuildable projection only.
+9. Notifications owns attributed delivery/read state but no business truth; Search is rebuildable projection only;
+10. Keycloak/provider is Authentication mechanism/credential authority only; Organization and Authorization remain MetalDocs authorities;
+11. no mandatory Tenant DEK/key-custody fact family exists without a named application-layer Target Data family requiring it.
 
 R10-A reopens only on material evidence such as:
 
@@ -506,7 +561,9 @@ R10-A reopens only on material evidence such as:
 - Evidence/Dossier lifecycle evidence requiring a different boundary;
 - an external-transfer requirement proving Interchange must split or a different owner must exist;
 - an indivisible multi-file requirement that materially changes Artifact semantics;
-- implementation evidence showing the acyclic/transactionally-composable ownership assumptions cannot preserve a frozen invariant.
+- implementation evidence showing the acyclic/transactionally-composable ownership assumptions cannot preserve a frozen invariant;
+- a material provider/authentication requirement showing one-realm-per-trust-domain cannot satisfy real tenant policy without provider Organization becoming product authority;
+- a named immutable Target Data family proving tenant key-custody lifecycle is essential.
 
 Package naming preference, current schema inconvenience, provider capability or implementation convenience are not reopen evidence.
 
@@ -514,16 +571,20 @@ Package naming preference, current schema inconvenience, provider capability or 
 
 # 9. R10-B1 — promoted relational substrate, tenancy and reference law
 
-R10-B1 is **CLOSED / APPROVED**. It fixes the shared relational/transactional laws that B2–B6 must obey; it does not choose their aggregate-specific table sets.
+R10-B1 is **CLOSED / APPROVED**. The GCR changed no structural B1 law; it only clarified product-state DB scope and forbade cross-provider-DB atomicity assumptions.
 
 ## 9.1 PostgreSQL topology and identity
 
 ```text
-one PostgreSQL database
+one MetalDocs product-state PostgreSQL database
 canonical target product-state schema = metaldocs
 schema-per-Tenant = NO
 schema-per-bounded-context = NO
 ```
+
+Provider-owned products such as Keycloak retain separate persistence authority, migrations, credentials and lifecycle. Physical co-location on one PostgreSQL server/cluster does not merge logical persistence authority.
+
+**No MetalDocs invariant may depend on cross-database atomicity between the MetalDocs product-state database and any provider-owned database.** No XA/2PC/distributed transaction is introduced to simulate such atomicity.
 
 PostgreSQL namespace is mechanism, never semantic authority. Target product state does not use `public` as a second business-state namespace.
 
@@ -535,9 +596,9 @@ id        UUID NOT NULL
 PRIMARY KEY (tenant_id, id)
 ```
 
-`id` is opaque technical identity. No second global `UNIQUE(id)` is required absent a real consumer. Business/provider/external identifiers — Document code, REV label, Dossier key, Artifact hash, external ID, provider key/URL — never become technical PKs by convenience.
+`id` is opaque technical identity. No second global `UNIQUE(id)` is required absent a real consumer. Business/provider/external identifiers — Document code, REV label, Dossier key, Artifact hash, provider subject, external ID, provider key/URL — never become technical PKs by convenience.
 
-Tenant is the root; genuinely global/product/credential facts may lack `tenant_id` when their owner semantics require it. B2+ must not mechanically tenant-key every table for uniformity.
+Tenant is the root; genuinely global/product facts may lack `tenant_id` when their owner semantics require it. B2+ must not mechanically tenant-key every table for uniformity. Provider-subject binding tenant dimension/cardinality is a B2 decision and must be explicit; global `UNIQUE(issuer, subject)` is not assumed.
 
 ## 9.2 Same-tenant references and FK action law
 
@@ -699,11 +760,11 @@ Concrete maintenance credential/process/rotation/cutover mechanics belong to R10
 
 ## 9.8 Transaction and isolation law
 
-Ordinary tenant-owned mutations execute in explicit local PostgreSQL transactions.
+Ordinary tenant-owned mutations execute in explicit local MetalDocs PostgreSQL transactions.
 
 Single-owner mutation: the owner application service owns the boundary.
 
-Cross-owner atomic use case:
+Cross-owner atomic use case inside the MetalDocs product-state DB:
 
 ```text
 composition opens one PostgreSQL transaction
@@ -714,13 +775,15 @@ composition opens one PostgreSQL transaction
 
 No semantic owner hides an independent nested commit inside a frozen atomic operation, and no owner imports another owner's repository to obtain atomicity. Concrete UnitOfWork/Tx interface shape is deferred to the relevant B-blocks.
 
+Provider-side work (Keycloak, object-store external effects, repositories, etc.) is never part of this local atomicity claim; it uses durable intent/idempotency/reconciliation in the owning later stage.
+
 Default isolation is `READ COMMITTED`. `SERIALIZABLE` is not a global correctness substitute; use the narrowest sufficient invariant mechanism (`UNIQUE`, partial UNIQUE, CHECK, FK, CAS/working_version, `SELECT ... FOR UPDATE`, atomic UPDATE) and raise isolation only for a demonstrated failure class.
 
 ## 9.9 Same-commit Audit and durable intent
 
-Where frozen authority requires Audit evidence, a critical governed mutation cannot report success unless its Audit append is durable in the same commit.
+Where frozen authority requires Audit evidence, a critical governed mutation cannot report success unless its Audit append is durable in the same MetalDocs DB commit.
 
-Where the mutation necessarily creates future async work, its required durable intent is inserted in that same commit.
+Where the mutation necessarily creates future async/provider work, its required durable intent is inserted in that same commit.
 
 ```text
 BEGIN
@@ -730,9 +793,7 @@ BEGIN
 COMMIT
 ```
 
-or all roll back.
-
-This law does not pretend external effects occur inside the DB transaction. External execution/retry belongs R10-D.
+or all local facts roll back. External/provider effects happen after commit and are reconciled; no cross-provider atomicity is implied.
 
 ## 9.10 Background work discovery
 
@@ -774,27 +835,17 @@ R10-B1 evidence chain:
 3. Method adjudication/corrected target — `docs/superpowers/analysis/2026-08-17-r10-b1-fable-adjudication-corrected-target.md` @ `92cba574`;
 4. bounded delta review — `docs/superpowers/analysis/2026-08-17-r10-b1-corrected-target-fable-delta-review.md` @ `f0273b58`, verdict `APPROVE R10-B1 CORRECTED TARGET`.
 
-Final delta result:
-
-```text
-prior findings closed = 6/6
-BLOCKER = 0
-MAJOR   = 0
-LOW     = 2 non-blocking clarity/successor-proof notes
-R9.5 reopen = EMPTY
-R10-A reopen = EMPTY
-```
-
-The review loop stops here. Remaining LOWs are incorporated as the B4 ownership annotation above and the R10-D Notifications-isolation closure-evidence expectation.
+The later GCR left B1 structural law unchanged and added only the product-state DB wording and no-cross-provider-DB-atomicity restriction.
 
 The following claims must remain falsifiable through later design/implementation:
 
 - same-Tenant composite-reference proof for every protected relationship;
 - census proving every cross-owner FK uses only `RESTRICT`/`NO ACTION` and can neither delete nor mutate another owner's durable state;
-- fail-closed RLS negative proof under the actual serving-class non-owner/NOBYPASSRLS role, never an owner/superuser connection;
+- fail-closed RLS negative proof under the actual serving-class non-owner/NOBYPASSRLS role;
 - proof that ordinary serving pools actually use the non-bypass role;
-- rollback proof that required Audit and durable-intent rows share the authoritative mutation commit;
+- rollback proof that required Audit and durable-intent rows share the authoritative MetalDocs mutation commit;
 - proof that every closed B-block assigns both semantic persistence class and mutation law;
+- proof that no promoted invariant requires atomicity across a provider DB and the MetalDocs product-state DB;
 - R10-D proof that global dispatch surfaces expose routing metadata, not arbitrary tenant content;
 - R10-D closure evidence explicitly exercising or declining the narrower-representation clause for Notifications while preserving the same tenant-isolation claim;
 - R10-F proof that any maintenance bypass is non-serving, least-privilege and unreachable from request paths.
@@ -805,7 +856,7 @@ Reopen B1 only on material evidence such as:
 
 - a real tenant-owned relationship that cannot preserve same-Tenant integrity under the composite-key/reference law;
 - a real global technical-identity consumer requiring global `UNIQUE(id)` rather than tenant-qualified identity;
-- evidence that the one-schema/local-transaction premise cannot preserve a frozen invariant;
+- evidence that the one-product-state-schema/local-transaction premise cannot preserve a frozen invariant;
 - an async/external-effect requirement that cannot remain globally claimable without exposing tenant content despite the routing-only seam;
 - a serving operation that genuinely cannot function under fail-closed Tenant context and cannot be expressed by per-Tenant iteration or routing intent;
 - implementation evidence that cross-owner `RESTRICT`/`NO ACTION` makes a frozen lifecycle impossible rather than merely explicit;
@@ -819,34 +870,72 @@ Current schema inconvenience, migration cost, provider capability, package namin
 
 Open **R10-B2 — Authentication / Organization / Authorization State** in design-only mode.
 
-B2 must derive the minimum target relational state for the three promoted owners under B1's substrate law. At minimum it must decide:
+B2 must derive the minimum target persistent state for the three promoted owners under B1's substrate law. The GCR removes local credential/key-custody machinery from scope and adds provider-binding/reconciliation obligations.
+
+At minimum B2 must decide:
 
 ```text
-Authentication credential/session identity representation
-Authentication ↔ Organization User binding without collapsing AuthN into Org
+Authentication provider-subject binding representation
+  stable issuer + subject boundary
+  explicit Tenant dimension in uniqueness law
+  whether one User may bind one or multiple provider subjects
+Authentication ↔ Organization User binding integrity
+opaque MetalDocs application Session representation and lifecycle
+fresh-auth / authentication-assurance representation
+structural provider anti-corruption contract proof:
+  no provider role/group/org/permission consumption
+  no generic claims map into Authorization/domain owners
+  no provider-role mapping / claim-to-permission bridge
+provider-binding/provisioning lifecycle + idempotent reconciliation for:
+  User exists / provider subject absent
+  provider subject exists / binding absent
+  binding exists / provider subject removed or disabled
+  duplicate issuer+subject attempt
+  provider unavailable
+  retry after uncertain provider response
+provider-side disable vs already-live MetalDocs Session posture
+
 Tenant / Area / User / Group / GroupMembership table ownership and lifecycle
 Tenant settings/configuration persistence without inventing a new authority
 Tenant lifecycle ACTIVE/SUSPENDED/ERASED durable representation
-TenantDeletionRequest / TenantErasureRecord / tombstone state
-Tenant key-custody lifecycle fact representation without moving crypto mechanism into Organization
+TenantDeletionRequest / TenantErasureRecord / tombstone + restore-reconciliation state
+
 Permission / Role / RoleAssignment representation
 User|Group principal references
 Tenant|Area typed scope representation
 role/grant/revocation evidence
 canonical grant-evaluation read model needed by later owners
+
 same-Tenant FK and RLS application under B1
-immutability/mutation classification for every B2 fact family
+semantic persistence + mutation-law classification for every B2 fact family
 transaction boundaries for membership/grant/lifecycle mutations
 required Audit/durable-intent insertion points
 ```
 
 B2 must preserve these boundaries:
 
-- Authentication owns credentials/sessions/fresh-auth, not organization membership or grants;
-- Organization owns Tenant/Area/User/Group/Tenant lifecycle/key-custody lifecycle facts, not credentials or permissions;
+- Authentication owns provider binding/app Session/assurance, not credentials, Organization membership or grants;
+- Organization owns Tenant/Area/User/Group/Tenant lifecycle, not credentials, permissions or mandatory key-custody state;
 - Authorization owns Permission/Role/RoleAssignment/grant evaluation, not domain relationship predicates;
 - RLS remains Tenant isolation only;
 - PlatformOperator/SystemPrincipal remain outside tenant RBAC with no implicit tenant-content authority;
-- no Keycloak, OpenFGA/SpiceDB, generic ACL/ReBAC graph, deny engine, nested groups or speculative enterprise identity machinery without a real trigger.
+- no `tenant_owner` bypass; flat groups only V1; exactly five frozen tenant roles; RoleAssignment subject = User|Group and scope = Tenant|Area; additive/default-deny grants;
+- Keycloak is the V1 AuthN provider but its roles/groups/organizations/permissions never become canonical product authority;
+- no OpenFGA/SpiceDB, generic ACL/ReBAC graph, deny engine, nested groups or speculative enterprise identity machinery without a real trigger;
+- no password/MFA/credential-storage target tables;
+- no mandatory Tenant DEK/KEK/wrap-unwrap infrastructure;
+- no XA/2PC with provider persistence.
+
+### Named successor obligations from GCR
+
+**B6 — Audit:** classify the immutable post-erasure Audit skeleton field-by-field. Prove surviving fields are PII-minimized/non-PII; user-readable enrichment is separately erasable/projection-only. If a real immutable Target Data family must remain stored yet become unintelligible, reopen GCR-R4 before adding crypto-erasure machinery.
+
+**R10-C — Artifact/storage/content safety:** define `ManagedArtifactStore` conformance and its execution environment; choose the S3 client deliberately; decide scanner vs parser/validator ordering; prove production malware inspection cannot be bypassed; make deployment-profile declaration single-sourced so inspection-disabled dev/test cannot present as production; define staged-byte cleanup; record deletion/replacement condition for any transitional MinIO/dev-CI endpoint.
+
+**R10-D — provider/external effects:** implement provider provisioning/retry/reconciliation mechanics only after B2 closes semantic lifecycle; no distributed transaction.
+
+**R10-E — authentication UX:** use provider-hosted/themed login, recovery and MFA journeys where appropriate; do not rebuild credential UX through Keycloak admin APIs.
+
+**R10-F — migration/cutover:** remove legacy local credential and DEK/KEK machinery according to accepted target mappings; provider persistence remains separate authority.
 
 Current IAM/auth/security tables, schema and runtime are evidence only. No schema/code implementation is authorized.
