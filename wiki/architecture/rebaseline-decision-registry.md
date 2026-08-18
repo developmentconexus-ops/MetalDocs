@@ -2,7 +2,7 @@
 
 > **Status:** ACTIVE / OPERATOR-RATIFIED DECISION DISPOSITION AUTHORITY  
 > **Ratified:** 2026-08-18  
-> **Last stage update:** T4 — Exact Content, Storage Integrity & Restore — OPERATOR-RATIFIED  
+> **Last stage update:** T5 — Durable Async, Search & External Effects — OPERATOR-RATIFIED  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Implementation:** BLOCKED
@@ -66,6 +66,7 @@ AGENTS.md
 → wiki/architecture/r10-t2-governance-effectivity-transactions.md
 → wiki/architecture/r10-t3-authorization-audit-enforcement.md
 → wiki/architecture/r10-t4-exact-content-storage-integrity-restore.md
+→ wiki/architecture/r10-t5-durable-async-search-external-effects.md
 → this registry for prior-decision disposition
 → active T-stage candidate only for its REOPEN set
 ```
@@ -101,6 +102,7 @@ READ COMMITTED + narrow explicit serialization/CAS = accepted default posture
 current Authorization = live User/Group grants + scope + domain predicates
 critical governed/security mutations cannot commit without required same-local-commit Audit
 exact governed content = semantic descriptor truth + opaque replaceable storage mechanism
+required future effects use transaction-coupled durable intent; queue/job state is never business authority
 ```
 
 # 4. Authentication
@@ -212,9 +214,9 @@ exact governed content = semantic descriptor truth + opaque replaceable storage 
 
 | ID | Disposition | Current meaning |
 |---|---|---|
-| REL-01 | **CURRENT** | SourceOnly vs one required official representation remains current; preview != semantic Rendition. |
-| REL-02 | **CURRENT / T4-CLARIFIED** | Rendition binds exact Submission and freezes its own ExactContentDescriptor + managed-content handle; renderer/provider work remains outside semantic transaction. |
-| REL-03 | **SUPERSEDED** | Universal mandatory PDF removed. |
+| REL-01 | **CURRENT / T5-CLARIFIED** | `SourceOnly` vs one required official representation remains current; ordinary preview/viewing is mechanism only and never semantic Rendition. PDF source is viewed directly by default; SourceOnly DOCX does not require persisted PDF. |
+| REL-02 | **CURRENT / T4+T5-CLARIFIED** | OfficialRendition binds exact Submission, freezes its own ExactContentDescriptor + managed-content handle, and is rendered durably only when the frozen Submission representation policy requires it. |
+| REL-03 | **SUPERSEDED** | Universal mandatory PDF removed; universal DOCX→PDF persistence for viewing is also not Launch baseline. |
 | REL-04 | **DEFERRED** | Scheduled/future-dated Release. |
 | REL-05 | **SUPERSEDED / REJECTED** | No human publish button; system Release establishes effectivity. |
 | REL-06 | **CURRENT** | First/replacement Release atomicity. |
@@ -236,13 +238,16 @@ exact governed content = semantic descriptor truth + opaque replaceable storage 
 
 | ID | Disposition | Current meaning |
 |---|---|---|
-| ASY-01 | **CURRENT** | Search = rebuildable/eventually-consistent discovery projection; canonical state/AuthZ re-resolved before serve. |
-| ASY-02 | **PRESERVE** | Notifications = delivery projection, never lifecycle authority; actual Launch notification consumers remain T5/T6 decision. |
-| ASY-03 | **PRESERVE / T2-compatible** | Real async/external work may require durable intent in same local transaction; intent is mechanism only. |
-| ASY-04 | **SUPERSEDED AS AUTHORITY** | Current River/job framework is implementation evidence, not target authority. |
-| ASY-05 | **SUPERSEDED / REJECTED** | No global SERIALIZABLE/global worker-lock framework baseline. |
-| ASY-06 | **REOPEN — T5** | T4 establishes `GC_PENDING` eligibility/recheck semantics but T5 must decide whether durable cleanup intent/worker/retry is required and how it executes. |
-| ASY-07 | **REOPEN — T5** | Required OfficialRendition provider execution is outside semantic transaction; T5 owns durable renderer execution/retry only if the Launch requirement proves it. |
+| ASY-01 | **CURRENT — T5** | Search = one PostgreSQL-backed rebuildable/eventually-consistent discovery projection keyed by Document; `search_refresh(document_id)` reloads latest canonical state, and current lifecycle/AuthZ are always re-resolved before serve. |
+| ASY-02 | **DEFERRED / PRESERVE FUTURE** | Notifications remain a delivery projection concept but have no mandatory Launch inbox/email/push consumer; add only a named delivery job/projection when a concrete capability requires it. |
+| ASY-03 | **CURRENT — T5** | If a semantic transaction creates a required future effect, durable job/intent is inserted in the same local transaction; provider/network execution stays outside and intent is mechanism only. |
+| ASY-04 | **PRESERVE — T5 MECHANISM SELECTION** | Launch uses one PostgreSQL-backed durable-job mechanism; River remains selected/reference implementation, replaceable without changing semantic meaning. |
+| ASY-05 | **SUPERSEDED / REJECTED** | No global SERIALIZABLE/global worker-lock framework baseline and no parallel hand-rolled scheduler/lease/outbox runtime beside the selected job mechanism. |
+| ASY-06 | **CURRENT — T5** | Managed-content cleanup is periodic reconciliation over durable T4 `GC_PENDING`; immediately re-prove no live/governed/backup-protected reference before physical delete; no per-handle durable outbox baseline. |
+| ASY-07 | **CURRENT — T5** | `official_rendition_render` is a conditional durable job only when frozen representation policy requires OfficialRendition; ordinary PDF/DOCX viewing creates no durable render requirement. |
+| ASY-08 | **CURRENT — T5** | Durable jobs are at-least-once, idempotent/revalidating, bounded-retry, terminal-visible/redrivable and carry bounded stable IDs/minimum immutable routing facts rather than business/AuthZ snapshots. |
+| ASY-09 | **CURRENT — T5** | Full Search rebuild/reconciliation is mandatory proof that Search is derivative; an always-on global reconciliation crawler is not Launch baseline. |
+| ASY-10 | **CURRENT — T5** | No generic domain-event bus or `ExternalEffectReceipt` family Launch; required async mechanisms expose minimum health/backlog/retry/terminal-failure observability. |
 
 # 13. Audit
 
@@ -369,7 +374,7 @@ Future:
 
 > **Defer the capability; preserve the evolution seam. Prepare the seam, not the dormant implementation.**
 
-# 21. Anti-legacy list — MUST NOT leak into T5–T7
+# 21. Anti-legacy list — MUST NOT leak into T6–T7
 
 ```text
 standalone Artifact semantic owner
@@ -396,11 +401,15 @@ External Repository generic Launch capability
 global AuditChainHead/hash-chain serialization
 scheduled Release
 universal PDF official representation
+universal DOCX→PDF persistence merely for viewing
 Artifact-rooted retention model
 provider/storage identity as semantic identity
 whole-Submission JCS digest without a named consumer
 multi-cloud/BYOS/active-active content platform
 Object Lock/WORM as lifecycle authority
+generic domain-event/integration platform without a named consumer
+generic ExternalEffectReceipt family
+parallel custom async schedulers/lease frameworks beside the selected job runtime
 ```
 
 A later stage may propose one only by naming new material evidence that explicitly reopens it.
@@ -419,39 +428,36 @@ Detailed authority:
 
 `wiki/architecture/r10-t4-exact-content-storage-integrity-restore.md`
 
+## T5 — Durable Async, Search & External Effects — CLOSED / OPERATOR-RATIFIED
+
+Detailed authority:
+
+`wiki/architecture/r10-t5-durable-async-search-external-effects.md`
+
 Closed decisions include:
 
 ```text
-ExactContentDescriptor = SHA-256 + exact size + ContentFormat
-no mandatory whole-Submission JCS digest Launch
-opaque managed-content handle is retrieval mechanism only
-one provider-neutral ManagedContentStore / one active store per deployment
-Local dev/test/conformance + AWS S3 reference production
-OPEN→READY server-verified admission
-opaque admission binding
-UNTRUSTED_EXTERNAL CLEAN malware gate at governed boundary
-create-once/no-overwrite
-WorkingContent as DRAFT recovery baseline
-zero provider/scanner calls inside SUBMIT/Rendition semantic transaction
-only unreferenced non-governed mechanism content reclaimable
-backup = DB recovery point + exact required-content set + GC exclusion
-restore exact-content fail-closed readiness
-post-snapshot UserProfile erasure reconciliation before serving historical restore
-future content capabilities reuse descriptor+mechanism without Artifact ownership
+one PostgreSQL-backed durable-job mechanism; River selected/reference mechanism
+search_refresh(document_id) always-required durable projection job
+official_rendition_render conditional only for policy-required OfficialRendition
+ordinary PDF/DOCX viewing creates no durable-rendition requirement
+required durable intent transaction-coupled with the semantic fact that creates it
+provider/renderer execution outside semantic transaction
+OfficialRendition finalization revalidates T4/T2/T3 state and is idempotent
+Search = PostgreSQL rebuildable projection keyed by Document
+latest-state refresh makes duplicate/out-of-order jobs converge safely
+Search may lag by omission but never grants stale authority/effectivity
+full Search rebuild/reconciliation required; always-on crawler not baseline
+managed-content GC = periodic reconciliation over GC_PENDING with immediate recheck
+no mandatory Launch notifications/inbox/fanout/domain-event bus
+no mandatory durable external IdP-disable job
+jobs at-least-once/idempotent/revalidating/bounded-retry/terminal-visible with bounded-ID payloads
+no generic ExternalEffectReceipt family
+minimum async operational observability required
+future capabilities add only named jobs/effects/receipts for proven consumers
 ```
 
-## T5 — Durable Async, Search & External Effects — ACTIVE REOPEN SET
-
-```text
-which effects actually require durable intent/outbox
-worker/lease/retry/DLQ mechanism
-renderer execution
-notifications if a Launch consumer remains
-Search projection/rebuild/freshness/reconciliation
-provider effect receipts where needed
-```
-
-## T6 — Canonical API / Frontend Journeys
+## T6 — Canonical API / Frontend Journeys — NEXT REOPEN SET
 
 ```text
 numbering configuration grammar and preview UX
