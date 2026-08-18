@@ -2,7 +2,7 @@
 
 > **Status:** Active staging workspace for the MetalDocs rebaselined R10 technical design.  
 > **Reset:** 2026-08-14.  
-> **Current gate:** **T1 + T2 + T3 + T4 + Decision Registry CLOSED / OPERATOR-RATIFIED; T5 ACTIVE / OPERATOR ADJUDICATION NEXT.**
+> **Current gate:** **T1 + T2 + T3 + T4 + Decision Registry CLOSED / OPERATOR-RATIFIED; T5 ACTIVE / RENDITION-VIEWER SUBGATE.**
 
 Durable accepted truth belongs in `wiki/`. Active, not-yet-promoted design analysis belongs here. Completed/superseded staging is removed from the live tree and remains recoverable from Git history.
 
@@ -22,9 +22,10 @@ wiki/architecture/launch-v1-product-contract.md
 
 ## Current active staging
 
-- `analysis/2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md` — **ACTIVE NON-AUTHORITATIVE T5 candidate; operator adjudication of T5-A→T5-P next.**
+- `analysis/2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md` — **PARENT NON-AUTHORITATIVE T5 candidate; whole T5 adjudication paused.**
+- `analysis/2026-08-18-t5-rendition-viewer-strategy-evaluation.md` — **ACTIVE MATERIAL SUBGATE; RV-1→RV-6 operator decision next.**
 
-Completed T4 candidate/adjudication staging was removed after durable promotion. Git history is the archive.
+Completed T4 staging was removed after durable promotion. Git history is the archive.
 
 ## Revalidation law
 
@@ -45,7 +46,9 @@ SUPERSEDED                   → reject inheritance absent explicit material reo
 Search = rebuildable/eventually-consistent discovery projection
 Search never grants access/effectivity
 provider calls never join semantic tx
-OfficialRendition is a real optional Release gate
+OfficialRendition is optional and exists only when frozen representation policy requires it
+SourceOnly remains valid
+preview/viewer mechanism is not semantic authority
 T4 managed-content exactness/admission/GC_PENDING laws are closed
 notifications are not domain/lifecycle authority
 current River/custom outbox code is evidence only
@@ -62,24 +65,29 @@ Search projection/rebuild/freshness/reconciliation
 provider effect receipts where needed
 ```
 
-## Candidate headline
+## Rendition / viewer subgate
+
+Current recommended hybrid:
 
 ```text
-one Postgres-backed durable-job mechanism; River selected/reference implementation
-mandatory durable jobs = official_rendition_render + search_refresh
-GC = periodic reconciliation over GC_PENDING
-transaction-coupled enqueue for required jobs
-renderer outside tx; semantic Rendition/Release finalization inside local tx
-PostgreSQL rebuildable Search projection keyed by Document
-latest-state search refresh makes duplicate/out-of-order jobs harmless
-Search lag may omit but never grant stale authority
-full rebuild required; always-on reconciliation crawler not baseline
-no Launch notifications/event bus
-no mandatory durable IdP-disable sync job
-at-least-once/idempotent/bounded-retry/fail-loud jobs
-no generic external-effect receipt family
-minimal async operational visibility required
+PDF source
+  → direct PDF viewer
+  → no duplicate generated PDF by default
+
+DOCX + SourceOnly
+  → direct read-only DOCX viewer
+  → no persistent governed PDF merely for viewing
+
+DOCX + RequireOfficialRendition(PDF)
+  → conditional durable render from exact Submission
+  → T4 admission
+  → immutable OfficialRendition
+  → Release gate
 ```
+
+Renderer product is not frozen. EigenPal, ONLYOFFICE and Gotenberg/LibreOffice remain candidates for different roles and must be tested against a representative DOCX fidelity corpus.
+
+Until `RV-1→RV-6` closes, **do not adjudicate T5-A→T5-P as a whole**.
 
 ## Mandatory T-stage closure protocol
 
@@ -103,7 +111,7 @@ T2 Governance, Effectivity & Lifecycle Transactions   CLOSED / OPERATOR-RATIFIED
 T3 Authorization & Audit Enforcement                  CLOSED / OPERATOR-RATIFIED
 T4 Exact Content, Storage Integrity & Restore         CLOSED / OPERATOR-RATIFIED
 Decision Registry                                      CURRENT / OPERATOR-RATIFIED
-T5 Durable Async, Search & External Effects           ACTIVE / CANDIDATE
+T5 Durable Async, Search & External Effects           ACTIVE / RENDITION-VIEWER SUBGATE
 T6 Canonical API / Frontend Journeys                  NOT OPEN
 T7 Historical Migration & Cutover                     NOT OPEN
 
