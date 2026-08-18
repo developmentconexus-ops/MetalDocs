@@ -12,8 +12,9 @@
 - **[r10-t2-governance-effectivity-transactions.md](r10-t2-governance-effectivity-transactions.md)** — operator-ratified T2 transaction/lifecycle authority.
 - **[r10-t3-authorization-audit-enforcement.md](r10-t3-authorization-audit-enforcement.md)** — operator-ratified T3 Authorization/Audit authority.
 - **[r10-t4-exact-content-storage-integrity-restore.md](r10-t4-exact-content-storage-integrity-restore.md)** — operator-ratified T4 exact-content/storage/restore authority.
-- **[rebaseline-decision-registry.md](rebaseline-decision-registry.md)** — operator-ratified disposition baseline for prior decisions.
-- **[r10-technical-architecture.md](r10-technical-architecture.md)** — exact current T1→T7 router; **T5 decisions accepted / platform summary ratification next**.
+- **[r10-t5-durable-async-search-external-effects.md](r10-t5-durable-async-search-external-effects.md)** — operator-ratified T5 async/Search/external-effects authority.
+- **[rebaseline-decision-registry.md](rebaseline-decision-registry.md)** — operator-ratified current cross-stage disposition baseline.
+- **[r10-technical-architecture.md](r10-technical-architecture.md)** — exact current T1→T7 router; **post-T5 Fable checkpoint active / T6 not open**.
 - [../references/current-agent-handoff.md](../references/current-agent-handoff.md) — exact fresh-session recovery point / current gate.
 - [../standards/root-cause-global-maximum-method.md](../standards/root-cause-global-maximum-method.md) — binding DevelopmentConexus Engineering Method v1.0.0 mirror.
 
@@ -24,19 +25,19 @@ T1 Semantic State & Invariants                         CLOSED / OPERATOR-RATIFIE
 T2 Governance, Effectivity & Lifecycle Transactions   CLOSED / OPERATOR-RATIFIED
 T3 Authorization & Audit Enforcement                  CLOSED / OPERATOR-RATIFIED
 T4 Exact Content, Storage Integrity & Restore         CLOSED / OPERATOR-RATIFIED
+T5 Durable Async, Search & External Effects           CLOSED / OPERATOR-RATIFIED
 Decision Registry                                      CURRENT / OPERATOR-RATIFIED
-RV-1→RV-6                                              ACCEPTED
-T5 Durable Async, Search & External Effects           DECISIONS ACCEPTED / SUMMARY RATIFICATION NEXT
-T6→T7                                                  NOT OPEN
+Post-T5 integrated Fable checkpoint                    ACTIVE / REVIEW REQUEST STAGED
+T6 Canonical API / Frontend Journeys                  NOT OPEN
+T7 Historical Migration & Cutover                     NOT OPEN
 implementation                                         BLOCKED
 ```
 
-Active T5 staging:
+Active review staging:
 
-- `../../docs/superpowers/analysis/2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md` — parent T5 analysis.
-- `../../docs/superpowers/analysis/2026-08-18-t5-rendition-viewer-strategy-evaluation.md` — accepted RV subgate.
-- `../../docs/superpowers/analysis/2026-08-18-r10-t5-corrected-adjudication-packet.md` — accepted T5-A→T5-P packet.
-- `../../docs/superpowers/analysis/2026-08-18-r10-t5-operator-adjudication.md` — active platform-summary ratification gate.
+- `../../docs/superpowers/analysis/2026-08-18-t1-t5-integrated-fable-review-request.md` — **independent cold-review request / review evidence only**.
+
+Completed T5 candidate/subgate/adjudication staging was removed after durable promotion; Git history is the archive.
 
 ## Revalidation law
 
@@ -59,42 +60,29 @@ Audit
 
 Storage/integrity, rendering/viewers, Search, async execution, Historical Migration tooling and backup/restore are mechanisms/projections/cutover/operations, not Launch semantic owners.
 
-## Accepted T5 rendition/viewer direction
+## Closed T5 headline
 
 ```text
-PDF source
-  → direct PDF viewer by default
-
-DOCX + SourceOnly
-  → native/read-only DOCX viewer
-  → no persistent governed PDF merely for viewing
-
-DOCX + RequireOfficialRendition(PDF)
-  → conditional durable PDF render from exact Submission
-  → immutable OfficialRendition
-  → Release gate
-```
-
-A preview/viewing PDF and a policy-required `OfficialRendition` are different meanings. A preview/cache may be rebuildable mechanism; only `OfficialRendition` is immutable semantic state and a Release gate.
-
-Renderer product is not frozen; a representative DOCX fidelity corpus must prove the mechanism.
-
-## Accepted T5 async/search direction
-
-```text
-one Postgres-backed durable-job mechanism; River selected/reference
-search_refresh = always-required durable job
-official_rendition_render = conditional on frozen representation policy
-GC = periodic reconciliation over GC_PENDING
-required durable enqueue transaction-coupled to semantic transition
+one PostgreSQL-backed durable-job mechanism; River selected/reference mechanism
+search_refresh always-required; OfficialRendition render conditional on frozen policy
+viewer/preview != OfficialRendition
 Search = rebuildable PostgreSQL projection keyed by Document
-latest-state refresh makes duplicates/out-of-order safe
-Search may lag by omission but never grants stale authority/effectivity
-full Search rebuild required
+latest-state refresh converges duplicates/out-of-order jobs
+Search lag may omit but never grant stale authority/effectivity
+full Search rebuild mandatory
+GC periodic reconciliation over GC_PENDING
 no mandatory Launch notifications/event bus
 no generic ExternalEffectReceipt
-minimum async operational visibility required
+bounded-retry terminal-visible/redrivable jobs
 ```
+
+Renderer/viewer product selection remains deliberately unfrozen pending a representative DOCX fidelity corpus.
+
+## Post-T5 Fable checkpoint
+
+The independent packet asks Fable to cold-review **T1→T5 as one system** before T6 encodes the architecture into public API/frontend journeys.
+
+It attacks cross-stage races, authority uniqueness, Decision Registry drift, overengineering and future seams. Findings are evidence only; T6 remains closed until findings are adjudicated and the checkpoint explicitly closes.
 
 ## Prior redesign / evidence
 
