@@ -1,17 +1,24 @@
 # Architecture
 
-> **Last verified:** 2026-08-14
+> **Last verified:** 2026-08-18
 > **Scope:** Durable system architecture truth and active target-design routing.
 
 ## Active target design — read first
 
-- **[cohesive-platform-redesign.md](cohesive-platform-redesign.md)** — **ACTIVE architecture authority.** MetalDocs is in a design-only whole-platform reset covering Organization/AuthZ, Approval, Controlled Information and every supporting concern. No product implementation until its integrated design gate opens.
-- [../standards/root-cause-global-maximum-method.md](../standards/root-cause-global-maximum-method.md) — binding Root-Cause / Global-Maximum method.
-- [../references/current-agent-handoff.md](../references/current-agent-handoff.md) — exact fresh-session recovery point.
+- **[launch-v1-product-contract.md](launch-v1-product-contract.md)** — **ACCEPTED Launch V1 product authority.** Defines required product capabilities, journeys, invariants and scope tiers before technical architecture.
+- **[whole-product-alignment-review.md](whole-product-alignment-review.md)** — **ACTIVE Whole-Product Global Coherence Review authority.** R10-C is paused while prior R9.5/R10 architecture is challenged against the accepted Product Contract.
+- [../references/current-agent-handoff.md](../references/current-agent-handoff.md) — exact fresh-session recovery point / current gate.
+- [../standards/root-cause-global-maximum-method.md](../standards/root-cause-global-maximum-method.md) — binding DevelopmentConexus Engineering Method v1.0.0 mirror.
+
+## Prior redesign authority under active review
+
+- [cohesive-platform-redesign.md](cohesive-platform-redesign.md) — prior cohesive redesign/global-coherence authority. Its R9.5/R10 decisions remain accepted/historical evidence except where the Product Contract or current Whole-Product review explicitly reopens them.
+- [r10-technical-architecture.md](r10-technical-architecture.md) — prior promoted R10 technical authority through integrated B2; not an instruction to continue technical descent while the Whole-Product review is active.
+- [launch-v1-scope-rebaseline.md](launch-v1-scope-rebaseline.md) — narrow operator-approved Records-Governance defer overlay; subordinate to the Product Contract for overall Launch scope/topology.
 
 ## Stable cross-cutting references
 
-These remain valid where they do not conflict with the active domain redesign:
+These remain valid where they do not conflict with the accepted Product Contract or active redesign:
 
 - [backend-api-structure.md](backend-api-structure.md) — backend route/OpenAPI structure.
 - [api-contract.md](api-contract.md) — contract-first policy and generated-surface rules.
@@ -24,12 +31,12 @@ These remain valid where they do not conflict with the active domain redesign:
 
 ## Legacy/current-state architecture references
 
-The following describe prior target programs or the current implementation and **must not be used as the target domain authority while the cohesive redesign is active**:
+The following describe prior target programs or the current implementation and **must not be used as target product/domain authority while the Whole-Product review is active**:
 
 - [backend-target-architecture.md](backend-target-architecture.md) — prior normative backend target; current infrastructure requirements may still be useful, but its module/domain topology is under redesign.
 - [backend-blueprint.md](backend-blueprint.md) — current/prior-state composition evidence.
 - [system-overview.md](system-overview.md) — current-state overview.
-- [data-model.md](data-model.md) — current/legacy data-model reference; target data model will be written only after domain closure.
+- [data-model.md](data-model.md) — current/legacy data-model reference; target data model is re-derived only after product/ownership closure.
 - [../backend/index.md](../backend/index.md) — forensic/current-state backend atlas; evidence, not target design.
 
-When these pages disagree with the active cohesive redesign on domain nouns, ownership or module boundaries, the cohesive redesign wins for the target.
+When these pages disagree on Launch capability, product semantics or active routing, the Product Contract + current handoff/Whole-Product review control the target.
