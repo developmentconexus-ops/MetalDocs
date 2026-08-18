@@ -1,6 +1,6 @@
 # R10 Technical Architecture — Active Stage Router
 
-> **Status:** ACTIVE — **T1 + T2 + T3 + T4 CLOSED / OPERATOR-RATIFIED; DECISION REGISTRY CURRENT; T5 ACTIVE; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1 + T2 + T3 + T4 CLOSED / OPERATOR-RATIFIED; DECISION REGISTRY CURRENT; T5 ACTIVE / RENDITION-VIEWER SUBGATE; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-18  
 > **Revision convention:** `REV000` initial issuance / `REV001` first revision  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
@@ -23,7 +23,8 @@ This file is the technical-stage router. Detailed accepted semantics live in ded
 10. `wiki/architecture/r10-t4-exact-content-storage-integrity-restore.md`
 11. `wiki/architecture/rebaseline-decision-registry.md`
 12. active T-stage staging candidate, when present
-13. active operator-adjudication/summary gate, when present
+13. active material subgate analysis, when present
+14. active operator-adjudication/summary gate, when present
 
 Historical R3–R9.5 / old R10 / current implementation/schema/OpenAPI are evidence only unless current authority or the Decision Registry preserves a decision.
 
@@ -75,7 +76,7 @@ T2 — Governance, Effectivity & Lifecycle Transactions        CLOSED / OPERATOR
 T3 — Authorization & Audit Enforcement                       CLOSED / OPERATOR-RATIFIED
 T4 — Exact Content, Storage Integrity & Restore              CLOSED / OPERATOR-RATIFIED
 Decision Reconciliation Registry                             CURRENT / OPERATOR-RATIFIED
-T5 — Durable Async, Search & External Effects                ACTIVE / DESIGN
+T5 — Durable Async, Search & External Effects                ACTIVE / RENDITION-VIEWER SUBGATE
 T6 — Canonical API / Frontend Journeys                       NOT OPEN
 T7 — Historical Migration & Cutover                          NOT OPEN
 
@@ -152,9 +153,13 @@ Later stages may not rediscover settled decisions from zero and may not inherit 
 
 ## 8. T5 — Durable Async, Search & External Effects — ACTIVE
 
-Active candidate:
+Parent candidate:
 
 `docs/superpowers/analysis/2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md`
+
+Active material subgate:
+
+`docs/superpowers/analysis/2026-08-18-t5-rendition-viewer-strategy-evaluation.md`
 
 Official T5 REOPEN set:
 
@@ -174,16 +179,44 @@ Search = rebuildable eventual-consistency projection
 Search never grants access/effectivity
 required external work may need transaction-coupled durable enqueue
 provider calls never join semantic tx
-OfficialRendition is a real optional Release gate
+OfficialRendition is optional and exists only when frozen representation policy requires it
+SourceOnly remains a valid representation policy
+preview/viewer mechanism is not semantic authority
 T4 GC_PENDING is technical eligibility
 current River/custom outbox implementations are evidence only
 ```
 
+### Rendition / Viewer subgate
+
+The operator challenged the implicit assumption that viewing DOCX requires a persisted OfficialRendition PDF. Reference-product research shows three distinct patterns: direct/native Office viewing, rebuildable/on-demand viewable renditions, and persisted governed renditions.
+
+The current recommendation is the hybrid Global Maximum:
+
+```text
+PDF source
+  → direct PDF viewer by default
+  → no duplicate generated PDF without named post-processing/business need
+
+DOCX + SourceOnly
+  → direct read-only DOCX viewer
+  → no persistent governed PDF merely for viewing
+
+DOCX + RequireOfficialRendition(PDF)
+  → durable server-side PDF render from exact Submission
+  → T4 admission
+  → immutable OfficialRendition
+  → Release gate
+```
+
+Renderer product selection remains empirical through a representative DOCX fidelity corpus; architecture does not yet freeze Gotenberg, ONLYOFFICE or another converter.
+
 ### Current gate
 
 ```text
-T5 candidate
-→ operator adjudication of T5-A→T5-P
+T5 parent candidate
+→ rendition/viewer subgate RV-1→RV-6 OPERATOR DECISION NEXT
+→ refine T5-D/T5-E + durable-job census
+→ adjudicate T5-A→T5-P as corrected
 → platform-facing T5 summary
 → explicit operator summary ratification
 → promote/close T5
@@ -191,6 +224,8 @@ T5 candidate
 → remove staging
 → open T6
 ```
+
+**Do not adjudicate T5-A→T5-P as a whole before RV-1→RV-6 closes.**
 
 T5 does not own public API/frontend journeys or Historical Migration execution.
 
