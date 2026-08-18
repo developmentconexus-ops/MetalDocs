@@ -1,13 +1,13 @@
 # R10 Technical Architecture — Active Stage Router
 
-> **Status:** ACTIVE — **T1 + T2 CLOSED / OPERATOR-RATIFIED; DECISION REGISTRY CLOSED / OPERATOR-RATIFIED; T3 DECISIONS ADJUDICATED / SUMMARY RATIFICATION NEXT; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1 + T2 + T3 CLOSED / OPERATOR-RATIFIED; DECISION REGISTRY CURRENT; T4 ACTIVE; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-18  
 > **Revision convention:** `REV000` initial issuance / `REV001` first revision  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Implementation gate:** **CLOSED — design/documentation only**
 
-This file is the **technical-stage router**. Detailed accepted semantics live in dedicated authorities; this page owns current stage status, reading order and next action.
+This file is the technical-stage router. Detailed accepted semantics live in dedicated authorities; this page owns current stage status, reading order and exact next action.
 
 ## 1. Binding authority chain
 
@@ -21,9 +21,10 @@ Read in order:
 6. `wiki/architecture/launch-v1-ownership-topology.md`
 7. `wiki/architecture/r10-t1-semantic-state-invariants.md`
 8. `wiki/architecture/r10-t2-governance-effectivity-transactions.md`
-9. `wiki/architecture/rebaseline-decision-registry.md`
-10. active T-stage staging candidate, when present
-11. active operator-adjudication/summary gate, when present
+9. `wiki/architecture/r10-t3-authorization-audit-enforcement.md`
+10. `wiki/architecture/rebaseline-decision-registry.md`
+11. active T-stage staging candidate, when present
+12. active operator-adjudication/summary gate, when present
 
 Historical R3–R9.5 / old R10-A→C / current implementation/schema/OpenAPI are evidence only unless the registry/current authority preserves a decision.
 
@@ -76,9 +77,9 @@ Do not resurrect `Artifact`, separate `Approval`, Distribution, Documentary Cont
 ```text
 T1 — Semantic State & Invariants                              CLOSED / OPERATOR-RATIFIED
 T2 — Governance, Effectivity & Lifecycle Transactions        CLOSED / OPERATOR-RATIFIED
-Decision Reconciliation Registry                             CLOSED / OPERATOR-RATIFIED
-T3 — Authorization & Audit Enforcement                       DECISIONS ACCEPTED / SUMMARY RATIFICATION PENDING
-T4 — Exact Content, Storage Integrity & Restore              NOT OPEN
+T3 — Authorization & Audit Enforcement                       CLOSED / OPERATOR-RATIFIED
+Decision Reconciliation Registry                             CURRENT / OPERATOR-RATIFIED
+T4 — Exact Content, Storage Integrity & Restore              ACTIVE / DESIGN
 T5 — Durable Async, Search & External Effects                NOT OPEN
 T6 — Canonical API / Frontend Journeys                       NOT OPEN
 T7 — Historical Migration & Cutover                          NOT OPEN
@@ -110,24 +111,14 @@ read Decision Registry
 → only then open Tn+1
 ```
 
-A technical A/B/C approval alone never opens the next stage.
+A technical decision approval alone never opens the next stage.
 
-## 6. Closed T1
-
-Detailed authority:
-
-`wiki/architecture/r10-t1-semantic-state-invariants.md`
-
-Headline:
+## 6. Closed T-stage authorities
 
 ```text
-Authentication → ProviderSubjectBinding + ApplicationSession
-Organization   → Company/User/UserProfile/Area/Group/GroupMembership
-Authorization  → product Role/Permission vocabulary + RoleAssignment
-Controlled Docs→ DocumentType, Document, Revision, WorkingContent, Submission,
-                 bounded governance, cancellation, Release, required Rendition,
-                 template origin and native/imported provenance seam
-Audit          → AuditEvent
+T1 → wiki/architecture/r10-t1-semantic-state-invariants.md
+T2 → wiki/architecture/r10-t2-governance-effectivity-transactions.md
+T3 → wiki/architecture/r10-t3-authorization-audit-enforcement.md
 ```
 
 Binding revision convention:
@@ -139,37 +130,15 @@ REV002 = second revision
 ...
 ```
 
-## 7. Closed T2
+T3 established the Launch role/permission surface, User|Group + Company|Area scope matrix, author/Area-manager/governance predicates, atomic offboarding, same-local-commit Audit census and Company|Area Audit visibility. No role is a domain-governance bypass.
 
-Detailed authority:
-
-`wiki/architecture/r10-t2-governance-effectivity-transactions.md`
-
-Headline:
-
-```text
-one local ACID transaction per native business transition
-Document = lifecycle serialization root
-WorkingContent OCC/CAS
-create = Document + REV000 DRAFT + WorkingContent atomically
-SUBMIT freezes exact generation + coherent config snapshots
-route selector = NAMED_USER | GROUP
-GROUP Step = ANY-one activation snapshot
-bounded submitter/initiator self-approval prohibition
-RETURN/withdraw/cancel preserve immutable history
-Release gates = human gate + optional official-rendition gate
-replacement Release atomically SUPERSEDES predecessor and EFFECTIVEs successor
-obsolescence mutually exclusive with replacement Revision in Launch
-READ COMMITTED + narrow explicit serialization/CAS
-```
-
-## 8. Ratified Decision Registry
+## 7. Ratified Decision Registry
 
 Authority:
 
 `wiki/architecture/rebaseline-decision-registry.md`
 
-The registry classifies prior decisions as:
+Registry vocabulary:
 
 ```text
 CURRENT
@@ -180,90 +149,61 @@ DEFERRED
 SUPERSEDED
 ```
 
-Later T-stages may not rediscover `CURRENT/PRESERVE/REFINED` decisions from zero and may not inherit `SUPERSEDED` decisions by sunk cost.
+Later stages may not rediscover CURRENT/PRESERVE/REFINED decisions from zero and may not inherit SUPERSEDED decisions by sunk cost.
 
-### Binding anti-legacy examples
+## 8. T4 — Exact Content, Storage Integrity & Restore — ACTIVE
+
+T4 consumes only the registry's official T4 REOPEN set:
 
 ```text
-standalone Artifact semantic owner
-old 8+3 ownership topology
-separate Approval semantic owner
-old exact 5×43 permission matrix
-universal tenant partition/RLS substrate
-REV001 as initial issuance
-ROLE_IN_AREA Launch routing
-configurable ANY|ALL baseline
-strict cross-Step SoD baseline
-fresh-auth/SLA/reassign/overseer as Launch defaults
-Periodic Review/Distribution/Dossier/Evidence/Records Launch state
-generic Interchange owner
-global AuditChainHead/hash chain
-scheduled Release
-universal PDF
-Artifact-rooted retention
+exact content descriptor/digest algorithm/canonicalization
+provider-neutral managed-content mechanism
+provider choice/profile/conformance
+staging/confirmation/admission
+malware policy/scan ordering
+immutable byte/no-overwrite enforcement
+mutable WorkingContent recovery
+backup/restore completeness + privacy non-resurrection
 ```
 
-These reopen only on new material evidence.
-
-## 9. T3 — Authorization & Audit Enforcement — DECISIONS ACCEPTED / SUMMARY PENDING
-
-T3 was rebuilt only from the registry's explicit T3 `REOPEN` set. On 2026-08-18 the operator accepted recommendations `T3-A→T3-P` as written.
-
-Active staging:
-
-- `docs/superpowers/analysis/2026-08-18-r10-t3-authorization-audit-enforcement-candidate.md`
-- `docs/superpowers/analysis/2026-08-18-r10-t3-operator-adjudication.md`
-
-Accepted headline:
+T4 MUST consume as baseline:
 
 ```text
-roles = governance_admin | area_manager | author | approver | viewer | governance_viewer
-15 Launch permissions only
-RoleAssignment subject = User | Group
-scope = Company | Area
-governance_admin Company-only
-area_manager Area-only
-author/approver/viewer/governance_viewer Company|Area
-organization.manage governs User/Area/Group identity lifecycle
-access.manage governs GroupMembership + RoleAssignment mutation
-Group deletion fails while live access/governance dependencies remain
-authoring = responsible owner OR document.owner.manage
-governance action = governance.act + exact active-Step participation + T2 predicates
-offboarding atomically disables User + tears down Sessions/memberships/direct grants + required Audit
-re-enable never restores prior access
-security-sensitive user actions serialize against offboarding eligibility
-Audit = explicit semantic append-only same-local-commit evidence for bounded census
-AuditEvent carries actor/time/operation/resource + immutable Company|Area visibility attribution + bounded PII-minimized facts
-audit.read may be Company- or Area-scoped
-ordinary autosave/search/read/download/login/logout/notification/preview/deny are not mandatory semantic Audit in Launch
-future capabilities never silently broaden existing role bundles
+no standalone Artifact semantic owner
+exact-content facts belong to the semantic record that owns/freezes them
+storage/provider identity never becomes semantic identity
+WorkingContent is mutable DRAFT authority under T2 OCC
+Submission is immutable exact governed attempt
+OfficialRendition binds exact Submission
+native/imported truth remains distinguishable
+provider calls never join semantic local transaction
+SHA-256 remains preserved prior candidate unless T4 finds a material counterexample
+governed immutable bytes should not overwrite in place unless T4 disproves the preserved law
+production malware inspection before admitting untrusted governed bytes remains a preserved candidate
+restore cannot be considered healthy when required governed bytes are missing/corrupt
+restore must not silently resurrect lawfully erased UserProfile PII
+Object Lock/WORM/provider versioning never becomes document/records lifecycle authority
 ```
 
-The old exact `5×43` catalog remains forbidden as target inheritance.
+T4 must not design worker/retry topology (T5), public API/frontend flows (T6) or historical migration execution (T7).
 
-### T3 current gate
+### T4 current gate
 
 ```text
-T3 material decisions ACCEPTED
-→ platform-facing T3 summary
+T4 candidate from registry
+→ operator adjudication of material REOPEN decisions
+→ platform-facing T4 summary
 → explicit operator summary ratification
-→ promote/close T3
+→ promote T4
 → update Decision Registry
-→ remove completed T3 staging
-→ open T4
+→ open T5
 ```
 
-T4 is **NOT OPEN** while summary ratification is pending.
-
-## 10. T4–T7 routing
-
-### T4 — Exact Content, Storage Integrity & Restore
-
-Consumes registry T4 REOPEN set: exact descriptor/digest/canonicalization, provider-neutral managed-content mechanism, provider/profile/conformance, staging/admission/malware, no-overwrite, DRAFT recovery, backup/restore + privacy non-resurrection.
+## 9. T5–T7 routing
 
 ### T5 — Durable Async, Search & External Effects
 
-Consumes registry T5 REOPEN set: which effects need durable intent, worker/retry/DLQ mechanics, renderer execution, named Launch notifications, Search rebuild/freshness/reconciliation and necessary provider receipts.
+Consumes registry T5 REOPEN set: real durable intents, worker/retry/DLQ mechanics, renderer execution, named Launch notifications, Search rebuild/freshness/reconciliation and required provider receipts.
 
 ### T6 — Canonical API / Frontend Journeys
 
@@ -273,7 +213,7 @@ Consumes registry T6 REOPEN set: numbering grammar/preview, admin journeys, edit
 
 Consumes registry T7 REOPEN set: actual source evidence, migration modes, imported target-owned shapes, ordinal/content/governance provenance, plan/dry-run/idempotency/reconciliation, semantic-unit atomicity and cutover/readiness/rollback/deletion map.
 
-## 11. Final gate
+## 10. Final gate
 
 After T7:
 
