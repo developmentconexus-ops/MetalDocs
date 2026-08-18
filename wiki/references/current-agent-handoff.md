@@ -1,7 +1,7 @@
 # Current Agent Handoff
 
 > **Last verified:** 2026-08-18  
-> **Status:** ACTIVE — **T1 + T2 CLOSED / OPERATOR-RATIFIED; T3 AUTHORIZATION + AUDIT ACTIVE / DISCOVERY-DESIGN NEXT**  
+> **Status:** ACTIVE — **T1 + T2 CLOSED / OPERATOR-RATIFIED; DECISION RECONCILIATION ACTIVE; T3 PAUSED**  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Implementation:** **BLOCKED — design/documentation only**
 
@@ -15,12 +15,15 @@ Read in this order:
 4. `wiki/architecture/launch-v1-product-contract.md` — **ACCEPTED PRODUCT AUTHORITY; REV000 INITIAL / REV001 FIRST REVISION**
 5. `wiki/architecture/whole-product-alignment-review.md` — **OPERATOR-ADJUDICATED GCR A1–A10**
 6. `wiki/architecture/launch-v1-ownership-topology.md` — **OPERATOR-APPROVED 4+1 OWNERSHIP + FUTURE-EVOLUTION LAW**
-7. `wiki/architecture/r10-technical-architecture.md` — **ACTIVE T1→T7 TECHNICAL AUTHORITY; T1 + T2 CLOSED / T3 ACTIVE**
-8. `wiki/architecture/r10-t2-governance-effectivity-transactions.md` — **OPERATOR-RATIFIED T2 TECHNICAL AUTHORITY**
-9. `wiki/architecture/launch-v1-scope-rebaseline.md` — narrow Records-Governance defer overlay
-10. prior cohesive/R9.5/R10 B1–B6/C material only as evidence where current authorities do not supersede it
+7. `wiki/architecture/r10-technical-architecture.md` — **ACTIVE T1→T7 ROUTER; T1 + T2 CLOSED / RECONCILIATION GATE ACTIVE / T3 PAUSED**
+8. `wiki/architecture/r10-t2-governance-effectivity-transactions.md` — **OPERATOR-RATIFIED T2 AUTHORITY**
+9. `docs/superpowers/analysis/2026-08-18-rebaseline-decision-reconciliation-candidate.md` — **ACTIVE NON-AUTHORITATIVE DECISION RECONCILIATION / OPERATOR REVIEW NEXT**
+10. `wiki/architecture/launch-v1-scope-rebaseline.md` — narrow Records-Governance defer overlay
+11. prior cohesive/R9.5/R10 B1–B6/C material only as evidence used by the reconciliation candidate
 
-`wiki/architecture/cohesive-platform-redesign.md` is prior-design evidence/compatibility routing only. Git history and current runtime/schema/OpenAPI remain evidence, not automatic target authority.
+`wiki/architecture/cohesive-platform-redesign.md` and `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md` are historical/prior-decision evidence, not current target authority.
+
+Git history and current runtime/schema/OpenAPI remain evidence, not automatic target authority.
 
 ---
 
@@ -33,15 +36,52 @@ Launch ownership topology        = CLOSED / APPROVED / 4+1
 T1→T7 technical decomposition    = CLOSED / APPROVED
 T1 Semantic State & Invariants   = CLOSED / OPERATOR-RATIFIED / PROMOTED
 T2 Governance/Effectivity/Tx     = CLOSED / OPERATOR-RATIFIED / PROMOTED
-T3 Authorization & Audit         = ACTIVE / DISCOVERY-DESIGN
+Decision Reconciliation          = ACTIVE NON-AUTHORITATIVE CANDIDATE
+T3 Authorization & Audit         = PAUSED ON RECONCILIATION
 T4→T7                            = NOT OPEN
 old R10-A 8+3                    = SUPERSEDED FOR LAUNCH
-old R10-B1→B6                    = EVIDENCE ONLY
+old R10-B1→B6                    = EVIDENCE ONLY UNTIL RECONCILED
 old R10-C                        = PAUSED HISTORICAL CANDIDATE / DO NOT REPAIR
 implementation                   = BLOCKED
 ```
 
 Completed T1/T2 staging is removed from the live tree after durable promotion; Git history is the archive.
+
+A premature T3 candidate created before the reconciliation gate is removed from the live staging tree and must be rebuilt from the operator-ratified registry rather than repaired in place.
+
+---
+
+## Revalidation law — operator explicit
+
+> **Revalidation does not mean reinvention. Preserve a prior simple/coherent decision unless current authority or a concrete failure mode disproves it; rederive only the composite decision whose justification changed; defer only the capability that actually left Launch.**
+
+Purpose:
+
+```text
+avoid carrying legacy/sunk-cost decisions after scope/topology changes
++
+avoid re-deciding simple choices that remain correct
+```
+
+The active reconciliation candidate classifies prior decisions as:
+
+```text
+CURRENT
+PRESERVE
+REFINED
+REOPEN
+DEFERRED
+SUPERSEDED
+```
+
+If ratified, it becomes a durable cross-stage disposition registry. T3–T7 must then:
+
+```text
+consume CURRENT/PRESERVE/REFINED
+explicitly design only their REOPEN set
+preserve DEFERRED future seams
+reject SUPERSEDED inheritance
+```
 
 ---
 
@@ -55,6 +95,7 @@ Tn candidate/design
 → assistant presents platform-facing summary
 → explicit operator approval of that summary
 → promote/close Tn
+→ update Decision Reconciliation Registry
 → only then open Tn+1
 ```
 
@@ -175,41 +216,17 @@ These are architecture counterexamples/attachment-seam evidence, not Launch impl
 
 ---
 
-## T3 current gate
-
-T3 is **Authorization & Audit Enforcement**.
-
-Derive from the accepted Product Contract + T1/T2 journeys, not from the old role catalog:
-
-```text
-personas
-→ named operations
-→ canonical resource/state predicates
-→ Company/Area scope
-→ permissions
-→ product role bundles
-→ RoleAssignment administration law
-→ check sites
-→ same-local-commit Audit census
-→ minimum bounded/PII-minimized Audit facts
-```
-
-T3 must include a least-privilege Auditor/Governance Viewer and must prove:
-
-```text
-Authorization grant alone never bypasses Controlled Documents lifecycle/governance predicates
-active governance action requires current grant + exact active Step participation
-provider roles/groups never become canonical product Authorization
-current grants are re-evaluated at action time
-historical actor attribution survives offboarding/profile erasure
-no circular privilege or hidden admin bypass
-Audit proves actions but never owns current state
-```
-
-The old exact `5×43` catalog is evidence/counterexample only. Do not preserve it by subtraction.
-
 ## Exact next step
 
-**Explore and present credible T3 access/Audit design alternatives and the recommended material choices for operator adjudication.**
+**Operator adjudication of the active Decision Reconciliation candidate (`DR-1→DR-8` plus the detailed disposition tables).**
+
+Only after reconciliation is ratified/promoted:
+
+```text
+rebuild T3 candidate from the registry
+→ T3 adjudication
+→ T3 platform-facing summary
+→ explicit operator ratification
+```
 
 Do not open T4 or write final SQL/table/index design, package layout, storage locator design, async topology, API/frontend routes, migration execution plan, implementation plan or product code.
