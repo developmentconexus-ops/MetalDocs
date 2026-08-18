@@ -1,7 +1,7 @@
 # Current Agent Handoff
 
 > **Last verified:** 2026-08-18  
-> **Status:** ACTIVE — **T1 + T2 + T3 + T4 + DECISION REGISTRY OPERATOR-RATIFIED; T5 ACTIVE / RENDITION-VIEWER SUBGATE**  
+> **Status:** ACTIVE — **T1 + T2 + T3 + T4 + DECISION REGISTRY OPERATOR-RATIFIED; T5 CORRECTED ADJUDICATION NEXT**  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Implementation:** **BLOCKED — design/documentation only**
 
@@ -21,10 +21,11 @@ Read in this order:
 10. `wiki/architecture/r10-t4-exact-content-storage-integrity-restore.md`
 11. `wiki/architecture/rebaseline-decision-registry.md`
 12. `wiki/architecture/r10-technical-architecture.md`
-13. `docs/superpowers/analysis/2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md` — **PARENT T5 CANDIDATE / CORRECTED PACKET PAUSED**
-14. `docs/superpowers/analysis/2026-08-18-t5-rendition-viewer-strategy-evaluation.md` — **ACTIVE MATERIAL SUBGATE / RV-1→RV-6 OPERATOR DECISION NEXT**
-15. `wiki/architecture/launch-v1-scope-rebaseline.md`
-16. old R3–R9.5 / R10-B1→B6/C and current implementation only as evidence allowed by the registry
+13. `docs/superpowers/analysis/2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md` — parent T5 analysis
+14. `docs/superpowers/analysis/2026-08-18-t5-rendition-viewer-strategy-evaluation.md` — **RV-1→RV-6 ACCEPTED**
+15. `docs/superpowers/analysis/2026-08-18-r10-t5-corrected-adjudication-packet.md` — **CURRENT T5-A→T5-P ADJUDICATION SURFACE**
+16. `wiki/architecture/launch-v1-scope-rebaseline.md`
+17. old R3–R9.5 / R10-B1→B6/C and current implementation only as evidence allowed by the registry
 
 ## Current checkpoint
 
@@ -37,8 +38,8 @@ T2 Governance/Effectivity/Tx     = CLOSED / OPERATOR-RATIFIED
 T3 Authorization & Audit         = CLOSED / OPERATOR-RATIFIED
 T4 Exact Content/Storage/Restore = CLOSED / OPERATOR-RATIFIED
 Decision Registry                = CURRENT / OPERATOR-RATIFIED
-T5 Durable Async/Search/Effects  = ACTIVE / RENDITION-VIEWER SUBGATE
-T5-A→T5-P whole adjudication     = PAUSED UNTIL RV-1→RV-6
+RV-1→RV-6                        = OPERATOR-ADJUDICATED / ACCEPTED
+T5-A→T5-P corrected              = OPERATOR ADJUDICATION NEXT
 T6→T7                            = NOT OPEN
 implementation                   = BLOCKED
 ```
@@ -76,20 +77,13 @@ Detailed authority:
 
 ```text
 ExactContentDescriptor = SHA-256 + exact size + ContentFormat
-no mandatory whole-Submission JCS digest
 opaque managed-content handle is mechanism only
-one provider-neutral ManagedContentStore / one active store
-Local dev/test/conformance + AWS S3 reference production
 OPEN→READY server-verified admission
-opaque admission binding
-UNTRUSTED_EXTERNAL CLEAN malware gate at governed boundary
 create-once/no-overwrite
 WorkingContent = DRAFT recovery baseline
 SUBMIT/Rendition semantic tx makes zero provider/scanner calls
-only non-governed unreferenced content reclaimable
-backup = DB recovery point + exact required-content set + GC exclusion
-restore exact-content fail-closed readiness
-post-snapshot UserProfile erasure reconciliation before serving restored profile data
+backup/restore exact-content fail-closed readiness
+post-snapshot UserProfile erasure reconciliation before restored profile serving
 ```
 
 ## T5 official REOPEN set
@@ -103,16 +97,12 @@ Search projection/rebuild/freshness/reconciliation
 provider effect receipts where needed
 ```
 
-## Active T5 rendition/viewer subgate
-
-The operator challenged the assumption that DOCX viewing requires a persistent `OfficialRendition` PDF.
-
-Current recommended hybrid:
+## Accepted rendition/viewer correction
 
 ```text
 PDF source
   → direct PDF viewer
-  → no duplicate PDF by default
+  → no duplicate generated PDF by default
 
 DOCX + SourceOnly
   → direct read-only DOCX viewer
@@ -125,9 +115,9 @@ DOCX + RequireOfficialRendition(PDF)
   → Release gate
 ```
 
-Preview/viewing PDF and OfficialRendition PDF are different meanings. A preview/cache may be rebuildable mechanism; it is not semantic truth or Release gate.
+Preview/viewing and OfficialRendition are different meanings. Renderer product remains evidence-driven; architecture does not freeze Gotenberg/ONLYOFFICE yet.
 
-Current corrected T5 job census candidate:
+Corrected T5 job census:
 
 ```text
 always-required durable job:
@@ -135,27 +125,18 @@ always-required durable job:
 
 conditional durable job:
   official_rendition_render
-  only for frozen RequireOfficialRendition policy
+  only when frozen representation policy requires it
 
 periodic reconciliation:
   managed-content GC over GC_PENDING
 ```
 
-Renderer product is not frozen. EigenPal is the lowest-cost native DOCX viewer candidate; ONLYOFFICE is a stronger self-hosted viewer/converter candidate; Gotenberg/LibreOffice is a simple server-side PDF converter candidate. Selection must be proven through a representative DOCX fidelity corpus.
-
 ## Exact next step
 
-Operator adjudication of `RV-1→RV-6` in:
+Operator adjudication of corrected `T5-A→T5-P` in:
 
-`docs/superpowers/analysis/2026-08-18-t5-rendition-viewer-strategy-evaluation.md`
+`docs/superpowers/analysis/2026-08-18-r10-t5-corrected-adjudication-packet.md`
 
-Only after that:
+After technical adjudication, **do not open T6**. Present the mandatory platform-facing T5 summary and obtain explicit operator ratification first.
 
-```text
-refine/confirm T5-D/T5-E + durable-job census
-→ adjudicate corrected T5-A→T5-P
-→ platform-facing T5 summary
-→ explicit operator ratification
-```
-
-Do **not** open T6. No final SQL/index/package/process topology, public API/frontend contract, migration execution plan, implementation plan or product code is authorized.
+No final SQL/index/package/process topology, public API/frontend contract, migration execution plan, implementation plan or product code is authorized.
