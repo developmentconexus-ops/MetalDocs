@@ -2,15 +2,16 @@
 
 > **Status:** ACTIVE / OPERATOR-RATIFIED TECHNICAL AUTHORITY  
 > **Ratified:** 2026-08-18  
+> **Post-T5 Fable bounded amendment:** 2026-08-18 — active obsolescence withdrawal + late-rendition eligibility  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Product authority:** `wiki/architecture/launch-v1-product-contract.md`  
 > **Technical routing:** `wiki/architecture/r10-technical-architecture.md`  
 > **Implementation:** BLOCKED
 
-This page records the operator-ratified T2 architecture. T2 defines how the semantic facts accepted in T1 change together under concurrency and lifecycle transitions. It does not define final SQL/table/index syntax, package layout, concrete permission names, storage provider topology, worker topology, API routes, frontend screens or migration execution.
+This page records the operator-ratified T2 architecture plus bounded completeness amendments ratified through the post-T5 independent-review checkpoint. T2 defines how the semantic facts accepted in T1 change together under concurrency and lifecycle transitions. It does not define final SQL/table/index syntax, package layout, concrete permission names, storage provider topology, worker topology, API routes, frontend screens or migration execution.
 
-The operator accepted T2-A→T2-N and ratified the platform-facing T2 summary on 2026-08-18, with one bounded product correction: **`REV000` is the initial issuance and `REV001` is the first subsequent revision.**
+The operator accepted T2-A→T2-N and ratified the platform-facing T2 summary on 2026-08-18, with the binding revision convention **`REV000` is the initial issuance and `REV001` is the first subsequent revision**.
 
 ---
 
@@ -49,11 +50,11 @@ The stable `Document` is the lifecycle serialization root for operations capable
 create later Revision
 SUBMIT
 RETURN_FOR_CHANGES
-WITHDRAW
+WITHDRAW Submission
 CANCEL Revision
 Step decision that advances/terminates governance
 Release
-obsolescence initiation/completion
+obsolescence initiation/completion/withdrawal
 ```
 
 This is a semantic serialization law, not final SQL lock syntax.
@@ -189,7 +190,7 @@ Launch does not prohibit the same non-initiating User from satisfying two differ
 
 Launch has no generic live reassignment, delegation or overseer mechanism.
 
-If a frozen route becomes impossible, the bounded recovery is:
+If a frozen Submission route becomes impossible, the bounded recovery is:
 
 ```text
 withdraw the active Submission attempt
@@ -199,7 +200,9 @@ withdraw the active Submission attempt
 → new immutable Submission/attempt snapshot
 ```
 
-Reassignment may be introduced later if real operations prove this insufficient.
+For an active human-governed obsolescence request, the bounded escape is its dedicated request-withdrawal rule in §8; no generic reassignment engine is required.
+
+Reassignment may be introduced later if real operations prove these bounded exits insufficient.
 
 ---
 
@@ -232,7 +235,7 @@ RETURN of an obsolescence request does not put the Document into DRAFT. It termi
 
 ## 8. Withdraw versus cancellation
 
-### Withdraw
+### Withdraw Submission
 
 Before Release, an authorized author may withdraw an active Submission attempt to continue editing the same Revision:
 
@@ -245,6 +248,19 @@ old Submission + decisions/feedback remain immutable
 Withdraw fabricates no ACCEPT/RETURN verdict.
 
 A governance-satisfied Submission that is only waiting for a required OfficialRendition is still pre-Release and may be withdrawn because Release is the effectivity boundary.
+
+### Withdraw active human-governed obsolescence request
+
+Before successful obsolescence completion, an authorized initiator/manager may withdraw an **active human-governed** obsolescence request under the T3 authorization predicate:
+
+```text
+active obsolescence GovernanceAttempt → terminated/WITHDRAWN
+target Revision remains EFFECTIVE
+original request + prior decisions/feedback remain immutable
+no ACCEPT/RETURN verdict is fabricated
+```
+
+A later obsolescence retry creates a new request/attempt. `NoHumanApproval` obsolescence completes synchronously in its initiation transaction, so there is no live human-governed request window to withdraw.
 
 ### Cancel Revision
 
@@ -305,6 +321,8 @@ Release = not yet established
 ```
 
 Later rendition success may trigger Release only after canonical eligibility is rechecked. Renderer/provider execution is outside the business transaction.
+
+If the exact Submission ceases to be an eligible pre-Release candidate before rendition finalization — for example through `RETURN_FOR_CHANGES`, Submission withdrawal or Revision cancellation — a later renderer result cannot create semantic OfficialRendition or Release truth for that terminated candidate. T5 defines the late-result no-op/reclamation behavior.
 
 ### First Release
 
@@ -377,7 +395,7 @@ no successor becomes EFFECTIVE
 immutable obsolescence result/time is written
 ```
 
-RETURN ends that request and leaves the Revision EFFECTIVE. There is no Launch reactivation of an OBSOLETE Document.
+RETURN or the bounded request-withdrawal rule in §8 ends that request and leaves the Revision EFFECTIVE. There is no Launch reactivation of an OBSOLETE Document.
 
 ---
 
@@ -403,6 +421,7 @@ No standalone browsable `PolicyVersion` aggregate is required by Launch.
 - rollback leaves no successful partial lifecycle transition;
 - external provider failure cannot retroactively invalidate committed semantic history;
 - a governance-satisfied Submission waiting for OfficialRendition is truthful durable state and resumes safely after restart;
+- renderer completion for a no-longer-eligible Submission is a semantic no-op, not historical Rendition creation;
 - repeated system Release triggers must be idempotent against canonical eligibility/fact identity;
 - transport retries may not fabricate duplicate semantic decisions;
 - stale commands fail/reload instead of overwriting newer lifecycle truth.
@@ -461,7 +480,7 @@ Reopen only the implicated decision when material evidence proves one of:
 - Launch needs `ALL`/N-of-M quorum;
 - a real route must select by product Role-in-Area;
 - regulation/customer contract requires strict cross-Step SoD or fresh-auth/eSignature;
-- live reassignment is operationally required;
+- live reassignment is operationally required beyond the bounded withdrawal exits;
 - obsolescence needs a distinct route;
 - a concrete Change-Control journey needs replacement and obsolescence intents to coexist;
 - scheduled effectivity becomes a real requirement;
@@ -480,9 +499,11 @@ SUBMIT cannot freeze a stale generation
 route edit cannot create a mixed in-flight snapshot
 Group membership drift cannot rewrite an activated Step candidate set
 RETURN/withdraw/cancel cannot mutate prior immutable history
+active obsolescence withdrawal cannot change current EFFECTIVE truth or fabricate participant verdict
 concurrent Releases cannot create two EFFECTIVE Revisions
 replacement Release cannot expose predecessor+successor EFFECTIVE together
 wrong/mismatched OfficialRendition cannot Release a different Submission
+late renderer result cannot create OfficialRendition/Release for a returned/withdrawn/cancelled candidate
 provider outage cannot create false EFFECTIVE truth
 obsolescence cannot complete against a no-longer-current EFFECTIVE target
 new Revision cannot race active obsolescence under the accepted mutual-exclusion law
