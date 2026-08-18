@@ -2,7 +2,7 @@
 
 > **Status:** Active staging workspace for the MetalDocs rebaselined R10 technical design.  
 > **Reset:** 2026-08-14.  
-> **Current gate:** **T1 + T2 + Decision Registry CLOSED / OPERATOR-RATIFIED; T3 ACTIVE / OPERATOR ADJUDICATION NEXT.**
+> **Current gate:** **T1 + T2 + Decision Registry CLOSED / OPERATOR-RATIFIED; T3 decisions accepted / platform summary ratification next.**
 
 Durable accepted truth belongs in `wiki/`. Active, not-yet-promoted design analysis belongs here. Completed/superseded staging is removed from the live tree and remains recoverable from Git history.
 
@@ -20,9 +20,10 @@ wiki/architecture/launch-v1-product-contract.md
 
 ## Current active staging
 
-- `analysis/2026-08-18-r10-t3-authorization-audit-enforcement-candidate.md` — **ACTIVE NON-AUTHORITATIVE T3 candidate; operator adjudication of T3-A→T3-P next.**
+- `analysis/2026-08-18-r10-t3-authorization-audit-enforcement-candidate.md` — **T3 technical candidate; T3-A→T3-P accepted, not yet promoted.**
+- `analysis/2026-08-18-r10-t3-operator-adjudication.md` — **operator adjudication record; platform summary ratification next.**
 
-The candidate is rebuilt from the ratified Decision Registry and designs only the official T3 `REOPEN` set.
+The candidate was rebuilt from the ratified Decision Registry and designs only the official T3 `REOPEN` set.
 
 The completed reconciliation candidate was promoted into `wiki/architecture/rebaseline-decision-registry.md` and removed from live staging. A premature pre-registry T3 candidate was also removed and must not be restored/repaired.
 
@@ -59,22 +60,24 @@ Audit append-only + PII-minimized
 no global AuditChainHead/hash-chain Launch requirement
 ```
 
-## T3 official REOPEN set
+## T3 accepted surface
 
 ```text
-exact Launch role vocabulary
-exact permission vocabulary/bundles
-whether/how area_manager survives
-whole-company admin role naming/bundle
-role↔scope matrix
-access administration law for GroupMembership/RoleAssignment
-Group administration/deletion exact law
-offboarding exact access teardown transaction
-least-privilege Governance Viewer/Auditor
-canonical check sites
-authorization-sensitive in-flight/offboarding races where material
-same-local-commit Audit operation census + minimum bounded facts
-Audit read visibility/scoping
+roles = governance_admin | area_manager | author | approver | viewer | governance_viewer
+15 Launch permissions
+all roles may target User | Group
+governance_admin Company-only
+area_manager Area-only
+author/approver/viewer/governance_viewer Company|Area
+organization.manage protects User/Area/Group identity lifecycle
+access.manage protects GroupMembership + RoleAssignment changes
+responsible-owner / document.owner.manage authoring predicate
+governance.act + exact active-Step participation + T2 predicates
+offboarding exact teardown and no silent authority restoration
+Audit explicit same-local-commit bounded census
+Audit Company|Area visibility attribution
+no mandatory semantic Audit for ordinary autosave/search/read/download/login/logout/notification/preview/deny
+future permissions never silently broaden role bundles
 ```
 
 ## Mandatory T-stage closure protocol
@@ -97,7 +100,7 @@ read registry
 T1 Semantic State & Invariants                         CLOSED / OPERATOR-RATIFIED
 T2 Governance, Effectivity & Lifecycle Transactions   CLOSED / OPERATOR-RATIFIED
 Decision Registry                                      CLOSED / OPERATOR-RATIFIED
-T3 Authorization & Audit Enforcement                  ACTIVE / CANDIDATE
+T3 Authorization & Audit Enforcement                  DECISIONS ACCEPTED / SUMMARY RATIFICATION PENDING
 T4 Exact Content, Storage Integrity & Restore         NOT OPEN
 T5 Durable Async, Search & External Effects           NOT OPEN
 T6 Canonical API / Frontend Journeys                  NOT OPEN
