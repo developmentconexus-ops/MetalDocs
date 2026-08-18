@@ -2,7 +2,7 @@
 
 > **Status:** Active staging workspace for the MetalDocs rebaselined R10 technical design.  
 > **Reset:** 2026-08-14.  
-> **Current gate:** **T1 + T2 + T3 + Decision Registry CLOSED / OPERATOR-RATIFIED; T4 ACTIVE.**
+> **Current gate:** **T1 + T2 + T3 + Decision Registry CLOSED / OPERATOR-RATIFIED; T4 ACTIVE / OPERATOR ADJUDICATION NEXT.**
 
 Durable accepted truth belongs in `wiki/`. Active, not-yet-promoted design analysis belongs here. Completed/superseded staging is removed from the live tree and remains recoverable from Git history.
 
@@ -21,11 +21,9 @@ wiki/architecture/launch-v1-product-contract.md
 
 ## Current active staging
 
-T4 is `Exact Content, Storage Integrity & Restore`.
+- `analysis/2026-08-18-r10-t4-exact-content-storage-integrity-restore-candidate.md` — **ACTIVE NON-AUTHORITATIVE T4 candidate; operator adjudication of T4-A→T4-O next.**
 
-The active T4 candidate must be derived from the Decision Registry and may design only the official T4 `REOPEN` set.
-
-Completed T3 candidate/adjudication staging is removed after promotion. Git history is the archive.
+Completed T3 candidate/adjudication staging was removed after durable promotion. Git history is the archive.
 
 ## Revalidation law
 
@@ -90,7 +88,7 @@ T1 Semantic State & Invariants                         CLOSED / OPERATOR-RATIFIE
 T2 Governance, Effectivity & Lifecycle Transactions   CLOSED / OPERATOR-RATIFIED
 T3 Authorization & Audit Enforcement                  CLOSED / OPERATOR-RATIFIED
 Decision Registry                                      CURRENT / OPERATOR-RATIFIED
-T4 Exact Content, Storage Integrity & Restore         ACTIVE
+T4 Exact Content, Storage Integrity & Restore         ACTIVE / CANDIDATE
 T5 Durable Async, Search & External Effects           NOT OPEN
 T6 Canonical API / Frontend Journeys                  NOT OPEN
 T7 Historical Migration & Cutover                     NOT OPEN
