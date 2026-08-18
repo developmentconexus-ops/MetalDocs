@@ -1,44 +1,47 @@
 # Cohesive Platform Redesign — Active Architecture Authority
 
-> **Status:** Active design authority — **R9.5 FROZEN; R10-A/B1/B2 PROMOTED; R10-B3/B4 ACCEPTED FOR R10 INTEGRATION / NON-FINAL; R10-B5 NEXT; NO PRODUCT IMPLEMENTATION AUTHORIZED**  
+> **Status:** Active design authority — **R9.5 FROZEN; R10-A/B1/B2 PROMOTED; R10-B3/B4/B5 ACCEPTED FOR R10 INTEGRATION / NON-FINAL; R10-B6 NEXT; NO PRODUCT IMPLEMENTATION AUTHORIZED**  
 > **Established:** 2026-08-14  
 > **R9.5 freeze ratified:** 2026-08-17  
 > **R10-A/B1/B2 promoted:** 2026-08-17  
 > **R10-B3 integration acceptance:** 2026-08-17 — non-final / not independently ratified  
 > **R10-B4 integration acceptance:** 2026-08-18 — non-final / not independently ratified  
+> **R10-B5 integration acceptance:** 2026-08-18 — non-final / not independently ratified  
 > **Design branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Method:** `docs/engineering/standards/root-cause-global-maximum-method.md`  
 > **Frozen product/domain ledger:** `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md`  
-> **Promoted R10 technical authority through B2:** `wiki/architecture/r10-technical-architecture.md`  
-> **Accepted B3 working candidate:** `docs/superpowers/analysis/2026-08-17-r10-b3-controlled-information-artifact-integrated-candidate.md`  
-> **Accepted B4 working candidate:** `docs/superpowers/analysis/2026-08-18-r10-b4-approval-rendition-release-distribution-integrated-candidate.md`  
-> **B4 acceptance/adjudication record:** `docs/superpowers/analysis/2026-08-18-r10-b4-integration-acceptance.md`
+> **Promoted R10 technical authority through B2:** `wiki/architecture/r10-technical-architecture.md`
+
+Accepted current R10 integration inputs:
+
+- `docs/superpowers/analysis/2026-08-17-r10-b3-controlled-information-artifact-integrated-candidate.md`
+- `docs/superpowers/analysis/2026-08-18-r10-b4-approval-rendition-release-distribution-integrated-candidate.md`
+- `docs/superpowers/analysis/2026-08-18-r10-b4-integration-acceptance.md`
+- `docs/superpowers/analysis/2026-08-18-r10-b5-documentary-context-records-governance-artifact-closure-integrated-candidate.md`
+- `docs/superpowers/analysis/2026-08-18-r10-b5-integration-acceptance.md`
+
+---
 
 ## 1. Purpose / north star
-
-MetalDocs is being redesigned as one coherent product before the next large implementation wave.
 
 > **MetalDocs is the system of record for product/organizational identity, governance, revision, evidence and documentary context. Authentication credential/upstream identity-provider truth may be provider-owned; physical storage, authoring/editor technology, viewers and upstream repositories are replaceable providers/connectors around the MetalDocs kernel.**
 
 Target posture:
 
 - smallest professional architecture preserving real invariants;
-- one authority for each business/system fact;
-- one company per V1 deployment;
-- same code/build/migrations for every deployment; no customer forks;
-- commodity mechanisms may be externalized without surrendering domain authority;
-- no speculative ECM/BPM/ReBAC/low-code/object platform;
+- one canonical authority per business/system fact;
+- one company per V1 deployment; common code/build/migrations; no customer forks;
+- commodity mechanism may be externalized without taking semantic authority;
+- no speculative ECM/BPM/ReBAC/low-code/object/records platform;
 - current implementation is evidence, never automatic target entitlement.
 
-## 2. Authority / evidence
+Fresh sessions follow `AGENTS.md` → Method → current handoff → this page → frozen ledger → promoted R10 authority → accepted non-final B3/B4/B5 working inputs.
 
-Fresh sessions follow `AGENTS.md` → Method → current handoff → this page → frozen ledger → promoted R10 authority → accepted non-final B3/B4 working candidates.
+R3–R9.5 remains frozen historical/product-domain authority except where an explicitly recorded bounded reopen/refinement is operator-approved for current R10 integration. B3/B4/B5 remain non-final and challengeable only by material later-stage counterexample.
 
-R3–R9.5 remains frozen product/domain authority except where an explicitly documented bounded reopen is operator-approved for current R10 integration. Accepted B3/B4 candidates are **working integration authority only**, not final independent ratification.
+---
 
-Whole-R10 Global Coherence Review + cold independent review occurs before final R10 ratification unless an exceptional material trust-boundary/irreversible/cross-repository blocker requires earlier independent review.
-
-## 3. Deployment / Authentication / Organization / Authorization
+## 2. Deployment / ownership / access posture
 
 V1 deployment invariant:
 
@@ -48,49 +51,16 @@ Promoted B1 substrate:
 
 ```text
 one PostgreSQL product DB / schema metaldocs
-UUID technical PKs
+UUID PKs
 ordinary typed FKs
 cross-owner RESTRICT / NO ACTION
 no universal tenant/company/deployment partition column
 no Tenant/Area/role/Permission RLS policy engine
 serving DB role non-owner + NOSUPERUSER
 READ COMMITTED
-same-local-commit business state + required Audit/durable intent
+same-local-commit frozen cross-owner invariants
 no provider DB atomicity dependency
 ```
-
-Authentication:
-
-- Keycloak is V1 AuthN provider;
-- MetalDocs owns only `ProviderSubjectBinding` + `ApplicationSession` semantic state;
-- stable provider identity = `issuer + subject`;
-- provider roles/groups/orgs/claims never become MetalDocs AuthZ authority;
-- fresh-auth evidence is Authentication-owned input; consuming domains persist their own bounded consumption evidence.
-
-Organization:
-
-```text
-Tenant
-Area
-User
-UserProfile
-Group
-GroupMembership
-```
-
-Area retirement preserves history and blocks prohibited new references. UserProfile is erasable human-readable enrichment. Groups are flat/company-wide; hard delete fails while any live typed reference exists.
-
-Authorization:
-
-- static product Role/Permission catalogs;
-- one persisted `RoleAssignment` family;
-- five roles: viewer, author, approver, area_manager, tenant_owner;
-- exact 43-permission catalog/bundles remain promoted B2 authority;
-- `tenant_owner` is a role bundle, never bypass;
-- canonical evaluation = live grants → static bundle → scope → domain relationship → governance → default deny;
-- no custom roles/deny/ReBAC/effective-permission store/Session AuthZ snapshot/provider bridge.
-
-## 4. R10-A ownership
 
 Business bounded contexts remain exactly 8:
 
@@ -113,44 +83,54 @@ Audit
 Interchange
 ```
 
-Notifications are attributed support; Search is rebuildable projection.
+Notifications are attributed support; Search is rebuildable projection; composition/platform/workers/providers own mechanisms only.
 
-## 5. R10-B3 accepted non-final working target
+Authentication uses Keycloak as V1 AuthN provider while MetalDocs owns provider-subject binding, local Session and bounded assurance consumption. Provider roles/groups/orgs/permissions never become canonical AuthZ.
+
+Authorization remains live additive/default-deny from static Role/Permission catalogs + current RoleAssignment + scope + owning-domain relationship/governance predicate. `tenant_owner` is a grant bundle, never bypass.
+
+---
+
+## 3. R10-B3 accepted working target
 
 Core:
 
 ```text
 Document
-→ DocumentRevision
+→ business DocumentRevision
 → WorkingContent + monotonic working_version OCC
 → immutable RevisionSubmission + deterministic governed manifest/digest
 → exact provider-neutral Artifact
 ```
 
-Small typed adjuncts cover DocumentType/category/numbering/dictionary, template Document role/use/spec/origin, EditorialComment and PeriodicReview.
+Key laws:
 
-Key B3 laws:
-
-- Document identity is not bytes/revision/autosave;
-- business REV is not technical autosave/checkpoint;
+- Document identity ≠ Revision ≠ autosave ≠ exact bytes;
 - WorkingContent is sole mutable DRAFT authority;
-- every governed DRAFT mutation uses one OCC generation;
-- SUBMIT freezes one coherent WorkingContent generation into immutable `RevisionSubmission` and consumes/increments the OCC generation;
+- SUBMIT freezes exactly one accepted generation and consumes the OCC generation;
 - same-REV return/resubmit never mutates old Submission;
-- Submission digest binds exact Artifact + governed state/provenance, never storage location;
-- Artifact is exact-byte identity, provider-neutral and not globally hash-unique business identity;
+- Artifact is exact-byte identity, not provider location and not global content-hash business identity;
 - Template reuses Document lifecycle; no parallel TemplateVersion aggregate;
 - one-open/one-EFFECTIVE have structural backstops;
-- template creation and PeriodicReview serialize with B4 Release on the Document root;
-- B5 must finish global Artifact typed-owner/disposition closure.
+- downstream governance binds exact immutable Submission.
 
-## 6. R10-B4 accepted non-final working target
+### B5-approved bounded B3 refinements
 
-Current working model:
+Current R10 working target additionally carries:
+
+1. `DocumentOrigin` no longer holds a strong FK to source Submission that would force indefinite template-source retention. It keeps source Revision identity + exact immutable Submission/digest/hash provenance snapshots.
+2. `DocumentRevision` owns one-shot canonical `cancelled_at` / `obsoleted_at`; native superseded time remains B4 ReleaseRecord authority and is not duplicated.
+3. `RevisionDictionarySnapshot` is separated from the permanent Revision identity skeleton so lawful disposition may remove retained payload without deleting/reusing the revision ordinal or mutating immutable JSON in place.
+
+These are bounded technical refinements exposed by real B5 Records-Governance counterexamples; no unrelated B3 semantic is reopened.
+
+---
+
+## 4. R10-B4 accepted working target
 
 ```text
 RevisionSubmission
-→ SubmissionApprovalRequirement / ReleasePlan snapshots
+→ immutable SubmissionApprovalRequirement / ReleasePlan snapshots
 → one sequential Approval/Governance Step model
 → detached SubmissionFeedback
 → immutable Rendition when produced
@@ -159,92 +139,92 @@ RevisionSubmission
 → explicit immutable AcknowledgementRecord
 ```
 
-### Approval
+Key laws:
 
-- ApprovalPolicy has stable identity + immutable numbered versions;
-- each Submission snapshots `NO_HUMAN_APPROVAL | USE_POLICY(exact version)`;
-- there is one Step semantic type, not `review|approval` types;
-- Step fields: `label`, ordered position, `NamedUser|Group|RoleInArea`, `ANY|ALL`, optional fresh-auth, optional due date;
-- Step label is human/business language only;
-- actor rule resolves to concrete Users at Step activation; action-time AuthZ stays live;
-- strict SoD: creator/submitter cannot ACCEPT own Submission; same User cannot ACCEPT two Steps; no role bypass;
-- required fresh-auth evidence is one-shot/bounded and snapshotted in immutable decision evidence;
-- `RETURN_FOR_CHANGES` requires reason and returns same Revision to DRAFT without changing old Submission or resetting B3 generation;
-- qualified reassignment must currently satisfy the same frozen actor rule + enabled User + `approval.act` + SoD;
-- no generic delegation/BPM task engine.
+- one Step semantic type; historical `review|approval` discriminator is removed in current R10 working target;
+- Step carries label, ordered position, `NamedUser|Group|RoleInArea`, `ANY|ALL`, optional fresh-auth and due date;
+- active participants may inspect exact Submission in-product, including exact PDF rendition when available, and may comment/annotate/suggest;
+- feedback never mutates Submission; applying returned suggestion is later B3 OCC mutation;
+- strict SoD has live/domain + structural backstops;
+- required fresh-auth is Authentication-owned input and immutable Approval-owned consumption evidence;
+- return-for-changes requires reason and returns same Revision to DRAFT without resetting B3 generation;
+- Approval requirement/PolicyVersion + representation requirement are snapshotted per Submission;
+- viewer capability is independent from official representation policy;
+- Release is automatic/system-owned and sole effectivity transition;
+- Release atomically establishes EFFECTIVE/SUPERSEDED and concrete Distribution obligations;
+- Distribution never grants access; explicit acknowledgement is the only obligation completion signal.
 
-### In-product collaboration/viewing
+### Explicit bounded R9.5 Approval refinement
 
-- supported native governed formats must have a safe in-product inspection journey;
-- approval-route participants may view exact source and/or exact PDF rendition derived from the same Submission;
-- comments/annotations/suggestions are `SubmissionFeedback`, detached from submitted bytes;
-- applying a returned suggestion is a later B3 WorkingContent OCC mutation;
-- viewer/editor provider states never become Step/domain identity or mechanism permissions.
+Frozen historical ledger contains `Step.purpose = review | approval`. Operator-approved R10 overlay removes it because external evidence + Structural Inversion Test showed it encoded legacy editor/UI ceremony rather than an invariant. Collaboration and fresh-auth remain orthogonal capabilities; `PeriodicReview` remains the distinct CI review concept.
 
-### Rendition / Release
+---
 
-- `OfficialRepresentationPolicy = SourceOnly | RequireRendition(ContentFormat)`;
-- viewer capability is independent: SourceOnly may still have auxiliary PDF for in-product viewing;
-- Rendition is immutable exact-Submission → exact output Artifact + generator/build provenance;
-- successful Rendition confirmation creates Artifact + typed Rendition ownership in one local semantic transaction;
-- ReleasePlan snapshots representation requirement + optional `not_before` per Submission;
-- Release is automatic/system-owned; no publish button;
-- winning Release is the only effectivity transition and atomically creates ReleaseRecord, makes candidate EFFECTIVE and predecessor SUPERSEDED;
-- one semantic Release winner is enforced by Document serialization + unique ReleaseRecord + B3 one-EFFECTIVE backstop.
+## 5. R10-B5 accepted working target
 
-### Distribution
+### Documentary Context
 
-- live V1 audience currently includes typed Group configuration only where evidenced;
-- audience mutations and Release serialize on the same Document root;
-- winning Release snapshots concrete Users and inserts DistributionObligation rows in the same commit;
-- later Group membership/rename/delete never rewrites historical denominator;
-- Distribution never grants access;
-- only explicit authenticated acknowledgement by the obligated User completes the obligation;
-- view/download/notification/search do not acknowledge.
+- Dossier is stable documentary context only; never physical folder/content owner/access grant/retention authority/ERP-PLM master.
+- DossierType remains small with explicit eligible DocumentTypes/EvidenceTypes; no custom fields/forms/workflow/ACL/completeness engine.
+- Dossier↔Document is M:N over stable Document identity, copies no content and changes no lifecycle/Area/AuthZ.
+- Dossier scope = exactly one TenantScope|AreaScope; stable type/key/scope; title mutable; archive reversible navigation only.
+- External source identity/provenance remains explicit; no heuristic source takeover/merge.
 
-## 7. Explicit bounded R9.5 Approval refinement
+### Evidence
 
-The frozen ledger historically states:
+- lifecycle = `DRAFT → CAPTURED → VOIDED`; VOIDED means invalid MetalDocs capture only;
+- CAPTURE freezes immutable payload/metadata + exactly one primary Artifact and creates RetentionBinding;
+- every CAPTURED Evidence has exactly one immutable primary Dossier and may have secondary Dossier context;
+- Evidence reuses primary-Dossier scope and does not use REV/Approval/Release by default;
+- canonical name freezes at CAPTURE; user filename remains provenance;
+- current `{SEQ}` candidate uses one monotonic EvidenceType series; Dossier-local reset is a reopen trigger.
 
-```text
-ApprovalPolicy Step purpose = review | approval
-```
+### Records Governance
 
-On 2026-08-18 the operator approved a bounded reopen after directed external research + DevelopmentConexus Method review.
+- no generic Record aggregate/declaration operation;
+- first DocumentRevision Submission / Evidence CAPTURE automatically create immutable typed RetentionBinding;
+- policy = explicit `NoMinimum | KeepFor(value,DAYS|MONTHS|YEARS) | Indefinite`;
+- anchor derives from canonical owner lifecycle facts; Audit never becomes retention-clock authority;
+- RetentionExtension only lengthens and cannot be added after DispositionFence;
+- LegalHold scopes V1 = Evidence | stable Document | Dossier and materialize exact RetentionBindings, including newly entering live scope;
+- Hold activation is fail-closed/all-or-nothing for current preservable scope when a fence/inconsistent subject is encountered;
+- expiry only means eligibility; never automatic delete;
+- DispositionFence is semantic irreversible authorization barrier; worker/retry state belongs R10-D;
+- DispositionRecord means verified physical + semantic completion, not merely requested deletion;
+- business lifecycle and records disposition are orthogonal axes.
 
-Current R10 working target **removes this discriminator** and uses one governance Step model.
+### Artifact closure
 
-Reason:
+- every confirmed Artifact has exactly one semantic retention root: one DocumentRevision or one Evidence;
+- multiple references within that root are allowed; cross-root Artifact-row reuse is rejected;
+- identical bytes may have separate Artifact semantic rows across roots; physical dedupe remains mechanism freedom;
+- no Artifact retention policy, generic owner registry or ref-count authority;
+- semantic Artifact survival/deletion is derived from typed reachability.
 
-- new evidence showed comparable mature systems do not establish a universal `review|approval` kernel taxonomy;
-- collaboration, verdict and stronger authentication are orthogonal task capabilities;
-- the old distinction primarily encoded legacy editor/UI behavior and therefore failed the Structural Inversion Test;
-- keeping it would create accidental complexity and ambiguity beside Controlled Information `PeriodicReview`.
+### Retained DocumentRevision unit
 
-This bounded refinement does not reopen exact Submission binding, actor rules, ANY/ALL, SoD, fresh-auth, return/resubmit, Rendition, Release, Distribution, B1, B2 or B3.
+The retained Revision unit includes its subordinate immutable governance history, including B3 Submission/dictionary/provenance/PeriodicReview state and B4 Approval/fresh-auth/feedback/Rendition/Release/Distribution/Acknowledgement evidence. Independent authorities such as User, Group, DocumentType and ApprovalPolicy are not recursively swallowed into the retention unit merely because referenced.
 
-The frozen ledger remains the historical decision record; this section + B4 acceptance record are the explicit current-R10 overlay so fresh sessions must not resurrect `purpose=review|approval` as the working target.
+---
 
-## 8. Storage / records / privacy / migration posture carried forward
+## 6. Storage / privacy / migration posture carried forward
 
-- Artifact exact-byte identity/hash remains provider-independent;
-- ManagedArtifactStore port/conformance remains first-class; Local dev/test and AWS S3 reference production posture remain;
-- production malware inspection remains mandatory/fail-closed before confirming untrusted Artifact bytes;
-- no generic Record declaration; governed objects become retention subjects according to frozen rules;
-- retention expiry never auto-deletes; LegalHold blocks disposition, not business lifecycle;
-- User/data-subject privacy remains separable from immutable governance evidence; surviving Audit skeleton must be PII-minimized/non-PII;
-- Backup/Restore, Historical Migration, Governed Subject Export and explicit IMPORT_COPY/PUBLISH_COPY remain; Tenant Portability Export remains deferred;
-- no PKI/TSA/HSM/eDiscovery/crypto-erasure platform without a named real trigger.
+- ManagedArtifactStore port/conformance remains first-class; production malware inspection remains mandatory/fail-closed before untrusted bytes become confirmed Artifact;
+- provider WORM/ObjectLock/Purview may enforce physical retention but never becomes MetalDocs Records-Governance authority;
+- User/data-subject privacy remains separable from immutable governance evidence; B6 must classify surviving Audit/post-disposition skeleton fields;
+- no generic privacy workflow or mandatory crypto-erasure platform without named immutable Target Data;
+- Backup/Restore, Historical Migration, Governed Subject Export and explicit IMPORT_COPY/PUBLISH_COPY remain; Tenant Portability Export is deferred.
 
-## 9. Implementation gate
+---
 
-**CLOSED.** B3/B4 are accepted only for continued R10 integration, not final ratification.
+## 7. Implementation gate
+
+**CLOSED.** B3/B4/B5 are accepted only for continued R10 integration, not final ratification.
 
 Before implementation:
 
 ```text
-B5
-→ B6
+B6
 → R10-C
 → R10-D
 → R10-E
@@ -258,53 +238,60 @@ B5
 → code
 ```
 
-## 10. Exact next step — R10-B5 Documentary Context + Records Governance + Artifact closure
+---
 
-Open **R10-B5** in the same integrated research-heavy design mode. Consume promoted B1/B2 plus accepted non-final B3/B4; do not reopen them for implementation convenience.
+## 8. Exact next step — R10-B6 Audit + Interchange + Cross-owner Atomicity
 
-B5 must jointly cover:
+Open **R10-B6** as one integrated research-heavy design batch from promoted B1/B2 + accepted non-final B3/B4/B5.
+
+B6 must jointly close:
 
 ```text
-DossierType / Dossier
-Dossier↔Document contextual relation
-EvidenceType / Evidence
-primary Dossier + secondary contextual links
-Evidence capture immutability + exact Artifact ownership
-ExternalReference/provenance where B5-owned
+Audit
+  append-only AuditEvent semantic skeleton
+  trusted actor/resource/operation/time meaning
+  field-by-field privacy / PII-minimized surviving skeleton
+  erasable human-readable enrichment boundary
+  forensic grant/revoke reconstruction after current-state deletion
+  tamper-evidence/query/export ownership and separate Audit retention regime
 
-Retention policy selection + RetentionBinding snapshot
-DocumentRevision retention unit
-Evidence retention unit
-RetentionExtension
-LegalHold scopes + materialized held subjects
-Disposition eligibility + explicit DispositionRecord
-no automatic deletion
+Interchange
+  Historical Migration batch/plan/dry-run/item outcome/reconciliation state
+  imported history vs native domain-fact boundary
+  Governed Subject Export process/package semantics
+  External Repository IMPORT_COPY / PUBLISH_COPY truth
+  required connection/reference state used by Dossier ExternalReference / publication
+  no Tenant Portability Export V1
 
-final typed Artifact ownership/reference closure
-preservation across retained/held subjects
-no generic owner_type/id registry
-no confirmed orphan semantic Artifact
+Cross-owner coherence
+  final B1–B5 same-local-commit matrix
+  exact required Audit append points
+  exact required durable-intent points routed to R10-D
+  published transaction-composition seams; no nested owner commits/repository imports
+  final READ COMMITTED lock-order/deadlock challenge
+  imported-history DB coherence with native constraints without fabricating native facts
 ```
 
-Cross-stage review must explicitly attack:
+Explicitly challenge:
 
 ```text
-B3 Submission/Artifact ownership
-B4 Approval/Rendition/Release evidence as part of DocumentRevision retention unit
-Release/effectivity anchors for retention clocks
-LegalHold over newly entering subjects
-Artifact shared-reference preservation/disposition
-Distribution/Acknowledgement retention interaction where material
+B2 offboarding/privacy vs immutable Audit evidence
+B3/B4/B5 critical mutations vs same-commit Audit
+B5 disposition vs Audit's separate retention regime
+B5 post-disposition skeleton privacy
+Historical Migration without synthetic native Approval/Release/actors/timestamps
+Export completeness + canonical AuthZ
+External repository effects without provider atomicity
+whole B1–B5 lock graph
 ```
 
 Route later work correctly:
 
 ```text
-Audit/Interchange/final cross-owner matrix              → B6
-physical storage/malware/relocation/restore             → R10-C
-async jobs/projections/notifications/provider effects   → R10-D
-API/frontend/viewer/editor journeys                     → R10-E
-historical migration/cutover/deletion                   → R10-F
+physical store/object-lock/malware/restore       → R10-C
+async jobs/retry/lease/projections/effects       → R10-D
+API/frontend/viewer/editor journeys              → R10-E
+historical cutover/legacy deletion/bootstrap     → R10-F
 ```
 
 Implementation remains **BLOCKED**.
