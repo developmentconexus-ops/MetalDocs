@@ -13,7 +13,7 @@
 - **[r10-t3-authorization-audit-enforcement.md](r10-t3-authorization-audit-enforcement.md)** — operator-ratified T3 Authorization/Audit authority.
 - **[r10-t4-exact-content-storage-integrity-restore.md](r10-t4-exact-content-storage-integrity-restore.md)** — operator-ratified T4 exact-content/storage/restore authority.
 - **[rebaseline-decision-registry.md](rebaseline-decision-registry.md)** — operator-ratified disposition baseline for prior decisions.
-- **[r10-technical-architecture.md](r10-technical-architecture.md)** — exact current T1→T7 router; **T5 active on rendition/viewer subgate**.
+- **[r10-technical-architecture.md](r10-technical-architecture.md)** — exact current T1→T7 router; **T5 corrected adjudication next**.
 - [../references/current-agent-handoff.md](../references/current-agent-handoff.md) — exact fresh-session recovery point / current gate.
 - [../standards/root-cause-global-maximum-method.md](../standards/root-cause-global-maximum-method.md) — binding DevelopmentConexus Engineering Method v1.0.0 mirror.
 
@@ -25,16 +25,17 @@ T2 Governance, Effectivity & Lifecycle Transactions   CLOSED / OPERATOR-RATIFIED
 T3 Authorization & Audit Enforcement                  CLOSED / OPERATOR-RATIFIED
 T4 Exact Content, Storage Integrity & Restore         CLOSED / OPERATOR-RATIFIED
 Decision Registry                                      CURRENT / OPERATOR-RATIFIED
-T5 Durable Async, Search & External Effects           ACTIVE / RENDITION-VIEWER SUBGATE
-T5-A→T5-P whole adjudication                           PAUSED UNTIL RV-1→RV-6
+RV-1→RV-6                                              ACCEPTED
+T5 Durable Async, Search & External Effects           ACTIVE / CORRECTED ADJUDICATION NEXT
 T6→T7                                                  NOT OPEN
 implementation                                         BLOCKED
 ```
 
 Active T5 staging:
 
-- `../../docs/superpowers/analysis/2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md` — parent corrected T5 candidate.
-- `../../docs/superpowers/analysis/2026-08-18-t5-rendition-viewer-strategy-evaluation.md` — active material subgate; RV-1→RV-6 next.
+- `../../docs/superpowers/analysis/2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md` — parent T5 analysis.
+- `../../docs/superpowers/analysis/2026-08-18-t5-rendition-viewer-strategy-evaluation.md` — RV-1→RV-6 accepted.
+- `../../docs/superpowers/analysis/2026-08-18-r10-t5-corrected-adjudication-packet.md` — **current T5-A→T5-P adjudication surface.**
 
 ## Revalidation law
 
@@ -57,9 +58,7 @@ Audit
 
 Storage/integrity, rendering/viewers, Search, async execution, Historical Migration tooling and backup/restore are mechanisms/projections/cutover/operations, not Launch semantic owners.
 
-## Current T5 rendition/viewer direction
-
-The current recommended split is:
+## Accepted T5 rendition/viewer direction
 
 ```text
 PDF source
