@@ -22,7 +22,7 @@ wiki/architecture/launch-v1-product-contract.md
 
 ## Current active staging
 
-- `analysis/2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md` — **PARENT NON-AUTHORITATIVE T5 candidate; whole T5 adjudication paused.**
+- `analysis/2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md` — **PARENT NON-AUTHORITATIVE T5 candidate; corrected T5-A→P packet paused on rendition/viewer subgate.**
 - `analysis/2026-08-18-t5-rendition-viewer-strategy-evaluation.md` — **ACTIVE MATERIAL SUBGATE; RV-1→RV-6 operator decision next.**
 
 Completed T4 staging was removed after durable promotion. Git history is the archive.
@@ -85,9 +85,25 @@ DOCX + RequireOfficialRendition(PDF)
   → Release gate
 ```
 
+Preview/viewing PDF and OfficialRendition PDF are intentionally different meanings. A preview/cache may be rebuildable mechanism; only the policy-required OfficialRendition is immutable semantic state and a Release gate.
+
 Renderer product is not frozen. EigenPal, ONLYOFFICE and Gotenberg/LibreOffice remain candidates for different roles and must be tested against a representative DOCX fidelity corpus.
 
 Until `RV-1→RV-6` closes, **do not adjudicate T5-A→T5-P as a whole**.
+
+## Corrected T5 job census candidate
+
+```text
+always-required durable job:
+  search_refresh
+
+conditional durable job:
+  official_rendition_render
+  only for frozen RequireOfficialRendition policy
+
+periodic reconciliation:
+  managed-content GC over GC_PENDING
+```
 
 ## Mandatory T-stage closure protocol
 
