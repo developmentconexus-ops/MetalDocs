@@ -1,6 +1,6 @@
 # R10 Technical Architecture — Active Stage Router
 
-> **Status:** ACTIVE — **T1 + T2 + T3 + T4 CLOSED / OPERATOR-RATIFIED; DECISION REGISTRY CURRENT; T5 ACTIVE / CORRECTED ADJUDICATION NEXT; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1 + T2 + T3 + T4 CLOSED / OPERATOR-RATIFIED; DECISION REGISTRY CURRENT; T5 DECISIONS ACCEPTED / SUMMARY RATIFICATION NEXT; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-18  
 > **Revision convention:** `REV000` initial issuance / `REV001` first revision  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
@@ -22,7 +22,7 @@ This file is the technical-stage router. Detailed accepted semantics live in ded
 9. `wiki/architecture/r10-t3-authorization-audit-enforcement.md`
 10. `wiki/architecture/r10-t4-exact-content-storage-integrity-restore.md`
 11. `wiki/architecture/rebaseline-decision-registry.md`
-12. active T-stage staging candidate, when present
+12. active T-stage parent analysis, when present
 13. accepted material subgate analysis, when present
 14. corrected adjudication packet / operator-adjudication gate, when present
 
@@ -76,7 +76,7 @@ T2 — Governance, Effectivity & Lifecycle Transactions        CLOSED / OPERATOR
 T3 — Authorization & Audit Enforcement                       CLOSED / OPERATOR-RATIFIED
 T4 — Exact Content, Storage Integrity & Restore              CLOSED / OPERATOR-RATIFIED
 Decision Reconciliation Registry                             CURRENT / OPERATOR-RATIFIED
-T5 — Durable Async, Search & External Effects                ACTIVE / CORRECTED ADJUDICATION NEXT
+T5 — Durable Async, Search & External Effects                DECISIONS ACCEPTED / SUMMARY RATIFICATION NEXT
 T6 — Canonical API / Frontend Journeys                       NOT OPEN
 T7 — Historical Migration & Cutover                          NOT OPEN
 
@@ -151,7 +151,7 @@ SUPERSEDED
 
 Later stages may not rediscover settled decisions from zero and may not inherit superseded decisions by sunk cost.
 
-## 8. T5 — Durable Async, Search & External Effects — ACTIVE
+## 8. T5 — Durable Async, Search & External Effects — DECISIONS ACCEPTED
 
 Parent analysis:
 
@@ -161,9 +161,13 @@ Accepted rendition/viewer subgate:
 
 `docs/superpowers/analysis/2026-08-18-t5-rendition-viewer-strategy-evaluation.md`
 
-Current corrected adjudication surface:
+Accepted corrected decision packet:
 
 `docs/superpowers/analysis/2026-08-18-r10-t5-corrected-adjudication-packet.md`
+
+Operator adjudication record:
+
+`docs/superpowers/analysis/2026-08-18-r10-t5-operator-adjudication.md`
 
 Official T5 REOPEN set:
 
@@ -176,23 +180,7 @@ Search projection/rebuild/freshness/reconciliation
 provider effect receipts where needed
 ```
 
-T5 MUST consume:
-
-```text
-Search = rebuildable eventual-consistency projection
-Search never grants access/effectivity
-required external work may need transaction-coupled durable enqueue
-provider calls never join semantic tx
-OfficialRendition is optional and exists only when frozen representation policy requires it
-SourceOnly remains a valid representation policy
-preview/viewer mechanism is not semantic authority
-T4 GC_PENDING is technical eligibility
-current River/custom outbox implementations are evidence only
-```
-
-### Accepted Rendition / Viewer correction — RV-1→RV-6
-
-The operator accepted the hybrid Global Maximum:
+Accepted RV correction:
 
 ```text
 PDF source
@@ -210,17 +198,7 @@ DOCX + RequireOfficialRendition(PDF)
   → Release gate
 ```
 
-Binding distinctions:
-
-```text
-preview/viewing PDF != OfficialRendition
-SourceOnly viewing != durable rendition job
-OfficialRendition render = conditional on frozen representation policy
-```
-
-Renderer product selection remains empirical through a representative DOCX fidelity corpus. EigenPal is the first SourceOnly viewer candidate; ONLYOFFICE is the stronger viewer fallback; Gotenberg/LibreOffice versus ONLYOFFICE conversion remains a renderer conformance decision.
-
-### Corrected T5 durable-effect census
+Accepted T5 durable-effect census:
 
 ```text
 always-required durable job:
@@ -234,16 +212,36 @@ periodic reconciliation:
   managed-content GC over GC_PENDING
 ```
 
+Accepted T5 laws include:
+
+```text
+one Postgres-backed durable-job mechanism; River selected/reference mechanism
+required job enqueue transaction-coupled to the semantic fact that creates it
+provider/renderer execution outside semantic tx
+OfficialRendition finalization revalidates T4 + T2/T3 state in local tx
+at-least-once/idempotent/revalidating jobs with bounded retry and terminal visibility
+PostgreSQL rebuildable Search projection keyed by Document
+search_refresh reloads latest canonical state; duplicates/out-of-order jobs converge safely
+Search may lag by omission but never grants stale authority/effectivity
+full Search rebuild required; always-on crawler not baseline
+GC periodic reconciliation over GC_PENDING; immediate canonical recheck before delete
+no mandatory Launch notifications/inbox/fanout/domain-event bus
+no mandatory durable external IdP-disable job
+no generic ExternalEffectReceipt family
+minimum async operational observability required
+future capabilities add only named jobs/effects/receipts for proven consumers
+```
+
 ### Current gate
 
 ```text
 RV-1→RV-6                         ACCEPTED
-→ corrected T5-A→T5-P operator adjudication NEXT
-→ platform-facing T5 summary
+T5-A→T5-P                         ADJUDICATED / ACCEPTED
+→ platform-facing T5 summary NEXT
 → explicit operator summary ratification
 → promote/close T5
-→ update registry
-→ remove completed staging
+→ update Decision Registry
+→ remove completed T5 staging
 → open T6
 ```
 
