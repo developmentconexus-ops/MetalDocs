@@ -1,7 +1,7 @@
 # Current Agent Handoff
 
 > **Last verified:** 2026-08-18  
-> **Status:** ACTIVE — **T1→T5 + DECISION REGISTRY OPERATOR-RATIFIED; POST-T5 FABLE REVIEW RECEIVED; AUTHOR ROUND-1 ADJUDICATION PENDING OPERATOR RATIFICATION; T6 NOT OPEN**  
+> **Status:** ACTIVE — **PRODUCT CONTRACT REV001 + T1→T5 + DECISION REGISTRY OPERATOR-RATIFIED; POST-T5 FABLE ROUND-1 AMENDMENTS PROMOTED; DELTA REVIEW PENDING; T6 NOT OPEN**  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Implementation:** **BLOCKED — design/documentation only**
 
@@ -12,7 +12,7 @@ Read in this order:
 1. `AGENTS.md`
 2. `docs/engineering/standards/root-cause-global-maximum-method.md`
 3. this file
-4. `wiki/architecture/launch-v1-product-contract.md`
+4. `wiki/architecture/launch-v1-product-contract.md` — **REV001**
 5. `wiki/architecture/whole-product-alignment-review.md`
 6. `wiki/architecture/launch-v1-ownership-topology.md`
 7. `wiki/architecture/r10-t1-semantic-state-invariants.md`
@@ -22,16 +22,16 @@ Read in this order:
 11. `wiki/architecture/r10-t5-durable-async-search-external-effects.md`
 12. `wiki/architecture/rebaseline-decision-registry.md`
 13. `wiki/architecture/r10-technical-architecture.md`
-14. `docs/superpowers/analysis/2026-08-18-t1-t5-integrated-fable-review-request.md` — review request / evidence
-15. `docs/superpowers/analysis/2026-08-18-t1-t5-integrated-independent-fable-review.md` — **FABLE REVIEW RECEIVED**
-16. `docs/superpowers/analysis/2026-08-18-t1-t5-fable-author-adjudication-round1.md` — **AUTHOR RESPONSE / OPERATOR RATIFICATION NEXT**
+14. `docs/superpowers/analysis/2026-08-18-t1-t5-integrated-independent-fable-review.md` — independent review evidence
+15. `docs/superpowers/analysis/2026-08-18-t1-t5-fable-author-adjudication-round1.md` — **OPERATOR-RATIFIED ROUND 1**
+16. `docs/superpowers/analysis/2026-08-18-t1-t5-fable-delta-review-request.md` — **ACTIVE DELTA REVIEW REQUEST**
 17. `wiki/architecture/launch-v1-scope-rebaseline.md`
 18. old R3–R9.5 / old R10/current implementation only as evidence allowed by current authority/registry
 
 ## Current checkpoint
 
 ```text
-Product Contract                         = ACTIVE / OPERATOR-APPROVED
+Product Contract                         = REV001 / OPERATOR-APPROVED
 Whole-Product GCR A1–A10                 = CLOSED / OPERATOR-APPROVED
 Launch ownership topology                = CLOSED / OPERATOR-APPROVED / 4+1
 T1 Semantic State & Invariants           = CLOSED / OPERATOR-RATIFIED
@@ -39,96 +39,72 @@ T2 Governance/Effectivity/Tx             = CLOSED / OPERATOR-RATIFIED
 T3 Authorization & Audit                 = CLOSED / OPERATOR-RATIFIED
 T4 Exact Content/Storage/Restore         = CLOSED / OPERATOR-RATIFIED
 T5 Durable Async/Search/Effects          = CLOSED / OPERATOR-RATIFIED
-Decision Registry                        = CURRENT / OPERATOR-RATIFIED
-Fable independent review                 = RECEIVED / EVIDENCE ONLY
-Fable verdict                            = APPROVE T1→T5 WITH MATERIAL FIXES
-Author Round-1 adjudication              = WRITTEN / OPERATOR RATIFICATION NEXT
-Durable amendments                       = NOT YET APPLIED
+Decision Registry                        = CURRENT / RECONCILED / OPERATOR-RATIFIED
+Fable original verdict                   = APPROVE T1→T5 WITH MATERIAL FIXES
+Formal T-stage reopen                    = NONE
+Round-1 adjudication                     = OPERATOR-RATIFIED
+Durable bounded amendments               = APPLIED
+Fable delta review                       = PENDING
 Post-T5 checkpoint                       = OPEN
 T6 Canonical API / Frontend Journeys     = NOT OPEN
 T7 Historical Migration / Cutover        = NOT OPEN
 implementation                           = BLOCKED
 ```
 
-## Fable verdict
-
-Commit:
-
-`bdef5fc3c4004aa3ab4deefc9e8373dd3efcf856`
+## Ratified post-T5 delta
 
 ```text
-BLOCKER = 0
-MAJOR   = 3
-LOW     = 5
-NOTE    = 3
-formal T-stage reopen = NONE
+M1
+  materialized Search is conditional;
+  if activated, serialize per-Document projection write before canonical read through rewrite/removal;
+  FIFO remains unnecessary.
+
+M2
+  all restored ApplicationSessions invalid before ordinary serving;
+  required known post-snapshot access teardown must be reconciled/proven before ordinary authenticated serving;
+  T7 chooses smallest recovery proof mechanism; no generic per-grant journal frozen.
+
+M3
+  Search journey required;
+  baseline = canonical PostgreSQL query/view over current canonical facts;
+  materialized projection + search_refresh + rebuild activate only on proven derived/expensive/measured need.
+
+L1 title = Revision-governed metadata.
+L2 late renderer result for dead candidate = semantic no-op/reclaimable output.
+L3 live bounded admission claim protects in-flight READY content from GC.
+L4 active human-governed obsolescence request has bounded initiator/manager withdrawal.
+L5 T3 provider-disable wording follows T5-L.
 ```
 
-Major findings:
+Additional guardrails:
 
 ```text
-M1 Search projection concurrent overlap can end stale despite latest-state reads.
-M2 restore can resurrect revoked sessions/access teardown.
-M3 materialized Search/search_refresh lack a named current consumer proving materialization.
+same-DB durable-intent restore coherence recorded
+registry ambiguous SUPERSEDED wording tightened
+T6 REOPEN explicitly includes source upload/T4 admission UX and Search materialization proof
+T7 REOPEN explicitly includes post-snapshot security-teardown recovery choreography
 ```
 
-## Author Round-1 recommendation — NON-AUTHORITATIVE until operator ratification
-
-Detailed file:
-
-`docs/superpowers/analysis/2026-08-18-t1-t5-fable-author-adjudication-round1.md`
-
-Headline:
-
-```text
-M1 ACCEPT
-  conditional materialized projection must serialize per-Document projection write before canonical read through write; no FIFO.
-
-M2 ACCEPT ROOT CAUSE / REFINE FIX
-  invalidate all restored ApplicationSessions before serving;
-  fail closed until required post-snapshot security teardown is reconciled/proven;
-  T7 chooses smallest recovery proof mechanism — no generic security journal frozen now.
-
-M3 ACCEPT — OPTION (b)
-  Search journey remains required;
-  canonical PostgreSQL query/view is baseline for current canonical search facts;
-  materialized projection + search_refresh + rebuild become conditional on T6 proving a real derived/expensive consumer or measured need.
-```
-
-LOW dispositions proposed:
-
-```text
-L1 title = Revision-governed metadata, preserving DRAFT/EFFECTIVE separation
-L2 late renderer result = semantic no-op if Submission/Revision no longer eligible
-L3 live admission claim/binding prevents GC until bounded release/expiry
-L4 bounded initiator/manager withdraw of active human-governed obsolescence request
-L5 T3 provider-disable wording aligned to T5-L
-```
-
-Notes proposed:
-
-```text
-same-DB job recovery coherence recorded as reopen guard
-registry SUPERSEDED wording tightened cosmetically
-T6 explicitly names source upload/admission UX
-```
-
-Everything else remains frozen.
+Everything not named remains frozen.
 
 ## Exact next step
 
-Operator ratification of the Round-1 adjudication.
+Operator dispatches Fable to read:
 
-If ratified:
+`docs/superpowers/analysis/2026-08-18-t1-t5-fable-delta-review-request.md`
+
+Fable must write:
+
+`docs/superpowers/analysis/2026-08-18-t1-t5-integrated-fable-delta-review.md`
+
+Close condition:
 
 ```text
-apply only the ratified bounded amendments to durable T1→T5 authorities + Decision Registry
-→ update router/handoff/PR
-→ Fable reads the adjudication/delta from GitHub and challenges only remaining material disagreement if operator dispatches it
-→ explicitly close post-T5 checkpoint when disagreement set is empty/adjudicated
-→ only then open T6
+DELTA VERDICT = APPROVE
+DISAGREEMENT SET = EMPTY
+T6 READINESS = MAY OPEN
 ```
 
-Do **not** open T6 before this checkpoint closes.
+If Fable disagrees, adjudicate only the exact remaining delta through GitHub. Do **not** restart T1→T5 from zero.
 
-No final SQL/index/package/process topology, public API/frontend contract, Historical Migration execution plan, implementation plan or product code is authorized.
+T6 remains NOT OPEN until the post-T5 checkpoint explicitly closes. No final SQL/index/package/process topology, public API/frontend contract, Historical Migration execution plan, implementation plan or product code is authorized.
