@@ -2,6 +2,7 @@
 
 > **Status:** ACTIVE / OPERATOR-RATIFIED DECISION DISPOSITION AUTHORITY  
 > **Ratified:** 2026-08-18  
+> **Last stage update:** T3 — Authorization & Audit Enforcement — OPERATOR-RATIFIED  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Implementation:** BLOCKED
@@ -12,7 +13,7 @@ The Whole-Product rebaseline changed Launch scope and semantic ownership after R
 
 > **Revalidation does not mean reinvention. Preserve a prior simple/coherent decision unless current authority or a concrete failure mode disproves it; rederive only the composite decision whose justification changed; defer only the capability that actually left Launch.**
 
-This registry is the current disposition authority for those prior decisions. It is **not** a competing detailed product specification. Detailed current truth remains in the Product Contract, Whole-Product GCR, ownership topology, ratified T-stage authorities and later accepted authorities.
+This registry is the current disposition authority for those prior decisions. It is **not** a competing detailed product specification. Detailed current truth remains in the Product Contract, Whole-Product GCR, ownership topology and ratified T-stage authorities.
 
 Before every remaining T-stage:
 
@@ -24,7 +25,7 @@ read this registry
 → reject SUPERSEDED inheritance
 ```
 
-When a T-stage closes, this registry must be updated to point the affected decisions to their new durable authority.
+When a T-stage closes, this registry is updated to point the affected decisions to their new durable authority.
 
 ## 1. Disposition vocabulary
 
@@ -63,6 +64,7 @@ AGENTS.md
 → wiki/architecture/launch-v1-ownership-topology.md
 → wiki/architecture/r10-t1-semantic-state-invariants.md
 → wiki/architecture/r10-t2-governance-effectivity-transactions.md
+→ wiki/architecture/r10-t3-authorization-audit-enforcement.md
 → this registry for prior-decision disposition
 → active T-stage candidate only for its REOPEN set
 ```
@@ -95,6 +97,8 @@ external/provider calls never join local semantic atomicity
 Document = lifecycle serialization root
 WorkingContent = OCC/CAS for DRAFT races
 READ COMMITTED + narrow explicit serialization/CAS = accepted default posture
+current Authorization = live User/Group grants + scope + domain predicates
+critical governed/security mutations cannot commit without required same-local-commit Audit
 ```
 
 # 4. Authentication
@@ -121,8 +125,8 @@ READ COMMITTED + narrow explicit serialization/CAS = accepted default posture
 | ORG-06 | **CURRENT** | GroupMembership is current truth only; historical transition evidence belongs Audit when required. |
 | ORG-07 | **SUPERSEDED AS BASELINE** | No independent `UserAreaMembership`/home-area relation without named consumer. |
 | ORG-08 | **PRESERVE** | Area retirement/inactivity blocks future use as appropriate but preserves existing references/history. |
-| ORG-09 | **PRESERVE** | Group cannot disappear while current memberships, RoleAssignments or live governance config references it; activated historical Steps use concrete User snapshots. |
-| ORG-10 | **PRESERVE** | Offboarding removes future access; re-enable restores eligibility only and never silently restores deleted grants/memberships/sessions. |
+| ORG-09 | **CURRENT — T3** | Group deletion fails closed while current memberships, Group grants, current governance routes or live unactivated GROUP-step snapshots depend on it; resolved/completed Steps use concrete User snapshots. |
+| ORG-10 | **CURRENT — T3** | Offboarding disables User, revokes Sessions, removes current memberships/direct grants and preserves history; re-enable restores eligibility only and never silently restores prior authority. |
 
 # 6. Authorization
 
@@ -132,15 +136,18 @@ READ COMMITTED + narrow explicit serialization/CAS = accepted default posture
 | AZ-02 | **CURRENT** | RoleAssignment is sole persisted current grant family; subject `User | Group`. |
 | AZ-03 | **REFINED / CURRENT** | Scope is `Company | Area`; old TenantScope terminology is replaced. |
 | AZ-04 | **CURRENT** | Additive grants + default deny; no deny engine/ACL graph. |
-| AZ-05 | **PRESERVE** | Canonical evaluation uses current direct User grants + current GroupMembership→Group grants; not durable Session/JWT permission snapshots. |
+| AZ-05 | **CURRENT — T3** | Canonical evaluation uses current direct User grants + current GroupMembership→Group grants; Session/JWT/provider claims never become durable permission authority. |
 | AZ-06 | **CURRENT** | Domain relationship/lifecycle/governance constraints remain with Controlled Documents, not RBAC. |
 | AZ-07 | **CURRENT** | No role, including admin, bypasses domain governance. |
-| AZ-08 | **REOPEN / PARTIAL PRESERVE** | Prior role concepts remain evidence (`tenant_owner`, `area_manager`, `author`, `approver`, `viewer`), but current exact names/bundles must be rederived; GCR requires least-privilege Governance Viewer/Auditor. |
+| AZ-08 | **REFINED / CURRENT — T3** | Launch roles are `governance_admin`, `area_manager`, `author`, `approver`, `viewer`, `governance_viewer`; exact old five-role set/bundles are superseded. |
 | AZ-09 | **SUPERSEDED** | Exact old 5×43 permission matrix must not be preserved by subtraction. |
-| AZ-10 | **PRESERVE CANDIDATE** | Area Manager remains a valuable operational role concept and should not silently become whole-company RBAC administrator; exact bundle is T3. |
-| AZ-11 | **PRESERVE CANDIDATE** | `access.manage` protecting both RoleAssignment and GroupMembership mutation remains strong prior law because membership can change inherited authority. |
+| AZ-10 | **CURRENT — T3** | `area_manager` is AreaScope-only operational management, not RBAC administration; it gains Area-wide document management through `document.owner.manage`. |
+| AZ-11 | **CURRENT — T3** | `access.manage` protects GroupMembership + RoleAssignment mutations because either can change effective authority. |
 | AZ-12 | **SUPERSEDED / REJECTED** | RLS is not Role/Area/permission policy engine; canonical AuthZ is application/domain authority. |
 | AZ-13 | **SUPERSEDED** | Universal `tenant_id` composite PK/FK + tenant RLS substrate is incompatible with single-company Launch. |
+| AZ-14 | **CURRENT — T3** | `governance_admin` = CompanyScope only; `area_manager` = AreaScope only; `author/approver/viewer/governance_viewer` = CompanyScope or AreaScope; every role may be assigned to User or Group. |
+| AZ-15 | **CURRENT — T3** | Accepted Launch permission vocabulary is the 15-permission catalog owned by `wiki/architecture/r10-t3-authorization-audit-enforcement.md`. |
+| AZ-16 | **CURRENT — T3** | Ordinary author working authority is bounded by current responsible-owner relationship unless actor also has `document.owner.manage`; governance verdict requires `governance.act` plus exact active-Step participation and T2 predicates. |
 
 # 7. Governance
 
@@ -189,7 +196,7 @@ READ COMMITTED + narrow explicit serialization/CAS = accepted default posture
 | CNT-04 | **SUPERSEDED / REJECTED** | WorkingSnapshot is never business history; recovery checkpoint can exist only as mechanism. |
 | CNT-05 | **CURRENT** | Submission immutable/exact; same Revision may have multiple attempts. |
 | CNT-06 | **CURRENT** | Submission freezes coherent exact WorkingContent generation + decision-relevant governed config/state. |
-| CNT-07 | **REOPEN** | Exact-content proof required, but RFC8785/JCS + digest realization is T4 decision. |
+| CNT-07 | **REOPEN — T4** | Exact-content proof required, but canonical descriptor/digest/canonicalization realization is T4. |
 | CNT-08 | **SUPERSEDED** | Standalone Artifact exact-byte owner removed. |
 | CNT-09 | **CURRENT** | Template = ordinary governed Document role; no parallel lifecycle. |
 | CNT-10 | **CURRENT** | Template eligibility remains small M:N current relation to target DocumentTypes. |
@@ -238,12 +245,14 @@ READ COMMITTED + narrow explicit serialization/CAS = accepted default posture
 | ID | Disposition | Current meaning |
 |---|---|---|
 | AUD-01 | **CURRENT** | AuditEvent = transversal evidence, never current state/event sourcing. |
-| AUD-02 | **CURRENT PRINCIPLE / REOPEN CENSUS** | Critical governed/security mutations require same-local-commit Audit; exact operation census + bounded facts are T3. |
+| AUD-02 | **CURRENT — T3** | Exact same-local-commit Audit census and bounded minimum facts are ratified in `wiki/architecture/r10-t3-authorization-audit-enforcement.md`. |
 | AUD-03 | **CURRENT** | Audit append-only and PII-minimized; no credential/token/request-body/free-form reason copying by convenience. |
 | AUD-04 | **SUPERSEDED / DEFERRED** | Deployment-wide AuditChainHead/hash-chain/global terminal lock removed absent concrete assurance requirement. |
 | AUD-05 | **DEFERRED** | Generic Audit export permission/capability. |
-| AUD-06 | **REOPEN / PRIOR EVIDENCE** | No accepted indefinite-retention period; future compliance/records requirement decides retention. |
+| AUD-06 | **REOPEN / FUTURE COMPLIANCE** | T3 intentionally does not claim indefinite/statutory retention; future Records/compliance requirement defines retention/pruning/checkpoint semantics. |
 | AUD-07 | **SUPERSEDED / REJECTED** | DB CRUD triggers do not infer semantic Audit; explicit use-case composition records operation meaning. |
+| AUD-08 | **CURRENT — T3** | Audit visibility is immutable `Company` or `Area` attribution captured at event time; `audit.read @ Company` sees company+areas, `audit.read @ Area` sees only that Area's events. |
+| AUD-09 | **CURRENT — T3** | Ordinary autosave/search/read/download/login/logout/notification/preview/deny events are telemetry, not mandatory semantic Audit absent a named compliance requirement. |
 
 # 14. Storage / Exact Content / Restore
 
@@ -252,10 +261,10 @@ READ COMMITTED + narrow explicit serialization/CAS = accepted default posture
 | STO-01 | **CURRENT** | Storage/provider identity never semantic identity. |
 | STO-02 | **PRESERVE / REQUIRED SEAM** | Provider-neutral shared storage/integrity mechanism may serve multiple semantic owners without becoming an owner. |
 | STO-03 | **SUPERSEDED IN NAME/OWNERSHIP** | `ManagedArtifactStore` as Artifact-owned semantic surface removed; T4 may preserve provider-neutral managed-content mechanism only. |
-| STO-04 | **PRESERVE CANDIDATE** | SHA-256 remains strong prior exact-byte digest choice; descriptor/canonicalization is T4. |
-| STO-05 | **PRESERVE CANDIDATE** | Governed immutable bytes never overwrite in place; mutable WorkingContent may point to replacement content under OCC. |
-| STO-06 | **REOPEN / PRIOR MECHANISM CHOICE** | Local dev/test + AWS S3 reference production is evidence; T4 revalidates actual provider/profile/conformance. |
-| STO-07 | **PRESERVE CANDIDATE** | Production malware inspection before admission of untrusted governed bytes remains coherent; exact semantics are T4. |
+| STO-04 | **PRESERVE CANDIDATE / T4** | SHA-256 remains strong prior exact-byte digest choice; descriptor/canonicalization is T4. |
+| STO-05 | **PRESERVE CANDIDATE / T4** | Governed immutable bytes never overwrite in place; mutable WorkingContent may point to replacement content under OCC. |
+| STO-06 | **REOPEN / PRIOR MECHANISM CHOICE — T4** | Local dev/test + AWS S3 reference production is evidence; T4 revalidates actual provider/profile/conformance. |
+| STO-07 | **PRESERVE CANDIDATE / T4** | Production malware inspection before admission of untrusted governed bytes remains coherent; exact semantics are T4. |
 | STO-08 | **SUPERSEDED / REJECTED** | Object-store versioning/Object Lock/WORM are defense/enforcement, never lifecycle authority. |
 | STO-09 | **DEFERRED / REJECTED AS DEFAULT** | Application-layer Company DEK/crypto-erasure is not mandatory absent named Target Data/assurance requirement. |
 | STO-10 | **SUPERSEDED / REJECTED** | External repository IDs never become MetalDocs content identity. |
@@ -348,7 +357,7 @@ Future:
 
 > **Defer the capability; preserve the evolution seam. Prepare the seam, not the dormant implementation.**
 
-# 21. Anti-legacy list — MUST NOT leak into T3–T7
+# 21. Anti-legacy list — MUST NOT leak into T4–T7
 
 ```text
 standalone Artifact semantic owner
@@ -380,29 +389,33 @@ provider/storage identity as semantic identity
 
 A later stage may propose one only by naming new material evidence that explicitly reopens it.
 
-# 22. Official REOPEN set for remaining T-stages
+# 22. Closed T3 and official REOPEN set for remaining stages
 
-## T3 — Authorization & Audit Enforcement
+## T3 — Authorization & Audit Enforcement — CLOSED / OPERATOR-RATIFIED
+
+Detailed authority:
+
+`wiki/architecture/r10-t3-authorization-audit-enforcement.md`
+
+Closed decisions include:
 
 ```text
-exact Launch role vocabulary
-exact permission vocabulary/bundles
-whether/how area_manager survives
-whole-company admin role naming/bundle
-role↔scope matrix
-access administration law for GroupMembership/RoleAssignment
-Group administration/deletion exact law
-offboarding exact access teardown transaction
-least-privilege Governance Viewer/Auditor
-canonical check sites
-authorization-sensitive in-flight/offboarding races where material
-same-local-commit Audit operation census + minimum bounded facts
-Audit read visibility/scoping
+six Launch roles + 15 Launch permissions
+User|Group subjects + accepted Company|Area scope matrix
+organization.manage vs access.manage administration split
+Group deletion live-dependency law
+responsible-owner / document.owner.manage authoring predicate
+governance.act + exact active-Step participation
+atomic offboarding + no silent access resurrection
+offboarding/security-action User-eligibility serialization
+bounded same-local-commit Audit census
+PII-minimized Audit facts
+Company|Area historical Audit visibility
+no mandatory semantic Audit for ordinary reads/downloads/search/autosave/login/logout/preview/deny
+future capability permissions never silently broaden current roles
 ```
 
-T3 starts from the preserved/current AuthN/Organization/AuthZ laws above rather than from zero.
-
-## T4 — Exact Content, Storage Integrity & Restore
+## T4 — Exact Content, Storage Integrity & Restore — ACTIVE REOPEN SET
 
 ```text
 exact content descriptor/digest algorithm/canonicalization
@@ -457,8 +470,8 @@ DR-2 ACCEPT — disposition vocabulary = CURRENT / PRESERVE / REFINED / REOPEN /
 DR-3 ACCEPT — later T-stages consume CURRENT/PRESERVE/REFINED and deliberately redesign only their REOPEN set.
 DR-4 ACCEPT — old 2026-08-14 cohesive redesign ledger is historical inventory/evidence, never current decision authority.
 DR-5 ACCEPT — future Dossier/Evidence/Records/Distribution/PeriodicReview designs remain preserved as future evidence, not conceptually discarded and not instantiated in Launch.
-DR-6 ACCEPT — anti-legacy list in §21 is binding absent later explicit material reopen.
-DR-7 ACCEPT — premature T3 candidate is discarded; T3 is rebuilt from this accepted registry.
+DR-6 ACCEPT — anti-legacy list is binding absent later explicit material reopen.
+DR-7 ACCEPT — premature pre-registry T3 candidate was discarded; ratified T3 was rebuilt from this registry.
 DR-8 ACCEPT — update this registry after every T-stage closure so it remains the current cross-stage baseline.
 ```
 
