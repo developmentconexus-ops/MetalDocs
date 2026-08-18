@@ -4,16 +4,16 @@
 > **Date:** 2026-08-18  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
-> **Input working baseline:** B1/B2 promoted authority + B3 **ACCEPTED FOR R10 INTEGRATION / NON-FINAL**  
+> **Input:** B1/B2 promoted authority + B3 **ACCEPTED FOR R10 INTEGRATION / NON-FINAL**  
 > **Method:** DevelopmentConexus Engineering Method v1.0.0  
 > **Implementation:** BLOCKED  
 > **Independent review:** deferred to Whole-R10 unless a material exception trigger appears.
 
-This file is staging analysis. It does **not** independently ratify B4 or amend the frozen R3–R9.5 ledger. It consumes the operator-accepted non-final B3 candidate and must remain challengeable by B5–F and Whole-R10 review.
+This is staging analysis. It does not independently ratify B4 or amend frozen R3–R9.5 authority. B4 remains challengeable by B5–F and Whole-R10 review.
 
 ---
 
-# 1. Authority and evidence boundary
+# 1. Authority / evidence boundary
 
 Authority path:
 
@@ -23,181 +23,158 @@ Authority path:
 4. `wiki/architecture/cohesive-platform-redesign.md`
 5. `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md`
 6. `wiki/architecture/r10-technical-architecture.md`
-7. `docs/superpowers/analysis/2026-08-17-r10-b3-controlled-information-artifact-integrated-candidate.md` — accepted non-final integration input
+7. accepted non-final B3 candidate
 
-Current code/schema/OpenAPI/legacy ADRs are evidence only.
-
-External references are comparison evidence only. The useful pattern is narrow: mature DMS/QMS products separate document/version identity, review/approval work, viewer/annotations, and publication/effectivity. MetalDocs does not import a generic workflow/BPM engine.
+Current code/schema/OpenAPI/legacy ADRs are evidence only. External products are comparison evidence only.
 
 ---
 
 # 2. Operator refinement carried into B4
 
-The operator explicitly requires:
+The operator requires:
 
-1. governed documents must be viewable **inside MetalDocs**; supported viewing must not require downloading a file and opening another application;
-2. approval and review journeys must be able to view the exact candidate as PDF when a PDF rendition exists/is generated;
-3. collaborative review must support comments and a suggesting/redline-like interaction;
-4. this capability must be provider-neutral — current authoring/editor technology is an adapter, never product/domain identity.
+- supported governed documents are viewable **inside MetalDocs**; normal viewing must not require download + external desktop application;
+- review and approval can visualize the exact candidate as PDF when a PDF rendition is available/generated;
+- collaborative review supports comments and a suggesting/redline-like interaction;
+- current editor/viewer technology remains an adapter, never product/domain identity.
 
-Consequent architectural distinction:
+Therefore:
 
 ```text
 OfficialRepresentationPolicy
-!=
-what the UI is capable of previewing
+!= viewer capability
 ```
 
-A DocumentType may be `SourceOnly` for official Release and still have an auxiliary PDF `Rendition` for in-product viewing. Such a rendition does not become official merely because the viewer uses it.
+`SourceOnly` may still have an auxiliary PDF Rendition for in-product viewing. That PDF is not official merely because the viewer uses it.
 
-Likewise:
+And:
 
 ```text
-review suggesting UX
-!=
-mutation of RevisionSubmission
+suggesting UX
+!= mutation of RevisionSubmission
 ```
 
-While the Revision is `SUBMITTED`, the exact Submission remains immutable. Review comments/proposed changes are a **detached review-feedback layer bound to that Submission**. If the attempt is returned to DRAFT, applying a suggestion becomes an ordinary B3 `WorkingContent` OCC mutation and therefore produces new working state before a new Submission.
+`SUBMITTED` remains immutable. Review comments/proposed changes are detached, exact-Submission-bound feedback. Applying a suggestion after `return_for_changes` is a normal B3 WorkingContent OCC mutation.
 
 ---
 
-# 3. Evidence → Known / Inferred / Unknown / Deferred
+# 3. Known / Inferred / Unknown / Deferred
 
-## 3.1 Known — frozen/promoted inputs
+## Known
 
-B4 must preserve:
+B4 preserves:
 
-- Approval is specialized sequential human workflow, not generic BPM;
-- `ApprovalPolicy(version)` has ordered Steps;
-- Step fields: `purpose = review|approval`, `actor_rule = NamedUser|Group|RoleInArea`, `completion = ANY|ALL`, `requires_reauthentication`, optional `due_in_days`;
-- human decision outcomes are `accept | return_for_changes`;
-- `withdraw | cancel | reassign` are separate operations;
-- there is no normal terminal reject V1;
-- strict SoD: creator/submitter cannot accept own Submission; same User cannot accept two Steps of one ApprovalInstance; reassignment must stay qualified and SoD-valid;
-- `tenant_owner` is never a bypass;
-- ApprovalInstance binds exactly one immutable `RevisionSubmission`;
-- return/withdraw terminates the attempt and returns the same Revision to DRAFT;
-- resubmission creates a new Submission and new ApprovalInstance when human approval applies;
-- fresh-auth consumes Authentication-owned assurance evidence; Approval never stores/challenges passwords;
-- Rendition is immutable derived representation of exact Submission with output hash + generator/build provenance;
-- Approval approves Submission, never renderer output bytes;
+- specialized sequential Approval, not BPM;
+- versioned ApprovalPolicy with ordered Steps;
+- Step `purpose=review|approval`;
+- actor rule `NamedUser|Group|RoleInArea`;
+- completion `ANY|ALL`;
+- optional reauthentication and `due_in_days`;
+- human outcomes `accept|return_for_changes`;
+- separate withdraw/cancel/reassign;
+- no normal terminal reject V1;
+- strict SoD: creator/submitter cannot accept own Submission; same User cannot accept two Steps of one ApprovalInstance; reassignment remains qualified + SoD-valid;
+- ApprovalInstance binds one exact immutable RevisionSubmission;
+- return/withdraw returns same Revision to DRAFT without mutating Submission;
+- fresh-auth is Authentication-owned evidence consumption;
+- Rendition derives exact Submission and retains output hash/Artifact + generator/build provenance;
+- Approval approves Submission, never renderer bytes;
 - Release is automatic/system-owned; no publish button;
-- optional `ReleasePlan.not_before`; actual `effective_at = released_at`;
-- winning Release atomically makes candidate EFFECTIVE and prior Revision SUPERSEDED;
-- representation policy = `SourceOnly | RequireRendition(ContentFormat)`;
-- at most one required derived rendition V1; source Artifact always remains exact Submission source;
-- Distribution is controlled obligation/acknowledgement, not AuthZ/LMS;
-- Release snapshots concrete Users; later Group membership never rewrites historical denominator;
-- explicit immutable AcknowledgementRecord completes obligation; notification read/view/download never completes it;
-- B2 Group live-reference law applies to ApprovalPolicy and Distribution configuration;
-- B3 exact Submission identity, OCC generation consumption, one-open/one-effective constraints and exact Artifact semantics remain integration inputs.
+- optional `ReleasePlan.not_before`; `effective_at=released_at`;
+- winning Release makes candidate EFFECTIVE and predecessor SUPERSEDED atomically;
+- representation policy `SourceOnly|RequireRendition(ContentFormat)`;
+- Distribution snapshots concrete Users at Release;
+- later Group membership never rewrites historical denominator;
+- explicit immutable AcknowledgementRecord is the only completion signal;
+- B2 Group live-reference RESTRICT law;
+- B3 exact Submission identity, OCC generation consumption and one-EFFECTIVE backstop.
 
-## 3.2 Inferred — candidate technical choices
+## Inferred candidate choices
 
-1. `RevisionSubmission.id` is the shared exact-candidate identity across Approval, Rendition and Release. No second `release_generation` identity is introduced.
-2. ApprovalPolicy has stable identity plus immutable numbered versions; in-flight instances pin one exact version.
-3. Step participants are resolved to concrete Users when a step becomes active, not kept as a live Group/Role expression for historical completion.
-4. Authorization stays live at action time; participant snapshot never becomes an AuthZ snapshot.
-5. Review feedback is detached immutable/submission-bound state. It may contain comments or proposed changes but never mutates Submission bytes.
-6. `SUGGESTION` feedback is allowed only on `purpose=review`; ordinary COMMENT feedback may be added during review or approval.
-7. A PDF Rendition may exist for preview even when `OfficialRepresentationPolicy=SourceOnly`; release only requires one when the policy says so.
-8. ReleaseRecord points to the exact Rendition used as official representation when one is required; post-release effective-document viewing must use that exact rendition when present.
-9. Distribution V1 live audience configuration includes Group because B2 proves it as a real consumer; unproven generic User/Area/company audience unions are not added yet.
-10. Distribution obligations are created in the winning Release transaction, not asynchronously after Release, so the denominator is historical truth rather than a later membership projection.
-11. Acknowledgement V1 is an explicit authenticated product action but does not require fresh-auth/e-signature absent a new requirement.
-12. `due_in_days` is deadline/attention metadata only; it does not auto-escalate, auto-accept, auto-return or mutate quorum.
-13. Approval `cancel` terminates the attempt and returns the Revision to DRAFT; cancelling the business Revision itself remains `document.cancel_revision`.
+1. `RevisionSubmission.id` is the shared identity for Approval, Rendition and Release; no duplicate `release_generation` identity.
+2. ApprovalPolicy has stable identity + immutable numbered versions.
+3. At ApprovalInstance creation, every Step actor rule resolves to a **concrete User pool snapshot**. In-flight execution never depends on later Group/Role membership.
+4. At step activation, the active participant denominator is selected from that frozen pool after strict SoD filtering; action-time AuthZ remains live.
+5. ReviewFeedback is detached immutable state bound to exact Submission.
+6. `SUGGESTION` feedback is REVIEW-only; COMMENT is permitted on REVIEW or APPROVAL.
+7. Auxiliary PDF Rendition may exist under `SourceOnly`; only representation policy decides Release blocking.
+8. V1 admits at most one semantic Rendition per `(Submission, ContentFormat)`; failed renderer attempts are R10-D mechanism state and never Rendition rows.
+9. ReleaseRecord selects the exact official Rendition when one is required.
+10. Distribution live audience V1 includes Group because B2 proves a real Group consumer; no generic polymorphic audience engine.
+11. Distribution obligations are inserted in the **winning Release transaction**, not resolved later by a worker.
+12. Acknowledgement is explicit authenticated action but not fresh-auth/e-signature V1.
+13. `due_in_days` is attention/SLA data only; no auto-escalation or lifecycle mutation.
+14. `approval.cancel` returns the Approval attempt to DRAFT; cancelling the Revision remains `document.cancel_revision`.
 
-## 3.3 Unknown — bounded
+## Unknown
 
-- whether future Distribution needs direct User, Area or whole-company live audience types in addition to Group;
-- whether review feedback needs mandatory per-item resolution/disposition before resubmit;
-- whether approval-stage comments should support geometric/text anchors beyond general Submission comments;
-- whether post-release re-rendering of a SourceOnly preview PDF needs a retained history policy;
-- whether future compliance requires fresh-auth/e-signature for Acknowledgement;
-- exact provider-neutral review-anchor schemas for every future content format;
-- exact viewer implementation/provider selection.
+- future direct User/Area/company Distribution audience types;
+- mandatory per-feedback APPLIED/DECLINED resolution before resubmit;
+- richer review-anchor schemas for future formats;
+- post-release re-rendering/replacement of a semantic Rendition;
+- future e-signature/fresh-auth for Acknowledgement;
+- exact viewer/editor adapter implementation.
 
-None currently requires B2/B3 reopen.
-
-## 3.4 Deferred
+## Deferred
 
 ```text
-Evidence/Dossier/Records + retention/hold/disposition        → B5
-Audit skeleton/final cross-owner same-commit matrix          → B6
-physical Artifact storage/malware/restore                    → R10-C
-worker/outbox/timers/notification delivery/projections       → R10-D
-API/frontend/viewer/editor/provider adapter journeys         → R10-E
-historical migration/cutover/legacy deletion                 → R10-F
+Evidence/Dossier/Records/Retention/Hold/Disposition → B5
+Audit final skeleton / same-commit matrix           → B6
+physical storage/malware/restore                    → R10-C
+workers/outbox/timers/notifications/projections     → R10-D
+API/frontend/viewer/editor/provider journeys        → R10-E
+migration/cutover/deletion                          → R10-F
 ```
 
-R10-E has a **hard successor requirement**: for supported formats/representations, users can view governed content in-product; approval/review does not require download-and-open-external-app as the normal viewing journey.
+R10-E has a hard successor obligation: supported content must be viewable in-product, including exact PDF viewing where applicable, without making a provider brand part of the domain surface.
 
 ---
 
 # 4. Root Cause
 
-The failure class is not “missing approval tables”. It is **collapsed governance stages**:
+The structural failure class is **collapsed governance stages**. Human decision, derived representation, effectivity and distribution obligation can be wrongly collapsed into one floating “document status” or multiple pipelines that each infer “current content”.
 
-```text
-human decision
-+ derived representation
-+ effectivity
-+ distribution obligation
-```
-
-can be incorrectly represented by one floating document status or by multiple paths that each infer “current content”. That permits approval, renderer, publication and reader obligations to refer to different candidates.
-
-B4 must make these truths separate but causally linked through one immutable Submission.
+B4 must separate these truths while causally binding all of them to one immutable Submission.
 
 ---
 
 # 5. Target invariant
 
-> Every human Approval decision, every derived Rendition selected for official use, and every ReleaseRecord refers to the same immutable RevisionSubmission. A winning Release is the sole transition that makes its Revision EFFECTIVE, supersedes the prior EFFECTIVE Revision, and freezes the concrete Distribution obligations created by that effectivity event. Viewer/review interaction may add detached feedback or derived preview representations but can never mutate or replace the submitted candidate.
-
-Corollaries:
+> Every Approval decision, every Rendition selected for official use and every ReleaseRecord refers to the same immutable RevisionSubmission. Winning Release is the only effectivity transition; it supersedes the prior EFFECTIVE Revision and freezes concrete Distribution obligations in the same local transaction. Viewer/review interaction may add detached feedback or derived preview representations but can never mutate the submitted candidate.
 
 ```text
-ApprovalDecision   != content mutation
-ReviewFeedback     != WorkingContent
-Rendition          != source Submission
-PDF preview        != automatically official representation
-Approval complete  != Release complete
-Release            != human publish action
-Distribution       != Authorization
-View/download      != Acknowledgement
-Group membership   != historical obligation denominator
+ApprovalDecision    != content mutation
+ReviewFeedback      != WorkingContent
+Rendition           != source Submission
+PDF preview         != automatically official
+Approval complete   != Release complete
+Release             != human publish action
+Distribution        != Authorization
+View/download       != Acknowledgement
+Group membership    != historical denominator
 ```
 
 ---
 
-# 6. Credible alternatives
+# 6. Alternatives
 
-## A — one status-heavy DocumentRevision workflow
+## A — status-heavy Revision workflow
 
-Encode `under_review/approved/published/read` and related fields directly on Revision.
-
-**Reject / Local Maximum.** It cannot prove exact-candidate coherence and mixes incompatible mutation laws.
+**Reject / Local Maximum.** Mixes incompatible mutation laws and cannot prove exact-candidate coherence.
 
 ## B — generic BPM/workflow platform
 
-Model Approval, review, distribution, periodic review and possibly retention as generic nodes/transitions/conditions.
+**Reject / overengineered.** Creates generic nodes/conditions/delegation machinery without real consumers.
 
-**Reject / overengineered non-maximum.** Solves hypothetical workflow classes and creates a new low-code authority.
+## C — specialized Approval + detached feedback + immutable Rendition + automatic Release + concrete Distribution snapshot
 
-## C — specialized Approval + detached review feedback + immutable Rendition + automatic Release + concrete Distribution snapshot
-
-**Recommended Global Maximum.** Each necessary fact gets one authority while all four stages share the same exact Submission identity.
+**Recommended Global Maximum.** Minimum structure preserving the frozen invariants and operator viewer/review requirements.
 
 ---
 
 # 7. Approval configuration
 
 ## 7.1 DocumentTypeApprovalConfig
-
-Approval-owned live binding from Controlled Information type to Approval behavior:
 
 ```text
 DocumentTypeApprovalConfig
@@ -209,11 +186,11 @@ DocumentTypeApprovalConfig
 CHECK:
 
 ```text
-NO_HUMAN_APPROVAL → approval_policy_id IS NULL
-USE_POLICY        → approval_policy_id IS NOT NULL
+NO_HUMAN_APPROVAL → policy NULL
+USE_POLICY        → policy NOT NULL
 ```
 
-Tenant-wide `approval_policy.manage` governs configuration.
+Tenant-wide `approval_policy.manage`.
 
 ## 7.2 ApprovalPolicy
 
@@ -226,7 +203,7 @@ ApprovalPolicy
   created_at TIMESTAMPTZ NOT NULL
 ```
 
-Stable identity/current eligibility only. Policy change never rewrites historical versions.
+Stable identity/current eligibility only.
 
 ## 7.3 ApprovalPolicyVersion
 
@@ -241,9 +218,9 @@ ApprovalPolicyVersion
   UNIQUE(approval_policy_id, version_no)
 ```
 
-Immutable/append-only. Current version = highest committed version of an ACTIVE policy. Reverting means creating a new version, never reviving/mutating an older row.
+Immutable. Highest committed version of ACTIVE policy is current. “Rollback” creates a new version.
 
-## 7.4 ApprovalPolicyStep
+## 7.4 ApprovalPolicyStep — immutable semantic snapshot
 
 ```text
 ApprovalPolicyStep
@@ -257,28 +234,35 @@ ApprovalPolicyStep
 
   actor_kind TEXT NOT NULL CHECK NAMED_USER|GROUP|ROLE_IN_AREA
   named_user_id UUID NULL FK User(id) RESTRICT
-  group_id UUID NULL FK Group(id) RESTRICT           // live/current version relation only
+  group_id_snapshot UUID NULL          // historical identity value, NOT a live FK
+  group_name_snapshot TEXT NULL
   role_code TEXT NULL
   area_id UUID NULL FK Area(id) RESTRICT
 
   UNIQUE(policy_version_id, step_order)
 ```
 
-Closed-union CHECK:
+Closed-union CHECK prevents mixed actor kinds.
+
+User identity is durable; Area is retired rather than historically deleted. Group is different because B2 permits hard delete after live references disappear. Therefore historical Group rule is a snapshot, not permanent FK.
+
+## 7.5 ApprovalPolicyLiveGroupRef — current configuration only
 
 ```text
-NAMED_USER   → only named_user_id
-GROUP        → only group_id
-ROLE_IN_AREA → only role_code + area_id
+ApprovalPolicyLiveGroupRef
+  policy_id UUID NOT NULL FK ApprovalPolicy(id) RESTRICT
+  policy_version_id UUID NOT NULL FK ApprovalPolicyVersion(id) RESTRICT
+  policy_step_id UUID NOT NULL FK ApprovalPolicyStep(id) RESTRICT
+  group_id UUID NOT NULL FK Group(id) RESTRICT
+
+  PRIMARY KEY(policy_step_id)
 ```
 
-New/current policy configuration rejects disabled NamedUser, deleted Group and retired Area. Role vocabulary comes from B2 static catalog; runtime action still requires `approval.act`.
+Exists only for Group steps in the **current live PolicyVersion**. New version promotion atomically replaces the live refs after validating exact snapshot UUID/name coherence. Group hard delete fails while this live config exists.
 
-### Historical Group-reference lifecycle
+Crucially, ApprovalInstance initialization resolves every Step to concrete Users, so in-flight instances never require Group survival. Once a version stops being current, its live Group refs can be removed without damaging running/history truth.
 
-B2 requires Group hard-delete to fail only while a **live typed reference** exists. Therefore B4 implementation specification must distinguish current policy live references from immutable historical policy/instance evidence. Superseding/deactivating the live version removes its Group FK dependency only after all in-flight instances have concrete participant snapshots; historical interpretation must not require Group row survival.
-
-The exact normalized live-reference table/transition mechanism is implementation-spec work, but a permanent FK from every historical PolicyVersion to Group is **not** acceptable because it would silently convert Group hard-delete into never-delete.
+New policy version rejects disabled NamedUser and retired Area; Group live ref proves Group exists. Runtime actors still need live `approval.act`.
 
 ---
 
@@ -297,9 +281,9 @@ ApprovalInstance
   completed_at TIMESTAMPTZ NULL
 ```
 
-No duplicated document/revision/hash identity. They are derived through Submission.
+No duplicate document/revision/hash identity.
 
-`NoHumanApproval` creates no fake human instance. Release eligibility treats the human gate as satisfied by configuration while still requiring the B3 Submission.
+`NoHumanApproval` creates no fake human instance; it simply satisfies the human Release gate for the existing B3 Submission.
 
 ## 8.2 ApprovalStepInstance
 
@@ -320,11 +304,33 @@ ApprovalStepInstance
   UNIQUE(approval_instance_id, step_order)
 ```
 
-Purpose/completion/reauth are frozen snapshots of the policy step semantics relevant to the instance; the instance does not consult floating current policy after start.
+## 8.3 ApprovalParticipantPool — frozen actor resolution
 
-## 8.3 ApprovalParticipant
+At ApprovalInstance creation, **all** Step rules are resolved to concrete Users using current Organization/AuthZ state:
 
-When a step becomes ACTIVE, its actor rule is resolved against current Organization/AuthZ facts and strict SoD, then concrete Users are frozen:
+```text
+ApprovalParticipantPool
+  step_instance_id UUID NOT NULL FK ApprovalStepInstance(id) RESTRICT
+  user_id UUID NOT NULL FK User(id) RESTRICT
+  resolved_at TIMESTAMPTZ NOT NULL
+
+  PRIMARY KEY(step_instance_id, user_id)
+```
+
+This is the immutable pool snapshot for that attempt.
+
+Consequences:
+
+- later Group membership/RoleAssignment change does not add/remove pool members;
+- old Group can later be deleted without rewriting instance history;
+- policy version and actor pool are deterministic for the attempt;
+- live Authorization still gates actual action.
+
+Pool initialization fails closed if a Step resolves to zero concrete Users before SoD filtering.
+
+## 8.4 ApprovalParticipant — active denominator
+
+At each Step activation, materialize the actionable denominator from its frozen pool after applying current strict SoD exclusions:
 
 ```text
 ApprovalParticipant
@@ -334,18 +340,16 @@ ApprovalParticipant
   assignment_kind TEXT NOT NULL CHECK ORIGINAL|REASSIGNED
   created_at TIMESTAMPTZ NOT NULL
 
-  UNIQUE(step_instance_id, user_id)
+  UNIQUE(step_instance_id,user_id)
 ```
 
-Participant snapshot is historical workflow assignment, **not Authorization authority**.
+A User who ACCEPTED a prior Step is excluded from later active denominator. If filtering leaves zero participants, the Step remains fail-closed/uncompletable and requires qualified reassignment or cancellation; **zero participants never satisfies ANY/ALL**.
 
-At decision time User must still be enabled, still possess `approval.act` under canonical B2 evaluation, be the current participant and satisfy SoD.
+Later offboarding/permission loss does not rewrite participant history. It blocks action live and may require reassignment.
 
-Participant resolution occurs at **step activation**, not for all steps at initial submit. This allows prior accepted Users to be excluded from later steps and avoids freezing future-step membership too early. Once a step activates, its denominator does not drift when Group/Role membership later changes.
+Reassignment may select only a User from the frozen Step pool who is currently enabled, currently `approval.act`-authorized and SoD-valid. If no such User exists, the attempt must be cancelled/returned and resubmitted under a suitable policy; V1 does not expand the actor rule mid-instance.
 
-If an active participant later becomes ineligible/offboarded, the row remains historical assignment but action fails live. `approval.reassign`/cancel handles the blocked workflow; quorum never silently shrinks.
-
-## 8.4 ApprovalDecision
+## 8.5 ApprovalDecision
 
 ```text
 ApprovalDecision
@@ -359,94 +363,94 @@ ApprovalDecision
   fresh_auth_satisfied BOOLEAN NOT NULL
   decided_at TIMESTAMPTZ NOT NULL
 
-  UNIQUE(step_instance_id, actor_user_id)
+  UNIQUE(step_instance_id,actor_user_id)
 ```
 
-Immutable/append-only.
+Immutable.
 
-For `requires_reauthentication=true`, the decision transaction must consume valid Authentication-owned one-shot fresh-auth evidence and persist only the durable product fact that the requirement was satisfied; no password, Keycloak token or provider claim payload is copied into Approval.
+Decision-time gates:
+
+```text
+active instance + active step
+current participant
+User enabled
+live canonical approval.act
+strict SoD
+fresh-auth one-shot consumed when required
+```
+
+Approval stores no password/provider token/claim payload. It persists only the durable product fact that required fresh-auth was satisfied for that decision.
 
 ### ANY
 
-First valid ACCEPT completes the Step; other undecided participants become no-longer-required through Step status, not fabricated decisions.
+First valid ACCEPT completes Step. No fabricated decisions for other participants.
 
 ### ALL
 
-All current concrete participants must ACCEPT.
+Every active participant must ACCEPT. Empty denominator is invalid, not vacuous success.
 
 ### RETURN_FOR_CHANGES
 
-Any authorized current participant may return the attempt. The ApprovalInstance becomes terminal `RETURNED`; the same Revision returns to DRAFT; Submission and all feedback/decisions remain immutable. B3 `working_version` is never reset.
+Any current authorized participant may return the attempt:
 
-## 8.5 Strict SoD
+```text
+instance → RETURNED
+remaining steps → ABORTED
+Revision SUBMITTED → DRAFT
+Submission/feedback/decisions remain immutable
+B3 working_version never resets
+```
+
+## 8.6 Strict SoD
 
 Before ACCEPT:
 
 ```text
-actor_user_id != Submission submitter/creator under frozen SoD rule
-actor_user_id has not ACCEPTED another Step of this ApprovalInstance
+actor != Submission creator/submitter under frozen rule
+actor has not ACCEPTED another Step in this ApprovalInstance
 ```
 
-Returning for changes is not an ACCEPT and does not consume the “one accepted step per user” constraint.
+RETURN_FOR_CHANGES is not ACCEPT and does not consume the “one accepted Step” constraint.
 
-No role, including tenant_owner, bypasses SoD.
+No role bypasses SoD.
 
-## 8.6 Withdraw / cancel / reassign
-
-### Withdraw
-
-Submitter-authorized termination:
+## 8.7 Withdraw / cancel / reassign
 
 ```text
-ACTIVE instance → WITHDRAWN
-Revision SUBMITTED → DRAFT
+withdraw → instance WITHDRAWN → Revision DRAFT
+cancel   → instance CANCELLED → Revision DRAFT
 ```
 
-### Cancel
+Neither sets business Revision `CANCELLED`; that remains Controlled Information `document.cancel_revision`.
 
-`approval.cancel` overseer operation:
-
-```text
-ACTIVE instance → CANCELLED
-Revision SUBMITTED → DRAFT
-```
-
-It does **not** set Revision `CANCELLED`; that is the separate Controlled Information `document.cancel_revision` operation.
-
-### Reassign
-
-Reassignment is an explicit immutable event/relationship change, never an UPDATE that erases the prior assignment:
+Reassignment is immutable evidence:
 
 ```text
 ApprovalReassignment
   id UUID PRIMARY KEY
-  step_instance_id UUID NOT NULL
-  from_participant_id UUID NOT NULL
-  to_participant_id UUID NOT NULL
-  performed_by_user_id UUID NOT NULL
+  step_instance_id UUID NOT NULL FK ApprovalStepInstance(id) RESTRICT
+  from_participant_id UUID NULL FK ApprovalParticipant(id) RESTRICT
+  to_participant_id UUID NOT NULL FK ApprovalParticipant(id) RESTRICT
+  performed_by_user_id UUID NOT NULL FK User(id) RESTRICT
   reason TEXT NOT NULL
   reassigned_at TIMESTAMPTZ NOT NULL
 ```
 
-Replacement must be enabled, `approval.act`-authorized, compatible with the step qualification semantics and SoD-valid. No broad delegation platform V1.
+`from_participant_id` may be NULL only when a Step activation produced zero actionable participants and an overseer activates a qualified pool User. No generic delegation platform.
 
-## 8.7 due_in_days
-
-On step activation:
+## 8.8 due_in_days
 
 ```text
 due_at = activated_at + due_in_days
 ```
 
-Overdue is query/projection/notification information only. It never auto-accepts, auto-returns, changes ANY/ALL, bypasses SoD or mutates Revision state.
+Overdue is projection/notification information only. No automatic transition/quorum change/escalation.
 
 ---
 
-# 9. Review feedback / annotations / suggesting mode
+# 9. Review feedback / suggesting / annotations
 
 ## 9.1 ReviewFeedback
-
-Product-owned detached feedback bound to exact immutable candidate:
 
 ```text
 ReviewFeedback
@@ -466,60 +470,83 @@ ReviewFeedback
 
 Immutable/append-only V1.
 
-Rules:
+Laws:
 
-- every feedback row must bind the same Submission as its ApprovalInstance;
-- COMMENT may be added on REVIEW or APPROVAL steps;
-- SUGGESTION may be added only on REVIEW steps;
-- `anchor_payload` and `suggestion_payload` are bounded/versioned provider-neutral contracts; raw editor-library IDs are not business identity;
-- a provider may visually present tracked insertions/deletions, comments, highlights and redlines, but persisted business feedback is detached from immutable Submission bytes;
-- review feedback is not B3 `EditorialComment`: EditorialComment is mutable-DRAFT collaboration and affects pre-SUBMIT eligibility; ReviewFeedback exists after SUBMIT and explains a human review of that exact attempt.
+- feedback Submission must equal instance Submission;
+- COMMENT allowed in REVIEW or APPROVAL;
+- SUGGESTION allowed only in REVIEW;
+- anchors/proposals use bounded versioned provider-neutral contracts;
+- raw editor-library IDs never become business identity;
+- provider may visually show tracked insertions/deletions, highlights and comments, but submitted bytes never change;
+- B3 EditorialComment remains distinct DRAFT collaboration/submit-gate state.
 
-## 9.2 Return to DRAFT / applying a suggestion
+## 9.2 Applying a suggestion
 
-On `RETURN_FOR_CHANGES`:
+After RETURN_FOR_CHANGES:
 
 ```text
-Submission S7 remains immutable
-ReviewFeedback remains bound to S7
-Revision returns to DRAFT
+S7 remains immutable
+feedback remains on S7
+Revision becomes DRAFT
 ```
 
-The authoring journey may offer “apply suggestion”. Successful application is:
+“Apply suggestion” is:
 
 ```text
-read S7 ReviewFeedback
-→ provider/adapter proposes concrete mutation
-→ ordinary B3 WorkingContent CAS at expected working_version
-→ new Artifact/structured state as needed
+read ReviewFeedback
+→ adapter maps proposal to concrete candidate mutation
+→ B3 WorkingContent CAS(expected_working_version)
+→ Artifact/structured state changes as required
 → working_version++
 ```
 
-No feedback item has direct write authority over WorkingContent.
+Feedback itself has no write authority over WorkingContent.
 
-V1 does not require a second feedback-resolution workflow before resubmit. If a real compliance/UX requirement later demands mandatory APPLIED/DECLINED disposition per suggestion, add that as a typed fact rather than overloading comment state.
-
-## 9.3 In-product viewer requirement
-
-B4 semantic requirement supplied to R10-E:
-
-```text
-Approval/review participant
-→ opens exact Submission inside MetalDocs
-→ may switch among supported in-product representations
-→ may view PDF Rendition when available
-→ never must download and open an external application as the normal supported path
-```
-
-Viewer technology is replaceable. It may use browser-native PDF, PDF.js, an authoring-provider read-only surface, or another adapter later; none becomes Document/Submission identity.
-
-Review mode may show detached suggesting/redline overlays. Approval mode is content-read-only but may still add COMMENT/annotation feedback and return-for-changes.
+V1 does not invent a second feedback-resolution workflow. A future requirement for mandatory APPLIED/DECLINED disposition is a reopen trigger.
 
 ---
 
-# 10. Rendition / representation policy — Controlled Information-owned
+# 10. In-product viewer semantics
 
-## 10.1 DocumentTypeRepresentationPolicy
+B4 supplies the semantic contract; R10-E supplies UI/API/provider implementation.
+
+```text
+AUTHOR DRAFT
+  editable source/provider view
+  WorkingContent OCC
+  B3 EditorialComments
+
+REVIEW SUBMITTED
+  exact immutable Submission
+  read-only source view
+  optional PDF view derived from same Submission
+  COMMENT + SUGGESTION overlays
+  accept / return-for-changes
+
+APPROVAL SUBMITTED
+  exact immutable Submission
+  read-only source view
+  optional PDF view derived from same Submission
+  COMMENT/annotation feedback
+  accept / return-for-changes
+  optional fresh-auth before decision
+
+EFFECTIVE
+  in-product official representation view
+  exact Release-selected rendition when one exists
+  otherwise source/auxiliary viewer through provider-neutral adapter
+  explicit acknowledgement when obligation exists
+```
+
+Normal supported viewing must not require download + external app. Download/export remains separate optional action.
+
+Viewer/editor brands never enter Document/Revision/Submission identity or semantic permissions.
+
+---
+
+# 11. Rendition / representation policy — Controlled Information
+
+## 11.1 DocumentTypeRepresentationPolicy
 
 ```text
 DocumentTypeRepresentationPolicy
@@ -528,53 +555,54 @@ DocumentTypeRepresentationPolicy
   required_format TEXT NULL CHECK closed ContentFormat
 ```
 
-CHECK:
-
 ```text
-SOURCE_ONLY       → required_format IS NULL
-REQUIRE_RENDITION→ required_format IS NOT NULL
+SOURCE_ONLY        → format NULL
+REQUIRE_RENDITION → format NOT NULL
 ```
 
-Policy answers only what must exist for Release. It does not prohibit auxiliary view renditions.
+Policy controls Release requirements only, not viewer capability.
 
-## 10.2 Rendition
+## 11.2 Rendition
 
 ```text
 Rendition
   id UUID PRIMARY KEY
   submission_id UUID NOT NULL FK RevisionSubmission(id) RESTRICT
-  output_artifact_id UUID NOT NULL FK Artifact(id) RESTRICT
+  output_artifact_id UUID NOT NULL UNIQUE FK Artifact(id) RESTRICT
   output_format TEXT NOT NULL
   generator_name TEXT NOT NULL
   generator_version TEXT NULL
   generator_build TEXT NULL
   generated_at TIMESTAMPTZ NOT NULL
+
+  UNIQUE(submission_id, output_format)
 ```
 
-Immutable.
+Immutable semantic success record.
+
+Failed/retried renderer attempts live in R10-D job/effect state and do not create Rendition. First confirmed semantic success for `(Submission,Format)` wins V1. Replacing a confirmed Rendition is not supported silently; a real re-render correction requirement reopens this bounded rule.
 
 Laws:
 
-- exact input identity is Submission, not floating Revision/WorkingContent;
-- output Artifact proves exact derived bytes;
-- generator/build provenance is retained;
-- storage location/provider absent;
-- renderer output never changes Submission digest;
-- renderer retries may create more than one immutable Rendition attempt; only ReleaseRecord selects an official one when policy requires it.
+- exact input = Submission;
+- exact output = Artifact;
+- generator/build provenance retained;
+- provider/storage location absent;
+- renderer output never changes Submission digest.
 
-### PDF viewing without mandatory PDF authority
+### PDF viewer without hidden mandatory PDF
 
-For `SourceOnly`, a PDF Rendition may be generated for viewer convenience before/during review or after Release. It is auxiliary. No PDF availability is a Release blocker.
+`SourceOnly` may generate PDF for viewing. Release does not wait for it.
 
-For `RequireRendition(PDF)`, Release is blocked until a valid PDF Rendition for the exact Submission is selected. After Release, in-product effective-document viewing uses that selected official rendition where applicable.
+`RequireRendition(PDF)` blocks Release until the exact Submission has its semantic PDF Rendition. ReleaseRecord then pins that Rendition as official.
 
-This prevents `SourceOnly` from becoming “must download DOCX externally” while also preventing universal PDF from re-entering as a hidden product invariant.
+Review/approval PDF tab may only display a Rendition whose `submission_id` equals the ApprovalInstance Submission.
 
 ---
 
-# 11. Release
+# 12. Release
 
-## 11.1 ReleasePlan
+## 12.1 ReleasePlan
 
 ```text
 ReleasePlan
@@ -583,31 +611,19 @@ ReleasePlan
   created_at TIMESTAMPTZ NOT NULL
 ```
 
-Immutable for the Submission attempt. Absence of `not_before` = effective as soon as all required gates hold.
+Immutable per Submission. No generic publication-plan engine.
 
-No generic publication-plan engine or cross-document supersession graph is introduced absent frozen requirement.
-
-## 11.2 Release eligibility
-
-For Submission S:
+## 12.2 Gates
 
 ```text
-human_gate(S) =
-  NoHumanApproval
-  OR terminal ACCEPTED ApprovalInstance for S
-
-representation_gate(S) =
-  SourceOnly
-  OR exact required-format Rendition selected for S
-
-time_gate(S) =
-  ReleasePlan absent/not_before NULL
-  OR now >= not_before
+human_gate = NoHumanApproval OR ACCEPTED ApprovalInstance for same Submission
+representation_gate = SourceOnly OR exact required-format Rendition exists
+time_gate = no not_before OR now >= not_before
 ```
 
-Release may proceed iff all three hold and S still belongs to the current SUBMITTED open Revision of its Document.
+Candidate must still be the current SUBMITTED open Revision of its Document.
 
-## 11.3 ReleaseRecord
+## 12.3 ReleaseRecord
 
 ```text
 ReleaseRecord
@@ -620,94 +636,77 @@ ReleaseRecord
 
 Immutable.
 
-`official_rendition_id`:
+Cross-row guard:
 
 ```text
-SourceOnly        → NULL
-RequireRendition  → exact matching Rendition for same Submission
+SourceOnly        → official_rendition_id NULL
+RequireRendition → rendition required, correct format, same Submission
 ```
 
-Release itself is attributed to a system principal in B6 Audit causality; it is not falsely attributed as a human publication action.
+`effective_at` semantics come from `released_at`; no second mutable effective timestamp authority is necessary.
 
-## 11.4 Winning Release transaction
+## 12.4 Winning Release transaction
 
 ```text
 BEGIN
-  lock target Document serialization root
+  lock Document serialization root
   lock/validate candidate Revision + exact Submission
-  prove candidate Revision = SUBMITTED and still current open Revision
-  prove human gate
-  prove representation gate
-  prove time gate
+  prove Revision = SUBMITTED/current open
+  prove human/representation/time gates
+  identify prior EFFECTIVE Revision
 
-  identify prior EFFECTIVE Revision, if any
-  lock it under same Document root
+  load DistributionAudienceGroup rows
+  lock referenced Group rows FOR UPDATE in UUID order
+    // conflicts with concurrent FK membership insert / Group deletion
+  lock existing GroupMembership rows for those Groups FOR UPDATE in deterministic order
+    // conflicts with membership removal/offboarding deletion
+  resolve deduplicated concrete Users visible in this serialized membership cut
 
-  resolve Distribution live Groups to concrete current User membership
-  freeze concrete obligations (see §12)
-
-  insert unique ReleaseRecord(S)
+  insert unique ReleaseRecord(Submission)
   prior EFFECTIVE → SUPERSEDED
   candidate SUBMITTED → EFFECTIVE
-  effective_at = released_at semantic fact supplied by ReleaseRecord
+  insert DistributionObligation rows for resolved Users
 
-  insert DistributionObligation rows for exact Release denominator
-
-  // B6 composes required Audit evidence
-  // R10-D composes post-commit notification/search/timer intents
+  // B6: required Audit composition
+  // R10-D: post-commit notification/search/timer intents
 COMMIT
 ```
 
-Structural B3 partial uniqueness on EFFECTIVE is the final backstop.
+This uses B2’s existing FK/group-deletion semantics rather than a new membership-version subsystem. Concurrent membership change is serialized before or after the Release snapshot; audience truth is never “best effort after commit”.
 
-Atomicity claim:
+No User row lock is acquired after Group/member locks. Offboarding that already owns a User lock and tries to delete a membership serializes on the membership row; Release may therefore logically precede or follow offboarding without introducing a Group→User reverse lock cycle.
 
-```text
-ReleaseRecord
-+ Revision winner
-+ predecessor supersession
-+ Distribution denominator
-```
+Two release retries are harmless: Document serialization + `UNIQUE(ReleaseRecord.submission_id)` + B3 one-EFFECTIVE partial uniqueness yields one winner.
 
-commit together or none do.
+## 12.5 B3 seam closure
 
-Two retries/workers on the same Submission are harmless: unique `ReleaseRecord.submission_id` + Document serialization yields one winner. No second “release generation” key exists.
+Create-from-template and Release on the template Document use the same Document serialization root, preventing stale template origin.
 
-## 11.5 B3 seam closures
-
-### Template-source race
-
-Create-from-template and Release on a Template Document use the same per-Document serialization root. A derived Document cannot commit provenance to a Submission that ceased to be current EFFECTIVE during creation.
-
-### Periodic-review race
-
-PeriodicReviewRecord and Release on the reviewed Document share the same serialization root. Review cannot commit as current-EFFECTIVE evidence after a new Revision wins Release.
+PeriodicReviewRecord and Release on the reviewed Document share the same root, preventing stale review of a Revision that ceased to be current EFFECTIVE.
 
 ---
 
-# 12. Distribution
+# 13. Distribution
 
-## 12.1 Live configuration — Group only where evidenced
+## 13.1 Live audience configuration
 
-Minimum V1 live audience relation:
+Minimum evidenced V1:
 
 ```text
 DistributionAudienceGroup
   document_id UUID NOT NULL FK Document(id) RESTRICT
   group_id UUID NOT NULL FK Group(id) RESTRICT
 
-  PRIMARY KEY(document_id, group_id)
+  PRIMARY KEY(document_id,group_id)
 ```
 
-Current configuration only. Group FK is live and therefore participates in B2 `RESTRICT` hard-delete law.
+Current configuration only; Group FK participates in B2 hard-delete RESTRICT.
 
-No generic polymorphic audience target. Direct User/Area/whole-company audience types are reopen additions only when a real consumer is proven.
+No generic `target_type/target_id`. Direct User/Area/company audience types require real product evidence.
 
-## 12.2 Concrete Release snapshot
+## 13.2 DistributionObligation
 
-At winning Release, all configured Groups are resolved to concrete membership and deduplicated by User.
-
-Historical obligation never carries a live Group FK:
+Created in winning Release transaction:
 
 ```text
 DistributionObligation
@@ -716,30 +715,14 @@ DistributionObligation
   user_id UUID NOT NULL FK User(id) RESTRICT
   created_at TIMESTAMPTZ NOT NULL
 
-  UNIQUE(release_id, user_id)
+  UNIQUE(release_id,user_id)
 ```
 
-This is the historical denominator.
+Concrete historical denominator. No live Group FK.
 
-Later:
+Group rename/delete/membership change never rewrites obligations.
 
-```text
-Group membership add/remove
-Group rename/delete
-User group reassignment
-```
-
-never rewrites existing obligations.
-
-### Membership concurrency
-
-Release must not resolve audience in a post-commit worker. The denominator is frozen in the local Release transaction.
-
-Implementation-spec lock law must coordinate with B2 Group/GroupMembership mutation such that concurrent membership change has a serial order relative to the Release snapshot. Use the existing B2 Group hard-delete/membership coordination seams and deterministic Group/member locking; do not introduce an eventual “best effort audience” projection as authority.
-
-If implementation proof shows the promoted B2 locking contract cannot provide this serial boundary without a cycle, that is a material cross-stage counterexample and narrowly reopens the implicated lock law before coding.
-
-## 12.3 AcknowledgementRecord
+## 13.3 AcknowledgementRecord
 
 ```text
 AcknowledgementRecord
@@ -751,20 +734,17 @@ AcknowledgementRecord
 
 Immutable.
 
-Laws:
-
-- user_id must equal obligation.user_id;
-- caller must be authenticated/eligible and authorized to view the effective Document through normal domain rules;
-- explicit acknowledgement action is required;
-- notification delivered/read, document viewed, PDF viewed, source downloaded, search hit or email-open never creates acknowledgement;
-- no manager/proxy acknowledgement V1;
+- User must equal obligation User;
+- explicit authenticated action only;
+- notification delivery/read, view, PDF view, source download, search hit do not acknowledge;
+- no proxy acknowledgement;
 - no mandatory fresh-auth/e-signature V1.
 
-Distribution reminders/notifications are R10-D effects over these canonical obligation facts; delivery failure never erases obligation.
+Reminder/delivery jobs are R10-D effects. They may fail without changing obligation truth.
 
 ---
 
-# 13. Permission target classification / B2 coherence
+# 14. AuthZ / B2 coherence
 
 Tenant-wide configuration:
 
@@ -772,314 +752,287 @@ Tenant-wide configuration:
 approval_policy.manage
 ```
 
-Area-targeted execution by owning Document.area_id and exact relationship:
+Area-targeted execution through Document.area_id + exact domain relationship:
 
 ```text
 approval.act
 approval.oversee
 approval.reassign
 approval.cancel
-
 distribution.manage
 distribution.oversee
 ```
 
-Whole-company configuration must not be silently downgraded because a referenced Document/Area exists.
+Permission alone never grants arbitrary case access. Participant/ownership/state/SoD predicates still apply.
 
-Participant/action relationship rules supplement permissions; permission alone never lets a user act on an arbitrary ApprovalInstance.
+No provider/mechanism permissions:
 
-No direct `artifact.read`, `pdf.view`, `renderer.retry`, `eigenpal.review`, `viewer.annotate` or provider-specific permissions are introduced. Viewing and review feedback are authorized through Document/Approval relationships.
+```text
+artifact.read
+pdf.view
+renderer.retry
+editor.suggest
+viewer.annotate
+```
+
+Viewing/feedback are authorized through Document/Approval relationships.
 
 ---
 
-# 14. Persistence class × mutation law
+# 15. Persistence class × mutation law
 
 | Family | Owner | Mutation law |
 |---|---|---|
 | DocumentTypeApprovalConfig | Approval | mutable current config |
 | ApprovalPolicy | Approval | stable identity/status/display |
-| ApprovalPolicyVersion | Approval | immutable append-only |
-| ApprovalPolicyStep | Approval | immutable within version |
-| ApprovalInstance | Approval | explicit lifecycle only |
-| ApprovalStepInstance | Approval | explicit lifecycle only |
-| ApprovalParticipant | Approval | append/current assignment semantics; history retained |
-| ApprovalDecision | Approval | immutable append-only |
-| ApprovalReassignment | Approval | immutable append-only |
-| ReviewFeedback | Approval | immutable append-only detached feedback |
-| DocumentTypeRepresentationPolicy | Controlled Information | mutable current config |
-| Rendition | Controlled Information | immutable derived representation |
-| ReleasePlan | Controlled Information | immutable per Submission attempt |
-| ReleaseRecord | Controlled Information | immutable effectivity evidence |
+| ApprovalPolicyVersion | Approval | immutable |
+| ApprovalPolicyStep | Approval | immutable snapshot |
+| ApprovalPolicyLiveGroupRef | Approval | current live config only |
+| ApprovalInstance | Approval | explicit lifecycle |
+| ApprovalStepInstance | Approval | explicit lifecycle |
+| ApprovalParticipantPool | Approval | immutable pool snapshot |
+| ApprovalParticipant | Approval | active assignment history |
+| ApprovalDecision | Approval | immutable |
+| ApprovalReassignment | Approval | immutable |
+| ReviewFeedback | Approval | immutable detached feedback |
+| DocumentTypeRepresentationPolicy | CI | mutable current config |
+| Rendition | CI | immutable semantic success |
+| ReleasePlan | CI | immutable per Submission |
+| ReleaseRecord | CI | immutable effectivity evidence |
 | DistributionAudienceGroup | Distribution | mutable current config |
-| DistributionObligation | Distribution | immutable Release denominator |
-| AcknowledgementRecord | Distribution | immutable one-time explicit acknowledgement |
+| DistributionObligation | Distribution | immutable denominator |
+| AcknowledgementRecord | Distribution | immutable acknowledgement |
 
 ---
 
-# 15. Structural constraint envelope
+# 16. Structural constraints
 
 ```text
 ApprovalPolicy.code                                  UNIQUE
-ApprovalPolicyVersion(policy_id, version_no)         UNIQUE
-ApprovalPolicyStep(policy_version_id, step_order)    UNIQUE
-
+ApprovalPolicyVersion(policy_id,version_no)          UNIQUE
+ApprovalPolicyStep(version_id,step_order)            UNIQUE
+ApprovalPolicyLiveGroupRef.policy_step_id            PK
 ApprovalInstance.submission_id                       UNIQUE
-ApprovalStepInstance(instance_id, step_order)        UNIQUE
+ApprovalStepInstance(instance_id,step_order)         UNIQUE
+ApprovalParticipantPool(step_id,user_id)             PK
 ApprovalParticipant(step_id,user_id)                 UNIQUE
 ApprovalDecision(step_id,actor_user_id)              UNIQUE
-
-ReleasePlan.submission_id                            PK/UNIQUE
+Rendition(submission_id,output_format)                UNIQUE
+ReleasePlan.submission_id                            PK
 ReleaseRecord.submission_id                          UNIQUE
-
 DistributionAudienceGroup(document_id,group_id)      PK
 DistributionObligation(release_id,user_id)           UNIQUE
 AcknowledgementRecord.obligation_id                  UNIQUE
 ```
 
-Cross-row guards must prove:
+Cross-row DB/application guards must prove:
 
-- ApprovalInstance Submission belongs to expected Document/Revision state;
-- ReviewFeedback Submission = instance Submission;
-- ReleaseRecord official Rendition, if present, derives from same Submission;
-- required representation format matches policy;
-- Acknowledgement User = obligation User;
-- live Group/Area refs obey B2 lifecycle eligibility.
+- actor union validity;
+- live Group ref matches current Group snapshot in step;
+- instance Submission/state coherence;
+- feedback Submission = instance Submission;
+- official Rendition = same Submission + required format;
+- acknowledgement User = obligation User;
+- retired Area/disabled NamedUser/new Group live refs rejected where applicable.
 
 No cross-owner CASCADE/SET NULL.
 
 ---
 
-# 16. Transaction contracts
+# 17. Core transaction contracts
 
-## 16.1 SUBMIT → Approval initialization
+## 17.1 SUBMIT + Approval initialization
 
-B3 performs exact Submission freeze. B4 composition in the same product command/transaction where appropriate:
+B3 freezes Submission. B4 composition:
 
 ```text
 read DocumentTypeApprovalConfig
-if NoHumanApproval:
-  no fake human instance
+if NO_HUMAN_APPROVAL:
+  no fake ApprovalInstance
 else:
-  lock/read ACTIVE ApprovalPolicy
-  pin latest committed PolicyVersion
-  insert ApprovalInstance(S)
-  insert StepInstances from exact version
-  activate Step 1
-  resolve concrete participants
-  fail closed if active step has no valid participant after SoD
+  lock ACTIVE ApprovalPolicy/current version
+  validate live actor refs
+  insert ApprovalInstance + all StepInstances
+  resolve every Step actor rule to concrete User pool snapshot
+  fail if any pool is empty
+  activate Step 1 from pool after SoD filter
 ```
 
-No policy version change can affect the running instance.
+Group resolution during initialization must take a deterministic membership cut (Group row + membership rows) so its pool snapshot is real at transaction time; exact lock order must be composed with B3 Document locks in the implementation spec without reverse acquisition.
 
-## 16.2 Review feedback append
+## 17.2 ReviewFeedback append
 
 ```text
-BEGIN
-  prove instance ACTIVE
-  prove step ACTIVE and actor is current participant
-  prove live approval.act + relationship
-  prove feedback Submission = instance Submission
-  if SUGGESTION prove step purpose=REVIEW
-  insert immutable ReviewFeedback
-COMMIT
+prove ACTIVE instance/step/current participant/live approval.act
+prove exact Submission
+if SUGGESTION prove REVIEW purpose
+insert immutable feedback
 ```
 
-Does not touch WorkingContent/Artifact/Submission.
+No WorkingContent mutation.
 
-## 16.3 ACCEPT decision
+## 17.3 ACCEPT
 
 ```text
-BEGIN
-  serialize active StepInstance
-  prove actor participant + enabled + live approval.act
-  prove SoD
-  if requires_reauthentication consume one-shot Authentication evidence
-  insert immutable ACCEPT decision
-  evaluate ANY|ALL
-
-  if step complete:
-    complete current Step
-    if next step:
-      activate next
-      resolve concrete participant snapshot excluding SoD-invalid prior acceptors
-      fail/hold closed if empty; never relax rule
-    else:
-      ApprovalInstance → ACCEPTED
-COMMIT
+serialize active Step
+prove participant + live AuthZ + SoD
+consume fresh-auth if required
+insert immutable ACCEPT
+apply ANY|ALL
+if complete activate next Step from its frozen pool minus SoD-ineligible prior acceptors
+if no next Step → instance ACCEPTED
 ```
 
-Release is evaluated separately/idempotently; Approval transaction never lies that content is EFFECTIVE.
+Approval success never directly asserts EFFECTIVE.
 
-## 16.4 RETURN_FOR_CHANGES
+## 17.4 RETURN_FOR_CHANGES
 
 ```text
-BEGIN
-  serialize instance/step
-  prove actor participant + live authorization
-  insert immutable RETURN_FOR_CHANGES decision
-  instance → RETURNED
-  abort remaining steps
-  Revision SUBMITTED → DRAFT
-  keep Submission/decisions/feedback immutable
-  never reset B3 working_version
-COMMIT
+insert immutable decision
+instance RETURNED
+remaining steps ABORTED
+Revision SUBMITTED → DRAFT
+never reset working_version
 ```
 
-## 16.5 Release
+## 17.5 Release
 
-See §11.4. Distribution denominator is part of the winning local Release transaction.
+See §12.4. Effectivity + predecessor supersession + Distribution denominator are one local commit.
 
-## 16.6 Acknowledgement
+## 17.6 Acknowledgement
 
 ```text
-BEGIN
-  load obligation + Release/Document relation
-  prove caller == obligation User
-  prove current authenticated eligible User
-  prove effective Document remains view-authorized
-  insert AcknowledgementRecord once
-COMMIT
+load obligation/release/document
+prove caller == obligation User
+prove authenticated eligible user + effective-view authorization
+insert once
 ```
 
-Duplicate request is idempotent/already-acknowledged; no second record.
+Duplicate request is idempotent/already-acknowledged.
 
 ---
 
-# 17. Viewer / representation semantics supplied to R10-E
+# 18. B3↔B4 adversarial challenge
 
-R10-E must build one coherent in-product document workspace with mode-specific capabilities rather than provider-branded product pages:
+## F1 — suggesting mode mutates Submission
 
-```text
-AUTHOR DRAFT
-  source/editor view
-  B3 EditorialComments
-  WorkingContent mutation via OCC
+**Closed:** detached ReviewFeedback; applying feedback only in DRAFT via B3 OCC.
 
-REVIEW SUBMITTED
-  immutable exact Submission
-  read-only source view
-  optional PDF view of same Submission
-  COMMENT + SUGGESTION detached review overlays
-  accept / return-for-changes
+## F2 — PDF becomes approval authority
 
-APPROVAL SUBMITTED
-  immutable exact Submission
-  read-only source view
-  optional PDF view of same Submission
-  COMMENT/annotation feedback
-  accept / return-for-changes
-  optional fresh-auth before decision
+**Closed:** decisions bind Submission; Rendition only derives it.
 
-EFFECTIVE
-  in-product official representation view
-  if official_rendition_id exists use that exact rendition
-  otherwise source/approved auxiliary viewer through provider-neutral adapter
-  acknowledgement action when obligation exists
-```
+## F3 — in-product viewer reintroduces universal mandatory PDF
 
-Normal supported viewing must not require “download file → open another desktop application”. Download/export may exist as a separate authorized action, not the viewer implementation.
+**Closed:** viewer capability and official representation policy are separate.
 
----
+## F4 — wrong PDF shown during approval
 
-# 18. Adversarial challenge — B3 ↔ B4
+**Closed:** UI may display only Rendition whose Submission matches the instance exactly.
 
-## F1 — review suggestions mutate frozen Submission
+## F5 — stale pre-SUBMIT writer after return
 
-**Attack:** provider suggesting mode writes tracked changes into submitted bytes.
+**Closed by B3:** SUBMIT consumes working_version N→N+1; return never resets.
 
-**Closed:** ReviewFeedback is detached; Submission is immutable. Applying feedback happens only after return to DRAFT through B3 OCC.
+## F6 — policy edit changes in-flight instance
 
-## F2 — PDF preview accidentally becomes approval authority
+**Closed:** exact immutable PolicyVersion + concrete pools pinned.
 
-**Attack:** approver views PDF and implementation starts binding decision to PDF hash rather than Submission.
+## F7 — Group membership drift changes approval pool
 
-**Closed:** ApprovalDecision binds instance→Submission only. PDF is a Rendition of that same Submission; approval never targets output bytes.
+**Closed:** pools snapshot at instance start.
 
-## F3 — SourceOnly secretly becomes mandatory PDF
+## F8 — Group historical FK makes hard-delete impossible
 
-**Attack:** in-product viewer requirement forces every release to wait for PDF.
+**Closed:** only current live policy config has Group FK; immutable versions/pools survive without Group row.
 
-**Closed:** representation policy and viewer capability are separate. SourceOnly releases without PDF; auxiliary PDF may be created solely for viewing.
+## F9 — same user accepts two steps
 
-## F4 — reviewer sees PDF from another Submission
+**Closed:** next active denominator excludes prior acceptors; decision path rechecks SoD.
 
-**Attack:** floating “latest PDF” is shown during S8 approval while it was rendered from S7/S9.
+## F10 — zero pool/denominator vacuously completes ALL
 
-**Closed:** every viewer Rendition is submission-bound; review/approval UI may show only a rendition whose `submission_id` equals the instance Submission.
+**Closed:** empty pool fails initialization; zero active denominator is explicitly uncompletable.
 
-## F5 — return-to-DRAFT stale write
+## F11 — renderer failure makes Revision falsely EFFECTIVE
 
-**Attack:** pre-SUBMIT writer becomes valid after return.
+**Closed:** Approval complete != Release complete; required Rendition is separate gate.
 
-**Already closed by B3:** SUBMIT consumes N→N+1; B4 return never resets generation.
+## F12 — duplicate renderer jobs create competing semantic PDFs
 
-## F6 — policy changes mid-instance
+**Closed V1:** one semantic Rendition per `(Submission,Format)`; job attempts remain R10-D state.
 
-**Attack:** current policy edit silently alters in-flight steps.
+## F13 — duplicate release
 
-**Closed:** instance pins immutable PolicyVersion.
+**Closed:** Document serialization + unique ReleaseRecord + B3 EFFECTIVE unique backstop.
 
-## F7 — Group membership drift rewrites approval denominator
+## F14 — async Distribution snapshots membership too late
 
-**Attack:** active review step gains/loses participants as Group changes.
+**Closed:** obligations inserted in winning Release transaction.
 
-**Closed:** concrete Users frozen when step activates; live AuthZ still gates action.
+## F15 — membership insert/delete races Release snapshot
 
-## F8 — same approver signs two steps
+**Closed candidate law:** lock Group parent rows FOR UPDATE + current membership rows FOR UPDATE; FK insertion conflicts at Group parent, deletion/offboarding conflicts at membership row. No post-lock User acquisition.
 
-**Attack:** a broad role resolves same User again later.
+## F16 — Group delete destroys history
 
-**Closed:** later participant resolution excludes Users who ACCEPTED earlier Steps; decision path also enforces SoD.
+**Closed:** current config uses RESTRICT; history is concrete Users/snapshots.
 
-## F9 — renderer failure makes document falsely effective
+## F17 — view/download counts as acknowledgement
 
-**Attack:** terminal approval immediately flips EFFECTIVE despite required PDF missing.
+**Closed:** only explicit AcknowledgementRecord.
 
-**Closed:** Approval complete != Release complete. Required Rendition is independent Release gate; prior Revision remains EFFECTIVE.
+## F18 — fresh-auth duplicates passwords/provider state
 
-## F10 — duplicate release retry creates two effective transitions
+**Closed:** Authentication owns evidence/challenge; Approval stores only satisfied decision fact.
 
-**Closed:** per-Document serialization + unique ReleaseRecord(Submission) + B3 one-EFFECTIVE backstop.
+## F19 — B3 EditorialComment and B4 feedback become duplicate authority
 
-## F11 — async Distribution resolves membership too late
-
-**Attack:** Release at 12:00, user leaves Group at 12:01, worker snapshots at 12:05 and historical denominator is false.
-
-**Closed:** concrete obligations are inserted in the winning Release transaction. Notification can be async; obligation cannot.
-
-## F12 — Group delete makes history uninterpretable
-
-**Closed:** live config uses Group FK RESTRICT. Historical approval participants/distribution obligations point to concrete Users, not Group.
-
-## F13 — view/download marks acknowledgement
-
-**Closed:** only explicit AcknowledgementRecord action completes obligation.
-
-## F14 — fresh-auth becomes password duplication
-
-**Closed:** Authentication owns the challenge/provider evidence; Approval records only successful bounded consumption.
-
-## F15 — comment systems duplicate B3 EditorialComment
-
-**Closed:** B3 EditorialComment = DRAFT collaboration/submit gate. B4 ReviewFeedback = immutable feedback on an already-submitted exact attempt. Different owner/time/mutation law.
+**Closed:** DRAFT collaboration vs immutable feedback on submitted attempt; different lifecycle and gate.
 
 ---
 
-# 19. Essential vs accidental complexity / YAGNI
+# 19. Proof obligations
+
+Later implementation proof must show at minimum:
+
+1. policy version edit never mutates in-flight instance;
+2. Group hard delete fails only while live current config ref exists, not due historical version/pool;
+3. pool snapshot cannot drift after instance start;
+4. live AuthZ/offboarding still blocks participant action;
+5. strict SoD under concurrent accepts;
+6. ANY/ALL cannot complete from empty active denominator;
+7. return-to-DRAFT preserves exact old Submission and B3 OCC generation advance;
+8. feedback cannot mutate Submission/WorkingContent while SUBMITTED;
+9. PDF shown in review is exact-Submission-derived;
+10. SourceOnly releases without PDF;
+11. RequireRendition blocks until exact format Rendition exists;
+12. only one semantic Rendition per Submission/format;
+13. Release has one winner and one EFFECTIVE Revision;
+14. predecessor supersession + effectivity + obligations are atomic;
+15. concurrent GroupMembership add/remove has deterministic serial order versus Release snapshot;
+16. later membership changes do not alter obligations;
+17. acknowledgement cannot be produced by view/download/notification;
+18. in-product viewer path exists for supported effective/review content without requiring external application;
+19. provider/editor/viewer identifiers never become business identity or semantic permission.
+
+---
+
+# 20. Essential vs accidental complexity / YAGNI
 
 ## Essential
 
 - immutable policy versions;
-- ordered specialized steps;
-- concrete participant snapshots;
+- live Group ref + historical User pool separation;
+- sequential Steps/ANY/ALL;
 - strict SoD;
-- exact-Submission decisions;
-- detached review comments/suggestions;
-- optional fresh-auth consumption;
-- immutable rendition provenance;
+- exact Submission decisions;
+- detached comments/suggestions;
+- bounded fresh-auth consumption;
+- immutable semantic Rendition;
 - automatic one-winner Release;
-- exact official-rendition selection when required;
-- concrete Release-time distribution obligations;
+- exact official representation selection;
+- Release-time concrete obligations;
 - immutable explicit acknowledgement;
 - in-product viewer successor contract.
 
@@ -1087,30 +1040,28 @@ Normal supported viewing must not require “download file → open another desk
 
 - BPMN/generic workflow engine;
 - parallel DAG stages;
-- M-of-N quorum;
-- generic delegation platform;
+- M-of-N;
+- generic delegation;
 - auto-escalation workflow;
-- publish button/capability;
-- approval of PDF/renderer bytes;
+- publish button;
+- approval of renderer bytes;
 - universal mandatory PDF;
-- provider/editor-specific business permissions;
+- editor/viewer-specific business permissions;
 - mutable review of submitted bytes;
-- generic annotation platform covering every format up front;
-- post-commit eventual audience as historical authority;
-- read-event analytics as acknowledgement truth;
+- generic annotation platform for every format;
+- eventual post-release audience as authority;
+- read analytics as acknowledgement;
 - LMS/training platform;
-- e-signature for acknowledgement without requirement;
+- e-signature acknowledgement without requirement;
 - duplicate release-generation identity.
 
 ---
 
-# 20. Global Maximum decision — candidate only
+# 21. Candidate decision
 
-Recommended Method outcome:
+> **RESTRUCTURE NOW** — B4 should be a small specialized Approval kernel over exact RevisionSubmission, with frozen concrete actor pools, detached provider-neutral review feedback, immutable derived Rendition, CI-owned automatic Release as sole effectivity authority, and concrete Distribution obligations frozen in the winning Release transaction. R10-E must expose this through an in-product viewer/review workspace without making the current editor/viewer provider part of product identity.
 
-> **RESTRUCTURE NOW** — converge B4 on a small specialized Approval kernel over exact RevisionSubmission, detached provider-neutral review feedback, immutable derived Renditions, CI-owned automatic Release as the sole effectivity transition, and concrete-user Distribution obligations frozen in that Release transaction. R10-E must expose those semantics through an in-product viewer/review workspace without making current editor/viewer technology part of product identity.
-
-Candidate family set:
+Candidate families:
 
 ```text
 Approval
@@ -1118,8 +1069,10 @@ Approval
   ApprovalPolicy
   ApprovalPolicyVersion
   ApprovalPolicyStep
+  ApprovalPolicyLiveGroupRef
   ApprovalInstance
   ApprovalStepInstance
+  ApprovalParticipantPool
   ApprovalParticipant
   ApprovalDecision
   ApprovalReassignment
@@ -1145,26 +1098,24 @@ implementation = BLOCKED
 next = R10-B5 integrated candidate
 ```
 
-No Fable/microreview is requested here. Whole-R10 independent review remains the default gate.
+No Fable/microreview now. Whole-R10 independent cold review remains the default gate.
 
 ---
 
-# 21. Reopen triggers
+# 22. Reopen triggers
 
-Reopen B4 only on material evidence such as:
+- real parallel approval stages;
+- legitimate M-of-N;
+- actor qualification beyond NamedUser/Group/RoleInArea;
+- real delegation domain;
+- compliance requires Approval to target a rendition/signature package rather than Submission;
+- official multi-rendition package;
+- more complex effectivity plan than optional `not_before`;
+- proven direct User/Area/company Distribution config;
+- acknowledgement e-signature/fresh-auth/training semantics;
+- real second content format requires richer provider-neutral suggestion patch model;
+- Group/membership lock proof reveals a wait-for cycle or false snapshot under B1/B2 laws;
+- B3 exact Submission proves insufficient as shared identity;
+- viewer/provider cannot serve exact Submission/rendition without leaking provider identity.
 
-- real parallel/concurrent approval stages required;
-- legitimate M-of-N quorum;
-- actor qualification cannot be represented by NamedUser/Group/RoleInArea;
-- real delegated authority requires a durable delegation domain;
-- a compliance requirement makes Approval target a rendition/signature package rather than Submission;
-- official multi-rendition package becomes mandatory;
-- explicit effective-date semantics require more than one optional `not_before` gate;
-- Distribution proves direct User/Area/company audience types are first-class V1 configuration;
-- acknowledgement needs e-signature/fresh-auth/training semantics;
-- review suggestions require a richer provider-neutral patch model with a real second format consumer;
-- B2 Group/membership lock law cannot serialize release-time audience snapshot without a material deadlock/invariant failure;
-- B3 exact-Submission identity proves insufficient for Release correlation;
-- viewer/provider cannot expose exact Submission/rendition safely without leaking provider identity into product contracts.
-
-Implementation inconvenience, existing EigenPal/Gotenberg/MinIO shape or old approval tables are not reopen triggers.
+Implementation inconvenience or current EigenPal/Gotenberg/MinIO/legacy schema shape is not a reopen trigger.
