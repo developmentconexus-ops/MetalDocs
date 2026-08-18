@@ -1,6 +1,6 @@
 # R10 Technical Architecture — Active Stage Router
 
-> **Status:** ACTIVE — **T1 + T2 + T3 + T4 CLOSED / OPERATOR-RATIFIED; DECISION REGISTRY CURRENT; T5 ACTIVE / RENDITION-VIEWER SUBGATE; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1 + T2 + T3 + T4 CLOSED / OPERATOR-RATIFIED; DECISION REGISTRY CURRENT; T5 ACTIVE / CORRECTED ADJUDICATION NEXT; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-18  
 > **Revision convention:** `REV000` initial issuance / `REV001` first revision  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
@@ -23,8 +23,8 @@ This file is the technical-stage router. Detailed accepted semantics live in ded
 10. `wiki/architecture/r10-t4-exact-content-storage-integrity-restore.md`
 11. `wiki/architecture/rebaseline-decision-registry.md`
 12. active T-stage staging candidate, when present
-13. active material subgate analysis, when present
-14. active operator-adjudication/summary gate, when present
+13. accepted material subgate analysis, when present
+14. corrected adjudication packet / operator-adjudication gate, when present
 
 Historical R3–R9.5 / old R10 / current implementation/schema/OpenAPI are evidence only unless current authority or the Decision Registry preserves a decision.
 
@@ -76,7 +76,7 @@ T2 — Governance, Effectivity & Lifecycle Transactions        CLOSED / OPERATOR
 T3 — Authorization & Audit Enforcement                       CLOSED / OPERATOR-RATIFIED
 T4 — Exact Content, Storage Integrity & Restore              CLOSED / OPERATOR-RATIFIED
 Decision Reconciliation Registry                             CURRENT / OPERATOR-RATIFIED
-T5 — Durable Async, Search & External Effects                ACTIVE / RENDITION-VIEWER SUBGATE
+T5 — Durable Async, Search & External Effects                ACTIVE / CORRECTED ADJUDICATION NEXT
 T6 — Canonical API / Frontend Journeys                       NOT OPEN
 T7 — Historical Migration & Cutover                          NOT OPEN
 
@@ -153,13 +153,17 @@ Later stages may not rediscover settled decisions from zero and may not inherit 
 
 ## 8. T5 — Durable Async, Search & External Effects — ACTIVE
 
-Parent candidate:
+Parent analysis:
 
 `docs/superpowers/analysis/2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md`
 
-Active material subgate:
+Accepted rendition/viewer subgate:
 
 `docs/superpowers/analysis/2026-08-18-t5-rendition-viewer-strategy-evaluation.md`
+
+Current corrected adjudication surface:
+
+`docs/superpowers/analysis/2026-08-18-r10-t5-corrected-adjudication-packet.md`
 
 Official T5 REOPEN set:
 
@@ -186,48 +190,64 @@ T4 GC_PENDING is technical eligibility
 current River/custom outbox implementations are evidence only
 ```
 
-### Rendition / Viewer subgate
+### Accepted Rendition / Viewer correction — RV-1→RV-6
 
-The operator challenged the implicit assumption that viewing DOCX requires a persisted OfficialRendition PDF. Reference-product research shows three distinct patterns: direct/native Office viewing, rebuildable/on-demand viewable renditions, and persisted governed renditions.
-
-The current recommendation is the hybrid Global Maximum:
+The operator accepted the hybrid Global Maximum:
 
 ```text
 PDF source
   → direct PDF viewer by default
-  → no duplicate generated PDF without named post-processing/business need
+  → no duplicate generated PDF without named need
 
 DOCX + SourceOnly
   → direct read-only DOCX viewer
   → no persistent governed PDF merely for viewing
 
 DOCX + RequireOfficialRendition(PDF)
-  → durable server-side PDF render from exact Submission
+  → conditional durable server-side render from exact Submission
   → T4 admission
   → immutable OfficialRendition
   → Release gate
 ```
 
-**Preview/viewing PDF and OfficialRendition PDF are different meanings.** A future/view-only PDF cache may be rebuildable mechanism; it must not become a Release gate or semantic truth merely because it is convenient for display.
+Binding distinctions:
 
-Renderer product selection remains empirical through a representative DOCX fidelity corpus; architecture does not yet freeze Gotenberg, ONLYOFFICE or another converter.
+```text
+preview/viewing PDF != OfficialRendition
+SourceOnly viewing != durable rendition job
+OfficialRendition render = conditional on frozen representation policy
+```
+
+Renderer product selection remains empirical through a representative DOCX fidelity corpus. EigenPal is the first SourceOnly viewer candidate; ONLYOFFICE is the stronger viewer fallback; Gotenberg/LibreOffice versus ONLYOFFICE conversion remains a renderer conformance decision.
+
+### Corrected T5 durable-effect census
+
+```text
+always-required durable job:
+  search_refresh(document_id)
+
+conditional durable job:
+  official_rendition_render(submission_id, required_format)
+  only when frozen representation policy requires OfficialRendition
+
+periodic reconciliation:
+  managed-content GC over GC_PENDING
+```
 
 ### Current gate
 
 ```text
-T5 parent candidate
-→ rendition/viewer subgate RV-1→RV-6 OPERATOR DECISION NEXT
-→ refine T5-D/T5-E + durable-job census
-→ adjudicate T5-A→T5-P as corrected
+RV-1→RV-6                         ACCEPTED
+→ corrected T5-A→T5-P operator adjudication NEXT
 → platform-facing T5 summary
 → explicit operator summary ratification
 → promote/close T5
 → update registry
-→ remove staging
+→ remove completed staging
 → open T6
 ```
 
-**Do not adjudicate T5-A→T5-P as a whole before RV-1→RV-6 closes.**
+**T6 remains NOT OPEN.**
 
 T5 does not own public API/frontend journeys or Historical Migration execution.
 
