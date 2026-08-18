@@ -1,6 +1,6 @@
 # R10 Technical Architecture — Rebaselined Active Stage Authority
 
-> **Status:** ACTIVE — **T1 TECHNICAL DECISIONS ADJUDICATED / OPERATOR PLATFORM-SUMMARY RATIFICATION NEXT / IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1 CLOSED / OPERATOR-RATIFIED; T2 GOVERNANCE + EFFECTIVITY TRANSACTIONS OPEN; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-18  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
@@ -10,13 +10,11 @@
 > **Ownership authority:** `wiki/architecture/launch-v1-ownership-topology.md`  
 > **Implementation gate:** **CLOSED — design/documentation only**
 
-This page is the active technical-stage routing authority after the operator-approved Whole-Product rebaseline. It **supersedes the former R10-A/B1–B6/C–F stage order as the active technical descent**. Git history preserves the old page; the old B1–B6/C artifacts remain evidence only where current authorities do not supersede them.
-
-The rebaseline exists because the old stage structure encoded the superseded 8+3 ownership model (`Artifact`, separate `Approval`, `Distribution`, `Documentary Context`, `Records Governance`, generic `Interchange`). Continuing that order and subtracting features would be a Local Maximum.
+This page is the active technical-stage authority after the Whole-Product rebaseline. It supersedes the former R10-A/B1–B6/C–F stage order as active routing. Old R10 artifacts remain evidence only where the current Product Contract, GCR, 4+1 ownership topology and accepted T-stage conclusions preserve them.
 
 ---
 
-## 1. Binding technical objective
+## 1. Binding objective and evolution law
 
 Derive the **smallest sustainable Launch V1 technical architecture** from:
 
@@ -37,11 +35,11 @@ Launch correctness
 + named-future compatibility
 ```
 
-Binding evolution law:
+Binding law:
 
 > **Defer the capability; preserve the evolution seam. Prepare the seam, not the dormant implementation.**
 
-Known future direction is a counterexample set, not permission to prebuild modules/tables/frameworks.
+Known future direction is a counterexample set, not permission to prebuild modules, tables, jobs, permissions or generic frameworks.
 
 ---
 
@@ -70,22 +68,20 @@ Historical Migration execution machinery
 backup/restore transport/readiness
 ```
 
-Historical `Artifact`, `Distribution`, `Documentary Context`, `Records Governance`, generic `Interchange`, and separate `Approval` ownership must not be resurrected by technical convenience.
+Historical `Artifact`, separate `Approval`, `Distribution`, `Documentary Context`, `Records Governance` and generic `Interchange` must not be resurrected by technical convenience.
 
 ---
 
 # 3. Rebaselined R10 decomposition
 
-The operator approved the following technical descent on 2026-08-18.
-
 ```text
-T1 — Semantic State & Invariants
-T2 — Governance, Effectivity & Lifecycle Transactions
-T3 — Authorization & Audit Enforcement
-T4 — Exact Content, Storage Integrity & Restore
-T5 — Durable Async, Search & External Effects
-T6 — Canonical API / Frontend Journeys
-T7 — Historical Migration & Cutover
+T1 — Semantic State & Invariants                              CLOSED / OPERATOR-RATIFIED
+T2 — Governance, Effectivity & Lifecycle Transactions        ACTIVE
+T3 — Authorization & Audit Enforcement                       NOT OPEN
+T4 — Exact Content, Storage Integrity & Restore              NOT OPEN
+T5 — Durable Async, Search & External Effects                NOT OPEN
+T6 — Canonical API / Frontend Journeys                       NOT OPEN
+T7 — Historical Migration & Cutover                          NOT OPEN
 
 → Integrated Whole-R10 Global Coherence Review
 → cold independent review
@@ -94,13 +90,11 @@ T7 — Historical Migration & Cutover
 → code
 ```
 
-The sequence is by **failure class and proof dependency**, not by old module/context boundaries.
+The sequence is by failure class and proof dependency, not by old module/context boundaries.
 
 ## 3.0 Mandatory T-stage closure protocol — OPERATOR-APPROVED
 
-A technical adjudication is not enough to move to the next T-stage. Before `Tn` closes, the operator must receive and explicitly approve a **platform-facing summary** explaining what the stage decided and how those decisions will behave in MetalDocs.
-
-Binding sequence for every T-stage:
+For every `Tn`:
 
 ```text
 Tn candidate/design
@@ -108,302 +102,260 @@ Tn candidate/design
 → platform-facing summary
 → explicit operator summary ratification
 → promote durable Tn conclusions
-→ remove completed staging per documentation governance
+→ remove completed staging
 → only then open Tn+1
 ```
 
-The summary must explain, proportionally:
-
-1. what problem the stage solved;
-2. what was decided;
-3. how MetalDocs will behave because of those decisions;
-4. concrete user/admin/governance behavior preserved or changed;
-5. what remains deliberately undecided or deferred;
-6. how the named Launch+/Future horizon remains attachable;
-7. material Unknowns/reopen triggers.
-
-Do not convert this into ceremonial duplication. The summary is the operator comprehension/ratification gate for material technical architecture.
+The platform summary must explain what problem the stage solved, what was decided, how MetalDocs behaves because of it, what remains deferred, how the named future horizon remains attachable, and material reopen triggers. Technical A/B/C approval alone never opens the next stage.
 
 ---
 
-## 3.1 T1 — Semantic State & Invariants — SUMMARY RATIFICATION PENDING
+# 4. T1 — Semantic State & Invariants — CLOSED / RATIFIED
 
-Question:
+The operator accepted T1-A→T1-I, accepted T1-J Option 1, then explicitly ratified the platform-facing T1 summary on 2026-08-18.
 
-> What enduring semantic facts and mutation laws must exist so every Launch journey has one authority and future capabilities can attach without rewriting core history?
+## 4.1 Accepted semantic family set
 
-T1 owns design of:
+### Authentication
 
 ```text
-minimum semantic fact families per 4+1 owner
-stable identities versus mutable current truth versus immutable evidence
-Document/Revision/WorkingContent/Submission separation
-bounded shared governance semantics for Submission + Obsolescence
-Release/effectivity causal facts
+ProviderSubjectBinding
+ApplicationSession
+```
+
+Authentication provider subject identity, organizational User identity and product Authorization remain distinct. Fresh-auth/e-signature state is absent until a named T2/T3 consumer proves it.
+
+### Organization
+
+```text
+Company
+User
+UserProfile
+Area
+Group
+GroupMembership
+```
+
+`User` is stable historical participant identity; human-readable profile enrichment is separately erasable. Area and Group remain small flat organizational concepts. No Area hierarchy, dynamic/nested groups, provider-group mirroring or generic User↔Area membership exists without a consumer.
+
+### Authorization
+
+```text
+product Role vocabulary
+product Permission vocabulary
+RoleAssignment
+```
+
+Role/Permission semantics are product-owned, not customer-defined platform data. The exact Launch catalog/bundles/check sites are T3. RoleAssignment remains current grant truth over User|Group and Company|Area scopes. No role is a domain-governance bypass.
+
+### Controlled Documents
+
+```text
+DocumentType + numbering semantics
+Document + Area/responsibility + Template role
+DocumentOrigin
+Revision
+WorkingContent
+Submission
+current GovernanceRoute configuration
+bounded GovernanceAttempt over SUBMISSION | OBSOLESCENCE
+governance Step / Decision evidence
+SubmissionFeedback
+RevisionCancellation
+Release
+OfficialRendition only when required
+Obsolescence request/result semantics
 native/imported provenance seam
-Audit semantic minimum
-explicit deletion of old uncontracted semantic families
 ```
 
-T1 explicitly does **not** decide SQL/table/package shape, locks, exact participant rules, concrete permissions, storage handles, async topology, API/UI or migration execution.
-
-Active staging:
-
-- `docs/superpowers/analysis/2026-08-18-r10-t1-semantic-state-invariants-candidate.md`
-- `docs/superpowers/analysis/2026-08-18-r10-t1-operator-adjudication.md`
-
-Operator adjudication already accepted `T1-A→T1-I` and `T1-J Option 1`:
+### Audit
 
 ```text
-NoHumanApproval on the Document Type
-→ governed obsolescence may have zero human Step
-→ but still requires authorized initiation, mandatory reason, eligibility/invariant checks,
-   immutable domain evidence and required Audit when T3 establishes the Audit census
-→ no fake System approver
+AuditEvent
 ```
 
-Current gate:
+Audit is append-only supporting semantic evidence, never current domain state. Deployment-wide `AuditChainHead`/global hash-chain serialization remains deferred absent a concrete Launch assurance requirement.
+
+## 4.2 T1 lifecycle/content laws
 
 ```text
-T1 technical decisions ACCEPTED
-→ operator-facing T1 platform summary
-→ explicit summary ratification
-→ only then T1 promotion/closure and T2 opening
+Document != Revision != WorkingContent != Submission
+Revision ordinals never reuse
+WorkingContent = sole mutable DRAFT authority
+Submission = immutable exact governed attempt
+same-Revision resubmit = new Submission
+Template = ordinary governed Document role
+GovernanceAttempt is bounded to SUBMISSION|OBSOLESCENCE; not generic BPM
+feedback/decisions never mutate Submission
+withdraw governance attempt != cancel Revision
+Release = sole normal native effectivity authority
+replacement Release = predecessor SUPERSEDED + successor EFFECTIVE as one business transition
+at most one EFFECTIVE Revision per Document
+required OfficialRendition binds exact Submission
+SourceOnly preview != semantic Rendition
+obsolescence without replacement is explicit governed history
+Search never establishes effectivity/access
+storage/provider identity never becomes semantic content identity
+native history != imported history
+future contexts attach by reference rather than duplicate core authority
 ```
+
+## 4.3 T1-J — NoHumanApproval obsolescence
+
+Accepted:
+
+> If the Document Type is configured `NoHumanApproval`, governed obsolescence may complete with zero human Step after authorized initiation, mandatory reason and all eligibility/invariant checks.
+
+This is **not** a raw status toggle and creates no fake System approver. Domain evidence remains mandatory; T3 later establishes required Audit.
+
+## 4.4 Explicitly absent from Launch T1
+
+```text
+standalone Artifact semantic owner
+DocumentTypeCategory taxonomy
+generic Dictionary/System Value platform
+TemplateSpec platform
+DRAFT EditorialComment platform
+Periodic Review state
+Distribution / acknowledgement state
+Dossier / Evidence / Records Governance
+generic Interchange / governed export / repository receipt state
+global AuditChainHead/hash chain
+business WorkingSnapshot history
+EditorSession as business authority
+```
+
+These remain Launch+/Future or mechanism unless a later named Launch consumer proves otherwise.
+
+## 4.5 T1 future-evolution proof
+
+Stable attachment anchors are intentionally preserved:
+
+```text
+Distribution         → Release + effective Revision + User/Group
+Periodic Review      → Document + current EFFECTIVE Revision
+Dossier              → stable Document identity
+Evidence             → Organization/AuthZ + future shared exact-content mechanism
+Records              → stable governed identities + immutable lifecycle history
+Governed Export      → stable semantic relationships + exact-content facts
+Repository connector → target-owner seams + exact-content snapshots
+Training/LMS         → released/effective document + future Distribution
+Change Control       → stable Document/Revision lifecycle seams
+pooled tenancy       → stable Company identity + reopenable substrate
+CRDT                 → replaceable WorkingContent concurrency mechanism
+```
+
+T1 is now durable architecture authority. Its completed staging packets are removed from the live tree; Git history is the archive.
 
 ---
 
-## 3.2 T2 — Governance, Effectivity & Lifecycle Transactions — NOT OPEN
+# 5. T2 — Governance, Effectivity & Lifecycle Transactions — ACTIVE
 
-Begins only after T1 platform-summary ratification and durable T1 promotion.
+T2 asks:
 
-Must prove all named lifecycle transitions, including:
+> **How do the accepted T1 facts change together under concurrency so every Launch journey is atomic, exact and unambiguous without creating generic workflow machinery?**
+
+T2 must prove:
 
 ```text
-create / allocate code
-DRAFT mutation + autosave concurrency
-SUBMIT
-ACCEPT
-RETURN_FOR_CHANGES
-RESUBMIT
-WITHDRAW Submission attempt
-CANCEL Revision
+create / code allocation / REV001 DRAFT
+blank and template-based creation
+DRAFT WorkingContent mutation/autosave concurrency
+SUBMIT exact generation
+NoHumanApproval release behavior
+sequential human governance
+ACCEPT / RETURN_FOR_CHANGES
+resubmit
+withdraw Submission attempt
+cancel open Revision
 first Release
 replacement Release / supersession
-OBSOLETE without replacement
+required-Rendition release gate
+governed obsolescence without replacement
 ```
 
 T2 owns:
 
 ```text
-transaction boundaries
+local transaction boundaries
 serialization roots
-OCC/concurrency correctness
+OCC/concurrency law
 state-transition eligibility
 smallest participant-selection semantics
-quorum only if required
-SoD only if required
-fresh-auth only if required
-attempt termination semantics
+route snapshot timing
+attempt activation/termination semantics
 one-EFFECTIVE atomicity
-obsolescence governance behavior
+obsolescence mutual-exclusion behavior
+Release gate composition
 ```
 
-T2 must not create a generic BPM engine.
+T2 must not decide the exact permission catalog/Audit census (T3), storage locator/integrity implementation (T4), async worker topology (T5), API/frontend routes (T6), or historical migration execution (T7).
+
+Active staging packet:
+
+`docs/superpowers/analysis/2026-08-18-r10-t2-governance-effectivity-transactions-candidate.md`
+
+Current gate:
+
+```text
+T2 candidate
+→ operator adjudication of material T2 decisions
+→ T2 platform-facing summary
+→ explicit summary ratification
+→ T2 promotion/closure
+→ T3
+```
 
 ---
 
-## 3.3 T3 — Authorization & Audit Enforcement — NOT OPEN
+# 6. T3–T7 routing
 
-Begins after T2 proves the concrete Launch actions/relationships.
-
-Derivation:
+## T3 — Authorization & Audit Enforcement — NOT OPEN
 
 ```text
-personas
-→ named operations
-→ resources
-→ scopes
-→ owning-domain relationship predicates
-→ permissions
-→ role bundles
-→ check sites
+personas → operations → resources → scopes → domain predicates
+→ permissions → role bundles → check sites
 ```
 
-T3 regenerates the Launch catalog from zero; the old exact 5×43 catalog is historical evidence only.
+Regenerates the Launch AuthZ catalog from zero and establishes the same-local-commit Audit census/minimum facts. Includes least-privilege Auditor/Governance Viewer. No role bypasses domain governance.
 
-Required persona coverage includes a least-privilege:
+## T4 — Exact Content, Storage Integrity & Restore — NOT OPEN
 
-```text
-Auditor / Governance Viewer
-```
+Proves exact-content storage/integrity/restore without restoring Artifact semantic ownership: immutable governed bytes, mutable DRAFT recovery, hash/size/format validation, safe untrusted-content admission, no overwrite, provider outage truth, temporary cleanup, backup/restore and fail-closed restore.
 
-T3 also establishes:
+## T5 — Durable Async, Search & External Effects — NOT OPEN
 
-```text
-which governed/security operations require same-local-commit Audit
-minimum Audit facts per operation
-current-grant versus historical evidence boundary
-offboarding access termination and truthful attribution
-```
+Designs only genuinely required durable intents/workers/retries, renderer execution, Search projection/rebuild/freshness, notifications and external effects. Worker/Search/provider state never becomes domain truth.
 
-No role is a domain-governance bypass.
+## T6 — Canonical API / Frontend Journeys — NOT OPEN
+
+Proves admin/create/edit/submit/govern/return/withdraw/cancel/release/revise/obsolete/search/read/download/history/audit journeys. Search hit always re-resolves canonical state + Authorization + exact intended content before serving.
+
+## T7 — Historical Migration & Cutover — NOT OPEN
+
+Proves truthful native/imported handling, unknown preservation, ordinal/content provenance, idempotency/reconciliation, atomic semantic import units, cutover/readiness/rollback and legacy retirement. It may not recreate generic Interchange product scope.
 
 ---
 
-## 3.4 T4 — Exact Content, Storage Integrity & Restore — NOT OPEN
-
-T4 answers the physical-content problem **without restoring Artifact semantic ownership**.
-
-Must prove:
+# 7. Old R10 evidence classification
 
 ```text
-semantic exact-content identity != provider/storage identity
-WorkingContent mutable bytes remain recoverable
-Submission/Rendition/imported exact content remains immutable
-provider PUT success != semantic success
-hash/size/format validation
-safe untrusted-content admission / malware gate where required
-no overwrite of governed bytes
-temporary DRAFT/staging cleanup
-provider outage behavior
-backup/restore completeness
-restore fail-closed on missing/corrupt required content
+former R10-A 8+3                  → SUPERSEDED FOR LAUNCH
+former R10-B1                     → evidence for surviving substrate/transaction laws
+former R10-B2                     → AuthN/Org/AuthZ evidence; exact catalog reopened
+former R10-B3                     → core semantic evidence; Artifact/adjunct shape rejected
+former R10-B4                     → one Step + Release evidence; workflow richness/Distribution reopened
+former R10-B5                     → Future Dossier/Evidence/Records evidence only
+former R10-B6                     → Audit/migration evidence; Interchange/hash-chain scope reopened
+former R10-C                      → paused physical-safety evidence only; Artifact-owned solution rejected
+former R10-D/E/F                   → old stage labels superseded by T5/T6/T7
 ```
 
-A shared storage/integrity mechanism may serve multiple semantic owners now or later without acquiring their meaning.
-
-Future-seam counterexamples include Evidence, Records/WORM, repository connectors and CRDT DRAFT editing.
+Do not repair old candidate files into the target. Extract only surviving evidence into the active T-stage.
 
 ---
 
-## 3.5 T5 — Durable Async, Search & External Effects — NOT OPEN
-
-T5 owns mechanism semantics only where asynchronous/external execution is truly required:
-
-```text
-durable intents/outbox when necessary
-claim/lease/retry/dead-letter behavior
-renderer/provider execution
-notifications when required
-Search projection + rebuild
-projection freshness/reconciliation
-external effect receipts where a Launch consumer exists
-```
-
-Binding laws:
-
-```text
-worker state != business state
-Search state != effectivity
-Search state != Authorization
-provider receipt != domain truth unless owning semantic operation explicitly consumes it
-```
-
-Named future seams: Distribution, Periodic Review scheduling and repository connectors must be addable without entering core Release authority.
-
----
-
-## 3.6 T6 — Canonical API / Frontend Journeys — NOT OPEN
-
-T6 proves the externally observable Launch journeys against the accepted semantic/transactional model:
-
-```text
-admin configuration
-create blank/template-based
-edit/autosave
-submit
-govern/return/resubmit
-withdraw
-cancel Revision
-release/revise
-obsolete
-search
-read/download
-history/audit
-offboarding consequences
-```
-
-Critical serving law:
-
-```text
-Search hit
-→ canonical resource/state re-resolution
-→ canonical Authorization
-→ exact intended content resolution
-→ serve
-```
-
-A stale projection must never serve SUPERSEDED/OBSOLETE content as current official truth.
-
----
-
-## 3.7 T7 — Historical Migration & Cutover — NOT OPEN
-
-Migration is designed last because it must write into the settled target rather than reshape the target around legacy convenience.
-
-T7 must prove:
-
-```text
-native vs imported distinction
-unknown remains unknown
-no fabricated native Submission/decision/Release/User action
-reliable historical ordinal preservation
-exact imported content where available
-truthful handling of incomplete old history
-idempotency/reconciliation
-atomic semantic import unit
-cutover/readiness/rollback strategy
-legacy mapping/deletion only after proof
-```
-
-T7 may introduce the smallest target-owned imported-history fact shapes required by actual source evidence. It must not recreate generic `Interchange`, Governed Export or repository-sync product scope.
-
----
-
-# 4. Named-future compatibility proof
-
-Every T1–T7 candidate contains an explicit future-horizon attack.
-
-Required examples:
-
-```text
-Distribution         → can attach to Release + User/Group without becoming effectivity/AuthZ authority
-Periodic Review      → can attach to Document + exact current EFFECTIVE Revision
-Dossier              → can reference stable Document without owning content/access
-Evidence             → can gain independent lifecycle using shared exact-content mechanism
-Records              → can attach policy/hold/disposition to stable governed identities/history
-Governed Export      → can consume stable identities/content without becoming source authority
-Repository connector → can import/publish through target-owner seams without provider IDs becoming product IDs
-Training/LMS         → can consume released/distributed content without becoming effectivity
-Change Control       → can orchestrate/reference Document/Revision without taking their authority
-pooled tenancy       → can reopen substrate around stable Company identity
-CRDT                 → can replace WorkingContent concurrency mechanism without changing Revision/Submission semantics
-```
-
-Future compatibility does not require zero migration. It requires avoiding needless **authority demolition, immutable-history rewrite, or duplicate semantics**.
-
----
-
-# 5. Old R10 evidence classification
-
-```text
-former R10-A 8+3                     → SUPERSEDED FOR LAUNCH
-former R10-B1 relational substrate    → evidence; re-evaluate only where T1–T7 need it
-former R10-B2 AuthN/Org/AuthZ         → semantic boundary largely survives; exact catalog/technical enforcement reopened
-former R10-B3                         → core Document/Revision/WorkingContent/Submission evidence; Artifact/adjuncts reopened
-former R10-B4                         → one Step + Release evidence; Approval-owner richness/Distribution reopened
-former R10-B5                         → historical evidence for Future Dossier/Evidence/Records; not Launch target
-former R10-B6                         → Audit/migration evidence; Interchange/hash-chain scope reopened
-former R10-C                          → paused safety evidence only; Artifact-owned solution rejected
-former R10-D/E/F                      → old stage labels superseded by T5/T6/T7
-```
-
-Do not repair old candidate files into the new target. Extract a surviving invariant into the current T-stage candidate or leave it in history/evidence.
-
----
-
-# 6. Proof and review discipline
+# 8. Proof and review discipline
 
 Each T-stage must include:
 
@@ -418,37 +370,16 @@ Each T-stage must include:
 9. explicit non-decisions;
 10. material decision adjudication gate;
 11. operator-facing platform summary;
-12. explicit operator summary ratification before next-stage opening.
-
-A stage is not implementation authority. Accepted stage findings are promoted into durable authority only after both technical adjudication and platform-summary ratification.
+12. explicit summary ratification before next-stage opening.
 
 After T7:
 
 ```text
-integrated Whole-R10 GCR
+Integrated Whole-R10 GCR
 → cold independent review
 → operator final ratification
+→ implementation spec/plan
+→ code
 ```
 
-Only after that may implementation spec/plan be authored.
-
----
-
-# 7. Current gate
-
-```text
-Product Contract           = ACCEPTED
-Whole-Product GCR A1–A10   = ACCEPTED
-Launch ownership 4+1       = ACCEPTED
-T1–T7 decomposition        = OPERATOR-APPROVED
-T1 decisions A→J           = ADJUDICATED / ACCEPTED
-T1 platform summary        = NEXT / OPERATOR RATIFICATION REQUIRED
-T1 final closure           = PENDING SUMMARY RATIFICATION
-T2–T7                      = NOT OPEN
-implementation             = BLOCKED
-```
-
-Current active packets:
-
-- `docs/superpowers/analysis/2026-08-18-r10-t1-semantic-state-invariants-candidate.md`
-- `docs/superpowers/analysis/2026-08-18-r10-t1-operator-adjudication.md`
+Implementation remains **BLOCKED**.
