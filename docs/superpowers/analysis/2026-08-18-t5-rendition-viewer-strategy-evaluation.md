@@ -28,37 +28,37 @@ T4 already guarantees that if an OfficialRendition exists, it freezes its own ex
 
 ### Veeva Vault — persistent derived viewable PDF
 
-Veeva automatically creates a PDF `Viewable Rendition` for each document version. The rendition is used for inline viewing/annotations/download and can be re-rendered as rendering technology/settings change. That demonstrates a useful distinction: a persisted PDF can still be **derived/rebuildable viewing infrastructure**, not necessarily the source document's immutable business identity.
+Veeva automatically creates a PDF `Viewable Rendition` for each document version. The rendition is used for inline viewing/annotations/download and is a version-specific derived representation. Reference: Veeva Vault Help, `About Auto-Generated Viewable Renditions`.
 
-This pattern is justified by named consumers such as annotations, overlays/signature pages, standardized exports, protected renditions and PDF/A profiles.
+This pattern is justified by named consumers such as annotations and standardized view/download behavior.
 
-### M-Files — native preview plus optional/persisted or on-the-fly PDF
+### M-Files — native preview plus optional PDF
 
-M-Files supports previewing Word, Excel, PowerPoint, PDF and other formats. PDF conversion is optional: users may save as PDF, replace the original with PDF, or add a separate PDF file. Its ARender connector explicitly offers on-the-fly renditions so multiple converted copies need not be stored.
+M-Files previews Microsoft Word/Excel/PowerPoint and PDF directly. PDF conversion is separately configurable/optional and can keep the original file or add a separate PDF. References: M-Files User Guide, `Document preview` and `Convert to PDF format`.
 
 ### DocuWare — multi-format viewer / Office for Web
 
-DocuWare's viewer supports PDF and Microsoft Office formats. It can open Office files through Microsoft for the Web, while PDF rendering is client-side in its new viewer. Downloads can be original or converted to PDF depending on the operation. This is a general ECM pattern where a stored PDF is not mandatory merely to display Office content.
+DocuWare's Viewer supports PDF and Microsoft Office formats including DOCX. Its current viewer renders PDFs client-side and can open Microsoft Office documents through Microsoft for the Web/native applications. References: DocuWare Knowledge Center, `File formats supported by the Viewer` and `Viewing documents in new DocuWare`.
 
-### Microsoft 365 / SharePoint — direct Office browser rendering
+### Microsoft 365 / WOPI — direct DOCX browser rendering
 
-WOPI/Office for the Web renders `.docx` directly in the browser from the source file. This proves that browser viewing does not require a separately persisted PDF rendition.
+Microsoft's WOPI viewing scenario renders `.docx` directly in the browser from the source file through a WOPI client. Reference: Microsoft Learn `[MS-WOPI]: Viewing a Document`.
 
 ### ONLYOFFICE — direct DOCX viewer/editor plus explicit conversion service
 
-ONLYOFFICE Docs can view/edit DOCX directly and separately exposes a conversion service for DOCX→PDF. This cleanly separates the viewing need from the conversion need.
+ONLYOFFICE Docs views/edits DOCX in the browser and exposes document conversion as a separate service, including DOCX→PDF. References: ONLYOFFICE Docs API `How it works`, `Converting and downloading file`, and Conversion API.
 
 ### Gotenberg / LibreOffice — simple server-side PDF conversion
 
-Gotenberg is a self-hosted PDF conversion API and supports Office→PDF through LibreOffice. It is operationally attractive, but fidelity depends on the LibreOffice/font environment; its own troubleshooting documentation warns that font availability can change layout. It is therefore a renderer candidate to prove with a corpus, not an architectural authority.
+Gotenberg exposes self-hosted Office→PDF conversion using LibreOffice. Its troubleshooting docs explicitly show that fonts/resource constraints can affect conversion behavior, so fidelity must be empirically proven. References: Gotenberg `Convert to PDF`, `Installation`, and `Troubleshooting`.
 
 ### EigenPal / docx-editor — browser-native DOCX editing/viewing
 
-The currently preserved mechanism candidate already renders/edits DOCX in the browser without a server dependency and exposes print-preview style behavior. This makes it a natural low-cost DRAFT/read-only viewer candidate, subject to a fidelity conformance corpus.
+EigenPal's open-source DOCX editor is client-side and edits DOCX natively. It remains the lowest-infrastructure candidate already preserved by the MetalDocs decision registry for DRAFT and read-only DOCX rendering, subject to a fidelity corpus. Reference: `eigenpal/docx-editor` GitHub repository.
 
 ### PDF.js — direct PDF browser viewer
 
-For PDF source content, PDF.js is a mature client-side PDF viewer. A second PDF conversion is unnecessary unless MetalDocs needs post-processing or a separately governed representation.
+PDF.js provides a browser PDF viewer/display layer. For source PDF content, a second generated PDF is unnecessary unless a separate business representation is required. Reference: Mozilla PDF.js Getting Started.
 
 ## 4. Four architecture options
 
@@ -99,7 +99,7 @@ A DOCX may be converted to PDF on first view or asynchronously for UX and cached
 Pros:
 - consistent/faster read UX after first render;
 - avoids making PDF a Release gate;
-- mirrors Veeva's regenerable viewable-rendition idea and M-Files/ARender on-demand idea.
+- mirrors the regenerable/viewing-rendition pattern used by document platforms.
 
 Cons:
 - adds cache invalidation/renderer-profile mechanism that Launch may not need;
@@ -177,7 +177,7 @@ source = DOCX, RequireOfficialRendition(PDF)
   output = persisted managed-content PDF + OfficialRendition descriptor
 ```
 
-Microsoft 365/Office for the Web is a high-fidelity reference pattern, but a standalone MetalDocs integration introduces Microsoft/WOPI program/licensing/deployment dependency and should not be Launch default without a deliberate product decision.
+Microsoft 365/Office for the Web is a high-fidelity reference pattern, but a standalone MetalDocs integration introduces an external Microsoft/WOPI product dependency and should not be Launch default without a deliberate product decision.
 
 ## 8. Renderer selection must be empirical
 
