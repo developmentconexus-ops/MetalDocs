@@ -1,12 +1,13 @@
 # R10-T5 — Corrected Operator Adjudication Packet
 
-> **Status:** ACTIVE STAGING / NON-AUTHORITATIVE — OPERATOR ADJUDICATION NEXT  
+> **Status:** ACTIVE STAGING — T5-A→T5-P OPERATOR-ADJUDICATED / ACCEPTED; PLATFORM SUMMARY NEXT  
 > **Date:** 2026-08-18  
 > **Parent candidate:** `2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md`  
 > **Accepted subgate:** `2026-08-18-t5-rendition-viewer-strategy-evaluation.md` — RV-1→RV-6 ACCEPTED  
+> **Adjudication record:** `2026-08-18-r10-t5-operator-adjudication.md`  
 > **Implementation:** BLOCKED
 
-This packet is the final corrected T5 decision surface after the operator-ratified rendition/viewer subgate. It does not add a new design branch; it resolves the parent candidate's temporary pause and restates only the material T5-A→T5-P decisions in their current form.
+This packet is the final corrected T5 decision surface after the operator-ratified rendition/viewer subgate. The operator accepted T5-A→T5-P. T5 is not closed yet: the mandatory platform-facing T5 summary must still be explicitly ratified before promotion, Decision Registry update, staging removal and T6 opening.
 
 ## 1. Accepted rendition/viewer correction consumed by T5
 
@@ -52,7 +53,7 @@ periodic reconciliation, not per-object durable enqueue:
 
 No mandatory Launch durable job exists merely for viewing PDF/DOCX.
 
-## 3. T5-A→T5-P — final corrected recommendations
+## 3. T5-A→T5-P — accepted decisions
 
 ```text
 T5-A ACCEPT — use one Postgres-backed transactional durable-job mechanism; River remains selected/reference mechanism. Do not run a parallel custom scheduler, lease framework or second outbox-dispatch runtime.
@@ -106,11 +107,12 @@ future notification UX
 
 ```text
 RV-1→RV-6                         = ACCEPTED
-corrected T5-A→T5-P               = OPERATOR ADJUDICATION NEXT
-T5 platform-facing summary        = NOT YET PRESENTED
-T5 promotion/closure              = NOT YET
+corrected T5-A→T5-P               = OPERATOR-ADJUDICATED / ACCEPTED
+T5 platform-facing summary        = NEXT
+T5 promotion/closure              = PENDING SUMMARY RATIFICATION
+Decision Registry update          = PENDING T5 CLOSURE
 T6                                = NOT OPEN
 implementation                    = BLOCKED
 ```
 
-After technical adjudication of T5-A→T5-P, **do not open T6**. Present the mandatory platform-facing T5 summary and obtain explicit operator ratification first.
+After this technical adjudication, **do not open T6**. Present the mandatory platform-facing T5 summary and obtain explicit operator ratification first.
