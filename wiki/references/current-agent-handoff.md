@@ -1,7 +1,7 @@
 # Current Agent Handoff
 
 > **Last verified:** 2026-08-18  
-> **Status:** ACTIVE — **T1 + T2 + T3 + T4 + DECISION REGISTRY OPERATOR-RATIFIED; T5 DURABLE ASYNC / SEARCH / EXTERNAL EFFECTS ACTIVE**  
+> **Status:** ACTIVE — **T1 + T2 + T3 + T4 + DECISION REGISTRY OPERATOR-RATIFIED; T5 ACTIVE / RENDITION-VIEWER SUBGATE**  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Implementation:** **BLOCKED — design/documentation only**
 
@@ -21,9 +21,10 @@ Read in this order:
 10. `wiki/architecture/r10-t4-exact-content-storage-integrity-restore.md`
 11. `wiki/architecture/rebaseline-decision-registry.md`
 12. `wiki/architecture/r10-technical-architecture.md`
-13. `docs/superpowers/analysis/2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md` — **ACTIVE NON-AUTHORITATIVE T5 CANDIDATE / OPERATOR ADJUDICATION NEXT**
-14. `wiki/architecture/launch-v1-scope-rebaseline.md`
-15. old R3–R9.5 / R10-B1→B6/C and current implementation only as evidence allowed by the registry
+13. `docs/superpowers/analysis/2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md` — **PARENT T5 CANDIDATE / T5-A→P NOT YET READY FOR WHOLE ADJUDICATION**
+14. `docs/superpowers/analysis/2026-08-18-t5-rendition-viewer-strategy-evaluation.md` — **ACTIVE MATERIAL SUBGATE / RV-1→RV-6 OPERATOR DECISION NEXT**
+15. `wiki/architecture/launch-v1-scope-rebaseline.md`
+16. old R3–R9.5 / R10-B1→B6/C and current implementation only as evidence allowed by the registry
 
 ## Current checkpoint
 
@@ -36,7 +37,8 @@ T2 Governance/Effectivity/Tx     = CLOSED / OPERATOR-RATIFIED
 T3 Authorization & Audit         = CLOSED / OPERATOR-RATIFIED
 T4 Exact Content/Storage/Restore = CLOSED / OPERATOR-RATIFIED
 Decision Registry                = CURRENT / OPERATOR-RATIFIED
-T5 Durable Async/Search/Effects  = ACTIVE / NON-AUTHORITATIVE CANDIDATE
+T5 Durable Async/Search/Effects  = ACTIVE / RENDITION-VIEWER SUBGATE
+T5-A→T5-P whole adjudication     = PAUSED UNTIL RV-1→RV-6
 T6→T7                            = NOT OPEN
 implementation                   = BLOCKED
 ```
@@ -101,29 +103,51 @@ Search projection/rebuild/freshness/reconciliation
 provider effect receipts where needed
 ```
 
-The active candidate currently recommends T5-A→T5-P. Headline:
+## Active T5 rendition/viewer subgate
+
+The operator challenged the assumption that a DOCX used for viewing must produce a persistent `OfficialRendition` PDF.
+
+Reference-software review found three valid patterns:
 
 ```text
-one Postgres-backed durable-job runtime; River retained as selected/reference mechanism
-mandatory durable jobs = official_rendition_render + search_refresh
-GC = periodic reconciliation over durable GC_PENDING, not per-handle outbox
-required jobs transactionally enqueue with semantic transition
-Rendition render outside tx; final T4 admission + semantic Rendition/Release revalidation inside local tx
-Search = PostgreSQL rebuildable projection keyed by Document
-search_refresh(document_id) reloads latest canonical state so duplicate/out-of-order jobs are harmless
-Search may lag by omission but stale hit never grants access/effectivity
-full Search rebuild required; permanent reconciliation crawler not baseline
-no Launch notifications/inbox/fanout/event bus
-no mandatory durable external IdP-disable job
-jobs = at-least-once, idempotent, bounded-retry, fail-loud, terminal-visible
-no generic ExternalEffectReceipt family
-minimal async health/backlog/retry/failure observability required
+direct/native Office viewing
+rebuildable/on-demand viewable rendition
+persistent governed OfficialRendition
 ```
+
+Current recommended hybrid:
+
+```text
+PDF source
+  → direct PDF viewer
+  → no duplicate PDF by default
+
+DOCX + SourceOnly
+  → direct read-only DOCX viewer
+  → no persistent governed PDF merely for viewing
+
+DOCX + RequireOfficialRendition(PDF)
+  → conditional durable render from exact Submission
+  → T4 admission
+  → immutable OfficialRendition
+  → Release gate
+```
+
+Renderer product is not frozen yet. EigenPal is the lowest-cost native DOCX viewer candidate; ONLYOFFICE is a stronger self-hosted viewer/converter candidate; Gotenberg/LibreOffice is a simple server-side PDF converter candidate. Selection must be proven through a representative DOCX fidelity corpus.
 
 ## Exact next step
 
-Operator adjudication of T5 recommendations `T5-A→T5-P`.
+Operator adjudication of `RV-1→RV-6` in:
 
-After technical adjudication, **do not open T6**. Present the mandatory platform-facing T5 summary and obtain explicit operator ratification first.
+`docs/superpowers/analysis/2026-08-18-t5-rendition-viewer-strategy-evaluation.md`
 
-No final SQL/index/package/process topology, public API/frontend contract, migration execution plan, implementation plan or product code is authorized.
+Only after that:
+
+```text
+refine T5-D/T5-E + durable-job census
+→ adjudicate corrected T5-A→T5-P
+→ platform-facing T5 summary
+→ explicit operator ratification
+```
+
+Do **not** open T6. No final SQL/index/package/process topology, public API/frontend contract, migration execution plan, implementation plan or product code is authorized.
