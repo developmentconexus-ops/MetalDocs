@@ -1,12 +1,13 @@
 # Cohesive Platform Redesign — Active Architecture Authority
 
-> **Status:** Active design authority — **R9.5 FROZEN; R10-A/B1/B2 PROMOTED; R10-B3/B4/B5 ACCEPTED FOR R10 INTEGRATION / NON-FINAL; R10-B6 NEXT; NO PRODUCT IMPLEMENTATION AUTHORIZED**  
+> **Status:** Active design authority — **R9.5 FROZEN; R10-A/B1/B2 PROMOTED; R10-B3/B4/B5/B6 ACCEPTED FOR R10 INTEGRATION / NON-FINAL; R10-B INTEGRATED DESIGN BLOCK COMPLETE / NON-FINAL; R10-C NEXT; NO PRODUCT IMPLEMENTATION AUTHORIZED**  
 > **Established:** 2026-08-14  
 > **R9.5 freeze ratified:** 2026-08-17  
 > **R10-A/B1/B2 promoted:** 2026-08-17  
 > **R10-B3 integration acceptance:** 2026-08-17 — non-final / not independently ratified  
 > **R10-B4 integration acceptance:** 2026-08-18 — non-final / not independently ratified  
 > **R10-B5 integration acceptance:** 2026-08-18 — non-final / not independently ratified  
+> **R10-B6 integration acceptance:** 2026-08-18 — non-final / not independently ratified  
 > **Design branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Method:** `docs/engineering/standards/root-cause-global-maximum-method.md`  
 > **Frozen product/domain ledger:** `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md`  
@@ -19,6 +20,8 @@ Accepted current R10 integration inputs:
 - `docs/superpowers/analysis/2026-08-18-r10-b4-integration-acceptance.md`
 - `docs/superpowers/analysis/2026-08-18-r10-b5-documentary-context-records-governance-artifact-closure-integrated-candidate.md`
 - `docs/superpowers/analysis/2026-08-18-r10-b5-integration-acceptance.md`
+- `docs/superpowers/analysis/2026-08-18-r10-b6-audit-interchange-cross-owner-atomicity-integrated-candidate.md`
+- `docs/superpowers/analysis/2026-08-18-r10-b6-integration-acceptance.md`
 
 ---
 
@@ -32,12 +35,14 @@ Target posture:
 - one canonical authority per business/system fact;
 - one company per V1 deployment; common code/build/migrations; no customer forks;
 - commodity mechanism may be externalized without taking semantic authority;
-- no speculative ECM/BPM/ReBAC/low-code/object/records platform;
+- no speculative ECM/BPM/ReBAC/low-code/object/records/integration/event-sourcing platform;
 - current implementation is evidence, never automatic target entitlement.
 
-Fresh sessions follow `AGENTS.md` → Method → current handoff → this page → frozen ledger → promoted R10 authority → accepted non-final B3/B4/B5 working inputs.
+Fresh sessions follow `AGENTS.md` → Method → current handoff → this page → frozen ledger → promoted R10 authority → accepted non-final B3–B6 working inputs.
 
-R3–R9.5 remains frozen historical/product-domain authority except where an explicitly recorded bounded reopen/refinement is operator-approved for current R10 integration. B3/B4/B5 remain non-final and challengeable only by material later-stage counterexample.
+R3–R9.5 remains frozen historical/product-domain authority except where an explicitly recorded bounded reopen/refinement is operator-approved for current R10 integration. B3–B6 remain non-final and challengeable only by material later-stage counterexample.
+
+B6 included the internal whole-R10-B coherence/adversarial challenge required to close the relational/transactional design block for continued integration. This does **not** replace Whole-R10 Global Coherence Review + cold independent review before final ratification.
 
 ---
 
@@ -57,9 +62,9 @@ cross-owner RESTRICT / NO ACTION
 no universal tenant/company/deployment partition column
 no Tenant/Area/role/Permission RLS policy engine
 serving DB role non-owner + NOSUPERUSER
-READ COMMITTED
+READ COMMITTED by default
 same-local-commit frozen cross-owner invariants
-no provider DB atomicity dependency
+no provider DB/object-store atomicity dependency
 ```
 
 Business bounded contexts remain exactly 8:
@@ -93,8 +98,6 @@ Authorization remains live additive/default-deny from static Role/Permission cat
 
 ## 3. R10-B3 accepted working target
 
-Core:
-
 ```text
 Document
 → business DocumentRevision
@@ -112,17 +115,22 @@ Key laws:
 - Artifact is exact-byte identity, not provider location and not global content-hash business identity;
 - Template reuses Document lifecycle; no parallel TemplateVersion aggregate;
 - one-open/one-EFFECTIVE have structural backstops;
-- downstream governance binds exact immutable Submission.
+- downstream native governance binds exact immutable Submission.
 
 ### B5-approved bounded B3 refinements
 
-Current R10 working target additionally carries:
+1. `DocumentOrigin` does not retain source Submission/Artifact forever through a strong FK; it preserves permanent source Revision identity plus exact source provenance snapshots.
+2. `DocumentRevision.cancelled_at` / `obsoleted_at` are canonical native lifecycle instants; native supersession time remains B4 ReleaseRecord authority and is not duplicated.
+3. `RevisionDictionarySnapshot` is separated from permanent Revision identity so lawful disposition may remove retained payload without deleting/reusing the revision ordinal or mutating immutable JSON in place.
 
-1. `DocumentOrigin` no longer holds a strong FK to source Submission that would force indefinite template-source retention. It keeps source Revision identity + exact immutable Submission/digest/hash provenance snapshots.
-2. `DocumentRevision` owns one-shot canonical `cancelled_at` / `obsoleted_at`; native superseded time remains B4 ReleaseRecord authority and is not duplicated.
-3. `RevisionDictionarySnapshot` is separated from the permanent Revision identity skeleton so lawful disposition may remove retained payload without deleting/reusing the revision ordinal or mutating immutable JSON in place.
+### B6-approved imported-history refinements
 
-These are bounded technical refinements exposed by real B5 Records-Governance counterexamples; no unrelated B3 semantic is reopened.
+4. `RevisionOrdinalReservation` preserves a historically real ordinal when insufficient exact bytes prevent creation of a truthful DocumentRevision.
+5. `RevisionImportedContent` is CI-owned immutable exact imported Revision content and never a fake native RevisionSubmission.
+6. `DocumentRevision.history_kind = NATIVE|IMPORTED`; imported governance/effectivity/actor proof is target-owner imported governance state, not synthetic ApprovalDecision/ReleaseRecord/native User action.
+7. Template origin supports `NATIVE_SUBMISSION | IMPORTED_REVISION_CONTENT` source kind through immutable source identity/digest/hash snapshots.
+8. native terminal timestamps remain native-only; already-terminal imported history may keep native timestamp NULL while imported governance preserves truthful historical timestamp/unknown.
+9. current Tenant Dictionary is never resolved merely to fabricate imported historical dictionary state.
 
 ---
 
@@ -150,7 +158,7 @@ Key laws:
 - return-for-changes requires reason and returns same Revision to DRAFT without resetting B3 generation;
 - Approval requirement/PolicyVersion + representation requirement are snapshotted per Submission;
 - viewer capability is independent from official representation policy;
-- Release is automatic/system-owned and sole effectivity transition;
+- Release is automatic/system-owned and sole native effectivity transition;
 - Release atomically establishes EFFECTIVE/SUPERSEDED and concrete Distribution obligations;
 - Distribution never grants access; explicit acknowledgement is the only obligation completion signal.
 
@@ -179,12 +187,18 @@ Frozen historical ledger contains `Step.purpose = review | approval`. Operator-a
 - canonical name freezes at CAPTURE; user filename remains provenance;
 - current `{SEQ}` candidate uses one monotonic EvidenceType series; Dossier-local reset is a reopen trigger.
 
+### B6-approved imported Evidence refinement
+
+- `Evidence.history_kind = NATIVE|IMPORTED`;
+- historical Evidence uses immutable target-owner imported capture/provenance state rather than fake native captured-by/captured-at;
+- imported Evidence receives RetentionBinding inside the migration semantic unit; unknown historical anchor never silently becomes disposition-eligible.
+
 ### Records Governance
 
 - no generic Record aggregate/declaration operation;
-- first DocumentRevision Submission / Evidence CAPTURE automatically create immutable typed RetentionBinding;
+- first native DocumentRevision Submission / Evidence CAPTURE automatically create immutable typed RetentionBinding; imported target subjects create Binding in their migration semantic unit;
 - policy = explicit `NoMinimum | KeepFor(value,DAYS|MONTHS|YEARS) | Indefinite`;
-- anchor derives from canonical owner lifecycle facts; Audit never becomes retention-clock authority;
+- anchor derives from canonical owner lifecycle/imported-history facts; Audit never becomes retention-clock authority;
 - RetentionExtension only lengthens and cannot be added after DispositionFence;
 - LegalHold scopes V1 = Evidence | stable Document | Dossier and materialize exact RetentionBindings, including newly entering live scope;
 - Hold activation is fail-closed/all-or-nothing for current preservable scope when a fence/inconsistent subject is encountered;
@@ -203,29 +217,120 @@ Frozen historical ledger contains `Step.purpose = review | approval`. Operator-a
 
 ### Retained DocumentRevision unit
 
-The retained Revision unit includes its subordinate immutable governance history, including B3 Submission/dictionary/provenance/PeriodicReview state and B4 Approval/fresh-auth/feedback/Rendition/Release/Distribution/Acknowledgement evidence. Independent authorities such as User, Group, DocumentType and ApprovalPolicy are not recursively swallowed into the retention unit merely because referenced.
+The retained Revision unit includes subordinate immutable governance history: B3 Submission/dictionary/provenance/PeriodicReview state and B4 Approval/fresh-auth/feedback/Rendition/Release/Distribution/Acknowledgement evidence. Independent authorities such as User, Group, DocumentType and ApprovalPolicy are not recursively swallowed into the retention unit merely because referenced.
 
 ---
 
-## 6. Storage / privacy / migration posture carried forward
+## 6. R10-B6 accepted working target
 
-- ManagedArtifactStore port/conformance remains first-class; production malware inspection remains mandatory/fail-closed before untrusted bytes become confirmed Artifact;
+### Audit
+
+```text
+business/system owner mutation
+→ required durable async intent(s) when needed
+→ AuditChainHead lock
+→ required AuditEvent append(s)
+→ one COMMIT / ROLLBACK
+```
+
+- AuditEvent is transversal forensic/timeline evidence, never canonical business state;
+- required governed mutations cannot report success without same-local-commit Audit;
+- one deployment-wide append chain reuses RFC 8785 JCS + SHA-256;
+- ordinary serving role has no direct mutation right on AuditEvent/AuditChainHead and uses only a narrow Audit-owned DB append primitive within the caller transaction;
+- `AuditChainHead` is always the final contended semantic lock; no domain lock follows it;
+- facts schemas are bounded product-owned contracts, not arbitrary JSON dumps;
+- immutable skeleton contains stable UUIDs/codes/times/digests/outcomes only; names/emails/profile/JWT/secrets/request bodies/free-form reasons remain outside indefinite Audit;
+- User UUID may survive as a PII-minimized pseudonymous identity skeleton while UserProfile remains separately erasable/read-resolved;
+- Audit skeleton retention V1 = `Indefinite`; finite pruning/checkpoint/external crypto anchoring are reopen triggers;
+- Audit is not outbox, event sourcing, telemetry, Approval/effectivity/AuthZ/retention authority.
+
+### Interchange
+
+Distinct contracts remain:
+
+```text
+Historical Migration
+Governed Subject Export
+External Repository IMPORT_COPY
+External Repository PUBLISH_COPY
+```
+
+Backup/Restore remains separate; Tenant Portability Export remains deferred.
+
+Historical Migration:
+
+- never fabricates native Submission/Approval/Release/User facts;
+- unknown source history remains unknown;
+- source actors/timestamps/labels remain imported provenance;
+- plan + true dry-run/apply + deterministic outcomes + reconciliation;
+- APPLY atomic per explicit semantic import unit; partial batch success allowed/reconciled;
+- new historical Document identity commits with at least one exact imported Revision/content unit or rolls back;
+- long-lived idempotency uses stable SHA-256 source-identity digest instead of requiring raw human-readable source IDs.
+
+Governed Subject Export:
+
+- `COMPLETE` has explicit Document/Evidence/Dossier closure semantics and fails closed when required linked content is unauthorized;
+- short `REPEATABLE READ` snapshot creates immutable provider-independent manifest facts; package assembly runs after commit;
+- manifest uses exact object/relationship/provenance/file/hash facts + JCS/SHA-256;
+- generated package is temporary delivery output, not automatically Artifact/Evidence/retention subject;
+- V1 has no masquerading partial-export contract and no mandatory signing/BagIt/PKI.
+
+External Repository:
+
+- `InterchangeConnection` is stable logical repository identity; credentials/endpoints are provider/deployment mechanism;
+- PUBLISH_COPY pins exact source identity/hash/format, and success exists only through immutable external receipt after provider confirmation;
+- IMPORT_COPY uses ordinary target-owner lifecycle/permissions and commits target semantic creation + immutable receipt together;
+- stable provider object identity is preferred over transient URL/path/display name.
+
+### Cross-owner atomicity / lock law
+
+- composition opens one local PostgreSQL transaction and calls transactionally composable owner seams;
+- owners do not import each other's repositories or hide nested commits;
+- provider/network/object-store effects never join the DB transaction;
+- required durable effect intents are inserted in the same transaction and execute later in R10-D;
+- default isolation remains READ COMMITTED; Governed Subject Export snapshot is the bounded REPEATABLE READ exception;
+- lock acquisition follows one compatible forward partial order, with deterministic ordering inside equivalent sets;
+- before implementation the whole B1→B6 admitted-write lock graph must be mechanically demonstrated acyclic.
+
+---
+
+## 7. R10-B integrated design-block closure
+
+With operator acceptance of B6:
+
+```text
+R10-B1 = CLOSED / APPROVED / SINGLE-COMPANY-RESTRUCTURED
+R10-B2 = CLOSED / APPROVED / INTEGRATED
+R10-B3 = ACCEPTED FOR R10 INTEGRATION / NON-FINAL
+R10-B4 = ACCEPTED FOR R10 INTEGRATION / NON-FINAL
+R10-B5 = ACCEPTED FOR R10 INTEGRATION / NON-FINAL
+R10-B6 = ACCEPTED FOR R10 INTEGRATION / NON-FINAL
+
+R10-B = INTEGRATED DESIGN BLOCK COMPLETE / NON-FINAL
+```
+
+Internal B1↔B6 coherence/adversarial review is closed sufficiently for continued R10 integration. Whole-R10 integration + Global Coherence Review + cold independent review still occur after R10-C–F and before final R10 ratification.
+
+---
+
+## 8. Storage / privacy / migration posture carried forward
+
+- ManagedArtifactStore provider-neutral boundary remains first-class; production malware inspection remains mandatory/fail-closed before untrusted bytes become confirmed Artifact;
 - provider WORM/ObjectLock/Purview may enforce physical retention but never becomes MetalDocs Records-Governance authority;
-- User/data-subject privacy remains separable from immutable governance evidence; B6 must classify surviving Audit/post-disposition skeleton fields;
 - no generic privacy workflow or mandatory crypto-erasure platform without named immutable Target Data;
-- Backup/Restore, Historical Migration, Governed Subject Export and explicit IMPORT_COPY/PUBLISH_COPY remain; Tenant Portability Export is deferred.
+- B6 accepted PII-minimized Audit skeleton posture; R10-C must prove physical restore/non-resurrection behavior where applicable;
+- Historical Migration/Governed Export/IMPORT_COPY/PUBLISH_COPY business meaning is closed non-final; R10-F later owns legacy cutover/execution/deletion mapping.
 
 ---
 
-## 7. Implementation gate
+## 9. Implementation gate
 
-**CLOSED.** B3/B4/B5 are accepted only for continued R10 integration, not final ratification.
+**CLOSED.** B3–B6 are accepted only for continued R10 integration, not final ratification.
 
 Before implementation:
 
 ```text
-B6
-→ R10-C
+R10-C
 → R10-D
 → R10-E
 → R10-F
@@ -240,58 +345,63 @@ B6
 
 ---
 
-## 8. Exact next step — R10-B6 Audit + Interchange + Cross-owner Atomicity
+## 10. Exact next step — R10-C Artifact / Records Physical Integrity
 
-Open **R10-B6** as one integrated research-heavy design batch from promoted B1/B2 + accepted non-final B3/B4/B5.
+Open **R10-C** as one integrated research-heavy design batch from promoted B1/B2 + accepted non-final B3–B6.
 
-B6 must jointly close:
+R10-C owns physical integrity and provider-mechanism semantics. It must not move Artifact/Controlled Information/Records Governance authority into storage-provider configuration.
+
+At minimum jointly close:
 
 ```text
-Audit
-  append-only AuditEvent semantic skeleton
-  trusted actor/resource/operation/time meaning
-  field-by-field privacy / PII-minimized surviving skeleton
-  erasable human-readable enrichment boundary
-  forensic grant/revoke reconstruction after current-state deletion
-  tamper-evidence/query/export ownership and separate Audit retention regime
+ManagedArtifactStore
+  provider-neutral physical-location/reference representation
+  conformance contract
+  Local dev/test + reference production adapter posture
 
-Interchange
-  Historical Migration batch/plan/dry-run/item outcome/reconciliation state
-  imported history vs native domain-fact boundary
-  Governed Subject Export process/package semantics
-  External Repository IMPORT_COPY / PUBLISH_COPY truth
-  required connection/reference state used by Dossier ExternalReference / publication
-  no Tenant Portability Export V1
+staging / confirmation
+  temporary staging identity/lifecycle
+  production malware inspection / fail-closed gate
+  hash/size/format verification before semantic confirmation
+  no confirmed orphan Artifact
 
-Cross-owner coherence
-  final B1–B5 same-local-commit matrix
-  exact required Audit append points
-  exact required durable-intent points routed to R10-D
-  published transaction-composition seams; no nested owner commits/repository imports
-  final READ COMMITTED lock-order/deadlock challenge
-  imported-history DB coherence with native constraints without fabricating native facts
+physical integrity
+  byte verification on read where required
+  relocation/copy verification
+  restore verification
+  provider version/object identity treatment
+  relocation never changes Artifact business identity or Submission digest
+
+Records physical enforcement
+  Object Lock/WORM interaction as enforcement only
+  LegalHold/Retention/Disposition remain Records Governance authority
+  physical deletion after DispositionFence
+  provider-neutral deletion verification before DispositionRecord completion
+
+recovery / cleanup
+  failed staging/render/export physical cleanup
+  orphan mechanism-state reconciliation
+  backup/restore integrity
+  privacy non-resurrection constraints where restore can reintroduce erased human-readable data
 ```
 
 Explicitly challenge:
 
 ```text
-B2 offboarding/privacy vs immutable Audit evidence
-B3/B4/B5 critical mutations vs same-commit Audit
-B5 disposition vs Audit's separate retention regime
-B5 post-disposition skeleton privacy
-Historical Migration without synthetic native Approval/Release/actors/timestamps
-Export completeness + canonical AuthZ
-External repository effects without provider atomicity
-whole B1–B5 lock graph
+B5 one-semantic-retention-root Artifact law vs physical dedupe
+DispositionFence vs ObjectLock/provider deletion races
+storage relocation vs exact Submission/Rendition identity
+malware result vs semantic Artifact confirmation
+backup/restore vs legal disposition/privacy erasure
+provider outage/retry without business-truth rewrite
 ```
 
 Route later work correctly:
 
 ```text
-physical store/object-lock/malware/restore       → R10-C
-async jobs/retry/lease/projections/effects       → R10-D
-API/frontend/viewer/editor journeys              → R10-E
-historical cutover/legacy deletion/bootstrap     → R10-F
+async retry/lease/jobs/reconciliation execution → R10-D
+API/frontend/viewer/download journeys           → R10-E
+historical cutover/legacy deletion/bootstrap    → R10-F
 ```
 
 Implementation remains **BLOCKED**.
