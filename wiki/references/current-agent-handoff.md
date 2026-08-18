@@ -1,7 +1,7 @@
 # Current Agent Handoff
 
 > **Last verified:** 2026-08-18  
-> **Status:** ACTIVE — **PRODUCT/GCR/4+1/T1→T7 APPROVED; T1 DECISIONS ACCEPTED / PLATFORM-SUMMARY RATIFICATION NEXT; T2 NOT OPEN**  
+> **Status:** ACTIVE — **T1 CLOSED / OPERATOR-RATIFIED; T2 GOVERNANCE + EFFECTIVITY TRANSACTIONS ACTIVE CANDIDATE / OPERATOR ADJUDICATION NEXT**  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Implementation:** **BLOCKED — design/documentation only**
 
@@ -15,15 +15,12 @@ Read in this order:
 4. `wiki/architecture/launch-v1-product-contract.md` — **ACCEPTED PRODUCT AUTHORITY**
 5. `wiki/architecture/whole-product-alignment-review.md` — **OPERATOR-ADJUDICATED GCR A1–A10**
 6. `wiki/architecture/launch-v1-ownership-topology.md` — **OPERATOR-APPROVED 4+1 OWNERSHIP + FUTURE-EVOLUTION LAW**
-7. `wiki/architecture/r10-technical-architecture.md` — **ACTIVE REBASELINED T1→T7 TECHNICAL-STAGE AUTHORITY + MANDATORY SUMMARY-RATIFICATION GATE**
-8. `docs/superpowers/analysis/2026-08-18-r10-t1-semantic-state-invariants-candidate.md` — T1 design candidate/evidence
-9. `docs/superpowers/analysis/2026-08-18-r10-t1-operator-adjudication.md` — **ACTIVE T1 ADJUDICATION / SUMMARY-RATIFICATION STAGING**
-10. `wiki/architecture/launch-v1-scope-rebaseline.md` — narrow Records-Governance defer overlay
-11. prior cohesive/R9.5/R10 B1–B6/C material only as evidence where current authorities do not supersede it
+7. `wiki/architecture/r10-technical-architecture.md` — **ACTIVE T1→T7 TECHNICAL AUTHORITY; T1 PROMOTED / T2 OPEN**
+8. `docs/superpowers/analysis/2026-08-18-r10-t2-governance-effectivity-transactions-candidate.md` — **ACTIVE NON-AUTHORITATIVE T2 CANDIDATE / OPERATOR ADJUDICATION PACKET**
+9. `wiki/architecture/launch-v1-scope-rebaseline.md` — narrow Records-Governance defer overlay
+10. prior cohesive/R9.5/R10 B1–B6/C material only as evidence where current authorities do not supersede it
 
-`wiki/architecture/cohesive-platform-redesign.md` is a short **prior-design evidence compatibility page**, not active routing. Git history preserves its former full narrative.
-
-Git history and current runtime/schema/OpenAPI remain evidence, not automatic target authority.
+`wiki/architecture/cohesive-platform-redesign.md` is prior-design evidence/compatibility routing only. Git history and current runtime/schema/OpenAPI remain evidence, not automatic target authority.
 
 ---
 
@@ -31,26 +28,25 @@ Git history and current runtime/schema/OpenAPI remain evidence, not automatic ta
 
 ```text
 Product Contract                 = ACCEPTED / PROMOTED
-Whole-Product GCR A1–A10         = OPERATOR-ADJUDICATED / ACCEPTED
-Launch ownership topology        = CLOSED / OPERATOR-APPROVED / 4+1
-T1→T7 technical decomposition    = CLOSED / OPERATOR-APPROVED
-T1 decisions A→J                 = OPERATOR-ADJUDICATED / ACCEPTED
-T1 platform summary              = NEXT / EXPLICIT OPERATOR RATIFICATION REQUIRED
-T1 final promotion/closure       = PENDING SUMMARY RATIFICATION
-T2→T7                            = NOT OPEN
+Whole-Product GCR A1–A10         = ACCEPTED
+Launch ownership topology        = CLOSED / APPROVED / 4+1
+T1→T7 technical decomposition    = CLOSED / APPROVED
+T1 Semantic State & Invariants   = CLOSED / OPERATOR-RATIFIED / PROMOTED
+T2 Governance/Effectivity/Tx     = ACTIVE NON-AUTHORITATIVE CANDIDATE
+T3→T7                            = NOT OPEN
 old R10-A 8+3                    = SUPERSEDED FOR LAUNCH
 old R10-B1→B6                    = EVIDENCE ONLY
 old R10-C                        = PAUSED HISTORICAL CANDIDATE / DO NOT REPAIR
 implementation                   = BLOCKED
 ```
 
-No implementation plan or product code is authorized until T1→T7 are integrated, Whole-R10 GCR + cold independent review complete, and the operator gives final ratification.
+T1 staging was completed and is removed from the live tree after durable promotion; Git history is the archive.
 
 ---
 
-## Mandatory T-stage comprehension gate — operator explicit
+## Mandatory T-stage comprehension gate
 
-For every technical stage `Tn`:
+For every `Tn`:
 
 ```text
 Tn candidate/design
@@ -61,49 +57,55 @@ Tn candidate/design
 → only then open Tn+1
 ```
 
-The summary must explain what was decided **and how it will work in the MetalDocs platform**, not merely repeat architecture labels. It must also identify deliberate deferrals/future seams and material reopen triggers.
-
-A prior “approve A/B/C” response does not by itself authorize opening the next stage unless the platform summary has also been explicitly ratified.
+A technical recommendation approval alone does not open the next stage.
 
 ---
 
-## Accepted Launch ownership
+## Accepted T1 headline
 
 ```text
-BUSINESS
 Authentication
+  ProviderSubjectBinding
+  ApplicationSession
+
 Organization
+  Company / User / UserProfile / Area / Group / GroupMembership
+
 Authorization
+  product Role/Permission vocabulary
+  RoleAssignment
+
 Controlled Documents
+  DocumentType + numbering semantics
+  Document + Template role/origin
+  Revision
+  WorkingContent
+  Submission
+  bounded GovernanceAttempt over SUBMISSION|OBSOLESCENCE
+  Step/Decision evidence + SubmissionFeedback
+  RevisionCancellation
+  Release
+  OfficialRendition only when required
+  Obsolescence result
+  native/imported provenance seam
 
-SUPPORTING SEMANTIC
 Audit
+  AuditEvent
 ```
 
-Not semantic owners in Launch:
+Accepted T1-J:
 
-```text
-storage/staging/integrity → mechanism
-render/view/editor         → mechanism
-Search                     → rebuildable projection
-async/outbox/jobs          → mechanism
-Historical Migration      → cutover capability
-backup/restore             → operations/readiness
-```
+> `NoHumanApproval` may complete governed obsolescence with zero human Step after authorized initiation, mandatory reason and all eligibility/invariant checks. No raw status toggle and no fake System approver.
 
-`Artifact`, separate `Approval`, `Distribution`, `Documentary Context`, `Records Governance` and generic `Interchange` are not Launch semantic owners.
+Not Launch T1 semantic state: standalone Artifact, taxonomy/dictionary platform, TemplateSpec, DRAFT comment platform, Periodic Review, Distribution, Dossier/Evidence/Records, generic Interchange/export/repository state, global AuditChainHead/hash chain.
 
 ---
 
-## Future-evolution law — operator explicit
-
-> **Known future capabilities must not be forgotten or made structurally expensive merely because they are deferred from Launch.**
-
-Controlling rule:
+## Future-evolution law
 
 > **Defer the capability; preserve the evolution seam. Prepare the seam, not the dormant implementation.**
 
-Named horizon:
+Named horizon remains:
 
 ```text
 Launch+:
@@ -122,99 +124,46 @@ Future:
   realtime coauthoring / CRDT
 ```
 
-These are architecture counterexamples and attachment-seam evidence, not Launch implementation scope.
+These are architecture counterexamples/attachment-seam evidence, not Launch implementation scope.
 
 ---
 
-## Approved technical descent
+## T2 current candidate — headline
+
+T2 derives the atomic/concurrent behavior of the accepted T1 facts.
+
+Material candidate direction:
 
 ```text
-T1 — Semantic State & Invariants                         SUMMARY RATIFICATION PENDING
-T2 — Governance, Effectivity & Lifecycle Transactions   NOT OPEN
-T3 — Authorization & Audit Enforcement                  NOT OPEN
-T4 — Exact Content, Storage Integrity & Restore         NOT OPEN
-T5 — Durable Async, Search & External Effects           NOT OPEN
-T6 — Canonical API / Frontend Journeys                  NOT OPEN
-T7 — Historical Migration & Cutover                     NOT OPEN
-
-→ Integrated Whole-R10 Global Coherence Review
-→ cold independent review
-→ operator final ratification
-→ implementation spec/plan
-→ code
+one local ACID transaction per native business transition
+Document = lifecycle serialization root
+WorkingContent = OCC for DRAFT races
+create = code + Document + REV001 DRAFT + initial WorkingContent atomically
+SUBMIT = freeze exact expected WorkingContent generation + config snapshots
+route selector = NAMED_USER | GROUP
+Group Step = ANY-one from activation snapshot
+sequential one-active-Step governance
+bounded initiator self-approval prohibition only
+RETURN/withdraw/cancel preserve immutable Submission history
+Release gates = human gate + optional official-Rendition gate
+system Release may occur in same tx when all gates already satisfied
+replacement Release = predecessor SUPERSEDED + successor EFFECTIVE atomically
+Distribution absent from Launch-Core Release transaction
+obsolescence = current EFFECTIVE + mandatory reason + no open replacement + no competing obsolescence
+same DocumentType governance route reused for obsolescence
+NoHumanApproval obsolescence = zero human Step
+route/config edit cannot reinterpret in-flight attempt
+READ COMMITTED + narrow explicit serialization/CAS candidate posture
 ```
 
-Do not use the former B1→B6→C→D→E→F order as active routing.
-
----
-
-## T1 adjudicated headline
-
-The operator accepted:
-
-```text
-Authentication
-  ProviderSubjectBinding
-  ApplicationSession
-
-Organization
-  Company
-  User
-  UserProfile
-  Area
-  Group
-  GroupMembership
-
-Authorization
-  product Role/Permission vocabulary
-  RoleAssignment
-
-Controlled Documents
-  DocumentType + numbering semantics
-  Document + Template role/origin
-  Revision
-  WorkingContent
-  Submission
-  GovernanceRoute current config
-  bounded GovernanceAttempt over SUBMISSION|OBSOLESCENCE
-  Step/Decision evidence + SubmissionFeedback
-  RevisionCancellation
-  Release
-  OfficialRendition only when required
-  Obsolescence result
-  imported/native provenance seam
-
-Audit
-  AuditEvent
-```
-
-Accepted T1-J:
-
-> If the Document Type is `NoHumanApproval`, governed obsolescence may complete with zero human Step after authorized initiation, mandatory reason and all eligibility/invariant checks. It remains a governed operation and creates no fake System approver.
-
-Explicitly absent from Launch T1 unless a later stage proves a named Launch consumer:
-
-```text
-Artifact semantic owner
-DocumentTypeCategory
-generic Dictionary/System Value platform
-TemplateSpec platform
-DRAFT EditorialComment platform
-Periodic Review state
-Distribution state
-Dossier/Evidence/Records
-Interchange / Governed Export / repository receipts
-global AuditChainHead/hash chain
-```
-
-T1 is **not yet durably promoted/closed** because the operator-facing summary must be ratified first.
+T2 is **not authority yet**.
 
 ---
 
 ## Exact next step
 
-**Present the T1 platform-facing summary to the operator and obtain explicit summary ratification.**
+**Operator adjudication of T2 recommendations T2-A→T2-N.**
 
-Do not open T2 before that approval.
+After that adjudication, do **not** open T3. First present the mandatory platform-facing T2 summary and obtain explicit operator summary ratification.
 
-Until T1 closes, do not write SQL/table/index design, package layout, storage locator design, exact permission catalog, async topology, API routes, migration execution design, implementation plans or product code.
+Until T2 closes, do not write final SQL/table/index design, package layout, exact permission catalog, storage locator design, async topology, API/frontend routes, migration execution plan, implementation plan or product code.
