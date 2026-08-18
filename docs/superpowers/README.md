@@ -2,7 +2,7 @@
 
 > **Status:** Active staging workspace for the MetalDocs Whole-Product Alignment / rebaselined R10 technical design.  
 > **Reset:** 2026-08-14.  
-> **Current gate:** **T1 Semantic State & Invariants candidate open / operator adjudication next.**
+> **Current gate:** **T1 decisions adjudicated / operator-facing platform summary ratification next; T2 not open.**
 
 The previous accumulation of roadmaps, milestones, plans, reports, specs and analysis packets under `docs/superpowers/` was intentionally removed from the live tree during the architecture reset.
 
@@ -16,7 +16,8 @@ Current rule:
 
 ## Current active staging
 
-- `analysis/2026-08-18-r10-t1-semantic-state-invariants-candidate.md` — **ACTIVE NON-AUTHORITATIVE T1 adjudication packet.** It proposes the minimum enduring semantic fact set after the accepted Product Contract, GCR and 4+1 ownership topology.
+- `analysis/2026-08-18-r10-t1-semantic-state-invariants-candidate.md` — T1 design candidate/evidence;
+- `analysis/2026-08-18-r10-t1-operator-adjudication.md` — **ACTIVE T1 adjudication + platform-summary ratification gate.** T1-A→T1-I and T1-J Option 1 are accepted, but T1 is not promoted/closed until the operator explicitly ratifies the platform-facing summary.
 
 Current durable authority remains:
 
@@ -26,6 +27,21 @@ wiki/architecture/launch-v1-product-contract.md
 → wiki/architecture/launch-v1-ownership-topology.md
 → wiki/architecture/r10-technical-architecture.md
 ```
+
+## Mandatory T-stage closure protocol
+
+For every `Tn`:
+
+```text
+candidate/design
+→ material decision adjudication
+→ platform-facing summary
+→ explicit operator summary ratification
+→ promotion/closure
+→ only then Tn+1
+```
+
+A technical recommendation approval alone does not authorize the next stage. The summary must make clear how the accepted decisions behave in MetalDocs, what remains deferred, and how named future capabilities remain attachable.
 
 ## Prior-design evidence still retained in the live tree
 
@@ -42,7 +58,7 @@ The former Whole-Product GCR staging packet was promoted into durable adjudicate
 ## Approved active technical path
 
 ```text
-T1 Semantic State & Invariants                         ACTIVE
+T1 Semantic State & Invariants                         SUMMARY RATIFICATION PENDING
 T2 Governance, Effectivity & Lifecycle Transactions   NOT OPEN
 T3 Authorization & Audit Enforcement                  NOT OPEN
 T4 Exact Content, Storage Integrity & Restore         NOT OPEN
