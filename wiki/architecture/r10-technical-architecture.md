@@ -1,6 +1,6 @@
 # R10 Technical Architecture — Rebaselined Active Stage Authority
 
-> **Status:** ACTIVE — **TECHNICAL REBASELINE APPROVED / T1 SEMANTIC STATE & INVARIANTS OPEN / IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1 TECHNICAL DECISIONS ADJUDICATED / OPERATOR PLATFORM-SUMMARY RATIFICATION NEXT / IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-18  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
@@ -96,9 +96,37 @@ T7 — Historical Migration & Cutover
 
 The sequence is by **failure class and proof dependency**, not by old module/context boundaries.
 
+## 3.0 Mandatory T-stage closure protocol — OPERATOR-APPROVED
+
+A technical adjudication is not enough to move to the next T-stage. Before `Tn` closes, the operator must receive and explicitly approve a **platform-facing summary** explaining what the stage decided and how those decisions will behave in MetalDocs.
+
+Binding sequence for every T-stage:
+
+```text
+Tn candidate/design
+→ material decision adjudication
+→ platform-facing summary
+→ explicit operator summary ratification
+→ promote durable Tn conclusions
+→ remove completed staging per documentation governance
+→ only then open Tn+1
+```
+
+The summary must explain, proportionally:
+
+1. what problem the stage solved;
+2. what was decided;
+3. how MetalDocs will behave because of those decisions;
+4. concrete user/admin/governance behavior preserved or changed;
+5. what remains deliberately undecided or deferred;
+6. how the named Launch+/Future horizon remains attachable;
+7. material Unknowns/reopen triggers.
+
+Do not convert this into ceremonial duplication. The summary is the operator comprehension/ratification gate for material technical architecture.
+
 ---
 
-## 3.1 T1 — Semantic State & Invariants — ACTIVE
+## 3.1 T1 — Semantic State & Invariants — SUMMARY RATIFICATION PENDING
 
 Question:
 
@@ -119,21 +147,35 @@ explicit deletion of old uncontracted semantic families
 
 T1 explicitly does **not** decide SQL/table/package shape, locks, exact participant rules, concrete permissions, storage handles, async topology, API/UI or migration execution.
 
-Active staging candidate:
+Active staging:
 
-`docs/superpowers/analysis/2026-08-18-r10-t1-semantic-state-invariants-candidate.md`
+- `docs/superpowers/analysis/2026-08-18-r10-t1-semantic-state-invariants-candidate.md`
+- `docs/superpowers/analysis/2026-08-18-r10-t1-operator-adjudication.md`
+
+Operator adjudication already accepted `T1-A→T1-I` and `T1-J Option 1`:
+
+```text
+NoHumanApproval on the Document Type
+→ governed obsolescence may have zero human Step
+→ but still requires authorized initiation, mandatory reason, eligibility/invariant checks,
+   immutable domain evidence and required Audit when T3 establishes the Audit census
+→ no fake System approver
+```
 
 Current gate:
 
 ```text
-T1 candidate → operator adjudication
+T1 technical decisions ACCEPTED
+→ operator-facing T1 platform summary
+→ explicit summary ratification
+→ only then T1 promotion/closure and T2 opening
 ```
 
 ---
 
 ## 3.2 T2 — Governance, Effectivity & Lifecycle Transactions — NOT OPEN
 
-Begins only after T1 semantic facts are accepted.
+Begins only after T1 platform-summary ratification and durable T1 promotion.
 
 Must prove all named lifecycle transitions, including:
 
@@ -374,9 +416,11 @@ Each T-stage must include:
 7. proof strategy before implementation;
 8. reopen triggers;
 9. explicit non-decisions;
-10. operator adjudication gate.
+10. material decision adjudication gate;
+11. operator-facing platform summary;
+12. explicit operator summary ratification before next-stage opening.
 
-A stage is not implementation authority. Accepted stage findings are integrated into this durable authority only after operator adjudication.
+A stage is not implementation authority. Accepted stage findings are promoted into durable authority only after both technical adjudication and platform-summary ratification.
 
 After T7:
 
@@ -397,11 +441,14 @@ Product Contract           = ACCEPTED
 Whole-Product GCR A1–A10   = ACCEPTED
 Launch ownership 4+1       = ACCEPTED
 T1–T7 decomposition        = OPERATOR-APPROVED
-T1                         = ACTIVE CANDIDATE / OPERATOR ADJUDICATION NEXT
+T1 decisions A→J           = ADJUDICATED / ACCEPTED
+T1 platform summary        = NEXT / OPERATOR RATIFICATION REQUIRED
+T1 final closure           = PENDING SUMMARY RATIFICATION
 T2–T7                      = NOT OPEN
 implementation             = BLOCKED
 ```
 
-Current active packet:
+Current active packets:
 
-`docs/superpowers/analysis/2026-08-18-r10-t1-semantic-state-invariants-candidate.md`
+- `docs/superpowers/analysis/2026-08-18-r10-t1-semantic-state-invariants-candidate.md`
+- `docs/superpowers/analysis/2026-08-18-r10-t1-operator-adjudication.md`
