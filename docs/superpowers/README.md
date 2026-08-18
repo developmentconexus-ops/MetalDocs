@@ -2,7 +2,7 @@
 
 > **Status:** Active staging workspace for the MetalDocs rebaselined R10 technical design.  
 > **Reset:** 2026-08-14.  
-> **Current gate:** **T1 + T2 + T3 + T4 + Decision Registry CLOSED / OPERATOR-RATIFIED; T5 ACTIVE / RENDITION-VIEWER SUBGATE.**
+> **Current gate:** **T1 + T2 + T3 + T4 + Decision Registry CLOSED / OPERATOR-RATIFIED; T5 CORRECTED ADJUDICATION NEXT.**
 
 Durable accepted truth belongs in `wiki/`. Active, not-yet-promoted design analysis belongs here. Completed/superseded staging is removed from the live tree and remains recoverable from Git history.
 
@@ -22,8 +22,9 @@ wiki/architecture/launch-v1-product-contract.md
 
 ## Current active staging
 
-- `analysis/2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md` — **PARENT NON-AUTHORITATIVE T5 candidate; corrected T5-A→P packet paused on rendition/viewer subgate.**
-- `analysis/2026-08-18-t5-rendition-viewer-strategy-evaluation.md` — **ACTIVE MATERIAL SUBGATE; RV-1→RV-6 operator decision next.**
+- `analysis/2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md` — parent non-authoritative T5 analysis.
+- `analysis/2026-08-18-t5-rendition-viewer-strategy-evaluation.md` — **RV-1→RV-6 operator-adjudicated / accepted.**
+- `analysis/2026-08-18-r10-t5-corrected-adjudication-packet.md` — **CURRENT corrected T5-A→T5-P adjudication surface.**
 
 Completed T4 staging was removed after durable promotion. Git history is the archive.
 
@@ -65,9 +66,7 @@ Search projection/rebuild/freshness/reconciliation
 provider effect receipts where needed
 ```
 
-## Rendition / viewer subgate
-
-Current recommended hybrid:
+## Accepted Rendition / Viewer subgate
 
 ```text
 PDF source
@@ -85,13 +84,11 @@ DOCX + RequireOfficialRendition(PDF)
   → Release gate
 ```
 
-Preview/viewing PDF and OfficialRendition PDF are intentionally different meanings. A preview/cache may be rebuildable mechanism; only the policy-required OfficialRendition is immutable semantic state and a Release gate.
+Preview/viewing PDF and OfficialRendition PDF are intentionally different meanings. A preview/cache may be rebuildable mechanism; only a policy-required OfficialRendition is immutable semantic state and a Release gate.
 
-Renderer product is not frozen. EigenPal, ONLYOFFICE and Gotenberg/LibreOffice remain candidates for different roles and must be tested against a representative DOCX fidelity corpus.
+Renderer product is not frozen. EigenPal, ONLYOFFICE and Gotenberg/LibreOffice remain candidates for different roles and must be proven against a representative DOCX fidelity corpus.
 
-Until `RV-1→RV-6` closes, **do not adjudicate T5-A→T5-P as a whole**.
-
-## Corrected T5 job census candidate
+## Corrected T5 job census
 
 ```text
 always-required durable job:
@@ -99,7 +96,7 @@ always-required durable job:
 
 conditional durable job:
   official_rendition_render
-  only for frozen RequireOfficialRendition policy
+  only when frozen representation policy requires it
 
 periodic reconciliation:
   managed-content GC over GC_PENDING
@@ -127,7 +124,8 @@ T2 Governance, Effectivity & Lifecycle Transactions   CLOSED / OPERATOR-RATIFIED
 T3 Authorization & Audit Enforcement                  CLOSED / OPERATOR-RATIFIED
 T4 Exact Content, Storage Integrity & Restore         CLOSED / OPERATOR-RATIFIED
 Decision Registry                                      CURRENT / OPERATOR-RATIFIED
-T5 Durable Async, Search & External Effects           ACTIVE / RENDITION-VIEWER SUBGATE
+RV-1→RV-6                                              ACCEPTED
+T5 Durable Async, Search & External Effects           ACTIVE / CORRECTED ADJUDICATION NEXT
 T6 Canonical API / Frontend Journeys                  NOT OPEN
 T7 Historical Migration & Cutover                     NOT OPEN
 
