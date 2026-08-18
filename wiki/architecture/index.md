@@ -13,7 +13,7 @@
 - **[r10-t3-authorization-audit-enforcement.md](r10-t3-authorization-audit-enforcement.md)** — operator-ratified T3 Authorization/Audit authority.
 - **[r10-t4-exact-content-storage-integrity-restore.md](r10-t4-exact-content-storage-integrity-restore.md)** — operator-ratified T4 exact-content/storage/restore authority.
 - **[rebaseline-decision-registry.md](rebaseline-decision-registry.md)** — operator-ratified disposition baseline for prior decisions.
-- **[r10-technical-architecture.md](r10-technical-architecture.md)** — exact current T1→T7 router; **T5 corrected adjudication next**.
+- **[r10-technical-architecture.md](r10-technical-architecture.md)** — exact current T1→T7 router; **T5 decisions accepted / platform summary ratification next**.
 - [../references/current-agent-handoff.md](../references/current-agent-handoff.md) — exact fresh-session recovery point / current gate.
 - [../standards/root-cause-global-maximum-method.md](../standards/root-cause-global-maximum-method.md) — binding DevelopmentConexus Engineering Method v1.0.0 mirror.
 
@@ -26,7 +26,7 @@ T3 Authorization & Audit Enforcement                  CLOSED / OPERATOR-RATIFIED
 T4 Exact Content, Storage Integrity & Restore         CLOSED / OPERATOR-RATIFIED
 Decision Registry                                      CURRENT / OPERATOR-RATIFIED
 RV-1→RV-6                                              ACCEPTED
-T5 Durable Async, Search & External Effects           ACTIVE / CORRECTED ADJUDICATION NEXT
+T5 Durable Async, Search & External Effects           DECISIONS ACCEPTED / SUMMARY RATIFICATION NEXT
 T6→T7                                                  NOT OPEN
 implementation                                         BLOCKED
 ```
@@ -34,8 +34,9 @@ implementation                                         BLOCKED
 Active T5 staging:
 
 - `../../docs/superpowers/analysis/2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md` — parent T5 analysis.
-- `../../docs/superpowers/analysis/2026-08-18-t5-rendition-viewer-strategy-evaluation.md` — RV-1→RV-6 accepted.
-- `../../docs/superpowers/analysis/2026-08-18-r10-t5-corrected-adjudication-packet.md` — **current T5-A→T5-P adjudication surface.**
+- `../../docs/superpowers/analysis/2026-08-18-t5-rendition-viewer-strategy-evaluation.md` — accepted RV subgate.
+- `../../docs/superpowers/analysis/2026-08-18-r10-t5-corrected-adjudication-packet.md` — accepted T5-A→T5-P packet.
+- `../../docs/superpowers/analysis/2026-08-18-r10-t5-operator-adjudication.md` — active platform-summary ratification gate.
 
 ## Revalidation law
 
@@ -77,6 +78,23 @@ DOCX + RequireOfficialRendition(PDF)
 A preview/viewing PDF and a policy-required `OfficialRendition` are different meanings. A preview/cache may be rebuildable mechanism; only `OfficialRendition` is immutable semantic state and a Release gate.
 
 Renderer product is not frozen; a representative DOCX fidelity corpus must prove the mechanism.
+
+## Accepted T5 async/search direction
+
+```text
+one Postgres-backed durable-job mechanism; River selected/reference
+search_refresh = always-required durable job
+official_rendition_render = conditional on frozen representation policy
+GC = periodic reconciliation over GC_PENDING
+required durable enqueue transaction-coupled to semantic transition
+Search = rebuildable PostgreSQL projection keyed by Document
+latest-state refresh makes duplicates/out-of-order safe
+Search may lag by omission but never grants stale authority/effectivity
+full Search rebuild required
+no mandatory Launch notifications/event bus
+no generic ExternalEffectReceipt
+minimum async operational visibility required
+```
 
 ## Prior redesign / evidence
 
