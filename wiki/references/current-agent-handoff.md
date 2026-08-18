@@ -19,7 +19,7 @@ Read in this order:
 8. `wiki/architecture/r10-t2-governance-effectivity-transactions.md`
 9. `wiki/architecture/rebaseline-decision-registry.md` — **RATIFIED PRIOR-DECISION DISPOSITION BASELINE**
 10. `wiki/architecture/r10-technical-architecture.md` — active technical-stage router
-11. active T3 staging candidate
+11. `docs/superpowers/analysis/2026-08-18-r10-t3-authorization-audit-enforcement-candidate.md` — **ACTIVE NON-AUTHORITATIVE T3 CANDIDATE / OPERATOR ADJUDICATION NEXT**
 12. `wiki/architecture/launch-v1-scope-rebaseline.md` — narrow Records defer overlay
 13. old R3–R9.5 / R10-B1→B6/C only as evidence allowed by the registry
 
@@ -52,7 +52,7 @@ REV002 = second revision
 
 > **Revalidation does not mean reinvention. Preserve a prior simple/coherent decision unless current authority or a concrete failure mode disproves it; rederive only the composite decision whose justification changed; defer only the capability that actually left Launch.**
 
-Every remaining T-stage must begin from the Decision Registry:
+Every remaining T-stage begins from the Decision Registry:
 
 ```text
 CURRENT / PRESERVE / REFINED → baseline
@@ -118,7 +118,7 @@ The old exact `5×43` catalog is **SUPERSEDED** and may not be repaired/subtract
 
 ## Exact next step
 
-Review/adjudicate the rebuilt T3 candidate derived only from the official REOPEN set.
+Operator adjudication of T3 recommendations `T3-A→T3-P` in the active candidate.
 
 After technical adjudication, **do not open T4**. Present the mandatory platform-facing T3 summary and obtain explicit operator ratification first.
 
