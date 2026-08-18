@@ -2,7 +2,7 @@
 
 > **Status:** Active staging workspace for the MetalDocs rebaselined R10 technical design.  
 > **Reset:** 2026-08-14.  
-> **Current gate:** **T1 + T2 + T3 + T4 + Decision Registry CLOSED / OPERATOR-RATIFIED; T5 CORRECTED ADJUDICATION NEXT.**
+> **Current gate:** **T1 + T2 + T3 + T4 + Decision Registry CLOSED / OPERATOR-RATIFIED; T5 DECISIONS ACCEPTED / PLATFORM SUMMARY RATIFICATION NEXT.**
 
 Durable accepted truth belongs in `wiki/`. Active, not-yet-promoted design analysis belongs here. Completed/superseded staging is removed from the live tree and remains recoverable from Git history.
 
@@ -24,7 +24,8 @@ wiki/architecture/launch-v1-product-contract.md
 
 - `analysis/2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md` — parent non-authoritative T5 analysis.
 - `analysis/2026-08-18-t5-rendition-viewer-strategy-evaluation.md` — **RV-1→RV-6 operator-adjudicated / accepted.**
-- `analysis/2026-08-18-r10-t5-corrected-adjudication-packet.md` — **CURRENT corrected T5-A→T5-P adjudication surface.**
+- `analysis/2026-08-18-r10-t5-corrected-adjudication-packet.md` — **T5-A→T5-P operator-adjudicated / accepted.**
+- `analysis/2026-08-18-r10-t5-operator-adjudication.md` — **ACTIVE PLATFORM SUMMARY RATIFICATION GATE.**
 
 Completed T4 staging was removed after durable promotion. Git history is the archive.
 
@@ -55,17 +56,6 @@ notifications are not domain/lifecycle authority
 current River/custom outbox code is evidence only
 ```
 
-## T5 official REOPEN set
-
-```text
-which effects actually require durable intent/outbox
-worker/lease/retry/DLQ mechanism
-renderer execution
-notifications if a Launch consumer remains
-Search projection/rebuild/freshness/reconciliation
-provider effect receipts where needed
-```
-
 ## Accepted Rendition / Viewer subgate
 
 ```text
@@ -84,11 +74,9 @@ DOCX + RequireOfficialRendition(PDF)
   → Release gate
 ```
 
-Preview/viewing PDF and OfficialRendition PDF are intentionally different meanings. A preview/cache may be rebuildable mechanism; only a policy-required OfficialRendition is immutable semantic state and a Release gate.
-
 Renderer product is not frozen. EigenPal, ONLYOFFICE and Gotenberg/LibreOffice remain candidates for different roles and must be proven against a representative DOCX fidelity corpus.
 
-## Corrected T5 job census
+## Accepted T5 durable-effect census
 
 ```text
 always-required durable job:
@@ -100,6 +88,25 @@ conditional durable job:
 
 periodic reconciliation:
   managed-content GC over GC_PENDING
+```
+
+Accepted T5 architecture also establishes:
+
+```text
+one Postgres-backed durable-job runtime; River selected/reference mechanism
+transaction-coupled enqueue for required future work
+provider/renderer execution outside semantic tx
+idempotent at-least-once rendition finalization
+PostgreSQL rebuildable Search projection keyed by Document
+latest-state search refresh; duplicates/out-of-order converge safely
+Search may lag by omission but never grants stale authority/effectivity
+full Search rebuild required; always-on crawler not baseline
+no mandatory Launch notifications/event bus
+no mandatory durable IdP-disable job
+bounded retry + fail-loud terminal visibility + manual redrive
+no generic ExternalEffectReceipt
+minimum async operational visibility
+future capabilities add only named jobs/effects/receipts
 ```
 
 ## Mandatory T-stage closure protocol
@@ -125,7 +132,7 @@ T3 Authorization & Audit Enforcement                  CLOSED / OPERATOR-RATIFIED
 T4 Exact Content, Storage Integrity & Restore         CLOSED / OPERATOR-RATIFIED
 Decision Registry                                      CURRENT / OPERATOR-RATIFIED
 RV-1→RV-6                                              ACCEPTED
-T5 Durable Async, Search & External Effects           ACTIVE / CORRECTED ADJUDICATION NEXT
+T5 Durable Async, Search & External Effects           DECISIONS ACCEPTED / SUMMARY RATIFICATION NEXT
 T6 Canonical API / Frontend Journeys                  NOT OPEN
 T7 Historical Migration & Cutover                     NOT OPEN
 
