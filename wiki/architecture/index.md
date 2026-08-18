@@ -33,7 +33,7 @@ implementation                                         BLOCKED
 
 Active T5 staging:
 
-- `../../docs/superpowers/analysis/2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md` — parent T5 candidate.
+- `../../docs/superpowers/analysis/2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md` — parent corrected T5 candidate.
 - `../../docs/superpowers/analysis/2026-08-18-t5-rendition-viewer-strategy-evaluation.md` — active material subgate; RV-1→RV-6 next.
 
 ## Revalidation law
@@ -74,6 +74,8 @@ DOCX + RequireOfficialRendition(PDF)
   → immutable OfficialRendition
   → Release gate
 ```
+
+A preview/viewing PDF and a policy-required `OfficialRendition` are different meanings. A preview/cache may be rebuildable mechanism; only `OfficialRendition` is immutable semantic state and a Release gate.
 
 Renderer product is not frozen; a representative DOCX fidelity corpus must prove the mechanism.
 
