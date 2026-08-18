@@ -5,38 +5,56 @@
 
 ## Active target design — read first
 
-- **[launch-v1-product-contract.md](launch-v1-product-contract.md)** — **ACCEPTED Launch V1 product authority.** Defines required product capabilities, journeys, invariants and scope tiers before technical architecture.
-- **[whole-product-alignment-review.md](whole-product-alignment-review.md)** — **ACTIVE Whole-Product Global Coherence Review authority.** R10-C is paused while prior R9.5/R10 architecture is challenged against the accepted Product Contract.
+- **[launch-v1-product-contract.md](launch-v1-product-contract.md)** — **ACCEPTED Launch V1 product authority.** Defines required product capabilities, journeys, invariants and scope tiers.
+- **[whole-product-alignment-review.md](whole-product-alignment-review.md)** — **OPERATOR-ADJUDICATED Whole-Product GCR / active routing authority.** A1–A10 are accepted; remaining technical architecture must be re-derived.
+- **[launch-v1-ownership-topology.md](launch-v1-ownership-topology.md)** — **OPERATOR-APPROVED Launch semantic ownership authority.** Launch topology is 4 business owners + Audit, with the binding future-evolution law: defer capability, preserve the evolution seam.
 - [../references/current-agent-handoff.md](../references/current-agent-handoff.md) — exact fresh-session recovery point / current gate.
 - [../standards/root-cause-global-maximum-method.md](../standards/root-cause-global-maximum-method.md) — binding DevelopmentConexus Engineering Method v1.0.0 mirror.
 
-## Prior redesign authority under active review
+## Prior redesign / technical evidence
 
-- [cohesive-platform-redesign.md](cohesive-platform-redesign.md) — prior cohesive redesign/global-coherence authority. Its R9.5/R10 decisions remain accepted/historical evidence except where the Product Contract or current Whole-Product review explicitly reopens them.
-- [r10-technical-architecture.md](r10-technical-architecture.md) — prior promoted R10 technical authority through integrated B2; not an instruction to continue technical descent while the Whole-Product review is active.
-- [launch-v1-scope-rebaseline.md](launch-v1-scope-rebaseline.md) — narrow operator-approved Records-Governance defer overlay; subordinate to the Product Contract for overall Launch scope/topology.
+- [cohesive-platform-redesign.md](cohesive-platform-redesign.md) — prior cohesive redesign authority/evidence. Its former 8+3 Launch topology is superseded by `launch-v1-ownership-topology.md`; other conclusions survive only where current authorities preserve them.
+- [r10-technical-architecture.md](r10-technical-architecture.md) — prior promoted R10 technical authority/evidence through B2. Do not continue its old stage order or ownership assumptions by inertia.
+- [launch-v1-scope-rebaseline.md](launch-v1-scope-rebaseline.md) — narrow operator-approved Records-Governance defer overlay; subordinate to Product Contract/GCR/topology.
+
+## Active Launch ownership
+
+```text
+BUSINESS
+Authentication
+Organization
+Authorization
+Controlled Documents
+
+SUPPORTING SEMANTIC
+Audit
+```
+
+Storage/integrity, rendering/viewers, Search, async execution, Historical Migration tooling and backup/restore are mechanisms/projections/cutover/operations, not Launch semantic owners.
+
+Known Launch+/Future capabilities remain an explicit architectural horizon in `launch-v1-ownership-topology.md`. They receive stable attachment seams but no dormant implementation.
 
 ## Stable cross-cutting references
 
-These remain valid where they do not conflict with the accepted Product Contract or active redesign:
+These remain valid where they do not conflict with the accepted Product Contract, adjudicated GCR or approved Launch topology:
 
 - [backend-api-structure.md](backend-api-structure.md) — backend route/OpenAPI structure.
 - [api-contract.md](api-contract.md) — contract-first policy and generated-surface rules.
 - [api-design-system.md](api-design-system.md) — API behavior standards.
 - [frontend-structure.md](frontend-structure.md) — frontend structure and boundary rules.
-- [tenant-context.md](tenant-context.md) — runtime tenant trust boundary.
+- [tenant-context.md](tenant-context.md) — current/runtime trust-boundary reference; target tenancy mechanics must survive the current single-company authority.
 - [trusted-proxy.md](trusted-proxy.md) — network trust boundary.
 - [rate-limiting.md](rate-limiting.md) — request throttling architecture.
 - [tech-stack.md](tech-stack.md), [deployment.md](deployment.md) — supporting runtime/operations references.
 
 ## Legacy/current-state architecture references
 
-The following describe prior target programs or the current implementation and **must not be used as target product/domain authority while the Whole-Product review is active**:
+The following describe prior target programs or the current implementation and **must not be used as current Launch product/domain authority**:
 
-- [backend-target-architecture.md](backend-target-architecture.md) — prior normative backend target; current infrastructure requirements may still be useful, but its module/domain topology is under redesign.
+- [backend-target-architecture.md](backend-target-architecture.md) — prior normative backend target.
 - [backend-blueprint.md](backend-blueprint.md) — current/prior-state composition evidence.
 - [system-overview.md](system-overview.md) — current-state overview.
-- [data-model.md](data-model.md) — current/legacy data-model reference; target data model is re-derived only after product/ownership closure.
+- [data-model.md](data-model.md) — current/legacy data-model reference; target data model is re-derived only after the new technical design settles.
 - [../backend/index.md](../backend/index.md) — forensic/current-state backend atlas; evidence, not target design.
 
-When these pages disagree on Launch capability, product semantics or active routing, the Product Contract + current handoff/Whole-Product review control the target.
+When pages disagree on Launch capability, semantic ownership or current routing, the Product Contract + adjudicated GCR + Launch ownership topology + current handoff control the target.
