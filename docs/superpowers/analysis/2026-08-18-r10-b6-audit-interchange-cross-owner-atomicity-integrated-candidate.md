@@ -1,6 +1,6 @@
 # R10-B6 — Audit + Interchange + Cross-owner Atomicity — Integrated Candidate
 
-> **Status:** NON-AUTHORITATIVE CANDIDATE — OPERATOR REVIEW / R10 INTEGRATION PENDING  
+> **Status:** NON-AUTHORITATIVE — SELF-REVIEWED CORRECTED CANDIDATE — OPERATOR REVIEW / R10 INTEGRATION PENDING  
 > **Date:** 2026-08-18  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
@@ -10,13 +10,13 @@
 > **Implementation:** BLOCKED  
 > **Independent review:** deferred to Whole-R10 unless a material exception trigger appears.
 
-This file is staging analysis. It does **not** independently ratify B6, promote B3–B5 to final authority, or silently rewrite the frozen R3–R9.5 ledger. It closes the relational/transactional `R10-B` design surface and explicitly records bounded refinements exposed by real pre-MetalDocs-history counterexamples.
+This file is staging analysis. It does **not** independently ratify B6, promote B3–B5 to final authority, or silently rewrite the frozen R3–R9.5 ledger. It closes the relational/transactional `R10-B` design surface and records bounded refinements revealed by real pre-MetalDocs-history and cross-owner counterexamples.
 
 ---
 
-# 1. Authority and evidence boundary
+# 1. Authority / evidence boundary
 
-Authority path:
+Read authority in repository order:
 
 1. `AGENTS.md`
 2. `docs/engineering/standards/root-cause-global-maximum-method.md`
@@ -24,219 +24,183 @@ Authority path:
 4. `wiki/architecture/cohesive-platform-redesign.md`
 5. `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md`
 6. `wiki/architecture/r10-technical-architecture.md`
-7. accepted non-final B3 candidate + B5-approved B3 refinements
-8. accepted corrected non-final B4 candidate + B4 acceptance record
-9. accepted corrected non-final B5 candidate + B5 acceptance record
+7. accepted non-final B3 + B5-approved B3 refinements
+8. accepted corrected non-final B4 + acceptance record
+9. accepted corrected non-final B5 + acceptance record
 
-Current code/schema/OpenAPI/legacy ADR/module shape remains evidence only.
+Current code/schema/OpenAPI/legacy ADRs remain current-state evidence only.
 
 External comparison evidence only:
 
-- NIST SP 800-92 log-management guidance: <https://csrc.nist.gov/pubs/sp/800/92/final>
-- RFC 8493 BagIt file-package/manifests: <https://www.rfc-editor.org/rfc/rfc8493.html>
-- NARA electronic-record transfer metadata guidance: <https://www.archives.gov/records-mgmt/policy/metadata-compiled>
+- NIST SP 800-92: <https://csrc.nist.gov/pubs/sp/800/92/final>
+- RFC 8493 BagIt: <https://www.rfc-editor.org/rfc/rfc8493.html>
+- NARA transfer metadata: <https://www.archives.gov/records-mgmt/policy/metadata-compiled>
 - PostgreSQL isolation: <https://www.postgresql.org/docs/current/transaction-iso.html>
-- PostgreSQL explicit locking/deadlocks: <https://www.postgresql.org/docs/current/explicit-locking.html>
+- PostgreSQL locking: <https://www.postgresql.org/docs/current/explicit-locking.html>
+- PostgreSQL SHA-256 binary function precedent: <https://www.postgresql.org/docs/current/functions-binarystring.html>
+- PostgreSQL SECURITY DEFINER safety guidance: <https://www.postgresql.org/docs/current/sql-createfunction.html>
 
-Comparison signal only:
+Useful signal only:
 
-- log/audit management is a distinct evidence infrastructure, not a substitute for domain state;
-- transfer packages benefit from explicit payload manifests + checksums independent of storage layout;
-- transferred records need enough metadata to identify and interpret them later;
-- PostgreSQL `READ COMMITTED` may expose different snapshots to successive statements, while `REPEATABLE READ` provides one transaction snapshot;
-- consistent lock acquisition order is the primary defense against application deadlocks.
+- Audit/log infrastructure is evidence infrastructure, not domain-state authority;
+- transfer packages benefit from explicit manifests/checksums independent of storage layout;
+- transfer metadata must preserve enough meaning to identify and interpret content later;
+- `READ COMMITTED` does not provide one snapshot across a multi-statement export, whereas `REPEATABLE READ` does;
+- consistent lock order is the primary application defense against deadlock.
 
-MetalDocs does not adopt event sourcing, BagIt, a generic integration bus, PKI/TSA/HSM, or global stronger isolation merely because comparable systems expose those mechanisms.
+MetalDocs does not adopt event sourcing, BagIt, generic integration-bus semantics, global SERIALIZABLE, PKI/TSA/HSM, or provider-specific package identity merely because those mechanisms exist.
 
 ---
 
 # 2. Known / Inferred / Unknown / Deferred
 
-## 2.1 Known — frozen/promoted/accepted inputs
+## 2.1 Known
 
 ### Audit
 
-- Audit is append-only transversal timeline evidence, never canonical owner of resource state;
-- critical governed mutations cannot report success without required Audit evidence in the same local DB commit;
-- Audit is tamper-evident, queryable and exportable;
-- Audit has its own retention regime, separate from B5 Records Governance;
-- the immutable Audit portion surviving lawful user/data-subject PII erasure must be PII-minimized/non-human-readable;
-- human-readable User enrichment may be erased without rewriting immutable governance evidence;
-- B2 grant/revoke/offboarding evidence must remain forensically reconstructible after current grant/membership rows are deleted;
-- Audit cannot become retention-clock/effectivity/approval/authorization authority.
+- AuditEvent is transversal timeline evidence, never canonical resource state;
+- critical governed mutations cannot report success without required Audit in the same local DB commit;
+- Audit is append-only, tamper-evident, queryable/exportable and has a separate retention regime;
+- the immutable Audit skeleton surviving lawful User-profile erasure must be PII-minimized/non-human-readable;
+- B2 grant/revoke/offboarding evidence must remain reconstructible after current rows disappear;
+- Audit cannot become Approval/effectivity/AuthZ/retention-clock authority.
 
 ### Interchange
 
-- `Historical Migration`, `Governed Subject Export`, `External Repository IMPORT_COPY/PUBLISH_COPY`, and `Backup/Restore` are distinct contracts;
+- Historical Migration, Governed Subject Export, External Repository `IMPORT_COPY`/`PUBLISH_COPY`, and Backup/Restore are distinct contracts;
 - Tenant Portability Export remains deferred;
-- ordinary `IMPORT_COPY` follows normal target lifecycle/permissions;
-- Historical Migration is privileged pre-MetalDocs-history import and never fabricates native facts;
-- imported lifecycle/approval/effectivity facts are imported evidence, not fake ApprovalInstance/Decision/Release/internal-User actions;
-- unknown source facts remain unknown;
-- imported EFFECTIVE/SUPERSEDED/OBSOLETE require source proof;
-- reliable numeric legacy revision ordinals may map directly; arbitrary labels preserve source label and map deterministically;
-- next native REV must always be above the highest real imported historical ordinal;
-- exact primary bytes are required to create a target DocumentRevision; missing historical bytes may preserve source-history evidence but do not create a fake Revision;
-- Historical Migration has first-class plan/batch semantics, true dry-run, deterministic per-item outcomes, reconciliation and per-semantic-unit atomicity; partial batch success is valid;
-- same source identity + same content reuses; conflicting content/state fails closed;
-- source actors remain source snapshots/references; migration writes are attributed to Migration/System principal;
-- Governed Subject Export packages Document/Evidence/Dossier independently with versioned provider-independent manifest, object/relationship/provenance metadata, canonical filenames, ContentFormats, sizes and SHA-256;
-- a package claiming completeness fails closed rather than silently omit required unauthorized subjects;
-- generated export package is temporary delivery output, not automatically Artifact/Evidence;
-- V1 does not require signed export packages.
+- ordinary `IMPORT_COPY` follows ordinary target lifecycle and permissions;
+- Historical Migration never fabricates native Submission/Approval/Release/User facts;
+- unknown history remains unknown;
+- imported EFFECTIVE/SUPERSEDED/OBSOLETE requires proof;
+- reliable legacy revision ordinals may map directly and next native REV must remain above every real imported ordinal;
+- exact primary bytes are required for a real imported DocumentRevision; missing historical bytes may preserve evidence but cannot create a fake Revision;
+- Historical Migration requires plan, true dry-run, deterministic per-item result, reconciliation, per-semantic-unit atomicity and cross-plan idempotency;
+- source actors remain source snapshots/references; native migration actor is Migration/System principal;
+- Governed Subject Export uses a provider-independent complete manifest with relationships/provenance/filenames/formats/sizes/SHA-256;
+- a complete package fails closed if a required subject cannot lawfully be included;
+- generated package output is temporary delivery output, not automatically Evidence/Artifact;
+- signed packages are not required V1.
 
-### Cross-owner / B1–B5
+### B1–B5 integration
 
-- one local PostgreSQL product-state DB/schema;
-- ordinary isolation remains `READ COMMITTED` unless a narrower operation proves stronger isolation necessary;
-- cross-owner frozen atomicity uses one local transaction through composable owner seams;
-- no nested hidden commits and no owner imports another owner's repository for atomicity;
-- provider databases/object stores never join MetalDocs atomic commit;
-- required durable async intent is inserted in the same local transaction as the business fact when a later effect is necessary;
-- jobs/outbox/retries/leases/projections never become semantic authority;
-- B3 exact Submission, B4 Approval/Rendition/Release/Distribution and B5 Retention/Hold/Disposition laws remain integration inputs;
-- B5 Artifact closure = exactly one semantic retention root per Artifact: one DocumentRevision or one Evidence.
+- one local PostgreSQL product DB/schema, typed FKs, RESTRICT/NO ACTION, serving role non-owner, default `READ COMMITTED`;
+- cross-owner frozen atomicity uses one local transaction through owner seams;
+- no owner hides a commit/imports another owner's persistence to obtain atomicity;
+- provider/object-store calls never join MetalDocs commit;
+- required durable effect intent is inserted in the owning local transaction;
+- jobs/retries/outbox/projections never become semantic authority;
+- B3 exact Submission, B4 governance/effectivity and B5 retention/hold/disposition remain authoritative;
+- every Artifact has exactly one semantic retention root: one DocumentRevision or one Evidence.
 
-## 2.2 Inferred candidate choices
+## 2.2 Inferred corrected choices
 
-1. Audit uses one deployment-wide append-only hash chain with one small serialized chain-head row; it is not event sourcing.
-2. Audit sequence is allocated transactionally from the chain head, not from a non-transactional PostgreSQL sequence, so committed chain sequence is contiguous.
-3. Audit hashes a versioned canonical event envelope using RFC 8785 JCS + SHA-256, reusing the canonicalization stack already selected by B3.
-4. AuditChainHead is always the final contended semantic lock acquired by an audited transaction; no domain lock may be acquired after it.
-5. Audit immutable V1 skeleton retention is `Indefinite`; no Audit-pruning/checkpoint subsystem is created without a real finite-retention requirement.
-6. Audit payload does not copy free-form domain text, request bodies, passwords/tokens, IP/user-agent, provider claims or full resource snapshots. Domain reasons/comments/content remain with their owning evidence.
-7. Audit uses stable internal UUID/code snapshots for actor/resource/forensic facts. Human-readable UserProfile resolution is read-time enrichment, not stored immutable Audit duplication.
-8. Audit operation/fact schemas are small versioned product contracts. `facts JSONB` is bounded by the event schema and is not a generic dump field.
-9. Historical imported content needed by ongoing Controlled Information behavior must be target-owner state, not an Interchange table that CI must query forever.
-10. `DocumentRevision` therefore gains immutable `history_kind = NATIVE | IMPORTED` on the permanent identity skeleton.
-11. Historical exact Revision content is represented by CI-owned immutable `RevisionImportedContent`, not a fabricated `RevisionSubmission`.
-12. Imported source lifecycle/governance facts required to interpret a Revision are represented by CI-owned immutable `RevisionImportedGovernanceSnapshot`; Interchange owns the migration process/provenance that created it, not ongoing CI meaning.
-13. Historical numeric ordinals that are real but lack sufficient bytes for a DocumentRevision are reserved by CI-owned `RevisionOrdinalReservation`; native allocation is above both Revision rows and reservations.
-14. Template origin can reference either native Submission content or imported Revision content through a source-content-kind snapshot without reintroducing strong retention payload FKs.
-15. Imported current EFFECTIVE Revision with unknown trustworthy source effectivity does not invent `effective_at`; `adopted_as_current_at` is an adoption fact. For Periodic Review, lack of a trustworthy prior anchor makes the Revision immediately due (not invalid) until an explicit review establishes a new anchor.
-16. Imported Revision RetentionBinding is created in the migration semantic unit even though no native first Submission exists. Imported retention anchor derives from trustworthy imported lifecycle evidence; unknown anchor never silently becomes disposition-eligible.
-17. Historical Evidence likewise requires an imported capture shape instead of fake native `captured_by`/`captured_at`; B5 is bounded-refined with immutable `Evidence.history_kind` + `EvidenceImportedCapture`.
-18. Interchange source idempotency uses a persistent typed `HistoricalSourceBinding`; it is a closed target union, not `target_type/target_id` generic polymorphism.
-19. External repository connection semantics use a stable MetalDocs `InterchangeConnection` identity; credentials/endpoints remain deployment/provider mechanism. Rebinding one connection to a different logical external repository is forbidden; create a new connection instead.
-20. Governed export semantic snapshot is created inside one short PostgreSQL `REPEATABLE READ` transaction; package materialization happens after commit through R10-D mechanisms.
-21. Governed export manifest uses JCS + SHA-256 and exact Artifact hashes; MetalDocs does not adopt BagIt V1 absent a consumer requiring that external packaging contract.
-22. Export does not create hidden LegalHold/retention. If source bytes are lawfully disposed before package build finishes, build fails visibly/reconciles rather than silently changing retention semantics.
-23. PUBLISH_COPY request snapshots exact source identity/hash/format but does not retain a strong Artifact FK forever. If source is disposed before external effect succeeds, transfer fails visibly/reconciles.
-24. IMPORT_COPY calls ordinary target-owner seams after bytes are staged/validated; it never bypasses normal target governance because an external connector fetched the bytes.
-25. B6 closes an explicit same-local-commit matrix and a global partial lock order. Operations may start at a later class, but may never backtrack to an earlier class.
+1. Audit uses one small deployment-wide append hash chain; it is not event sourcing.
+2. Committed Audit sequence is allocated transactionally from the chain head, not a non-transactional DB sequence.
+3. Audit canonicalization reuses RFC 8785 JCS + SHA-256 from B3.
+4. AuditChainHead is always the final contended semantic lock of an audited transaction.
+5. V1 immutable Audit skeleton retention = `Indefinite`; finite chain pruning is not invented without requirement.
+6. Audit never copies free-form domain reasons/comments/request bodies/profile attributes/provider claims/secrets into its immutable skeleton.
+7. Human-readable User data is resolved at read time from erasable profile state; no `AuditEventEnrichment` table V1.
+8. Audit event/facts schemas are versioned bounded product contracts, not arbitrary JSON dumps.
+9. A narrow DB-owned Audit append primitive must structurally prevent ordinary serving SQL from directly inserting arbitrary chain rows or resetting AuditChainHead. Direct table INSERT/UPDATE privileges are not the target write contract.
+10. Historical information needed by ongoing CI/Evidence behavior becomes target-owner imported state, not a permanent runtime dependency on Interchange process tables.
+11. Permanent `DocumentRevision.history_kind = NATIVE|IMPORTED` and `Evidence.history_kind = NATIVE|IMPORTED` distinguish provenance without changing business lifecycle vocabulary.
+12. Imported exact Revision content uses CI-owned `RevisionImportedContent`, never fake `RevisionSubmission`.
+13. Imported lifecycle/governance interpretation uses CI-owned `RevisionImportedGovernanceSnapshot`; source-system/process mapping remains Interchange-owned.
+14. Real historical ordinals without sufficient bytes use CI-owned permanent `RevisionOrdinalReservation`.
+15. Native `RevisionDictionarySnapshot` remains mandatory for NATIVE revisions; imported revisions never resolve current dictionary merely to fill history. Imported dictionary state is present only if trustworthy source mapping exists and is represented explicitly in imported content/governance payload.
+16. B5 native `cancelled_at/obsoleted_at` are **native MetalDocs transition instants**. For an already-terminal imported Revision they may remain NULL when imported governance proof carries the historical source terminal fact. A later native post-adoption terminal transition writes the corresponding native timestamp once.
+17. Template origin accepts exact source kind `NATIVE_SUBMISSION|IMPORTED_REVISION_CONTENT` without restoring strong retention-payload FKs.
+18. Imported current EFFECTIVE with unknown trustworthy effective/review anchor remains EFFECTIVE but is immediately due for Periodic Review; `adopted_as_current_at` is not relabeled as historical effectivity.
+19. Imported Revision RetentionBinding is created in the migration unit despite no native Submission; trustworthy imported lifecycle anchors may drive retention, unknown anchors never silently do.
+20. Historical Evidence uses `EvidenceImportedCapture`, never fake native captured-by/time. Imported retention uses trustworthy source captured/occurred fact only.
+21. Historical Migration cross-plan idempotency uses a persistent closed typed `HistoricalSourceBinding`, not `target_type/target_id` polymorphism.
+22. `InterchangeConnection` is stable logical external-repository identity; credentials/endpoints are provider/deployment mechanism. Rebinding to a different logical repository requires a new connection.
+23. Governed export semantic snapshot uses one short `REPEATABLE READ` transaction; package assembly is asynchronous after commit.
+24. Export manifest uses JCS + SHA-256; BagIt remains an optional future external contract.
+25. Export creates no hidden retention/hold. Lawful disposition racing package build may make build fail visibly; export request does not silently preserve source forever.
+26. PUBLISH_COPY pins exact source root + Artifact UUID/hash/format as snapshots but no strong Artifact FK. Missing/disposed source before external success produces visible failure.
+27. IMPORT_COPY uses ordinary target-owner creation/revision/capture operations; successful target mutation and `RepositoryTransferReceipt` commit together.
+28. B6 closes one same-local-commit matrix and a global partial lock order; operations may start later but never backtrack.
 
-## 2.3 Unknown — kept unknown
+## 2.3 Unknown
 
-- a future contractual finite Audit retention period and chain-pruning/checkpoint scheme;
-- external cryptographic anchoring/WORM/TSA/HSM for stronger DBA-level non-repudiation;
-- a future BagIt or other standardized export packaging requirement;
-- a future explicitly partial Governed Subject Export contract;
-- provider-specific External Repository receipt metadata beyond bounded stable IDs/version facts;
-- future non-MetalDocs consumer requiring a public integration event bus;
-- imported historical source states not faithfully expressible in current target lifecycle without a new explicit semantic mapping;
-- exact R10-F legacy/cutover mechanics for historical state maps.
-
-These are reopen triggers, not V1 defaults.
+- contractual finite Audit retention/pruning/checkpoint requirements;
+- external cryptographic Audit anchoring/WORM/TSA/HSM;
+- standardized BagIt/signed export requirement;
+- explicitly partial export contract;
+- provider-specific external receipt metadata beyond stable IDs/version snapshots;
+- a real public integration event bus consumer;
+- a historical source state not truthfully representable through current imported-target snapshots;
+- exact R10-F legacy state/cutover mechanics.
 
 ## 2.4 Deferred
 
 ```text
-physical storage / malware / ObjectLock / restore / byte-delete proof → R10-C
-worker schemas / retries / leases / timers / DLQ / projections       → R10-D
-HTTP/API/frontend/export/download/admin journeys                     → R10-E
-legacy cutover / bootstrap recovery / final migration execution map   → R10-F
+physical bytes / malware / ObjectLock / restore / delete verification → R10-C
+worker/outbox schema / retry / lease / timer / DLQ / projection       → R10-D
+HTTP/API/frontend/export/download/admin journeys                      → R10-E
+legacy cutover / bootstrap recovery / final execution/deletion map    → R10-F
 ```
 
 ---
 
-# 3. Root Cause
+# 3. Root Cause / Target Invariant
 
-B6 prevents **transversal truth collapse**.
+Failure class: **transversal truth collapse**.
 
-Without an explicit boundary, three cross-cutting concerns tend to become shadow authorities:
+Audit log, migration/integration state and async state can easily become shadow authorities. That produces best-effort Audit, fake native history, export snapshots that never existed, provider truth masquerading as product truth, and cross-owner partial commits.
 
-```text
-Audit log
-integration/migration state
-async/outbox state
-```
+Target invariant:
 
-Typical defects:
-
-- business state succeeds while mandatory Audit is lost;
-- Audit payload is later queried as the resource authority;
-- Audit becomes event sourcing accidentally;
-- outbox/job state is treated as proof an external effect occurred;
-- historical source approval/effectivity is rewritten as native MetalDocs actions;
-- migration time is substituted for unknown historical time;
-- export reads multiple `READ COMMITTED` snapshots and emits a package representing no real database state;
-- generic integration registries duplicate target-owner identity;
-- a reverse lock edge through Audit/composition creates deadlocks;
-- one owner commits locally and a second owner is “repaired later” even though the invariant required atomicity.
-
----
-
-# 4. Target invariant
-
-> **Every business/system fact remains owned by exactly one semantic owner. Required Audit evidence is appended in the same local transaction as the governed mutation but never becomes the mutation's authority. Historical Migration preserves external truth as explicit imported target-owner state/evidence without fabricating native actions. External imports/publishes/exports preserve exact provenance and content identity without provider-storage coupling. Every B1–B5 invariant that spans local owners is committed once through composition under one compatible lock order, while external effects are represented only by durable intent + later explicit receipt.**
+> **Every business/system fact has one semantic owner. Required Audit is atomically appended with the mutation but never owns that mutation. Historical Migration preserves source truth through explicit imported target-owner forms without fabricating native actions. External import/publish/export preserves exact provenance/content identity without storage coupling. Every local cross-owner invariant commits once through composition under one compatible lock order; external effects are durable intents followed by explicit receipts.**
 
 ```text
 AuditEvent != domain state
 AuditEvent != outbox/event bus
-outbox intent != effect receipt
-Migration execution != native User action
+outbox intent != external-effect receipt
+migration execution != native User action
 imported governance != ApprovalDecision/ReleaseRecord
-export manifest != provider key listing
+export manifest != provider object layout
 InterchangeConnection != credential store
-REPEATABLE READ export snapshot != global DB isolation policy
 composition != semantic owner
 ```
 
 ---
 
-# 5. Credible alternatives / Global Maximum
+# 4. Alternatives / Method outcome
 
-## A — central event sourcing / Audit as global history authority
+### A — global event sourcing / Audit as history authority
+Reject. Duplicates every domain authority and makes migration/recovery depend on one transversal log.
 
-Reject. Creates a second authority for every domain, couples all recovery/migration to one log and dramatically increases accidental complexity.
+### B — best-effort Audit + generic integration/outbox engine
+Reject. Allows governed success without evidence and collapses provenance/effect intent/process truth.
 
-## B — async best-effort Audit + generic integration/outbox engine
+### C — DB triggers infer semantic Audit from CRUD
+Reject. Persistence writes do not reliably encode Submission/Approval/Release/hold meaning.
 
-Reject. Business facts can succeed without mandatory evidence; provenance/effect intent/process truth become one ambiguous transversal subsystem.
+### D — small semantic Audit + specialized Interchange contracts + explicit tx/lock matrix
+**Recommended Global Maximum.** Smallest structure preserving auditability, historical truth, export integrity and local atomicity without a generic transversal platform.
 
-## C — DB triggers audit every CRUD write
-
-Reject. Captures persistence mutations, not business meaning; cannot correctly express exact Submission/Approval/Release/hold semantics and makes the database infer domain authority.
-
-## D — small semantic Audit + specialized Interchange contracts + explicit transaction/lock matrix
-
-**Recommended Global Maximum.** Smallest structure that preserves forensic evidence, imported truth and cross-owner atomicity without introducing a generic event/integration platform.
+Method outcome if accepted: **RESTRUCTURE NOW at design level**.
 
 ---
 
-# 6. Audit semantic model
+# 5. Audit model
 
-## 6.1 AuditChainHead
-
-One row per deployment/database:
+## 5.1 AuditChainHead
 
 ```text
 AuditChainHead
-  singleton_key SMALLINT PRIMARY KEY CHECK singleton_key = 1
+  singleton_key SMALLINT PRIMARY KEY CHECK singleton_key=1
   last_sequence BIGINT NOT NULL CHECK last_sequence >= 0
   last_hash BYTEA NOT NULL CHECK octet_length(last_hash)=32
 ```
 
-Genesis:
+Genesis = sequence 0 + 32 zero bytes.
 
-```text
-last_sequence = 0
-last_hash = 32 zero bytes
-```
-
-Mutation law: mutable only inside Audit append; serving application cannot reset/reseed it.
-
-## 6.2 AuditEvent
+## 5.2 AuditEvent
 
 ```text
 AuditEvent
@@ -254,145 +218,125 @@ AuditEvent
 
   facts_schema TEXT NOT NULL
   facts JSONB NOT NULL CHECK jsonb_typeof(facts)='object'
-
   correlation_id UUID NULL
 
   prev_hash BYTEA NOT NULL CHECK octet_length(prev_hash)=32
   event_hash BYTEA NOT NULL CHECK octet_length(event_hash)=32
 ```
 
-Actor union:
+Actor XOR:
 
 ```text
 USER   → actor_user_id only
 SYSTEM → system_actor_code only
 ```
 
-`resource_kind/resource_id` is intentionally non-FK forensic attribution. B1 permits generic attribution in Audit because Audit does not own or constrain resource lifecycle; the target row may later be disposed/deleted.
+`system_actor_code`, `operation_code`, `resource_kind` and `facts_schema` are product-owned closed/bounded vocabularies at the admitted schema version. Facts schema defines exact keys/types; unknown arbitrary facts fail validation.
 
-## 6.3 Canonical hash
+`resource_kind/resource_id` intentionally has no FK. Audit attribution is non-authoritative and the resource row/payload may later be lawfully disposed.
 
-Versioned canonical payload:
+`occurred_at` is trusted server/application transaction time, never a client-supplied historical timestamp.
+
+## 5.3 Hash
 
 ```text
 payload = {
-  id,
-  sequence_no,
-  occurred_at,
-  actor_kind,
-  actor_user_id?,
-  system_actor_code?,
-  operation_code,
-  resource_kind,
-  resource_id,
-  facts_schema,
-  facts,
-  correlation_id?
+  id, sequence_no, occurred_at,
+  actor_kind, actor_user_id?, system_actor_code?,
+  operation_code, resource_kind, resource_id,
+  facts_schema, facts, correlation_id?
 }
 
 canonical = RFC8785_JCS(payload)
 
 event_hash = SHA256(
-  prev_hash
-  || 0x00
-  || UTF8("metaldocs.audit-event.v1")
-  || 0x00
-  || canonical
+  prev_hash || 0x00 || UTF8("metaldocs.audit-event.v1") || 0x00 || canonical
 )
 ```
 
-`prev_hash` is stored separately and must equal the prior committed event hash. Cross-runtime golden vectors are required before implementation.
+Cross-runtime golden vectors are mandatory.
 
-## 6.4 Append transaction law
+## 5.4 DB-enforced append seam
 
-For an audited mutation, all domain/records/effect-intent work is completed first. Audit append is last:
-
-```text
-lock AuditChainHead FOR UPDATE
-read last_sequence/last_hash
-for each required event in stable caller-defined order:
-  allocate sequence = previous + 1
-  compute canonical event/hash
-  insert AuditEvent
-  advance local previous hash/sequence
-update AuditChainHead once to final sequence/hash
-COMMIT
-```
-
-Rollback rolls back events + chain-head advance, so the committed Audit sequence has no transaction-created gaps.
-
-**No domain/owner lock may be acquired after AuditChainHead.**
-
-## 6.5 Serving trust / tamper evidence
-
-Ordinary serving trust:
+Target DB privilege posture:
 
 ```text
-AuditEvent INSERT/SELECT as needed
-AuditEvent UPDATE/DELETE forbidden
-AuditChainHead UPDATE only through narrow Audit append seam
+ordinary serving role:
+  NO direct INSERT/UPDATE/DELETE on AuditEvent
+  NO direct UPDATE on AuditChainHead
+  SELECT only where backend query path requires it
+  EXECUTE only on narrow Audit-owned append primitive
 ```
 
-Hash-chain verification detects mutation/deletion/reordering within the trust domain. V1 does **not** claim cryptographic non-repudiation against an attacker capable of rewriting the whole DB + application trust domain. External anchoring/signing remains a reopen trigger.
+The append primitive executes inside the caller's existing transaction and:
+
+1. locks the singleton head;
+2. obtains previous sequence/hash;
+3. enforces next committed sequence;
+4. accepts the bounded event envelope/canonical bytes from the Audit application seam;
+5. inserts immutable event;
+6. advances head monotonically;
+7. exposes no reset/backfill API to ordinary serving trust.
+
+Exact SQL-function vs equivalently strong database-owned primitive is implementation-spec work. If a SECURITY DEFINER function is chosen, ownership/search-path/PUBLIC EXECUTE must follow PostgreSQL safety guidance. Integrity validation recomputes the canonical hash independently; a malformed supplied hash cannot silently become a valid chain.
+
+Multiple required events in one business transaction append in stable caller-defined semantic order while holding the head once.
+
+## 5.5 Terminal lock rule
+
+Audit append happens only after all owner locks/writes and required durable intents:
+
+```text
+... owner work
+→ durable intent insert(s)
+→ AuditChainHead
+→ Audit event(s)
+→ COMMIT
+```
+
+**No owner/domain lock may be acquired after AuditChainHead.**
+
+Rollback removes business mutation + Audit events + head advance together.
 
 ---
 
-# 7. Audit privacy classification
+# 6. Audit privacy / retention
 
-Immutable V1 event skeleton stores only the minimum needed for forensic reconstruction.
+Immutable skeleton classification:
 
-| Field class | V1 treatment |
+| Data | Treatment |
 |---|---|
-| event UUID / sequence / trusted time / hashes / schemas | non-PII technical/governance evidence |
-| operation/resource kind | non-human-readable product code |
-| actor User UUID / subject User UUID in bounded facts | PII-minimized stable pseudonymous identity skeleton accepted to survive UserProfile erasure |
-| role code / scope kind / Area/Tenant UUID / assignment id / outcome codes / digests | bounded non-human-readable governance facts |
-| User display name/email/username/profile | **not copied into immutable AuditEvent** |
-| source actor free text from historical systems | **not copied into AuditEvent**; belongs imported Revision/Evidence retention payload |
-| approval/comment/return/disposition reason text | **not copied**; authoritative domain evidence is referenced by UUID |
-| JWT/token/password/fresh-auth raw provider data | forbidden |
-| IP/user-agent/request body/arbitrary HTTP headers | not semantic Audit V1; telemetry/security logging may own them separately |
+| event id/sequence/time/hash/schema | non-PII technical/governance evidence |
+| operation/resource codes | product codes |
+| actor/subject User UUID | PII-minimized stable pseudonymous skeleton allowed to survive UserProfile erasure |
+| role/scope/Area/Tenant/assignment ids, outcome/digest codes | bounded non-human-readable facts |
+| User name/email/username/profile | forbidden from immutable Audit |
+| historical source actor free text | imported retained payload, not Audit |
+| approval/comment/return/disposition reason text | remains owning-domain evidence; Audit stores its evidence-id/outcome only |
+| raw fresh-auth/JWT/password/token/provider claims | forbidden |
+| IP/user-agent/request bodies/headers | telemetry/security logging, not semantic Audit V1 |
 
-Read-time UI may resolve a surviving `actor_user_id` through current UserProfile. If enrichment is erased/unavailable, display a stable opaque User identifier rather than rewriting Audit.
+Read UI may resolve current UserProfile; when erased/unavailable, show stable opaque User identity.
 
-No `AuditEventEnrichment` table is introduced V1.
+No immutable erasable enrichment copy is introduced V1.
 
----
-
-# 8. Audit retention / query boundary
-
-V1 immutable Audit skeleton retention:
+Audit skeleton retention V1:
 
 ```text
 Indefinite
 ```
 
-Reason: frozen authority requires a separate Audit regime but establishes no finite term. Designing chain segmentation/pruning now would add unsupported correctness machinery. A real finite-retention/legal deletion requirement reopens this decision.
+This is a product choice, not a claimed legal term. Finite retention would require explicit chain pruning/checkpoint semantics and therefore reopens B6.
 
-Audit query/export reads AuditEvent; it never reconstructs canonical business state from “latest event”. Domain reads always return to the owning authority.
-
-Audit export/package mechanics belong R10-D/E where material; exporting Audit does not convert it into B5 Evidence or a Governed Subject Export unless a future explicit requirement says so.
+Audit query/export never answers canonical resource state by “latest event”; owner reads remain mandatory.
 
 ---
 
-# 9. B3/B5 bounded refinements revealed by Historical Migration
+# 7. B3 bounded refinements from historical truth
 
-These are material pre-MetalDocs-history counterexamples, not implementation convenience.
+## 7.1 B3-R4 — RevisionOrdinalReservation
 
-## 9.1 B3-R4 — reserve real historical ordinals without fake Revision
-
-Counterexample:
-
-```text
-legacy REV007 has exact bytes → import real REV007
-legacy REV008 ordinal/proof exists but bytes are lost
-→ frozen rule forbids fake DocumentRevision REV008
-→ B3 max(DocumentRevision.revision_no)+1 would create native REV008
-```
-
-That reuses a real historical ordinal.
-
-Target:
+Real historical ordinal without sufficient exact bytes cannot become a Revision but cannot be reused.
 
 ```text
 RevisionOrdinalReservation
@@ -403,32 +347,27 @@ RevisionOrdinalReservation
   UNIQUE(document_id,revision_no)
 ```
 
-DB guard enforces no `(document_id,revision_no)` collision across `DocumentRevision` and `RevisionOrdinalReservation`.
+Database guard rejects any same `(document_id,revision_no)` across `DocumentRevision` and reservation.
 
-Native allocation becomes:
+Native next ordinal:
 
 ```text
-max(
-  all DocumentRevision.revision_no,
-  all RevisionOrdinalReservation.revision_no
-) + 1
+max(DocumentRevision ordinals ∪ Reservation ordinals) + 1
 ```
 
-Reservation is a permanent minimal ordinal skeleton, not a fake lifecycle object.
+Permanent minimal identity only; no fake lifecycle.
 
-## 9.2 B3-R5 — imported exact Revision content is not RevisionSubmission
+## 7.2 B3-R5/R6 — imported Revision identity/content/governance
 
-`RevisionSubmission` means a native submit attempt. Historical Migration must not fabricate it.
-
-Permanent Revision skeleton gains:
+Permanent skeleton adds:
 
 ```text
 DocumentRevision.history_kind TEXT NOT NULL CHECK NATIVE|IMPORTED
 ```
 
-Immutable.
+`NATIVE` continues ordinary B3 rules. Historical Migration creates `IMPORTED` only through privileged CI seam.
 
-Imported exact content:
+### RevisionImportedContent
 
 ```text
 RevisionImportedContent
@@ -440,27 +379,19 @@ RevisionImportedContent
   adopted_at TIMESTAMPTZ NOT NULL
 ```
 
-Canonical digest:
+Digest = `SHA256(UTF8(manifest_schema) || 0x00 || RFC8785_JCS(manifest_payload))`.
 
-```text
-SHA256(
-  UTF8(manifest_schema)
-  || 0x00
-  || RFC8785_JCS(manifest_payload)
-)
-```
+Manifest freezes exact Artifact hash/size/format/media type and trustworthy imported governed/structured metadata. Unknown historical fields remain unknown; current dictionary/system values are never resolved merely to fill history.
 
-Manifest contains exact primary Artifact hash/size/format/media type + known governed metadata/structured provenance. Unknown historical fields remain absent/explicitly unknown per schema; migration time never substitutes for a missing historical fact.
+`RevisionDictionarySnapshot` remains mandatory for `history_kind=NATIVE`; for `IMPORTED`, it exists only when trustworthy historical dictionary state can actually be represented. Otherwise imported manifest/governance explicitly records the absence/unknown.
 
-`RevisionImportedContent` is immutable retention payload under the same DocumentRevision Artifact root.
-
-## 9.3 B3-R6 — imported governance snapshot belongs CI, not Interchange runtime dependency
-
-CI must be able to interpret an imported Revision after migration machinery/process history is no longer in working context.
+### RevisionImportedGovernanceSnapshot
 
 ```text
 RevisionImportedGovernanceSnapshot
   revision_id UUID PRIMARY KEY FK DocumentRevision(id) RESTRICT
+  source_system_code_snapshot TEXT NOT NULL
+  source_object_id_snapshot TEXT NULL
   source_revision_label TEXT NULL
   source_state TEXT NOT NULL
   source_effective_at TIMESTAMPTZ NULL
@@ -472,20 +403,32 @@ RevisionImportedGovernanceSnapshot
   source_governance_snapshot JSONB NOT NULL CHECK jsonb_typeof(...)='object'
 ```
 
-Bounded/versioned snapshot schema is required; it is not arbitrary metadata.
+Bounded versioned schemas apply to actor/governance snapshots.
 
-Rules:
+Target `DocumentRevision.state` remains CI authority. Historical source state/actors/times are evidence snapshots only.
 
-- target `DocumentRevision.state` remains CI authority;
-- imported state must be supported by explicit source proof/mapping;
-- no ApprovalInstance/Decision/ReleaseRecord is synthesized;
-- source actor names/references are source provenance, never internal User actors;
-- if target state is imported EFFECTIVE and trustworthy source effectivity is unknown, keep `source_effective_at NULL` and set `adopted_as_current_at` to the real MetalDocs adoption instant;
-- imported snapshot belongs to the DocumentRevision retention unit and may be disposed with that unit while permanent Revision identity/history_kind/ordinal survives.
+No fake ApprovalInstance/Decision/ReleaseRecord/internal User action.
 
-## 9.4 B3-R1 extension — Template origin supports imported current-effective content
+### Imported state law
 
-Accepted B5 shape is extended:
+Historical `IMPORTED` revisions do not use target `SUBMITTED`, because that state asserts a native Submission boundary. Historical draft/submitted-like source material remains source evidence or enters ordinary import/native DRAFT if it needs live editing.
+
+V1 historical target states admitted by privileged migration are terminal/current governed states that can be truthfully proven (`EFFECTIVE|SUPERSEDED|OBSOLETE|CANCELLED`). Any extra state mapping is a reopen/explicit R10-F rule, not silent coercion.
+
+### B5-R2 native timestamp refinement
+
+`DocumentRevision.cancelled_at/obsoleted_at` mean **native MetalDocs transition times**:
+
+```text
+history_kind=NATIVE + CANCELLED → cancelled_at required
+history_kind=NATIVE + OBSOLETE  → obsoleted_at required
+```
+
+For an imported Revision already terminal at adoption, the native timestamp may remain NULL while imported governance carries trustworthy source terminal evidence. If an imported current Revision later undergoes a native post-adoption cancel/obsolete transition, the corresponding native timestamp is written once.
+
+Supersession caused later by native B4 Release always uses `ReleaseRecord.released_at`.
+
+## 7.3 B3-R1 extension — imported Template source
 
 ```text
 DocumentOrigin
@@ -499,42 +442,33 @@ DocumentOrigin
   created_at
 ```
 
-`NATIVE_SUBMISSION` requires source Submission-id snapshot; imported kind requires it NULL. Creation serializes against current Template effectivity and proves the selected exact source content authority for that source Revision.
+Native kind requires Submission-id snapshot; imported kind requires it NULL. Creation still serializes against current template effectivity and validates the exact source content authority.
 
-## 9.5 Imported Periodic Review baseline
+## 7.4 Imported Periodic Review / retention
 
-For current imported EFFECTIVE Revision:
+Imported EFFECTIVE:
 
 ```text
-trusted source effective/review anchor known
-→ normal due calculation from that trusted anchor
-
-trusted source anchor unknown
-→ preserve unknown historical effective time
-→ adopted_as_current_at is not re-labeled as historical effective_at
-→ Revision is immediately DUE for Periodic Review
+trustworthy source effective/review anchor known → normal review due calculation
+anchor unknown                              → preserve unknown + immediately DUE
 ```
 
-Immediate due does not invalidate EFFECTIVE content. Once a native PeriodicReviewRecord occurs, later due scheduling uses the normal current-Revision review anchor.
+DUE never invalidates EFFECTIVE. First native PeriodicReviewRecord establishes the next ordinary review anchor.
 
-## 9.6 B5 refinement — imported Revision RetentionBinding
+Imported Revision with exact content creates B5 RetentionBinding in the migration item transaction despite no native Submission.
 
-`DocumentRevision` history kind `IMPORTED` with exact `RevisionImportedContent` creates its RetentionBinding in the same migration semantic unit; no first native Submission is required.
+Retention anchor:
 
-Imported retention anchor:
-
-- while imported Revision is current EFFECTIVE → no running clock;
-- when later superseded natively → B4 winning Release time is the new anchor;
-- already-historical imported states may use only trustworthy imported lifecycle anchor from `RevisionImportedGovernanceSnapshot`;
-- unknown historical anchor → no silent disposition eligibility.
+- current EFFECTIVE → no running clock;
+- later native supersession → B4 ReleaseRecord time;
+- already-historical imported state → trustworthy imported lifecycle timestamp only;
+- unknown imported historical anchor → no silent disposition eligibility.
 
 ---
 
-# 10. B5-R1 — historical Evidence capture without fake native actor/time
+# 8. B5 bounded refinement — historical Evidence
 
-B5 native `EvidenceCapture` requires native `captured_by_user_id` and `captured_at`. Historical Migration cannot invent them.
-
-Permanent Evidence skeleton gains:
+Permanent skeleton adds:
 
 ```text
 Evidence.history_kind TEXT NOT NULL CHECK NATIVE|IMPORTED
@@ -558,428 +492,345 @@ EvidenceImportedCapture
   adopted_at TIMESTAMPTZ NOT NULL
 ```
 
-Exactly one native `EvidenceCapture` **or** `EvidenceImportedCapture` exists for CAPTURED Evidence according to `history_kind`.
+CAPTURED Evidence has exactly one `EvidenceCapture` for NATIVE or `EvidenceImportedCapture` for IMPORTED.
 
-Migration transaction creates:
+Migration atomic unit creates Evidence identity + exact Artifact root + imported capture + frozen primary Dossier/name/sequence + RetentionBinding + applicable active hold materialization.
 
-```text
-Evidence identity/history_kind IMPORTED
-+ exact Artifact relation
-+ EvidenceImportedCapture
-+ immutable primary Dossier/name/sequence state
-+ RetentionBinding
-+ applicable active LegalHold materialization
-```
+No fake `captured_by_user_id` or fake historical `captured_at`.
 
-No fake internal capture User/time.
-
-Retention anchor:
+Retention:
 
 ```text
-CAPTURED_AT → source_captured_at when trustworthy, else UNKNOWN
-OCCURRED_AT → occurred_at when trustworthy, else UNKNOWN
+CAPTURED_AT → trustworthy source_captured_at only
+OCCURRED_AT → trustworthy occurred_at only
+unknown     → not silently disposition-eligible
 ```
 
-Unknown anchor never silently becomes disposition-eligible. `adopted_at` is provenance, not substitute capture/occurred time.
+`adopted_at` is provenance, not substitute historical time.
 
 ---
 
-# 11. Historical Migration semantic model
+# 9. Historical Migration model
 
-## 11.1 HistoricalMigrationSource
-
-Stable source namespace:
+## HistoricalMigrationSource
 
 ```text
-HistoricalMigrationSource
-  id UUID PRIMARY KEY
-  code TEXT NOT NULL UNIQUE
-  name TEXT NOT NULL
-  source_kind TEXT NOT NULL
-  status TEXT NOT NULL CHECK ACTIVE|INACTIVE
-  created_at TIMESTAMPTZ NOT NULL
+id UUID PK
+code TEXT UNIQUE immutable
+name TEXT
+source_kind TEXT
+status ACTIVE|INACTIVE
+created_at TIMESTAMPTZ
 ```
 
-No credentials/provider endpoint secrets.
+Stable source namespace, no credentials/endpoints/secrets.
 
-## 11.2 HistoricalMigrationPlan
+## HistoricalMigrationPlan + Item
+
+Plan is created as a complete immutable unit; there is no selectable partially built plan.
 
 ```text
 HistoricalMigrationPlan
-  id UUID PRIMARY KEY
-  source_id UUID NOT NULL FK HistoricalMigrationSource(id) RESTRICT
-  mode TEXT NOT NULL CHECK CURRENT_STATE|FULL_HISTORY
-  plan_schema TEXT NOT NULL
-  plan_digest BYTEA NOT NULL CHECK octet_length(plan_digest)=32
-  created_by_user_id UUID NOT NULL FK User(id) RESTRICT
-  created_at TIMESTAMPTZ NOT NULL
-```
+  id UUID PK
+  source_id UUID FK HistoricalMigrationSource RESTRICT
+  mode CURRENT_STATE|FULL_HISTORY
+  plan_schema TEXT
+  plan_digest BYTEA32
+  created_by_user_id UUID FK User RESTRICT
+  created_at TIMESTAMPTZ
 
-Immutable after finalization. Plan digest covers a canonical ordered plan-item descriptor set.
-
-## 11.3 HistoricalMigrationPlanItem
-
-```text
 HistoricalMigrationPlanItem
-  id UUID PRIMARY KEY
-  plan_id UUID NOT NULL FK HistoricalMigrationPlan(id) RESTRICT
-  item_order BIGINT NOT NULL CHECK item_order >= 1
-  source_entity_kind TEXT NOT NULL
-  source_entity_id TEXT NOT NULL
-  source_fingerprint BYTEA NOT NULL CHECK octet_length(source_fingerprint)=32
-  target_kind TEXT NOT NULL CHECK DOCUMENT|DOCUMENT_REVISION|REVISION_ORDINAL|EVIDENCE|DOSSIER
-  target_hint JSONB NOT NULL CHECK jsonb_typeof(...)='object'
-
+  id UUID PK
+  plan_id UUID FK Plan RESTRICT
+  item_order BIGINT >= 1
+  source_entity_kind TEXT
+  source_entity_id TEXT
+  source_fingerprint BYTEA32
+  target_kind DOCUMENT|DOCUMENT_REVISION|REVISION_ORDINAL|EVIDENCE|DOSSIER
+  target_hint JSONB bounded object
   UNIQUE(plan_id,item_order)
   UNIQUE(plan_id,source_entity_kind,source_entity_id)
 ```
 
-`target_hint` is bounded mapping input only; no credentials/file bytes/free-form governance dumps.
+Plan digest uses a versioned canonical ordered descriptor list with JCS + SHA-256.
 
-## 11.4 HistoricalMigrationExecution
+## Execution / Outcome
 
 ```text
 HistoricalMigrationExecution
-  id UUID PRIMARY KEY
-  plan_id UUID NOT NULL FK HistoricalMigrationPlan(id) RESTRICT
-  mode TEXT NOT NULL CHECK DRY_RUN|APPLY
-  requested_by_user_id UUID NOT NULL FK User(id) RESTRICT
-  requested_at TIMESTAMPTZ NOT NULL
+  id UUID PK
+  plan_id UUID FK Plan RESTRICT
+  mode DRY_RUN|APPLY
+  requested_by_user_id UUID FK User RESTRICT
+  requested_at TIMESTAMPTZ
   completed_at TIMESTAMPTZ NULL
-  status TEXT NOT NULL CHECK RUNNING|COMPLETED|PARTIAL|FAILED
-```
+  status RUNNING|COMPLETED|PARTIAL|FAILED
 
-Process state only; target truth never inferred from execution status.
-
-## 11.5 HistoricalMigrationItemOutcome
-
-One semantic final outcome per execution/item:
-
-```text
 HistoricalMigrationItemOutcome
-  id UUID PRIMARY KEY
-  execution_id UUID NOT NULL FK HistoricalMigrationExecution(id) RESTRICT
-  plan_item_id UUID NOT NULL FK HistoricalMigrationPlanItem(id) RESTRICT
-  outcome TEXT NOT NULL CHECK
-    WOULD_CREATE|WOULD_REUSE|CONFLICT|INVALID|
-    CREATED|REUSED|FAILED
+  id UUID PK
+  execution_id UUID FK Execution RESTRICT
+  plan_item_id UUID FK Item RESTRICT
+  outcome WOULD_CREATE|WOULD_REUSE|CONFLICT|INVALID|CREATED|REUSED|FAILED
   reason_code TEXT NULL
   target_id_snapshot UUID NULL
-  recorded_at TIMESTAMPTZ NOT NULL
-
+  recorded_at TIMESTAMPTZ
   UNIQUE(execution_id,plan_item_id)
 ```
 
-Transient attempts/retries/logs remain R10-D.
+Transient attempts/errors/retries stay R10-D.
 
-## 11.6 HistoricalSourceBinding — cross-plan idempotency
+## HistoricalSourceBinding
+
+Cross-plan source idempotency:
 
 ```text
 HistoricalSourceBinding
-  id UUID PRIMARY KEY
-  source_id UUID NOT NULL FK HistoricalMigrationSource(id) RESTRICT
-  source_entity_kind TEXT NOT NULL
-  source_entity_id TEXT NOT NULL
-  source_fingerprint BYTEA NOT NULL CHECK octet_length(source_fingerprint)=32
+  id UUID PK
+  source_id UUID FK HistoricalMigrationSource RESTRICT
+  source_entity_kind TEXT
+  source_entity_id TEXT
+  source_fingerprint BYTEA32
 
-  document_id UUID NULL FK Document(id) RESTRICT
-  document_revision_id UUID NULL FK DocumentRevision(id) RESTRICT
-  revision_ordinal_reservation_id UUID NULL FK RevisionOrdinalReservation(id) RESTRICT
-  evidence_id UUID NULL FK Evidence(id) RESTRICT
-  dossier_id UUID NULL FK Dossier(id) RESTRICT
+  document_id UUID NULL FK Document RESTRICT
+  document_revision_id UUID NULL FK DocumentRevision RESTRICT
+  revision_ordinal_reservation_id UUID NULL FK RevisionOrdinalReservation RESTRICT
+  evidence_id UUID NULL FK Evidence RESTRICT
+  dossier_id UUID NULL FK Dossier RESTRICT
 
-  bound_at TIMESTAMPTZ NOT NULL
-
+  bound_at TIMESTAMPTZ
   UNIQUE(source_id,source_entity_kind,source_entity_id)
 ```
 
 Exactly one target FK.
 
-Same source identity:
-
-```text
-same source_fingerprint + compatible target truth → REUSE
-changed/conflicting fingerprint/state             → CONFLICT / fail closed
-```
-
-No heuristic merge.
+Same source identity + same fingerprint/coherent target = REUSE. Different/conflicting fingerprint/state = fail closed. No heuristic merge.
 
 ---
 
-# 12. Historical Migration dry-run/apply law
+# 10. Dry-run / APPLY law
 
-Dry-run:
+### DRY_RUN
 
-- validates source fingerprint/format/mapping/uniqueness/permissions/retention preconditions using the same target validation contracts as APPLY;
-- creates no target Document/Revision/Evidence/Dossier/Artifact/RetentionBinding/hold/domain Audit facts;
-- records deterministic `WOULD_* | CONFLICT | INVALID` outcomes only.
+Uses the same validation contracts as APPLY for source fingerprints, mapping, formats, uniqueness, target eligibility and retention preconditions, but creates **zero target semantic rows, Artifacts, RetentionBindings or domain governance facts**. It persists only the Interchange dry-run execution/outcomes.
 
-APPLY:
+### APPLY per item
 
-1. re-read/verify exact source fingerprint against finalized plan item;
-2. if existing `HistoricalSourceBinding` matches same source fingerprint and target is coherent → REUSE;
-3. if binding/fingerprint/target conflicts → fail item closed;
-4. prepare/stage exact bytes outside semantic DB transaction where needed;
-5. open one semantic target transaction;
-6. call the target owner's privileged migration seam;
-7. create target-owned imported content/governance/capture facts + RetentionBinding/holds where required;
-8. confirm Artifact + one semantic retention root in same transaction;
-9. create/update `HistoricalSourceBinding` for the exact source identity;
-10. insert APPLY item outcome;
-11. append required Audit event(s) last;
-12. commit.
+1. re-read/verify source fingerprint against finalized plan;
+2. existing matching source binding + coherent target → REUSE;
+3. conflict → fail item closed;
+4. stage exact bytes outside DB transaction where necessary;
+5. open one target semantic transaction;
+6. call privileged target-owner migration seam;
+7. create target imported content/governance/capture + RetentionBinding/holds where required;
+8. confirm Artifact with one semantic retention root in same transaction;
+9. create HistoricalSourceBinding;
+10. insert final APPLY item outcome;
+11. insert any required durable intent;
+12. append Audit event(s) last;
+13. commit.
 
-Partial batch success is valid. Each item is independently reconcilable.
+Partial batch success is valid and reconciled per item. No whole-batch rollback promise.
 
-No whole-batch rollback promise.
+Migration/System is native Audit actor for actual imported mutation. Source actor remains imported retained provenance only.
 
 ---
 
-# 13. Governed Subject Export
+# 11. Governed Subject Export
 
-## 13.1 Semantic request
-
-Closed subject union:
+## 11.1 Subject request
 
 ```text
 GovernedSubjectExport
-  id UUID PRIMARY KEY
-  document_id UUID NULL FK Document(id) RESTRICT
-  evidence_id UUID NULL FK Evidence(id) RESTRICT
-  dossier_id UUID NULL FK Dossier(id) RESTRICT
-  requested_by_user_id UUID NOT NULL FK User(id) RESTRICT
-  requested_at TIMESTAMPTZ NOT NULL
+  id UUID PK
+  document_id UUID NULL FK Document RESTRICT
+  evidence_id UUID NULL FK Evidence RESTRICT
+  dossier_id UUID NULL FK Dossier RESTRICT
+  requested_by_user_id UUID FK User RESTRICT
+  requested_at TIMESTAMPTZ
 ```
 
-Exactly one subject.
+Exactly one root.
 
-## 13.2 Stable complete snapshot — narrow isolation exception
+## 11.2 Complete closure semantics
 
-The snapshot transaction uses PostgreSQL `REPEATABLE READ` **only for this operation**.
+`COMPLETE` V1 is explicit and non-recursive beyond the following bounded graph:
 
-Within one short transaction:
+### Document export
 
-1. resolve the requested subject closure under one stable database snapshot;
-2. apply canonical Authorization to every required object/relation;
-3. if any required subject is unauthorized/unavailable, fail the complete export request before success;
-4. enumerate exact retained/current content identities + hashes without provider locations;
-5. build canonical versioned export manifest;
-6. insert `GovernedSubjectExport` + immutable snapshot;
-7. insert package-build durable intent;
-8. append Audit event last;
-9. commit.
+Includes:
 
-No physical bytes are copied while the DB transaction is open.
+- stable Document identity/config provenance required to interpret it;
+- every Revision identity skeleton for the Document, including ordinal reservations;
+- every **currently present** retained Revision unit payload/history from B3/B4/B5;
+- DispositionRecord/records skeleton where a historical payload was already lawfully disposed;
+- exact current/present Artifact bytes referenced by included retained units;
+- relevant Template origin and Dossier relationship metadata as references, but does **not** recursively export unrelated Dossier contents.
 
-PostgreSQL serialization/retry errors are fail-visible/retryable; they do not justify global isolation change.
+A disposed Revision is represented truthfully as identity/disposition evidence with no invented/missing bytes.
 
-## 13.3 GovernedExportSnapshot
+### Evidence export
+
+Includes Evidence identity + currently present native/imported capture payload/Artifact + records/disposition evidence + primary/secondary Dossier relationship identities. It does not recursively export all other Dossier contents.
+
+### Dossier export
+
+Includes Dossier identity/provenance + all currently linked Documents (`DossierDocumentLink`) + all Evidence for which the Dossier is primary or secondary, each using its bounded Document/Evidence closure above. Traversal stops there; no Dossier-to-Dossier/transitive context graph is invented.
+
+If any required included subject is not authorized/readable under canonical AuthZ, the COMPLETE export fails closed.
+
+No PARTIAL export V1.
+
+## 11.3 Stable snapshot — narrow isolation exception
+
+One short PostgreSQL `REPEATABLE READ` transaction:
+
+1. resolve exact complete closure under one DB snapshot;
+2. apply canonical AuthZ to every required subject;
+3. enumerate identities/relationships/provenance/hashes without provider locations;
+4. build canonical manifest;
+5. insert `GovernedSubjectExport` + immutable snapshot;
+6. insert package-build durable intent;
+7. append Audit last;
+8. commit.
+
+No byte copying while the DB transaction is open. Serialization/retry failure is visible/retryable, not reason for global isolation change.
+
+## 11.4 Snapshot / receipt
 
 ```text
 GovernedExportSnapshot
-  export_id UUID PRIMARY KEY FK GovernedSubjectExport(id) RESTRICT
-  manifest_schema TEXT NOT NULL
-  manifest_payload JSONB NOT NULL CHECK jsonb_typeof(...)='object'
-  manifest_digest BYTEA NOT NULL CHECK octet_length(manifest_digest)=32
-  snapshotted_at TIMESTAMPTZ NOT NULL
-```
+  export_id UUID PK FK GovernedSubjectExport RESTRICT
+  manifest_schema TEXT
+  manifest_payload JSONB bounded object
+  manifest_digest BYTEA32
+  snapshotted_at TIMESTAMPTZ
 
-Manifest V1 contains at minimum:
-
-```text
-package schema/version
-root subject identity
-included object identities/types
-relationships/context
-provenance
-canonical filenames
-ContentFormat/media type
-size_bytes
-sha256
-content/governance identity digests where applicable
-completeness = COMPLETE
-```
-
-No provider bucket/key/URL/version identifier.
-
-Digest = `SHA256(UTF8(manifest_schema) || 0x00 || RFC8785_JCS(manifest_payload))`.
-
-No partial export V1.
-
-## 13.4 Package result
-
-Actual package is temporary delivery output and is not a semantic Artifact/Evidence.
-
-Successful build records only provider-independent receipt:
-
-```text
 GovernedExportPackageReceipt
-  export_id UUID PRIMARY KEY FK GovernedSubjectExport(id) RESTRICT
-  package_sha256 BYTEA NOT NULL CHECK octet_length(package_sha256)=32
-  size_bytes BIGINT NOT NULL CHECK size_bytes >= 0
-  completed_at TIMESTAMPTZ NOT NULL
+  export_id UUID PK FK GovernedSubjectExport RESTRICT
+  package_sha256 BYTEA32
+  size_bytes BIGINT >= 0
+  completed_at TIMESTAMPTZ
 ```
 
-Temporary package storage/location/expiry/download token is R10-D/E mechanism state.
+Manifest includes package version, root, objects, relationships, provenance, canonical filenames, formats/media types, sizes, SHA-256, content/governance digests and `completeness=COMPLETE`. No provider bucket/key/URL/version identity.
 
-Package build must verify every emitted file against the snapshot hash before writing receipt.
+Manifest digest = JCS + SHA-256.
 
-Export does not create/release LegalHold, change retention, or count as Distribution acknowledgement.
+Package output is temporary delivery output, not semantic Artifact/Evidence. Before receipt, package builder verifies every emitted file against snapshot hashes. Temporary location/expiry/download token is R10-D/E.
+
+Export never changes LegalHold/retention or counts as Distribution acknowledgement.
 
 ---
 
-# 14. InterchangeConnection / ExternalReference closure
+# 12. External Repository Interchange
+
+## InterchangeConnection
 
 ```text
 InterchangeConnection
-  id UUID PRIMARY KEY
-  code TEXT NOT NULL UNIQUE
-  name TEXT NOT NULL
-  connector_kind TEXT NOT NULL
-  status TEXT NOT NULL CHECK ACTIVE|INACTIVE
-  created_at TIMESTAMPTZ NOT NULL
+  id UUID PK
+  code TEXT UNIQUE immutable
+  name TEXT
+  connector_kind TEXT product-supported bounded code
+  status ACTIVE|INACTIVE
+  created_at TIMESTAMPTZ
 ```
 
-Code immutable. This row is the stable MetalDocs identity of one logical external repository/source connection.
+Logical connection identity only. Credentials/tokens/endpoints/secrets live in deployment/provider config keyed by connection id. If endpoint configuration changes the logical repository identity, create a new connection.
 
-Credentials, tokens, endpoints and secret material are provider/deployment configuration keyed by connection id and never stored as business identity.
+B5 `DossierExternalReference.connection_id` becomes FK here; `(connection_id,entity_kind,external_id)` remains unique.
 
-If configuration points to a materially different logical repository, create a new `InterchangeConnection`; do not reinterpret historical external IDs under the old connection.
-
-B5 `DossierExternalReference.connection_id` becomes a typed FK to this family. `(connection_id, entity_kind, external_id)` remains unique for Dossier mapping.
-
----
-
-# 15. External Repository COPY process
-
-## 15.1 RepositoryTransfer
+## RepositoryTransfer
 
 ```text
 RepositoryTransfer
-  id UUID PRIMARY KEY
-  connection_id UUID NOT NULL FK InterchangeConnection(id) RESTRICT
-  direction TEXT NOT NULL CHECK IMPORT_COPY|PUBLISH_COPY
-  requested_by_user_id UUID NOT NULL FK User(id) RESTRICT
-  requested_at TIMESTAMPTZ NOT NULL
+  id UUID PK
+  connection_id UUID FK InterchangeConnection RESTRICT
+  direction IMPORT_COPY|PUBLISH_COPY
+  requested_by_user_id UUID FK User RESTRICT
+  requested_at TIMESTAMPTZ
 
   external_entity_kind TEXT NULL
   external_entity_id TEXT NULL
 
-  source_document_revision_id UUID NULL FK DocumentRevision(id) RESTRICT
-  source_evidence_id UUID NULL FK Evidence(id) RESTRICT
+  source_document_revision_id UUID NULL FK DocumentRevision RESTRICT
+  source_evidence_id UUID NULL FK Evidence RESTRICT
   source_artifact_id_snapshot UUID NULL
-  source_sha256 BYTEA NULL CHECK NULL OR octet_length(source_sha256)=32
+  source_sha256 BYTEA NULL CHECK NULL OR octet_length(...)=32
   source_content_format TEXT NULL
 
   intended_target_kind TEXT NULL CHECK NULL OR DOCUMENT|EVIDENCE
+  requested_target_document_id UUID NULL FK Document(id) RESTRICT
 ```
 
-Shape:
+PUBLISH pins one internal source root + exact Artifact snapshot, no Artifact FK. IMPORT pins external source + intended ordinary target operation; optional existing Document target allows an ordinary new-revision/import workflow rather than a generic transformation engine.
 
-- `PUBLISH_COPY` pins one internal source root + exact Artifact id/hash/format snapshot; no strong Artifact FK;
-- `IMPORT_COPY` pins external entity identity + intended target kind and does not pre-create target business state.
-
-This row is process truth, not proof the external effect occurred.
-
-## 15.2 Transfer effect
-
-Same request transaction:
+Request transaction:
 
 ```text
 RepositoryTransfer
-+ Audit request event
-+ durable external-effect intent
++ external-effect durable intent
++ Audit
 COMMIT
 ```
 
-R10-D worker performs provider interaction.
+No request row is success proof.
 
 ### PUBLISH_COPY
 
-Before external write, worker proves the pinned Artifact still exists with exact expected hash/format. If not, fail visibly; do not resurrect disposed content or invent retention.
+Worker re-proves pinned Artifact UUID/hash/format still exists before provider write. If disposed/missing, transfer fails visibly; no resurrection/hidden retention.
 
 ### IMPORT_COPY
 
-Worker retrieves/stages/validates bytes, then calls ordinary target `Document`/`Evidence` creation/capture seams under the requesting actor's authorized operation semantics. The connector does not bypass target governance.
+Worker fetches/stages/validates exact bytes, then invokes ordinary target owner operation under current authorized semantics. Connector identity does not bypass Document/Evidence governance.
 
-## 15.3 RepositoryTransferReceipt
-
-Only successful external effect creates immutable receipt:
+## RepositoryTransferReceipt
 
 ```text
 RepositoryTransferReceipt
-  transfer_id UUID PRIMARY KEY FK RepositoryTransfer(id) RESTRICT
-  external_entity_kind TEXT NOT NULL
-  external_entity_id TEXT NOT NULL
+  transfer_id UUID PK FK RepositoryTransfer RESTRICT
+  external_entity_kind TEXT
+  external_entity_id TEXT
   external_version_snapshot TEXT NULL
-  target_document_id UUID NULL FK Document(id) RESTRICT
-  target_evidence_id UUID NULL FK Evidence(id) RESTRICT
-  completed_at TIMESTAMPTZ NOT NULL
+  target_document_id UUID NULL FK Document RESTRICT
+  target_document_revision_id UUID NULL FK DocumentRevision RESTRICT
+  target_evidence_id UUID NULL FK Evidence RESTRICT
+  completed_at TIMESTAMPTZ
 ```
 
-For PUBLISH_COPY, receipt identifies external created/updated copy. For IMPORT_COPY, receipt identifies both external source and the exact resulting MetalDocs target.
+For IMPORT_COPY, target semantic creation/revision/capture **and Receipt commit in the same local target transaction**. If target creation commits, receipt cannot be missing for a transfer claimed successful.
 
-No receipt = no semantic claim that the external effect succeeded.
+For PUBLISH_COPY, only external provider confirmation creates receipt.
 
-Provider URLs remain mechanism/display data, not receipt identity.
+No receipt = no semantic success claim. Provider URLs remain display/mechanism data.
 
 ---
 
-# 16. Required Audit event classes
+# 13. Required semantic Audit classes
 
-Audit is not “log every mutation”. Mandatory V1 same-commit semantic event classes:
+Audit does not log everything. Same-commit V1 Audit is mandatory for:
 
-### Authentication / Organization / Authorization
+### B2
+Tenant/Area/User lifecycle/settings; governed UserProfile mutation/erasure; binding acceptance/replacement/disable/erasure where admitted; admin Session revoke/offboard; Group create/rename/delete; membership add/remove; RoleAssignment grant/revoke.
 
-- Tenant settings mutation;
-- Area create/rename/retire/re-enable;
-- User create/offboard/re-enable;
-- UserProfile governed mutation/erasure;
-- ProviderSubjectBinding acceptance/replacement/disable/erasure where admitted;
-- administrative Session revocation / offboarding;
-- Group create/rename/delete;
-- GroupMembership add/remove;
-- RoleAssignment grant/revoke, including bounded forensic subject/role/scope facts.
+Grant/revoke facts preserve assignment id, subject stable id, role, scope and operation without human profile duplication.
 
-### Controlled Information / Approval / Distribution
+### B3/B4
+Document creation; responsibility change; Revision creation when materially entering governance; SUBMIT; Revision cancel/obsolete; PeriodicReviewRecord; ApprovalStepDecision; approval cancel/withdraw/reassign; Rendition semantic success; Release; explicit Distribution acknowledgement.
 
-- Document creation;
-- responsibility change;
-- Revision creation where material to governance timeline;
-- SUBMIT;
-- Revision cancel/obsolete;
-- PeriodicReviewRecord creation;
-- ApprovalStepDecision;
-- approval cancel/withdraw/reassign;
-- Rendition semantic success;
-- Release;
-- Distribution acknowledgement.
+### B5
+Dossier create/archive/re-enable; Dossier↔Document link/unlink; Evidence CAPTURE/VOID; captured secondary-Dossier link/unlink; RetentionExtension; LegalHold activate/release; DispositionFence; completed DispositionRecord.
 
-### Documentary Context / Evidence / Records
+### B6
+Historical Migration APPLY semantic outcome; accepted Governed Export snapshot; COPY request; successful COPY receipt.
 
-- Dossier create/archive/re-enable;
-- Dossier↔Document link/unlink;
-- Evidence CAPTURE/VOID;
-- captured Evidence secondary-Dossier link/unlink because it can affect live-hold scope;
-- RetentionExtension;
-- LegalHold activate/release;
-- DispositionFence;
-- completed DispositionRecord.
-
-### Interchange
-
-- Historical Migration APPLY item CREATE/REUSE/CONFLICT where a semantic target/binding decision occurs;
-- Governed Subject Export snapshot accepted;
-- external COPY request;
-- external COPY successful receipt.
-
-Not mandatory semantic Audit V1 by default:
+Not mandatory semantic Audit by default:
 
 ```text
 WorkingContent autosave/edit
 EditorSession heartbeat/lease
-EvidenceDraft edits
-EditorialComment / SubmissionFeedback ordinary collaboration
+EvidenceDraft edit
+ordinary EditorialComment/SubmissionFeedback collaboration
 search/view/download
 notification delivery/read
 worker retry/lease/DLQ
@@ -987,377 +838,274 @@ projection rebuild
 provider health/telemetry
 ```
 
-Those facts have their own authority or are operational telemetry. A later compliance requirement may promote a specific event class deliberately.
+A later requirement may promote a specific class; no generic “audit every row” rule.
 
 ---
 
-# 17. Same-local-commit matrix
+# 14. Same-local-commit matrix
 
-`Audit` below means required event(s) in the same local transaction, appended last. `Intent` means durable mechanism intent in the same transaction only when a later external/async effect is required.
+`Audit` below means required immutable event(s), appended last. `Intent` is same-commit durable mechanism only when future work is required.
 
 | Operation | Atomic semantic set |
 |---|---|
-| User offboarding | User disable + local Session revoke + memberships/direct grants revoke + required binding state + Audit + provider-disable Intent |
-| Document + REV001 create | numbering allocation + Document + Revision + RevisionDictionarySnapshot + WorkingContent + optional Template origin/spec + Audit |
-| First SUBMIT | WorkingContent generation consume + RevisionSubmission + B4 ApprovalRequirement/ReleasePlan + Approval init where required + B5 RetentionBinding + applicable Hold materialization + Audit + downstream evaluation Intent if needed |
-| Same-REV resubmit | new RevisionSubmission + new B4 per-Submission requirements/Approval init + Audit + evaluation Intent; existing RetentionBinding unchanged |
-| Approval RETURN/CANCEL/WITHDRAW | CI Revision return-to-DRAFT generation law + Approval terminal state + Audit |
-| Approval ACCEPT decision | immutable decision + Step/Instance transition + Audit + release-evaluation Intent if final gate can now progress |
-| Rendition semantic success | Artifact confirmation + Rendition owner relation + Audit + release-evaluation Intent |
+| User offboarding | User disable + local Session revoke + membership/direct-grant revoke + admitted binding state + Audit + provider-disable Intent |
+| Document + REV001 | number allocation + Document + Revision + native RevisionDictionarySnapshot + WorkingContent + template adjuncts + Audit |
+| first SUBMIT | WC generation consume + RevisionSubmission + ApprovalRequirement/ReleasePlan + Approval init + RetentionBinding + active Hold materialization + Audit + evaluation Intent where needed |
+| same-REV resubmit | new Submission + new B4 per-Submission requirements/Approval init + Audit + evaluation Intent; existing Binding unchanged |
+| Approval RETURN/CANCEL/WITHDRAW | Revision DRAFT return generation law + Approval terminal state + Audit |
+| Approval ACCEPT | immutable decision + Step/Instance transition + Audit + final-gate evaluation Intent if needed |
+| Rendition success | Artifact confirm + Rendition relation + Audit + release evaluation Intent |
 | Release | candidate EFFECTIVE + predecessor SUPERSEDED + ReleaseRecord + DistributionObligations + Audit + notification/search Intents |
-| Periodic Review | exact current Revision review record + Audit |
-| Evidence CAPTURE | EvidenceCapture/ImportedCapture + Artifact root + Evidence state/name/primary dossier + RetentionBinding + applicable Holds + Audit |
-| Dossier link enters active hold | link + necessary LegalHoldSubject rows + Audit |
-| captured Evidence secondary link enters hold | link + necessary LegalHoldSubject rows + Audit |
-| LegalHold activation | hold + complete current materialization + Audit |
+| Periodic Review | exact current-Revision record + Audit |
+| native/imported Evidence CAPTURE | capture authority + Artifact root + Evidence frozen identity/context + RetentionBinding + applicable Holds + Audit |
+| Dossier/secondary Evidence link entering hold | relation + necessary HoldSubject materialization + Audit |
+| LegalHold activation | Hold + complete current materialization + Audit |
 | RetentionExtension | extension + Audit |
 | DispositionFence | fence + Audit + physical-delete Intent |
-| Disposition completion | retained payload cleanup + Artifact semantic cleanup + DispositionRecord + Audit |
-| Historical Migration APPLY item | target-owner imported state/content/provenance + source binding + RetentionBinding/holds where required + item outcome + Audit |
-| Governed Export snapshot | export request + immutable complete manifest snapshot + package-build Intent + Audit under one REPEATABLE READ transaction |
-| PUBLISH/IMPORT COPY request | RepositoryTransfer + external-effect Intent + Audit |
-| COPY success | RepositoryTransferReceipt + target relation if import + Audit |
+| Disposition completion | retained payload/Artifact semantic cleanup + DispositionRecord + Audit |
+| Historical Migration APPLY item | target imported state/content/provenance + source binding + Binding/holds + item outcome + Audit |
+| Governed Export snapshot | export root + immutable complete manifest + build Intent + Audit under REPEATABLE READ |
+| COPY request | RepositoryTransfer + external-effect Intent + Audit |
+| IMPORT_COPY success | ordinary target semantic creation/revision/capture + RepositoryTransferReceipt + Audit in one local target transaction |
+| PUBLISH_COPY success | RepositoryTransferReceipt + Audit |
 
-No provider call/object-store transfer is inside these DB atomic boundaries.
-
----
-
-# 18. Cross-owner composition law
-
-`internal/composition` may orchestrate one local transaction but owns no durable business meaning.
-
-Each semantic owner exposes transaction-aware application seams that:
-
-- accept the shared transaction/context;
-- do not commit/rollback independently;
-- do not open hidden nested transactions for required semantic writes;
-- do not import another owner's persistence adapter/repository;
-- return domain-specific success/failure to composition;
-- make all mandatory local invariants visible before the final Audit append.
-
-Audit exposes a transaction-aware append seam only. R10-D exposes durable-intent insert seam only. Neither may call domain owners back after their lock class is reached.
+No provider call/object transfer is inside DB commit.
 
 ---
 
-# 19. Final B1–B6 lock-order law
+# 15. Composition / lock law
 
-The target is a **partial order**, not a generic lock manager.
+`internal/composition` owns no durable business meaning. Owner seams share a transaction, never commit independently, never import another owner's repository, and expose all local failure before Audit append.
 
-## 19.1 Main governed-content branch
+Global target is a partial order, not a lock-manager framework.
+
+## Main governed-content branch
 
 When applicable:
 
 ```text
-B2 eligibility roots required by the operation
-  User / Binding / Area according to promoted B2 sub-order
-
+B2 eligibility roots according to promoted B2 sub-order
 → current configuration/allocation roots
   DocumentType / EvidenceType / Approval config / NumberSeries / EvidenceSequence
-
-→ business subject roots
-  existing Document(s) ordered UUID
-  → existing Evidence(s) ordered UUID
-  → Dossier(s) ordered UUID
-
-→ business child/execution rows
-  DocumentRevision / WorkingContent / ApprovalInstance+Step / EvidenceDraft+Capture
-
-→ RetentionBinding(s) ordered UUID
-
-→ Artifact existing-row coordination only where genuinely required
-
-→ durable-intent inserts
-
+→ business roots
+  Document(s) UUID order
+  → Evidence(s) UUID order
+  → Dossier(s) UUID order
+→ child/execution
+  Revision / WorkingContent / ApprovalInstance+Step / Evidence capture state
+→ RetentionBinding(s) UUID order
+→ Artifact existing-row coordination only when necessary
+→ durable Intent inserts
 → AuditChainHead ALWAYS LAST
 ```
 
-Classes may be skipped. A transaction may start at a later class if it will never acquire an earlier class.
+A transaction may begin later if it never acquires an earlier class.
 
-## 19.2 Group live-configuration/snapshot branch
+## Group branch
 
-B2 Group deletion remains isolated:
+Promoted B2 Group deletion remains:
 
 ```text
-Group
-→ GroupMembership / Group RoleAssignment children
+Group → memberships/group grants
 ```
 
-and never acquires Document/Evidence/Dossier/Audit-domain roots afterwards except AuditChainHead last.
+and never later acquires governed Document/Evidence/Dossier roots. B4 may read/lock live Group dependencies after its Document/Approval root because the reverse path is prohibited, preserving DAG direction.
 
-B4 Release/Approval participant resolution may lock/read live Group dependencies **after** its Document/Approval root because the reverse Group-maintenance path is forbidden from later acquiring those governed-content roots. This creates a DAG edge, not a cycle.
+## Approval return
 
-## 19.3 Approval return rule
+Any path that may return/cancel/withdraw a Revision locks Document/Revision before Approval execution rows. Pure intermediate ACCEPT may remain Approval-local and then Audit; it may not later acquire Document.
 
-A path that can return/cancel/withdraw a Revision must acquire the Document/Revision root **before** Approval execution rows.
-
-Pure ACCEPT on a non-terminal intermediate Step may remain Approval-local and then append Audit; it must not subsequently acquire Document.
-
-## 19.4 Dossier/Records rule
-
-For relations/holds involving an existing subject:
+## Dossier/Records
 
 ```text
-Document or Evidence subject root
+Document or Evidence root
 → relevant Dossier roots UUID order
 → RetentionBinding
-→ AuditChainHead
+→ Audit
 ```
 
-Dossier-wide Hold activation may start at Dossier and then acquire RetentionBindings in deterministic order; it must not backtrack to Document/Evidence roots after those bindings are locked.
+Dossier-wide Hold activation may start at Dossier then acquire RetentionBindings deterministically; it must not backtrack to Document/Evidence after binding locks.
 
-## 19.5 Audit rule
+## Audit leaf
 
 ```text
-NO owner/domain lock after AuditChainHead is acquired.
+NO owner/domain lock after AuditChainHead.
 ```
 
-This is structural and must be testable in the implementation spec.
+This is a proof obligation, not documentation convention.
 
 ---
 
-# 20. Governed Export isolation law
+# 16. Export isolation law
 
-Global product isolation remains `READ COMMITTED`.
+Product default remains `READ COMMITTED`.
 
-Only the short semantic export-snapshot transaction uses `REPEATABLE READ`, because a complete manifest spanning many relationships must reflect one actual database snapshot without long row-lock fan-out.
+Only short complete-export snapshot transaction uses `REPEATABLE READ` because many relationship reads must represent one real database snapshot without locking a large graph for package-build duration.
 
-The transaction ends after:
+Transaction ends after manifest + build Intent + Audit. Package bytes are assembled after commit.
 
-```text
-closure resolved
-+ AuthZ checked
-+ immutable manifest persisted
-+ build Intent persisted
-+ Audit appended
-```
-
-Package bytes are assembled after commit.
-
-No other B6 operation gains stronger isolation by default.
+No other operation gets stronger isolation by default.
 
 ---
 
-# 21. Persistence / mutation classes
+# 17. Persistence / mutation classes
 
-| Family | Semantic class | Mutation law |
+| Family | Class | Mutation law |
 |---|---|---|
-| AuditChainHead | supporting semantic mechanism for Audit integrity | narrowly mutable monotonic head |
-| AuditEvent | semantic Audit authority | immutable append-only |
-| RevisionOrdinalReservation | CI semantic identity skeleton | immutable/permanent |
+| AuditChainHead | integrity-support semantic mechanism | narrow monotonic mutable head |
+| AuditEvent | Audit semantic authority | immutable append-only |
+| RevisionOrdinalReservation | CI semantic identity skeleton | permanent immutable |
 | DocumentRevision.history_kind | CI semantic identity | immutable |
-| RevisionImportedContent | CI semantic imported content authority | immutable retention payload |
-| RevisionImportedGovernanceSnapshot | CI semantic imported governance snapshot | immutable retention payload |
+| RevisionImportedContent | CI imported content authority | immutable retention payload |
+| RevisionImportedGovernanceSnapshot | CI imported governance authority | immutable retention payload |
 | Evidence.history_kind | Documentary Context semantic identity | immutable |
-| EvidenceImportedCapture | Documentary Context semantic imported capture authority | immutable retention payload |
-| HistoricalMigrationSource | Interchange semantic configuration | code immutable; display/status mutable |
-| HistoricalMigrationPlan/Item | Interchange semantic process plan | immutable after finalization |
-| HistoricalMigrationExecution | Interchange semantic process truth | constrained state machine |
-| HistoricalMigrationItemOutcome | Interchange semantic evidence | immutable final per execution/item |
-| HistoricalSourceBinding | Interchange source↔target provenance authority | immutable identity/fingerprint binding |
-| GovernedSubjectExport | Interchange semantic request | immutable |
-| GovernedExportSnapshot | Interchange semantic export identity | immutable |
-| GovernedExportPackageReceipt | Interchange semantic success evidence | immutable |
-| InterchangeConnection | Interchange semantic connection identity | code immutable; name/status mutable |
-| RepositoryTransfer | Interchange semantic request/process truth | immutable request |
-| RepositoryTransferReceipt | Interchange semantic success evidence | immutable |
-| outbox/job/retry/lease/package location | durable/ephemeral mechanism | R10-D |
+| EvidenceImportedCapture | Documentary Context imported capture authority | immutable retention payload |
+| HistoricalMigrationSource | Interchange config | code immutable; display/status mutable |
+| HistoricalMigrationPlan/Item | Interchange plan | immutable complete plan |
+| HistoricalMigrationExecution | Interchange process | constrained state machine |
+| HistoricalMigrationItemOutcome | Interchange process evidence | immutable final per item/execution |
+| HistoricalSourceBinding | source↔target provenance authority | immutable binding |
+| GovernedSubjectExport | Interchange request | immutable |
+| GovernedExportSnapshot | export semantic identity | immutable |
+| GovernedExportPackageReceipt | export success evidence | immutable |
+| InterchangeConnection | external logical identity | code immutable; name/status mutable |
+| RepositoryTransfer | transfer request | immutable |
+| RepositoryTransferReceipt | transfer success evidence | immutable |
+| job/outbox/retry/lease/temp package location | mechanism | R10-D |
 
 ---
 
-# 22. Enforcement / proof obligations
+# 18. Proof obligations
 
-Before implementation, prove at minimum:
+Before implementation prove at minimum:
 
 ### Audit
-
-1. serving role cannot UPDATE/DELETE AuditEvent;
-2. chain head cannot be reset through serving paths;
-3. rollback of audited mutation leaves neither domain state nor Audit event/head advance;
-4. deleting/mutating/reordering an AuditEvent makes integrity validation fail;
-5. two concurrent audited commits receive distinct contiguous committed sequence numbers;
-6. canonical hash golden vectors match across runtimes/DB validation tooling;
-7. no audited path acquires a domain lock after AuditChainHead;
-8. mandatory operation census has no uncovered write path.
+1. serving trust cannot direct-write AuditEvent/reset head;
+2. audited business rollback also rolls Audit/head back;
+3. mutate/delete/reorder event → validator fails;
+4. concurrent audited commits produce distinct contiguous committed sequences;
+5. Go/TS/tool canonical hash goldens match;
+6. mandatory operation census has no admitted uncovered path;
+7. no audited path obtains a domain lock after Audit head;
+8. Audit query cannot be used by canonical owner read paths to infer state.
 
 ### Imported history
+9. missing-byte ordinal reservation prevents reuse;
+10. imported Revision has no fake Submission/Approval/Release;
+11. NATIVE dictionary snapshot required; imported unknown dictionary never resolved from current values;
+12. imported terminal source state may retain NULL native terminal timestamp with imported proof;
+13. unknown historical effectivity/capture remains unknown;
+14. native successor Release supersedes imported EFFECTIVE normally;
+15. imported Template origin works without fake Submission/indefinite source retention;
+16. imported Evidence has no fake User/time;
+17. unknown imported retention anchor never becomes eligible;
+18. same source + same fingerprint reuses, changed fingerprint conflicts;
+19. dry-run creates zero target semantic rows/Artifacts/Bindings.
 
-9. missing-byte historical REV ordinal reservation prevents later ordinal reuse;
-10. imported Revision can be EFFECTIVE without fake RevisionSubmission/ReleaseRecord only when imported proof exists;
-11. unknown source effectivity remains unknown; adoption time is not substituted;
-12. native successor of imported EFFECTIVE revision supersedes it atomically through normal B4 Release;
-13. imported Template content can create a derived Document without fake Submission and without retaining source payload forever;
-14. imported Evidence creates no fake captured-by User/time;
-15. imported unknown retention anchor never becomes silently disposition-eligible;
-16. same historical source identity + same fingerprint reuses; conflicting fingerprint fails closed;
-17. dry-run creates zero target semantic rows/Artifacts/Bindings.
+### Export / transfers
+20. Document/Evidence/Dossier closure matches the bounded COMPLETE contract;
+21. any required unauthorized subject makes COMPLETE export fail closed;
+22. disposed history exports truthful skeleton/disposition evidence, never missing-byte fiction;
+23. concurrent writes cannot make the manifest span inconsistent snapshots;
+24. package builder verifies each exact hash before receipt;
+25. manifest/package has no provider storage identifiers;
+26. no COPY receipt means no external success claim;
+27. IMPORT target semantic mutation + receipt is atomic locally;
+28. IMPORT cannot bypass normal target governance;
+29. disposed/missing PUBLISH source fails visibly without resurrection.
 
-### Export / external repository
-
-18. complete export fails closed when one required linked subject is unauthorized;
-19. manifest is stable under concurrent unrelated writes and corresponds to one REPEATABLE READ snapshot;
-20. package build verifies every file hash before receipt;
-21. manifest/package contains no provider storage location identifiers;
-22. external PUBLISH without receipt never reads as completed;
-23. IMPORT_COPY cannot bypass ordinary target permission/governance;
-24. disposed/missing pinned source causes visible transfer failure, not resurrection.
-
-### Transactions / locks
-
-25. whole B1–B6 wait-for graph has no cycle under admitted transaction paths;
-26. multi-row same-class locking uses deterministic order;
-27. no nested owner commit can produce partial local success;
-28. every same-commit matrix row has a negative failure probe proving rollback across all local semantic participants;
-29. durable-intent failure rolls back the owning semantic mutation when the intent is required;
-30. provider/external failure after commit does not rewrite domain truth and is recoverable through R10-D reconciliation.
-
----
-
-# 23. Adversarial challenge
-
-## F1 — Audit becomes hidden event sourcing
-
-**Attack:** consumers start reading latest AuditEvent to infer state.  
-**Closure:** Audit resource refs are non-authoritative; owner read contract remains mandatory. Architecture/static guard should forbid product-state code from using Audit as canonical state.
-
-## F2 — indefinite Audit retains PII forever
-
-**Attack:** free-form facts/profile names leak into immutable chain.  
-**Closure:** bounded schema + field classification forbids human-readable/profile/request payload. Stable UUID skeleton only. A real requirement to erase even stable identifier skeleton reopens privacy/crypto decision.
-
-## F3 — global Audit head becomes throughput/deadlock bottleneck
-
-**Attack:** every audited transaction serializes at one row.  
-**Closure:** head is final lock and critical section is tiny. No current throughput evidence justifies segmented chains. Measured contention is reopen trigger.
-
-## F4 — Historical Migration fakes native history
-
-**Attack:** implementation creates System-submitted RevisionSubmission/ReleaseRecord for convenience.  
-**Closure:** history_kind + imported content/governance families provide lawful exact alternatives; synthetic native facts are forbidden.
-
-## F5 — CI depends forever on Interchange
-
-**Attack:** current imported Revision viewer/template/review reads migration tables.  
-**Closure:** ongoing imported content/governance facts are target-owner snapshots; Interchange owns process/source mapping only.
-
-## F6 — missing historical ordinal is reused
-
-**Attack:** bytes missing means no Revision row, then next native revision reuses old ordinal.  
-**Closure:** permanent RevisionOrdinalReservation participates in allocation guard.
-
-## F7 — imported Evidence invents capture actor/time
-
-**Attack:** migration user/time inserted as capture user/time.  
-**Closure:** `EvidenceImportedCapture` separates source captured/occurred facts from `adopted_at` and source actor snapshot.
-
-## F8 — export package is internally inconsistent
-
-**Attack:** successive READ COMMITTED queries observe changing Dossier links/revisions.  
-**Closure:** narrow REPEATABLE READ snapshot persisted before package assembly.
-
-## F9 — export secretly blocks disposition forever
-
-**Attack:** strong Artifact FKs/package leases become accidental retention.  
-**Closure:** no hidden hold. Build may fail visibly if source is lawfully disposed before completion.
-
-## F10 — PUBLISH_COPY truth conflates request with success
-
-**Attack:** request row is treated as external publication proof.  
-**Closure:** immutable Receipt is the only success evidence.
-
-## F11 — generic integration engine appears through target/source unions
-
-**Attack:** arbitrary `target_type/id` and free-form action/plugin graph emerges.  
-**Closure:** closed typed FKs for admitted target families; four frozen transfer contracts remain distinct.
-
-## F12 — Audit chain lock creates reverse deadlock
-
-**Attack:** Audit append callback calls owner again.  
-**Closure:** AuditChainHead is terminal leaf; no callback/domain lock after acquisition.
+### Transactions / concurrency
+30. whole B1–B6 wait-for graph is acyclic under all admitted paths;
+31. same-class multi-row locks use deterministic order;
+32. no nested owner commit produces partial local success;
+33. each matrix row has a negative probe proving local rollback across all semantic participants;
+34. required Intent insert failure rolls back the business mutation;
+35. provider failure after commit leaves domain truth intact and recoverable through R10-D.
 
 ---
 
-# 24. Essential vs accidental complexity
+# 19. Adversarial findings closed by candidate
 
-## Essential
-
-- same-commit minimal Audit evidence;
-- tamper-evident append chain;
-- PII-minimized immutable skeleton;
-- imported vs native truth distinction;
-- exact imported content authority;
-- historical ordinal preservation;
-- true dry-run/idempotency/reconciliation;
-- provider-independent complete export manifest;
-- explicit external-copy success receipt;
-- durable effect intent distinct from semantic result;
-- final same-commit matrix and lock DAG;
-- narrow stable-snapshot isolation for complete export.
-
-## Accidental/deferred
-
-- event sourcing;
-- generic event/integration bus as domain;
-- DB-trigger semantic audit;
-- free-form Audit payload dumps;
-- finite Audit pruning/checkpoints without requirement;
-- external cryptographic audit anchors;
-- BagIt requirement without consumer;
-- signed export packages;
-- partial export V1;
-- generic transformation/sync engine;
-- provider URLs/keys as business identity;
-- whole-batch migration transaction;
-- global SERIALIZABLE;
-- distributed lock service;
-- generic plugin workflow around transfers.
+- **Audit as hidden event sourcing:** forbidden owner-read dependency; Audit only attribution/evidence.
+- **Indefinite Audit stores PII:** bounded schemas prohibit human profile/free text; stable UUID skeleton only.
+- **Audit chain direct-write bypass:** serving trust targets narrow DB append primitive, not direct event/head writes.
+- **Global head deadlock:** Audit is terminal leaf; measured throughput pressure is reopen trigger, not speculative segmentation.
+- **Migration fakes native history:** explicit history kind/imported content/governance forms.
+- **CI depends on Interchange forever:** ongoing imported facts are target-owner snapshots.
+- **Historical ordinal reused:** permanent reservation participates in allocation.
+- **Imported terminal timestamp fabricated:** native timestamp means native transition; historical source time stays imported evidence.
+- **Imported Evidence invents captured-by/time:** dedicated imported capture.
+- **Export is inconsistent:** short REPEATABLE READ manifest snapshot.
+- **Export closure ambiguous:** explicit Document/Evidence/Dossier bounded COMPLETE closure.
+- **Export secretly becomes hold:** no hidden preservation; race may fail package visibly.
+- **COPY request treated as success:** immutable receipt only.
+- **IMPORT target commits without receipt:** target mutation + receipt same local transaction.
+- **Generic integration registry:** closed typed unions; four frozen contracts remain separate.
+- **Audit reverse lock edge:** no owner call/lock after head acquisition.
 
 ---
 
-# 25. Reopen triggers
+# 20. Essential vs accidental complexity / reopen
 
-Reopen the implicated decision only if real evidence shows:
+Essential:
 
-- measured single AuditChainHead contention is material;
-- immutable Audit stable identifiers must themselves be lawfully erased;
-- external cryptographic/timestamp non-repudiation is contractually required;
-- Audit must have finite retention;
-- a consumer requires BagIt/another standardized signed package;
-- a real partial-export contract is required;
-- a new imported historical state cannot be represented truthfully by imported target-owner snapshots;
-- a new retention-subject family enters Historical Migration;
-- external repository synchronization becomes bidirectional continuous semantic sync rather than explicit copies;
-- a real cross-repository transaction/trust boundary requires earlier independent review;
-- the whole B1–B6 lock graph cannot be proven acyclic without disproportionate machinery;
-- `REPEATABLE READ` export cannot produce the required complete package semantics under real workload/evolution evidence.
+```text
+same-commit bounded Audit
+append tamper chain
+PII-minimized skeleton
+native vs imported truth
+exact imported content/capture authority
+historical ordinal preservation
+true dry-run/idempotency/reconciliation
+complete stable export manifest
+explicit external-effect receipts
+final tx matrix + lock DAG
+narrow REPEATABLE READ export snapshot
+```
 
-Implementation inconvenience, existing legacy schema, current Audit/outbox code shape, or hypothetical future integrations do not reopen B6.
+Rejected/deferred:
+
+```text
+event sourcing
+generic integration/event bus domain
+DB-trigger semantic inference
+free-form Audit dumps
+finite Audit pruning without requirement
+external cryptographic anchors
+BagIt/signatures without consumer
+partial export V1
+generic transform/sync engine
+provider URL/key identity
+whole-batch migration transaction
+global SERIALIZABLE
+distributed lock service
+```
+
+Reopen only on material evidence: measured Audit-head contention; finite/erasure requirement for Audit skeleton; external non-repudiation contract; standardized/partial export consumer; new truthful imported-state requirement; new retention subject in migration; continuous bidirectional sync requirement; cross-repository trust boundary; lock-graph proof failure; or real workload proving the export isolation solution insufficient.
+
+Implementation inconvenience/current schema/hypothetical integrations do not reopen.
 
 ---
 
-# 26. Candidate decision
-
-DevelopmentConexus Method outcome:
-
-> **RESTRUCTURE NOW at design level:** keep domain owners authoritative; replace best-effort/transversal ambiguity with a minimal same-commit tamper-evident Audit, explicit imported-history target-owner forms, specialized Interchange process/receipt contracts, a narrow stable-snapshot export transaction and one final B1–B6 same-commit/lock law.
-
-If operator-accepted:
+# 21. Candidate decision / next state if accepted
 
 ```text
 R10-B3 = ACCEPTED FOR R10 INTEGRATION / NON-FINAL
          + B5 refinements B3-R1/R2/R3
-         + B6 refinements B3-R4/R5/R6 + B3-R1 imported-content extension
+         + B6 refinements B3-R4/R5/R6
+         + B3-R1 imported-content extension
+         + B3-R2 native-vs-imported terminal timestamp clarification
 
 R10-B4 = ACCEPTED FOR R10 INTEGRATION / NON-FINAL
 
 R10-B5 = ACCEPTED FOR R10 INTEGRATION / NON-FINAL
-         + B6 Evidence imported-capture bounded refinement
+         + imported-Evidence bounded refinement
 
 R10-B6 = ACCEPTED FOR R10 INTEGRATION / NON-FINAL / NOT INDEPENDENTLY RATIFIED
 
 R10-B = INTEGRATED DESIGN BLOCK COMPLETE / NON-FINAL
-
 implementation = BLOCKED
 next = R10-C — Artifact / Records Physical Integrity
 ```
 
-Before R10-C starts, perform one integrated B1↔B6 Global Coherence Review of this corrected candidate. Whole-R10 cold independent review remains deferred until B6/C/D/E/F integration is complete unless a material exception trigger appears.
+Before operator acceptance, run one integrated B1↔B6 coherence review of this corrected candidate. Whole-R10 cold independent review remains deferred until integrated B6/C/D/E/F unless a material exception trigger appears.
