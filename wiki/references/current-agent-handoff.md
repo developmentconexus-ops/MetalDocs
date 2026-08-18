@@ -21,7 +21,7 @@ Read in this order:
 10. `wiki/architecture/r10-t4-exact-content-storage-integrity-restore.md`
 11. `wiki/architecture/rebaseline-decision-registry.md`
 12. `wiki/architecture/r10-technical-architecture.md`
-13. `docs/superpowers/analysis/2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md` — **PARENT T5 CANDIDATE / T5-A→P NOT YET READY FOR WHOLE ADJUDICATION**
+13. `docs/superpowers/analysis/2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md` — **PARENT T5 CANDIDATE / CORRECTED PACKET PAUSED**
 14. `docs/superpowers/analysis/2026-08-18-t5-rendition-viewer-strategy-evaluation.md` — **ACTIVE MATERIAL SUBGATE / RV-1→RV-6 OPERATOR DECISION NEXT**
 15. `wiki/architecture/launch-v1-scope-rebaseline.md`
 16. old R3–R9.5 / R10-B1→B6/C and current implementation only as evidence allowed by the registry
@@ -58,7 +58,7 @@ REV001 = first revision
 
 ```text
 read registry
-→ design only Tn REOPEN set
+→ design Tn REOPEN set
 → operator adjudication
 → platform-facing summary
 → explicit operator summary ratification
@@ -105,15 +105,7 @@ provider effect receipts where needed
 
 ## Active T5 rendition/viewer subgate
 
-The operator challenged the assumption that a DOCX used for viewing must produce a persistent `OfficialRendition` PDF.
-
-Reference-software review found three valid patterns:
-
-```text
-direct/native Office viewing
-rebuildable/on-demand viewable rendition
-persistent governed OfficialRendition
-```
+The operator challenged the assumption that DOCX viewing requires a persistent `OfficialRendition` PDF.
 
 Current recommended hybrid:
 
@@ -133,7 +125,23 @@ DOCX + RequireOfficialRendition(PDF)
   → Release gate
 ```
 
-Renderer product is not frozen yet. EigenPal is the lowest-cost native DOCX viewer candidate; ONLYOFFICE is a stronger self-hosted viewer/converter candidate; Gotenberg/LibreOffice is a simple server-side PDF converter candidate. Selection must be proven through a representative DOCX fidelity corpus.
+Preview/viewing PDF and OfficialRendition PDF are different meanings. A preview/cache may be rebuildable mechanism; it is not semantic truth or Release gate.
+
+Current corrected T5 job census candidate:
+
+```text
+always-required durable job:
+  search_refresh
+
+conditional durable job:
+  official_rendition_render
+  only for frozen RequireOfficialRendition policy
+
+periodic reconciliation:
+  managed-content GC over GC_PENDING
+```
+
+Renderer product is not frozen. EigenPal is the lowest-cost native DOCX viewer candidate; ONLYOFFICE is a stronger self-hosted viewer/converter candidate; Gotenberg/LibreOffice is a simple server-side PDF converter candidate. Selection must be proven through a representative DOCX fidelity corpus.
 
 ## Exact next step
 
@@ -144,7 +152,7 @@ Operator adjudication of `RV-1→RV-6` in:
 Only after that:
 
 ```text
-refine T5-D/T5-E + durable-job census
+refine/confirm T5-D/T5-E + durable-job census
 → adjudicate corrected T5-A→T5-P
 → platform-facing T5 summary
 → explicit operator ratification
