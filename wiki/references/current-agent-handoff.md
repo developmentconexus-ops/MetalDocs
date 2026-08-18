@@ -16,12 +16,13 @@ Read in this order:
 5. `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md` — frozen R3–R9.5 historical/product-domain authority
 6. `wiki/architecture/r10-technical-architecture.md` — promoted R10 authority through integrated B2
 7. accepted B3/B4/B5/B6 candidates + B4/B5/B6 acceptance records
-8. **`docs/superpowers/analysis/2026-08-18-launch-v1-records-governance-defer-rebaseline.md` — CURRENT LAUNCH-V1 OVERLAY; read after earlier accepted design because it deliberately supersedes only the launch-scope Records-Governance portions**
-9. older review/current-state artifacts only when auditing how a decision was challenged
+8. **`wiki/architecture/launch-v1-scope-rebaseline.md` — CURRENT DURABLE LAUNCH-V1 OVERLAY; supersedes only the launch-scope decisions it explicitly names**
+9. `docs/superpowers/analysis/2026-08-18-launch-v1-records-governance-defer-rebaseline.md` only when the rationale/evidence behind the overlay is needed
+10. older review/current-state artifacts only when auditing how a decision was challenged
 
 Git history is archive. Current code/schema/OpenAPI/module docs remain current-state/migration evidence only.
 
-If earlier R9.5/R10 documents describe RetentionBinding, LegalHold, Disposition or Records Governance as Launch V1 target, apply the explicit Launch-V1 rebaseline above. Do not treat that as an unresolved contradiction: the rebaseline is the operator-approved bounded current-R10 overlay.
+If earlier R9.5/R10 documents describe RetentionBinding, LegalHold, Disposition or Records Governance as Launch V1 target, apply the explicit Launch-V1 overlay above. This is an operator-approved bounded rebaseline, not an unresolved authority conflict.
 
 ---
 
@@ -47,7 +48,7 @@ R10-F   = NOT STARTED
 implementation = BLOCKED
 ```
 
-Whole-R10 Global Coherence Review + cold independent review remain required before final R10 ratification. The rebaseline is intended to **shorten** C/D/E/F and the later implementation surface, not bypass the final review gate.
+Whole-R10 Global Coherence Review + cold independent review remain required before final R10 ratification. The rebaseline shortens C/D/E/F and the implementation surface; it does not bypass the final review gate.
 
 ---
 
@@ -73,9 +74,9 @@ Records-driven ObjectLock/WORM
 eDiscovery/custodian machinery
 ```
 
-Do not create disabled tables, feature flags, dormant permissions or empty modules for them.
+Do not create disabled tables, feature flags, dormant permissions, empty modules or jobs for them.
 
-Reopen only on a concrete regulatory, contractual, customer or operational requirement for finite retention, legal preservation hold or governed destruction.
+Reopen only on concrete regulatory, contractual, customer or operational evidence requiring finite retention, legal preservation hold or governed destruction.
 
 ---
 
