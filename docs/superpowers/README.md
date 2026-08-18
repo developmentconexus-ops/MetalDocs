@@ -2,9 +2,9 @@
 
 > **Status:** Active staging workspace for the MetalDocs rebaselined R10 technical design.  
 > **Reset:** 2026-08-14.  
-> **Current gate:** **T1 + T2 + T3 + T4 + Decision Registry CLOSED / OPERATOR-RATIFIED; T5 DECISIONS ACCEPTED / PLATFORM SUMMARY RATIFICATION NEXT.**
+> **Current gate:** **T1→T5 + Decision Registry CLOSED / OPERATOR-RATIFIED; POST-T5 FABLE CHECKPOINT ACTIVE; T6 NOT OPEN.**
 
-Durable accepted truth belongs in `wiki/`. Active, not-yet-promoted design analysis belongs here. Completed/superseded staging is removed from the live tree and remains recoverable from Git history.
+Durable accepted truth belongs in `wiki/`. Active review/design analysis belongs here. Completed/superseded staging is removed from the live tree and remains recoverable from Git history.
 
 ## Current durable authority
 
@@ -16,24 +16,22 @@ wiki/architecture/launch-v1-product-contract.md
 → wiki/architecture/r10-t2-governance-effectivity-transactions.md
 → wiki/architecture/r10-t3-authorization-audit-enforcement.md
 → wiki/architecture/r10-t4-exact-content-storage-integrity-restore.md
+→ wiki/architecture/r10-t5-durable-async-search-external-effects.md
 → wiki/architecture/rebaseline-decision-registry.md
 → wiki/architecture/r10-technical-architecture.md
 ```
 
 ## Current active staging
 
-- `analysis/2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md` — parent non-authoritative T5 analysis.
-- `analysis/2026-08-18-t5-rendition-viewer-strategy-evaluation.md` — **RV-1→RV-6 operator-adjudicated / accepted.**
-- `analysis/2026-08-18-r10-t5-corrected-adjudication-packet.md` — **T5-A→T5-P operator-adjudicated / accepted.**
-- `analysis/2026-08-18-r10-t5-operator-adjudication.md` — **ACTIVE PLATFORM SUMMARY RATIFICATION GATE.**
+- `analysis/2026-08-18-t1-t5-integrated-fable-review-request.md` — **ACTIVE INDEPENDENT FABLE COLD-REVIEW REQUEST / NOT TARGET AUTHORITY.**
 
-Completed T4 staging was removed after durable promotion. Git history is the archive.
+Completed T5 candidate/subgate/adjudication staging was removed after durable promotion. Git history is the archive.
 
 ## Revalidation law
 
 > **Revalidation does not mean reinvention. Preserve a prior simple/coherent decision unless current authority or a concrete failure mode disproves it; rederive only the composite decision whose justification changed; defer only the capability that actually left Launch.**
 
-For every remaining T-stage:
+For remaining T-stages:
 
 ```text
 CURRENT / PRESERVE / REFINED → baseline
@@ -42,86 +40,38 @@ DEFERRED                     → future seam/counterexample only
 SUPERSEDED                   → reject inheritance absent explicit material reopen
 ```
 
-## T5 preserved baseline
+## Closed T5 headline
 
 ```text
-Search = rebuildable/eventually-consistent discovery projection
-Search never grants access/effectivity
-provider calls never join semantic tx
-OfficialRendition is optional and exists only when frozen representation policy requires it
-SourceOnly remains valid
-preview/viewer mechanism is not semantic authority
-T4 managed-content exactness/admission/GC_PENDING laws are closed
-notifications are not domain/lifecycle authority
-current River/custom outbox code is evidence only
-```
-
-## Accepted Rendition / Viewer subgate
-
-```text
-PDF source
-  → direct PDF viewer
-  → no duplicate generated PDF by default
-
-DOCX + SourceOnly
-  → direct read-only DOCX viewer
-  → no persistent governed PDF merely for viewing
-
-DOCX + RequireOfficialRendition(PDF)
-  → conditional durable render from exact Submission
-  → T4 admission
-  → immutable OfficialRendition
-  → Release gate
-```
-
-Renderer product is not frozen. EigenPal, ONLYOFFICE and Gotenberg/LibreOffice remain candidates for different roles and must be proven against a representative DOCX fidelity corpus.
-
-## Accepted T5 durable-effect census
-
-```text
-always-required durable job:
-  search_refresh
-
-conditional durable job:
-  official_rendition_render
-  only when frozen representation policy requires it
-
-periodic reconciliation:
-  managed-content GC over GC_PENDING
-```
-
-Accepted T5 architecture also establishes:
-
-```text
-one Postgres-backed durable-job runtime; River selected/reference mechanism
+one PostgreSQL-backed durable-job mechanism; River selected/reference mechanism
+search_refresh(document_id) always-required durable projection job
+official_rendition_render conditional only for frozen policy-required OfficialRendition
+PDF source direct-view by default
+DOCX + SourceOnly direct read-only viewer; no persisted PDF merely for viewing
 transaction-coupled enqueue for required future work
 provider/renderer execution outside semantic tx
-idempotent at-least-once rendition finalization
+OfficialRendition finalization T4/T2/T3-revalidated and idempotent
 PostgreSQL rebuildable Search projection keyed by Document
-latest-state search refresh; duplicates/out-of-order converge safely
-Search may lag by omission but never grants stale authority/effectivity
-full Search rebuild required; always-on crawler not baseline
+latest-state refresh makes duplicate/out-of-order jobs converge
+Search lag may omit but never grant stale authority/effectivity
+full Search rebuild mandatory; always-on crawler not baseline
+GC periodic reconciliation over GC_PENDING
 no mandatory Launch notifications/event bus
 no mandatory durable IdP-disable job
-bounded retry + fail-loud terminal visibility + manual redrive
 no generic ExternalEffectReceipt
+bounded-retry terminal-visible/redrivable jobs with bounded-ID payloads
 minimum async operational visibility
-future capabilities add only named jobs/effects/receipts
 ```
 
-## Mandatory T-stage closure protocol
+## Active Fable checkpoint
 
-```text
-read registry
-→ candidate/design
-→ material decision adjudication
-→ platform-facing summary
-→ explicit operator summary ratification
-→ promotion/closure
-→ update Decision Registry
-→ remove completed staging
-→ only then Tn+1
-```
+The independent reviewer must reconstruct T1→T5 cold from repo authority and attack integrated flows, authority uniqueness, races, Decision Registry drift, overengineering and future seams.
+
+Review request:
+
+`analysis/2026-08-18-t1-t5-integrated-fable-review-request.md`
+
+Review findings are evidence only. T6 stays closed until material findings are adjudicated and the post-T5 checkpoint explicitly closes.
 
 ## Active technical path
 
@@ -130,14 +80,18 @@ T1 Semantic State & Invariants                         CLOSED / OPERATOR-RATIFIE
 T2 Governance, Effectivity & Lifecycle Transactions   CLOSED / OPERATOR-RATIFIED
 T3 Authorization & Audit Enforcement                  CLOSED / OPERATOR-RATIFIED
 T4 Exact Content, Storage Integrity & Restore         CLOSED / OPERATOR-RATIFIED
+T5 Durable Async, Search & External Effects           CLOSED / OPERATOR-RATIFIED
 Decision Registry                                      CURRENT / OPERATOR-RATIFIED
-RV-1→RV-6                                              ACCEPTED
-T5 Durable Async, Search & External Effects           DECISIONS ACCEPTED / SUMMARY RATIFICATION NEXT
+Post-T5 integrated Fable checkpoint                    ACTIVE / REVIEW REQUEST STAGED
 T6 Canonical API / Frontend Journeys                  NOT OPEN
 T7 Historical Migration & Cutover                     NOT OPEN
 
+→ Fable findings adjudication
+→ explicit post-T5 checkpoint closure
+→ T6
+→ T7
 → Integrated Whole-R10 GCR
-→ cold independent review
+→ cold independent final review
 → final operator ratification
 → implementation spec/plan
 → code
@@ -145,4 +99,4 @@ T7 Historical Migration & Cutover                     NOT OPEN
 
 ## Hard stop
 
-No product implementation or implementation plan is authorized while active design gates remain open.
+No product implementation or implementation plan is authorized while active design/review gates remain open.
