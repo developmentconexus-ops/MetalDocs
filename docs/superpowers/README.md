@@ -2,16 +2,15 @@
 
 > **Status:** Active staging workspace for the MetalDocs Whole-Product Alignment / rebaselined R10 technical design.  
 > **Reset:** 2026-08-14.  
-> **Current gate:** **T1 CLOSED / PROMOTED; T2 decisions accepted with REV000 correction / platform summary ratification next.**
+> **Current gate:** **T1 + T2 CLOSED / PROMOTED; T3 Authorization & Audit Enforcement discovery/design active.**
 
 The live `docs/superpowers/` tree contains active working material only. Durable accepted truth belongs in `wiki/`; completed/superseded staging is removed and remains recoverable from Git history.
 
 ## Current active staging
 
-- `analysis/2026-08-18-r10-t2-governance-effectivity-transactions-candidate.md` — **CORRECTED T2 design packet; REV000 initial issuance.**
-- `analysis/2026-08-18-r10-t2-operator-adjudication.md` — **T2-A→T2-N accepted; platform-summary ratification gate active.**
+No T3 material decision packet has been written yet. T3 is in discovery/design and must first compare credible access/Audit approaches against the accepted Product Contract + T1/T2 journeys.
 
-T1 was operator-adjudicated, summarized in platform terms, explicitly summary-ratified, promoted into `wiki/architecture/r10-technical-architecture.md`, and its completed staging is removed from the live tree.
+T1 and T2 were operator-adjudicated, summarized in platform terms, explicitly summary-ratified and promoted into durable `wiki/` authority. Their completed staging is removed from the live tree.
 
 Binding revision convention:
 
@@ -29,6 +28,7 @@ wiki/architecture/launch-v1-product-contract.md
 → wiki/architecture/whole-product-alignment-review.md
 → wiki/architecture/launch-v1-ownership-topology.md
 → wiki/architecture/r10-technical-architecture.md
+→ wiki/architecture/r10-t2-governance-effectivity-transactions.md
 ```
 
 ## Mandatory T-stage closure protocol
@@ -60,8 +60,8 @@ Prior B1–B6/C artifacts may be consulted as evidence but do not control active
 
 ```text
 T1 Semantic State & Invariants                         CLOSED / OPERATOR-RATIFIED
-T2 Governance, Effectivity & Lifecycle Transactions   DECISIONS ACCEPTED / SUMMARY RATIFICATION PENDING
-T3 Authorization & Audit Enforcement                  NOT OPEN
+T2 Governance, Effectivity & Lifecycle Transactions   CLOSED / OPERATOR-RATIFIED
+T3 Authorization & Audit Enforcement                  ACTIVE / DISCOVERY-DESIGN
 T4 Exact Content, Storage Integrity & Restore         NOT OPEN
 T5 Durable Async, Search & External Effects           NOT OPEN
 T6 Canonical API / Frontend Journeys                  NOT OPEN
