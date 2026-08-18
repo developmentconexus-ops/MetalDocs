@@ -1,7 +1,7 @@
 # Current Agent Handoff
 
 > **Last verified:** 2026-08-18  
-> **Status:** ACTIVE — **PRODUCT/GCR/4+1/T1→T7 APPROVED; T1 SEMANTIC STATE CANDIDATE OPEN / OPERATOR ADJUDICATION NEXT**  
+> **Status:** ACTIVE — **PRODUCT/GCR/4+1/T1→T7 APPROVED; T1 DECISIONS ACCEPTED / PLATFORM-SUMMARY RATIFICATION NEXT; T2 NOT OPEN**  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Implementation:** **BLOCKED — design/documentation only**
 
@@ -15,12 +15,13 @@ Read in this order:
 4. `wiki/architecture/launch-v1-product-contract.md` — **ACCEPTED PRODUCT AUTHORITY**
 5. `wiki/architecture/whole-product-alignment-review.md` — **OPERATOR-ADJUDICATED GCR A1–A10**
 6. `wiki/architecture/launch-v1-ownership-topology.md` — **OPERATOR-APPROVED 4+1 OWNERSHIP + FUTURE-EVOLUTION LAW**
-7. `wiki/architecture/r10-technical-architecture.md` — **ACTIVE REBASELINED T1→T7 TECHNICAL-STAGE AUTHORITY**
-8. `docs/superpowers/analysis/2026-08-18-r10-t1-semantic-state-invariants-candidate.md` — **ACTIVE NON-AUTHORITATIVE T1 CANDIDATE / OPERATOR ADJUDICATION PACKET**
-9. `wiki/architecture/launch-v1-scope-rebaseline.md` — narrow Records-Governance defer overlay
-10. prior cohesive/R9.5/R10 B1–B6/C material only as evidence where current authorities do not supersede it
+7. `wiki/architecture/r10-technical-architecture.md` — **ACTIVE REBASELINED T1→T7 TECHNICAL-STAGE AUTHORITY + MANDATORY SUMMARY-RATIFICATION GATE**
+8. `docs/superpowers/analysis/2026-08-18-r10-t1-semantic-state-invariants-candidate.md` — T1 design candidate/evidence
+9. `docs/superpowers/analysis/2026-08-18-r10-t1-operator-adjudication.md` — **ACTIVE T1 ADJUDICATION / SUMMARY-RATIFICATION STAGING**
+10. `wiki/architecture/launch-v1-scope-rebaseline.md` — narrow Records-Governance defer overlay
+11. prior cohesive/R9.5/R10 B1–B6/C material only as evidence where current authorities do not supersede it
 
-`wiki/architecture/cohesive-platform-redesign.md` is now a short **prior-design evidence compatibility page**, not active routing. Git history preserves its former full narrative.
+`wiki/architecture/cohesive-platform-redesign.md` is a short **prior-design evidence compatibility page**, not active routing. Git history preserves its former full narrative.
 
 Git history and current runtime/schema/OpenAPI remain evidence, not automatic target authority.
 
@@ -33,7 +34,9 @@ Product Contract                 = ACCEPTED / PROMOTED
 Whole-Product GCR A1–A10         = OPERATOR-ADJUDICATED / ACCEPTED
 Launch ownership topology        = CLOSED / OPERATOR-APPROVED / 4+1
 T1→T7 technical decomposition    = CLOSED / OPERATOR-APPROVED
-T1 Semantic State & Invariants   = ACTIVE NON-AUTHORITATIVE CANDIDATE
+T1 decisions A→J                 = OPERATOR-ADJUDICATED / ACCEPTED
+T1 platform summary              = NEXT / EXPLICIT OPERATOR RATIFICATION REQUIRED
+T1 final promotion/closure       = PENDING SUMMARY RATIFICATION
 T2→T7                            = NOT OPEN
 old R10-A 8+3                    = SUPERSEDED FOR LAUNCH
 old R10-B1→B6                    = EVIDENCE ONLY
@@ -42,6 +45,25 @@ implementation                   = BLOCKED
 ```
 
 No implementation plan or product code is authorized until T1→T7 are integrated, Whole-R10 GCR + cold independent review complete, and the operator gives final ratification.
+
+---
+
+## Mandatory T-stage comprehension gate — operator explicit
+
+For every technical stage `Tn`:
+
+```text
+Tn candidate/design
+→ material decision adjudication
+→ assistant presents platform-facing summary
+→ explicit operator approval of that summary
+→ promote/close Tn
+→ only then open Tn+1
+```
+
+The summary must explain what was decided **and how it will work in the MetalDocs platform**, not merely repeat architecture labels. It must also identify deliberate deferrals/future seams and material reopen triggers.
+
+A prior “approve A/B/C” response does not by itself authorize opening the next stage unless the platform summary has also been explicitly ratified.
 
 ---
 
@@ -107,7 +129,7 @@ These are architecture counterexamples and attachment-seam evidence, not Launch 
 ## Approved technical descent
 
 ```text
-T1 — Semantic State & Invariants                         ACTIVE
+T1 — Semantic State & Invariants                         SUMMARY RATIFICATION PENDING
 T2 — Governance, Effectivity & Lifecycle Transactions   NOT OPEN
 T3 — Authorization & Audit Enforcement                  NOT OPEN
 T4 — Exact Content, Storage Integrity & Restore         NOT OPEN
@@ -126,9 +148,9 @@ Do not use the former B1→B6→C→D→E→F order as active routing.
 
 ---
 
-## T1 current candidate — headline
+## T1 adjudicated headline
 
-T1 proposes the minimum enduring semantic families needed for Launch:
+The operator accepted:
 
 ```text
 Authentication
@@ -166,6 +188,10 @@ Audit
   AuditEvent
 ```
 
+Accepted T1-J:
+
+> If the Document Type is `NoHumanApproval`, governed obsolescence may complete with zero human Step after authorized initiation, mandatory reason and all eligibility/invariant checks. It remains a governed operation and creates no fake System approver.
+
 Explicitly absent from Launch T1 unless a later stage proves a named Launch consumer:
 
 ```text
@@ -181,18 +207,14 @@ Interchange / Governed Export / repository receipts
 global AuditChainHead/hash chain
 ```
 
-T1 is **not yet accepted authority**.
+T1 is **not yet durably promoted/closed** because the operator-facing summary must be ratified first.
 
 ---
 
 ## Exact next step
 
-**Operator adjudication of T1 recommendations T1-A→T1-I and bounded product-semantic question T1-J.**
+**Present the T1 platform-facing summary to the operator and obtain explicit summary ratification.**
 
-T1-J asks:
-
-> If a Document Type uses `NoHumanApproval`, may governed obsolescence also complete with no human Step after authorized initiation/reason/eligibility checks, or must obsolescence always require at least one human governance Step?
-
-Do not answer this silently in T2.
+Do not open T2 before that approval.
 
 Until T1 closes, do not write SQL/table/index design, package layout, storage locator design, exact permission catalog, async topology, API routes, migration execution design, implementation plans or product code.
