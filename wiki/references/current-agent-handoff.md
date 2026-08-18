@@ -1,7 +1,7 @@
 # Current Agent Handoff
 
 > **Last verified:** 2026-08-18  
-> **Status:** ACTIVE — **WHOLE-PRODUCT GCR OPERATOR-ADJUDICATED / OWNERSHIP TOPOLOGY RE-DERIVATION NEXT; R10-C PAUSED**  
+> **Status:** ACTIVE — **PRODUCT/GCR/4+1 OWNERSHIP APPROVED; REMAINING TECHNICAL ARCHITECTURE RE-DERIVATION NEXT; R10-C PAUSED**  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Implementation:** **BLOCKED — design/documentation only**
 
@@ -14,141 +14,156 @@ Read in this order:
 3. this file
 4. `wiki/architecture/launch-v1-product-contract.md` — **ACCEPTED PRODUCT AUTHORITY**
 5. `wiki/architecture/whole-product-alignment-review.md` — **OPERATOR-ADJUDICATED GCR / ACTIVE ROUTING AUTHORITY**
-6. `wiki/architecture/launch-v1-scope-rebaseline.md` — narrow Records-Governance defer overlay; subordinate to Product Contract/GCR adjudication
-7. `wiki/architecture/cohesive-platform-redesign.md` — prior redesign authority/evidence where still relevant
-8. `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md` — frozen R3–R9.5 historical/product-domain evidence
-9. `wiki/architecture/r10-technical-architecture.md` — prior promoted R10 technical authority through B2, **not active routing for technical descent**
-10. accepted B3/B4/B5/B6 candidates + acceptance records only when auditing earlier decisions
-11. `docs/superpowers/analysis/2026-08-18-r10-c-artifact-physical-integrity-integrated-candidate.md` — **PAUSED CANDIDATE / EVIDENCE ONLY; DO NOT PROMOTE OR IMPLEMENT**
+6. `wiki/architecture/launch-v1-ownership-topology.md` — **OPERATOR-APPROVED 4+1 SEMANTIC OWNERSHIP AUTHORITY + FUTURE-EVOLUTION LAW**
+7. `wiki/architecture/launch-v1-scope-rebaseline.md` — narrow Records-Governance defer overlay
+8. prior cohesive/R9.5/R10 material only as evidence where the current authorities do not supersede it
+9. `docs/superpowers/analysis/2026-08-18-r10-c-artifact-physical-integrity-integrated-candidate.md` only as **PAUSED EVIDENCE; DO NOT REPAIR OR PROMOTE**
 
-The completed Whole-Product GCR staging packet was promoted into the adjudicated routing authority and removed from the live staging tree. Git history remains its archive.
-
-Git history and current runtime/schema/OpenAPI are evidence, not automatic target authority.
+Git history and current runtime/schema/OpenAPI remain evidence, not automatic target authority.
 
 ---
 
 ## Current checkpoint
 
 ```text
-R9.5    = FROZEN historical authority/evidence; Product Contract controls Launch capability
-R10-A   = REOPENED by operator-adjudicated Whole-Product GCR; replacement topology must be re-derived
-R10-B1  = prior promoted substrate; reusable only where it survives later re-derivation
-R10-B2  = prior promoted AuthN/Org/AuthZ; boundary largely survives, exact role/permission catalog reopened
-R10-B3  = accepted non-final evidence; core Document/Revision/WorkingContent/Submission survives, Artifact/adjuncts challenged
-R10-B4  = accepted non-final evidence; one Step + Release survive, Distribution coupling/workflow richness challenged
-R10-B5  = accepted non-final historical evidence; Dossier/Evidence/Records are Future for Launch
-R10-B6  = accepted non-final evidence; Audit separation + migration truth survive, generic Interchange/hash-chain scope challenged
-R10-C   = PAUSED / NON-AUTHORITATIVE CANDIDATE / DO NOT REPAIR
-R10-D–F = NOT STARTED
+Product Contract             = ACCEPTED / PROMOTED
+Whole-Product GCR A1–A10     = OPERATOR-ADJUDICATED / ACCEPTED
+Launch ownership topology    = CLOSED / OPERATOR-APPROVED / 4+1
+R10-A prior 8+3 topology     = SUPERSEDED FOR LAUNCH
+R10-B1/B2/B3/B4/B5/B6        = prior technical evidence only where implicated
+R10-C                        = PAUSED / NON-AUTHORITATIVE / DO NOT REPAIR
+R10-D–F                      = NOT STARTED
 
-Product Contract      = ACCEPTED / PROMOTED
-Whole-Product GCR     = OPERATOR-ADJUDICATED / A1–A10 ACCEPTED
-Ownership re-derivation = NEXT
-implementation        = BLOCKED
+remaining technical architecture re-derivation = NEXT
+implementation                              = BLOCKED
 ```
 
-No technical stage resumes until the replacement ownership/topology is derived from the accepted product/GCR findings and approved by the operator.
+No implementation plan or product code is authorized until the remaining technical design is re-derived, integrated, reviewed cold and finally ratified by the operator.
 
 ---
 
-## Accepted product authority
+## Accepted Launch ownership
 
-`wiki/architecture/launch-v1-product-contract.md` is the Launch V1 product authority.
+```text
+BUSINESS
+Authentication
+Organization
+Authorization
+Controlled Documents
 
-Launch Core is the controlled-document loop: single-company identity/access, Document Types/numbering, stable Document identity, business Revision, mutable DRAFT Working Content/autosave, governed Templates, immutable Submission, `NoHumanApproval` or one sequential governance route, feedback/return/withdraw/resubmit, Revision cancellation, system-owned Release/effectivity, optional required Rendition, explicit governed obsolescence, current-effective search/read/download, Audit, truthful migration/cutover and backup/restore correctness.
+SUPPORTING SEMANTIC
+Audit
+```
 
+Not semantic owners in Launch:
+
+```text
+storage/staging/integrity → mechanism
+render/view/editor         → mechanism
+Search                     → rebuildable projection
+async/outbox/jobs          → mechanism
+Historical Migration      → cutover capability
+backup/restore             → operations/readiness
+```
+
+`Artifact`, `Distribution`, `Documentary Context`, `Records Governance` and generic `Interchange` are not Launch semantic owners.
+
+Controlled Documents owns the complete controlled-document lifecycle, including the smallest sequential governance semantics needed for both exact Submission governance and explicit no-replacement obsolescence. This is one semantic authority, not one giant code unit.
+
+---
+
+## Future-evolution law — operator explicit
+
+The operator approved the 4+1 topology with an explicit constraint:
+
+> **Known future capabilities must not be forgotten or made structurally expensive merely because they are deferred from Launch.**
+
+Controlling rule:
+
+> **Defer the capability; preserve the evolution seam. Prepare the seam, not the dormant implementation.**
+
+Named horizon to preserve:
+
+```text
 Launch+:
+  Distribution / Read & Acknowledge
+  Periodic Review
 
-```text
-Distribution / Read & Acknowledge
-Periodic Review
+Future:
+  Dossier
+  Evidence
+  Retention / Legal Hold / Disposition
+  Governed Export
+  generic External Repository IMPORT/PUBLISH
+  Training/LMS
+  generic/multi-document Change Control
+  pooled multi-customer tenancy
+  realtime coauthoring / CRDT
 ```
 
-Future absent named consumer/requirement:
+These are **evidenced future direction**, not Launch implementation scope.
 
-```text
-Dossier
-Evidence
-Retention / Legal Hold / disposition
-Governed Subject Export package
-generic External Repository IMPORT/PUBLISH
-Training/LMS
-generic/multi-document Change Control
-```
+Remaining technical design must make reasonable future attachment additive around stable semantic anchors without duplicating/reinterpreting Document, Revision, Submission, Release, User/Group/Area or Audit history. It must not create dormant modules/tables/permissions/jobs or generic frameworks for those future features.
 
 ---
 
-## Operator-adjudicated Whole-Product GCR
-
-The accepted Method outcome is:
+## Core invariants that survive
 
 ```text
-RESTRUCTURE NOW at whole-product target-design level
-```
-
-Accepted A1–A10, now owned by `wiki/architecture/whole-product-alignment-review.md`:
-
-```text
-REMOVE / RESTRUCTURE:
-  standalone Artifact semantic owner
-  current Artifact-owned R10-C model
-  prior 8+3 topology as an automatic Launch conclusion
-  Submission-only governance as the complete governance abstraction
-  Distribution inside Launch-Core Release atomicity
-  generic Interchange owner
-  current exact 5×43 role/permission catalog
-
-KEEP / RE-DERIVE MINIMALLY:
-  Document != Revision != WorkingContent != Submission
-  single-company AuthN / Organization / scoped AuthZ separation
-  Template as ordinary governed Document role
-  one sequential governance Step semantic
-  NoHumanApproval
-  system-owned Release/effectivity
-  optional required official Rendition
-  governed obsolescence as explicit second journey
-  Audit != domain state
-  Search = projection only
-  truthful native/imported history distinction
-  exact-content integrity + restore fail-closed obligations
-
-DEFER:
-  Distribution + Periodic Review → Launch+
-  Dossier/Evidence/Records → Future
-  Governed Export/repository copy → Future
-  global Audit hash-chain lock absent named assurance requirement
-  uncontracted workflow/authoring/taxonomy adjuncts
+AuthN provider identity != Organization identity != Authorization grants
+Document != Revision != WorkingContent != Submission
+Revision numbers never reuse
+Submission is immutable exact governed attempt
+same-Revision resubmit creates a new Submission
+Template is an ordinary governed Document role
+one sequential governance Step semantic
+NoHumanApproval creates no fake approver
+Release is system-owned effectivity authority
+one current EFFECTIVE truth
+obsolescence without replacement is explicit and governed
+Audit is evidence, never current-state authority
+Search is projection, never access/effectivity authority
+storage/provider identity never becomes semantic identity
+historical migration never fabricates native history
+governed history is preserved in Launch
+restore must fail closed on inconsistent semantic/content truth
 ```
 
 ---
 
 ## Exact next step
 
-**Re-derive Launch V1 ownership/topology from zero.**
+Re-derive the remaining technical architecture **from zero where prior R10 was implicated**, using old R10 only as evidence.
 
-Order:
-
-```text
-accepted capabilities
-→ end-to-end journeys
-→ facts/lifecycles requiring semantic ownership
-→ authority boundaries
-→ credible topology alternatives
-→ smallest sustainable topology
-→ operator approval
-```
-
-Do not preserve a prior context merely because it already has tables, permissions, locks or review history. Do not collapse independently evolving authorities merely to minimize context count.
-
-Do not write SQL, code, storage/schema/package design, an R10-C replacement or implementation plans before the topology gate closes.
-
-After topology approval:
+Sequence:
 
 ```text
-re-derive remaining technical architecture
-→ Whole-R10 Global Coherence Review
-→ cold independent review
-→ final operator ratification
-→ implementation spec/plan
-→ code
+1. minimal persistent semantic facts + invariants per 4+1 owner
+2. transactions / concurrency / lifecycle atomicity
+3. regenerated Launch AuthZ catalog + check sites
+4. exact-content / storage / integrity / restore mechanism
+5. async / Search / effects
+6. API + frontend journeys
+7. Historical Migration / cutover
+8. integrated Whole-R10 Global Coherence Review
+9. cold independent review
+10. operator final ratification
+11. implementation spec/plan
+12. code
 ```
+
+For every material decision run:
+
+```text
+Launch correctness
++ essential vs accidental complexity
++ authority ownership
++ proof strategy
++ named-future compatibility
+```
+
+Do not restore an old entity/context/table simply because it previously solved a future feature. Do not choose a Launch shortcut that forces future features to rewrite immutable history or dismantle core authority when a small seam can prevent that dead end.
+
+## Gate
+
+**Implementation remains BLOCKED.**
