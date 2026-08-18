@@ -2,7 +2,7 @@
 
 > **Status:** ACTIVE / OPERATOR-RATIFIED DECISION DISPOSITION AUTHORITY  
 > **Ratified:** 2026-08-18  
-> **Last stage update:** T5 — Durable Async, Search & External Effects — OPERATOR-RATIFIED  
+> **Last reconciliation:** Post-T5 Fable Round 1 bounded amendments — OPERATOR-RATIFIED 2026-08-18  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Implementation:** BLOCKED
@@ -25,7 +25,7 @@ read this registry
 → reject SUPERSEDED inheritance
 ```
 
-When a T-stage closes, this registry is updated to point the affected decisions to their new durable authority.
+When a T-stage closes or a bounded independent-review amendment is operator-ratified, this registry is updated to point the affected decisions to their durable authority.
 
 ## 1. Disposition vocabulary
 
@@ -59,7 +59,7 @@ SUPERSEDED
 AGENTS.md
 → DevelopmentConexus Engineering Method v1.0.0
 → wiki/references/current-agent-handoff.md
-→ wiki/architecture/launch-v1-product-contract.md
+→ wiki/architecture/launch-v1-product-contract.md (REV001)
 → wiki/architecture/whole-product-alignment-review.md
 → wiki/architecture/launch-v1-ownership-topology.md
 → wiki/architecture/r10-t1-semantic-state-invariants.md
@@ -68,7 +68,7 @@ AGENTS.md
 → wiki/architecture/r10-t4-exact-content-storage-integrity-restore.md
 → wiki/architecture/r10-t5-durable-async-search-external-effects.md
 → this registry for prior-decision disposition
-→ active T-stage candidate only for its REOPEN set
+→ active T-stage/review staging only for its explicitly open question
 ```
 
 Old R3–R9.5/R10 files are evidence/provenance only and never override this chain.
@@ -82,6 +82,7 @@ single company per Launch deployment
 4 business owners + Audit supporting owner
 Document != Revision != WorkingContent != Submission
 REV000 = initial issuance; REV001 = first revision
+human-readable title = Revision-governed metadata
 Submission = immutable exact governed attempt
 one sequential governance Step semantic
 NoHumanApproval creates no fake approver
@@ -89,7 +90,10 @@ Release = system-owned effectivity authority
 at most one EFFECTIVE Revision per Document
 replacement Release = atomic SUPERSEDED + EFFECTIVE
 explicit governed obsolescence without replacement
+active human-governed obsolescence request may be withdrawn without changing current EFFECTIVE truth
 Search never grants access or establishes effectivity
+Launch Search baseline = canonical PostgreSQL query/view over current canonical search facts
+materialized Search projection/search_refresh exists only on a proven derived/expensive/measured consumer
 Audit proves actions and never reconstructs current state
 storage/provider identity never becomes semantic identity
 imported history never becomes fake native history
@@ -103,6 +107,8 @@ current Authorization = live User/Group grants + scope + domain predicates
 critical governed/security mutations cannot commit without required same-local-commit Audit
 exact governed content = semantic descriptor truth + opaque replaceable storage mechanism
 required future effects use transaction-coupled durable intent; queue/job state is never business authority
+all restored ApplicationSessions are invalid before ordinary serving
+historical restore must not silently resurrect required known post-snapshot privacy/security teardown
 ```
 
 # 4. Authentication
@@ -113,8 +119,8 @@ required future effects use transaction-coupled durable intent; queue/job state 
 | AUTH-02 | **PRESERVE — mechanism selection** | Keycloak remains selected V1 AuthN provider unless concrete deployment evidence reopens it; replaceable behind anti-corruption seam. |
 | AUTH-03 | **CURRENT** | Stable provider identity is `issuer + subject`; `ProviderSubjectBinding` binds it to stable MetalDocs User. |
 | AUTH-04 | **CURRENT** | Provider roles/groups/org/claims never feed canonical MetalDocs AuthZ. |
-| AUTH-05 | **CURRENT** | `ApplicationSession` is MetalDocs-owned and independently revocable; Session is not Role/Permission authority. |
-| AUTH-06 | **PRESERVE / T2-compatible** | No atomic MetalDocs↔Keycloak transaction; provider effects are post-commit/reconciled. |
+| AUTH-05 | **CURRENT** | `ApplicationSession` is MetalDocs-owned and independently revocable; Session is not Role/Permission authority. Restored sessions are invalidated before serving. |
+| AUTH-06 | **PRESERVE / T2-compatible** | No atomic MetalDocs↔Keycloak transaction; provider effects are post-commit/reconciled when explicitly required. |
 | AUTH-07 | **DEFERRED** | Fresh-auth/eSignature evidence has no named Launch consumer; Authentication remains future owner if promoted. |
 
 # 5. Organization
@@ -130,7 +136,7 @@ required future effects use transaction-coupled durable intent; queue/job state 
 | ORG-07 | **SUPERSEDED AS BASELINE** | No independent `UserAreaMembership`/home-area relation without named consumer. |
 | ORG-08 | **PRESERVE** | Area retirement/inactivity blocks future use as appropriate but preserves existing references/history. |
 | ORG-09 | **CURRENT — T3** | Group deletion fails closed while current memberships, Group grants, current governance routes or live unactivated GROUP-step snapshots depend on it; resolved/completed Steps use concrete User snapshots. |
-| ORG-10 | **CURRENT — T3** | Offboarding disables User, revokes Sessions, removes current memberships/direct grants and preserves history; re-enable restores eligibility only and never silently restores prior authority. |
+| ORG-10 | **CURRENT — T3/T4** | Offboarding disables User, revokes Sessions, removes current memberships/direct grants and preserves history; re-enable restores eligibility only. Restore must not silently resurrect known post-snapshot teardown. |
 
 # 6. Authorization
 
@@ -167,10 +173,10 @@ required future effects use transaction-coupled durable intent; queue/job state 
 | GOV-08 | **REFINED / CURRENT** | Submitter/obsolescence initiator cannot satisfy human Step on same attempt; cross-Step same-user prohibition deferred. |
 | GOV-09 | **DEFERRED** | Fresh-auth per Step. |
 | GOV-10 | **DEFERRED** | Due dates/SLA/escalation. |
-| GOV-11 | **DEFERRED** | Reassign/overseer/delegation; Launch escape is withdraw→fix route→resubmit. |
-| GOV-12 | **REFINED** | Withdraw Submission and cancel Revision are separate explicit meanings; no generic approval-cancel platform. |
+| GOV-11 | **DEFERRED** | Generic reassign/overseer/delegation; Launch uses bounded withdraw exits where applicable. |
+| GOV-12 | **REFINED / CURRENT** | Withdraw Submission, withdraw active human-governed obsolescence request and cancel Revision are separate explicit meanings; no generic approval-cancel platform. |
 | GOV-13 | **CURRENT** | NoHumanApproval creates no fake approver, including accepted no-human obsolescence. |
-| GOV-14 | **SUPERSEDED / REJECTED** | GovernanceAttempt has closed subject universe `SUBMISSION | OBSOLESCENCE`; no arbitrary subject registry. |
+| GOV-14 | **CURRENT REJECTION / OLD GENERIC SUBJECT SUPERSEDED** | GovernanceAttempt has closed subject universe `SUBMISSION | OBSOLESCENCE`; no arbitrary subject registry. |
 
 # 8. Controlled Document / Revision
 
@@ -178,7 +184,7 @@ required future effects use transaction-coupled durable intent; queue/job state 
 |---|---|---|
 | DOC-01 | **CURRENT** | Stable Document identity across Revisions. |
 | DOC-02 | **CURRENT** | Revision = business change cycle; autosave != Revision; `REV000` initial. |
-| DOC-03 | **SUPERSEDED** | `REV001` as initial issuance is invalid; `REV000` is binding initial issuance. |
+| DOC-03 | **CURRENT CORRECTION / OLD RULE SUPERSEDED** | `REV000` is binding initial issuance; `REV001` is the first revision. |
 | DOC-04 | **CURRENT** | Revision states remain `DRAFT | SUBMITTED | EFFECTIVE | SUPERSEDED | OBSOLETE | CANCELLED`. |
 | DOC-05 | **CURRENT** | At most one open and one EFFECTIVE Revision; prior EFFECTIVE may coexist with newer DRAFT/SUBMITTED. |
 | DOC-06 | **SUPERSEDED AS LAUNCH REQUIREMENT** | Mandatory reason-for-change at `REV002+` is not current Product Contract requirement. |
@@ -189,6 +195,7 @@ required future effects use transaction-coupled durable intent; queue/job state 
 | DOC-11 | **DEFERRED** | Editable Dictionary/System Value platform. |
 | DOC-12 | **REOPEN / PRIOR EVIDENCE** | Numbering capability/non-reuse is current; exact `{TYPE}/{AREA}/{SEQ}`, TYPE/TYPE_AREA/padding grammar must be revalidated in T6/admin/API design. |
 | DOC-13 | **CURRENT / PRESERVE** | Number allocation monotonic; committed codes never reuse; preview reserves nothing. |
+| DOC-14 | **CURRENT — POST-T5 FABLE** | Human-readable title is Revision-governed metadata. DRAFT/SUBMITTED retitle does not rewrite the title ordinary readers see for the current EFFECTIVE Revision. |
 
 # 9. Working Content / Submission / Template
 
@@ -222,6 +229,7 @@ required future effects use transaction-coupled durable intent; queue/job state 
 | REL-06 | **CURRENT** | First/replacement Release atomicity. |
 | REL-07 | **CURRENT** | Release waits only on human gate + required rendition gate. |
 | REL-08 | **SUPERSEDED FOR LAUNCH** | Distribution obligations are outside Launch-Core Release atomicity. |
+| REL-09 | **CURRENT — POST-T5 FABLE** | A renderer result arriving after RETURN/Submission withdraw/Revision cancellation is a semantic no-op for that dead candidate; no OfficialRendition/Release is created and the output becomes reclaimable mechanism content after claim release/expiry. |
 
 # 11. Obsolescence
 
@@ -229,32 +237,34 @@ required future effects use transaction-coupled durable intent; queue/job state 
 |---|---|---|
 | OBS-01 | **CURRENT** | Explicit governed withdrawal without successor; raw status toggle invalid. |
 | OBS-02 | **CURRENT** | Target remains EFFECTIVE during human governance; only successful completion makes OBSOLETE. |
-| OBS-03 | **SUPERSEDED** | NoHumanApproval obsolescence may complete with zero human Step after authorization/reason/invariant checks. |
+| OBS-03 | **REFINED / CURRENT / OLD HUMAN-STEP REQUIREMENT SUPERSEDED** | NoHumanApproval obsolescence may complete with zero human Step after authorization/reason/invariant checks. |
 | OBS-04 | **REFINED / CURRENT** | No open replacement at initiation; active obsolescence blocks new Revision. |
 | OBS-05 | **DEFERRED** | Separate obsolescence route; Launch reuses same DocumentType route. |
 | OBS-06 | **DEFERRED / OUT OF LAUNCH** | Reactivation of OBSOLETE. |
+| OBS-07 | **CURRENT — POST-T5 FABLE** | Active human-governed obsolescence may be withdrawn before completion by the authorized initiator/manager; target remains EFFECTIVE, no fake RETURN is created, later retry is a new request. |
 
 # 12. Search / Notifications / Async
 
 | ID | Disposition | Current meaning |
 |---|---|---|
-| ASY-01 | **CURRENT — T5** | Search = one PostgreSQL-backed rebuildable/eventually-consistent discovery projection keyed by Document; `search_refresh(document_id)` reloads latest canonical state, and current lifecycle/AuthZ are always re-resolved before serve. |
+| ASY-01 | **CURRENT — T5 POST-FABLE** | Search journey is Launch-required, but baseline mechanism is canonical PostgreSQL query/view over current canonical facts. Materialized Search projection is optional and activates only on a named derived/expensive fact or measured need; Search never grants access/effectivity. |
 | ASY-02 | **DEFERRED / PRESERVE FUTURE** | Notifications remain a delivery projection concept but have no mandatory Launch inbox/email/push consumer; add only a named delivery job/projection when a concrete capability requires it. |
-| ASY-03 | **CURRENT — T5** | If a semantic transaction creates a required future effect, durable job/intent is inserted in the same local transaction; provider/network execution stays outside and intent is mechanism only. |
-| ASY-04 | **PRESERVE — T5 MECHANISM SELECTION** | Launch uses one PostgreSQL-backed durable-job mechanism; River remains selected/reference implementation, replaceable without changing semantic meaning. |
+| ASY-03 | **CURRENT — T5** | If a semantic transaction creates a required activated future effect, durable job/intent is inserted in the same local transaction; provider/network execution stays outside and intent is mechanism only. |
+| ASY-04 | **PRESERVE — T5 MECHANISM SELECTION** | Launch uses one PostgreSQL-backed durable-job mechanism; River remains selected/reference implementation, replaceable without changing semantic meaning. Current consumer: policy-required OfficialRendition rendering; GC may use its scheduling primitive. |
 | ASY-05 | **SUPERSEDED / REJECTED** | No global SERIALIZABLE/global worker-lock framework baseline and no parallel hand-rolled scheduler/lease/outbox runtime beside the selected job mechanism. |
-| ASY-06 | **CURRENT — T5** | Managed-content cleanup is periodic reconciliation over durable T4 `GC_PENDING`; immediately re-prove no live/governed/backup-protected reference before physical delete; no per-handle durable outbox baseline. |
-| ASY-07 | **CURRENT — T5** | `official_rendition_render` is a conditional durable job only when frozen representation policy requires OfficialRendition; ordinary PDF/DOCX viewing creates no durable render requirement. |
+| ASY-06 | **CURRENT — T4+T5 POST-FABLE** | Managed-content cleanup is periodic reconciliation over durable T4 `GC_PENDING`; immediately re-prove no live/governed/admission-claim/backup-protected reference before physical delete; no per-handle durable outbox baseline. |
+| ASY-07 | **CURRENT — T5 POST-FABLE** | `official_rendition_render` is a conditional durable job only when frozen representation policy requires OfficialRendition; ordinary viewing creates no durable render requirement; late result for dead candidate is semantic no-op. |
 | ASY-08 | **CURRENT — T5** | Durable jobs are at-least-once, idempotent/revalidating, bounded-retry, terminal-visible/redrivable and carry bounded stable IDs/minimum immutable routing facts rather than business/AuthZ snapshots. |
-| ASY-09 | **CURRENT — T5** | Full Search rebuild/reconciliation is mandatory proof that Search is derivative; an always-on global reconciliation crawler is not Launch baseline. |
-| ASY-10 | **CURRENT — T5** | No generic domain-event bus or `ExternalEffectReceipt` family Launch; required async mechanisms expose minimum health/backlog/retry/terminal-failure observability. |
+| ASY-09 | **CURRENT — T5 POST-FABLE** | Full Search rebuild/reconciliation is mandatory only if materialized projection is activated; canonical query/view baseline has no projection to rebuild. Always-on global crawler is not baseline. |
+| ASY-10 | **CURRENT — T5** | No generic domain-event bus or `ExternalEffectReceipt` family Launch; required activated async mechanisms expose minimum health/backlog/retry/terminal-failure observability. |
+| ASY-11 | **CURRENT — T5 POST-FABLE** | If materialized Search exists, per-Document projection-write serialization is acquired before canonical read and held through projection rewrite/removal; rebuild obeys the same law. FIFO/broker ordering remains unnecessary. |
 
 # 13. Audit
 
 | ID | Disposition | Current meaning |
 |---|---|---|
 | AUD-01 | **CURRENT** | AuditEvent = transversal evidence, never current state/event sourcing. |
-| AUD-02 | **CURRENT — T3** | Exact same-local-commit Audit census and bounded minimum facts are ratified in `wiki/architecture/r10-t3-authorization-audit-enforcement.md`. |
+| AUD-02 | **CURRENT — T3** | Exact same-local-commit Audit census and bounded minimum facts are ratified in `wiki/architecture/r10-t3-authorization-audit-enforcement.md`, including obsolescence-request withdrawal. |
 | AUD-03 | **CURRENT** | Audit append-only and PII-minimized; no credential/token/request-body/free-form reason copying by convenience. |
 | AUD-04 | **SUPERSEDED / DEFERRED** | Deployment-wide AuditChainHead/hash-chain/global terminal lock removed absent concrete assurance requirement. |
 | AUD-05 | **DEFERRED** | Generic Audit export permission/capability. |
@@ -277,15 +287,16 @@ required future effects use transaction-coupled durable intent; queue/job state 
 | STO-08 | **SUPERSEDED / REJECTED** | Object-store Versioning/Object Lock/WORM are defense/enforcement only, never lifecycle authority. |
 | STO-09 | **DEFERRED / REJECTED AS DEFAULT** | Application-layer Company DEK/crypto-erasure is not mandatory absent named Target Data/assurance requirement. |
 | STO-10 | **SUPERSEDED / REJECTED** | External repository IDs never become MetalDocs content identity. |
-| STO-11 | **CURRENT — T4** | Restore is non-serving until every required semantic content reference resolves and exact size/SHA-256/format match; missing/corrupt required content fails closed. |
+| STO-11 | **CURRENT — T4 POST-FABLE** | Restore is non-serving until required semantic content verifies exactly; all restored ApplicationSessions are invalidated before ordinary serving. |
 | STO-12 | **CURRENT — T4** | `managed_content_id` is an opaque retrieval handle only; OPEN→READY is durable mechanism state, not semantic Artifact confirmation. |
 | STO-13 | **CURRENT — T4** | Server independently derives descriptor from stored bytes; provider PUT/client claims never equal semantic admission. |
-| STO-14 | **CURRENT — T4** | Opaque server-owned admission binding prevents arbitrary/cross-root handle reuse without introducing a generic owner registry. |
+| STO-14 | **CURRENT — T4 POST-FABLE** | Opaque server-owned admission binding prevents arbitrary/cross-root handle reuse; a live bounded admission claim also protects in-flight READY content from GC until consumed/released/expired. |
 | STO-15 | **CURRENT — T4** | SUBMIT/Rendition semantic transactions make zero provider/scanner calls; they revalidate READY/descriptor/binding/malware proof and freeze exact handle+descriptor atomically with semantic truth. |
-| STO-16 | **CURRENT — T4** | Only unreferenced/non-governed mechanism content may be reclaimed; immutable governed content has no ordinary Launch delete/disposition path. |
+| STO-16 | **CURRENT — T4 POST-FABLE** | Only unreferenced/non-governed/non-claim-protected mechanism content may be reclaimed; immutable governed content has no ordinary Launch delete/disposition path. |
 | STO-17 | **CURRENT — T4** | Backup = consistent DB recovery point + exact required-content manifest/copy, including current DRAFT WorkingContent; capture must exclude GC races through bounded pin/equivalent. |
-| STO-18 | **CURRENT — T4** | Historical restore must reconcile post-snapshot lawful UserProfile erasures through independently retained erasure barrier/journal or equivalent proof before serving human-readable profile data. |
+| STO-18 | **CURRENT — T4 POST-FABLE** | Historical restore must reconcile post-snapshot lawful UserProfile erasures and required known post-snapshot security teardown before ordinary serving; T7 chooses the smallest proof/choreography and no generic per-grant journal is frozen by T4. |
 | STO-19 | **DEFERRED — T4** | Whole-Submission canonical JCS/composite digest remains deferred until a named signing/export/non-repudiation consumer exists. |
+| STO-20 | **CURRENT — T4/T5 POST-FABLE** | Same-PostgreSQL durable job intents restore transactionally coherently with the semantic facts that required them; a future separate job substrate must re-prove recovery coherence. |
 
 # 15. Launch+ — Distribution / Periodic Review
 
@@ -351,7 +362,7 @@ These designs are **not legacy garbage**. They are future evidence and must crea
 | SEC-04 | **DEFERRED FUTURE** | Pooled/shared multi-customer tenancy not Launch; stable Company root preserves seam. |
 | SEC-05 | **DEFERRED FUTURE** | Customer-company lifecycle/portability deletion/export not Launch. |
 | SEC-06 | **DEFERRED** | Generic eDiscovery/PKI/TSA/HSM/signature/quarantine platform absent concrete requirement. |
-| SEC-07 | **CURRENT — T4 RESTORE LAW** | Restore may not silently resurrect lawfully erased UserProfile PII; post-snapshot erasures must be reconciled before serving restored profile data. |
+| SEC-07 | **CURRENT — T4 POST-FABLE RESTORE LAW** | Restore may not silently resurrect lawfully erased UserProfile PII or required known post-snapshot revoked access state; restored sessions are invalid before serving and T7/ops must prove the chosen security reconciliation choreography. |
 
 # 20. Known future horizon
 
@@ -410,9 +421,10 @@ Object Lock/WORM as lifecycle authority
 generic domain-event/integration platform without a named consumer
 generic ExternalEffectReceipt family
 parallel custom async schedulers/lease frameworks beside the selected job runtime
+materialized Search projection/search_refresh merely because Search exists, without a named derived/expensive/measured consumer
 ```
 
-A later stage may propose one only by naming new material evidence that explicitly reopens it.
+A later stage may propose one only by naming new material evidence that explicitly reopens or activates the preserved seam.
 
 # 22. Closed T-stages and official REOPEN set for remaining stages
 
@@ -434,38 +446,39 @@ Detailed authority:
 
 `wiki/architecture/r10-t5-durable-async-search-external-effects.md`
 
-Closed decisions include:
+Current closed decisions include:
 
 ```text
 one PostgreSQL-backed durable-job mechanism; River selected/reference mechanism
-search_refresh(document_id) always-required durable projection job
-official_rendition_render conditional only for policy-required OfficialRendition
+policy-required official_rendition_render = current conditional durable job
 ordinary PDF/DOCX viewing creates no durable-rendition requirement
-required durable intent transaction-coupled with the semantic fact that creates it
+required activated durable intent transaction-coupled with the semantic fact that creates it
 provider/renderer execution outside semantic transaction
-OfficialRendition finalization revalidates T4/T2/T3 state and is idempotent
-Search = PostgreSQL rebuildable projection keyed by Document
-latest-state refresh makes duplicate/out-of-order jobs converge safely
-Search may lag by omission but never grants stale authority/effectivity
-full Search rebuild/reconciliation required; always-on crawler not baseline
-managed-content GC = periodic reconciliation over GC_PENDING with immediate recheck
+late renderer result for dead candidate = semantic no-op/reclaimable output
+Search journey required; baseline = canonical PostgreSQL query/view over current canonical facts
+materialized PostgreSQL Search projection + search_refresh + rebuild only on a proven derived/expensive/measured consumer
+if materialized Search exists, per-Document projection-write serialization begins before canonical read and spans write/removal
+Search never grants stale authority/effectivity
+managed-content GC = periodic reconciliation over GC_PENDING with semantic/live-claim/backup recheck
 no mandatory Launch notifications/inbox/fanout/domain-event bus
 no mandatory durable external IdP-disable job
 jobs at-least-once/idempotent/revalidating/bounded-retry/terminal-visible with bounded-ID payloads
 no generic ExternalEffectReceipt family
-minimum async operational observability required
+minimum async operational observability only for activated required effects
 future capabilities add only named jobs/effects/receipts for proven consumers
 ```
 
-## T6 — Canonical API / Frontend Journeys — NEXT REOPEN SET
+## T6 — Canonical API / Frontend Journeys — NEXT REOPEN SET (held closed by post-T5 delta review)
 
 ```text
 numbering configuration grammar and preview UX
 admin journeys for current Organization/AuthZ/config
+source upload / T4 admission UX
 editor/viewer provider behavior
 in-product inspection vs exact-source download
 public idempotency/error contracts
 search/read/history/audit workspaces
+exact Search field/ranking UX + prove whether any derived/expensive fact activates materialized Search seam
 EditorSession/UX lease only if a real editor-integration consumer requires it
 ```
 
@@ -479,7 +492,7 @@ ordinal/content/governance provenance
 plan/dry-run/idempotency/reconciliation
 semantic-unit atomicity
 cutover/readiness/rollback/deletion map
-concrete restore/erasure reconciliation choreography where cutover/recovery requires it
+concrete restore/erasure and post-snapshot security-teardown reconciliation choreography where cutover/recovery requires it
 ```
 
 # 23. Registry governance — OPERATOR-RATIFIED DR-1→DR-8
@@ -490,9 +503,9 @@ DR-2 ACCEPT — disposition vocabulary = CURRENT / PRESERVE / REFINED / REOPEN /
 DR-3 ACCEPT — later T-stages consume CURRENT/PRESERVE/REFINED and deliberately redesign only their REOPEN set.
 DR-4 ACCEPT — old 2026-08-14 cohesive redesign ledger is historical inventory/evidence, never current decision authority.
 DR-5 ACCEPT — future Dossier/Evidence/Records/Distribution/PeriodicReview designs remain preserved as future evidence, not conceptually discarded and not instantiated in Launch.
-DR-6 ACCEPT — anti-legacy list is binding absent later explicit material reopen.
+DR-6 ACCEPT — anti-legacy list is binding absent later explicit material reopen/activation trigger.
 DR-7 ACCEPT — premature pre-registry T3 candidate was discarded; ratified T3 was rebuilt from this registry.
-DR-8 ACCEPT — update this registry after every T-stage closure so it remains the current cross-stage baseline.
+DR-8 ACCEPT — update this registry after every T-stage closure or ratified bounded independent-review amendment so it remains the current cross-stage baseline.
 ```
 
 Implementation remains **BLOCKED**.
