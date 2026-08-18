@@ -1,7 +1,7 @@
 # Current Agent Handoff
 
 > **Last verified:** 2026-08-18  
-> **Status:** ACTIVE — **WHOLE-PRODUCT ALIGNMENT REVIEW; R10-C PAUSED; PRODUCT CONTRACT CANDIDATE PENDING WRITTEN OPERATOR REVIEW**  
+> **Status:** ACTIVE — **WHOLE-PRODUCT GLOBAL COHERENCE REVIEW; PRODUCT CONTRACT ACCEPTED/PROMOTED; R10-C PAUSED**  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Implementation:** **BLOCKED — design/documentation only**
 
@@ -12,12 +12,12 @@ Read in this order:
 1. `AGENTS.md`
 2. `docs/engineering/standards/root-cause-global-maximum-method.md`
 3. this file
-4. `wiki/architecture/whole-product-alignment-review.md` — **ACTIVE ROUTING OVERLAY**
-5. `docs/superpowers/specs/2026-08-18-launch-v1-product-contract-design.md` — **NON-AUTHORITATIVE PRODUCT CONTRACT CANDIDATE UNDER REVIEW**
-6. `wiki/architecture/launch-v1-scope-rebaseline.md` — current promoted Launch Records-Governance defer overlay
-7. `wiki/architecture/cohesive-platform-redesign.md` — prior active program/global-coherence authority
-8. `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md` — frozen historical/product-domain authority
-9. `wiki/architecture/r10-technical-architecture.md` — promoted R10 technical authority through integrated B2
+4. `wiki/architecture/launch-v1-product-contract.md` — **ACCEPTED PRODUCT AUTHORITY**
+5. `wiki/architecture/whole-product-alignment-review.md` — **ACTIVE WHOLE-PRODUCT GCR ROUTING / REVIEW AUTHORITY**
+6. `wiki/architecture/launch-v1-scope-rebaseline.md` — earlier Records-Governance defer overlay; subordinate to the accepted Product Contract wherever product scope differs
+7. `wiki/architecture/cohesive-platform-redesign.md` — prior program/global-coherence authority; evidence under the active whole-product review where implicated
+8. `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md` — frozen R3–R9.5 historical/product-domain authority
+9. `wiki/architecture/r10-technical-architecture.md` — prior promoted R10 technical authority through integrated B2
 10. accepted B3/B4/B5/B6 candidates + acceptance records only when auditing earlier decisions
 11. `docs/superpowers/analysis/2026-08-18-r10-c-artifact-physical-integrity-integrated-candidate.md` — **PAUSED CANDIDATE / EVIDENCE ONLY; DO NOT PROMOTE OR IMPLEMENT**
 
@@ -29,119 +29,89 @@ Git history and current runtime/schema/OpenAPI are evidence, not automatic targe
 
 ```text
 R9.5    = FROZEN historical authority
-R10-A   = prior promoted ownership topology; under whole-product re-evaluation where candidate product findings implicate it
-R10-B1  = prior promoted substrate
-R10-B2  = prior promoted AuthN/Org/AuthZ
-R10-B3  = accepted non-final; product distinctions under re-evaluation only where candidate Product Contract implicates them
-R10-B4  = accepted non-final
-R10-B5  = accepted non-final; Records-Governance Launch portion already DEFERRED
-R10-B6  = accepted non-final
+R10-A   = prior promoted ownership topology; under whole-product re-evaluation where Product Contract findings implicate it
+R10-B1  = prior promoted substrate; challenge only where product re-derivation implicates it
+R10-B2  = prior promoted AuthN/Org/AuthZ; challenge only where product re-derivation implicates it
+R10-B3  = accepted non-final; Product Contract distinctions are now authoritative
+R10-B4  = accepted non-final; Product Contract distinctions are now authoritative
+R10-B5  = accepted non-final; Dossier/Evidence are Future for Launch absent a named consumer; Records Governance already deferred
+R10-B6  = accepted non-final; Governed Export and generic repository copy are Future for Launch absent a named consumer
 R10-C   = PAUSED / NON-AUTHORITATIVE CANDIDATE EXISTS
 R10-D   = NOT STARTED
 R10-E   = NOT STARTED
 R10-F   = NOT STARTED
 
-Whole-Product Alignment Review = ACTIVE
-Product Contract candidate      = OPERATOR WRITTEN REVIEW PENDING
-implementation                  = BLOCKED
+Product Contract                  = ACCEPTED / PROMOTED
+Whole-Product Global Coherence Review = ACTIVE
+implementation                    = BLOCKED
 ```
 
-No technical stage resumes until the Product Contract gate closes.
+No technical stage resumes until the Whole-Product review is adjudicated and ownership/topology is re-derived from the accepted Product Contract.
 
 ---
 
-## Why technical descent is paused
+## Accepted product authority
 
-The simplified R10-C review exposed a material coherence question around the standalone `Artifact` semantic owner. Re-running the DevelopmentConexus Method showed a broader risk: older architectural assumptions were being carried forward after Launch scope had materially shrunk.
+`wiki/architecture/launch-v1-product-contract.md` is the Launch V1 product authority.
 
-Current discipline:
+Its Launch Core is the controlled-document product path: single-company identity/access, Document Types/numbering, stable Document identity, business Revision, mutable DRAFT Working Content/autosave, governed Templates, immutable Submission, `NoHumanApproval` or one sequential governance route, feedback/return/withdraw/resubmit, Revision cancellation, system-owned Release/effectivity, optional required Rendition, explicit governed obsolescence, current-effective search/read/download, Audit, truthful migration/cutover and backup/restore correctness.
 
-> **The product contract must determine which architecture deserves to exist. Architecture must not determine which product capabilities Launch inherits.**
-
----
-
-## Product Contract candidate — current direction under review
-
-### Core controlled-document path to KEEP
+Launch+:
 
 ```text
-Document stable identity
-→ business Revision
-→ mutable DRAFT Working Content
-→ immutable Submission
-→ NoHumanApproval OR sequential governance route
-→ ACCEPT / RETURN_FOR_CHANGES
-→ withdraw attempt OR cancel Revision as distinct operations
-→ system Release
-→ EFFECTIVE / SUPERSEDED
+Distribution / Read & Acknowledge
+Periodic Review
 ```
 
-Also keep:
-
-- Template as ordinary governed Document role;
-- source + optional required official Rendition;
-- normal readers find current EFFECTIVE content by default;
-- Audit is timeline evidence, not state authority;
-- historical migration never fabricates native governance history;
-- one company per Launch deployment;
-- Launch has no governed physical disposition.
-
-### Product finding to PROMOTE if contract is accepted
+Future unless a named consumer/requirement appears:
 
 ```text
-explicit governed OBSOLETE journey without a replacement revision
+Dossier
+Evidence
+Retention / Legal Hold / disposition
+Governed Subject Export package
+generic External Repository IMPORT/PUBLISH
+Training/LMS
+generic/multi-document Change Control
 ```
 
-### Candidate bounded reopens
-
-```text
-standalone Artifact semantic owner → remove from Launch target
-R10-C current candidate             → rebuild later from accepted Product Contract
-```
-
-### Candidate scope reductions
-
-```text
-Distribution / Read & Acknowledge → Launch+ recommended
-Periodic Review                  → Launch+
-Dossier                          → Future
-Evidence                         → Future
-Retention/Hold/Disposition       → Future
-Governed Subject Export package  → Future
-Generic External Repository copy → Future
-Training/LMS                     → Future
-Generic/multi-doc Change Control → Future
-```
-
-These remain candidate findings until the operator accepts the written Product Contract.
+The Product Contract explicitly removes standalone `Artifact` semantic ownership from the Launch target. Exact-content facts belong to the semantic record that freezes them; byte storage remains mechanism.
 
 ---
 
 ## Exact next step
 
-**Do not write SQL, code, implementation plans, R10-C replacements or new technical authority.**
+**Do not write SQL, code, implementation plans, storage architecture, R10-C replacements or new technical authority yet.**
 
 Next action:
 
 ```text
-operator reviews:
-docs/superpowers/specs/2026-08-18-launch-v1-product-contract-design.md
+Whole-Product Global Coherence Review from zero
+against:
+  accepted Product Contract
+  R9.5 frozen authority/evidence
+  R10-A
+  R10-B1→B6 accepted/promoted material
+  paused R10-C candidate as evidence only
 
-then:
-  accepted as written
-  OR
-  bounded corrections
+review order:
+  product capability
+  → end-to-end journeys
+  → invariants
+  → essential vs accidental complexity
+  → ownership
+  → only then technical consequences
 ```
 
-After written acceptance:
+Attack duplicate/missing authority, abstractions caused by abstractions, Launch owners with no consumer, workflow/generalization creep, storage/content identity, current-effective search truth, obsolescence, migration truth, Audit-vs-domain truth, and capabilities imported from reference platforms without a MetalDocs requirement.
+
+After operator adjudicates the GCR:
 
 ```text
-promote durable Product Contract authority
-→ Whole-Product Global Coherence Review of R9.5/R10 decisions
-→ re-derive ownership topology
-→ re-derive technical stages
-→ complete remaining technical design
-→ Whole-R10 cold review / ratification
-→ implementation plan
+re-derive ownership/topology
+→ re-derive remaining technical architecture
+→ Whole-R10 cold independent review
+→ final operator ratification
+→ implementation spec/plan
 → code
 ```
