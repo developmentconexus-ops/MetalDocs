@@ -7,7 +7,7 @@
 
 ## 1. Why this subgate exists
 
-The active T5 candidate originally treated `official_rendition_render` as one of the two mandatory durable job types. The operator challenged the implied product assumption: MetalDocs will ingest both native PDF and DOCX, and a PDF used only to make DOCX easy to view is not automatically the same thing as a governed `OfficialRendition` that must be persisted and gate Release.
+The active T5 candidate originally treated `official_rendition_render` as one of the mandatory durable job types. The operator challenged the implied product assumption: MetalDocs will ingest both native PDF and DOCX, and a PDF used only to make DOCX easy to view is not automatically the same thing as a governed `OfficialRendition` that must be persisted and gate Release.
 
 Therefore T5-D/T5-E and the exact meaning of `official_rendition_render` are **paused for this subgate**. T5-A→T5-P must not be adjudicated as a whole until this distinction is settled.
 
@@ -131,13 +131,32 @@ DOCX source + RequireOfficialRendition(PDF)
 
 It preserves the existing T1/T2 representation-policy seam instead of inventing a universal PDF policy.
 
-## 5. Storage law
+## 5. Important semantic distinction
+
+```text
+Source content
+  = exact content the author edited/submitted
+
+Viewable preview / viewable rendition
+  = derived display mechanism
+  = may be direct client render, service render, or rebuildable cache
+  = not automatically a Release gate
+
+OfficialRendition
+  = policy-required immutable representation
+  = has its own T4 exact descriptor/handle
+  = may gate Release
+```
+
+A PDF used only to make a DOCX convenient to read must **not** silently acquire the meaning of `OfficialRendition`.
+
+## 6. Storage law
 
 If a generated PDF must be retained, its bytes do **not** belong in PostgreSQL. They live in the T4 `ManagedContentStore`; PostgreSQL keeps only the semantic `OfficialRendition` reference, exact descriptor and opaque handle.
 
 A preview/cache PDF, if later added, is mechanism-only and remains rebuildable from the exact source.
 
-## 6. Recommended Launch viewer mapping
+## 7. Recommended Launch viewer mapping
 
 ```text
 source = PDF
@@ -160,7 +179,7 @@ source = DOCX, RequireOfficialRendition(PDF)
 
 Microsoft 365/Office for the Web is a high-fidelity reference pattern, but a standalone MetalDocs integration introduces Microsoft/WOPI program/licensing/deployment dependency and should not be Launch default without a deliberate product decision.
 
-## 7. Renderer selection must be empirical
+## 8. Renderer selection must be empirical
 
 Do not choose Gotenberg, ONLYOFFICE or a client renderer from marketing claims alone. Build a representative MetalDocs DOCX conformance corpus and compare against Microsoft Word's PDF output/reference rendering.
 
@@ -197,9 +216,9 @@ security/isolation
 operational burden
 ```
 
-## 8. Proposed correction to T5
+## 9. Proposed correction to T5
 
-The active T5 recommendation should be refined from:
+The active T5 recommendation is refined from:
 
 ```text
 mandatory durable jobs = official_rendition_render + search_refresh
@@ -221,7 +240,7 @@ preview/viewer:
 
 Managed-content GC remains a periodic reconciliation mechanism.
 
-## 9. Remaining material choices for operator
+## 10. Remaining material choices for operator
 
 ```text
 RV-1 — ACCEPT hybrid Option D as Launch policy.
