@@ -1,14 +1,15 @@
 # R10 Technical Architecture — Rebaselined Active Stage Authority
 
-> **Status:** ACTIVE — **T1 CLOSED / OPERATOR-RATIFIED; T2 DECISIONS ADJUDICATED / PLATFORM-SUMMARY RATIFICATION NEXT; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1 + T2 CLOSED / OPERATOR-RATIFIED; T3 AUTHORIZATION + AUDIT DISCOVERY ACTIVE; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-18  
-> **Revision-numbering amendment:** 2026-08-18 — **REV000 initial issuance / REV001 first revision**  
+> **Revision convention:** **REV000 initial issuance / REV001 first revision**  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Method:** `docs/engineering/standards/root-cause-global-maximum-method.md`  
 > **Product authority:** `wiki/architecture/launch-v1-product-contract.md`  
 > **GCR authority:** `wiki/architecture/whole-product-alignment-review.md`  
 > **Ownership authority:** `wiki/architecture/launch-v1-ownership-topology.md`  
+> **T2 authority:** `wiki/architecture/r10-t2-governance-effectivity-transactions.md`  
 > **Implementation gate:** **CLOSED — design/documentation only**
 
 This page is the active technical-stage authority after the Whole-Product rebaseline. It supersedes the former R10-A/B1–B6/C–F stage order as active routing. Old R10 artifacts remain evidence only where the current Product Contract, GCR, 4+1 ownership topology and accepted T-stage conclusions preserve them.
@@ -23,6 +24,7 @@ Derive the **smallest sustainable Launch V1 technical architecture** from:
 accepted Product Contract
 + operator-adjudicated Whole-Product GCR
 + operator-approved 4+1 ownership topology
++ ratified T-stage conclusions
 + known-future evolution law
 ```
 
@@ -77,8 +79,8 @@ Historical `Artifact`, separate `Approval`, `Distribution`, `Documentary Context
 
 ```text
 T1 — Semantic State & Invariants                              CLOSED / OPERATOR-RATIFIED
-T2 — Governance, Effectivity & Lifecycle Transactions        DECISIONS ACCEPTED / SUMMARY RATIFICATION PENDING
-T3 — Authorization & Audit Enforcement                       NOT OPEN
+T2 — Governance, Effectivity & Lifecycle Transactions        CLOSED / OPERATOR-RATIFIED
+T3 — Authorization & Audit Enforcement                       ACTIVE / DISCOVERY-DESIGN
 T4 — Exact Content, Storage Integrity & Restore              NOT OPEN
 T5 — Durable Async, Search & External Effects                NOT OPEN
 T6 — Canonical API / Frontend Journeys                       NOT OPEN
@@ -124,7 +126,7 @@ ProviderSubjectBinding
 ApplicationSession
 ```
 
-Authentication provider subject identity, organizational User identity and product Authorization remain distinct. Fresh-auth/e-signature state is absent until a named T2/T3 consumer proves it.
+Authentication provider subject identity, organizational User identity and product Authorization remain distinct. Fresh-auth/e-signature state is absent until a named later consumer proves it.
 
 ### Organization
 
@@ -203,13 +205,9 @@ native history != imported history
 future contexts attach by reference rather than duplicate core authority
 ```
 
-## 4.3 T1-J — NoHumanApproval obsolescence
+## 4.3 NoHumanApproval obsolescence
 
-Accepted:
-
-> If the Document Type is configured `NoHumanApproval`, governed obsolescence may complete with zero human Step after authorized initiation, mandatory reason and all eligibility/invariant checks.
-
-This is **not** a raw status toggle and creates no fake System approver. Domain evidence remains mandatory; T3 later establishes required Audit.
+If the Document Type is configured `NoHumanApproval`, governed obsolescence may complete with zero human Step after authorized initiation, mandatory reason and all eligibility/invariant checks. This is not a raw status toggle and creates no fake System approver. Domain evidence remains mandatory; T3 establishes the required Audit census.
 
 ## 4.4 Explicitly absent from Launch T1
 
@@ -230,9 +228,7 @@ EditorSession as business authority
 
 These remain Launch+/Future or mechanism unless a later named Launch consumer proves otherwise.
 
-## 4.5 T1 future-evolution proof
-
-Stable attachment anchors are intentionally preserved:
+## 4.5 T1 future-evolution anchors
 
 ```text
 Distribution         → Release + effective Revision + User/Group
@@ -248,105 +244,206 @@ pooled tenancy       → stable Company identity + reopenable substrate
 CRDT                 → replaceable WorkingContent concurrency mechanism
 ```
 
-T1 is durable architecture authority. Its completed staging packets are removed from the live tree; Git history is the archive.
+T1 is durable architecture authority. Its completed staging is removed; Git history is the archive.
 
 ---
 
-# 5. T2 — Governance, Effectivity & Lifecycle Transactions — DECISIONS ACCEPTED / SUMMARY PENDING
+# 5. T2 — Governance, Effectivity & Lifecycle Transactions — CLOSED / RATIFIED
 
-T2 asks:
+Durable detailed authority: `wiki/architecture/r10-t2-governance-effectivity-transactions.md`.
 
-> **How do the accepted T1 facts change together under concurrency so every Launch journey is atomic, exact and unambiguous without creating generic workflow machinery?**
+The operator accepted T2-A→T2-N with the `REV000` correction and explicitly ratified the platform-facing T2 summary on 2026-08-18.
 
-On 2026-08-18 the operator accepted T2-A→T2-N as recommended, with one bounded correction: initial document creation establishes `REV000 DRAFT`, not `REV001 DRAFT`. `REV001` is the first subsequent business revision. T3 remains closed until the required platform-facing T2 summary is explicitly ratified.
-
-T2 covers:
-
-```text
-create / code allocation / REV000 DRAFT
-blank and template-based creation
-DRAFT WorkingContent mutation/autosave concurrency
-SUBMIT exact generation
-NoHumanApproval release behavior
-sequential human governance
-ACCEPT / RETURN_FOR_CHANGES
-resubmit
-withdraw Submission attempt
-cancel open Revision
-first Release of REV000
-replacement Release / supersession (REV000 → REV001 for first revision)
-required-Rendition release gate
-governed obsolescence without replacement
-```
-
-Accepted T2 direction:
+## 5.1 Accepted transaction / concurrency laws
 
 ```text
 one local ACID transaction per native business transition
+no external/provider call joins local lifecycle atomicity
 Document = lifecycle serialization root
-WorkingContent OCC for DRAFT races
-create = code + Document + REV000 DRAFT + WorkingContent atomically
-SUBMIT freezes exact expected generation + coherent governance/representation snapshots
-route selector = NAMED_USER | GROUP
-Group Step = ANY-one from activation membership snapshot
-one active sequential Step
-bounded initiator self-approval prohibition only
-RETURN / withdraw / cancel preserve immutable Submission history
-Release gates = human gate + optional OfficialRendition gate
-system Release may occur in same tx when all gates are already satisfied
-replacement Release = predecessor SUPERSEDED + successor EFFECTIVE atomically
-Distribution remains outside Launch-Core Release atomicity
-obsolescence requires current EFFECTIVE + reason + no open replacement + no competing obsolescence
-same DocumentType route reused for obsolescence
-NoHumanApproval obsolescence = zero human Step
-route edits never reinterpret an in-flight attempt
+WorkingContent = OCC/CAS for DRAFT races
 READ COMMITTED + narrow explicit serialization/CAS posture
+no silent last-write-wins governed DRAFT mutation
 ```
 
-T2 owns:
+## 5.2 Create / SUBMIT
 
 ```text
-local transaction boundaries
-serialization roots
-OCC/concurrency law
-state-transition eligibility
-smallest participant-selection semantics
-route snapshot timing
-attempt activation/termination semantics
-one-EFFECTIVE atomicity
-obsolescence mutual-exclusion behavior
-Release gate composition
+create = code + Document + REV000 DRAFT + initial WorkingContent atomically
+first later business revision = REV001
+template-based create revalidates exact current EFFECTIVE template source at commit
+SUBMIT freezes exact expected WorkingContent generation
+SUBMIT freezes coherent governance + representation configuration snapshots
+Revision DRAFT → SUBMITTED atomically with the immutable Submission
+NoHumanApproval creates no fake GovernanceAttempt
 ```
 
-T2 does not decide the exact permission catalog/Audit census (T3), storage locator/integrity implementation (T4), async worker topology (T5), API/frontend routes (T6), or historical migration execution (T7).
+## 5.3 Governance
 
-Active staging packets:
+```text
+route selector vocabulary = NAMED_USER | GROUP
+one active sequential Step at a time
+GROUP Step = ANY-one from enabled membership snapshot captured at activation
+current Authorization is rechecked when a User acts
+Submission submitter cannot satisfy a human Step on that Submission attempt
+obsolescence initiator cannot satisfy a human Step on that obsolescence attempt
+no baseline cross-Step same-user prohibition
+no baseline ALL/N-of-M quorum
+no baseline ROLE_IN_AREA routing
+no baseline reassign/overseer engine
+```
 
-- `docs/superpowers/analysis/2026-08-18-r10-t2-governance-effectivity-transactions-candidate.md`
-- `docs/superpowers/analysis/2026-08-18-r10-t2-operator-adjudication.md`
+If a frozen route becomes impossible, the Launch recovery is withdraw → fix current route → resubmit, preserving immutable history.
+
+## 5.4 Return / withdraw / cancel
+
+```text
+RETURN preserves prior immutable Submission/decision/feedback history
+Submission RETURN returns the same Revision to DRAFT
+obsolescence RETURN leaves the target Revision EFFECTIVE
+WITHDRAW terminates the current Submission attempt and returns the same Revision DRAFT
+CANCEL terminally cancels the open Revision and never reuses its ordinal
+older EFFECTIVE Revision remains EFFECTIVE after successor cancellation
+```
+
+No operation fabricates a participant verdict.
+
+## 5.5 Release
+
+Release gates are orthogonal:
+
+```text
+human gate:
+  NoHumanApproval      → satisfied by absence
+  UseGovernanceRoute   → satisfied by final ACCEPT
+
+representation gate:
+  SourceOnly                → satisfied by absence
+  RequireOfficialRendition  → exact successful OfficialRendition required
+```
+
+System Release may occur in the same transaction as SUBMIT/final ACCEPT when all gates are already satisfied. If a required OfficialRendition is missing, the truthful state remains SUBMITTED until it exists and Release eligibility is revalidated.
+
+Replacement Release is atomic:
+
+```text
+prior EFFECTIVE → SUPERSEDED
+successor       → EFFECTIVE
+```
+
+For the first revision:
+
+```text
+REV000 → SUPERSEDED
+REV001 → EFFECTIVE
+```
+
+Distribution/Acknowledgement is not part of Launch-Core Release atomicity.
+
+## 5.6 Obsolescence
+
+Obsolescence initiation requires:
+
+```text
+current EFFECTIVE target
+mandatory reason
+no open replacement Revision
+no competing active obsolescence
+```
+
+While obsolescence is active, a new Revision cannot be created. The same DocumentType governance route is reused for obsolescence in Launch.
+
+`NoHumanApproval` obsolescence may complete with zero human Step after authorization/reason/conflict checks. Human-governed obsolescence leaves the target EFFECTIVE until final ACCEPT. Successful completion changes the exact current EFFECTIVE Revision to OBSOLETE with no successor.
+
+## 5.7 Configuration and restart laws
+
+```text
+route/config mutation is atomic as a whole
+attempt snapshot is coherent old-or-new configuration, never mixed
+in-flight attempts never reinterpret after admin edits
+rollback exposes no successful partial transition
+provider failure cannot retroactively change committed domain truth
+retries/restarts cannot fabricate duplicate Release/decision results
+```
+
+## 5.8 T2 deferred/reopen surface
+
+Deferred absent real requirement:
+
+```text
+ALL/N-of-M quorum
+ROLE_IN_AREA routing
+cross-Step strict SoD
+fresh-auth/eSignature
+live reassign/overseer
+SLA/escalation
+separate obsolescence route
+scheduled/future-dated effectivity
+```
+
+T2 is durable architecture authority. Its completed staging is removed; Git history is the archive.
+
+---
+
+# 6. T3 — Authorization & Audit Enforcement — ACTIVE / DISCOVERY-DESIGN
+
+T3 asks:
+
+> **Which current grants and domain predicates must permit each already-ratified Launch operation, at what Company/Area scope, and which operations require same-local-commit Audit evidence?**
+
+Required derivation order:
+
+```text
+accepted personas + T1/T2 journeys
+→ named operations
+→ canonical resource owner/state predicates
+→ scopes
+→ permissions
+→ product role bundles
+→ administration law
+→ check sites
+→ same-local-commit Audit census
+→ minimum bounded Audit facts
+```
+
+T3 must regenerate Launch Authorization **from zero**. The former exact `5×43` catalog is evidence/counterexample only and cannot be preserved by subtraction.
+
+T3 must prove at least:
+
+```text
+least-privilege Reader path
+Author / Document Owner path
+Reviewer / Approver path requiring both grant + active Step participation
+Governance Admin path
+least-privilege Auditor / Governance Viewer path
+no role/domain-governance bypass
+User/Group + Company/Area RoleAssignment semantics
+current grant re-evaluation at action time
+historical actor attribution after offboarding/profile erasure
+role-assignment administration without circular privilege
+same-local-commit Audit for required governed/security mutations
+Audit facts remain bounded/PII-minimized and never duplicate domain reasons/comments as authority
+```
+
+T3 does not own storage integrity (T4), Search/async (T5), public API/frontend composition (T6) or migration execution (T7).
 
 Current gate:
 
 ```text
-T2 decisions ACCEPTED
-→ platform-facing T2 summary
-→ explicit operator summary ratification
-→ T2 promotion/closure
-→ T3
+T3 discovery/design
+→ compare credible access-model alternatives
+→ present T3 material design choices to operator
+→ operator adjudication
+→ platform-facing T3 summary
+→ explicit summary ratification
+→ promote/close T3
+→ T4
 ```
+
+No T3 catalog is accepted merely because a prior role name existed.
 
 ---
 
-# 6. T3–T7 routing
-
-## T3 — Authorization & Audit Enforcement — NOT OPEN
-
-```text
-personas → operations → resources → scopes → domain predicates
-→ permissions → role bundles → check sites
-```
-
-Regenerates the Launch AuthZ catalog from zero and establishes the same-local-commit Audit census/minimum facts. Includes least-privilege Auditor/Governance Viewer. No role bypasses domain governance.
+# 7. T4–T7 routing
 
 ## T4 — Exact Content, Storage Integrity & Restore — NOT OPEN
 
@@ -366,7 +463,7 @@ Proves truthful native/imported handling, unknown preservation, ordinal/content 
 
 ---
 
-# 7. Old R10 evidence classification
+# 8. Old R10 evidence classification
 
 ```text
 former R10-A 8+3                  → SUPERSEDED FOR LAUNCH
@@ -384,7 +481,7 @@ Do not repair old candidate files into the target. Extract only surviving eviden
 
 ---
 
-# 8. Proof and review discipline
+# 9. Proof and review discipline
 
 Each T-stage must include:
 
