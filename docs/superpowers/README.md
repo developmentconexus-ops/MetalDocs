@@ -2,7 +2,7 @@
 
 > **Status:** Active staging workspace for the MetalDocs rebaselined R10 technical design.  
 > **Reset:** 2026-08-14.  
-> **Current gate:** **T1→T5 + Decision Registry CLOSED / OPERATOR-RATIFIED; POST-T5 FABLE CHECKPOINT ACTIVE; T6 NOT OPEN.**
+> **Current gate:** **T1→T5 + Decision Registry CLOSED / OPERATOR-RATIFIED; FABLE REVIEW RECEIVED; AUTHOR ROUND-1 ADJUDICATION PENDING OPERATOR RATIFICATION; T6 NOT OPEN.**
 
 Durable accepted truth belongs in `wiki/`. Active review/design analysis belongs here. Completed/superseded staging is removed from the live tree and remains recoverable from Git history.
 
@@ -23,7 +23,9 @@ wiki/architecture/launch-v1-product-contract.md
 
 ## Current active staging
 
-- `analysis/2026-08-18-t1-t5-integrated-fable-review-request.md` — **ACTIVE INDEPENDENT FABLE COLD-REVIEW REQUEST / NOT TARGET AUTHORITY.**
+- `analysis/2026-08-18-t1-t5-integrated-fable-review-request.md` — independent cold-review request / evidence.
+- `analysis/2026-08-18-t1-t5-integrated-independent-fable-review.md` — **FABLE REVIEW RECEIVED / EVIDENCE ONLY.**
+- `analysis/2026-08-18-t1-t5-fable-author-adjudication-round1.md` — **AUTHOR ROUND-1 RESPONSE / OPERATOR RATIFICATION NEXT.**
 
 Completed T5 candidate/subgate/adjudication staging was removed after durable promotion. Git history is the archive.
 
@@ -40,38 +42,33 @@ DEFERRED                     → future seam/counterexample only
 SUPERSEDED                   → reject inheritance absent explicit material reopen
 ```
 
-## Closed T5 headline
+## Fable checkpoint status
+
+Fable verdict:
 
 ```text
-one PostgreSQL-backed durable-job mechanism; River selected/reference mechanism
-search_refresh(document_id) always-required durable projection job
-official_rendition_render conditional only for frozen policy-required OfficialRendition
-PDF source direct-view by default
-DOCX + SourceOnly direct read-only viewer; no persisted PDF merely for viewing
-transaction-coupled enqueue for required future work
-provider/renderer execution outside semantic tx
-OfficialRendition finalization T4/T2/T3-revalidated and idempotent
-PostgreSQL rebuildable Search projection keyed by Document
-latest-state refresh makes duplicate/out-of-order jobs converge
-Search lag may omit but never grant stale authority/effectivity
-full Search rebuild mandatory; always-on crawler not baseline
-GC periodic reconciliation over GC_PENDING
-no mandatory Launch notifications/event bus
-no mandatory durable IdP-disable job
-no generic ExternalEffectReceipt
-bounded-retry terminal-visible/redrivable jobs with bounded-ID payloads
-minimum async operational visibility
+APPROVE T1→T5 WITH MATERIAL FIXES
+BLOCKER = 0
+MAJOR   = 3
+LOW     = 5
+formal T-stage reopen = NONE
 ```
 
-## Active Fable checkpoint
+Author Round-1 recommendation, still non-authoritative:
 
-The independent reviewer must reconstruct T1→T5 cold from repo authority and attack integrated flows, authority uniqueness, races, Decision Registry drift, overengineering and future seams.
+```text
+M1 accept — conditional materialized Search projection needs per-Document write serialization; FIFO still unnecessary.
+M2 accept/refine — restore invalidates all restored ApplicationSessions and fails closed until required post-snapshot security teardown is reconciled/proven; T7 chooses smallest proof mechanism.
+M3 accept option (b) — canonical PostgreSQL query/view is Search baseline; materialized projection + search_refresh + rebuild activate only when T6 proves a real derived/expensive consumer or measured need.
 
-Review request:
+L1 title becomes Revision-governed metadata.
+L2 late rendition finalization becomes no-op when Submission/Revision is no longer eligible.
+L3 live admission claim/binding protects READY handles from GC until bounded release/expiry.
+L4 bounded initiator/manager withdrawal closes active human-governed obsolescence deadlock.
+L5 T3 provider-disable wording aligns to T5-L.
+```
 
-`analysis/2026-08-18-t1-t5-integrated-fable-review-request.md`
-
-Review findings are evidence only. T6 stays closed until material findings are adjudicated and the post-T5 checkpoint explicitly closes.
+No durable authority has been modified yet by these recommendations.
 
 ## Active technical path
 
@@ -82,12 +79,17 @@ T3 Authorization & Audit Enforcement                  CLOSED / OPERATOR-RATIFIED
 T4 Exact Content, Storage Integrity & Restore         CLOSED / OPERATOR-RATIFIED
 T5 Durable Async, Search & External Effects           CLOSED / OPERATOR-RATIFIED
 Decision Registry                                      CURRENT / OPERATOR-RATIFIED
-Post-T5 integrated Fable checkpoint                    ACTIVE / REVIEW REQUEST STAGED
+Fable independent review                               RECEIVED
+Author Round-1 adjudication                            WRITTEN / OPERATOR RATIFICATION NEXT
+Durable bounded amendments                             NOT APPLIED
+Post-T5 checkpoint                                     OPEN
 T6 Canonical API / Frontend Journeys                  NOT OPEN
 T7 Historical Migration & Cutover                     NOT OPEN
 
-→ Fable findings adjudication
-→ explicit post-T5 checkpoint closure
+→ operator ratification of author adjudication
+→ bounded authority/registry amendments only
+→ GitHub delta challenge by Fable if dispatched / material disagreement remains
+→ explicit checkpoint closure
 → T6
 → T7
 → Integrated Whole-R10 GCR
