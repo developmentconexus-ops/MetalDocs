@@ -2,7 +2,7 @@
 
 > **Status:** Active staging workspace for the MetalDocs rebaselined R10 technical design.  
 > **Reset:** 2026-08-14.  
-> **Current gate:** **T1 + T2 + Decision Registry CLOSED / OPERATOR-RATIFIED; T3 ACTIVE.**
+> **Current gate:** **T1 + T2 + Decision Registry CLOSED / OPERATOR-RATIFIED; T3 ACTIVE / OPERATOR ADJUDICATION NEXT.**
 
 Durable accepted truth belongs in `wiki/`. Active, not-yet-promoted design analysis belongs here. Completed/superseded staging is removed from the live tree and remains recoverable from Git history.
 
@@ -20,11 +20,11 @@ wiki/architecture/launch-v1-product-contract.md
 
 ## Current active staging
 
-T3 is `Authorization & Audit Enforcement`.
+- `analysis/2026-08-18-r10-t3-authorization-audit-enforcement-candidate.md` — **ACTIVE NON-AUTHORITATIVE T3 candidate; operator adjudication of T3-A→T3-P next.**
 
-The active T3 candidate must be rebuilt from the Decision Registry and may design only the registry's T3 `REOPEN` set.
+The candidate is rebuilt from the ratified Decision Registry and designs only the official T3 `REOPEN` set.
 
-The completed reconciliation candidate is promoted into `wiki/architecture/rebaseline-decision-registry.md` and is removed from live staging. A premature pre-registry T3 candidate was also removed and must not be restored/repaired.
+The completed reconciliation candidate was promoted into `wiki/architecture/rebaseline-decision-registry.md` and removed from live staging. A premature pre-registry T3 candidate was also removed and must not be restored/repaired.
 
 ## Revalidation law
 
@@ -97,7 +97,7 @@ read registry
 T1 Semantic State & Invariants                         CLOSED / OPERATOR-RATIFIED
 T2 Governance, Effectivity & Lifecycle Transactions   CLOSED / OPERATOR-RATIFIED
 Decision Registry                                      CLOSED / OPERATOR-RATIFIED
-T3 Authorization & Audit Enforcement                  ACTIVE
+T3 Authorization & Audit Enforcement                  ACTIVE / CANDIDATE
 T4 Exact Content, Storage Integrity & Restore         NOT OPEN
 T5 Durable Async, Search & External Effects           NOT OPEN
 T6 Canonical API / Frontend Journeys                  NOT OPEN
