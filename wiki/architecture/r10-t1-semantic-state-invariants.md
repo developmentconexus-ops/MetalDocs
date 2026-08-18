@@ -2,6 +2,7 @@
 
 > **Status:** ACTIVE / OPERATOR-RATIFIED TECHNICAL AUTHORITY  
 > **Ratified:** 2026-08-18  
+> **Post-T5 Fable bounded amendment:** 2026-08-18 — Revision-governed title metadata  
 > **Revision convention:** `REV000` initial issuance / `REV001` first revision  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
@@ -9,7 +10,7 @@
 > **Ownership authority:** `wiki/architecture/launch-v1-ownership-topology.md`  
 > **Implementation:** BLOCKED
 
-This page extracts the already operator-ratified T1 conclusions from the R10 router into one-topic durable authority. It changes no T1 semantics.
+This page records the operator-ratified T1 conclusions plus bounded completeness amendments ratified through the post-T5 independent-review checkpoint. No semantic owner or lifecycle state family is reopened.
 
 ## 1. Accepted semantic owners and families
 
@@ -49,9 +50,9 @@ Role/Permission semantics are product-owned, not customer-defined platform data.
 
 ```text
 DocumentType + numbering semantics
-Document + Area/responsibility + Template role
+Document + stable code/type/Area/responsibility + Template role
 DocumentOrigin
-Revision
+Revision + governed human-readable title metadata
 WorkingContent
 Submission
 current GovernanceRoute configuration
@@ -64,6 +65,8 @@ OfficialRendition only when required
 Obsolescence request/result semantics
 native/imported provenance seam
 ```
+
+The stable Document identity is not silently retitled in place. Human-readable title belongs to the Revision being governed. Therefore a newer DRAFT/SUBMITTED Revision may carry a new title while ordinary readers continue seeing the title of the current EFFECTIVE Revision. Historical Revisions preserve their own governed titles.
 
 ### Audit
 
@@ -80,6 +83,8 @@ Document != Revision != WorkingContent != Submission
 REV000 = initial issuance
 REV001 = first revision after initial issuance
 revision ordinals increment monotonically from zero and never reuse
+human-readable title = Revision-governed metadata
+current reader title = title of current EFFECTIVE Revision
 WorkingContent = sole mutable DRAFT authority
 Submission = immutable exact governed attempt
 same-Revision resubmit = new Submission
