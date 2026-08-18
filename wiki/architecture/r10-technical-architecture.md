@@ -1,6 +1,6 @@
 # R10 Technical Architecture — Active Stage Router
 
-> **Status:** ACTIVE — **T1 + T2 + T3 CLOSED / OPERATOR-RATIFIED; DECISION REGISTRY CURRENT; T4 ACTIVE; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1 + T2 + T3 CLOSED / OPERATOR-RATIFIED; DECISION REGISTRY CURRENT; T4 DECISIONS ADJUDICATED / SUMMARY RATIFICATION NEXT; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-18  
 > **Revision convention:** `REV000` initial issuance / `REV001` first revision  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
@@ -79,7 +79,7 @@ T1 — Semantic State & Invariants                              CLOSED / OPERATO
 T2 — Governance, Effectivity & Lifecycle Transactions        CLOSED / OPERATOR-RATIFIED
 T3 — Authorization & Audit Enforcement                       CLOSED / OPERATOR-RATIFIED
 Decision Reconciliation Registry                             CURRENT / OPERATOR-RATIFIED
-T4 — Exact Content, Storage Integrity & Restore              ACTIVE / DESIGN
+T4 — Exact Content, Storage Integrity & Restore              DECISIONS ACCEPTED / SUMMARY RATIFICATION PENDING
 T5 — Durable Async, Search & External Effects                NOT OPEN
 T6 — Canonical API / Frontend Journeys                       NOT OPEN
 T7 — Historical Migration & Cutover                          NOT OPEN
@@ -151,7 +151,7 @@ SUPERSEDED
 
 Later stages may not rediscover CURRENT/PRESERVE/REFINED decisions from zero and may not inherit SUPERSEDED decisions by sunk cost.
 
-## 8. T4 — Exact Content, Storage Integrity & Restore — ACTIVE
+## 8. T4 — Exact Content, Storage Integrity & Restore — DECISIONS ACCEPTED
 
 T4 consumes only the registry's official T4 REOPEN set:
 
@@ -177,26 +177,51 @@ Submission is immutable exact governed attempt
 OfficialRendition binds exact Submission
 native/imported truth remains distinguishable
 provider calls never join semantic local transaction
-SHA-256 remains preserved prior candidate unless T4 finds a material counterexample
-governed immutable bytes should not overwrite in place unless T4 disproves the preserved law
-production malware inspection before admitting untrusted governed bytes remains a preserved candidate
-restore cannot be considered healthy when required governed bytes are missing/corrupt
-restore must not silently resurrect lawfully erased UserProfile PII
 Object Lock/WORM/provider versioning never becomes document/records lifecycle authority
 ```
 
-T4 must not design worker/retry topology (T5), public API/frontend flows (T6) or historical migration execution (T7).
+Operator-adjudicated T4 headline:
+
+```text
+ExactContentDescriptor = SHA-256 + exact size + ContentFormat
+no mandatory whole-Submission JCS digest in Launch
+opaque managed-content UUID handle = retrieval mechanism only
+one provider-neutral ManagedContentStore / one active store per deployment
+Local dev/test/conformance + AWS S3 reference production profile
+OPEN→READY admission with server-derived hash/size/format
+opaque admission binding prevents arbitrary/cross-root handle reuse
+UNTRUSTED_EXTERNAL requires CLEAN malware proof before governed admission
+ClamAV/clamd reference MalwareInspector; no scan on every autosave
+create-once/no-overwrite; replacement = new handle
+WorkingContent current state is DRAFT recovery baseline; no mandatory WorkingSnapshot business history
+SUBMIT/Rendition tx performs no provider/scanner calls and freezes exact READY handle+descriptor
+only unreferenced/non-governed DRAFT mechanism objects are reclaimable in Launch
+backup = DB recovery point + exact required-content manifest/copy + GC fence
+restore remains non-serving until required content matches size/SHA-256/format
+older restore must reconcile later lawful UserProfile erasures via minimum independent barrier/journal
+future content capabilities reuse descriptor+mechanism without restoring Artifact ownership
+```
 
 ### T4 current gate
 
 ```text
-T4 candidate from registry
-→ operator adjudication of material REOPEN decisions
-→ platform-facing T4 summary
+T4 candidate/design          = COMPLETE FOR ADJUDICATION
+T4-A→T4-O                    = OPERATOR-ADJUDICATED / ACCEPTED
+T4 platform-facing summary   = NEXT
+T4 promotion/closure         = PENDING SUMMARY RATIFICATION
+T5                           = NOT OPEN
+implementation               = BLOCKED
+```
+
+Next:
+
+```text
+present platform-facing T4 summary
 → explicit operator summary ratification
-→ promote T4
+→ promote/close T4
 → update Decision Registry
-→ open T5
+→ remove completed T4 staging
+→ only then open T5
 ```
 
 ## 9. T5–T7 routing
