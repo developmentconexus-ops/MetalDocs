@@ -20,7 +20,7 @@ Read in this order:
 9. `wiki/architecture/r10-t3-authorization-audit-enforcement.md`
 10. `wiki/architecture/rebaseline-decision-registry.md`
 11. `wiki/architecture/r10-technical-architecture.md` — exact current router
-12. active T4 staging candidate
+12. `docs/superpowers/analysis/2026-08-18-r10-t4-exact-content-storage-integrity-restore-candidate.md` — **ACTIVE NON-AUTHORITATIVE T4 CANDIDATE / OPERATOR ADJUDICATION NEXT**
 13. `wiki/architecture/launch-v1-scope-rebaseline.md` — narrow Records defer overlay
 14. old R3–R9.5 / R10-B1→B6/C only as evidence allowed by the registry
 
@@ -36,7 +36,7 @@ T1 Semantic State & Invariants   = CLOSED / OPERATOR-RATIFIED
 T2 Governance/Effectivity/Tx     = CLOSED / OPERATOR-RATIFIED
 T3 Authorization & Audit         = CLOSED / OPERATOR-RATIFIED
 Decision Registry                = CURRENT / OPERATOR-RATIFIED
-T4 Exact Content/Storage/Restore = ACTIVE / DESIGN
+T4 Exact Content/Storage/Restore = ACTIVE / NON-AUTHORITATIVE CANDIDATE
 T5→T7                            = NOT OPEN
 implementation                   = BLOCKED
 ```
@@ -84,43 +84,26 @@ Detailed authority:
 `wiki/architecture/r10-t3-authorization-audit-enforcement.md`
 
 ```text
-roles:
-  governance_admin
-  area_manager
-  author
-  approver
-  viewer
-  governance_viewer
-
-15 Launch permissions
+six Launch roles / 15 Launch permissions
 RoleAssignment subject = User | Group
-governance_admin = CompanyScope only
-area_manager = AreaScope only
-author/approver/viewer/governance_viewer = CompanyScope | AreaScope
-organization.manage = User/Area/Group identity lifecycle
-access.manage = GroupMembership + RoleAssignment mutations
-ordinary Author = current responsible owner unless document.owner.manage
-Area Manager manages Area work through document.owner.manage
-governance.act requires exact active-Step participation + T2 predicates
-offboarding atomically disables User + revokes Sessions + removes memberships/direct grants + Audit
-re-enable restores no prior authority
-security-sensitive actions serialize against offboarding eligibility
-Audit = explicit same-local-commit semantic evidence for bounded critical census
-AuditEvent = actor/time/operation/resource + Company|Area attribution + bounded PII-minimized facts
-audit.read may be Company- or Area-scoped
-ordinary read/download/search/autosave/login/logout/preview/deny are not mandatory semantic Audit in Launch
-future capabilities never silently broaden existing role bundles
+accepted Company|Area scope matrix
+organization.manage vs access.manage administration split
+responsible-owner / document.owner.manage authoring predicate
+governance.act + exact active-Step participation
+atomic offboarding + no silent access resurrection
+security-action/offboarding User-eligibility serialization
+same-local-commit Audit census + PII-minimized facts
+Company|Area historical Audit visibility
+future features never silently broaden existing role bundles
 ```
 
-The old exact 5×43 catalog remains superseded.
-
-## T4 preserved baseline — do not re-decide
+## T4 baseline that MUST NOT be re-decided
 
 ```text
 no standalone Artifact semantic owner
 exact-content facts live with the semantic record that owns/freezes them
 storage/provider identity never becomes semantic identity
-WorkingContent = mutable DRAFT authority protected by T2 OCC
+WorkingContent = mutable DRAFT authority under T2 OCC
 Submission = immutable exact governed attempt
 OfficialRendition binds exact Submission
 provider calls never join local semantic transaction
@@ -141,10 +124,12 @@ mutable WorkingContent recovery
 backup/restore completeness + privacy non-resurrection
 ```
 
+The active candidate currently recommends T4-A→T4-O. It preserves the useful old R10-C staging/no-overwrite/malware/restore findings while removing Artifact ownership.
+
 ## Exact next step
 
-Review/adjudicate the active T4 candidate derived only from the official REOPEN set.
+Operator adjudication of T4 recommendations `T4-A→T4-O` in the active candidate.
 
-After T4 technical adjudication, **do not open T5**. Present the mandatory platform-facing T4 summary and obtain explicit operator ratification first.
+After technical adjudication, **do not open T5**. Present the mandatory platform-facing T4 summary and obtain explicit operator ratification first.
 
 No final SQL/table/index design, package layout, async topology, public API/frontend contract, migration execution plan, implementation plan or product code is authorized.
