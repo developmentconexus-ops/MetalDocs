@@ -208,6 +208,8 @@ DOCX + RequireOfficialRendition(PDF)
   → Release gate
 ```
 
+**Preview/viewing PDF and OfficialRendition PDF are different meanings.** A future/view-only PDF cache may be rebuildable mechanism; it must not become a Release gate or semantic truth merely because it is convenient for display.
+
 Renderer product selection remains empirical through a representative DOCX fidelity corpus; architecture does not yet freeze Gotenberg, ONLYOFFICE or another converter.
 
 ### Current gate
