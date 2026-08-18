@@ -1,14 +1,17 @@
-# R10-T2 — Governance, Effectivity & Lifecycle Transactions — Integrated Candidate
+# R10-T2 — Governance, Effectivity & Lifecycle Transactions — Corrected Integrated Candidate
 
-> **Status:** ACTIVE STAGING / NON-AUTHORITATIVE CANDIDATE — OPERATOR ADJUDICATION PENDING  
+> **Status:** ACTIVE STAGING — MATERIAL DECISIONS ADJUDICATED / PLATFORM SUMMARY RATIFICATION PENDING  
 > **Date:** 2026-08-18  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Technical authority:** `wiki/architecture/r10-technical-architecture.md`  
 > **T1 authority:** promoted T1 section in `wiki/architecture/r10-technical-architecture.md`  
+> **Adjudication:** `docs/superpowers/analysis/2026-08-18-r10-t2-operator-adjudication.md`  
 > **Implementation:** BLOCKED
 
 T2 derives the smallest transaction/concurrency/governance behavior needed to make the operator-ratified T1 semantic facts behave correctly in Launch V1.
+
+The operator accepted T2-A→T2-N on 2026-08-18 with one bounded correction to the candidate: **initial issuance is `REV000`; `REV001` is the first subsequent revision.** This file is corrected to that authority. T2 is not closed until the operator ratifies the required platform-facing summary.
 
 It does **not** define final SQL/table/index syntax, Go package layout, concrete Authorization permission names/bundles, storage locator design, worker topology, API routes, frontend UX, or migration execution.
 
@@ -22,7 +25,29 @@ T2 succeeds when every named Launch transition has one explicit eligibility rule
 
 ---
 
-## 2. Authority / evidence boundary
+## 2. Accepted revision convention
+
+```text
+REV000 = initial issuance
+REV001 = first revision after initial issuance
+REV002 = second revision
+...
+```
+
+Therefore:
+
+```text
+create Document → REV000 DRAFT
+first Release   → REV000 EFFECTIVE
+first later change cycle → REV001 DRAFT
+first replacement Release → REV000 SUPERSEDED + REV001 EFFECTIVE
+```
+
+Revision ordinals never reuse.
+
+---
+
+## 3. Authority / evidence boundary
 
 Authority, in order:
 
@@ -38,72 +63,11 @@ Prior B1/B3/B4/B6 and paused R10-C are evidence only. Their old context ownershi
 
 ---
 
-## 3. Known / Reopened / Deferred
+## 4. Target invariant
 
-### Known
+> **Every lifecycle command revalidates canonical state under one local transaction/serialization boundary, mutates only the facts it owns, freezes immutable evidence before exposing success, and never depends on an external provider call to make the local business transition atomic.**
 
-T2 must preserve:
-
-```text
-Document != Revision != WorkingContent != Submission
-one open Revision at most per Document
-one EFFECTIVE Revision at most per Document
-prior EFFECTIVE may coexist with newer DRAFT/SUBMITTED Revision
-Revision ordinal never reuses
-WorkingContent mutable only for DRAFT
-Submission immutable exact attempt
-same-Revision resubmit creates new Submission
-GovernanceAttempt closed to SUBMISSION | OBSOLESCENCE
-one sequential Step semantic
-normal human outcomes ACCEPT | RETURN_FOR_CHANGES
-withdraw Submission attempt != cancel Revision
-Release is system-owned effectivity authority
-replacement Release atomically supersedes predecessor
-OfficialRendition is a Release gate only when required
-NoHumanApproval creates no fake approver/attempt
-obsolescence without successor is explicit and governed
-NoHumanApproval obsolescence may have zero human Step
-Audit is not current state
-storage/provider identity is not semantic identity
-```
-
-### Reopened from old R10
-
-The following are not automatically retained:
-
-```text
-ANY|ALL configurable quorum
-RoleInArea actor selector
-strict submitter/creator SoD as broad policy engine
-cross-Step same-user SoD
-fresh-auth
-reassign/overseer machinery
-due dates/SLA/escalation
-scheduled ReleasePlan.not_before
-Distribution obligations in Release transaction
-Approval as separate owner
-nested commits/cross-owner repository imports
-global SERIALIZABLE
-global AuditChainHead terminal lock
-```
-
-### Deferred
-
-```text
-T3 → exact permission catalog, check sites, Audit census/facts
-T4 → byte locator/staging/integrity/malware/restore
-T5 → renderer worker/outbox/retry/Search/notifications
-T6 → public API/frontend/viewer journeys/idempotency UX
-T7 → historical migration/cutover transaction shapes
-```
-
----
-
-## 4. Root cause / target invariant
-
-Failure class: **split lifecycle atomicity**.
-
-A correct semantic model can still fail if:
+Failure classes T2 prevents include:
 
 ```text
 Submission freezes one generation while Revision moves on another
@@ -116,23 +80,17 @@ obsolescence races a replacement Revision
 external rendition/provider calls become part of business atomicity
 ```
 
-Target invariant:
-
-> **Every lifecycle command revalidates canonical state under one local transaction/serialization boundary, mutates only the facts it owns, freezes immutable evidence before exposing success, and never depends on an external provider call to make the local business transition atomic.**
-
 ---
 
-# 5. Transaction and serialization posture
+# 5. Accepted transaction / concurrency posture
 
-## 5.1 One local ACID product transaction for one business transition
+## 5.1 One local ACID transaction per native business transition
 
 Native lifecycle transitions commit in one local MetalDocs product-state transaction. No Keycloak call, object-store call, renderer call, notification delivery or repository/provider call joins that transaction.
 
-Provider/external effects that must happen later become T4/T5 mechanisms.
+## 5.2 Document as lifecycle serialization root
 
-## 5.2 Document is the lifecycle serialization root
-
-All operations that can change the lifecycle/effectivity truth of one existing Document serialize on that Document before changing subordinate lifecycle state:
+Operations that can change lifecycle/effectivity truth of one existing Document serialize on that Document before changing subordinate lifecycle state:
 
 ```text
 new Revision
@@ -142,530 +100,428 @@ Release
 obsolescence initiation/completion
 ```
 
-This is a semantic lock-order law, not final SQL syntax.
+DRAFT WorkingContent mutation uses OCC as the primary race arbiter.
 
-For DRAFT content mutation, WorkingContent uses OCC as the primary race arbiter; a Document lifecycle serialization boundary is acquired when a mutation also crosses a lifecycle boundary such as SUBMIT.
+## 5.3 WorkingContent OCC
 
-## 5.3 Default isolation
+Every governed DRAFT mutation carries the caller-observed generation:
 
-Candidate posture: keep ordinary PostgreSQL `READ COMMITTED` plus explicit row-level serialization/CAS on the relevant canonical rows. Do not introduce global `SERIALIZABLE` when narrow constraints/locks/OCC can prove the invariants.
+```text
+expected == current → accept + increment once
+expected != current → stale/conflict; no silent overwrite
+```
 
-Exact SQL lock clauses and index/constraint implementation are implementation-spec work after R10 ratification, but T2 must define the admitted lock classes/order sufficiently for later proof.
+Autosave never allocates a business Revision. Future CRDT may replace the DRAFT concurrency mechanism without changing Revision/Submission meaning.
 
-## 5.4 No nested semantic commits
+## 5.4 Isolation posture
 
-A composed lifecycle use case owns the transaction boundary. Lower semantic seams must be transactionally composable and must not commit independently or import another owner's repository merely to obtain atomicity.
+Accepted design posture:
 
-T3 later adds required same-commit Audit without changing this business transaction ownership.
+```text
+PostgreSQL READ COMMITTED
++ explicit narrow serialization/CAS/constraints
+```
+
+No global `SERIALIZABLE` requirement is introduced. Exact SQL enforcement waits for implementation design after final R10 ratification.
 
 ---
 
 # 6. Create / numbering / template-based creation
 
-## 6.1 Blank creation
-
-One successful create command atomically establishes:
+A successful blank creation atomically establishes:
 
 ```text
 allocated stable Document code
 Document identity
-REV001 DRAFT
+REV000 DRAFT
 initial WorkingContent
 ```
 
-A partial shell is never successful.
+No successful partial shell exists. Committed codes never rebind/reuse. Gap-free numbering is not required; uniqueness and no reuse are.
 
-Committed Document codes never rebind to another Document. T2 does not promise gap-free human numbering; uniqueness and no reuse matter, not cosmetic contiguity.
-
-Read-only number preview reserves nothing.
-
-## 6.2 Template-based creation
-
-Create-from-template additionally proves at commit that:
+Create-from-template additionally revalidates at commit that:
 
 ```text
 source Document still has Template role/eligibility
-selected source Revision is still that Template's current EFFECTIVE Revision
+selected source Revision is still the Template's current EFFECTIVE Revision
 exact source-content provenance is pinned
-new Document receives an independent WorkingContent copy/seed
+new Document receives an independent REV000 WorkingContent seed
 ```
 
 Later Template changes never rebind the derived Document.
 
-The source Template lifecycle is revalidated/serialized narrowly for this operation so a concurrent Template Release cannot silently switch the source between selection and commit.
-
 ---
 
-# 7. DRAFT WorkingContent / autosave concurrency
+# 7. SUBMIT
 
-WorkingContent keeps one monotonically increasing `working_generation`/equivalent OCC token.
-
-Every accepted governed DRAFT mutation carries the caller-observed expected generation:
-
-```text
-expected generation == current
-→ accept mutation
-→ increment generation once
-
-expected generation != current
-→ reject stale mutation / conflict
-```
-
-Laws:
-
-- no last-write-wins silent overwrite for governed DRAFT state;
-- autosave never allocates a business Revision;
-- autosave/checkpoint recovery may use technical mechanism state later, but never becomes official history;
-- no EditorSession/checkout is required for correctness;
-- future CRDT may replace the DRAFT concurrency mechanism without changing Revision/Submission semantics.
-
----
-
-# 8. SUBMIT transaction
-
-SUBMIT serializes the Document/lifecycle boundary and requires:
+SUBMIT serializes the lifecycle boundary and requires:
 
 ```text
 Revision is current open DRAFT
 caller supplies expected WorkingContent generation
-expected generation still equals canonical WorkingContent generation
-all Launch submit requirements satisfied
-current DocumentType governance + representation configuration can be read as one coherent committed configuration
+expected generation is still canonical
+all Launch submit requirements are satisfied
+DocumentType governance + representation config is read coherently
 ```
 
 One successful SUBMIT atomically:
 
 1. freezes immutable Submission from exactly that WorkingContent generation;
-2. freezes the exact governance mode/route snapshot for that attempt;
+2. freezes governance mode/route snapshot;
 3. freezes official-representation requirement;
-4. changes Revision from DRAFT → SUBMITTED;
-5. creates a GovernanceAttempt only when mode = `UseGovernanceRoute`.
+4. changes Revision `DRAFT → SUBMITTED`;
+5. creates GovernanceAttempt only for `UseGovernanceRoute`.
 
-NoHumanApproval creates no fake GovernanceAttempt/System decision.
-
-Later DocumentType/route changes affect future attempts only.
+`NoHumanApproval` creates no fake GovernanceAttempt/System approver.
 
 ---
 
-# 9. Governance route — smallest Launch participant semantics
+# 8. Governance route — smallest Launch semantics
 
-## 9.1 Actor selector
+## 8.1 Actor selector
 
-Candidate Launch selector vocabulary:
+Accepted Launch selector vocabulary:
 
 ```text
 NAMED_USER
 GROUP
 ```
 
-`ROLE_IN_AREA` is rejected for Launch unless a real journey proves it. Authorization roles are access bundles and should not automatically become business-routing identity.
+`ROLE_IN_AREA` is absent from the Launch baseline.
 
-## 9.2 One active Step at a time
+## 8.2 Sequential one-active-Step rule
 
-The route is sequential. Exactly one Step is active at a time for a live human GovernanceAttempt.
+Exactly one human Step is active at a time.
 
 At activation:
 
 - `NAMED_USER` resolves the configured User;
 - `GROUP` resolves a concrete snapshot of current enabled Group members;
-- later Group membership drift does not rewrite that active Step's candidate set;
-- current Authorization is still rechecked when someone actually acts; snapshot membership is not a permission grant.
+- later Group membership drift does not rewrite that active candidate set;
+- current Authorization is rechecked when a User actually acts.
 
-## 9.3 Group completion
+## 8.3 Group completion
 
-Launch Group Step completion is **ANY-one**:
+Group Step completion is **ANY-one**: one currently authorized User from the activation snapshot may make the Step decision.
 
-> one currently authorized User from the activation snapshot may make the Step decision.
+No `ALL`, N-of-M or generic quorum engine is part of Launch.
 
-No configurable ALL/quorum engine is introduced.
+## 8.4 Bounded SoD
 
-This keeps Groups useful for resilient routing while avoiding dormant voting/quorum machinery.
-
-## 9.4 Human independence — bounded SoD
-
-Recommended minimum Launch rule:
+Accepted minimum independence rule:
 
 ```text
-Submission submitter cannot satisfy a human Step on that Submission attempt.
-Obsolescence initiator cannot satisfy a human Step on that obsolescence attempt.
+Submission submitter cannot satisfy a human Step on that same Submission attempt.
+Obsolescence initiator cannot satisfy a human Step on that same obsolescence attempt.
 ```
 
-This gives `UseGovernanceRoute` actual independent-human meaning without restoring the old broad strict-SoD engine.
+No baseline cross-Step same-user prohibition exists. Stronger SoD is a reopen trigger on concrete regulation/customer requirement.
 
-No baseline rule forbids the same non-initiating User from satisfying two different Steps if the configured NamedUser/Group selectors legitimately include that User. A future regulatory/customer requirement may add cross-Step SoD deliberately.
+## 8.5 No reassign/overseer baseline
 
-This bounded rule is a material T2 operator decision; see T2-K.
-
-## 9.5 No reassign/overseer baseline
-
-Launch has no general reassign/overseer operation.
-
-If a route snapshot becomes impossible (for example an unavailable NamedUser), the safe bounded escape is:
+If a frozen route becomes impossible, the safe Launch escape is:
 
 ```text
 withdraw current Submission attempt
 → same Revision DRAFT
-→ administrator fixes current route configuration
-→ resubmit creates a new immutable Submission/attempt snapshot
+→ admin fixes current route config
+→ resubmit creates new immutable Submission/attempt snapshot
 ```
 
-This preserves history instead of mutating an active route invisibly.
+No invisible mutation of an active historical route.
 
 ---
 
-# 10. ACCEPT / RETURN / resubmit
+# 9. ACCEPT / RETURN / resubmit
 
-## 10.1 ACCEPT
+ACCEPT binds exact attempt + Step + subject, records actual User/trusted time and is immutable evidence. If more Steps remain, the next activates; final ACCEPT satisfies the human gate.
 
-An ACCEPT decision:
-
-```text
-binds exact active GovernanceAttempt + Step + governed subject
-records actual User and trusted time
-requires current T3 Authorization when implemented
-is immutable evidence
-```
-
-If more Steps remain, the next Step activates.
-
-If this was the final required Step, the human governance gate becomes satisfied.
-
-## 10.2 RETURN_FOR_CHANGES — Submission governance
-
-Any eligible actor on the active Step may return the Submission for changes.
-
-One transaction:
+For Submission governance, RETURN atomically:
 
 ```text
 record immutable RETURN decision/reason
 terminate GovernanceAttempt as RETURNED
 Revision SUBMITTED → DRAFT
-preserve old Submission + prior Step decisions/feedback
-preserve/increment WorkingContent generation continuity; do not reset business history
+preserve old Submission + decisions + feedback
 ```
 
-A later SUBMIT creates a new Submission and, when human governance applies, a new GovernanceAttempt.
+A later SUBMIT creates a new Submission and, if human governance applies, a new GovernanceAttempt.
 
-## 10.3 RETURN_FOR_CHANGES — Obsolescence governance
-
-For an obsolescence attempt, RETURN does **not** put the Document/Revision into DRAFT.
-
-It terminates that obsolescence request/attempt as returned/unsuccessful; the target Revision remains EFFECTIVE. A later retry creates a new obsolescence request/attempt with a new immutable reason/snapshot.
-
-No mutable generic “obsolescence draft” workflow state is introduced.
+For obsolescence governance, RETURN terminates only that obsolescence attempt; the target Revision remains EFFECTIVE.
 
 ---
 
-# 11. Withdraw Submission attempt
+# 10. Withdraw and cancel
 
-Before Release, an authorized author may withdraw an active Submission attempt to continue editing the same business Revision.
+## Withdraw
 
-One transaction:
+Before Release, authorized withdrawal:
 
 ```text
-active Submission governance execution → WITHDRAWN/terminated
+terminate active Submission governance execution as WITHDRAWN
 Revision SUBMITTED → DRAFT
-old Submission + decisions/feedback remain immutable history
-WorkingContent remains the same Revision's mutable DRAFT authority
+preserve old Submission + decisions/feedback
 ```
 
-Withdraw creates no ACCEPT/RETURN decision and is not Revision cancellation.
+No participant verdict is fabricated.
 
-A governance-satisfied Submission that is only waiting on a required Rendition is still pre-Release and may be withdrawn if the accepted product journey permits authorized withdrawal before Release; T2 recommends YES because Release, not human-gate completion, is the irreversible effectivity boundary.
+A governance-satisfied Submission waiting only for required Rendition is still pre-Release and may be withdrawn.
 
----
+## Cancel Revision
 
-# 12. Cancel open Revision
-
-An authorized actor may cancel the current open Revision while it is DRAFT or pre-Release SUBMITTED.
-
-One transaction:
+Cancellation of a DRAFT or eligible pre-Release SUBMITTED Revision atomically:
 
 ```text
-if a GovernanceAttempt is live, terminate it without fabricating a participant verdict
-write immutable RevisionCancellation reason/actor/time
+terminate any live GovernanceAttempt without fake verdict
+record immutable cancellation reason/actor/time
 Revision → CANCELLED
 ```
 
-Prior EFFECTIVE Revision, if any, remains EFFECTIVE.
-
-All prior Submissions/decisions/feedback remain history.
-
-A cancelled Revision never reopens and its ordinal never reuses.
+Older EFFECTIVE Revision remains EFFECTIVE. Cancelled ordinal never reuses.
 
 ---
 
-# 13. Release gate and effectivity
-
-Release is system-owned and can occur only for the exact winning Submission.
+# 11. Release gates and effectivity
 
 Release gates are orthogonal:
 
 ```text
-human governance gate:
-  NoHumanApproval → satisfied by absence
-  UseGovernanceRoute → satisfied only after final ACCEPT
+human gate:
+  NoHumanApproval     → satisfied by absence
+  UseGovernanceRoute  → final required ACCEPT
 
 representation gate:
-  SourceOnly → satisfied by absence
-  RequireOfficialRendition → satisfied only by exact successful OfficialRendition for that Submission
+  SourceOnly                 → satisfied by absence
+  RequireOfficialRendition   → exact successful OfficialRendition for winning Submission
 ```
 
-## 13.1 Immediate Release when all gates are already satisfied
+## 11.1 Immediate first Release
 
-If SUBMIT creates a Submission where all Release gates are synchronously satisfied, the system may execute Release in the **same local business transaction** rather than exposing a meaningless durable intermediate state.
-
-Canonical example:
+For example:
 
 ```text
-NoHumanApproval + SourceOnly
-DRAFT
+REV000 DRAFT
++ NoHumanApproval
++ SourceOnly
 → freeze Submission
-→ system Release
-→ EFFECTIVE
+→ system Release in same local transaction
+→ REV000 EFFECTIVE
 ```
 
-Submission and Release remain distinct immutable semantic facts even if committed together.
+Submission and Release remain distinct semantic facts even when committed together.
 
-## 13.2 Final ACCEPT and Release
+## 11.2 Final ACCEPT / Rendition waiting
 
-If the final human ACCEPT satisfies the last missing gate and any required OfficialRendition already exists, the system may perform Release in the same transaction as that final decision.
+If final ACCEPT satisfies the last missing gate and required Rendition already exists, system Release may occur in that same transaction.
 
-If the required Rendition does not yet exist:
+If Rendition is still missing:
 
 ```text
-GovernanceAttempt = satisfied
+GovernanceAttempt satisfied
 Revision remains SUBMITTED
-Release waits
+Release waits truthfully
 ```
 
-Later successful rendition completion may trigger system Release after rechecking canonical eligibility. Renderer/provider execution is T4/T5 mechanism, not part of the human decision transaction.
+Later exact Rendition completion may trigger Release after canonical revalidation. Renderer/provider execution stays outside the human decision transaction.
 
-## 13.3 First Release
+## 11.3 Replacement Release
 
-Atomically:
-
-```text
-winning Revision SUBMITTED → EFFECTIVE
-Release fact written for exact winning Submission
-```
-
-## 13.4 Replacement Release
-
-Serialized on the stable Document and atomically:
+Serialized on the stable Document and atomic:
 
 ```text
-prior current EFFECTIVE Revision → SUPERSEDED
+prior EFFECTIVE → SUPERSEDED
 winning successor SUBMITTED → EFFECTIVE
-Release records predecessor identity + winning Submission
+Release records predecessor + exact winning Submission
 ```
 
-No externally observable successful state may contain two EFFECTIVE revisions for one Document.
+First replacement example:
 
-Distribution/Acknowledgement is absent from this transaction in Launch Core.
+```text
+REV000 EFFECTIVE
+REV001 SUBMITTED + all gates satisfied
+→ REV000 SUPERSEDED
+→ REV001 EFFECTIVE
+```
+
+No successful observable state contains two EFFECTIVE revisions. Distribution/Acknowledgement is absent from Launch-Core Release atomicity.
 
 ---
 
-# 14. Governed obsolescence without replacement
+# 12. Governed obsolescence without replacement
 
-## 14.1 Initiation eligibility
-
-T2 recommends the smallest unambiguous Launch rule:
-
-An obsolescence request may start only when:
+Obsolescence may start only when:
 
 ```text
-target Revision is the Document's current EFFECTIVE Revision
+target Revision is current EFFECTIVE
 mandatory reason is nonblank
 no open replacement Revision exists
-no other active obsolescence attempt exists for the Document
+no other active obsolescence attempt exists
 ```
 
-While an obsolescence attempt is active, creation of a new Revision is blocked. This prevents simultaneous “replace it” and “remove it without replacement” business intents.
+While obsolescence is active, creation of a new Revision is blocked. This prevents simultaneous contradictory intents: “replace it” and “remove it without successor.”
 
-The Product Contract only requires the replacement Revision to be resolved before completion; this stricter Launch admission rule removes an otherwise useless contradictory intermediate state. Reopen if a concrete future Change-Control journey needs concurrent intents.
+Launch reuses the same current DocumentType governance mode/route for obsolescence; no separate obsolescence workflow family exists.
 
-## 14.2 Governance mode
-
-Launch uses the same current DocumentType governance mode/route semantics for obsolescence as for Submission governance. T2 does not add a separate obsolescence workflow configuration family.
-
-A future concrete requirement for a different retirement route is an additive configuration reopen, not a reason to build it now.
-
-## 14.3 NoHumanApproval obsolescence
-
-Operator-ratified T1-J applies:
+## NoHumanApproval
 
 ```text
 authorized initiation
-+ reason
++ mandatory reason
 + eligibility/conflict checks
 + NoHumanApproval
-→ no GovernanceAttempt / no human Step / no fake approver
-→ system completes obsolescence in the same transaction
-→ EFFECTIVE → OBSOLETE
+→ zero human Step / no fake approver
+→ system completes in same transaction
+→ current EFFECTIVE → OBSOLETE
 ```
 
-Immutable obsolescence domain evidence remains mandatory.
+## Human-governed
 
-## 14.4 Human-governed obsolescence
+The target remains EFFECTIVE while route governance is active. Final ACCEPT rechecks target/current state/no replacement/active attempt under Document serialization, then atomically changes the current EFFECTIVE Revision to OBSOLETE. RETURN ends the request and leaves it EFFECTIVE.
 
-`UseGovernanceRoute` creates an immutable obsolescence request + bounded GovernanceAttempt using the frozen route snapshot.
-
-The target stays EFFECTIVE while governance is active.
-
-Final ACCEPT rechecks under Document serialization that:
-
-```text
-target is still current EFFECTIVE
-no open replacement Revision exists
-attempt is still the active obsolescence attempt
-```
-
-Then one transaction changes:
-
-```text
-current EFFECTIVE Revision → OBSOLETE
-no successor becomes EFFECTIVE
-immutable obsolescence result/time is recorded
-```
-
-RETURN terminates the attempt and leaves the target EFFECTIVE.
-
-No reactivation of OBSOLETE exists in Launch.
+No OBSOLETE reactivation exists in Launch.
 
 ---
 
-# 15. Route/configuration concurrency
+# 13. Route/configuration concurrency
 
-Current DocumentType governance/representation configuration is mutable current truth, but each Submission/obsolescence attempt freezes one coherent configuration snapshot.
+Current DocumentType governance/representation configuration is mutable current truth, but every Submission/obsolescence attempt freezes one coherent snapshot.
 
-T2 requires:
+Accepted law:
 
 ```text
-configuration mutation = atomic whole configuration mutation
-attempt creation = atomic coherent snapshot
+configuration edit = atomic whole-config mutation
+attempt creation    = atomic coherent snapshot
 ```
 
-A concurrent admin edit and SUBMIT/obsolescence initiation must resolve to either the complete old configuration or the complete new configuration, never a mixed route.
-
-This requirement does not force a first-class browsable `ApprovalPolicyVersion` object.
+Concurrent admin edit vs attempt creation resolves to complete old or complete new config, never a mixed route. A first-class browsable `PolicyVersion` object remains unnecessary without another consumer.
 
 ---
 
-# 16. Failure / restart laws
+# 14. Failure / restart laws
 
 - rollback leaves no successful partial Submission/decision/Release/obsolescence transition;
 - external provider failure cannot retroactively invalidate committed semantic history;
-- a governance-satisfied Submission waiting for Rendition is truthful durable state and may be resumed after restart;
-- repeated system Release trigger must be idempotent against canonical Release eligibility/fact identity;
-- repeated user command transport retries must not fabricate duplicate semantic decisions; request/API idempotency realization is T6, while T2 defines which semantic results are unique/append-only;
-- any stale command must fail/reload rather than overwrite newer lifecycle truth.
+- governance-satisfied Submission waiting for Rendition is truthful durable state and resumes after restart;
+- repeated Release trigger is idempotent against canonical Release eligibility/fact identity;
+- retries cannot fabricate duplicate semantic decisions;
+- stale commands fail/reload rather than overwrite newer lifecycle truth.
+
+API/transport idempotency contract is T6; T2 defines semantic uniqueness.
 
 ---
 
-# 17. Named-future compatibility attack
+# 15. Named-future compatibility
 
 | Future capability | T2 seam preserved |
 |---|---|
 | Distribution / Read & Acknowledge | reacts after Release; no audience obligation inside Release atomicity |
-| Periodic Review | serializes against exact current EFFECTIVE Revision later; does not enter Release gate |
-| Dossier | references stable Document; no lifecycle transaction ownership |
-| Evidence | may have its own lifecycle/transactions rather than reusing Revision/Release |
-| Records/Hold/Disposition | attaches to immutable Release/Submission/Revision history; business status still never means delete |
-| Governed Export | reads stable transactionally consistent semantic facts later; does not own them |
+| Periodic Review | later serializes against exact current EFFECTIVE Revision; not a Release gate |
+| Dossier | references stable Document; owns no lifecycle transaction |
+| Evidence | may have independent lifecycle/transactions rather than reuse Revision/Release |
+| Records/Hold/Disposition | attaches to immutable Release/Submission/Revision history; lifecycle status never means delete |
+| Governed Export | reads stable transactionally consistent facts; owns none |
 | Repository connectors | provider effects remain outside local lifecycle transaction |
-| Training/LMS | consumes effective/released truth later; never becomes Release gate by accident |
-| Change Control | may orchestrate multiple Documents later but must not take over each Document's lifecycle serialization authority |
-| pooled tenancy | local transaction laws remain per product-state authority; substrate may reopen around Company identity |
-| CRDT | replaces DRAFT mutation/concurrency mechanism; SUBMIT still freezes one exact accepted generation/state |
+| Training/LMS | consumes effective/released truth later; does not become Release gate accidentally |
+| Change Control | may orchestrate multiple Documents but cannot take each Document's lifecycle authority |
+| pooled tenancy | transaction laws remain local; substrate may reopen around stable Company identity |
+| CRDT | may replace DRAFT concurrency; SUBMIT still freezes exact accepted state |
 
 ---
 
-# 18. Proof strategy before implementation
+# 16. Proof obligations before implementation
 
-T2 acceptance requires a later implementation plan to include falsifiable proofs for at least:
+Later implementation planning must make these falsifiable, at minimum:
 
 ```text
-concurrent create/code allocation cannot produce duplicate committed Document code
-stale autosave/update cannot overwrite newer WorkingContent
-SUBMIT cannot freeze stale WorkingContent generation
-route edit cannot create mixed in-flight snapshot
-Group membership drift cannot rewrite an activated Step candidate set
+concurrent create/code allocation cannot duplicate committed Document code
+initial create always produces REV000, never REV001
+stale DRAFT mutation cannot overwrite newer WorkingContent
+SUBMIT cannot freeze stale generation
+route edit cannot create a mixed in-flight snapshot
+Group membership drift cannot rewrite activated Step candidates
 RETURN/withdraw/cancel never mutate prior Submission/decision history
-concurrent Release attempts cannot create two EFFECTIVE Revisions
+concurrent Release cannot create two EFFECTIVE Revisions
 replacement Release cannot expose predecessor+successor EFFECTIVE together
 required Rendition mismatch cannot Release a different Submission
-renderer/provider outage cannot make false EFFECTIVE truth
+provider outage cannot create false EFFECTIVE truth
 obsolescence cannot complete against a no-longer-current EFFECTIVE target
-new Revision cannot race an active obsolescence attempt under accepted mutual-exclusion law
+new Revision cannot race active obsolescence under the accepted mutual-exclusion law
 retry/restart cannot duplicate one semantic Release/decision result
 ```
 
-T2 is design only; these are proof obligations, not claims that tests currently exist.
+These are design proof obligations, not claims that implementation/tests exist today.
 
 ---
 
-# 19. Explicit non-decisions
+# 17. Explicit non-decisions
 
 T2 does not decide:
 
 ```text
 final SQL table/index/trigger names
-exact lock SQL / all global lock ordering beyond T2 lifecycle roots
+exact lock SQL / full global lock ordering
 exact Role/Permission names/bundles
 AuditEvent census/facts
 object-store handles / staging keys / scan implementation
 renderer/outbox/worker/retry topology
 Search technology
-API route/error envelope/idempotency key contract
+API route/error envelope/idempotency-key contract
 frontend workflow screens
 migration import transaction shapes
-cross-Step strict SoD beyond the bounded initiator rule proposed here
+cross-Step strict SoD beyond bounded initiator rule
 fresh-auth/eSignature
 quorum ALL/N-of-M
 reassignment/overseer/SLA/escalation
 separate obsolescence-specific route configuration
-scheduled release
+scheduled Release
 ```
 
 ---
 
-# 20. Reopen triggers
+# 18. Reopen triggers
 
-Reopen the implicated T2 decision only when material evidence shows:
+Reopen only the implicated T2 decision if material evidence shows:
 
-- Launch truly needs `ALL`/N-of-M quorum rather than ANY-one Group Step;
-- a real business route must select by product Role-in-Area rather than NamedUser/Group;
+- Launch needs `ALL`/N-of-M quorum rather than ANY-one Group Step;
+- a real route must select by product Role-in-Area rather than NamedUser/Group;
 - regulation/customer contract requires strict cross-Step SoD, eSignature/fresh-auth or mandatory reauthentication;
-- live reassign/overseer is required and withdraw→fix route→resubmit is operationally insufficient;
-- obsolescence must use a distinct governance route;
-- a concrete Change-Control journey needs an active replacement Revision and obsolescence intent to coexist;
+- live reassignment/overseer is required and withdraw→fix→resubmit is insufficient;
+- obsolescence must use a distinct route;
+- Change Control needs active replacement Revision and obsolescence intent to coexist;
 - scheduled/future-dated effectivity becomes a real requirement;
-- implementation evidence proves `READ COMMITTED` + explicit locks/CAS cannot enforce the accepted invariants without disproportionate complexity.
+- implementation evidence proves `READ COMMITTED` + narrow locks/CAS cannot enforce invariants without disproportionate complexity.
 
 ---
 
-# 21. T2 operator adjudication packet
+# 19. Adjudication result / current gate
 
-Recommended dispositions:
+Accepted dispositions:
 
 ```text
-T2-A ACCEPT — one local ACID transaction per native business transition; no external/provider call joins it.
-T2-B ACCEPT — stable Document is lifecycle serialization root; WorkingContent uses OCC for DRAFT races.
-T2-C ACCEPT — create atomically establishes code + Document + REV001 DRAFT + initial WorkingContent; template creation revalidates exact current EFFECTIVE source at commit.
-T2-D ACCEPT — SUBMIT freezes exact expected WorkingContent generation + coherent governance/representation snapshots and moves Revision to SUBMITTED; NoHumanApproval creates no GovernanceAttempt.
-T2-E ACCEPT — Launch route selector = NAMED_USER | GROUP only; no ROLE_IN_AREA baseline.
-T2-F ACCEPT — Group Step = ANY-one from concrete enabled membership snapshot captured at Step activation; current AuthZ still rechecked at decision.
-T2-G ACCEPT — one active sequential Step; ACCEPT advances; RETURN terminates attempt and preserves immutable history; no generic quorum/reassign/overseer engine.
-T2-H ACCEPT — withdraw pre-Release returns same Revision to DRAFT and terminates the attempt without fake verdict; cancellation terminally cancels the Revision and preserves older EFFECTIVE/history.
-T2-I ACCEPT — Release gates = human gate + optional official-rendition gate; system may Release in the same transaction as SUBMIT/final ACCEPT when all gates are already satisfied, otherwise truthful SUBMITTED state remains until the missing gate completes.
-T2-J ACCEPT — replacement Release atomically sets predecessor SUPERSEDED + successor EFFECTIVE and never includes Distribution obligations in Launch-Core atomicity.
-T2-K ACCEPT RECOMMENDED — bounded SoD only: Submission submitter / obsolescence initiator cannot satisfy a human Step on that same attempt; no baseline cross-Step same-user prohibition.
-T2-L ACCEPT — obsolescence initiation requires current EFFECTIVE + reason + no open replacement Revision + no active obsolescence; active obsolescence blocks new Revision; same DocumentType governance route is reused; NoHumanApproval completes with zero human Step.
-T2-M ACCEPT — route/config edits and attempt snapshotting are atomic whole-config operations; in-flight attempts never reinterpret after admin edits; no mandatory standalone PolicyVersion object.
-T2-N ACCEPT — ordinary posture remains READ COMMITTED + explicit narrow serialization/CAS rather than global SERIALIZABLE; exact SQL enforcement waits for implementation design.
+T2-A ACCEPT
+T2-B ACCEPT
+T2-C ACCEPT WITH REV000 CORRECTION
+T2-D ACCEPT
+T2-E ACCEPT
+T2-F ACCEPT
+T2-G ACCEPT
+T2-H ACCEPT
+T2-I ACCEPT
+T2-J ACCEPT
+T2-K ACCEPT
+T2-L ACCEPT
+T2-M ACCEPT
+T2-N ACCEPT
 ```
 
-T2 remains **non-authoritative** until the operator adjudicates these recommendations. After adjudication, the mandatory platform-facing T2 summary must be presented and explicitly ratified before T2 can close or T3 open.
+Current gate:
 
-Implementation remains **BLOCKED**.
+```text
+T2 material decisions       = ACCEPTED
+T2 platform-facing summary  = NEXT
+T2 promotion/closure        = PENDING SUMMARY RATIFICATION
+T3                          = NOT OPEN
+implementation              = BLOCKED
+```
+
+The pre-adjudication candidate is preserved in Git history; this corrected staging file is the active T2 design packet until summary ratification and durable promotion.
