@@ -1,6 +1,6 @@
 # T5 Subgate — Rendition / Viewer Strategy Evaluation
 
-> **Status:** ACTIVE STAGING / NON-AUTHORITATIVE — OPERATOR DECISION PENDING  
+> **Status:** OPERATOR-ADJUDICATED / ACCEPTED — INCORPORATED INTO PARENT T5 CANDIDATE  
 > **Date:** 2026-08-18  
 > **Parent stage:** T5 — Durable Async, Search & External Effects  
 > **Implementation:** BLOCKED
@@ -9,7 +9,7 @@
 
 The active T5 candidate originally treated `official_rendition_render` as one of the mandatory durable job types. The operator challenged the implied product assumption: MetalDocs will ingest both native PDF and DOCX, and a PDF used only to make DOCX easy to view is not automatically the same thing as a governed `OfficialRendition` that must be persisted and gate Release.
 
-Therefore T5-D/T5-E and the exact meaning of `official_rendition_render` are **paused for this subgate**. T5-A→T5-P must not be adjudicated as a whole until this distinction is settled.
+Therefore T5-D/T5-E and the exact meaning of `official_rendition_render` were paused for this subgate. The operator has now accepted RV-1→RV-6, so the parent T5 candidate may proceed to whole-stage technical adjudication using the corrected semantics below.
 
 ## 2. Binding baseline from T1→T4
 
@@ -76,7 +76,7 @@ Cons:
 - risks making a viewing copy look like semantic truth;
 - duplicates content for a capability that may be satisfied by native DOCX viewer.
 
-**Reject as universal Launch default unless the operator deliberately wants PDF to be the official human-readable representation for every controlled DOCX.**
+**Rejected as universal Launch default.**
 
 ### Option B — client/native viewer only; never persist generated PDF
 
@@ -90,7 +90,7 @@ Cons:
 - repeated server/on-the-fly conversion may cost CPU if chosen viewer internally converts;
 - no stable PDF for controlled print/export where that becomes a requirement.
 
-**Credible Launch baseline for `SourceOnly`.**
+**Accepted as the SourceOnly behavior within the hybrid policy.**
 
 ### Option C — rebuildable ViewableRendition cache, not semantic OfficialRendition
 
@@ -105,7 +105,7 @@ Cons:
 - adds cache invalidation/renderer-profile mechanism that Launch may not need;
 - still stores duplicate content.
 
-**Defer until native DOCX viewer performance/fidelity proves inadequate.**
+**Deferred until native DOCX viewer performance/fidelity proves inadequate.**
 
 ### Option D — hybrid: native viewer by default; persisted OfficialRendition only by DocumentType policy
 
@@ -127,7 +127,7 @@ DOCX source + RequireOfficialRendition(PDF)
   → Release gate satisfied only by that exact rendition
 ```
 
-**Recommended Global Maximum.**
+**ACCEPTED Global Maximum.**
 
 It preserves the existing T1/T2 representation-policy seam instead of inventing a universal PDF policy.
 
@@ -156,7 +156,7 @@ If a generated PDF must be retained, its bytes do **not** belong in PostgreSQL. 
 
 A preview/cache PDF, if later added, is mechanism-only and remains rebuildable from the exact source.
 
-## 7. Recommended Launch viewer mapping
+## 7. Accepted Launch viewer mapping
 
 ```text
 source = PDF
@@ -177,7 +177,7 @@ source = DOCX, RequireOfficialRendition(PDF)
   output = persisted managed-content PDF + OfficialRendition descriptor
 ```
 
-Microsoft 365/Office for the Web is a high-fidelity reference pattern, but a standalone MetalDocs integration introduces an external Microsoft/WOPI product dependency and should not be Launch default without a deliberate product decision.
+Microsoft 365/Office for the Web is a high-fidelity reference pattern, but a standalone MetalDocs integration introduces an external Microsoft/WOPI product dependency and is not Launch default without a future deliberate product decision.
 
 ## 8. Renderer selection must be empirical
 
@@ -216,7 +216,7 @@ security/isolation
 operational burden
 ```
 
-## 9. Proposed correction to T5
+## 9. Accepted correction to T5
 
 The active T5 recommendation is refined from:
 
@@ -240,15 +240,25 @@ preview/viewer:
 
 Managed-content GC remains a periodic reconciliation mechanism.
 
-## 10. Remaining material choices for operator
+## 10. Operator adjudication — RV-1→RV-6 ACCEPTED
+
+The operator accepted all subgate recommendations:
 
 ```text
-RV-1 — ACCEPT hybrid Option D as Launch policy.
-RV-2 — For SourceOnly DOCX, start with EigenPal read-only rendering; keep ONLYOFFICE as a stronger candidate if conformance fails.
-RV-3 — PDF source is viewed directly; do not duplicate PDF by default.
-RV-4 — Persistent generated PDF exists only for RequireOfficialRendition(PDF) or another named future consumer.
-RV-5 — Renderer product choice remains evidence-driven through a DOCX fidelity corpus before implementation; architecture does not freeze Gotenberg/ONLYOFFICE yet.
-RV-6 — Refine T5 job census so `official_rendition_render` is conditional, not universally mandatory.
+RV-1 ACCEPT — hybrid Option D is the Launch representation/viewing policy.
+RV-2 ACCEPT — SourceOnly DOCX starts with EigenPal read-only rendering; ONLYOFFICE remains the stronger candidate if conformance fails.
+RV-3 ACCEPT — PDF source is viewed directly; no duplicate PDF by default.
+RV-4 ACCEPT — persistent generated PDF exists only for RequireOfficialRendition(PDF) or another explicitly named future consumer.
+RV-5 ACCEPT — renderer product choice remains evidence-driven through a representative DOCX fidelity corpus before implementation; architecture does not freeze Gotenberg/ONLYOFFICE yet.
+RV-6 ACCEPT — `official_rendition_render` is conditional, not universally mandatory.
 ```
 
-Until RV-1→RV-6 are adjudicated, **T5-A→T5-P as a whole is paused** and T6 remains NOT OPEN.
+## 11. Current gate
+
+```text
+RV-1→RV-6                         = OPERATOR-ADJUDICATED / ACCEPTED
+parent T5 candidate               = CORRECTED
+corrected T5-A→T5-P adjudication  = NEXT
+T6                                = NOT OPEN
+implementation                    = BLOCKED
+```
