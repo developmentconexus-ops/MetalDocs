@@ -5,7 +5,7 @@
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Original Fable review:** `docs/superpowers/analysis/2026-08-18-t1-t5-integrated-independent-fable-review.md` @ `bdef5fc3c4004aa3ab4deefc9e8373dd3efcf856`  
-> **Author adjudication:** `docs/superpowers/analysis/2026-08-18-t1-t5-fable-author-adjudication-round1.md`  
+> **Author adjudication:** `docs/superpowers/analysis/2026-08-18-t1-t5-fable-author-adjudication-round1.md` — **OPERATOR-RATIFIED**  
 > **Operator disposition:** Round-1 adjudication APPROVED; bounded amendments promoted  
 > **T6:** NOT OPEN  
 > **Implementation:** BLOCKED
