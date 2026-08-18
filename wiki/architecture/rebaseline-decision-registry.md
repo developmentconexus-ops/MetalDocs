@@ -2,7 +2,7 @@
 
 > **Status:** ACTIVE / OPERATOR-RATIFIED DECISION DISPOSITION AUTHORITY  
 > **Ratified:** 2026-08-18  
-> **Last stage update:** T3 — Authorization & Audit Enforcement — OPERATOR-RATIFIED  
+> **Last stage update:** T4 — Exact Content, Storage Integrity & Restore — OPERATOR-RATIFIED  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Implementation:** BLOCKED
@@ -65,6 +65,7 @@ AGENTS.md
 → wiki/architecture/r10-t1-semantic-state-invariants.md
 → wiki/architecture/r10-t2-governance-effectivity-transactions.md
 → wiki/architecture/r10-t3-authorization-audit-enforcement.md
+→ wiki/architecture/r10-t4-exact-content-storage-integrity-restore.md
 → this registry for prior-decision disposition
 → active T-stage candidate only for its REOPEN set
 ```
@@ -99,6 +100,7 @@ WorkingContent = OCC/CAS for DRAFT races
 READ COMMITTED + narrow explicit serialization/CAS = accepted default posture
 current Authorization = live User/Group grants + scope + domain predicates
 critical governed/security mutations cannot commit without required same-local-commit Audit
+exact governed content = semantic descriptor truth + opaque replaceable storage mechanism
 ```
 
 # 4. Authentication
@@ -192,12 +194,12 @@ critical governed/security mutations cannot commit without required same-local-c
 |---|---|---|
 | CNT-01 | **CURRENT** | WorkingContent = sole mutable DRAFT authority; editor/provider never authority. |
 | CNT-02 | **CURRENT** | One monotonic OCC generation; no silent last-write-wins. |
-| CNT-03 | **REOPEN / MECHANISM** | EditorSession/one-active-writer lease is optional mechanism only if T4/T6 proves need; OCC is correctness authority. |
-| CNT-04 | **SUPERSEDED / REJECTED** | WorkingSnapshot is never business history; recovery checkpoint can exist only as mechanism. |
+| CNT-03 | **REOPEN / T6 UX MECHANISM** | T4 ratified that EditorSession is not a correctness dependency; T6 may still add a bounded editor lease only if UX/integration evidence requires it. |
+| CNT-04 | **SUPERSEDED / REJECTED** | WorkingSnapshot is never business history; T4 ratified current WorkingContent as the Launch DRAFT recovery baseline. |
 | CNT-05 | **CURRENT** | Submission immutable/exact; same Revision may have multiple attempts. |
 | CNT-06 | **CURRENT** | Submission freezes coherent exact WorkingContent generation + decision-relevant governed config/state. |
-| CNT-07 | **REOPEN — T4** | Exact-content proof required, but canonical descriptor/digest/canonicalization realization is T4. |
-| CNT-08 | **SUPERSEDED** | Standalone Artifact exact-byte owner removed. |
+| CNT-07 | **CURRENT — T4** | Exact-content descriptor is `SHA-256 + exact size + closed ContentFormat`; no mandatory whole-Submission JCS/composite digest Launch. |
+| CNT-08 | **SUPERSEDED** | Standalone Artifact exact-byte owner removed; T4 confirms no Artifact/ArtifactStage semantic ownership. |
 | CNT-09 | **CURRENT** | Template = ordinary governed Document role; no parallel lifecycle. |
 | CNT-10 | **CURRENT** | Template eligibility remains small M:N current relation to target DocumentTypes. |
 | CNT-11 | **REFINED / CURRENT** | Derived origin pins source Template Document + exact EFFECTIVE Revision/content provenance without mandatory native Submission. |
@@ -211,7 +213,7 @@ critical governed/security mutations cannot commit without required same-local-c
 | ID | Disposition | Current meaning |
 |---|---|---|
 | REL-01 | **CURRENT** | SourceOnly vs one required official representation remains current; preview != semantic Rendition. |
-| REL-02 | **CURRENT** | Rendition binds exact Submission, never mutable latest content. |
+| REL-02 | **CURRENT / T4-CLARIFIED** | Rendition binds exact Submission and freezes its own ExactContentDescriptor + managed-content handle; renderer/provider work remains outside semantic transaction. |
 | REL-03 | **SUPERSEDED** | Universal mandatory PDF removed. |
 | REL-04 | **DEFERRED** | Scheduled/future-dated Release. |
 | REL-05 | **SUPERSEDED / REJECTED** | No human publish button; system Release establishes effectivity. |
@@ -239,6 +241,8 @@ critical governed/security mutations cannot commit without required same-local-c
 | ASY-03 | **PRESERVE / T2-compatible** | Real async/external work may require durable intent in same local transaction; intent is mechanism only. |
 | ASY-04 | **SUPERSEDED AS AUTHORITY** | Current River/job framework is implementation evidence, not target authority. |
 | ASY-05 | **SUPERSEDED / REJECTED** | No global SERIALIZABLE/global worker-lock framework baseline. |
+| ASY-06 | **REOPEN — T5** | T4 establishes `GC_PENDING` eligibility/recheck semantics but T5 must decide whether durable cleanup intent/worker/retry is required and how it executes. |
+| ASY-07 | **REOPEN — T5** | Required OfficialRendition provider execution is outside semantic transaction; T5 owns durable renderer execution/retry only if the Launch requirement proves it. |
 
 # 13. Audit
 
@@ -259,16 +263,24 @@ critical governed/security mutations cannot commit without required same-local-c
 | ID | Disposition | Current meaning |
 |---|---|---|
 | STO-01 | **CURRENT** | Storage/provider identity never semantic identity. |
-| STO-02 | **PRESERVE / REQUIRED SEAM** | Provider-neutral shared storage/integrity mechanism may serve multiple semantic owners without becoming an owner. |
-| STO-03 | **SUPERSEDED IN NAME/OWNERSHIP** | `ManagedArtifactStore` as Artifact-owned semantic surface removed; T4 may preserve provider-neutral managed-content mechanism only. |
-| STO-04 | **PRESERVE CANDIDATE / T4** | SHA-256 remains strong prior exact-byte digest choice; descriptor/canonicalization is T4. |
-| STO-05 | **PRESERVE CANDIDATE / T4** | Governed immutable bytes never overwrite in place; mutable WorkingContent may point to replacement content under OCC. |
-| STO-06 | **REOPEN / PRIOR MECHANISM CHOICE — T4** | Local dev/test + AWS S3 reference production is evidence; T4 revalidates actual provider/profile/conformance. |
-| STO-07 | **PRESERVE CANDIDATE / T4** | Production malware inspection before admission of untrusted governed bytes remains coherent; exact semantics are T4. |
-| STO-08 | **SUPERSEDED / REJECTED** | Object-store versioning/Object Lock/WORM are defense/enforcement, never lifecycle authority. |
+| STO-02 | **CURRENT — T4** | Provider-neutral shared `ManagedContentStore` mechanism serves semantic owners without becoming an owner; Launch uses one active store per deployment. |
+| STO-03 | **SUPERSEDED / T4-REFINED** | `ManagedArtifactStore`/Artifact-owned surface is removed; T4 preserves only provider-neutral managed-content mechanism with opaque handle. |
+| STO-04 | **CURRENT — T4** | ExactContentDescriptor = SHA-256 + exact size + closed ContentFormat; client/provider metadata is not semantic exactness. |
+| STO-05 | **CURRENT — T4** | Managed handles are create-once/no-overwrite; DRAFT replacement creates a new handle. |
+| STO-06 | **CURRENT — T4** | Local = dev/test/conformance provider; AWS S3 = reference production provider; alternate providers must pass the same contract. |
+| STO-07 | **CURRENT — T4** | UNTRUSTED_EXTERNAL exact bytes require CLEAN malware proof before immutable governed admission in production; autosaves are not scanned on every debounce; ClamAV/clamd is reference MalwareInspector. |
+| STO-08 | **SUPERSEDED / REJECTED** | Object-store Versioning/Object Lock/WORM are defense/enforcement only, never lifecycle authority. |
 | STO-09 | **DEFERRED / REJECTED AS DEFAULT** | Application-layer Company DEK/crypto-erasure is not mandatory absent named Target Data/assurance requirement. |
 | STO-10 | **SUPERSEDED / REJECTED** | External repository IDs never become MetalDocs content identity. |
-| STO-11 | **CURRENT PRODUCT OBLIGATION / T4 REALIZATION** | Restore must prove semantic facts + exact required bytes coherent; missing/corrupt content cannot be reported healthy. |
+| STO-11 | **CURRENT — T4** | Restore is non-serving until every required semantic content reference resolves and exact size/SHA-256/format match; missing/corrupt required content fails closed. |
+| STO-12 | **CURRENT — T4** | `managed_content_id` is an opaque retrieval handle only; OPEN→READY is durable mechanism state, not semantic Artifact confirmation. |
+| STO-13 | **CURRENT — T4** | Server independently derives descriptor from stored bytes; provider PUT/client claims never equal semantic admission. |
+| STO-14 | **CURRENT — T4** | Opaque server-owned admission binding prevents arbitrary/cross-root handle reuse without introducing a generic owner registry. |
+| STO-15 | **CURRENT — T4** | SUBMIT/Rendition semantic transactions make zero provider/scanner calls; they revalidate READY/descriptor/binding/malware proof and freeze exact handle+descriptor atomically with semantic truth. |
+| STO-16 | **CURRENT — T4** | Only unreferenced/non-governed mechanism content may be reclaimed; immutable governed content has no ordinary Launch delete/disposition path. |
+| STO-17 | **CURRENT — T4** | Backup = consistent DB recovery point + exact required-content manifest/copy, including current DRAFT WorkingContent; capture must exclude GC races through bounded pin/equivalent. |
+| STO-18 | **CURRENT — T4** | Historical restore must reconcile post-snapshot lawful UserProfile erasures through independently retained erasure barrier/journal or equivalent proof before serving human-readable profile data. |
+| STO-19 | **DEFERRED — T4** | Whole-Submission canonical JCS/composite digest remains deferred until a named signing/export/non-repudiation consumer exists. |
 
 # 15. Launch+ — Distribution / Periodic Review
 
@@ -287,7 +299,7 @@ These designs are **not legacy garbage**. They are future evidence and must crea
 | ID | Disposition | Future meaning |
 |---|---|---|
 | FUT-01 | **DEFERRED FUTURE / PRESERVE EVIDENCE** | Dossier = documentary context, never content owner/access grant; stable Document is seam. |
-| FUT-02 | **DEFERRED FUTURE / PRESERVE EVIDENCE** | Evidence may gain independent captured-record lifecycle; do not force through Document Revision. |
+| FUT-02 | **DEFERRED FUTURE / PRESERVE EVIDENCE / T4 SEAM** | Evidence may own its own exact descriptor + managed-content handle while retaining independent lifecycle; no Artifact owner required. |
 | FUT-03 | **DEFERRED FUTURE / PRESERVE EVIDENCE** | Retention/Hold/Disposition remain separate from document lifecycle/provider storage; expiry must not imply delete. |
 | FUT-04 | **PRESERVE FUTURE INVARIANT** | Dossier link never grants access. |
 | FUT-05 | **PRESERVE FUTURE INVARIANT** | LegalHold business preservation != ObjectLock/provider physical enforcement. |
@@ -301,12 +313,12 @@ These designs are **not legacy garbage**. They are future evidence and must crea
 | MIG-01 | **CURRENT** | Historical Migration is distinct go-live/cutover capability, not normal integration. |
 | MIG-02 | **CURRENT** | Unknown remains unknown; never fabricate native Submission/decision/Release/User actions. |
 | MIG-03 | **CURRENT AT SEMANTIC LEVEL** | Preserve reliable legacy ordinals; next native ordinal above real history; current `REV000` convention never rewrites source history. |
-| MIG-04 | **CURRENT** | Imported exact content may exist without native Submission. |
+| MIG-04 | **CURRENT / T4-CLARIFIED** | Imported exact content may exist without native Submission and uses the same exact descriptor + managed-content admission seam; T7 owns imported fact shapes. |
 | MIG-05 | **PRESERVE CANDIDATE** | Plan/dry-run/deterministic outcomes/reconciliation/idempotency/atomic semantic import unit remain strong cutover evidence. |
 | MIG-06 | **PRESERVE EVIDENCE / REOPEN T7** | `CURRENT_STATE | FULL_HISTORY` modes are useful evidence but actual source completeness decides final modes. |
 | MIG-07 | **SUPERSEDED** | Generic Interchange semantic owner removed. |
-| MIG-08 | **DEFERRED FUTURE** | Governed Subject Export not Launch. |
-| MIG-09 | **DEFERRED FUTURE** | Generic External Repository IMPORT/PUBLISH not Launch. |
+| MIG-08 | **DEFERRED FUTURE / T4 SEAM** | Governed Subject Export may derive future manifests/digests from stable semantic descriptors without provider identity becoming product truth. |
+| MIG-09 | **DEFERRED FUTURE / T4 SEAM** | Generic External Repository IMPORT/PUBLISH remains Future and reuses exact descriptor/copy mechanisms without making external object IDs MetalDocs identity. |
 | MIG-10 | **REOPEN** | Detailed imported target families are not frozen; T7 derives smallest truthful shape from actual source evidence. |
 
 # 18. Relational / Transaction substrate
@@ -334,7 +346,7 @@ These designs are **not legacy garbage**. They are future evidence and must crea
 | SEC-04 | **DEFERRED FUTURE** | Pooled/shared multi-customer tenancy not Launch; stable Company root preserves seam. |
 | SEC-05 | **DEFERRED FUTURE** | Customer-company lifecycle/portability deletion/export not Launch. |
 | SEC-06 | **DEFERRED** | Generic eDiscovery/PKI/TSA/HSM/signature/quarantine platform absent concrete requirement. |
-| SEC-07 | **PRESERVE REJECTION / PROOF OBLIGATION** | Restore may not silently resurrect lawfully erased UserProfile PII; T4/T7/ops reconcile privacy with retained stable actor identity. |
+| SEC-07 | **CURRENT — T4 RESTORE LAW** | Restore may not silently resurrect lawfully erased UserProfile PII; post-snapshot erasures must be reconciled before serving restored profile data. |
 
 # 20. Known future horizon
 
@@ -357,10 +369,11 @@ Future:
 
 > **Defer the capability; preserve the evolution seam. Prepare the seam, not the dormant implementation.**
 
-# 21. Anti-legacy list — MUST NOT leak into T4–T7
+# 21. Anti-legacy list — MUST NOT leak into T5–T7
 
 ```text
 standalone Artifact semantic owner
+ArtifactStage business model
 old 8+3 semantic ownership topology
 separate Approval semantic owner
 exact old 5×43 permission catalog
@@ -385,11 +398,14 @@ scheduled Release
 universal PDF official representation
 Artifact-rooted retention model
 provider/storage identity as semantic identity
+whole-Submission JCS digest without a named consumer
+multi-cloud/BYOS/active-active content platform
+Object Lock/WORM as lifecycle authority
 ```
 
 A later stage may propose one only by naming new material evidence that explicitly reopens it.
 
-# 22. Closed T3 and official REOPEN set for remaining stages
+# 22. Closed T-stages and official REOPEN set for remaining stages
 
 ## T3 — Authorization & Audit Enforcement — CLOSED / OPERATOR-RATIFIED
 
@@ -397,38 +413,34 @@ Detailed authority:
 
 `wiki/architecture/r10-t3-authorization-audit-enforcement.md`
 
+## T4 — Exact Content, Storage Integrity & Restore — CLOSED / OPERATOR-RATIFIED
+
+Detailed authority:
+
+`wiki/architecture/r10-t4-exact-content-storage-integrity-restore.md`
+
 Closed decisions include:
 
 ```text
-six Launch roles + 15 Launch permissions
-User|Group subjects + accepted Company|Area scope matrix
-organization.manage vs access.manage administration split
-Group deletion live-dependency law
-responsible-owner / document.owner.manage authoring predicate
-governance.act + exact active-Step participation
-atomic offboarding + no silent access resurrection
-offboarding/security-action User-eligibility serialization
-bounded same-local-commit Audit census
-PII-minimized Audit facts
-Company|Area historical Audit visibility
-no mandatory semantic Audit for ordinary reads/downloads/search/autosave/login/logout/preview/deny
-future capability permissions never silently broaden current roles
+ExactContentDescriptor = SHA-256 + exact size + ContentFormat
+no mandatory whole-Submission JCS digest Launch
+opaque managed-content handle is retrieval mechanism only
+one provider-neutral ManagedContentStore / one active store per deployment
+Local dev/test/conformance + AWS S3 reference production
+OPEN→READY server-verified admission
+opaque admission binding
+UNTRUSTED_EXTERNAL CLEAN malware gate at governed boundary
+create-once/no-overwrite
+WorkingContent as DRAFT recovery baseline
+zero provider/scanner calls inside SUBMIT/Rendition semantic transaction
+only unreferenced non-governed mechanism content reclaimable
+backup = DB recovery point + exact required-content set + GC exclusion
+restore exact-content fail-closed readiness
+post-snapshot UserProfile erasure reconciliation before serving historical restore
+future content capabilities reuse descriptor+mechanism without Artifact ownership
 ```
 
-## T4 — Exact Content, Storage Integrity & Restore — ACTIVE REOPEN SET
-
-```text
-exact content descriptor/digest algorithm/canonicalization
-provider-neutral managed-content mechanism
-provider choice/profile/conformance
-staging/confirmation/admission
-malware policy/scan ordering
-immutable byte/no-overwrite enforcement
-mutable WorkingContent recovery
-backup/restore completeness + privacy non-resurrection
-```
-
-## T5 — Durable Async, Search & External Effects
+## T5 — Durable Async, Search & External Effects — ACTIVE REOPEN SET
 
 ```text
 which effects actually require durable intent/outbox
@@ -448,6 +460,7 @@ editor/viewer provider behavior
 in-product inspection vs exact-source download
 public idempotency/error contracts
 search/read/history/audit workspaces
+EditorSession/UX lease only if a real editor-integration consumer requires it
 ```
 
 ## T7 — Historical Migration & Cutover
@@ -460,6 +473,7 @@ ordinal/content/governance provenance
 plan/dry-run/idempotency/reconciliation
 semantic-unit atomicity
 cutover/readiness/rollback/deletion map
+concrete restore/erasure reconciliation choreography where cutover/recovery requires it
 ```
 
 # 23. Registry governance — OPERATOR-RATIFIED DR-1→DR-8
