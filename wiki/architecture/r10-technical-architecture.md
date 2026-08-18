@@ -1,6 +1,6 @@
 # R10 Technical Architecture — Active Stage Router
 
-> **Status:** ACTIVE — **T1 + T2 + T3 + T4 CLOSED / OPERATOR-RATIFIED; DECISION REGISTRY CURRENT; T5 DECISIONS ACCEPTED / SUMMARY RATIFICATION NEXT; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1→T5 CLOSED / OPERATOR-RATIFIED; DECISION REGISTRY CURRENT; POST-T5 FABLE CHECKPOINT ACTIVE; T6 NOT OPEN; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-18  
 > **Revision convention:** `REV000` initial issuance / `REV001` first revision  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
@@ -21,12 +21,14 @@ This file is the technical-stage router. Detailed accepted semantics live in ded
 8. `wiki/architecture/r10-t2-governance-effectivity-transactions.md`
 9. `wiki/architecture/r10-t3-authorization-audit-enforcement.md`
 10. `wiki/architecture/r10-t4-exact-content-storage-integrity-restore.md`
-11. `wiki/architecture/rebaseline-decision-registry.md`
-12. active T-stage parent analysis, when present
-13. accepted material subgate analysis, when present
-14. corrected adjudication packet / operator-adjudication gate, when present
+11. `wiki/architecture/r10-t5-durable-async-search-external-effects.md`
+12. `wiki/architecture/rebaseline-decision-registry.md`
+13. this router
+14. active independent-review packet/evidence only when a review checkpoint is open
 
 Historical R3–R9.5 / old R10 / current implementation/schema/OpenAPI are evidence only unless current authority or the Decision Registry preserves a decision.
+
+The active Fable packet is **review evidence/staging**, never target authority.
 
 ## 2. Binding method laws
 
@@ -75,13 +77,16 @@ T1 — Semantic State & Invariants                              CLOSED / OPERATO
 T2 — Governance, Effectivity & Lifecycle Transactions        CLOSED / OPERATOR-RATIFIED
 T3 — Authorization & Audit Enforcement                       CLOSED / OPERATOR-RATIFIED
 T4 — Exact Content, Storage Integrity & Restore              CLOSED / OPERATOR-RATIFIED
+T5 — Durable Async, Search & External Effects                CLOSED / OPERATOR-RATIFIED
 Decision Reconciliation Registry                             CURRENT / OPERATOR-RATIFIED
-T5 — Durable Async, Search & External Effects                DECISIONS ACCEPTED / SUMMARY RATIFICATION NEXT
+Post-T5 integrated independent Fable checkpoint              ACTIVE / REVIEW REQUEST STAGED
 T6 — Canonical API / Frontend Journeys                       NOT OPEN
 T7 — Historical Migration & Cutover                          NOT OPEN
 
+→ T6 only after Fable findings are adjudicated and checkpoint explicitly closes
+→ T7
 → Integrated Whole-R10 Global Coherence Review
-→ cold independent review
+→ cold independent final review
 → operator final ratification
 → implementation spec/plan
 → code
@@ -107,6 +112,8 @@ read Decision Registry
 
 A technical decision approval alone never opens the next stage.
 
+An independent checkpoint may deliberately hold the next stage closed **after** the prior stage has been fully promoted; review findings remain evidence until separately adjudicated.
+
 ## 6. Closed T-stage authorities
 
 ```text
@@ -114,9 +121,10 @@ T1 → wiki/architecture/r10-t1-semantic-state-invariants.md
 T2 → wiki/architecture/r10-t2-governance-effectivity-transactions.md
 T3 → wiki/architecture/r10-t3-authorization-audit-enforcement.md
 T4 → wiki/architecture/r10-t4-exact-content-storage-integrity-restore.md
+T5 → wiki/architecture/r10-t5-durable-async-search-external-effects.md
 ```
 
-T4 closed the exact-content boundary:
+### T4 closed exact-content boundary
 
 ```text
 ExactContentDescriptor = SHA-256 + size + ContentFormat
@@ -130,6 +138,29 @@ zero provider/scanner calls inside SUBMIT/Rendition semantic tx
 only non-governed unreferenced mechanism content reclaimable
 backup = DB recovery point + exact required content
 restore fails closed on content mismatch and post-snapshot profile-erasure resurrection
+```
+
+### T5 closed async/Search boundary
+
+```text
+one PostgreSQL-backed durable-job mechanism; River selected/reference mechanism
+search_refresh(document_id) = always-required durable projection job
+official_rendition_render = conditional only for frozen policy-required OfficialRendition
+PDF source direct-view by default
+DOCX + SourceOnly direct read-only viewer; no persisted PDF merely for viewing
+required job enqueue transaction-coupled to semantic fact
+provider/renderer execution outside semantic tx
+OfficialRendition finalization revalidates T4/T2/T3 and is idempotent
+Search = PostgreSQL rebuildable projection keyed by Document
+latest-state refresh makes duplicate/out-of-order jobs converge
+Search may lag by omission but never grants stale authority/effectivity
+full Search rebuild mandatory; always-on crawler not baseline
+GC periodic reconciliation over GC_PENDING with immediate canonical recheck
+no mandatory Launch notifications/event bus
+no mandatory durable external IdP-disable job
+no generic ExternalEffectReceipt
+at-least-once/idempotent/revalidating/bounded-retry/terminal-visible jobs with bounded-ID payloads
+minimum async operational visibility required
 ```
 
 ## 7. Decision Registry
@@ -149,123 +180,97 @@ DEFERRED
 SUPERSEDED
 ```
 
-Later stages may not rediscover settled decisions from zero and may not inherit superseded decisions by sunk cost.
+T5 is reconciled into the registry. T6's official REOPEN set is now the next design set, but T6 remains held closed by the active independent review checkpoint.
 
-## 8. T5 — Durable Async, Search & External Effects — DECISIONS ACCEPTED
+## 8. Post-T5 independent Fable checkpoint — ACTIVE
 
-Parent analysis:
+Review request:
 
-`docs/superpowers/analysis/2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md`
+`docs/superpowers/analysis/2026-08-18-t1-t5-integrated-fable-review-request.md`
 
-Accepted rendition/viewer subgate:
+Purpose:
 
-`docs/superpowers/analysis/2026-08-18-t5-rendition-viewer-strategy-evaluation.md`
+> Cold-review the complete ratified T1→T5 architecture for cross-stage contradictions, authority duplication, races, accidental complexity and future-seam defects **before T6 API/frontend journeys encode those decisions into public contracts and UX**.
 
-Accepted corrected decision packet:
-
-`docs/superpowers/analysis/2026-08-18-r10-t5-corrected-adjudication-packet.md`
-
-Operator adjudication record:
-
-`docs/superpowers/analysis/2026-08-18-r10-t5-operator-adjudication.md`
-
-Official T5 REOPEN set:
+Required reviewer posture:
 
 ```text
-which effects actually require durable intent/outbox
-worker/lease/retry/DLQ mechanism
-renderer execution
-notifications if a Launch consumer remains
-Search projection/rebuild/freshness/reconciliation
-provider effect receipts where needed
+repo cold start
+Method first
+ratified authorities are baseline
+current code is evidence only
+review packet is not authority
+Structural Inversion
+minimal reopen only on material counterexample
 ```
 
-Accepted RV correction:
+The review explicitly attacks:
 
 ```text
-PDF source
-  → direct PDF viewer by default
-  → no duplicate generated PDF without named need
-
-DOCX + SourceOnly
-  → direct read-only DOCX viewer
-  → no persistent governed PDF merely for viewing
-
-DOCX + RequireOfficialRendition(PDF)
-  → conditional durable server-side render from exact Submission
-  → T4 admission
-  → immutable OfficialRendition
-  → Release gate
-```
-
-Accepted T5 durable-effect census:
-
-```text
-always-required durable job:
-  search_refresh(document_id)
-
-conditional durable job:
-  official_rendition_render(submission_id, required_format)
-  only when frozen representation policy requires OfficialRendition
-
-periodic reconciliation:
-  managed-content GC over GC_PENDING
-```
-
-Accepted T5 laws include:
-
-```text
-one Postgres-backed durable-job mechanism; River selected/reference mechanism
-required job enqueue transaction-coupled to the semantic fact that creates it
-provider/renderer execution outside semantic tx
-OfficialRendition finalization revalidates T4 + T2/T3 state in local tx
-at-least-once/idempotent/revalidating jobs with bounded retry and terminal visibility
-PostgreSQL rebuildable Search projection keyed by Document
-search_refresh reloads latest canonical state; duplicates/out-of-order jobs converge safely
-Search may lag by omission but never grants stale authority/effectivity
-full Search rebuild required; always-on crawler not baseline
-GC periodic reconciliation over GC_PENDING; immediate canonical recheck before delete
-no mandatory Launch notifications/inbox/fanout/domain-event bus
-no mandatory durable external IdP-disable job
-no generic ExternalEffectReceipt family
-minimum async operational observability required
-future capabilities add only named jobs/effects/receipts for proven consumers
+DRAFT→SUBMIT→governance→optional Rendition→Release→Search
+offboarding vs governance/async work
+replacement Release / obsolescence vs stale Search
+GC vs WorkingContent/Submission/Rendition/backup
+restore vs offboarding/privacy
+viewer/preview vs OfficialRendition
+Audit + required durable job composition
+Search/AuthZ stale-projection boundary
+Decision Registry consistency
+essential vs accidental complexity
+future evolution seams
 ```
 
 ### Current gate
 
 ```text
-RV-1→RV-6                         ACCEPTED
-T5-A→T5-P                         ADJUDICATED / ACCEPTED
-→ platform-facing T5 summary NEXT
-→ explicit operator summary ratification
-→ promote/close T5
-→ update Decision Registry
-→ remove completed T5 staging
-→ open T6
+T1→T5 durable authorities          CLOSED / RATIFIED
+Decision Registry                  CURRENT
+Fable review request               STAGED
+Fable independent review           PENDING EXTERNAL REVIEWER
+T6                                 NOT OPEN
+implementation                     BLOCKED
 ```
 
-**T6 remains NOT OPEN.**
+When Fable returns:
 
-T5 does not own public API/frontend journeys or Historical Migration execution.
+```text
+independent review evidence
+→ adjudicate each material finding against current repo authority + Method
+→ bounded correction/reopen only if justified
+→ optional Fable delta review if material fixes were required
+→ explicit post-T5 checkpoint closure
+→ only then open T6
+```
 
-## 9. T6–T7 routing
+The Fable checkpoint does **not** replace the Integrated Whole-R10 GCR or final cold review after T7.
 
-### T6 — Canonical API / Frontend Journeys
+## 9. T6 — Canonical API / Frontend Journeys — NOT OPEN
 
-Consumes registry T6 REOPEN set: numbering grammar/preview, admin journeys, editor/viewer behavior, in-product inspection vs source download, public idempotency/errors, search/read/history/audit workspaces and any bounded EditorSession UX seam actually required.
+When the Fable checkpoint closes, T6 consumes only the registry's T6 REOPEN set:
 
-### T7 — Historical Migration & Cutover
+```text
+numbering configuration grammar and preview UX
+admin journeys for current Organization/AuthZ/config
+editor/viewer provider behavior
+in-product inspection vs exact-source download
+public idempotency/error contracts
+search/read/history/audit workspaces
+EditorSession/UX lease only if a real editor-integration consumer requires it
+```
+
+T6 must not reopen T1→T5 absent material evidence and explicit bounded reopen.
+
+## 10. T7 — Historical Migration & Cutover
 
 Consumes registry T7 REOPEN set: source evidence, migration modes, imported target-owned shapes, ordinal/content/governance provenance, plan/dry-run/idempotency/reconciliation, semantic-unit atomicity and cutover/readiness/rollback/deletion map.
 
-## 10. Final gate
+## 11. Final gate
 
 After T7:
 
 ```text
 Integrated Whole-R10 GCR
-→ cold independent review
+→ cold independent final review
 → operator final ratification
 ```
 
