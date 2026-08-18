@@ -8,7 +8,7 @@ The live `docs/superpowers/` tree contains active working material only. Durable
 
 ## Current active staging
 
-No T3 material decision packet has been written yet. T3 is in discovery/design and must first compare credible access/Audit approaches against the accepted Product Contract + T1/T2 journeys.
+No T3 material-decision packet has been written yet. T3 is in discovery/design and must first compare credible access/Audit approaches against the accepted Product Contract + T1/T2 journeys.
 
 T1 and T2 were operator-adjudicated, summarized in platform terms, explicitly summary-ratified and promoted into durable `wiki/` authority. Their completed staging is removed from the live tree.
 
