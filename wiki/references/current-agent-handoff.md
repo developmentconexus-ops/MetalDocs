@@ -1,7 +1,7 @@
 # Current Agent Handoff
 
 > **Last verified:** 2026-08-17
-> **Status:** ACTIVE — Cohesive Platform Redesign / **R9.5 FROZEN + GCR-REFINED + SINGLE-COMPANY-REFINED / R10-A CLOSED + SINGLE-COMPANY-REFINED / R10-B1 CLOSED + SINGLE-COMPANY-RESTRUCTURED / R10-B2 CLOSED + APPROVED + INTEGRATED / R10-B3 NEXT**
+> **Status:** ACTIVE — Cohesive Platform Redesign / **R9.5 FROZEN + GCR-REFINED + SINGLE-COMPANY-REFINED / R10-A CLOSED + SINGLE-COMPANY-REFINED / R10-B1 CLOSED + SINGLE-COMPANY-RESTRUCTURED / R10-B2 CLOSED + APPROVED + INTEGRATED / R10-B3 ACCEPTED FOR R10 INTEGRATION + NON-FINAL / R10-B4 NEXT**
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
 > **Implementation:** **BLOCKED — design/documentation only**
 
@@ -11,11 +11,12 @@ Start with `AGENTS.md` and follow its authority chain. For the current stage rea
 
 1. `AGENTS.md`
 2. `docs/engineering/standards/root-cause-global-maximum-method.md`
-3. **this file** for current status / next step
-4. `wiki/architecture/cohesive-platform-redesign.md` — program authority / global coherence
+3. **this file** for current status / exact next step
+4. `wiki/architecture/cohesive-platform-redesign.md` — program authority / global coherence / current R10 working posture
 5. `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md` — frozen R3–R9.5 product/domain authority including promoted GCR + single-company refinements
-6. `wiki/architecture/r10-technical-architecture.md` — active R10 technical authority including promoted B1 and integrated B2
-7. review artifacts only when auditing how a promoted decision was challenged
+6. `wiki/architecture/r10-technical-architecture.md` — promoted R10 technical authority through integrated B2; B3 has not been independently promoted into this file
+7. `docs/superpowers/analysis/2026-08-17-r10-b3-controlled-information-artifact-integrated-candidate.md` — **operator-accepted working B3 candidate / NON-FINAL**
+8. prior review artifacts only when auditing how an already-promoted decision was challenged
 
 Git history is archive. Current code/schema/OpenAPI/module docs are current-state evidence only for target design.
 
@@ -48,8 +49,8 @@ R10-B2-1 = CLOSED / APPROVED
 R10-B2-2 = CLOSED / APPROVED / INTEGRATED
 R10-B2-3 = CLOSED / APPROVED / INTEGRATED
 R10-B2-4 = CLOSED / APPROVED / INTEGRATED
-R10-B3   = NEXT / DESIGN ONLY
-R10-B4   = NOT STARTED
+R10-B3   = ACCEPTED FOR R10 INTEGRATION / NON-FINAL / NOT INDEPENDENTLY RATIFIED
+R10-B4   = NEXT / DESIGN ONLY
 R10-B5   = NOT STARTED
 R10-B6   = NOT STARTED
 R10-C    = NOT STARTED
@@ -63,8 +64,18 @@ implementation = BLOCKED
 Promoted target authority:
 
 - R3–R9.5 product/domain semantics: `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md`
-- R10 technical architecture including integrated B2: `wiki/architecture/r10-technical-architecture.md`
-- program/global-coherence mirror: `wiki/architecture/cohesive-platform-redesign.md`
+- R10 technical architecture promoted through integrated B2: `wiki/architecture/r10-technical-architecture.md`
+- program/global-coherence/current working posture: `wiki/architecture/cohesive-platform-redesign.md`
+
+Accepted non-final R10 integration input:
+
+- B3: `docs/superpowers/analysis/2026-08-17-r10-b3-controlled-information-artifact-integrated-candidate.md`
+
+### R10 working-mode rule from B3 onward
+
+B3–F are developed as integrated, repo-grounded candidates with directed external research where it materially improves decision quality, DevelopmentConexus Method reasoning, internal adversarial challenge and cross-stage coherence review. Operator acceptance means **accepted for R10 integration / non-final**, not independent ratification.
+
+Do not return to table/field/microdecision review gates. Later blocks may reopen only the materially implicated earlier decision when a real counterexample appears. Whole-R10 Global Coherence Review + cold independent Fable review happens before final R10 ratification unless an exceptional material trust-boundary, irreversible or cross-repository blocker requires earlier independent challenge.
 
 ---
 
@@ -215,37 +226,78 @@ Implementation remains blocked.
 
 ---
 
-## Exact next step — R10-B3 Controlled Information + Artifact relational core
+## R10-B3 Controlled Information + Artifact relational core — accepted working outcome
 
-Open **R10-B3** in batch/design-only mode. Do not reopen B2 unless material evidence satisfies its reopen contract.
+Operator accepted the integrated B3 candidate for continued R10 integration on 2026-08-17 after an explanatory walkthrough of the architecture and Global Maximum rationale.
 
-First deliverable = one integrated intake/decomposition and candidate relational system covering:
-
-```text
-Artifact core
-DocumentType / optional category / numbering
-Document + DocumentRevision
-WorkingContent + working_version OCC
-immutable RevisionSubmission + digest/source Artifact relation
-template Document role + TemplateUse + TemplateSpec + origin provenance
-EditorialComment where material
-PeriodicReview policy/record + responsible owner
-creation / draft mutation / submission-freeze transaction boundaries
-uniqueness / immutable identity / exactly-one-open/effective constraints
-```
-
-Separate clearly:
+Working kernel:
 
 ```text
-Approval/Rendition/Release/Distribution → B4
-Evidence/Dossier/Records + Artifact closure → B5
-Audit/Interchange/cross-owner matrix → B6
-physical storage/malware/restore → R10-C
-async/projections/provider effects → R10-D
-API/frontend → R10-E
-historical cutover/deletion → R10-F
+Document
+→ business DocumentRevision
+→ one mutable WorkingContent + working_version OCC
+→ immutable RevisionSubmission + deterministic governed manifest/digest
+→ exact provider-neutral Artifact
 ```
 
-Use one serious adversarial review of the B3 batch after the integrated candidate; do not return to microdecision review ceremony without a truly independent failure class.
+Small typed adjuncts cover DocumentType/category/numbering/dictionary, template Document role + TemplateUse + TemplateSpec + immutable DocumentOrigin, material EditorialComment and PeriodicReviewPolicy/PeriodicReviewRecord.
+
+Key B3 contracts carried into B4:
+
+- downstream review/rendition/release may bind only exact immutable `RevisionSubmission`, never mutable "current revision" content;
+- same-REV return-for-changes never mutates submitted bytes/history;
+- SUBMIT consumes the accepted `working_version` generation so stale pre-submit autosave cannot become valid again after return-to-DRAFT;
+- create-from-template must serialize against template effectivity so a stale effective source cannot be recorded as current;
+- Periodic Review must serialize against Release so a review cannot commit against a Revision that ceased to be current EFFECTIVE;
+- at-most-one open and at-most-one EFFECTIVE have structural relational backstops;
+- Artifact is exact-byte identity, not provider location, and B5 must finish global typed-owner/disposition closure.
+
+This outcome is **NON-FINAL / NOT INDEPENDENTLY RATIFIED**. Material B4–F counterexamples may reopen only the implicated decision.
+
+---
+
+## Exact next step — R10-B4 Approval + CI-owned Rendition/Release + Distribution
+
+Open **R10-B4** in integrated batch/design-only mode using promoted B1/B2 authority plus the accepted non-final B3 candidate.
+
+First deliverable: one integrated intake/decomposition and candidate system covering at minimum:
+
+```text
+ApprovalPolicy versioning + ordered Steps
+actor rules: NamedUser | Group | RoleInArea
+ANY / ALL completion
+requires_reauthentication + bounded freshness consumption
+ApprovalInstance exact-RevisionSubmission binding
+participant activation/snapshot semantics
+strict SoD
+ApprovalDecision / return / withdraw / cancel / reassign / oversight
+
+Rendition exact-Submission derivation + OfficialRepresentationPolicy
+ReleasePlan / automatic system-owned Release
+exactly-one-EFFECTIVE winner transaction
+prior EFFECTIVE → SUPERSEDED coherence
+not_before / released_at / effective_at semantics
+release idempotency and concurrency
+
+Distribution audience config
+release-time concrete User snapshot
+AcknowledgementRecord
+membership/history denominator stability
+```
+
+B4 must explicitly attack B3↔B4 integration, especially exact-Submission identity, return-to-DRAFT/OCC generation, template-effectivity serialization and PeriodicReview-vs-Release serialization. It must also consume B2 constraints for retired Areas, typed Group references with RESTRICT, concrete User snapshots, strict SoD and fresh-auth policy.
+
+Keep outside B4:
+
+```text
+Evidence / Dossier / Records Governance + final Artifact closure → B5
+Audit / Interchange / final cross-owner atomicity matrix → B6
+malware / physical storage integrity / relocation / restore → R10-C
+async worker/projection/provider-effect execution → R10-D
+API/frontend journeys → R10-E
+historical migration/cutover/deletion → R10-F
+```
+
+No B4 microreviews and no independent Fable gate by default. Perform integrated research, alternatives, Global Maximum analysis, proof obligations and internal adversarial challenge; explain the architecture to the operator before acceptance. Whole-R10 independent review remains deferred until the integrated design is complete unless an exceptional material blocker requires earlier review.
 
 Current implementation is evidence only. Implementation remains **BLOCKED**.
