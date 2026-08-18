@@ -2,6 +2,7 @@
 
 > **Status:** ACTIVE / OPERATOR-APPROVED PRODUCT AUTHORITY  
 > **Accepted:** 2026-08-18  
+> **Product Contract revision:** **REV001** — 2026-08-18 — post-T5 independent-review bounded amendments  
 > **Revision-numbering amendment:** 2026-08-18 — **REV000 is initial issuance; REV001 is the first revision**  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
@@ -10,7 +11,7 @@
 
 This contract defines **what Launch V1 must do and mean before technical architecture resumes**. It intentionally contains no SQL, table layout, Go package design, provider-key design or storage topology.
 
-The operator accepted the written Product Contract on 2026-08-18 and later clarified the business revision convention on the same date: the initial issuance is `REV000`; `REV001` means the document has undergone its first revision. This page is the durable product authority.
+The operator accepted the written Product Contract on 2026-08-18, later clarified the business revision convention on the same date, and ratified two bounded product-completeness amendments after the post-T5 independent review: **document title is governed Revision metadata**, and an **active human-governed obsolescence request may be withdrawn before completion without changing the EFFECTIVE document**. This page is the durable product authority.
 
 Earlier R9.5/R10 decisions remain evidence. They cannot force a Launch capability or abstraction that this contract does not justify.
 
@@ -77,6 +78,8 @@ Launch has no generic workflow designer, low-code rule engine or custom-form pla
 
 Stable official identity across its lifetime, for example `PO-001 — Procedimento de Compras`. A Document is not a file and is not replaced when its content changes.
 
+The stable Document identity includes its stable code/identity. **The human-readable title is governed Revision metadata**, so a title change belongs to a business Revision rather than silently mutating the current official reader truth. While a newer Revision is DRAFT/SUBMITTED, ordinary readers continue seeing the title of the current EFFECTIVE Revision.
+
 ### Business Revision
 
 One governed issuance/change cycle. Numbering starts at zero:
@@ -89,6 +92,8 @@ REV002 = second revision
 ```
 
 Revision numbers never reuse. The ordinal therefore communicates revision count: `REV000` has not yet been revised; `REV001` has undergone one revision after initial issuance.
+
+A Revision owns the governed human-readable title for that issuance/change cycle together with the content/state it presents as official when EFFECTIVE.
 
 Lifecycle:
 
@@ -234,7 +239,7 @@ REV000 EFFECTIVE
 → REV001 DRAFT
 ```
 
-Readers continue seeing REV000 while REV001 is drafted/governed. Successful Release of REV001 changes:
+Readers continue seeing REV000 — including its governed title — while REV001 is drafted/governed. Successful Release of REV001 changes:
 
 ```text
 REV000 → SUPERSEDED
@@ -257,9 +262,10 @@ Rules:
 6. ordinary current-document search stops presenting it as active;
 7. authorized history remains available;
 8. an existing open replacement Revision must be cancelled/withdrawn/resolved before obsolescence can complete;
-9. reactivation of an OBSOLETE Document is not Launch scope.
+9. reactivation of an OBSOLETE Document is not Launch scope;
+10. while a **human-governed** obsolescence request is still active and incomplete, an authorized initiator/manager may withdraw that request; the target remains EFFECTIVE, no fake `RETURN_FOR_CHANGES` is fabricated, and a later retry is a new request/attempt.
 
-For a Document Type configured `NoHumanApproval`, governed obsolescence may complete with zero human Step after authorized initiation, mandatory reason and all eligibility/invariant checks; no fake System approver is created.
+For a Document Type configured `NoHumanApproval`, governed obsolescence may complete with zero human Step after authorized initiation, mandatory reason and all eligibility/invariant checks; no fake System approver is created. Because completion occurs synchronously, there is no live human-governed request window to withdraw.
 
 ### K. Search / read / download
 
@@ -292,6 +298,7 @@ roles / scoped access
 Document Types
 numbering
 Controlled Document + business Revision starting at REV000
+Revision-governed human-readable title
 DRAFT Working Content + autosave/concurrency
 Templates
 immutable Submission
@@ -301,7 +308,7 @@ Revision cancellation
 Approval evidence
 Release / EFFECTIVE / SUPERSEDED
 optional required Rendition
-explicit governed OBSOLETE flow
+explicit governed OBSOLETE flow + bounded withdrawal of active human-governed request
 revision/history view
 search/filter current effective content
 source/official representation read/download
@@ -347,6 +354,7 @@ Future capabilities create no dormant Launch module/table/permission/job.
 
 - Document ≠ Revision ≠ Working Draft ≠ Submission.
 - Revision ordinals start at `REV000` and never reuse; `REV001` is the first revision after initial issuance.
+- Document identity remains stable; human-readable title is governed Revision metadata.
 - One current EFFECTIVE revision; newer DRAFT/SUBMITTED may coexist.
 - Immutable Submission; return/resubmit creates another Submission.
 - One sequential governance Step model rather than Review/Approval engines.
@@ -364,7 +372,7 @@ Future capabilities create no dormant Launch module/table/permission/job.
 ### BOUNDED REOPEN / RESTRUCTURE
 
 - **Standalone Artifact semantic owner:** remove from Launch target. Exact-content facts belong to the semantic record that freezes them; shared byte storage is mechanism only.
-- **Obsolescence:** explicit governed product journey; `NoHumanApproval` may remove the human gate but never turns it into a raw status toggle.
+- **Obsolescence:** explicit governed product journey; `NoHumanApproval` may remove the human gate but never turns it into a raw status toggle. Active human-governed requests may be withdrawn before completion without changing the EFFECTIVE target.
 - **B5 Launch scope:** Dossier/Evidence leave Launch Core unless a named rollout consumer is produced before final ratification.
 - **B6 Governed Subject Export:** Future unless a concrete auditor/customer/portability obligation is named.
 - **Generic External Repository import/publish:** Future; Historical Migration remains a distinct go-live concern.
@@ -398,7 +406,7 @@ Reopen only on a named consumer, requirement or reachable production failure mod
 8. Cancelling a Revision ends that business change cycle without disturbing an older EFFECTIVE revision.
 9. Release is the only normal transition establishing a new EFFECTIVE revision.
 10. Replacement Release supersedes the prior EFFECTIVE revision as one product transition.
-11. Obsolescence without replacement is explicit, justified and governed.
+11. Obsolescence without replacement is explicit, justified and governed; an active human-governed request may be withdrawn before completion without changing current effectivity.
 12. EFFECTIVE/SUPERSEDED/OBSOLETE/CANCELLED are lifecycle facts, never physical delete commands.
 13. Templates create independent Documents.
 14. Search never grants access and never presents drafts as official to ordinary readers.
@@ -407,6 +415,7 @@ Reopen only on a named consumer, requirement or reachable production failure mod
 17. Storage/provider identity never becomes Document/Revision/Submission identity.
 18. Launch preserves governed history and has no governed physical disposition.
 19. Later capabilities must attach without duplicating Document/Revision/Submission authority.
+20. Human-readable title is Revision-governed metadata; a DRAFT/SUBMITTED retitle cannot rewrite the title ordinary readers see for the current EFFECTIVE revision.
 
 ---
 
@@ -428,7 +437,9 @@ Any renewed technical architecture must answer all scenarios without contradicto
 | First Release | establish REV000 as first EFFECTIVE truth |
 | First Revision | after REV000, create REV001; prior EFFECTIVE stays reader truth until successor Release |
 | Later Revision | increment ordinal monotonically without reuse |
+| Retitle | title change belongs to the new Revision; readers keep current EFFECTIVE title until Release |
 | Obsolete | governed withdrawal without successor |
+| Withdraw obsolescence request | active human-governed request ends without fake RETURN; target remains EFFECTIVE |
 | Search | ordinary discovery favors current EFFECTIVE |
 | View/download | content corresponds to intended governed version |
 | Offboarding | access ends; history remains truthful |
@@ -448,7 +459,7 @@ Launch is product-complete when a real company can:
 ```text
 configure controlled-document governance
 → create REV000 from blank/template
-→ author safely
+→ author safely, including governed title changes
 → submit exact content
 → govern it or return it
 → make REV000 effective as initial issuance
@@ -456,7 +467,7 @@ configure controlled-document governance
 → create REV001 as the first revision while REV000 stays effective
 → release successors without revision-number reuse
 → withdraw a Submission or cancel a change cycle correctly
-→ obsolete an effective Document without replacement
+→ obsolete an effective Document without replacement or withdraw an in-flight human-governed obsolescence request
 → inspect trustworthy lifecycle/audit history
 → migrate/restore without fabricating documentary truth
 ```
@@ -470,12 +481,14 @@ without Dossier, Evidence, Retention, Legal Hold, generic Change Control, govern
 This file is the accepted Launch V1 product authority. The active technical architecture is routed by `wiki/architecture/r10-technical-architecture.md`.
 
 ```text
-accepted Product Contract
+accepted Product Contract REV001
 → Whole-Product GCR / adjudication
 → approved 4+1 ownership
-→ T1 Semantic State & Invariants CLOSED
-→ T2 Governance, Effectivity & Lifecycle Transactions ACTIVE
-→ T3–T7
+→ T1→T5 CLOSED / OPERATOR-RATIFIED
+→ post-T5 Fable bounded amendments ratified
+→ post-T5 delta review checkpoint
+→ T6 only after checkpoint closure
+→ T7
 → Whole-R10 Global Coherence Review
 → cold independent review
 → final operator ratification
