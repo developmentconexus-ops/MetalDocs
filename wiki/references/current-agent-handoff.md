@@ -1,7 +1,7 @@
 # Current Agent Handoff
 
 > **Last verified:** 2026-08-18  
-> **Status:** ACTIVE — **T1 + T2 + T3 + DECISION REGISTRY OPERATOR-RATIFIED; T4 EXACT CONTENT / STORAGE / RESTORE ACTIVE**  
+> **Status:** ACTIVE — **T1 + T2 + T3 + DECISION REGISTRY OPERATOR-RATIFIED; T4 DECISIONS ACCEPTED / PLATFORM SUMMARY RATIFICATION NEXT**  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Implementation:** **BLOCKED — design/documentation only**
 
@@ -20,11 +20,12 @@ Read in this order:
 9. `wiki/architecture/r10-t3-authorization-audit-enforcement.md`
 10. `wiki/architecture/rebaseline-decision-registry.md`
 11. `wiki/architecture/r10-technical-architecture.md` — exact current router
-12. `docs/superpowers/analysis/2026-08-18-r10-t4-exact-content-storage-integrity-restore-candidate.md` — **ACTIVE NON-AUTHORITATIVE T4 CANDIDATE / OPERATOR ADJUDICATION NEXT**
-13. `wiki/architecture/launch-v1-scope-rebaseline.md` — narrow Records defer overlay
-14. old R3–R9.5 / R10-B1→B6/C only as evidence allowed by the registry
+12. `docs/superpowers/analysis/2026-08-18-r10-t4-exact-content-storage-integrity-restore-candidate.md` — **T4 ACCEPTED TECHNICAL CANDIDATE / NOT YET PROMOTED**
+13. `docs/superpowers/analysis/2026-08-18-r10-t4-operator-adjudication.md` — **T4-A→T4-O ACCEPTED / PLATFORM SUMMARY GATE**
+14. `wiki/architecture/launch-v1-scope-rebaseline.md` — narrow Records defer overlay
+15. old R3–R9.5 / R10-B1→B6/C only as evidence allowed by the registry
 
-`wiki/architecture/cohesive-platform-redesign.md` and `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md` are historical inventory/evidence, not current authority.
+Historical design files are evidence/provenance only and never override the authority chain above.
 
 ## Current checkpoint
 
@@ -36,7 +37,9 @@ T1 Semantic State & Invariants   = CLOSED / OPERATOR-RATIFIED
 T2 Governance/Effectivity/Tx     = CLOSED / OPERATOR-RATIFIED
 T3 Authorization & Audit         = CLOSED / OPERATOR-RATIFIED
 Decision Registry                = CURRENT / OPERATOR-RATIFIED
-T4 Exact Content/Storage/Restore = ACTIVE / NON-AUTHORITATIVE CANDIDATE
+T4 decisions A→O                 = OPERATOR-ADJUDICATED / ACCEPTED
+T4 platform summary              = OPERATOR RATIFICATION NEXT
+T4 promotion/closure             = PENDING SUMMARY RATIFICATION
 T5→T7                            = NOT OPEN
 implementation                   = BLOCKED
 ```
@@ -79,9 +82,7 @@ read registry
 
 ## Closed T3 headline
 
-Detailed authority:
-
-`wiki/architecture/r10-t3-authorization-audit-enforcement.md`
+Detailed authority: `wiki/architecture/r10-t3-authorization-audit-enforcement.md`.
 
 ```text
 six Launch roles / 15 Launch permissions
@@ -97,39 +98,48 @@ Company|Area historical Audit visibility
 future features never silently broaden existing role bundles
 ```
 
-## T4 baseline that MUST NOT be re-decided
+## Accepted T4 headline
 
 ```text
-no standalone Artifact semantic owner
-exact-content facts live with the semantic record that owns/freezes them
-storage/provider identity never becomes semantic identity
-WorkingContent = mutable DRAFT authority under T2 OCC
-Submission = immutable exact governed attempt
-OfficialRendition binds exact Submission
-provider calls never join local semantic transaction
-Object Lock/WORM/provider versioning never owns lifecycle
-restore with missing/corrupt required bytes is not healthy
+ExactContentDescriptor = SHA-256 + exact size + ContentFormat
+whole-Submission JCS/composite digest deferred absent named consumer
+managed_content_id = opaque retrieval mechanism only
+one provider-neutral ManagedContentStore / one active store per deployment
+Local dev/test/conformance + AWS S3 reference production profile
+OPEN→READY admission; server derives hash/size/format from exact bytes
+opaque admission binding blocks arbitrary/cross-root handle reuse
+production UNTRUSTED_EXTERNAL bytes require CLEAN before governed admission
+ClamAV/clamd reference scanner; no malware scan on every autosave
+create-once/no-overwrite; DRAFT replacement creates new handle
+WorkingContent current state is DRAFT recovery baseline; no mandatory WorkingSnapshot history
+SUBMIT/Rendition tx performs zero provider/scanner calls and freezes exact READY handle+descriptor
+only unreferenced/non-governed DRAFT mechanism objects are reclaimable in Launch
+backup couples DB recovery point + exact required-content manifest/copy + GC fence
+restore remains non-serving until every required handle matches size/SHA-256/format
+older restore reconciles later lawful UserProfile erasures via minimum independent barrier/journal
+future Evidence/Records/Export/Repository reuse descriptor+mechanism without Artifact owner
 ```
 
-## T4 official REOPEN set
+The product rationale accepted by the operator is that T4 is required to prove four Launch promises:
 
 ```text
-exact content descriptor/digest algorithm/canonicalization
-provider-neutral managed-content mechanism
-provider choice/profile/conformance
-staging/confirmation/admission
-malware policy/scan ordering
-immutable byte/no-overwrite enforcement
-mutable WorkingContent recovery
-backup/restore completeness + privacy non-resurrection
+what exact content was approved
+what exact content is officially effective
+that governed history did not silently change
+that backup/restore truly recovers semantic state + required exact content
 ```
-
-The active candidate currently recommends T4-A→T4-O. It preserves the useful old R10-C staging/no-overwrite/malware/restore findings while removing Artifact ownership.
 
 ## Exact next step
 
-Operator adjudication of T4 recommendations `T4-A→T4-O` in the active candidate.
+Present the mandatory **platform-facing T4 summary** and obtain explicit operator ratification.
 
-After technical adjudication, **do not open T5**. Present the mandatory platform-facing T4 summary and obtain explicit operator ratification first.
+Only after summary ratification:
 
-No final SQL/table/index design, package layout, async topology, public API/frontend contract, migration execution plan, implementation plan or product code is authorized.
+```text
+promote/close T4
+→ update Decision Registry
+→ remove completed T4 staging
+→ open T5 Durable Async, Search & External Effects
+```
+
+Do not open T5 or write final SQL/table/index design, package layout, async topology, public API/frontend contract, migration execution plan, implementation plan or product code.
