@@ -1,6 +1,6 @@
 # R10 Technical Architecture — Rebaselined Active Stage Authority
 
-> **Status:** ACTIVE — **T1 + T2 CLOSED / OPERATOR-RATIFIED; T3 AUTHORIZATION + AUDIT DISCOVERY ACTIVE; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1 + T2 CLOSED / OPERATOR-RATIFIED; DECISION RECONCILIATION GATE ACTIVE; T3 PAUSED; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-18  
 > **Revision convention:** **REV000 initial issuance / REV001 first revision**  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
@@ -12,7 +12,7 @@
 > **T2 authority:** `wiki/architecture/r10-t2-governance-effectivity-transactions.md`  
 > **Implementation gate:** **CLOSED — design/documentation only**
 
-This page is the active technical-stage authority after the Whole-Product rebaseline. It supersedes the former R10-A/B1–B6/C–F stage order as active routing. Old R10 artifacts remain evidence only where the current Product Contract, GCR, 4+1 ownership topology and accepted T-stage conclusions preserve them.
+This page is the active technical-stage authority after the Whole-Product rebaseline. It supersedes the former R10-A/B1–B6/C–F stage order as active routing. Old R10 artifacts remain evidence only where the current Product Contract, GCR, 4+1 ownership topology, accepted T-stage conclusions and the pending Decision Reconciliation preserve them.
 
 ---
 
@@ -25,6 +25,7 @@ accepted Product Contract
 + operator-adjudicated Whole-Product GCR
 + operator-approved 4+1 ownership topology
 + ratified T-stage conclusions
++ revalidated prior-decision baseline
 + known-future evolution law
 ```
 
@@ -43,6 +44,10 @@ Binding law:
 > **Defer the capability; preserve the evolution seam. Prepare the seam, not the dormant implementation.**
 
 Known future direction is a counterexample set, not permission to prebuild modules, tables, jobs, permissions or generic frameworks.
+
+Revalidation law accepted by the operator on 2026-08-18:
+
+> **Revalidation does not mean reinvention. Preserve a prior simple/coherent decision unless current authority or a concrete failure mode disproves it; rederive only the composite decision whose justification changed; defer only the capability that actually left Launch.**
 
 ---
 
@@ -80,7 +85,10 @@ Historical `Artifact`, separate `Approval`, `Distribution`, `Documentary Context
 ```text
 T1 — Semantic State & Invariants                              CLOSED / OPERATOR-RATIFIED
 T2 — Governance, Effectivity & Lifecycle Transactions        CLOSED / OPERATOR-RATIFIED
-T3 — Authorization & Audit Enforcement                       ACTIVE / DISCOVERY-DESIGN
+
+Decision Reconciliation Baseline                             ACTIVE GATE / OPERATOR REVIEW NEXT
+
+T3 — Authorization & Audit Enforcement                       PAUSED ON RECONCILIATION
 T4 — Exact Content, Storage Integrity & Restore              NOT OPEN
 T5 — Durable Async, Search & External Effects                NOT OPEN
 T6 — Canonical API / Frontend Journeys                       NOT OPEN
@@ -95,6 +103,8 @@ T7 — Historical Migration & Cutover                          NOT OPEN
 
 The sequence is by failure class and proof dependency, not by old module/context boundaries.
 
+The reconciliation gate was inserted because prior R3–R9.5/B1–B6 decisions contain a mixture of still-good primitives, superseded topology, future capabilities, and composite bundles whose rationale changed. T3–T7 must not either inherit all of that by sunk cost or rediscover good decisions from zero.
+
 ## 3.0 Mandatory T-stage closure protocol — OPERATOR-APPROVED
 
 For every `Tn`:
@@ -105,6 +115,7 @@ Tn candidate/design
 → platform-facing summary
 → explicit operator summary ratification
 → promote durable Tn conclusions
+→ update Decision Reconciliation Registry
 → remove completed staging
 → only then open Tn+1
 ```
@@ -384,16 +395,64 @@ T2 is durable architecture authority. Its completed staging is removed; Git hist
 
 ---
 
-# 6. T3 — Authorization & Audit Enforcement — ACTIVE / DISCOVERY-DESIGN
+# 6. Decision Reconciliation Baseline — ACTIVE GATE
+
+Active staging candidate:
+
+`docs/superpowers/analysis/2026-08-18-rebaseline-decision-reconciliation-candidate.md`
+
+Question:
+
+> **Which prior R3–R9.5 and old R10 decisions are still current, should be preserved, were refined, must be re-opened, are deliberately deferred, or are superseded after the Product/GCR/T1/T2 rebaseline?**
+
+The candidate uses the disposition vocabulary:
+
+```text
+CURRENT
+PRESERVE
+REFINED
+REOPEN
+DEFERRED
+SUPERSEDED
+```
+
+Its intended role after operator ratification is a durable cross-stage **disposition registry**, not a competing giant specification. Later T-stages consume CURRENT/PRESERVE/REFINED, explicitly design only their REOPEN set, preserve DEFERRED seams, and reject SUPERSEDED inheritance.
+
+This gate exists specifically to prevent two failure modes:
+
+```text
+sunk-cost inheritance of superseded legacy decisions
+and
+wasteful reinvention of simple decisions that remain correct
+```
+
+Current gate:
+
+```text
+Decision Reconciliation candidate
+→ operator adjudication
+→ promote durable registry
+→ remove reconciliation staging
+→ rebuild/resume T3 from registry
+```
+
+T3 is paused until this closes.
+
+---
+
+# 7. T3 — Authorization & Audit Enforcement — PAUSED ON RECONCILIATION
 
 T3 asks:
 
 > **Which current grants and domain predicates must permit each already-ratified Launch operation, at what Company/Area scope, and which operations require same-local-commit Audit evidence?**
 
+After the reconciliation gate closes, T3 must begin from the registry's surviving decisions — not from the old 5×43 catalog and not from an aesthetic zero-reset.
+
 Required derivation order:
 
 ```text
-accepted personas + T1/T2 journeys
+revalidated Authorization/Organization/Audit baseline
++ accepted personas + T1/T2 journeys
 → named operations
 → canonical resource owner/state predicates
 → scopes
@@ -405,45 +464,13 @@ accepted personas + T1/T2 journeys
 → minimum bounded Audit facts
 ```
 
-T3 must regenerate Launch Authorization **from zero**. The former exact `5×43` catalog is evidence/counterexample only and cannot be preserved by subtraction.
+T3 must include a least-privilege Auditor/Governance Viewer and prove no role/domain-governance bypass.
 
-T3 must prove at least:
-
-```text
-least-privilege Reader path
-Author / Document Owner path
-Reviewer / Approver path requiring both grant + active Step participation
-Governance Admin path
-least-privilege Auditor / Governance Viewer path
-no role/domain-governance bypass
-User/Group + Company/Area RoleAssignment semantics
-current grant re-evaluation at action time
-historical actor attribution after offboarding/profile erasure
-role-assignment administration without circular privilege
-same-local-commit Audit for required governed/security mutations
-Audit facts remain bounded/PII-minimized and never duplicate domain reasons/comments as authority
-```
-
-T3 does not own storage integrity (T4), Search/async (T5), public API/frontend composition (T6) or migration execution (T7).
-
-Current gate:
-
-```text
-T3 discovery/design
-→ compare credible access-model alternatives
-→ present T3 material design choices to operator
-→ operator adjudication
-→ platform-facing T3 summary
-→ explicit summary ratification
-→ promote/close T3
-→ T4
-```
-
-No T3 catalog is accepted merely because a prior role name existed.
+No T3 material-decision candidate is active while reconciliation remains open.
 
 ---
 
-# 7. T4–T7 routing
+# 8. T4–T7 routing
 
 ## T4 — Exact Content, Storage Integrity & Restore — NOT OPEN
 
@@ -463,7 +490,9 @@ Proves truthful native/imported handling, unknown preservation, ordinal/content 
 
 ---
 
-# 8. Old R10 evidence classification
+# 9. Old R10 evidence classification
+
+Until the Decision Reconciliation Registry is ratified, old material remains evidence only:
 
 ```text
 former R10-A 8+3                  → SUPERSEDED FOR LAUNCH
@@ -477,26 +506,28 @@ former R10-C                      → paused physical-safety evidence only; Arti
 former R10-D/E/F                   → old stage labels superseded by T5/T6/T7
 ```
 
-Do not repair old candidate files into the target. Extract only surviving evidence into the active T-stage.
+Do not repair old candidate files into the target. Reconcile their decisions through the active registry candidate.
 
 ---
 
-# 9. Proof and review discipline
+# 10. Proof and review discipline
 
 Each T-stage must include:
 
 1. authority/evidence boundary;
-2. Known / Inferred / Unknown / Deferred;
-3. root cause and target invariant;
-4. credible alternatives;
-5. smallest sustainable decision;
-6. named future-horizon attack;
-7. proof strategy before implementation;
-8. reopen triggers;
-9. explicit non-decisions;
-10. material decision adjudication gate;
-11. operator-facing platform summary;
-12. explicit summary ratification before next-stage opening.
+2. Decision Registry baseline + explicit REOPEN set;
+3. Known / Inferred / Unknown / Deferred;
+4. root cause and target invariant;
+5. credible alternatives;
+6. smallest sustainable decision;
+7. named future-horizon attack;
+8. proof strategy before implementation;
+9. reopen triggers;
+10. explicit non-decisions;
+11. material decision adjudication gate;
+12. operator-facing platform summary;
+13. explicit summary ratification before next-stage opening;
+14. registry update on closure.
 
 After T7:
 
