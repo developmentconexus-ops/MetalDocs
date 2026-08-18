@@ -1,7 +1,7 @@
 # Current Agent Handoff
 
 > **Last verified:** 2026-08-18  
-> **Status:** ACTIVE — **T1 + T2 + T3 + DECISION REGISTRY OPERATOR-RATIFIED; T4 DECISIONS ACCEPTED / PLATFORM SUMMARY RATIFICATION NEXT**  
+> **Status:** ACTIVE — **T1 + T2 + T3 + T4 + DECISION REGISTRY OPERATOR-RATIFIED; T5 DURABLE ASYNC / SEARCH / EXTERNAL EFFECTS ACTIVE**  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Implementation:** **BLOCKED — design/documentation only**
 
@@ -18,14 +18,12 @@ Read in this order:
 7. `wiki/architecture/r10-t1-semantic-state-invariants.md`
 8. `wiki/architecture/r10-t2-governance-effectivity-transactions.md`
 9. `wiki/architecture/r10-t3-authorization-audit-enforcement.md`
-10. `wiki/architecture/rebaseline-decision-registry.md`
-11. `wiki/architecture/r10-technical-architecture.md` — exact current router
-12. `docs/superpowers/analysis/2026-08-18-r10-t4-exact-content-storage-integrity-restore-candidate.md` — **T4 ACCEPTED TECHNICAL CANDIDATE / NOT YET PROMOTED**
-13. `docs/superpowers/analysis/2026-08-18-r10-t4-operator-adjudication.md` — **T4-A→T4-O ACCEPTED / PLATFORM SUMMARY GATE**
-14. `wiki/architecture/launch-v1-scope-rebaseline.md` — narrow Records defer overlay
-15. old R3–R9.5 / R10-B1→B6/C only as evidence allowed by the registry
-
-Historical design files are evidence/provenance only and never override the authority chain above.
+10. `wiki/architecture/r10-t4-exact-content-storage-integrity-restore.md`
+11. `wiki/architecture/rebaseline-decision-registry.md`
+12. `wiki/architecture/r10-technical-architecture.md`
+13. `docs/superpowers/analysis/2026-08-18-r10-t5-durable-async-search-external-effects-candidate.md` — **ACTIVE NON-AUTHORITATIVE T5 CANDIDATE / OPERATOR ADJUDICATION NEXT**
+14. `wiki/architecture/launch-v1-scope-rebaseline.md`
+15. old R3–R9.5 / R10-B1→B6/C and current implementation only as evidence allowed by the registry
 
 ## Current checkpoint
 
@@ -36,110 +34,96 @@ Launch ownership topology        = CLOSED / APPROVED / 4+1
 T1 Semantic State & Invariants   = CLOSED / OPERATOR-RATIFIED
 T2 Governance/Effectivity/Tx     = CLOSED / OPERATOR-RATIFIED
 T3 Authorization & Audit         = CLOSED / OPERATOR-RATIFIED
+T4 Exact Content/Storage/Restore = CLOSED / OPERATOR-RATIFIED
 Decision Registry                = CURRENT / OPERATOR-RATIFIED
-T4 decisions A→O                 = OPERATOR-ADJUDICATED / ACCEPTED
-T4 platform summary              = OPERATOR RATIFICATION NEXT
-T4 promotion/closure             = PENDING SUMMARY RATIFICATION
-T5→T7                            = NOT OPEN
+T5 Durable Async/Search/Effects  = ACTIVE / NON-AUTHORITATIVE CANDIDATE
+T6→T7                            = NOT OPEN
 implementation                   = BLOCKED
 ```
 
-## Revision convention
+## Binding laws
 
 ```text
 REV000 = initial issuance
 REV001 = first revision
-REV002 = second revision
-...
 ```
 
-## Revalidation law
+> **Defer the capability; preserve the evolution seam. Prepare the seam, not the dormant implementation.**
 
 > **Revalidation does not mean reinvention. Preserve a prior simple/coherent decision unless current authority or a concrete failure mode disproves it; rederive only the composite decision whose justification changed; defer only the capability that actually left Launch.**
 
-Every remaining T-stage begins from the Decision Registry:
-
-```text
-CURRENT / PRESERVE / REFINED → baseline
-REOPEN                       → design deliberately in owning T-stage
-DEFERRED                     → future seam/counterexample only
-SUPERSEDED                   → forbidden inheritance absent new material reopen
-```
-
-## Mandatory T-stage closure protocol
+## Mandatory stage gate
 
 ```text
 read registry
-→ design Tn REOPEN set
+→ design only Tn REOPEN set
 → operator adjudication
-→ platform-facing Tn summary
+→ platform-facing summary
 → explicit operator summary ratification
 → promote/close Tn
 → update registry
-→ remove completed staging
+→ remove staging
 → only then Tn+1
 ```
 
-## Closed T3 headline
+## Closed T4 headline
 
-Detailed authority: `wiki/architecture/r10-t3-authorization-audit-enforcement.md`.
+Detailed authority:
 
-```text
-six Launch roles / 15 Launch permissions
-RoleAssignment subject = User | Group
-accepted Company|Area scope matrix
-organization.manage vs access.manage administration split
-responsible-owner / document.owner.manage authoring predicate
-governance.act + exact active-Step participation
-atomic offboarding + no silent access resurrection
-security-action/offboarding User-eligibility serialization
-same-local-commit Audit census + PII-minimized facts
-Company|Area historical Audit visibility
-future features never silently broaden existing role bundles
-```
-
-## Accepted T4 headline
+`wiki/architecture/r10-t4-exact-content-storage-integrity-restore.md`
 
 ```text
 ExactContentDescriptor = SHA-256 + exact size + ContentFormat
-whole-Submission JCS/composite digest deferred absent named consumer
-managed_content_id = opaque retrieval mechanism only
-one provider-neutral ManagedContentStore / one active store per deployment
-Local dev/test/conformance + AWS S3 reference production profile
-OPEN→READY admission; server derives hash/size/format from exact bytes
-opaque admission binding blocks arbitrary/cross-root handle reuse
-production UNTRUSTED_EXTERNAL bytes require CLEAN before governed admission
-ClamAV/clamd reference scanner; no malware scan on every autosave
-create-once/no-overwrite; DRAFT replacement creates new handle
-WorkingContent current state is DRAFT recovery baseline; no mandatory WorkingSnapshot history
-SUBMIT/Rendition tx performs zero provider/scanner calls and freezes exact READY handle+descriptor
-only unreferenced/non-governed DRAFT mechanism objects are reclaimable in Launch
-backup couples DB recovery point + exact required-content manifest/copy + GC fence
-restore remains non-serving until every required handle matches size/SHA-256/format
-older restore reconciles later lawful UserProfile erasures via minimum independent barrier/journal
-future Evidence/Records/Export/Repository reuse descriptor+mechanism without Artifact owner
+no mandatory whole-Submission JCS digest
+opaque managed-content handle is mechanism only
+one provider-neutral ManagedContentStore / one active store
+Local dev/test/conformance + AWS S3 reference production
+OPEN→READY server-verified admission
+opaque admission binding
+UNTRUSTED_EXTERNAL CLEAN malware gate at governed boundary
+create-once/no-overwrite
+WorkingContent = DRAFT recovery baseline
+SUBMIT/Rendition semantic tx makes zero provider/scanner calls
+only non-governed unreferenced content reclaimable
+backup = DB recovery point + exact required-content set + GC exclusion
+restore exact-content fail-closed readiness
+post-snapshot UserProfile erasure reconciliation before serving restored profile data
 ```
 
-The product rationale accepted by the operator is that T4 is required to prove four Launch promises:
+## T5 official REOPEN set
 
 ```text
-what exact content was approved
-what exact content is officially effective
-that governed history did not silently change
-that backup/restore truly recovers semantic state + required exact content
+which effects actually require durable intent/outbox
+worker/lease/retry/DLQ mechanism
+renderer execution
+notifications if a Launch consumer remains
+Search projection/rebuild/freshness/reconciliation
+provider effect receipts where needed
+```
+
+The active candidate currently recommends T5-A→T5-P. Headline:
+
+```text
+one Postgres-backed durable-job runtime; River retained as selected/reference mechanism
+mandatory durable jobs = official_rendition_render + search_refresh
+GC = periodic reconciliation over durable GC_PENDING, not per-handle outbox
+required jobs transactionally enqueue with semantic transition
+Rendition render outside tx; final T4 admission + semantic Rendition/Release revalidation inside local tx
+Search = PostgreSQL rebuildable projection keyed by Document
+search_refresh(document_id) reloads latest canonical state so duplicate/out-of-order jobs are harmless
+Search may lag by omission but stale hit never grants access/effectivity
+full Search rebuild required; permanent reconciliation crawler not baseline
+no Launch notifications/inbox/fanout/event bus
+no mandatory durable external IdP-disable job
+jobs = at-least-once, idempotent, bounded-retry, fail-loud, terminal-visible
+no generic ExternalEffectReceipt family
+minimal async health/backlog/retry/failure observability required
 ```
 
 ## Exact next step
 
-Present the mandatory **platform-facing T4 summary** and obtain explicit operator ratification.
+Operator adjudication of T5 recommendations `T5-A→T5-P`.
 
-Only after summary ratification:
+After technical adjudication, **do not open T6**. Present the mandatory platform-facing T5 summary and obtain explicit operator ratification first.
 
-```text
-promote/close T4
-→ update Decision Registry
-→ remove completed T4 staging
-→ open T5 Durable Async, Search & External Effects
-```
-
-Do not open T5 or write final SQL/table/index design, package layout, async topology, public API/frontend contract, migration execution plan, implementation plan or product code.
+No final SQL/index/package/process topology, public API/frontend contract, migration execution plan, implementation plan or product code is authorized.
