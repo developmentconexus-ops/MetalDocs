@@ -2,6 +2,7 @@
 
 > **Status:** ACTIVE / OPERATOR-RATIFIED TECHNICAL AUTHORITY  
 > **Ratified:** 2026-08-18  
+> **Post-T5 Fable bounded amendment:** 2026-08-18 — obsolescence-withdraw AuthZ + provider-disable alignment  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Decision baseline:** `wiki/architecture/rebaseline-decision-registry.md`  
@@ -9,7 +10,7 @@
 > **T2 authority:** `wiki/architecture/r10-t2-governance-effectivity-transactions.md`  
 > **Implementation:** BLOCKED
 
-This page records the operator-ratified T3 architecture. T3 defines Launch Authorization and semantic Audit enforcement over the already-ratified Organization, Controlled Documents and lifecycle model. It does not define final SQL/index syntax, package layout, API routes, frontend screens, storage, worker topology or migration execution.
+This page records the operator-ratified T3 architecture plus bounded completeness amendments ratified through the post-T5 independent-review checkpoint. T3 defines Launch Authorization and semantic Audit enforcement over the already-ratified Organization, Controlled Documents and lifecycle model. It does not define final SQL/index syntax, package layout, API routes, frontend screens, storage, worker topology or migration execution.
 
 The operator accepted T3-A→T3-P and explicitly ratified the platform-facing T3 summary on 2026-08-18.
 
@@ -128,7 +129,7 @@ No dormant Launch permission is created for Distribution, Periodic Review, Dossi
 
 ### Bounded non-permission operations
 
-No separate `document.withdraw` is required in Launch. Withdraw is permitted through:
+No separate `document.withdraw` is required in Launch. Submission withdraw is permitted through:
 
 ```text
 document.submit
@@ -145,7 +146,7 @@ document.edit
 + T2 next-Revision eligibility
 ```
 
-No separate `session.manage` permission exists because Launch has no standalone session-administrator journey; required session revocation is part of the governed User offboarding operation.
+No separate session-administration permission exists because Launch has no standalone session-administrator journey; required session revocation is part of the governed User offboarding operation and restore readiness may invalidate restored sessions structurally under T4.
 
 Current governance route and representation configuration are DocumentType configuration under `document_type.manage`; no separate Approval-policy permission family exists.
 
@@ -364,6 +365,8 @@ document.cancel_revision
 
 ### Obsolescence
 
+Initiate/complete under the existing permission:
+
 ```text
 document.obsolete
 + matching scope
@@ -374,6 +377,23 @@ document.obsolete
 + T2 governance mode/route
 → initiate/complete governed obsolescence
 ```
+
+Withdraw an active **human-governed** obsolescence request:
+
+```text
+document.obsolete
++ matching scope
++ active pre-completion obsolescence request
++ (
+    actor is the request initiator
+    OR actor also has document.owner.manage in scope
+  )
++ T2 withdrawal eligibility
+→ terminate request as WITHDRAWN
+→ current target remains EFFECTIVE
+```
+
+This creates no fake participant `RETURN_FOR_CHANGES` decision. `NoHumanApproval` obsolescence completes synchronously and therefore has no live request window to withdraw.
 
 ### Change responsible owner
 
@@ -412,13 +432,14 @@ revoke all live ApplicationSessions
 remove all current GroupMemberships for User
 remove all direct User RoleAssignments
 append required Audit evidence for access teardown + offboarding
-insert durable provider-disable intent only if a provider-side effect is required
 COMMIT
 ```
 
 `ProviderSubjectBinding` remains where needed because provider-subject→User historical correlation remains truthful after employment/access ends.
 
 Group RoleAssignments remain because they belong to the Group; removing membership removes the offboarded User's inherited access.
+
+**T5-L is the baseline for provider-side disable:** MetalDocs access correctness does not require a durable IdP-disable job. If a future assurance requirement explicitly makes provider-state convergence mandatory, that same offboarding transaction may insert the smallest named durable provider-disable intent under T5's transaction-coupled-job rules. No generic identity-sync engine is implied.
 
 Re-enable changes User eligibility and appends required Audit, but never resurrects:
 
@@ -459,6 +480,8 @@ Submission / withdraw / cancel / obsolescence user mutations
 ```
 
 T3 does not claim magical cancellation of already committed/linearized work or ordinary reads that completed authorization before offboarding linearized.
+
+Historical restore is a separate readiness boundary: T4 requires restored sessions to be invalidated and post-snapshot security teardown to be reconciled before ordinary serving resumes.
 
 ---
 
@@ -580,6 +603,7 @@ Revision cancelled
 OfficialRendition semantic completion when a required record is established
 Release completed
 obsolescence requested
+obsolescence withdrawn
 obsolescence completed
 ```
 
@@ -705,6 +729,7 @@ Audit export
 cryptographic tamper-evidence/global anchoring
 finite Audit retention/pruning
 standalone session administration
+mandatory provider-side identity convergence for assurance
 mandatory last-admin product invariant beyond bootstrap/ops recovery
 ```
 
