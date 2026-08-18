@@ -2,6 +2,7 @@
 
 > **Status:** ACTIVE / OPERATOR-RATIFIED TECHNICAL AUTHORITY  
 > **Ratified:** 2026-08-18  
+> **Post-T5 Fable bounded amendment:** 2026-08-18 — restore security non-resurrection + admission-claim GC liveness  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Decision baseline:** `wiki/architecture/rebaseline-decision-registry.md`  
@@ -10,7 +11,7 @@
 > **T3 authority:** `wiki/architecture/r10-t3-authorization-audit-enforcement.md`  
 > **Implementation:** BLOCKED
 
-This page records the operator-ratified T4 architecture. T4 defines how MetalDocs proves, retrieves and restores the exact content owned/frozen by WorkingContent, Submission, OfficialRendition and later imported-history facts while storage remains replaceable mechanism.
+This page records the operator-ratified T4 architecture plus bounded completeness amendments ratified through the post-T5 independent-review checkpoint. T4 defines how MetalDocs proves, retrieves and restores the exact content owned/frozen by WorkingContent, Submission, OfficialRendition and later imported-history facts while storage remains replaceable mechanism.
 
 The operator accepted T4-A→T4-O and explicitly ratified the platform-facing T4 summary on 2026-08-18 after a dedicated comprehension check proving why exact-content identity is essential to a controlled-document product rather than overengineering.
 
@@ -24,10 +25,10 @@ T4 exists to make four Launch claims falsifiable:
 1. “You approved this exact content.”
 2. “This is the exact official content now in effect.”
 3. “Governed history did not silently change underneath its business identity.”
-4. “Backup/restore truly recovers both semantic state and the exact required content.”
+4. “Backup/restore truly recovers both semantic state and the exact required content without silently resurrecting later-invalid access/privacy state.”
 ```
 
-The minimum architecture is therefore about proving exact governed content, not building a generic byte-management/content platform.
+The minimum architecture is therefore about proving exact governed content and safe restore readiness, not building a generic byte-management/content/security-recovery platform.
 
 ---
 
@@ -46,6 +47,7 @@ provider/external calls never join local semantic transaction
 Object Lock/WORM/provider versioning never becomes lifecycle authority
 restore with missing/corrupt required bytes is not healthy
 restore must not silently resurrect lawfully erased UserProfile PII
+restore must not silently reactivate restored ApplicationSessions or known post-snapshot access teardown
 ```
 
 T4 must not be used to resurrect:
@@ -59,6 +61,7 @@ content-addressed semantic entity identity
 confirmed orphan Artifact library
 multi-cloud/BYOS/active-active product platform
 confirmed-governed-content delete/disposition Launch API
+generic per-grant security teardown journal/platform
 ```
 
 ---
@@ -223,11 +226,13 @@ Knowing a handle UUID never authorizes attaching it to an arbitrary semantic ope
 
 ```text
 managed-content allocation
-→ server binds handle to intended operation/root through an opaque unforgeable binding
+→ server binds handle to intended operation/root through an opaque unforgeable binding/claim
 → owning use case must re-prove that binding before attachment
 ```
 
 The mechanism does not parse or own Document/Revision/Submission semantics. No generic `owner_type/owner_id` registry is introduced.
+
+A **live admission claim/binding reserved for an in-flight attachment** protects that READY handle from GC eligibility until the claim is consumed, explicitly released or reaches a bounded mechanism expiry. The claim is technical liveness/authorization state, not business ownership or retention.
 
 Legitimate cross-root copy/template seeding creates a new authorized handle. Same-Revision unchanged resubmission may reuse the already-authorized handle.
 
@@ -342,9 +347,9 @@ preflight malware scan when required
 
 No provider/scanner call occurs inside the semantic transaction.
 
-Rollback creates no Submission truth even when provider upload already succeeded. The READY handle remains retry/reclaim mechanism state.
+Rollback creates no Submission truth even when provider upload already succeeded. The READY handle remains retry/reclaim mechanism state once any live admission claim is released/expires.
 
-Required OfficialRendition uses the same pattern: rendering happens outside the semantic transaction; final admission revalidates exact READY content and creates the semantic Rendition fact.
+Required OfficialRendition uses the same pattern: rendering happens outside the semantic transaction; final admission revalidates exact READY content and creates the semantic Rendition fact only if the exact Submission remains eligible under T2/T5.
 
 T7 Historical Migration uses the same admission seam for untrusted imported exact content.
 
@@ -363,14 +368,15 @@ BEGIN
 lock mechanism object
 prove not current WorkingContent
 prove no immutable Submission/Rendition/imported fact references handle
+prove no live admission claim/binding reserves handle for an in-flight attachment
+prove no backup exclusion/pin protects handle
 mark GC_PENDING
-record cleanup intent only if T5 proves durable async cleanup is required
 COMMIT
 ```
 
 Physical delete is outside the semantic transaction and T5 owns worker/retry mechanics.
 
-Immediately before provider delete, execution must re-read/re-prove `GC_PENDING` and absence of semantic/live references.
+Immediately before provider delete, execution must re-read/re-prove `GC_PENDING` and absence of semantic/live references, live admission claims/bindings and backup protection.
 
 Provider age/listing alone never authorizes deletion.
 
@@ -404,11 +410,13 @@ The backup manifest is recovery/operations metadata, never semantic product auth
 
 An in-progress backup must prevent selected live DRAFT content from becoming physically reclaimable before capture completes through a bounded backup pin/lease or equivalent GC exclusion. This is not business retention.
 
+Because the selected durable-job mechanism stores required job intents in the same PostgreSQL product-state database, a DB recovery point is transactionally coherent between semantic facts and the durable intents committed with them: pre-snapshot semantic requirements and their intents restore together; post-snapshot facts and their intents are both absent. Restored pending work may re-run under T5 idempotency. A future move to a separate job substrate must re-prove this recovery coherence rather than assume it.
+
 Provider-native backup/snapshot mechanisms may satisfy the contract if they prove the same complete set and descriptor integrity.
 
 ---
 
-## 15. Restore exact-content readiness — T4-M
+## 15. Restore exact-content and session readiness — T4-M
 
 A restored deployment remains non-serving until every required semantic content reference proves:
 
@@ -433,15 +441,24 @@ serving = BLOCKED
 
 Do not silently drop history, substitute another provider object or recalculate semantic truth from whatever bytes happen to be present.
 
+**All ApplicationSessions restored from the recovery point are invalidated before ordinary serving resumes.** A user must establish a fresh post-restore session. Restore never treats a historical session row/token as proof of current authentication eligibility.
+
 ---
 
-## 16. Privacy non-resurrection restore barrier — T4-N
+## 16. Privacy + security non-resurrection restore barrier — T4-N
 
-Byte integrity alone is insufficient for a historical restore.
+Byte integrity and session invalidation are necessary but insufficient for a historical restore.
 
-A restored recovery point may not enter serving mode until lawful `UserProfile` erasures known after that recovery point have been reconciled.
+A restored recovery point may not enter ordinary authenticated serving mode until:
 
-Acceptable bounded shapes:
+```text
+lawful UserProfile erasures known after the recovery point are reconciled
+AND
+required known post-snapshot User offboardings / access teardown / security revocations
+have been reconciled or otherwise proven safe for the restored serving state
+```
+
+Acceptable privacy shapes remain bounded:
 
 ```text
 restore point at/after latest independently known erasure barrier
@@ -449,9 +466,13 @@ OR
 replay/apply post-snapshot erasure facts from an independently retained recovery journal/control-plane source
 ```
 
-If completeness of that barrier/journal cannot be proven, restored human-readable profile data fails closed for serving.
+For security teardown, T4 freezes the **readiness invariant**, not a generic journal design. T7/operations must choose the smallest recovery evidence/choreography that can prove and reapply the required post-snapshot offboardings/revocations for the chosen recovery model. This may reuse an independently retained control-plane/recovery source where appropriate; T4 does not require journaling every grant mutation as a new product subsystem.
 
-This is a narrow restore-safety mechanism, not a generic privacy workflow and not a reason to introduce mandatory per-user/application encryption.
+If the chosen recovery proof cannot establish a safe current access state, ordinary authenticated serving remains fail-closed until reconciliation is completed. Non-serving recovery/maintenance operations may continue through an explicit operations trust surface; they do not become ordinary product access.
+
+If completeness of the privacy erasure barrier/journal cannot be proven, restored human-readable profile data also fails closed for serving.
+
+This is a narrow restore-safety mechanism, not a generic privacy/security workflow and not a reason to introduce mandatory per-user/application encryption.
 
 T7/operations own concrete restore/cutover choreography; T4 owns the readiness invariant.
 
@@ -492,8 +513,11 @@ ContentFormat            → governed format/view/render behavior
 opaque handle            → retrieve bytes without provider identity becoming domain identity
 create-once/no-overwrite → stable hash/malware/Submission exactness
 OPEN→READY               → provider upload success is not semantic admission
+admission binding        → authorize in-flight attachment without generic owner registry
 malware gate             → untrusted bytes cannot become governed truth unsafely
 restore verification     → Product Contract backup/restore correctness
+session invalidation     → historical restore cannot reactivate bearer access
+security reconciliation  → restored old access state cannot silently become current truth
 ```
 
 Explicitly absent/deferred because no current consumer proves them:
@@ -508,6 +532,7 @@ quarantine/CDR/rescan platform
 PKI/signature infrastructure
 confirmed governed-content delete/disposition Launch API
 generic privacy-case platform/per-user crypto-erasure machinery
+generic per-grant security teardown journal
 ```
 
 ---
@@ -527,13 +552,17 @@ malware result applies to the exact immutable bytes later referenced
 scanner failure cannot silently weaken production admission
 SUBMIT rollback creates no semantic Submission despite successful prior upload
 guessed handle cannot be attached to another root/operation
+live admission claim/binding protects an in-flight READY handle from GC until bounded consume/release/expiry
 WorkingContent OCC remains sole DRAFT race arbiter
 GC cannot delete current WorkingContent or immutable governed content
-stale cleanup intent cannot delete after eligibility/reference changes
+stale cleanup intent cannot delete after eligibility/reference/claim changes
 backup captures exact content required by its DB recovery point
 backup/GC race cannot lose selected DRAFT content before capture
+same-DB restore preserves coherence between committed semantic requirements and transaction-coupled durable intents
 restore missing/corrupt required content fails closed
+all restored ApplicationSessions are invalid before ordinary serving
 historical restore cannot serve erased UserProfile PII without erasure reconciliation
+historical restore cannot silently re-enable known post-snapshot offboarded/revoked access state
 provider Object Lock/Versioning/checksum never becomes semantic authority
 ```
 
@@ -554,6 +583,7 @@ Search technology
 public upload/download API
 frontend editor/viewer UX
 Historical Migration batch/cutover implementation
+exact recovery evidence/source for post-snapshot security teardown
 future Records disposition/WORM policy
 multi-store routing/BYOS/active-active
 ```
@@ -575,6 +605,7 @@ DRAFT recovery needs user-visible checkpoint/undo history
 signature/non-repudiation needs canonical whole-Submission digest
 backup provider cannot satisfy exact-content capture/GC exclusion economically
 privacy/legal requirements demand stronger erasure than restore reconciliation
+the selected recovery model cannot prove post-snapshot access teardown without a stronger dedicated mechanism
 ```
 
 Implementation remains **BLOCKED** until the remaining R10 stages, integrated GCR, cold review and final operator ratification close.
