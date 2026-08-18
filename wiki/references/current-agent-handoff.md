@@ -1,7 +1,7 @@
 # Current Agent Handoff
 
 > **Last verified:** 2026-08-18  
-> **Status:** ACTIVE — **T1 + T2 CLOSED / OPERATOR-RATIFIED; DECISION RECONCILIATION ACTIVE; T3 PAUSED**  
+> **Status:** ACTIVE — **T1 + T2 + DECISION REGISTRY OPERATOR-RATIFIED; T3 AUTHORIZATION + AUDIT ACTIVE**  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Implementation:** **BLOCKED — design/documentation only**
 
@@ -12,221 +12,114 @@ Read in this order:
 1. `AGENTS.md`
 2. `docs/engineering/standards/root-cause-global-maximum-method.md`
 3. this file
-4. `wiki/architecture/launch-v1-product-contract.md` — **ACCEPTED PRODUCT AUTHORITY; REV000 INITIAL / REV001 FIRST REVISION**
-5. `wiki/architecture/whole-product-alignment-review.md` — **OPERATOR-ADJUDICATED GCR A1–A10**
-6. `wiki/architecture/launch-v1-ownership-topology.md` — **OPERATOR-APPROVED 4+1 OWNERSHIP + FUTURE-EVOLUTION LAW**
-7. `wiki/architecture/r10-technical-architecture.md` — **ACTIVE T1→T7 ROUTER; T1 + T2 CLOSED / RECONCILIATION GATE ACTIVE / T3 PAUSED**
-8. `wiki/architecture/r10-t2-governance-effectivity-transactions.md` — **OPERATOR-RATIFIED T2 AUTHORITY**
-9. `docs/superpowers/analysis/2026-08-18-rebaseline-decision-reconciliation-candidate.md` — **ACTIVE NON-AUTHORITATIVE DECISION RECONCILIATION / OPERATOR REVIEW NEXT**
-10. `wiki/architecture/launch-v1-scope-rebaseline.md` — narrow Records-Governance defer overlay
-11. prior cohesive/R9.5/R10 B1–B6/C material only as evidence used by the reconciliation candidate
+4. `wiki/architecture/launch-v1-product-contract.md`
+5. `wiki/architecture/whole-product-alignment-review.md`
+6. `wiki/architecture/launch-v1-ownership-topology.md`
+7. `wiki/architecture/r10-t1-semantic-state-invariants.md`
+8. `wiki/architecture/r10-t2-governance-effectivity-transactions.md`
+9. `wiki/architecture/rebaseline-decision-registry.md` — **RATIFIED PRIOR-DECISION DISPOSITION BASELINE**
+10. `wiki/architecture/r10-technical-architecture.md` — active technical-stage router
+11. active T3 staging candidate
+12. `wiki/architecture/launch-v1-scope-rebaseline.md` — narrow Records defer overlay
+13. old R3–R9.5 / R10-B1→B6/C only as evidence allowed by the registry
 
-`wiki/architecture/cohesive-platform-redesign.md` and `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md` are historical/prior-decision evidence, not current target authority.
-
-Git history and current runtime/schema/OpenAPI remain evidence, not automatic target authority.
-
----
+`wiki/architecture/cohesive-platform-redesign.md` and `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md` are historical inventory/evidence, not current authority.
 
 ## Current checkpoint
 
 ```text
-Product Contract                 = ACCEPTED / PROMOTED / REV000 INITIAL
+Product Contract                 = ACCEPTED / REV000 INITIAL
 Whole-Product GCR A1–A10         = ACCEPTED
 Launch ownership topology        = CLOSED / APPROVED / 4+1
-T1→T7 technical decomposition    = CLOSED / APPROVED
-T1 Semantic State & Invariants   = CLOSED / OPERATOR-RATIFIED / PROMOTED
-T2 Governance/Effectivity/Tx     = CLOSED / OPERATOR-RATIFIED / PROMOTED
-Decision Reconciliation          = ACTIVE NON-AUTHORITATIVE CANDIDATE
-T3 Authorization & Audit         = PAUSED ON RECONCILIATION
+T1 Semantic State & Invariants   = CLOSED / OPERATOR-RATIFIED
+T2 Governance/Effectivity/Tx     = CLOSED / OPERATOR-RATIFIED
+Decision Registry                = CLOSED / OPERATOR-RATIFIED
+T3 Authorization & Audit         = ACTIVE / NON-AUTHORITATIVE DESIGN CANDIDATE
 T4→T7                            = NOT OPEN
-old R10-A 8+3                    = SUPERSEDED FOR LAUNCH
-old R10-B1→B6                    = EVIDENCE ONLY UNTIL RECONCILED
-old R10-C                        = PAUSED HISTORICAL CANDIDATE / DO NOT REPAIR
 implementation                   = BLOCKED
 ```
 
-Completed T1/T2 staging is removed from the live tree after durable promotion; Git history is the archive.
-
-A premature T3 candidate created before the reconciliation gate is removed from the live staging tree and must be rebuilt from the operator-ratified registry rather than repaired in place.
-
----
-
-## Revalidation law — operator explicit
-
-> **Revalidation does not mean reinvention. Preserve a prior simple/coherent decision unless current authority or a concrete failure mode disproves it; rederive only the composite decision whose justification changed; defer only the capability that actually left Launch.**
-
-Purpose:
-
-```text
-avoid carrying legacy/sunk-cost decisions after scope/topology changes
-+
-avoid re-deciding simple choices that remain correct
-```
-
-The active reconciliation candidate classifies prior decisions as:
-
-```text
-CURRENT
-PRESERVE
-REFINED
-REOPEN
-DEFERRED
-SUPERSEDED
-```
-
-If ratified, it becomes a durable cross-stage disposition registry. T3–T7 must then:
-
-```text
-consume CURRENT/PRESERVE/REFINED
-explicitly design only their REOPEN set
-preserve DEFERRED future seams
-reject SUPERSEDED inheritance
-```
-
----
-
-## Mandatory T-stage comprehension gate
-
-For every `Tn`:
-
-```text
-Tn candidate/design
-→ material decision adjudication
-→ assistant presents platform-facing summary
-→ explicit operator approval of that summary
-→ promote/close Tn
-→ update Decision Reconciliation Registry
-→ only then open Tn+1
-```
-
-A technical recommendation approval alone does not open the next stage.
-
----
-
-## Revision numbering
-
-Binding product convention:
+## Revision convention
 
 ```text
 REV000 = initial issuance
-REV001 = first revision after initial issuance
+REV001 = first revision
 REV002 = second revision
 ...
 ```
 
-Initial creation creates `REV000 DRAFT`; first Release makes `REV000 EFFECTIVE`; the first subsequent business change cycle is `REV001`.
+## Revalidation law
 
----
+> **Revalidation does not mean reinvention. Preserve a prior simple/coherent decision unless current authority or a concrete failure mode disproves it; rederive only the composite decision whose justification changed; defer only the capability that actually left Launch.**
 
-## Accepted T1 headline
-
-```text
-Authentication
-  ProviderSubjectBinding
-  ApplicationSession
-
-Organization
-  Company / User / UserProfile / Area / Group / GroupMembership
-
-Authorization
-  product Role/Permission vocabulary
-  RoleAssignment
-
-Controlled Documents
-  DocumentType + numbering semantics
-  Document + Template role/origin
-  Revision
-  WorkingContent
-  Submission
-  bounded GovernanceAttempt over SUBMISSION|OBSOLESCENCE
-  Step/Decision evidence + SubmissionFeedback
-  RevisionCancellation
-  Release
-  OfficialRendition only when required
-  Obsolescence result
-  native/imported provenance seam
-
-Audit
-  AuditEvent
-```
-
-`NoHumanApproval` may complete governed obsolescence with zero human Step after authorized initiation, mandatory reason and all eligibility/invariant checks. No raw status toggle and no fake System approver.
-
-Not Launch T1 semantic state: standalone Artifact, taxonomy/dictionary platform, TemplateSpec, DRAFT comment platform, Periodic Review, Distribution, Dossier/Evidence/Records, generic Interchange/export/repository state, global AuditChainHead/hash chain.
-
----
-
-## Accepted T2 headline
-
-Detailed authority: `wiki/architecture/r10-t2-governance-effectivity-transactions.md`.
+Every remaining T-stage must begin from the Decision Registry:
 
 ```text
-one local ACID transaction per native business transition
-Document = lifecycle serialization root
-WorkingContent = OCC/CAS for DRAFT races
-create = code + Document + REV000 DRAFT + initial WorkingContent atomically
-first later revision = REV001
-SUBMIT freezes exact expected WorkingContent generation + coherent config snapshots
-route selector = NAMED_USER | GROUP
-Group Step = ANY-one from activation membership snapshot
-one active sequential Step
-submitter/initiator cannot self-approve the same attempt
-no baseline cross-Step same-user prohibition
-RETURN / withdraw / cancel preserve immutable Submission history
-Release gates = human gate + optional OfficialRendition gate
-system Release may occur in same tx when all gates are already satisfied
-replacement Release = predecessor SUPERSEDED + successor EFFECTIVE atomically
-Distribution remains outside Launch-Core Release atomicity
-obsolescence requires current EFFECTIVE + reason + no open replacement + no competing obsolescence
-active obsolescence blocks new Revision
-same DocumentType route reused for obsolescence
-NoHumanApproval obsolescence = zero human Step
-route edits never reinterpret an in-flight attempt
-READ COMMITTED + narrow explicit serialization/CAS posture
+CURRENT / PRESERVE / REFINED → baseline
+REOPEN                       → design deliberately in owning T-stage
+DEFERRED                     → future seam/counterexample only
+SUPERSEDED                   → forbidden inheritance absent new material reopen
 ```
 
-Deferred absent named requirement: ALL/N-of-M quorum, ROLE_IN_AREA routing, cross-Step strict SoD, fresh-auth/eSignature, live reassign/overseer, SLA/escalation, separate obsolescence route, scheduled effectivity.
-
----
-
-## Future-evolution law
-
-> **Defer the capability; preserve the evolution seam. Prepare the seam, not the dormant implementation.**
-
-Named horizon:
+## Mandatory T-stage closure protocol
 
 ```text
-Launch+:
-  Distribution / Read & Acknowledge
-  Periodic Review
-
-Future:
-  Dossier
-  Evidence
-  Retention / Legal Hold / Disposition
-  Governed Export
-  generic External Repository IMPORT/PUBLISH
-  Training/LMS
-  generic/multi-document Change Control
-  pooled multi-customer tenancy
-  realtime coauthoring / CRDT
+read registry
+→ design Tn REOPEN set
+→ operator adjudication
+→ platform-facing Tn summary
+→ explicit operator summary ratification
+→ promote/close Tn
+→ update registry
+→ remove completed staging
+→ only then Tn+1
 ```
 
-These are architecture counterexamples/attachment-seam evidence, not Launch implementation scope.
+## T3 baseline that MUST NOT be re-decided
 
----
+```text
+Group + GroupMembership
+RoleAssignment subject = User | Group
+scope = Company | Area
+static product-owned Role/Permission vocabularies
+additive grants + default deny
+live direct + Group-mediated grants
+provider roles/groups/claims never canonical AuthZ
+Session is not durable Role/Permission authority
+Controlled Documents owns relationship/lifecycle/governance predicates
+no role bypasses domain governance
+Area Manager remains a preserved role concept, exact bundle open
+offboarding preserves historical identity and re-enable never silently restores old grants/memberships/sessions
+Audit != current state
+same-local-commit Audit principle for critical governed/security mutations
+Audit append-only + PII-minimized
+no global AuditChainHead/hash-chain Launch requirement
+```
+
+## T3 official REOPEN set
+
+```text
+exact Launch role vocabulary
+exact permission vocabulary/bundles
+whether/how area_manager survives
+whole-company admin role naming/bundle
+role↔scope matrix
+access administration law for GroupMembership/RoleAssignment
+Group administration/deletion exact law
+offboarding exact access teardown transaction
+least-privilege Governance Viewer/Auditor
+canonical check sites
+authorization-sensitive in-flight/offboarding races where material
+same-local-commit Audit operation census + minimum bounded facts
+Audit read visibility/scoping
+```
+
+The old exact `5×43` catalog is **SUPERSEDED** and may not be repaired/subtracted into the target.
 
 ## Exact next step
 
-**Operator adjudication of the active Decision Reconciliation candidate (`DR-1→DR-8` plus the detailed disposition tables).**
+Review/adjudicate the rebuilt T3 candidate derived only from the official REOPEN set.
 
-Only after reconciliation is ratified/promoted:
+After technical adjudication, **do not open T4**. Present the mandatory platform-facing T3 summary and obtain explicit operator ratification first.
 
-```text
-rebuild T3 candidate from the registry
-→ T3 adjudication
-→ T3 platform-facing summary
-→ explicit operator ratification
-```
-
-Do not open T4 or write final SQL/table/index design, package layout, storage locator design, async topology, API/frontend routes, migration execution plan, implementation plan or product code.
+No final SQL/table/index design, package layout, storage locator design, async topology, public API/frontend contract, migration execution plan, implementation plan or product code is authorized.
