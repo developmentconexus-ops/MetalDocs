@@ -90,27 +90,15 @@ Otherwise default DENY.
 
 ## 4. Recommended Launch role vocabulary
 
-Preserve the useful prior role concepts and refine only what changed:
+Preserve/refine the useful prior role concepts and add only the least-privilege governance-view path required by the current GCR:
 
 ```text
 governance_admin   // refinement of old tenant_owner for single-company Launch
 area_manager       // preserved operational Area manager
 author             // preserved
-author? no — one role only: author
 approver           // preserved
 viewer             // preserved
-governance_viewer  // new least-privilege Auditor/Governance Viewer required by GCR
-```
-
-Canonical set:
-
-```text
-governance_admin
-area_manager
-author
-approver
-viewer
-governance_viewer
+governance_viewer  // new least-privilege Auditor/Governance Viewer
 ```
 
 Roles are static, additive and non-hierarchical. A User/Group may hold multiple roles when responsibilities overlap. `governance_admin` is not a superuser/bypass.
