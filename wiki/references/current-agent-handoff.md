@@ -1,7 +1,7 @@
 # Current Agent Handoff
 
 > **Last verified:** 2026-08-18  
-> **Status:** ACTIVE — Cohesive Platform Redesign / **R10-B COMPLETE NON-FINAL + LAUNCH-V1 RECORDS-GOVERNANCE DEFER REBASELINE + R10-C NEXT / SIMPLIFIED**  
+> **Status:** ACTIVE — **WHOLE-PRODUCT ALIGNMENT REVIEW; R10-C PAUSED; PRODUCT CONTRACT CANDIDATE PENDING WRITTEN OPERATOR REVIEW**  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Implementation:** **BLOCKED — design/documentation only**
 
@@ -11,221 +11,137 @@ Read in this order:
 
 1. `AGENTS.md`
 2. `docs/engineering/standards/root-cause-global-maximum-method.md`
-3. this file — current checkpoint / exact next step
-4. `wiki/architecture/cohesive-platform-redesign.md` — active program/global-coherence authority
-5. `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md` — frozen R3–R9.5 historical/product-domain authority
-6. `wiki/architecture/r10-technical-architecture.md` — promoted R10 authority through integrated B2
-7. accepted B3/B4/B5/B6 candidates + B4/B5/B6 acceptance records
-8. **`wiki/architecture/launch-v1-scope-rebaseline.md` — CURRENT DURABLE LAUNCH-V1 OVERLAY; supersedes only the launch-scope decisions it explicitly names**
-9. `docs/superpowers/analysis/2026-08-18-launch-v1-records-governance-defer-rebaseline.md` only when the rationale/evidence behind the overlay is needed
-10. older review/current-state artifacts only when auditing how a decision was challenged
+3. this file
+4. `wiki/architecture/whole-product-alignment-review.md` — **ACTIVE ROUTING OVERLAY**
+5. `docs/superpowers/specs/2026-08-18-launch-v1-product-contract-design.md` — **NON-AUTHORITATIVE PRODUCT CONTRACT CANDIDATE UNDER REVIEW**
+6. `wiki/architecture/launch-v1-scope-rebaseline.md` — current promoted Launch Records-Governance defer overlay
+7. `wiki/architecture/cohesive-platform-redesign.md` — prior active program/global-coherence authority
+8. `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md` — frozen historical/product-domain authority
+9. `wiki/architecture/r10-technical-architecture.md` — promoted R10 technical authority through integrated B2
+10. accepted B3/B4/B5/B6 candidates + acceptance records only when auditing earlier decisions
+11. `docs/superpowers/analysis/2026-08-18-r10-c-artifact-physical-integrity-integrated-candidate.md` — **PAUSED CANDIDATE / EVIDENCE ONLY; DO NOT PROMOTE OR IMPLEMENT**
 
-Git history is archive. Current code/schema/OpenAPI/module docs remain current-state/migration evidence only.
-
-If earlier R9.5/R10 documents describe RetentionBinding, LegalHold, Disposition or Records Governance as Launch V1 target, apply the explicit Launch-V1 overlay above. This is an operator-approved bounded rebaseline, not an unresolved authority conflict.
+Git history and current runtime/schema/OpenAPI are evidence, not automatic target authority.
 
 ---
 
 ## Current checkpoint
 
 ```text
-R9.5    = FROZEN / historical product-domain authority
-R10-A   = CLOSED / APPROVED historically; Launch V1 topology rebaselined by current overlay
-
-R10-B1  = CLOSED / APPROVED / SINGLE-COMPANY-RESTRUCTURED
-R10-B2  = CLOSED / APPROVED / INTEGRATED; Launch permission catalog rebaselined 43 → 40
-R10-B3  = ACCEPTED FOR R10 INTEGRATION / NON-FINAL
-R10-B4  = ACCEPTED FOR R10 INTEGRATION / NON-FINAL
-R10-B5  = ACCEPTED FOR R10 INTEGRATION / NON-FINAL; Records-Governance portion DEFERRED for Launch
-R10-B6  = ACCEPTED FOR R10 INTEGRATION / NON-FINAL; transaction matrix rebaselined accordingly
-R10-B   = INTEGRATED DESIGN BLOCK COMPLETE / NON-FINAL / LAUNCH-SCOPE-REBASELINED
-
-R10-C   = NEXT / SIMPLIFIED DESIGN ONLY
+R9.5    = FROZEN historical authority
+R10-A   = prior promoted ownership topology; under whole-product re-evaluation where candidate product findings implicate it
+R10-B1  = prior promoted substrate
+R10-B2  = prior promoted AuthN/Org/AuthZ
+R10-B3  = accepted non-final; product distinctions under re-evaluation only where candidate Product Contract implicates them
+R10-B4  = accepted non-final
+R10-B5  = accepted non-final; Records-Governance Launch portion already DEFERRED
+R10-B6  = accepted non-final
+R10-C   = PAUSED / NON-AUTHORITATIVE CANDIDATE EXISTS
 R10-D   = NOT STARTED
 R10-E   = NOT STARTED
 R10-F   = NOT STARTED
 
-implementation = BLOCKED
+Whole-Product Alignment Review = ACTIVE
+Product Contract candidate      = OPERATOR WRITTEN REVIEW PENDING
+implementation                  = BLOCKED
 ```
 
-Whole-R10 Global Coherence Review + cold independent review remain required before final R10 ratification. The rebaseline shortens C/D/E/F and the implementation surface; it does not bypass the final review gate.
+No technical stage resumes until the Product Contract gate closes.
 
 ---
 
-## Launch V1 invariant — operator approved
+## Why technical descent is paused
 
-> **Launch V1 preserves confirmed governed history and exposes no governed physical deletion/disposition. SUPERSEDED, OBSOLETE, CANCELLED and VOIDED are lifecycle facts, never deletion commands. Only temporary/mechanism state is eligible for ordinary GC.**
+The simplified R10-C review exposed a material coherence question around the standalone `Artifact` semantic owner. Re-running the DevelopmentConexus Method showed a broader risk: older architectural assumptions were being carried forward after Launch scope had materially shrunk.
 
-Therefore these are **DEFERRED FUTURE CAPABILITY**, not Launch placeholders:
+Current discipline:
 
-```text
-Records Governance bounded context/module
-DocumentTypeRetentionRule
-EvidenceTypeRetentionRule
-RetentionBinding
-RetentionExtension
-LegalHold
-LegalHoldSubject
-DispositionFence
-DispositionRecord
-retention clocks / expiry eligibility
-governed physical delete workflow
-Records-driven ObjectLock/WORM
-eDiscovery/custodian machinery
-```
-
-Do not create disabled tables, feature flags, dormant permissions, empty modules or jobs for them.
-
-Reopen only on concrete regulatory, contractual, customer or operational evidence requiring finite retention, legal preservation hold or governed destruction.
+> **The product contract must determine which architecture deserves to exist. Architecture must not determine which product capabilities Launch inherits.**
 
 ---
 
-## Launch ownership / permissions after rebaseline
+## Product Contract candidate — current direction under review
 
-Seven active business bounded contexts:
-
-```text
-Authentication
-Organization
-Authorization
-Controlled Information
-Approval
-Documentary Context
-Distribution
-```
-
-Supporting semantic owners:
+### Core controlled-document path to KEEP
 
 ```text
-Artifact
-Audit
-Interchange
+Document stable identity
+→ business Revision
+→ mutable DRAFT Working Content
+→ immutable Submission
+→ NoHumanApproval OR sequential governance route
+→ ACCEPT / RETURN_FOR_CHANGES
+→ withdraw attempt OR cancel Revision as distinct operations
+→ system Release
+→ EFFECTIVE / SUPERSEDED
 ```
 
-`Records Governance` = future bounded capability.
+Also keep:
 
-Launch semantic permission catalog removes:
+- Template as ordinary governed Document role;
+- source + optional required official Rendition;
+- normal readers find current EFFECTIVE content by default;
+- Audit is timeline evidence, not state authority;
+- historical migration never fabricates native governance history;
+- one company per Launch deployment;
+- Launch has no governed physical disposition.
+
+### Product finding to PROMOTE if contract is accepted
 
 ```text
-retention.extend
-legal_hold.manage
-disposition.manage
+explicit governed OBSOLETE journey without a replacement revision
 ```
 
-Current Launch V1 count = **40**. No new role is introduced.
+### Candidate bounded reopens
+
+```text
+standalone Artifact semantic owner → remove from Launch target
+R10-C current candidate             → rebuild later from accepted Product Contract
+```
+
+### Candidate scope reductions
+
+```text
+Distribution / Read & Acknowledge → Launch+ recommended
+Periodic Review                  → Launch+
+Dossier                          → Future
+Evidence                         → Future
+Retention/Hold/Disposition       → Future
+Governed Subject Export package  → Future
+Generic External Repository copy → Future
+Training/LMS                     → Future
+Generic/multi-doc Change Control → Future
+```
+
+These remain candidate findings until the operator accepts the written Product Contract.
 
 ---
 
-## Current R10-B kernel that remains in Launch
+## Exact next step
 
-### Controlled Information / Approval / Release
+**Do not write SQL, code, implementation plans, R10-C replacements or new technical authority.**
 
-```text
-Document
-→ DocumentRevision
-→ WorkingContent + monotonic OCC
-→ immutable RevisionSubmission
-→ one sequential Governance Step route
-→ SubmissionFeedback
-→ optional Rendition
-→ automatic Release
-→ Distribution obligations / explicit acknowledgement
-```
-
-Keep the approved bounded Approval refinement: there is no structural `review|approval` Step discriminator; collaboration and fresh-auth are orthogonal.
-
-### Documentary Context / Evidence
-
-- Dossier is stable documentary context only; never folder/content owner/access grant.
-- Dossier↔Document is contextual M:N over stable Document identity.
-- Evidence remains a small `DRAFT → CAPTURED → VOIDED` lifecycle with exact immutable captured Artifact/payload.
-- no generic Record declaration.
-
-### Artifact
-
-Every confirmed Artifact has exactly one **semantic root**: one DocumentRevision or one Evidence. Multiple references inside the same root are allowed; cross-root Artifact-row reuse is rejected. Same bytes may exist as distinct Artifact rows; physical dedupe is provider mechanism freedom.
-
-### Audit / Interchange
-
-Keep B6:
-
-- same-local-commit required PII-minimized tamper-evident Audit;
-- Audit is never state/outbox/event sourcing;
-- Historical Migration / Governed Export / IMPORT_COPY / PUBLISH_COPY remain distinct;
-- migration never fabricates native Approval/Release/User history;
-- semantic-unit migration atomicity;
-- complete export uses bounded consistent snapshot + provider-independent exact manifest;
-- one local transaction through owner seams; provider effects remain async mechanisms;
-- AuditChainHead final semantic lock; admitted-write lock graph must be mechanically proven before implementation.
-
----
-
-## B3/B5/B6 refinements after Launch rebaseline
-
-### Keep
-
-- `DocumentRevision.cancelled_at` / `obsoleted_at` as native lifecycle facts;
-- `RevisionOrdinalReservation`;
-- `DocumentRevision.history_kind = NATIVE | IMPORTED`;
-- `RevisionImportedContent`;
-- target-owner imported Revision governance state;
-- Evidence native/imported history distinction and imported capture state;
-- native vs imported timestamps remain distinct;
-- current Tenant Dictionary is never resolved to fabricate historical state.
-
-### Simplify
-
-**Dictionary:** no separate `RevisionDictionarySnapshot` table in Launch; immutable dictionary snapshot returns to `DocumentRevision.dictionary_snapshot` because governed disposition is absent.
-
-**Template origin:** use a closed typed exact source reference:
+Next action:
 
 ```text
-source_kind = NATIVE_SUBMISSION | IMPORTED_REVISION_CONTENT
-native      → exact RevisionSubmission FK
-imported    → exact imported Revision content identity
+operator reviews:
+docs/superpowers/specs/2026-08-18-launch-v1-product-contract-design.md
+
+then:
+  accepted as written
+  OR
+  bounded corrections
 ```
 
-No retention-survival provenance snapshot machinery is needed until governed disposal returns.
-
-**Historical Migration:** no RetentionBinding/Hold materialization for imported Revision/Evidence because Records Governance is absent.
-
----
-
-## Exact next step — simplified R10-C Artifact Physical Integrity
-
-Open **R10-C** only for physical integrity required by the launch product:
+After written acceptance:
 
 ```text
-ManagedArtifactStore provider-neutral conformance
-Local first-class dev/test provider
-AWS S3 reference production provider
-staging → upload completion → integrity/malware/format validation → semantic confirmation
-canonical full-byte SHA-256 + size verification
-physical location binding without leaking provider identity into Artifact
-no-overwrite / immutable confirmed bytes
-backup/restore exact-byte integrity
-failed/unconfirmed staging and temporary export/render cleanup
-privacy non-resurrection reconciliation where restore is implicated
+promote durable Product Contract authority
+→ Whole-Product Global Coherence Review of R9.5/R10 decisions
+→ re-derive ownership topology
+→ re-derive technical stages
+→ complete remaining technical design
+→ Whole-R10 cold review / ratification
+→ implementation plan
+→ code
 ```
-
-Explicitly **not** R10-C Launch scope:
-
-```text
-governed physical disposition
-DispositionFence / DispositionRecord delete verification
-LegalHold / retention clocks
-Records-driven ObjectLock/WORM
-multi-cloud/BYOS/active-active
-content-addressed business identity
-permanent dual-write
-```
-
-Keep later routing:
-
-```text
-async retry/lease/jobs/projections/effects → R10-D
-API/frontend/viewer/download journeys      → R10-E
-historical cutover/bootstrap/legacy delete → R10-F
-```
-
-Current implementation is evidence only. Implementation remains **BLOCKED** until the shortened remaining R10 stages, Whole-R10 review, operator ratification and implementation plan are complete.
