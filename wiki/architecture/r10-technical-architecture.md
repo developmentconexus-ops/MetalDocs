@@ -1,6 +1,6 @@
 # R10 Technical Architecture — Active Stage Router
 
-> **Status:** ACTIVE — **PRODUCT CONTRACT REV001 + T1→T5 OPERATOR-RATIFIED; POST-T5 FABLE ROUND-1 AMENDMENTS PROMOTED; DELTA REVIEW PENDING; T6 NOT OPEN; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **PRODUCT CONTRACT REV001 + T1→T5 OPERATOR-RATIFIED; POST-T5 FABLE DELTA APPROVED / DISAGREEMENT EMPTY; CHECKPOINT CLOSURE OPERATOR NEXT; T6 NOT OPEN; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-18  
 > **Revision convention:** `REV000` initial issuance / `REV001` first revision  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
@@ -24,7 +24,7 @@ This file is the technical-stage router. Detailed accepted semantics live in ded
 11. `wiki/architecture/r10-t5-durable-async-search-external-effects.md`
 12. `wiki/architecture/rebaseline-decision-registry.md`
 13. this router
-14. active independent-review/delta-review staging only while the checkpoint is open
+14. active independent-review/adjudication staging only while the checkpoint is open
 
 Historical R3–R9.5 / old R10 / current implementation/schema/OpenAPI are evidence only unless current authority or the Decision Registry preserves a decision.
 
@@ -81,13 +81,15 @@ T4 — Exact Content, Storage Integrity & Restore       CLOSED / OPERATOR-RATIFI
 T5 — Durable Async, Search & External Effects         CLOSED / OPERATOR-RATIFIED
 Decision Reconciliation Registry                      CURRENT / OPERATOR-RATIFIED
 Post-T5 Fable Round-1 amendments                      OPERATOR-RATIFIED / PROMOTED
-Fable delta review                                    PENDING
+Fable delta review                                    APPROVE / DISAGREEMENT EMPTY
+Author delta adjudication                             ACCEPTED
+Post-T5 checkpoint closure                            OPERATOR ACTION NEXT
 T6 — Canonical API / Frontend Journeys                NOT OPEN
 T7 — Historical Migration & Cutover                   NOT OPEN
 implementation                                         BLOCKED
 ```
 
-T6 may open only after the delta-review disagreement set is empty/adjudicated and the post-T5 checkpoint explicitly closes.
+T6 may open only after explicit operator closure of the post-T5 checkpoint.
 
 ## 5. Closed authorities and promoted post-T5 amendments
 
@@ -99,7 +101,7 @@ T4 → wiki/architecture/r10-t4-exact-content-storage-integrity-restore.md
 T5 → wiki/architecture/r10-t5-durable-async-search-external-effects.md
 ```
 
-Operator-ratified post-T5 bounded amendments now include:
+Operator-ratified post-T5 bounded amendments include:
 
 ```text
 Product/T1
@@ -143,17 +145,13 @@ post-snapshot security-teardown recovery choreography explicitly in T7 REOPEN se
 ambiguous SUPERSEDED wording tightened
 ```
 
-## 7. Post-T5 independent Fable checkpoint — ACTIVE
-
-Original review request:
-
-`docs/superpowers/analysis/2026-08-18-t1-t5-integrated-fable-review-request.md`
+## 7. Post-T5 independent Fable checkpoint — CLOSURE PENDING
 
 Independent Fable review:
 
 `docs/superpowers/analysis/2026-08-18-t1-t5-integrated-independent-fable-review.md`
 
-Fable verdict:
+Original verdict:
 
 ```text
 APPROVE T1→T5 WITH MATERIAL FIXES
@@ -165,32 +163,51 @@ Operator-ratified Round-1 adjudication:
 
 `docs/superpowers/analysis/2026-08-18-t1-t5-fable-author-adjudication-round1.md`
 
-Active delta-review request:
-
-`docs/superpowers/analysis/2026-08-18-t1-t5-fable-delta-review-request.md`
-
-Expected delta response:
+Independent delta review:
 
 `docs/superpowers/analysis/2026-08-18-t1-t5-integrated-fable-delta-review.md`
 
-### Current close condition
+Delta verdict:
 
 ```text
 DELTA VERDICT = APPROVE
+M1 = CLOSED
+M2 = CLOSED
+M3 = CLOSED
+L1 = CLOSED
+L2 = CLOSED
+L3 = CLOSED
+L4 = CLOSED
+L5 = CLOSED
+NEW MATERIAL FINDINGS = 0
 DISAGREEMENT SET = EMPTY
 T6 READINESS = MAY OPEN
 ```
 
-If Fable returns a material disagreement, adjudicate only that exact delta; do not restart T1→T5 from zero.
+Author delta adjudication:
+
+`docs/superpowers/analysis/2026-08-18-t1-t5-fable-delta-adjudication.md`
+
+Author disposition:
+
+```text
+ACCEPT DELTA VERDICT IN FULL
+no remaining material disagreement
+no additional bounded amendment required
+no T1→T5 reopen required
+```
+
+The Fable non-blocking retitle-concurrency observation remains owned by T6/implementation design and does not reopen T1/T2.
 
 ## 8. Current gate
 
 ```text
 T1→T5 + bounded amendments    OPERATOR-RATIFIED
 Decision Registry             CURRENT / RECONCILED
-Fable delta review request    STAGED
-Fable delta verdict           PENDING
-Post-T5 checkpoint            OPEN
+Fable delta verdict           APPROVE
+Disagreement set              EMPTY
+Author delta adjudication     ACCEPTED
+Post-T5 checkpoint            OPERATOR CLOSURE NEXT
 T6                            NOT OPEN
 implementation                BLOCKED
 ```
@@ -198,11 +215,10 @@ implementation                BLOCKED
 Next:
 
 ```text
-operator dispatches Fable to read GitHub delta request
-→ Fable writes delta verdict in GitHub
-→ author reads/adjudicates through GitHub
-→ if disagreement set EMPTY: explicit checkpoint closure
-→ only then open T6
+explicit operator closes post-T5 checkpoint
+→ remove/archive completed Fable staging from live tree
+→ update router/handoff/PR
+→ open T6 Canonical API / Frontend Journeys
 ```
 
 ## 9. T6 — Canonical API / Frontend Journeys — NOT OPEN
@@ -218,6 +234,7 @@ in-product inspection vs exact-source download
 public idempotency/error contracts
 search/read/history/audit workspaces
 exact Search field/ranking UX + proof whether any derived/expensive fact activates materialized Search seam
+DRAFT retitle mutation/concurrency placement under an existing T2 law
 EditorSession/UX lease only if a real editor-integration consumer requires it
 ```
 
