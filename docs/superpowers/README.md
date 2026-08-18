@@ -32,29 +32,17 @@ Expected Fable response:
 
 - `analysis/2026-08-18-t1-t5-integrated-fable-delta-review.md`
 
-Completed T5 candidate/subgate/adjudication staging was removed after durable promotion. Git history is the archive.
-
 ## Ratified post-T5 delta
 
 ```text
-M1
-  optional materialized Search uses per-Document projection-write serialization
-  before canonical read through rewrite/removal; FIFO remains unnecessary.
-
-M2
-  all restored ApplicationSessions invalid before ordinary serving;
-  required known post-snapshot security teardown reconciled/proven before ordinary authenticated serving;
-  T7 chooses smallest proof mechanism, no generic per-grant journal frozen.
-
-M3
-  Search baseline = canonical PostgreSQL query/view;
-  materialized projection + search_refresh + rebuild activate only on proven derived/expensive/measured consumer.
-
-L1 title = Revision-governed metadata.
-L2 late rendition for dead candidate = semantic no-op/reclaimable output.
-L3 live bounded admission claim protects READY content from GC.
-L4 bounded withdrawal of active human-governed obsolescence request.
-L5 provider-disable wording aligned to T5-L.
+M1  optional materialized Search serializes per Document before canonical read through rewrite/removal; no FIFO.
+M2  restored sessions invalid before serving; required post-snapshot security teardown reconciled/proven; T7 chooses proof mechanism.
+M3  Search baseline = canonical PostgreSQL query/view; materialization/search_refresh/rebuild only on proven derived/expensive/measured consumer.
+L1  title = Revision-governed metadata.
+L2  late rendition for dead candidate = semantic no-op/reclaimable output.
+L3  live bounded admission claim protects READY content from GC.
+L4  bounded withdrawal of active human-governed obsolescence request.
+L5  provider-disable wording aligned to T5-L.
 ```
 
 Also ratified:
