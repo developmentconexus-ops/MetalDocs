@@ -1,6 +1,6 @@
 # R10 Technical Architecture — Active Stage Router
 
-> **Status:** ACTIVE — **T1 + T2 CLOSED / OPERATOR-RATIFIED; DECISION REGISTRY CLOSED / OPERATOR-RATIFIED; T3 ACTIVE; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1 + T2 CLOSED / OPERATOR-RATIFIED; DECISION REGISTRY CLOSED / OPERATOR-RATIFIED; T3 DECISIONS ADJUDICATED / SUMMARY RATIFICATION NEXT; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-18  
 > **Revision convention:** `REV000` initial issuance / `REV001` first revision  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
@@ -23,6 +23,7 @@ Read in order:
 8. `wiki/architecture/r10-t2-governance-effectivity-transactions.md`
 9. `wiki/architecture/rebaseline-decision-registry.md`
 10. active T-stage staging candidate, when present
+11. active operator-adjudication/summary gate, when present
 
 Historical R3–R9.5 / old R10-A→C / current implementation/schema/OpenAPI are evidence only unless the registry/current authority preserves a decision.
 
@@ -76,7 +77,7 @@ Do not resurrect `Artifact`, separate `Approval`, Distribution, Documentary Cont
 T1 — Semantic State & Invariants                              CLOSED / OPERATOR-RATIFIED
 T2 — Governance, Effectivity & Lifecycle Transactions        CLOSED / OPERATOR-RATIFIED
 Decision Reconciliation Registry                             CLOSED / OPERATOR-RATIFIED
-T3 — Authorization & Audit Enforcement                       ACTIVE / DESIGN
+T3 — Authorization & Audit Enforcement                       DECISIONS ACCEPTED / SUMMARY RATIFICATION PENDING
 T4 — Exact Content, Storage Integrity & Restore              NOT OPEN
 T5 — Durable Async, Search & External Effects                NOT OPEN
 T6 — Canonical API / Frontend Journeys                       NOT OPEN
@@ -204,58 +205,55 @@ Artifact-rooted retention
 
 These reopen only on new material evidence.
 
-## 9. T3 — Authorization & Audit Enforcement — ACTIVE
+## 9. T3 — Authorization & Audit Enforcement — DECISIONS ACCEPTED / SUMMARY PENDING
 
-T3 starts only from the registry's explicit T3 REOPEN set:
+T3 was rebuilt only from the registry's explicit T3 `REOPEN` set. On 2026-08-18 the operator accepted recommendations `T3-A→T3-P` as written.
 
-```text
-exact Launch role vocabulary
-exact permission vocabulary/bundles
-whether/how area_manager survives
-whole-company admin role naming/bundle
-role↔scope matrix
-access administration law for GroupMembership/RoleAssignment
-Group administration/deletion exact law
-offboarding exact access teardown transaction
-least-privilege Governance Viewer/Auditor
-canonical check sites
-authorization-sensitive in-flight/offboarding races where material
-same-local-commit Audit operation census + minimum bounded facts
-Audit read visibility/scoping
-```
+Active staging:
 
-T3 MUST consume as baseline rather than reconsider:
+- `docs/superpowers/analysis/2026-08-18-r10-t3-authorization-audit-enforcement-candidate.md`
+- `docs/superpowers/analysis/2026-08-18-r10-t3-operator-adjudication.md`
+
+Accepted headline:
 
 ```text
-Group + GroupMembership
+roles = governance_admin | area_manager | author | approver | viewer | governance_viewer
+15 Launch permissions only
 RoleAssignment subject = User | Group
 scope = Company | Area
-static product-owned Role/Permission vocabularies
-additive grants + default deny
-live direct + Group-mediated grants
-provider roles/groups never canonical AuthZ
-domain lifecycle/governance predicate remains Controlled Documents authority
-no role bypasses domain governance
-offboarding preserves history and re-enable never silently restores old authority
-Audit != domain state
-same-local-commit Audit principle for critical governed/security operations
-Audit append-only + PII-minimized
-no global AuditChainHead/hash-chain Launch requirement
+governance_admin Company-only
+area_manager Area-only
+author/approver/viewer/governance_viewer Company|Area
+organization.manage governs User/Area/Group identity lifecycle
+access.manage governs GroupMembership + RoleAssignment mutation
+Group deletion fails while live access/governance dependencies remain
+authoring = responsible owner OR document.owner.manage
+governance action = governance.act + exact active-Step participation + T2 predicates
+offboarding atomically disables User + tears down Sessions/memberships/direct grants + required Audit
+re-enable never restores prior access
+security-sensitive user actions serialize against offboarding eligibility
+Audit = explicit semantic append-only same-local-commit evidence for bounded census
+AuditEvent carries actor/time/operation/resource + immutable Company|Area visibility attribution + bounded PII-minimized facts
+audit.read may be Company- or Area-scoped
+ordinary autosave/search/read/download/login/logout/notification/preview/deny are not mandatory semantic Audit in Launch
+future capabilities never silently broaden existing role bundles
 ```
 
-The old exact `5×43` catalog is forbidden as target inheritance.
+The old exact `5×43` catalog remains forbidden as target inheritance.
 
 ### T3 current gate
 
 ```text
-T3 candidate rebuilt from registry
-→ operator adjudication of material REOPEN decisions
+T3 material decisions ACCEPTED
 → platform-facing T3 summary
 → explicit operator summary ratification
-→ promote T3
-→ update registry
+→ promote/close T3
+→ update Decision Registry
+→ remove completed T3 staging
 → open T4
 ```
+
+T4 is **NOT OPEN** while summary ratification is pending.
 
 ## 10. T4–T7 routing
 
