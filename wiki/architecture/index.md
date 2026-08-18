@@ -5,39 +5,46 @@
 
 ## Active target design — read first
 
-- **[launch-v1-product-contract.md](launch-v1-product-contract.md)** — accepted Launch V1 product authority; `REV000 = initial issuance`, `REV001 = first revision`.
+- **[launch-v1-product-contract.md](launch-v1-product-contract.md)** — accepted Launch V1 product authority, now **REV001**; business revision convention remains `REV000 = initial issuance`, `REV001 = first revision`.
 - **[whole-product-alignment-review.md](whole-product-alignment-review.md)** — operator-adjudicated Whole-Product GCR A1–A10.
 - **[launch-v1-ownership-topology.md](launch-v1-ownership-topology.md)** — operator-approved 4+1 semantic ownership + future-evolution law.
-- **[r10-t1-semantic-state-invariants.md](r10-t1-semantic-state-invariants.md)** — operator-ratified T1 authority.
-- **[r10-t2-governance-effectivity-transactions.md](r10-t2-governance-effectivity-transactions.md)** — operator-ratified T2 transaction/lifecycle authority.
-- **[r10-t3-authorization-audit-enforcement.md](r10-t3-authorization-audit-enforcement.md)** — operator-ratified T3 Authorization/Audit authority.
-- **[r10-t4-exact-content-storage-integrity-restore.md](r10-t4-exact-content-storage-integrity-restore.md)** — operator-ratified T4 exact-content/storage/restore authority.
-- **[r10-t5-durable-async-search-external-effects.md](r10-t5-durable-async-search-external-effects.md)** — operator-ratified T5 async/Search/external-effects authority.
-- **[rebaseline-decision-registry.md](rebaseline-decision-registry.md)** — operator-ratified current cross-stage disposition baseline.
-- **[r10-technical-architecture.md](r10-technical-architecture.md)** — exact current T1→T7 router; **post-T5 Fable checkpoint active / T6 not open**.
+- **[r10-t1-semantic-state-invariants.md](r10-t1-semantic-state-invariants.md)** — operator-ratified T1 authority + bounded post-T5 title amendment.
+- **[r10-t2-governance-effectivity-transactions.md](r10-t2-governance-effectivity-transactions.md)** — operator-ratified T2 transaction/lifecycle authority + bounded obsolescence-withdraw/late-rendition amendment.
+- **[r10-t3-authorization-audit-enforcement.md](r10-t3-authorization-audit-enforcement.md)** — operator-ratified T3 Authorization/Audit authority + bounded provider/obsolescence amendments.
+- **[r10-t4-exact-content-storage-integrity-restore.md](r10-t4-exact-content-storage-integrity-restore.md)** — operator-ratified T4 exact-content/storage/restore authority + restore-security/GC-liveness amendments.
+- **[r10-t5-durable-async-search-external-effects.md](r10-t5-durable-async-search-external-effects.md)** — operator-ratified T5 async/Search/external-effects authority + canonical-Search/conditional-materialization amendments.
+- **[rebaseline-decision-registry.md](rebaseline-decision-registry.md)** — operator-ratified current cross-stage disposition baseline, reconciled after Fable Round 1.
+- **[r10-technical-architecture.md](r10-technical-architecture.md)** — exact current T1→T7 router; **Fable delta review pending / T6 not open**.
 - [../references/current-agent-handoff.md](../references/current-agent-handoff.md) — exact fresh-session recovery point / current gate.
 - [../standards/root-cause-global-maximum-method.md](../standards/root-cause-global-maximum-method.md) — binding DevelopmentConexus Engineering Method v1.0.0 mirror.
 
 Current gate:
 
 ```text
-T1 Semantic State & Invariants                         CLOSED / OPERATOR-RATIFIED
-T2 Governance, Effectivity & Lifecycle Transactions   CLOSED / OPERATOR-RATIFIED
-T3 Authorization & Audit Enforcement                  CLOSED / OPERATOR-RATIFIED
-T4 Exact Content, Storage Integrity & Restore         CLOSED / OPERATOR-RATIFIED
-T5 Durable Async, Search & External Effects           CLOSED / OPERATOR-RATIFIED
-Decision Registry                                      CURRENT / OPERATOR-RATIFIED
-Post-T5 integrated Fable checkpoint                    ACTIVE / REVIEW REQUEST STAGED
-T6 Canonical API / Frontend Journeys                  NOT OPEN
-T7 Historical Migration & Cutover                     NOT OPEN
-implementation                                         BLOCKED
+Product Contract                                       REV001 / OPERATOR-APPROVED
+T1 Semantic State & Invariants                        CLOSED / OPERATOR-RATIFIED
+T2 Governance, Effectivity & Lifecycle Transactions  CLOSED / OPERATOR-RATIFIED
+T3 Authorization & Audit Enforcement                 CLOSED / OPERATOR-RATIFIED
+T4 Exact Content, Storage Integrity & Restore        CLOSED / OPERATOR-RATIFIED
+T5 Durable Async, Search & External Effects          CLOSED / OPERATOR-RATIFIED
+Decision Registry                                     CURRENT / RECONCILED / OPERATOR-RATIFIED
+Post-T5 Fable Round-1 amendments                     OPERATOR-RATIFIED / PROMOTED
+Fable delta review                                   PENDING
+T6 Canonical API / Frontend Journeys                 NOT OPEN
+T7 Historical Migration & Cutover                    NOT OPEN
+implementation                                        BLOCKED
 ```
 
 Active review staging:
 
-- `../../docs/superpowers/analysis/2026-08-18-t1-t5-integrated-fable-review-request.md` — **independent cold-review request / review evidence only**.
+- `../../docs/superpowers/analysis/2026-08-18-t1-t5-integrated-fable-review-request.md` — original cold-review request / evidence.
+- `../../docs/superpowers/analysis/2026-08-18-t1-t5-integrated-independent-fable-review.md` — independent review / evidence only.
+- `../../docs/superpowers/analysis/2026-08-18-t1-t5-fable-author-adjudication-round1.md` — operator-ratified Round-1 disposition/promotion record.
+- `../../docs/superpowers/analysis/2026-08-18-t1-t5-fable-delta-review-request.md` — **active delta-review request**.
 
-Completed T5 candidate/subgate/adjudication staging was removed after durable promotion; Git history is the archive.
+Expected delta response:
+
+- `../../docs/superpowers/analysis/2026-08-18-t1-t5-integrated-fable-delta-review.md`
 
 ## Revalidation law
 
@@ -60,29 +67,45 @@ Audit
 
 Storage/integrity, rendering/viewers, Search, async execution, Historical Migration tooling and backup/restore are mechanisms/projections/cutover/operations, not Launch semantic owners.
 
-## Closed T5 headline
+## Current T5/Search headline
 
 ```text
 one PostgreSQL-backed durable-job mechanism; River selected/reference mechanism
-search_refresh always-required; OfficialRendition render conditional on frozen policy
+policy-required OfficialRendition render = current conditional durable job
 viewer/preview != OfficialRendition
-Search = rebuildable PostgreSQL projection keyed by Document
-latest-state refresh converges duplicates/out-of-order jobs
-Search lag may omit but never grant stale authority/effectivity
-full Search rebuild mandatory
-GC periodic reconciliation over GC_PENDING
+Search journey required
+Search baseline = canonical PostgreSQL query/view over current canonical facts
+materialized Search + search_refresh + rebuild only on proven derived/expensive/measured consumer
+if materialized Search exists, per-Document projection-write serialization spans canonical read→write
+Search never grants access/effectivity
+GC periodic reconciliation over GC_PENDING with semantic/live-claim/backup recheck
 no mandatory Launch notifications/event bus
 no generic ExternalEffectReceipt
-bounded-retry terminal-visible/redrivable jobs
+bounded-retry terminal-visible/redrivable jobs only for activated effects
 ```
 
-Renderer/viewer product selection remains deliberately unfrozen pending a representative DOCX fidelity corpus.
+## Current restore headline
+
+```text
+all restored ApplicationSessions invalid before ordinary serving
+post-snapshot lawful erasure + required known security teardown reconciled/proven before ordinary serving
+T7 chooses smallest recovery proof/choreography
+no generic per-grant security journal frozen by T4
+```
 
 ## Post-T5 Fable checkpoint
 
-The independent packet asks Fable to cold-review **T1→T5 as one system** before T6 encodes the architecture into public API/frontend journeys.
+The original independent review returned `APPROVE T1→T5 WITH MATERIAL FIXES`, with no formal T-stage reopen. The operator ratified the bounded Round-1 amendments and they are now durable authority.
 
-It attacks cross-stage races, authority uniqueness, Decision Registry drift, overengineering and future seams. Findings are evidence only; T6 remains closed until findings are adjudicated and the checkpoint explicitly closes.
+The remaining checkpoint is a **delta review only**. Fable must verify the promoted corrections and return an exact disagreement set; it must not restart the whole T1→T5 critique.
+
+Close condition:
+
+```text
+DELTA VERDICT = APPROVE
+DISAGREEMENT SET = EMPTY
+T6 READINESS = MAY OPEN
+```
 
 ## Prior redesign / evidence
 
