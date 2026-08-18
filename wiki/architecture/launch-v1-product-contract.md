@@ -2,6 +2,7 @@
 
 > **Status:** ACTIVE / OPERATOR-APPROVED PRODUCT AUTHORITY  
 > **Accepted:** 2026-08-18  
+> **Revision-numbering amendment:** 2026-08-18 — **REV000 is initial issuance; REV001 is the first revision**  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Method:** DevelopmentConexus Engineering Method v1.0.0  
@@ -9,9 +10,9 @@
 
 This contract defines **what Launch V1 must do and mean before technical architecture resumes**. It intentionally contains no SQL, table layout, Go package design, provider-key design or storage topology.
 
-The operator accepted the written Product Contract as authored on 2026-08-18. This page is the durable product authority promoted from the former staging candidate `docs/superpowers/specs/2026-08-18-launch-v1-product-contract-design.md`.
+The operator accepted the written Product Contract on 2026-08-18 and later clarified the business revision convention on the same date: the initial issuance is `REV000`; `REV001` means the document has undergone its first revision. This page is the durable product authority.
 
-Earlier R9.5/R10 decisions remain evidence. They cannot force a Launch capability or abstraction that this contract does not justify. The current R10-C candidate remains paused and non-authoritative until architecture is re-derived from this contract.
+Earlier R9.5/R10 decisions remain evidence. They cannot force a Launch capability or abstraction that this contract does not justify.
 
 ---
 
@@ -78,7 +79,16 @@ Stable official identity across its lifetime, for example `PO-001 — Procedimen
 
 ### Business Revision
 
-One governed change cycle: `REV001`, `REV002`, ... Revision numbers never reuse.
+One governed issuance/change cycle. Numbering starts at zero:
+
+```text
+REV000 = initial issuance
+REV001 = first revision after the initial issuance
+REV002 = second revision
+...
+```
+
+Revision numbers never reuse. The ordinal therefore communicates revision count: `REV000` has not yet been revised; `REV001` has undergone one revision after initial issuance.
 
 Lifecycle:
 
@@ -141,7 +151,7 @@ A Template is an ordinary governed Document used to seed a new independent Docum
 ```text
 Choose Document Type
 → allocate stable code
-→ create REV001 DRAFT
+→ create REV000 DRAFT
 → edit
 ```
 
@@ -201,33 +211,37 @@ DRAFT or eligible SUBMITTED open Revision
 → CANCELLED
 ```
 
-If an older revision is EFFECTIVE, it remains EFFECTIVE. Cancellation does not delete historical identity or rewrite prior Submissions.
+If an older revision is EFFECTIVE, it remains EFFECTIVE. Cancellation does not delete historical identity or rewrite prior Submissions. A cancelled ordinal is never reused.
 
 ### H. Release / first effective version
 
 When all required gates pass:
 
 ```text
-REV001 SUBMITTED
+REV000 SUBMITTED
 → system Release
-→ REV001 EFFECTIVE
+→ REV000 EFFECTIVE
 ```
 
-Readers can now discover it as official content.
+Readers can now discover the initial issuance as official content.
 
 ### I. Revise an effective Document
 
-```text
-REV003 EFFECTIVE
-→ REV004 DRAFT
-```
-
-Readers continue seeing REV003 while REV004 is drafted/governed. Successful Release of REV004 changes:
+After the initial `REV000` is effective, the first business revision is `REV001`:
 
 ```text
-REV003 → SUPERSEDED
-REV004 → EFFECTIVE
+REV000 EFFECTIVE
+→ REV001 DRAFT
 ```
+
+Readers continue seeing REV000 while REV001 is drafted/governed. Successful Release of REV001 changes:
+
+```text
+REV000 → SUPERSEDED
+REV001 → EFFECTIVE
+```
+
+The same law continues for later revisions (`REV001 → REV002`, etc.).
 
 ### J. Governed obsolescence without replacement
 
@@ -245,7 +259,7 @@ Rules:
 8. an existing open replacement Revision must be cancelled/withdrawn/resolved before obsolescence can complete;
 9. reactivation of an OBSOLETE Document is not Launch scope.
 
-Exact reuse/configuration of the governance engine for obsolescence is technical design work after this contract.
+For a Document Type configured `NoHumanApproval`, governed obsolescence may complete with zero human Step after authorized initiation, mandatory reason and all eligibility/invariant checks; no fake System approver is created.
 
 ### K. Search / read / download
 
@@ -277,7 +291,7 @@ users / areas / groups
 roles / scoped access
 Document Types
 numbering
-Controlled Document + business Revision
+Controlled Document + business Revision starting at REV000
 DRAFT Working Content + autosave/concurrency
 Templates
 immutable Submission
@@ -332,7 +346,7 @@ Future capabilities create no dormant Launch module/table/permission/job.
 ### KEEP
 
 - Document ≠ Revision ≠ Working Draft ≠ Submission.
-- Revision ordinals never reuse.
+- Revision ordinals start at `REV000` and never reuse; `REV001` is the first revision after initial issuance.
 - One current EFFECTIVE revision; newer DRAFT/SUBMITTED may coexist.
 - Immutable Submission; return/resubmit creates another Submission.
 - One sequential governance Step model rather than Review/Approval engines.
@@ -350,8 +364,7 @@ Future capabilities create no dormant Launch module/table/permission/job.
 ### BOUNDED REOPEN / RESTRUCTURE
 
 - **Standalone Artifact semantic owner:** remove from Launch target. Exact-content facts belong to the semantic record that freezes them; shared byte storage is mechanism only.
-- **R10-C:** paused and must be redesigned after Product Contract acceptance.
-- **Obsolescence:** becomes an explicit governed product journey.
+- **Obsolescence:** explicit governed product journey; `NoHumanApproval` may remove the human gate but never turns it into a raw status toggle.
 - **B5 Launch scope:** Dossier/Evidence leave Launch Core unless a named rollout consumer is produced before final ratification.
 - **B6 Governed Subject Export:** Future unless a concrete auditor/customer/portability obligation is named.
 - **Generic External Repository import/publish:** Future; Historical Migration remains a distinct go-live concern.
@@ -377,7 +390,7 @@ Reopen only on a named consumer, requirement or reachable production failure mod
 
 1. A Document has one stable official identity across revisions.
 2. A business Revision is not an autosave/checkpoint.
-3. Revision ordinals never reuse.
+3. Initial issuance is `REV000`; first revision is `REV001`; revision ordinals never reuse.
 4. Ordinary readers see current effective truth, not moving drafts.
 5. A Submission is immutable exact governed-candidate identity.
 6. Governance/feedback always binds an exact Submission.
@@ -403,8 +416,8 @@ Any renewed technical architecture must answer all scenarios without contradicto
 
 | Scenario | Required truth |
 |---|---|
-| Create blank | stable Document + REV001 DRAFT, not official |
-| Create template-based | current EFFECTIVE template seeds independent Document |
+| Create blank | stable Document + REV000 DRAFT, not official |
+| Create template-based | current EFFECTIVE template seeds independent Document as REV000 DRAFT |
 | Autosave | preserve work without consuming REV/official history |
 | Submit | freeze exact candidate |
 | Return | old Submission stays immutable; same REV returns DRAFT |
@@ -412,8 +425,9 @@ Any renewed technical architecture must answer all scenarios without contradicto
 | Cancel Revision | end business change cycle; older EFFECTIVE remains |
 | Resubmit | new Submission, same business REV |
 | Governance | actor judges exact Submission |
-| Release | establish one EFFECTIVE truth |
-| New Revision | prior EFFECTIVE stays reader truth until successor Release |
+| First Release | establish REV000 as first EFFECTIVE truth |
+| First Revision | after REV000, create REV001; prior EFFECTIVE stays reader truth until successor Release |
+| Later Revision | increment ordinal monotonically without reuse |
 | Obsolete | governed withdrawal without successor |
 | Search | ordinary discovery favors current EFFECTIVE |
 | View/download | content corresponds to intended governed version |
@@ -433,13 +447,14 @@ Launch is product-complete when a real company can:
 
 ```text
 configure controlled-document governance
-→ create from blank/template
+→ create REV000 from blank/template
 → author safely
 → submit exact content
 → govern it or return it
-→ make it effective
+→ make REV000 effective as initial issuance
 → let readers reliably find/read the current effective revision
-→ revise it while the old revision stays effective
+→ create REV001 as the first revision while REV000 stays effective
+→ release successors without revision-number reuse
 → withdraw a Submission or cancel a change cycle correctly
 → obsolete an effective Document without replacement
 → inspect trustworthy lifecycle/audit history
@@ -452,18 +467,20 @@ without Dossier, Evidence, Retention, Legal Hold, generic Change Control, govern
 
 ## 11. Authority and next gate
 
-This file is the accepted Launch V1 product authority. Technical architecture is still blocked.
+This file is the accepted Launch V1 product authority. The active technical architecture is routed by `wiki/architecture/r10-technical-architecture.md`.
 
 ```text
 accepted Product Contract
-→ Whole-Product Global Coherence Review against R9.5 + R10-A→C
-→ operator adjudication
-→ re-derive ownership/topology
-→ re-derive remaining technical architecture
-→ Whole-R10 cold independent review
+→ Whole-Product GCR / adjudication
+→ approved 4+1 ownership
+→ T1 Semantic State & Invariants CLOSED
+→ T2 Governance, Effectivity & Lifecycle Transactions ACTIVE
+→ T3–T7
+→ Whole-R10 Global Coherence Review
+→ cold independent review
 → final operator ratification
 → implementation spec/plan
 → code
 ```
 
-Do not resume the paused R10-C candidate or author an implementation plan before the Whole-Product review and subsequent design gates close.
+Implementation remains blocked until the R10 design/review gates close.
