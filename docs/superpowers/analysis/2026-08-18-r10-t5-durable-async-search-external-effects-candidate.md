@@ -1,6 +1,6 @@
 # R10-T5 — Durable Async, Search & External Effects — Reconciled Candidate
 
-> **Status:** ACTIVE STAGING / NON-AUTHORITATIVE — OPERATOR ADJUDICATION PENDING  
+> **Status:** ACTIVE STAGING / NON-AUTHORITATIVE — **RENDITION/VIEWER SUBGATE ACTIVE; WHOLE T5 ADJUDICATION PAUSED**  
 > **Date:** 2026-08-18  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
@@ -9,9 +9,12 @@
 > **T2 authority:** `wiki/architecture/r10-t2-governance-effectivity-transactions.md`  
 > **T3 authority:** `wiki/architecture/r10-t3-authorization-audit-enforcement.md`  
 > **T4 authority:** `wiki/architecture/r10-t4-exact-content-storage-integrity-restore.md`  
+> **Active subgate:** `docs/superpowers/analysis/2026-08-18-t5-rendition-viewer-strategy-evaluation.md`  
 > **Implementation:** BLOCKED
 
 T5 derives only the durable-async/Search/external-effect decisions still open after T1→T4. Existing River/outbox/notifications/search code is current-state/prior-design evidence only. T5 does not preserve runtime machinery merely because it already exists.
+
+**Important:** the operator challenged the original implication that DOCX viewing requires a persisted `OfficialRendition` PDF. The active rendition/viewer subgate must close before T5-A→T5-P can be adjudicated as a whole. The corrected direction is that `official_rendition_render` is conditional on frozen `RequireOfficialRendition(PDF)` policy, while SourceOnly viewing remains a viewer concern rather than a durable-rendition requirement.
 
 T5 does not define final SQL/table/index syntax, Go package/binary layout, public API/frontend routes or historical-migration execution.
 
@@ -37,7 +40,9 @@ current River/job implementation is evidence only, not target authority
 no global SERIALIZABLE/global worker-lock framework
 provider/external calls never join local semantic transactions
 Document/Submission/Release/Audit remain semantic authority
-OfficialRendition is a real optional Launch Release gate
+OfficialRendition is an optional Launch Release gate only when frozen representation policy requires it
+SourceOnly remains a valid representation policy
+preview/viewer mechanism is not semantic authority
 T4 managed content uses create-once handles + exact descriptors
 T4 GC_PENDING is technical eligibility, not Records disposition
 T4 provider/scanner work remains outside semantic transactions
@@ -54,6 +59,7 @@ scheduled Release
 old lifecycle notification fanout merely because it exists today
 external Search engine without a demonstrated Launch consumer
 provider effect receipts as a generic semantic family
+universal DOCX→PDF persistence merely for viewing convenience
 ```
 
 ---
@@ -79,523 +85,522 @@ These facts prove the value of **one job mechanism**, not the validity of every 
 
 ## A — generic durable event bus/outbox for every business event
 
-```text
-all mutations
-→ domain event log
-→ projector/fanout framework
-```
+Reject. Launch has no named need for replayable generic domain-event infrastructure. Audit remains action evidence, not an event bus.
 
-**Reject — accidental platform.** Launch has only a few named effects. Audit already owns action evidence and must not become the bus; a second durable domain-event history would create replay/versioning/retention complexity without a second current consumer.
+## B — ad-hoc goroutines / post-commit best-effort calls
 
-## B — ad-hoc goroutines/callbacks/best-effort provider calls
+Reject for required effects. If process death can permanently lose work required by an accepted semantic transition, best-effort execution is not truthful.
 
-**Reject — incorrect for required effects.** A process crash after semantic commit could permanently lose required OfficialRendition/Search propagation work.
+## C — one Postgres-backed durable-job mechanism for named required effects
 
-## C — one transactional durable-job mechanism for named effects only
-
-```text
-business transaction
-  semantic truth
-  required Audit
-  required durable job enqueue
-COMMIT
-
-worker
-  load canonical current truth
-  perform effect idempotently
-  finalize through proper owner use case
-```
-
-**Recommended Global Maximum.**
-
-No generic event platform is introduced. Only a named effect that must survive process restart gets a durable job.
+Recommended. Use one job runtime, transactionally enqueue only work whose eventual execution is required, and keep each job payload bounded to stable IDs needed to re-load canonical state.
 
 ---
 
-# 5. One durable job runtime — T5-A
+# 5. Selected durable-job mechanism
 
-T5 recommends one Postgres-backed transactional durable-job mechanism for Launch.
+T5 recommends one Postgres-backed transactional durable-job runtime for Launch. River remains the selected/reference implementation because current evidence proves it already supports the needed transaction-coupled enqueue, retry and scheduling primitives.
 
-The existing River framework is retained as the **selected/reference implementation** because current repository evidence already proves the needed primitive set and because keeping it avoids rebuilding queue, retry, scheduling and lease machinery.
-
-Architectural law:
+This is a mechanism selection, not semantic authority:
 
 ```text
-River/job runtime = mechanism
-job row            = durable work intent, not domain state
-job completion     != semantic business completion
+River job row != business state
+queue/attempt/status != Document lifecycle
+worker receipt != Release/Rendition/Search truth
 ```
 
-Do not operate a second custom lease scheduler, generic outbox dispatcher or custom retry framework beside it.
+Do not add a second hand-rolled lease scheduler, staging poller or parallel outbox-dispatch framework beside the selected runtime.
 
-If a later implementation replaces River, the replacement must preserve the same T5 contract; River identity never enters domain semantics.
+Exact binary/process topology, queue names and operational configuration remain implementation design.
 
 ---
 
-# 6. Named Launch durable job classes — T5-B
+# 6. Corrected Launch durable-effect census
 
-T5 finds only two mandatory durable async classes in Launch Core:
+The rendition/viewer subgate refines the original census.
 
 ```text
-1. official_rendition_render
-2. search_refresh
+always-required durable job:
+  search_refresh(document_id)
+
+conditional durable job only when the exact frozen Submission representation policy requires it:
+  official_rendition_render(submission_id, required_format)
+
+periodic reconciliation mechanism, not per-handle enqueue:
+  managed-content GC over durable GC_PENDING
 ```
 
-Plus one bounded technical periodic reconciliation:
+Preview/read-only viewing of PDF or DOCX is **not** itself a durable-job requirement. A SourceOnly DOCX may be viewed directly through the T6 viewer mechanism without generating/persisting a governed PDF.
+
+No mandatory Launch job exists for:
 
 ```text
-3. reclaim_gc_pending_managed_content
-```
-
-The GC item is **not** one durable job per handle; durable `GC_PENDING` mechanism state already survives crashes, so one periodic/reconciling worker can repeatedly discover eligible rows.
-
-Not mandatory durable async Launch work:
-
-```text
-malware scan before SUBMIT
-  → synchronous/retriable preflight; no semantic state waits on a background scan
-
-browser upload/admission
-  → request-driven T4 mechanism
-
-provider account disable on User offboarding
-  → local User-disabled/session/grant teardown already fail-closes MetalDocs access;
-     no mandatory external-IdP convergence job absent a separate product/ops requirement
-
 notifications
-  → no accepted Launch consumer; deferred below
+Distribution acknowledgement
+Periodic Review
+scheduled Release
+Audit integrity/hash chain
+routine offboarding IdP disable
+Search crawler reconciliation on every document
 ```
+
+A named future capability may add its own job later.
 
 ---
 
-# 7. Transactional enqueue law — T5-C
+# 7. Transaction-coupled enqueue law
 
-When a semantic transition creates a required future effect, durable enqueue occurs in that same local PostgreSQL transaction.
+If a semantic transaction creates a required future effect, durable intent/job is inserted in that same local transaction.
 
-```text
-BEGIN
-semantic mutation
-required T3 Audit
-required durable job enqueue
-COMMIT
-```
-
-If enqueue fails, the semantic transition that depends on guaranteed future work does not report success.
-
-Job payloads carry only stable routing identities and bounded mechanism configuration, for example:
+Examples:
 
 ```text
-Submission id
-Document id
-required ContentFormat
+Release / obsolescence / relevant current-effective change
+  → search_refresh(document_id)
+
+Submission with frozen RequireOfficialRendition(PDF)
+  → official_rendition_render(submission_id, PDF)
 ```
 
-They do not freeze a second copy of mutable business truth. Workers re-read canonical current state before acting.
+Required invariant:
+
+```text
+business fact commits
+⇔
+required durable work exists
+```
+
+The enqueue mechanism joins the local PostgreSQL transaction; provider/network execution does not.
 
 ---
 
-# 8. Official Rendition execution — T5-D
+# 8. Conditional OfficialRendition render execution
 
-A Submission whose snapshotted representation policy requires an OfficialRendition transactionally enqueues:
+This section applies only after the rendition/viewer subgate accepts that the frozen representation policy for this Submission requires an OfficialRendition.
 
-```text
-official_rendition_render(submission_id, required_format)
-```
-
-Enqueue occurs when the immutable Submission is created. Rendering may therefore run while human governance proceeds; Release remains governed by T2's independent human + representation gates.
-
-Worker path:
+Worker flow:
 
 ```text
-load exact immutable Submission + T4 source descriptor/handle
-→ verify the Submission still requires this rendition
+load Submission + frozen representation requirement
+→ load exact T4 source content
 → call renderer outside semantic transaction
-→ renderer output enters T4 managed-content admission as TRUSTED_INTERNAL_DERIVATION
-→ server derives exact output descriptor / READY
-→ BEGIN semantic transaction
-→ serialize Document under T2
-→ re-prove Submission/representation requirement is still eligible
-→ create exactly one OfficialRendition for required format
-→ required T3 Audit
-→ re-evaluate Release gates
-→ if all gates satisfied, system Release may complete in same transaction
+→ create/verify READY managed-content output through T4 mechanism
+→ open local transaction
+→ reload Submission/current lifecycle eligibility
+→ prove required rendition still absent and output bound to exact Submission
+→ revalidate READY descriptor/admission proof
+→ create OfficialRendition semantic record + required T3 Audit
+→ if human gate also satisfied, execute system Release under T2
 → COMMIT
 ```
 
-If the attempt was returned/withdrawn or otherwise no longer eligible before final admission, provider output never creates a Rendition; it remains reclaimable mechanism content.
+No renderer/provider call is made inside semantic transaction.
 
-No provider call joins the final semantic transaction.
+If rendering succeeds physically but the final transaction fails, output remains reclaimable managed-content mechanism state.
 
----
-
-# 9. Rendition idempotency / retry semantics — T5-E
-
-The runtime is at-least-once. Therefore rendering must be idempotent at the semantic boundary.
-
-Conceptual identity:
-
-```text
-one successful semantic OfficialRendition
-per (Submission, required ContentFormat)
-```
-
-Duplicate/retried jobs may render more than once physically, but only one eligible semantic success can commit. Extra READY outputs are reclaimable mechanism content.
-
-Failures:
-
-```text
-transient renderer/provider failure → retry with bounded backoff
-permanent unsupported/invalid render → terminal/discarded operational failure
-```
-
-A terminal render failure leaves the truthful Revision `SUBMITTED`; it never fabricates Release or falls back to SourceOnly when the snapshotted policy requires a Rendition.
-
-Operational failure must be visible; product/admin remediation may retry after the cause is corrected.
+If the Submission no longer needs/accepts the result, the worker does not force semantic admission.
 
 ---
 
-# 10. Search projection boundary — T5-F
+# 9. Rendition idempotency / at-least-once
 
-Search remains a **rebuildable mechanism projection**, not a semantic owner.
+Workers must tolerate duplicate delivery/retry.
 
-Launch target:
-
-```text
-one PostgreSQL-backed search projection
-keyed by stable Document identity
-containing only the current search fields required by T6
-```
-
-T5 deliberately does not freeze the final searchable-field list; T6 owns the actual search/read journey.
-
-Projection rules:
+Semantic uniqueness target:
 
 ```text
-no User/Group ACL materialization
-no permission cache
-no effectivity authority
-no lifecycle mutation
-no history ownership
-no external Elasticsearch/OpenSearch dependency without proven scale/feature need
+one required OfficialRendition
+per exact Submission + required format
 ```
 
-PostgreSQL is the Launch default search substrate because no current requirement proves a separate search service.
+Two physical render attempts may transiently produce two managed handles, but only one exact eligible output may become semantic OfficialRendition; loser output is reclaimable mechanism state.
+
+No silent fallback:
+
+```text
+RequireOfficialRendition(PDF)
++ renderer terminal failure
+≠ silently treat as SourceOnly
+```
+
+The Submission remains SUBMITTED and Release remains blocked until the requirement is truthfully resolved or an authorized business action changes the lifecycle via existing rules.
 
 ---
 
-# 11. Search refresh propagation — T5-G
+# 10. Search projection — smallest sustainable form
 
-Normal propagation uses one transactionally enqueued job:
+Search is one rebuildable PostgreSQL-backed projection over current searchable Document facts.
+
+Do not introduce an external Search engine in Launch without measured requirement for scale/ranking/language features the product database cannot sustainably provide.
+
+Conceptual projection key:
+
+```text
+one row / search document keyed by Document id
+```
+
+It may contain only the facts actually needed by T6 search UX, such as current searchable title/code/type/Area/current-effective searchable text and stable IDs. Exact field set belongs T6/implementation spec after journeys are settled.
+
+Search never owns:
+
+```text
+current EFFECTIVE truth
+Authorization
+Document lifecycle
+exact-content identity
+```
+
+---
+
+# 11. Search refresh — latest-state projector
+
+Job payload:
 
 ```text
 search_refresh(document_id)
 ```
 
-At minimum enqueue on:
+The worker never trusts stale event payload such as “revision X became effective”. It loads the **latest canonical state** for the Document at execution time and rewrites/removes the projection to match that state.
+
+Consequences:
 
 ```text
-Release that establishes/replaces EFFECTIVE content
-successful governed obsolescence
+duplicate jobs    → harmless
+out-of-order jobs → converge to latest state
+retry after later lifecycle transition → converges to latest state
 ```
 
-T6 may add enqueue call sites for other current fields it actually exposes in Search (for example a searchable display field), without changing the T5 mechanism.
-
-The job payload carries only `document_id`.
-
-Worker always loads **latest canonical truth at execution time** and then:
+Example:
 
 ```text
-current EFFECTIVE exists + searchable under canonical product rules
-  → upsert projection from latest canonical state
+Release REV001 enqueues refresh A
+replacement Release REV002 enqueues refresh B
+B runs first
+A runs later
 
-no current EFFECTIVE / OBSOLETE
-  → remove projection row
+A still reloads current canonical state = REV002
+→ projection remains REV002
 ```
 
-Because every job reads latest state, out-of-order duplicate refresh jobs are commutative/idempotent; an old job cannot rewrite the projection to an old Revision merely because it ran late.
+No per-Document FIFO/ordering infrastructure is required for correctness.
 
 ---
 
-# 12. Search freshness / serving law — T5-H
+# 12. Search freshness law
 
-Normal Search is eventually consistent.
-
-Allowed transient condition:
+After a canonical write commits, Search may lag temporarily by **omission**:
 
 ```text
-newly EFFECTIVE document may be temporarily missing from Search
+new EFFECTIVE Document not yet discoverable
 ```
 
-Never allowed as product truth:
+But a stale projection hit must never be served as authority.
+
+Before returning actionable/readable content:
 
 ```text
-stale Search hit grants access
-stale hit proves current effectivity
-stale indexed content is served without canonical revalidation
+Search hit stable Document id
+→ reload current canonical Document/Revision state
+→ apply current T3 Authorization
+→ serve only current allowed truth
 ```
 
-Before a hit is returned/used as an actionable document result, the request path must re-resolve current canonical Document state and current T3 Authorization. T6 owns the exact query/response choreography.
+Therefore:
 
-A stale projection row for a now-obsolete/superseded document is therefore filtered/dropped when canonical revalidation fails.
+```text
+Search false negative during lag = acceptable bounded projection behavior
+Search false positive granting stale access/effectivity = forbidden
+```
 
-Search may degrade by omission during lag; it may not degrade by granting stale authority.
+T6 defines UX for indexing delay where material.
 
 ---
 
-# 13. Search rebuild / reconciliation — T5-I
+# 13. Search rebuild / reconciliation
 
-Search must be derivable entirely from canonical product state.
-
-Required operational capability:
+A full Search rebuild is mandatory capability:
 
 ```text
-full rebuild:
-  clear/rebuild projection from canonical current-effective documents
+truncate/recreate projection
+→ enumerate canonical Documents
+→ compute current searchable facts
+→ upsert projection
+→ reconciliation check/counts
 ```
 
-Rebuild is used after:
+This is the proof that Search is derivative.
 
-```text
-projection corruption
-projection-schema/algorithm change
-restore/cutover
-known propagation defect
-```
+Launch does not need an always-on global crawler merely to compensate for unreliable job design. Durable transaction-coupled refresh handles normal convergence; explicit rebuild/reconciliation is an operational recovery path.
 
-A permanent always-on reconciliation crawler is **not** mandatory Launch baseline because transactional refresh jobs already provide normal propagation. Add periodic reconciliation only if operational evidence proves it is needed.
-
-Rebuild tooling may run through the same durable-job runtime but its state remains rebuildable mechanism only.
+A periodic low-frequency integrity check may be added later if operation evidence proves recurring drift.
 
 ---
 
-# 14. Managed-content GC execution — T5-J
+# 14. Managed-content GC execution
 
-T4 already owns the correctness fence:
+T4 already persists the durable eligibility fence:
 
 ```text
 GC_PENDING
-+ no current WorkingContent reference
-+ no immutable governed reference
 ```
 
-T5 therefore rejects a second per-object durable-outbox family.
+Therefore T5 does **not** require one transactional durable job per abandoned handle.
 
-One periodic/reconciling worker is sufficient:
+Smallest mechanism:
 
 ```text
-scan bounded GC_PENDING batch
-→ re-read/re-prove T4 eligibility immediately before provider delete
-→ DeleteReclaimable(handle)
-→ on success remove/finalize mechanism row
-→ on transient failure leave GC_PENDING for future retry
+periodic reconciler
+→ claim bounded GC_PENDING set
+→ immediately re-prove no current WorkingContent / immutable governed reference / backup exclusion
+→ provider DeleteReclaimable outside semantic tx
+→ finalize/remove mechanism state after confirmed absence
 ```
 
-Provider age/listing never authorizes deletion.
+If the process crashes, `GC_PENDING` itself preserves discoverability for a later run. The safe failure is leaked storage, not lost business truth.
 
-A failure only leaks reclaimable storage; it does not change semantic truth. This lower criticality is why per-handle guaranteed enqueue is unnecessary.
+The selected job runtime may schedule this periodic reconciliation, but no per-handle outbox is required.
 
 ---
 
-# 15. Notifications — T5-K
+# 15. Notifications — no Launch consumer
 
-T5 finds **no accepted Launch-Core notification consumer** in the current Product Contract/T1→T4 authority.
+Current Product Contract does not require notification inbox/email/push as a Launch-Core capability.
 
-Therefore Launch target contains no mandatory:
+Therefore do not preserve old:
 
 ```text
-Notification semantic owner
-notification inbox state
-lifecycle-notification fanout
-notification domain-event bus
-email/push dispatcher
+lifecycle notification events
+fan-out worker
+per-recipient notification inbox
+notification read/unread state
 ```
 
-Users can discover current work through canonical T6 worklists/journeys over governance state.
+merely because they exist in current code.
 
-Distribution/Read&Acknowledge and richer notification behavior remain Launch+/Future. Prior notification designs stay evidence only.
+T6 worklists/current-state screens provide the required in-product discovery journeys. If a named Launch journey later proves that email/inbox delivery is required, add the smallest named job/projection then.
 
-If a concrete Launch notification requirement is later added, it must define its trigger/recipient/delivery truth and may reuse the T5 durable-job mechanism without retroactively turning existing lifecycle events into a generic bus.
+Launch+/Future Distribution may later require notification delivery, but that is not current backward pressure.
 
 ---
 
-# 16. Provider identity/offboarding effects — T5-L
+# 16. Authentication provider disable — no mandatory durable job baseline
 
-T3 local offboarding is sufficient to stop MetalDocs access:
+T3 offboarding already atomically:
 
 ```text
-User disabled
-Sessions revoked
-memberships/direct grants removed
+disables User
+revokes ApplicationSessions
+removes GroupMemberships
+drops direct RoleAssignments
 ```
 
-Therefore T5 does not require a durable external IdP-disable job in Launch correctness.
+So MetalDocs access stops even if external IdP disable is delayed or unavailable.
 
-A post-commit provider-disable call may be operational defense-in-depth. If product/ops later requires eventual provider-account convergence, add a bounded named job then; do not create a generic provider-sync engine now.
+Provider account disable may be a post-commit defense-in-depth call. T5 does not make it a required durable job without an explicit assurance requirement that provider state must eventually converge.
+
+If such a requirement appears, add a named `provider_subject_disable` job; do not create a generic identity-sync engine now.
 
 ---
 
-# 17. Job execution semantics — T5-M
+# 17. Durable-job delivery semantics
 
-All durable jobs obey:
+Launch job semantics:
 
 ```text
-at-least-once execution
-idempotent semantic finalization
+at-least-once delivery
+idempotent/revalidating workers
 bounded retry/backoff
-terminal failure/discard visibility
-no silent success on unknown job kind
-stable IDs in payload; mutable business state re-read canonically
-no secrets/large governed content copied into job payload
-no job becomes semantic history authority
+terminal/discarded failure visible to operators
+no hidden infinite retry
+job payload contains stable IDs + minimum immutable routing facts only
+worker reloads canonical state before effect
 ```
 
-Concurrency is narrow and effect-specific. Do not introduce a global worker lock or global SERIALIZABLE posture.
+Do not place full Document/Submission content or mutable authorization snapshots in job payloads.
 
-The selected job runtime owns its own claim/lease/retry housekeeping; application code must not build a second scheduler/lease/reaper framework around it.
+Long-lived jobs never grant authority: current state and required technical eligibility are checked at execution/finalization.
 
 ---
 
-# 18. No generic external-effect receipt family — T5-N
+# 18. Failure / terminal-state handling
 
-T5 does not introduce a universal `ExternalEffectReceipt` semantic table.
+Required-effect failure cannot silently disappear.
 
-Success proof is already owned where meaning exists:
+For a job with exhausted bounded retries:
 
 ```text
-renderer effect → OfficialRendition semantic fact
-Search effect   → rebuildable projection row
-GC delete       → mechanism state/object absence
+job remains terminally inspectable
+cause/classification is observable
+subject stable id is visible to operators
+manual retry/re-drive is possible after cause correction
 ```
 
-Job runtime history is operational evidence only.
+T5 does not create a business `FAILED` Document/Submission state merely because a mechanism failed.
 
-A future external effect that requires a durable business-facing receipt may add one in its owning capability. Do not prebuild a polymorphic receipt registry.
-
----
-
-# 19. Async operational visibility — T5-O
-
-Because a stalled renderer can indefinitely block a required Release, the durable-job runtime must be operationally observable.
-
-Implementation proof must expose enough health/metrics/log correlation to answer at least:
+Examples:
 
 ```text
-is the durable-job executor alive/ready?
-how many jobs are available/retrying/terminal-failed by kind?
-what is the age of the oldest required rendition/search job?
-when did each required worker kind last succeed?
-which correlation/semantic IDs identify a failed job?
+rendition job terminal failure
+→ Submission stays SUBMITTED / Release gate unsatisfied
+
+search refresh terminal failure
+→ canonical truth remains correct; projection may omit/stale but serve path revalidates
 ```
 
-Exact Prometheus/HTTP endpoint/logging topology is implementation-spec work, but a required async effect may not rely only on an unobserved background process.
-
-No generic business dashboard is implied.
+T6/ops design later decides exact operator surfaces.
 
 ---
 
-# 20. Future capability attack — T5-P
+# 19. Provider effect receipts
+
+Reject a generic `ExternalEffectReceipt` semantic family for Launch.
+
+Each current effect already has a natural outcome:
+
+```text
+renderer result → admitted managed content + OfficialRendition
+Search effect   → Search projection row
+GC effect       → provider absence + finalized mechanism state
+```
+
+Provider-specific request IDs/error codes may live in bounded operational/job telemetry where useful; they do not become domain authority.
+
+Add a durable semantic receipt only if a future capability has a real business requirement to prove third-party acceptance, for example governed external publication.
+
+---
+
+# 20. Operational observability obligation
+
+Because OfficialRendition may block Release and Search drives discovery, async runtime cannot be an invisible background mechanism.
+
+Implementation/ops must expose enough to answer at least:
+
+```text
+is the job worker processing work?
+current available/retry/terminal-failure counts by required job kind
+age of oldest available/retrying required job
+last successful execution / recent terminal failures
+subject id/correlation needed to investigate a failed required effect
+```
+
+This is an implementation proof obligation, not a new business domain.
+
+T5 does not freeze HTTP health endpoints, Prometheus metric names, Grafana dashboards or process layout; implementation spec chooses the smallest operational surface.
+
+---
+
+# 21. Future capability attack
 
 | Future capability | T5 seam preserved |
 |---|---|
-| Distribution | may add named fanout/delivery jobs without making jobs the Distribution authority |
-| Periodic Review | due surfacing may use scheduled jobs/projection while review truth remains domain-owned |
-| Dossier/Evidence | may add named projection/effect jobs while semantic owners remain separate |
-| Records/Hold/Disposition | physical disposition may use durable jobs only after Records authority creates eligibility/fence |
-| Governed Export | package assembly/delivery may use named durable jobs; export semantic request/receipt stays owned by future capability |
-| Repository connector | import/publish effects may add bounded jobs/receipts; no generic integration bus required now |
-| Training/LMS | may add named delivery/sync work without broadening document roles |
-| Change Control | orchestration may enqueue named document operations but cannot bypass each Document's domain transactions |
-| pooled tenancy | job isolation/routing may reopen; job mechanism remains non-semantic |
-| CRDT | collaboration transport is separate from durable business-effect queue |
-
-Future job kinds are introduced only with a named consumer; adding a capability does not justify a generic event platform retroactively.
+| Distribution | may add named recipient-resolution/delivery jobs only when promoted; no generic bus needed today |
+| Periodic Review | may add timer/surfacing jobs only when promoted |
+| Dossier/Evidence | may enqueue named projections/effects without changing semantic ownership |
+| Records/Hold/Disposition | may add disposition-enforcement jobs; policy remains Records authority, job is mechanism |
+| Governed Export | may need durable export packaging/provider publish receipt; add explicit job/receipt then |
+| External Repository | may need IMPORT/PUBLISH jobs and provider acceptance proof; no generic connector bus now |
+| Training/LMS | may add delivery/sync jobs without changing current job semantics |
+| Change Control | orchestration may coordinate named jobs but cannot make queue state lifecycle authority |
+| pooled tenancy | job isolation/routing may reopen deployment substrate; payload remains stable IDs and canonical re-load |
+| CRDT | collaboration transport is separate from durable business-effect jobs |
 
 ---
 
-# 21. Proof obligations before implementation
+# 22. Proof obligations before implementation
 
-Later implementation design/tests must falsifiably prove at least:
+Later implementation/tests must falsifiably prove at least:
 
 ```text
-required rendition job is transactionally enqueued with Submission creation
-semantic Submission can never be inferred from job existence
-renderer duplicate/retry yields at most one semantic OfficialRendition per required format
-returned/withdrawn ineligible Submission cannot gain late Rendition/Release from stale job
-renderer terminal failure leaves truthful SUBMITTED state
-no provider call occurs inside Rendition/Release semantic transaction
-search refresh job always re-reads latest canonical Document state
-out-of-order search refresh cannot restore an old Revision into projection
-stale Search hit never bypasses canonical effectivity/AuthZ checks
-full Search rebuild yields the same projection as canonical current-effective truth
-GC worker cannot delete current WorkingContent or governed content
-GC transient failure leaves durable GC_PENDING eligibility for retry
-no Launch notification fanout/event bus exists without a named requirement
-User offboarding blocks MetalDocs access even if external IdP disable never completes
-job runtime retries are bounded and terminal failures are operationally visible
-unknown job kind fails loud
-no custom second lease/scheduler/retry framework exists beside selected runtime
+required search-refresh enqueue rolls back if semantic transaction rolls back
+conditional required-rendition enqueue rolls back if Submission transaction rolls back
+SourceOnly DOCX creates no official-rendition durable requirement merely for viewing
+process crash after semantic commit cannot permanently lose a required job
+at-least-once duplicate rendition job cannot create duplicate semantic OfficialRendition
+renderer output is never accepted without T4 exact-content/admission proof
+renderer failure cannot silently produce Release
+out-of-order Search refresh jobs converge to latest canonical Document state
+Search hit cannot bypass current state/AuthZ revalidation
+full Search rebuild reproduces projection from canonical state
+GC reconciler cannot delete current/immutable/backup-protected content
+GC crash leaves durable GC_PENDING work discoverable
+terminal required jobs are operator-visible and redrivable
+job payload contains no durable Authorization snapshot/business-content copy
+provider request IDs never become business truth
 ```
 
 ---
 
-# 22. Explicit non-decisions
+# 23. Explicit non-decisions
 
 T5 does not decide:
 
 ```text
-final River version/config values
-final job table/index names
-exact queue names or binary/process topology
-exact retry counts/backoff durations/retention periods
-exact Prometheus/health endpoint schema
-final Search columns/query grammar/ranking
-final PostgreSQL FTS/trigram index definition
-public worklist/Search/API routes
-frontend notification UX
-Historical Migration execution jobs
-future Distribution/Records/Repository job catalogs
+final River version/configuration
+table names/indexes/SQL
+exact queue names
+exact process/binary placement
+HTTP operational endpoints/metrics names
+public Search API/filters/ranking UI
+frontend worklists
+viewer/editor implementation
+renderer product selection for SourceOnly viewing or OfficialRendition generation
+Historical Migration jobs
+future notification UX
 ```
 
 ---
 
-# 23. Reopen triggers
+# 24. Reopen triggers
 
-Reopen only the implicated T5 seam on material evidence that:
+Reopen the implicated T5 decision only on material evidence that:
 
 ```text
-River cannot satisfy the required transactional/retry/scheduling contract economically
-Launch gains a concrete notification requirement
-Search scale/linguistic/ranking needs exceed PostgreSQL projection capability
-a second real consumer requires durable replayable domain-event history
-GC volume makes periodic reconciliation insufficient
-provider-account disable becomes a contractual/security convergence requirement
-a future external effect needs a business-facing durable receipt
-required async operational SLA requires stronger queue partitioning/priority semantics
+multiple durable-job mechanisms are required by a proven isolation/trust boundary
+external Search engine features/scale are necessary
+Search omission lag violates a concrete business SLA requiring synchronous projection
+a Launch notification consumer is explicitly required
+provider account disable must be guaranteed eventually for assurance
+managed-content GC volume requires per-object durable scheduling instead of reconciliation
+per-Document Search ordering is proven necessary despite latest-state projector
+future effect requires durable third-party acceptance receipt
+job payload cannot remain bounded IDs without unacceptable load/coupling
 ```
+
+Rendition/viewer strategy has its own active subgate and reopen criteria in `2026-08-18-t5-rendition-viewer-strategy-evaluation.md`.
 
 ---
 
-# 24. Operator adjudication packet
+# 25. Operator adjudication packet — PAUSED ON RV-1→RV-6
 
-Recommended dispositions:
+Do **not** adjudicate this packet as a whole before the rendition/viewer subgate closes.
+
+Current corrected recommendations:
 
 ```text
-T5-A ACCEPT — one Postgres-backed transactional durable-job mechanism; retain River as selected/reference implementation, never semantic authority; no parallel custom scheduler/outbox/retry framework.
-T5-B ACCEPT — mandatory Launch async classes are official_rendition_render + search_refresh; managed-content GC uses periodic reconciliation over durable GC_PENDING rather than one durable job per handle.
-T5-C ACCEPT — a required future effect is transactionally enqueued in the same local semantic transaction; job payload carries stable IDs/bounded routing only and workers re-read canonical state.
-T5-D ACCEPT — required OfficialRendition render job is enqueued with immutable Submission creation; render outside tx, T4-admit exact output, then local tx creates Rendition and may complete Release after revalidating T2 gates.
-T5-E ACCEPT — rendition runtime is at-least-once/idempotent with one semantic success per (Submission, required format); transient retry, permanent visible terminal failure; never fall back to SourceOnly.
-T5-F ACCEPT — Search remains one PostgreSQL-backed rebuildable projection keyed by Document; exact searchable fields wait T6; no embedded user ACL/permission authority and no external search service baseline.
-T5-G ACCEPT — transactionally enqueue search_refresh(document_id) at least on Release/obsolescence; worker always reads latest canonical truth, making duplicates/out-of-order execution idempotent/commutative.
-T5-H ACCEPT — Search may lag by omission, but stale hits never grant access/effectivity; canonical current state + T3 AuthZ are revalidated before actionable result/serve.
-T5-I ACCEPT — Search supports full rebuild from canonical current-effective truth; no mandatory always-on reconciliation crawler unless evidence proves need.
-T5-J ACCEPT — GC worker periodically reconciles bounded GC_PENDING rows, re-proves T4 eligibility immediately before provider delete, and retries by leaving GC_PENDING; no per-handle durable outbox family.
-T5-K ACCEPT — no mandatory Launch notifications/inbox/fanout/domain-event bus; defer until a named consumer appears.
-T5-L ACCEPT — no mandatory durable external IdP-disable job; T3 local offboarding already fail-closes access; provider convergence remains optional defense-in-depth/reopen trigger.
-T5-M ACCEPT — all jobs are at-least-once, idempotent, bounded-retry, fail-loud/terminal-visible, ID-only/bounded payload, canonical-reload workers; selected runtime owns leases/retry housekeeping.
-T5-N ACCEPT — no generic ExternalEffectReceipt family; semantic result/mechanism state owns success evidence; add bounded receipt only with a future named consumer.
-T5-O ACCEPT — required async runtime must expose minimal readiness/backlog/retry/terminal-failure/age/correlation observability; exact telemetry surface is implementation work.
-T5-P ACCEPT — future capabilities add only named jobs/effects without turning T5 into a generic integration/event platform.
+T5-A ACCEPT CANDIDATE — one Postgres-backed transactional durable-job mechanism; River remains selected/reference mechanism; no parallel custom scheduler/outbox runtime.
+T5-B REFINED CANDIDATE — always-required durable job = search_refresh; official_rendition_render is conditional only when frozen RequireOfficialRendition policy requires it; managed-content GC uses periodic reconciliation over durable GC_PENDING.
+T5-C ACCEPT CANDIDATE — required future effect/job is enqueued in the same local semantic transaction that creates the requirement.
+T5-D PAUSED ON RV SUBGATE — exact viewer vs OfficialRendition behavior must follow RV-1→RV-6; when OfficialRendition is required, render occurs outside tx and final T4 admission + semantic Rendition/Release revalidation occurs inside local tx.
+T5-E PAUSED ON RV SUBGATE — required OfficialRendition rendering is at-least-once/idempotent and cannot silently fall back to SourceOnly; SourceOnly viewing itself needs no durable rendition job.
+T5-F ACCEPT CANDIDATE — Search = one PostgreSQL-backed rebuildable projection keyed by Document; no external Search engine Launch baseline.
+T5-G ACCEPT CANDIDATE — search_refresh(document_id) reloads latest canonical state; duplicates/out-of-order execution converge without per-document FIFO.
+T5-H ACCEPT CANDIDATE — Search may lag by omission, but every hit is revalidated against current canonical state/AuthZ before serve; stale projection never grants authority/effectivity.
+T5-I ACCEPT CANDIDATE — full Search rebuild/reconciliation is mandatory; always-on crawler is not baseline.
+T5-J ACCEPT CANDIDATE — managed-content GC is periodic reconciliation over GC_PENDING with immediate canonical recheck before physical delete; no per-handle durable outbox required.
+T5-K ACCEPT CANDIDATE — no mandatory Launch notifications/inbox/fanout/domain-event bus; add named delivery job only on concrete consumer.
+T5-L ACCEPT CANDIDATE — no mandatory durable external IdP-disable job; current MetalDocs offboarding is already access-correct.
+T5-M ACCEPT CANDIDATE — jobs are at-least-once, idempotent/revalidating, bounded-retry, fail-loud/terminal-visible and carry bounded stable-ID payloads.
+T5-N ACCEPT CANDIDATE — no generic ExternalEffectReceipt family; effect-specific semantic outcome is authority.
+T5-O ACCEPT CANDIDATE — required async mechanism must expose minimum worker/readiness/backlog/retry/terminal-failure observability.
+T5-P ACCEPT CANDIDATE — future capabilities add only named jobs/effects/receipts on proven consumers; T5 never becomes a generic integration/event platform.
 ```
 
-T5 remains non-authoritative until operator adjudication. After technical adjudication, **T6 still must not open**: the mandatory platform-facing T5 summary must be presented and explicitly ratified first.
+Current exact next gate:
+
+```text
+RV-1→RV-6 operator adjudication
+→ incorporate accepted rendition/viewer decision
+→ adjudicate corrected T5-A→T5-P
+```
+
+T5 remains non-authoritative. T6 remains NOT OPEN.
