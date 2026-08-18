@@ -1,7 +1,8 @@
 # R10 Technical Architecture — Rebaselined Active Stage Authority
 
-> **Status:** ACTIVE — **T1 CLOSED / OPERATOR-RATIFIED; T2 GOVERNANCE + EFFECTIVITY TRANSACTIONS OPEN; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1 CLOSED / OPERATOR-RATIFIED; T2 DECISIONS ADJUDICATED / PLATFORM-SUMMARY RATIFICATION NEXT; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-18  
+> **Revision-numbering amendment:** 2026-08-18 — **REV000 initial issuance / REV001 first revision**  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Method:** `docs/engineering/standards/root-cause-global-maximum-method.md`  
@@ -76,7 +77,7 @@ Historical `Artifact`, separate `Approval`, `Distribution`, `Documentary Context
 
 ```text
 T1 — Semantic State & Invariants                              CLOSED / OPERATOR-RATIFIED
-T2 — Governance, Effectivity & Lifecycle Transactions        ACTIVE
+T2 — Governance, Effectivity & Lifecycle Transactions        DECISIONS ACCEPTED / SUMMARY RATIFICATION PENDING
 T3 — Authorization & Audit Enforcement                       NOT OPEN
 T4 — Exact Content, Storage Integrity & Restore              NOT OPEN
 T5 — Durable Async, Search & External Effects                NOT OPEN
@@ -112,7 +113,7 @@ The platform summary must explain what problem the stage solved, what was decide
 
 # 4. T1 — Semantic State & Invariants — CLOSED / RATIFIED
 
-The operator accepted T1-A→T1-I, accepted T1-J Option 1, then explicitly ratified the platform-facing T1 summary on 2026-08-18.
+The operator accepted T1-A→T1-I, accepted T1-J Option 1, then explicitly ratified the platform-facing T1 summary on 2026-08-18. The operator subsequently clarified the business revision convention: `REV000` is the initial issuance and `REV001` is the first revision after that issuance. This is a bounded semantic correction to T1 and the Product Contract, not a reopen of the T1 architecture.
 
 ## 4.1 Accepted semantic family set
 
@@ -180,7 +181,9 @@ Audit is append-only supporting semantic evidence, never current domain state. D
 
 ```text
 Document != Revision != WorkingContent != Submission
-Revision ordinals never reuse
+REV000 = initial issuance
+REV001 = first revision after initial issuance
+revision ordinals increment monotonically from zero and never reuse
 WorkingContent = sole mutable DRAFT authority
 Submission = immutable exact governed attempt
 same-Revision resubmit = new Submission
@@ -245,20 +248,22 @@ pooled tenancy       → stable Company identity + reopenable substrate
 CRDT                 → replaceable WorkingContent concurrency mechanism
 ```
 
-T1 is now durable architecture authority. Its completed staging packets are removed from the live tree; Git history is the archive.
+T1 is durable architecture authority. Its completed staging packets are removed from the live tree; Git history is the archive.
 
 ---
 
-# 5. T2 — Governance, Effectivity & Lifecycle Transactions — ACTIVE
+# 5. T2 — Governance, Effectivity & Lifecycle Transactions — DECISIONS ACCEPTED / SUMMARY PENDING
 
 T2 asks:
 
 > **How do the accepted T1 facts change together under concurrency so every Launch journey is atomic, exact and unambiguous without creating generic workflow machinery?**
 
-T2 must prove:
+On 2026-08-18 the operator accepted T2-A→T2-N as recommended, with one bounded correction: initial document creation establishes `REV000 DRAFT`, not `REV001 DRAFT`. `REV001` is the first subsequent business revision. T3 remains closed until the required platform-facing T2 summary is explicitly ratified.
+
+T2 covers:
 
 ```text
-create / code allocation / REV001 DRAFT
+create / code allocation / REV000 DRAFT
 blank and template-based creation
 DRAFT WorkingContent mutation/autosave concurrency
 SUBMIT exact generation
@@ -268,10 +273,34 @@ ACCEPT / RETURN_FOR_CHANGES
 resubmit
 withdraw Submission attempt
 cancel open Revision
-first Release
-replacement Release / supersession
+first Release of REV000
+replacement Release / supersession (REV000 → REV001 for first revision)
 required-Rendition release gate
 governed obsolescence without replacement
+```
+
+Accepted T2 direction:
+
+```text
+one local ACID transaction per native business transition
+Document = lifecycle serialization root
+WorkingContent OCC for DRAFT races
+create = code + Document + REV000 DRAFT + WorkingContent atomically
+SUBMIT freezes exact expected generation + coherent governance/representation snapshots
+route selector = NAMED_USER | GROUP
+Group Step = ANY-one from activation membership snapshot
+one active sequential Step
+bounded initiator self-approval prohibition only
+RETURN / withdraw / cancel preserve immutable Submission history
+Release gates = human gate + optional OfficialRendition gate
+system Release may occur in same tx when all gates are already satisfied
+replacement Release = predecessor SUPERSEDED + successor EFFECTIVE atomically
+Distribution remains outside Launch-Core Release atomicity
+obsolescence requires current EFFECTIVE + reason + no open replacement + no competing obsolescence
+same DocumentType route reused for obsolescence
+NoHumanApproval obsolescence = zero human Step
+route edits never reinterpret an in-flight attempt
+READ COMMITTED + narrow explicit serialization/CAS posture
 ```
 
 T2 owns:
@@ -289,19 +318,19 @@ obsolescence mutual-exclusion behavior
 Release gate composition
 ```
 
-T2 must not decide the exact permission catalog/Audit census (T3), storage locator/integrity implementation (T4), async worker topology (T5), API/frontend routes (T6), or historical migration execution (T7).
+T2 does not decide the exact permission catalog/Audit census (T3), storage locator/integrity implementation (T4), async worker topology (T5), API/frontend routes (T6), or historical migration execution (T7).
 
-Active staging packet:
+Active staging packets:
 
-`docs/superpowers/analysis/2026-08-18-r10-t2-governance-effectivity-transactions-candidate.md`
+- `docs/superpowers/analysis/2026-08-18-r10-t2-governance-effectivity-transactions-candidate.md`
+- `docs/superpowers/analysis/2026-08-18-r10-t2-operator-adjudication.md`
 
 Current gate:
 
 ```text
-T2 candidate
-→ operator adjudication of material T2 decisions
-→ T2 platform-facing summary
-→ explicit summary ratification
+T2 decisions ACCEPTED
+→ platform-facing T2 summary
+→ explicit operator summary ratification
 → T2 promotion/closure
 → T3
 ```
