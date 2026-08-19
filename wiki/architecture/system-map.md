@@ -1,99 +1,132 @@
-# System Map — what to read when
+# System Map — What to Read When
 
-> **Last verified:** 2026-08-14
-> **Active program:** Cohesive Platform Redesign
+> **Last verified:** 2026-08-19  
+> **Active program:** R10 Post-T6 Implementation Readiness  
+> **Implementation:** BLOCKED
 
 ## When in doubt
 
-Read these first:
+Read:
 
-1. [`../standards/root-cause-global-maximum-method.md`](../standards/root-cause-global-maximum-method.md)
-2. **[`cohesive-platform-redesign.md`](cohesive-platform-redesign.md)**
-3. `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md`
-4. [`../references/current-agent-handoff.md`](../references/current-agent-handoff.md)
+1. `../../AGENTS.md`
+2. `../standards/root-cause-global-maximum-method.md`
+3. `../references/current-agent-handoff.md`
+4. `r10-technical-architecture.md`
+5. Product Contract + T1→T6 authorities named by the router
+6. `r10-post-t6-implementation-readiness-program.md`
+7. the current active stage/staging named by the router
 
-If the task changes product/domain semantics, stop at the design gate. No product implementation is authorized yet.
+Do not route current target work through `cohesive-platform-redesign.md`; it is superseded for active target routing.
 
-## "I'm working on Organization / AuthZ / Approval / Documents / Templates / Taxonomy / Release"
+## “I’m deciding target backend/package architecture”
 
-Use the active redesign stack above. Current module docs are LEGACY/current-state evidence only.
+Do **not** use current `internal/modules/` or `backend-target-architecture.md` as target defaults.
 
-Do not follow the old module topology, old role/capability vocabulary, approval-route model or template lifecycle by inertia.
+Current state may be inspected through:
 
-## "I'm inspecting current runtime/API behavior"
+```text
+wiki/backend/repo-topology.md
+backend-blueprint.md
+current Go package/import graph
+current SQL/table access
+```
 
-1. [`backend-api-structure.md`](backend-api-structure.md)
-2. [`api-contract.md`](api-contract.md) + [`api-design-system.md`](api-design-system.md)
-3. current OpenAPI/generated types/code
-4. relevant current-state module page from [`../modules/index.md`](../modules/index.md)
+Target backend/package topology belongs to **T8-B**, after the Technical Realization Reconciliation Baseline is accepted and T7 closes.
 
-Current contract/code answers what runs today, not what must survive the redesign.
+## “I’m deciding target database/schema/transactions”
 
-## "I'm inspecting the current database"
+Current state:
 
-1. [`../database/index.md`](../database/index.md)
-2. current baseline/migrations/relationships
-3. [`data-model.md`](data-model.md) only as a LEGACY current-state reference
+1. `../database/index.md`
+2. `db/baseline/`, current migrations/grants/dictionary
+3. `data-model.md` only as current-state/legacy evidence
 
-Do not design migrations until the target domain/data model is closed.
+Target physical persistence belongs to **T8-D**. Current tables do not survive by existence. Concrete current→target schema/data transition belongs **T10**.
 
-## "I'm inspecting frontend journeys"
+## “I’m deciding target API/OpenAPI”
 
-1. [`frontend-structure.md`](frontend-structure.md)
-2. [`../modules/frontend/index.md`](../modules/frontend/index.md)
-3. generated API types
-4. relevant QA evidence
+T6 owns semantic operation/journey meaning.
 
-Frontend behavior is evidence about user needs; it does not own lifecycle or authorization semantics.
+Current implementation evidence:
 
-## "I'm investigating the old approval/freeze/PDF defect"
+```text
+backend-api-structure.md
+api/openapi/v1/openapi.yaml
+current generated Go packages
+current generated frontend types
+runtime handlers/validation
+```
 
-Start from the active redesign's content-truth invariant. Historical sequence diagrams/module docs may be inspected only as evidence.
+The exact target executable wire contract belongs **T8-E**. Current module/tag/package structure is not target entitlement.
 
-The known architecture failure was: editor-authored content was reviewed, while freeze rendered a different blank template snapshot. The target must make it impossible for Approval, freeze and Rendition to bind different content identities.
+## “I’m deciding target frontend structure”
 
-Useful current-support evidence:
+T6 owns semantic frontend lenses/journeys.
 
-- [`../modules/render-fanout.md`](../modules/render-fanout.md)
-- current `documents`/`approval`/renderer code
-- Git history for historical QA reports if a specific fact must be recovered
+Current evidence:
 
-## "I'm working on supporting audit/render/search/notifications/distribution/tokens/security"
+```text
+frontend-structure.md
+frontend/apps/web/src/
+current generated API types
+current frontend tests/QA
+```
 
-First read the active redesign's whole-product checklist. Then inspect the relevant supporting module page.
+Current features such as `approval`, `templates`, `taxonomy`, `iam`, `documents` and `controlled-documents` are current implementation evidence. Target route/feature/query/cache/editor/viewer topology belongs **T8-F**.
 
-Do not rewrite a supporting component just because the core is changing. Preserve healthy seams and revalidate only the contracts that depend on newly-settled core truths.
+## “I’m deciding runtime/jobs/deploy/observability”
 
-## "I'm starting a new module / feature"
+Current API/worker/jobs/renderer processes, River wiring, compose/Docker/scripts and observability are evidence only.
 
-If the request falls inside a boundary already owned by the Cohesive Platform Redesign, continue the **single active redesign ledger** instead of creating another design authority.
+T4/T5 provide binding correctness constraints. Exact target process/deployment/trust/readiness/observability realization belongs **T8-G**.
 
-For genuinely independent future work, use `.claude/skills/developing-new-work/SKILL.md` after confirming it does not overlap the active reset.
+## “I’m planning historical migration”
 
-## "I'm using the harness / dispatch hub"
+The former combined Historical Migration & Cutover T7 was superseded by the post-T6 Stage-Decomposition GCR.
 
-Read `.claude/skills/harness-hub/SKILL.md`.
+New ownership:
 
-During the redesign gate, the harness is design-only: read-only research/census/review may be parallelized; product implementation may not.
+```text
+T7  source truth + semantic historical mapping
+T10 concrete migration runtime/cutover/rollback/deletion/recovery choreography
+```
 
-## "I'm reviewing a design"
+Do not design concrete migration scripts before T8 has frozen the target physical realization.
 
-Use `.claude/skills/adversarial-review/SKILL.md`, verify claims against source, and require root-cause/local-vs-global-max disposition. Do not reopen settled decisions without a material new finding or changed constraint.
+## “I’m planning implementation”
 
-## "I'm onboarding"
+Implementation planning is **not open**.
 
-1. [`../../AGENTS.md`](../../AGENTS.md)
-2. [`../../CLAUDE.md`](../../CLAUDE.md) when applicable
-3. [`../ONBOARDING.md`](../ONBOARDING.md)
-4. active redesign authority + ledger + handoff
+Before implementation:
 
-## "I'm closing out work"
+```text
+T7  Historical Migration Truth & Mapping
+T8  Technical Realization Architecture
+T9  Golden Flows & Validation Baseline
+T10 Transition / Refactor / Migration / Cutover
+T11 Implementation Program & Execution Graph
+T12 Adversarial Implementation-Readiness
+→ Integrated Whole-R10 GCR
+→ fresh independent/cold review
+→ operator final authorization
+```
 
-Current redesign decisions close by being recorded in the active ledger after operator approval. Product implementation close-out/QA only resumes after the implementation gate opens.
+A Writer task may not contain unresolved architecture decisions.
 
-## See also
+## “I’m inspecting current runtime behavior”
 
-- [`../index.md`](../index.md)
-- [`index.md`](index.md)
-- [`../modules/index.md`](../modules/index.md)
-- [`../decisions/index.md`](../decisions/index.md)
+Use current code/schema/OpenAPI/generated types/deploy/tests. Runtime evidence may contradict stale wiki evidence; fix/reroute stale documentation rather than granting runtime shape target authority.
+
+## “I’m reviewing architecture”
+
+Use the DevelopmentConexus Method. Attack duplicate/missing authority, hidden package/SQL coupling, accidental topology inheritance, contract/frontend/runtime mismatch, proof gaps and migration traps. Findings are evidence; reopen only the exact decision materially implicated.
+
+## “I’m closing work”
+
+Current gate is the Technical Realization Reconciliation Baseline:
+
+`../../docs/superpowers/analysis/2026-08-19-r10-technical-realization-reconciliation-baseline.md`
+
+It is an evidence census only. Operator acceptance of its coverage/classification is required before redefined T7 opens.
+
+No implementation plan or product code is authorized.
