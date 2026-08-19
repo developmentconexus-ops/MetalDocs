@@ -1,13 +1,13 @@
 # Current Agent Handoff
 
 > **Last verified:** 2026-08-18  
-> **Status:** ACTIVE — **PRODUCT CONTRACT REV001 + T1→T5 OPERATOR-RATIFIED; POST-T5 FABLE CHECKPOINT CLOSED; T6 MATERIAL CANDIDATE READY / OPERATOR ADJUDICATION NEXT; T7 NOT OPEN**  
+> **Status:** ACTIVE — **PRODUCT CONTRACT REV001 + T1→T5 OPERATOR-RATIFIED; POST-T5 FABLE CHECKPOINT CLOSED; T6 CORRECTED GLOBAL-MAXIMUM ADJUDICATION READY / OPERATOR MATERIAL ADJUDICATION NEXT; T7 NOT OPEN**  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
-> **Implementation:** **BLOCKED — design/documentation only**
+> **Implementation:** **BLOCKED — architecture/design only**
 
 ## Fresh-session route
 
-Read in this order:
+Read in order:
 
 1. `AGENTS.md`
 2. `docs/engineering/standards/root-cause-global-maximum-method.md`
@@ -23,10 +23,12 @@ Read in this order:
 12. `wiki/architecture/rebaseline-decision-registry.md`
 13. `wiki/architecture/r10-technical-architecture.md`
 14. `docs/superpowers/analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-bootstrap.md`
-15. `docs/superpowers/analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-candidate.md` — **ACTIVE MATERIAL CANDIDATE / NON-AUTHORITATIVE**
-16. current API/frontend/runtime only as evidence needed to falsify/validate a concrete T6 claim
+15. `docs/superpowers/analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-candidate.md`
+16. `docs/superpowers/analysis/2026-08-18-r10-t6-external-evidence-docket.md`
+17. `docs/superpowers/analysis/2026-08-18-r10-t6-global-maximum-adjudication-packet.md` — **OPERATOR DECISION TARGET**
+18. current implementation only when claim-specific evidence is needed
 
-Completed post-T5 Fable review artifacts were removed from the live tree after explicit operator checkpoint closure; Git history is the archive.
+Completed Fable staging is removed; Git history is the archive.
 
 ## Current checkpoint
 
@@ -41,74 +43,68 @@ T4 Exact Content/Storage/Restore         = CLOSED / OPERATOR-RATIFIED
 T5 Durable Async/Search/Effects          = CLOSED / OPERATOR-RATIFIED
 Decision Registry                        = CURRENT / RECONCILED / OPERATOR-RATIFIED
 Post-T5 integrated Fable checkpoint      = CLOSED / OPERATOR-APPROVED
-T6 evidence/inversion pass               = COMPLETE ENOUGH FOR CANDIDATE
-T6 material candidate T6-A→T6-R         = READY / NON-AUTHORITATIVE
+T6 evidence/inversion pass               = COMPLETE ENOUGH FOR ADJUDICATION
+T6 base candidate                        = STAGED / NON-AUTHORITATIVE
+T6 corrected adjudication packet         = READY / NON-AUTHORITATIVE
 operator material adjudication           = NEXT
 T7 Historical Migration / Cutover        = NOT OPEN
 implementation                           = BLOCKED
 ```
 
-## T6 authority posture
+## Structural Inversion result
 
-Current implementation is **legacy/current-state evidence only**. There is no requirement to retain any current route, module, DTO, screen, capability, navigation category, writer session or public object shape.
+Current API/frontend is current-state evidence only and carries major superseded concepts. T6 has no obligation to retain routes/modules/DTOs/screens by migration cost or sunk cost.
 
-Structural Inversion controls:
-
-> If current implementation were deleted or opposite, the target conclusion should remain the same when derived from Product Contract REV001 + T1→T5.
-
-## T6 candidate direction
-
-The candidate recommends semantic lenses rather than legacy module-shaped UI/API:
+The target is rederived from Product Contract REV001 + T1→T5:
 
 ```text
-Library
-My Work
-Document official lens
-Document work lens
-exact Governance case lens
-Document history
-Audit
-Administration
+semantic public API instead of legacy module API
+semantic-lens frontend instead of old navigation ontology
+exact immutable Submission review instead of reviewer WorkingContent mutation
+current-effective Library instead of polymorphic document screen
+canonical Search instead of mandatory Search infrastructure
+provider-neutral content/editor mechanisms behind T4/OCC
 ```
 
-It explicitly rejects preserving separate public `Approvals`, `Templates`, `Controlled Documents`, Distribution, legacy capability navigation or writer-session correctness dependencies by inertia.
+## Corrected T6 material slate
 
-Candidate material decisions:
+The operator should adjudicate the combined candidate + corrected packet. Headline:
 
 ```text
-T6-A  OpenAPI contract-first semantic API
-T6-B  semantic-lens frontend navigation/routes
-T6-C  semantic query/command surface; no generic action API
-T6-D  server-derived allowed_actions for UX only
-T6-E  structured TYPE | TYPE_AREA numbering + non-reserving preview
-T6-F  DRAFT title+content share WorkingContent generation OCC
-T6-G  T4 upload/admission browser journey
-T6-H  My Work + exact governance-case lens
-T6-I  explicit source vs OfficialRendition viewer/download behavior
-T6-J  browser-buffer DOCX adapter baseline; no EditorSession baseline
-T6-K  materialized Search NOT activated for Launch
-T6-L  domain history != Audit
-T6-M  Admin = Organization / Access / Document Governance
-T6-N  RFC9457 semantic errors incl. dependency failures
-T6-O  targeted idempotency + OCC/preconditions
-T6-P  typed cursor list envelopes / explicit filters
-T6-Q  purpose-built semantic read models
-T6-R  preserve feature-sliced SPA mechanism pattern, replace legacy feature taxonomy
+T6-A   rebuild pre-launch /api/v1; OpenAPI 3.0.3 remains Launch wire-contract feature set; no compatibility layer
+T6-B   semantic frontend lenses / My Work + exact governance case
+T6-C   closed semantic public operation census; no generic action/module-shaped API
+T6-D   server-derived allowed_actions = UX hint only
+T6-E   numbering TYPE|TYPE_AREA, fixed '-', min width 3, no generic grammar
+T6-F   one strong ETag/If-Match DRAFT OCC covers title + WorkingContent; stale = 412
+T6-G   bound upload_id OPEN→READY→OCC attach; client never owns descriptor
+T6-H   reviewer operates only on exact immutable Submission
+T6-I   semantic exact-byte routes; provider/storage identity hidden
+T6-J   fidelity-gated EigenPal-class first candidate; ONLYOFFICE fallback; no EditorSession baseline
+T6-K   Search materialization/search_refresh OFF for Launch
+T6-L   domain history and Audit remain separate
+T6-M   minimal Admin Center + lost-update ETags + existing-provider identity binding
+T6-N   RFC9457; code canonical/type mechanically derived; closed error families incl. dependency/ratelimit
+T6-O   natural HTTP idempotency first; exact Idempotency-Key POST set; 24h replay
+T6-P   opaque cursor default20/max100; no totals/offset/generic filter DSL
+T6-Q   purpose-built semantic read models; no DB/module DTO leakage
+T6-R   preserve React/TanStack feature-sliced mechanism pattern, replace legacy taxonomy
+T6-S   Keycloak Authorization Code + MetalDocs ApplicationSession + CSRF; no local credentials/JIT user
+T6-V   blank seed = mechanism; Template/revise copy exact released SOURCE, never OfficialRendition
 ```
+
+Everything not named remains frozen.
 
 ## Exact next step
 
-Operator adjudicates T6-A→T6-R.
-
-After material adjudication:
-
 ```text
-correct candidate if required
+operator adjudicates material T6 slate
+→ revise only rejected/refined decisions
 → platform-facing T6 summary
 → explicit operator summary ratification
-→ durable T6 promotion
-→ Decision Registry update
-→ remove T6 staging
+→ promote T6 durable authority
+→ reconcile Decision Registry
+→ remove staging
 → only then T7
 ```
 
