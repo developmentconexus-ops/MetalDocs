@@ -1,11 +1,11 @@
 # `docs/superpowers` — Active Design Staging Only
 
 > **Status:** Active staging workspace for the MetalDocs rebaselined R10 technical design.  
-> **Current gate:** **T6 MATERIAL CANDIDATE READY / OPERATOR ADJUDICATION NEXT; T7 NOT OPEN; IMPLEMENTATION BLOCKED.**
+> **Current gate:** **T6 CORRECTED GLOBAL-MAXIMUM ADJUDICATION READY / OPERATOR MATERIAL ADJUDICATION NEXT; T7 NOT OPEN; IMPLEMENTATION BLOCKED.**
 
-Durable accepted truth belongs in `wiki/`. Active, not-yet-promoted design analysis belongs here. Completed/superseded staging is removed from the live tree and remains recoverable from Git history.
+Durable accepted truth belongs in `wiki/`. Active not-yet-promoted design/evidence belongs here. Completed staging is removed and Git history is the archive.
 
-## Current durable authority
+## Durable authority
 
 ```text
 wiki/architecture/launch-v1-product-contract.md          REV001
@@ -20,48 +20,46 @@ wiki/architecture/launch-v1-product-contract.md          REV001
 → wiki/architecture/r10-technical-architecture.md
 ```
 
-## Current active staging
+## Active T6 staging
 
-- `analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-bootstrap.md` — T6 router/bootstrap.
-- `analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-candidate.md` — **T6-A→T6-R MATERIAL CANDIDATE / NON-AUTHORITATIVE / OPERATOR ADJUDICATION NEXT.**
+- `analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-bootstrap.md` — stage scope/gate.
+- `analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-candidate.md` — material architecture candidate + alternatives.
+- `analysis/2026-08-18-r10-t6-external-evidence-docket.md` — primary/current evidence + claim boundaries.
+- `analysis/2026-08-18-r10-t6-global-maximum-adjudication-packet.md` — **CORRECTED MATERIAL DISPOSITION / OPERATOR DECISION TARGET.**
 
-Completed T5 and post-T5 Fable staging was removed after promotion/checkpoint closure. Git history is the archive.
+The adjudication packet refines the candidate where the evidence pass found implementation-level ambiguity. Neither is authority until ratified/promoted.
 
-## Greenfield law for T6
-
-Current routes/modules/screens/DTOs/capabilities are legacy/current-state evidence only. T6 has no compatibility obligation to preserve them.
+## T6 greenfield law
 
 ```text
-Product Contract + T1→T5
+Product Contract REV001 + T1→T5
 → Structural Inversion
 → smallest sustainable API/UX
 ```
 
-Do not preserve a legacy surface because migration would be easier.
+Current routes/modules/screens/DTOs are evidence only. Do not preserve a legacy surface because migration is easier.
 
-## Active technical path
+## Current path
 
 ```text
-Product Contract                                      REV001 / OPERATOR-APPROVED
-T1 Semantic State & Invariants                       CLOSED / OPERATOR-RATIFIED
-T2 Governance, Effectivity & Lifecycle Transactions CLOSED / OPERATOR-RATIFIED
-T3 Authorization & Audit Enforcement                CLOSED / OPERATOR-RATIFIED
-T4 Exact Content, Storage Integrity & Restore       CLOSED / OPERATOR-RATIFIED
-T5 Durable Async, Search & External Effects         CLOSED / OPERATOR-RATIFIED
-Decision Registry                                    CURRENT / RECONCILED
-Post-T5 Fable checkpoint                             CLOSED / OPERATOR-APPROVED
-T6 material candidate                               READY / ADJUDICATION NEXT
-T7 Historical Migration & Cutover                   NOT OPEN
+T1→T5                       CLOSED / OPERATOR-RATIFIED
+Post-T5 Fable               CLOSED / OPERATOR-APPROVED
+Decision Registry           CURRENT / RECONCILED
+T6 evidence/candidate       STAGED
+T6 corrected adjudication  READY / OPERATOR DECISION NEXT
+T7                          NOT OPEN
+implementation              BLOCKED
 
-→ operator adjudicates T6-A→T6-R
-→ T6 platform-facing summary + operator ratification
-→ durable T6 promotion / registry update / staging cleanup
-→ T7
-→ Integrated Whole-R10 GCR
-→ cold independent final review
+→ operator adjudicates T6 material slate
+→ platform-facing T6 summary
+→ explicit operator summary ratification
+→ durable T6 promotion + Registry update + staging cleanup
+→ only then T7
+→ Whole-R10 GCR
+→ final cold review
 → final operator ratification
 → implementation spec/plan
 → code
 ```
 
-No product implementation or implementation plan is authorized while design gates remain open.
+No implementation plan/product code is authorized while these gates remain open.
