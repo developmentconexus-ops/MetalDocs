@@ -1,7 +1,7 @@
 # Current Agent Handoff
 
 > **Last verified:** 2026-08-19  
-> **Status:** ACTIVE — **T1→T6 CLOSED / OPERATOR-RATIFIED; POST-T6 PROGRAM RESTRUCTURED; TRRB OPERATOR REVIEW NEXT; T7→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1→T6 CLOSED / OPERATOR-RATIFIED; POST-T6 PROGRAM RESTRUCTURED; TRRB OPERATOR-RATIFIED; T7 ACTIVE / SOURCE EVIDENCE CENSUS NEXT; T8→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
 
 ## Fresh-session route
@@ -26,11 +26,12 @@ Read in this order:
 16. `wiki/architecture/rebaseline-decision-registry-t6-amendment.md`
 17. `wiki/architecture/rebaseline-decision-registry-post-t6-amendment.md`
 18. `wiki/architecture/r10-post-t6-implementation-readiness-program.md`
-19. `wiki/architecture/r10-technical-architecture.md`
-20. `docs/superpowers/analysis/2026-08-19-r10-technical-realization-reconciliation-baseline.md` — **CURRENT OPERATOR REVIEW TARGET**
-21. current code/schema/API/frontend/runtime evidence only for a concrete claim
+19. `wiki/architecture/r10-technical-realization-reconciliation-baseline.md`
+20. `wiki/architecture/r10-technical-architecture.md`
+21. `docs/superpowers/analysis/2026-08-19-r10-t7-historical-migration-truth-semantic-mapping-bootstrap.md`
+22. source/runtime/data evidence only for a concrete T7 claim
 
-Do not route target design through `cohesive-platform-redesign.md`, `backend-target-architecture.md`, legacy module pages, current package names or historical implementation plans. They may be evidence only where the current R10 authority says so.
+Do not route target design through `cohesive-platform-redesign.md`, `backend-target-architecture.md`, legacy module pages, current package names or historical implementation plans. They are evidence only where current R10 authority says so.
 
 ## Current checkpoint
 
@@ -46,9 +47,9 @@ T6                                       CLOSED / OPERATOR-RATIFIED / PROMOTED
 Decision Registry                        CURRENT + D4 + T6 + post-T6 amendments
 
 Post-T6 Stage-Decomposition GCR          RESTRUCTURE NOW / OPERATOR-RATIFIED
-TRRB                                     STAGED / OPERATOR REVIEW NEXT
+TRRB                                     CLOSED / OPERATOR-RATIFIED / PROMOTED
 
-T7                                       NOT OPEN
+T7                                       ACTIVE / SOURCE EVIDENCE CENSUS NEXT
 T8                                       NOT OPEN
 T9                                       NOT OPEN
 T10                                      NOT OPEN
@@ -57,49 +58,31 @@ T12                                      NOT OPEN
 implementation                           BLOCKED
 ```
 
-## Why the program was restructured
+## Post-T6 program law
 
-After T6 closure, the operator challenged the assumption that T7 could be the final technical stage before implementation planning.
-
-The Global Coherence review found:
-
-```text
-T1→T6 successfully define product/semantic correctness and public journeys
-BUT
-physical realization is still materially open
-```
-
-Examples of still-unfrozen realization include:
-
-```text
-backend package/module topology
-internal owner communication
-physical DB/table/constraint ownership
-exact executable OpenAPI schemas
-frontend route/feature/query/cache topology
-runtime binaries/jobs/deployment/trust boundaries
-Golden Flow proof architecture
-current→target transition/cutover
-bounded implementation dependency graph
-```
-
-The Method outcome is `RESTRUCTURE NOW` for the **post-T6 stage decomposition only**. T1→T6 remain preserved.
+The operator ratified the corrected T7→T12 implementation-readiness descent after a Global Coherence finding proved that semantic design completion did not equal physical realization completion.
 
 Durable program authority:
 
 `wiki/architecture/r10-post-t6-implementation-readiness-program.md`
 
-Registry reconciliation:
+Registry stage-ownership reconciliation:
 
 `wiki/architecture/rebaseline-decision-registry-post-t6-amendment.md`
 
-## Current operator target — TRRB
+Binding execution rule:
 
-`docs/superpowers/analysis/2026-08-19-r10-technical-realization-reconciliation-baseline.md`
+> **No Writer task may contain a material architecture decision that should have been decided before execution.**
 
-The TRRB does not choose target packages/tables/processes. It establishes what is currently known and routes missing decisions.
+## TRRB — CLOSED
 
-Evidence classes:
+Durable baseline:
+
+`wiki/architecture/r10-technical-realization-reconciliation-baseline.md`
+
+The TRRB was operator-ratified as a coverage/evidence/routing baseline only. It does not choose target technical realization.
+
+Evidence classes remain:
 
 ```text
 CURRENT-PROVEN
@@ -108,12 +91,62 @@ STALE / SUPERSEDED
 UNKNOWN / REMEASURE
 ```
 
-Review only:
+Completed TRRB staging was removed from the live tree. Git history preserves the exact ratified source snapshot.
 
-1. coverage completeness;
-2. evidence classification correctness;
-3. future-stage routing of each missing decision;
-4. whether any material decision could still fall accidentally to a Writer.
+## T7 — ACTIVE
+
+Active bootstrap:
+
+`docs/superpowers/analysis/2026-08-19-r10-t7-historical-migration-truth-semantic-mapping-bootstrap.md`
+
+T7 asks:
+
+> **What historical/source truth can MetalDocs legitimately carry forward, and how may that truth map into the ratified semantic target without fabrication?**
+
+T7 scope:
+
+```text
+actual legacy/source evidence census
+PROVEN / INFERABLE WITH EXPLICIT RULE / UNKNOWN
+smallest justified migration-mode set
+imported target-owned facts vs provenance-only evidence
+source document/revision identity quality
+revision/ordinal mapping
+exact-content provenance quality
+actor/owner/governance provenance quality
+semantic migration unit
+truthful partial/ambiguous/unknown history
+```
+
+Explicitly out of T7:
+
+```text
+backend/package topology                    T8-B
+internal communication realization          T8-C
+target relational schema                    T8-D
+exact executable OpenAPI                    T8-E
+frontend realization                        T8-F
+runtime/process/deploy realization          T8-G
+Golden Flow proof architecture              T9
+migration tooling/dry-run/reconciliation    T10
+production cutover/rollback/deletion        T10
+restore/offboarding cutover choreography    T10
+implementation graph                        T11
+product code                                BLOCKED
+```
+
+## Exact next action
+
+```text
+fresh revalidate PR/HEAD
+→ inspect actual source DB/content/runtime evidence
+→ build source evidence census
+→ classify each material fact PROVEN / INFERABLE / UNKNOWN
+→ identify only material unknowns
+→ only then compare migration-truth approaches
+```
+
+Do not choose target packages, target tables, target runtime topology or concrete cutover implementation inside T7.
 
 ## Corrected future descent
 
@@ -143,16 +176,5 @@ Integrated Whole-R10 GCR
 → explicit implementation authorization
 → execute T11 graph
 ```
-
-## Exact next action
-
-```text
-operator reviews TRRB
-→ if corrections exist: correct census only
-→ when accepted: reconcile remaining technical-document routing
-→ open redefined T7
-```
-
-Do not start T7 source-migration design, T8 target design, implementation planning or product code before the current gate closes.
 
 Implementation remains **BLOCKED**.
