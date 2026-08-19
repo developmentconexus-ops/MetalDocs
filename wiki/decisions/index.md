@@ -1,58 +1,90 @@
 # Decisions
 
-> **Last verified:** 2026-08-14
-> **Status:** ADR archive + retained-decision register during Cohesive Platform Redesign
+> **Last verified:** 2026-08-19  
+> **Status:** HISTORICAL ADR REGISTER / R10 EVIDENCE INDEX — **NOT TARGET AUTHORITY BY ACCEPTED STATUS ALONE**
 
-## Active redesign rule
+Historical ADRs remain valuable rationale and implementation evidence. Under R10, an ADR's historical `Accepted` status does **not** grant automatic inheritance into the target physical architecture.
 
-Historical ADRs remain valuable evidence, but **Accepted does not mean automatically retained in the new target** when the active Cohesive Platform Redesign is explicitly re-adjudicating that boundary.
+## Current target authority
 
-Current target authority:
+For target decisions, read in this order:
 
-- [../architecture/cohesive-platform-redesign.md](../architecture/cohesive-platform-redesign.md)
-- `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md`
+1. `../architecture/launch-v1-product-contract.md`
+2. `../architecture/whole-product-alignment-review.md`
+3. `../architecture/launch-v1-ownership-topology.md`
+4. `../architecture/r10-t1-semantic-state-invariants.md` through the latest promoted R10 stage authority
+5. `../architecture/rebaseline-decision-registry.md` + current amendments
+6. `../architecture/r10-technical-architecture.md` — sole current stage/status/next-action router
+7. `../references/current-agent-handoff.md`
 
-For target-design conflicts, operator-approved decisions in the active ledger win until replacement/amending ADRs are promoted at design closure.
+Current promoted technical-realization disposition:
 
-Do not edit dozens of historical ADR status blocks during WIP design. This index is the **program-level reclassification layer** until the final ADR set is ready; at closure, affected ADRs will be formally amended/superseded or retained.
+- `../architecture/r10-t8a-technical-authority-legacy-disposition.md`
+- `../architecture/rebaseline-decision-registry-t8a-amendment.md`
 
-## Retained cross-cutting decisions / principles
+## ADR inheritance law
 
-These remain useful target constraints unless a later material finding explicitly reopens them:
+For any pre-R10 ADR:
 
-- [0001 — Eigenpal adoption](0001-eigenpal-adoption.md) — editor technology choice; editor does not own governance semantics.
-- [0009 — PDF dispatch transactional outbox](0009-pdf-dispatch-outbox.md) — async delivery pattern remains a valid infrastructure precedent.
-- [0012 — Contract-first API](0012-contract-first-api.md) — OpenAPI/generated-contract discipline remains.
-- [0014 — docx-renderer service naming/responsibility](0014-rename-docgen-v2-to-docx-renderer.md) — renderer remains supporting infrastructure.
-- [0021 — tenant vs platform admin separation](0021-tenant-vs-platform-admin-separation.md) — consistent with new `tenant_owner` vs future platform operator distinction.
-- [0025 — RFC 9457 error envelope](0025-error-envelope-rfc9457.md) — stable API behavior constraint.
-- [0027 — RLS adoption](0027-rls-adoption-sequencing.md) — tenant isolation defense-in-depth remains; final table set changes with the new data model.
-- [0034 — integration test fixture framework](0034-integration-test-fixture-framework.md) — engineering/test infrastructure, not product-domain authority.
-- [0036 — DB tracing](0036-otelsql-db-tracing.md) — observability infrastructure.
+```text
+historical ADR proposes property/mechanism
+→ identify a named current R10 consumer
+→ map it to a ratified R10 property
+→ compare alternatives when material
+→ retain only if it remains the smallest sustainable solution
+```
 
-## Retained concept, placement/semantics under redesign
+Absence of an obvious conflict is **not** proof of Global Maximum.
 
-- [0085 — Release Coordinator](0085-release-coordinator-approval-driven-publication.md) — **concept retained**: human approval does not directly publish; release/effectivity waits for mechanical/domain gates. Final placement and lifecycle contract will be re-specified with Controlled Information.
-- [0093 — Controlled Information context / template role](0093-controlled-information-context-template-as-role.md) — **direction incorporated but being amended by the active redesign**: one Controlled Information context survives; template-as-role survives and is now explicitly versioned only through DocumentRevision; the target stable noun is converging on `Document`, not a separate public `ControlledDocument` object.
-- [0015 — async freeze/pin/materialize](0015-async-freeze-pin-materialize.md) — async principle is useful, but the content-source contract must be re-specified so only the reviewed Revision can be frozen/renditioned.
-- [0069 — periodic review / reason-for-change](0069-document-periodic-review-and-reason-for-change.md) — product requirement retained for design; exact owner/data model/permissions will be re-specified.
+Current implementation, old tests, migration convenience and sunk cost do not create preservation rights.
 
-## HISTORICAL / target semantics superseded or reopened
+## Properties explicitly preserved by current R10 authority
 
-These files remain in Git/wiki as evidence but must not drive new implementation:
+These are preserved because current R10 authorities independently require them, not because their old ADRs exist:
 
-- [0007 — Two-Tier Authorization](0007-two-tier-authz.md) — enforcement-depth lessons remain, but old grant/role/scope semantics are superseded by the active scoped-RBAC + Groups redesign.
-- [0022 — AuthZ capability coherence](0022-authz-capability-coherence.md) — historical implementation program; old role vocabulary and capability surfaces are not target authority.
-- [0077 — Approval Delegation](0077-approval-delegation.md) — sophisticated delegation is not a V1 requirement; audited reassignment is the approved baseline.
-- [0081 — Per-Profile Signature/GovernanceClass route policy](0081-per-profile-signature-policy.md) — reopened. `GovernanceClass` survives only if independent business meaning is proven; ApprovalPolicy owns workflow shape.
-- [0082 — Approval kernel extraction](0082-approval-kernel-extraction.md) — the separation of Approval as an authority survives, but its historical internal engine/model is superseded by Approval V1.
-- [0087 — livre zero-stage route](0087-livre-configured-no-approval-route.md) — historical route-shape solution; the new design does not encode no-approval through a fake zero-step route unless the current redesign independently chooses that model.
-- [0092 — AuthZ grant-model unification](0092-authz-grant-unification.md) — historical precursor. The new design keeps one assignment concept but changes the role set, scope semantics, Group treatment and removes speculative/custom-role assumptions from V1.
+- **Contract-first API / generated Go+TypeScript boundaries** — T6/T8-A.
+- **RFC 9457 error envelope** — T6.
+- **PostgreSQL product-state substrate** — T2/T5/T8-A.
+- **River durable-job mechanism for named T5 jobs** — T5/T8-A.
+- **system-owned Release/effectivity** — Product Contract/T1/T2.
+- **exact-content SHA/size/fail-closed principles** — T4/T8-A.
+- **runtime DB identity separated from schema/DDL ownership** — T8-A.
+- **verification registry / local-CI SSOT model** — T8-A.
 
-## All other ADRs
+The current physical implementation of those properties is still subject to later T8 subgates unless explicitly frozen.
 
-Treat ADRs not explicitly classified above as **historical/current-implementation evidence pending revalidation** when they touch product nouns, lifecycle, permissions, workflow, document/template behavior or module ownership.
+## Historical ADRs whose old target meaning is not inherited
 
-Pure infrastructure/contract/engineering ADRs may continue to apply when they do not conflict with the new domain model.
+Examples include, but are not limited to:
 
-At integrated-design closure we will produce the exact formal ADR amendment/supersession map rather than leave this WIP classification as the permanent record.
+- `0007` / `0022` — old AuthZ grant/capability enforcement model.
+- `0021` / `0027` — pooled tenancy / tenant-isolation/RLS assumptions.
+- `0069` — Periodic Review implementation; capability is Launch+, not Launch implementation.
+- `0077` — approval delegation.
+- `0081` — historical governance/signature policy shape.
+- `0082` — historical approval-kernel ownership/engine shape.
+- `0087` — historical zero-stage route encoding.
+- `0092` — historical AuthZ grant-model unification.
+- `0093` — earlier Controlled Information redesign wording where it differs from promoted Product Contract/T1→T8-A truth.
+
+These remain evidence. They do not route new implementation.
+
+## T8-A binding disposition
+
+Current legacy shapes such as the 15-module topology, tenant/GUC/RLS mesh, local-password AuthN, current OpenAPI surface, current frontend feature topology, provider-key semantic storage contract and non-Launch job wiring are **REWRITE / REHOME / DELETE / CURRENT-STATE ONLY** according to `r10-t8a-technical-authority-legacy-disposition.md`.
+
+Selective code/mechanism reuse is allowed only when all five T8-A tests pass:
+
+```text
+named current R10 consumer
++ public contract free of legacy semantic authority
++ dependency direction fits target
++ proof asserts target property rather than legacy shape
++ reuse remains smaller than rewrite after transition cost
+```
+
+## Rule for Fresh Actors
+
+If an ADR conflicts with Product Contract, T1→current promoted R10 authority, Registry amendments, or the active R10 router, **R10 wins**.
+
+Do not edit dozens of historical ADR bodies to rewrite history. This index is the program-level authority boundary; Git history preserves the original rationale.
