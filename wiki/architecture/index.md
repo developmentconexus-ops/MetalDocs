@@ -1,67 +1,70 @@
 # Architecture
 
-> **Last verified:** 2026-08-18
-> **Scope:** Durable system architecture truth and active target-design routing.
+> **Last verified:** 2026-08-18  
+> **Scope:** Durable architecture truth and active target-design routing.
 
-## Active target design — read first
+## Durable authority
 
-- **[launch-v1-product-contract.md](launch-v1-product-contract.md)** — Launch V1 product authority, **REV001**.
-- **[whole-product-alignment-review.md](whole-product-alignment-review.md)** — operator-adjudicated Whole-Product GCR A1–A10.
-- **[launch-v1-ownership-topology.md](launch-v1-ownership-topology.md)** — operator-approved 4+1 semantic ownership.
-- **[r10-t1-semantic-state-invariants.md](r10-t1-semantic-state-invariants.md)** — operator-ratified T1 authority.
-- **[r10-t2-governance-effectivity-transactions.md](r10-t2-governance-effectivity-transactions.md)** — operator-ratified T2 authority.
-- **[r10-t3-authorization-audit-enforcement.md](r10-t3-authorization-audit-enforcement.md)** — operator-ratified T3 authority.
-- **[r10-t4-exact-content-storage-integrity-restore.md](r10-t4-exact-content-storage-integrity-restore.md)** — operator-ratified T4 authority.
-- **[r10-t5-durable-async-search-external-effects.md](r10-t5-durable-async-search-external-effects.md)** — operator-ratified T5 authority.
-- **[rebaseline-decision-registry.md](rebaseline-decision-registry.md)** — current operator-ratified cross-stage disposition baseline.
-- **[r10-technical-architecture.md](r10-technical-architecture.md)** — current router; **T6 PRE-RATIFICATION CORRECTION GATE ACTIVE**.
-- [../references/current-agent-handoff.md](../references/current-agent-handoff.md) — exact fresh-session recovery point.
+- `launch-v1-product-contract.md` — REV001.
+- `whole-product-alignment-review.md` — A1–A10.
+- `launch-v1-ownership-topology.md` — 4+1 ownership.
+- `r10-t1-semantic-state-invariants.md` — T1.
+- `r10-t2-governance-effectivity-transactions.md` — T2.
+- `r10-t3-authorization-audit-enforcement.md` — T3; only the D4 phrase is currently evidence-reopened for operator adjudication.
+- `r10-t4-exact-content-storage-integrity-restore.md` — T4.
+- `r10-t5-durable-async-search-external-effects.md` — T5.
+- `rebaseline-decision-registry.md` — current disposition baseline.
+- `r10-technical-architecture.md` — current stage router.
+- `../references/current-agent-handoff.md` — fresh-session recovery point.
 
 ## Current gate
 
 ```text
-Product Contract                                      REV001 / OPERATOR-APPROVED
-T1 Semantic State & Invariants                       CLOSED / OPERATOR-RATIFIED
-T2 Governance, Effectivity & Lifecycle Transactions CLOSED / OPERATOR-RATIFIED
-T3 Authorization & Audit Enforcement                CLOSED / OPERATOR-RATIFIED
-T4 Exact Content, Storage Integrity & Restore       CLOSED / OPERATOR-RATIFIED
-T5 Durable Async, Search & External Effects         CLOSED / OPERATOR-RATIFIED
-Decision Registry                                    CURRENT / RECONCILED / OPERATOR-RATIFIED
-Post-T5 integrated Fable checkpoint                  CLOSED / OPERATOR-APPROVED
-T6 material core                                    OPERATOR-APPROVED / PRESERVED
-T6 pre-ratification GCR                              COMPLETE
-T6 corrections C1→C8                                OPERATOR ADJUDICATION NEXT
-T6 platform-facing summary                          RATIFICATION HELD
-T6 durable authority                                NOT YET
-T7 Historical Migration & Cutover                   NOT OPEN
-implementation                                       BLOCKED
+Product Contract / GCR / ownership      APPROVED
+T1                                      CLOSED
+T2                                      CLOSED
+T3                                      CLOSED except D4 precision question
+T4                                      CLOSED
+T5                                      CLOSED
+T6 material core                        OPERATOR-APPROVED / PRESERVED
+C1→C8 + L1→L5                           CLOSED
+T6 bounded delta D1→D4                  OPERATOR ADJUDICATION NEXT
+T6 platform summary                     RATIFICATION HELD
+T7                                      NOT OPEN
+implementation                          BLOCKED
 ```
 
-## Active T6 review gate
+Current delta review:
 
-- `../../docs/superpowers/analysis/2026-08-18-r10-t6-pre-ratification-global-coherence-review.md` — **current operator correction target**.
-- `../../docs/superpowers/analysis/2026-08-18-r10-t6-platform-facing-summary.md` — summary remains staging until corrections are adjudicated/incorporated.
+`../../docs/superpowers/analysis/2026-08-18-r10-t6-bounded-coherence-delta-review.md`
 
-Review result:
+New bounded findings:
 
 ```text
-core T1→T5 + 4+1 coherence = PASS
-T6 direction               = PASS
-formal T1→T5 reopen        = NONE
-summary ratification       = HOLD
+D1 current access authorization before Idempotency-Key replay disclosure
+D2 cursor GroupMembership read surface under access.manage
+D3 purpose-built least-privilege document-creation/options reference projection
+D4 define responsible-owner target eligibility = current enabled Company User; no implicit access grant
 ```
 
-The review found bounded T6 contract/concurrency/authority corrections, not a need to redesign the platform core. Current runtime remains evidence only and receives no target entitlement from sunk cost.
-
-## Exact next gate
+Minimal reopen:
 
 ```text
-operator adjudicates C1→C8
-→ corrected platform-facing T6 summary
-→ bounded coherence delta
-→ explicit operator summary ratification
-→ durable T6 promotion + Decision Registry reconciliation + staging cleanup
+T3 §9 phrase only
+T6 D1→D3 only
+```
+
+Everything else remains frozen.
+
+## Next
+
+```text
+operator adjudicates D1→D4
+→ exact bounded corrections
+→ exact D1→D4 delta review
+→ operator T6 platform-summary ratification
+→ durable T6 promotion + Registry update + staging cleanup
 → only then T7
 ```
 
-No implementation plan/product code is authorized.
+No implementation plan or product code is authorized.
