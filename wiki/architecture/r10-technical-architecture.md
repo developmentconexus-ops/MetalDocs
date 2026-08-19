@@ -1,108 +1,139 @@
 # R10 Technical Architecture — Active Stage Router
 
-> **Status:** ACTIVE — **T1→T5 OPERATOR-RATIFIED; C1→C8 + D1→D4 CLOSED; T6 PLATFORM SUMMARY REV2 RATIFICATION NEXT; T7 NOT OPEN; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1→T6 CLOSED / OPERATOR-RATIFIED; T7 ACTIVE / EVIDENCE CENSUS NEXT; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-18  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
 
 This file owns current technical-stage status and exact next action.
 
-## Binding authority chain
+## 1. Binding authority chain
+
+1. `AGENTS.md`
+2. `docs/engineering/standards/root-cause-global-maximum-method.md`
+3. `wiki/references/current-agent-handoff.md`
+4. `wiki/architecture/launch-v1-product-contract.md` — REV001
+5. `wiki/architecture/whole-product-alignment-review.md`
+6. `wiki/architecture/launch-v1-ownership-topology.md`
+7. `wiki/architecture/r10-t1-semantic-state-invariants.md`
+8. `wiki/architecture/r10-t2-governance-effectivity-transactions.md`
+9. `wiki/architecture/r10-t3-authorization-audit-enforcement.md`
+10. `wiki/architecture/r10-t3-d4-responsible-owner-eligibility-amendment.md`
+11. `wiki/architecture/r10-t4-exact-content-storage-integrity-restore.md`
+12. `wiki/architecture/r10-t5-durable-async-search-external-effects.md`
+13. `wiki/architecture/r10-t6-canonical-api-frontend-journeys.md`
+14. `wiki/architecture/rebaseline-decision-registry.md`
+15. `wiki/architecture/rebaseline-decision-registry-d4-amendment.md`
+16. `wiki/architecture/rebaseline-decision-registry-t6-amendment.md`
+17. this router
+18. `docs/superpowers/analysis/2026-08-18-r10-t7-historical-migration-cutover-bootstrap.md`
+19. actual source-system evidence only where needed for T7
+
+Current/legacy implementation is evidence only and has no compatibility entitlement.
+
+## 2. Binding Method laws
 
 ```text
-AGENTS.md
-→ DevelopmentConexus Engineering Method v1.0.0
-→ wiki/references/current-agent-handoff.md
-→ Product Contract REV001
-→ Whole-Product GCR A1–A10
-→ 4+1 ownership topology
-→ T1
-→ T2
-→ T3
-→ wiki/architecture/r10-t3-d4-responsible-owner-eligibility-amendment.md
-→ T4
-→ T5
-→ Decision Registry
-→ wiki/architecture/rebaseline-decision-registry-d4-amendment.md
-→ this router
-→ active T6 staging only until promotion
+smallest sustainable solution
+one semantic authority per meaning
+mechanism != authority
+proof before implementation
+Structural Inversion
+revalidation does not mean reinvention
+prepare the seam, not dormant future capability
 ```
 
-Current implementation has no compatibility entitlement. Structural Inversion controls.
-
-## Current descent
+## 3. Technical descent
 
 ```text
 Product Contract                         REV001 / OPERATOR-APPROVED
-T1                                       CLOSED / OPERATOR-RATIFIED
-T2                                       CLOSED / OPERATOR-RATIFIED
-T3                                       CLOSED / OPERATOR-RATIFIED + D4 bounded amendment
-T4                                       CLOSED / OPERATOR-RATIFIED
-T5                                       CLOSED / OPERATOR-RATIFIED
-Decision Registry                        CURRENT + D4 bounded amendment
-Post-T5 Fable checkpoint                 CLOSED / OPERATOR-APPROVED
-T6 material core                         OPERATOR-APPROVED / PRESERVED
-C1→C8 + L1→L5                           CLOSED
-D1→D4                                   CLOSED / OPERATOR-APPROVED
-T6 exact D1→D4 delta                     APPROVE / NEW MATERIAL FINDINGS 0
-T6 Platform Summary REV2                 OPERATOR RATIFICATION NEXT
-T6 durable authority                     NOT YET
-T7                                       NOT OPEN
+Whole-Product GCR A1→A10                 CLOSED / OPERATOR-APPROVED
+Launch ownership topology                CLOSED / OPERATOR-APPROVED / 4+1
+T1 — Semantic State & Invariants         CLOSED / OPERATOR-RATIFIED
+T2 — Governance/Effectivity/Tx           CLOSED / OPERATOR-RATIFIED
+T3 — Authorization & Audit               CLOSED / OPERATOR-RATIFIED + D4 amendment
+T4 — Exact Content/Storage/Restore       CLOSED / OPERATOR-RATIFIED
+T5 — Durable Async/Search/Effects        CLOSED / OPERATOR-RATIFIED
+T6 — Canonical API/Frontend Journeys     CLOSED / OPERATOR-RATIFIED / PROMOTED
+Decision Registry                        CURRENT + D4 + T6 amendments
+T7 — Historical Migration & Cutover      ACTIVE / EVIDENCE CENSUS NEXT
 implementation                           BLOCKED
 ```
 
-## T6 final review evidence
+## 4. T6 closure
 
-Pre-ratification GCR:
+Durable T6 authority:
 
-`docs/superpowers/analysis/2026-08-18-r10-t6-pre-ratification-global-coherence-review.md`
+`wiki/architecture/r10-t6-canonical-api-frontend-journeys.md`
 
-C1→C8 bounded delta:
+Registry reconciliation:
 
-`docs/superpowers/analysis/2026-08-18-r10-t6-bounded-coherence-delta-review.md`
+`wiki/architecture/rebaseline-decision-registry-t6-amendment.md`
 
-D1→D4 operator adjudication:
-
-`docs/superpowers/analysis/2026-08-18-r10-t6-d1-d4-operator-adjudication.md`
-
-Exact D1→D4 delta:
-
-`docs/superpowers/analysis/2026-08-18-r10-t6-d1-d4-exact-delta-review.md`
-
-Final delta verdict:
+Closure evidence:
 
 ```text
-D1 = CLOSED
-D2 = CLOSED
-D3 = CLOSED
-D4 = CLOSED
-NEW MATERIAL FINDINGS = 0
-DISAGREEMENT SET = EMPTY
-DELTA VERDICT = APPROVE
+Platform Summary REV2                    OPERATOR-RATIFIED
+C1→C8                                    CLOSED
+L1→L5                                    CLOSED
+D1→D4                                    CLOSED
+final exact delta                        APPROVE
+new material findings                    0
+disagreement set                         EMPTY
+completed T6 staging in live tree        REMOVED
+Git history                              archive/provenance
 ```
 
-## Current operator ratification target
+T6 may reopen only through one of its durable authority reopen triggers or a later material cross-stage contradiction.
 
-`docs/superpowers/analysis/2026-08-18-r10-t6-platform-facing-summary-rev2.md`
+## 5. T7 — ACTIVE
 
-This is the single consolidated implementation-facing T6 model containing the operator-approved material core plus C1→C8, L1→L5 and D1→D4.
+Bootstrap:
 
-It remains staging/non-authoritative until the operator explicitly ratifies the summary.
+`docs/superpowers/analysis/2026-08-18-r10-t7-historical-migration-cutover-bootstrap.md`
 
-## Current gate
+T7 owns only the remaining Registry REOPEN set:
 
 ```text
-operator reviews + explicitly ratifies Platform Summary REV2
-→ promote durable T6 authority to wiki/
-→ reconcile T6 closure in Decision Registry authority chain
-→ update router/handoff/index/PR
-→ remove completed T6 staging from live tree (Git history archive)
-→ only then open T7 Historical Migration & Cutover
+actual source evidence census
+CURRENT_STATE / FULL_HISTORY or smaller real migration-mode set
+imported target-owned fact shapes
+ordinal/content/governance provenance
+plan / dry-run / idempotency / reconciliation
+semantic-unit atomicity
+cutover / readiness / rollback / deletion map
+concrete restore/erasure and post-snapshot security-teardown reconciliation choreography where cutover/recovery requires it
 ```
 
-The material/correction approvals already received do **not** themselves promote T6 or open T7.
+### T7 inherited hard boundaries
 
-## Final gate after T7
+```text
+imported history never becomes fake native history
+unknown stays unknown
+Historical Migration != generic Interchange domain
+migration writes through owning semantic seams
+T4 exact-content admission/integrity remains binding
+T3 current security/offboarding truth remains binding
+historical side effects are never replayed as new current effects
+migration convenience cannot redefine Document/Revision/Submission/Release
+```
+
+### Exact next action
+
+```text
+actual source evidence census
+→ classify PROVEN / INFERABLE / UNKNOWN
+→ only then derive 2–3 T7 approaches
+→ T7 candidate/design
+→ material adjudication
+→ platform-facing T7 summary
+→ explicit operator summary ratification
+→ durable promotion + Registry reconciliation + staging cleanup
+```
+
+No substantive T7 design is accepted yet.
+
+## 6. Final R10 gate after T7
 
 ```text
 Integrated Whole-R10 Global Coherence Review
