@@ -2,7 +2,7 @@
 
 > **Last verified:** 2026-08-19  
 > **Active program:** R10 Post-T6 Implementation Readiness  
-> **Current stage:** T7 — Historical Migration Truth & Semantic Mapping  
+> **Current stage:** T8-A — Technical Authority & Legacy Census  
 > **Implementation:** BLOCKED
 
 ## When in doubt
@@ -13,28 +13,52 @@ Read:
 2. `../standards/root-cause-global-maximum-method.md`
 3. `../references/current-agent-handoff.md`
 4. `r10-technical-architecture.md`
-5. Product Contract + T1→T6 authorities named by the router
+5. Product Contract + T1→T7 authorities named by the router
 6. `r10-post-t6-implementation-readiness-program.md`
 7. `r10-technical-realization-reconciliation-baseline.md`
 8. the current active stage/staging named by the router
 
 Do not route current target work through `cohesive-platform-redesign.md`; it is superseded for active target routing.
 
+## “I’m classifying current technical structures”
+
+Current stage is **T8-A**.
+
+Read the active T8-A bootstrap and inspect current code/schema/API/frontend/runtime/deploy/test evidence. Classify material structures as:
+
+```text
+PRESERVE
+REFINE
+REHOME
+REWRITE
+DELETE
+CURRENT-STATE ONLY
+SUPERSEDED
+```
+
+Do not use the census to select the replacement topology by stealth.
+
 ## “I’m working on historical/source migration truth”
 
-Current stage is **T7**.
+T7 is **CLOSED**.
 
-Read the active bootstrap named by the router and inspect only actual source DB/content/runtime evidence required for the claim.
+Durable authority:
 
-T7 decides source truth, evidence quality, migration-mode semantics and historical semantic mapping. It does not decide physical implementation or cutover tooling.
+`r10-t7-historical-migration-truth-semantic-mapping.md`
 
-Concrete migration tooling/cutover belongs to **T10** after T8/T9 close.
+Ratified decision:
+
+```text
+NO HISTORICAL BUSINESS MIGRATION REQUIRED FOR LAUNCH
+```
+
+Current MetalDocs DB/content/history is DEV/test/throwaway and is not business-history migration evidence. T10 still owns technical current→target transition.
 
 ## “I’m deciding target backend/package architecture”
 
 Do **not** use current `internal/modules/` or `backend-target-architecture.md` as target defaults.
 
-Current state may be inspected through:
+Current state may be inspected during T8-A through:
 
 ```text
 wiki/backend/repo-topology.md
@@ -43,11 +67,11 @@ current Go package/import graph
 current SQL/table access
 ```
 
-Target backend/package topology belongs to **T8-B**, after T7 closes.
+Target backend/package topology belongs to **T8-B**, after T8-A closes.
 
 ## “I’m deciding internal module/owner communication”
 
-T1→T6 define semantic ownership and transaction/effect laws. Current cross-package calls, ports, direct SQL and legacy module imports are evidence only.
+T1→T7 define semantic/product constraints. Current cross-package calls, ports, direct SQL and legacy module imports are evidence only.
 
 Target internal owner communication belongs to **T8-C**.
 
@@ -108,13 +132,13 @@ Existing QA/checks are evidence and safety rails, not automatically the final pr
 
 Do not do this before T8/T9 close.
 
-Current→target package/schema/API/frontend/runtime refactor, migration, cutover, rollback and legacy deletion belong **T10**.
+Current→target package/schema/API/frontend/runtime refactor, DEV/test-state disposal/reset, cutover, rollback and legacy deletion belong **T10**.
 
 ## “I’m writing implementation tasks”
 
-Implementation decomposition belongs **T11** only after T7→T10 close.
+Implementation decomposition belongs **T11** only after T8→T10 close.
 
-No Writer task may contain a material architecture decision that should have been resolved in T7→T10.
+No Writer task may contain a material architecture decision that should have been resolved earlier.
 
 ## “I’m reviewing whether implementation may start”
 
