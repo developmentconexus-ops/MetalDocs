@@ -1,8 +1,8 @@
 # `docs/superpowers` — Active Design Staging Only
 
-> **Status:** **T6 CLOSED / PROMOTED; T7 ACTIVE / EVIDENCE CENSUS NEXT; IMPLEMENTATION BLOCKED.**
+> **Status:** **POST-T6 PROGRAM RESTRUCTURED; TRRB OPERATOR REVIEW NEXT; T7→T12 NOT OPEN; IMPLEMENTATION BLOCKED.**
 
-Durable accepted truth belongs in `wiki/`. Active not-yet-promoted analysis/review belongs here. Completed staging is removed from the live tree and Git history is the archive.
+Durable accepted truth belongs in `wiki/`. Active not-yet-promoted analysis/review belongs here. Completed/superseded staging is removed from the live tree; Git history is the archive.
 
 ## Durable authority
 
@@ -16,53 +16,47 @@ Product Contract REV001
 → T4
 → T5
 → T6
-→ Decision Registry + D4/T6 amendments
-→ active router
+→ Decision Registry + D4/T6/post-T6 amendments
+→ r10-post-t6-implementation-readiness-program.md
+→ r10-technical-architecture.md
 ```
-
-T6 durable authority:
-
-`wiki/architecture/r10-t6-canonical-api-frontend-journeys.md`
-
-T6 completed staging has been removed from `docs/superpowers/analysis/`.
 
 ## Current active staging
 
-- `analysis/2026-08-18-r10-t7-historical-migration-cutover-bootstrap.md` — **T7 OPEN / EVIDENCE CENSUS NEXT / NON-AUTHORITATIVE.**
+- `analysis/2026-08-19-r10-technical-realization-reconciliation-baseline.md` — **CURRENT-STATE CENSUS / OPERATOR REVIEW NEXT.**
 
-No T7 candidate/design has been accepted yet.
+The TRRB is not target design. It classifies current evidence and routes missing decisions to T7→T12.
 
-## T7 method posture
-
-T7 is architectural and must start from actual source evidence rather than migration-framework assumptions.
+## Current state
 
 ```text
-source evidence census
-→ classify PROVEN / INFERABLE / UNKNOWN
-→ clarify only material unknowns
-→ compare 2–3 approaches
-→ candidate T7 design
-→ material adjudication
-→ platform-facing summary
-→ explicit operator ratification
-→ durable promotion + Registry reconciliation + staging cleanup
+T1→T6                           CLOSED / OPERATOR-RATIFIED
+Post-T6 Stage-Decomposition GCR RESTRUCTURE NOW / OPERATOR-RATIFIED
+TRRB                            STAGED / OPERATOR REVIEW NEXT
+T7                              NOT OPEN
+T8                              NOT OPEN
+T9                              NOT OPEN
+T10                             NOT OPEN
+T11                             NOT OPEN
+T12                             NOT OPEN
+implementation                  BLOCKED
 ```
 
-T7 must not become generic Interchange/ETL/repository infrastructure and may not weaken T1→T6 for legacy convenience.
-
-## Current path
+## Corrected path
 
 ```text
-T1→T6                    CLOSED / OPERATOR-RATIFIED
-T7                       ACTIVE / EVIDENCE CENSUS NEXT
-implementation           BLOCKED
-
-→ T7 design/ratification
+operator reviews TRRB coverage/evidence classifications
+→ technical-document routing reconciliation
+→ T7 Historical Migration Truth & Semantic Mapping
+→ T8 Technical Realization Architecture
+→ T9 Golden Flows & Validation Baseline
+→ T10 Transition / Refactor / Migration / Cutover
+→ T11 Implementation Program & Execution Graph
+→ T12 Adversarial Implementation-Readiness
 → Integrated Whole-R10 GCR
-→ cold independent final review
+→ fresh independent/cold review
 → final operator ratification
-→ implementation spec/plan
-→ code
+→ explicit implementation authorization
 ```
 
 No implementation plan or product code is authorized.
