@@ -3,9 +3,9 @@
 ```text
 ACTIVE STAGING ROUTER
 NON-AUTHORITATIVE
-ROUND-1 REVIEW + LEAD ADJUDICATION COMPLETE
-ADJUDICATED CORRECTED CANDIDATE MATERIALIZED
-BOUNDED ROUND-2 FABLE NEXT
+ROUND-1 + BOUNDED ROUND-2 COMPLETE
+FINAL LEAD ADJUDICATION COMPLETE
+OPERATOR RATIFICATION NEXT
 NOT IMPLEMENTATION AUTHORIZATION
 ```
 
@@ -17,9 +17,11 @@ NOT IMPLEMENTATION AUTHORIZATION
 > **Method:** DevelopmentConexus Engineering Method v1.0.0  
 > **Implementation:** BLOCKED
 
-This file is a non-authoritative T8-C staging router.
+This file is the non-authoritative T8-C staging router. T8-C is at its final operator-ratification gate; nothing in `docs/` is durable target authority.
 
-Provenance:
+---
+
+## 1. Staging/provenance chain
 
 ```text
 original candidate
@@ -28,15 +30,19 @@ original candidate
 Round-1 independent review
   docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-independent-fable-review.md
 
-current adjudicated corrected candidate / Round-2 input
+adjudicated corrected candidate
   docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-adjudicated-corrected-candidate.md
-```
 
-None is durable target authority.
+bounded Round-2 delta review
+  docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-corrected-candidate-fable-delta-review.md
+
+final Lead adjudication / operator-ratification input
+  docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-final-lead-adjudication.md
+```
 
 ---
 
-## 1. Exact T8-C question
+## 2. Exact T8-C question
 
 > **What is the smallest complete set of internal contracts that lets the ratified owners and non-semantic application/mechanism layers realize T1→T8-B semantics without direct owner imports, foreign SQL, duplicate authority, hidden write ownership or unnecessary interface ceremony?**
 
@@ -44,7 +50,7 @@ T8-C consumes T8-B. It does not reopen package topology by preference.
 
 ---
 
-## 2. Binding inputs
+## 3. Binding inputs
 
 Read current authority in repository order, including:
 
@@ -70,7 +76,7 @@ For external library/framework/SDK/API/cloud behavior that is load-bearing, foll
 
 ---
 
-## 3. Frozen T8-B constraints
+## 4. Frozen T8-B constraints
 
 ```text
 one Go module for backend Go code
@@ -96,13 +102,13 @@ Controlled Documents
 Audit
 ```
 
-T8-C may propose a T8-B reopen only if an exact required contract proves a concrete contradiction.
+No review round found a required T8-B or T1→T7 reopen.
 
 ---
 
-## 4. Round-1 disposition
+## 5. Review convergence
 
-Independent Round-1 verdict:
+### Round 1
 
 ```text
 APPROVE T8-C GLOBAL MAXIMUM CANDIDATE WITH MATERIAL FIXES
@@ -112,80 +118,52 @@ T8-B REOPEN NO
 T1→T7 REOPEN NO
 ```
 
-Lead adjudication:
+### Bounded Round 2
 
 ```text
-B1 ACCEPT
-B2 ACCEPT
-B3 ACCEPT
-B4 ACCEPT
-B5 REJECT AS BLOCKER
-
-M1 ACCEPT
-M2 ACCEPT
-M3 ACCEPT WITH NARROWING
-M4 ACCEPT
-M5 ACCEPT AS REAL T8-C DECISION -> PII-FREE REPLAY BY CONSTRUCTION
-M6 ACCEPT
-
-L1-L5 ACCEPT
+APPROVE CORRECTED T8-C DELTA WITH MATERIAL FIXES
+BLOCKER 0 / MAJOR 5 / LOW 5
+SURVIVING MATERIAL CONTRADICTION 0
+GLOBAL MAXIMUM CLASS CONFIRMED
+T8-B REOPEN NO
+T1→T7 REOPEN NO
+T8-D TRESPASS NO
+T8-E TRESPASS NO
+ANOTHER FABLE ROUND NO
 ```
 
-No accepted correction changes the authority-aligned hybrid model class.
+Round 2 independently upheld both contested Lead positions:
+
+```text
+Round-1 B5 blocker        NOT SUSTAINED
+PII-free replay selection UPHELD
+```
 
 ---
 
-## 5. Current corrected candidate
+## 6. Final Lead closure
 
-Current Round-2 input:
+The final Lead adjudication closes the bounded Round-2 precision set without changing the confirmed **AUTHORITY-ALIGNED HYBRID CONTRACT MODEL**.
 
-`docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-adjudicated-corrected-candidate.md`
-
-Key corrected delta:
+Final refinements include:
 
 ```text
-explicit database/sql-family transaction substrate
-+ sealed txscope + platform-only native SQL binding for River
-+ Audit historical-visibility read contract
-+ Authorization AuthorizedScopes query
-+ protected User-eligibility serialization contract
-+ owner VersionToken / expected-version law
-+ verified primitive issuer+subject provider seam
-+ ManagedContent admission-claim lifecycle
-+ DeleteReclaimable + T5-J GC contract family
-+ malware verdict digest correlation
-+ concurrent idempotency outcome law without mandatory savepoint/retry
-+ PII-free ReplaySnapshot by construction
-+ OfficialRendition content-read contract
-+ bounded operation-census precision fixes
+D19 inherits the already-ratified T2 READ COMMITTED posture
+Scope seal is defense-in-depth; non-txscope embedding is mechanically forbidden
+SQLTx native binding returns explicit fail-closed error for non-target Scope
+T5-J performs full semantic/live-reference/claim/backup re-proof immediately before provider deletion
+T5-J maintenance choreography host = internal/application/maintenance
+Replay response reconstruction = self-contained ReplaySnapshot only
+PII-free replay stays selected; no Launch purge/redaction subsystem
+free-form replay exclusion is snapshot-minimality, not UserProfile-erasure inference
+database/sql selection stands without pretending River requires that substrate universally
+ManagedContent PresignCreate = create-once/no-overwrite
+provider-directory enumeration is bounded/synchronous and propagates callback failure
+AuthorizedScopes is prefilter only and cannot substitute exact Decide/DecideMany
+exact no-op replacement returns current VersionToken
 ```
 
-T8-D and T8-E boundaries remain explicit in the corrected candidate.
-
----
-
-## 6. Bounded Round-2 scope
-
-Round 2 is a delta review only. It must not re-derive already-confirmed unchanged T8-C decisions without a new contradiction.
-
-Attack only:
-
-```text
-txscope/River corrected binding + deliberate database/sql constraint
-Audit read visibility
-Authorization AuthorizedScopes
-ManagedContent claims + GC completeness/legal path
-protected eligibility serialization semantics
-owner VersionToken vs T8-E ETag boundary
-provider primitive identity seam
-malware digest correlation
-B5 disagreement using PostgreSQL primary behavior
-PII-free replay decision
-OfficialRendition exact-content read
-operation-census delta closure
-```
-
-Another broad review is justified only if this delta changes the confirmed Global Maximum class or proves a real T8-B/upstream contradiction.
+No third Fable round is justified by current evidence.
 
 ---
 
@@ -203,20 +181,20 @@ current→target moves/deletions                       T10
 implementation task decomposition                    T11
 ```
 
+T8-D remains **NOT OPEN**.
+
 ---
 
 ## 8. Exact next action
 
 ```text
-bounded Fable Round 2 on the adjudicated corrected candidate
-→ verify only the material Round-1 correction delta
-→ attack B5 Lead rejection with PostgreSQL primary evidence
-→ attack new PII-free replay decision
-→ verify B1/B2/B3/B4/M1/M2/M3/M4/M6 closure
-→ verify operation-census delta closure
-→ report any surviving material contradiction
-→ final Lead adjudication
-→ explicit operator ratification before durable T8-C promotion
+operator reviews final T8-C package
+→ explicit operator ratification if accepted
+→ only after ratification:
+     promote one consolidated durable T8-C authority into wiki/
+     add Decision Registry T8-C amendment
+     update router/handoff/PR to T8-C CLOSED / T8-D ACTIVE
+     clean/tombstone superseded T8-C staging as tooling allows
 ```
 
-T8-D remains **NOT OPEN**. Implementation remains **BLOCKED**.
+Implementation remains **BLOCKED**.
