@@ -1,125 +1,98 @@
 # R10 Technical Architecture — Active Stage Router
 
-> **Status:** ACTIVE — **PRODUCT CONTRACT REV001 + T1→T5 OPERATOR-RATIFIED; T6 MATERIAL CORE PRESERVED; PRE-RATIFICATION GCR FOUND BOUNDED T6 CORRECTIONS; SUMMARY RATIFICATION HELD; T7 NOT OPEN; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1→T5 OPERATOR-RATIFIED; C1→C8 CLOSED; T6 BOUNDED DELTA FOUND D1→D4; SUMMARY RATIFICATION HELD; T7 NOT OPEN; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-18  
-> **Revision convention:** `REV000` initial issuance / `REV001` first revision  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
-> **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
-> **Implementation gate:** **CLOSED — architecture/design only**
+> **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
 
 This file owns current technical-stage status and exact next action.
 
-## 1. Binding authority chain
-
-1. `AGENTS.md`
-2. `docs/engineering/standards/root-cause-global-maximum-method.md`
-3. `wiki/references/current-agent-handoff.md`
-4. `wiki/architecture/launch-v1-product-contract.md` — REV001
-5. `wiki/architecture/whole-product-alignment-review.md`
-6. `wiki/architecture/launch-v1-ownership-topology.md`
-7. `wiki/architecture/r10-t1-semantic-state-invariants.md`
-8. `wiki/architecture/r10-t2-governance-effectivity-transactions.md`
-9. `wiki/architecture/r10-t3-authorization-audit-enforcement.md`
-10. `wiki/architecture/r10-t4-exact-content-storage-integrity-restore.md`
-11. `wiki/architecture/r10-t5-durable-async-search-external-effects.md`
-12. `wiki/architecture/rebaseline-decision-registry.md`
-13. this router
-14. `docs/superpowers/analysis/2026-08-18-r10-t6-operator-material-adjudication.md`
-15. `docs/superpowers/analysis/2026-08-18-r10-t6-pre-ratification-global-coherence-review.md` — **ACTIVE REVIEW / CORRECTION GATE**
-16. T6 platform summary/candidate/evidence staging only for the bounded correction set
-17. current implementation only as claim-specific evidence
-
-Current implementation has **no compatibility entitlement**. Structural Inversion controls T6.
-
-## 2. Binding Method laws
+## Binding authority chain
 
 ```text
-smallest sustainable solution
-one semantic authority per meaning
-mechanism != authority
-proof before implementation
-Structural Inversion
+AGENTS.md
+→ DevelopmentConexus Engineering Method v1.0.0
+→ wiki/references/current-agent-handoff.md
+→ Product Contract REV001
+→ Whole-Product GCR A1–A10
+→ 4+1 ownership topology
+→ T1
+→ T2
+→ T3
+→ T4
+→ T5
+→ Decision Registry
+→ this router
+→ active T6 review/adjudication staging only
 ```
 
-> **Defer the capability; preserve the evolution seam. Prepare the seam, not the dormant implementation.**
+Current implementation has no compatibility entitlement. Structural Inversion controls.
 
-> **Revalidation does not mean reinvention. Preserve a prior simple/coherent decision unless current authority or a concrete failure mode disproves it; rederive only the composite decision whose justification changed.**
-
-## 3. Technical descent
+## Current descent
 
 ```text
-Product Contract                                        REV001 / OPERATOR-APPROVED
-T1 — Semantic State & Invariants                       CLOSED / OPERATOR-RATIFIED
-T2 — Governance, Effectivity & Lifecycle Transactions CLOSED / OPERATOR-RATIFIED
-T3 — Authorization & Audit Enforcement                CLOSED / OPERATOR-RATIFIED
-T4 — Exact Content, Storage Integrity & Restore       CLOSED / OPERATOR-RATIFIED
-T5 — Durable Async, Search & External Effects         CLOSED / OPERATOR-RATIFIED
-Decision Registry                                      CURRENT / OPERATOR-RATIFIED
-Post-T5 integrated Fable checkpoint                   CLOSED / OPERATOR-APPROVED
-T6 material core                                      OPERATOR-APPROVED / PRESERVED
-T6 pre-ratification GCR                               COMPLETE / BOUNDED CORRECTIONS FOUND
-T6 correction set C1→C8                               OPERATOR ADJUDICATION NEXT
-T6 platform-facing summary                            RATIFICATION HELD
-T6 durable authority                                  NOT YET
-T7 — Historical Migration & Cutover                   NOT OPEN
-implementation                                         BLOCKED
+Product Contract                         REV001 / OPERATOR-APPROVED
+T1                                       CLOSED / OPERATOR-RATIFIED
+T2                                       CLOSED / OPERATOR-RATIFIED
+T3                                       CLOSED / OPERATOR-RATIFIED, except D4 precision question now evidence-open
+T4                                       CLOSED / OPERATOR-RATIFIED
+T5                                       CLOSED / OPERATOR-RATIFIED
+Decision Registry                        CURRENT / OPERATOR-RATIFIED
+Post-T5 Fable checkpoint                 CLOSED / OPERATOR-APPROVED
+T6 material core                         OPERATOR-APPROVED / PRESERVED
+C1→C8 + L1→L5                           CLOSED / INCORPORATED
+T6 bounded coherence delta               COMPLETE / NEW D1→D4 FOUND
+T6 summary                               RATIFICATION HELD
+T7                                       NOT OPEN
+implementation                           BLOCKED
 ```
 
-## 4. Pre-ratification Global Coherence Review
+## Bounded delta authority/evidence
 
-Authority/review:
+`docs/superpowers/analysis/2026-08-18-r10-t6-bounded-coherence-delta-review.md`
 
-`docs/superpowers/analysis/2026-08-18-r10-t6-pre-ratification-global-coherence-review.md`
-
-Verdict:
+Delta verdict:
 
 ```text
-core T1→T5 / 4+1 coherence     PASS
-T6 Global-Maximum direction    PASS
-formal T1→T5 reopen            NONE
-summary ready for ratification NO
+C1→C8 = CLOSED
+L1→L5 = CLOSED
+NEW MATERIAL FINDINGS = 4
+DELTA VERDICT = MATERIAL PRECISION DELTA
 ```
 
-Required bounded T6 corrections:
+D1→D4:
 
 ```text
-C1 status discovery is lens-scoped/derived; never persisted Document.currentStatus
-C2 Idempotency-Key replay result commits atomically with semantic transition; no baseline public IN_PROGRESS state
-C3 distinguish /api/v1 application contract from /auth integration and operations surfaces
-C4 restore complete Launch lifecycle journeys to platform-facing summary
-C5 next-Revision source copy revalidates current EFFECTIVE source after external copy and before commit
-C6 If-Match on provider-binding / responsible-owner / template-role current singleton resources
-C7 template admin uses bounded template_use.manage metadata surface without implicit document content/history access
-C8 normalized DocumentType.code + Area.code are Company-unique numbering inputs
+D1  current T3 access authorization must be rechecked before an Idempotency-Key replay response is disclosed; completed mutation predicates are not re-executed
+D2  Access Admin needs cursor-paginated GET GroupMembership read surface under access.manage
+D3  create/owner journeys need a purpose-built least-privilege document-creation/options projection instead of reusing admin/PII reads
+D4  T3 must define `eligible target User` for responsible owner; recommended = current ENABLED User in same Company, with no implicit Role/Permission grant
 ```
 
-Low refinements L1→L5 remain in the review and require no T1→T5 reopen.
-
-Everything else in the operator-approved T6 material core remains frozen.
-
-## 5. Current gate
+Minimal reopen set:
 
 ```text
-operator adjudicates C1→C8
-→ incorporate accepted corrections into T6 summary/material record
-→ bounded coherence delta against Product Contract + T1→T5
-→ explicit operator platform-summary ratification
-→ promote durable T6 authority to wiki/
-→ reconcile Decision Registry
-→ remove completed T6 staging
-→ only then open T7
+T1 = EMPTY
+T2 = EMPTY
+T3 = §9 responsible-owner target eligibility phrase only
+T4 = EMPTY
+T5 = EMPTY
+T6 = D1→D3 contract/read-surface precision
 ```
 
-A previous material-decision approval does not override this later evidence-driven correction gate.
+Everything else remains frozen.
 
-## 6. Final gate after T7
+## Current gate
 
 ```text
-Integrated Whole-R10 Global Coherence Review
-→ cold independent final review
-→ operator final ratification
-→ implementation spec/plan
-→ code
+operator adjudicates D1→D4
+→ if accepted: apply D1→D3 to T6 summary
+→ apply D4 bounded T3 clarification + Registry reconciliation
+→ rerun exact bounded delta only over D1→D4
+→ if clean: operator platform-summary ratification
+→ durable T6 promotion
+→ staging cleanup
+→ only then T7
 ```
 
-**Implementation remains BLOCKED.**
+A previous T6 material approval does not override later evidence. Implementation remains **BLOCKED**.
