@@ -1,6 +1,6 @@
 # R10 Technical Architecture — Active Stage Router
 
-> **Status:** ACTIVE — **T1→T8-B CLOSED / OPERATOR-RATIFIED; T8-C ACTIVE / GLOBAL MAXIMUM CANDIDATE MATERIALIZED / INDEPENDENT REVIEW NEXT; T8-D→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1→T8-B CLOSED / OPERATOR-RATIFIED; T8-C ACTIVE / ROUND-1 REVIEW + LEAD ADJUDICATION COMPLETE / CORRECTED CANDIDATE MATERIALIZED / BOUNDED ROUND-2 NEXT; T8-D→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-19  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
@@ -20,7 +20,7 @@ Read in order:
 7. `wiki/architecture/r10-post-t6-implementation-readiness-program.md`
 8. `wiki/architecture/r10-technical-realization-reconciliation-baseline.md`
 9. this router
-10. active T8-C bootstrap + candidate listed in §6
+10. active T8-C staging listed in §6
 11. current code/interfaces only for a concrete T8-C evidence claim
 
 Legacy implementation proves what exists, not what survives.
@@ -83,7 +83,7 @@ Decision Registry                                CURRENT + amendments through T8
 TRRB                                             CLOSED / OPERATOR-RATIFIED / PROMOTED
 
 T8 — Technical Realization Architecture          ACTIVE
-  T8-C Internal Communication Contracts          ACTIVE / CANDIDATE MATERIALIZED / INDEPENDENT REVIEW NEXT
+  T8-C Internal Communication Contracts          ACTIVE / CORRECTED CANDIDATE / BOUNDED ROUND-2 NEXT
   T8-D Persistence Realization                   NOT OPEN
   T8-E Executable Wire Contract                  NOT OPEN
   T8-F Frontend Realization                      NOT OPEN
@@ -145,61 +145,69 @@ first-party package classification = closed-world
 first-party dependency edges = default-deny
 ```
 
-T8-B bootstrap/candidate/reviewer artifacts are no longer active staging. Because physical deletion was unavailable in the publication tool, their live-tree files are reduced to explicit **SUPERSEDED/HISTORICAL tombstones** that route to this durable authority; complete provenance remains in Git history.
+T8-B bootstrap/candidate/reviewer artifacts are no longer active staging. Their tombstones route to durable authority; full provenance remains in Git history.
 
 ## 6. T8-C — ACTIVE
 
-Active bootstrap:
-
-`docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-bootstrap.md`
-
-Current non-authoritative Global Maximum candidate:
-
-`docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-global-maximum-candidate.md`
-
-Candidate status:
+Staging chain:
 
 ```text
-interaction census                   COMPLETE AT CANDIDATE LEVEL
-reference/standards check            COMPLETE AT CANDIDATE LEVEL
-contract-placement alternatives      COMPARED
-Global Maximum candidate             MATERIALIZED / NON-AUTHORITATIVE
-independent Fable review             NEXT
-Lead adjudication                    AFTER REVIEW
-operator ratification                AFTER ADJUDICATION
+bootstrap
+  docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-bootstrap.md
+
+original Global Maximum candidate
+  docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-global-maximum-candidate.md
+
+Round-1 independent Fable review
+  docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-independent-fable-review.md
+
+current adjudicated corrected candidate / bounded Round-2 input
+  docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-adjudicated-corrected-candidate.md
 ```
 
-The candidate selects an authority-aligned hybrid model:
+Round-1 result:
 
 ```text
-concrete semantic-owner public APIs
-+ consumer-owned narrow mechanism/resolver interfaces
-+ application-routed cross-owner facts
-+ provider-neutral shared txscope
-+ owner-authored same-tx Audit evidence
-+ Authorization-owned final ALLOW/default-DENY
-+ named transaction-coupled durable intents only
-+ application ReplaySnapshot / opaque idempotency mechanism
-- shared contracts/common models
-- generic UnitOfWork/EventBus/policy language/service locator
+APPROVE T8-C GLOBAL MAXIMUM CANDIDATE WITH MATERIAL FIXES
+GLOBAL MAXIMUM CLASS CONFIRMED
+T8-B REOPEN NO
+T1→T7 REOPEN NO
+```
+
+Lead adjudication accepted B1/B2/B3/B4, rejected B5 as a required blocker after PostgreSQL primary-evidence verification, accepted M1/M2/M4/M6, narrowed M3, and converted M5 into the explicit T8-C selection **PII-FREE REPLAY SNAPSHOT BY CONSTRUCTION**.
+
+Corrected candidate preserves the confirmed authority-aligned hybrid model and adds only bounded contract corrections, including:
+
+```text
+explicit database/sql-family tx substrate + platform-only River native binding
+Audit historical-visibility read
+Authorization AuthorizedScopes
+protected eligibility serialization semantic guarantee
+owner VersionToken / expected-version contract
+verified primitive issuer+subject provider seam
+ManagedContent admission claims + DeleteReclaimable + T5-J GC contracts
+malware digest correlation
+concurrent idempotency outcome law with SQL realization deferred T8-D
+PII-free ReplaySnapshot
+OfficialRendition content read
+operation-census precision fixes
 ```
 
 ### Exact next action
 
 ```text
-independent Fable review of the current T8-C Global Maximum candidate
-→ reviewer reconstructs authority independently
-→ attacks txscope / Audit / AuthZ / GROUP resolver / provider ports /
-   managed content / rendition intent / idempotency / read projections /
-   stage-boundary completeness
-→ Lead adjudicates findings against repository authority + Method
-→ bounded correction only if material finding survives
-→ explicit operator ratification before durable promotion
+bounded Fable Round 2 on the adjudicated corrected candidate
+→ verify only the material Round-1 delta
+→ attack txscope/River correction
+→ attack B5 Lead rejection against PostgreSQL primary evidence
+→ attack PII-free replay selection
+→ verify remaining material finding closure
+→ verify T8-D/T8-E boundaries and operation-census delta
+→ final Lead adjudication
+→ explicit operator ratification before durable T8-C promotion
 ```
 
-T8-C remains ACTIVE and non-authoritative until that chain closes.
-
-Current implementation interfaces remain evidence only and receive no survival entitlement from existence.
+No broad Round-2 re-derivation is required unless the delta proves a new material contradiction that changes the confirmed model class.
 
 ## 7. Stage boundaries
 
@@ -216,7 +224,7 @@ T11  = implementation Execution Graph
 T12  = adversarial implementation-readiness
 ```
 
-T8-C may identify persistence needs but must not design schema/locks by stealth. It may not reopen T8-B topology without a concrete contract contradiction.
+T8-C may identify persistence needs and deliberate substrate constraints but must not design schema/locks/SQL by stealth. T8-D remains closed until T8-C is promoted.
 
 ## 8. Final implementation gate
 
