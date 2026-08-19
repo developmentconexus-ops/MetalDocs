@@ -27,10 +27,11 @@ Read in order:
 14. `wiki/architecture/rebaseline-decision-registry.md`
 15. `wiki/architecture/rebaseline-decision-registry-d4-amendment.md`
 16. `wiki/architecture/rebaseline-decision-registry-t6-amendment.md`
-17. `wiki/architecture/r10-post-t6-implementation-readiness-program.md`
-18. this router
-19. `docs/superpowers/analysis/2026-08-19-r10-technical-realization-reconciliation-baseline.md`
-20. current code/schema/API/frontend/runtime evidence only for a concrete census/design claim
+17. `wiki/architecture/rebaseline-decision-registry-post-t6-amendment.md`
+18. `wiki/architecture/r10-post-t6-implementation-readiness-program.md`
+19. this router
+20. `docs/superpowers/analysis/2026-08-19-r10-technical-realization-reconciliation-baseline.md`
+21. current code/schema/API/frontend/runtime evidence only for a concrete census/design claim
 
 Legacy implementation and legacy technical design documents are evidence only unless the active R10 authority explicitly promotes their meaning.
 
@@ -63,7 +64,7 @@ T3 — Authorization & Audit                       CLOSED / OPERATOR-RATIFIED + 
 T4 — Exact Content / Storage / Restore           CLOSED / OPERATOR-RATIFIED
 T5 — Durable Async / Search / Effects            CLOSED / OPERATOR-RATIFIED
 T6 — Canonical API / Frontend Journeys           CLOSED / OPERATOR-RATIFIED / PROMOTED
-Decision Registry                                CURRENT + D4 + T6 amendments
+Decision Registry                                CURRENT + D4 + T6 + post-T6 amendments
 
 Post-T6 Stage-Decomposition GCR                  RESTRUCTURE NOW / OPERATOR-RATIFIED
 Technical Realization Reconciliation Baseline   STAGED / OPERATOR REVIEW NEXT
@@ -101,6 +102,10 @@ Operator ratified the corrected program on 2026-08-19.
 Durable program authority:
 
 `wiki/architecture/r10-post-t6-implementation-readiness-program.md`
+
+Registry stage-ownership reconciliation:
+
+`wiki/architecture/rebaseline-decision-registry-post-t6-amendment.md`
 
 T1→T6 remain preserved. The restructure changes the descent after T6, not their accepted meaning.
 
