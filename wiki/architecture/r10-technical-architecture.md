@@ -1,6 +1,6 @@
 # R10 Technical Architecture — Active Stage Router
 
-> **Status:** ACTIVE — **T1→T8-B CLOSED / OPERATOR-RATIFIED; T8-C ACTIVE / INTERNAL COMMUNICATION CONTRACTS; T8-D→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1→T8-B CLOSED / OPERATOR-RATIFIED; T8-C ACTIVE / GLOBAL MAXIMUM CANDIDATE MATERIALIZED / INDEPENDENT REVIEW NEXT; T8-D→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-19  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
@@ -20,7 +20,7 @@ Read in order:
 7. `wiki/architecture/r10-post-t6-implementation-readiness-program.md`
 8. `wiki/architecture/r10-technical-realization-reconciliation-baseline.md`
 9. this router
-10. active T8-C staging listed in §6
+10. active T8-C bootstrap + candidate listed in §6
 11. current code/interfaces only for a concrete T8-C evidence claim
 
 Legacy implementation proves what exists, not what survives.
@@ -83,7 +83,7 @@ Decision Registry                                CURRENT + amendments through T8
 TRRB                                             CLOSED / OPERATOR-RATIFIED / PROMOTED
 
 T8 — Technical Realization Architecture          ACTIVE
-  T8-C Internal Communication Contracts          ACTIVE / CONTRACT DERIVATION NEXT
+  T8-C Internal Communication Contracts          ACTIVE / CANDIDATE MATERIALIZED / INDEPENDENT REVIEW NEXT
   T8-D Persistence Realization                   NOT OPEN
   T8-E Executable Wire Contract                  NOT OPEN
   T8-F Frontend Realization                      NOT OPEN
@@ -153,47 +153,53 @@ Active bootstrap:
 
 `docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-bootstrap.md`
 
-T8-C answers:
+Current non-authoritative Global Maximum candidate:
 
-> **What is the smallest complete set of internal contracts that lets the ratified owners and non-semantic application/mechanism layers realize T1→T8-B semantics without direct owner imports, foreign SQL, duplicate authority, hidden write ownership or unnecessary interface ceremony?**
+`docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-global-maximum-candidate.md`
 
-T8-C freezes:
+Candidate status:
 
 ```text
-owner queries
-owner capabilities
-read projections
-same-process/local calls
-transaction-coupled intents
-River/durable job seams where already justified
-consumer/producer contract ownership
+interaction census                   COMPLETE AT CANDIDATE LEVEL
+reference/standards check            COMPLETE AT CANDIDATE LEVEL
+contract-placement alternatives      COMPARED
+Global Maximum candidate             MATERIALIZED / NON-AUTHORITATIVE
+independent Fable review             NEXT
+Lead adjudication                    AFTER REVIEW
+operator ratification                AFTER ADJUDICATION
 ```
 
-T8-C must resolve at minimum the exact contracts for the T8-B seam classes:
+The candidate selects an authority-aligned hybrid model:
 
 ```text
-provider-neutral transaction participation
-same-transaction owner evidence → Audit handoff
-owner-authored domain predicate facts → Authorization decision
-transaction-coupled durable intent
-material consumer-owned mechanism ports
+concrete semantic-owner public APIs
++ consumer-owned narrow mechanism/resolver interfaces
++ application-routed cross-owner facts
++ provider-neutral shared txscope
++ owner-authored same-tx Audit evidence
++ Authorization-owned final ALLOW/default-DENY
++ named transaction-coupled durable intents only
++ application ReplaySnapshot / opaque idempotency mechanism
+- shared contracts/common models
+- generic UnitOfWork/EventBus/policy language/service locator
 ```
 
 ### Exact next action
 
 ```text
-derive complete interaction census from T2/T3/T4/T5/T6 + T8-B
-→ classify sync query / mutation / same-tx / durable-intent / mechanism / read-projection
-→ freeze contract ownership and direction
-→ resolve txscope / Audit evidence / Authorization predicate contracts first
-→ derive remaining owner/mechanism contracts
-→ compare credible contract-placement alternatives
-→ apply Method + subtractive pass
-→ adversarial challenge
-→ operator-ratifiable T8-C candidate
+independent Fable review of the current T8-C Global Maximum candidate
+→ reviewer reconstructs authority independently
+→ attacks txscope / Audit / AuthZ / GROUP resolver / provider ports /
+   managed content / rendition intent / idempotency / read projections /
+   stage-boundary completeness
+→ Lead adjudicates findings against repository authority + Method
+→ bounded correction only if material finding survives
+→ explicit operator ratification before durable promotion
 ```
 
-Current implementation interfaces may be inspected as evidence only and receive no survival entitlement from existence.
+T8-C remains ACTIVE and non-authoritative until that chain closes.
+
+Current implementation interfaces remain evidence only and receive no survival entitlement from existence.
 
 ## 7. Stage boundaries
 
