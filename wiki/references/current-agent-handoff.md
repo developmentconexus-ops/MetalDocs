@@ -24,10 +24,11 @@ Read in this order:
 14. `wiki/architecture/rebaseline-decision-registry.md`
 15. `wiki/architecture/rebaseline-decision-registry-d4-amendment.md`
 16. `wiki/architecture/rebaseline-decision-registry-t6-amendment.md`
-17. `wiki/architecture/r10-post-t6-implementation-readiness-program.md`
-18. `wiki/architecture/r10-technical-architecture.md`
-19. `docs/superpowers/analysis/2026-08-19-r10-technical-realization-reconciliation-baseline.md` — **CURRENT OPERATOR REVIEW TARGET**
-20. current code/schema/API/frontend/runtime evidence only for a concrete claim
+17. `wiki/architecture/rebaseline-decision-registry-post-t6-amendment.md`
+18. `wiki/architecture/r10-post-t6-implementation-readiness-program.md`
+19. `wiki/architecture/r10-technical-architecture.md`
+20. `docs/superpowers/analysis/2026-08-19-r10-technical-realization-reconciliation-baseline.md` — **CURRENT OPERATOR REVIEW TARGET**
+21. current code/schema/API/frontend/runtime evidence only for a concrete claim
 
 Do not route target design through `cohesive-platform-redesign.md`, `backend-target-architecture.md`, legacy module pages, current package names or historical implementation plans. They may be evidence only where the current R10 authority says so.
 
@@ -42,7 +43,7 @@ T3                                       CLOSED / OPERATOR-RATIFIED + D4 amendme
 T4                                       CLOSED / OPERATOR-RATIFIED
 T5                                       CLOSED / OPERATOR-RATIFIED
 T6                                       CLOSED / OPERATOR-RATIFIED / PROMOTED
-Decision Registry                        CURRENT + D4 + T6 amendments
+Decision Registry                        CURRENT + D4 + T6 + post-T6 amendments
 
 Post-T6 Stage-Decomposition GCR          RESTRUCTURE NOW / OPERATOR-RATIFIED
 TRRB                                     STAGED / OPERATOR REVIEW NEXT
@@ -84,9 +85,13 @@ bounded implementation dependency graph
 
 The Method outcome is `RESTRUCTURE NOW` for the **post-T6 stage decomposition only**. T1→T6 remain preserved.
 
-Durable authority:
+Durable program authority:
 
 `wiki/architecture/r10-post-t6-implementation-readiness-program.md`
+
+Registry reconciliation:
+
+`wiki/architecture/rebaseline-decision-registry-post-t6-amendment.md`
 
 ## Current operator target — TRRB
 
