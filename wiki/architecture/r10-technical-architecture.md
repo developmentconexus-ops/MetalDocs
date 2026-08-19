@@ -145,7 +145,7 @@ first-party package classification = closed-world
 first-party dependency edges = default-deny
 ```
 
-T8-B staging/reviewer artifacts are completed provenance and are removed from the live staging tree after promotion; Git history preserves them.
+T8-B bootstrap/candidate/reviewer artifacts are no longer active staging. Because physical deletion was unavailable in the publication tool, their live-tree files are reduced to explicit **SUPERSEDED/HISTORICAL tombstones** that route to this durable authority; complete provenance remains in Git history.
 
 ## 6. T8-C — ACTIVE
 
