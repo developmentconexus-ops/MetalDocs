@@ -1,16 +1,17 @@
 # Current Agent Handoff
 
 > **Last verified:** 2026-08-18  
-> **Status:** ACTIVE — **T1→T5 OPERATOR-RATIFIED; C1→C8 + D1→D4 CLOSED; T6 PLATFORM SUMMARY REV2 RATIFICATION NEXT; T7 NOT OPEN**  
-> **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
-> **Implementation:** BLOCKED — architecture/design only
+> **Status:** ACTIVE — **T1→T6 CLOSED / OPERATOR-RATIFIED; T7 ACTIVE / EVIDENCE CENSUS NEXT; IMPLEMENTATION BLOCKED**  
+> **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
 
 ## Fresh-session route
+
+Read in this order:
 
 1. `AGENTS.md`
 2. `docs/engineering/standards/root-cause-global-maximum-method.md`
 3. this file
-4. `wiki/architecture/launch-v1-product-contract.md`
+4. `wiki/architecture/launch-v1-product-contract.md` — REV001
 5. `wiki/architecture/whole-product-alignment-review.md`
 6. `wiki/architecture/launch-v1-ownership-topology.md`
 7. `wiki/architecture/r10-t1-semantic-state-invariants.md`
@@ -19,67 +20,109 @@
 10. `wiki/architecture/r10-t3-d4-responsible-owner-eligibility-amendment.md`
 11. `wiki/architecture/r10-t4-exact-content-storage-integrity-restore.md`
 12. `wiki/architecture/r10-t5-durable-async-search-external-effects.md`
-13. `wiki/architecture/rebaseline-decision-registry.md`
-14. `wiki/architecture/rebaseline-decision-registry-d4-amendment.md`
-15. `wiki/architecture/r10-technical-architecture.md`
-16. `docs/superpowers/analysis/2026-08-18-r10-t6-platform-facing-summary-rev2.md` — **CURRENT OPERATOR RATIFICATION TARGET**
-17. `docs/superpowers/analysis/2026-08-18-r10-t6-d1-d4-exact-delta-review.md` — final delta evidence
-18. older T6 candidate/review files only for provenance when needed
+13. `wiki/architecture/r10-t6-canonical-api-frontend-journeys.md`
+14. `wiki/architecture/rebaseline-decision-registry.md`
+15. `wiki/architecture/rebaseline-decision-registry-d4-amendment.md`
+16. `wiki/architecture/rebaseline-decision-registry-t6-amendment.md`
+17. `wiki/architecture/r10-technical-architecture.md`
+18. `docs/superpowers/analysis/2026-08-18-r10-t7-historical-migration-cutover-bootstrap.md`
+19. source/runtime evidence only for a concrete T7 claim
+
+Completed T6 staging has been removed from the live tree. Git history is the archive/provenance.
 
 ## Current checkpoint
 
 ```text
 Product Contract                         REV001 / OPERATOR-APPROVED
-Whole-Product GCR / ownership            CLOSED / APPROVED
+Whole-Product GCR A1→A10                 CLOSED / OPERATOR-APPROVED
+Launch ownership topology                CLOSED / OPERATOR-APPROVED / 4+1
 T1                                       CLOSED / OPERATOR-RATIFIED
 T2                                       CLOSED / OPERATOR-RATIFIED
 T3                                       CLOSED / OPERATOR-RATIFIED + D4 amendment
 T4                                       CLOSED / OPERATOR-RATIFIED
 T5                                       CLOSED / OPERATOR-RATIFIED
-Decision Registry                        CURRENT + D4 amendment
-T6 material core                         OPERATOR-APPROVED / PRESERVED
-C1→C8 + L1→L5                           CLOSED
-D1→D4                                   CLOSED / OPERATOR-APPROVED
-exact D1→D4 delta                        APPROVE / new material findings 0
-Platform Summary REV2                    RATIFICATION NEXT
-T6 durable authority                     NOT YET
-T7                                       NOT OPEN
+T6                                       CLOSED / OPERATOR-RATIFIED / PROMOTED
+Decision Registry                        CURRENT + D4 + T6 amendments
+T7                                       ACTIVE / EVIDENCE CENSUS NEXT
 implementation                           BLOCKED
 ```
 
-## Final T6 corrections now incorporated
+## T6 durable result
+
+Primary authority:
+
+`wiki/architecture/r10-t6-canonical-api-frontend-journeys.md`
+
+Registry closure:
+
+`wiki/architecture/rebaseline-decision-registry-t6-amendment.md`
+
+Final bounded review result preserved in Git history:
 
 ```text
-C1 derived lens-scoped status; no Document.currentStatus
-C2 semantic fact + idempotency replay proof commit atomically
-C3 /api/v1 != /auth integration != operations surface
-C4 complete Launch lifecycle journeys in implementation-facing summary
-C5 external source copy + commit-time current-EFFECTIVE revalidation
-C6 If-Match on authority-bearing singleton current resources
-C7 bounded template-admin metadata without content/history leakage
-C8 Company-unique normalized DocumentType.code + Area.code
-D1 current AuthZ before replay disclosure; no historical command re-execution
-D2 GroupMembership current list under access.manage
-D3 purpose-built least-privilege document-creation/options projection
-D4 eligible responsible target = existing ENABLED User in same Company; relation grants no permission
+C1→C8 = CLOSED
+L1→L5 = CLOSED
+D1→D4 = CLOSED
+NEW MATERIAL FINDINGS = 0
+DISAGREEMENT SET = EMPTY
+DELTA VERDICT = APPROVE
 ```
 
-Everything else remains frozen.
+Do not recover old T6 staging as active authority.
 
-## Exact next step
+## T7 purpose
 
-Operator reviews and explicitly ratifies:
+T7 is Historical Migration & Cutover only. It must not become a generic Interchange/integration platform and cannot relax the ratified target merely to make legacy migration easier.
 
-`docs/superpowers/analysis/2026-08-18-r10-t6-platform-facing-summary-rev2.md`
-
-If ratified:
+Official T7 REOPEN set:
 
 ```text
-promote T6 durable authority to wiki/
-→ reconcile T6 closure in Registry authority chain
-→ update router/handoff/index/PR
-→ remove completed T6 staging
-→ only then open T7
+actual source evidence census
+CURRENT_STATE / FULL_HISTORY or smaller real migration-mode set
+imported target-owned fact shapes
+ordinal/content/governance provenance
+plan / dry-run / idempotency / reconciliation
+semantic-unit atomicity
+cutover / readiness / rollback / deletion map
+concrete restore/erasure and post-snapshot security-teardown reconciliation choreography where cutover/recovery requires it
 ```
 
-Do not open T7 or write implementation plan/code before T6 durable promotion.
+Inherited laws:
+
+```text
+unknown source truth stays unknown
+imported history never becomes fake native governance/history
+migration writes through owning semantic seams
+provider/storage identity never becomes semantic identity
+T4 exact-content admission applies to imported bytes
+T3 current access/offboarding truth controls cutover serving
+historical provider/jobs/notifications are not replayed as new current effects
+```
+
+## Exact next work
+
+T7 is architectural. Next session/work should:
+
+```text
+fresh revalidate PR/HEAD
+→ read authority chain above
+→ perform actual legacy/source evidence census
+→ classify facts PROVEN / INFERABLE / UNKNOWN
+→ identify only material unanswered questions
+→ propose 2–3 migration/cutover approaches
+→ derive T7 candidate
+```
+
+Do not write migration scripts, implementation plan, SQL cutover code or product code while T7 and final R10 review gates remain open.
+
+## After T7
+
+```text
+Integrated Whole-R10 Global Coherence Review
+→ cold independent final review
+→ operator final ratification
+→ implementation spec/plan
+→ code
+```
+
+Implementation remains **BLOCKED**.
