@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>MetalDocs R10 Rebaseline Cockpit</title>
+  <style>
+    :root {
+      --bg: #090b0f;
+      --bg-elev: #0f1319;
+      --panel: #121821;
+      --panel-2: #171f2b;
+      --line: #263142;
+      --line-soft: #1b2430;
+      --text: #edf2f7;
+      --muted: #9aa8ba;
+      --dim: #66758a;
+      --green: #42d392;
+      --green-soft: rgba(66, 211, 146, .12);
+      --amber: #f6bd60;
+      --amber-soft: rgba(246, 189, 96, .12);
+      --red: #ff6b6b;
+      --red-soft: rgba(255, 107, 107, .11);
+      --blue: #6cb6ff;
+      --blue-soft: rgba(108, 182, 255, .12);
+      --gray-soft: rgba(154, 168, 186, .08);
+      --shadow: 0 16px 60px rgba(0,0,0,.26);
+      --radius: 18px;
+      --radius-sm: 12px;
+      --max: 1540px;
+      --sidebar: 254px;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; background: var(--bg); }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 16% -8%, rgba(108,182,255,.10), transparent 30%),
+        radial-gradient(circle at 92% 9%, rgba(66,211,146,.07), transparent 25%),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+    a { color: inherit; }
+    button, input { font: inherit; }
+    button { color: inherit; }
+    :focus-visible { outline: 3px solid rgba(108,182,255,.72); outline-offset: 3px; }
+    ::selection { background: rgba(108,182,255,.26); }
+
+    .top-banner {
+      position: sticky; top: 0; z-index: 80;
+      display: flex; gap: 12px; align-items: center; justify-content: space-between;
+      min-height: 44px; padding: 8px 24px;
+      background: rgba(9,11,15,.92); backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--line-soft);
+      font-size: 12px; letter-spacing: .04em;
+    }
+    .authority-warning { color: var(--amber); font-weight: 800; text-transform: uppercase; }
+    .sync-meta { color: var(--muted); white-space: nowrap; }
+
+    .shell {
+      display: grid;
+      grid-template-columns: var(--sidebar) minmax(0, 1fr);
+      gap: 28px;
+      width: min(var(--max), calc(100% - 32px));
+      margin: 0 auto;
+      padding: 24px 0 72px;
+    }
+    .sidebar {
+      position: sticky; top: 68px; align-self: start;
+      max-height: calc(100vh - 88px); overflow: auto;
+      padding: 16px;
+      background: rgba(15,19,25,.86); backdrop-filter: blur(12px);
+      border: 1px solid var(--line-soft); border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .brand-small { display:flex; align-items:center; gap:10px; margin-bottom: 14px; }
+    .brand-mark {
+      width: 34px; height: 34px; border-radius: 10px;
+      display: grid; place-items: center; font-weight: 900;
+      background: linear-gradient(135deg, rgba(108,182,255,.20), rgba(66,211,146,.18));
+      border: 1px solid rgba(108,182,255,.24);
+    }
+    .brand-small strong { display:block; font-size:13px; }
+    .brand-small span { color:var(--muted); font-size:11px; }
+    .nav-title { margin: 18px 8px 6px; color: var(--dim); font-size:10px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; }
+    .nav-link {
+      display:flex; gap:9px; align-items:center;
+      padding: 8px 10px; margin: 2px 0; border-radius: 9px;
+      color: var(--muted); text-decoration:none; font-size: 12px;
+    }
+    .nav-link:hover, .nav-link.active { color: var(--text); background: var(--gray-soft); }
+    .nav-dot { width:7px; height:7px; border-radius:50%; background:var(--dim); flex:none; }
+    .nav-link.active .nav-dot { background: var(--amber); box-shadow: 0 0 14px rgba(246,189,96,.55); }
+    .sidebar-tools { display:grid; gap:8px; margin-top:16px; padding-top:14px; border-top:1px solid var(--line-soft); }
+
+    main { min-width: 0; }
+    section { scroll-margin-top: 72px; margin-bottom: 28px; }
+    .hero {
+      position: relative; overflow: hidden;
+      padding: 34px;
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      background: linear-gradient(145deg, rgba(23,31,43,.96), rgba(15,19,25,.96));
+      box-shadow: var(--shadow);
+    }
+    .hero::after {
+      content:""; position:absolute; inset:auto -10% -60% auto; width:520px; height:520px; border-radius:50%;
+      background: radial-gradient(circle, rgba(66,211,146,.10), transparent 63%); pointer-events:none;
+    }
+    .eyebrow { color:var(--blue); font-size:11px; font-weight:900; letter-spacing:.16em; text-transform:uppercase; }
+    h1 { margin:8px 0 10px; font-size: clamp(32px, 5vw, 64px); letter-spacing:-.045em; line-height:.98; max-width: 980px; }
+    .hero-copy { max-width: 880px; color:var(--muted); font-size: 16px; }
+    .hero-meta { display:flex; flex-wrap:wrap; gap:10px; margin-top:22px; }
+
+    .pill, .badge {
+      display:inline-flex; align-items:center; gap:7px; border-radius:999px; border:1px solid var(--line);
+      font-size:11px; font-weight:800; letter-spacing:.04em; text-transform:uppercase;
+    }
+    .pill { padding:7px 10px; }
+    .badge { padding:4px 7px; }
+    .green { color:var(--green); background:var(--green-soft); border-color:rgba(66,211,146,.25); }
+    .amber { color:var(--amber); background:var(--amber-soft); border-color:rgba(246,189,96,.27); }
+    .red { color:var(--red); background:var(--red-soft); border-color:rgba(255,107,107,.24); }
+    .blue { color:var(--blue); background:var(--blue-soft); border-color:rgba(108,182,255,.25); }
+    .gray { color:var(--muted); background:var(--gray-soft); }
+
+    .section-head { display:flex; align-items:flex-end; justify-content:space-between; gap:24px; margin: 0 2px 12px; }
+    .section-kicker { margin:0 0 4px; color:var(--dim); font-size:10px; font-weight:900; letter-spacing:.15em; text-transform:uppercase; }
+    h2 { margin:0; font-size: clamp(22px, 3vw, 34px); letter-spacing:-.025em; }
+    h3 { margin:0 0 8px; font-size:16px; }
+    p { margin: 0 0 12px; }
+    .muted { color:var(--muted); }
+    .tiny { color:var(--dim); font-size:11px; }
+
+    .grid { display:grid; gap:14px; }
+    .g2 { grid-template-columns: repeat(2,minmax(0,1fr)); }
+    .g3 { grid-template-columns: repeat(3,minmax(0,1fr)); }
+    .g4 { grid-template-columns: repeat(4,minmax(0,1fr)); }
+    .card {
+      background: rgba(18,24,33,.88); border:1px solid var(--line-soft); border-radius:var(--radius); padding:18px;
+      box-shadow: 0 10px 34px rgba(0,0,0,.12);
+    }
+    .card.emphasis { border-color:rgba(246,189,96,.30); background:linear-gradient(145deg, rgba(246,189,96,.08), rgba(18,24,33,.92)); }
+    .card.success { border-color:rgba(66,211,146,.22); }
+    .card.info { border-color:rgba(108,182,255,.20); }
+    .card.danger { border-color:rgba(255,107,107,.22); }
+    .metric { font-size:27px; font-weight:900; letter-spacing:-.035em; }
+    .metric-label { color:var(--muted); font-size:12px; }
+
+    .state-grid { display:grid; grid-template-columns: 1.15fr .85fr; gap:14px; margin-top:18px; }
+    .current-stage {
+      display:grid; grid-template-columns:auto 1fr; gap:16px; align-items:center;
+      padding:18px; border-radius:var(--radius); border:1px solid rgba(246,189,96,.28); background:var(--amber-soft);
+    }
+    .stage-orb {
+      width:70px; height:70px; border-radius:22px; display:grid; place-items:center;
+      color:#121212; background:var(--amber); font-weight:950; font-size:20px; box-shadow:0 0 32px rgba(246,189,96,.18);
+    }
+    .current-stage .label { color:var(--amber); font-size:10px; font-weight:900; letter-spacing:.15em; text-transform:uppercase; }
+    .current-stage strong { display:block; font-size:20px; margin-top:2px; }
+
+    .progress-lanes { display:grid; gap:9px; }
+    .lane { display:grid; grid-template-columns: 190px 1fr 126px; gap:12px; align-items:center; }
+    .lane-name { font-size:12px; color:var(--muted); }
+    .track { height:9px; border-radius:999px; background:#0b0e13; border:1px solid var(--line-soft); overflow:hidden; }
+    .fill { height:100%; border-radius:inherit; }
+    .fill.complete { width:100%; background:linear-gradient(90deg, #2aa56f, var(--green)); }
+    .fill.started { width:52px; max-width:35%; background:linear-gradient(90deg, #bd8632, var(--amber)); }
+    .fill.none { width:0; }
+    .lane-status { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--dim); }
+
+    .pipeline { display:grid; gap:8px; }
+    .stage-row {
+      display:grid; grid-template-columns: 80px 1fr auto; gap:12px; align-items:center;
+      padding:11px 13px; border:1px solid var(--line-soft); border-radius:12px; background:rgba(15,19,25,.78);
+    }
+    .stage-code { font-weight:900; letter-spacing:.04em; }
+    .stage-row[data-state="closed"] .stage-code { color:var(--green); }
+    .stage-row[data-state="active"] { border-color:rgba(246,189,96,.30); background:rgba(246,189,96,.07); }
+    .stage-row[data-state="active"] .stage-code { color:var(--amber); }
+    .stage-row[data-state="future"] .stage-code { color:var(--dim); }
+    .stage-desc { font-size:12px; color:var(--muted); }
+
+    .arch-owners { display:grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap:10px; }
+    .owner {
+      min-height:130px; padding:16px; border-radius:16px; border:1px solid rgba(66,211,146,.24); background:rgba(66,211,146,.06);
+    }
+    .owner.audit { border-color:rgba(108,182,255,.24); background:rgba(108,182,255,.06); }
+    .owner-title { color:var(--green); font-size:13px; font-weight:900; text-transform:uppercase; letter-spacing:.07em; }
+    .owner.audit .owner-title { color:var(--blue); }
+    .token-list { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+    .token { padding:4px 7px; border:1px solid var(--line); border-radius:8px; color:var(--muted); font-size:10px; background:#0d1117; }
+    .mechanisms { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; padding:14px; border:1px dashed rgba(108,182,255,.28); border-radius:14px; background:rgba(108,182,255,.04); }
+
+    .scope-col ul, .guard-list, .compact-list { margin:8px 0 0; padding-left:18px; color:var(--muted); font-size:12px; }
+    .scope-col li, .guard-list li, .compact-list li { margin:5px 0; }
+    .scope-title { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+
+    details.decision { border:1px solid var(--line-soft); border-radius:14px; background:rgba(18,24,33,.78); overflow:hidden; }
+    details.decision + details.decision { margin-top:8px; }
+    details.decision summary { cursor:pointer; list-style:none; display:grid; grid-template-columns:70px 1fr auto; gap:12px; align-items:center; padding:13px 15px; }
+    details.decision summary::-webkit-details-marker { display:none; }
+    details.decision summary::after { content:"+"; color:var(--dim); font-size:20px; }
+    details.decision[open] summary::after { content:"−"; }
+    .decision-code { color:var(--green); font-weight:900; }
+    .decision-body { padding: 0 15px 15px 97px; color:var(--muted); font-size:12px; }
+    .decision-body strong { color:var(--text); }
+    .law { margin:8px 0; padding:9px 11px; border-left:2px solid var(--blue); background:rgba(108,182,255,.05); border-radius:0 8px 8px 0; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; color:#c8d6e5; }
+
+    .guardrails { display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
+    .guard-x li::marker { color:var(--red); }
+    .guard-ok li::marker { color:var(--green); }
+
+    .toolbar {
+      display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px;
+      padding:10px; border:1px solid var(--line-soft); border-radius:14px; background:rgba(15,19,25,.72);
+    }
+    .search-wrap { flex:1 1 320px; position:relative; }
+    .search-wrap input {
+      width:100%; padding:9px 12px 9px 34px; color:var(--text); background:#0a0e13; border:1px solid var(--line); border-radius:10px; outline:none;
+    }
+    .search-wrap::before { content:"⌕"; position:absolute; left:12px; top:7px; color:var(--dim); }
+    .btn {
+      cursor:pointer; border:1px solid var(--line); background:#111720; color:var(--muted); padding:8px 10px; border-radius:10px; font-size:11px; font-weight:800;
+    }
+    .btn:hover, .btn.active { color:var(--text); border-color:#3a4b61; background:#17202c; }
+    .btn.primary { color:#0b0e12; background:var(--green); border-color:var(--green); }
+    .btn.amber-btn { color:#121212; background:var(--amber); border-color:var(--amber); }
+
+    .legend { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 14px; }
+    .matrix-wrap { overflow:auto; border:1px solid var(--line-soft); border-radius:14px; }
+    table { width:100%; border-collapse:collapse; min-width:870px; background:rgba(15,19,25,.72); }
+    th, td { padding:10px 12px; border-bottom:1px solid var(--line-soft); text-align:left; vertical-align:top; font-size:11px; }
+    th { position:sticky; top:0; background:#151c26; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; font-size:9px; }
+    tr:last-child td { border-bottom:0; }
+    td strong { color:var(--text); }
+
+    .authority-chain { display:grid; gap:7px; counter-reset:authority; }
+    .authority-item {
+      display:grid; grid-template-columns:34px 1fr auto; gap:10px; align-items:center;
+      padding:10px 12px; border:1px solid var(--line-soft); border-radius:11px; text-decoration:none; background:rgba(15,19,25,.68);
+    }
+    .authority-item::before { counter-increment:authority; content:counter(authority); width:24px; height:24px; display:grid; place-items:center; border-radius:7px; background:var(--blue-soft); color:var(--blue); font-size:10px; font-weight:900; }
+    .authority-path { color:var(--muted); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10px; }
+    .authority-item:hover { border-color:rgba(108,182,255,.30); }
+
+    .timeline { position:relative; padding-left:24px; }
+    .timeline::before { content:""; position:absolute; left:8px; top:5px; bottom:5px; width:1px; background:var(--line); }
+    .timeline-item { position:relative; padding:0 0 18px 14px; }
+    .timeline-item::before { content:""; position:absolute; left:-20px; top:5px; width:9px; height:9px; border-radius:50%; background:var(--green); box-shadow:0 0 0 4px var(--bg); }
+    .timeline-item.active::before { background:var(--amber); }
+    .timeline-item strong { font-size:12px; }
+    .timeline-item p { margin:3px 0 0; font-size:11px; color:var(--muted); }
+
+    pre.prompt {
+      margin:0; padding:16px; overflow:auto; white-space:pre-wrap; word-break:break-word;
+      max-height:520px; background:#07090c; border:1px solid var(--line); border-radius:14px;
+      color:#cdd8e5; font: 11px/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    }
+    .prompt-actions { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+    .copy-status { color:var(--green); font-size:11px; min-height:16px; margin-top:8px; }
+    .footer-note { margin-top:34px; text-align:center; color:var(--dim); font-size:10px; }
+
+    .searchable[hidden] { display:none !important; }
+    .filter-hidden { display:none !important; }
+    mark { background:rgba(246,189,96,.30); color:var(--text); border-radius:3px; padding:0 1px; }
+
+    @media (max-width: 1180px) {
+      :root { --sidebar: 220px; }
+      .g4 { grid-template-columns: repeat(2,minmax(0,1fr)); }
+      .arch-owners { grid-template-columns: repeat(2,minmax(0,1fr)); }
+      .state-grid { grid-template-columns: 1fr; }
+      .lane { grid-template-columns: 155px 1fr 110px; }
+    }
+    @media (max-width: 860px) {
+      .top-banner { padding:8px 12px; align-items:flex-start; }
+      .shell { display:block; width:min(100% - 20px, 900px); padding-top:10px; }
+      .sidebar {
+        top:68px; z-index:70; max-height:none; overflow-x:auto; overflow-y:hidden; display:flex; align-items:center; gap:4px; padding:8px; border-radius:12px; margin-bottom:12px;
+      }
+      .brand-small, .nav-title, .sidebar-tools { display:none; }
+      .nav-link { flex:none; margin:0; padding:7px 9px; font-size:10px; }
+      .hero { padding:24px 20px; border-radius:20px; }
+      h1 { font-size: clamp(31px, 9vw, 52px); }
+      .g2, .g3, .g4, .guardrails { grid-template-columns:1fr; }
+      .arch-owners { grid-template-columns:1fr; }
+      .lane { grid-template-columns: 1fr; gap:5px; padding:7px 0; }
+      .stage-row { grid-template-columns:60px 1fr; }
+      .stage-row .badge { grid-column:2; width:max-content; }
+      details.decision summary { grid-template-columns:54px 1fr auto; }
+      .decision-body { padding-left:15px; }
+      section { scroll-margin-top: 138px; }
+      .section-head { align-items:flex-start; flex-direction:column; gap:6px; }
+      .sync-meta { white-space:normal; text-align:right; }
+    }
+    @media (max-width: 480px) {
+      .top-banner { font-size:10px; }
+      .hero { padding:21px 16px; }
+      .card { padding:14px; border-radius:14px; }
+      .current-stage { grid-template-columns:1fr; }
+      .stage-orb { width:58px; height:58px; border-radius:17px; }
+      .authority-item { grid-template-columns:30px 1fr; }
+      .authority-item .badge { grid-column:2; width:max-content; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior:auto; }
+      *, *::before, *::after { animation:none !important; transition:none !important; }
+    }
+    @media print {
+      :root { --bg:#fff; --bg-elev:#fff; --panel:#fff; --panel-2:#fff; --line:#c9d1d9; --line-soft:#d8dee4; --text:#111827; --muted:#4b5563; --dim:#6b7280; }
+      body { background:#fff; color:#111; }
+      .top-banner { position:static; background:#fff; border-color:#ddd; }
+      .shell { display:block; width:100%; padding:0; }
+      .sidebar, .toolbar, .prompt-actions, .copy-status { display:none !important; }
+      .hero, .card, details.decision, .stage-row, .authority-item { box-shadow:none; background:#fff; break-inside:avoid; }
+      section { break-inside:auto; margin-bottom:18px; }
+      details.decision .decision-body { display:block !important; }
+      pre.prompt { max-height:none; white-space:pre-wrap; background:#f7f7f7; color:#111; }
+      a { text-decoration:none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="top-banner">
+    <div class="authority-warning">VISUAL ORIENTATION / PROJECTION — NOT ARCHITECTURE AUTHORITY</div>
+    <div class="sync-meta">Last sync: 2026-08-19 · Authority: <code>wiki/architecture/r10-technical-architecture.md</code></div>
+  </div>
+
+  <div class="shell">
+    <aside class="sidebar" aria-label="Navegação do cockpit">
+      <div class="brand-small">
+        <div class="brand-mark">M</div>
+        <div><strong>MetalDocs R10</strong><span>Rebaseline Cockpit</span></div>
+      </div>
+      <div class="nav-title">Orientação</div>
+      <a class="nav-link active" href="#overview"><span class="nav-dot"></span>Você está aqui</a>
+      <a class="nav-link" href="#path"><span class="nav-dot"></span>Caminho até código</a>
+      <a class="nav-link" href="#architecture"><span class="nav-dot"></span>Convergência</a>
+      <a class="nav-link" href="#scope"><span class="nav-dot"></span>Escopo</a>
+      <a class="nav-link" href="#decisions"><span class="nav-dot"></span>Decisões T1→T7</a>
+      <a class="nav-link" href="#guardrails"><span class="nav-dot"></span>Não reabrir</a>
+      <div class="nav-title">Trabalho atual</div>
+      <a class="nav-link" href="#t8a"><span class="nav-dot"></span>T8-A Workbench</a>
+      <a class="nav-link" href="#open-decisions"><span class="nav-dot"></span>Próximos gates</a>
+      <a class="nav-link" href="#authorities"><span class="nav-dot"></span>Authorities</a>
+      <a class="nav-link" href="#journey"><span class="nav-dot"></span>Como chegamos aqui</a>
+      <a class="nav-link" href="#session"><span class="nav-dot"></span>Nova sessão</a>
+      <div class="sidebar-tools">
+        <button class="btn" id="copy-authority-chain" type="button">Copy Authority Chain</button>
+        <button class="btn" id="print-cockpit" type="button">Print / PDF</button>
+      </div>
+    </aside>
+
+    <main>
+      <section id="overview" class="hero searchable" data-state="active" data-searchable>
+        <div class="eyebrow">MetalDocs · Architecture & Implementation Readiness</div>
+        <h1>METALDOCS R10 REBASELINE COCKPIT</h1>
+        <p class="hero-copy">Mapa visual para recuperar contexto rápido: o que já foi ratificado, o que o produto está se tornando, onde o programa está agora, o que falta antes de implementação e qual é a próxima pergunta correta. Este cockpit resume authority; nunca cria authority.</p>
+        <div class="hero-meta">
+          <span class="pill green">T1→T7 CLOSED</span>
+          <span class="pill amber">T8-A ACTIVE</span>
+          <span class="pill gray">T8-B→T12 NOT OPEN</span>
+          <span class="pill red">IMPLEMENTATION BLOCKED</span>
+          <span class="pill blue">PR #131 · branch docs/a8-authz-approval-redesign-ledger</span>
+        </div>
+
+        <div class="state-grid">
+          <div class="current-stage">
+            <div class="stage-orb">T8-A</div>
+            <div>
+              <div class="label">You are here</div>
+              <strong>Technical Authority & Legacy Census</strong>
+              <div class="muted">Current technical census + remeasurement next. Descobrir o que existe e o que merece sobreviver — sem escolher ainda a topologia final.</div>
+            </div>
+          </div>
+          <div class="card danger">
+            <div class="section-kicker">Implementation gate</div>
+            <div class="metric">BLOCKED</div>
+            <div class="metric-label">Código de produto só após T8→T12, Whole-R10 GCR, revisão independente/cold e autorização explícita do operador.</div>
+          </div>
+        </div>
+      </section>
+
+      <div class="toolbar" aria-label="Ferramentas de busca e filtro">
+        <div class="search-wrap"><input id="cockpit-search" type="search" placeholder="Buscar decisão, conceito, gate, authority…" aria-label="Buscar no cockpit" /></div>
+        <button class="btn active filter-btn" data-filter="all" type="button">All</button>
+        <button class="btn filter-btn" data-filter="closed" type="button">Closed</button>
+        <button class="btn filter-btn" data-filter="active" type="button">Active</button>
+        <button class="btn filter-btn" data-filter="future" type="button">Future / Blocked</button>
+      </div>
+
+      <section id="path" data-searchable class="searchable" data-state="active">
+        <div class="section-head">
+          <div><div class="section-kicker">Distance to implementation</div><h2>O que já terminou — e o que ainda falta</h2></div>
+          <span class="badge amber">No fake percentage</span>
+        </div>
+        <div class="card">
+          <div class="progress-lanes">
+            <div class="lane"><div class="lane-name">Product + semantic architecture</div><div class="track"><div class="fill complete"></div></div><div class="lane-status" style="color:var(--green)">Complete</div></div>
+            <div class="lane"><div class="lane-name">Physical realization architecture</div><div class="track"><div class="fill started"></div></div><div class="lane-status" style="color:var(--amber)">T8-A started</div></div>
+            <div class="lane"><div class="lane-name">Golden-flow validation baseline</div><div class="track"><div class="fill none"></div></div><div class="lane-status">T9 not open</div></div>
+            <div class="lane"><div class="lane-name">Transition / cutover design</div><div class="track"><div class="fill none"></div></div><div class="lane-status">T10 not open</div></div>
+            <div class="lane"><div class="lane-name">Execution graph</div><div class="track"><div class="fill none"></div></div><div class="lane-status">T11 not open</div></div>
+            <div class="lane"><div class="lane-name">Implementation readiness review</div><div class="track"><div class="fill none"></div></div><div class="lane-status">T12 not open</div></div>
+          </div>
+        </div>
+        <div class="card info searchable" data-searchable data-state="active" style="margin-top:12px"><strong>Current assessment:</strong> <span class="muted">a arquitetura semântica está fechada; a arquitetura física de implementação ainda não. O programa já atravessou a maior incerteza de produto, mas ainda precisa decidir realização, prova, transição e execução antes de liberar código.</span></div>
+        <div class="pipeline" style="margin-top:12px">
+          <div class="stage-row searchable" data-searchable data-state="closed"><div class="stage-code">Product</div><div><strong>Product Contract REV001 + Whole-Product GCR + 4+1 ownership</strong><div class="stage-desc">O que Launch significa e quais são os semantic owners.</div></div><span class="badge green">Closed</span></div>
+          <div class="stage-row searchable" data-searchable data-state="closed"><div class="stage-code">T1→T7</div><div><strong>Semantic architecture</strong><div class="stage-desc">State, transactions, AuthZ/Audit, content/storage, async/search, API/journeys e historical migration truth.</div></div><span class="badge green">Closed</span></div>
+          <div class="stage-row searchable" data-searchable data-state="active"><div class="stage-code">T8-A</div><div><strong>Technical Authority & Legacy Census</strong><div class="stage-desc">Remeasure current estate; disposition what survives, changes, moves or dies.</div></div><span class="badge amber">Now</span></div>
+          <div class="stage-row searchable" data-searchable data-state="future"><div class="stage-code">T8-B→H</div><div><strong>Technical Realization Architecture</strong><div class="stage-desc">Backend topology, internal contracts, persistence, wire, frontend, runtime and whole-T8 coherence.</div></div><span class="badge gray">Not open</span></div>
+          <div class="stage-row searchable" data-searchable data-state="future"><div class="stage-code">T9</div><div><strong>Golden Flows & Validation Baseline</strong><div class="stage-desc">Define composed proof obligations before implementation acceptance.</div></div><span class="badge gray">Not open</span></div>
+          <div class="stage-row searchable" data-searchable data-state="future"><div class="stage-code">T10</div><div><strong>Transition / Refactor / Migration / Cutover</strong><div class="stage-desc">Current DEV implementation → R10 target, including reset, rollback and deletion map.</div></div><span class="badge gray">Not open</span></div>
+          <div class="stage-row searchable" data-searchable data-state="future"><div class="stage-code">T11</div><div><strong>Implementation Program & Execution Graph</strong><div class="stage-desc">Turn accepted architecture into bounded work with no hidden architecture decisions.</div></div><span class="badge gray">Not open</span></div>
+          <div class="stage-row searchable" data-searchable data-state="future"><div class="stage-code">T12</div><div><strong>Adversarial Implementation-Readiness Review</strong><div class="stage-desc">Fresh attack on boundaries, contracts, security, recovery, transition and execution graph.</div></div><span class="badge gray">Not open</span></div>
+          <div class="stage-row searchable" data-searchable data-state="future"><div class="stage-code">Final</div><div><strong>Whole-R10 GCR → independent/cold review → operator authorization</strong><div class="stage-desc">Only after convergence does product implementation become legal.</div></div><span class="badge red">Code locked</span></div>
+        </div>
+      </section>
+
+      <section id="architecture" data-searchable class="searchable" data-state="closed">
+        <div class="section-head"><div><div class="section-kicker">Convergence map</div><h2>O que o MetalDocs está se tornando</h2></div><span class="badge green">Semantic ownership ratified</span></div>
+        <div class="arch-owners">
+          <div class="owner searchable" data-searchable data-state="closed"><div class="owner-title">Authentication</div><p class="tiny">Identity/session boundary, not business authorization.</p><div class="token-list"><span class="token">ProviderSubjectBinding</span><span class="token">ApplicationSession</span></div></div>
+          <div class="owner searchable" data-searchable data-state="closed"><div class="owner-title">Organization</div><p class="tiny">Stable company people/structure truth.</p><div class="token-list"><span class="token">Company</span><span class="token">User</span><span class="token">UserProfile</span><span class="token">Area</span><span class="token">Group</span><span class="token">GroupMembership</span></div></div>
+          <div class="owner searchable" data-searchable data-state="closed"><div class="owner-title">Authorization</div><p class="tiny">Product-owned access semantics.</p><div class="token-list"><span class="token">Role</span><span class="token">Permission</span><span class="token">RoleAssignment</span><span class="token">scope predicates</span></div></div>
+          <div class="owner searchable" data-searchable data-state="closed"><div class="owner-title">Controlled Documents</div><p class="tiny">The core governed information lifecycle.</p><div class="token-list"><span class="token">DocumentType</span><span class="token">Document</span><span class="token">Revision</span><span class="token">WorkingContent</span><span class="token">Submission</span><span class="token">Governance</span><span class="token">Release</span><span class="token">OfficialRendition</span><span class="token">Obsolescence</span><span class="token">Template role</span></div></div>
+        </div>
+        <div class="owner audit searchable" data-searchable data-state="closed" style="margin-top:10px; min-height:auto"><div class="owner-title">Audit — supporting evidence owner</div><p class="tiny" style="margin-bottom:0">Append-only semantic evidence. Never current lifecycle state and never event-sourcing authority.</p></div>
+        <div class="mechanisms searchable" data-searchable data-state="closed" aria-label="Mechanisms, not semantic owners">
+          <span class="badge blue">Managed Content / Storage</span><span class="badge blue">River / Durable Jobs</span><span class="badge blue">Rendering / DOCX→PDF</span><span class="badge blue">Search</span><span class="badge blue">Backup / Restore</span><span class="badge blue">OIDC / Keycloak</span><span class="badge blue">HTTP / OpenAPI</span><span class="badge blue">Observability</span>
+          <span class="tiny" style="width:100%">Mechanism ≠ authority. T8 decide como essas capacidades são fisicamente realizadas.</span>
+        </div>
+      </section>
+
+      <section id="scope" data-searchable class="searchable" data-state="closed">
+        <div class="section-head"><div><div class="section-kicker">Scope memory</div><h2>Launch, Launch+ e Future</h2></div><span class="badge blue">Deferred ≠ forgotten</span></div>
+        <div class="grid g3">
+          <div class="card success scope-col searchable" data-searchable data-state="closed"><div class="scope-title"><h3>Launch Core</h3><span class="badge green">Build first</span></div><ul><li>Single-company users / areas / groups / roles</li><li>Document Types + numbering</li><li>Document + REV000/REV001… lifecycle</li><li>Revision-governed title</li><li>WorkingContent + autosave/OCC</li><li>Template as ordinary governed Document role</li><li>Immutable Submission</li><li>NoHumanApproval or sequential governance</li><li>Feedback / return / withdraw / resubmit</li><li>Revision cancellation</li><li>Release / EFFECTIVE / SUPERSEDED</li><li>Optional OfficialRendition</li><li>Governed OBSOLETE</li><li>Search/read/history/Audit</li><li>Backup/restore correctness</li></ul></div>
+          <div class="card info scope-col searchable" data-searchable data-state="future"><div class="scope-title"><h3>Launch+</h3><span class="badge blue">Next layer</span></div><ul><li>Distribution / Read & Acknowledge</li><li>Periodic Review</li></ul><p class="tiny">Deliberately outside first-use prerequisites. Seams are preserved in Document/Release relationships.</p></div>
+          <div class="card scope-col searchable" data-searchable data-state="future"><div class="scope-title"><h3>Future</h3><span class="badge gray">No dormant implementation</span></div><ul><li>Dossier / documentary case context</li><li>Evidence / quality records</li><li>Retention / Legal Hold / disposition</li><li>WORM / records governance</li><li>Governed export</li><li>External repository connectors</li><li>Training / LMS</li><li>Generic multi-document Change Control</li><li>Pooled tenancy</li><li>Realtime CRDT coauthoring</li></ul></div>
+        </div>
+      </section>
+
+      <section id="decisions" data-searchable class="searchable" data-state="closed">
+        <div class="section-head"><div><div class="section-kicker">Decision memory</div><h2>O que T1→T7 já decidiu</h2></div><span class="badge green">Operator-ratified</span></div>
+
+        <details class="decision searchable" data-searchable data-state="closed" open>
+          <summary><div class="decision-code">T1</div><div><strong>Semantic State & Invariants</strong><div class="tiny">Who owns meaning; what the business objects are.</div></div><span class="badge green">Closed</span></summary>
+          <div class="decision-body"><strong>Core:</strong> Document ≠ Revision ≠ WorkingContent ≠ Submission. <span class="law">REV000 = initial issuance · REV001 = first revision · ordinals never reuse</span><strong>WorkingContent</strong> is the only mutable DRAFT authority; <strong>Submission</strong> is immutable exact governed attempt; title belongs to Revision; Template is an ordinary governed Document role; Release owns effectivity; at most one EFFECTIVE Revision; standalone Artifact semantic owner is removed.</div>
+        </details>
+        <details class="decision searchable" data-searchable data-state="closed">
+          <summary><div class="decision-code">T2</div><div><strong>Governance, Effectivity & Transactions</strong><div class="tiny">How accepted facts change safely under concurrency.</div></div><span class="badge green">Closed</span></summary>
+          <div class="decision-body"><span class="law">One native business transition = one local ACID product-state transaction.</span>Document is lifecycle serialization root; DRAFT uses generation/CAS; READ COMMITTED + narrow serialization; SUBMIT freezes exact attempt/config; one sequential Step active at a time; selectors are NAMED_USER or GROUP; Group is ANY-one; submitter/initiator cannot satisfy own human step; Release is system-owned; replacement Release atomically supersedes predecessor.</div>
+        </details>
+        <details class="decision searchable" data-searchable data-state="closed">
+          <summary><div class="decision-code">T3</div><div><strong>Authorization & Audit</strong><div class="tiny">Live access truth, role bundles, domain predicates and same-commit evidence.</div></div><span class="badge green">Closed</span></summary>
+          <div class="decision-body"><strong>Authorization equation:</strong> enabled User + live direct/group RoleAssignments + static Role→Permission + scope + domain predicate = allow; otherwise deny. Launch roles: governance_admin, area_manager, author, approver, viewer, governance_viewer. Governance admin is config-only, not content/governance/audit superuser. Offboarding disables User, revokes sessions and removes memberships/direct grants while preserving historical identity. Critical governed/security changes require same-local-commit Audit.</div>
+        </details>
+        <details class="decision searchable" data-searchable data-state="closed">
+          <summary><div class="decision-code">T4</div><div><strong>Exact Content, Storage Integrity & Restore</strong><div class="tiny">Prove exact governed bytes while keeping storage replaceable.</div></div><span class="badge green">Closed</span></summary>
+          <div class="decision-body"><span class="law">ExactContentDescriptor = SHA-256 + exact size + closed ContentFormat.</span>Provider identity is not content identity. Managed-content handle is mechanism only. Upload goes OPEN→READY with server-derived descriptor; untrusted bytes must be malware-clean before immutable governance; create-once/no-overwrite; backup includes DB + all required exact bytes; restore is fail-closed on missing/corrupt required content, invalidates restored sessions and reconciles post-snapshot privacy/security teardown before serving.</div>
+        </details>
+        <details class="decision searchable" data-searchable data-state="closed">
+          <summary><div class="decision-code">T5</div><div><strong>Durable Async, Search & External Effects</strong><div class="tiny">Small durable effects layer; no generic event platform.</div></div><span class="badge green">Closed</span></summary>
+          <div class="decision-body">PostgreSQL/River is the selected durable-job mechanism. PDF can be viewed directly; SourceOnly DOCX gets a read-only adapter; required PDF rendition is produced asynchronously and admitted against the exact Submission before Release. Renderer selection stays replaceable and must pass fidelity corpus. Search remains canonical Postgres query/view; materialized/external search is off until evidence demands it. Jobs are at-least-once and revalidate eligibility; late renderer results become no-op/reclaimable rather than semantic truth.</div>
+        </details>
+        <details class="decision searchable" data-searchable data-state="closed">
+          <summary><div class="decision-code">T6</div><div><strong>Canonical API & Frontend Journeys</strong><div class="tiny">Semantic HTTP/wire laws and user-facing lenses.</div></div><span class="badge green">Closed</span></summary>
+          <div class="decision-body"><strong>API:</strong> pre-launch `/api/v1` rebuilt in place; OpenAPI 3.0.3; generated Go/TS; UUID + RFC3339 UTC; RFC9457 errors; cursor pagination; Idempotency-Key on named POSTs; ETag/If-Match for DRAFT OCC. <strong>Auth:</strong> Keycloak Authorization Code + PKCE → ApplicationSession, secure host cookie + CSRF; no local passwords/JIT. <strong>Frontend lenses:</strong> Library, My Work, Document Official/Work/History, Governance Case, Audit, Admin. Search favors current EFFECTIVE truth.</div>
+        </details>
+        <details class="decision searchable" data-searchable data-state="closed">
+          <summary><div class="decision-code">T7</div><div><strong>Historical Migration Truth & Mapping</strong><div class="tiny">Source reality collapsed the migration problem instead of expanding it.</div></div><span class="badge green">Closed</span></summary>
+          <div class="decision-body"><span class="law">NO HISTORICAL BUSINESS MIGRATION REQUIRED FOR LAUNCH</span>Current MetalDocs DB/content/history is DEV / TEST / THROWAWAY; current business history = none; Launch requires no pre-existing business-document import. No DEV rows/objects/events become business history. No approval/release/actor/timestamp reconstruction. No generic importer/ETL/repository connector. R10 history begins natively at/after cutover. T10 still owns technical current→target transition.</div>
+        </details>
+      </section>
+
+      <section id="guardrails" data-searchable class="searchable" data-state="closed">
+        <div class="section-head"><div><div class="section-kicker">Revalidation law</div><h2>Não reabrir por preferência</h2></div><span class="badge red">Protect coherence</span></div>
+        <div class="guardrails">
+          <div class="card danger searchable" data-searchable data-state="closed"><h3 style="color:var(--red)">Do not resurrect</h3><ul class="guard-list guard-x"><li>standalone Artifact semantic owner</li><li>parallel Template lifecycle/version platform</li><li>generic BPM/workflow engine</li><li>ALL / N-of-M quorum engine without consumer</li><li>fresh-auth/eSignature/reassign/SLA machinery without requirement</li><li>generic event/notification platform baseline</li><li>dormant generic ETL/import framework</li><li>DEV/test historical compatibility</li><li>Distribution or Periodic Review back into Launch Core</li><li>legacy package/table survival by existence</li></ul></div>
+          <div class="card success searchable" data-searchable data-state="closed"><h3 style="color:var(--green)">Reopen only when material</h3><ul class="guard-list guard-ok"><li>concrete reachable failure mode</li><li>named customer/operator consumer</li><li>regulatory or contractual requirement</li><li>current authority contradiction</li><li>source/runtime evidence disproves an invariant</li><li>implementation evidence proves accepted mechanism cannot sustain property</li></ul><p class="tiny">Revalidation does not mean reinvention. Reopen only the composite decision whose justification changed.</p></div>
+        </div>
+      </section>
+
+      <section id="t8a" data-searchable class="searchable" data-state="active">
+        <div class="section-head"><div><div class="section-kicker">Current workbench</div><h2>T8-A — Technical Authority & Legacy Census</h2></div><span class="badge amber">Active now</span></div>
+        <div class="grid g3" style="margin-bottom:12px">
+          <div class="card emphasis searchable" data-searchable data-state="active"><h3>Question</h3><p class="muted">What exists today, what is technically valuable, what is legacy accident, and what deserves to survive?</p></div>
+          <div class="card searchable" data-searchable data-state="active"><h3>Disposition vocabulary</h3><div class="token-list"><span class="token">PRESERVE</span><span class="token">REFINE</span><span class="token">REHOME</span><span class="token">REWRITE</span><span class="token">DELETE</span><span class="token">CURRENT-STATE ONLY</span><span class="token">SUPERSEDED</span></div></div>
+          <div class="card searchable" data-searchable data-state="active"><h3>Evidence vocabulary</h3><div class="token-list"><span class="token">CURRENT-PROVEN</span><span class="token">LAST-REPRODUCED</span><span class="token">STALE / SUPERSEDED</span><span class="token">UNKNOWN / REMEASURE</span></div></div>
+        </div>
+        <div class="legend"><span class="badge blue">Evidence ≠ survival entitlement</span><span class="badge amber">Old Aug-09 counts = REMEASURE when load-bearing</span><span class="badge red">No historical-data compatibility consumer</span></div>
+        <div class="matrix-wrap">
+          <table aria-label="T8-A legacy disposition matrix">
+            <thead><tr><th>Surface</th><th>Current evidence</th><th>Evidence class</th><th>T8-A disposition</th><th>Later owner</th></tr></thead>
+            <tbody>
+              <tr class="searchable" data-searchable data-state="active"><td><strong>Repository / Go</strong></td><td>One Go module `metaldocs`; mixed Go + React/TS + SQL + Node/TS repo.</td><td><span class="badge blue">Current-proven</span></td><td><span class="badge amber">Pending census</span></td><td>T8-A → T8-B/G</td></tr>
+              <tr class="searchable" data-searchable data-state="active"><td><strong>Process roots</strong></td><td>Current API / worker / jobs / DOCX-renderer roots exist.</td><td><span class="badge blue">Current-proven</span></td><td><span class="badge amber">Pending census</span></td><td>T8-A → T8-G</td></tr>
+              <tr class="searchable" data-searchable data-state="active"><td><strong>Verification</strong></td><td>`tools/verify` is repository verification SSOT; CI delegates PR verification to it.</td><td><span class="badge blue">Current-proven</span></td><td><span class="badge amber">Evaluate preserve/refine</span></td><td>T8-A / T9</td></tr>
+              <tr class="searchable" data-searchable data-state="active"><td><strong>Legacy module names</strong></td><td>`approval`, `auth`, `iam`, `documents`, `controlleddocuments`, `templates`, `taxonomy`, `render`, `search`, `jobs`, …</td><td><span class="badge blue">Current evidence</span></td><td><span class="badge gray">No survival entitlement</span></td><td>T8-A → T8-B/C</td></tr>
+              <tr class="searchable" data-searchable data-state="active"><td><strong>Current DB model</strong></td><td>`data-model.md` + baseline/schema/migrations describe current persistence only.</td><td><span class="badge gray">Current-state only</span></td><td><span class="badge amber">Pending census</span></td><td>T8-A → T8-D</td></tr>
+              <tr class="searchable" data-searchable data-state="active"><td><strong>OpenAPI/codegen</strong></td><td>T6 semantic wire laws are ratified; current generated package/tag realization is legacy evidence.</td><td><span class="badge blue">Mixed</span></td><td><span class="badge amber">Separate property from shape</span></td><td>T8-A → T8-E</td></tr>
+              <tr class="searchable" data-searchable data-state="active"><td><strong>Frontend feature tree</strong></td><td>Current `approval/templates/taxonomy/iam/documents/controlled-documents` folders exist.</td><td><span class="badge gray">Current-state only</span></td><td><span class="badge amber">Pending census</span></td><td>T8-A → T8-F</td></tr>
+              <tr class="searchable" data-searchable data-state="active"><td><strong>Aug-09 exact mechanical counts</strong></td><td>Prior package/module/SCC/foreign-SQL metrics were reproduced on older `main` baseline.</td><td><span class="badge amber">Last-reproduced</span></td><td><span class="badge amber">REMEASURE</span></td><td>T8-A</td></tr>
+              <tr class="searchable" data-searchable data-state="closed"><td><strong>Historical business data compatibility</strong></td><td>Operator proved current data DEV/test/throwaway; no Launch import consumer.</td><td><span class="badge green">Current-proven</span></td><td><span class="badge green">DELETE constraint</span></td><td>T7 closed / T10 reset</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="tiny" style="margin-top:8px">This matrix is intentionally incomplete at T8-A start. Rows gain final disposition only from fresh evidence + adjudication; the cockpit must not pre-decide T8-B→T8-G.</p>
+      </section>
+
+      <section id="open-decisions" data-searchable class="searchable" data-state="future">
+        <div class="section-head"><div><div class="section-kicker">Scheduled uncertainty</div><h2>Ainda não decidido — por design</h2></div><span class="badge gray">Owned by later gates</span></div>
+        <div class="grid g3">
+          <div class="card searchable" data-searchable data-state="future"><h3>T8-B · Backend topology</h3><p class="muted">Target repository/package layout, semantic-owner realization, public/internal Go surfaces, dependency graph, composition root.</p></div>
+          <div class="card searchable" data-searchable data-state="future"><h3>T8-C · Internal contracts</h3><p class="muted">Owner queries/capabilities, projections, same-process calls, transaction-coupled intents and durable-job seams.</p></div>
+          <div class="card searchable" data-searchable data-state="future"><h3>T8-D · Persistence</h3><p class="muted">Target tables/schemas, constraints, state ownership, OCC, idempotency state, transaction/lock mapping.</p></div>
+          <div class="card searchable" data-searchable data-state="future"><h3>T8-E · Executable wire</h3><p class="muted">Exact paths, operationIds, schemas, headers, errors, pagination, upload/byte resources, codegen/runtime conformance.</p></div>
+          <div class="card searchable" data-searchable data-state="future"><h3>T8-F · Frontend</h3><p class="muted">Route tree, feature boundaries, generated transport, TanStack Query ownership, cache/state, editor/viewer adapters.</p></div>
+          <div class="card searchable" data-searchable data-state="future"><h3>T8-G · Runtime/deploy</h3><p class="muted">Binaries/processes, River workers, renderer boundary, startup/readiness/shutdown, secrets, trust, observability.</p></div>
+          <div class="card searchable" data-searchable data-state="future"><h3>T8-H · Whole-T8 GCR</h3><p class="muted">Cross-check backend + persistence + wire + frontend + runtime as one physical architecture.</p></div>
+          <div class="card searchable" data-searchable data-state="future"><h3>T9 · Golden flows</h3><p class="muted">Falsifiable composed proof matrix across frontend → API → domain → persistence → async → user-visible truth.</p></div>
+          <div class="card searchable" data-searchable data-state="future"><h3>T10 → T12</h3><p class="muted">Transition/cutover → implementation execution graph → adversarial implementation-readiness challenge.</p></div>
+        </div>
+        <div class="card info" style="margin-top:12px"><strong>Important distinction:</strong> <span class="muted">“Not decided yet” is not the same as “forgotten” or “unknown.” These questions are intentionally routed to named gates so implementation workers never have to invent architecture.</span></div>
+      </section>
+
+      <section id="authorities" data-searchable class="searchable" data-state="active">
+        <div class="section-head"><div><div class="section-kicker">What do I trust?</div><h2>Authority Navigator</h2></div><span class="badge amber">Always revalidate</span></div>
+        <div class="authority-chain" id="authority-chain">
+          <a class="authority-item searchable" data-searchable data-state="active" href="../../AGENTS.md"><div><strong>AGENTS.md</strong><div class="authority-path">repository bootstrap / routing</div></div><span class="badge blue">Router entry</span></a>
+          <a class="authority-item searchable" data-searchable data-state="active" href="../engineering/standards/root-cause-global-maximum-method.md"><div><strong>DevelopmentConexus Engineering Method</strong><div class="authority-path">docs/engineering/standards/root-cause-global-maximum-method.md</div></div><span class="badge blue">Method</span></a>
+          <a class="authority-item searchable" data-searchable data-state="active" href="../../wiki/references/current-agent-handoff.md"><div><strong>Current Agent Handoff</strong><div class="authority-path">wiki/references/current-agent-handoff.md</div></div><span class="badge amber">Fresh session</span></a>
+          <a class="authority-item searchable" data-searchable data-state="active" href="../../wiki/architecture/r10-technical-architecture.md"><div><strong>R10 Technical Architecture Router</strong><div class="authority-path">sole stage/status/next-action authority</div></div><span class="badge amber">Current status</span></a>
+          <a class="authority-item searchable" data-searchable data-state="closed" href="../../wiki/architecture/launch-v1-product-contract.md"><div><strong>Product Contract REV001</strong><div class="authority-path">Launch product meaning</div></div><span class="badge green">Ratified</span></a>
+          <a class="authority-item searchable" data-searchable data-state="closed" href="../../wiki/architecture/whole-product-alignment-review.md"><div><strong>Whole-Product GCR A1→A10</strong><div class="authority-path">whole-product simplification/adjudication</div></div><span class="badge green">Ratified</span></a>
+          <a class="authority-item searchable" data-searchable data-state="closed" href="../../wiki/architecture/launch-v1-ownership-topology.md"><div><strong>Launch 4+1 Ownership</strong><div class="authority-path">Authentication · Organization · Authorization · Controlled Documents + Audit</div></div><span class="badge green">Ratified</span></a>
+          <a class="authority-item searchable" data-searchable data-state="closed" href="../../wiki/architecture/r10-t1-semantic-state-invariants.md"><div><strong>T1→T7 durable authorities</strong><div class="authority-path">r10-t1… through r10-t7…</div></div><span class="badge green">Closed</span></a>
+          <a class="authority-item searchable" data-searchable data-state="closed" href="../../wiki/architecture/rebaseline-decision-registry-t7-amendment.md"><div><strong>Decision Registry amendments</strong><div class="authority-path">base + D4 + T6 + post-T6 + T7</div></div><span class="badge green">Current</span></a>
+          <a class="authority-item searchable" data-searchable data-state="closed" href="../../wiki/architecture/r10-post-t6-implementation-readiness-program.md"><div><strong>Post-T6 Implementation Readiness Program</strong><div class="authority-path">T7→T12 program law and boundaries</div></div><span class="badge green">Ratified</span></a>
+          <a class="authority-item searchable" data-searchable data-state="closed" href="../../wiki/architecture/r10-technical-realization-reconciliation-baseline.md"><div><strong>TRRB</strong><div class="authority-path">technical evidence coverage/classification baseline</div></div><span class="badge green">Ratified</span></a>
+          <a class="authority-item searchable" data-searchable data-state="active" href="../superpowers/analysis/2026-08-19-r10-t8a-technical-authority-legacy-census-bootstrap.md"><div><strong>Active T8-A staging</strong><div class="authority-path">docs/superpowers/analysis/2026-08-19-r10-t8a-technical-authority-legacy-census-bootstrap.md</div></div><span class="badge amber">Active</span></a>
+        </div>
+        <div class="card" style="margin-top:12px"><strong>Evidence layer:</strong> <span class="muted">current code, DB/schema/migrations, OpenAPI/generated contracts, frontend, deploy, tests and runtime answer <em>what runs today</em>. They do not automatically answer what R10 must preserve.</span></div>
+      </section>
+
+      <section id="journey" data-searchable class="searchable" data-state="closed">
+        <div class="section-head"><div><div class="section-kicker">Architecture journey</div><h2>Por que estamos no T8-A</h2></div><span class="badge blue">Context, not just status</span></div>
+        <div class="card">
+          <div class="timeline">
+            <div class="timeline-item"><strong>Product Contract REV001 established Launch meaning.</strong><p>Controlled-document product scope, revision convention and product invariants became explicit.</p></div>
+            <div class="timeline-item"><strong>T1→T6 closed semantic architecture.</strong><p>State → transactions → AuthZ/Audit → content/storage/restore → async/search/effects → API/frontend journeys.</p></div>
+            <div class="timeline-item"><strong>Implementation-readiness challenge found a structural gap.</strong><p>Semantic completion did not imply physical technical realization; implementation planning could have inherited hidden material decisions.</p></div>
+            <div class="timeline-item"><strong>Post-T6 program restructured the descent.</strong><p>T7→T12 introduced explicit source truth, realization, proof, transition, execution graph and adversarial readiness gates.</p></div>
+            <div class="timeline-item"><strong>TRRB reconciled technical evidence.</strong><p>Current vs last-reproduced vs stale vs unknown was separated; legacy technical docs lost target authority by inheritance.</p></div>
+            <div class="timeline-item"><strong>T7 source assumption was challenged.</strong><p>Operator clarified all current MetalDocs data/history is DEV/test/throwaway.</p></div>
+            <div class="timeline-item"><strong>T7 closed as NO historical business migration.</strong><p>No business corpus must be imported; T8 has no historical-data compatibility consumer.</p></div>
+            <div class="timeline-item active"><strong>T8-A opened.</strong><p>Fresh current technical census + remeasurement now decides what existing structures deserve preserve/refine/rehome/rewrite/delete/current-state-only/superseded disposition.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="session" data-searchable class="searchable" data-state="active">
+        <div class="section-head"><div><div class="section-kicker">Cross-session recovery</div><h2>Fresh Session Prompt</h2></div><span class="badge amber">Copy → paste → revalidate</span></div>
+        <div class="card info">
+          <div class="prompt-actions">
+            <button class="btn primary" id="copy-session-prompt" type="button">Copy New Session Prompt</button>
+            <button class="btn" id="copy-authority-chain-inline" type="button">Copy Authority Chain</button>
+          </div>
+          <pre class="prompt" id="fresh-session-prompt">Estamos continuando o MetalDocs Whole-Product / R10 Architecture Rebaseline.
+
+Repository: developmentconexus-ops/MetalDocs
+Branch: docs/a8-authz-approval-redesign-ledger
+PR: #131
+
+IMPORTANTE: este prompt e o cockpit são somente bootstrap/orientação, nunca authority. Comece do zero pelo repo e revalide o PR/HEAD antes de aceitar qualquer status, arquitetura ou decisão abaixo.
+
+Leia/obedeça nesta ordem:
+1. AGENTS.md
+2. docs/engineering/standards/root-cause-global-maximum-method.md
+3. wiki/references/current-agent-handoff.md
+4. wiki/architecture/r10-technical-architecture.md — sole current stage/status/next-action router
+5. Product Contract REV001 + Whole-Product GCR + 4+1 ownership
+6. T1→T7 durable R10 authorities
+7. Decision Registry + D4/T6/post-T6/T7 amendments
+8. wiki/architecture/r10-post-t6-implementation-readiness-program.md
+9. wiki/architecture/r10-technical-realization-reconciliation-baseline.md
+10. docs/superpowers/analysis/2026-08-19-r10-t8a-technical-authority-legacy-census-bootstrap.md
+11. current code/schema/OpenAPI/frontend/runtime/deploy/test evidence only for concrete T8-A claims
+
+Last known accepted state — REVALIDATE, DO NOT ASSUME:
+- Product Contract / Whole-Product GCR / 4+1 ownership: CLOSED / OPERATOR-APPROVED
+- T1→T7: CLOSED / OPERATOR-RATIFIED
+- T8 Technical Realization Architecture: ACTIVE
+- T8-A Technical Authority & Legacy Census: ACTIVE / CURRENT TECHNICAL CENSUS + REMEASUREMENT NEXT
+- T8-B→T8-H: NOT OPEN
+- T9→T12: NOT OPEN
+- implementation BLOCKED
+
+Ratified T7 decision:
+NO HISTORICAL BUSINESS MIGRATION REQUIRED FOR LAUNCH.
+Current MetalDocs DB/content/history is DEV / TEST / THROWAWAY; no current DEV data has business-history migration authority. T10 still owns technical current→target transition/reset/cutover.
+
+T8-A objective:
+Perform fresh current technical census and remeasure load-bearing evidence. Classify current structures using PRESERVE / REFINE / REHOME / REWRITE / DELETE / CURRENT-STATE ONLY / SUPERSEDED. Use CURRENT-PROVEN / LAST-REPRODUCED / STALE-SUPERSEDED / UNKNOWN-REMEASURE evidence classes. Current implementation proves what exists, not what survives.
+
+Do NOT choose final package topology, target relational schema, exact executable OpenAPI, frontend topology or runtime/deployment topology inside T8-A; those belong to T8-B→T8-G. Do NOT write product implementation code or implementation execution tasks.
+
+No Writer task may contain a material architecture decision that should have been decided before execution.
+
+Revalidation law: preserve accepted simple/coherent decisions unless current authority or a concrete failure mode disproves them; reopen only the decision whose justification changed.
+
+Continue from the exact current router gate after fresh PR/HEAD + authority revalidation.</pre>
+          <div class="copy-status" id="copy-status" role="status" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <div class="footer-note">MetalDocs R10 Rebaseline Cockpit · visual orientation only · router/wiki remain authority · synchronized 2026-08-19</div>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      const searchInput = document.getElementById('cockpit-search');
+      const filterButtons = Array.from(document.querySelectorAll('.filter-btn'));
+      const searchable = Array.from(document.querySelectorAll('[data-searchable]'));
+      let activeFilter = 'all';
+
+      function applyView() {
+        const query = (searchInput.value || '').trim().toLocaleLowerCase('pt-BR');
+        searchable.forEach(el => {
+          const state = el.dataset.state || 'all';
+          const stateMatch = activeFilter === 'all' || state === activeFilter;
+          const queryMatch = !query || el.textContent.toLocaleLowerCase('pt-BR').includes(query);
+          el.classList.toggle('filter-hidden', !(stateMatch && queryMatch));
+        });
+      }
+
+      searchInput.addEventListener('input', applyView);
+      filterButtons.forEach(btn => btn.addEventListener('click', () => {
+        activeFilter = btn.dataset.filter;
+        filterButtons.forEach(x => x.classList.toggle('active', x === btn));
+        applyView();
+      }));
+
+      const navLinks = Array.from(document.querySelectorAll('.nav-link'));
+      const sectionEls = navLinks.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+      if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver(entries => {
+          const visible = entries.filter(e => e.isIntersecting).sort((a,b) => b.intersectionRatio - a.intersectionRatio)[0];
+          if (!visible) return;
+          navLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + visible.target.id));
+        }, { rootMargin: '-18% 0px -68% 0px', threshold: [0.01, .15, .35] });
+        sectionEls.forEach(s => observer.observe(s));
+      }
+
+      async function copyText(text, successMessage) {
+        let copied = false;
+        try {
+          if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+            copied = true;
+          }
+        } catch (_) {}
+        if (!copied) {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.setAttribute('readonly', '');
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          try { copied = document.execCommand('copy'); } catch (_) { copied = false; }
+          ta.remove();
+        }
+        const status = document.getElementById('copy-status');
+        status.textContent = copied ? successMessage : 'Não foi possível copiar automaticamente. Selecione o conteúdo manualmente.';
+        window.setTimeout(() => { status.textContent = ''; }, 3200);
+        return copied;
+      }
+
+      const prompt = document.getElementById('fresh-session-prompt').textContent.trim();
+      const authorityText = [
+        'AGENTS.md',
+        'docs/engineering/standards/root-cause-global-maximum-method.md',
+        'wiki/references/current-agent-handoff.md',
+        'wiki/architecture/r10-technical-architecture.md',
+        'Product Contract REV001 + Whole-Product GCR + 4+1 ownership',
+        'T1→T7 durable authorities',
+        'Decision Registry + D4/T6/post-T6/T7 amendments',
+        'wiki/architecture/r10-post-t6-implementation-readiness-program.md',
+        'wiki/architecture/r10-technical-realization-reconciliation-baseline.md',
+        'docs/superpowers/analysis/2026-08-19-r10-t8a-technical-authority-legacy-census-bootstrap.md'
+      ].join('\n→ ');
+
+      document.getElementById('copy-session-prompt').addEventListener('click', () => copyText(prompt, 'Prompt de nova sessão copiado.'));
+      document.getElementById('copy-authority-chain').addEventListener('click', () => copyText(authorityText, 'Authority chain copiada.'));
+      document.getElementById('copy-authority-chain-inline').addEventListener('click', () => copyText(authorityText, 'Authority chain copiada.'));
+      document.getElementById('print-cockpit').addEventListener('click', () => window.print());
+    })();
+  </script>
+</body>
+</html>
