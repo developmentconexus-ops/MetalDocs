@@ -1,6 +1,6 @@
 # R10 Technical Architecture — Active Stage Router
 
-> **Status:** ACTIVE — **PRODUCT CONTRACT REV001 + T1→T5 OPERATOR-RATIFIED; T6 MATERIAL DECISIONS OPERATOR-APPROVED; PLATFORM-FACING SUMMARY RATIFICATION NEXT; T7 NOT OPEN; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **PRODUCT CONTRACT REV001 + T1→T5 OPERATOR-RATIFIED; T6 MATERIAL CORE PRESERVED; PRE-RATIFICATION GCR FOUND BOUNDED T6 CORRECTIONS; SUMMARY RATIFICATION HELD; T7 NOT OPEN; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-18  
 > **Revision convention:** `REV000` initial issuance / `REV001` first revision  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
@@ -24,9 +24,9 @@ This file owns current technical-stage status and exact next action.
 11. `wiki/architecture/r10-t5-durable-async-search-external-effects.md`
 12. `wiki/architecture/rebaseline-decision-registry.md`
 13. this router
-14. T6 material-adjudication record
-15. active T6 platform-facing summary
-16. T6 candidate/evidence staging only for provenance while T6 remains open
+14. `docs/superpowers/analysis/2026-08-18-r10-t6-operator-material-adjudication.md`
+15. `docs/superpowers/analysis/2026-08-18-r10-t6-pre-ratification-global-coherence-review.md` — **ACTIVE REVIEW / CORRECTION GATE**
+16. T6 platform summary/candidate/evidence staging only for the bounded correction set
 17. current implementation only as claim-specific evidence
 
 Current implementation has **no compatibility entitlement**. Structural Inversion controls T6.
@@ -56,111 +56,63 @@ T4 — Exact Content, Storage Integrity & Restore       CLOSED / OPERATOR-RATIFI
 T5 — Durable Async, Search & External Effects         CLOSED / OPERATOR-RATIFIED
 Decision Registry                                      CURRENT / OPERATOR-RATIFIED
 Post-T5 integrated Fable checkpoint                   CLOSED / OPERATOR-APPROVED
-T6 material decisions                                 OPERATOR-APPROVED
-T6 platform-facing summary                            STAGED / OPERATOR RATIFICATION NEXT
+T6 material core                                      OPERATOR-APPROVED / PRESERVED
+T6 pre-ratification GCR                               COMPLETE / BOUNDED CORRECTIONS FOUND
+T6 correction set C1→C8                               OPERATOR ADJUDICATION NEXT
+T6 platform-facing summary                            RATIFICATION HELD
 T6 durable authority                                  NOT YET
 T7 — Historical Migration & Cutover                   NOT OPEN
 implementation                                         BLOCKED
 ```
 
-## 4. T6 operator-approved material decision record
+## 4. Pre-ratification Global Coherence Review
 
-`docs/superpowers/analysis/2026-08-18-r10-t6-operator-material-adjudication.md`
+Authority/review:
 
-The operator approved the final T6 proposal in this precedence order:
+`docs/superpowers/analysis/2026-08-18-r10-t6-pre-ratification-global-coherence-review.md`
+
+Verdict:
 
 ```text
-base candidate
-→ corrected Global-Maximum adjudication packet
-→ final refinements FR-1..FR-4 where named
+core T1→T5 / 4+1 coherence     PASS
+T6 Global-Maximum direction    PASS
+formal T1→T5 reopen            NONE
+summary ready for ratification NO
 ```
 
-The approved direction includes:
+Required bounded T6 corrections:
 
 ```text
-rebuild pre-launch /api/v1 from current product semantics; no compatibility layer
-OpenAPI contract-first + generated Go/TS boundary; OAS 3.0.3 Launch baseline
-Keycloak Authorization Code → MetalDocs ApplicationSession + session-bound CSRF
-semantic-lens frontend with stable route meanings
-one DRAFT generation exposed as strong ETag/If-Match; PATCH title/source under same T2 OCC
-T4-bound upload_id OPEN→READY→OCC attachment; client never owns ExactContentDescriptor
-review exact immutable Submission; case participation never mutates WorkingContent
-User eligibility = singleton PUT current resource; DISABLED executes T3 offboarding semantics
-Governance Step Decision = singleton immutable PUT resource
-semantic exact-byte routes hide provider/storage identity
-one fidelity-gated DOCX provider; no EditorSession correctness dependency baseline
-closed TYPE | TYPE_AREA numbering; no generic formatting grammar
-Search materialization/search_refresh OFF for Launch
-Domain history != Audit
-RFC9457 errors with one canonical MetalDocs problem code authority
-natural HTTP idempotency first; durable Idempotency-Key only for truly non-idempotent POST creation
-opaque cursor pagination for unbounded lists
-blank/template/revise seeds use exact governed source, never OfficialRendition as editable source
+C1 status discovery is lens-scoped/derived; never persisted Document.currentStatus
+C2 Idempotency-Key replay result commits atomically with semantic transition; no baseline public IN_PROGRESS state
+C3 distinguish /api/v1 application contract from /auth integration and operations surfaces
+C4 restore complete Launch lifecycle journeys to platform-facing summary
+C5 next-Revision source copy revalidates current EFFECTIVE source after external copy and before commit
+C6 If-Match on provider-binding / responsible-owner / template-role current singleton resources
+C7 template admin uses bounded template_use.manage metadata surface without implicit document content/history access
+C8 normalized DocumentType.code + Area.code are Company-unique numbering inputs
 ```
 
-Everything outside the approved T6 slate remains frozen unless material evidence triggers an explicit bounded reopen.
+Low refinements L1→L5 remain in the review and require no T1→T5 reopen.
 
-## 5. Platform-facing T6 summary — ACTIVE GATE
+Everything else in the operator-approved T6 material core remains frozen.
 
-`docs/superpowers/analysis/2026-08-18-r10-t6-platform-facing-summary.md`
-
-The summary consolidates the operator-approved material decisions into one implementation-facing system description covering:
+## 5. Current gate
 
 ```text
-platform semantic lenses
-public contract law
-AuthN/session/CSRF
-frontend information architecture
-Library/Search
-create/numbering/seeding
-DRAFT OCC
-T4 upload/admission
-Submission/governance
-lifecycle/idempotency transport
-Release/source/OfficialRendition presentation
-DOCX provider proof gate
-Administration
-errors
-pagination/read models
-History vs Audit
-frontend technical organization
-explicit subtraction from legacy Launch target
-implementation-proof obligations
-```
-
-It is **not durable authority until explicitly ratified by the operator**.
-
-## 6. T6 hard boundaries
-
-T6 does not reopen by implication:
-
-```text
-Document/Revision/WorkingContent/Submission meaning
-Revision-owned title
-Release/effectivity
-T3 Authorization/Audit authority
-T4 exact-content/admission authority
-viewer/preview vs OfficialRendition distinction
-Search authority boundary + canonical-query baseline
-no-notification/event-platform baseline
-Historical Migration/Cutover execution
-```
-
-## 7. Current gate
-
-```text
-operator reviews platform-facing T6 summary
-→ explicit operator summary ratification
+operator adjudicates C1→C8
+→ incorporate accepted corrections into T6 summary/material record
+→ bounded coherence delta against Product Contract + T1→T5
+→ explicit operator platform-summary ratification
 → promote durable T6 authority to wiki/
 → reconcile Decision Registry
-→ update router/handoff/index/PR
-→ remove completed T6 staging from live tree (Git history archive)
+→ remove completed T6 staging
 → only then open T7
 ```
 
-The material decision approval already received does **not** itself promote T6 or open T7.
+A previous material-decision approval does not override this later evidence-driven correction gate.
 
-## 8. Final gate after T7
+## 6. Final gate after T7
 
 ```text
 Integrated Whole-R10 Global Coherence Review
