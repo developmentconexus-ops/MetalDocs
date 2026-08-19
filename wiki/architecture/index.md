@@ -14,7 +14,7 @@
 - **[r10-t4-exact-content-storage-integrity-restore.md](r10-t4-exact-content-storage-integrity-restore.md)** — operator-ratified T4 authority.
 - **[r10-t5-durable-async-search-external-effects.md](r10-t5-durable-async-search-external-effects.md)** — operator-ratified T5 authority.
 - **[rebaseline-decision-registry.md](rebaseline-decision-registry.md)** — current operator-ratified cross-stage disposition baseline.
-- **[r10-technical-architecture.md](r10-technical-architecture.md)** — current router; **T6 FINAL GLOBAL-MAXIMUM ADJUDICATION READY**.
+- **[r10-technical-architecture.md](r10-technical-architecture.md)** — current router; **T6 PLATFORM-FACING SUMMARY RATIFICATION NEXT**.
 - [../references/current-agent-handoff.md](../references/current-agent-handoff.md) — exact fresh-session recovery point.
 
 ## Current gate
@@ -28,52 +28,40 @@ T4 Exact Content, Storage Integrity & Restore       CLOSED / OPERATOR-RATIFIED
 T5 Durable Async, Search & External Effects         CLOSED / OPERATOR-RATIFIED
 Decision Registry                                    CURRENT / RECONCILED / OPERATOR-RATIFIED
 Post-T5 integrated Fable checkpoint                  CLOSED / OPERATOR-APPROVED
-T6 Canonical API / Frontend Journeys                ACTIVE / FINAL ADJUDICATION READY
-operator material adjudication                      NEXT
+T6 material decisions                               OPERATOR-APPROVED
+T6 platform-facing summary                          STAGED / RATIFICATION NEXT
+T6 durable authority                                NOT YET
 T7 Historical Migration & Cutover                   NOT OPEN
 implementation                                       BLOCKED
 ```
 
-## Active T6 staging / precedence
+## Active T6 decision/gate artifacts
+
+- `../../docs/superpowers/analysis/2026-08-18-r10-t6-operator-material-adjudication.md` — material decisions approved.
+- `../../docs/superpowers/analysis/2026-08-18-r10-t6-platform-facing-summary.md` — **current operator ratification target**.
+
+Candidate/evidence artifacts remain staging provenance until T6 promotion and are then removed from the live tree; Git history is the archive.
+
+## T6 platform direction
 
 ```text
-bootstrap
-→ docs/superpowers/analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-bootstrap.md
-
-base candidate
-→ docs/superpowers/analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-candidate.md
-
-evidence docket
-→ docs/superpowers/analysis/2026-08-18-r10-t6-external-evidence-docket.md
-
-corrected adjudication
-→ docs/superpowers/analysis/2026-08-18-r10-t6-global-maximum-adjudication-packet.md
-
-final FR-1..FR-4 precedence
-→ docs/superpowers/analysis/2026-08-18-r10-t6-final-adjudication-refinements.md
-```
-
-Operator decision precedence is base candidate → corrected packet → final refinements where named. None is durable authority yet.
-
-## T6 Global-Maximum direction
-
-```text
-rebuild pre-launch /api/v1; no legacy compatibility layer
-server-side OIDC Authorization Code + MetalDocs ApplicationSession + CSRF
-semantic-lens frontend, stable route meanings
-one DRAFT generation expressed by ETag/If-Match; PATCH title/source under same OCC
+rebuild pre-launch /api/v1; no compatibility layer
+OpenAPI contract-first + generated Go/TS boundaries
+Keycloak Authorization Code → ApplicationSession + session-bound CSRF
+semantic-lens frontend with stable truth-specific routes
+one DRAFT generation via strong ETag/If-Match
 T4-bound upload/admission; client never owns exact-content descriptor
-immutable Submission governance; singleton Step Decision resource
-singleton User eligibility resource executes T3 offboarding/reenable semantics
-semantic exact-byte URLs; no provider identity in product contract
-fidelity-gated single DOCX adapter; no EditorSession baseline
-closed TYPE | TYPE_AREA numbering; no custom grammar
+immutable Submission governance; reviewer never mutates WorkingContent by case access
+singleton User eligibility and singleton Step Decision transport
+semantic byte URLs; no provider identity in product contract
+fidelity-gated single DOCX provider; no EditorSession correctness baseline
+closed TYPE | TYPE_AREA numbering
 canonical Search only; materialized Search OFF
 Domain history != Audit
-RFC9457 errors + semantic problem codes
+RFC9457 + canonical semantic problem codes
 natural HTTP idempotency before replay machinery
-cursor lists; no generic filter DSL
-template/revision editing seeds exact released source, never OfficialRendition
+opaque cursor lists
+blank/template/revise seed exact source, never OfficialRendition
 ```
 
 Current API/frontend/runtime remain evidence only and receive no target entitlement from sunk cost.
@@ -81,11 +69,10 @@ Current API/frontend/runtime remain evidence only and receive no target entitlem
 ## Exact next gate
 
 ```text
-operator adjudicates final T6 material slate
-→ revise only rejected/refined items
-→ platform-facing T6 summary
-→ explicit operator summary ratification
-→ durable T6 promotion + Registry reconciliation + staging cleanup
+operator ratifies platform-facing T6 summary
+→ durable T6 promotion
+→ Decision Registry reconciliation
+→ staging cleanup
 → only then T7
 ```
 
