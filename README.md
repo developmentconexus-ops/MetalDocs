@@ -19,6 +19,14 @@ T8-B→T12 NOT OPEN
 CODE     BLOCKED
 ```
 
+## Visual orientation cockpit
+
+For a fast visual recovery of **where we are, what has already been decided, what MetalDocs is converging toward, what remains before implementation, and the fresh-session continuation prompt**, open:
+
+[`docs/operator/r10-rebaseline-cockpit.html`](docs/operator/r10-rebaseline-cockpit.html)
+
+This cockpit is **non-authoritative visual orientation only**. It summarizes current R10 authority; it never creates or overrides architecture truth. If the cockpit and the R10 router disagree, `wiki/architecture/r10-technical-architecture.md` wins and the cockpit must be updated.
+
 T7 closed with:
 
 ```text
