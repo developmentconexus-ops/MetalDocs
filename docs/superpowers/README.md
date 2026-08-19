@@ -1,6 +1,6 @@
 # `docs/superpowers` — Active Design Staging Only
 
-> **Status:** **TRRB CLOSED / PROMOTED; T7 ACTIVE / SOURCE EVIDENCE CENSUS NEXT; T8→T12 NOT OPEN; IMPLEMENTATION BLOCKED.**
+> **Status:** **T1→T7 CLOSED / OPERATOR-RATIFIED; T8-A ACTIVE / CURRENT TECHNICAL CENSUS + REMEASUREMENT NEXT; IMPLEMENTATION BLOCKED.**
 
 Durable accepted truth belongs in `wiki/`. Active not-yet-promoted analysis/review belongs here. Completed/superseded staging is removed from the live tree; Git history is the archive.
 
@@ -10,32 +10,39 @@ Durable accepted truth belongs in `wiki/`. Active not-yet-promoted analysis/revi
 Product Contract REV001
 → Whole-Product GCR A1–A10
 → 4+1 ownership topology
-→ T1
-→ T2
-→ T3 + D4 amendment
-→ T4
-→ T5
-→ T6
-→ Decision Registry + D4/T6/post-T6 amendments
+→ T1 → T2 → T3 + D4 → T4 → T5 → T6 → T7
+→ Decision Registry + D4/T6/post-T6/T7 amendments
 → r10-post-t6-implementation-readiness-program.md
 → r10-technical-realization-reconciliation-baseline.md
 → r10-technical-architecture.md
 ```
 
+T7 durable decision:
+
+```text
+NO HISTORICAL BUSINESS MIGRATION REQUIRED FOR LAUNCH
+```
+
+Completed T7 staging has been removed after operator ratification and durable promotion.
+
 ## Current active staging
 
-- `analysis/2026-08-19-r10-t7-historical-migration-truth-semantic-mapping-bootstrap.md` — **T7 OPEN / SOURCE EVIDENCE CENSUS NEXT / NON-AUTHORITATIVE.**
-
-Completed TRRB staging has been removed after operator ratification and durable promotion.
+- `analysis/2026-08-19-r10-t8a-technical-authority-legacy-census-bootstrap.md` — **T8-A OPEN / CURRENT TECHNICAL CENSUS + REMEASUREMENT NEXT / NON-AUTHORITATIVE.**
 
 ## Current state
 
 ```text
-T1→T6                           CLOSED / OPERATOR-RATIFIED
+T1→T7                           CLOSED / OPERATOR-RATIFIED
 Post-T6 Stage-Decomposition GCR RESTRUCTURE NOW / OPERATOR-RATIFIED
 TRRB                            CLOSED / OPERATOR-RATIFIED / PROMOTED
-T7                              ACTIVE / SOURCE EVIDENCE CENSUS NEXT
-T8                              NOT OPEN
+T8-A                            ACTIVE / CURRENT TECHNICAL CENSUS + REMEASUREMENT NEXT
+T8-B                            NOT OPEN
+T8-C                            NOT OPEN
+T8-D                            NOT OPEN
+T8-E                            NOT OPEN
+T8-F                            NOT OPEN
+T8-G                            NOT OPEN
+T8-H                            NOT OPEN
 T9                              NOT OPEN
 T10                             NOT OPEN
 T11                             NOT OPEN
@@ -43,29 +50,32 @@ T12                             NOT OPEN
 implementation                  BLOCKED
 ```
 
-## T7 method posture
+## T8-A posture
 
-T7 is historical/source truth and semantic mapping only.
+T8-A performs evidence-first technical disposition:
 
 ```text
-actual source evidence census
-→ PROVEN / INFERABLE WITH EXPLICIT RULE / UNKNOWN
-→ identify material unknowns
-→ compare 2–3 migration-truth approaches
-→ Global Maximum candidate
-→ material adjudication
-→ platform-facing T7 summary
-→ explicit operator ratification
-→ durable T7 promotion + Registry reconciliation + staging cleanup
+current technical census
+→ remeasure load-bearing stale metrics
+→ map structures to ratified target properties
+→ PRESERVE / REFINE / REHOME / REWRITE / DELETE / CURRENT-STATE ONLY / SUPERSEDED
+→ adjudicate material disagreements
+→ operator ratifies T8-A disposition summary
 ```
 
-T7 must not select backend/package topology, target database, exact executable OpenAPI, frontend topology, runtime/deployment realization or concrete cutover tooling.
+T8-A does **not** freeze final package topology, relational schema, exact OpenAPI, frontend topology or process/deployment topology. Those belong to T8-B→T8-G.
 
-## Corrected path
+## Remaining path
 
 ```text
-T7 Historical Migration Truth & Semantic Mapping
-→ T8 Technical Realization Architecture
+T8-A Technical Authority & Legacy Census
+→ T8-B Backend Module & Package Topology
+→ T8-C Internal Communication Contracts
+→ T8-D Persistence Realization
+→ T8-E Executable Wire Contract
+→ T8-F Frontend Realization
+→ T8-G Runtime / Process / Deployment
+→ T8-H Whole-T8 GCR
 → T9 Golden Flows & Validation Baseline
 → T10 Transition / Refactor / Migration / Cutover
 → T11 Implementation Program & Execution Graph
