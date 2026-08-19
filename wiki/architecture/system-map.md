@@ -2,6 +2,7 @@
 
 > **Last verified:** 2026-08-19  
 > **Active program:** R10 Post-T6 Implementation Readiness  
+> **Current stage:** T7 — Historical Migration Truth & Semantic Mapping  
 > **Implementation:** BLOCKED
 
 ## When in doubt
@@ -14,9 +15,20 @@ Read:
 4. `r10-technical-architecture.md`
 5. Product Contract + T1→T6 authorities named by the router
 6. `r10-post-t6-implementation-readiness-program.md`
-7. the current active stage/staging named by the router
+7. `r10-technical-realization-reconciliation-baseline.md`
+8. the current active stage/staging named by the router
 
 Do not route current target work through `cohesive-platform-redesign.md`; it is superseded for active target routing.
+
+## “I’m working on historical/source migration truth”
+
+Current stage is **T7**.
+
+Read the active bootstrap named by the router and inspect only actual source DB/content/runtime evidence required for the claim.
+
+T7 decides source truth, evidence quality, migration-mode semantics and historical semantic mapping. It does not decide physical implementation or cutover tooling.
+
+Concrete migration tooling/cutover belongs to **T10** after T8/T9 close.
 
 ## “I’m deciding target backend/package architecture”
 
@@ -31,7 +43,13 @@ current Go package/import graph
 current SQL/table access
 ```
 
-Target backend/package topology belongs to **T8-B**, after the Technical Realization Reconciliation Baseline is accepted and T7 closes.
+Target backend/package topology belongs to **T8-B**, after T7 closes.
+
+## “I’m deciding internal module/owner communication”
+
+T1→T6 define semantic ownership and transaction/effect laws. Current cross-package calls, ports, direct SQL and legacy module imports are evidence only.
+
+Target internal owner communication belongs to **T8-C**.
 
 ## “I’m deciding target database/schema/transactions”
 
@@ -78,55 +96,42 @@ Current features such as `approval`, `templates`, `taxonomy`, `iam`, `documents`
 
 Current API/worker/jobs/renderer processes, River wiring, compose/Docker/scripts and observability are evidence only.
 
-T4/T5 provide binding correctness constraints. Exact target process/deployment/trust/readiness/observability realization belongs **T8-G**.
+Target process/service/runtime/deployment/trust/observability realization belongs **T8-G**.
 
-## “I’m planning historical migration”
+## “I’m designing end-to-end proof”
 
-The former combined Historical Migration & Cutover T7 was superseded by the post-T6 Stage-Decomposition GCR.
+Target composed Golden Flows, failure/restart/security/recovery proofs and Validation Baseline belong **T9**.
 
-New ownership:
+Existing QA/checks are evidence and safety rails, not automatically the final proof architecture.
+
+## “I’m planning how to transform the current code into the target”
+
+Do not do this before T8/T9 close.
+
+Current→target package/schema/API/frontend/runtime refactor, migration, cutover, rollback and legacy deletion belong **T10**.
+
+## “I’m writing implementation tasks”
+
+Implementation decomposition belongs **T11** only after T7→T10 close.
+
+No Writer task may contain a material architecture decision that should have been resolved in T7→T10.
+
+## “I’m reviewing whether implementation may start”
+
+Use **T12 — Adversarial Implementation-Readiness Review**, followed by Integrated Whole-R10 GCR, fresh independent/cold review and explicit operator implementation authorization.
+
+## Current-state technical evidence
+
+The following remain useful for archaeology/current runtime only unless a later T8 decision promotes a property:
 
 ```text
-T7  source truth + semantic historical mapping
-T10 concrete migration runtime/cutover/rollback/deletion/recovery choreography
+backend-blueprint.md
+backend-api-structure.md
+frontend-structure.md
+data-model.md
+wiki/backend/repo-topology.md
+wiki/modules/*
+current code/schema/OpenAPI/deploy/tests
 ```
 
-Do not design concrete migration scripts before T8 has frozen the target physical realization.
-
-## “I’m planning implementation”
-
-Implementation planning is **not open**.
-
-Before implementation:
-
-```text
-T7  Historical Migration Truth & Mapping
-T8  Technical Realization Architecture
-T9  Golden Flows & Validation Baseline
-T10 Transition / Refactor / Migration / Cutover
-T11 Implementation Program & Execution Graph
-T12 Adversarial Implementation-Readiness
-→ Integrated Whole-R10 GCR
-→ fresh independent/cold review
-→ operator final authorization
-```
-
-A Writer task may not contain unresolved architecture decisions.
-
-## “I’m inspecting current runtime behavior”
-
-Use current code/schema/OpenAPI/generated types/deploy/tests. Runtime evidence may contradict stale wiki evidence; fix/reroute stale documentation rather than granting runtime shape target authority.
-
-## “I’m reviewing architecture”
-
-Use the DevelopmentConexus Method. Attack duplicate/missing authority, hidden package/SQL coupling, accidental topology inheritance, contract/frontend/runtime mismatch, proof gaps and migration traps. Findings are evidence; reopen only the exact decision materially implicated.
-
-## “I’m closing work”
-
-Current gate is the Technical Realization Reconciliation Baseline:
-
-`../../docs/superpowers/analysis/2026-08-19-r10-technical-realization-reconciliation-baseline.md`
-
-It is an evidence census only. Operator acceptance of its coverage/classification is required before redefined T7 opens.
-
-No implementation plan or product code is authorized.
+`backend-target-architecture.md` and `cohesive-platform-redesign.md` are historical/superseded target artifacts.
