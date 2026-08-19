@@ -149,7 +149,7 @@ stale architecture exception = verifier FAIL, not alert
 missing required domain predicate fact = DENY
 ```
 
-Completed T8-B staging and Fable review artifacts are removed from the live staging tree after promotion; Git history is provenance.
+T8-B bootstrap/candidate/reviewer artifacts are no longer active staging. Because physical deletion was unavailable in the publication tool, their live-tree files are explicit **SUPERSEDED/HISTORICAL tombstones** routing to the durable authority; full evidence remains in Git history.
 
 ## T8-C — ACTIVE
 
