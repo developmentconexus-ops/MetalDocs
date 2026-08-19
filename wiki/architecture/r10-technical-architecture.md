@@ -1,6 +1,6 @@
 # R10 Technical Architecture — Active Stage Router
 
-> **Status:** ACTIVE — **PRODUCT CONTRACT REV001 + T1→T5 OPERATOR-RATIFIED; POST-T5 FABLE CHECKPOINT CLOSED; T6 FINAL GLOBAL-MAXIMUM ADJUDICATION READY; OPERATOR MATERIAL ADJUDICATION NEXT; T7 NOT OPEN; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **PRODUCT CONTRACT REV001 + T1→T5 OPERATOR-RATIFIED; T6 MATERIAL DECISIONS OPERATOR-APPROVED; PLATFORM-FACING SUMMARY RATIFICATION NEXT; T7 NOT OPEN; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-18  
 > **Revision convention:** `REV000` initial issuance / `REV001` first revision  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
@@ -24,12 +24,10 @@ This file owns current technical-stage status and exact next action.
 11. `wiki/architecture/r10-t5-durable-async-search-external-effects.md`
 12. `wiki/architecture/rebaseline-decision-registry.md`
 13. this router
-14. T6 bootstrap
-15. T6 material candidate
-16. T6 evidence docket
-17. T6 corrected adjudication packet
-18. T6 final adjudication refinements
-19. current API/frontend/runtime only as claim-specific evidence
+14. T6 material-adjudication record
+15. active T6 platform-facing summary
+16. T6 candidate/evidence staging only for provenance while T6 remains open
+17. current implementation only as claim-specific evidence
 
 Current implementation has **no compatibility entitlement**. Structural Inversion controls T6.
 
@@ -58,69 +56,83 @@ T4 — Exact Content, Storage Integrity & Restore       CLOSED / OPERATOR-RATIFI
 T5 — Durable Async, Search & External Effects         CLOSED / OPERATOR-RATIFIED
 Decision Registry                                      CURRENT / OPERATOR-RATIFIED
 Post-T5 integrated Fable checkpoint                   CLOSED / OPERATOR-APPROVED
-T6 — Canonical API / Frontend Journeys                ACTIVE / FINAL ADJUDICATION READY
+T6 material decisions                                 OPERATOR-APPROVED
+T6 platform-facing summary                            STAGED / OPERATOR RATIFICATION NEXT
+T6 durable authority                                  NOT YET
 T7 — Historical Migration & Cutover                   NOT OPEN
 implementation                                         BLOCKED
 ```
 
-## 4. T6 active staging and precedence
+## 4. T6 operator-approved material decision record
 
-```text
-docs/superpowers/analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-bootstrap.md
-  → stage scope / hard boundaries
+`docs/superpowers/analysis/2026-08-18-r10-t6-operator-material-adjudication.md`
 
-docs/superpowers/analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-candidate.md
-  → material architecture candidate + alternatives / Structural Inversion
-
-docs/superpowers/analysis/2026-08-18-r10-t6-external-evidence-docket.md
-  → primary/current evidence + claim boundaries
-
-docs/superpowers/analysis/2026-08-18-r10-t6-global-maximum-adjudication-packet.md
-  → corrected, more-specific material dispositions
-
-docs/superpowers/analysis/2026-08-18-r10-t6-final-adjudication-refinements.md
-  → FR-1..FR-4 final precedence where named
-```
-
-Operator adjudication precedence:
+The operator approved the final T6 proposal in this precedence order:
 
 ```text
 base candidate
-→ corrected adjudication packet
-→ final refinements FR-1..FR-4
+→ corrected Global-Maximum adjudication packet
+→ final refinements FR-1..FR-4 where named
 ```
 
-All are staging/evidence until operator ratification.
-
-## 5. T6 Global-Maximum headline
+The approved direction includes:
 
 ```text
-pre-launch /api/v1 rebuilt from current semantics; no /api/v2 compatibility layer
-OpenAPI contract-first + generated Go/TS wire boundaries
-Keycloak Authorization Code → MetalDocs ApplicationSession; no local credential API
-session-bound CSRF for unsafe browser requests
-semantic-lens frontend: Library / My Work / exact Governance case / History / Audit / Admin
-one DRAFT ETag/If-Match OCC token covers Revision title + WorkingContent
-DRAFT mutation = explicit PATCH + If-Match; stale = 412
-T4-bound upload_id OPEN→READY→OCC attach; client never owns ExactContentDescriptor
-reviewer reads exact immutable Submission; no reviewer WorkingContent editing
-User eligibility = singleton PUT current state; offboarding semantics remain T3
-Governance Step Decision = singleton immutable PUT; no replay row needed
-semantic byte routes hide provider/storage identity
-DOCX provider chosen by representative fidelity gate; no dual provider; no EditorSession baseline
-numbering = closed TYPE | TYPE_AREA, fixed '-', minimum 3-digit sequence; no custom grammar
-Search materialization/search_refresh = OFF for Launch
+rebuild pre-launch /api/v1 from current product semantics; no compatibility layer
+OpenAPI contract-first + generated Go/TS boundary; OAS 3.0.3 Launch baseline
+Keycloak Authorization Code → MetalDocs ApplicationSession + session-bound CSRF
+semantic-lens frontend with stable route meanings
+one DRAFT generation exposed as strong ETag/If-Match; PATCH title/source under same T2 OCC
+T4-bound upload_id OPEN→READY→OCC attachment; client never owns ExactContentDescriptor
+review exact immutable Submission; case participation never mutates WorkingContent
+User eligibility = singleton PUT current resource; DISABLED executes T3 offboarding semantics
+Governance Step Decision = singleton immutable PUT resource
+semantic exact-byte routes hide provider/storage identity
+one fidelity-gated DOCX provider; no EditorSession correctness dependency baseline
+closed TYPE | TYPE_AREA numbering; no generic formatting grammar
+Search materialization/search_refresh OFF for Launch
 Domain history != Audit
 RFC9457 errors with one canonical MetalDocs problem code authority
-natural HTTP idempotency first; Idempotency-Key only where POST retry can truly duplicate a semantic fact
-Idempotency replay retention is bounded operational policy; 24h is implementation-default candidate, not architecture invariant
-cursor default20/max100 for unbounded lists
-blank/template/revise seeds use exact source semantics; never OfficialRendition as editable source
+natural HTTP idempotency first; durable Idempotency-Key only for truly non-idempotent POST creation
+opaque cursor pagination for unbounded lists
+blank/template/revise seeds use exact governed source, never OfficialRendition as editable source
 ```
+
+Everything outside the approved T6 slate remains frozen unless material evidence triggers an explicit bounded reopen.
+
+## 5. Platform-facing T6 summary — ACTIVE GATE
+
+`docs/superpowers/analysis/2026-08-18-r10-t6-platform-facing-summary.md`
+
+The summary consolidates the operator-approved material decisions into one implementation-facing system description covering:
+
+```text
+platform semantic lenses
+public contract law
+AuthN/session/CSRF
+frontend information architecture
+Library/Search
+create/numbering/seeding
+DRAFT OCC
+T4 upload/admission
+Submission/governance
+lifecycle/idempotency transport
+Release/source/OfficialRendition presentation
+DOCX provider proof gate
+Administration
+errors
+pagination/read models
+History vs Audit
+frontend technical organization
+explicit subtraction from legacy Launch target
+implementation-proof obligations
+```
+
+It is **not durable authority until explicitly ratified by the operator**.
 
 ## 6. T6 hard boundaries
 
-T6 may not casually reopen:
+T6 does not reopen by implication:
 
 ```text
 Document/Revision/WorkingContent/Submission meaning
@@ -131,27 +143,24 @@ T4 exact-content/admission authority
 viewer/preview vs OfficialRendition distinction
 Search authority boundary + canonical-query baseline
 no-notification/event-platform baseline
-historical migration/cutover execution
+Historical Migration/Cutover execution
 ```
 
 ## 7. Current gate
 
 ```text
-operator adjudicates final T6 material slate
-→ correct only rejected/refined items if needed
-→ platform-facing T6 summary
+operator reviews platform-facing T6 summary
 → explicit operator summary ratification
-→ promote durable T6 authority
-→ update Decision Registry
-→ remove completed T6 staging
+→ promote durable T6 authority to wiki/
+→ reconcile Decision Registry
+→ update router/handoff/index/PR
+→ remove completed T6 staging from live tree (Git history archive)
 → only then open T7
 ```
 
-A material-decision approval alone does not open T7.
+The material decision approval already received does **not** itself promote T6 or open T7.
 
-## 8. Final gate
-
-After T7:
+## 8. Final gate after T7
 
 ```text
 Integrated Whole-R10 Global Coherence Review
