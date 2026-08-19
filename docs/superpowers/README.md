@@ -1,7 +1,7 @@
 # `docs/superpowers` — Active Design Staging Only
 
 > **Status:** Active staging workspace for the MetalDocs rebaselined R10 technical design.  
-> **Current gate:** **T6 FINAL GLOBAL-MAXIMUM ADJUDICATION READY / OPERATOR MATERIAL ADJUDICATION NEXT; T7 NOT OPEN; IMPLEMENTATION BLOCKED.**
+> **Current gate:** **T6 MATERIAL DECISIONS OPERATOR-APPROVED; PLATFORM-FACING SUMMARY RATIFICATION NEXT; T7 NOT OPEN; IMPLEMENTATION BLOCKED.**
 
 Durable accepted truth belongs in `wiki/`. Active not-yet-promoted design/evidence belongs here. Completed staging is removed and Git history is the archive.
 
@@ -22,21 +22,20 @@ wiki/architecture/launch-v1-product-contract.md          REV001
 
 ## Active T6 staging
 
-- `analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-bootstrap.md` — stage scope/gate.
-- `analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-candidate.md` — material architecture candidate + alternatives.
-- `analysis/2026-08-18-r10-t6-external-evidence-docket.md` — primary/current evidence + claim boundaries.
-- `analysis/2026-08-18-r10-t6-global-maximum-adjudication-packet.md` — corrected material disposition.
-- `analysis/2026-08-18-r10-t6-final-adjudication-refinements.md` — **FR-1..FR-4 FINAL PRECEDENCE / OPERATOR DECISION TARGET.**
+Decision provenance:
 
-Adjudication precedence:
+- `analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-bootstrap.md`
+- `analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-candidate.md`
+- `analysis/2026-08-18-r10-t6-external-evidence-docket.md`
+- `analysis/2026-08-18-r10-t6-global-maximum-adjudication-packet.md`
+- `analysis/2026-08-18-r10-t6-final-adjudication-refinements.md`
 
-```text
-base candidate
-→ corrected adjudication packet
-→ final refinements FR-1..FR-4
-```
+Current gate artifacts:
 
-None is authority until ratified/promoted.
+- `analysis/2026-08-18-r10-t6-operator-material-adjudication.md` — **MATERIAL DECISIONS OPERATOR-APPROVED.**
+- `analysis/2026-08-18-r10-t6-platform-facing-summary.md` — **OPERATOR SUMMARY RATIFICATION NEXT.**
+
+The material adjudication does not yet make T6 durable authority. Promotion waits for explicit summary ratification.
 
 ## T6 greenfield law
 
@@ -51,17 +50,16 @@ Current routes/modules/screens/DTOs are evidence only. Do not preserve a legacy 
 ## Current path
 
 ```text
-T1→T5                       CLOSED / OPERATOR-RATIFIED
-Post-T5 Fable               CLOSED / OPERATOR-APPROVED
-Decision Registry           CURRENT / RECONCILED
-T6 evidence/candidate       STAGED
-T6 final adjudication       READY / OPERATOR DECISION NEXT
-T7                          NOT OPEN
-implementation              BLOCKED
+T1→T5                        CLOSED / OPERATOR-RATIFIED
+Post-T5 Fable                CLOSED / OPERATOR-APPROVED
+Decision Registry            CURRENT / RECONCILED
+T6 material decisions        OPERATOR-APPROVED
+T6 platform-facing summary   STAGED / RATIFICATION NEXT
+T6 durable authority         NOT YET
+T7                           NOT OPEN
+implementation               BLOCKED
 
-→ operator adjudicates final T6 material slate
-→ platform-facing T6 summary
-→ explicit operator summary ratification
+→ operator ratifies platform-facing T6 summary
 → durable T6 promotion + Registry update + staging cleanup
 → only then T7
 → Whole-R10 GCR
