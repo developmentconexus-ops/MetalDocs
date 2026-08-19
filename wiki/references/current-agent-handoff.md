@@ -1,7 +1,7 @@
 # Current Agent Handoff
 
 > **Last verified:** 2026-08-19  
-> **Status:** ACTIVE — **T1→T8-B CLOSED / OPERATOR-RATIFIED; T8-C ACTIVE / INTERNAL COMMUNICATION CONTRACTS; T8-D→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1→T8-B CLOSED / OPERATOR-RATIFIED; T8-C ACTIVE / GLOBAL MAXIMUM CANDIDATE MATERIALIZED / INDEPENDENT REVIEW NEXT; T8-D→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
 
 ## Fresh-session route
@@ -18,7 +18,8 @@ Read in this order:
 8. `wiki/architecture/r10-post-t6-implementation-readiness-program.md`
 9. `wiki/architecture/r10-technical-realization-reconciliation-baseline.md`
 10. `docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-bootstrap.md`
-11. current interfaces/code only when a concrete T8-C evidence claim needs them
+11. `docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-global-maximum-candidate.md`
+12. current interfaces/code only when a concrete T8-C evidence claim needs them
 
 Do not route target design through superseded/historical architecture or current module/interface existence.
 
@@ -32,7 +33,7 @@ Decision Registry                        CURRENT + amendments through T8-B
 Post-T6 Stage-Decomposition GCR          RESTRUCTURE NOW / OPERATOR-RATIFIED
 TRRB                                     CLOSED / OPERATOR-RATIFIED / PROMOTED
 
-T8-C                                     ACTIVE / INTERNAL CONTRACT DERIVATION NEXT
+T8-C                                     ACTIVE / CANDIDATE MATERIALIZED / INDEPENDENT REVIEW NEXT
 T8-D                                     NOT OPEN
 T8-E                                     NOT OPEN
 T8-F                                     NOT OPEN
@@ -48,6 +49,25 @@ implementation                           BLOCKED
 ## Binding execution law
 
 > **No Writer task may contain a material architecture decision that should have been decided before execution.**
+
+## Reference-backed decision law
+
+For material technical decisions, use this order:
+
+```text
+MetalDocs semantic/product authority
+→ DevelopmentConexus Engineering Method
+→ current repository evidence
+→ primary/current standards and official tool/library documentation
+→ relevant reference products/patterns as falsification evidence
+→ credible alternatives + Global Maximum
+→ proof/adversarial review
+→ operator ratification
+```
+
+Do not reinvent a technical mechanism when the selected language/database/standard/tool already provides the required property. Do not import an external "best practice" when it conflicts with MetalDocs authority. Reference-product private architecture is never inferred.
+
+`AGENTS.md` requires Context7 for current external library/framework/SDK/API/CLI/cloud behavior when that behavior is load-bearing.
 
 ## T7 — CLOSED
 
@@ -149,51 +169,68 @@ stale architecture exception = verifier FAIL, not alert
 missing required domain predicate fact = DENY
 ```
 
-T8-B bootstrap/candidate/reviewer artifacts are no longer active staging. Because physical deletion was unavailable in the publication tool, their live-tree files are explicit **SUPERSEDED/HISTORICAL tombstones** routing to the durable authority; full evidence remains in Git history.
+T8-B bootstrap/candidate/reviewer artifacts are no longer active staging. Their live-tree tombstones route to durable authority; full evidence remains in Git history.
 
 ## T8-C — ACTIVE
 
-Active bootstrap:
+Bootstrap:
 
 `docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-bootstrap.md`
 
-T8-C freezes how the accepted owners/application/mechanism layers communicate without changing their T8-B homes.
+Current non-authoritative candidate:
 
-Scope:
+`docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-global-maximum-candidate.md`
+
+Candidate Global Maximum:
 
 ```text
-owner queries
-owner capabilities
-read projections
-same-process/local calls
-transaction-coupled intents
-River/durable-job seams where already justified
-consumer/producer contract ownership
+AUTHORITY-ALIGNED HYBRID CONTRACT MODEL
+
+concrete producer-owned semantic-owner APIs
++ narrow consumer-owned mechanism/resolver interfaces only for real consumers
++ application-routed cross-owner facts
++ provider-neutral txscope with application-owned lifecycle
++ owner-authored Audit evidence → application mapping → same-tx Audit append
++ Organization/owner facts → Authorization-owned final ALLOW/default-DENY
++ named transaction-coupled durable-intent ports only
++ operation-local ReplaySnapshot + opaque idempotency mechanism
++ bounded owner facts + application read-projection composition
+-
+shared contracts/common models
+-
+generic UnitOfWork/EventBus/policy language/service locator
 ```
 
-First contract families to resolve:
+Candidate/reference pass includes current Go/database/sql, PostgreSQL, River, HTTP, OIDC, S3 and OpenAPI behavior only where technically load-bearing. Current repo pins River v0.37.1; its transaction-coupled enqueue property is preserved behind a named port, not exposed as application authority.
+
+### Candidate status
 
 ```text
-transaction-scope exact contract
-same-transaction Audit evidence handoff
-Authorization decision + owner predicate fact vocabulary
-transaction-coupled durable-intent contract
-material consumer-owned mechanism ports
+interaction census                   COMPLETE AT CANDIDATE LEVEL
+owner/mechanism contract families    MATERIALIZED
+inside/outside transaction law       MATERIALIZED
+fail-closed law                      MATERIALIZED
+T8-A contract reuse disposition      MATERIALIZED
+primary/current reference pass       MATERIALIZED
+credible alternatives                COMPARED
+subtractive/Structural Inversion     COMPLETE AT CANDIDATE LEVEL
+independent Fable review             NEXT
 ```
 
 ### Exact next action
 
 ```text
-derive interaction census from T2/T3/T4/T5/T6 + T8-B
-→ classify sync query / mutation / same-tx / durable-intent / mechanism / read-projection
-→ freeze contract ownership and call direction
-→ resolve txscope / Audit evidence / Authorization contracts first
-→ derive remaining owner/mechanism contracts
-→ compare credible contract-placement alternatives
-→ apply Method + subtractive pass
-→ adversarial challenge
-→ operator-ratifiable T8-C candidate
+independent Fable review of the T8-C Global Maximum candidate
+→ reconstruct authority independently
+→ challenge selected contract-placement model and T8C-D01→D25
+→ test T8-B reopen / T8-D or T8-E trespass
+→ search for a materially superior Global Maximum
+→ Lead adjudicates reviewer evidence technically
+→ bounded correction only where a material finding survives
+→ explicit operator ratification before durable T8-C promotion
 ```
+
+Do **not** start T8-D from the candidate. It remains non-authoritative staging.
 
 ### Do not decide by stealth
 
