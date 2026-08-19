@@ -1,8 +1,8 @@
 # `docs/superpowers` — Active Design Staging Only
 
-> **Status:** **T6 PLATFORM SUMMARY REV2 OPERATOR RATIFICATION NEXT; T7 NOT OPEN; IMPLEMENTATION BLOCKED.**
+> **Status:** **T6 CLOSED / PROMOTED; T7 ACTIVE / EVIDENCE CENSUS NEXT; IMPLEMENTATION BLOCKED.**
 
-Durable accepted truth belongs in `wiki/`. Active not-yet-promoted analysis/review belongs here; completed staging is removed and Git history is the archive.
+Durable accepted truth belongs in `wiki/`. Active not-yet-promoted analysis/review belongs here. Completed staging is removed from the live tree and Git history is the archive.
 
 ## Durable authority
 
@@ -12,58 +12,57 @@ Product Contract REV001
 → 4+1 ownership topology
 → T1
 → T2
-→ T3
-→ T3 D4 bounded amendment
+→ T3 + D4 amendment
 → T4
 → T5
-→ Decision Registry
-→ Registry D4 amendment
+→ T6
+→ Decision Registry + D4/T6 amendments
 → active router
 ```
 
-## Active T6 staging
+T6 durable authority:
 
-Decision/review provenance remains available while T6 is open. Current gate artifacts are:
+`wiki/architecture/r10-t6-canonical-api-frontend-journeys.md`
 
-- `analysis/2026-08-18-r10-t6-c1-c8-operator-adjudication.md` — C1→C8 approved.
-- `analysis/2026-08-18-r10-t6-d1-d4-operator-adjudication.md` — D1→D4 approved.
-- `analysis/2026-08-18-r10-t6-platform-facing-summary-rev2.md` — **CURRENT OPERATOR RATIFICATION TARGET.**
-- `analysis/2026-08-18-r10-t6-d1-d4-exact-delta-review.md` — final bounded delta, `APPROVE`.
+T6 completed staging has been removed from `docs/superpowers/analysis/`.
 
-Earlier T6 candidate/review artifacts remain provenance only until T6 closes.
+## Current active staging
 
-## Final T6 review result
+- `analysis/2026-08-18-r10-t7-historical-migration-cutover-bootstrap.md` — **T7 OPEN / EVIDENCE CENSUS NEXT / NON-AUTHORITATIVE.**
+
+No T7 candidate/design has been accepted yet.
+
+## T7 method posture
+
+T7 is architectural and must start from actual source evidence rather than migration-framework assumptions.
 
 ```text
-C1→C8 = CLOSED
-L1→L5 = CLOSED
-D1→D4 = CLOSED
-NEW MATERIAL FINDINGS = 0
-DISAGREEMENT SET = EMPTY
-DELTA VERDICT = APPROVE
+source evidence census
+→ classify PROVEN / INFERABLE / UNKNOWN
+→ clarify only material unknowns
+→ compare 2–3 approaches
+→ candidate T7 design
+→ material adjudication
+→ platform-facing summary
+→ explicit operator ratification
+→ durable promotion + Registry reconciliation + staging cleanup
 ```
+
+T7 must not become generic Interchange/ETL/repository infrastructure and may not weaken T1→T6 for legacy convenience.
 
 ## Current path
 
 ```text
-T1→T5                       CLOSED / OPERATOR-RATIFIED
-T3 D4 amendment             OPERATOR-RATIFIED
-Decision Registry D4        RECONCILED BY BOUNDED AMENDMENT
-T6 material/corrections     OPERATOR-APPROVED
-T6 Platform Summary REV2    OPERATOR RATIFICATION NEXT
-T6 durable authority        NOT YET
-T7                          NOT OPEN
-implementation              BLOCKED
+T1→T6                    CLOSED / OPERATOR-RATIFIED
+T7                       ACTIVE / EVIDENCE CENSUS NEXT
+implementation           BLOCKED
 
-→ operator ratifies Platform Summary REV2
-→ durable T6 promotion + T6 closure reconciliation
-→ staging cleanup
-→ only then T7
-→ Whole-R10 GCR
-→ final cold review
+→ T7 design/ratification
+→ Integrated Whole-R10 GCR
+→ cold independent final review
 → final operator ratification
 → implementation spec/plan
 → code
 ```
 
-No implementation plan or product code is authorized while these gates remain open.
+No implementation plan or product code is authorized.
