@@ -6,9 +6,9 @@
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **T8-A authority:** `wiki/architecture/r10-t8a-technical-authority-legacy-disposition.md`
 
-This bounded amendment reconciles the Decision Registry after T8-A closure. It changes technical-realization inheritance/disposition only; it does not rewrite unrelated Product Contract or T1→T7 semantics.
+This bounded amendment reconciled the Decision Registry after T8-A closure. It changes technical-realization inheritance/disposition only; it does not rewrite unrelated Product Contract or T1→T7 semantics.
 
-Registry authority chain is now:
+The registry chain has since been extended by the operator-ratified T8-B amendment:
 
 ```text
 rebaseline-decision-registry.md
@@ -17,7 +17,10 @@ rebaseline-decision-registry.md
 → rebaseline-decision-registry-post-t6-amendment.md
 → rebaseline-decision-registry-t7-amendment.md
 → rebaseline-decision-registry-t8a-amendment.md
+→ rebaseline-decision-registry-t8b-amendment.md
 ```
+
+For current stage/status use the R10 router, not this historical amendment's former "next stage" section.
 
 ## 1. T8-A stage disposition
 
@@ -36,7 +39,7 @@ CLEAN-SLATE PHYSICAL TARGET FREEDOM
 
 ## 2. Registry inheritance law
 
-For T8-B→T10:
+For later realization stages:
 
 ```text
 existing implementation = evidence only
@@ -82,11 +85,11 @@ current jobs registry/non-Launch wiring
 legacy target-specific architecture guards
 ```
 
-Ownership of the replacement decisions remains:
+Replacement ownership remains:
 
 ```text
-T8-B = backend module/package topology
-T8-C = internal communication contracts
+T8-B = backend module/package topology — NOW CLOSED / PROMOTED
+T8-C = internal communication contracts — CURRENT ACTIVE STAGE
 T8-D = persistence realization
 T8-E = executable wire contract
 T8-F = frontend realization
@@ -133,14 +136,19 @@ Old exact mechanical metrics remain `LAST-REPRODUCED` until remeasured.
 
 Remeasure only when the metric is load-bearing to a material later decision. T8-A does not require ritual reproduction of old counts when direct current evidence already proves the property needed for disposition.
 
-## 8. Next stage
+## 8. Successor routing
 
-The next open stage is:
+T8-A no longer owns next-stage routing. Current routing is:
 
 ```text
-T8-B — Backend Module & Package Topology
+wiki/architecture/r10-technical-architecture.md
 ```
 
-T8-B must not silently decide T8-C persistence/API/frontend/runtime questions. It may name required seams/interfaces only to the degree necessary to prove package ownership and dependency direction; detailed communication contracts remain T8-C.
+T8-B closure authority:
 
-Implementation remains BLOCKED.
+```text
+wiki/architecture/r10-t8b-backend-module-package-topology.md
+wiki/architecture/rebaseline-decision-registry-t8b-amendment.md
+```
+
+Current active stage is T8-C. Implementation remains **BLOCKED**.
