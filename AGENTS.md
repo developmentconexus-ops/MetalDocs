@@ -32,7 +32,7 @@ Current target architecture is routed by:
 ```text
 wiki/references/current-agent-handoff.md
 → wiki/architecture/r10-technical-architecture.md
-→ Product Contract + T1→T6 durable authority
+→ Product Contract + T1→T7 durable authority
 → wiki/architecture/r10-post-t6-implementation-readiness-program.md
 → current stage/staging named by the router
 ```
@@ -61,7 +61,7 @@ If two active authorities materially contradict, stop and surface the conflict. 
 ## Authority by question
 
 - **Current R10 status / next step / implementation gate:** `wiki/architecture/r10-technical-architecture.md` via `wiki/references/current-agent-handoff.md`.
-- **Product and semantic target:** Product Contract REV001 + Whole-Product GCR + 4+1 ownership + T1→T6 durable R10 pages.
+- **Product and semantic target:** Product Contract REV001 + Whole-Product GCR + 4+1 ownership + T1→T7 durable R10 pages.
 - **Post-T6 realization/readiness:** `wiki/architecture/r10-post-t6-implementation-readiness-program.md` and the current stage artifact routed from the R10 router.
 - **What runs today:** current runtime code, database/schema/migrations, OpenAPI/generated contracts, frontend and deploy artifacts.
 - **QA/close-out mechanisms:** `wiki/quality/qa-operating-system.md` where not superseded by a more specific current R10 proof decision.
