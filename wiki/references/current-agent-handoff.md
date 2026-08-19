@@ -1,7 +1,7 @@
 # Current Agent Handoff
 
 > **Last verified:** 2026-08-19  
-> **Status:** ACTIVE — **T1→T8-B CLOSED / OPERATOR-RATIFIED; T8-C ACTIVE / GLOBAL MAXIMUM CANDIDATE MATERIALIZED / INDEPENDENT REVIEW NEXT; T8-D→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1→T8-B CLOSED / OPERATOR-RATIFIED; T8-C ACTIVE / ROUND-1 REVIEW + LEAD ADJUDICATION COMPLETE / CORRECTED CANDIDATE MATERIALIZED / BOUNDED ROUND-2 NEXT; T8-D→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
 
 ## Fresh-session route
@@ -19,7 +19,9 @@ Read in this order:
 9. `wiki/architecture/r10-technical-realization-reconciliation-baseline.md`
 10. `docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-bootstrap.md`
 11. `docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-global-maximum-candidate.md`
-12. current interfaces/code only when a concrete T8-C evidence claim needs them
+12. `docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-independent-fable-review.md`
+13. `docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-adjudicated-corrected-candidate.md`
+14. current interfaces/code only when a concrete T8-C evidence claim needs them
 
 Do not route target design through superseded/historical architecture or current module/interface existence.
 
@@ -33,7 +35,7 @@ Decision Registry                        CURRENT + amendments through T8-B
 Post-T6 Stage-Decomposition GCR          RESTRUCTURE NOW / OPERATOR-RATIFIED
 TRRB                                     CLOSED / OPERATOR-RATIFIED / PROMOTED
 
-T8-C                                     ACTIVE / CANDIDATE MATERIALIZED / INDEPENDENT REVIEW NEXT
+T8-C                                     ACTIVE / CORRECTED CANDIDATE / BOUNDED ROUND-2 NEXT
 T8-D                                     NOT OPEN
 T8-E                                     NOT OPEN
 T8-F                                     NOT OPEN
@@ -52,7 +54,7 @@ implementation                           BLOCKED
 
 ## Reference-backed decision law
 
-For material technical decisions, use this order:
+For material technical decisions:
 
 ```text
 MetalDocs semantic/product authority
@@ -65,9 +67,7 @@ MetalDocs semantic/product authority
 → operator ratification
 ```
 
-Do not reinvent a technical mechanism when the selected language/database/standard/tool already provides the required property. Do not import an external "best practice" when it conflicts with MetalDocs authority. Reference-product private architecture is never inferred.
-
-`AGENTS.md` requires Context7 for current external library/framework/SDK/API/CLI/cloud behavior when that behavior is load-bearing.
+Do not reinvent technical mechanisms already solved by the selected stack unless a concrete MetalDocs invariant requires an additional boundary. Do not import an external best practice when it conflicts with MetalDocs authority.
 
 ## T7 — CLOSED
 
@@ -75,26 +75,13 @@ Do not reinvent a technical mechanism when the selected language/database/standa
 NO HISTORICAL BUSINESS MIGRATION REQUIRED FOR LAUNCH
 ```
 
-Current MetalDocs DB/content/history is DEV/test/throwaway and gives no business-data compatibility entitlement.
+Current MetalDocs DB/content/history is DEV/test/throwaway and creates no business-data compatibility entitlement.
 
 ## T8-A — CLOSED
 
 Durable authority:
 
 `wiki/architecture/r10-t8a-technical-authority-legacy-disposition.md`
-
-Registry amendment:
-
-`wiki/architecture/rebaseline-decision-registry-t8a-amendment.md`
-
-Ratified law:
-
-```text
-CLEAN-SLATE PHYSICAL TARGET FREEDOM
-+ SELECTIVE PROOF-BACKED MECHANISM REUSE
-- LEGACY SHAPE INHERITANCE
-- FULL-GREENFIELD PURITY RESET WITHOUT EVIDENCE
-```
 
 Current implementation remains evidence only. PRESERVE requires all five T8-A proofs.
 
@@ -103,10 +90,6 @@ Current implementation remains evidence only. PRESERVE requires all five T8-A pr
 Durable authority:
 
 `wiki/architecture/r10-t8b-backend-module-package-topology.md`
-
-Registry amendment:
-
-`wiki/architecture/rebaseline-decision-registry-t8b-amendment.md`
 
 Ratified Global Maximum:
 
@@ -121,126 +104,113 @@ ONE GO MODULE FOR BACKEND GO CODE
 + CLOSED-WORLD / DEFAULT-DENY FIRST-PARTY DEPENDENCY GRAPH
 ```
 
-Binding owner homes:
+Semantic homes remain exactly:
 
 ```text
 Authentication
 Organization
 Authorization
 Controlled Documents
-Audit — supporting evidence authority
+Audit
 ```
 
-Binding realization consequences:
-
-```text
-exactly one public package path per owner
-owner-private decomposition is ungated and may evolve internally
-no direct owner→owner imports
-transport → application is the only semantic inbound door
-application leaves are stateless; application→application imports forbidden
-platform owns mechanisms, never semantic truth
-composition owns construction only
-foreign SQL / hidden shared write authority forbidden
-package classification and dependency edges are closed-world/default-deny
-```
-
-Required T8-B seam classes carried into T8-C:
-
-```text
-provider-neutral transaction participation
-same-transaction owner evidence → Audit coordination
-owner-authored predicate facts → Authorization final decision
-```
-
-T8-B freezes their ownership/direction only. Exact contracts are T8-C.
-
-Other key closure laws:
-
-```text
-session/AuthN has an application leaf; omitted use cases never justify transport bypass
-generated Go OpenAPI boundary is transport/wire technical, exact content T8-E
-IdP protocol client = platform; anti-corruption meaning = Authentication
-OfficialRendition mechanism != interactive editor/viewer
-idempotency = opaque + live-authorized + erasure-safe
-owner persistence adapters private; T8-D owns mapping, not private folder layout
-tools/cilint = analyzer host; tools/verify = verification SSOT
-stale architecture exception = verifier FAIL, not alert
-missing required domain predicate fact = DENY
-```
-
-T8-B bootstrap/candidate/reviewer artifacts are no longer active staging. Their live-tree tombstones route to durable authority; full evidence remains in Git history.
+No direct owner→owner imports, foreign SQL, mechanism-as-authority or second Authorization evaluator.
 
 ## T8-C — ACTIVE
 
-Bootstrap:
-
-`docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-bootstrap.md`
-
-Current non-authoritative candidate:
+### Original candidate
 
 `docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-global-maximum-candidate.md`
 
-Candidate Global Maximum:
+### Round-1 Fable evidence
+
+`docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-independent-fable-review.md`
+
+Round-1 verdict:
 
 ```text
-AUTHORITY-ALIGNED HYBRID CONTRACT MODEL
-
-concrete producer-owned semantic-owner APIs
-+ narrow consumer-owned mechanism/resolver interfaces only for real consumers
-+ application-routed cross-owner facts
-+ provider-neutral txscope with application-owned lifecycle
-+ owner-authored Audit evidence → application mapping → same-tx Audit append
-+ Organization/owner facts → Authorization-owned final ALLOW/default-DENY
-+ named transaction-coupled durable-intent ports only
-+ operation-local ReplaySnapshot + opaque idempotency mechanism
-+ bounded owner facts + application read-projection composition
--
-shared contracts/common models
--
-generic UnitOfWork/EventBus/policy language/service locator
+APPROVE T8-C GLOBAL MAXIMUM CANDIDATE WITH MATERIAL FIXES
+BLOCKER 5 / MAJOR 6 / LOW 5
+GLOBAL MAXIMUM CLASS CONFIRMED
+T8-B REOPEN NO
+T1→T7 REOPEN NO
 ```
 
-Candidate/reference pass includes current Go/database/sql, PostgreSQL, River, HTTP, OIDC, S3 and OpenAPI behavior only where technically load-bearing. Current repo pins River v0.37.1; its transaction-coupled enqueue property is preserved behind a named port, not exposed as application authority.
-
-### Candidate status
+### Lead adjudication
 
 ```text
-interaction census                   COMPLETE AT CANDIDATE LEVEL
-owner/mechanism contract families    MATERIALIZED
-inside/outside transaction law       MATERIALIZED
-fail-closed law                      MATERIALIZED
-T8-A contract reuse disposition      MATERIALIZED
-primary/current reference pass       MATERIALIZED
-credible alternatives                COMPARED
-subtractive/Structural Inversion     COMPLETE AT CANDIDATE LEVEL
-independent Fable review             NEXT
+B1 ACCEPT
+B2 ACCEPT
+B3 ACCEPT
+B4 ACCEPT
+B5 REJECT AS BLOCKER after PostgreSQL primary-evidence verification
+
+M1 ACCEPT
+M2 ACCEPT
+M3 ACCEPT WITH NARROWING
+M4 ACCEPT
+M5 ACCEPT as real unmade decision -> SELECT PII-FREE REPLAY SNAPSHOT BY CONSTRUCTION
+M6 ACCEPT
+
+L1-L5 ACCEPT
 ```
+
+Reviewer evidence never became authority. The selected Global Maximum class remains confirmed.
+
+### Current corrected candidate / Round-2 input
+
+`docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-adjudicated-corrected-candidate.md`
+
+Key corrected laws:
+
+```text
+database/sql-family transaction substrate deliberately selected
+sealed txscope + platform-only native SQL binding for River
+semantic owners still receive only txscope.Scope
+Audit AppendIn + Authorization-scoped historical ListEvents
+Authorization AuthorizedScopes from same canonical evaluator
+ProtectedSecuritySubjectIn serializes eligibility against offboarding semantically
+owner VersionToken + expected-version mutation law; ETag remains T8-E
+ProviderClient crosses verified primitive issuer+subject, not raw claim bag
+ManagedContent admission claims + DeleteReclaimable + T5-J GC contracts
+MalwareInspector returns digest of exactly inspected bytes
+OfficialRendition intent remains named; no EventBus
+idempotency concurrent outcome frozen, SQL realization remains T8-D
+PII-free ReplaySnapshot by construction; no Launch purge/redaction subsystem
+OfficialRendition content read explicitly covered
+L1-L5 operation-census precision closed in candidate
+```
+
+### B5 Lead rejection
+
+The target contract requires concurrent same-key requests to serialize and return claim/replay/conflict without leaving Scope unusable. It does **not** mandate a unique-violation path. PostgreSQL current primary documentation supports conflict handling through `ON CONFLICT DO NOTHING` under READ COMMITTED; exact SQL remains T8-D.
 
 ### Exact next action
 
 ```text
-independent Fable review of the T8-C Global Maximum candidate
-→ reconstruct authority independently
-→ challenge selected contract-placement model and T8C-D01→D25
-→ test T8-B reopen / T8-D or T8-E trespass
-→ search for a materially superior Global Maximum
-→ Lead adjudicates reviewer evidence technically
-→ bounded correction only where a material finding survives
+bounded Fable Round 2 on the adjudicated corrected candidate
+→ attack only the material corrected delta
+→ verify txscope/River binding
+→ verify Audit read + AuthorizedScopes + eligibility serialization + VersionToken
+→ verify ManagedContent claim/GC + malware correlation + rendition read
+→ directly challenge B5 Lead rejection using PostgreSQL primary evidence
+→ directly challenge new PII-free replay decision
+→ verify operation-census delta closure and T8-D/T8-E boundaries
+→ final Lead adjudication
 → explicit operator ratification before durable T8-C promotion
 ```
 
-Do **not** start T8-D from the candidate. It remains non-authoritative staging.
+Do **not** start T8-D from the corrected candidate.
 
 ### Do not decide by stealth
 
 ```text
-schema/tables/constraints/locks        → T8-D
-exact OpenAPI/wire                     → T8-E
-frontend realization                  → T8-F
-runtime/process/deployment            → T8-G
-transition/deletion                   → T10
-implementation tasks                  → T11
+schema/tables/constraints/indexes/lock SQL → T8-D
+exact OpenAPI/wire/ETag encoding            → T8-E
+frontend realization                       → T8-F
+runtime/process/deployment                  → T8-G
+transition/deletion                         → T10
+implementation tasks                        → T11
 ```
 
 T8-C may reopen T8-B only on a concrete required-contract contradiction, not preference.
