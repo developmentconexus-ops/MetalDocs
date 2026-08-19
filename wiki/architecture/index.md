@@ -1,9 +1,9 @@
 # Architecture
 
-> **Last verified:** 2026-08-18  
+> **Last verified:** 2026-08-19  
 > **Scope:** Durable architecture truth and active target-design routing.
 
-## Durable authority — read first
+## Active authority — read first
 
 - `launch-v1-product-contract.md` — Product Contract REV001.
 - `whole-product-alignment-review.md` — Whole-Product GCR A1–A10.
@@ -14,55 +14,76 @@
 - `r10-t3-d4-responsible-owner-eligibility-amendment.md` — bounded T3 D4 authority.
 - `r10-t4-exact-content-storage-integrity-restore.md` — T4 operator-ratified.
 - `r10-t5-durable-async-search-external-effects.md` — T5 operator-ratified.
-- `r10-t6-canonical-api-frontend-journeys.md` — **T6 operator-ratified durable authority.**
+- `r10-t6-canonical-api-frontend-journeys.md` — T6 operator-ratified.
 - `rebaseline-decision-registry.md` — prior-decision disposition baseline.
-- `rebaseline-decision-registry-d4-amendment.md` — bounded D4 Registry reconciliation.
-- `rebaseline-decision-registry-t6-amendment.md` — **T6 closure Registry reconciliation.**
-- `r10-technical-architecture.md` — current stage router.
+- `rebaseline-decision-registry-d4-amendment.md` — D4 reconciliation.
+- `rebaseline-decision-registry-t6-amendment.md` — T6 closure reconciliation.
+- `rebaseline-decision-registry-post-t6-amendment.md` — **operator-ratified post-T6 stage-ownership reconciliation.**
+- `r10-post-t6-implementation-readiness-program.md` — **active post-T6 program authority; T7→T12 decomposition.**
+- `r10-technical-architecture.md` — sole current stage/status/next-action router.
 - `../references/current-agent-handoff.md` — fresh-session recovery point.
 
 ## Current gate
 
 ```text
-Product Contract / GCR / ownership      APPROVED
-T1                                      CLOSED / OPERATOR-RATIFIED
-T2                                      CLOSED / OPERATOR-RATIFIED
-T3                                      CLOSED / OPERATOR-RATIFIED + D4 amendment
-T4                                      CLOSED / OPERATOR-RATIFIED
-T5                                      CLOSED / OPERATOR-RATIFIED
-T6                                      CLOSED / OPERATOR-RATIFIED / PROMOTED
-Decision Registry                       CURRENT + D4 + T6 amendments
-T7                                      ACTIVE / EVIDENCE CENSUS NEXT
-implementation                          BLOCKED
+Product Contract / GCR / ownership       APPROVED
+T1→T6                                    CLOSED / OPERATOR-RATIFIED
+Decision Registry                        CURRENT + D4 + T6 + post-T6 amendments
+Post-T6 Stage-Decomposition GCR          RESTRUCTURE NOW / OPERATOR-RATIFIED
+TRRB                                     STAGED / OPERATOR REVIEW NEXT
+T7→T12                                   NOT OPEN
+implementation                           BLOCKED
 ```
 
-## Active T7 staging
+## Current operator review target
 
-`../../docs/superpowers/analysis/2026-08-18-r10-t7-historical-migration-cutover-bootstrap.md`
+`../../docs/superpowers/analysis/2026-08-19-r10-technical-realization-reconciliation-baseline.md`
 
-T7 owns only:
+The Technical Realization Reconciliation Baseline is a census, not target design. It classifies current evidence as:
 
 ```text
-actual source evidence census
-CURRENT_STATE / FULL_HISTORY or smaller real migration-mode set
-imported target-owned fact shapes
-ordinal/content/governance provenance
-plan / dry-run / idempotency / reconciliation
-semantic-unit atomicity
-cutover / readiness / rollback / deletion map
-restore/erasure/post-snapshot security-teardown reconciliation choreography when required
+CURRENT-PROVEN
+LAST-REPRODUCED
+STALE / SUPERSEDED
+UNKNOWN / REMEASURE
 ```
 
-T7 is not a generic Interchange platform and may not weaken the target architecture for migration convenience.
+Its purpose is to prove that backend/package, persistence, API wire, frontend, runtime/deploy, proof and transition decisions have explicit future owners before implementation.
 
-## Final R10 gate after T7
+## Corrected post-T6 descent
 
 ```text
-Integrated Whole-R10 Global Coherence Review
-→ cold independent final review
+T7  Historical Migration Truth & Semantic Mapping
+T8  Technical Realization Architecture
+T9  Golden Flows & Validation Baseline
+T10 Transition / Refactor / Migration / Cutover
+T11 Implementation Program & Execution Graph
+T12 Adversarial Implementation-Readiness Review
+```
+
+Then:
+
+```text
+Integrated Whole-R10 GCR
+→ fresh independent/cold review
 → operator final ratification
-→ implementation spec/plan
-→ code
+→ explicit implementation authorization
 ```
+
+## Current-state technical references
+
+Until T8 explicitly promotes/replaces them, these are **evidence about the existing implementation, not target R10 authority**:
+
+```text
+backend-blueprint.md
+backend-api-structure.md
+frontend-structure.md
+data-model.md
+wiki/backend/repo-topology.md
+current module pages
+current code/schema/OpenAPI/deploy/tests
+```
+
+`backend-target-architecture.md` and `cohesive-platform-redesign.md` are historical/superseded target artifacts and must not route new target decisions.
 
 No implementation plan or product code is authorized.
