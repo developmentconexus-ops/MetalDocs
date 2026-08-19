@@ -1,6 +1,6 @@
 # R10 Technical Architecture — Active Stage Router
 
-> **Status:** ACTIVE — **T1→T8-A CLOSED / OPERATOR-RATIFIED; T8-B ACTIVE / BACKEND MODULE & PACKAGE TOPOLOGY; T8-C→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1→T8-B CLOSED / OPERATOR-RATIFIED; T8-C ACTIVE / INTERNAL COMMUNICATION CONTRACTS; T8-D→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-19  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
@@ -15,13 +15,13 @@ Read in order:
 2. `docs/engineering/standards/root-cause-global-maximum-method.md`
 3. `wiki/references/current-agent-handoff.md`
 4. Product Contract REV001 + Whole-Product GCR + 4+1 ownership
-5. T1→T8-A durable R10 authorities
-6. Decision Registry + D4/T6/post-T6/T7/T8-A amendments
+5. T1→T8-B durable R10 authorities
+6. Decision Registry + D4/T6/post-T6/T7/T8-A/T8-B amendments
 7. `wiki/architecture/r10-post-t6-implementation-readiness-program.md`
 8. `wiki/architecture/r10-technical-realization-reconciliation-baseline.md`
 9. this router
-10. active T8-B staging listed in §5
-11. current code/import/package evidence only for a concrete T8-B claim
+10. active T8-C staging listed in §6
+11. current code/interfaces only for a concrete T8-C evidence claim
 
 Legacy implementation proves what exists, not what survives.
 
@@ -51,6 +51,19 @@ CLEAN-SLATE PHYSICAL TARGET FREEDOM
 - FULL-GREENFIELD PURITY RESET WITHOUT EVIDENCE
 ```
 
+Ratified T8-B topology law:
+
+```text
+ONE GO MODULE FOR BACKEND GO CODE
++ OWNER-FIRST MODULAR MONOLITH
++ ONE IMPORTABLE PUBLIC SURFACE PER SEMANTIC OWNER
++ STATELESS APPLICATION LEAF ORCHESTRATION
++ ONE SEMANTIC INBOUND DOOR THROUGH APPLICATION
++ NON-SEMANTIC PLATFORM MECHANISMS
++ WIRING-ONLY COMPOSITION ROOT
++ CLOSED-WORLD / DEFAULT-DENY FIRST-PARTY DEPENDENCY GRAPH
+```
+
 ## 3. Current descent
 
 ```text
@@ -65,12 +78,12 @@ T5 — Durable Async / Search / Effects            CLOSED / OPERATOR-RATIFIED
 T6 — Canonical API / Frontend Journeys           CLOSED / OPERATOR-RATIFIED / PROMOTED
 T7 — Historical Migration Truth & Mapping        CLOSED / OPERATOR-RATIFIED / PROMOTED
 T8-A — Technical Authority & Legacy Census       CLOSED / OPERATOR-RATIFIED / PROMOTED
-Decision Registry                                CURRENT + D4 + T6 + post-T6 + T7 + T8-A amendments
+T8-B — Backend Module & Package Topology         CLOSED / OPERATOR-RATIFIED / PROMOTED
+Decision Registry                                CURRENT + amendments through T8-B
 TRRB                                             CLOSED / OPERATOR-RATIFIED / PROMOTED
 
 T8 — Technical Realization Architecture          ACTIVE
-  T8-B Backend Module & Package Topology         ACTIVE / TARGET TOPOLOGY DERIVATION NEXT
-  T8-C Internal Communication Contracts          NOT OPEN
+  T8-C Internal Communication Contracts          ACTIVE / CONTRACT DERIVATION NEXT
   T8-D Persistence Realization                   NOT OPEN
   T8-E Executable Wire Contract                  NOT OPEN
   T8-F Frontend Realization                      NOT OPEN
@@ -87,81 +100,105 @@ implementation                                    BLOCKED
 
 ## 4. T8-A closure
 
-Durable T8-A authority:
+Durable authority:
 
 `wiki/architecture/r10-t8a-technical-authority-legacy-disposition.md`
 
-Registry reconciliation:
+Registry amendment:
 
 `wiki/architecture/rebaseline-decision-registry-t8a-amendment.md`
 
-Binding consequences:
+Binding consequences remain:
 
 ```text
 current implementation = evidence only
 legacy module/package topology = REWRITE / REHOME
 current persistence/API/frontend/auth/storage shapes = no inheritance entitlement
 non-Launch implementation = DELETE / DEFER absent named Launch consumer
-PostgreSQL/River/contract-first/verifier/DB least-privilege properties = preserved where ratified/proven
 selective reuse requires all five T8-A proofs
 ```
 
-Completed T8-A staging is removed after promotion. Git history is provenance.
+## 5. T8-B closure
 
-## 5. T8-B — ACTIVE
+Durable authority:
+
+`wiki/architecture/r10-t8b-backend-module-package-topology.md`
+
+Registry amendment:
+
+`wiki/architecture/rebaseline-decision-registry-t8b-amendment.md`
+
+Binding consequences:
+
+```text
+semantic owner public roots = authentication / organization / authorization /
+                              controlleddocs / audit
+one importable public surface per owner
+owner-private decomposition ungated
+transport → application = only semantic inbound door
+application leaves = stateless choreography
+owner → owner direct imports forbidden
+platform = mechanism only
+composition = wiring only
+transaction/Audit/AuthZ seam classes named, exact contracts deferred T8-C
+first-party package classification = closed-world
+first-party dependency edges = default-deny
+```
+
+T8-B staging/reviewer artifacts are completed provenance and are removed from the live staging tree after promotion; Git history preserves them.
+
+## 6. T8-C — ACTIVE
 
 Active bootstrap:
 
-`docs/superpowers/analysis/2026-08-19-r10-t8b-backend-module-package-topology-bootstrap.md`
+`docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-bootstrap.md`
 
-T8-B answers:
+T8-C answers:
 
-> **What is the smallest backend package/module topology that gives each ratified semantic authority one clear home, keeps supporting mechanisms non-semantic, exposes only intentional public surfaces, and makes forbidden dependencies mechanically understandable?**
+> **What is the smallest complete set of internal contracts that lets the ratified owners and non-semantic application/mechanism layers realize T1→T8-B semantics without direct owner imports, foreign SQL, duplicate authority, hidden write ownership or unnecessary interface ceremony?**
 
-T8-B freezes only:
-
-```text
-target repository/package layout
-semantic-owner realization boundaries
-layering within owners
-public/internal Go package surfaces
-allowed dependency graph
-forbidden dependency graph
-composition root / dependency injection
-location of shared mechanisms
-```
-
-Semantic ownership baseline:
+T8-C freezes:
 
 ```text
-Authentication
-Organization
-Authorization
-Controlled Documents
-Audit — supporting evidence authority
+owner queries
+owner capabilities
+read projections
+same-process/local calls
+transaction-coupled intents
+River/durable job seams where already justified
+consumer/producer contract ownership
 ```
 
-Supporting mechanisms are not semantic owners merely because they have packages.
+T8-C must resolve at minimum the exact contracts for the T8-B seam classes:
+
+```text
+provider-neutral transaction participation
+same-transaction owner evidence → Audit handoff
+owner-authored domain predicate facts → Authorization decision
+transaction-coupled durable intent
+material consumer-owned mechanism ports
+```
 
 ### Exact next action
 
 ```text
-derive target backend responsibilities from the ratified 4+1 owners + T1→T8-A
-→ identify cohesive vs isolated responsibilities
-→ compare 2–3 materially distinct package-topology approaches
-→ apply Global Maximum / essential-vs-accidental complexity
-→ produce allowed/forbidden dependency candidate
+derive complete interaction census from T2/T3/T4/T5/T6 + T8-B
+→ classify sync query / mutation / same-tx / durable-intent / mechanism / read-projection
+→ freeze contract ownership and direction
+→ resolve txscope / Audit evidence / Authorization predicate contracts first
+→ derive remaining owner/mechanism contracts
+→ compare credible contract-placement alternatives
+→ apply Method + subtractive pass
 → adversarial challenge
-→ T8-B platform-facing summary for operator ratification
+→ operator-ratifiable T8-C candidate
 ```
 
-Do **not** begin by mapping the legacy 15 modules one-for-one.
+Current implementation interfaces may be inspected as evidence only and receive no survival entitlement from existence.
 
-## 6. Stage boundaries
+## 7. Stage boundaries
 
 ```text
-T8-B = backend/package topology
-T8-C = detailed inter-owner communication contracts
+T8-C = internal communication contracts
 T8-D = persistence realization
 T8-E = exact executable OpenAPI/wire contract
 T8-F = frontend realization
@@ -173,9 +210,9 @@ T11  = implementation Execution Graph
 T12  = adversarial implementation-readiness
 ```
 
-T8-B may identify that a seam is required to justify dependency direction; it must not invent the detailed T8-C contract by stealth.
+T8-C may identify persistence needs but must not design schema/locks by stealth. It may not reopen T8-B topology without a concrete contract contradiction.
 
-## 7. Final implementation gate
+## 8. Final implementation gate
 
 Implementation remains blocked until:
 
