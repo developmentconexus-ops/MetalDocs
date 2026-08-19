@@ -1,6 +1,6 @@
 # R10 Technical Architecture — Active Stage Router
 
-> **Status:** ACTIVE — **PRODUCT CONTRACT REV001 + T1→T5 OPERATOR-RATIFIED; POST-T5 FABLE CHECKPOINT CLOSED; T6 ACTIVE / DESIGN NEXT; T7 NOT OPEN; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **PRODUCT CONTRACT REV001 + T1→T5 OPERATOR-RATIFIED; POST-T5 FABLE CHECKPOINT CLOSED; T6 MATERIAL CANDIDATE READY / OPERATOR ADJUDICATION NEXT; T7 NOT OPEN; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-18  
 > **Revision convention:** `REV000` initial issuance / `REV001` first revision  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
@@ -24,10 +24,11 @@ This file owns current technical-stage status, reading order and exact next acti
 11. `wiki/architecture/r10-t5-durable-async-search-external-effects.md`
 12. `wiki/architecture/rebaseline-decision-registry.md`
 13. this router
-14. active T6 staging
-15. current API/frontend/runtime only as evidence for a concrete T6 claim
+14. T6 bootstrap
+15. active T6 material candidate
+16. current API/frontend/runtime only as evidence for a concrete T6 claim
 
-Historical/current implementation is never target authority by existence.
+Historical/current implementation is never target authority by existence. T6 has no compatibility obligation to legacy routes/modules/screens/DTOs.
 
 ## 2. Binding method laws
 
@@ -53,7 +54,7 @@ T4 — Exact Content, Storage Integrity & Restore       CLOSED / OPERATOR-RATIFI
 T5 — Durable Async, Search & External Effects         CLOSED / OPERATOR-RATIFIED
 Decision Reconciliation Registry                      CURRENT / OPERATOR-RATIFIED
 Post-T5 integrated Fable checkpoint                   CLOSED / OPERATOR-APPROVED
-T6 — Canonical API / Frontend Journeys                ACTIVE / DESIGN NEXT
+T6 — Canonical API / Frontend Journeys                ACTIVE / CANDIDATE READY / ADJUDICATION NEXT
 T7 — Historical Migration & Cutover                   NOT OPEN
 implementation                                         BLOCKED
 ```
@@ -73,13 +74,24 @@ T6 READINESS = MAY OPEN
 
 The operator explicitly closed the checkpoint on 2026-08-18. Completed Fable staging was removed from the live tree; Git history remains the archive. No formal T1→T5 reopen occurred.
 
-Promoted bounded amendments remain in Product Contract REV001, T1→T5 and the Decision Registry.
-
 ## 5. T6 — Canonical API / Frontend Journeys — ACTIVE
 
-Active staging:
+Bootstrap:
 
 `docs/superpowers/analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-bootstrap.md`
+
+Material candidate:
+
+`docs/superpowers/analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-candidate.md`
+
+Candidate status:
+
+```text
+T6-A→T6-R = PROPOSED / NON-AUTHORITATIVE
+operator material adjudication = NEXT
+```
+
+The candidate is intentionally greenfield. It may delete/rewrite every current route, module, screen, DTO, capability or editor-session shape when current authority does not justify it.
 
 T6 consumes only the current Registry REOPEN set:
 
@@ -95,7 +107,7 @@ exact Search field/ranking UX + prove whether any derived/expensive fact activat
 EditorSession/UX lease only if a real editor-integration consumer requires it
 ```
 
-The post-Fable non-blocking retitle observation is also a T6 proof question: place DRAFT retitle mutation under one existing T2 concurrency law without reopening Revision-owned title semantics.
+The post-Fable retitle observation is also resolved by the candidate through the existing WorkingContent generation/OCC mechanism; it remains non-authoritative until adjudicated.
 
 ### T6 hard boundaries
 
@@ -114,15 +126,13 @@ no-notification/event-platform baseline
 
 T6 does not own Historical Migration execution.
 
-## 6. Mandatory T-stage closure protocol
+## 6. Current gate
 
 ```text
-read Decision Registry
-→ consume CURRENT / PRESERVE / REFINED
-→ design only T6 REOPEN set
-→ candidate/design
-→ material decision adjudication
-→ platform-facing summary
+read candidate T6-A→T6-R
+→ operator adjudicates material decisions
+→ corrected candidate/adjudication record if needed
+→ platform-facing T6 summary
 → explicit operator summary ratification
 → promote durable T6 conclusions
 → update Decision Registry
