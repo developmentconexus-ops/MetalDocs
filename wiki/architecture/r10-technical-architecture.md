@@ -1,6 +1,6 @@
 # R10 Technical Architecture — Active Stage Router
 
-> **Status:** ACTIVE — **T1→T8-B CLOSED / OPERATOR-RATIFIED; T8-C ACTIVE / ROUND-1 REVIEW + LEAD ADJUDICATION COMPLETE / CORRECTED CANDIDATE MATERIALIZED / BOUNDED ROUND-2 NEXT; T8-D→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1→T8-B CLOSED / OPERATOR-RATIFIED; T8-C ACTIVE / ROUND-1 + BOUNDED ROUND-2 COMPLETE / FINAL LEAD ADJUDICATION COMPLETE / OPERATOR RATIFICATION NEXT; T8-D→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-19  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
@@ -83,7 +83,7 @@ Decision Registry                                CURRENT + amendments through T8
 TRRB                                             CLOSED / OPERATOR-RATIFIED / PROMOTED
 
 T8 — Technical Realization Architecture          ACTIVE
-  T8-C Internal Communication Contracts          ACTIVE / CORRECTED CANDIDATE / BOUNDED ROUND-2 NEXT
+  T8-C Internal Communication Contracts          ACTIVE / FINAL OPERATOR RATIFICATION NEXT
   T8-D Persistence Realization                   NOT OPEN
   T8-E Executable Wire Contract                  NOT OPEN
   T8-F Frontend Realization                      NOT OPEN
@@ -147,9 +147,9 @@ first-party dependency edges = default-deny
 
 T8-B bootstrap/candidate/reviewer artifacts are no longer active staging. Their tombstones route to durable authority; full provenance remains in Git history.
 
-## 6. T8-C — ACTIVE
+## 6. T8-C — ACTIVE / FINAL RATIFICATION GATE
 
-Staging chain:
+Staging/provenance chain:
 
 ```text
 bootstrap
@@ -161,53 +161,69 @@ original Global Maximum candidate
 Round-1 independent Fable review
   docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-independent-fable-review.md
 
-current adjudicated corrected candidate / bounded Round-2 input
+adjudicated corrected candidate / Round-2 input
   docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-adjudicated-corrected-candidate.md
+
+bounded Round-2 Fable delta review
+  docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-corrected-candidate-fable-delta-review.md
+
+final Lead adjudication / operator-ratification input
+  docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-final-lead-adjudication.md
 ```
 
-Round-1 result:
+Independent review convergence:
 
 ```text
-APPROVE T8-C GLOBAL MAXIMUM CANDIDATE WITH MATERIAL FIXES
-GLOBAL MAXIMUM CLASS CONFIRMED
-T8-B REOPEN NO
-T1→T7 REOPEN NO
+Round 1:
+  APPROVE T8-C GLOBAL MAXIMUM CANDIDATE WITH MATERIAL FIXES
+  Global Maximum class CONFIRMED
+  T8-B reopen NO
+  T1→T7 reopen NO
+
+Bounded Round 2:
+  APPROVE CORRECTED T8-C DELTA WITH MATERIAL FIXES
+  BLOCKER 0
+  SURVIVING MATERIAL CONTRADICTION 0
+  Global Maximum class CONFIRMED
+  T8-B reopen NO
+  T1→T7 reopen NO
+  T8-D trespass NO
+  T8-E trespass NO
+  another Fable round NO
 ```
 
-Lead adjudication accepted B1/B2/B3/B4, rejected B5 as a required blocker after PostgreSQL primary-evidence verification, accepted M1/M2/M4/M6, narrowed M3, and converted M5 into the explicit T8-C selection **PII-FREE REPLAY SNAPSHOT BY CONSTRUCTION**.
-
-Corrected candidate preserves the confirmed authority-aligned hybrid model and adds only bounded contract corrections, including:
+Final Lead adjudication closes the bounded Round-2 precision set without changing the confirmed model class. Final refinements include:
 
 ```text
-explicit database/sql-family tx substrate + platform-only River native binding
-Audit historical-visibility read
-Authorization AuthorizedScopes
-protected eligibility serialization semantic guarantee
-owner VersionToken / expected-version contract
-verified primitive issuer+subject provider seam
-ManagedContent admission claims + DeleteReclaimable + T5-J GC contracts
-malware digest correlation
-concurrent idempotency outcome law with SQL realization deferred T8-D
-PII-free ReplaySnapshot
-OfficialRendition content read
-operation-census precision fixes
+D19 explicitly inherits the already-ratified T2 READ COMMITTED posture
+Scope sealing claim narrowed; foreign embedding mechanically forbidden
+SQLTx native binding fails closed for non-target Scope
+T5-J GC repeats the full semantic/live reference proof immediately before delete
+T5-J host = internal/application/maintenance within the existing application class
+Replay reconstruction = self-contained snapshot-only; no replay-time current-state re-projection
+PII-free replay remains selected; free-form text exclusion is snapshot-minimality, not erasure inference
+database/sql rationale no longer treats River as independent substrate-selection evidence
+ManagedContent PresignCreate explicitly means create-once/no-overwrite
+provider-directory callback semantics are bounded and fail-propagating
+AuthorizedScopes has an explicit non-substitution proof obligation
+owner no-op replacement returns the current VersionToken
 ```
 
 ### Exact next action
 
 ```text
-bounded Fable Round 2 on the adjudicated corrected candidate
-→ verify only the material Round-1 delta
-→ attack txscope/River correction
-→ attack B5 Lead rejection against PostgreSQL primary evidence
-→ attack PII-free replay selection
-→ verify remaining material finding closure
-→ verify T8-D/T8-E boundaries and operation-census delta
-→ final Lead adjudication
-→ explicit operator ratification before durable T8-C promotion
+operator reviews the final T8-C package
+→ explicit operator ratification if accepted
+→ only after ratification:
+     promote one consolidated durable T8-C authority into wiki/
+     add Decision Registry T8-C amendment
+     reconcile router/handoff/PR to T8-C CLOSED / T8-D ACTIVE
+     clean/tombstone superseded T8-C staging as repository tooling allows
 ```
 
-No broad Round-2 re-derivation is required unless the delta proves a new material contradiction that changes the confirmed model class.
+No third Fable round is required by current evidence.
+
+T8-C remains non-authoritative staging until explicit operator ratification.
 
 ## 7. Stage boundaries
 
@@ -224,7 +240,7 @@ T11  = implementation Execution Graph
 T12  = adversarial implementation-readiness
 ```
 
-T8-C may identify persistence needs and deliberate substrate constraints but must not design schema/locks/SQL by stealth. T8-D remains closed until T8-C is promoted.
+T8-C may identify persistence needs and deliberate substrate constraints but must not design schema/locks/SQL by stealth. T8-D remains closed until T8-C is operator-ratified and promoted.
 
 ## 8. Final implementation gate
 
