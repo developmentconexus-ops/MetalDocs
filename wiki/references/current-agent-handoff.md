@@ -1,7 +1,7 @@
 # Current Agent Handoff
 
 > **Last verified:** 2026-08-19  
-> **Status:** ACTIVE — **T1→T8-B CLOSED / OPERATOR-RATIFIED; T8-C ACTIVE / ROUND-1 REVIEW + LEAD ADJUDICATION COMPLETE / CORRECTED CANDIDATE MATERIALIZED / BOUNDED ROUND-2 NEXT; T8-D→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1→T8-B CLOSED / OPERATOR-RATIFIED; T8-C ACTIVE / ROUND-1 + BOUNDED ROUND-2 COMPLETE / FINAL LEAD ADJUDICATION COMPLETE / OPERATOR RATIFICATION NEXT; T8-D→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
 
 ## Fresh-session route
@@ -17,11 +17,8 @@ Read in this order:
 7. Decision Registry + amendments through T8-B
 8. `wiki/architecture/r10-post-t6-implementation-readiness-program.md`
 9. `wiki/architecture/r10-technical-realization-reconciliation-baseline.md`
-10. `docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-bootstrap.md`
-11. `docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-global-maximum-candidate.md`
-12. `docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-independent-fable-review.md`
-13. `docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-adjudicated-corrected-candidate.md`
-14. current interfaces/code only when a concrete T8-C evidence claim needs them
+10. T8-C staging chain listed below
+11. current interfaces/code only when a concrete T8-C evidence claim needs them
 
 Do not route target design through superseded/historical architecture or current module/interface existence.
 
@@ -35,7 +32,7 @@ Decision Registry                        CURRENT + amendments through T8-B
 Post-T6 Stage-Decomposition GCR          RESTRUCTURE NOW / OPERATOR-RATIFIED
 TRRB                                     CLOSED / OPERATOR-RATIFIED / PROMOTED
 
-T8-C                                     ACTIVE / CORRECTED CANDIDATE / BOUNDED ROUND-2 NEXT
+T8-C                                     ACTIVE / FINAL OPERATOR RATIFICATION NEXT
 T8-D                                     NOT OPEN
 T8-E                                     NOT OPEN
 T8-F                                     NOT OPEN
@@ -116,93 +113,89 @@ Audit
 
 No direct owner→owner imports, foreign SQL, mechanism-as-authority or second Authorization evaluator.
 
-## T8-C — ACTIVE
+## T8-C — ACTIVE / FINAL RATIFICATION GATE
 
-### Original candidate
-
-`docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-global-maximum-candidate.md`
-
-### Round-1 Fable evidence
-
-`docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-independent-fable-review.md`
-
-Round-1 verdict:
+Staging/provenance chain:
 
 ```text
-APPROVE T8-C GLOBAL MAXIMUM CANDIDATE WITH MATERIAL FIXES
-BLOCKER 5 / MAJOR 6 / LOW 5
-GLOBAL MAXIMUM CLASS CONFIRMED
-T8-B REOPEN NO
-T1→T7 REOPEN NO
+bootstrap
+  docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-bootstrap.md
+
+original candidate
+  docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-global-maximum-candidate.md
+
+Round-1 Fable evidence
+  docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-independent-fable-review.md
+
+adjudicated corrected candidate
+  docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-adjudicated-corrected-candidate.md
+
+bounded Round-2 Fable delta review
+  docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-corrected-candidate-fable-delta-review.md
+
+final Lead adjudication / operator-ratification input
+  docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-final-lead-adjudication.md
 ```
 
-### Lead adjudication
+### Review convergence
 
 ```text
-B1 ACCEPT
-B2 ACCEPT
-B3 ACCEPT
-B4 ACCEPT
-B5 REJECT AS BLOCKER after PostgreSQL primary-evidence verification
+Round 1:
+  APPROVE T8-C GLOBAL MAXIMUM CANDIDATE WITH MATERIAL FIXES
+  GLOBAL MAXIMUM CLASS CONFIRMED
+  T8-B REOPEN NO
+  T1→T7 REOPEN NO
 
-M1 ACCEPT
-M2 ACCEPT
-M3 ACCEPT WITH NARROWING
-M4 ACCEPT
-M5 ACCEPT as real unmade decision -> SELECT PII-FREE REPLAY SNAPSHOT BY CONSTRUCTION
-M6 ACCEPT
-
-L1-L5 ACCEPT
+Bounded Round 2:
+  APPROVE CORRECTED T8-C DELTA WITH MATERIAL FIXES
+  BLOCKER 0 / MAJOR 5 / LOW 5
+  SURVIVING MATERIAL CONTRADICTION 0
+  GLOBAL MAXIMUM CLASS CONFIRMED
+  T8-B REOPEN NO
+  T1→T7 REOPEN NO
+  T8-D TRESPASS NO
+  T8-E TRESPASS NO
+  ANOTHER FABLE ROUND NO
 ```
 
-Reviewer evidence never became authority. The selected Global Maximum class remains confirmed.
+### Final Lead adjudication
 
-### Current corrected candidate / Round-2 input
+The five Round-2 MAJOR and five LOW findings are closed at staging level without changing the confirmed **AUTHORITY-ALIGNED HYBRID CONTRACT MODEL**.
 
-`docs/superpowers/analysis/2026-08-19-r10-t8c-internal-communication-contracts-adjudicated-corrected-candidate.md`
-
-Key corrected laws:
+Final precision laws include:
 
 ```text
-database/sql-family transaction substrate deliberately selected
-sealed txscope + platform-only native SQL binding for River
-semantic owners still receive only txscope.Scope
-Audit AppendIn + Authorization-scoped historical ListEvents
-Authorization AuthorizedScopes from same canonical evaluator
-ProtectedSecuritySubjectIn serializes eligibility against offboarding semantically
-owner VersionToken + expected-version mutation law; ETag remains T8-E
-ProviderClient crosses verified primitive issuer+subject, not raw claim bag
-ManagedContent admission claims + DeleteReclaimable + T5-J GC contracts
-MalwareInspector returns digest of exactly inspected bytes
-OfficialRendition intent remains named; no EventBus
-idempotency concurrent outcome frozen, SQL realization remains T8-D
-PII-free ReplaySnapshot by construction; no Launch purge/redaction subsystem
-OfficialRendition content read explicitly covered
-L1-L5 operation-census precision closed in candidate
+idempotency D19 inherits already-ratified T2 READ COMMITTED posture
+Scope unexported marker blocks from-scratch implementations; embedding outside txscope is mechanically forbidden
+SQLTx(scope) returns explicit fail-closed error for unrecognized/non-target Scope
+T5-J GC repeats full semantic/live-reference/claim/backup proof immediately before delete
+T5-J host = internal/application/maintenance within existing application class; no T8-B reopen
+Replay response reconstruction = self-contained ReplaySnapshot only; no replay-time current-state re-projection
+PII-free replay remains selected; free-form exclusion is snapshot minimality, not UserProfile-erasure inference
+database/sql selection stands; River compatibility is supporting evidence, not independent selection reason
+ManagedContent PresignCreate = create-once/no-overwrite
+provider directory enumeration is bounded/synchronous with propagated callback error
+AuthorizedScopes is prefilter only and must never substitute exact Decide/DecideMany
+exact no-op replacement returns current VersionToken with no version/Audit fabrication
 ```
-
-### B5 Lead rejection
-
-The target contract requires concurrent same-key requests to serialize and return claim/replay/conflict without leaving Scope unusable. It does **not** mandate a unique-violation path. PostgreSQL current primary documentation supports conflict handling through `ON CONFLICT DO NOTHING` under READ COMMITTED; exact SQL remains T8-D.
 
 ### Exact next action
 
 ```text
-bounded Fable Round 2 on the adjudicated corrected candidate
-→ attack only the material corrected delta
-→ verify txscope/River binding
-→ verify Audit read + AuthorizedScopes + eligibility serialization + VersionToken
-→ verify ManagedContent claim/GC + malware correlation + rendition read
-→ directly challenge B5 Lead rejection using PostgreSQL primary evidence
-→ directly challenge new PII-free replay decision
-→ verify operation-census delta closure and T8-D/T8-E boundaries
-→ final Lead adjudication
-→ explicit operator ratification before durable T8-C promotion
+operator reviews final T8-C package
+→ explicit operator ratification if accepted
+→ only then:
+     promote consolidated T8-C durable authority into wiki/
+     add T8-C Decision Registry amendment
+     update router/handoff/PR to T8-C CLOSED / T8-D ACTIVE
+     clean/tombstone superseded T8-C staging as tooling allows
 ```
 
-Do **not** start T8-D from the corrected candidate.
+No third Fable round is justified by current evidence.
 
-### Do not decide by stealth
+Do **not** start T8-D before ratification/promotion.
+
+### Stage boundaries remain
 
 ```text
 schema/tables/constraints/indexes/lock SQL → T8-D
@@ -212,7 +205,5 @@ runtime/process/deployment                  → T8-G
 transition/deletion                         → T10
 implementation tasks                        → T11
 ```
-
-T8-C may reopen T8-B only on a concrete required-contract contradiction, not preference.
 
 Implementation remains **BLOCKED**.
