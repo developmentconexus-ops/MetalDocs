@@ -1,7 +1,7 @@
 # Current Agent Handoff
 
 > **Last verified:** 2026-08-18  
-> **Status:** ACTIVE — **PRODUCT CONTRACT REV001 + T1→T5 OPERATOR-RATIFIED; POST-T5 FABLE CHECKPOINT CLOSED; T6 FINAL GLOBAL-MAXIMUM ADJUDICATION READY / OPERATOR MATERIAL ADJUDICATION NEXT; T7 NOT OPEN**  
+> **Status:** ACTIVE — **PRODUCT CONTRACT REV001 + T1→T5 OPERATOR-RATIFIED; T6 MATERIAL DECISIONS OPERATOR-APPROVED; PLATFORM-FACING T6 SUMMARY RATIFICATION NEXT; T7 NOT OPEN**  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Implementation:** **BLOCKED — architecture/design only**
 
@@ -22,12 +22,10 @@ Read in order:
 11. `wiki/architecture/r10-t5-durable-async-search-external-effects.md`
 12. `wiki/architecture/rebaseline-decision-registry.md`
 13. `wiki/architecture/r10-technical-architecture.md`
-14. `docs/superpowers/analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-bootstrap.md`
-15. `docs/superpowers/analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-candidate.md`
-16. `docs/superpowers/analysis/2026-08-18-r10-t6-external-evidence-docket.md`
-17. `docs/superpowers/analysis/2026-08-18-r10-t6-global-maximum-adjudication-packet.md`
-18. `docs/superpowers/analysis/2026-08-18-r10-t6-final-adjudication-refinements.md` — **FINAL OPERATOR DECISION PRECEDENCE FOR FR-1..FR-4**
-19. current implementation only when claim-specific evidence is needed
+14. `docs/superpowers/analysis/2026-08-18-r10-t6-operator-material-adjudication.md`
+15. `docs/superpowers/analysis/2026-08-18-r10-t6-platform-facing-summary.md` — **OPERATOR SUMMARY RATIFICATION NEXT**
+16. T6 candidate/evidence files only when provenance for a material decision is needed
+17. current implementation only as claim-specific evidence
 
 Completed Fable staging is removed; Git history is the archive.
 
@@ -44,60 +42,83 @@ T4 Exact Content/Storage/Restore         = CLOSED / OPERATOR-RATIFIED
 T5 Durable Async/Search/Effects          = CLOSED / OPERATOR-RATIFIED
 Decision Registry                        = CURRENT / RECONCILED / OPERATOR-RATIFIED
 Post-T5 integrated Fable checkpoint      = CLOSED / OPERATOR-APPROVED
-T6 evidence/inversion pass               = COMPLETE ENOUGH FOR ADJUDICATION
-T6 base candidate                        = STAGED / NON-AUTHORITATIVE
-T6 corrected adjudication packet         = STAGED / NON-AUTHORITATIVE
-T6 final refinements FR-1..FR-4          = STAGED / NON-AUTHORITATIVE
-operator material adjudication           = NEXT
+T6 material decisions                    = OPERATOR-APPROVED
+T6 platform-facing summary               = STAGED / RATIFICATION NEXT
+T6 durable authority                     = NOT YET
 T7 Historical Migration / Cutover        = NOT OPEN
 implementation                           = BLOCKED
 ```
 
-## Structural Inversion result
-
-Current API/frontend is current-state evidence only and carries major superseded concepts. T6 has no obligation to retain routes/modules/DTOs/screens by migration cost or sunk cost.
-
-Target direction:
+## T6 approved platform direction
 
 ```text
-semantic public API instead of legacy module API
-semantic-lens frontend instead of old navigation ontology
-exact immutable Submission review instead of reviewer WorkingContent mutation
-current-effective Library instead of polymorphic document screen
-canonical Search instead of mandatory Search infrastructure
-provider-neutral content/editor mechanisms behind T4/OCC
+API
+  rebuild pre-launch /api/v1 from current semantics
+  OpenAPI contract-first + generated Go/TS boundaries
+  no /api/v2 or compatibility shims
+
+AuthN/browser
+  Keycloak Authorization Code
+  MetalDocs ApplicationSession
+  no local credentials/JIT User
+  session-bound CSRF on unsafe requests
+
+Frontend
+  Library / My Work / exact Governance case / Document official-work-history / Audit / Admin
+  stable semantic route meanings
+
+DRAFT/content
+  Revision title + source share one WorkingContent generation
+  PATCH + strong If-Match; stale = 412
+  T4 upload_id OPEN→READY→OCC attach
+  client never owns ExactContentDescriptor
+
+Governance
+  exact immutable Submission is review truth
+  Step Decision is singleton immutable PUT
+  reviewer case access never mutates WorkingContent
+
+Search
+  canonical PostgreSQL code/title + filters
+  materialized Search/search_refresh OFF for Launch
+
+Representation
+  semantic byte URLs hide provider identity
+  SourceOnly vs OfficialRendition explicit
+  one fidelity-gated DOCX provider; no EditorSession correctness baseline
+
+Admin
+  Organization / Access / Document Governance only
+  User eligibility singleton PUT executes T3 offboarding/reenable semantics
+  strong ETag/If-Match on mutable authority-bearing config
+
+Transport
+  RFC9457 + canonical semantic code
+  natural HTTP idempotency first
+  Idempotency-Key only for truly non-idempotent semantic POST creation
+  opaque cursor lists default20/max100
+
+Seeds
+  blank = trusted mechanism asset
+  Template/revise copy exact governed/released SOURCE, never OfficialRendition
 ```
 
-## Operator adjudication precedence
-
-```text
-T6 base candidate
-→ corrected Global-Maximum adjudication packet
-→ final refinements FR-1..FR-4
-```
-
-FR-1..FR-4 final candidate deltas:
-
-```text
-FR-1 User eligibility = singleton GET/PUT current resource; DISABLED transition executes T3 offboarding; ENABLED never restores grants.
-FR-2 Governance Step Decision = singleton immutable GET/PUT resource; no Idempotency-Key replay row.
-FR-3 DRAFT mutation = PATCH + strong If-Match over one generation for title + source; stale = 412.
-FR-4 Idempotency-Key only for truly non-idempotent semantic POSTs; replay retention bounded; 24h only first implementation-default candidate, not architecture invariant.
-```
-
-Everything else follows the corrected packet and remains non-authoritative until operator ratification.
+Current implementation carries no compatibility entitlement from sunk cost.
 
 ## Exact next step
 
+Review and explicitly ratify:
+
+`docs/superpowers/analysis/2026-08-18-r10-t6-platform-facing-summary.md`
+
+If ratified:
+
 ```text
-operator adjudicates final T6 material slate
-→ revise only rejected/refined decisions
-→ platform-facing T6 summary
-→ explicit operator summary ratification
-→ promote T6 durable authority
+promote T6 durable authority to wiki/
 → reconcile Decision Registry
-→ remove staging
-→ only then T7
+→ update router/handoff/index/PR
+→ remove completed T6 staging
+→ open T7 only after those steps complete
 ```
 
-No final SQL/index/package/process topology, Historical Migration execution plan, implementation plan or product code is authorized.
+Do **not** open T7 or write implementation plan/code before summary ratification and T6 promotion.
