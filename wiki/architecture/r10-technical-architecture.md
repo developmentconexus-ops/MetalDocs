@@ -1,6 +1,6 @@
 # R10 Technical Architecture — Active Stage Router
 
-> **Status:** ACTIVE — **T1→T6 CLOSED / OPERATOR-RATIFIED; POST-T6 PROGRAM RESTRUCTURED; TRRB OPERATOR-RATIFIED; T7 ACTIVE / NO-HISTORICAL-BUSINESS-MIGRATION CANDIDATE / OPERATOR SUMMARY RATIFICATION NEXT; T8→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1→T7 CLOSED / OPERATOR-RATIFIED; T8-A ACTIVE / CURRENT TECHNICAL CENSUS + REMEASUREMENT NEXT; T8-B→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-19  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
@@ -15,16 +15,15 @@ Read in order:
 2. `docs/engineering/standards/root-cause-global-maximum-method.md`
 3. `wiki/references/current-agent-handoff.md`
 4. Product Contract REV001 + Whole-Product GCR + 4+1 ownership
-5. T1→T6 durable R10 authorities
-6. Decision Registry + D4/T6/post-T6 amendments
+5. T1→T7 durable R10 authorities
+6. Decision Registry + D4/T6/post-T6/T7 amendments
 7. `wiki/architecture/r10-post-t6-implementation-readiness-program.md`
 8. `wiki/architecture/r10-technical-realization-reconciliation-baseline.md`
 9. this router
-10. `docs/superpowers/analysis/2026-08-19-r10-t7-source-corpus-operator-clarification.md`
-11. `docs/superpowers/analysis/2026-08-19-r10-t7-no-historical-business-migration-candidate.md`
-12. `docs/superpowers/analysis/2026-08-19-r10-t7-platform-facing-summary.md`
+10. `docs/superpowers/analysis/2026-08-19-r10-t8a-technical-authority-legacy-census-bootstrap.md`
+11. current code/schema/API/frontend/runtime/deploy/test evidence for each concrete T8-A claim
 
-Legacy implementation and legacy technical design documents are evidence only unless the active R10 authority explicitly promotes their meaning.
+Legacy implementation proves what exists, not what survives.
 
 ## 2. Binding Method laws
 
@@ -55,12 +54,21 @@ T3 — Authorization & Audit                       CLOSED / OPERATOR-RATIFIED + 
 T4 — Exact Content / Storage / Restore           CLOSED / OPERATOR-RATIFIED
 T5 — Durable Async / Search / Effects            CLOSED / OPERATOR-RATIFIED
 T6 — Canonical API / Frontend Journeys           CLOSED / OPERATOR-RATIFIED / PROMOTED
-Decision Registry                                CURRENT + D4 + T6 + post-T6 amendments
+T7 — Historical Migration Truth & Mapping        CLOSED / OPERATOR-RATIFIED / PROMOTED
+Decision Registry                                CURRENT + D4 + T6 + post-T6 + T7 amendments
 Post-T6 Stage-Decomposition GCR                  RESTRUCTURE NOW / OPERATOR-RATIFIED
 Technical Realization Reconciliation Baseline   CLOSED / OPERATOR-RATIFIED / PROMOTED
 
-T7 — Historical Migration Truth & Mapping        ACTIVE / NO-MIGRATION CANDIDATE / OPERATOR SUMMARY RATIFICATION NEXT
-T8 — Technical Realization Architecture          NOT OPEN
+T8 — Technical Realization Architecture          ACTIVE
+  T8-A Technical Authority & Legacy Census       ACTIVE / CURRENT TECHNICAL CENSUS + REMEASUREMENT NEXT
+  T8-B Backend Module & Package Topology         NOT OPEN
+  T8-C Internal Communication Contracts          NOT OPEN
+  T8-D Persistence Realization                   NOT OPEN
+  T8-E Executable Wire Contract                  NOT OPEN
+  T8-F Frontend Realization                      NOT OPEN
+  T8-G Runtime / Process / Deployment            NOT OPEN
+  T8-H Whole-T8 Global Coherence Review          NOT OPEN
+
 T9 — Golden Flows & Validation Baseline          NOT OPEN
 T10 — Transition / Refactor / Migration/Cutover  NOT OPEN
 T11 — Implementation Program & Execution Graph   NOT OPEN
@@ -69,19 +77,53 @@ T12 — Adversarial Implementation-Readiness       NOT OPEN
 implementation                                    BLOCKED
 ```
 
-## 4. Post-T6 Global Coherence finding
+## 4. T7 closure
 
-The operator-ratified post-T6 program preserves T1→T6 and inserts the missing realization, validation, transition and implementation-readiness layers. Durable authority:
+Durable T7 authority:
 
-`wiki/architecture/r10-post-t6-implementation-readiness-program.md`
+`wiki/architecture/r10-t7-historical-migration-truth-semantic-mapping.md`
 
-## 5. TRRB closure
+Registry reconciliation:
 
-Durable TRRB authority:
+`wiki/architecture/rebaseline-decision-registry-t7-amendment.md`
 
-`wiki/architecture/r10-technical-realization-reconciliation-baseline.md`
+Ratified decision:
 
-Its evidence law remains:
+```text
+NO HISTORICAL BUSINESS MIGRATION REQUIRED FOR LAUNCH
+```
+
+Binding consequences:
+
+```text
+current MetalDocs business history = NONE
+current DB/content/history = DEV / TEST / THROWAWAY
+no historical-data compatibility consumer exists for T8
+R10 business history begins natively at/after cutover
+T10 remains mandatory for technical current→target transition
+```
+
+Completed T7 staging was removed from the live tree. Git history is provenance.
+
+## 5. T8-A — ACTIVE
+
+Active bootstrap:
+
+`docs/superpowers/analysis/2026-08-19-r10-t8a-technical-authority-legacy-census-bootstrap.md`
+
+T8-A classifies current technical structures using:
+
+```text
+PRESERVE
+REFINE
+REHOME
+REWRITE
+DELETE
+CURRENT-STATE ONLY
+SUPERSEDED
+```
+
+Evidence continues to use the TRRB classes:
 
 ```text
 CURRENT-PROVEN
@@ -90,78 +132,59 @@ STALE / SUPERSEDED
 UNKNOWN / REMEASURE
 ```
 
-## 6. T7 — operator summary ratification next
+Old Aug-09 mechanical counts are not current facts until remeasured when load-bearing.
 
-The operator established:
-
-```text
-current MetalDocs DB/content/history = DEV / TEST / THROWAWAY
-current MetalDocs business history   = NONE
-Launch requires pre-existing business-document import = NO
-```
-
-Therefore the current T7 Global Maximum candidate is:
+### T8-A required surfaces
 
 ```text
-NO HISTORICAL BUSINESS MIGRATION REQUIRED FOR LAUNCH
+backend modules/packages/import graph/composition
+SQL/table/view/function/trigger ownership and foreign access
+OpenAPI/codegen/runtime contract mechanisms
+frontend routes/features/query/cache/state/editor/viewer boundaries
+async/jobs/rendering
+binaries/processes/deploy/config/trust/observability/recovery
+verification/tests/CI/tools/verify/architecture guards
+technical-document and ADR authority status
 ```
-
-Candidate:
-
-`docs/superpowers/analysis/2026-08-19-r10-t7-no-historical-business-migration-candidate.md`
-
-Platform-facing operator ratification target:
-
-`docs/superpowers/analysis/2026-08-19-r10-t7-platform-facing-summary.md`
-
-Candidate consequences:
-
-```text
-no current MetalDocs DEV/test row/object/event becomes business history
-no historical approvals/releases/actors/timestamps are synthesized
-no generic importer/ETL/repository connector is built for Launch
-R10 business history begins natively at/after cutover
-T1 imported-provenance seam remains a future reopen seam only
-```
-
-T10 remains mandatory for technical transition:
-
-```text
-current DEV implementation → R10 implementation
-schema/API/frontend/runtime replacement
-DEV/test-state disposal/reset
-technical cutover/readiness/rollback
-authoritative legacy deletion map
-```
-
-T10 has no historical business-import branch for Launch unless T7 is explicitly reopened by a concrete source corpus or preservation requirement.
 
 ### Exact next action
 
 ```text
-operator ratifies/rejects T7 platform-facing summary
-→ if ratified: promote T7 durable authority + Registry reconciliation + staging cleanup
-→ mark T7 CLOSED
-→ only then open T8-A Technical Authority / Legacy Census
+fresh current technical census
+→ remeasure load-bearing legacy metrics against current source
+→ map each material structure to a ratified target property, if any
+→ preliminary PRESERVE / REFINE / REHOME / REWRITE / DELETE / CURRENT-STATE ONLY / SUPERSEDED disposition
+→ identify only material unknowns/disagreements
+→ T8-A disposition candidate + operator adjudication
 ```
 
-## 7. Future stage boundaries
+T8-A may classify `REWRITE` without selecting the replacement topology. Final package/database/API/frontend/runtime designs belong T8-B→T8-G.
+
+## 6. Future stage boundaries
 
 ```text
-T8  = backend/package/internal contracts/persistence/wire/frontend/runtime realization
-T9  = Golden Flows + falsifiable Validation Baseline
-T10 = current→target technical refactor/data/API/frontend/runtime migration + cutover/rollback
-T11 = bounded implementation Execution Graph; no hidden architecture decisions
-T12 = fresh adversarial implementation-readiness challenge
+T8-B = target backend/package topology
+T8-C = target internal owner communication contracts
+T8-D = target persistence realization
+T8-E = exact executable OpenAPI/wire contract
+T8-F = target frontend realization
+T8-G = target runtime/process/deployment realization
+T8-H = Whole-T8 Global Coherence Review
+T9   = Golden Flows + falsifiable Validation Baseline
+T10  = current→target technical transition/cutover/rollback
+T11  = bounded implementation Execution Graph; no hidden architecture decisions
+T12  = fresh adversarial implementation-readiness challenge
 ```
 
-## 8. Final implementation gate
+## 7. Final implementation gate
 
 Implementation remains blocked until:
 
 ```text
-T7→T12 CLOSED / OPERATOR-RATIFIED
+T8→T12 CLOSED / OPERATOR-RATIFIED
 → Integrated Whole-R10 Global Coherence Review PASS
 → fresh independent/cold review converged
 → operator explicitly authorizes implementation
 ```
+
+Existing runtime safety controls remain binding until deliberately replaced by accepted target realization.
