@@ -1,17 +1,30 @@
-# Backend Target Architecture — HISTORICAL PRIOR TARGET
+# Backend Target Architecture — SUPERSEDED HISTORICAL TARGET
 
-> **Status:** HISTORICAL / no longer normative for product/domain topology
-> **Marked:** 2026-08-14
+> **Status:** SUPERSEDED / HISTORICAL EVIDENCE ONLY  
+> **Reclassified:** 2026-08-19 by operator-ratified T8-A  
+> **Do not use for R10 target decisions.**
 
-This page previously served as the normative target for the backend professionalization program. The Cohesive Platform Redesign now re-adjudicates product/domain boundaries, module ownership, authorization, approval, Controlled Information and the target data model.
+This page previously defined a backend target for an earlier professionalization/redesign program. Its detailed former contents remain available in Git history for archaeology.
 
-Current target authority:
+## Current authority
 
-- [cohesive-platform-redesign.md](cohesive-platform-redesign.md)
-- `docs/superpowers/analysis/2026-08-14-cohesive-platform-redesign-ledger.md`
+Use:
 
-The former detailed REQ-* target remains available in Git history for infrastructure/engineering archaeology. Stable concerns such as contract-first API behavior, RFC 9457 errors, multi-tenant isolation, RLS defense-in-depth, transactional outbox, observability and DB-enforced invariants continue through their owning architecture/standard pages unless the active redesign explicitly changes them.
+- `launch-v1-product-contract.md`
+- `whole-product-alignment-review.md`
+- `launch-v1-ownership-topology.md`
+- `r10-t1-semantic-state-invariants.md` through the latest promoted R10 stage
+- `r10-t8a-technical-authority-legacy-disposition.md`
+- `rebaseline-decision-registry-t8a-amendment.md`
+- `r10-technical-architecture.md` — sole current stage/status/next-action router
+- `../references/current-agent-handoff.md`
 
-Do **not** infer from the former “15 bounded-context modules” topology, historical IAM/approval wording or previous module ownership that those boundaries survive the redesign.
+## T8-A ruling
 
-A new technical target architecture will be written only after the whole-product domain model, final authorization matrix, supporting concerns and migration map are closed.
+The prior target's physical assumptions — including the historical 15-module topology, pooled tenancy/RLS posture, old IAM/Approval ownership, old API/package organization and previous runtime composition — have **no R10 inheritance entitlement**.
+
+Some properties discussed historically may survive only where current R10 independently preserves them. Examples currently preserved at property/mechanism level include PostgreSQL, River for named durable jobs, contract-first generated boundaries, RFC 9457 via T6, least-privilege runtime DB identity, and verification control-plane principles.
+
+Historical statements that multi-tenant isolation, RLS, a particular outbox topology, renderer process shape or other infrastructure automatically continue are superseded unless a current R10 authority says so.
+
+T8-B→T8-G derive the actual physical target. Git history is the archive for this page's former detail.
