@@ -1,13 +1,13 @@
 # R10 Technical Architecture — Active Stage Router
 
-> **Status:** ACTIVE — **PRODUCT CONTRACT REV001 + T1→T5 OPERATOR-RATIFIED; POST-T5 FABLE CHECKPOINT CLOSED; T6 MATERIAL CANDIDATE READY / OPERATOR ADJUDICATION NEXT; T7 NOT OPEN; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **PRODUCT CONTRACT REV001 + T1→T5 OPERATOR-RATIFIED; POST-T5 FABLE CHECKPOINT CLOSED; T6 CORRECTED GLOBAL-MAXIMUM ADJUDICATION READY; OPERATOR MATERIAL ADJUDICATION NEXT; T7 NOT OPEN; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-18  
 > **Revision convention:** `REV000` initial issuance / `REV001` first revision  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
-> **Implementation gate:** **CLOSED — design/documentation only**
+> **Implementation gate:** **CLOSED — architecture/design only**
 
-This file owns current technical-stage status, reading order and exact next action.
+This file owns current technical-stage status and exact next action.
 
 ## 1. Binding authority chain
 
@@ -25,23 +25,26 @@ This file owns current technical-stage status, reading order and exact next acti
 12. `wiki/architecture/rebaseline-decision-registry.md`
 13. this router
 14. T6 bootstrap
-15. active T6 material candidate
-16. current API/frontend/runtime only as evidence for a concrete T6 claim
+15. T6 material candidate
+16. T6 evidence docket
+17. T6 corrected adjudication packet
+18. current API/frontend/runtime only as claim-specific evidence
 
-Historical/current implementation is never target authority by existence. T6 has no compatibility obligation to legacy routes/modules/screens/DTOs.
+Current implementation has **no compatibility entitlement**. Structural Inversion controls T6.
 
-## 2. Binding method laws
+## 2. Binding Method laws
 
 ```text
 smallest sustainable solution
 one semantic authority per meaning
 mechanism != authority
 proof before implementation
+Structural Inversion
 ```
 
 > **Defer the capability; preserve the evolution seam. Prepare the seam, not the dormant implementation.**
 
-> **Revalidation does not mean reinvention. Preserve a prior simple/coherent decision unless current authority or a concrete failure mode disproves it; rederive only the composite decision whose justification changed; defer only the capability that actually left Launch.**
+> **Revalidation does not mean reinvention. Preserve a prior simple/coherent decision unless current authority or a concrete failure mode disproves it; rederive only the composite decision whose justification changed.**
 
 ## 3. Technical descent
 
@@ -52,106 +55,92 @@ T2 — Governance, Effectivity & Lifecycle Transactions CLOSED / OPERATOR-RATIFI
 T3 — Authorization & Audit Enforcement                CLOSED / OPERATOR-RATIFIED
 T4 — Exact Content, Storage Integrity & Restore       CLOSED / OPERATOR-RATIFIED
 T5 — Durable Async, Search & External Effects         CLOSED / OPERATOR-RATIFIED
-Decision Reconciliation Registry                      CURRENT / OPERATOR-RATIFIED
+Decision Registry                                      CURRENT / OPERATOR-RATIFIED
 Post-T5 integrated Fable checkpoint                   CLOSED / OPERATOR-APPROVED
-T6 — Canonical API / Frontend Journeys                ACTIVE / CANDIDATE READY / ADJUDICATION NEXT
+T6 — Canonical API / Frontend Journeys                ACTIVE / CORRECTED ADJUDICATION READY
 T7 — Historical Migration & Cutover                   NOT OPEN
 implementation                                         BLOCKED
 ```
 
-## 4. Post-T5 checkpoint — CLOSED
-
-The independent review and delta review ended with:
+## 4. T6 active staging
 
 ```text
-DELTA VERDICT = APPROVE
-M1–M3 = CLOSED
-L1–L5 = CLOSED
-NEW MATERIAL FINDINGS = 0
-DISAGREEMENT SET = EMPTY
-T6 READINESS = MAY OPEN
+docs/superpowers/analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-bootstrap.md
+  → stage scope / hard boundaries
+
+docs/superpowers/analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-candidate.md
+  → material architecture candidate + alternatives / Structural Inversion
+
+docs/superpowers/analysis/2026-08-18-r10-t6-external-evidence-docket.md
+  → primary/current evidence + claim boundaries
+
+docs/superpowers/analysis/2026-08-18-r10-t6-global-maximum-adjudication-packet.md
+  → corrected, more-specific material dispositions for operator decision
 ```
 
-The operator explicitly closed the checkpoint on 2026-08-18. Completed Fable staging was removed from the live tree; Git history remains the archive. No formal T1→T5 reopen occurred.
+When the adjudication packet is more specific than the base candidate, it is the proposed disposition. Neither staging artifact is authority before operator ratification.
 
-## 5. T6 — Canonical API / Frontend Journeys — ACTIVE
+## 5. T6 Global-Maximum headline
 
-Bootstrap:
-
-`docs/superpowers/analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-bootstrap.md`
-
-Material candidate:
-
-`docs/superpowers/analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-candidate.md`
-
-Candidate status:
+Candidate architecture deliberately rejects legacy module preservation.
 
 ```text
-T6-A→T6-R = PROPOSED / NON-AUTHORITATIVE
-operator material adjudication = NEXT
+pre-launch /api/v1 is rebuilt from current semantics; no /api/v2 compatibility layer
+OpenAPI contract-first + generated Go/TS wire boundaries
+Keycloak Authorization Code → MetalDocs ApplicationSession; no local credential API
+session-bound CSRF for unsafe browser requests
+semantic-lens frontend: Library / My Work / exact Governance case / History / Audit / Admin
+one DRAFT ETag/If-Match OCC token covers Revision title + WorkingContent
+T4-bound upload_id OPEN→READY→OCC attach; client never owns ExactContentDescriptor
+reviewer reads exact immutable Submission; no reviewer WorkingContent editing
+semantic byte routes hide provider/storage identity
+DOCX provider chosen by representative fidelity gate; no dual provider; no EditorSession baseline
+numbering = closed TYPE | TYPE_AREA, fixed '-', minimum 3-digit sequence; no custom grammar
+Search materialization/search_refresh = OFF for Launch
+Domain history != Audit
+RFC9457 errors with one canonical MetalDocs problem code authority
+natural HTTP idempotency first; Idempotency-Key only where non-idempotent POST retry could duplicate semantic facts
+cursor default20/max100 for unbounded lists
+blank/template/revise seeds use exact source semantics; never OfficialRendition as editable source
 ```
 
-The candidate is intentionally greenfield. It may delete/rewrite every current route, module, screen, DTO, capability or editor-session shape when current authority does not justify it.
-
-T6 consumes only the current Registry REOPEN set:
-
-```text
-numbering configuration grammar and preview UX
-admin journeys for current Organization/AuthZ/config
-source upload / T4 admission UX
-editor/viewer provider behavior
-in-product inspection vs exact-source download
-public idempotency/error contracts
-search/read/history/audit workspaces
-exact Search field/ranking UX + prove whether any derived/expensive fact activates materialized Search seam
-EditorSession/UX lease only if a real editor-integration consumer requires it
-```
-
-The post-Fable retitle observation is also resolved by the candidate through the existing WorkingContent generation/OCC mechanism; it remains non-authoritative until adjudicated.
-
-### T6 hard boundaries
+## 6. T6 hard boundaries
 
 T6 may not casually reopen:
 
 ```text
 Document/Revision/WorkingContent/Submission meaning
+Revision-owned title
 Release/effectivity
 T3 Authorization/Audit authority
 T4 exact-content/admission authority
 viewer/preview vs OfficialRendition distinction
-Search authority boundary
-canonical Search baseline / conditional materialization law
+Search authority boundary + canonical-query baseline
 no-notification/event-platform baseline
+historical migration/cutover execution
 ```
 
-T6 does not own Historical Migration execution.
-
-## 6. Current gate
+## 7. Current gate
 
 ```text
-read candidate T6-A→T6-R
-→ operator adjudicates material decisions
-→ corrected candidate/adjudication record if needed
+operator adjudicates corrected T6 material slate
+→ correct only rejected/refined items if needed
 → platform-facing T6 summary
 → explicit operator summary ratification
-→ promote durable T6 conclusions
+→ promote durable T6 authority
 → update Decision Registry
 → remove completed T6 staging
 → only then open T7
 ```
 
-A technical-decision approval alone does not open T7.
-
-## 7. T7 — NOT OPEN
-
-T7 remains Historical Migration & Cutover and consumes only its Registry REOPEN set, including restore/erasure/post-snapshot security-teardown reconciliation choreography.
+A material-decision approval alone does not open T7.
 
 ## 8. Final gate
 
 After T7:
 
 ```text
-Integrated Whole-R10 GCR
+Integrated Whole-R10 Global Coherence Review
 → cold independent final review
 → operator final ratification
 → implementation spec/plan
