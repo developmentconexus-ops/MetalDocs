@@ -18,8 +18,9 @@
 - `rebaseline-decision-registry.md` — prior-decision disposition baseline.
 - `rebaseline-decision-registry-d4-amendment.md` — D4 reconciliation.
 - `rebaseline-decision-registry-t6-amendment.md` — T6 closure reconciliation.
-- `rebaseline-decision-registry-post-t6-amendment.md` — **operator-ratified post-T6 stage-ownership reconciliation.**
-- `r10-post-t6-implementation-readiness-program.md` — **active post-T6 program authority; T7→T12 decomposition.**
+- `rebaseline-decision-registry-post-t6-amendment.md` — operator-ratified post-T6 stage-ownership reconciliation.
+- `r10-post-t6-implementation-readiness-program.md` — operator-ratified T7→T12 program authority.
+- `r10-technical-realization-reconciliation-baseline.md` — **operator-ratified technical census/routing baseline.**
 - `r10-technical-architecture.md` — sole current stage/status/next-action router.
 - `../references/current-agent-handoff.md` — fresh-session recovery point.
 
@@ -30,25 +31,31 @@ Product Contract / GCR / ownership       APPROVED
 T1→T6                                    CLOSED / OPERATOR-RATIFIED
 Decision Registry                        CURRENT + D4 + T6 + post-T6 amendments
 Post-T6 Stage-Decomposition GCR          RESTRUCTURE NOW / OPERATOR-RATIFIED
-TRRB                                     STAGED / OPERATOR REVIEW NEXT
-T7→T12                                   NOT OPEN
+TRRB                                     CLOSED / OPERATOR-RATIFIED / PROMOTED
+T7                                       ACTIVE / SOURCE EVIDENCE CENSUS NEXT
+T8→T12                                   NOT OPEN
 implementation                           BLOCKED
 ```
 
-## Current operator review target
+## Active T7 staging
 
-`../../docs/superpowers/analysis/2026-08-19-r10-technical-realization-reconciliation-baseline.md`
+`../../docs/superpowers/analysis/2026-08-19-r10-t7-historical-migration-truth-semantic-mapping-bootstrap.md`
 
-The Technical Realization Reconciliation Baseline is a census, not target design. It classifies current evidence as:
+T7 owns only historical/source truth and semantic mapping:
 
 ```text
-CURRENT-PROVEN
-LAST-REPRODUCED
-STALE / SUPERSEDED
-UNKNOWN / REMEASURE
+actual source evidence census
+PROVEN / INFERABLE WITH EXPLICIT RULE / UNKNOWN
+smallest justified migration-mode set
+imported target-owned facts vs provenance-only evidence
+source document/revision identity and ordinal quality
+exact-content provenance quality
+actor/owner/governance provenance quality
+semantic migration unit
+truthful representation of partial/ambiguous/unknown history
 ```
 
-Its purpose is to prove that backend/package, persistence, API wire, frontend, runtime/deploy, proof and transition decisions have explicit future owners before implementation.
+Concrete target realization and cutover implementation remain outside T7.
 
 ## Corrected post-T6 descent
 
