@@ -1,7 +1,7 @@
 # Current Agent Handoff
 
 > **Last verified:** 2026-08-19  
-> **Status:** ACTIVE — **T1→T6 CLOSED / OPERATOR-RATIFIED; POST-T6 PROGRAM RESTRUCTURED; TRRB OPERATOR-RATIFIED; T7 ACTIVE / NO-HISTORICAL-BUSINESS-MIGRATION CANDIDATE / OPERATOR SUMMARY RATIFICATION NEXT; T8→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1→T7 CLOSED / OPERATOR-RATIFIED; T8-A ACTIVE / CURRENT TECHNICAL CENSUS + REMEASUREMENT NEXT; T8-B→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
 
 ## Fresh-session route
@@ -12,14 +12,13 @@ Read in this order:
 2. `docs/engineering/standards/root-cause-global-maximum-method.md`
 3. this file
 4. Product Contract REV001 + Whole-Product GCR + 4+1 ownership
-5. T1→T6 durable authorities
-6. Decision Registry + D4/T6/post-T6 amendments
+5. T1→T7 durable authorities
+6. Decision Registry + D4/T6/post-T6/T7 amendments
 7. `wiki/architecture/r10-post-t6-implementation-readiness-program.md`
 8. `wiki/architecture/r10-technical-realization-reconciliation-baseline.md`
 9. `wiki/architecture/r10-technical-architecture.md`
-10. `docs/superpowers/analysis/2026-08-19-r10-t7-source-corpus-operator-clarification.md`
-11. `docs/superpowers/analysis/2026-08-19-r10-t7-no-historical-business-migration-candidate.md`
-12. `docs/superpowers/analysis/2026-08-19-r10-t7-platform-facing-summary.md`
+10. `docs/superpowers/analysis/2026-08-19-r10-t8a-technical-authority-legacy-census-bootstrap.md`
+11. current source/schema/OpenAPI/frontend/deploy/test evidence for a concrete T8-A claim
 
 Do not route target design through superseded/historical architecture or current package/module existence.
 
@@ -28,13 +27,19 @@ Do not route target design through superseded/historical architecture or current
 ```text
 Product Contract                         REV001 / OPERATOR-APPROVED
 Whole-Product GCR / 4+1 ownership       CLOSED / OPERATOR-APPROVED
-T1→T6                                    CLOSED / OPERATOR-RATIFIED
-Decision Registry                        CURRENT + D4 + T6 + post-T6 amendments
+T1→T7                                    CLOSED / OPERATOR-RATIFIED
+Decision Registry                        CURRENT + D4 + T6 + post-T6 + T7 amendments
 Post-T6 Stage-Decomposition GCR          RESTRUCTURE NOW / OPERATOR-RATIFIED
 TRRB                                     CLOSED / OPERATOR-RATIFIED / PROMOTED
 
-T7                                       ACTIVE / NO-MIGRATION CANDIDATE / OPERATOR SUMMARY RATIFICATION NEXT
-T8                                       NOT OPEN
+T8-A                                     ACTIVE / CURRENT TECHNICAL CENSUS + REMEASUREMENT NEXT
+T8-B                                     NOT OPEN
+T8-C                                     NOT OPEN
+T8-D                                     NOT OPEN
+T8-E                                     NOT OPEN
+T8-F                                     NOT OPEN
+T8-G                                     NOT OPEN
+T8-H                                     NOT OPEN
 T9                                       NOT OPEN
 T10                                      NOT OPEN
 T11                                      NOT OPEN
@@ -46,61 +51,100 @@ implementation                           BLOCKED
 
 > **No Writer task may contain a material architecture decision that should have been decided before execution.**
 
-## T7 binding facts
+## T7 — CLOSED
 
-The operator explicitly established:
+Durable authority:
 
-```text
-all current MetalDocs product data/history is DEV / TEST / THROWAWAY
-there is no real business history currently in MetalDocs
-Launch does not require pre-existing business documents to be imported
-```
+`wiki/architecture/r10-t7-historical-migration-truth-semantic-mapping.md`
 
-Therefore:
+Registry amendment:
 
-```text
-CURRENT METALDOCS AS BUSINESS SOURCE = EXCLUDED
-EXTERNAL BUSINESS CORPUS REQUIRED    = NO
-HISTORICAL BUSINESS MIGRATION        = NOT REQUIRED
-```
+`wiki/architecture/rebaseline-decision-registry-t7-amendment.md`
 
-Current MetalDocs schema/code/data may be inspected later only as technical legacy evidence for T8/T10.
-
-## T7 candidate
-
-`docs/superpowers/analysis/2026-08-19-r10-t7-no-historical-business-migration-candidate.md`
-
-Global Maximum candidate:
+Ratified:
 
 ```text
 NO HISTORICAL BUSINESS MIGRATION REQUIRED FOR LAUNCH
 ```
 
-Rejected:
+Binding facts:
 
 ```text
-build dormant generic import/ETL capability
-preserve/import DEV/test MetalDocs history
-fabricate historical approvals/releases/actors/timestamps
+current MetalDocs DB/content/history = DEV / TEST / THROWAWAY
+current MetalDocs business history   = NONE
+Launch pre-existing corpus import    = NO
 ```
 
-T10 remains required for technical current→target transition, DEV/test-state disposal/reset, deployment cutover/readiness/rollback and the legacy technical deletion map.
-
-## Current operator ratification target
-
-`docs/superpowers/analysis/2026-08-19-r10-t7-platform-facing-summary.md`
-
-Exact next action:
+Consequences:
 
 ```text
-operator ratifies/rejects platform-facing T7 summary
-→ if ratified: promote T7 durable authority to wiki/
-→ reconcile Decision Registry
-→ remove completed T7 staging
-→ mark T7 CLOSED
-→ only then open T8-A Technical Authority / Legacy Census
+no DEV/test state becomes business history
+no generic import/ETL framework in Launch
+no historical approval/release/actor/time reconstruction
+T1 future imported-provenance seam stays dormant
+T10 still owns technical current→target transition and DEV/test disposal/reset
 ```
 
-Do not open T8, write implementation plans or product code before T7 promotion/cleanup.
+Completed T7 staging is removed from the live tree; Git history preserves the ratified source artifacts.
+
+## T8-A — ACTIVE
+
+Active bootstrap:
+
+`docs/superpowers/analysis/2026-08-19-r10-t8a-technical-authority-legacy-census-bootstrap.md`
+
+T8-A is a technical evidence/disposition stage, not target realization design.
+
+Disposition vocabulary:
+
+```text
+PRESERVE
+REFINE
+REHOME
+REWRITE
+DELETE
+CURRENT-STATE ONLY
+SUPERSEDED
+```
+
+Evidence vocabulary:
+
+```text
+CURRENT-PROVEN
+LAST-REPRODUCED
+STALE / SUPERSEDED
+UNKNOWN / REMEASURE
+```
+
+### First work
+
+Inspect and remeasure load-bearing current technical surfaces:
+
+```text
+backend packages/modules/import graph/composition
+DB schema/SQL/table ownership/cross-owner access
+OpenAPI/codegen/runtime conformance
+frontend routes/features/query/cache/state
+async/jobs/rendering
+binaries/deploy/config/trust/observability/recovery
+verification/tests/CI/architecture guards
+technical documentation/ADR authority
+```
+
+For each material structure, identify which ratified target property it serves, then disposition it. Existing code receives no survival entitlement from existence or sunk cost.
+
+## Exact next action
+
+```text
+fresh technical census
+→ remeasure load-bearing stale audit metrics
+→ disposition material current structures
+→ reconcile technical-document authority
+→ identify material unknowns/disagreements
+→ T8-A disposition candidate
+→ operator adjudication/summary ratification
+```
+
+Do not choose final package topology, target DB, exact OpenAPI, frontend topology or runtime process topology inside T8-A; those belong to T8-B→T8-G.
 
 Implementation remains **BLOCKED**.
