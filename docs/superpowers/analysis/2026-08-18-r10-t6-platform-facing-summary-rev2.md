@@ -1,6 +1,6 @@
 # R10-T6 — Canonical API / Frontend Journeys — Platform-Facing Summary REV2
 
-> **Status:** ACTIVE STAGING / NON-AUTHORITATIVE — **D1→D4 INCORPORATED / EXACT DELTA REVIEW NEXT**  
+> **Status:** ACTIVE STAGING / NON-AUTHORITATIVE — **EXACT D1→D4 DELTA APPROVE / OPERATOR SUMMARY RATIFICATION NEXT**  
 > **Date:** 2026-08-18  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
@@ -9,12 +9,13 @@
 > **T6 material core:** OPERATOR-APPROVED  
 > **C1→C8:** OPERATOR-APPROVED / INCORPORATED  
 > **D1→D4:** OPERATOR-APPROVED / INCORPORATED  
+> **Exact D1→D4 delta:** APPROVE / NEW MATERIAL FINDINGS 0  
 > **Implementation:** BLOCKED  
 > **T7:** NOT OPEN
 
 This is the consolidated implementation-facing T6 platform model after the pre-ratification Global Coherence Review and the bounded D1→D4 delta. It is deliberately independent of the current MetalDocs implementation shape.
 
-It is **not yet durable authority**. The exact D1→D4 delta must close cleanly and the operator must then explicitly ratify this summary before T6 promotion.
+The exact D1→D4 delta closed with `APPROVE` and zero new material findings. This summary is therefore the current **operator ratification target**, but it remains staging/non-authoritative until the operator explicitly ratifies it.
 
 Authority for this summary is:
 
@@ -1635,10 +1636,11 @@ future seams attach without duplicate current authority
 ```text
 T6 material core                 OPERATOR-APPROVED
 C1→C8                            CLOSED / INCORPORATED
-D1→D4                            OPERATOR-APPROVED / INCORPORATED
+D1→D4                            CLOSED / OPERATOR-APPROVED / INCORPORATED
 T3 D4 bounded amendment          OPERATOR-RATIFIED
 Registry D4 reconciliation       ACTIVE
-this Platform Summary REV2       EXACT D1→D4 DELTA REVIEW NEXT
+exact D1→D4 delta                APPROVE / NEW MATERIAL FINDINGS 0
+this Platform Summary REV2       OPERATOR RATIFICATION NEXT
 T6 durable promotion             NOT YET
 T7                               NOT OPEN
 implementation                    BLOCKED
@@ -1647,9 +1649,8 @@ implementation                    BLOCKED
 Next:
 
 ```text
-exact D1→D4 bounded delta review
-→ if clean: explicit operator ratification of this Platform Summary REV2
-→ only after ratification: durable T6 promotion / Registry stage reconciliation / staging cleanup
+explicit operator ratification of this Platform Summary REV2
+→ only after ratification: durable T6 promotion / Registry T6 closure reconciliation / staging cleanup
 → only then open T7
 ```
 
