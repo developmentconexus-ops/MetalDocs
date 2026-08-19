@@ -1,9 +1,9 @@
 # `docs/superpowers` — Active Design Staging Only
 
 > **Status:** Active staging workspace for the MetalDocs rebaselined R10 technical design.  
-> **Current gate:** **T6 MATERIAL DECISIONS OPERATOR-APPROVED; PLATFORM-FACING SUMMARY RATIFICATION NEXT; T7 NOT OPEN; IMPLEMENTATION BLOCKED.**
+> **Current gate:** **T6 PRE-RATIFICATION GCR FOUND BOUNDED CORRECTIONS; SUMMARY RATIFICATION HELD; T7 NOT OPEN; IMPLEMENTATION BLOCKED.**
 
-Durable accepted truth belongs in `wiki/`. Active not-yet-promoted design/evidence belongs here. Completed staging is removed and Git history is the archive.
+Durable accepted truth belongs in `wiki/`. Active not-yet-promoted design/review evidence belongs here. Completed staging is removed and Git history is the archive.
 
 ## Durable authority
 
@@ -29,37 +29,37 @@ Decision provenance:
 - `analysis/2026-08-18-r10-t6-external-evidence-docket.md`
 - `analysis/2026-08-18-r10-t6-global-maximum-adjudication-packet.md`
 - `analysis/2026-08-18-r10-t6-final-adjudication-refinements.md`
+- `analysis/2026-08-18-r10-t6-operator-material-adjudication.md`
+- `analysis/2026-08-18-r10-t6-platform-facing-summary.md` — summary under review, **not ratifiable yet**.
+- `analysis/2026-08-18-r10-t6-pre-ratification-global-coherence-review.md` — **ACTIVE / C1→C8 OPERATOR ADJUDICATION NEXT.**
 
-Current gate artifacts:
-
-- `analysis/2026-08-18-r10-t6-operator-material-adjudication.md` — **MATERIAL DECISIONS OPERATOR-APPROVED.**
-- `analysis/2026-08-18-r10-t6-platform-facing-summary.md` — **OPERATOR SUMMARY RATIFICATION NEXT.**
-
-The material adjudication does not yet make T6 durable authority. Promotion waits for explicit summary ratification.
-
-## T6 greenfield law
+## Review outcome
 
 ```text
-Product Contract REV001 + T1→T5
-→ Structural Inversion
-→ smallest sustainable API/UX
+T1→T5 / 4+1 core coherence      PASS
+T6 Global-Maximum direction     PASS
+formal T1→T5 reopen             NONE
+T6 platform summary             HELD for bounded corrections
 ```
 
-Current routes/modules/screens/DTOs are evidence only. Do not preserve a legacy surface because migration is easier.
+Required C1→C8 and low refinements are owned by the review artifact. Everything not named there remains frozen.
 
 ## Current path
 
 ```text
-T1→T5                        CLOSED / OPERATOR-RATIFIED
-Post-T5 Fable                CLOSED / OPERATOR-APPROVED
-Decision Registry            CURRENT / RECONCILED
-T6 material decisions        OPERATOR-APPROVED
-T6 platform-facing summary   STAGED / RATIFICATION NEXT
-T6 durable authority         NOT YET
-T7                           NOT OPEN
-implementation               BLOCKED
+T1→T5                       CLOSED / OPERATOR-RATIFIED
+Post-T5 Fable               CLOSED / OPERATOR-APPROVED
+Decision Registry           CURRENT / RECONCILED
+T6 material core            OPERATOR-APPROVED / PRESERVED
+T6 pre-ratification GCR     COMPLETE
+T6 corrections C1→C8       OPERATOR ADJUDICATION NEXT
+T6 summary ratification     HELD
+T7                          NOT OPEN
+implementation              BLOCKED
 
-→ operator ratifies platform-facing T6 summary
+→ operator adjudicates C1→C8
+→ corrected T6 summary + bounded coherence delta
+→ explicit operator summary ratification
 → durable T6 promotion + Registry update + staging cleanup
 → only then T7
 → Whole-R10 GCR
