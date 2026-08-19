@@ -1,6 +1,6 @@
 # R10 Technical Architecture — Active Stage Router
 
-> **Status:** ACTIVE — **T1→T6 CLOSED / OPERATOR-RATIFIED; POST-T6 PROGRAM RESTRUCTURED; TRRB OPERATOR REVIEW NEXT; T7→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1→T6 CLOSED / OPERATOR-RATIFIED; POST-T6 PROGRAM RESTRUCTURED; TRRB OPERATOR-RATIFIED; T7 ACTIVE / SOURCE EVIDENCE CENSUS NEXT; T8→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-19  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
@@ -29,9 +29,10 @@ Read in order:
 16. `wiki/architecture/rebaseline-decision-registry-t6-amendment.md`
 17. `wiki/architecture/rebaseline-decision-registry-post-t6-amendment.md`
 18. `wiki/architecture/r10-post-t6-implementation-readiness-program.md`
-19. this router
-20. `docs/superpowers/analysis/2026-08-19-r10-technical-realization-reconciliation-baseline.md`
-21. current code/schema/API/frontend/runtime evidence only for a concrete census/design claim
+19. `wiki/architecture/r10-technical-realization-reconciliation-baseline.md`
+20. this router
+21. `docs/superpowers/analysis/2026-08-19-r10-t7-historical-migration-truth-semantic-mapping-bootstrap.md`
+22. actual source-system/runtime/data evidence only for a concrete T7 claim
 
 Legacy implementation and legacy technical design documents are evidence only unless the active R10 authority explicitly promotes their meaning.
 
@@ -67,9 +68,9 @@ T6 — Canonical API / Frontend Journeys           CLOSED / OPERATOR-RATIFIED / 
 Decision Registry                                CURRENT + D4 + T6 + post-T6 amendments
 
 Post-T6 Stage-Decomposition GCR                  RESTRUCTURE NOW / OPERATOR-RATIFIED
-Technical Realization Reconciliation Baseline   STAGED / OPERATOR REVIEW NEXT
+Technical Realization Reconciliation Baseline   CLOSED / OPERATOR-RATIFIED / PROMOTED
 
-T7 — Historical Migration Truth & Mapping        NOT OPEN
+T7 — Historical Migration Truth & Mapping        ACTIVE / SOURCE EVIDENCE CENSUS NEXT
 T8 — Technical Realization Architecture          NOT OPEN
 T9 — Golden Flows & Validation Baseline          NOT OPEN
 T10 — Transition / Refactor / Migration/Cutover  NOT OPEN
@@ -97,7 +98,7 @@ Method outcome:
 RESTRUCTURE NOW
 ```
 
-Operator ratified the corrected program on 2026-08-19.
+Operator ratified the corrected program on 2026-08-19. T1→T6 remain preserved.
 
 Durable program authority:
 
@@ -107,15 +108,15 @@ Registry stage-ownership reconciliation:
 
 `wiki/architecture/rebaseline-decision-registry-post-t6-amendment.md`
 
-T1→T6 remain preserved. The restructure changes the descent after T6, not their accepted meaning.
+## 5. TRRB closure
 
-## 5. Current gate — TRRB
+Durable TRRB authority:
 
-Current staging/evidence target:
+`wiki/architecture/r10-technical-realization-reconciliation-baseline.md`
 
-`docs/superpowers/analysis/2026-08-19-r10-technical-realization-reconciliation-baseline.md`
+The operator ratified the census/coverage/routing baseline. It does **not** choose target packages, tables, wire schemas, frontend topology, runtime topology, transition implementation or execution sequence.
 
-The TRRB is a **census**, not a target architecture. It classifies current evidence as:
+Ratified evidence classes remain:
 
 ```text
 CURRENT-PROVEN
@@ -124,36 +125,48 @@ STALE / SUPERSEDED
 UNKNOWN / REMEASURE
 ```
 
-It covers:
+Old exact audit metrics remain `LAST-REPRODUCED` until a later stage remeasures them when load-bearing.
+
+Completed TRRB staging is removed from the live tree; Git history is provenance.
+
+## 6. T7 — ACTIVE
+
+Active bootstrap:
+
+`docs/superpowers/analysis/2026-08-19-r10-t7-historical-migration-truth-semantic-mapping-bootstrap.md`
+
+T7 owns only:
 
 ```text
-repository/runtime topology
-backend modules/packages/import graph
-persistence/table/SQL ownership
-API/OpenAPI/codegen
-frontend topology
-async/jobs/rendering
-runtime/deploy/operations
-verification/tests/CI
-technical-document authority drift
-future-stage decision ownership
+actual legacy/source evidence census
+PROVEN / INFERABLE WITH EXPLICIT RULE / UNKNOWN
+smallest justified migration-mode set
+imported target-owned facts vs provenance-only evidence
+source document/revision identity quality
+revision/ordinal mapping
+exact-content provenance quality
+actor/owner/governance provenance quality
+semantic migration unit
+truthful handling of partial/ambiguous/unknown history
 ```
 
-Exact next action:
+T7 explicitly does **not** own backend/package realization, target relational schema, exact executable OpenAPI, frontend realization, runtime/deploy realization, concrete migration tooling, dry-run/reconciliation implementation, production cutover, rollback, deletion or restore choreography. Those belong to T8/T10 as routed by the post-T6 program and Registry amendment.
+
+### Exact next action
 
 ```text
-operator reviews/adjudicates TRRB coverage + evidence classifications
-→ correct any material census gap/misclassification
-→ complete technical-document authority reconciliation
-→ only then open redefined T7
+actual source evidence census
+→ classify each material source claim PROVEN / INFERABLE / UNKNOWN
+→ identify only material unknowns
+→ only then compare 2–3 migration-truth approaches
+→ T7 candidate/design
 ```
 
-Do **not** perform substantive T7 design before this gate closes.
+No migration script, target schema, package topology or product code is authorized in T7.
 
-## 6. Future stage boundaries
+## 7. Future stage boundaries
 
 ```text
-T7  = source truth + semantic historical mapping only
 T8  = backend/package/internal contracts/persistence/wire/frontend/runtime realization
 T9  = Golden Flows + falsifiable Validation Baseline
 T10 = current→target refactor/data/API/frontend/runtime migration + cutover/rollback
@@ -163,7 +176,7 @@ T12 = fresh adversarial implementation-readiness challenge
 
 Detailed subgates and reopen laws belong to the post-T6 program authority.
 
-## 7. Final implementation gate
+## 8. Final implementation gate
 
 Implementation remains blocked until:
 
