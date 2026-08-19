@@ -1,6 +1,6 @@
 # R10 Technical Architecture — Active Stage Router
 
-> **Status:** ACTIVE — **PRODUCT CONTRACT REV001 + T1→T5 OPERATOR-RATIFIED; POST-T5 FABLE CHECKPOINT CLOSED; T6 CORRECTED GLOBAL-MAXIMUM ADJUDICATION READY; OPERATOR MATERIAL ADJUDICATION NEXT; T7 NOT OPEN; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **PRODUCT CONTRACT REV001 + T1→T5 OPERATOR-RATIFIED; POST-T5 FABLE CHECKPOINT CLOSED; T6 FINAL GLOBAL-MAXIMUM ADJUDICATION READY; OPERATOR MATERIAL ADJUDICATION NEXT; T7 NOT OPEN; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-18  
 > **Revision convention:** `REV000` initial issuance / `REV001` first revision  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
@@ -28,7 +28,8 @@ This file owns current technical-stage status and exact next action.
 15. T6 material candidate
 16. T6 evidence docket
 17. T6 corrected adjudication packet
-18. current API/frontend/runtime only as claim-specific evidence
+18. T6 final adjudication refinements
+19. current API/frontend/runtime only as claim-specific evidence
 
 Current implementation has **no compatibility entitlement**. Structural Inversion controls T6.
 
@@ -57,12 +58,12 @@ T4 — Exact Content, Storage Integrity & Restore       CLOSED / OPERATOR-RATIFI
 T5 — Durable Async, Search & External Effects         CLOSED / OPERATOR-RATIFIED
 Decision Registry                                      CURRENT / OPERATOR-RATIFIED
 Post-T5 integrated Fable checkpoint                   CLOSED / OPERATOR-APPROVED
-T6 — Canonical API / Frontend Journeys                ACTIVE / CORRECTED ADJUDICATION READY
+T6 — Canonical API / Frontend Journeys                ACTIVE / FINAL ADJUDICATION READY
 T7 — Historical Migration & Cutover                   NOT OPEN
 implementation                                         BLOCKED
 ```
 
-## 4. T6 active staging
+## 4. T6 active staging and precedence
 
 ```text
 docs/superpowers/analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-bootstrap.md
@@ -75,31 +76,44 @@ docs/superpowers/analysis/2026-08-18-r10-t6-external-evidence-docket.md
   → primary/current evidence + claim boundaries
 
 docs/superpowers/analysis/2026-08-18-r10-t6-global-maximum-adjudication-packet.md
-  → corrected, more-specific material dispositions for operator decision
+  → corrected, more-specific material dispositions
+
+docs/superpowers/analysis/2026-08-18-r10-t6-final-adjudication-refinements.md
+  → FR-1..FR-4 final precedence where named
 ```
 
-When the adjudication packet is more specific than the base candidate, it is the proposed disposition. Neither staging artifact is authority before operator ratification.
+Operator adjudication precedence:
+
+```text
+base candidate
+→ corrected adjudication packet
+→ final refinements FR-1..FR-4
+```
+
+All are staging/evidence until operator ratification.
 
 ## 5. T6 Global-Maximum headline
 
-Candidate architecture deliberately rejects legacy module preservation.
-
 ```text
-pre-launch /api/v1 is rebuilt from current semantics; no /api/v2 compatibility layer
+pre-launch /api/v1 rebuilt from current semantics; no /api/v2 compatibility layer
 OpenAPI contract-first + generated Go/TS wire boundaries
 Keycloak Authorization Code → MetalDocs ApplicationSession; no local credential API
 session-bound CSRF for unsafe browser requests
 semantic-lens frontend: Library / My Work / exact Governance case / History / Audit / Admin
 one DRAFT ETag/If-Match OCC token covers Revision title + WorkingContent
+DRAFT mutation = explicit PATCH + If-Match; stale = 412
 T4-bound upload_id OPEN→READY→OCC attach; client never owns ExactContentDescriptor
 reviewer reads exact immutable Submission; no reviewer WorkingContent editing
+User eligibility = singleton PUT current state; offboarding semantics remain T3
+Governance Step Decision = singleton immutable PUT; no replay row needed
 semantic byte routes hide provider/storage identity
 DOCX provider chosen by representative fidelity gate; no dual provider; no EditorSession baseline
 numbering = closed TYPE | TYPE_AREA, fixed '-', minimum 3-digit sequence; no custom grammar
 Search materialization/search_refresh = OFF for Launch
 Domain history != Audit
 RFC9457 errors with one canonical MetalDocs problem code authority
-natural HTTP idempotency first; Idempotency-Key only where non-idempotent POST retry could duplicate semantic facts
+natural HTTP idempotency first; Idempotency-Key only where POST retry can truly duplicate a semantic fact
+Idempotency replay retention is bounded operational policy; 24h is implementation-default candidate, not architecture invariant
 cursor default20/max100 for unbounded lists
 blank/template/revise seeds use exact source semantics; never OfficialRendition as editable source
 ```
@@ -123,7 +137,7 @@ historical migration/cutover execution
 ## 7. Current gate
 
 ```text
-operator adjudicates corrected T6 material slate
+operator adjudicates final T6 material slate
 → correct only rejected/refined items if needed
 → platform-facing T6 summary
 → explicit operator summary ratification
