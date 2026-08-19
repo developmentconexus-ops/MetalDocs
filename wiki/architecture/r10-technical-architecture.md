@@ -1,13 +1,15 @@
 # R10 Technical Architecture — Active Stage Router
 
-> **Status:** ACTIVE — **T1→T6 CLOSED / OPERATOR-RATIFIED; T7 ACTIVE / EVIDENCE CENSUS NEXT; IMPLEMENTATION BLOCKED**  
-> **Rebaselined:** 2026-08-18  
+> **Status:** ACTIVE — **T1→T6 CLOSED / OPERATOR-RATIFIED; POST-T6 PROGRAM RESTRUCTURED; TRRB OPERATOR REVIEW NEXT; T7→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
+> **Rebaselined:** 2026-08-19  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
 
-This file owns current technical-stage status and exact next action.
+This file is the sole R10 stage/status/next-action router. Detailed meaning lives in the durable authorities it routes to.
 
 ## 1. Binding authority chain
+
+Read in order:
 
 1. `AGENTS.md`
 2. `docs/engineering/standards/root-cause-global-maximum-method.md`
@@ -25,11 +27,12 @@ This file owns current technical-stage status and exact next action.
 14. `wiki/architecture/rebaseline-decision-registry.md`
 15. `wiki/architecture/rebaseline-decision-registry-d4-amendment.md`
 16. `wiki/architecture/rebaseline-decision-registry-t6-amendment.md`
-17. this router
-18. `docs/superpowers/analysis/2026-08-18-r10-t7-historical-migration-cutover-bootstrap.md`
-19. actual source-system evidence only where needed for T7
+17. `wiki/architecture/r10-post-t6-implementation-readiness-program.md`
+18. this router
+19. `docs/superpowers/analysis/2026-08-19-r10-technical-realization-reconciliation-baseline.md`
+20. current code/schema/API/frontend/runtime evidence only for a concrete census/design claim
 
-Current/legacy implementation is evidence only and has no compatibility entitlement.
+Legacy implementation and legacy technical design documents are evidence only unless the active R10 authority explicitly promotes their meaning.
 
 ## 2. Binding Method laws
 
@@ -39,108 +42,131 @@ one semantic authority per meaning
 mechanism != authority
 proof before implementation
 Structural Inversion
+unknown remains unknown
 revalidation does not mean reinvention
 prepare the seam, not dormant future capability
 ```
 
-## 3. Technical descent
+Program-specific implementation law:
+
+> **No Writer task may contain a material architecture decision that should have been decided before execution.**
+
+## 3. Current descent
 
 ```text
-Product Contract                         REV001 / OPERATOR-APPROVED
-Whole-Product GCR A1→A10                 CLOSED / OPERATOR-APPROVED
-Launch ownership topology                CLOSED / OPERATOR-APPROVED / 4+1
-T1 — Semantic State & Invariants         CLOSED / OPERATOR-RATIFIED
-T2 — Governance/Effectivity/Tx           CLOSED / OPERATOR-RATIFIED
-T3 — Authorization & Audit               CLOSED / OPERATOR-RATIFIED + D4 amendment
-T4 — Exact Content/Storage/Restore       CLOSED / OPERATOR-RATIFIED
-T5 — Durable Async/Search/Effects        CLOSED / OPERATOR-RATIFIED
-T6 — Canonical API/Frontend Journeys     CLOSED / OPERATOR-RATIFIED / PROMOTED
-Decision Registry                        CURRENT + D4 + T6 amendments
-T7 — Historical Migration & Cutover      ACTIVE / EVIDENCE CENSUS NEXT
-implementation                           BLOCKED
+Product Contract REV001                          CLOSED / OPERATOR-APPROVED
+Whole-Product GCR A1→A10                         CLOSED / OPERATOR-APPROVED
+Launch ownership topology                        CLOSED / OPERATOR-APPROVED / 4+1
+T1 — Semantic State & Invariants                 CLOSED / OPERATOR-RATIFIED
+T2 — Governance / Effectivity / Tx               CLOSED / OPERATOR-RATIFIED
+T3 — Authorization & Audit                       CLOSED / OPERATOR-RATIFIED + D4 amendment
+T4 — Exact Content / Storage / Restore           CLOSED / OPERATOR-RATIFIED
+T5 — Durable Async / Search / Effects            CLOSED / OPERATOR-RATIFIED
+T6 — Canonical API / Frontend Journeys           CLOSED / OPERATOR-RATIFIED / PROMOTED
+Decision Registry                                CURRENT + D4 + T6 amendments
+
+Post-T6 Stage-Decomposition GCR                  RESTRUCTURE NOW / OPERATOR-RATIFIED
+Technical Realization Reconciliation Baseline   STAGED / OPERATOR REVIEW NEXT
+
+T7 — Historical Migration Truth & Mapping        NOT OPEN
+T8 — Technical Realization Architecture          NOT OPEN
+T9 — Golden Flows & Validation Baseline          NOT OPEN
+T10 — Transition / Refactor / Migration/Cutover  NOT OPEN
+T11 — Implementation Program & Execution Graph   NOT OPEN
+T12 — Adversarial Implementation-Readiness       NOT OPEN
+
+implementation                                    BLOCKED
 ```
 
-## 4. T6 closure
+## 4. Post-T6 Global Coherence finding
 
-Durable T6 authority:
+The previously accepted sequence from T7 directly to final review/implementation planning was challenged after T6 closure.
 
-`wiki/architecture/r10-t6-canonical-api-frontend-journeys.md`
-
-Registry reconciliation:
-
-`wiki/architecture/rebaseline-decision-registry-t6-amendment.md`
-
-Closure evidence:
+Finding:
 
 ```text
-Platform Summary REV2                    OPERATOR-RATIFIED
-C1→C8                                    CLOSED
-L1→L5                                    CLOSED
-D1→D4                                    CLOSED
-final exact delta                        APPROVE
-new material findings                    0
-disagreement set                         EMPTY
-completed T6 staging in live tree        REMOVED
-Git history                              archive/provenance
+semantic architecture T1→T6 = coherent
+physical technical realization = not yet completely designed
+old post-T6 sequence could delegate material realization choices to implementation planning
 ```
 
-T6 may reopen only through one of its durable authority reopen triggers or a later material cross-stage contradiction.
-
-## 5. T7 — ACTIVE
-
-Bootstrap:
-
-`docs/superpowers/analysis/2026-08-18-r10-t7-historical-migration-cutover-bootstrap.md`
-
-T7 owns only the remaining Registry REOPEN set:
+Method outcome:
 
 ```text
-actual source evidence census
-CURRENT_STATE / FULL_HISTORY or smaller real migration-mode set
-imported target-owned fact shapes
-ordinal/content/governance provenance
-plan / dry-run / idempotency / reconciliation
-semantic-unit atomicity
-cutover / readiness / rollback / deletion map
-concrete restore/erasure and post-snapshot security-teardown reconciliation choreography where cutover/recovery requires it
+RESTRUCTURE NOW
 ```
 
-### T7 inherited hard boundaries
+Operator ratified the corrected program on 2026-08-19.
+
+Durable program authority:
+
+`wiki/architecture/r10-post-t6-implementation-readiness-program.md`
+
+T1→T6 remain preserved. The restructure changes the descent after T6, not their accepted meaning.
+
+## 5. Current gate — TRRB
+
+Current staging/evidence target:
+
+`docs/superpowers/analysis/2026-08-19-r10-technical-realization-reconciliation-baseline.md`
+
+The TRRB is a **census**, not a target architecture. It classifies current evidence as:
 
 ```text
-imported history never becomes fake native history
-unknown stays unknown
-Historical Migration != generic Interchange domain
-migration writes through owning semantic seams
-T4 exact-content admission/integrity remains binding
-T3 current security/offboarding truth remains binding
-historical side effects are never replayed as new current effects
-migration convenience cannot redefine Document/Revision/Submission/Release
+CURRENT-PROVEN
+LAST-REPRODUCED
+STALE / SUPERSEDED
+UNKNOWN / REMEASURE
 ```
 
-### Exact next action
+It covers:
 
 ```text
-actual source evidence census
-→ classify PROVEN / INFERABLE / UNKNOWN
-→ only then derive 2–3 T7 approaches
-→ T7 candidate/design
-→ material adjudication
-→ platform-facing T7 summary
-→ explicit operator summary ratification
-→ durable promotion + Registry reconciliation + staging cleanup
+repository/runtime topology
+backend modules/packages/import graph
+persistence/table/SQL ownership
+API/OpenAPI/codegen
+frontend topology
+async/jobs/rendering
+runtime/deploy/operations
+verification/tests/CI
+technical-document authority drift
+future-stage decision ownership
 ```
 
-No substantive T7 design is accepted yet.
-
-## 6. Final R10 gate after T7
+Exact next action:
 
 ```text
-Integrated Whole-R10 Global Coherence Review
-→ cold independent final review
-→ operator final ratification
-→ implementation spec/plan
-→ code
+operator reviews/adjudicates TRRB coverage + evidence classifications
+→ correct any material census gap/misclassification
+→ complete technical-document authority reconciliation
+→ only then open redefined T7
 ```
 
-Implementation remains **BLOCKED**.
+Do **not** perform substantive T7 design before this gate closes.
+
+## 6. Future stage boundaries
+
+```text
+T7  = source truth + semantic historical mapping only
+T8  = backend/package/internal contracts/persistence/wire/frontend/runtime realization
+T9  = Golden Flows + falsifiable Validation Baseline
+T10 = current→target refactor/data/API/frontend/runtime migration + cutover/rollback
+T11 = bounded implementation Execution Graph; no hidden architecture decisions
+T12 = fresh adversarial implementation-readiness challenge
+```
+
+Detailed subgates and reopen laws belong to the post-T6 program authority.
+
+## 7. Final implementation gate
+
+Implementation remains blocked until:
+
+```text
+T7→T12 CLOSED / OPERATOR-RATIFIED
+→ Integrated Whole-R10 Global Coherence Review PASS
+→ fresh independent/cold review converged
+→ operator explicitly authorizes implementation
+```
+
+Existing runtime safety controls remain binding until deliberately replaced by accepted target realization.
