@@ -1,6 +1,6 @@
 # `docs/superpowers` — Active Design Staging Only
 
-> **Status:** **T1→T7 CLOSED / OPERATOR-RATIFIED; T8-A ACTIVE / CURRENT TECHNICAL CENSUS + REMEASUREMENT NEXT; IMPLEMENTATION BLOCKED.**
+> **Status:** **T1→T7 CLOSED / OPERATOR-RATIFIED; T8-A ACTIVE / TECHNICAL CENSUS + DISPOSITION ANALYSIS; IMPLEMENTATION BLOCKED.**
 
 Durable accepted truth belongs in `wiki/`. Active not-yet-promoted analysis/review belongs here. Completed/superseded staging is removed from the live tree; Git history is the archive.
 
@@ -25,9 +25,15 @@ NO HISTORICAL BUSINESS MIGRATION REQUIRED FOR LAUNCH
 
 Completed T7 staging has been removed after operator ratification and durable promotion.
 
-## Current active staging
+## Current active T8-A staging
 
-- `analysis/2026-08-19-r10-t8a-technical-authority-legacy-census-bootstrap.md` — **T8-A OPEN / CURRENT TECHNICAL CENSUS + REMEASUREMENT NEXT / NON-AUTHORITATIVE.**
+Read in order:
+
+1. `analysis/2026-08-19-r10-t8a-technical-authority-legacy-census-bootstrap.md` — stage scope/laws.
+2. `analysis/2026-08-19-r10-t8a-technical-census-disposition-matrix.md` — current evidence + preliminary PRESERVE/REFINE/REHOME/REWRITE/DELETE/CURRENT-STATE/SUPERSEDED matrix.
+3. `analysis/2026-08-19-r10-t8a-technical-document-authority-reconciliation.md` — legacy technical-document / ADR routing reconciliation candidate.
+
+All are **NON-AUTHORITATIVE until T8-A operator ratification + durable promotion**.
 
 ## Current state
 
@@ -35,7 +41,7 @@ Completed T7 staging has been removed after operator ratification and durable pr
 T1→T7                           CLOSED / OPERATOR-RATIFIED
 Post-T6 Stage-Decomposition GCR RESTRUCTURE NOW / OPERATOR-RATIFIED
 TRRB                            CLOSED / OPERATOR-RATIFIED / PROMOTED
-T8-A                            ACTIVE / CURRENT TECHNICAL CENSUS + REMEASUREMENT NEXT
+T8-A                            ACTIVE / TECHNICAL CENSUS + DISPOSITION ANALYSIS
 T8-B                            NOT OPEN
 T8-C                            NOT OPEN
 T8-D                            NOT OPEN
@@ -56,11 +62,24 @@ T8-A performs evidence-first technical disposition:
 
 ```text
 current technical census
-→ remeasure load-bearing stale metrics
+→ remeasure only stale metrics that are load-bearing to a material decision
+→ separate valuable property from legacy physical shape
 → map structures to ratified target properties
 → PRESERVE / REFINE / REHOME / REWRITE / DELETE / CURRENT-STATE ONLY / SUPERSEDED
+→ adversarially attack PRESERVE candidates
 → adjudicate material disagreements
-→ operator ratifies T8-A disposition summary
+→ platform-facing summary
+→ explicit operator ratification
+→ durable promotion + Registry reconciliation + staging cleanup
+```
+
+Binding Global Maximum posture:
+
+```text
+existing implementation = evidence only
+sunk cost / test count / migration convenience = no survival entitlement
+PRESERVE must be proved
+clean-slate rewrite is allowed whenever it is the smallest sustainable solution
 ```
 
 T8-A does **not** freeze final package topology, relational schema, exact OpenAPI, frontend topology or process/deployment topology. Those belong to T8-B→T8-G.
