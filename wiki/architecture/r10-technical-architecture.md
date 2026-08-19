@@ -1,6 +1,6 @@
 # R10 Technical Architecture — Active Stage Router
 
-> **Status:** ACTIVE — **T1→T7 CLOSED / OPERATOR-RATIFIED; T8-A ACTIVE / CURRENT TECHNICAL CENSUS + REMEASUREMENT NEXT; T8-B→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
+> **Status:** ACTIVE — **T1→T7 CLOSED / OPERATOR-RATIFIED; T8-A ACTIVE / DISPOSITION CANDIDATE / OPERATOR RATIFICATION NEXT; T8-B→T12 NOT OPEN; IMPLEMENTATION BLOCKED**  
 > **Rebaselined:** 2026-08-19  
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131
@@ -20,8 +20,8 @@ Read in order:
 7. `wiki/architecture/r10-post-t6-implementation-readiness-program.md`
 8. `wiki/architecture/r10-technical-realization-reconciliation-baseline.md`
 9. this router
-10. `docs/superpowers/analysis/2026-08-19-r10-t8a-technical-authority-legacy-census-bootstrap.md`
-11. current code/schema/API/frontend/runtime/deploy/test evidence for each concrete T8-A claim
+10. active T8-A staging listed in §5
+11. current code/schema/API/frontend/runtime/deploy/test evidence for a concrete T8-A claim
 
 Legacy implementation proves what exists, not what survives.
 
@@ -42,6 +42,16 @@ Program-specific implementation law:
 
 > **No Writer task may contain a material architecture decision that should have been decided before execution.**
 
+T8-A Global Maximum posture:
+
+```text
+existing implementation = evidence only
+sunk cost / test count / migration convenience = no survival entitlement
+PRESERVE must be proved
+REWRITE / REHOME / DELETE are valid outcomes
+full-greenfield reset is also not justified without evidence
+```
+
 ## 3. Current descent
 
 ```text
@@ -60,7 +70,7 @@ Post-T6 Stage-Decomposition GCR                  RESTRUCTURE NOW / OPERATOR-RATI
 Technical Realization Reconciliation Baseline   CLOSED / OPERATOR-RATIFIED / PROMOTED
 
 T8 — Technical Realization Architecture          ACTIVE
-  T8-A Technical Authority & Legacy Census       ACTIVE / CURRENT TECHNICAL CENSUS + REMEASUREMENT NEXT
+  T8-A Technical Authority & Legacy Census       ACTIVE / DISPOSITION CANDIDATE / OPERATOR RATIFICATION NEXT
   T8-B Backend Module & Package Topology         NOT OPEN
   T8-C Internal Communication Contracts          NOT OPEN
   T8-D Persistence Realization                   NOT OPEN
@@ -105,13 +115,20 @@ T10 remains mandatory for technical current→target transition
 
 Completed T7 staging was removed from the live tree. Git history is provenance.
 
-## 5. T8-A — ACTIVE
+## 5. T8-A — DISPOSITION CANDIDATE
 
-Active bootstrap:
+Active T8-A staging, read in order:
 
-`docs/superpowers/analysis/2026-08-19-r10-t8a-technical-authority-legacy-census-bootstrap.md`
+1. `docs/superpowers/analysis/2026-08-19-r10-t8a-technical-authority-legacy-census-bootstrap.md`
+2. `docs/superpowers/analysis/2026-08-19-r10-t8a-technical-census-disposition-matrix.md`
+3. `docs/superpowers/analysis/2026-08-19-r10-t8a-technical-document-authority-reconciliation.md`
+4. `docs/superpowers/analysis/2026-08-19-r10-t8a-technical-authority-legacy-disposition-candidate.md`
+5. `docs/superpowers/analysis/2026-08-19-r10-t8a-candidate-adversarial-challenge.md`
+6. `docs/superpowers/analysis/2026-08-19-r10-t8a-platform-facing-summary.md` — **operator ratification target**
 
-T8-A classifies current technical structures using:
+All are staging/non-authoritative until explicit operator ratification + durable promotion.
+
+T8-A dispositions current structures using:
 
 ```text
 PRESERVE
@@ -123,7 +140,7 @@ CURRENT-STATE ONLY
 SUPERSEDED
 ```
 
-Evidence continues to use the TRRB classes:
+Evidence continues to use:
 
 ```text
 CURRENT-PROVEN
@@ -132,33 +149,81 @@ STALE / SUPERSEDED
 UNKNOWN / REMEASURE
 ```
 
-Old Aug-09 mechanical counts are not current facts until remeasured when load-bearing.
-
-### T8-A required surfaces
+### Candidate Global Maximum
 
 ```text
-backend modules/packages/import graph/composition
-SQL/table/view/function/trigger ownership and foreign access
-OpenAPI/codegen/runtime contract mechanisms
-frontend routes/features/query/cache/state/editor/viewer boundaries
-async/jobs/rendering
-binaries/processes/deploy/config/trust/observability/recovery
-verification/tests/CI/tools/verify/architecture guards
-technical-document and ADR authority status
+CLEAN-SLATE PHYSICAL TARGET FREEDOM
++ SELECTIVE PROOF-BACKED MECHANISM REUSE
+- LEGACY SHAPE INHERITANCE
+- FULL-GREENFIELD PURITY RESET WITHOUT EVIDENCE
 ```
+
+High-confidence candidate consequences:
+
+```text
+legacy semantic package/module topology          REWRITE / REHOME
+current persistent model / table families        REWRITE; many DELETE candidates
+current tenant/GUC/RLS mesh                      REWRITE / DELETE current mechanism
+current OpenAPI surface                          REWRITE
+local-password authentication capability         DELETE / REWRITE AuthN realization
+current frontend feature/route topology          REWRITE / REHOME
+provider/storage-key semantic references         DELETE / REWRITE storage contract
+current jobs/process/provider topology            CURRENT-STATE ONLY / rederive
+non-Launch capability implementation             DELETE / DEFER absent named Launch consumer
+
+PostgreSQL product-state substrate               PRESERVE
+River durable-job mechanism                      PRESERVE
+contract-first + generated Go/TS boundaries      PRESERVE
+verification registry / local-CI SSOT model      PRESERVE
+runtime DB identity != schema/DDL owner property PRESERVE
+deterministic DB bootstrap/proof property        PRESERVE / REFINE
+```
+
+Selective reuse is allowed only if all are proven:
+
+```text
+named current R10 consumer
++ public contract free of legacy semantic authority
++ dependency direction fits target
++ proof asserts target property rather than legacy shape
++ reuse remains smaller than rewrite after transition cost
+```
+
+Exact old Aug-09 counts are remeasured only when load-bearing. Current foreign-SQL leakage is qualitatively proven; exact historical `55/12` reproduction is not required to choose the T8-A disposition strategy.
+
+### Explicitly still undecided
+
+T8-A does **not** choose:
+
+```text
+exact target Go packages/module count
+exact owner interfaces/dependency graph
+exact target tables/constraints/RLS posture
+exact OpenAPI operations/schemas
+frontend libraries/folder/query/cache realization
+interactive DOCX / renderer provider
+number of runtime processes/containers
+Redis survival
+exact deployment topology
+current→target transition sequence
+```
+
+Those belong to T8-B→T8-G/T10.
 
 ### Exact next action
 
 ```text
-fresh current technical census
-→ remeasure load-bearing legacy metrics against current source
-→ map each material structure to a ratified target property, if any
-→ preliminary PRESERVE / REFINE / REHOME / REWRITE / DELETE / CURRENT-STATE ONLY / SUPERSEDED disposition
-→ identify only material unknowns/disagreements
-→ T8-A disposition candidate + operator adjudication
+operator reviews/ratifies or rejects the T8-A platform-facing summary
+→ if ratified:
+   promote T8-A durable authority to wiki/
+   → reconcile Decision Registry
+   → repair stale technical-document / ADR routing labels
+   → remove completed T8-A staging
+   → mark T8-A CLOSED
+   → only then open T8-B Backend Module & Package Topology
 ```
 
-T8-A may classify `REWRITE` without selecting the replacement topology. Final package/database/API/frontend/runtime designs belong T8-B→T8-G.
+No T8-B design or product implementation is authorized before that gate.
 
 ## 6. Future stage boundaries
 
