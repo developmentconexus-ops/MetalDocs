@@ -1,7 +1,7 @@
 # `docs/superpowers` — Active Design Staging Only
 
 > **Status:** Active staging workspace for the MetalDocs rebaselined R10 technical design.  
-> **Current gate:** **T6 CORRECTED GLOBAL-MAXIMUM ADJUDICATION READY / OPERATOR MATERIAL ADJUDICATION NEXT; T7 NOT OPEN; IMPLEMENTATION BLOCKED.**
+> **Current gate:** **T6 FINAL GLOBAL-MAXIMUM ADJUDICATION READY / OPERATOR MATERIAL ADJUDICATION NEXT; T7 NOT OPEN; IMPLEMENTATION BLOCKED.**
 
 Durable accepted truth belongs in `wiki/`. Active not-yet-promoted design/evidence belongs here. Completed staging is removed and Git history is the archive.
 
@@ -25,9 +25,18 @@ wiki/architecture/launch-v1-product-contract.md          REV001
 - `analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-bootstrap.md` — stage scope/gate.
 - `analysis/2026-08-18-r10-t6-canonical-api-frontend-journeys-candidate.md` — material architecture candidate + alternatives.
 - `analysis/2026-08-18-r10-t6-external-evidence-docket.md` — primary/current evidence + claim boundaries.
-- `analysis/2026-08-18-r10-t6-global-maximum-adjudication-packet.md` — **CORRECTED MATERIAL DISPOSITION / OPERATOR DECISION TARGET.**
+- `analysis/2026-08-18-r10-t6-global-maximum-adjudication-packet.md` — corrected material disposition.
+- `analysis/2026-08-18-r10-t6-final-adjudication-refinements.md` — **FR-1..FR-4 FINAL PRECEDENCE / OPERATOR DECISION TARGET.**
 
-The adjudication packet refines the candidate where the evidence pass found implementation-level ambiguity. Neither is authority until ratified/promoted.
+Adjudication precedence:
+
+```text
+base candidate
+→ corrected adjudication packet
+→ final refinements FR-1..FR-4
+```
+
+None is authority until ratified/promoted.
 
 ## T6 greenfield law
 
@@ -46,11 +55,11 @@ T1→T5                       CLOSED / OPERATOR-RATIFIED
 Post-T5 Fable               CLOSED / OPERATOR-APPROVED
 Decision Registry           CURRENT / RECONCILED
 T6 evidence/candidate       STAGED
-T6 corrected adjudication  READY / OPERATOR DECISION NEXT
+T6 final adjudication       READY / OPERATOR DECISION NEXT
 T7                          NOT OPEN
 implementation              BLOCKED
 
-→ operator adjudicates T6 material slate
+→ operator adjudicates final T6 material slate
 → platform-facing T6 summary
 → explicit operator summary ratification
 → durable T6 promotion + Registry update + staging cleanup
