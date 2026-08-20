@@ -16,7 +16,7 @@ Repository: developmentconexus-ops/MetalDocs
 Branch: docs/repository-information-architecture
 PR: #132
 Fable-reviewed HEAD: 8eb2e70d11917362669f279f5183ae8366759e99
-Fable review commit / post-review HEAD: 3b8a25488e1aed5edc6c2b83d64e802b8d66c1c0
+Fable review commit: 3b8a25488e1aed5edc6c2b83d64e802b8d66c1c0
 Review target: docs/development/documentation.md
 Product implementation: not authorized
 Legacy deletion: not started
@@ -34,7 +34,7 @@ MAJOR   8
 LOW     6
 ```
 
-Fable confirmed the main structure—one `docs/` root, semantic naming/navigation, one temporary proposal + AI dialogue, one coherent PR gate, and Git/closed PRs as archive—while finding bounded defects in retention, parity proof, current agent-context preservation, and merge-ready enforcement.
+The reviewer confirmed the selected structure and found bounded defects in retention, parity proof, current agent-context preservation, and merge-ready enforcement.
 
 ## Lead adjudication
 
@@ -42,7 +42,7 @@ Fable confirmed the main structure—one `docs/` root, semantic naming/navigatio
 |---|---|---|
 | B1 machine-consumed `wiki/` subjects | ACCEPT | complete disposition; explicit machine-doc homes; gate-subject repoint-or-retire invariant |
 | B2 false-green R10 census | ACCEPT WITH STRENGTHENING | closed source→target map + filesystem census + real normative vocabulary + empty-source failure |
-| B3 Ready-state guard cannot fire | ACCEPT | `docs/work/**` Draft-only; CI must handle `ready_for_review` before using this as merge protection |
+| B3 Ready-state guard cannot fire | ACCEPT | `docs/work/**` Draft-only; CI must handle `ready_for_review` before relying on the guard |
 | M1 zero textual old-path rule | ACCEPT | repair live executable consumers only; provenance/history citations do not force churn |
 | M2 `.gitleaksignore` historical paths | ACCEPT | preserve history-pinned fingerprints while consumed by full-history scanning |
 | M3 generated report/frontmatter | ACCEPT | generator emits metadata; generated output is not hand-edited |
@@ -50,7 +50,7 @@ Fable confirmed the main structure—one `docs/` root, semantic naming/navigatio
 | M5 AGENTS/CLAUDE safety truth would vanish | ACCEPT | move repo law to `docs/development/engineering-rules.md`; current orientation to `docs/reference/current-system.md` before shrinking roots |
 | M6 local proof weaker than CI | ACCEPT | mirror `--require-infra`, lint/security, and affected non-PR governance checks |
 | M7 `authority + active` ambiguity | ACCEPT WITH SUBTRACTION | remove `status`; closed kinds = `authority | work` |
-| M8 existing docs omitted | ACCEPT | complete `git ls-files '*.md'` disposition census; undispositioned path blocks G1 |
+| M8 existing docs omitted | ACCEPT | complete tracked-doc disposition census; undispositioned path blocks G1 |
 | L1 pushed-branch rebase contradiction | ACCEPT | no force-rebase merely to refresh base |
 | L2 brittle fixed `git rm` | ACCEPT BY REMOVAL | derive deletions from census |
 | L3 ADR navigation conflict | ACCEPT | governed collection index provides reachability |
@@ -78,13 +78,7 @@ PRODUCT/R10 REOPEN                           NO
 SECOND FABLE ROUND                           NOT REQUIRED
 ```
 
-The corrected decisions are materialized in:
-
-```text
-docs/development/documentation.md
-docs/work/current/proposal.md
-docs/work/current/plan.md
-```
+The corrected decisions are materialized in `docs/development/documentation.md`, `docs/work/current/proposal.md`, and `docs/work/current/plan.md`.
 
 No legacy deletion, G1 implementation, Product/R10 authority migration, or T8-E resumption has begun.
 
