@@ -9,32 +9,32 @@ summary: Sole current MetalDocs stage, gate, and next-action authority.
 
 ```text
 REPOSITORY MODE                              CLEAN-SLATE / ARCHITECTURE-FIRST
-REPOSITORY RESET                             OPERATOR-RATIFIED / PR #134 MERGE PENDING
+REPOSITORY RESET                             MERGED / OPERATOR-RATIFIED
 PRODUCT CONTRACT                             OPERATOR-APPROVED
 WHOLE-PRODUCT ALIGNMENT / OWNERSHIP          OPERATOR-APPROVED
 T1 → T8-D                                    CLOSED / OPERATOR-RATIFIED
-T8-E EXECUTABLE WIRE CONTRACT                ACTIVE / ACCEPTED CHECKPOINT
+T8-E EXECUTABLE WIRE CONTRACT                ACTIVE / PR #135
 T8-F → T12                                   NOT OPEN — SEE decisions/stage-program.md
 IMPLEMENTATION                               BLOCKED
-LEGACY IMPLEMENTATION                        ABSENT FROM RESET TREE
+LEGACY IMPLEMENTATION                        ABSENT FROM LIVE TREE
 ```
 
 ## Current gate
 
-Finalize the ratified clean-slate repository reset, then continue T8-E in a fresh small Draft PR from updated `main`.
+T8-E — Executable Wire Contract, active in Draft PR #135 on branch `arch/t8e-executable-wire-contract`.
 
-The accepted T8-E checkpoint is durable at `docs/reference/t8e-checkpoint.md`; the current 78-operation application census is owned by `docs/decisions/api-operation-census.md`.
+The accepted T8-E baseline is preserved at `docs/reference/t8e-checkpoint.md`; active delta work is under `docs/work/current/`. The current 78-operation application census is owned by `docs/decisions/api-operation-census.md`.
 
 ## T8-E exact next action
 
 ```text
-create fresh T8-E Draft PR from updated main
-→ materialize the accepted checkpoint as the active proposal
-→ freeze the remaining 78-operation executable ledger
-→ close exact schemas / enums / nullability / success headers
+freeze the remaining 78-operation executable ledger
+→ close exact request/success schemas
+→ close required / optional / nullable fields and closed enums
+→ close success status/header matrix
 → close operation-specific RFC 9457 problem-code matrix
 → close filters / deterministic ordering / allowed_actions
-→ close request-body limits from evidence
+→ close request/body/document limits from evidence
 → prove Go + TypeScript generation/conformance feasibility
 → final subtractive/global-coherence pass
 → one final independent Fable challenge
