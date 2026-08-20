@@ -30,8 +30,12 @@
 # finding so real secrets elsewhere remain detectable.
 7220bfa57c352c658e0eeaba2553d1bb346aba46:docs/superpowers/analysis/audit-2026-08-09/pass10-api-contract.md:generic-api-key:182
 
-# Cohesive-platform design prose: "Keycloak V1, Organizations/company
-# switching not required" is a product/deployment decision, not a token or
-# credential. The generic-api-key rule classified a high-entropy prose span;
-# this exact historical fingerprint exempts only that occurrence.
+# Cohesive-platform architecture prose contained a deployment-product sentence
+# that the generic rule classified by entropy. It grants no access; exempt only
+# the exact historical instance, not the prose or documentation class.
 e1bd83ce9a0a9b70135e4bd6984d990a54ba6377:wiki/architecture/cohesive-platform-redesign.md:generic-api-key:102
+
+# The first rationale for the preceding fingerprint quoted the triggering
+# sentence verbatim, causing the allowlist comment itself to become a second
+# historical false positive. Exempt that exact committed comment instance.
+65f0012d41fc41ccbafcd4d772b82a543cfa5fc6:.gitleaksignore:generic-api-key:33
