@@ -27,16 +27,15 @@ T8-E — Executable Wire Contract, active in Draft PR #136 on branch `arch/t8e-w
 
 Accepted work through the previous four T8-E layers is preserved at `docs/reference/t8e-checkpoint.md`. The current application census is 78 operations and is owned by `docs/product/journeys.md` plus `docs/decisions/api-operation-census.md`.
 
-The active candidate now contains the closed 78-operation request/success/header/problem/filter/action ledger. Final promotion is blocked only by evidence-triggered bounded upstream reconciliation and the remaining executable/measurement proofs recorded in `docs/work/current/proposal.md`.
+The active candidate now contains the closed 78-operation request/success/header/problem/filter/action ledger. Final promotion is blocked only by two evidence-triggered bounded upstream reconciliations plus the remaining measurement/executable proofs recorded in `docs/work/current/proposal.md`.
 
 ## Exact next action
 
 ```text
-adjudicate the three bounded contradictions exposed by the executable ledger
+adjudicate the two bounded contradictions exposed by the executable ledger
 → T8-D Governance Step label + immutable label snapshot
 → T3 unreachable ProviderSubjectBinding-disabled Audit census entry
-→ T8-C direct-PUT presign seam: exact expected bytes + max guard
-→ reconcile only the implicated durable authorities after explicit operator approval
+→ reconcile only those implicated durable authorities after explicit operator approval
 → measure representative DOCX/PDF corpus and freeze raw/expanded/ZIP ceilings
 → run pinned Go + TypeScript generation/compile/type probe
 → prove exact request/response fixtures across all 78 operation rows
@@ -46,7 +45,9 @@ adjudicate the three bounded contradictions exposed by the executable ledger
 → explicit operator ratification
 ```
 
-Do not reopen the accepted T8-E checkpoint or any completed T1→T8-D decision by preference. Only the three named material contradictions above are bounded reopen candidates; Product/T6 operation census remains closed at 78.
+The direct-PUT exact-length concern does **not** require a T8-C reopen: the existing `PresignCreate(handle,maxBytes,ttl)` seam is sufficient when the T8-E consumer supplies `maxBytes=expected_size_bytes` and the provider PUT profile binds that value as exact `Content-Length`.
+
+Do not reopen the accepted T8-E checkpoint or any completed T1→T8-D decision by preference. Only the two named material contradictions above are bounded reopen candidates; Product/T6 operation census remains closed at 78.
 
 ## Remaining architecture program
 
