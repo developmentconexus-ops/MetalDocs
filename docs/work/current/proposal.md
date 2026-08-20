@@ -57,7 +57,32 @@ This is the current Global Maximum: removing a column leaves a material wire cho
 
 # 1. Wire laws
 
-## 1.1 Closed objects
+## 1.1 Application authentication boundary
+
+The `/api/v1` OpenAPI root security requirement is one cookie scheme:
+
+```yaml
+MetalDocsSession:
+  type: apiKey
+  in: cookie
+  name: __Host-metaldocs_session
+```
+
+All 78 operations require it. Browser OIDC `/auth/login` and `/auth/callback` remain outside this application SSOT. OAS security scopes are **not** used to encode MetalDocs Authorization; T3 remains the sole permission/scope authority.
+
+Session cookie attributes remain the accepted browser law:
+
+```text
+Secure
+HttpOnly
+SameSite=Lax
+Path=/
+Domain absent
+```
+
+`GET /api/v1/session` bootstraps the session-bound CSRF token. Every unsafe operation requires `X-CSRF-Token` in addition to the cookie.
+
+## 1.2 Closed objects
 
 OpenAPI 3.0.3 defaults `additionalProperties` to `true`. Every fixed MetalDocs request, response, reference, page, union branch and Problem object therefore uses:
 
@@ -69,7 +94,7 @@ The only current deliberate map is `DraftUploadAllocation.required_headers`, bec
 
 There is no generic metadata/settings/facts/property-bag map in the application contract.
 
-## 1.2 Presence and nullability
+## 1.3 Presence and nullability
 
 ```text
 required = member must be present
@@ -79,20 +104,57 @@ nullable = explicit JSON null is a semantic value
 
 OAS 3.0.3 `nullable: true` is used only for explicit null. Absence and null are not interchangeable. PATCH/PUT never acquires implicit “null means delete”. Request and response components are purpose-built rather than using `readOnly`/`writeOnly` to hide an overbroad shared DTO.
 
-The baseline nullable member remains `Page.next_cursor`. All other nullability below is explicit where needed; otherwise absence means the fact does not exist in that projection.
+The baseline nullable member remains `Page.next_cursor`. All other optional members below are absent when their semantic fact does not exist unless a component explicitly states otherwise.
 
-## 1.3 Composition
+## 1.4 Composition
 
 Do not use `allOf` inheritance merely to reduce YAML. True closed semantic unions use `oneOf` with a required discriminator; ordinary reuse nests `$ref` components. A generator limitation may change encoding only when semantic exactness remains unchanged.
 
-## 1.4 JSON vocabulary
+## 1.5 JSON vocabulary and code normalization
 
 - JSON member names: `snake_case`.
 - Semantic enums described upstream in uppercase/PascalCase normalize to lower snake case.
-- Canonical product identifiers keep their accepted spelling; T3 `PermissionCode` therefore remains dot-separated (`document.read_effective`, etc.).
+- Canonical Product identifiers keep their accepted spelling; T3 `PermissionCode` remains dot-separated (`document.read_effective`, etc.).
 - Unknown enum values are invalid; there is no `other`/future catch-all.
 
-## 1.5 Aggregate JSON request limit
+Area/DocumentType code requests use `CodeInput`:
+
+```text
+already trimmed ASCII alphanumeric
+case-insensitive input
+maxLength 32
+```
+
+Server normalization is exactly uppercase ASCII. Responses use canonical `CodeToken` (`^[A-Z0-9]+$`). `-` is forbidden inside a token because Product owns it as the numbering separator.
+
+## 1.6 Strong ETag domain law
+
+Each ETag is a strong opaque validator bound to exactly one canonical representation concurrency domain. It does not expose raw generation/version and cannot be transferred between resource/subresource domains.
+
+```text
+GET canonical representation -> only canonical source of that domain's ETag
+If-Match from another domain/resource -> syntactically valid but false -> 412
+stale same-domain tag -> 412
+missing/malformed required header -> 400
+```
+
+An ETag-protected representation may contain only:
+
+```text
+fields governed by that concurrency token
++ stable immutable identifiers/references
+```
+
+It must not embed independently mutable display enrichment that could change while the ETag remains unchanged. Therefore, for example:
+
+```text
+ResponsibleOwnerView       -> responsible_owner_user_id, not UserProfile display name
+EligibleTemplatesView      -> stable DocumentReference only, not current Revision title
+```
+
+Display-rich aggregate read models remain allowed when they are not the canonical conditional-write representation.
+
+## 1.7 Aggregate JSON request limit
 
 All `/api/v1` `application/json` request bodies have one raw-body ceiling:
 
@@ -100,41 +162,67 @@ All `/api/v1` `application/json` request bodies have one raw-body ceiling:
 65,536 bytes
 ```
 
-The eventual OAS carries one machine-readable extension on each JSON request body:
+The eventual OAS carries:
 
 ```text
 x-metaldocs-max-request-body-bytes: 65536
 ```
 
-Central request validation enforces the raw limit before JSON decoding. Request compression is not a Launch capability: a JSON request with a non-identity `Content-Encoding` is rejected as unsupported media.
+on every JSON request body. Central request handling enforces the raw limit before JSON decoding.
 
-Why one ceiling instead of many guessed limits:
+Request compression is absent from Launch. A non-identity `Content-Encoding` on a JSON request returns `415 request.unsupported_media_type`; that response includes `Accept-Encoding: identity`. A 415 caused only by media type does not include `Accept-Encoding`.
 
-- OWASP requires bounded incoming payloads/parameters for API resource-consumption safety;
-- no application JSON command carries document bytes;
-- the largest current semantic commands are bounded configuration/UUID arrays and route steps;
-- 64 KiB leaves large operational headroom while preventing an effectively unbounded parser/memory surface;
-- increasing this ceiling later does not change semantic ownership or persistence meaning.
+Why one ceiling instead of many guessed field maxima:
+
+- API resource-consumption guidance requires bounded incoming payloads;
+- document bytes never traverse an application JSON body;
+- the largest current commands are bounded configuration/UUID arrays and route steps;
+- 64 KiB supplies large operational headroom while removing an unbounded parser/memory surface;
+- raising this transport ceiling later does not change semantic ownership.
 
 Reopen trigger: a measured legitimate Launch command cannot be represented within 64 KiB.
 
-Direct document bytes are outside this JSON ceiling and remain blocked on the separate measured corpus obligation in §9.
-
-## 1.6 Query/opaque transport bounds
+## 1.8 Opaque/query bounds
 
 ```text
-SearchQuery / provider directory query  maxLength 256
-OpaqueCursor                            maxLength 2048
-CsrfToken                               maxLength 512
-ProviderSubjectRef                      maxLength 2048
-CodeToken                               maxLength 32
+SearchQuery / provider query   maxLength 256
+OpaqueCursor                   maxLength 2048
+CsrfToken                      maxLength 512
+ProviderSubjectRef             maxLength 2048
+CodeInput / CodeToken          maxLength 32
 ```
 
-`CodeToken` is uppercase ASCII alphanumeric only; `-` remains product-owned separator and is forbidden inside Area/DocumentType code tokens.
+Server-produced/user-provided UUIDs retain UUID format. Revision ordinals and byte counts use JSON integers with maximum `9007199254740991` so the generated TypeScript boundary remains exact rather than relying on unsafe IEEE-754 integers. The measured document limit will be far smaller than that generic byte-count ceiling.
 
-The 32-character code ceiling is a T8-E contract choice, not inherited implementation. It keeps human business codes bounded, permits materially longer values than current examples, and is additively reopenable if a real code vocabulary exceeds it.
+## 1.9 Document search normalization
 
-## 1.7 Exact-byte delivery
+`q` is trimmed and must be nonblank when supplied. Matching is:
+
+```text
+Document code: ASCII case-insensitive against canonical uppercase code
+Revision title: case-insensitive, accent-sensitive
+no fuzzy matching
+no stemming
+no accent folding
+```
+
+Accepted ranking remains:
+
+```text
+q present:
+exact code
+-> code prefix
+-> title prefix
+-> title contains
+-> code + document_id tie-break
+
+q absent:
+code + document_id
+```
+
+Cursor binding uses the normalized query/filter tuple and this ordering.
+
+## 1.10 Exact-byte delivery
 
 Semantic byte GETs return authenticated application-origin `200`, never provider redirect, 206, 304 or transformed content.
 
@@ -159,44 +247,49 @@ pdf  -> application/pdf
 
 `Content-Encoding` is absent. Filename is server-generated ASCII from stable Document code + Revision ordinal only; title/user/provider text never enters it. Revision ordinal display width is minimum three and expands naturally after 999.
 
-A `Range` request is unsupported at Launch and fails `400 request.invalid`; HEAD is undeclared and follows the 405 router law. Exact-byte missing/corrupt semantic content fails `500 internal.content_integrity`; temporary storage/dependency failure uses `503 dependency.unavailable`.
+A `Range` request fails `400 request.invalid`; HEAD is undeclared and follows the 405 router law. Exact-byte missing/corrupt semantic content fails `500 internal.content_integrity`; temporary storage/dependency failure uses `503 dependency.unavailable`.
 
 ---
 
-# 2. Request / success header profiles
+# 2. Header profiles
 
 ## 2.1 Request profiles
 
 ```text
 SAFE_READ
-  authenticated request; no application mutation header
+  MetalDocsSession only
 
 UNSAFE_CSRF
+  MetalDocsSession
   X-CSRF-Token required
 
 IDEMPOTENT_CREATE
+  MetalDocsSession
   X-CSRF-Token required
   Idempotency-Key required; client-generated UUID
 
 IF_MATCH_MUTATION
+  MetalDocsSession
   X-CSRF-Token required
   If-Match required
   exactly one strong entity-tag
   `*`, weak tags and lists forbidden
 
 SUBMISSION_CREATE
+  MetalDocsSession
   X-CSRF-Token required
   Idempotency-Key required; client-generated UUID
-  If-Match required for exact DRAFT generation
+  If-Match required from exact DRAFT domain
 
 PROFILE_REPLACE
+  MetalDocsSession
   X-CSRF-Token required
   existing profile -> If-Match required
   absent profile recreation -> If-None-Match exactly `*` required
   both conditional headers together -> invalid request
 ```
 
-Every unsafe `/api/v1` operation uses one unsafe profile even when bodyless. Missing/malformed required conditional or idempotency headers are `request.invalid`; a syntactically valid stale precondition is 412.
+Missing/malformed required conditional/idempotency headers are `request.invalid`; a valid stale/wrong-domain precondition is 412.
 
 ## 2.2 Success profiles
 
@@ -218,27 +311,55 @@ JSON_ETAG_MUTATION
   ETag: required resulting/current strong opaque entity-tag
   Cache-Control: no-store
 
+SESSION_END
+  Cache-Control: no-store
+  Set-Cookie clears __Host-metaldocs_session with:
+    empty value; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax; Domain absent
+
 EXACT_BYTES
-  §1.7 exact-byte header set
+  §1.10 exact-byte header set
 ```
 
 No baseline `Location`, replay-indicator, permission snapshot, provider ID, or generic metadata response header exists.
 
-Problem responses use `Content-Type: application/problem+json` and `Cache-Control: no-store`. `401` additionally requires:
+Problem responses use `Content-Type: application/problem+json` and `Cache-Control: no-store`.
 
 ```text
-WWW-Authenticate: MetalDocsSession
+401 -> WWW-Authenticate: MetalDocsSession
+405 -> exact Allow for the known path
+429 -> Retry-After MAY be present; when present it is non-negative delta-seconds
+415 due unsupported content coding -> Accept-Encoding: identity
 ```
 
-`429` requires `Retry-After` as non-negative delta-seconds. `405` requires the exact `Allow` set for that path.
+A rate limiter that cannot truthfully predict a retry time does not fabricate `Retry-After`.
 
 ---
 
 # 3. Shared component registry
 
-All objects below are closed.
+All fixed objects are closed.
 
-## 3.1 Scalars
+## 3.1 Field type convention
+
+Unless explicitly overridden:
+
+```text
+*_id                         Uuid
+*_at                         UtcInstant
+provider_subject_ref         ProviderSubjectRef
+email                        EmailAddress
+sha256                       Sha256Hex
+size_bytes / max_bytes       ByteCount
+revision ordinal             RevisionOrdinal
+Area/DocumentType response code  CodeToken
+Area/DocumentType request code   CodeInput
+Document code                DocumentCode
+name/display_name/title/label/reason/message  NonBlankString
+```
+
+These conventions are normative schema shorthand, not implementation inference.
+
+## 3.2 Scalars
 
 ```text
 Uuid
@@ -246,7 +367,7 @@ Uuid
 
 UtcInstant
   string; format=date-time
-  server serialization = RFC3339 UTC `Z`
+  canonical server serialization = RFC3339 UTC `Z`
 
 OpaqueCursor
   nonblank string; maxLength=2048
@@ -260,6 +381,9 @@ CsrfToken
 ProviderSubjectRef
   nonblank opaque string; maxLength=2048
 
+CorrelationId
+  nonblank opaque string
+
 Sha256Hex
   lowercase hex; pattern ^[0-9a-f]{64}$
 
@@ -269,33 +393,36 @@ NonBlankString
 SearchQuery
   NonBlankString; maxLength=256
 
+CodeInput
+  string; pattern ^[A-Za-z0-9]+$; maxLength=32
+
 CodeToken
-  pattern ^[A-Z0-9]+$; maxLength=32
+  string; pattern ^[A-Z0-9]+$; maxLength=32
 
 DocumentCode
-  pattern ^[A-Z0-9]+(?:-[A-Z0-9]+)?-[0-9]{3,}$
-  maximum derived from two 32-char code tokens + separators + BIGINT decimal counter = 85 chars
+  string; pattern ^[A-Z0-9]+(?:-[A-Z0-9]+)?-[0-9]{3,}$
+  maxLength=85
 
 EmailAddress
   string; format=email
 
 RevisionOrdinal
-  integer; format=int64; minimum=0
+  integer; minimum=0; maximum=9007199254740991
 
 ByteCount
-  integer; format=int64; minimum=0
+  integer; minimum=0; maximum=9007199254740991
 ```
 
-Other human text remains bounded by the 64-KiB aggregate request ceiling rather than inventing unrelated per-field maxima. A future requirement may narrow a particular semantic field without changing this law.
+Other human text is bounded by the aggregate request ceiling rather than unrelated guessed per-field maxima.
 
-## 3.2 References
+## 3.3 References
 
 ```text
 UserReference
   required: user_id
   optional: display_name
-  display_name absence = erasable UserProfile enrichment absent
-  never contains email/provider/grant data
+  display_name absent when erasable UserProfile enrichment is absent
+  never includes email/provider/grant data
 
 AreaReference
   required: area_id, code, name
@@ -318,9 +445,9 @@ ContentSummary
   required: sha256, size_bytes, content_format
 ```
 
-A Submission never reuses a live `RevisionReference` as historical title authority; it carries its own frozen `title` snapshot beside `RevisionIdentity`.
+A Submission never reuses a live `RevisionReference` as historical title authority; it carries frozen `title` beside `RevisionIdentity`.
 
-## 3.3 Closed enums
+## 3.4 Closed enums
 
 ```text
 ContentFormat
@@ -413,11 +540,9 @@ GovernanceCaseAction
   accept | return_for_changes | add_feedback
 ```
 
-`DocumentType.active` is a boolean, matching the ratified T8-D current truth; no redundant `active|inactive` wire enum is introduced.
+`DocumentType.active` is a boolean, matching T8-D. No redundant active/inactive enum is introduced. OPEN/READY/GC_PENDING upload states remain mechanism-only.
 
-No public upload lifecycle enum exists. OPEN/READY/GC_PENDING are mechanism states, not product wire state.
-
-## 3.4 True unions
+## 3.5 True unions
 
 ```text
 RoleAssignmentSubject
@@ -444,9 +569,9 @@ RepresentationPolicy
   require_official_rendition -> { kind:require_official_rendition, format:pdf }
 ```
 
-The `GovernanceRouteStep.label` field is Product-owned and currently exposes the bounded T8-D contradiction in §8. It is **not** removed to make persistence convenient.
+`GovernanceRouteStep.label` exposes the bounded T8-D contradiction in §8; it is not deleted to accommodate persistence.
 
-## 3.5 Pagination
+## 3.6 Pagination
 
 ```text
 Page
@@ -455,9 +580,9 @@ Page
   has_more: boolean
 ```
 
-Potentially unbounded lists return `{items,page}`. Query `limit` is integer `1..100`, default `20`; `cursor` is opaque. No offset, total count, generic sort, frozen snapshot, or server cursor state.
+Potentially unbounded lists return `{items,page}`. `limit` is integer `1..100`, default `20`; `cursor` is opaque. No offset, total count, generic sort, frozen snapshot, or server cursor state.
 
-Cursor integrity binds canonical operationId + normalized filters + deterministic ordering. Current Authorization is rechecked every page.
+Cursor integrity binds operationId + normalized filters + deterministic ordering. Current Authorization is rechecked on every page.
 
 ---
 
@@ -465,7 +590,7 @@ Cursor integrity binds canonical operationId + normalized filters + deterministi
 
 ## 4.1 Exact base law
 
-Every Problem variant is a full closed object, not an open base inherited with `allOf`.
+Every Problem code is its own full closed schema; there is no open base inherited with `allOf`.
 
 Common required members:
 
@@ -479,18 +604,19 @@ code
 trace_id
 ```
 
-`instance` is a fresh `urn:uuid:<uuid>` for that Problem occurrence. `trace_id` is opaque/nonblank correlation text; clients do not parse its provider format.
+`instance` is a fresh `urn:uuid:<uuid>` per occurrence. `trace_id` is opaque/nonblank correlation text; clients do not parse provider format.
 
 Only `request.invalid` and validation-family variants may contain optional non-empty `errors[]`:
 
 ```text
 ProblemError
   required: pointer, detail
-  pointer = RFC 6901 pointer rooted at /path, /query, /header, or /body
+  pointer pattern begins /path, /query, /header, or /body
+  RFC 6901 escaping applies
   rejected sensitive values are never echoed
 ```
 
-Each variant freezes `type`, `title`, `status`, and `code` using single-value enums where OAS 3.0.3 lacks `const`.
+Each variant freezes `type`, `title`, `status`, and `code` with single-value enums where OAS 3.0.3 lacks `const`.
 
 ## 4.2 Closed catalog
 
@@ -527,11 +653,21 @@ https://errors.conexus.fun/metaldocs/{code}
 
 Existing upstream exact codes are preserved: `precondition.resource_changed`, `precondition.draft_changed`, `validation.idempotency_key_reused`, `validation.content_malicious`, `dependency.malware_inspector_unavailable`, and `state.governance_step_already_decided`.
 
-No module/provider/storage/database/scanner error string escapes.
+No module/provider/storage/database/scanner error text escapes.
 
-## 4.3 Ledger shorthand — exact expansion only
+## 4.3 Disclosure law
 
-To keep the candidate ledger readable, the following are **textual exact-set macros**. They do not exist as runtime inheritance and the final OAS expands every operation to concrete Problem response variants.
+```text
+no valid ApplicationSession                         -> 401
+valid session, visible route/action but no permission/trust -> 403
+item absent OR caller may not learn item existence  -> 404
+```
+
+Collection/read-model operations may return an authorized empty result instead of manufacturing 403 when the Product lens is defined by per-item visibility. A requested management catalog mode that itself requires missing authority may return 403.
+
+## 4.4 Ledger shorthand — exact expansion only
+
+These are textual exact-set macros. The final OAS expands every operation to concrete Problem variants; there is no runtime/common-error inheritance.
 
 ```text
 B = request.invalid
@@ -556,9 +692,14 @@ D = precondition.draft_changed
 X = internal.content_integrity
 ```
 
-`ratelimit.exceeded` is allowed cross-cutting because 429 is already in the accepted T8-E baseline and resource-consumption protection is transport safety, not business authority. T8-E freezes only the response shape; any threshold/policy is not invented here.
+429 is allowed cross-cutting because it is already in the accepted T8-E baseline and resource-consumption protection is transport safety, not business authority. T8-E freezes response shape, not rate policy.
 
-`request.method_not_allowed` is router-level: an undeclared method on a declared path returns its 405 Problem + exact `Allow`; it is not attached to one of the 78 declared operations.
+Router-level laws outside the 78 operations:
+
+```text
+unknown /api/v1 path -> 404 notfound.resource
+undeclared method on known path -> 405 request.method_not_allowed + Allow
+```
 
 ---
 
@@ -573,7 +714,7 @@ SessionView
 
 ProviderSubjectOption
   required: provider_subject_ref, display_hints
-  display_hints: string[]
+  display_hints: string[]; maxItems=3; each maxLength=256
 
 ProviderSubjectSearchView
   required: items
@@ -597,14 +738,14 @@ UserProfileInput
 
 CreateUserRequest
   required: provider_subject_ref, profile
-  law: successful create establishes ENABLED User + required profile + binding atomically
+  successful create establishes ENABLED User + required profile + binding atomically
 
 CreateUserResult
   required: user_id
 
 UserView
   required: user, eligibility
-  law: aggregate read only; eligibility subresource remains canonical ETag source
+  aggregate read only; eligibility subresource remains canonical ETag source
 
 UserPage
   required: items, page
@@ -642,7 +783,8 @@ AreaPage
 
 CreateAreaRequest
   required: code, name
-  law: new Area starts `active`; creating an already-retired Area is not a Launch capability
+  code: CodeInput
+  new Area starts active; creating an already-retired Area is absent
 
 CreateAreaResult
   required: area_id
@@ -714,16 +856,18 @@ DocumentTypePage
 
 CreateDocumentTypeRequest
   required: code, name, numbering_scope, active, governance, representation
+  code: CodeInput
   governance: GovernancePolicy
   representation: RepresentationPolicy
-  law: eligible-template set starts empty
+  eligible-template set starts empty
 
 CreateDocumentTypeResult
   required: document_type_id
 
 ReplaceDocumentTypeRequest
   required: code, name, numbering_scope, active
-  code/numbering_scope change after first committed Document -> state.conflict
+  code: CodeInput
+  normalized code/numbering_scope change after first committed Document -> state.conflict
 
 DocumentTypeGovernanceView
   required: governance, representation
@@ -731,13 +875,10 @@ DocumentTypeGovernanceView
 ReplaceDocumentTypeGovernanceRequest
   required: governance, representation
 
-EligibleTemplateItem
-  required: document
-  optional: current_effective_title
-
 EligibleTemplatesView
   required: templates
-  templates ordered by document code, id
+  templates: DocumentReference[] ordered by document code, id
+  only stable references are present because this is an ETag concurrency representation
 
 ReplaceEligibleTemplatesRequest
   required: template_document_ids
@@ -745,6 +886,7 @@ ReplaceEligibleTemplatesRequest
 
 NumberingPreviewView
   required: preview_code, reservation
+  preview_code: DocumentCode
   reservation is constant false
 
 TemplateConfigurationItem
@@ -755,7 +897,7 @@ TemplateConfigurationPage
   required: items, page
 ```
 
-Creating a DocumentType carries its initial governance/representation explicitly because T8-D requires those current values and no accepted default exists. This avoids a hidden Writer-selected `NoHumanApproval`/`SourceOnly` default while retaining the independent later replacement resources/ETags.
+Creating a DocumentType carries initial governance/representation explicitly because T8-D requires those values and no accepted default exists. This avoids hidden Writer-selected `NoHumanApproval`/`SourceOnly` defaults while preserving separate later ETags.
 
 ---
 
@@ -769,16 +911,10 @@ TemplateCreationOption
   effective_revision: RevisionReference
 
 DocumentCreationOptionsView
-  required:
-    areas
-    document_types
-    templates
-    default_responsible_owner
-  optional:
-    responsible_owner_candidates
-  law:
-    absence of responsible_owner_candidates = caller lacks owner-manage selection capability
-    present empty array = capability exists but no alternate eligible target
+  required: areas, document_types, templates, default_responsible_owner
+  optional: responsible_owner_candidates
+  absence of responsible_owner_candidates = caller lacks owner-manage selection capability
+  present empty array = capability exists but no alternate eligible target
 
 CreateDocumentRequest
   required: document_type_id, area_id, title
@@ -787,7 +923,7 @@ CreateDocumentRequest
 
 CreateDocumentResult
   required: document_id, revision_id
-  deliberately excludes code/title/free text from durable replay result
+  excludes code/title/free text from replay result
 
 DocumentSummary
   required: document, document_type, area, responsible_owner, status
@@ -808,19 +944,24 @@ DocumentOfficialView
   required: document, document_type, area, responsible_owner, status
   optional: official
   official: ReleasedRevisionView
-  law:
-    official present for current/last released truth (including obsolete)
-    absent before any Release
-    an older EFFECTIVE revision keeps status effective even if a newer open revision is cancelled
 ```
 
-Library `status` query vocabulary is only `effective|obsolete|cancelled`, default `effective`. DRAFT/SUBMITTED remain Work lenses.
+Cross-field laws:
+
+```text
+official present iff at least one Release exists
+obsolete may retain the last released `official` view
+newer cancelled/open work never replaces older EFFECTIVE official truth
+pre-first-release draft/submitted/cancelled has no `official`
+```
+
+Library status query is only `effective|obsolete|cancelled`, default `effective`; DRAFT/SUBMITTED remain Work lenses.
 
 ## 6.2 Current relationships / work
 
 ```text
 ResponsibleOwnerView
-  required: document_id, responsible_owner
+  required: document_id, responsible_owner_user_id
 
 ReplaceResponsibleOwnerRequest
   required: user_id
@@ -837,11 +978,11 @@ CreateRevisionResult
 RevisionView
   required: revision, document, title, state, created_at
   optional: current_submission_id
-  current_submission_id present only while state=submitted
+  current_submission_id present iff state=submitted
 
 DocumentWorkView
   required: document, revision, title, content, updated_at
-  generation is deliberately absent: opaque strong ETag is the wire concurrency token
+  generation absent: opaque strong ETag is wire concurrency token
 
 UpdateDraftRequest
   optional: title, source_upload_id
@@ -857,27 +998,21 @@ DraftUploadAllocation
   expires_at <= allocation time + 15 minutes
 ```
 
-Upload allocation contains no provider account/bucket/key/version/ETag. `required_headers` contains only exact headers needed for provider create-only PUT.
-
-Upload completion is bodyless and returns no client-authored/returned authoritative descriptor. The server independently derives descriptor; subsequent DRAFT PATCH references only `upload_id`.
+Allocation exposes no provider account/bucket/key/version/ETag. Completion is bodyless, naturally idempotent, returns no authoritative descriptor, and server independently derives descriptor before READY.
 
 ## 6.3 Submission
 
 ```text
 SubmissionCreateResult
-  governance_pending ->
-    { state:governance_pending, submission_id, governance_attempt_id }
-  rendition_pending ->
-    { state:rendition_pending, submission_id }
-  released ->
-    { state:released, submission_id, release_id }
+  governance_pending -> { state:governance_pending, submission_id, governance_attempt_id }
+  rendition_pending -> { state:rendition_pending, submission_id }
+  released -> { state:released, submission_id, release_id }
 
 SubmissionHumanGate
   required: required, satisfied
 
 SubmissionRepresentationGate
   required: required, satisfied, attention_required
-  attention_required is only a derived terminal-renderer attention hint; never job/lifecycle state
 
 SubmissionView
   required:
@@ -897,7 +1032,21 @@ SubmissionView
     termination
 ```
 
-`title` is the immutable Submission title snapshot. No renderer/River/provider job identity or state appears.
+Cross-field laws:
+
+```text
+title = immutable Submission title snapshot
+governance_attempt_id present iff governance_mode=use_governance_route
+human_gate.required iff governance_mode=use_governance_route
+human_gate.required=false -> human_gate.satisfied=true
+representation_gate.required iff representation=require_official_rendition
+representation_gate.required=false -> representation_gate.satisfied=true
+attention_required=true only when representation required + not satisfied + terminal renderer attention exists
+release_id and termination are mutually exclusive
+release_id present only when this Submission won Release
+```
+
+No renderer/River/provider job identity/state appears.
 
 ```text
 SubmissionWithdrawalView
@@ -908,6 +1057,14 @@ RevisionCancellationRequest
 
 RevisionCancellationView
   required: revision_id, actor, reason, cancelled_at
+```
+
+Cancellation singleton law:
+
+```text
+first cancellation -> 201
+same reason exact repeat -> existing 200
+later different reason -> 409 state.conflict
 ```
 
 ## 6.4 Governance / feedback
@@ -951,13 +1108,13 @@ ObsolescenceGovernanceSubject
 GovernanceCaseView
   required: governance_attempt_id, state, subject, steps, feedback, allowed_actions
   subject: SubmissionGovernanceSubject | ObsolescenceGovernanceSubject
-  steps: ordered by ordinal
-  feedback: first page (20) in created_at ASC, feedback_id ASC
-  feedback.page.next_cursor, when present, is a continuation cursor for listGovernanceFeedback
+  steps ordered by ordinal
+  feedback = same first 20 items as listGovernanceFeedback with no cursor
+  embedded feedback.page.next_cursor, when present, is minted for listGovernanceFeedback
   allowed_actions: unique GovernanceCaseAction[]; may be empty
 ```
 
-`allowed_actions` vocabulary is exactly:
+`allowed_actions` is exactly:
 
 ```text
 accept
@@ -965,11 +1122,19 @@ return_for_changes
 add_feedback
 ```
 
-It is computed from the same current T3 decisions + Controlled Documents facts used by command authorization. Every command rechecks truth.
+It derives from canonical current T3 + Controlled Documents truth; every command rechecks truth.
+
+Governance decision singleton law:
+
+```text
+first decision -> 201
+same outcome + same required reason exact repeat -> existing 200
+any later different outcome/reason -> 409 state.governance_step_already_decided
+```
 
 ## 6.5 History / work lists
 
-`DocumentHistoryItem` is a closed union. Route `document_id` supplies stable Document context.
+Every `DocumentHistoryItem` branch has a required `kind` discriminator matching the branch:
 
 ```text
 revision_created
@@ -981,7 +1146,7 @@ submission_created
 
 governance_decision
   decision_id, governance_attempt_id, step_id, actor, outcome, occurred_at
-  optional reason only for return_for_changes
+  optional reason iff outcome=return_for_changes
 
 feedback_added
   feedback_id, governance_attempt_id, actor, message, occurred_at
@@ -1001,6 +1166,7 @@ official_rendition_completed
 
 obsolescence_requested
   request_id, target_revision_id, initiator, reason, occurred_at
+  optional governance_attempt_id
 
 obsolescence_withdrawn
   request_id, actor, occurred_at
@@ -1038,7 +1204,8 @@ No generic work/action DTO or priority/SLA/ranking is invented.
 ReleaseView
   source_only ->
     { release_id, document, revision, title, submission_id, released_at,
-      optional predecessor_revision_id, representation:{kind:source_only, source:ContentSummary} }
+      optional predecessor_revision_id,
+      representation:{kind:source_only, source:ContentSummary} }
 
   official_rendition ->
     { release_id, document, revision, title, submission_id, released_at,
@@ -1052,11 +1219,31 @@ ObsolescenceRequestCreateRequest
 ObsolescenceCreateResult
   governance_pending -> { state:governance_pending, request_id, governance_attempt_id }
   obsolete -> { state:obsolete, request_id }
+```
 
-ObsolescenceRequestView
-  required: request_id, document, target_revision, initiator, reason, state, requested_at
-  optional: ended_at, governance_attempt_id
+`ObsolescenceRequestView` is a state-discriminated union:
 
+```text
+active
+  required: request_id, document, target_revision, initiator, reason,
+            state=active, requested_at, governance_attempt_id
+  ended_at absent
+
+returned
+  same core fields + state=returned + governance_attempt_id + ended_at
+
+withdrawn
+  same core fields + state=withdrawn + governance_attempt_id + ended_at
+
+completed-human
+  same core fields + state=completed + governance_attempt_id + ended_at
+
+completed-no-human
+  same core fields + state=completed + ended_at
+  governance_attempt_id absent
+```
+
+```text
 ObsolescenceWithdrawalView
   required: request_id, actor, withdrawn_at
 ```
@@ -1084,7 +1271,6 @@ AuditResourceKind
   user_profile
   area
   group
-  group_membership
   role_assignment
   document_type
   document
@@ -1095,6 +1281,8 @@ AuditResourceKind
   release
   obsolescence_request
 ```
+
+There is intentionally no `group_membership` resource kind because T8-D GroupMembership has composite `(group_id,user_id)` identity and no invented UUID. Membership events use stable Group resource identity and typed membership facts.
 
 `AuditOperationCode` is the closed T3 census projection:
 
@@ -1141,7 +1329,7 @@ obsolescence.completed
 
 ## 7.2 Typed public facts
 
-Audit does not expose its JSONB storage shape as an open object. Public facts are a closed union:
+Audit storage may retain additional bounded owner-authored facts permitted by T3. The Launch wire projects only the typed facts required by current Audit inspection; it never exposes raw JSONB.
 
 ```text
 none
@@ -1165,19 +1353,48 @@ revision_evidence
   { kind:revision_evidence, document_id, revision_id, evidence_id }
 ```
 
-Audit event variants constrain `operation_code` to the matching facts family; invalid code/facts combinations are not schema-valid. Config/user/group/provider events whose resource identity + operation code are sufficient use `none`; Audit never copies free-form governed reasons/content/PII into the wire merely because storage has bounded facts.
+Exact operation -> resource/facts mapping:
 
 ```text
-AuditEventView
-  required: event_id, occurred_at, actor, operation_code,
-            resource_kind, resource_id, visibility, facts
+provider_binding.*                         -> provider_binding / none
+user.*                                     -> user / none
+user_profile.erased                        -> user_profile (resource_id=user_id) / none
+area.*                                     -> area / none
+group.created|renamed|deleted              -> group / none
+group_membership.added|removed             -> group (resource_id=group_id) / group_membership
+role_assignment.granted|revoked            -> role_assignment / role_assignment
+document_type.*                            -> document_type / none
+document_governance.changed                -> document_type / none
+template_eligibility.changed               -> document_type / none
+document.responsible_owner_changed         -> document / none
+document.template_role_changed             -> document / none
+document.created                           -> document / none
+revision.created                            -> revision / none
+submission.created|withdrawn               -> submission / none
+governance.accepted|returned_for_changes   -> governance_decision / governance_decision
+official_rendition.completed               -> official_rendition / none
+release.completed                           -> release / release
+revision.cancelled                          -> revision / revision_evidence
+obsolescence.*                              -> obsolescence_request / revision_evidence
+```
 
+`AuditEventView` is a closed union whose operation-code branch fixes the matching resource/facts family above:
+
+```text
+required: event_id, occurred_at, actor, operation_code,
+          resource_kind, resource_id, visibility, facts
+optional: correlation_id
+```
+
+`correlation_id` is non-semantic correlation metadata only.
+
+```text
 AuditEventPage
   required: items, page
   order: occurred_at DESC, event_id DESC
 ```
 
-No Audit filter is added by inference. Launch `GET /audit/events` accepts only cursor/limit; current `audit.read` scope filtering occurs before pagination per T3/T8-C. A named auditor filter requirement can be added later without a new owner or route family.
+No Audit filter is added by inference. `GET /audit/events` accepts only cursor/limit; `audit.read` historical visibility filtering happens before pagination.
 
 ---
 
@@ -1185,7 +1402,7 @@ No Audit filter is added by inference. Launch `GET /audit/events` accepts only c
 
 ## 8.1 Evidence
 
-Product Contract/T6 makes Governance Route Step a product concept with human-facing labels such as:
+Product Contract/T6 makes Governance Route Step a human-facing product concept with labels such as:
 
 ```text
 Revisão técnica
@@ -1193,7 +1410,7 @@ Gestor
 Qualidade
 ```
 
-The executable wire therefore correctly needs `GovernanceRouteStep.label`, and Governance Case must preserve the exact frozen label shown for each Step.
+The executable wire therefore needs `GovernanceRouteStep.label`, and Governance Case must preserve the exact frozen label shown for each Step.
 
 Ratified T8-D currently persists current route steps as:
 
@@ -1216,17 +1433,15 @@ state
 activated_at
 ```
 
-Neither shape preserves the product Step label. Deriving a historical case from the **current** DocumentType label would allow a later configuration rename to rewrite the label of an earlier frozen GovernanceAttempt.
-
-That contradicts the already-ratified rule that each attempt freezes one coherent route snapshot.
+Neither preserves the Product Step label. Deriving a historical case from the current DocumentType label would let a later config rename rewrite an earlier frozen GovernanceAttempt, contradicting the ratified coherent-route snapshot law.
 
 ## 8.2 Method classification
 
 ```text
-KNOWN          Product requires human-facing Step label meaning
+KNOWN          Product requires Step label meaning
 KNOWN          GovernanceAttempt freezes route snapshot
 KNOWN          T8-D current + snapshot persistence omit label
-MATERIAL       yes: historical governed context + persistent meaning
+MATERIAL       historical governed context + persistent meaning
 CAUSE          bounded T8-D completeness omission exposed by executable wire
 NOT A REASON   preference, legacy shape, generator convenience
 OUTCOME        STOP / SPLIT PREREQUISITE for label-dependent promotion only
@@ -1234,9 +1449,9 @@ OUTCOME        STOP / SPLIT PREREQUISITE for label-dependent promotion only
 
 Unrelated T8-E closure continues.
 
-## 8.3 Smallest correction if operator ratifies the bounded reopen
+## 8.3 Smallest correction if operator ratifies bounded reopen
 
-Exactly two persistence additions; no new table/owner/lifecycle/API operation:
+Exactly two persistence additions; zero new tables/owners/lifecycles/API operations:
 
 ```text
 controlled_docs.document_type_governance_steps
@@ -1246,46 +1461,62 @@ controlled_docs.governance_attempt_steps
   + label_snapshot TEXT NOT NULL
 ```
 
-Attempt creation copies the exact current configured label into `label_snapshot` in the same coherent route-snapshot transition. Frozen snapshot label is immutable thereafter.
+Attempt creation copies the exact configured label into `label_snapshot` in the coherent route-snapshot transition. Frozen snapshot label is immutable.
 
-No candidate-user list, Role semantics, generic workflow metadata, localization framework, or versioned Policy aggregate is added.
+No candidate list, Role semantics, workflow metadata, localization framework, or PolicyVersion aggregate is added.
 
-T8-E may specify the intended wire now, but **T8-E cannot be ratified/promoted until this contradiction is explicitly adjudicated and the affected T8-D authority is reconciled**.
+T8-E may specify the intended wire, but cannot be ratified/promoted until this contradiction is explicitly adjudicated and T8-D is reconciled.
 
 ---
 
-# 9. Document admission limits — measured evidence prerequisite
+# 9. Limits still requiring evidence
+
+## 9.1 Idempotency replay snapshot — CLOSED
+
+The 10 accepted Idempotency-Key POSTs now have an exact success census. Their durable replay bodies contain only UUIDs plus small closed state enums.
+
+Current largest compact JSON success body is under 160 bytes; no replay result contains UserProfile PII, title, reason, feedback, provider data, or arbitrary text.
+
+Freeze:
+
+```text
+ReplaySnapshot payload maximum = 2,048 bytes
+```
+
+This leaves >10x current body headroom for a small versioned self-contained status/body encoding without making replay storage an open blob. If a future material wire change needs more, that change already reopens the affected contract.
+
+## 9.2 Document admission — OPEN / measured prerequisite
 
 Do not guess raw DOCX/PDF ceilings from internet defaults.
 
-Before T8-E close, measure a representative MetalDocs/controlled-document corpus and tooling behavior, then freeze:
+Before T8-E close, measure a representative controlled-document corpus and tooling behavior, then freeze:
 
 ```text
 maximum raw document bytes
 maximum structurally expanded DOCX bytes
 maximum ZIP entry count
-maximum ZIP nesting/depth if the chosen structural parser follows nested archives
+maximum ZIP nesting/depth if parser follows nested archives
 ```
 
-Security evidence already establishes the direction: uploads must have size limits, actual content type/signature must be validated, archive expansion must be bounded, and ZIP/XML bomb behavior must fail closed. It does **not** establish MetalDocs' correct business ceiling.
+Security evidence establishes that upload size and archive expansion must be bounded; it does **not** establish MetalDocs' correct business ceiling.
 
-The current repository authority pack contains no named representative binary corpus. Therefore these numbers remain **Unknown**, and `DraftUploadAllocation.max_bytes` remains unresolved until the measurement evidence exists.
+The current repository authority pack contains no named representative binary corpus. Therefore these numbers remain **Unknown**, and `DraftUploadAllocation.max_bytes` remains unresolved until measurement evidence exists.
 
-Multipart upload remains absent unless the measured accepted raw size proves a real need.
+Multipart upload remains absent unless measured accepted size proves a real need.
 
 ---
 
 # 10. 78-operation executable ledger
 
+`JSON` means 64-KiB application/json body + `J`. `PAGED` means only `cursor`,`limit` unless stated.
+
 ## 10.1 Session / Organization / Authorization / Document Governance — 1→43
 
-`JSON` in Request means 64-KiB JSON body + `J` problem additions. `PAGED` means only `cursor`,`limit` unless stated.
-
-| # | operationId | Method + path | Request/profile | Success | Headers | Query/order | Problems |
+|#|operationId|Method + path|Request/profile|Success|Headers|Query/order|Problems|
 |---:|---|---|---|---|---|---|---|
 |1|`getSession`|`GET /api/v1/session`|`SAFE_READ`|`200 SessionView`|`JSON_NO_STORE`|none|`B`|
-|2|`endSession`|`DELETE /api/v1/session`|no body / `UNSAFE_CSRF`|`204`|`NO_STORE`|none|`C`|
-|3|`searchProviderSubjects`|`GET /api/v1/authentication/provider-subjects`|`SAFE_READ`|`200 ProviderSubjectSearchView`|`JSON_NO_STORE`|required `query`; provider order|`A`|
+|2|`endSession`|`DELETE /api/v1/session`|no body / `UNSAFE_CSRF`|`204`|`SESSION_END`|none|`C`|
+|3|`searchProviderSubjects`|`GET /api/v1/authentication/provider-subjects`|`SAFE_READ`|`200 ProviderSubjectSearchView`|`JSON_NO_STORE`|required query; provider order|`A`|
 |4|`getCompany`|`GET /api/v1/company`|`SAFE_READ`|`200 CompanyView`|`JSON_ETAG`|none|`A`|
 |5|`replaceCompany`|`PUT /api/v1/company`|`ReplaceCompanyRequest` JSON / `IF_MATCH_MUTATION`|`200 CompanyView`|`JSON_ETAG_MUTATION`|none|`U + J + P`|
 |6|`listUsers`|`GET /api/v1/users`|`SAFE_READ`|`200 UserPage`|`JSON_NO_STORE`|`PAGED`; user_id ASC|`A`|
@@ -1298,7 +1529,7 @@ Multipart upload remains absent unless the measured accepted raw size proves a r
 |13|`replaceUserProviderBinding`|`PUT /api/v1/users/{user_id}/provider-binding`|`ReplaceUserProviderBindingRequest` JSON / `IF_MATCH_MUTATION`|`200 UserProviderBindingView`|`JSON_ETAG_MUTATION`|none|`U + J + N + P + S`|
 |14|`getUserEligibility`|`GET /api/v1/users/{user_id}/eligibility`|`SAFE_READ`|`200 UserEligibilityView`|`JSON_ETAG`|none|`A + N`|
 |15|`replaceUserEligibility`|`PUT /api/v1/users/{user_id}/eligibility`|`ReplaceUserEligibilityRequest` JSON / `IF_MATCH_MUTATION`|`200 UserEligibilityView`, including exact no-op|`JSON_ETAG_MUTATION`|none|`U + J + N + P`|
-|16|`listAreas`|`GET /api/v1/areas`|`SAFE_READ`|`200 AreaPage`|`JSON_NO_STORE`|`PAGED`; code ASC, area_id ASC|`A`|
+|16|`listAreas`|`GET /api/v1/areas`|`SAFE_READ`|`200 AreaPage`|`JSON_NO_STORE`|`PAGED`; code ASC,area_id ASC|`A`|
 |17|`createArea`|`POST /api/v1/areas`|`CreateAreaRequest` JSON / `IDEMPOTENT_CREATE`|`201 CreateAreaResult`|`JSON_NO_STORE`|none|`U + J + I + S`|
 |18|`getArea`|`GET /api/v1/areas/{area_id}`|`SAFE_READ`|`200 AreaView`|`JSON_ETAG`|none|`A + N`|
 |19|`replaceArea`|`PUT /api/v1/areas/{area_id}`|`ReplaceAreaRequest` JSON / `IF_MATCH_MUTATION`|`200 AreaView`|`JSON_ETAG_MUTATION`|none|`U + J + N + P`|
@@ -1310,19 +1541,19 @@ Multipart upload remains absent unless the measured accepted raw size proves a r
 |25|`replaceGroup`|`PUT /api/v1/groups/{group_id}`|`ReplaceGroupRequest` JSON / `IF_MATCH_MUTATION`|`200 GroupView`|`JSON_ETAG_MUTATION`|none|`U + J + N + P`|
 |26|`deleteGroup`|`DELETE /api/v1/groups/{group_id}`|no body / `UNSAFE_CSRF`|`204`, including absent repeat|`NO_STORE`|none|`U + S`|
 |27|`listGroupMembers`|`GET /api/v1/groups/{group_id}/members`|`SAFE_READ`|`200 GroupMemberPage`|`JSON_NO_STORE`|`PAGED`; user_id ASC|`A + N`|
-|28|`addGroupMember`|`PUT /api/v1/groups/{group_id}/members/{user_id}`|no body / `UNSAFE_CSRF`|`201` first creation; `204` exact repeat|`NO_STORE`|none|`U + N + S`|
+|28|`addGroupMember`|`PUT /api/v1/groups/{group_id}/members/{user_id}`|no body / `UNSAFE_CSRF`|`201` first; `204` exact repeat|`NO_STORE`|none|`U + N + S`|
 |29|`removeGroupMember`|`DELETE /api/v1/groups/{group_id}/members/{user_id}`|no body / `UNSAFE_CSRF`|`204`, including absent repeat|`NO_STORE`|none|`U`|
-|30|`listRoles`|`GET /api/v1/roles`|`SAFE_READ`|`200 RoleListView`|`JSON_NO_STORE`|fixed T3 role order; not paged|`A`|
+|30|`listRoles`|`GET /api/v1/roles`|`SAFE_READ`|`200 RoleListView`|`JSON_NO_STORE`|fixed T3 role order|`A`|
 |31|`listRoleAssignments`|`GET /api/v1/role-assignments`|`SAFE_READ`|`200 RoleAssignmentPage`|`JSON_NO_STORE`|`PAGED`; assignment_id ASC|`A`|
 |32|`createRoleAssignment`|`POST /api/v1/role-assignments`|`CreateRoleAssignmentRequest` JSON / `IDEMPOTENT_CREATE`|`201 CreateRoleAssignmentResult`|`JSON_NO_STORE`|none|`U + J + I + S`|
 |33|`deleteRoleAssignment`|`DELETE /api/v1/role-assignments/{assignment_id}`|no body / `UNSAFE_CSRF`|`204`, including absent repeat|`NO_STORE`|none|`U`|
-|34|`listDocumentTypes`|`GET /api/v1/document-types`|`SAFE_READ`|`200 DocumentTypePage`|`JSON_NO_STORE`|`PAGED`; code ASC, id ASC|`A`|
+|34|`listDocumentTypes`|`GET /api/v1/document-types`|`SAFE_READ`|`200 DocumentTypePage`|`JSON_NO_STORE`|`PAGED`; document_type_id ASC|`A`|
 |35|`createDocumentType`|`POST /api/v1/document-types`|`CreateDocumentTypeRequest` JSON / `IDEMPOTENT_CREATE`|`201 CreateDocumentTypeResult`|`JSON_NO_STORE`|none|`U + J + I + S`|
 |36|`getDocumentType`|`GET /api/v1/document-types/{document_type_id}`|`SAFE_READ`|`200 DocumentTypeView`|`JSON_ETAG`|none|`A + N`|
 |37|`replaceDocumentType`|`PUT /api/v1/document-types/{document_type_id}`|`ReplaceDocumentTypeRequest` JSON / `IF_MATCH_MUTATION`|`200 DocumentTypeView`|`JSON_ETAG_MUTATION`|none|`U + J + N + P + S`|
 |38|`getDocumentTypeGovernance`|`GET /api/v1/document-types/{document_type_id}/governance`|`SAFE_READ`|`200 DocumentTypeGovernanceView`|`JSON_ETAG`|none|`A + N`|
 |39|`replaceDocumentTypeGovernance`|`PUT /api/v1/document-types/{document_type_id}/governance`|`ReplaceDocumentTypeGovernanceRequest` JSON / `IF_MATCH_MUTATION`|`200 DocumentTypeGovernanceView`|`JSON_ETAG_MUTATION`|none|`U + J + N + P + S`|
-|40|`getDocumentTypeEligibleTemplates`|`GET /api/v1/document-types/{document_type_id}/eligible-templates`|`SAFE_READ`|`200 EligibleTemplatesView`|`JSON_ETAG`|code ASC,id ASC|`A + N`|
+|40|`getDocumentTypeEligibleTemplates`|`GET /api/v1/document-types/{document_type_id}/eligible-templates`|`SAFE_READ`|`200 EligibleTemplatesView`|`JSON_ETAG`|document.code ASC,id ASC|`A + N`|
 |41|`replaceDocumentTypeEligibleTemplates`|`PUT /api/v1/document-types/{document_type_id}/eligible-templates`|`ReplaceEligibleTemplatesRequest` JSON / `IF_MATCH_MUTATION`|`200 EligibleTemplatesView`|`JSON_ETAG_MUTATION`|none|`U + J + N + P + S`|
 |42|`getDocumentTypeNumberingPreview`|`GET /api/v1/document-types/{document_type_id}/numbering-preview`|`SAFE_READ`|`200 NumberingPreviewView`|`JSON_NO_STORE`|optional area_id|`A + N + validation.failed`|
 |43|`listTemplateConfigurations`|`GET /api/v1/document-governance/templates`|`SAFE_READ`|`200 TemplateConfigurationPage`|`JSON_NO_STORE`|`PAGED`; document.code ASC,id ASC|`A`|
@@ -1331,10 +1562,10 @@ Rows 35/38/39 are wire-defined but promotion-blocked by §8 until Step labels be
 
 ## 10.2 Controlled Documents / Work — 44→77
 
-| # | operationId | Method + path | Request/profile | Success | Headers | Query/order | Problems |
+|#|operationId|Method + path|Request/profile|Success|Headers|Query/order|Problems|
 |---:|---|---|---|---|---|---|---|
-|44|`getDocumentCreationOptions`|`GET /api/v1/document-creation/options`|`SAFE_READ`|`200 DocumentCreationOptionsView`|`JSON_NO_STORE`|optional area_id,document_type_id; arrays code/id, candidates user_id|`A + validation.failed`|
-|45|`listDocuments`|`GET /api/v1/documents`|`SAFE_READ`|`200 DocumentPage`|`JSON_NO_STORE`|q,document_type_id,area_id,responsible_owner_user_id,status,cursor,limit; accepted T6 ranking|`B + permission.denied` only when requested catalog mode itself is forbidden|
+|44|`getDocumentCreationOptions`|`GET /api/v1/document-creation/options`|`SAFE_READ`|`200 DocumentCreationOptionsView`|`JSON_NO_STORE`|optional area_id,document_type_id; arrays code/id,candidates user_id|`A + validation.failed`|
+|45|`listDocuments`|`GET /api/v1/documents`|`SAFE_READ`|`200 DocumentPage`|`JSON_NO_STORE`|q,document_type_id,area_id,responsible_owner_user_id,status,cursor,limit; §1.9 ranking|`A`|
 |46|`createDocument`|`POST /api/v1/documents`|`CreateDocumentRequest` JSON / `IDEMPOTENT_CREATE`|`201 CreateDocumentResult`|`JSON_NO_STORE`|none|`U + J + I + S`|
 |47|`getDocument`|`GET /api/v1/documents/{document_id}`|`SAFE_READ`|`200 DocumentOfficialView`|`JSON_NO_STORE`|none|`B + N`|
 |48|`getDocumentResponsibleOwner`|`GET /api/v1/documents/{document_id}/responsible-owner`|`SAFE_READ`|`200 ResponsibleOwnerView`|`JSON_ETAG`|none|`A + N`|
@@ -1368,11 +1599,11 @@ Rows 35/38/39 are wire-defined but promotion-blocked by §8 until Step labels be
 |76|`getObsolescenceRequest`|`GET /api/v1/obsolescence-requests/{request_id}`|`SAFE_READ`|`200 ObsolescenceRequestView`|`JSON_NO_STORE`|none|`A + N`|
 |77|`withdrawObsolescenceRequest`|`PUT /api/v1/obsolescence-requests/{request_id}/withdrawal`|no body / `UNSAFE_CSRF`|`201 ObsolescenceWithdrawalView` first; `200` exact repeat|`JSON_NO_STORE`|none|`U + N + S`|
 
-Row 67's label-dependent Step projection is promotion-blocked by §8. No other Controlled Documents operation requires the bounded T8-D correction.
+Row 67's label-dependent Step projection is promotion-blocked by §8. No other Controlled Documents operation requires that correction.
 
 ## 10.3 Audit — 78
 
-| # | operationId | Method + path | Request/profile | Success | Headers | Query/order | Problems |
+|#|operationId|Method + path|Request/profile|Success|Headers|Query/order|Problems|
 |---:|---|---|---|---|---|---|---|
 |78|`listAuditEvents`|`GET /api/v1/audit/events`|`SAFE_READ`|`200 AuditEventPage`|`JSON_NO_STORE`|`PAGED`; occurred_at DESC,event_id DESC|`A`|
 
@@ -1392,16 +1623,16 @@ TOTAL                               78
 
 # 11. Generation feasibility
 
-Feasibility needs concrete probe generators, not a generic “OpenAPI can generate types” claim.
-
-Current probe pair:
+Reproducible probe versions as of 2026-08-20:
 
 ```text
-Go          oapi-codegen strict-server generation
-TypeScript  openapi-typescript paths/components generation
+Go generator     oapi-codegen v2.8.0, strict-server
+TS generator     openapi-typescript 7.13.0, paths/components only
 ```
 
-Why this is the smallest evidence-backed pair:
+These pins are **probe evidence**, not implementation dependency authorization.
+
+Why this is the smallest pair:
 
 ```text
 oapi-codegen
@@ -1409,17 +1640,15 @@ oapi-codegen
   typed closed response-object sets
   oneOf/discriminator support
   customizable strict ResponseErrorHandlerFunc
-  does not pretend strict generation itself validates incoming requests
+  strict generation does not pretend to validate incoming requests
 
 openapi-typescript
-  directly generates the requested paths/components boundary
+  directly generates requested paths/components boundary
   no generated runtime SDK requirement
   preserves required/optional/nullable distinctions
-  supports oneOf-oriented discriminated modeling
+  supports oneOf-oriented modeling
   benefits from explicit additionalProperties closure
 ```
-
-A larger generated SDK/runtime is not selected merely because it also emits types.
 
 Executable disposable probe must prove:
 
@@ -1427,62 +1656,62 @@ Executable disposable probe must prove:
 1. additionalProperties:false does not generate arbitrary object bags
 2. required/optional/nullable remain distinguishable in Go + TS
 3. every enum remains finite
-4. RoleAssignment/Governance/Representation/Submission/Audit unions avoid any/untyped escape
-5. multiple declared success statuses generate a closed response set
-6. per-operation Problem variants require no default response
-7. strict-server unexpected errors route through canonical RFC9457 500 serializer
-8. central OpenAPI request validation is a separate demonstrated control
-9. 64-KiB OAS extension is enforced by the central request boundary
-10. unknown JSON/query members and undeclared request bodies are rejected
-11. one Go wire package + one TS paths/components boundary remain the only generated authorities
-12. no generator/provider field leaks into public contract
+4. unions avoid any/untyped escape
+5. JS-visible integers remain within the safe integer contract
+6. multiple success statuses generate a closed response set
+7. per-operation Problem variants require no default response
+8. strict-server unexpected errors route through canonical RFC9457 500 serializer
+9. central request validation is a separate demonstrated control
+10. 64-KiB OAS extension is enforced at request boundary
+11. unknown JSON/query members and undeclared request bodies are rejected
+12. one Go wire package + one TS paths/components boundary remain sole generated authorities
+13. no generator/provider field enters public contract
 ```
 
-Failure of a generator may adjust schema encoding only; it cannot widen Product semantics or add operation 79.
-
-The probe is architectural/tooling evidence, not Product implementation.
+The oapi-codegen tool's own current Go build requirement does not freeze the MetalDocs runtime Go version; generated-code compatibility is part of the probe.
 
 ---
 
 # 12. Runtime contract-conformance proof
 
-Freeze the proof obligation, not runtime realization:
-
 ```text
 request:
 raw HTTP
-→ raw request/body/header limit checks
-→ central OpenAPI request validation
-→ generated typed request boundary
-→ application semantic handler
+-> session/trust + raw request limits
+-> central OpenAPI request validation
+-> generated typed request boundary
+-> semantic handler
 
 response:
 semantic result
-→ generated typed response boundary
-→ HTTP
-→ contract test validates exact status + headers + body + Problem variant
+-> generated typed response boundary
+-> HTTP
+-> contract test validates exact status + headers + body + Problem variant
 ```
 
 Required negative proof classes:
 
 ```text
+missing/invalid session -> 401 Problem + challenge
+logout clears the exact __Host cookie
 undeclared JSON member rejected
 undeclared query member rejected
-body supplied to bodyless operation rejected
-JSON > 65,536 bytes rejected with 413
-compressed JSON request rejected
+body on bodyless operation rejected
+JSON >65,536 bytes -> 413
+compressed JSON -> 415 + Accept-Encoding identity
 missing/malformed CSRF, Idempotency-Key, If-Match rejected
 weak/list/wildcard If-Match rejected
+wrong-domain/stale ETag returns exact 412 code
 PROFILE_REPLACE rejects missing conditional and both conditionals together
-stale valid ETag returns the exact 412 code
-undeclared enum value rejected
-invalid oneOf branch/field combination rejected
+undeclared enum/invalid oneOf rejected
+ETag-protected response cannot change through an independently mutable embedded label
 success cannot omit required member/header
 operation cannot emit undeclared Problem.code
-router unknown method returns closed 405 + Allow
+router unknown path/method returns closed 404/405 behavior
 pagination cursor is operation/filter/order bound
-exact-byte Range fails 400 and response cannot become redirect/206/304/compressed/provider URL
-Content-Digest bytes equal SHA-256 of exact response body
+ReplaySnapshot fixture remains <=2,048 bytes
+exact-byte Range ->400 and response cannot become redirect/206/304/compressed/provider URL
+Content-Digest equals SHA-256 of exact body
 ```
 
 No generic production response-buffer validator is added. Generated typed output + contract tests remain the accepted minimum.
@@ -1491,41 +1720,45 @@ No generic production response-buffer validator is added. Generated typed output
 
 # 13. Structural Inversion / subtractive checkpoint
 
-Current candidate survives the first Lead pass:
+Current candidate survives the Lead pass with the corrections above:
 
 ```text
-if legacy API shape were the opposite:
+if legacy API shape were opposite:
   78 semantic operations still follow Product/T6
   ETag/idempotency/CSRF/pagination still follow accepted invariants
   exact-content wire still follows T4
-  component-registry + operation-ledger shape still closes Writer decisions
-
-removed/not introduced:
-  universal response envelope
-  generic action endpoint
-  generic filter/sort DSL
-  generic metadata/facts bag
-  provider/job state
-  persisted permission snapshot
-  editable role/policy engine
-  separate Approval API
-  multipart upload without measured need
-  Range/HEAD/304 baseline
-  arbitrary Problem extensions/default response
-  dormant future capability
+  component-registry + operation-ledger still closes Writer decisions
 ```
 
-The one newly exposed structural defect is **not** a T8-E abstraction problem; it is the bounded T8-D Step-label omission in §8.
+Removed/not introduced:
+
+```text
+universal response envelope
+generic action endpoint
+generic filter/sort DSL
+generic public JSON facts bag
+provider/job state
+persisted permission snapshot
+editable role/policy engine
+separate Approval API
+multipart without measured need
+Range/HEAD/304 baseline
+arbitrary Problem extensions/default response
+generator-specific product fields
+dormant future capability
+```
+
+The one material structural defect exposed is the bounded T8-D Step-label omission in §8, not a reason to redesign lifecycle or governance.
 
 ---
 
 # 14. Remaining closure prerequisites
 
 ```text
-A. operator adjudication of the bounded T8-D Step-label contradiction
-B. representative DOCX/PDF corpus measurement and exact raw/expanded/ZIP limits
-C. disposable oapi-codegen + openapi-typescript generation/compile/type probe
-D. exact contract fixtures proving the 78-row Problem/status/header matrix
+A. operator adjudication of bounded T8-D Step-label contradiction
+B. representative DOCX/PDF corpus measurement + raw/expanded/ZIP limits
+C. disposable pinned oapi-codegen + openapi-typescript generation/compile/type probe
+D. exact contract fixtures proving 78-row status/header/Problem matrix
 E. final whole-candidate Structural Inversion / YAGNI / overengineering / global-coherence pass
 F. isolated final Fable branch only after A→E converge
 G. Lead adjudication + explicit operator ratification
