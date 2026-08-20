@@ -5,7 +5,7 @@
 > **Repository:** `developmentconexus-ops/MetalDocs`  
 > **Branch / PR:** `docs/a8-authz-approval-redesign-ledger` / PR #131  
 > **Product authority:** Product Contract REV001  
-> **Program authority:** `wiki/architecture/r10-post-t6-implementation-readiness-program.md`  
+> **Program authority:** `docs/decisions/stage-program.md`  
 > **Ratified platform-summary snapshot:** Git blob `9ae3cce4b25d6824a45bbb4872d21e558f6c6763`  
 > **Supporting candidate snapshot:** Git blob `cfda127151d55c2de28737fc4e692d1b5bf603fa`  
 > **Implementation:** BLOCKED
