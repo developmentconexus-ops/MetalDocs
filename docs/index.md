@@ -11,7 +11,7 @@ Start here after `AGENTS.md`, then read `roadmap.md`, then only the owning docum
 
 | Task / intention | Start with | Do not read by default |
 |---|---|---|
-| Current stage, gate, implementation permission, next action | [Roadmap](roadmap.md) | Git history, closed PRs, old implementation |
+| Program progression / implementation permission / next action | [Roadmap](roadmap.md) | Git history, closed PRs, old implementation |
 | Product scope and concepts | [Product contract](product/contract.md) | Technical realization docs |
 | Whole-product alignment / ownership | [Product alignment](product/alignment.md) + [Ownership](architecture/ownership.md) | Historical review artifacts |
 | User journeys / application API meaning | [Product journeys](product/journeys.md) + [API operation census](decisions/api-operation-census.md) | Removed OpenAPI/generated code |
@@ -25,7 +25,8 @@ Start here after `AGENTS.md`, then read `roadmap.md`, then only the owning docum
 | Internal owner contracts | [Interfaces](architecture/interfaces.md) | Foreign-SQL legacy evidence unless named |
 | Persistence realization | [Persistence](architecture/persistence.md) | Old migrations/schema |
 | Transition / migration posture | [Transition](architecture/transition.md) | Old cutover plans |
-| Current decisions / forward obligations | [Decision register](decisions/index.md) | Review chronology |
+| Current decision dispositions | [Decision register](decisions/index.md) | Review chronology |
+| Preserved / reopen / deferred obligations | [Forward obligations](decisions/forward-obligations.md) | Old decision-registry corpus |
 | Repository reset / provenance | [Repository reset](decisions/repository-reset.md) | Unmerged branches unless exact provenance is required |
 | Documentation governance | [Documentation rules](development/documentation.md) | Product architecture |
 | Repository-local engineering / CI / Git | [Engineering rules](development/engineering-rules.md) | Global Method text duplicated locally |
