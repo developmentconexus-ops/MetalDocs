@@ -2,7 +2,7 @@
 id: engineering-rules
 kind: authority
 owner: engineering
-summary: Defines repository-local engineering, Git, review, and proof rules that remain valid during the clean-slate rebuild.
+summary: Defines repository-local engineering, Git, review, decision-consumption, and proof rules for the clean-slate rebuild.
 ---
 
 # Engineering rules
@@ -32,6 +32,18 @@ prepare the seam, not dormant implementation
 - do not resurrect old implementation for convenience;
 - do not prebuild future capabilities.
 
+## Decision consumption
+
+Before a remaining T-stage, read its current owning authorities plus `docs/decisions/forward-obligations.md`.
+
+```text
+PRESERVE → baseline evidence unless materially disproved
+REOPEN   → owning stage must decide deliberately
+DEFERRED → preserve seam/counterexample; create no dormant implementation
+```
+
+Current semantic authorities outrank older forward-obligation wording. When a stage closes a forward obligation, update the durable obligation page rather than creating an amendment chain.
+
 ## Evidence and reuse
 
 Historical code may be inspected only for a concrete technical question. A removed unit is reusable only when all are true:
@@ -48,16 +60,33 @@ Use one coherent ratifiable gate per branch/PR. Architecture/governance PRs rema
 
 Final architecture review uses one temporary `docs/work/current/ai-dialog.md`. Fable challenges; Lead adjudicates; operator ratifies. Reviewer output never becomes authority by itself.
 
-## Git
+Repository rules currently require:
+
+```text
+status context: required
+ruleset id: 20560142
+all review conversations resolved before merge
+```
+
+Renaming/removing the `required` job without updating the repository ruleset would silently un-gate `main` and is prohibited.
+
+## Git and provenance
 
 - no direct commits to `main`;
 - no force-push/rewrite of shared history;
 - prefer squash merge for architecture/governance gates;
-- do not create live-tree archive branches/directories as a substitute for Git history;
-- destructive cleanup is allowed only when the replacement truth or deliberate absence is explicit.
+- do not create live-tree archive/tombstone directories;
+- destructive cleanup is allowed only when replacement truth or deliberate absence is explicit;
+- an unmerged authority branch that is the only reachable provenance ref MUST remain reachable until an equivalent immutable archival ref/tag exists.
+
+Current protected provenance refs for the reset are recorded in `docs/status.md` and `docs/decisions/repository-reset.md`.
+
+## Verification
+
+The repository is intentionally architecture-first while implementation is blocked. The current CI must prove the **allowed tree shape**, not enumerate known legacy names.
+
+A failing legacy check is not a reason to restore legacy machinery. First ask whether the check protects a current target property. If not, retire it; if yes, replace it with the smallest check that proves that property.
 
 ## Closure
 
-Do not claim `done`, `green`, or `merged` without revalidating the current remote HEAD and required checks.
-
-A failing legacy check is not automatically a reason to restore legacy machinery. First ask whether the check protects a current target property. If not, retire it; if yes, replace it with the smallest check that proves that property.
+Do not claim `done`, `green`, or `merged` without revalidating current remote HEAD, required status, unresolved review threads, and the final changed-file/tree shape.
