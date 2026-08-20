@@ -7,7 +7,7 @@ summary: Defines MetalDocs documentation placement, naming, lifecycle, agent rou
 
 # Documentation and agent-context governance
 
-> Operator-ratified candidate authority. It becomes current only after temporary-work cleanup, required checks, and merge of PR #132.
+> Operator-ratified target governance authority. It governs the G1 target and transition constraints; existing documentation-placement and routing rules remain operative until G1 atomically supersedes them.
 
 ## Purpose
 
@@ -246,7 +246,7 @@ Product/R10 consolidation uses both structural mapping and normative-content che
 
 Required proof:
 
-1. A closed source manifest from the immutable PR #131 authority HEAD maps every accepted source authority to one or more target authorities.
+1. A closed, final source-to-target map from the immutable PR #131 authority HEAD maps every accepted source authority to one or more target authorities.
 2. The source census is read with a filesystem-capable command (`grep`, `rg`, or equivalent), not `git grep` against ignored temporary files.
 3. The normative vocabulary census covers the repository's actual terms, including at least `MUST`, `SHOULD`, `MAY`, `SHALL`, `REQUIRE`, `FORBID`, `PROHIBIT`, `NEVER`, `ALWAYS`, `ONLY`, `SELECT`, `REJECT`, `BLOCKED`, and `CLOSED` where used normatively.
 4. An empty source census is failure, never parity.
@@ -291,7 +291,7 @@ A consolidation is complete only when:
 
 ## Transitional state
 
-PR #132 defines this profile but does not yet reorganize the existing tree. Until G1 merges, existing `AGENTS.md`, `wiki/`, current verification subjects, and current runtime documentation remain operative evidence/safety rails. G1 is the named successor gate that atomically rehomes current truth, repairs consumers, activates the new navigation/verifier, and removes legacy roots.
+PR #132 ratifies this target profile but does not make it the operative documentation-placement authority for the pre-G1 tree. Until G1 merges, existing `AGENTS.md`, `wiki/`, current verification subjects, and current runtime documentation remain operative evidence and safety rails. This page governs the G1 target and its transition constraints. G1 is the named successor gate that atomically rehomes current truth, repairs consumers, activates the new navigation/verifier, supersedes the old placement rules, and removes legacy roots.
 
 No Writer may apply the final-root deletion rules before the G1 parity and gate-subject proofs are satisfied.
 
