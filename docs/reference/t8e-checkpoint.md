@@ -1,13 +1,15 @@
 ---
 id: t8e-executable-wire-contract
-kind: work
+kind: checkpoint
 owner: architecture
-summary: Active non-authoritative T8-E proposal checkpoint for the exact OpenAPI 3.0.3 application wire contract.
+summary: Durable paused checkpoint preserving the accepted T8-E executable-wire design until active work resumes.
 ---
 
-# T8-E executable wire contract
+# T8-E executable wire contract checkpoint
 
-> Active work. Implementation remains blocked.
+> **PAUSED ACCEPTED CHECKPOINT.** Non-authoritative until the final T8-E candidate is ratified. Implementation remains blocked.
+
+Current operation-census authority: `../decisions/api-operation-census.md` — **78 operations**.
 
 ## Question
 
@@ -29,14 +31,7 @@ generated typed output path + contract-test response validation
 no generic production response-buffer validation baseline
 ```
 
-The original T6 census contained 76 operations. A bounded precision amendment adds:
-
-```text
-GET /api/v1/users/{user_id}/profile         getUserProfile
-GET /api/v1/areas/{area_id}/lifecycle       getAreaLifecycle
-```
-
-Current census: **78 operations**.
+The bounded read-symmetry precision adding `getUserProfile` and `getAreaLifecycle` is now durably owned by `../decisions/api-operation-census.md`; T8-E consumes that 78-operation census and does not invent another route family.
 
 ## Approved layer 2 — concurrency, idempotency, CSRF, pagination
 
@@ -213,3 +208,7 @@ Freeze the remaining executable ledger for all 78 operations:
 10. final subtractive/global-coherence pass.
 
 Then run one final independent Fable challenge and obtain explicit operator ratification before opening T8-F.
+
+## Resume law
+
+When the repository reset is merged, copy this checkpoint into a fresh `docs/work/current/proposal.md` for active T8-E work. This checkpoint remains durable provenance until T8-E is ratified; it is never edited as if it were active work.
