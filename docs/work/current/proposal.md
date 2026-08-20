@@ -190,24 +190,32 @@ fresh T8-E executable API-contract PR
 
 G0/G1 do not authorize product implementation or Product/R10 semantic changes.
 
-## Corrections accepted from independent review
+## Independent review adjudication
 
-The Fable review at PR #132 HEAD `3b8a25488e1aed5edc6c2b83d64e802b8d66c1c0` identified three blockers and bounded majors. Lead accepts the defect class and selected corrections:
+Fable reviewed the original G0 profile at commit `3b8a25488e1aed5edc6c2b83d64e802b8d66c1c0` and returned:
+
+```text
+APPROVE REPOSITORY DOCUMENTATION PROFILE WITH MATERIAL FIXES
+BLOCKER 3 / MAJOR 8 / LOW 6
+```
+
+Lead accepted the defect classes and selected the bounded corrections now reflected in this proposal, the durable candidate, and the execution plan:
 
 - complete disposition replaces hand-written allowlists;
 - gate-subject preservation is a hard invariant;
-- executable consumers are repaired, provenance citations are not churned;
+- executable consumers are repaired while provenance citations are not churned;
 - history-pinned secret-scan allowlists may retain deleted paths;
 - generated durable docs get generator-owned frontmatter;
 - repository safety law and current-system orientation receive durable homes before AGENTS/CLAUDE shrink;
 - local proof mirrors actual CI, including `--require-infra`, lint, and affected non-PR governance checks;
 - `ready_for_review` must trigger the temporary-work guard;
-- G0/G1 provenance is recorded before temporary review files are deleted;
+- G0/G1 provenance is retained before temporary work is deleted;
 - ADR/reference collections may be indexed collections instead of one nav row per member;
-- no unrelated `.claude` permission cleanup is part of this gate.
+- no unrelated `.claude` permission cleanup is part of this gate;
+- metadata is reduced to `id`, `kind`, `owner`, `summary`, with `kind = authority | work`.
 
-No Product/R10 or one-docs-root reopen is required.
+No Product/R10 or one-docs-root reopen is required. No second Fable round is required because no material contradiction survives adjudication.
 
-## Open gate
+## Current gate
 
-No legacy deletion starts in PR #132. After Lead adjudication is recorded, the operator decides whether to ratify this corrected profile. Only after ratification and the S0 prerequisite is green may G0 be cleaned for merge and G1 begin from updated `main`.
+No legacy deletion starts in PR #132. Explicit operator ratification of the corrected G0 profile is next. Only after ratification and a green S0 prerequisite may G0 be cleaned for merge and G1 begin from updated `main`.
