@@ -397,7 +397,6 @@ Area references:
 ```text
 Company-scoped document.create
 → current ACTIVE Areas eligible for creation
-
 Area-scoped document.create
 → only matching current ACTIVE Areas
 ```
@@ -1302,6 +1301,17 @@ Frontend feature folders do not mirror Go package names by default.
 
 Minor path spelling/operationId normalization during OpenAPI authoring is allowed only when semantic meaning is unchanged. New product route families require a named Product Contract journey or explicit T6 reopen.
 
+A bounded read-symmetry precision accepted during T8-E analysis on 2026-08-20 is durably recorded in `docs/decisions/api-operation-census.md` and adds exactly these two reads to the original 76-operation census:
+
+```text
+GET /api/v1/users/{user_id}/profile       getUserProfile
+GET /api/v1/areas/{area_id}/lifecycle     getAreaLifecycle
+```
+
+These reads expose the canonical current representations already mutated by the existing profile/lifecycle surfaces so clients can obtain strong ETags without deriving or guessing state. This precision introduces no new semantic owner, capability, or route family.
+
+**Current closed application census: 78 operations.** Operation 79 requires a new material Product/T6 reopen; it cannot be inferred from this precision.
+
 Session/AuthN support:
 
 ```text
@@ -1318,6 +1328,7 @@ PUT    /api/v1/company
 GET    /api/v1/users
 POST   /api/v1/users
 GET    /api/v1/users/{user_id}
+GET    /api/v1/users/{user_id}/profile
 PUT    /api/v1/users/{user_id}/profile
 DELETE /api/v1/users/{user_id}/profile
 GET    /api/v1/users/{user_id}/provider-binding
@@ -1328,6 +1339,7 @@ GET    /api/v1/areas
 POST   /api/v1/areas
 GET    /api/v1/areas/{area_id}
 PUT    /api/v1/areas/{area_id}
+GET    /api/v1/areas/{area_id}/lifecycle
 PUT    /api/v1/areas/{area_id}/lifecycle
 GET    /api/v1/groups
 POST   /api/v1/groups
