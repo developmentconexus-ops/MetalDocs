@@ -10,7 +10,7 @@
 # api/jobs/worker with GO_VERSION threaded from go.mod through the compose
 # build stanza (planned A7.4/A7.5) deletes this restatement outright; that
 # consolidation is deliberately out of scope here.
-FROM golang:1.26.5-alpine AS builder
+FROM golang:1.26.7-alpine AS builder
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
